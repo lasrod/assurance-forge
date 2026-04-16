@@ -1,0 +1,42 @@
+# Build directories
+build/
+out/
+cmake-build-*/
+
+# IDE
+.vs/
+.vscode/
+.claude/
+*.user
+*.suo
+*.sln
+*.vcxproj*
+
+# Compiled binaries
+*.exe
+*.dll
+*.lib
+*.pdb
+*.obj
+*.o
+*.a
+
+# CMake generated
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# FetchContent downloads
+_deps/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+
+# ImGui state
+imgui.ini

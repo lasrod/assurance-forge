@@ -1,0 +1,108 @@
+#include "parser/xml_parser.h"
+#include <pugixml.hpp>
+
+namespace parser {
+
+namespace {
+
+void extract_elements_recursive(pugi::xml_node node, std::vector<SacmElement>& elements) {
+    for (pugi::xml_node child : node.children()) {
+        std::string node_name = child.name();
+
+        // Skip text nodes and processing instructions
+        if (node_name.empty()) {
+            continue;
+        }
+
+        // Check if this is an element we care about
+        bool is_relevant =
+            node_name == "claim" ||
+            node_name == "argumentReasoning" ||
+            node_name == "artifact" ||
+            node_name == "artifactReference" ||
+            node_name == "expression" ||
+            node_name == "assertedInference" ||
+            node_name == "assertedContext" ||
+            node_name == "assertedEvidence";
+
+        if (is_relevant) {
+            SacmElement elem;
+            elem.id = child.attribute("id").as_string();
+            elem.name = child.attribute("name").as_string();
+            elem.type = node_name;
+            elem.content = child.attribute("content").as_string();
+
+            // For expression elements, content is in 'value' attribute
+            if (node_name == "expression") {
+                elem.content = child.attribute("value").as_string();
+            }
+
+            // Get description from child element or attribute
+            pugi::xml_node desc_node = child.child("description");
+            if (desc_node) {
+                elem.description = desc_node.text().as_string();
+            } else {
+                elem.description = child.attribute("description").as_string();
+            }
+
+            elements.push_back(elem);
+        }
+
+        // Recurse into child nodes
+        extract_elements_recursive(child, elements);
+    }
+}
+
+ParseResult parse_document(pugi::xml_document& doc) {
+    ParseResult result;
+
+    // Find the root AssuranceCasePackage element
+    pugi::xml_node root = doc.child("sacm:AssuranceCasePackage");
+    if (!root) {
+        result.success = false;
+        result.error_message = "Root element 'sacm:AssuranceCasePackage' not found";
+        return result;
+    }
+
+    result.assurance_case.id = root.attribute("id").as_string();
+    result.assurance_case.name = root.attribute("name").as_string();
+    result.assurance_case.description = root.attribute("description").as_string();
+
+    // Extract all relevant elements recursively
+    extract_elements_recursive(root, result.assurance_case.elements);
+
+    result.success = true;
+    return result;
+}
+
+}  // namespace
+
+ParseResult parse_sacm_xml(const std::string& file_path) {
+    ParseResult result;
+    pugi::xml_document doc;
+    pugi::xml_parse_result parse_result = doc.load_file(file_path.c_str());
+
+    if (!parse_result) {
+        result.success = false;
+        result.error_message = "XML parse error: " + std::string(parse_result.description());
+        return result;
+    }
+
+    return parse_document(doc);
+}
+
+ParseResult parse_sacm_xml_string(const std::string& xml_content) {
+    ParseResult result;
+    pugi::xml_document doc;
+    pugi::xml_parse_result parse_result = doc.load_string(xml_content.c_str());
+
+    if (!parse_result) {
+        result.success = false;
+        result.error_message = "XML parse error: " + std::string(parse_result.description());
+        return result;
+    }
+
+    return parse_document(doc);
+}
+
+}  // namespace parser
