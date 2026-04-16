@@ -5,9 +5,9 @@ A minimal ImGui application with SACM (Structured Assurance Case Metamodel) XML 
 ## Requirements
 
 - Windows 10/11
-- Visual Studio 2022 Build Tools or Community
-- CMake 3.20+
-- Git (for submodules)
+- [Visual Studio 2022 Build Tools](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022) (select "Desktop development with C++")
+- [CMake 3.20+](https://cmake.org/download/)
+- [Git](https://git-scm.com/download/win)
 
 ## Project Structure
 
@@ -15,7 +15,7 @@ A minimal ImGui application with SACM (Structured Assurance Case Metamodel) XML 
 imgui-starter/
 ├── CMakeLists.txt          # Build configuration
 ├── data/                   # Sample data files
-│   └── open-autonomy-safety-case.sacm.xml
+│   └── sample.sacm.xml
 ├── external/               # Third-party dependencies (git submodules)
 │   ├── imgui/              # Dear ImGui
 │   └── pugixml/            # XML parser
