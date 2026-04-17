@@ -111,6 +111,6 @@ https://github.com/EdgeCaseResearch/oasc
 
 ## Dependencies
 
-- [Dear ImGui](https://github.com/ocornut/imgui) - Immediate mode GUI
-- [pugixml](https://github.com/zeux/pugixml) - XML parser
-- [GoogleTest](https://github.com/google/googletest) - Testing framework (fetched via CMake)
+- [Dear ImGui](https://github.com/ocornut/imgui) - Immediate mode GUI (MIT License)
+- [pugixml](https://github.com/zeux/pugixml) - XML parser (MIT License)
+- [GoogleTest](https://github.com/google/googletest) - Testing framework, fetched via CMake (BSD-3-Clause)
