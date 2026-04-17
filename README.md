@@ -5,9 +5,10 @@ A minimal ImGui application with SACM (Structured Assurance Case Metamodel) XML 
 ## Requirements
 
 - Windows 10/11
-- [Visual Studio 2022 Build Tools](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022) (select "Desktop development with C++")
-- [CMake 3.20+](https://cmake.org/download/)
+- [Visual Studio 2022 Build Tools](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022) (select "Desktop development with C++", includes CMake)
 - [Git](https://git-scm.com/download/win)
+
+Tested with Visual Studio 2022 (v18), CMake 4.2.3, Git 2.53.
 
 ## Project Structure
 
