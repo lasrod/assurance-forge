@@ -1,4 +1,4 @@
-// ImGui Starter - Win32 + DirectX11 Application
+// Assurance Forge - Win32 + DirectX11 Application
 // Minimal ImGui window with SACM XML parsing capability
 
 #include "imgui.h"
@@ -39,13 +39,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         nullptr,
         nullptr,
         nullptr,
-        L"ImGuiStarterClass",
+        L"AssuranceForgeClass",
         nullptr
     };
     RegisterClassExW(&wc);
     HWND hwnd = CreateWindowW(
         wc.lpszClassName,
-        L"ImGui Starter - SACM Viewer",
+        L"Assurance Forge",
         WS_OVERLAPPEDWINDOW,
         100, 100, 1280, 720,
         nullptr, nullptr, wc.hInstance, nullptr
