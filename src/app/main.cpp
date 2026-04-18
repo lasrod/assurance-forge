@@ -8,6 +8,7 @@
 #include <tchar.h>
 
 #include "ui/gsn_canvas.h"
+#include "ui/gsn_adapter.h"
 
 #include "core/app_state.h"
 
@@ -142,6 +143,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         // Display loaded data
         if (app_state.loaded_case.has_value()) {
             const auto& ac = app_state.loaded_case.value();
+
+            // Push parsed elements into the GSN canvas renderer
+            ui::SetCanvasElements(ui::ConvertFromAssuranceCase(ac));
 
             ImGui::Text("Assurance Case: %s", ac.name.c_str());
             ImGui::TextWrapped("Description: %s", ac.description.c_str());

@@ -29,6 +29,9 @@ add_executable(assurance-forge WIN32
     src/app/main.cpp
     src/parser/xml_parser.cpp
     src/ui/gsn_canvas.cpp
+    src/ui/gsn_layout.cpp
+    src/ui/gsn_canvas_renderer.cpp
+    src/ui/gsn_adapter.cpp
     src/core/app_state.cpp
 )
 target_include_directories(assurance-forge PRIVATE src)

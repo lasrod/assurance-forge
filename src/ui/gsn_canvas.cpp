@@ -1,8 +1,15 @@
 #include "ui/gsn_canvas.h"
+#include "ui/gsn_canvas_renderer.h"
 
 #include <iostream>
 
 namespace ui {
+
+// Single shared renderer instance used by the compatibility wrapper.
+static GsnCanvas& GlobalRenderer() {
+    static GsnCanvas instance;
+    return instance;
+}
 
 static ImU32 ColorForType(const std::string& type) {
     if (type == "Claim") return IM_COL32(100, 220, 100, 255);
@@ -51,22 +58,22 @@ void ShowGsnCanvasWindow() {
     if (ImGui::Begin("GSN Canvas", nullptr, window_flags)) {
         // Reserve a canvas area
         ImVec2 canvas_size = ImGui::GetContentRegionAvail();
-        ImGui::Text("GSN Canvas (hardcoded demo)");
+        ImGui::Text("GSN Canvas");
         ImGui::Separator();
 
         // Start a child region so cursor screen pos is stable
         ImGui::BeginChild("gsn_canvas_child", ImVec2(0, 0), false, ImGuiWindowFlags_NoMove);
 
-        // Hardcoded nodes
-        GsnNode claim{ "G1", "Claim", ImVec2(50, 20), ImVec2(180, 80), "Claim: Top Goal" };
-        GsnNode evidence{ "E1", "Evidence", ImVec2(300, 160), ImVec2(160, 60), "Evidence: Test Report" };
-
-        DrawGsnNode(claim);
-        DrawGsnNode(evidence);
+        // Use a single shared renderer instance
+        GlobalRenderer().Render();
 
         ImGui::EndChild();
     }
     ImGui::End();
+}
+
+void SetCanvasElements(const std::vector<CanvasElement>& elements) {
+    GlobalRenderer().SetElements(elements);
 }
 
 } // namespace ui
