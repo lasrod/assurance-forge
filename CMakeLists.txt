@@ -1,5 +1,5 @@
 ﻿cmake_minimum_required(VERSION 3.20)
-project(imgui-starter LANGUAGES CXX)
+project(assurance-forge LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -25,13 +25,13 @@ target_link_libraries(imgui PUBLIC d3d11 d3dcompiler dxgi)
 add_subdirectory(external/pugixml)
 
 # --- Main application ---
-add_executable(imgui_starter WIN32
+add_executable(assurance-forge WIN32
     src/app/main.cpp
     src/parser/xml_parser.cpp
     src/core/app_state.cpp
 )
-target_include_directories(imgui_starter PRIVATE src)
-target_link_libraries(imgui_starter PRIVATE imgui pugixml)
+target_include_directories(assurance-forge PRIVATE src)
+target_link_libraries(assurance-forge PRIVATE imgui pugixml)
 
 # --- Tests ---
 include(FetchContent)

@@ -1,6 +1,6 @@
-# ImGui Starter - SACM Viewer
+# Assurance Forge - Safety Case engineering tool
 
-A minimal ImGui application with SACM (Structured Assurance Case Metamodel) XML parsing capability.
+Assurance Forge is an application that assist Safety Engineers with Safety Case development. The tool uses SACM (Structured Assurance Case Metamodel).
 
 ## Requirements
 
@@ -9,29 +9,6 @@ A minimal ImGui application with SACM (Structured Assurance Case Metamodel) XML 
 - [Git](https://git-scm.com/download/win)
 
 Tested with Visual Studio 2022 (v18), CMake 4.2.3, Git 2.53.
-
-## Project Structure
-
-```
-imgui-starter/
-├── CMakeLists.txt          # Build configuration
-├── data/                   # Sample data files
-│   └── sample.sacm.xml
-├── external/               # Third-party dependencies (git submodules)
-│   ├── imgui/              # Dear ImGui
-│   └── pugixml/            # XML parser
-├── src/
-│   ├── app/                # Application entry point
-│   │   └── main.cpp
-│   ├── core/               # Application state management
-│   │   ├── app_state.h
-│   │   └── app_state.cpp
-│   └── parser/             # XML parsing
-│       ├── xml_parser.h
-│       └── xml_parser.cpp
-└── tests/                  # GoogleTest unit tests
-    └── test_xml_parser.cpp
-```
 
 ## Build Instructions
 
@@ -49,7 +26,7 @@ Or in cmd:
 
 ```bash
 git clone <repository-url>
-cd imgui-starter
+cd assurance-forge
 git submodule update --init --recursive
 ```
 
@@ -63,7 +40,7 @@ cmake --build build --config Release
 ### 4. Run the Application
 
 ```bash
-build\Release\imgui_starter.exe
+build\Release\assurance-forge.exe
 ```
 
 ### 5. Run Tests
