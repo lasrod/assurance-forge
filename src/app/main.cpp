@@ -7,6 +7,8 @@
 #include <d3d11.h>
 #include <tchar.h>
 
+#include "ui/gsn_canvas.h"
+
 #include "core/app_state.h"
 
 // DirectX 11 globals
@@ -67,6 +69,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    // Docking requires a docking-enabled Dear ImGui build. If you update
+    // the bundled ImGui to a version with docking support, re-enable
+    // the following line:
+    // io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
@@ -96,6 +102,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
+
+        // GSN Canvas demo window (isolated drawing logic)
+        ui::ShowGsnCanvasWindow();
 
         // Main window
         ImGui::SetNextWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
