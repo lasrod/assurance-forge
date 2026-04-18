@@ -1,7 +1,56 @@
-# Assurance Forge - Safety Case engineering tool
+# Assurance Forge - Safety Case Engineering Tool
 
-Assurance Forge is an application that assist Safety Engineers with Safety Case development. The tool uses SACM (Structured Assurance Case Metamodel).
+Assurance Forge is an application that assists Safety Engineers with Safety Case development.
+The tool uses SACM (Structured Assurance Case Metamodel).
 
+---
+
+## ✨ Vision
+
+Assurance Forge aims to modernize safety case development by:
+
+- Making safety cases easier to understand and navigate
+- Ensuring credibility through SACM compliance
+- Enabling AI-assisted improvement of assurance arguments using the SCCG (Safety Case Core Guidelines)
+- Removing the burden of diagram maintenance through automatic layout
+- Fully open source
+
+---
+
+## 🧭 Core Principles
+
+### Model-driven, not drawing-driven
+Users work with assurance content, not diagram layout.
+
+- SACM XML is the source of truth
+- Layout is automatically generated
+- No manual positioning of nodes
+
+### SACM-first approach
+- The tool consumes and produces SACM 2.3 XML
+- Internal structures closely follow SACM concepts
+
+### AI as optional assistance
+- Users provide their own AI provider
+- No vendor lock-in
+
+---
+
+## 🚀 Current Scope (MVP)
+
+- Load SACM XML files
+- Visualize assurance cases in a GSN-like structure
+- Automatic layout of assurance elements
+- Inspect nodes and relationships
+- AI-based suggestions (planned)
+
+---
+
+## 🗺️ Roadmap
+
+See docs/ROADMAP.md
+
+---
 ## Requirements
 
 - Windows 10/11
