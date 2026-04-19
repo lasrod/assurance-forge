@@ -34,6 +34,8 @@ struct TreeNode {
 
     // Layout scratch fields (filled by layout engine)
     int subtree_width = 1;
+    int left_overhang = 0;   // extra columns Group2 extends beyond left edge
+    int right_overhang = 0;  // extra columns Group2 extends beyond right edge
 };
 
 class AssuranceTree {

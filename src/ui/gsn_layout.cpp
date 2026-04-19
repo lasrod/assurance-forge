@@ -29,18 +29,46 @@ static ElementRole to_ui_role(core::NodeRole r) {
     }
 }
 
-// ===== Step 1: Compute subtree widths bottom-up =====
-static int compute_subtree_width(core::TreeNode* node) {
-    if (node->group1_children.empty()) {
-        node->subtree_width = 1;
-        return 1;
-    }
-    int total = 0;
+// ===== Step 1: Compute subtree widths and Group2 overhang bottom-up =====
+static void compute_subtree_info(core::TreeNode* node) {
+    // Recurse into Group1 children first
     for (auto* child : node->group1_children) {
-        total += compute_subtree_width(child);
+        compute_subtree_info(child);
     }
-    node->subtree_width = total;
-    return total;
+
+    // Compute base width from Group1 children, adding gaps between adjacent
+    // siblings to prevent their Group2 attachments from overlapping.
+    auto& children = node->group1_children;
+    if (children.empty()) {
+        node->subtree_width = 1;
+    } else {
+        int total = 0;
+        for (int i = 0; i < (int)children.size(); i++) {
+            total += children[i]->subtree_width;
+            if (i > 0) {
+                total += children[i - 1]->right_overhang
+                       + children[i]->left_overhang;
+            }
+        }
+        node->subtree_width = total;
+    }
+
+    // Determine whether this node has Group2 attachments on each side
+    int n_att = (int)node->group2_attachments.size();
+    bool has_left_g2  = (n_att > 0);                // first attachment goes left
+    bool has_right_g2 = (n_att >= 2);               // second+ goes right
+
+    // Own overhang: if the subtree is too narrow (< 2 columns) the Group2
+    // node at column ± 1 extends beyond the subtree boundary.
+    int own_left  = (has_left_g2  && node->subtree_width < 2) ? 1 : 0;
+    int own_right = (has_right_g2 && node->subtree_width < 2) ? 1 : 0;
+
+    // Propagate overhang from the leftmost / rightmost child
+    int child_left  = children.empty() ? 0 : children.front()->left_overhang;
+    int child_right = children.empty() ? 0 : children.back()->right_overhang;
+
+    node->left_overhang  = std::max(own_left,  child_left);
+    node->right_overhang = std::max(own_right, child_right);
 }
 
 // ===== Group 2 side distribution (spec §10.2.1) =====
@@ -111,19 +139,28 @@ static void layout_recursive(
     if (children.size() == 1) {
         layout_recursive(children[0], column, row + 1, placements, row_max_stack);
     } else {
-        // Distribute children using subtree widths
+        // Distribute children using subtree widths, adding gaps between
+        // adjacent siblings to prevent Group2 attachment overlap.
         float total_width = 0.0f;
-        for (auto* c : children) {
-            total_width += (float)c->subtree_width;
+        for (int i = 0; i < (int)children.size(); i++) {
+            total_width += (float)children[i]->subtree_width;
+            if (i > 0) {
+                total_width += (float)(children[i - 1]->right_overhang
+                                     + children[i]->left_overhang);
+            }
         }
 
         // Place children so their subtree spans tile next to each other,
         // centered under the parent
         float cursor = column - total_width / 2.0f;
-        for (auto* c : children) {
-            float child_col = cursor + (float)c->subtree_width / 2.0f;
-            layout_recursive(c, child_col, row + 1, placements, row_max_stack);
-            cursor += (float)c->subtree_width;
+        for (int i = 0; i < (int)children.size(); i++) {
+            if (i > 0) {
+                cursor += (float)(children[i - 1]->right_overhang
+                                + children[i]->left_overhang);
+            }
+            float child_col = cursor + (float)children[i]->subtree_width / 2.0f;
+            layout_recursive(children[i], child_col, row + 1, placements, row_max_stack);
+            cursor += (float)children[i]->subtree_width;
         }
     }
 }
@@ -133,10 +170,10 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
     std::vector<LayoutNode> result;
     if (!tree.root) return result;
 
-    // Step 1: Compute subtree widths
-    compute_subtree_width(tree.root);
+    // Step 1: Compute subtree widths and Group2 overhang
+    compute_subtree_info(tree.root);
     for (auto* orphan : tree.orphans) {
-        compute_subtree_width(orphan);
+        compute_subtree_info(orphan);
     }
 
     // Step 2: Layout from root
