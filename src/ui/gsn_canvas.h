@@ -21,7 +21,8 @@ extern ImFont* g_BoldFont;
 
 // Draw a single GSN node (rectangle + label) and handle clicks.
 // canvas_origin is the fixed screen-space origin of the canvas.
-void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin);
+// zoom scales all positions and sizes (default 1.0 = no zoom).
+void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin, float zoom = 1.0f);
 
 // Backwards-compatible function used by `main.cpp`.
 // Internally uses the new `GsnCanvas` renderer.

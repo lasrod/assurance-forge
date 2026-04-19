@@ -22,6 +22,11 @@ static constexpr int   kBezierSamples       = 64;     // arc-length sample count
 static const ImU32 kGroup1EdgeColor = IM_COL32(180, 180, 180, 255);
 static const ImU32 kGroup2EdgeColor = IM_COL32(120, 120, 200, 200);
 
+// ===== Zoom constants =====
+static constexpr float kZoomMin      = 0.25f;  // minimum zoom level (25%)
+static constexpr float kZoomMax      = 3.0f;   // maximum zoom level (300%)
+static constexpr float kZoomStep     = 0.1f;   // zoom increment per step (10%)
+
 // ===== Arrowhead helpers =====
 
 // Compute the two base corners of an arrowhead triangle given its tip,
@@ -145,93 +150,116 @@ void GsnCanvas::SetElements(const std::vector<CanvasElement>& elements) {
     layout_nodes_ = le.ComputeLayout(elements_);
 }
 
+void GsnCanvas::ZoomIn() {
+    zoom_level_ = std::min(zoom_level_ + kZoomStep, kZoomMax);
+}
+
+void GsnCanvas::ZoomOut() {
+    zoom_level_ = std::max(zoom_level_ - kZoomStep, kZoomMin);
+}
+
+void GsnCanvas::ResetZoom() {
+    zoom_level_ = 1.0f;
+}
+
+void GsnCanvas::ZoomAtPoint(float new_zoom, ImVec2 focus_content) {
+    float old_zoom = zoom_level_;
+    zoom_level_ = std::max(kZoomMin, std::min(new_zoom, kZoomMax));
+    // Adjust view_offset_ so the content point under the mouse stays fixed on screen.
+    // screen_pos = canvas_origin + content * zoom - view_offset
+    // We want the same screen_pos before and after:
+    //   view_offset_new = view_offset_old + focus * (new_zoom - old_zoom)
+    view_offset_.x += focus_content.x * (zoom_level_ - old_zoom);
+    view_offset_.y += focus_content.y * (zoom_level_ - old_zoom);
+}
+
+void GsnCanvas::Pan(float dx, float dy) {
+    view_offset_.x += dx;
+    view_offset_.y += dy;
+}
+
 // ===== Edge drawing helpers =====
 
 // Compute the screen-space connection points for a parent→child edge.
 // Group1 edges go from parent's bottom center to child's top center.
 static void ComputeGroup1Endpoints(const LayoutNode& parent, const LayoutNode& child,
-                                   ImVec2 origin, ImVec2& out_start, ImVec2& out_end) {
-    out_start = ImVec2(origin.x + parent.position.x + parent.size.x * 0.5f,
-                       origin.y + parent.position.y + parent.size.y);
-    out_end   = ImVec2(origin.x + child.position.x + child.size.x * 0.5f,
-                       origin.y + child.position.y);
+                                   ImVec2 origin, float zoom,
+                                   ImVec2& out_start, ImVec2& out_end) {
+    out_start = ImVec2(origin.x + (parent.position.x + parent.size.x * 0.5f) * zoom,
+                       origin.y + (parent.position.y + parent.size.y) * zoom);
+    out_end   = ImVec2(origin.x + (child.position.x + child.size.x * 0.5f) * zoom,
+                       origin.y + child.position.y * zoom);
 }
 
 // Draw a Group1 (structural) edge: straight stubs → solid Bezier → solid arrowhead.
-static void DrawGroup1Edge(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 child_top) {
-    ImVec2 stub_start(parent_bottom.x, parent_bottom.y + kStubLength);
-    ImVec2 stub_end(child_top.x, child_top.y - kStubLength);
+static void DrawGroup1Edge(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 child_top, float zoom) {
+    float scaled_stub = kStubLength * zoom;
+    float scaled_edge_width = kSolidEdgeWidth * zoom;
+    float scaled_arrow = kArrowSize * zoom;
+
+    ImVec2 stub_start(parent_bottom.x, parent_bottom.y + scaled_stub);
+    ImVec2 stub_end(child_top.x, child_top.y - scaled_stub);
 
     float vertical_span = fabsf(stub_end.y - stub_start.y);
     ImVec2 ctrl_1(stub_start.x, stub_start.y + vertical_span * kVerticalControlPct);
     ImVec2 ctrl_2(stub_end.x,   stub_end.y   - vertical_span * kVerticalControlPct);
 
-    draw_list->AddLine(parent_bottom, stub_start, kGroup1EdgeColor, kSolidEdgeWidth);
-    DrawSolidBezier(draw_list, stub_start, ctrl_1, ctrl_2, stub_end, kGroup1EdgeColor, kSolidEdgeWidth);
-    draw_list->AddLine(stub_end, child_top, kGroup1EdgeColor, kSolidEdgeWidth);
-    DrawSolidArrow(draw_list, child_top, 0.0f, 1.0f, kGroup1EdgeColor);
+    draw_list->AddLine(parent_bottom, stub_start, kGroup1EdgeColor, scaled_edge_width);
+    DrawSolidBezier(draw_list, stub_start, ctrl_1, ctrl_2, stub_end, kGroup1EdgeColor, scaled_edge_width);
+    draw_list->AddLine(stub_end, child_top, kGroup1EdgeColor, scaled_edge_width);
+    DrawSolidArrow(draw_list, child_top, 0.0f, 1.0f, kGroup1EdgeColor, scaled_arrow);
 }
 
 // Compute screen-space endpoints for a Group2 (side-attached) edge.
 // Parent side → attachment nearest edge, depending on which side.
 static void ComputeGroup2Endpoints(const LayoutNode& parent, const LayoutNode& attachment,
-                                   ImVec2 origin,
+                                   ImVec2 origin, float zoom,
                                    ImVec2& out_parent_side, ImVec2& out_attachment_edge) {
     if (attachment.is_left_side) {
-        out_parent_side = ImVec2(origin.x + parent.position.x,
-                                 origin.y + parent.position.y + parent.size.y * 0.5f);
-        out_attachment_edge = ImVec2(origin.x + attachment.position.x + attachment.size.x,
-                                     origin.y + attachment.position.y + attachment.size.y * 0.5f);
+        out_parent_side = ImVec2(origin.x + parent.position.x * zoom,
+                                 origin.y + (parent.position.y + parent.size.y * 0.5f) * zoom);
+        out_attachment_edge = ImVec2(origin.x + (attachment.position.x + attachment.size.x) * zoom,
+                                     origin.y + (attachment.position.y + attachment.size.y * 0.5f) * zoom);
     } else {
-        out_parent_side = ImVec2(origin.x + parent.position.x + parent.size.x,
-                                 origin.y + parent.position.y + parent.size.y * 0.5f);
-        out_attachment_edge = ImVec2(origin.x + attachment.position.x,
-                                     origin.y + attachment.position.y + attachment.size.y * 0.5f);
+        out_parent_side = ImVec2(origin.x + (parent.position.x + parent.size.x) * zoom,
+                                 origin.y + (parent.position.y + parent.size.y * 0.5f) * zoom);
+        out_attachment_edge = ImVec2(origin.x + attachment.position.x * zoom,
+                                     origin.y + (attachment.position.y + attachment.size.y * 0.5f) * zoom);
     }
 }
 
 // Draw a Group2 (contextual) edge: dashed stubs → dashed Bezier → hollow arrowhead.
 static void DrawGroup2Edge(ImDrawList* draw_list, ImVec2 parent_side, ImVec2 attachment_edge,
-                           bool is_left_side) {
+                           bool is_left_side, float zoom) {
     // Sign encodes horizontal direction: -1 toward left, +1 toward right
     float horizontal_sign = is_left_side ? -1.0f : 1.0f;
+    float scaled_stub = kStubLength * zoom;
+    float scaled_edge_width = kDashedEdgeWidth * zoom;
 
-    ImVec2 stub_start(parent_side.x + horizontal_sign * kStubLength, parent_side.y);
-    ImVec2 stub_end(attachment_edge.x - horizontal_sign * kStubLength, attachment_edge.y);
+    ImVec2 stub_start(parent_side.x + horizontal_sign * scaled_stub, parent_side.y);
+    ImVec2 stub_end(attachment_edge.x - horizontal_sign * scaled_stub, attachment_edge.y);
 
     float horizontal_span = fabsf(stub_end.x - stub_start.x) * 0.5f;
     ImVec2 ctrl_1(stub_start.x + horizontal_sign * horizontal_span, stub_start.y);
     ImVec2 ctrl_2(stub_end.x   - horizontal_sign * horizontal_span, stub_end.y);
 
     // Straight stub from parent → dashed Bezier → straight stub into attachment
-    DrawDashedBezier(draw_list, parent_side, parent_side, parent_side, stub_start, kGroup2EdgeColor, kDashedEdgeWidth);
-    DrawDashedBezier(draw_list, stub_start, ctrl_1, ctrl_2, stub_end, kGroup2EdgeColor, kDashedEdgeWidth);
-    DrawDashedBezier(draw_list, stub_end, stub_end, stub_end, attachment_edge, kGroup2EdgeColor, kDashedEdgeWidth);
+    DrawDashedBezier(draw_list, parent_side, parent_side, parent_side, stub_start, kGroup2EdgeColor, scaled_edge_width);
+    DrawDashedBezier(draw_list, stub_start, ctrl_1, ctrl_2, stub_end, kGroup2EdgeColor, scaled_edge_width);
+    DrawDashedBezier(draw_list, stub_end, stub_end, stub_end, attachment_edge, kGroup2EdgeColor, scaled_edge_width);
     // Arrow points into the attachment node
-    DrawHollowArrow(draw_list, attachment_edge, horizontal_sign, 0.0f, kGroup2EdgeColor);
+    DrawHollowArrow(draw_list, attachment_edge, horizontal_sign, 0.0f, kGroup2EdgeColor, kArrowSize * zoom);
 }
 
 // ===== Main rendering =====
 
 void GsnCanvas::Render() {
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
-    ImVec2 canvas_origin = ImGui::GetCursorScreenPos();
+    ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
+    float zoom = zoom_level_;
 
-    // Compute content extents for scrollable area
-    float max_x = 0.0f, max_y = 0.0f;
-    for (const auto& node : layout_nodes_) {
-        float right  = node.position.x + node.size.x;
-        float bottom = node.position.y + node.size.y;
-        if (right  > max_x) max_x = right;
-        if (bottom > max_y) max_y = bottom;
-    }
-    max_x += kScrollPadding;
-    max_y += kScrollPadding;
-
-    // Declare content size so ImGui provides scrollbars
-    ImGui::SetCursorPos(ImVec2(max_x, max_y));
-    ImGui::Dummy(ImVec2(0, 0));
-    ImGui::SetCursorScreenPos(canvas_origin);
+    // Apply our own view offset to the drawing origin (replaces ImGui scroll)
+    ImVec2 origin(canvas_pos.x - view_offset_.x, canvas_pos.y - view_offset_.y);
 
     // Build a lookup map for finding parent nodes by ID
     std::unordered_map<std::string, const LayoutNode*> node_by_id;
@@ -250,14 +278,14 @@ void GsnCanvas::Render() {
 
         if (child_node.group == ElementGroup::Group2) {
             ImVec2 parent_side, attachment_edge;
-            ComputeGroup2Endpoints(parent_node, child_node, canvas_origin,
+            ComputeGroup2Endpoints(parent_node, child_node, origin, zoom,
                                    parent_side, attachment_edge);
-            DrawGroup2Edge(draw_list, parent_side, attachment_edge, child_node.is_left_side);
+            DrawGroup2Edge(draw_list, parent_side, attachment_edge, child_node.is_left_side, zoom);
         } else {
             ImVec2 parent_bottom, child_top;
-            ComputeGroup1Endpoints(parent_node, child_node, canvas_origin,
+            ComputeGroup1Endpoints(parent_node, child_node, origin, zoom,
                                    parent_bottom, child_top);
-            DrawGroup1Edge(draw_list, parent_bottom, child_top);
+            DrawGroup1Edge(draw_list, parent_bottom, child_top, zoom);
         }
     }
 
@@ -278,7 +306,7 @@ void GsnCanvas::Render() {
         gsn_node.position = node.position;
         gsn_node.size = node.size;
         gsn_node.label = node.label;
-        DrawGsnNode(gsn_node, canvas_origin);
+        DrawGsnNode(gsn_node, origin, zoom);
     }
 }
 

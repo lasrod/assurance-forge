@@ -20,6 +20,9 @@ static constexpr int   kCircleSegments     = 36;     // number of segments for c
 static const ImU32 kOutlineColor = IM_COL32(0, 0, 0, 200);
 static const ImU32 kTextColor    = IM_COL32(10, 10, 10, 255);
 
+// Zoom step used by keyboard and button controls (matches renderer constant)
+static constexpr float kZoomStep = 0.1f;
+
 // Single shared renderer instance used by the compatibility wrapper.
 static GsnCanvas& GlobalRenderer() {
     static GsnCanvas instance;
@@ -81,38 +84,45 @@ static void DrawRoundedRect(ImDrawList* draw_list, ImVec2 top_left, ImVec2 botto
 // ===== Text layout helper =====
 
 // Compute the horizontal text region (left edge and wrap width) for a given node shape.
+// All outputs are in screen-space (already scaled by zoom).
 static void ComputeTextRegion(const GsnNode& node, ImVec2 top_left, ImVec2 bottom_right,
-                              float& out_text_left, float& out_text_wrap) {
-    out_text_left = top_left.x + kTextPadding;
-    out_text_wrap = node.size.x - kTextPadding * 2.0f;
+                              float zoom, float& out_text_left, float& out_text_wrap) {
+    float scaled_padding = kTextPadding * zoom;
+    float scaled_width  = node.size.x * zoom;
+    float scaled_height = node.size.y * zoom;
+
+    out_text_left = top_left.x + scaled_padding;
+    out_text_wrap = scaled_width - scaled_padding * 2.0f;
 
     if (node.type == "Strategy") {
-        float skew = node.size.x * kParallelogramSkew;
-        out_text_left = top_left.x + skew + kTextPadding;
-        out_text_wrap = node.size.x - skew * 2.0f - kTextPadding * 2.0f;
+        float skew = scaled_width * kParallelogramSkew;
+        out_text_left = top_left.x + skew + scaled_padding;
+        out_text_wrap = scaled_width - skew * 2.0f - scaled_padding * 2.0f;
     } else if (node.type == "Solution" || node.type == "Evidence") {
         float center_x = (top_left.x + bottom_right.x) * 0.5f;
-        float radius = (node.size.x < node.size.y ? node.size.x : node.size.y) * 0.5f;
+        float radius = (scaled_width < scaled_height ? scaled_width : scaled_height) * 0.5f;
         float inset = radius * kCircleTextInset;
-        out_text_left = center_x - radius + inset + kTextPadding;
-        out_text_wrap = (radius - inset) * 2.0f - kTextPadding * 2.0f;
+        out_text_left = center_x - radius + inset + scaled_padding;
+        out_text_wrap = (radius - inset) * 2.0f - scaled_padding * 2.0f;
     } else if (node.type == "Context" || node.type == "Assumption" || node.type == "Justification") {
-        float inset = node.size.y * kStadiumTextInset;
-        out_text_left = top_left.x + inset + kTextPadding;
-        out_text_wrap = node.size.x - inset * 2.0f - kTextPadding * 2.0f;
+        float inset = scaled_height * kStadiumTextInset;
+        out_text_left = top_left.x + inset + scaled_padding;
+        out_text_wrap = scaled_width - inset * 2.0f - scaled_padding * 2.0f;
     }
 
-    if (out_text_wrap < kMinTextWrap) out_text_wrap = kMinTextWrap;
+    float scaled_min_wrap = kMinTextWrap * zoom;
+    if (out_text_wrap < scaled_min_wrap) out_text_wrap = scaled_min_wrap;
 }
 
 // Draw the node label: bold first line (ID: Name), normal text for rest (description).
 // Text is vertically centered within the node bounding box.
 static void DrawNodeLabel(ImDrawList* draw_list, const GsnNode& node,
                           ImVec2 top_left, ImVec2 bottom_right,
-                          float text_left, float text_wrap) {
+                          float text_left, float text_wrap, float zoom) {
     ImFont* bold_font   = g_BoldFont ? g_BoldFont : ImGui::GetFont();
     ImFont* normal_font = ImGui::GetFont();
-    float font_size = ImGui::GetFontSize();
+    float font_size = ImGui::GetFontSize() * zoom;
+    float scaled_padding = kTextPadding * zoom;
 
     const char* label_start = node.label.c_str();
     const char* first_newline = strchr(label_start, '\n');
@@ -127,9 +137,10 @@ static void DrawNodeLabel(ImDrawList* draw_list, const GsnNode& node,
         bold_text_size = bold_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, label_start, nullptr);
     }
 
+    float scaled_node_height = node.size.y * zoom;
     float total_text_height = bold_text_size.y + rest_text_size.y;
-    float text_y = top_left.y + (node.size.y - total_text_height) * 0.5f;
-    if (text_y < top_left.y + kTextPadding) text_y = top_left.y + kTextPadding;
+    float text_y = top_left.y + (scaled_node_height - total_text_height) * 0.5f;
+    if (text_y < top_left.y + scaled_padding) text_y = top_left.y + scaled_padding;
 
     // Bold first line
     draw_list->AddText(bold_font, font_size, ImVec2(text_left, text_y), kTextColor,
@@ -143,10 +154,13 @@ static void DrawNodeLabel(ImDrawList* draw_list, const GsnNode& node,
 
 // ===== Main node drawing function =====
 
-void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin) {
+void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin, float zoom) {
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
-    ImVec2 top_left  = ImVec2(canvas_origin.x + node.position.x, canvas_origin.y + node.position.y);
-    ImVec2 bottom_right = ImVec2(top_left.x + node.size.x, top_left.y + node.size.y);
+    ImVec2 top_left  = ImVec2(canvas_origin.x + node.position.x * zoom,
+                              canvas_origin.y + node.position.y * zoom);
+    ImVec2 bottom_right = ImVec2(top_left.x + node.size.x * zoom,
+                                 top_left.y + node.size.y * zoom);
+    ImVec2 scaled_size = ImVec2(node.size.x * zoom, node.size.y * zoom);
 
     ImU32 fill_color = ColorForType(node.type);
 
@@ -163,12 +177,12 @@ void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin) {
 
     // Draw label text
     float text_left, text_wrap;
-    ComputeTextRegion(node, top_left, bottom_right, text_left, text_wrap);
-    DrawNodeLabel(draw_list, node, top_left, bottom_right, text_left, text_wrap);
+    ComputeTextRegion(node, top_left, bottom_right, zoom, text_left, text_wrap);
+    DrawNodeLabel(draw_list, node, top_left, bottom_right, text_left, text_wrap, zoom);
 
     // Invisible button for hit-testing
     ImGui::SetCursorScreenPos(top_left);
-    ImGui::InvisibleButton(node.id.c_str(), node.size);
+    ImGui::InvisibleButton(node.id.c_str(), scaled_size);
     if (ImGui::IsItemClicked()) {
         std::cout << "Clicked node: " << node.label << " (id=" << node.id << ")\n";
         ImGui::OpenPopup(("clicked_" + node.id).c_str());
@@ -194,12 +208,95 @@ void ShowGsnCanvasWindow() {
         ImGui::Text("GSN Canvas");
         ImGui::Separator();
 
-        // Start a child region so cursor screen pos is stable
+        // Child region with clipping; we manage our own pan/zoom offset
+        // so no ImGui scrollbars are needed.
         ImGui::BeginChild("gsn_canvas_child", ImVec2(0, 0), false,
-                          ImGuiWindowFlags_NoMove | ImGuiWindowFlags_HorizontalScrollbar);
+                          ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
-        // Use a single shared renderer instance
-        GlobalRenderer().Render();
+        // --- Zoom & pan input handling ---
+        GsnCanvas& renderer = GlobalRenderer();
+        ImVec2 child_pos = ImGui::GetWindowPos();
+
+        // Ctrl + mouse scroll wheel: zoom at mouse pointer position
+        if (ImGui::IsWindowHovered()) {
+            float wheel = ImGui::GetIO().MouseWheel;
+            if (wheel != 0.0f && ImGui::GetIO().KeyCtrl) {
+                // Convert mouse screen position to content-space (unzoomed layout coords)
+                ImVec2 mouse = ImGui::GetIO().MousePos;
+                ImVec2 offset = renderer.GetViewOffset();
+                float zoom = renderer.GetZoom();
+                // screen = child_pos + content * zoom - view_offset
+                // => content = (mouse - child_pos + view_offset) / zoom
+                ImVec2 focus_content(
+                    (mouse.x - child_pos.x + offset.x) / zoom,
+                    (mouse.y - child_pos.y + offset.y) / zoom
+                );
+                float new_zoom = zoom + (wheel > 0.0f ? kZoomStep : -kZoomStep);
+                renderer.ZoomAtPoint(new_zoom, focus_content);
+            }
+        }
+
+        // Middle mouse button panning
+        if (ImGui::IsWindowHovered() && ImGui::IsMouseDragging(ImGuiMouseButton_Middle, 0.0f)) {
+            ImVec2 delta = ImGui::GetIO().MouseDelta;
+            renderer.Pan(-delta.x, -delta.y);
+        }
+
+        // Keyboard +/- (numpad and main keyboard)
+        if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
+            if (ImGui::IsKeyPressed(ImGuiKey_Equal) || ImGui::IsKeyPressed(ImGuiKey_KeypadAdd)) {
+                renderer.ZoomIn();
+            }
+            if (ImGui::IsKeyPressed(ImGuiKey_Minus) || ImGui::IsKeyPressed(ImGuiKey_KeypadSubtract)) {
+                renderer.ZoomOut();
+            }
+            if (ImGui::IsKeyPressed(ImGuiKey_0) || ImGui::IsKeyPressed(ImGuiKey_Keypad0)) {
+                renderer.ResetZoom();
+            }
+        }
+
+        // Render the canvas content
+        renderer.Render();
+
+        // --- Overlay zoom buttons in bottom-right corner ---
+        {
+            ImVec2 child_size = ImGui::GetWindowSize();
+            float button_size = 28.0f;
+            float margin = 12.0f;
+            float label_width = 50.0f;
+
+            // Position: bottom-right of the child window
+            float buttons_x = child_pos.x + child_size.x - (button_size * 2 + label_width + margin + 8.0f);
+            float buttons_y = child_pos.y + child_size.y - (button_size + margin);
+
+            // Semi-transparent background for the zoom control strip
+            ImDrawList* fg = ImGui::GetForegroundDrawList();
+            float strip_width = button_size * 2 + label_width + 12.0f;
+            ImVec2 strip_tl(buttons_x - 4.0f, buttons_y - 2.0f);
+            ImVec2 strip_br(buttons_x + strip_width, buttons_y + button_size + 2.0f);
+            fg->AddRectFilled(strip_tl, strip_br, IM_COL32(40, 40, 40, 180), 6.0f);
+            fg->AddRect(strip_tl, strip_br, IM_COL32(80, 80, 80, 200), 6.0f);
+
+            ImGui::SetCursorScreenPos(ImVec2(buttons_x, buttons_y));
+            if (ImGui::Button("-##zoom_out", ImVec2(button_size, button_size))) {
+                renderer.ZoomOut();
+            }
+
+            ImGui::SameLine();
+            // Zoom percentage label
+            char zoom_label[16];
+            snprintf(zoom_label, sizeof(zoom_label), "%d%%", static_cast<int>(renderer.GetZoom() * 100.0f + 0.5f));
+            ImVec2 text_size = ImGui::CalcTextSize(zoom_label);
+            float label_x = ImGui::GetCursorScreenPos().x + (label_width - text_size.x) * 0.5f;
+            float label_y = ImGui::GetCursorScreenPos().y + (button_size - text_size.y) * 0.5f;
+            fg->AddText(ImVec2(label_x, label_y), IM_COL32(220, 220, 220, 255), zoom_label);
+            ImGui::Dummy(ImVec2(label_width, button_size));
+
+            ImGui::SameLine();
+            if (ImGui::Button("+##zoom_in", ImVec2(button_size, button_size))) {
+                renderer.ZoomIn();
+            }
+        }
 
         ImGui::EndChild();
     }
