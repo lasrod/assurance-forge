@@ -31,10 +31,15 @@ void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin) {
     dl->AddRectFilled(a, b, col, 6.0f);
     dl->AddRect(a, b, IM_COL32(0,0,0,200), 6.0f, 0, 2.0f);
 
-    // Draw label centered
-    ImVec2 text_size = ImGui::CalcTextSize(node.label.c_str());
-    ImVec2 text_pos = ImVec2(a.x + (node.size.x - text_size.x) * 0.5f, a.y + (node.size.y - text_size.y) * 0.5f);
-    dl->AddText(text_pos, IM_COL32(10,10,10,255), node.label.c_str());
+    // Draw label with word-wrapping inside the node box
+    const float pad = 6.0f;
+    float wrap_width = node.size.x - pad * 2.0f;
+    ImVec2 text_size = ImGui::CalcTextSize(node.label.c_str(), nullptr, false, wrap_width);
+    // Center vertically within the box
+    float text_y = a.y + (node.size.y - text_size.y) * 0.5f;
+    if (text_y < a.y + pad) text_y = a.y + pad;
+    dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(a.x + pad, text_y),
+                IM_COL32(10,10,10,255), node.label.c_str(), nullptr, wrap_width);
 
     // Invisible button for hit-testing
     ImGui::SetCursorScreenPos(a);

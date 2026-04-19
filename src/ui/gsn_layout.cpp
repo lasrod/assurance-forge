@@ -6,8 +6,8 @@
 namespace ui {
 
 // ===== Constants =====
-static const float kNodeWidth  = 180.0f;
-static const float kNodeHeight =  80.0f;
+static const float kNodeWidth  = 220.0f;
+static const float kNodeHeight = 100.0f;
 static const float kHSpacing   =  40.0f;
 static const float kVSpacing   =  80.0f;
 static const float kLeftMargin =  20.0f;

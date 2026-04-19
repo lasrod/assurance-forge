@@ -57,7 +57,15 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac) {
 
         auto node = std::make_unique<TreeNode>();
         node->id = e.id.empty() ? e.name : e.id;
-        node->label = !e.name.empty() ? e.name : e.content;
+
+        // Build label: "ID: Name\nDetail"
+        // Claims use content for detail; everything else uses description
+        std::string detail = (e.type == "claim") ? e.content : e.description;
+        node->label = node->id + ": " + e.name;
+        if (!detail.empty()) {
+            node->label += "\n" + detail;
+        }
+
         node->role = classify_role(e);
         node->group = group_for_role(node->role);
 
