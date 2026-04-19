@@ -7,6 +7,9 @@
 #include <d3d11.h>
 #include <tchar.h>
 
+#include "ui/gsn_canvas.h"
+#include "ui/gsn_adapter.h"
+
 #include "core/app_state.h"
 
 // DirectX 11 globals
@@ -67,6 +70,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    // Docking requires a docking-enabled Dear ImGui build. If you update
+    // the bundled ImGui to a version with docking support, re-enable
+    // the following line:
+    // io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
@@ -96,6 +103,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
+
+        // GSN Canvas demo window (isolated drawing logic)
+        ui::ShowGsnCanvasWindow();
 
         // Main window
         ImGui::SetNextWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
@@ -133,6 +143,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         // Display loaded data
         if (app_state.loaded_case.has_value()) {
             const auto& ac = app_state.loaded_case.value();
+
+            // Push parsed elements into the GSN canvas renderer
+            ui::SetCanvasElements(ui::ConvertFromAssuranceCase(ac));
 
             ImGui::Text("Assurance Case: %s", ac.name.c_str());
             ImGui::TextWrapped("Description: %s", ac.description.c_str());
