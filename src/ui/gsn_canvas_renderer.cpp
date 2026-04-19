@@ -2,8 +2,53 @@
 #include "gsn_layout.h"
 #include "gsn_canvas.h" // for DrawGsnNode
 #include <imgui.h>
+#include <cmath>
 
 namespace ui {
+
+// Draw a solid (filled) arrowhead at 'tip' pointing in direction from 'from' to 'tip'
+static void DrawSolidArrow(ImDrawList* dl, ImVec2 from, ImVec2 tip, ImU32 col, float size = 8.0f) {
+    float dx = tip.x - from.x;
+    float dy = tip.y - from.y;
+    float len = sqrtf(dx * dx + dy * dy);
+    if (len < 1.0f) return;
+    dx /= len; dy /= len;
+    // Perpendicular
+    float px = -dy, py = dx;
+    ImVec2 p1(tip.x - dx * size + px * size * 0.5f, tip.y - dy * size + py * size * 0.5f);
+    ImVec2 p2(tip.x - dx * size - px * size * 0.5f, tip.y - dy * size - py * size * 0.5f);
+    dl->AddTriangleFilled(tip, p1, p2, col);
+}
+
+// Draw a hollow (outline) arrowhead at 'tip' pointing in direction from 'from' to 'tip'
+static void DrawHollowArrow(ImDrawList* dl, ImVec2 from, ImVec2 tip, ImU32 col, float size = 8.0f, float thickness = 1.5f) {
+    float dx = tip.x - from.x;
+    float dy = tip.y - from.y;
+    float len = sqrtf(dx * dx + dy * dy);
+    if (len < 1.0f) return;
+    dx /= len; dy /= len;
+    float px = -dy, py = dx;
+    ImVec2 p1(tip.x - dx * size + px * size * 0.5f, tip.y - dy * size + py * size * 0.5f);
+    ImVec2 p2(tip.x - dx * size - px * size * 0.5f, tip.y - dy * size - py * size * 0.5f);
+    dl->AddTriangle(tip, p1, p2, col, thickness);
+}
+
+// Draw a dashed line between two points
+static void DrawDashedLine(ImDrawList* dl, ImVec2 a, ImVec2 b, ImU32 col, float thickness = 1.5f, float dash = 8.0f, float gap = 5.0f) {
+    float dx = b.x - a.x;
+    float dy = b.y - a.y;
+    float len = sqrtf(dx * dx + dy * dy);
+    if (len < 1.0f) return;
+    float ux = dx / len, uy = dy / len;
+    float t = 0.0f;
+    while (t < len) {
+        float seg = (t + dash < len) ? dash : (len - t);
+        ImVec2 p1(a.x + ux * t, a.y + uy * t);
+        ImVec2 p2(a.x + ux * (t + seg), a.y + uy * (t + seg));
+        dl->AddLine(p1, p2, col, thickness);
+        t += dash + gap;
+    }
+}
 
 GsnCanvas::GsnCanvas() {
 }
@@ -56,7 +101,7 @@ void GsnCanvas::Render() {
                     win_pos.y + n.position.y);
 
                 if (n.group == ElementGroup::Group2) {
-                    // Group2: horizontal attachment line from parent side to attachment
+                    // Group2: dashed line with hollow arrowhead
                     ImVec2 parent_side;
                     if (n.is_left_side) {
                         parent_side = ImVec2(
@@ -67,13 +112,26 @@ void GsnCanvas::Render() {
                             win_pos.x + it->position.x + it->size.x,
                             win_pos.y + it->position.y + it->size.y * 0.5f);
                     }
-                    ImVec2 att_center = ImVec2(
-                        win_pos.x + n.position.x + n.size.x * 0.5f,
-                        win_pos.y + n.position.y + n.size.y * 0.5f);
-                    dl->AddLine(parent_side, att_center, IM_COL32(120,120,200,200), 1.5f);
+                    ImVec2 att_edge;
+                    if (n.is_left_side) {
+                        // Attachment is to the left — line arrives at its right edge
+                        att_edge = ImVec2(
+                            win_pos.x + n.position.x + n.size.x,
+                            win_pos.y + n.position.y + n.size.y * 0.5f);
+                    } else {
+                        // Attachment is to the right — line arrives at its left edge
+                        att_edge = ImVec2(
+                            win_pos.x + n.position.x,
+                            win_pos.y + n.position.y + n.size.y * 0.5f);
+                    }
+                    ImU32 col = IM_COL32(120,120,200,200);
+                    DrawDashedLine(dl, parent_side, att_edge, col, 1.5f);
+                    DrawHollowArrow(dl, parent_side, att_edge, col);
                 } else {
-                    // Group1: vertical decomposition line
-                    dl->AddLine(parent_bottom, child_top, IM_COL32(180,180,180,200), 2.0f);
+                    // Group1: solid line with solid arrowhead pointing to child
+                    ImU32 col = IM_COL32(180,180,180,255);
+                    dl->AddLine(parent_bottom, child_top, col, 2.0f);
+                    DrawSolidArrow(dl, parent_bottom, child_top, col);
                 }
             }
         }
