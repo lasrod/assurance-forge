@@ -10,9 +10,15 @@ namespace parser {
 struct SacmElement {
     std::string id;
     std::string name;
-    std::string type;  // "claim", "argumentReasoning", "artifact", etc.
+    std::string type;  // "claim", "argumentreasoning", "artifact", etc. (lowercased local-name)
     std::string content;
     std::string description;
+
+    // Relationship fields (populated for assertedinference, assertedcontext, assertedevidence)
+    std::vector<std::string> source_refs;  // ids from <source ref="..."/>
+    std::vector<std::string> target_refs;  // ids from <target ref="..."/>
+    std::string reasoning_ref;             // from reasoning attribute (assertedinference)
+    std::string assertion_declaration;     // from assertionDeclaration attribute
 };
 
 // Represents a parsed SACM assurance case

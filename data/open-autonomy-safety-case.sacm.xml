@@ -1,0 +1,1085 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Open Autonomy Safety Case (OASC)
+  SACM 2.2 (Structured Assurance Case Metamodel) Representation
+
+  This file represents the Open Autonomy Safety Case using OMG SACM 2.2.
+  Original notation: Goal Structuring Notation (GSN)
+
+  Mapping:
+    GSN Goal      -> SACM Claim
+    GSN Strategy  -> SACM ArgumentReasoning + AssertedInference
+    GSN Context   -> SACM ArtifactReference + AssertedContext
+    GSN Solution  -> SACM ArtifactReference + AssertedEvidence
+-->
+<sacm:AssuranceCasePackage
+    xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    id="OASC"
+    name="Open Autonomy Safety Case"
+    description="A safety case template for autonomous vehicle deployment based on Positive Trust Balance">
+
+  <!-- ============================================================== -->
+  <!-- TERMINOLOGY PACKAGE - Definitions and Standards Referenced     -->
+  <!-- ============================================================== -->
+  <terminologyPackage id="TP_Standards" name="Referenced Standards">
+    <expression id="TERM_UL4600" value="UL 4600 - Standard for Evaluation of Autonomous Products"/>
+    <expression id="TERM_ISO26262" value="ISO 26262 - Road vehicles Functional Safety"/>
+    <expression id="TERM_ISO21448" value="ISO 21448 - Safety of the Intended Functionality (SOTIF)"/>
+    <expression id="TERM_ISO21434" value="ISO 21434 - Road vehicles Cybersecurity engineering"/>
+    <expression id="TERM_ISO10007" value="ISO 10007 - Quality management Configuration management"/>
+    <expression id="TERM_ISOPAS8800" value="ISO/PAS 8800 - Road vehicles Safety and AI"/>
+    <expression id="TERM_FMVSS" value="Federal Motor Vehicle Safety Standards"/>
+    <expression id="TERM_SAE_J3307" value="SAE J3307 - STPA Hazard Analysis"/>
+    <expression id="TERM_SAE_AVSC00003" value="SAE AVSC 00003 - Trip Interruption"/>
+    <expression id="TERM_SAE_AVSC00004" value="SAE AVSC 00004 - Data Recording"/>
+    <expression id="TERM_SAE_AVSC00006" value="SAE AVSC 00006 - Safety Metrics"/>
+    <expression id="TERM_SAE_AVSCI01" value="SAE AVSC-I-01 - First Responder Interaction"/>
+    <expression id="TERM_SAE_AVSCI04" value="SAE AVSC-I-04 - Remote Operations"/>
+    <expression id="TERM_SAE_AVSCI05" value="SAE AVSC-I-05 - Post-Crash Operations"/>
+    <expression id="TERM_SAE_AVSCD03" value="SAE AVSC-D-03 - Safety Inspections"/>
+    <expression id="TERM_14CFR5" value="14 CFR Part 5 - Safety Management Systems"/>
+    <expression id="TERM_IATF16949" value="IATF 16949 - Automotive Quality Management"/>
+    <expression id="TERM_GermanEthics" value="German Ethics Commission Report on Automated Driving"/>
+    <expression id="TERM_SMS" value="Safety Management System"/>
+  </terminologyPackage>
+
+  <!-- ============================================================== -->
+  <!-- ARTIFACT PACKAGE - Evidence and Contextual Information         -->
+  <!-- ============================================================== -->
+  <artifactPackage id="AP_Evidence" name="Evidence and Context Artifacts">
+
+    <!-- Context Artifacts -->
+    <artifact id="ART_VehicleDescription" name="Vehicle Description">
+      <description>Description of vehicle, operations, and stakeholder requirements</description>
+    </artifact>
+
+    <artifact id="ART_SMSClaims" name="SMS Claims">
+      <description>Relevant Safety Management System claims</description>
+    </artifact>
+
+    <artifact id="ART_SafetyAdvisoryBoard" name="Safety Advisory Board">
+      <description>Our safety advisory board includes a full set of stakeholder responsibilities</description>
+    </artifact>
+
+    <!-- Evidence Artifacts - Independent Assessments -->
+    <artifact id="ART_Assessment_13" name="Independent Assessment 13">
+      <description>Results of independent assessment - Transparency assessment results</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_14" name="Independent Assessment 14">
+      <description>Results of independent assessment - Assessor independence verification</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_27" name="Independent Assessment 27">
+      <description>Results of independent assessment - Safety advisory board approval</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_28" name="Independent Assessment 28">
+      <description>Results of independent assessment - Regulatory compliance</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_29" name="Independent Assessment 29">
+      <description>Results of independent assessment - Ethics guidelines compliance</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_30" name="Independent Assessment 30">
+      <description>Results of independent assessment - 14 CFR Part 5 compliance</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_31" name="Independent Assessment 31">
+      <description>Results of independent assessment - UL 4600 continuous improvement</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_32" name="Independent Assessment 32">
+      <description>Results of independent assessment - IATF 16949 conformance</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_61" name="Independent Assessment 61">
+      <description>Results of independent assessment - STPA hazard analysis</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_62" name="Independent Assessment 62">
+      <description>Results of independent assessment - FMVSS conformance</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_63" name="Independent Assessment 63">
+      <description>Results of independent assessment - ISO 26262 conformance</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_64" name="Independent Assessment 64">
+      <description>Results of independent assessment - ISO/PAS 8800 conformance</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_65" name="Independent Assessment 65">
+      <description>Results of independent assessment - ISO 21448 conformance</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_66" name="Independent Assessment 66">
+      <description>Results of independent assessment - ISO 21434 conformance</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_67" name="Independent Assessment 67">
+      <description>Results of independent assessment - ISO 10007 conformance</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_68" name="Independent Assessment 68">
+      <description>Results of independent assessment - SAE AVSC 00004 conformance</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_80" name="Independent Assessment 80">
+      <description>Results of independent assessment - Trip interruption operations</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_81" name="Independent Assessment 81">
+      <description>Results of independent assessment - Post-crash operations</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_82" name="Independent Assessment 82">
+      <description>Results of independent assessment - Remote operations</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_83" name="Independent Assessment 83">
+      <description>Results of independent assessment - First responder interactions</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_84" name="Independent Assessment 84">
+      <description>Results of independent assessment - Safety inspections</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_85" name="Independent Assessment 85">
+      <description>Results of independent assessment - Operational metrics monitoring</description>
+    </artifact>
+
+    <artifact id="ART_Assessment_86" name="Independent Assessment 86">
+      <description>Results of independent assessment - Procedural hazard mitigations</description>
+    </artifact>
+
+  </artifactPackage>
+
+  <!-- ============================================================== -->
+  <!-- MAIN ARGUMENT PACKAGE - Top-Level Safety Case Structure        -->
+  <!-- ============================================================== -->
+  <argumentPackage id="ARG_Main" name="Open Autonomy Safety Case - Main Argument">
+
+    <!-- ============================================================ -->
+    <!-- TOP-LEVEL CLAIMS (Goals 1-5)                                 -->
+    <!-- ============================================================ -->
+
+    <!-- Goal 1: Top-level claim -->
+    <claim id="G1" name="Goal 1"
+           content="The autonomous vehicle is safe enough to deploy.">
+      <description>Top-level safety claim for the autonomous vehicle deployment</description>
+    </claim>
+
+    <!-- Goal 3: Organization Trustworthiness - "Live It Right" -->
+    <claim id="G3" name="Goal 3"
+           content="The organization is trustworthy.">
+      <description>Organizational trustworthiness claim - "Live It Right"</description>
+    </claim>
+
+    <!-- Goal 4: Vehicle Safety - "Build It Right" -->
+    <claim id="G4" name="Goal 4"
+           content="The vehicle is safe to operate.">
+      <description>Vehicle safety claim - "Build It Right"</description>
+    </claim>
+
+    <!-- Goal 5: Operational Safety - "Operate It Right" -->
+    <claim id="G5" name="Goal 5"
+           content="We operate the vehicle safely.">
+      <description>Operational safety claim - "Operate It Right"</description>
+    </claim>
+
+    <!-- ============================================================ -->
+    <!-- TOP-LEVEL STRATEGY AND CONTEXT                               -->
+    <!-- ============================================================ -->
+
+    <!-- Strategy 2: Appeal to Positive Trust Balance -->
+    <argumentReasoning id="S2" name="Strategy 2"
+                       content="Appeal to Positive Trust Balance.">
+      <description>The argument strategy based on achieving a positive trust balance through organizational trustworthiness, vehicle safety, and safe operations</description>
+    </argumentReasoning>
+
+    <!-- Context: Vehicle and Operations Description -->
+    <artifactReference id="CTX_VehicleOps" name="Vehicle Operations Context"
+                       referencedArtifact="ART_VehicleDescription">
+      <description>Description of vehicle, operations, and stakeholder requirements</description>
+    </artifactReference>
+
+    <!-- Top-level inference: G3, G4, G5 support G1 via S2 -->
+    <assertedInference id="AI_TopLevel" name="Top-Level Inference">
+      <description>The top-level claim is supported by organizational trustworthiness, vehicle safety, and operational safety through positive trust balance</description>
+      <source href="#G3"/>
+      <source href="#G4"/>
+      <source href="#G5"/>
+      <target href="#G1"/>
+      <reasoning href="#S2"/>
+    </assertedInference>
+
+    <!-- Context link to Strategy 2 -->
+    <assertedContext id="AC_TopLevel" name="Top-Level Context">
+      <description>Vehicle and operations context informs the positive trust balance strategy</description>
+      <source href="#CTX_VehicleOps"/>
+      <target href="#S2"/>
+    </assertedContext>
+
+  </argumentPackage>
+
+  <!-- ============================================================== -->
+  <!-- ARGUMENT PACKAGE: ORGANIZATION TRUSTWORTHINESS (Goal 3)        -->
+  <!-- "Live It Right"                                                -->
+  <!-- ============================================================== -->
+  <argumentPackage id="ARG_OrgTrust" name="Organization Trustworthiness">
+
+    <!-- ============================================================ -->
+    <!-- CLAIMS (Goals 8-12, 21-26)                                   -->
+    <!-- ============================================================ -->
+
+    <!-- Goal 8: Transparency -->
+    <claim id="G8" name="Goal 8"
+           content="We regularly share results of independent safety assessments with stakeholders.">
+      <description>Transparency through sharing assessment results</description>
+    </claim>
+
+    <!-- Goal 9: Assessor Independence -->
+    <claim id="G9" name="Goal 9"
+           content="Assessor independence satisfies requirements of UL 4600.">
+      <description>Independent assessor qualification per UL 4600</description>
+    </claim>
+
+    <!-- Goal 10: SMS Policies Alignment -->
+    <claim id="G10" name="Goal 10"
+           content="SMS safety policies are aligned with stakeholder requirements.">
+      <description>Safety Management System policies meet stakeholder needs</description>
+    </claim>
+
+    <!-- Goal 11: SMS Processes -->
+    <claim id="G11" name="Goal 11"
+           content="SMS processes are in use.">
+      <description>Safety Management System processes are actively implemented</description>
+    </claim>
+
+    <!-- Goal 12: Safety Case Monitoring -->
+    <claim id="G12" name="Goal 12"
+           content="Our safety case is monitored &amp; improved.">
+      <description>Continuous monitoring and improvement of the safety case</description>
+    </claim>
+
+    <!-- Goal 21: Safety Advisory Board Approval -->
+    <claim id="G21" name="Goal 21"
+           content="SRCs are approved by our safety advisory board.">
+      <description>Safety-related claims approved by safety advisory board</description>
+    </claim>
+
+    <!-- Goal 22: Regulatory Compliance -->
+    <claim id="G22" name="Goal 22"
+           content="Our SRCs satisfy regulations in our operational area.">
+      <description>Safety-related claims satisfy applicable regulations</description>
+    </claim>
+
+    <!-- Goal 23: Ethics Guidelines Compliance -->
+    <claim id="G23" name="Goal 23"
+           content="Our SRCs satisfy report guidelines.">
+      <description>Safety-related claims satisfy German Ethics Commission guidelines</description>
+    </claim>
+
+    <!-- Goal 24: 14 CFR part 5 Conformance -->
+    <claim id="G24" name="Goal 24"
+           content="Our SMS conforms with 14 CFR part 5.">
+      <description>Safety Management System conformance with aviation SMS standards</description>
+    </claim>
+
+    <!-- Goal 25: UL 4600 Continuous Improvement -->
+    <claim id="G25" name="Goal 25"
+           content="Our safety case is continuously improved in conformance with relevant sections of UL 4600.">
+      <description>Continuous improvement per UL 4600 requirements</description>
+    </claim>
+
+    <!-- Goal 26: IATF 16949 Conformance -->
+    <claim id="G26" name="Goal 26"
+           content="Our organization conforms with IATF 16949.">
+      <description>Automotive quality management system conformance</description>
+    </claim>
+
+    <!-- ============================================================ -->
+    <!-- STRATEGIES (6-7, 15-20)                                      -->
+    <!-- ============================================================ -->
+
+    <!-- Strategy 6: Transparency enables trust -->
+    <argumentReasoning id="S6" name="Strategy 6"
+                       content="Transparency enables trust.">
+      <description>Argument that transparency through sharing assessments builds stakeholder trust</description>
+    </argumentReasoning>
+
+    <!-- Strategy 7: SMS Best Practice -->
+    <argumentReasoning id="S7" name="Strategy 7"
+                       content="An SMS is a best practice for managing system safety.">
+      <description>Argument that a Safety Management System represents best practice</description>
+    </argumentReasoning>
+
+    <!-- Context 15: Safety Advisory Board -->
+    <artifactReference id="CTX_15" name="Context 15"
+                       referencedArtifact="ART_SafetyAdvisoryBoard">
+      <description>Our safety advisory board includes a full set of stakeholder responsibilities</description>
+    </artifactReference>
+
+    <!-- Strategy 16: Appeal to relevant regulation -->
+    <argumentReasoning id="S16" name="Strategy 16"
+                       content="Appeal to relevant regulation.">
+      <description>Argument based on regulatory compliance</description>
+    </argumentReasoning>
+
+    <!-- Strategy 17: Appeal to German Ethics Commission -->
+    <argumentReasoning id="S17" name="Strategy 17"
+                       content="Appeal to German Ethics Commission report.">
+      <description>Argument based on ethical guidelines for automated driving</description>
+    </argumentReasoning>
+
+    <!-- Strategy 18: Appeal to 14 CFR part 5 -->
+    <argumentReasoning id="S18" name="Strategy 18"
+                       content="Appeal to 14 CFR part 5.">
+      <description>Argument based on aviation safety management standards</description>
+    </argumentReasoning>
+
+    <!-- Strategy 19: Appeal to UL 4600 -->
+    <argumentReasoning id="S19" name="Strategy 19"
+                       content="Appeal to UL 4600.">
+      <description>Argument based on autonomous products evaluation standard</description>
+    </argumentReasoning>
+
+    <!-- Strategy 20: Appeal to IATF 16949 -->
+    <argumentReasoning id="S20" name="Strategy 20"
+                       content="Appeal to IATF 16949.">
+      <description>Argument based on automotive quality management standard</description>
+    </argumentReasoning>
+
+    <!-- ============================================================ -->
+    <!-- EVIDENCE REFERENCES                                          -->
+    <!-- ============================================================ -->
+
+    <artifactReference id="EV_13" name="Evidence 13" referencedArtifact="ART_Assessment_13">
+      <description>Results of independent assessment - Transparency</description>
+    </artifactReference>
+
+    <artifactReference id="EV_14" name="Evidence 14" referencedArtifact="ART_Assessment_14">
+      <description>Results of independent assessment - Assessor independence</description>
+    </artifactReference>
+
+    <artifactReference id="EV_27" name="Evidence 27" referencedArtifact="ART_Assessment_27">
+      <description>Results of independent assessment - Safety advisory board</description>
+    </artifactReference>
+
+    <artifactReference id="EV_28" name="Evidence 28" referencedArtifact="ART_Assessment_28">
+      <description>Results of independent assessment - Regulatory compliance</description>
+    </artifactReference>
+
+    <artifactReference id="EV_29" name="Evidence 29" referencedArtifact="ART_Assessment_29">
+      <description>Results of independent assessment - Ethics guidelines</description>
+    </artifactReference>
+
+    <artifactReference id="EV_30" name="Evidence 30" referencedArtifact="ART_Assessment_30">
+      <description>Results of independent assessment - 14 CFR Part 5</description>
+    </artifactReference>
+
+    <artifactReference id="EV_31" name="Evidence 31" referencedArtifact="ART_Assessment_31">
+      <description>Results of independent assessment - UL 4600 improvement</description>
+    </artifactReference>
+
+    <artifactReference id="EV_32" name="Evidence 32" referencedArtifact="ART_Assessment_32">
+      <description>Results of independent assessment - IATF 16949</description>
+    </artifactReference>
+
+    <!-- ============================================================ -->
+    <!-- ASSERTED RELATIONSHIPS                                       -->
+    <!-- ============================================================ -->
+
+    <!-- G8, G9 support G3 via S6 (Transparency) -->
+    <assertedInference id="AI_OrgTrust_Transparency" name="Transparency Inference">
+      <description>Transparency and assessor independence support organizational trustworthiness</description>
+      <source href="#G8"/>
+      <source href="#G9"/>
+      <target href="#G3"/>
+      <reasoning href="#S6"/>
+    </assertedInference>
+
+    <!-- G10, G11, G12 support G3 via S7 (SMS Best Practice) -->
+    <assertedInference id="AI_OrgTrust_SMS" name="SMS Inference">
+      <description>SMS policies, processes, and monitoring support organizational trustworthiness</description>
+      <source href="#G10"/>
+      <source href="#G11"/>
+      <source href="#G12"/>
+      <target href="#G3"/>
+      <reasoning href="#S7"/>
+    </assertedInference>
+
+    <!-- G21 supports G10 via S15 context -->
+    <assertedInference id="AI_G21_G10" name="Advisory Board Approval Inference">
+      <description>Safety advisory board approval supports SMS policy alignment</description>
+      <source href="#G21"/>
+      <target href="#G10"/>
+    </assertedInference>
+
+    <!-- Context link for G21 -->
+    <assertedContext id="AC_G21_CTX15" name="Advisory Board Context">
+      <description>Safety advisory board context for SRC approval</description>
+      <source href="#CTX_15"/>
+      <target href="#G21"/>
+    </assertedContext>
+
+    <!-- G22 supports G10 via S16 -->
+    <assertedInference id="AI_G22_G10" name="Regulatory Compliance Inference">
+      <description>Regulatory compliance supports SMS policy alignment</description>
+      <source href="#G22"/>
+      <target href="#G10"/>
+      <reasoning href="#S16"/>
+    </assertedInference>
+
+    <!-- G23 supports G10 via S17 -->
+    <assertedInference id="AI_G23_G10" name="Ethics Guidelines Inference">
+      <description>Ethics guidelines compliance supports SMS policy alignment</description>
+      <source href="#G23"/>
+      <target href="#G10"/>
+      <reasoning href="#S17"/>
+    </assertedInference>
+
+    <!-- G24 supports G11 via S18 -->
+    <assertedInference id="AI_G24_G11" name="14 CFR Part 5 Inference">
+      <description>14 CFR Part 5 conformance supports SMS processes</description>
+      <source href="#G24"/>
+      <target href="#G11"/>
+      <reasoning href="#S18"/>
+    </assertedInference>
+
+    <!-- G25, G26 support G12 via S19, S20 -->
+    <assertedInference id="AI_G25_G12" name="UL 4600 Improvement Inference">
+      <description>UL 4600 continuous improvement supports safety case monitoring</description>
+      <source href="#G25"/>
+      <target href="#G12"/>
+      <reasoning href="#S19"/>
+    </assertedInference>
+
+    <assertedInference id="AI_G26_G12" name="IATF 16949 Inference">
+      <description>IATF 16949 conformance supports safety case monitoring</description>
+      <source href="#G26"/>
+      <target href="#G12"/>
+      <reasoning href="#S20"/>
+    </assertedInference>
+
+    <!-- Evidence links -->
+    <assertedEvidence id="AE_G8_EV13" name="Transparency Evidence">
+      <description>Assessment results support transparency claim</description>
+      <source href="#EV_13"/>
+      <target href="#G8"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G9_EV14" name="Assessor Independence Evidence">
+      <description>Assessment results support assessor independence claim</description>
+      <source href="#EV_14"/>
+      <target href="#G9"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G21_EV27" name="Advisory Board Approval Evidence">
+      <description>Assessment results support safety advisory board approval claim</description>
+      <source href="#EV_27"/>
+      <target href="#G21"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G22_EV28" name="Regulatory Compliance Evidence">
+      <description>Assessment results support regulatory compliance claim</description>
+      <source href="#EV_28"/>
+      <target href="#G22"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G23_EV29" name="Ethics Guidelines Evidence">
+      <description>Assessment results support ethics guidelines compliance claim</description>
+      <source href="#EV_29"/>
+      <target href="#G23"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G24_EV30" name="14 CFR Part 5 Evidence">
+      <description>Assessment results support 14 CFR Part 5 conformance claim</description>
+      <source href="#EV_30"/>
+      <target href="#G24"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G25_EV31" name="UL 4600 Improvement Evidence">
+      <description>Assessment results support UL 4600 continuous improvement claim</description>
+      <source href="#EV_31"/>
+      <target href="#G25"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G26_EV32" name="IATF 16949 Evidence">
+      <description>Assessment results support IATF 16949 conformance claim</description>
+      <source href="#EV_32"/>
+      <target href="#G26"/>
+    </assertedEvidence>
+
+  </argumentPackage>
+
+  <!-- ============================================================== -->
+  <!-- ARGUMENT PACKAGE: VEHICLE SAFETY (Goal 4)                      -->
+  <!-- "Build It Right"                                               -->
+  <!-- ============================================================== -->
+  <argumentPackage id="ARG_VehicleSafety" name="Vehicle Safety">
+
+    <!-- ============================================================ -->
+    <!-- CLAIMS (Goals 37-44, 53-60)                                  -->
+    <!-- ============================================================ -->
+
+    <!-- Goal 37: Hazard Analysis -->
+    <claim id="G37" name="Goal 37"
+           content="We have analyzed all hazards posed by the vehicle.">
+      <description>Comprehensive hazard analysis completion</description>
+    </claim>
+
+    <!-- Goal 38: Vehicle Safety Standards -->
+    <claim id="G38" name="Goal 38"
+           content="The vehicle conforms with vehicle safety standards.">
+      <description>Conformance with vehicle safety standards</description>
+    </claim>
+
+    <!-- Goal 39: Functional Safety -->
+    <claim id="G39" name="Goal 39"
+           content="The vehicle conforms with functional safety standards.">
+      <description>Conformance with functional safety standards</description>
+    </claim>
+
+    <!-- Goal 40: AI Engineering Rigor -->
+    <claim id="G40" name="Goal 40"
+           content="The vehicle conforms with AI engineering rigor standards.">
+      <description>Conformance with AI/ML engineering standards</description>
+    </claim>
+
+    <!-- Goal 41: Intended Functions Safety -->
+    <claim id="G41" name="Goal 41"
+           content="The vehicle's intended functions are safe.">
+      <description>Safety of intended functionality (SOTIF)</description>
+    </claim>
+
+    <!-- Goal 42: Security Standards -->
+    <claim id="G42" name="Goal 42"
+           content="The vehicle conforms with security standards.">
+      <description>Conformance with cybersecurity standards</description>
+    </claim>
+
+    <!-- Goal 43: Configuration Management -->
+    <claim id="G43" name="Goal 43"
+           content="We follow configuration management standards.">
+      <description>Configuration management practices</description>
+    </claim>
+
+    <!-- Goal 44: Data Recording -->
+    <claim id="G44" name="Goal 44"
+           content="The vehicle conforms with data recording best practices.">
+      <description>Forensic data recording capabilities</description>
+    </claim>
+
+    <!-- Goal 53: STPA Hazard Analysis -->
+    <claim id="G53" name="Goal 53"
+           content="We completed a hazard analysis according to this standard.">
+      <description>Hazard analysis per SAE J3307 STPA</description>
+    </claim>
+
+    <!-- Goal 54: FMVSS Conformance -->
+    <claim id="G54" name="Goal 54"
+           content="Our vehicle conforms with FMVSS.">
+      <description>Federal Motor Vehicle Safety Standards conformance</description>
+    </claim>
+
+    <!-- Goal 55: ISO 26262 Conformance -->
+    <claim id="G55" name="Goal 55"
+           content="We developed our system according to ISO 26262.">
+      <description>Functional safety development per ISO 26262</description>
+    </claim>
+
+    <!-- Goal 56: ISO/PAS 8800 Conformance -->
+    <claim id="G56" name="Goal 56"
+           content="We developed our system according to ISO/PAS 8800.">
+      <description>AI safety development per ISO/PAS 8800</description>
+    </claim>
+
+    <!-- Goal 57: ISO 21448 Conformance -->
+    <claim id="G57" name="Goal 57"
+           content="We developed our system according to ISO 21448.">
+      <description>SOTIF development per ISO 21448</description>
+    </claim>
+
+    <!-- Goal 58: ISO 21434 Conformance -->
+    <claim id="G58" name="Goal 58"
+           content="We developed our system according to ISO 21434.">
+      <description>Cybersecurity engineering per ISO 21434</description>
+    </claim>
+
+    <!-- Goal 59: ISO 10007 Risk Management -->
+    <claim id="G59" name="Goal 59"
+           content="We manage these risks according to ISO 10007.">
+      <description>Configuration management per ISO 10007</description>
+    </claim>
+
+    <!-- Goal 60: SAE AVSC 00004 Conformance -->
+    <claim id="G60" name="Goal 60"
+           content="Our system and operations conform with all recommendations in SAE AVSC 00004.">
+      <description>Data recording per SAE AVSC 00004</description>
+    </claim>
+
+    <!-- ============================================================ -->
+    <!-- STRATEGIES (33-36, 45-52)                                    -->
+    <!-- ============================================================ -->
+
+    <!-- Strategy 33: Safety Hazard Analysis Standards -->
+    <argumentReasoning id="S33" name="Strategy 33"
+                       content="Appeal to safety hazard analysis standards.">
+      <description>Argument based on hazard analysis methodologies</description>
+    </argumentReasoning>
+
+    <!-- Strategy 34: Safety Risk Mitigation Standards -->
+    <argumentReasoning id="S34" name="Strategy 34"
+                       content="Appeal to safety risk mitigation standards.">
+      <description>Argument based on risk mitigation through standards conformance</description>
+    </argumentReasoning>
+
+    <!-- Strategy 35: Configuration Management Standards -->
+    <argumentReasoning id="S35" name="Strategy 35"
+                       content="Appeal to config mgmt standards.">
+      <description>Argument based on configuration management standards</description>
+    </argumentReasoning>
+
+    <!-- Strategy 36: Data Recording Best Practices -->
+    <argumentReasoning id="S36" name="Strategy 36"
+                       content="Appeal to forensic data recording best practices.">
+      <description>Argument based on data recording for incident investigation</description>
+    </argumentReasoning>
+
+    <!-- Strategy 45: SAE J3307 (STPA) -->
+    <argumentReasoning id="S45" name="Strategy 45"
+                       content="Appeal to SAE J3307 (STPA).">
+      <description>Argument based on STPA hazard analysis methodology</description>
+    </argumentReasoning>
+
+    <!-- Strategy 46: FMVSS -->
+    <argumentReasoning id="S46" name="Strategy 46"
+                       content="Appeal to FMVSS.">
+      <description>Argument based on Federal Motor Vehicle Safety Standards</description>
+    </argumentReasoning>
+
+    <!-- Strategy 47: ISO 26262 -->
+    <argumentReasoning id="S47" name="Strategy 47"
+                       content="Appeal to ISO 26262.">
+      <description>Argument based on functional safety standard</description>
+    </argumentReasoning>
+
+    <!-- Strategy 48: ISO/PAS 8800 -->
+    <argumentReasoning id="S48" name="Strategy 48"
+                       content="Appeal to ISO/PAS 8800.">
+      <description>Argument based on AI safety standard</description>
+    </argumentReasoning>
+
+    <!-- Strategy 49: ISO 21448 -->
+    <argumentReasoning id="S49" name="Strategy 49"
+                       content="Appeal to ISO 21448.">
+      <description>Argument based on SOTIF standard</description>
+    </argumentReasoning>
+
+    <!-- Strategy 50: ISO 21434 -->
+    <argumentReasoning id="S50" name="Strategy 50"
+                       content="Appeal to ISO 21434.">
+      <description>Argument based on cybersecurity engineering standard</description>
+    </argumentReasoning>
+
+    <!-- Strategy 51: ISO 10007 -->
+    <argumentReasoning id="S51" name="Strategy 51"
+                       content="Appeal to ISO 10007.">
+      <description>Argument based on configuration management standard</description>
+    </argumentReasoning>
+
+    <!-- Strategy 52: SAE AVSC 00004 -->
+    <argumentReasoning id="S52" name="Strategy 52"
+                       content="Appeal to SAE AVSC 00004.">
+      <description>Argument based on data recording standard</description>
+    </argumentReasoning>
+
+    <!-- ============================================================ -->
+    <!-- EVIDENCE REFERENCES                                          -->
+    <!-- ============================================================ -->
+
+    <artifactReference id="EV_61" name="Evidence 61" referencedArtifact="ART_Assessment_61">
+      <description>Results of independent assessment - STPA hazard analysis</description>
+    </artifactReference>
+
+    <artifactReference id="EV_62" name="Evidence 62" referencedArtifact="ART_Assessment_62">
+      <description>Results of independent assessment - FMVSS</description>
+    </artifactReference>
+
+    <artifactReference id="EV_63" name="Evidence 63" referencedArtifact="ART_Assessment_63">
+      <description>Results of independent assessment - ISO 26262</description>
+    </artifactReference>
+
+    <artifactReference id="EV_64" name="Evidence 64" referencedArtifact="ART_Assessment_64">
+      <description>Results of independent assessment - ISO/PAS 8800</description>
+    </artifactReference>
+
+    <artifactReference id="EV_65" name="Evidence 65" referencedArtifact="ART_Assessment_65">
+      <description>Results of independent assessment - ISO 21448</description>
+    </artifactReference>
+
+    <artifactReference id="EV_66" name="Evidence 66" referencedArtifact="ART_Assessment_66">
+      <description>Results of independent assessment - ISO 21434</description>
+    </artifactReference>
+
+    <artifactReference id="EV_67" name="Evidence 67" referencedArtifact="ART_Assessment_67">
+      <description>Results of independent assessment - ISO 10007</description>
+    </artifactReference>
+
+    <artifactReference id="EV_68" name="Evidence 68" referencedArtifact="ART_Assessment_68">
+      <description>Results of independent assessment - SAE AVSC 00004</description>
+    </artifactReference>
+
+    <!-- ============================================================ -->
+    <!-- ASSERTED RELATIONSHIPS                                       -->
+    <!-- ============================================================ -->
+
+    <!-- G37 supports G4 via S33 (Hazard Analysis) -->
+    <assertedInference id="AI_G37_G4" name="Hazard Analysis Inference">
+      <description>Hazard analysis supports vehicle safety</description>
+      <source href="#G37"/>
+      <target href="#G4"/>
+      <reasoning href="#S33"/>
+    </assertedInference>
+
+    <!-- G38, G39, G40, G41, G42 support G4 via S34 (Risk Mitigation) -->
+    <assertedInference id="AI_RiskMitigation_G4" name="Risk Mitigation Inference">
+      <description>Standards conformance supports vehicle safety through risk mitigation</description>
+      <source href="#G38"/>
+      <source href="#G39"/>
+      <source href="#G40"/>
+      <source href="#G41"/>
+      <source href="#G42"/>
+      <target href="#G4"/>
+      <reasoning href="#S34"/>
+    </assertedInference>
+
+    <!-- G43 supports G4 via S35 (Configuration Management) -->
+    <assertedInference id="AI_G43_G4" name="Configuration Management Inference">
+      <description>Configuration management supports vehicle safety</description>
+      <source href="#G43"/>
+      <target href="#G4"/>
+      <reasoning href="#S35"/>
+    </assertedInference>
+
+    <!-- G44 supports G4 via S36 (Data Recording) -->
+    <assertedInference id="AI_G44_G4" name="Data Recording Inference">
+      <description>Data recording supports vehicle safety through incident investigation capability</description>
+      <source href="#G44"/>
+      <target href="#G4"/>
+      <reasoning href="#S36"/>
+    </assertedInference>
+
+    <!-- G53 supports G37 via S45 -->
+    <assertedInference id="AI_G53_G37" name="STPA Inference">
+      <description>STPA hazard analysis supports hazard identification claim</description>
+      <source href="#G53"/>
+      <target href="#G37"/>
+      <reasoning href="#S45"/>
+    </assertedInference>
+
+    <!-- G54 supports G38 via S46 -->
+    <assertedInference id="AI_G54_G38" name="FMVSS Inference">
+      <description>FMVSS conformance supports vehicle safety standards claim</description>
+      <source href="#G54"/>
+      <target href="#G38"/>
+      <reasoning href="#S46"/>
+    </assertedInference>
+
+    <!-- G55 supports G39 via S47 -->
+    <assertedInference id="AI_G55_G39" name="ISO 26262 Inference">
+      <description>ISO 26262 development supports functional safety claim</description>
+      <source href="#G55"/>
+      <target href="#G39"/>
+      <reasoning href="#S47"/>
+    </assertedInference>
+
+    <!-- G56 supports G40 via S48 -->
+    <assertedInference id="AI_G56_G40" name="ISO/PAS 8800 Inference">
+      <description>ISO/PAS 8800 development supports AI engineering rigor claim</description>
+      <source href="#G56"/>
+      <target href="#G40"/>
+      <reasoning href="#S48"/>
+    </assertedInference>
+
+    <!-- G57 supports G41 via S49 -->
+    <assertedInference id="AI_G57_G41" name="ISO 21448 Inference">
+      <description>ISO 21448 development supports intended functions safety claim</description>
+      <source href="#G57"/>
+      <target href="#G41"/>
+      <reasoning href="#S49"/>
+    </assertedInference>
+
+    <!-- G58 supports G42 via S50 -->
+    <assertedInference id="AI_G58_G42" name="ISO 21434 Inference">
+      <description>ISO 21434 development supports security standards claim</description>
+      <source href="#G58"/>
+      <target href="#G42"/>
+      <reasoning href="#S50"/>
+    </assertedInference>
+
+    <!-- G59 supports G43 via S51 -->
+    <assertedInference id="AI_G59_G43" name="ISO 10007 Inference">
+      <description>ISO 10007 risk management supports configuration management claim</description>
+      <source href="#G59"/>
+      <target href="#G43"/>
+      <reasoning href="#S51"/>
+    </assertedInference>
+
+    <!-- G60 supports G44 via S52 -->
+    <assertedInference id="AI_G60_G44" name="SAE AVSC 00004 Inference">
+      <description>SAE AVSC 00004 conformance supports data recording claim</description>
+      <source href="#G60"/>
+      <target href="#G44"/>
+      <reasoning href="#S52"/>
+    </assertedInference>
+
+    <!-- Evidence links -->
+    <assertedEvidence id="AE_G53_EV61" name="STPA Evidence">
+      <description>Assessment results support STPA hazard analysis claim</description>
+      <source href="#EV_61"/>
+      <target href="#G53"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G54_EV62" name="FMVSS Evidence">
+      <description>Assessment results support FMVSS conformance claim</description>
+      <source href="#EV_62"/>
+      <target href="#G54"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G55_EV63" name="ISO 26262 Evidence">
+      <description>Assessment results support ISO 26262 development claim</description>
+      <source href="#EV_63"/>
+      <target href="#G55"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G56_EV64" name="ISO/PAS 8800 Evidence">
+      <description>Assessment results support ISO/PAS 8800 development claim</description>
+      <source href="#EV_64"/>
+      <target href="#G56"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G57_EV65" name="ISO 21448 Evidence">
+      <description>Assessment results support ISO 21448 development claim</description>
+      <source href="#EV_65"/>
+      <target href="#G57"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G58_EV66" name="ISO 21434 Evidence">
+      <description>Assessment results support ISO 21434 development claim</description>
+      <source href="#EV_66"/>
+      <target href="#G58"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G59_EV67" name="ISO 10007 Evidence">
+      <description>Assessment results support ISO 10007 risk management claim</description>
+      <source href="#EV_67"/>
+      <target href="#G59"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G60_EV68" name="SAE AVSC 00004 Evidence">
+      <description>Assessment results support SAE AVSC 00004 conformance claim</description>
+      <source href="#EV_68"/>
+      <target href="#G60"/>
+    </assertedEvidence>
+
+  </argumentPackage>
+
+  <!-- ============================================================== -->
+  <!-- ARGUMENT PACKAGE: OPERATIONAL SAFETY (Goal 5)                  -->
+  <!-- "Operate It Right"                                             -->
+  <!-- ============================================================== -->
+  <argumentPackage id="ARG_OpSafety" name="Operational Safety">
+
+    <!-- ============================================================ -->
+    <!-- CLAIMS (Goals 72-78)                                         -->
+    <!-- ============================================================ -->
+
+    <!-- Goal 72: Trip Interruptions -->
+    <claim id="G72" name="Goal 72"
+           content="Our operations support trip interruptions IAW all recommendations in SAE AVSC 00003.">
+      <description>Trip interruption operations per SAE AVSC 00003</description>
+    </claim>
+
+    <!-- Goal 73: Post-Crash Operations -->
+    <claim id="G73" name="Goal 73"
+           content="Our post-crash operations conform with all recommendations in SAE AVSC-I-05.">
+      <description>Post-crash operations per SAE AVSC-I-05</description>
+    </claim>
+
+    <!-- Goal 74: Remote Operations -->
+    <claim id="G74" name="Goal 74"
+           content="Our remote operations conform with all recommendations in SAE AVSC-I-04.">
+      <description>Remote operations per SAE AVSC-I-04</description>
+    </claim>
+
+    <!-- Goal 75: First Responder Interactions -->
+    <claim id="G75" name="Goal 75"
+           content="Our first responder interactions conform with all recommendations in SAE AVSC-I-01.">
+      <description>First responder interaction procedures per SAE AVSC-I-01</description>
+    </claim>
+
+    <!-- Goal 76: Safety Inspections -->
+    <claim id="G76" name="Goal 76"
+           content="Our safety inspections conform with all recommendations in SAE AVSC-D-03.">
+      <description>Safety inspection procedures per SAE AVSC-D-03</description>
+    </claim>
+
+    <!-- Goal 77: Metrics Monitoring -->
+    <claim id="G77" name="Goal 77"
+           content="We monitor metrics in operations IAW all recommendations in SAE AVSC 00006.">
+      <description>Operational metrics monitoring per SAE AVSC 00006</description>
+    </claim>
+
+    <!-- Goal 78: Procedural Hazard Mitigations -->
+    <claim id="G78" name="Goal 78"
+           content="Our operating procedures mitigate all hazards without technical mitigations.">
+      <description>Procedural mitigations for residual hazards</description>
+    </claim>
+
+    <!-- ============================================================ -->
+    <!-- STRATEGIES (69-71)                                           -->
+    <!-- ============================================================ -->
+
+    <!-- Strategy 69: Operational Safety Best Practices -->
+    <argumentReasoning id="S69" name="Strategy 69"
+                       content="Appeal to all relevant operational safety best practices.">
+      <description>Argument based on operational safety best practices</description>
+    </argumentReasoning>
+
+    <!-- Strategy 70: Procedural Mitigations -->
+    <argumentReasoning id="S70" name="Strategy 70"
+                       content="Argument over procedural mitigations.">
+      <description>Argument that operating procedures address residual hazards</description>
+    </argumentReasoning>
+
+    <!-- Strategy 71: Effective Safety Management -->
+    <argumentReasoning id="S71" name="Strategy 71"
+                       content="Appeal to effective safety management.">
+      <description>Argument based on safety management effectiveness</description>
+    </argumentReasoning>
+
+    <!-- ============================================================ -->
+    <!-- CONTEXT                                                      -->
+    <!-- ============================================================ -->
+
+    <!-- Context 79: Relevant SMS Claims -->
+    <artifactReference id="CTX_79" name="Context 79"
+                       referencedArtifact="ART_SMSClaims">
+      <description>Relevant SMS claims providing context for operational safety</description>
+    </artifactReference>
+
+    <!-- ============================================================ -->
+    <!-- EVIDENCE REFERENCES                                          -->
+    <!-- ============================================================ -->
+
+    <artifactReference id="EV_80" name="Evidence 80" referencedArtifact="ART_Assessment_80">
+      <description>Results of independent assessment - Trip interruptions</description>
+    </artifactReference>
+
+    <artifactReference id="EV_81" name="Evidence 81" referencedArtifact="ART_Assessment_81">
+      <description>Results of independent assessment - Post-crash operations</description>
+    </artifactReference>
+
+    <artifactReference id="EV_82" name="Evidence 82" referencedArtifact="ART_Assessment_82">
+      <description>Results of independent assessment - Remote operations</description>
+    </artifactReference>
+
+    <artifactReference id="EV_83" name="Evidence 83" referencedArtifact="ART_Assessment_83">
+      <description>Results of independent assessment - First responder interactions</description>
+    </artifactReference>
+
+    <artifactReference id="EV_84" name="Evidence 84" referencedArtifact="ART_Assessment_84">
+      <description>Results of independent assessment - Safety inspections</description>
+    </artifactReference>
+
+    <artifactReference id="EV_85" name="Evidence 85" referencedArtifact="ART_Assessment_85">
+      <description>Results of independent assessment - Metrics monitoring</description>
+    </artifactReference>
+
+    <artifactReference id="EV_86" name="Evidence 86" referencedArtifact="ART_Assessment_86">
+      <description>Results of independent assessment - Procedural mitigations</description>
+    </artifactReference>
+
+    <!-- ============================================================ -->
+    <!-- ASSERTED RELATIONSHIPS                                       -->
+    <!-- ============================================================ -->
+
+    <!-- G72-G77 support G5 via S69 (Operational Best Practices) -->
+    <assertedInference id="AI_OpBestPractices_G5" name="Operational Best Practices Inference">
+      <description>Operational best practices conformance supports safe vehicle operation</description>
+      <source href="#G72"/>
+      <source href="#G73"/>
+      <source href="#G74"/>
+      <source href="#G75"/>
+      <source href="#G76"/>
+      <source href="#G77"/>
+      <target href="#G5"/>
+      <reasoning href="#S69"/>
+    </assertedInference>
+
+    <!-- G78 supports G5 via S70 (Procedural Mitigations) -->
+    <assertedInference id="AI_G78_G5" name="Procedural Mitigations Inference">
+      <description>Procedural mitigations support safe vehicle operation</description>
+      <source href="#G78"/>
+      <target href="#G5"/>
+      <reasoning href="#S70"/>
+    </assertedInference>
+
+    <!-- S71 provides reasoning context linked to SMS -->
+    <assertedContext id="AC_SMS_S71" name="SMS Context for Safety Management">
+      <description>SMS claims provide context for effective safety management strategy</description>
+      <source href="#CTX_79"/>
+      <target href="#S71"/>
+    </assertedContext>
+
+    <!-- Evidence links -->
+    <assertedEvidence id="AE_G72_EV80" name="Trip Interruption Evidence">
+      <description>Assessment results support trip interruption operations claim</description>
+      <source href="#EV_80"/>
+      <target href="#G72"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G73_EV81" name="Post-Crash Evidence">
+      <description>Assessment results support post-crash operations claim</description>
+      <source href="#EV_81"/>
+      <target href="#G73"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G74_EV82" name="Remote Operations Evidence">
+      <description>Assessment results support remote operations claim</description>
+      <source href="#EV_82"/>
+      <target href="#G74"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G75_EV83" name="First Responder Evidence">
+      <description>Assessment results support first responder interactions claim</description>
+      <source href="#EV_83"/>
+      <target href="#G75"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G76_EV84" name="Safety Inspections Evidence">
+      <description>Assessment results support safety inspections claim</description>
+      <source href="#EV_84"/>
+      <target href="#G76"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G77_EV85" name="Metrics Monitoring Evidence">
+      <description>Assessment results support metrics monitoring claim</description>
+      <source href="#EV_85"/>
+      <target href="#G77"/>
+    </assertedEvidence>
+
+    <assertedEvidence id="AE_G78_EV86" name="Procedural Mitigations Evidence">
+      <description>Assessment results support procedural mitigations claim</description>
+      <source href="#EV_86"/>
+      <target href="#G78"/>
+    </assertedEvidence>
+
+  </argumentPackage>
+
+</sacm:AssuranceCasePackage>

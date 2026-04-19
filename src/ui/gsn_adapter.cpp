@@ -4,11 +4,11 @@ namespace ui {
 
 static ElementRole MapType(const std::string& t) {
     if (t == "claim") return ElementRole::Claim;
-    if (t == "assertedContext" || t == "assertedContext") return ElementRole::Context;
-    if (t == "assertedJustification" || t == "justification") return ElementRole::Justification;
+    if (t == "assertedcontext") return ElementRole::Context;
+    if (t == "assertedjustification" || t == "justification") return ElementRole::Justification;
     if (t == "assumption") return ElementRole::Assumption;
-    if (t == "argumentReasoning") return ElementRole::Strategy;
-    if (t == "artifact" || t == "artifactReference" || t == "expression") return ElementRole::Evidence;
+    if (t == "argumentreasoning") return ElementRole::Strategy;
+    if (t == "artifact" || t == "artifactreference" || t == "expression") return ElementRole::Evidence;
     return ElementRole::Other;
 }
 
@@ -20,10 +20,14 @@ std::vector<CanvasElement> ConvertFromAssuranceCase(const parser::AssuranceCase&
         ce.id = e.id.empty() ? e.name : e.id;
         ce.role = MapType(e.type);
         ce.label = !e.name.empty() ? e.name : e.content;
-        ce.parent_id = ""; // TODO: set when parser exposes relations
+        ce.parent_id = ""; // legacy: no relationships
         out.push_back(ce);
     }
     return out;
+}
+
+core::AssuranceTree BuildAssuranceTree(const parser::AssuranceCase& ac) {
+    return core::AssuranceTree::Build(ac);
 }
 
 } // namespace ui
