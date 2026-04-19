@@ -12,15 +12,19 @@ static GsnCanvas& GlobalRenderer() {
 }
 
 static ImU32 ColorForType(const std::string& type) {
-    if (type == "Claim") return IM_COL32(100, 220, 100, 255);
-    if (type == "Evidence") return IM_COL32(230, 180, 80, 255);
+    if (type == "Claim")         return IM_COL32(100, 220, 100, 255);
+    if (type == "Strategy")      return IM_COL32(100, 160, 230, 255);
+    if (type == "Solution")      return IM_COL32(230, 180,  80, 255);
+    if (type == "Context")       return IM_COL32(200, 200, 200, 255);
+    if (type == "Assumption")    return IM_COL32(240, 160, 160, 255);
+    if (type == "Justification") return IM_COL32(180, 200, 240, 255);
+    if (type == "Evidence")      return IM_COL32(230, 180,  80, 255);
     return IM_COL32(200, 200, 200, 255);
 }
 
-void DrawGsnNode(const GsnNode& node) {
+void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
-    ImVec2 win_pos = ImGui::GetCursorScreenPos();
-    ImVec2 a = ImVec2(win_pos.x + node.position.x, win_pos.y + node.position.y);
+    ImVec2 a = ImVec2(canvas_origin.x + node.position.x, canvas_origin.y + node.position.y);
     ImVec2 b = ImVec2(a.x + node.size.x, a.y + node.size.y);
 
     ImU32 col = ColorForType(node.type);
@@ -62,7 +66,8 @@ void ShowGsnCanvasWindow() {
         ImGui::Separator();
 
         // Start a child region so cursor screen pos is stable
-        ImGui::BeginChild("gsn_canvas_child", ImVec2(0, 0), false, ImGuiWindowFlags_NoMove);
+        ImGui::BeginChild("gsn_canvas_child", ImVec2(0, 0), false,
+                          ImGuiWindowFlags_NoMove | ImGuiWindowFlags_HorizontalScrollbar);
 
         // Use a single shared renderer instance
         GlobalRenderer().Render();
@@ -74,6 +79,10 @@ void ShowGsnCanvasWindow() {
 
 void SetCanvasElements(const std::vector<CanvasElement>& elements) {
     GlobalRenderer().SetElements(elements);
+}
+
+void SetCanvasTree(const core::AssuranceTree& tree) {
+    GlobalRenderer().SetTree(tree);
 }
 
 } // namespace ui

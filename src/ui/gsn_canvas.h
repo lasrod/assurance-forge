@@ -4,6 +4,7 @@
 #include <vector>
 #include "imgui.h"
 #include "gsn_model.h"
+#include "core/assurance_tree.h"
 
 namespace ui {
 
@@ -16,7 +17,8 @@ struct GsnNode {
 };
 
 // Draw a single GSN node (rectangle + label) and handle clicks.
-void DrawGsnNode(const GsnNode& node);
+// canvas_origin is the fixed screen-space origin of the canvas.
+void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin);
 
 // Backwards-compatible function used by `main.cpp`.
 // Internally uses the new `GsnCanvas` renderer.
@@ -26,7 +28,10 @@ void ShowGsnCanvasWindow();
 class GsnCanvas;
 
 // Provide a simple setter so external code (app) can push elements to the
-// canvas renderer.
+// canvas renderer (legacy).
 void SetCanvasElements(const std::vector<CanvasElement>& elements);
+
+// Push an AssuranceTree to the canvas renderer (new).
+void SetCanvasTree(const core::AssuranceTree& tree);
 
 } // namespace ui

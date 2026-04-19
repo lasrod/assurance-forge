@@ -85,6 +85,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Application state
     core::AppState app_state;
     static char file_path_buf[512] = "data/sample.sacm.xml";
+    bool tree_needs_rebuild = false;
 
     // Main loop
     bool done = false;
@@ -131,6 +132,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         ImGui::SameLine();
         if (ImGui::Button("Load")) {
             app_state.load_file(file_path_buf);
+            tree_needs_rebuild = true;
         }
 
         // Status display
@@ -144,8 +146,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         if (app_state.loaded_case.has_value()) {
             const auto& ac = app_state.loaded_case.value();
 
-            // Push parsed elements into the GSN canvas renderer
-            ui::SetCanvasElements(ui::ConvertFromAssuranceCase(ac));
+            // Build tree once on load, not every frame
+            if (tree_needs_rebuild) {
+                auto tree = ui::BuildAssuranceTree(ac);
+                ui::SetCanvasTree(tree);
+                tree_needs_rebuild = false;
+            }
 
             ImGui::Text("Assurance Case: %s", ac.name.c_str());
             ImGui::TextWrapped("Description: %s", ac.description.c_str());

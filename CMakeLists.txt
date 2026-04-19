@@ -28,11 +28,12 @@ add_subdirectory(external/pugixml)
 add_executable(assurance-forge WIN32
     src/app/main.cpp
     src/parser/xml_parser.cpp
+    src/core/app_state.cpp
+    src/core/assurance_tree.cpp
     src/ui/gsn_canvas.cpp
     src/ui/gsn_layout.cpp
     src/ui/gsn_canvas_renderer.cpp
     src/ui/gsn_adapter.cpp
-    src/core/app_state.cpp
 )
 target_include_directories(assurance-forge PRIVATE src)
 target_link_libraries(assurance-forge PRIVATE imgui pugixml)
@@ -50,7 +51,10 @@ FetchContent_MakeAvailable(googletest)
 enable_testing()
 add_executable(tests
     tests/test_xml_parser.cpp
+    tests/test_assurance_tree.cpp
+    tests/test_layout.cpp
     src/parser/xml_parser.cpp
+    src/core/assurance_tree.cpp
 )
 target_include_directories(tests PRIVATE src)
 target_link_libraries(tests PRIVATE GTest::gtest_main pugixml)
