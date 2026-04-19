@@ -5,7 +5,7 @@
 
 namespace ui {
 
-ImFont* g_BoldFont = nullptr;
+// g_BoldFont is defined in gsn_layout.cpp (shared between layout and drawing)
 
 // Single shared renderer instance used by the compatibility wrapper.
 static GsnCanvas& GlobalRenderer() {
