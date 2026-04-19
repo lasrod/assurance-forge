@@ -7,14 +7,14 @@ namespace core {
 
 namespace {
 
-NodeRole classify_role(const parser::SacmElement& e) {
-    if (e.type == "claim") {
-        if (e.assertion_declaration == "assumed") return NodeRole::Assumption;
+// ===== Role classification =====
+
+NodeRole classify_role(const parser::SacmElement& element) {
+    if (element.type == "claim") {
+        if (element.assertion_declaration == "assumed") return NodeRole::Assumption;
         return NodeRole::Claim;
     }
-    if (e.type == "argumentreasoning") return NodeRole::Strategy;
-    if (e.type == "artifact" || e.type == "artifactreference") return NodeRole::Other; // role assigned by relationship
-    if (e.type == "expression") return NodeRole::Other;
+    if (element.type == "argumentreasoning") return NodeRole::Strategy;
     return NodeRole::Other;
 }
 
@@ -39,163 +39,172 @@ bool is_relationship(const std::string& type) {
            type == "assertedevidence";
 }
 
+// ===== Relationship processing helpers =====
+
+// Find the first node matching any of the given IDs. Returns nullptr if none found.
+static TreeNode* FindFirstNode(const std::vector<std::string>& refs,
+                               const std::unordered_map<std::string, TreeNode*>& node_by_id) {
+    for (const auto& ref : refs) {
+        auto it = node_by_id.find(ref);
+        if (it != node_by_id.end()) return it->second;
+    }
+    return nullptr;
+}
+
+// Wire a child node as a Group1 child of the given parent (if not already wired).
+static void WireGroup1Child(TreeNode* child, TreeNode* parent, std::unordered_set<std::string>& wired_ids) {
+    if (child->parent != nullptr) return; // already wired
+    child->parent = parent;
+    parent->group1_children.push_back(child);
+    wired_ids.insert(child->id);
+}
+
+// Wire a child node as a Group2 attachment of the given parent with the specified role.
+static void WireGroup2Attachment(TreeNode* child, TreeNode* parent, NodeRole role,
+                                 std::unordered_set<std::string>& wired_ids) {
+    child->role = role;
+    child->group = ElementGroup::Group2;
+    child->parent = parent;
+    parent->group2_attachments.push_back(child);
+    wired_ids.insert(child->id);
+}
+
+// Process an AssertedInference relationship.
+// Wires source claims as Group1 children of the target claim.
+// If a reasoning node (Strategy) is specified, it is inserted between target and sources.
+static void ProcessInference(const parser::SacmElement& relationship,
+                             const std::unordered_map<std::string, TreeNode*>& node_by_id,
+                             std::unordered_set<std::string>& wired_ids) {
+    TreeNode* target_node = FindFirstNode(relationship.target_refs, node_by_id);
+    if (!target_node) return;
+
+    // Determine the parent that sources attach to
+    TreeNode* attach_parent = target_node;
+
+    // If reasoning is specified, insert the strategy node between target and sources
+    if (!relationship.reasoning_ref.empty()) {
+        auto reasoning_it = node_by_id.find(relationship.reasoning_ref);
+        if (reasoning_it != node_by_id.end()) {
+            TreeNode* reasoning_node = reasoning_it->second;
+            reasoning_node->role = NodeRole::Strategy;
+            reasoning_node->group = ElementGroup::Group1;
+            if (reasoning_node->parent == nullptr) {
+                reasoning_node->parent = target_node;
+                target_node->group1_children.push_back(reasoning_node);
+                wired_ids.insert(reasoning_node->id);
+            }
+            attach_parent = reasoning_node;
+        }
+    }
+
+    // Wire source nodes as Group1 children of the attach parent
+    for (const auto& source_ref : relationship.source_refs) {
+        auto source_it = node_by_id.find(source_ref);
+        if (source_it == node_by_id.end()) continue;
+        WireGroup1Child(source_it->second, attach_parent, wired_ids);
+    }
+    wired_ids.insert(target_node->id);
+}
+
+// Process an AssertedContext relationship.
+// Source artifacts become Group2 Context attachments of the target claim.
+static void ProcessContext(const parser::SacmElement& relationship,
+                           const std::unordered_map<std::string, TreeNode*>& node_by_id,
+                           std::unordered_set<std::string>& wired_ids) {
+    if (relationship.target_refs.empty() || relationship.source_refs.empty()) return;
+
+    TreeNode* target_node = FindFirstNode(relationship.target_refs, node_by_id);
+    if (!target_node) return;
+
+    for (const auto& source_ref : relationship.source_refs) {
+        auto source_it = node_by_id.find(source_ref);
+        if (source_it == node_by_id.end()) continue;
+        WireGroup2Attachment(source_it->second, target_node, NodeRole::Context, wired_ids);
+    }
+    wired_ids.insert(target_node->id);
+}
+
+// Process an AssertedEvidence relationship.
+// Source artifacts become Group1 Solution leaf children of the target claim.
+static void ProcessEvidence(const parser::SacmElement& relationship,
+                            const std::unordered_map<std::string, TreeNode*>& node_by_id,
+                            std::unordered_set<std::string>& wired_ids) {
+    if (relationship.target_refs.empty() || relationship.source_refs.empty()) return;
+
+    TreeNode* target_node = FindFirstNode(relationship.target_refs, node_by_id);
+    if (!target_node) return;
+
+    for (const auto& source_ref : relationship.source_refs) {
+        auto source_it = node_by_id.find(source_ref);
+        if (source_it == node_by_id.end()) continue;
+
+        TreeNode* source_node = source_it->second;
+        source_node->role = NodeRole::Solution;
+        source_node->group = ElementGroup::Group1;
+        WireGroup1Child(source_node, target_node, wired_ids);
+    }
+    wired_ids.insert(target_node->id);
+}
+
 }  // namespace
+
+// ===== Build the assurance tree from a parsed SACM case =====
 
 AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac) {
     AssuranceTree tree;
 
-    // Index: id → SacmElement (non-relationship elements only)
-    std::unordered_map<std::string, const parser::SacmElement*> elem_by_id;
-    // Index: id → TreeNode*
+    std::unordered_map<std::string, const parser::SacmElement*> element_by_id;
     std::unordered_map<std::string, TreeNode*> node_by_id;
-    // Track which ids are wired into the tree
     std::unordered_set<std::string> wired_ids;
 
-    // Step 1: Create TreeNode for every non-relationship element
-    for (const auto& e : ac.elements) {
-        if (is_relationship(e.type)) continue;
+    // Step 1: Create a TreeNode for every non-relationship element
+    for (const auto& element : ac.elements) {
+        if (is_relationship(element.type)) continue;
 
         auto node = std::make_unique<TreeNode>();
-        node->id = e.id.empty() ? e.name : e.id;
+        node->id = element.id.empty() ? element.name : element.id;
 
         // Build label: "ID: Name\nDetail"
-        // Claims use content for detail; everything else uses description
-        std::string detail = (e.type == "claim") ? e.content : e.description;
-        node->label = node->id + ": " + e.name;
+        std::string detail = (element.type == "claim") ? element.content : element.description;
+        node->label = node->id + ": " + element.name;
         if (!detail.empty()) {
             node->label += "\n" + detail;
         }
 
-        node->role = classify_role(e);
+        node->role = classify_role(element);
         node->group = group_for_role(node->role);
 
-        elem_by_id[node->id] = &e;
+        element_by_id[node->id] = &element;
         node_by_id[node->id] = node.get();
         tree.nodes.push_back(std::move(node));
     }
 
     // Step 2: Wire the tree using relationship elements
-    for (const auto& e : ac.elements) {
-        if (!is_relationship(e.type)) continue;
+    for (const auto& element : ac.elements) {
+        if (!is_relationship(element.type)) continue;
 
-        if (e.type == "assertedinference") {
-            // AssertedInference: source nodes become Group 1 children of target node
-            // If reasoning is specified, the reasoning node (Strategy) is inserted between
-            // sources and target as: target -> reasoning -> sources
-            if (e.target_refs.empty()) continue;
-
-            TreeNode* target_node = nullptr;
-            for (const auto& tref : e.target_refs) {
-                auto it = node_by_id.find(tref);
-                if (it != node_by_id.end()) {
-                    target_node = it->second;
-                    break;
-                }
-            }
-            if (!target_node) continue;
-
-            // Determine the parent that sources attach to
-            TreeNode* attach_parent = target_node;
-
-            // If reasoning is specified, insert reasoning node between target and sources
-            if (!e.reasoning_ref.empty()) {
-                auto rit = node_by_id.find(e.reasoning_ref);
-                if (rit != node_by_id.end()) {
-                    TreeNode* reasoning_node = rit->second;
-                    reasoning_node->role = NodeRole::Strategy;
-                    reasoning_node->group = ElementGroup::Group1;
-
-                    // Add reasoning as child of target (if not already)
-                    if (reasoning_node->parent == nullptr) {
-                        reasoning_node->parent = target_node;
-                        target_node->group1_children.push_back(reasoning_node);
-                        wired_ids.insert(reasoning_node->id);
-                    }
-
-                    attach_parent = reasoning_node;
-                }
-            }
-
-            // Add source nodes as Group 1 children of attach_parent
-            for (const auto& sref : e.source_refs) {
-                auto sit = node_by_id.find(sref);
-                if (sit == node_by_id.end()) continue;
-
-                TreeNode* source_node = sit->second;
-                if (source_node->parent != nullptr) continue; // already wired
-
-                source_node->parent = attach_parent;
-                attach_parent->group1_children.push_back(source_node);
-                wired_ids.insert(source_node->id);
-            }
-
-            wired_ids.insert(target_node->id);
-
-        } else if (e.type == "assertedcontext") {
-            // AssertedContext: source artifact becomes Group 2 attachment (Context) of target claim
-            if (e.target_refs.empty() || e.source_refs.empty()) continue;
-
-            TreeNode* target_node = nullptr;
-            for (const auto& tref : e.target_refs) {
-                auto it = node_by_id.find(tref);
-                if (it != node_by_id.end()) { target_node = it->second; break; }
-            }
-            if (!target_node) continue;
-
-            for (const auto& sref : e.source_refs) {
-                auto sit = node_by_id.find(sref);
-                if (sit == node_by_id.end()) continue;
-
-                TreeNode* source_node = sit->second;
-                source_node->role = NodeRole::Context;
-                source_node->group = ElementGroup::Group2;
-                source_node->parent = target_node;
-                target_node->group2_attachments.push_back(source_node);
-                wired_ids.insert(source_node->id);
-            }
-
-            wired_ids.insert(target_node->id);
-
-        } else if (e.type == "assertedevidence") {
-            // AssertedEvidence: source artifact becomes Group 1 child (Solution leaf) of target claim
-            if (e.target_refs.empty() || e.source_refs.empty()) continue;
-
-            TreeNode* target_node = nullptr;
-            for (const auto& tref : e.target_refs) {
-                auto it = node_by_id.find(tref);
-                if (it != node_by_id.end()) { target_node = it->second; break; }
-            }
-            if (!target_node) continue;
-
-            for (const auto& sref : e.source_refs) {
-                auto sit = node_by_id.find(sref);
-                if (sit == node_by_id.end()) continue;
-
-                TreeNode* source_node = sit->second;
-                source_node->role = NodeRole::Solution;
-                source_node->group = ElementGroup::Group1;
-                source_node->parent = target_node;
-                target_node->group1_children.push_back(source_node);
-                wired_ids.insert(source_node->id);
-            }
-
-            wired_ids.insert(target_node->id);
+        if (element.type == "assertedinference") {
+            ProcessInference(element, node_by_id, wired_ids);
+        } else if (element.type == "assertedcontext") {
+            ProcessContext(element, node_by_id, wired_ids);
+        } else if (element.type == "assertedevidence") {
+            ProcessEvidence(element, node_by_id, wired_ids);
         }
     }
 
-    // Step 3: Find root (claim with no parent)
-    for (const auto& n : tree.nodes) {
-        if (n->parent == nullptr && n->role == NodeRole::Claim) {
+    // Step 3: Find root (first parentless Claim)
+    for (const auto& node : tree.nodes) {
+        if (node->parent == nullptr && node->role == NodeRole::Claim) {
             if (tree.root == nullptr) {
-                tree.root = n.get();
+                tree.root = node.get();
             }
         }
     }
 
     // Step 4: Collect orphans (non-relationship nodes not wired into the tree)
-    for (const auto& n : tree.nodes) {
-        if (n->parent == nullptr && n.get() != tree.root) {
-            tree.orphans.push_back(n.get());
+    for (const auto& node : tree.nodes) {
+        if (node->parent == nullptr && node.get() != tree.root) {
+            tree.orphans.push_back(node.get());
         }
     }
 

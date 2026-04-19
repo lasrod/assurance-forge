@@ -34,85 +34,77 @@ static pugi::xml_node find_child_by_local_name(pugi::xml_node node, const char* 
 
 void extract_elements_recursive(pugi::xml_node node, std::vector<SacmElement>& elements) {
     for (pugi::xml_node child : node.children()) {
-        std::string node_name = get_local_name(child.name());
+        std::string local_name = get_local_name(child.name());
 
-        // Skip text nodes and processing instructions
-        if (node_name.empty()) {
-            continue;
-        }
+        if (local_name.empty()) continue;
 
-        // Check if this is an element we care about (match local-name so prefixes and case don't matter)
         bool is_relevant =
-            node_name == "claim" ||
-            node_name == "argumentreasoning" ||
-            node_name == "artifact" ||
-            node_name == "artifactreference" ||
-            node_name == "expression" ||
-            node_name == "assertedinference" ||
-            node_name == "assertedcontext" ||
-            node_name == "assertedevidence";
+            local_name == "claim" ||
+            local_name == "argumentreasoning" ||
+            local_name == "artifact" ||
+            local_name == "artifactreference" ||
+            local_name == "expression" ||
+            local_name == "assertedinference" ||
+            local_name == "assertedcontext" ||
+            local_name == "assertedevidence";
 
         if (is_relevant) {
-            SacmElement elem;
-            elem.id = child.attribute("id").as_string();
-            elem.name = child.attribute("name").as_string();
-            elem.type = node_name;
-            elem.content = child.attribute("content").as_string();
-            elem.assertion_declaration = child.attribute("assertionDeclaration").as_string();
+            SacmElement element;
+            element.id = child.attribute("id").as_string();
+            element.name = child.attribute("name").as_string();
+            element.type = local_name;
+            element.content = child.attribute("content").as_string();
+            element.assertion_declaration = child.attribute("assertionDeclaration").as_string();
 
-            // For expression elements, content is in 'value' attribute
-            if (node_name == "expression") {
-                elem.content = child.attribute("value").as_string();
+            if (local_name == "expression") {
+                element.content = child.attribute("value").as_string();
             }
 
-            // Get description from child element (namespace-agnostic) or attribute
+            // Description: try child element first, fall back to attribute
             pugi::xml_node desc_node = find_child_by_local_name(child, "description");
             if (desc_node) {
-                elem.description = desc_node.text().as_string();
-                // Also try <content> inside <description>
+                element.description = desc_node.text().as_string();
                 pugi::xml_node content_node = find_child_by_local_name(desc_node, "content");
                 if (content_node) {
-                    elem.description = content_node.text().as_string();
+                    element.description = content_node.text().as_string();
                 }
             } else {
-                elem.description = child.attribute("description").as_string();
+                element.description = child.attribute("description").as_string();
             }
 
-            // For relationship elements, extract source/target refs and reasoning
-            bool is_relationship =
-                node_name == "assertedinference" ||
-                node_name == "assertedcontext" ||
-                node_name == "assertedevidence";
+            // Relationship elements: extract source/target refs and reasoning
+            bool is_relationship_element =
+                local_name == "assertedinference" ||
+                local_name == "assertedcontext" ||
+                local_name == "assertedevidence";
 
-            if (is_relationship) {
-                for (pugi::xml_node src : child.children()) {
-                    std::string child_local = get_local_name(src.name());
-                    if (child_local == "source") {
-                        std::string ref = get_ref(src);
-                        if (!ref.empty()) elem.source_refs.push_back(ref);
-                    } else if (child_local == "target") {
-                        std::string ref = get_ref(src);
-                        if (!ref.empty()) elem.target_refs.push_back(ref);
-                    } else if (child_local == "reasoning") {
-                        // <reasoning href="#S2"/> child element
-                        std::string ref = get_ref(src);
-                        if (!ref.empty()) elem.reasoning_ref = ref;
+            if (is_relationship_element) {
+                for (pugi::xml_node ref_child : child.children()) {
+                    std::string ref_local_name = get_local_name(ref_child.name());
+                    if (ref_local_name == "source") {
+                        std::string ref = get_ref(ref_child);
+                        if (!ref.empty()) element.source_refs.push_back(ref);
+                    } else if (ref_local_name == "target") {
+                        std::string ref = get_ref(ref_child);
+                        if (!ref.empty()) element.target_refs.push_back(ref);
+                    } else if (ref_local_name == "reasoning") {
+                        std::string ref = get_ref(ref_child);
+                        if (!ref.empty()) element.reasoning_ref = ref;
                     }
                 }
                 // Also check reasoning as attribute: reasoning="ar_1"
-                if (elem.reasoning_ref.empty()) {
+                if (element.reasoning_ref.empty()) {
                     std::string attr_reasoning = child.attribute("reasoning").as_string();
                     if (!attr_reasoning.empty()) {
                         if (attr_reasoning[0] == '#') attr_reasoning = attr_reasoning.substr(1);
-                        elem.reasoning_ref = attr_reasoning;
+                        element.reasoning_ref = attr_reasoning;
                     }
                 }
             }
 
-            elements.push_back(elem);
+            elements.push_back(element);
         }
 
-        // Recurse into child nodes
         extract_elements_recursive(child, elements);
     }
 }
