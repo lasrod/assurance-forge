@@ -55,8 +55,9 @@ add_executable(tests
     tests/test_layout.cpp
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp
+    src/ui/gsn_layout.cpp
 )
 target_include_directories(tests PRIVATE src)
-target_link_libraries(tests PRIVATE GTest::gtest_main pugixml)
+target_link_libraries(tests PRIVATE GTest::gtest_main pugixml imgui)
 include(GoogleTest)
 gtest_discover_tests(tests)

@@ -41,7 +41,39 @@ static void compute_subtree_info(core::TreeNode* node) {
     auto& children = node->group1_children;
     if (children.empty()) {
         node->subtree_width = 1;
+    } else if (children.size() == 1) {
+        node->subtree_width = children[0]->subtree_width;
+    } else if (children.size() % 2 == 1) {
+        // Odd children: the middle child will be centered under the parent.
+        // Compute left_arm and right_arm (space needed on each side of mid).
+        int mid = (int)children.size() / 2;
+        int left_arm = 0;
+        for (int i = 0; i < mid; i++) {
+            left_arm += children[i]->subtree_width;
+            if (i > 0) {
+                left_arm += children[i - 1]->right_overhang
+                          + children[i]->left_overhang;
+            }
+        }
+        // gap between leftmost-of-left and middle
+        left_arm += children[mid - 1]->right_overhang + children[mid]->left_overhang;
+
+        int right_arm = 0;
+        for (int i = mid + 1; i < (int)children.size(); i++) {
+            right_arm += children[i]->subtree_width;
+            if (i > mid + 1) {
+                right_arm += children[i - 1]->right_overhang
+                           + children[i]->left_overhang;
+            }
+        }
+        // gap between middle and leftmost-of-right
+        right_arm += children[mid]->right_overhang + children[mid + 1]->left_overhang;
+
+        // Width must accommodate both arms symmetrically from center
+        int max_arm = std::max(left_arm, right_arm);
+        node->subtree_width = children[mid]->subtree_width + 2 * max_arm;
     } else {
+        // Even children: sequential layout
         int total = 0;
         for (int i = 0; i < (int)children.size(); i++) {
             total += children[i]->subtree_width;
@@ -63,9 +95,40 @@ static void compute_subtree_info(core::TreeNode* node) {
     int own_left  = (has_left_g2  && node->subtree_width < 2) ? 1 : 0;
     int own_right = (has_right_g2 && node->subtree_width < 2) ? 1 : 0;
 
-    // Propagate overhang from the leftmost / rightmost child
-    int child_left  = children.empty() ? 0 : children.front()->left_overhang;
-    int child_right = children.empty() ? 0 : children.back()->right_overhang;
+    // Propagate overhang from the leftmost / rightmost child.
+    // For odd-centered layouts, the shorter arm has padding that absorbs
+    // some child overhang, so we subtract it.
+    int child_left  = 0;
+    int child_right = 0;
+    if (!children.empty()) {
+        child_left  = children.front()->left_overhang;
+        child_right = children.back()->right_overhang;
+
+        if (children.size() > 1 && children.size() % 2 == 1) {
+            int mid = (int)children.size() / 2;
+            int left_arm = 0;
+            for (int i = 0; i < mid; i++) {
+                left_arm += children[i]->subtree_width;
+                if (i > 0)
+                    left_arm += children[i - 1]->right_overhang + children[i]->left_overhang;
+            }
+            left_arm += children[mid - 1]->right_overhang + children[mid]->left_overhang;
+
+            int right_arm = 0;
+            for (int i = mid + 1; i < (int)children.size(); i++) {
+                right_arm += children[i]->subtree_width;
+                if (i > mid + 1)
+                    right_arm += children[i - 1]->right_overhang + children[i]->left_overhang;
+            }
+            right_arm += children[mid]->right_overhang + children[mid + 1]->left_overhang;
+
+            int max_arm = std::max(left_arm, right_arm);
+            int left_padding  = max_arm - left_arm;
+            int right_padding = max_arm - right_arm;
+            child_left  = std::max(0, child_left  - left_padding);
+            child_right = std::max(0, child_right - right_padding);
+        }
+    }
 
     node->left_overhang  = std::max(own_left,  child_left);
     node->right_overhang = std::max(own_right, child_right);
@@ -138,9 +201,33 @@ static void layout_recursive(
 
     if (children.size() == 1) {
         layout_recursive(children[0], column, row + 1, placements, row_max_stack);
+    } else if (children.size() % 2 == 1) {
+        // Odd number of children: anchor the middle child directly under
+        // the parent, then lay out left and right halves outward.
+        int mid = (int)children.size() / 2;
+
+        // Place middle child centered on parent column
+        layout_recursive(children[mid], column, row + 1, placements, row_max_stack);
+
+        // Left half: place rightmost-to-leftmost, growing leftward from middle
+        float cursor = column - (float)children[mid]->subtree_width / 2.0f;
+        for (int i = mid - 1; i >= 0; --i) {
+            cursor -= (float)(children[i]->right_overhang + children[i + 1]->left_overhang);
+            float child_col = cursor - (float)children[i]->subtree_width / 2.0f;
+            layout_recursive(children[i], child_col, row + 1, placements, row_max_stack);
+            cursor -= (float)children[i]->subtree_width;
+        }
+
+        // Right half: place leftmost-to-rightmost, growing rightward from middle
+        cursor = column + (float)children[mid]->subtree_width / 2.0f;
+        for (int i = mid + 1; i < (int)children.size(); ++i) {
+            cursor += (float)(children[i - 1]->right_overhang + children[i]->left_overhang);
+            float child_col = cursor + (float)children[i]->subtree_width / 2.0f;
+            layout_recursive(children[i], child_col, row + 1, placements, row_max_stack);
+            cursor += (float)children[i]->subtree_width;
+        }
     } else {
-        // Distribute children using subtree widths, adding gaps between
-        // adjacent siblings to prevent Group2 attachment overlap.
+        // Even number of children: distribute symmetrically using total width.
         float total_width = 0.0f;
         for (int i = 0; i < (int)children.size(); i++) {
             total_width += (float)children[i]->subtree_width;
@@ -150,8 +237,6 @@ static void layout_recursive(
             }
         }
 
-        // Place children so their subtree spans tile next to each other,
-        // centered under the parent
         float cursor = column - total_width / 2.0f;
         for (int i = 0; i < (int)children.size(); i++) {
             if (i > 0) {
