@@ -6,8 +6,10 @@
 namespace ui {
 
 // ===== Constants =====
-static const float kNodeWidth  = 220.0f;
-static const float kNodeHeight = 100.0f;
+static const float kNodeWidth      = 220.0f;
+static const float kNodeHeight     = 100.0f;
+static const float kSolutionWidth  = 160.0f;  // circle diameter for Solution/Evidence
+static const float kSolutionHeight = 160.0f;
 static const float kHSpacing   =  40.0f;
 static const float kVSpacing   =  80.0f;
 static const float kLeftMargin =  20.0f;
@@ -170,6 +172,7 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
 
     // Step 4: Convert grid positions to pixel positions
     const ImVec2 node_size(kNodeWidth, kNodeHeight);
+    const ImVec2 solution_size(kSolutionWidth, kSolutionHeight);
     float col_unit = kNodeWidth + kHSpacing;
 
     for (const auto& p : placements) {
@@ -178,12 +181,17 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
         ln.role = to_ui_role(p.node->role);
         ln.group = (p.node->group == core::ElementGroup::Group1) ? ElementGroup::Group1 : ElementGroup::Group2;
         ln.label = p.node->label;
-        ln.size = node_size;
+        bool is_solution = (p.node->role == core::NodeRole::Solution);
+        ln.size = is_solution ? solution_size : node_size;
         ln.parent_id = p.node->parent ? p.node->parent->id : "";
         ln.is_left_side = p.is_left_side;
         ln.side_stack_index = p.stack_index;
 
         float x = kLeftMargin + p.pos.col * col_unit;
+        // Center solution circle within the column
+        if (is_solution) {
+            x += (kNodeWidth - kSolutionWidth) * 0.5f;
+        }
         float base_y = row_y[p.pos.row];
 
         if (p.is_group2) {
