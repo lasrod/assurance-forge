@@ -37,6 +37,8 @@ add_executable(assurance-forge WIN32
     src/ui/ui_state.cpp
     src/core/app_state.cpp
     src/core/assurance_tree.cpp
+    src/sacm/sacm_parser.cpp
+    src/sacm/sacm_serializer.cpp
 )
 target_include_directories(assurance-forge PRIVATE src)
 target_link_libraries(assurance-forge PRIVATE imgui pugixml)
@@ -56,11 +58,14 @@ add_executable(tests
     tests/test_xml_parser.cpp
     tests/test_assurance_tree.cpp
     tests/test_layout.cpp
+    tests/test_sacm_roundtrip.cpp
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp
     src/ui/gsn_layout.cpp
+    src/sacm/sacm_parser.cpp
+    src/sacm/sacm_serializer.cpp
 )
 target_include_directories(tests PRIVATE src)
 target_link_libraries(tests PRIVATE GTest::gtest_main pugixml imgui)
 include(GoogleTest)
-gtest_discover_tests(tests)
+gtest_discover_tests(tests WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
