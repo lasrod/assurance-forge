@@ -42,7 +42,8 @@ static void RenderTreeNode(const core::TreeNode* node) {
 
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow
                              | ImGuiTreeNodeFlags_OpenOnDoubleClick
-                             | ImGuiTreeNodeFlags_SpanAvailWidth;
+                             | ImGuiTreeNodeFlags_SpanAvailWidth
+                             | ImGuiTreeNodeFlags_DefaultOpen;
 
     bool has_children = !node->group1_children.empty() || !node->group2_attachments.empty();
     if (!has_children)
@@ -88,7 +89,7 @@ void ShowTreeViewPanel(const core::AssuranceTree* tree) {
         // Show orphan nodes if any
         if (!tree->orphans.empty()) {
             ImGui::Separator();
-            if (ImGui::TreeNodeEx("##orphans", ImGuiTreeNodeFlags_DefaultOpen, "Orphans (%d)", (int)tree->orphans.size())) {
+            if (ImGui::TreeNodeEx("##orphans", ImGuiTreeNodeFlags_None, "Orphans (%d)", (int)tree->orphans.size())) {
                 for (const auto* orphan : tree->orphans) {
                     RenderTreeNode(orphan);
                 }
