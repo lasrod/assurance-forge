@@ -1,4 +1,4 @@
-#include "sacm/sacm_parser.h"
+﻿#include "sacm/sacm_parser.h"
 #include <pugixml.hpp>
 #include <algorithm>
 #include <cctype>
@@ -34,27 +34,90 @@ static std::string get_ref(pugi::xml_node node) {
     return ref;
 }
 
-// Extract description text from a node. Handles:
-//   <description><content lang="en">text</content></description>
+// Extract multi-language description from a node. Handles:
+//   <description><content lang="en">text</content><content lang="ja">text</content></description>
+//   <description><content>text</content></description>   (no lang -> "en")
 //   <description>text</description>
 //   description="text" attribute
-static std::string extract_description(pugi::xml_node node) {
+static MultiLangText extract_description_ml(pugi::xml_node node) {
+    MultiLangText ml;
     auto desc_node = find_child(node, "description");
     if (desc_node) {
-        auto content_node = find_child(desc_node, "content");
-        if (content_node) {
-            return content_node.text().as_string();
+        bool found_content = false;
+        for (auto child : desc_node.children()) {
+            if (local_name(child.name()) == "content") {
+                std::string lang = child.attribute("lang").as_string();
+                if (lang.empty()) lang = "en";
+                std::string text = child.text().as_string();
+                if (!text.empty()) {
+                    ml.set(lang, text);
+                }
+                found_content = true;
+            }
         }
-        return desc_node.text().as_string();
+        if (!found_content) {
+            std::string text = desc_node.text().as_string();
+            if (!text.empty()) ml.set("en", text);
+        }
+    } else {
+        std::string text = node.attribute("description").as_string();
+        if (!text.empty()) ml.set("en", text);
     }
-    return node.attribute("description").as_string();
+    return ml;
+}
+
+// Extract multi-language name from <name> child element (same pattern as description).
+// Falls back to the "name" attribute.
+static MultiLangText extract_name_ml(pugi::xml_node node) {
+    MultiLangText ml;
+    auto name_node = find_child(node, "name");
+    if (name_node) {
+        bool found_content = false;
+        for (auto child : name_node.children()) {
+            if (local_name(child.name()) == "content") {
+                std::string lang = child.attribute("lang").as_string();
+                if (lang.empty()) lang = "en";
+                std::string text = child.text().as_string();
+                if (!text.empty()) {
+                    ml.set(lang, text);
+                }
+                found_content = true;
+            }
+        }
+        if (!found_content) {
+            std::string text = name_node.text().as_string();
+            if (!text.empty()) ml.set("en", text);
+        }
+    } else {
+        std::string text = node.attribute("name").as_string();
+        if (!text.empty()) ml.set("en", text);
+    }
+    return ml;
+}
+
+// Extract multi-language content from <content lang="xx"> direct children of the element.
+static MultiLangText extract_content_ml(pugi::xml_node node) {
+    MultiLangText ml;
+    for (auto child : node.children()) {
+        if (local_name(child.name()) == "content") {
+            std::string lang = child.attribute("lang").as_string();
+            if (lang.empty()) lang = "en";
+            std::string text = child.text().as_string();
+            if (!text.empty()) {
+                ml.set(lang, text);
+            }
+        }
+    }
+    return ml;
 }
 
 // Parse base SacmElement fields.
 static void parse_base(pugi::xml_node node, SacmElement& elem) {
     elem.id = node.attribute("id").as_string();
-    elem.name = node.attribute("name").as_string();
-    elem.description = extract_description(node);
+    elem.name_ml = extract_name_ml(node);
+    elem.name = elem.name_ml.get_primary();
+    elem.description_ml = extract_description_ml(node);
+    elem.description = elem.description_ml.get_primary();
 }
 
 // Parse source and target child refs into an AssertedRelationship.
@@ -118,6 +181,16 @@ static Claim parse_claim(pugi::xml_node node) {
         auto stmt = find_child(node, "statement");
         if (stmt) c.content = stmt.text().as_string();
     }
+    // Store content in multilang map (attribute is primary lang)
+    if (!c.content.empty()) {
+        c.content_ml.set("en", c.content);
+    }
+    // Extract multi-language content from <content lang="xx"> direct children
+    MultiLangText content_ml = extract_content_ml(node);
+    if (!content_ml.texts.empty()) {
+        c.content_ml = content_ml;
+        c.content = c.content_ml.get_primary();
+    }
     c.assertionDeclaration = node.attribute("assertionDeclaration").as_string();
     return c;
 }
@@ -126,6 +199,15 @@ static ArgumentReasoning parse_argument_reasoning(pugi::xml_node node) {
     ArgumentReasoning ar;
     parse_base(node, ar);
     ar.content = node.attribute("content").as_string();
+    if (!ar.content.empty()) {
+        ar.content_ml.set("en", ar.content);
+    }
+    // Extract multi-language content from <content lang="xx"> direct children
+    MultiLangText content_ml = extract_content_ml(node);
+    if (!content_ml.texts.empty()) {
+        ar.content_ml = content_ml;
+        ar.content = ar.content_ml.get_primary();
+    }
     return ar;
 }
 

@@ -62,6 +62,7 @@ static void RenderTreeNode(const core::TreeNode* node) {
 
     if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
         state.selected_element_id = node->id;
+        state.center_on_selection = true;
     }
 
     if (has_children && open) {

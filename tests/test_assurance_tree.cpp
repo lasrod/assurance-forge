@@ -1,6 +1,7 @@
-#include <gtest/gtest.h>
+﻿#include <gtest/gtest.h>
 #include "core/assurance_tree.h"
 #include "parser/xml_parser.h"
+#include "sacm/sacm_model.h"
 
 using namespace core;
 using namespace parser;
@@ -255,4 +256,83 @@ TEST(AssuranceTreeTest, FullVehicleBrakingExample) {
     // ctx_1 should be context attachment on root
     EXPECT_EQ(tree.root->group2_attachments[0]->id, "ctx_1");
     EXPECT_EQ(tree.root->group2_attachments[0]->role, NodeRole::Context);
+}
+
+// ----- Multi-language label_secondary -----
+
+TEST(AssuranceTreeTest, SecondaryLabelFromDescriptionLangs) {
+    const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="urn:test" id="T" name="T">
+  <argumentPackage id="AP" name="AP">
+    <claim id="cl_top" name="TopClaim" content="Safe">
+      <description>
+        <content lang="en">English desc</content>
+        <content lang="ja">Japanese desc</content>
+      </description>
+    </claim>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    auto tree = build_tree_from_xml(xml);
+    ASSERT_NE(tree.root, nullptr);
+    // label_secondary should contain japanese desc
+    EXPECT_TRUE(tree.root->label_secondary.find("Japanese desc") != std::string::npos);
+    // primary label should contain english desc or content
+    EXPECT_TRUE(tree.root->label.find("Safe") != std::string::npos);
+}
+
+TEST(AssuranceTreeTest, SecondaryLabelFallsToPrimaryWhenNoJa) {
+    const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="urn:test" id="T" name="T">
+  <argumentPackage id="AP" name="AP">
+    <claim id="cl_top" name="TopClaim" content="Safe">
+      <description>English only</description>
+    </claim>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    auto tree = build_tree_from_xml(xml);
+    ASSERT_NE(tree.root, nullptr);
+    // When no ja exists, secondary should fall back to primary detail
+    EXPECT_TRUE(tree.root->label_secondary.find("Safe") != std::string::npos);
+}
+
+// ----- MultiLangText struct -----
+
+TEST(MultiLangTextTest, GetWithFallback) {
+    sacm::MultiLangText ml;
+    ml.set("en", "English");
+    ml.set("ja", "Japanese");
+
+    EXPECT_EQ(ml.get("en"), "English");
+    EXPECT_EQ(ml.get("ja"), "Japanese");
+    // Fallback to "en" for unknown lang
+    EXPECT_EQ(ml.get("fr"), "English");
+}
+
+TEST(MultiLangTextTest, GetPrimary) {
+    sacm::MultiLangText ml;
+    ml.set("en", "English");
+    ml.set("ja", "Japanese");
+    EXPECT_EQ(ml.get_primary(), "English");
+
+    sacm::MultiLangText ml2;
+    ml2.set("ja", "Only Japanese");
+    // No en, should return first available
+    EXPECT_EQ(ml2.get_primary(), "Only Japanese");
+}
+
+TEST(MultiLangTextTest, HasSecondary) {
+    sacm::MultiLangText ml;
+    ml.set("en", "English");
+    EXPECT_FALSE(ml.has_secondary());
+    ml.set("ja", "Japanese");
+    EXPECT_TRUE(ml.has_secondary());
+}
+
+TEST(MultiLangTextTest, EmptyTextReturnsEmpty) {
+    sacm::MultiLangText ml;
+    EXPECT_EQ(ml.get("en"), "");
+    EXPECT_EQ(ml.get_primary(), "");
+    EXPECT_FALSE(ml.has_secondary());
 }

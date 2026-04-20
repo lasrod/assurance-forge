@@ -1,4 +1,4 @@
-#include <gtest/gtest.h>
+﻿#include <gtest/gtest.h>
 #include "parser/xml_parser.h"
 
 using namespace parser;
@@ -298,4 +298,57 @@ TEST(XmlParserTest, ParseCrossPackageReferences) {
     EXPECT_TRUE(found_g3);
     EXPECT_TRUE(found_s2);
     EXPECT_TRUE(found_ai1);
+}
+
+// Test multi-language description parsing
+TEST(XmlParserTest, ParseMultiLangDescription) {
+    const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage
+    xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation"
+    id="TEST" name="Test" description="Test">
+    <argumentPackage id="AP1" name="Args">
+        <claim id="G1" name="Goal 1" content="System is safe.">
+            <description>
+                <content lang="en">Top safety claim</content>
+                <content lang="ja">&#12488;&#12483;&#12503;&#23433;&#20840;&#20027;&#24373;</content>
+            </description>
+        </claim>
+    </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    ParseResult result = parse_sacm_xml_string(xml);
+    ASSERT_TRUE(result.success);
+    ASSERT_EQ(result.assurance_case.elements.size(), 1);
+
+    const auto& claim = result.assurance_case.elements[0];
+    EXPECT_EQ(claim.description, "Top safety claim");
+
+    // description_langs should have both en and ja
+    auto en_it = claim.description_langs.find("en");
+    ASSERT_NE(en_it, claim.description_langs.end());
+    EXPECT_EQ(en_it->second, "Top safety claim");
+
+    auto ja_it = claim.description_langs.find("ja");
+    ASSERT_NE(ja_it, claim.description_langs.end());
+    EXPECT_FALSE(ja_it->second.empty());
+}
+
+// Test that description without lang attribute defaults to en
+TEST(XmlParserTest, ParseDescriptionDefaultLang) {
+    const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage
+    xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation"
+    id="TEST" name="Test" description="Test">
+    <argumentPackage id="AP1" name="Args">
+        <claim id="G1" name="Goal 1" content="Safe.">
+            <description>Simple description</description>
+        </claim>
+    </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    ParseResult result = parse_sacm_xml_string(xml);
+    ASSERT_TRUE(result.success);
+    ASSERT_EQ(result.assurance_case.elements.size(), 1);
+    const auto& claim = result.assurance_case.elements[0];
+    EXPECT_EQ(claim.description, "Simple description");
 }

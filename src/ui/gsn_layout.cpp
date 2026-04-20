@@ -1,4 +1,4 @@
-#include "gsn_layout.h"
+﻿#include "gsn_layout.h"
 #include "gsn_canvas.h" // for g_BoldFont
 #include <algorithm>
 #include <unordered_map>
@@ -167,7 +167,7 @@ static void compute_subtree_info(core::TreeNode* node) {
     bool has_right_attachment = (attachment_count >= 2);   // second+ goes right
 
     // Own overhang: if the subtree is too narrow (< 2 columns) the Group2
-    // node at column ± 1 extends beyond the subtree boundary.
+    // node at column Â± 1 extends beyond the subtree boundary.
     int own_left  = (has_left_attachment  && node->subtree_width < 2) ? 1 : 0;
     int own_right = (has_right_attachment && node->subtree_width < 2) ? 1 : 0;
 
@@ -196,7 +196,7 @@ static void compute_subtree_info(core::TreeNode* node) {
     node->right_overhang = std::max(own_right, child_right_overhang);
 }
 
-// ===== Group 2 side distribution (GSN spec §10.2.1) =====
+// ===== Group 2 side distribution (GSN spec Â§10.2.1) =====
 // Distributes N attachments between left and right sides: ceil(N/2) left, floor(N/2) right.
 // Returns pair: (left_indices, right_indices) into the attachments vector.
 static std::pair<std::vector<int>, std::vector<int>> DistributeAttachmentSides(int count) {
@@ -390,6 +390,7 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
         layout_node.group = (placement.node->group == core::ElementGroup::Group1)
                           ? ElementGroup::Group1 : ElementGroup::Group2;
         layout_node.label = placement.node->label;
+        layout_node.label_secondary = placement.node->label_secondary;
         layout_node.size  = node_sizes[placement.node->id];
         layout_node.parent_id = placement.node->parent ? placement.node->parent->id : "";
         layout_node.is_left_side = placement.is_left_side;
@@ -415,7 +416,7 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
     return result;
 }
 
-// ===== Legacy flat layout (deprecated — kept for backwards compatibility) =====
+// ===== Legacy flat layout (deprecated â€” kept for backwards compatibility) =====
 std::vector<LayoutNode> LayoutEngine::ComputeLayout(const std::vector<CanvasElement>& elements) {
     std::vector<LayoutNode> nodes;
     const ImVec2 default_size = ImVec2(kNodeWidth, kNodeHeight);
@@ -434,6 +435,7 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const std::vector<CanvasElem
         layout_node.id = claims[i].id;
         layout_node.role = claims[i].role;
         layout_node.label = claims[i].label;
+        layout_node.label_secondary = claims[i].label_secondary;
         layout_node.size = default_size;
         layout_node.position = ImVec2(kLeftMargin + (float)i * (kNodeWidth + kHSpacing), kTopMargin);
         layout_node.parent_id = claims[i].parent_id;
@@ -451,6 +453,7 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const std::vector<CanvasElem
             layout_node.id = row_elements[i].id;
             layout_node.role = row_elements[i].role;
             layout_node.label = row_elements[i].label;
+            layout_node.label_secondary = row_elements[i].label_secondary;
             layout_node.size = default_size;
             layout_node.position = ImVec2(kLeftMargin + (float)i * (kNodeWidth + kHSpacing),
                                           kTopMargin + (float)row_index * (kNodeHeight + kVSpacing));

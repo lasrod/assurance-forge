@@ -1,4 +1,4 @@
-// Assurance Forge - Win32 + DirectX11 Application
+﻿// Assurance Forge - Win32 + DirectX11 Application
 // Minimal ImGui window with SACM XML parsing capability
 
 #include "imgui.h"
@@ -15,6 +15,10 @@
 
 #include "core/app_state.h"
 #include <cstdio>   // for FILE, fopen, fclose (file-exists check)
+#include <filesystem>
+#include <vector>
+#include <string>
+#include <algorithm>
 
 // DirectX 11 globals
 static ID3D11Device*            g_pd3dDevice = nullptr;
@@ -74,7 +78,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.IniFilename = nullptr;  // Disable imgui.ini — we manage layout manually
+    io.IniFilename = nullptr;  // Disable imgui.ini â€” we manage layout manually
     // Docking requires a docking-enabled Dear ImGui build. If you update
     // the bundled ImGui to a version with docking support, re-enable
     // the following line:
@@ -84,10 +88,52 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ImGui::StyleColorsDark();
 
     // Load fonts: normal and bold variants of Segoe UI (Windows system font)
+    // with Japanese glyph ranges merged from Yu Gothic or MS Gothic
     const char* font_path = "C:\\Windows\\Fonts\\segoeui.ttf";
     const char* bold_path = "C:\\Windows\\Fonts\\segoeuib.ttf";
-    io.Fonts->AddFontFromFileTTF(font_path, 15.0f);  // default font
+    io.Fonts->AddFontFromFileTTF(font_path, 15.0f);  // default font (Latin)
+
+    // Merge Japanese font on top of the default font
+    {
+        ImFontConfig merge_cfg;
+        merge_cfg.MergeMode = true;
+        const char* jp_fonts[] = {
+            "C:\\Windows\\Fonts\\YuGothR.ttc",
+            "C:\\Windows\\Fonts\\msgothic.ttc",
+            "C:\\Windows\\Fonts\\meiryo.ttc",
+            nullptr
+        };
+        for (const char** jp = jp_fonts; *jp; ++jp) {
+            FILE* f = fopen(*jp, "rb");
+            if (f) {
+                fclose(f);
+                io.Fonts->AddFontFromFileTTF(*jp, 15.0f, &merge_cfg, io.Fonts->GetGlyphRangesJapanese());
+                break;
+            }
+        }
+    }
+
+    // Bold font
     ui::g_BoldFont = io.Fonts->AddFontFromFileTTF(bold_path, 15.0f);
+    if (ui::g_BoldFont) {
+        // Merge Japanese font on top of bold font too
+        ImFontConfig merge_cfg;
+        merge_cfg.MergeMode = true;
+        const char* jp_fonts[] = {
+            "C:\\Windows\\Fonts\\YuGothR.ttc",
+            "C:\\Windows\\Fonts\\msgothic.ttc",
+            "C:\\Windows\\Fonts\\meiryo.ttc",
+            nullptr
+        };
+        for (const char** jp = jp_fonts; *jp; ++jp) {
+            FILE* f = fopen(*jp, "rb");
+            if (f) {
+                fclose(f);
+                io.Fonts->AddFontFromFileTTF(*jp, 15.0f, &merge_cfg, io.Fonts->GetGlyphRangesJapanese());
+                break;
+            }
+        }
+    }
     if (!ui::g_BoldFont) {
         // Fallback: use default font for bold too
         ui::g_BoldFont = io.Fonts->Fonts[0];
@@ -100,9 +146,38 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Application state
     core::AppState app_state;
     static char file_path_buf[512] = "data/open-autonomy-safety-case.sacm.xml";
+    static char dir_path_buf[512] = "data";
+    static std::vector<std::string> xml_files;
+    static int selected_file_idx = -1;
     bool tree_needs_rebuild = false;
     core::AssuranceTree current_tree;
     bool show_overwrite_confirm = false;
+
+    // Scan directory for XML files
+    auto scan_directory = [&]() {
+        xml_files.clear();
+        selected_file_idx = -1;
+        std::error_code ec;
+        if (std::filesystem::is_directory(dir_path_buf, ec)) {
+            for (const auto& entry : std::filesystem::directory_iterator(dir_path_buf, ec)) {
+                if (!entry.is_regular_file()) continue;
+                auto ext = entry.path().extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(),
+                               [](unsigned char c) { return std::tolower(c); });
+                if (ext == ".xml") {
+                    xml_files.push_back(entry.path().string());
+                }
+            }
+            std::sort(xml_files.begin(), xml_files.end());
+            // Select current file if it matches
+            for (int i = 0; i < (int)xml_files.size(); ++i) {
+                if (xml_files[i] == file_path_buf) { selected_file_idx = i; break; }
+            }
+        }
+    };
+
+    // Initial scan
+    scan_directory();
 
     // Fixed panel window flags (no moving, no resizing, no collapsing)
     const ImGuiWindowFlags kPanelFlags = ImGuiWindowFlags_NoMove
@@ -217,9 +292,44 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
 
         // File loading section
+        ImGui::Text("Directory:");
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::InputText("##dirpath", dir_path_buf, sizeof(dir_path_buf),
+                             ImGuiInputTextFlags_EnterReturnsTrue)) {
+            scan_directory();
+        }
+
         ImGui::Text("XML File:");
         ImGui::SetNextItemWidth(-1);
-        ImGui::InputText("##filepath", file_path_buf, sizeof(file_path_buf));
+        // Build combo items from xml_files
+        if (xml_files.empty()) {
+            ImGui::TextDisabled("No XML files found");
+        } else {
+            // Show filename-only for preview
+            const char* preview = "";
+            if (selected_file_idx >= 0 && selected_file_idx < (int)xml_files.size()) {
+                const std::string& sel = xml_files[selected_file_idx];
+                auto pos = sel.find_last_of("/\\");
+                preview = (pos != std::string::npos) ? sel.c_str() + pos + 1 : sel.c_str();
+            }
+            if (ImGui::BeginCombo("##fileselect", preview)) {
+                for (int i = 0; i < (int)xml_files.size(); ++i) {
+                    const std::string& path = xml_files[i];
+                    auto pos = path.find_last_of("/\\");
+                    const char* label = (pos != std::string::npos) ? path.c_str() + pos + 1 : path.c_str();
+                    bool is_selected = (i == selected_file_idx);
+                    if (ImGui::Selectable(label, is_selected)) {
+                        selected_file_idx = i;
+                        size_t len = path.size();
+                        if (len >= sizeof(file_path_buf)) len = sizeof(file_path_buf) - 1;
+                        memcpy(file_path_buf, path.c_str(), len);
+                        file_path_buf[len] = '\0';
+                    }
+                    if (is_selected) ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+        }
         if (ImGui::Button("Load")) {
             app_state.load_file(file_path_buf);
             tree_needs_rebuild = true;
@@ -277,6 +387,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             if (tree_needs_rebuild) {
                 current_tree = ui::BuildAssuranceTree(ac);
                 ui::SetCanvasTree(current_tree);
+                ui::GetUiState().model_has_translations = ui::ModelHasTranslations(ac);
                 tree_needs_rebuild = false;
             }
 
@@ -329,7 +440,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             parser::AssuranceCase* ac_ptr = app_state.loaded_case.has_value() ? &app_state.loaded_case.value() : nullptr;
             sacm::AssuranceCasePackage* sacm_ptr = app_state.sacm_package.has_value() ? &app_state.sacm_package.value() : nullptr;
             if (ui::ShowElementPanel(ac_ptr, sacm_ptr)) {
-                // An edit occurred — rebuild tree so canvas reflects changes
+                // An edit occurred â€” rebuild tree so canvas reflects changes
                 tree_needs_rebuild = true;
             }
         }

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <string>
 #include <vector>
@@ -27,6 +27,7 @@ struct CanvasElement {
     std::string id;
     ElementRole role = ElementRole::Other;
     std::string label;
+    std::string label_secondary;
     std::string parent_id; // empty if none
 };
 
@@ -35,6 +36,7 @@ struct LayoutNode {
     ElementRole role = ElementRole::Other;
     ElementGroup group = ElementGroup::Group1;
     std::string label;
+    std::string label_secondary;
     ImVec2 position;
     ImVec2 size;
     std::string parent_id;

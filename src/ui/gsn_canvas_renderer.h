@@ -28,6 +28,9 @@ public:
     void Pan(float dx, float dy);
     ImVec2 GetViewOffset() const { return view_offset_; }
 
+    // Center the view on a specific node by ID. Returns true if found.
+    bool CenterOnNode(const std::string& node_id, ImVec2 viewport_size);
+
     // Get the bounding box of all content in layout-space (unzoomed).
     // Returns min and max corners. If no nodes, both are (0,0).
     void GetContentBounds(ImVec2& out_min, ImVec2& out_max) const;

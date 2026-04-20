@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <string>
 #include <vector>
@@ -8,8 +8,8 @@
 namespace core {
 
 enum class ElementGroup {
-    Group1,  // Structural: Claim, Strategy, Solution — placed below parent
-    Group2   // Contextual: Context, Assumption, Justification — side-attached
+    Group1,  // Structural: Claim, Strategy, Solution â€” placed below parent
+    Group2   // Contextual: Context, Assumption, Justification â€” side-attached
 };
 
 enum class NodeRole {
@@ -25,6 +25,7 @@ enum class NodeRole {
 struct TreeNode {
     std::string id;
     std::string label;
+    std::string label_secondary;  // secondary language label for toggle
     NodeRole role = NodeRole::Other;
     ElementGroup group = ElementGroup::Group1;
 

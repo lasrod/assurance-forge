@@ -1,10 +1,10 @@
 {
-  "tests": 38,
+  "tests": 46,
   "name": "AllTests",
   "testsuites": [
     {
       "name": "XmlParserTest",
-      "tests": 11,
+      "tests": 13,
       "testsuite": [
         {
           "name": "ParseMinimalValidXml",
@@ -60,52 +60,98 @@
           "name": "ParseCrossPackageReferences",
           "file": "C:\\development\\assurance-forge\\tests\\test_xml_parser.cpp",
           "line": 262
+        },
+        {
+          "name": "ParseMultiLangDescription",
+          "file": "C:\\development\\assurance-forge\\tests\\test_xml_parser.cpp",
+          "line": 304
+        },
+        {
+          "name": "ParseDescriptionDefaultLang",
+          "file": "C:\\development\\assurance-forge\\tests\\test_xml_parser.cpp",
+          "line": 337
         }
       ]
     },
     {
       "name": "AssuranceTreeTest",
-      "tests": 8,
+      "tests": 10,
       "testsuite": [
         {
           "name": "RootIsTopClaim",
           "file": "C:\\development\\assurance-forge\\tests\\test_assurance_tree.cpp",
-          "line": 17
+          "line": 18
         },
         {
           "name": "InferenceWiresGroup1Children",
           "file": "C:\\development\\assurance-forge\\tests\\test_assurance_tree.cpp",
-          "line": 38
+          "line": 39
         },
         {
           "name": "ReasoningInsertsStrategy",
           "file": "C:\\development\\assurance-forge\\tests\\test_assurance_tree.cpp",
-          "line": 62
+          "line": 63
         },
         {
           "name": "ContextIsGroup2Attachment",
           "file": "C:\\development\\assurance-forge\\tests\\test_assurance_tree.cpp",
-          "line": 90
+          "line": 91
         },
         {
           "name": "EvidenceIsSolutionGroup1Leaf",
           "file": "C:\\development\\assurance-forge\\tests\\test_assurance_tree.cpp",
-          "line": 113
+          "line": 114
         },
         {
           "name": "AssumedClaimIsAssumption",
           "file": "C:\\development\\assurance-forge\\tests\\test_assurance_tree.cpp",
-          "line": 137
+          "line": 138
         },
         {
           "name": "OrphanedElementsAtRootLevel",
           "file": "C:\\development\\assurance-forge\\tests\\test_assurance_tree.cpp",
-          "line": 163
+          "line": 164
         },
         {
           "name": "FullVehicleBrakingExample",
           "file": "C:\\development\\assurance-forge\\tests\\test_assurance_tree.cpp",
-          "line": 182
+          "line": 183
+        },
+        {
+          "name": "SecondaryLabelFromDescriptionLangs",
+          "file": "C:\\development\\assurance-forge\\tests\\test_assurance_tree.cpp",
+          "line": 263
+        },
+        {
+          "name": "SecondaryLabelFallsToPrimaryWhenNoJa",
+          "file": "C:\\development\\assurance-forge\\tests\\test_assurance_tree.cpp",
+          "line": 284
+        }
+      ]
+    },
+    {
+      "name": "MultiLangTextTest",
+      "tests": 4,
+      "testsuite": [
+        {
+          "name": "GetWithFallback",
+          "file": "C:\\development\\assurance-forge\\tests\\test_assurance_tree.cpp",
+          "line": 302
+        },
+        {
+          "name": "GetPrimary",
+          "file": "C:\\development\\assurance-forge\\tests\\test_assurance_tree.cpp",
+          "line": 313
+        },
+        {
+          "name": "HasSecondary",
+          "file": "C:\\development\\assurance-forge\\tests\\test_assurance_tree.cpp",
+          "line": 325
+        },
+        {
+          "name": "EmptyTextReturnsEmpty",
+          "file": "C:\\development\\assurance-forge\\tests\\test_assurance_tree.cpp",
+          "line": 333
         }
       ]
     },

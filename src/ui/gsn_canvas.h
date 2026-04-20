@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <string>
 #include <vector>
@@ -14,6 +14,7 @@ struct GsnNode {
     ImVec2 position;
     ImVec2 size;
     std::string label;
+    std::string label_secondary;  // secondary language label
 };
 
 // Bold font used for the ID/name line in nodes (set by main.cpp at startup).

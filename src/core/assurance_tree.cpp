@@ -1,4 +1,4 @@
-#include "core/assurance_tree.h"
+﻿#include "core/assurance_tree.h"
 #include <unordered_map>
 #include <unordered_set>
 #include <algorithm>
@@ -169,6 +169,32 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac) {
         node->label = node->id + ": " + element.name;
         if (!detail.empty()) {
             node->label += "\n" + detail;
+        }
+
+        // Build secondary language label (for language toggle)
+        {
+            std::string sec_lang = "ja";
+            std::string sec_detail;
+            if (element.type == "claim") {
+                auto cit = element.content_langs.find(sec_lang);
+                if (cit != element.content_langs.end() && !cit->second.empty()) {
+                    sec_detail = cit->second;
+                } else {
+                    auto dit = element.description_langs.find(sec_lang);
+                    sec_detail = (dit != element.description_langs.end() && !dit->second.empty()) ? dit->second : detail;
+                }
+            } else {
+                auto dit = element.description_langs.find(sec_lang);
+                sec_detail = (dit != element.description_langs.end() && !dit->second.empty()) ? dit->second : detail;
+            }
+            // Use translated name if available, otherwise primary name
+            auto nit = element.name_langs.find(sec_lang);
+            const std::string& sec_name = (nit != element.name_langs.end() && !nit->second.empty())
+                                          ? nit->second : element.name;
+            node->label_secondary = node->id + ": " + sec_name;
+            if (!sec_detail.empty()) {
+                node->label_secondary += "\n" + sec_detail;
+            }
         }
 
         node->role = classify_role(element);
