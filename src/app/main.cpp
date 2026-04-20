@@ -15,6 +15,10 @@
 
 #include "core/app_state.h"
 #include <cstdio>   // for FILE, fopen, fclose (file-exists check)
+#include <filesystem>
+#include <vector>
+#include <string>
+#include <algorithm>
 
 // DirectX 11 globals
 static ID3D11Device*            g_pd3dDevice = nullptr;
@@ -142,9 +146,38 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Application state
     core::AppState app_state;
     static char file_path_buf[512] = "data/open-autonomy-safety-case.sacm.xml";
+    static char dir_path_buf[512] = "data";
+    static std::vector<std::string> xml_files;
+    static int selected_file_idx = -1;
     bool tree_needs_rebuild = false;
     core::AssuranceTree current_tree;
     bool show_overwrite_confirm = false;
+
+    // Scan directory for XML files
+    auto scan_directory = [&]() {
+        xml_files.clear();
+        selected_file_idx = -1;
+        std::error_code ec;
+        if (std::filesystem::is_directory(dir_path_buf, ec)) {
+            for (const auto& entry : std::filesystem::directory_iterator(dir_path_buf, ec)) {
+                if (!entry.is_regular_file()) continue;
+                auto ext = entry.path().extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(),
+                               [](unsigned char c) { return std::tolower(c); });
+                if (ext == ".xml") {
+                    xml_files.push_back(entry.path().string());
+                }
+            }
+            std::sort(xml_files.begin(), xml_files.end());
+            // Select current file if it matches
+            for (int i = 0; i < (int)xml_files.size(); ++i) {
+                if (xml_files[i] == file_path_buf) { selected_file_idx = i; break; }
+            }
+        }
+    };
+
+    // Initial scan
+    scan_directory();
 
     // Fixed panel window flags (no moving, no resizing, no collapsing)
     const ImGuiWindowFlags kPanelFlags = ImGuiWindowFlags_NoMove
@@ -259,9 +292,44 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
 
         // File loading section
+        ImGui::Text("Directory:");
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::InputText("##dirpath", dir_path_buf, sizeof(dir_path_buf),
+                             ImGuiInputTextFlags_EnterReturnsTrue)) {
+            scan_directory();
+        }
+
         ImGui::Text("XML File:");
         ImGui::SetNextItemWidth(-1);
-        ImGui::InputText("##filepath", file_path_buf, sizeof(file_path_buf));
+        // Build combo items from xml_files
+        if (xml_files.empty()) {
+            ImGui::TextDisabled("No XML files found");
+        } else {
+            // Show filename-only for preview
+            const char* preview = "";
+            if (selected_file_idx >= 0 && selected_file_idx < (int)xml_files.size()) {
+                const std::string& sel = xml_files[selected_file_idx];
+                auto pos = sel.find_last_of("/\\");
+                preview = (pos != std::string::npos) ? sel.c_str() + pos + 1 : sel.c_str();
+            }
+            if (ImGui::BeginCombo("##fileselect", preview)) {
+                for (int i = 0; i < (int)xml_files.size(); ++i) {
+                    const std::string& path = xml_files[i];
+                    auto pos = path.find_last_of("/\\");
+                    const char* label = (pos != std::string::npos) ? path.c_str() + pos + 1 : path.c_str();
+                    bool is_selected = (i == selected_file_idx);
+                    if (ImGui::Selectable(label, is_selected)) {
+                        selected_file_idx = i;
+                        size_t len = path.size();
+                        if (len >= sizeof(file_path_buf)) len = sizeof(file_path_buf) - 1;
+                        memcpy(file_path_buf, path.c_str(), len);
+                        file_path_buf[len] = '\0';
+                    }
+                    if (is_selected) ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+        }
         if (ImGui::Button("Load")) {
             app_state.load_file(file_path_buf);
             tree_needs_rebuild = true;
