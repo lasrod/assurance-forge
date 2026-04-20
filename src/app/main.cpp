@@ -9,6 +9,9 @@
 
 #include "ui/gsn_canvas.h"
 #include "ui/gsn_adapter.h"
+#include "ui/tree_view.h"
+#include "ui/element_panel.h"
+#include "ui/ui_state.h"
 
 #include "core/app_state.h"
 
@@ -70,6 +73,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.IniFilename = nullptr;  // Disable imgui.ini — we manage layout manually
     // Docking requires a docking-enabled Dear ImGui build. If you update
     // the bundled ImGui to a version with docking support, re-enable
     // the following line:
@@ -96,6 +100,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     core::AppState app_state;
     static char file_path_buf[512] = "data/open-autonomy-safety-case.sacm.xml";
     bool tree_needs_rebuild = false;
+    core::AssuranceTree current_tree;
+
+    // Fixed panel window flags (no moving, no resizing, no collapsing)
+    const ImGuiWindowFlags kPanelFlags = ImGuiWindowFlags_NoMove
+                                       | ImGuiWindowFlags_NoResize
+                                       | ImGuiWindowFlags_NoCollapse
+                                       | ImGuiWindowFlags_NoBringToFrontOnFocus;
+
+    // Panel layout ratios (persist across frames, adjustable via splitter drag)
+    float left_ratio  = 0.20f;   // left column width as fraction of display
+    float right_ratio = 0.20f;   // right column width as fraction of display
+    const float kMinPanelRatio = 0.10f;  // minimum 10% of display width
+    const float kMaxPanelRatio = 0.40f;  // maximum 40% of display width
+    const float kSplitterThickness = 6.0f;  // hit area for splitter drag
 
     // Main loop
     bool done = false;
@@ -115,13 +133,75 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
 
-        // GSN Canvas demo window (isolated drawing logic)
-        ui::ShowGsnCanvasWindow();
+        // Compute panel layout from current display size
+        ImVec2 display = ImGui::GetIO().DisplaySize;
+        float left_w   = display.x * left_ratio;
+        float right_w  = display.x * right_ratio;
+        float center_w = display.x - left_w - right_w - kSplitterThickness * 2;
+        float top_left_h    = display.y * 0.50f;
+        float bottom_left_h = display.y - top_left_h;
 
-        // Main window
-        ImGui::SetNextWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowPos(ImVec2(50, 50), ImGuiCond_FirstUseEver);
-        ImGui::Begin("SACM Viewer", nullptr, ImGuiWindowFlags_MenuBar);
+        // ---- Left splitter (between left column and center) ----
+        {
+            float splitter_x = left_w;
+            ImGui::SetNextWindowPos(ImVec2(splitter_x, 0));
+            ImGui::SetNextWindowSize(ImVec2(kSplitterThickness, display.y));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(1, 1));
+            ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
+            ImGui::Begin("##left_splitter", nullptr,
+                         kPanelFlags | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar);
+            ImGui::InvisibleButton("##left_splitter_btn", ImVec2(kSplitterThickness, display.y));
+            if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+                ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+            if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)) {
+                float delta = ImGui::GetIO().MouseDelta.x;
+                left_ratio += delta / display.x;
+                if (left_ratio < kMinPanelRatio) left_ratio = kMinPanelRatio;
+                if (left_ratio > kMaxPanelRatio) left_ratio = kMaxPanelRatio;
+            }
+            ImGui::End();
+            ImGui::PopStyleColor();
+            ImGui::PopStyleVar(2);
+        }
+
+        float center_x = left_w + kSplitterThickness;
+
+        // ---- Right splitter (between center and right column) ----
+        {
+            float splitter_x = center_x + center_w;
+            ImGui::SetNextWindowPos(ImVec2(splitter_x, 0));
+            ImGui::SetNextWindowSize(ImVec2(kSplitterThickness, display.y));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(1, 1));
+            ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
+            ImGui::Begin("##right_splitter", nullptr,
+                         kPanelFlags | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar);
+            ImGui::InvisibleButton("##right_splitter_btn", ImVec2(kSplitterThickness, display.y));
+            if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+                ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+            if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)) {
+                float delta = ImGui::GetIO().MouseDelta.x;
+                right_ratio -= delta / display.x;
+                if (right_ratio < kMinPanelRatio) right_ratio = kMinPanelRatio;
+                if (right_ratio > kMaxPanelRatio) right_ratio = kMaxPanelRatio;
+            }
+            ImGui::End();
+            ImGui::PopStyleColor();
+            ImGui::PopStyleVar(2);
+        }
+
+        // ---- Top-Left: Tree View ----
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImVec2(left_w, top_left_h));
+        ImGui::Begin("Safety Case Tree", nullptr, kPanelFlags);
+        ui::ShowTreeViewPanel(current_tree.root ? &current_tree : nullptr);
+        ImGui::End();
+
+        // ---- Bottom-Left: SACM Viewer ----
+        ImGui::SetNextWindowPos(ImVec2(0, top_left_h));
+        ImGui::SetNextWindowSize(ImVec2(left_w, bottom_left_h));
+        ImGui::Begin("SACM Viewer", nullptr, kPanelFlags | ImGuiWindowFlags_MenuBar);
 
         // Menu bar
         if (ImGui::BeginMenuBar()) {
@@ -136,10 +216,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
         // File loading section
         ImGui::Text("XML File:");
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(400);
+        ImGui::SetNextItemWidth(-1);
         ImGui::InputText("##filepath", file_path_buf, sizeof(file_path_buf));
-        ImGui::SameLine();
         if (ImGui::Button("Load")) {
             app_state.load_file(file_path_buf);
             tree_needs_rebuild = true;
@@ -158,13 +236,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
             // Build tree once on load, not every frame
             if (tree_needs_rebuild) {
-                auto tree = ui::BuildAssuranceTree(ac);
-                ui::SetCanvasTree(tree);
+                current_tree = ui::BuildAssuranceTree(ac);
+                ui::SetCanvasTree(current_tree);
                 tree_needs_rebuild = false;
             }
 
             ImGui::Text("Assurance Case: %s", ac.name.c_str());
-            ImGui::TextWrapped("Description: %s", ac.description.c_str());
 
             ImGui::Separator();
 
@@ -177,9 +254,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     ImVec4 color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
                     if (elem.type == "claim") {
                         color = ImVec4(0.4f, 0.8f, 0.4f, 1.0f);
-                    } else if (elem.type == "argumentReasoning") {
+                    } else if (elem.type == "argumentreasoning") {
                         color = ImVec4(0.4f, 0.6f, 0.9f, 1.0f);
-                    } else if (elem.type == "artifact" || elem.type == "artifactReference") {
+                    } else if (elem.type == "artifact" || elem.type == "artifactreference") {
                         color = ImVec4(0.9f, 0.7f, 0.3f, 1.0f);
                     }
 
@@ -197,6 +274,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             ImGui::EndChild();
         }
 
+        ImGui::End();
+
+        // ---- Center: GSN Canvas ----
+        ImGui::SetNextWindowPos(ImVec2(center_x, 0));
+        ImGui::SetNextWindowSize(ImVec2(center_w, display.y));
+        ui::ShowGsnCanvasWindow();
+
+        // ---- Right: Element Properties ----
+        float right_x = center_x + center_w + kSplitterThickness;
+        ImGui::SetNextWindowPos(ImVec2(right_x, 0));
+        ImGui::SetNextWindowSize(ImVec2(right_w, display.y));
+        ImGui::Begin("Element Properties", nullptr, kPanelFlags);
+        ui::ShowElementPanel(app_state.loaded_case.has_value() ? &app_state.loaded_case.value() : nullptr);
         ImGui::End();
 
         // Rendering

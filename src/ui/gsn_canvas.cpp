@@ -1,5 +1,6 @@
 #include "ui/gsn_canvas.h"
 #include "ui/gsn_canvas_renderer.h"
+#include "ui/ui_state.h"
 
 #include <iostream>
 
@@ -184,29 +185,25 @@ void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin, float zoom) {
     ImGui::SetCursorScreenPos(top_left);
     ImGui::InvisibleButton(node.id.c_str(), scaled_size);
     if (ImGui::IsItemClicked()) {
-        std::cout << "Clicked node: " << node.label << " (id=" << node.id << ")\n";
-        ImGui::OpenPopup(("clicked_" + node.id).c_str());
+        GetUiState().selected_element_id = node.id;
     }
 
-    // Popup feedback (transient)
-    if (ImGui::BeginPopup(("clicked_" + node.id).c_str())) {
-        ImGui::Text("Clicked: %s", node.label.c_str());
-        ImGui::EndPopup();
+    // Highlight selected node
+    if (GetUiState().selected_element_id == node.id) {
+        draw_list->AddRect(
+            ImVec2(top_left.x - 2.0f, top_left.y - 2.0f),
+            ImVec2(bottom_right.x + 2.0f, bottom_right.y + 2.0f),
+            IM_COL32(255, 200, 0, 255), kClaimRounding + 2.0f, 0, 3.0f);
     }
 }
 
 void ShowGsnCanvasWindow() {
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_None;
-    // Ensure the canvas appears on-screen by providing a sensible
-    // default position/size on first use (avoids stale imgui.ini values).
-    ImGui::SetNextWindowPos(ImVec2(50, 50), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_FirstUseEver);
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoCollapse
+                                  | ImGuiWindowFlags_NoMove
+                                  | ImGuiWindowFlags_NoResize
+                                  | ImGuiWindowFlags_NoBringToFrontOnFocus;
 
     if (ImGui::Begin("GSN Canvas", nullptr, window_flags)) {
-        // Reserve a canvas area
-        ImVec2 canvas_size = ImGui::GetContentRegionAvail();
-        ImGui::Text("GSN Canvas");
-        ImGui::Separator();
 
         // Child region with clipping; we manage our own pan/zoom offset
         // so no ImGui scrollbars are needed.
@@ -218,6 +215,7 @@ void ShowGsnCanvasWindow() {
         ImVec2 child_pos = ImGui::GetWindowPos();
 
         // Ctrl + mouse scroll wheel: zoom at mouse pointer position
+        // Plain scroll wheel (no Ctrl): pan vertically
         if (ImGui::IsWindowHovered()) {
             float wheel = ImGui::GetIO().MouseWheel;
             if (wheel != 0.0f && ImGui::GetIO().KeyCtrl) {
@@ -225,14 +223,19 @@ void ShowGsnCanvasWindow() {
                 ImVec2 mouse = ImGui::GetIO().MousePos;
                 ImVec2 offset = renderer.GetViewOffset();
                 float zoom = renderer.GetZoom();
-                // screen = child_pos + content * zoom - view_offset
-                // => content = (mouse - child_pos + view_offset) / zoom
                 ImVec2 focus_content(
                     (mouse.x - child_pos.x + offset.x) / zoom,
                     (mouse.y - child_pos.y + offset.y) / zoom
                 );
                 float new_zoom = zoom + (wheel > 0.0f ? kZoomStep : -kZoomStep);
                 renderer.ZoomAtPoint(new_zoom, focus_content);
+            } else if (wheel != 0.0f) {
+                // Scroll wheel without Ctrl: pan vertically (Shift+wheel: pan horizontally)
+                float scroll_speed = 60.0f;
+                if (ImGui::GetIO().KeyShift)
+                    renderer.Pan(-wheel * scroll_speed, 0.0f);
+                else
+                    renderer.Pan(0.0f, -wheel * scroll_speed);
             }
         }
 
@@ -295,6 +298,106 @@ void ShowGsnCanvasWindow() {
             ImGui::SameLine();
             if (ImGui::Button("+##zoom_in", ImVec2(button_size, button_size))) {
                 renderer.ZoomIn();
+            }
+        }
+
+        // --- Custom scrollbars ---
+        {
+            ImVec2 content_min, content_max;
+            renderer.GetContentBounds(content_min, content_max);
+
+            float zoom = renderer.GetZoom();
+            ImVec2 offset = renderer.GetViewOffset();
+            ImVec2 child_size = ImGui::GetWindowSize();
+
+            // Total content size in screen pixels (zoomed)
+            float content_w = (content_max.x - content_min.x) * zoom;
+            float content_h = (content_max.y - content_min.y) * zoom;
+
+            // Viewport position relative to content origin (in screen pixels)
+            float viewport_x = offset.x - content_min.x * zoom;
+            float viewport_y = offset.y - content_min.y * zoom;
+
+            float scrollbar_thickness = 10.0f;
+            float scrollbar_margin = 2.0f;
+            ImU32 track_color = IM_COL32(50, 50, 50, 120);
+            ImU32 thumb_color = IM_COL32(150, 150, 150, 180);
+            ImU32 thumb_hover = IM_COL32(180, 180, 180, 220);
+
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+
+            // Horizontal scrollbar (along bottom edge, above zoom controls area)
+            if (content_w > child_size.x) {
+                float bar_y = child_pos.y + child_size.y - scrollbar_thickness - scrollbar_margin;
+                float bar_x = child_pos.x + scrollbar_margin;
+                float bar_w = child_size.x - scrollbar_thickness - scrollbar_margin * 3;
+
+                // Track
+                draw_list->AddRectFilled(
+                    ImVec2(bar_x, bar_y),
+                    ImVec2(bar_x + bar_w, bar_y + scrollbar_thickness),
+                    track_color, 4.0f);
+
+                // Thumb
+                float thumb_ratio = child_size.x / content_w;
+                float thumb_w = bar_w * thumb_ratio;
+                if (thumb_w < 20.0f) thumb_w = 20.0f;
+                float scroll_ratio = viewport_x / (content_w - child_size.x);
+                if (scroll_ratio < 0.0f) scroll_ratio = 0.0f;
+                if (scroll_ratio > 1.0f) scroll_ratio = 1.0f;
+                float thumb_x = bar_x + scroll_ratio * (bar_w - thumb_w);
+
+                ImVec2 thumb_tl(thumb_x, bar_y);
+                ImVec2 thumb_br(thumb_x + thumb_w, bar_y + scrollbar_thickness);
+
+                // Hit test for dragging
+                ImGui::SetCursorScreenPos(thumb_tl);
+                ImGui::InvisibleButton("##hscroll_thumb", ImVec2(thumb_w, scrollbar_thickness));
+                bool h_hovered = ImGui::IsItemHovered();
+                if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)) {
+                    float delta_px = ImGui::GetIO().MouseDelta.x;
+                    float delta_scroll = delta_px / (bar_w - thumb_w) * (content_w - child_size.x);
+                    renderer.Pan(delta_scroll, 0.0f);
+                }
+
+                draw_list->AddRectFilled(thumb_tl, thumb_br, h_hovered ? thumb_hover : thumb_color, 4.0f);
+            }
+
+            // Vertical scrollbar (along right edge)
+            if (content_h > child_size.y) {
+                float bar_x = child_pos.x + child_size.x - scrollbar_thickness - scrollbar_margin;
+                float bar_y = child_pos.y + scrollbar_margin;
+                float bar_h = child_size.y - scrollbar_thickness - scrollbar_margin * 3;
+
+                // Track
+                draw_list->AddRectFilled(
+                    ImVec2(bar_x, bar_y),
+                    ImVec2(bar_x + scrollbar_thickness, bar_y + bar_h),
+                    track_color, 4.0f);
+
+                // Thumb
+                float thumb_ratio = child_size.y / content_h;
+                float thumb_h = bar_h * thumb_ratio;
+                if (thumb_h < 20.0f) thumb_h = 20.0f;
+                float scroll_ratio = viewport_y / (content_h - child_size.y);
+                if (scroll_ratio < 0.0f) scroll_ratio = 0.0f;
+                if (scroll_ratio > 1.0f) scroll_ratio = 1.0f;
+                float thumb_y = bar_y + scroll_ratio * (bar_h - thumb_h);
+
+                ImVec2 thumb_tl(bar_x, thumb_y);
+                ImVec2 thumb_br(bar_x + scrollbar_thickness, thumb_y + thumb_h);
+
+                // Hit test for dragging
+                ImGui::SetCursorScreenPos(thumb_tl);
+                ImGui::InvisibleButton("##vscroll_thumb", ImVec2(scrollbar_thickness, thumb_h));
+                bool v_hovered = ImGui::IsItemHovered();
+                if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)) {
+                    float delta_px = ImGui::GetIO().MouseDelta.y;
+                    float delta_scroll = delta_px / (bar_h - thumb_h) * (content_h - child_size.y);
+                    renderer.Pan(0.0f, delta_scroll);
+                }
+
+                draw_list->AddRectFilled(thumb_tl, thumb_br, v_hovered ? thumb_hover : thumb_color, 4.0f);
             }
         }
 

@@ -178,6 +178,28 @@ void GsnCanvas::Pan(float dx, float dy) {
     view_offset_.y += dy;
 }
 
+void GsnCanvas::GetContentBounds(ImVec2& out_min, ImVec2& out_max) const {
+    if (layout_nodes_.empty()) {
+        out_min = ImVec2(0, 0);
+        out_max = ImVec2(0, 0);
+        return;
+    }
+    float min_x = FLT_MAX, min_y = FLT_MAX;
+    float max_x = -FLT_MAX, max_y = -FLT_MAX;
+    for (const auto& node : layout_nodes_) {
+        if (node.position.x < min_x) min_x = node.position.x;
+        if (node.position.y < min_y) min_y = node.position.y;
+        float r = node.position.x + node.size.x;
+        float b = node.position.y + node.size.y;
+        if (r > max_x) max_x = r;
+        if (b > max_y) max_y = b;
+    }
+    // Add some padding around the content
+    float pad = 40.0f;
+    out_min = ImVec2(min_x - pad, min_y - pad);
+    out_max = ImVec2(max_x + pad, max_y + pad);
+}
+
 // ===== Edge drawing helpers =====
 
 // Compute the screen-space connection points for a parent→child edge.

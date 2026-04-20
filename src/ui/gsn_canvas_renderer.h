@@ -28,6 +28,10 @@ public:
     void Pan(float dx, float dy);
     ImVec2 GetViewOffset() const { return view_offset_; }
 
+    // Get the bounding box of all content in layout-space (unzoomed).
+    // Returns min and max corners. If no nodes, both are (0,0).
+    void GetContentBounds(ImVec2& out_min, ImVec2& out_max) const;
+
 private:
     std::vector<CanvasElement> elements_;
     std::vector<LayoutNode> layout_nodes_;
