@@ -14,6 +14,7 @@
 #include "ui/ui_state.h"
 
 #include "core/app_state.h"
+#include <cstdio>   // for FILE, fopen, fclose (file-exists check)
 
 // DirectX 11 globals
 static ID3D11Device*            g_pd3dDevice = nullptr;
@@ -101,6 +102,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     static char file_path_buf[512] = "data/open-autonomy-safety-case.sacm.xml";
     bool tree_needs_rebuild = false;
     core::AssuranceTree current_tree;
+    bool show_overwrite_confirm = false;
 
     // Fixed panel window flags (no moving, no resizing, no collapsing)
     const ImGuiWindowFlags kPanelFlags = ImGuiWindowFlags_NoMove
@@ -222,6 +224,43 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             app_state.load_file(file_path_buf);
             tree_needs_rebuild = true;
         }
+        ImGui::SameLine();
+        {
+            bool can_save = app_state.sacm_package.has_value();
+            if (!can_save) ImGui::BeginDisabled();
+            if (ImGui::Button("Save")) {
+                // Check if file exists before overwriting
+                FILE* f = fopen(file_path_buf, "r");
+                if (f) {
+                    fclose(f);
+                    show_overwrite_confirm = true;
+                } else {
+                    app_state.save_file(file_path_buf);
+                }
+            }
+            if (!can_save) ImGui::EndDisabled();
+        }
+
+        // Overwrite confirmation popup
+        if (show_overwrite_confirm) {
+            ImGui::OpenPopup("Overwrite File?");
+            show_overwrite_confirm = false;
+        }
+        if (ImGui::BeginPopupModal("Overwrite File?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Text("File already exists:\n%s", file_path_buf);
+            ImGui::Separator();
+            ImGui::Text("Are you sure you want to overwrite it?");
+            ImGui::Spacing();
+            if (ImGui::Button("Yes, Overwrite", ImVec2(130, 0))) {
+                app_state.save_file(file_path_buf);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel", ImVec2(130, 0))) {
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
 
         // Status display
         if (!app_state.status_message.empty()) {
@@ -286,7 +325,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         ImGui::SetNextWindowPos(ImVec2(right_x, 0));
         ImGui::SetNextWindowSize(ImVec2(right_w, display.y));
         ImGui::Begin("Element Properties", nullptr, kPanelFlags);
-        ui::ShowElementPanel(app_state.loaded_case.has_value() ? &app_state.loaded_case.value() : nullptr);
+        {
+            parser::AssuranceCase* ac_ptr = app_state.loaded_case.has_value() ? &app_state.loaded_case.value() : nullptr;
+            sacm::AssuranceCasePackage* sacm_ptr = app_state.sacm_package.has_value() ? &app_state.sacm_package.value() : nullptr;
+            if (ui::ShowElementPanel(ac_ptr, sacm_ptr)) {
+                // An edit occurred — rebuild tree so canvas reflects changes
+                tree_needs_rebuild = true;
+            }
+        }
         ImGui::End();
 
         // Rendering
