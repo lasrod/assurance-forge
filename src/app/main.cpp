@@ -1,4 +1,4 @@
-// Assurance Forge - Win32 + DirectX11 Application
+﻿// Assurance Forge - Win32 + DirectX11 Application
 // Minimal ImGui window with SACM XML parsing capability
 
 #include "imgui.h"
@@ -74,7 +74,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.IniFilename = nullptr;  // Disable imgui.ini — we manage layout manually
+    io.IniFilename = nullptr;  // Disable imgui.ini â€” we manage layout manually
     // Docking requires a docking-enabled Dear ImGui build. If you update
     // the bundled ImGui to a version with docking support, re-enable
     // the following line:
@@ -84,10 +84,52 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ImGui::StyleColorsDark();
 
     // Load fonts: normal and bold variants of Segoe UI (Windows system font)
+    // with Japanese glyph ranges merged from Yu Gothic or MS Gothic
     const char* font_path = "C:\\Windows\\Fonts\\segoeui.ttf";
     const char* bold_path = "C:\\Windows\\Fonts\\segoeuib.ttf";
-    io.Fonts->AddFontFromFileTTF(font_path, 15.0f);  // default font
+    io.Fonts->AddFontFromFileTTF(font_path, 15.0f);  // default font (Latin)
+
+    // Merge Japanese font on top of the default font
+    {
+        ImFontConfig merge_cfg;
+        merge_cfg.MergeMode = true;
+        const char* jp_fonts[] = {
+            "C:\\Windows\\Fonts\\YuGothR.ttc",
+            "C:\\Windows\\Fonts\\msgothic.ttc",
+            "C:\\Windows\\Fonts\\meiryo.ttc",
+            nullptr
+        };
+        for (const char** jp = jp_fonts; *jp; ++jp) {
+            FILE* f = fopen(*jp, "rb");
+            if (f) {
+                fclose(f);
+                io.Fonts->AddFontFromFileTTF(*jp, 15.0f, &merge_cfg, io.Fonts->GetGlyphRangesJapanese());
+                break;
+            }
+        }
+    }
+
+    // Bold font
     ui::g_BoldFont = io.Fonts->AddFontFromFileTTF(bold_path, 15.0f);
+    if (ui::g_BoldFont) {
+        // Merge Japanese font on top of bold font too
+        ImFontConfig merge_cfg;
+        merge_cfg.MergeMode = true;
+        const char* jp_fonts[] = {
+            "C:\\Windows\\Fonts\\YuGothR.ttc",
+            "C:\\Windows\\Fonts\\msgothic.ttc",
+            "C:\\Windows\\Fonts\\meiryo.ttc",
+            nullptr
+        };
+        for (const char** jp = jp_fonts; *jp; ++jp) {
+            FILE* f = fopen(*jp, "rb");
+            if (f) {
+                fclose(f);
+                io.Fonts->AddFontFromFileTTF(*jp, 15.0f, &merge_cfg, io.Fonts->GetGlyphRangesJapanese());
+                break;
+            }
+        }
+    }
     if (!ui::g_BoldFont) {
         // Fallback: use default font for bold too
         ui::g_BoldFont = io.Fonts->Fonts[0];
@@ -277,6 +319,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             if (tree_needs_rebuild) {
                 current_tree = ui::BuildAssuranceTree(ac);
                 ui::SetCanvasTree(current_tree);
+                ui::GetUiState().model_has_translations = ui::ModelHasTranslations(ac);
                 tree_needs_rebuild = false;
             }
 
@@ -329,7 +372,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             parser::AssuranceCase* ac_ptr = app_state.loaded_case.has_value() ? &app_state.loaded_case.value() : nullptr;
             sacm::AssuranceCasePackage* sacm_ptr = app_state.sacm_package.has_value() ? &app_state.sacm_package.value() : nullptr;
             if (ui::ShowElementPanel(ac_ptr, sacm_ptr)) {
-                // An edit occurred — rebuild tree so canvas reflects changes
+                // An edit occurred â€” rebuild tree so canvas reflects changes
                 tree_needs_rebuild = true;
             }
         }

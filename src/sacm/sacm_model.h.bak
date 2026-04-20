@@ -1,44 +1,9 @@
-﻿#pragma once
+#pragma once
 
 #include <string>
 #include <vector>
-#include <map>
 
 namespace sacm {
-
-// ===== Multi-language text =====
-
-// Stores text in multiple languages, keyed by language code (e.g. "en", "ja").
-struct MultiLangText {
-    std::map<std::string, std::string> texts;  // lang -> text
-
-    // Get text for a given language, falling back to "en", then first available.
-    std::string get(const std::string& lang) const {
-        auto it = texts.find(lang);
-        if (it != texts.end()) return it->second;
-        it = texts.find("en");
-        if (it != texts.end()) return it->second;
-        if (!texts.empty()) return texts.begin()->second;
-        return {};
-    }
-
-    // Get text for the default (primary) language.
-    std::string get_primary() const { return get("en"); }
-
-    // Set text for a language.
-    void set(const std::string& lang, const std::string& text) { texts[lang] = text; }
-
-    // Check if a specific language exists.
-    bool has(const std::string& lang) const { return texts.count(lang) > 0; }
-
-    // Check if any non-primary language exists with non-empty text.
-    bool has_secondary() const {
-        for (const auto& [lang, text] : texts) {
-            if (lang != "en" && !text.empty()) return true;
-        }
-        return false;
-    }
-};
 
 // ===== Base element =====
 
@@ -46,10 +11,6 @@ struct SacmElement {
     std::string id;
     std::string name;
     std::string description;
-
-    // Multi-language fields (includes the primary "en" text and any translations)
-    MultiLangText name_ml;
-    MultiLangText description_ml;
 };
 
 // ===== Terminology =====
@@ -76,16 +37,10 @@ struct ArtifactPackage : SacmElement {
 struct Claim : SacmElement {
     std::string content;
     std::string assertionDeclaration;  // "asserted", "needsSupport", "assumed", "defeated"
-
-    // Multi-language content
-    MultiLangText content_ml;
 };
 
 struct ArgumentReasoning : SacmElement {
     std::string content;
-
-    // Multi-language content
-    MultiLangText content_ml;
 };
 
 struct ArtifactReference : SacmElement {
@@ -133,3 +88,4 @@ struct AssuranceCasePackage : SacmElement {
 };
 
 }  // namespace sacm
+

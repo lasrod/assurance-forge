@@ -125,7 +125,11 @@ static void DrawNodeLabel(ImDrawList* draw_list, const GsnNode& node,
     float font_size = ImGui::GetFontSize() * zoom;
     float scaled_padding = kTextPadding * zoom;
 
-    const char* label_start = node.label.c_str();
+    // Pick label based on language toggle
+    const UiState& state = GetUiState();
+    const std::string& active_label = (state.show_secondary_language && !node.label_secondary.empty())
+                                      ? node.label_secondary : node.label;
+    const char* label_start = active_label.c_str();
     const char* first_newline = strchr(label_start, '\n');
 
     // Measure both parts for vertical centering
@@ -260,6 +264,36 @@ void ShowGsnCanvasWindow() {
 
         // Render the canvas content
         renderer.Render();
+
+        // --- Language toggle button above zoom strip (bottom-right) ---
+        {
+            UiState& state = GetUiState();
+            // Only show when model has translations
+            if (state.show_secondary_language || state.model_has_translations) {
+                ImVec2 child_size_lang = ImGui::GetWindowSize();
+                float lang_btn_w = 36.0f;
+                float lang_btn_h = 24.0f;
+                float lang_margin = 12.0f;
+                float lang_x = child_pos.x + child_size_lang.x - (lang_btn_w + lang_margin);
+                float lang_y = child_pos.y + child_size_lang.y - (28.0f + lang_margin) - lang_btn_h - 6.0f;
+
+                ImDrawList* fg_lang = ImGui::GetForegroundDrawList();
+                fg_lang->AddRectFilled(ImVec2(lang_x - 2.0f, lang_y - 2.0f),
+                                       ImVec2(lang_x + lang_btn_w + 2.0f, lang_y + lang_btn_h + 2.0f),
+                                       IM_COL32(40, 40, 40, 180), 4.0f);
+
+                ImGui::SetCursorScreenPos(ImVec2(lang_x, lang_y));
+                // Show "EN" when primary, or the active secondary language code (uppercased)
+                char lang_upper[4] = {};
+                const std::string& sl = state.active_secondary_lang;
+                for (size_t i = 0; i < sl.size() && i < 3; ++i)
+                    lang_upper[i] = (char)toupper((unsigned char)sl[i]);
+                const char* lang_label = state.show_secondary_language ? lang_upper : "EN";
+                if (ImGui::Button(lang_label, ImVec2(lang_btn_w, lang_btn_h))) {
+                    state.show_secondary_language = !state.show_secondary_language;
+                }
+            }
+        }
 
         // --- Overlay zoom buttons in bottom-right corner ---
         {

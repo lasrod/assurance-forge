@@ -1,4 +1,4 @@
-#include "gsn_canvas_renderer.h"
+﻿#include "gsn_canvas_renderer.h"
 #include "gsn_layout.h"
 #include "gsn_canvas.h" // for DrawGsnNode
 #include <imgui.h>
@@ -69,7 +69,7 @@ static void DrawHollowArrow(ImDrawList* draw_list, ImVec2 tip, float dir_x, floa
 
 // ===== Bezier curve helpers =====
 
-// Evaluate a cubic Bezier at parameter t ∈ [0,1].
+// Evaluate a cubic Bezier at parameter t âˆˆ [0,1].
 static ImVec2 EvalBezier(ImVec2 p0, ImVec2 p1, ImVec2 p2, ImVec2 p3, float t) {
     float u = 1.0f - t;
     float uu = u * u, uuu = uu * u;
@@ -202,7 +202,7 @@ void GsnCanvas::GetContentBounds(ImVec2& out_min, ImVec2& out_max) const {
 
 // ===== Edge drawing helpers =====
 
-// Compute the screen-space connection points for a parent→child edge.
+// Compute the screen-space connection points for a parentâ†’child edge.
 // Group1 edges go from parent's bottom center to child's top center.
 static void ComputeGroup1Endpoints(const LayoutNode& parent, const LayoutNode& child,
                                    ImVec2 origin, float zoom,
@@ -213,7 +213,7 @@ static void ComputeGroup1Endpoints(const LayoutNode& parent, const LayoutNode& c
                        origin.y + child.position.y * zoom);
 }
 
-// Draw a Group1 (structural) edge: straight stubs → solid Bezier → solid arrowhead.
+// Draw a Group1 (structural) edge: straight stubs â†’ solid Bezier â†’ solid arrowhead.
 static void DrawGroup1Edge(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 child_top, float zoom) {
     float scaled_stub = kStubLength * zoom;
     float scaled_edge_width = kSolidEdgeWidth * zoom;
@@ -233,7 +233,7 @@ static void DrawGroup1Edge(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 c
 }
 
 // Compute screen-space endpoints for a Group2 (side-attached) edge.
-// Parent side → attachment nearest edge, depending on which side.
+// Parent side â†’ attachment nearest edge, depending on which side.
 static void ComputeGroup2Endpoints(const LayoutNode& parent, const LayoutNode& attachment,
                                    ImVec2 origin, float zoom,
                                    ImVec2& out_parent_side, ImVec2& out_attachment_edge) {
@@ -250,7 +250,7 @@ static void ComputeGroup2Endpoints(const LayoutNode& parent, const LayoutNode& a
     }
 }
 
-// Draw a Group2 (contextual) edge: dashed stubs → dashed Bezier → hollow arrowhead.
+// Draw a Group2 (contextual) edge: dashed stubs â†’ dashed Bezier â†’ hollow arrowhead.
 static void DrawGroup2Edge(ImDrawList* draw_list, ImVec2 parent_side, ImVec2 attachment_edge,
                            bool is_left_side, float zoom) {
     // Sign encodes horizontal direction: -1 toward left, +1 toward right
@@ -265,7 +265,7 @@ static void DrawGroup2Edge(ImDrawList* draw_list, ImVec2 parent_side, ImVec2 att
     ImVec2 ctrl_1(stub_start.x + horizontal_sign * horizontal_span, stub_start.y);
     ImVec2 ctrl_2(stub_end.x   - horizontal_sign * horizontal_span, stub_end.y);
 
-    // Straight stub from parent → dashed Bezier → straight stub into attachment
+    // Straight stub from parent â†’ dashed Bezier â†’ straight stub into attachment
     DrawDashedBezier(draw_list, parent_side, parent_side, parent_side, stub_start, kGroup2EdgeColor, scaled_edge_width);
     DrawDashedBezier(draw_list, stub_start, ctrl_1, ctrl_2, stub_end, kGroup2EdgeColor, scaled_edge_width);
     DrawDashedBezier(draw_list, stub_end, stub_end, stub_end, attachment_edge, kGroup2EdgeColor, scaled_edge_width);
@@ -328,6 +328,7 @@ void GsnCanvas::Render() {
         gsn_node.position = node.position;
         gsn_node.size = node.size;
         gsn_node.label = node.label;
+        gsn_node.label_secondary = node.label_secondary;
         DrawGsnNode(gsn_node, origin, zoom);
     }
 }

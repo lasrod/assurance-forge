@@ -1,4 +1,4 @@
-#include "parser/xml_parser.h"
+﻿#include "parser/xml_parser.h"
 #include <pugixml.hpp>
 #include <string>
 #include <algorithm>
@@ -32,6 +32,112 @@ static pugi::xml_node find_child_by_local_name(pugi::xml_node node, const char* 
     return pugi::xml_node();
 }
 
+// Extract description text and multi-language variants from a node.
+// Populates element.description (primary) and element.description_langs (all languages).
+static void extract_description(pugi::xml_node child, SacmElement& element) {
+    pugi::xml_node desc_node = find_child_by_local_name(child, "description");
+    if (desc_node) {
+        bool found_content = false;
+        for (pugi::xml_node content_child : desc_node.children()) {
+            if (get_local_name(content_child.name()) == "content") {
+                std::string lang = content_child.attribute("lang").as_string();
+                if (lang.empty()) lang = "en";
+                std::string text = content_child.text().as_string();
+                if (!text.empty()) {
+                    element.description_langs[lang] = text;
+                }
+                found_content = true;
+            }
+        }
+        if (found_content) {
+            // Primary description: prefer "en", fall back to first
+            auto it = element.description_langs.find("en");
+            if (it != element.description_langs.end()) {
+                element.description = it->second;
+            } else if (!element.description_langs.empty()) {
+                element.description = element.description_langs.begin()->second;
+            }
+        } else {
+            element.description = desc_node.text().as_string();
+            if (!element.description.empty()) {
+                element.description_langs["en"] = element.description;
+            }
+        }
+    } else {
+        element.description = child.attribute("description").as_string();
+        if (!element.description.empty()) {
+            element.description_langs["en"] = element.description;
+        }
+    }
+}
+
+// Extract multi-language name from <name> child element (same pattern as description).
+// Falls back to the "name" attribute as primary "en" text.
+static void extract_name(pugi::xml_node child, SacmElement& element) {
+    pugi::xml_node name_node = find_child_by_local_name(child, "name");
+    if (name_node) {
+        bool found_content = false;
+        for (pugi::xml_node content_child : name_node.children()) {
+            if (get_local_name(content_child.name()) == "content") {
+                std::string lang = content_child.attribute("lang").as_string();
+                if (lang.empty()) lang = "en";
+                std::string text = content_child.text().as_string();
+                if (!text.empty()) {
+                    element.name_langs[lang] = text;
+                }
+                found_content = true;
+            }
+        }
+        if (found_content) {
+            auto it = element.name_langs.find("en");
+            if (it != element.name_langs.end()) {
+                element.name = it->second;
+            } else if (!element.name_langs.empty()) {
+                element.name = element.name_langs.begin()->second;
+            }
+        } else {
+            // <name> element without <content> children — use text directly
+            std::string text = name_node.text().as_string();
+            if (!text.empty()) {
+                element.name = text;
+                element.name_langs["en"] = text;
+            }
+        }
+    }
+    // If no <name> child, the name was already set from attribute.
+    // Ensure it's in name_langs.
+    if (element.name_langs.empty() && !element.name.empty()) {
+        element.name_langs["en"] = element.name;
+    }
+}
+
+// Extract multi-language content from <content lang="xx"> direct children of the element.
+// These are distinct from <content> children inside <description> (which are description translations).
+// If found, overrides the content attribute value.
+static void extract_content(pugi::xml_node child, SacmElement& element) {
+    bool found_lang_content = false;
+    for (pugi::xml_node content_child : child.children()) {
+        if (get_local_name(content_child.name()) == "content") {
+            std::string lang = content_child.attribute("lang").as_string();
+            if (lang.empty()) lang = "en";
+            std::string text = content_child.text().as_string();
+            if (!text.empty()) {
+                element.content_langs[lang] = text;
+                found_lang_content = true;
+            }
+        }
+    }
+    if (found_lang_content) {
+        // Override content attribute with primary language from child elements
+        auto it = element.content_langs.find("en");
+        if (it != element.content_langs.end()) {
+            element.content = it->second;
+        } else if (!element.content_langs.empty()) {
+            element.content = element.content_langs.begin()->second;
+        }
+    }
+}
+
 void extract_elements_recursive(pugi::xml_node node, std::vector<SacmElement>& elements) {
     for (pugi::xml_node child : node.children()) {
         std::string local_name = get_local_name(child.name());
@@ -60,17 +166,19 @@ void extract_elements_recursive(pugi::xml_node node, std::vector<SacmElement>& e
                 element.content = child.attribute("value").as_string();
             }
 
-            // Description: try child element first, fall back to attribute
-            pugi::xml_node desc_node = find_child_by_local_name(child, "description");
-            if (desc_node) {
-                element.description = desc_node.text().as_string();
-                pugi::xml_node content_node = find_child_by_local_name(desc_node, "content");
-                if (content_node) {
-                    element.description = content_node.text().as_string();
-                }
-            } else {
-                element.description = child.attribute("description").as_string();
+            // Store content in multilang map
+            if (!element.content.empty()) {
+                element.content_langs["en"] = element.content;
             }
+
+            // Description: extract with multi-language support
+            extract_description(child, element);
+
+            // Name: extract with multi-language support (overrides attribute if <name> child exists)
+            extract_name(child, element);
+
+            // Content: extract with multi-language support (overrides attribute if <content> children exist)
+            extract_content(child, element);
 
             // Relationship elements: extract source/target refs and reasoning
             bool is_relationship_element =

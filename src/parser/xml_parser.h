@@ -1,7 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include <string>
 #include <vector>
+#include <map>
 #include <optional>
 
 namespace parser {
@@ -13,6 +14,11 @@ struct SacmElement {
     std::string type;  // "claim", "argumentreasoning", "artifact", etc. (lowercased local-name)
     std::string content;
     std::string description;
+
+    // Multi-language maps: lang code -> text (e.g. "en" -> "...", "ja" -> "...")
+    std::map<std::string, std::string> name_langs;
+    std::map<std::string, std::string> description_langs;
+    std::map<std::string, std::string> content_langs;
 
     // Relationship fields (populated for assertedinference, assertedcontext, assertedevidence)
     std::vector<std::string> source_refs;  // ids from <source ref="..."/>
