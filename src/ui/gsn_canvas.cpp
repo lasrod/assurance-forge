@@ -24,6 +24,10 @@ static const ImU32 kTextColor    = IM_COL32(10, 10, 10, 255);
 // Zoom step used by keyboard and button controls (matches renderer constant)
 static constexpr float kZoomStep = 0.1f;
 
+// Flag: true when mouse is hovering over overlay controls (zoom/language buttons).
+// Set each frame before node rendering so that node clicks are suppressed.
+static bool g_overlay_hovered = false;
+
 // Single shared renderer instance used by the compatibility wrapper.
 static GsnCanvas& GlobalRenderer() {
     static GsnCanvas instance;
@@ -185,11 +189,14 @@ void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin, float zoom) {
     ComputeTextRegion(node, top_left, bottom_right, zoom, text_left, text_wrap);
     DrawNodeLabel(draw_list, node, top_left, bottom_right, text_left, text_wrap, zoom);
 
-    // Invisible button for hit-testing
-    ImGui::SetCursorScreenPos(top_left);
-    ImGui::InvisibleButton(node.id.c_str(), scaled_size);
-    if (ImGui::IsItemClicked()) {
-        GetUiState().selected_element_id = node.id;
+    // Invisible button for hit-testing (skip when overlay controls are hovered
+    // so that zoom/language buttons can receive the click instead)
+    if (!g_overlay_hovered) {
+        ImGui::SetCursorScreenPos(top_left);
+        ImGui::InvisibleButton(node.id.c_str(), scaled_size);
+        if (ImGui::IsItemClicked()) {
+            GetUiState().selected_element_id = node.id;
+        }
     }
 
     // Highlight selected node
@@ -259,6 +266,42 @@ void ShowGsnCanvasWindow() {
             }
             if (ImGui::IsKeyPressed(ImGuiKey_0) || ImGui::IsKeyPressed(ImGuiKey_Keypad0)) {
                 renderer.ResetZoom();
+            }
+        }
+
+        // --- Pre-compute overlay button rects and check if mouse is over them ---
+        // This prevents node clicks from firing when clicking overlay controls.
+        {
+            ImVec2 child_size_pre = ImGui::GetWindowSize();
+            ImVec2 mouse_pos = ImGui::GetIO().MousePos;
+            g_overlay_hovered = false;
+
+            // Zoom strip rect
+            float btn_sz = 28.0f;
+            float mgn = 12.0f;
+            float lbl_w = 50.0f;
+            float strip_w = btn_sz * 2 + lbl_w + 12.0f;
+            float zx = child_pos.x + child_size_pre.x - (btn_sz * 2 + lbl_w + mgn + 8.0f);
+            float zy = child_pos.y + child_size_pre.y - (btn_sz + mgn);
+            ImVec2 zoom_tl(zx - 4.0f, zy - 2.0f);
+            ImVec2 zoom_br(zx + strip_w, zy + btn_sz + 2.0f);
+            if (mouse_pos.x >= zoom_tl.x && mouse_pos.x <= zoom_br.x &&
+                mouse_pos.y >= zoom_tl.y && mouse_pos.y <= zoom_br.y) {
+                g_overlay_hovered = true;
+            }
+
+            // Language button rect
+            UiState& state_pre = GetUiState();
+            if (state_pre.show_secondary_language || state_pre.model_has_translations) {
+                float lbw = 36.0f, lbh = 24.0f, lmgn = 12.0f;
+                float lx = child_pos.x + child_size_pre.x - (lbw + lmgn);
+                float ly = child_pos.y + child_size_pre.y - (28.0f + lmgn) - lbh - 6.0f;
+                ImVec2 lang_tl(lx - 2.0f, ly - 2.0f);
+                ImVec2 lang_br(lx + lbw + 2.0f, ly + lbh + 2.0f);
+                if (mouse_pos.x >= lang_tl.x && mouse_pos.x <= lang_br.x &&
+                    mouse_pos.y >= lang_tl.y && mouse_pos.y <= lang_br.y) {
+                    g_overlay_hovered = true;
+                }
             }
         }
 
