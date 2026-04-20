@@ -1,11 +1,12 @@
 #pragma once
 
 #include "parser/xml_parser.h"
+#include "sacm/sacm_model.h"
 
 namespace ui {
 
-// Render the element properties panel showing details of the selected element.
-// Expects to be called inside an ImGui::Begin/End block.
-void ShowElementPanel(const parser::AssuranceCase* ac);
+// Render the element properties panel with editable fields.
+// Returns true if any field was modified (caller should rebuild tree).
+bool ShowElementPanel(parser::AssuranceCase* ac, sacm::AssuranceCasePackage* sacm_pkg);
 
 }  // namespace ui

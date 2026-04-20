@@ -325,7 +325,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         ImGui::SetNextWindowPos(ImVec2(right_x, 0));
         ImGui::SetNextWindowSize(ImVec2(right_w, display.y));
         ImGui::Begin("Element Properties", nullptr, kPanelFlags);
-        ui::ShowElementPanel(app_state.loaded_case.has_value() ? &app_state.loaded_case.value() : nullptr);
+        {
+            parser::AssuranceCase* ac_ptr = app_state.loaded_case.has_value() ? &app_state.loaded_case.value() : nullptr;
+            sacm::AssuranceCasePackage* sacm_ptr = app_state.sacm_package.has_value() ? &app_state.sacm_package.value() : nullptr;
+            if (ui::ShowElementPanel(ac_ptr, sacm_ptr)) {
+                // An edit occurred — rebuild tree so canvas reflects changes
+                tree_needs_rebuild = true;
+            }
+        }
         ImGui::End();
 
         // Rendering
