@@ -189,14 +189,14 @@ void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin, float zoom) {
     ComputeTextRegion(node, top_left, bottom_right, zoom, text_left, text_wrap);
     DrawNodeLabel(draw_list, node, top_left, bottom_right, text_left, text_wrap, zoom);
 
-    // Invisible button for hit-testing (skip when overlay controls are hovered
-    // so that zoom/language buttons can receive the click instead)
-    if (!g_overlay_hovered) {
-        ImGui::SetCursorScreenPos(top_left);
-        ImGui::InvisibleButton(node.id.c_str(), scaled_size);
-        if (ImGui::IsItemClicked()) {
-            GetUiState().selected_element_id = node.id;
-        }
+    // Invisible button for hit-testing.
+    // SetNextItemAllowOverlap lets overlay buttons (zoom/language) receive clicks
+    // even when they overlap a node's hit area.
+    ImGui::SetCursorScreenPos(top_left);
+    ImGui::SetNextItemAllowOverlap();
+    ImGui::InvisibleButton(node.id.c_str(), scaled_size);
+    if (ImGui::IsItemClicked() && !g_overlay_hovered) {
+        GetUiState().selected_element_id = node.id;
     }
 
     // Highlight selected node
@@ -224,6 +224,16 @@ void ShowGsnCanvasWindow() {
         // --- Zoom & pan input handling ---
         GsnCanvas& renderer = GlobalRenderer();
         ImVec2 child_pos = ImGui::GetWindowPos();
+
+        // Center on selected element if requested (e.g. from tree view click)
+        {
+            UiState& state = GetUiState();
+            if (state.center_on_selection && !state.selected_element_id.empty()) {
+                ImVec2 viewport_size = ImGui::GetWindowSize();
+                renderer.CenterOnNode(state.selected_element_id, viewport_size);
+                state.center_on_selection = false;
+            }
+        }
 
         // Ctrl + mouse scroll wheel: zoom at mouse pointer position
         // Plain scroll wheel (no Ctrl): pan vertically

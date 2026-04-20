@@ -333,4 +333,19 @@ void GsnCanvas::Render() {
     }
 }
 
+bool GsnCanvas::CenterOnNode(const std::string& node_id, ImVec2 viewport_size) {
+    for (const auto& node : layout_nodes_) {
+        if (node.id == node_id) {
+            // Center of the node in layout-space (unzoomed)
+            float cx = node.position.x + node.size.x * 0.5f;
+            float cy = node.position.y + node.size.y * 0.5f;
+            // Set view_offset so the node center maps to viewport center
+            view_offset_.x = cx * zoom_level_ - viewport_size.x * 0.5f;
+            view_offset_.y = cy * zoom_level_ - viewport_size.y * 0.5f;
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace ui

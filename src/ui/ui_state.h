@@ -12,6 +12,9 @@ struct UiState {
     bool show_secondary_language = false;
     std::string active_secondary_lang = "ja";
     bool model_has_translations = false;  // set when tree is built/rebuilt
+
+    // Set to true when the canvas should center on the selected element
+    bool center_on_selection = false;
 };
 
 // Global shared UI state accessible from all panels.
