@@ -3,6 +3,8 @@
 Assurance Forge is an application that assists Safety Engineers with Safety Case development.
 The tool uses SACM (Structured Assurance Case Metamodel).
 
+![Early Screenshot](docs/screenshot/early-screenshot.png)
+
 ---
 
 ## ✨ Vision

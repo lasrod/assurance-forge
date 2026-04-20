@@ -32,6 +32,9 @@ add_executable(assurance-forge WIN32
     src/ui/gsn_layout.cpp
     src/ui/gsn_canvas_renderer.cpp
     src/ui/gsn_adapter.cpp
+    src/ui/tree_view.cpp
+    src/ui/element_panel.cpp
+    src/ui/ui_state.cpp
     src/core/app_state.cpp
     src/core/assurance_tree.cpp
 )
