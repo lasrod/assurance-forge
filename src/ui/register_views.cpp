@@ -228,6 +228,14 @@ void RebuildRegisterViews(const parser::AssuranceCase* ac) {
     });
 }
 
+size_t GetCseRegisterRowCount() {
+    return g_cse_rows.size();
+}
+
+size_t GetEvidenceRegisterRowCount() {
+    return g_evidence_rows.size();
+}
+
 void ShowCseRegisterView() {
     if (g_cse_rows.empty()) {
         ImGui::TextDisabled("No CSE rows were derived from direct claim-evidence relations.");
@@ -244,7 +252,7 @@ void ShowCseRegisterView() {
         return;
     }
 
-    ImGui::TableSetupScrollFreeze(0, 1);
+    ImGui::TableSetupScrollFreeze(2, 1);
     ImGui::TableSetupColumn("CSE ID");
     ImGui::TableSetupColumn("Claim ID");
     ImGui::TableSetupColumn("Claim");
@@ -331,7 +339,7 @@ void ShowEvidenceRegisterView() {
         return;
     }
 
-    ImGui::TableSetupScrollFreeze(0, 1);
+    ImGui::TableSetupScrollFreeze(2, 1);
     ImGui::TableSetupColumn("Evidence ID");
     ImGui::TableSetupColumn("Evidence");
     ImGui::TableSetupColumn("Evidence Owner");

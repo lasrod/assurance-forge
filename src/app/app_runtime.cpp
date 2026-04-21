@@ -22,6 +22,7 @@ namespace app {
 namespace {
 
 constexpr size_t kPathBufferSize = 512;
+constexpr const char* kDefaultDemoFilePath = "data/oasc-ja.xml";
 
 constexpr float kInitialLeftPanelRatio = 0.20f;
 constexpr float kInitialRightPanelRatio = 0.20f;
@@ -29,6 +30,7 @@ constexpr float kMinPanelRatio = 0.10f;
 constexpr float kMaxPanelRatio = 0.40f;
 constexpr float kSplitterThickness = 6.0f;
 constexpr float kTopLeftHeightRatio = 0.50f;
+constexpr float kSummaryStripHeight = 88.0f;
 
 // Splitter color: medium-dark neutral gray (#262626)
 const ImVec4 kSplitterColor = ImVec4(0.15f, 0.15f, 0.15f, 1.0f);
@@ -38,6 +40,8 @@ const ImVec4 kElementTypeDefaultColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);  // whit
 const ImVec4 kElementTypeClaimColor = ImVec4(0.4f, 0.8f, 0.4f, 1.0f);    // green
 const ImVec4 kElementTypeStrategyColor = ImVec4(0.4f, 0.6f, 0.9f, 1.0f); // blue
 const ImVec4 kElementTypeEvidenceColor = ImVec4(0.9f, 0.7f, 0.3f, 1.0f); // amber
+const ImVec4 kSummaryLabelColor = ImVec4(0.70f, 0.70f, 0.70f, 1.0f);      // light gray
+const ImVec4 kSummaryValueColor = ImVec4(0.96f, 0.96f, 0.96f, 1.0f);      // near-white
 
 constexpr float kOverwriteButtonWidth = 130.0f;
 
@@ -77,12 +81,29 @@ void DrawVerticalSplitter(const char* id,
     ImGui::PopStyleVar(2);
 }
 
+int CountElementsOfType(const parser::AssuranceCase& ac, const char* type_a, const char* type_b = nullptr) {
+    int count = 0;
+    for (const auto& elem : ac.elements) {
+        if (elem.type == type_a || (type_b && elem.type == type_b)) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+void SummaryMetric(const char* label, int value) {
+    ImGui::BeginGroup();
+    ImGui::TextColored(kSummaryLabelColor, "%s", label);
+    ImGui::TextColored(kSummaryValueColor, "%d", value);
+    ImGui::EndGroup();
+}
+
 }  // namespace
 
 struct AppRuntime::Impl {
     core::AppState app_state;
 
-    char file_path_buf[kPathBufferSize] = "data/open-autonomy-safety-case.sacm.xml";
+    char file_path_buf[kPathBufferSize] = "data/oasc-ja.xml";
     char dir_path_buf[kPathBufferSize] = "data";
 
     std::vector<std::string> xml_files;
@@ -92,6 +113,7 @@ struct AppRuntime::Impl {
     core::AssuranceTree current_tree;
     bool show_overwrite_confirm = false;
     bool force_center_tab_selection = false;
+    bool pending_focus_root = false;
 
     float left_ratio = kInitialLeftPanelRatio;
     float right_ratio = kInitialRightPanelRatio;
@@ -99,6 +121,12 @@ struct AppRuntime::Impl {
 
 AppRuntime::AppRuntime() : impl_(new Impl()) {
     ScanDirectory();
+
+    if (impl_->app_state.load_file(impl_->file_path_buf)) {
+        impl_->tree_needs_rebuild = true;
+        impl_->pending_focus_root = true;
+        ui::GetUiState().center_view = ui::CenterView::GsnCanvas;
+    }
 }
 
 AppRuntime::~AppRuntime() {
@@ -127,8 +155,20 @@ void AppRuntime::ScanDirectory() {
 
     std::sort(impl_->xml_files.begin(), impl_->xml_files.end());
 
+    std::error_code path_ec;
+    std::filesystem::path selected_path = std::filesystem::weakly_canonical(std::filesystem::path(impl_->file_path_buf), path_ec);
+    if (path_ec) {
+        selected_path = std::filesystem::path(impl_->file_path_buf).lexically_normal();
+    }
+
     for (int i = 0; i < static_cast<int>(impl_->xml_files.size()); ++i) {
-        if (impl_->xml_files[i] == impl_->file_path_buf) {
+        std::filesystem::path candidate_path = std::filesystem::weakly_canonical(std::filesystem::path(impl_->xml_files[i]), path_ec);
+        if (path_ec) {
+            path_ec.clear();
+            candidate_path = std::filesystem::path(impl_->xml_files[i]).lexically_normal();
+        }
+
+        if (candidate_path == selected_path) {
             impl_->selected_file_idx = i;
             break;
         }
@@ -151,6 +191,16 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     ui::SetCanvasTree(impl_->current_tree);
     ui::RebuildRegisterViews(&ac);
     ui::GetUiState().model_has_translations = ui::ModelHasTranslations(ac);
+
+    if (impl_->pending_focus_root && impl_->current_tree.root) {
+        ui::UiState& ui_state = ui::GetUiState();
+        ui_state.selected_element_id = impl_->current_tree.root->id;
+        ui_state.center_on_selection = true;
+        ui_state.center_view = ui::CenterView::GsnCanvas;
+        impl_->force_center_tab_selection = true;
+        impl_->pending_focus_root = false;
+    }
+
     impl_->tree_needs_rebuild = false;
 }
 
@@ -241,8 +291,15 @@ void AppRuntime::RenderSacmViewerPanel(float left_w, float top_left_h, float bot
     }
 
     if (ImGui::Button("Load")) {
-        impl_->app_state.load_file(impl_->file_path_buf);
-        impl_->tree_needs_rebuild = true;
+        if (impl_->app_state.load_file(impl_->file_path_buf)) {
+            impl_->tree_needs_rebuild = true;
+            impl_->pending_focus_root = true;
+        } else {
+            impl_->current_tree = core::AssuranceTree();
+            ui::SetCanvasTree(impl_->current_tree);
+            ui::RebuildRegisterViews(nullptr);
+            ui::GetUiState().selected_element_id.clear();
+        }
     }
 
     ImGui::SameLine();
@@ -291,6 +348,20 @@ void AppRuntime::RenderSacmViewerPanel(float left_w, float top_left_h, float bot
 
     if (impl_->app_state.loaded_case.has_value()) {
         const auto& ac = impl_->app_state.loaded_case.value();
+
+        if (ImGui::BeginChild("ProjectSummary", ImVec2(0, kSummaryStripHeight), true, ImGuiWindowFlags_NoScrollbar)) {
+            ImGui::Text("Project Summary");
+            if (ImGui::BeginTable("ProjectSummaryMetrics", 5, ImGuiTableFlags_SizingStretchSame)) {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn(); SummaryMetric("Claims", CountElementsOfType(ac, "claim"));
+                ImGui::TableNextColumn(); SummaryMetric("Strategies", CountElementsOfType(ac, "argumentreasoning"));
+                ImGui::TableNextColumn(); SummaryMetric("Evidence", CountElementsOfType(ac, "artifact", "artifactreference") + CountElementsOfType(ac, "expression"));
+                ImGui::TableNextColumn(); SummaryMetric("CSE Rows", static_cast<int>(ui::GetCseRegisterRowCount()));
+                ImGui::TableNextColumn(); SummaryMetric("Evidence Rows", static_cast<int>(ui::GetEvidenceRegisterRowCount()));
+                ImGui::EndTable();
+            }
+        }
+        ImGui::EndChild();
 
         ImGui::Text("Assurance Case: %s", ac.name.c_str());
         ImGui::Separator();
