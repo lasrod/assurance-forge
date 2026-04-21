@@ -12,6 +12,7 @@
 #include "ui/tree_view.h"
 #include "ui/element_panel.h"
 #include "ui/ui_state.h"
+#include "ui/register_views.h"
 
 #include "core/app_state.h"
 #include <cstdio>   // for FILE, fopen, fclose (file-exists check)
@@ -152,6 +153,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     bool tree_needs_rebuild = false;
     core::AssuranceTree current_tree;
     bool show_overwrite_confirm = false;
+    bool force_center_tab_selection = false;
 
     // Scan directory for XML files
     auto scan_directory = [&]() {
@@ -275,6 +277,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         ui::ShowTreeViewPanel(current_tree.root ? &current_tree : nullptr);
         ImGui::End();
 
+        if (tree_needs_rebuild && !app_state.loaded_case.has_value()) {
+            ui::RebuildRegisterViews(nullptr);
+            tree_needs_rebuild = false;
+        }
+
         // ---- Bottom-Left: SACM Viewer ----
         ImGui::SetNextWindowPos(ImVec2(0, top_left_h));
         ImGui::SetNextWindowSize(ImVec2(left_w, bottom_left_h));
@@ -285,6 +292,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             if (ImGui::BeginMenu("File")) {
                 if (ImGui::MenuItem("Exit")) {
                     done = true;
+                }
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu("View")) {
+                ui::UiState& ui_state_menu = ui::GetUiState();
+                if (ImGui::MenuItem("GSN Canvas", nullptr, ui_state_menu.center_view == ui::CenterView::GsnCanvas)) {
+                    ui_state_menu.center_view = ui::CenterView::GsnCanvas;
+                    force_center_tab_selection = true;
+                }
+                if (ImGui::MenuItem("CSE Register", nullptr, ui_state_menu.center_view == ui::CenterView::CseRegister)) {
+                    ui_state_menu.center_view = ui::CenterView::CseRegister;
+                    force_center_tab_selection = true;
+                }
+                if (ImGui::MenuItem("Evidence Register", nullptr, ui_state_menu.center_view == ui::CenterView::EvidenceRegister)) {
+                    ui_state_menu.center_view = ui::CenterView::EvidenceRegister;
+                    force_center_tab_selection = true;
                 }
                 ImGui::EndMenu();
             }
@@ -387,6 +410,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             if (tree_needs_rebuild) {
                 current_tree = ui::BuildAssuranceTree(ac);
                 ui::SetCanvasTree(current_tree);
+                ui::RebuildRegisterViews(&ac);
                 ui::GetUiState().model_has_translations = ui::ModelHasTranslations(ac);
                 tree_needs_rebuild = false;
             }
@@ -426,10 +450,45 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
         ImGui::End();
 
-        // ---- Center: GSN Canvas ----
+        // ---- Center: Main View (tabs) ----
         ImGui::SetNextWindowPos(ImVec2(center_x, 0));
         ImGui::SetNextWindowSize(ImVec2(center_w, display.y));
-        ui::ShowGsnCanvasWindow();
+        ImGui::Begin("Center View", nullptr, kPanelFlags | ImGuiWindowFlags_NoTitleBar);
+        {
+            ui::UiState& ui_state = ui::GetUiState();
+            if (ImGui::BeginTabBar("##center_tabs")) {
+                ImGuiTabItemFlags gsn_flags = (force_center_tab_selection && ui_state.center_view == ui::CenterView::GsnCanvas)
+                                              ? ImGuiTabItemFlags_SetSelected
+                                              : 0;
+                if (ImGui::BeginTabItem("GSN Canvas", nullptr, gsn_flags)) {
+                    ui_state.center_view = ui::CenterView::GsnCanvas;
+                    ui::ShowGsnCanvasContent();
+                    ImGui::EndTabItem();
+                }
+
+                ImGuiTabItemFlags cse_flags = (force_center_tab_selection && ui_state.center_view == ui::CenterView::CseRegister)
+                                              ? ImGuiTabItemFlags_SetSelected
+                                              : 0;
+                if (ImGui::BeginTabItem("CSE Register", nullptr, cse_flags)) {
+                    ui_state.center_view = ui::CenterView::CseRegister;
+                    ui::ShowCseRegisterView();
+                    ImGui::EndTabItem();
+                }
+
+                ImGuiTabItemFlags ev_flags = (force_center_tab_selection && ui_state.center_view == ui::CenterView::EvidenceRegister)
+                                             ? ImGuiTabItemFlags_SetSelected
+                                             : 0;
+                if (ImGui::BeginTabItem("Evidence Register", nullptr, ev_flags)) {
+                    ui_state.center_view = ui::CenterView::EvidenceRegister;
+                    ui::ShowEvidenceRegisterView();
+                    ImGui::EndTabItem();
+                }
+
+                ImGui::EndTabBar();
+                force_center_tab_selection = false;
+            }
+        }
+        ImGui::End();
 
         // ---- Right: Element Properties ----
         float right_x = center_x + center_w + kSplitterThickness;

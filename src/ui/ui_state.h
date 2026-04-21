@@ -5,6 +5,12 @@
 
 namespace ui {
 
+enum class CenterView {
+    GsnCanvas,
+    CseRegister,
+    EvidenceRegister,
+};
+
 struct UiState {
     std::string selected_element_id;
 
@@ -15,6 +21,9 @@ struct UiState {
 
     // Set to true when the canvas should center on the selected element
     bool center_on_selection = false;
+
+    // Active center panel view
+    CenterView center_view = CenterView::GsnCanvas;
 };
 
 // Global shared UI state accessible from all panels.
