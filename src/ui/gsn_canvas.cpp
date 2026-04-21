@@ -341,6 +341,28 @@ void ShowGsnCanvasContent() {
             }
         }
 
+        // --- Keyboard and mouse shortcut hints (top-left) ---
+        {
+            const char* hint_1 = "Ctrl+Wheel  Zoom";
+            const char* hint_2 = "Middle Drag  Pan";
+
+            ImDrawList* fg_hints = ImGui::GetForegroundDrawList();
+            ImVec2 hint_pos(child_pos.x + 12.0f, child_pos.y + 12.0f);
+            ImVec2 hint_size(164.0f, 44.0f);
+
+            fg_hints->AddRectFilled(
+                hint_pos,
+                ImVec2(hint_pos.x + hint_size.x, hint_pos.y + hint_size.y),
+                IM_COL32(40, 40, 40, 180), 6.0f);
+            fg_hints->AddRect(
+                hint_pos,
+                ImVec2(hint_pos.x + hint_size.x, hint_pos.y + hint_size.y),
+                IM_COL32(80, 80, 80, 200), 6.0f);
+
+            fg_hints->AddText(ImVec2(hint_pos.x + 10.0f, hint_pos.y + 8.0f), IM_COL32(220, 220, 220, 255), hint_1);
+            fg_hints->AddText(ImVec2(hint_pos.x + 10.0f, hint_pos.y + 26.0f), IM_COL32(220, 220, 220, 255), hint_2);
+        }
+
         // --- Overlay zoom buttons in bottom-right corner ---
         {
             ImVec2 child_size = ImGui::GetWindowSize();

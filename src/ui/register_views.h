@@ -38,6 +38,9 @@ struct EvidenceRegisterRow {
 
 void RebuildRegisterViews(const parser::AssuranceCase* ac);
 
+size_t GetCseRegisterRowCount();
+size_t GetEvidenceRegisterRowCount();
+
 void ShowCseRegisterView();
 void ShowEvidenceRegisterView();
 
