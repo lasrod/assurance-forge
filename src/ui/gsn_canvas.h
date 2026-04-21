@@ -29,6 +29,10 @@ void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin, float zoom = 1.0f);
 // Internally uses the new `GsnCanvas` renderer.
 void ShowGsnCanvasWindow();
 
+// Render only the canvas content in the current window.
+// This enables embedding the canvas under tab views.
+void ShowGsnCanvasContent();
+
 // High-level renderer class (in implementation file)
 class GsnCanvas;
 

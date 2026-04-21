@@ -27,6 +27,8 @@ add_subdirectory(external/pugixml)
 # --- Main application ---
 add_executable(assurance-forge WIN32
     src/app/main.cpp
+    src/app/app_runtime.cpp
+    src/app/platform_win32_dx11.cpp
     src/parser/xml_parser.cpp
     src/ui/gsn_canvas.cpp
     src/ui/gsn_layout.cpp
@@ -34,6 +36,7 @@ add_executable(assurance-forge WIN32
     src/ui/gsn_adapter.cpp
     src/ui/tree_view.cpp
     src/ui/element_panel.cpp
+    src/ui/register_views.cpp
     src/ui/ui_state.cpp
     src/core/app_state.cpp
     src/core/assurance_tree.cpp

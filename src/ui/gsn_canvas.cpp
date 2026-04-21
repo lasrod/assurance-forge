@@ -208,18 +208,11 @@ void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin, float zoom) {
     }
 }
 
-void ShowGsnCanvasWindow() {
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoCollapse
-                                  | ImGuiWindowFlags_NoMove
-                                  | ImGuiWindowFlags_NoResize
-                                  | ImGuiWindowFlags_NoBringToFrontOnFocus;
-
-    if (ImGui::Begin("GSN Canvas", nullptr, window_flags)) {
-
-        // Child region with clipping; we manage our own pan/zoom offset
-        // so no ImGui scrollbars are needed.
-        ImGui::BeginChild("gsn_canvas_child", ImVec2(0, 0), false,
-                          ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+void ShowGsnCanvasContent() {
+    // Child region with clipping; we manage our own pan/zoom offset
+    // so no ImGui scrollbars are needed.
+    ImGui::BeginChild("gsn_canvas_child", ImVec2(0, 0), false,
+                      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
         // --- Zoom & pan input handling ---
         GsnCanvas& renderer = GlobalRenderer();
@@ -488,7 +481,17 @@ void ShowGsnCanvasWindow() {
             }
         }
 
-        ImGui::EndChild();
+    ImGui::EndChild();
+}
+
+void ShowGsnCanvasWindow() {
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoCollapse
+                                  | ImGuiWindowFlags_NoMove
+                                  | ImGuiWindowFlags_NoResize
+                                  | ImGuiWindowFlags_NoBringToFrontOnFocus;
+
+    if (ImGui::Begin("GSN Canvas", nullptr, window_flags)) {
+        ShowGsnCanvasContent();
     }
     ImGui::End();
 }
