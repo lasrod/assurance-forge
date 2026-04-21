@@ -142,3 +142,7 @@ https://github.com/EdgeCaseResearch/oasc
 - [Dear ImGui](https://github.com/ocornut/imgui) - Immediate mode GUI (MIT License)
 - [pugixml](https://github.com/zeux/pugixml) - XML parser (MIT License)
 - [GoogleTest](https://github.com/google/googletest) - Testing framework, fetched via CMake (BSD-3-Clause)
+
+
+## Copyright and license
+Code and documentation copyright 2026 Jesper Brännström. Code released under the [MIT License](LICENSE.md)
