@@ -1,8 +1,11 @@
 ﻿#include "ui/element_panel.h"
 #include "ui/ui_state.h"
 #include "ui/gsn_canvas.h"
+#include "core/sccg_review.h"
 #include "imgui.h"
+#include <cstddef>
 #include <cstring>
+#include <vector>
 
 namespace ui {
 
@@ -269,6 +272,110 @@ bool ShowElementPanel(parser::AssuranceCase* ac, sacm::AssuranceCasePackage* sac
             }
             modified = true;
         }
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Text("SCCG Review Tags");
+    ImGui::TextDisabled("Attach guideline findings to this element.");
+
+    bool sccg_modified = false;
+    std::vector<core::ElementSccgTag> tags = core::GetTagsForElement(elem->id);
+    const std::vector<core::SccgGuideline>& guidelines = core::GetSccgGuidelines();
+
+    if (tags.empty()) {
+        ImGui::TextDisabled("No SCCG tags on this element.");
+    }
+
+    for (size_t i = 0; i < tags.size(); ++i) {
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::Separator();
+
+        int selected_guideline_idx = -1;
+        for (int gi = 0; gi < static_cast<int>(guidelines.size()); ++gi) {
+            if (guidelines[gi].id == tags[i].guideline_id) {
+                selected_guideline_idx = gi;
+                break;
+            }
+        }
+
+        const char* preview = tags[i].guideline_id.empty() ? "Select guideline" : tags[i].guideline_id.c_str();
+        if (ImGui::BeginCombo("Guideline ID", preview)) {
+            for (int gi = 0; gi < static_cast<int>(guidelines.size()); ++gi) {
+                bool is_selected = (gi == selected_guideline_idx);
+                std::string label = guidelines[gi].id + " - " + guidelines[gi].title;
+                if (ImGui::Selectable(label.c_str(), is_selected)) {
+                    tags[i].guideline_id = guidelines[gi].id;
+                    sccg_modified = true;
+                }
+                if (is_selected) ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+
+        static const char* kStatuses[] = {
+            "Open",
+            "Mitigated",
+            "Accepted",
+            "False Positive",
+        };
+        int status_idx = 0;
+        for (int si = 0; si < 4; ++si) {
+            if (tags[i].status == kStatuses[si]) {
+                status_idx = si;
+                break;
+            }
+        }
+        if (ImGui::Combo("Status", &status_idx, kStatuses, 4)) {
+            tags[i].status = kStatuses[status_idx];
+            sccg_modified = true;
+        }
+
+        static const char* kSeverities[] = {
+            "Info",
+            "Minor",
+            "Major",
+        };
+        int severity_idx = 0;
+        for (int si = 0; si < 3; ++si) {
+            if (tags[i].severity == kSeverities[si]) {
+                severity_idx = si;
+                break;
+            }
+        }
+        if (ImGui::Combo("Severity", &severity_idx, kSeverities, 3)) {
+            tags[i].severity = kSeverities[severity_idx];
+            sccg_modified = true;
+        }
+
+        ImGui::Text("Comment");
+        if (EditableTextField("sccg_comment", tags[i].comment)) {
+            sccg_modified = true;
+        }
+
+        if (ImGui::Button("Remove Tag")) {
+            tags.erase(tags.begin() + static_cast<std::ptrdiff_t>(i));
+            sccg_modified = true;
+            ImGui::PopID();
+            break;
+        }
+
+        ImGui::PopID();
+    }
+
+    if (ImGui::Button("Add SCCG Tag")) {
+        core::ElementSccgTag tag;
+        tag.status = "Open";
+        tag.severity = "Minor";
+        if (!guidelines.empty()) {
+            tag.guideline_id = guidelines.front().id;
+        }
+        tags.push_back(std::move(tag));
+        sccg_modified = true;
+    }
+
+    if (sccg_modified) {
+        core::SetTagsForElement(elem->id, tags);
     }
 
     // Sync edits to SACM model

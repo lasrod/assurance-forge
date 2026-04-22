@@ -44,6 +44,8 @@ Users work with assurance content, not diagram layout.
 - Visualize assurance cases in a GSN-like structure
 - Automatic layout of assurance elements
 - Inspect nodes and relationships
+- Browse SCCG guidelines in-app
+- Tag elements with SCCG findings (stored in sidecar review files)
 - AI-based suggestions (planned)
 
 ---

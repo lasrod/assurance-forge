@@ -9,6 +9,7 @@ enum class CenterView {
     GsnCanvas,
     CseRegister,
     EvidenceRegister,
+    SccgGuidelines,
 };
 
 struct UiState {

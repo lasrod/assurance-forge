@@ -3,8 +3,10 @@
 #include "imgui.h"
 
 #include "core/app_state.h"
+#include "core/sccg_review.h"
 #include "ui/gsn_canvas.h"
 #include "ui/register_views.h"
+#include "ui/sccg_panel.h"
 #include "ui/tree_view.h"
 #include "ui/element_panel.h"
 #include "ui/gsn_adapter.h"
@@ -23,6 +25,7 @@ namespace {
 
 constexpr size_t kPathBufferSize = 512;
 constexpr const char* kDefaultDemoFilePath = "data/oasc-ja.xml";
+constexpr const char* kDefaultSccgCatalogPath = "data/sccg_guidelines.tsv";
 
 constexpr float kInitialLeftPanelRatio = 0.20f;
 constexpr float kInitialRightPanelRatio = 0.20f;
@@ -120,12 +123,14 @@ struct AppRuntime::Impl {
 };
 
 AppRuntime::AppRuntime() : impl_(new Impl()) {
+    core::LoadSccgCatalog(kDefaultSccgCatalogPath);
     ScanDirectory();
 
     if (impl_->app_state.load_file(impl_->file_path_buf)) {
         impl_->tree_needs_rebuild = true;
         impl_->pending_focus_root = true;
         ui::GetUiState().center_view = ui::CenterView::GsnCanvas;
+        core::LoadReviewSidecarForModel(impl_->file_path_buf);
     }
 }
 
@@ -246,6 +251,10 @@ void AppRuntime::RenderSacmViewerPanel(float left_w, float top_left_h, float bot
                 ui_state.center_view = ui::CenterView::EvidenceRegister;
                 impl_->force_center_tab_selection = true;
             }
+            if (ImGui::MenuItem("SCCG Guidelines", nullptr, ui_state.center_view == ui::CenterView::SccgGuidelines)) {
+                ui_state.center_view = ui::CenterView::SccgGuidelines;
+                impl_->force_center_tab_selection = true;
+            }
             ImGui::EndMenu();
         }
 
@@ -294,11 +303,13 @@ void AppRuntime::RenderSacmViewerPanel(float left_w, float top_left_h, float bot
         if (impl_->app_state.load_file(impl_->file_path_buf)) {
             impl_->tree_needs_rebuild = true;
             impl_->pending_focus_root = true;
+            core::LoadReviewSidecarForModel(impl_->file_path_buf);
         } else {
             impl_->current_tree = core::AssuranceTree();
             ui::SetCanvasTree(impl_->current_tree);
             ui::RebuildRegisterViews(nullptr);
             ui::GetUiState().selected_element_id.clear();
+            core::ClearReviewData();
         }
     }
 
@@ -312,7 +323,9 @@ void AppRuntime::RenderSacmViewerPanel(float left_w, float top_left_h, float bot
                 fclose(f);
                 impl_->show_overwrite_confirm = true;
             } else {
-                impl_->app_state.save_file(impl_->file_path_buf);
+                if (impl_->app_state.save_file(impl_->file_path_buf)) {
+                    core::SaveReviewSidecarForModel(impl_->file_path_buf);
+                }
             }
         }
         if (!can_save) ImGui::EndDisabled();
@@ -330,7 +343,9 @@ void AppRuntime::RenderSacmViewerPanel(float left_w, float top_left_h, float bot
         ImGui::Spacing();
 
         if (ImGui::Button("Yes, Overwrite", ImVec2(kOverwriteButtonWidth, 0))) {
-            impl_->app_state.save_file(impl_->file_path_buf);
+            if (impl_->app_state.save_file(impl_->file_path_buf)) {
+                core::SaveReviewSidecarForModel(impl_->file_path_buf);
+            }
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
@@ -351,13 +366,15 @@ void AppRuntime::RenderSacmViewerPanel(float left_w, float top_left_h, float bot
 
         if (ImGui::BeginChild("ProjectSummary", ImVec2(0, kSummaryStripHeight), true, ImGuiWindowFlags_NoScrollbar)) {
             ImGui::Text("Project Summary");
-            if (ImGui::BeginTable("ProjectSummaryMetrics", 5, ImGuiTableFlags_SizingStretchSame)) {
+            if (ImGui::BeginTable("ProjectSummaryMetrics", 7, ImGuiTableFlags_SizingStretchSame)) {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn(); SummaryMetric("Claims", CountElementsOfType(ac, "claim"));
                 ImGui::TableNextColumn(); SummaryMetric("Strategies", CountElementsOfType(ac, "argumentreasoning"));
                 ImGui::TableNextColumn(); SummaryMetric("Evidence", CountElementsOfType(ac, "artifact", "artifactreference") + CountElementsOfType(ac, "expression"));
                 ImGui::TableNextColumn(); SummaryMetric("CSE Rows", static_cast<int>(ui::GetCseRegisterRowCount()));
                 ImGui::TableNextColumn(); SummaryMetric("Evidence Rows", static_cast<int>(ui::GetEvidenceRegisterRowCount()));
+                ImGui::TableNextColumn(); SummaryMetric("Tagged Elements", core::CountTaggedElements());
+                ImGui::TableNextColumn(); SummaryMetric("Open Findings", core::CountOpenFindings());
                 ImGui::EndTable();
             }
         }
@@ -430,6 +447,15 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float display
             ImGui::EndTabItem();
         }
 
+        ImGuiTabItemFlags sccg_flags = (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::SccgGuidelines)
+                                       ? ImGuiTabItemFlags_SetSelected
+                                       : 0;
+        if (ImGui::BeginTabItem("SCCG Guidelines", nullptr, sccg_flags)) {
+            ui_state.center_view = ui::CenterView::SccgGuidelines;
+            ui::ShowSccgGuidelinesView();
+            ImGui::EndTabItem();
+        }
+
         ImGui::EndTabBar();
         impl_->force_center_tab_selection = false;
     }
@@ -472,6 +498,10 @@ void AppRuntime::RenderFrame(bool& done) {
     float center_x = left_w + kSplitterThickness;
     RenderCenterPanel(center_x, center_w, display.y);
     RenderElementPropertiesPanel(center_x, center_w, right_w);
+
+    if (core::HasPendingReviewChanges()) {
+        core::SaveReviewSidecarForModel(impl_->file_path_buf);
+    }
 }
 
 }  // namespace app

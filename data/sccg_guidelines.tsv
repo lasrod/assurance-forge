@@ -1,0 +1,14 @@
+id|category|title|guideline
+CL.1|Claim|Write each claim as a falsifiable proposition|State each claim as a sentence that can in principle be shown true or false.
+CL.4|Claim|Avoid ambiguity and overloaded wording|Write claims so that competent reviewers are likely to understand them in the same way.
+AR.1|Argument|Let structure carry the argument|Use goals for claims, strategies for inference, context for scope, assumptions for dependencies, and solutions for evidence references.
+AR.2|Argument|State the inference step explicitly|State how the parent claim is decomposed or argued and do not hide the reasoning step.
+EV.1|Evidence|Make the evidence-support path explicit|Show for each claim the evidence path that supports it directly or through stated sub-claims.
+EV.4|Evidence|Cite precise evidence locations|Reference exact sections, tables, figures, or datasets rather than broad document citations.
+EV.7|Evidence|Keep evidence controlled|Track owner, version, date, status, and stable repository location for cited evidence.
+SU.2|Sufficiency|Make assumptions explicit|State assumptions explicitly, explain why they are reasonable, and monitor them where needed.
+SU.6|Sufficiency|Do not dismiss adverse operational feedback|Do not dismiss incidents or anomalies just because they are non-injury or not yet reproducible.
+LF.1|Logical Fallacy|Avoid circular reasoning|Do not support a claim by restating it or assuming it in the support.
+LF.3|Logical Fallacy|Avoid arguing from ignorance|Do not treat lack of discovered counter-evidence as positive proof.
+RD.2|Rhetorical|Use scoped claims and qualified confidence language|State operating scope and confidence language that matches actual support and open issues.
+RD.4|Rhetorical|Avoid promotional and inflated language|Do not use boastful or image-enhancing wording in safety arguments.
