@@ -40,6 +40,7 @@ add_executable(assurance-forge WIN32
     src/ui/ui_state.cpp
     src/core/app_state.cpp
     src/core/assurance_tree.cpp
+    src/core/element_factory.cpp
     src/sacm/sacm_parser.cpp
     src/sacm/sacm_serializer.cpp
 )

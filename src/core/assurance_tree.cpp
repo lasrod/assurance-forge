@@ -12,6 +12,7 @@ namespace {
 NodeRole classify_role(const parser::SacmElement& element) {
     if (element.type == "claim") {
         if (element.assertion_declaration == "assumed") return NodeRole::Assumption;
+        if (element.assertion_declaration == "justification") return NodeRole::Justification;
         return NodeRole::Claim;
     }
     if (element.type == "argumentreasoning") return NodeRole::Strategy;
@@ -60,9 +61,12 @@ static void WireGroup1Child(TreeNode* child, TreeNode* parent, std::unordered_se
 }
 
 // Wire a child node as a Group2 attachment of the given parent with the specified role.
+// Preserves an already-classified Assumption or Justification role rather than forcing it.
 static void WireGroup2Attachment(TreeNode* child, TreeNode* parent, NodeRole role,
                                  std::unordered_set<std::string>& wired_ids) {
-    child->role = role;
+    if (child->role != NodeRole::Assumption && child->role != NodeRole::Justification) {
+        child->role = role;
+    }
     child->group = ElementGroup::Group2;
     child->parent = parent;
     parent->group2_attachments.push_back(child);

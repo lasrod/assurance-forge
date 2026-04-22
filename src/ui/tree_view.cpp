@@ -1,8 +1,26 @@
 #include "ui/tree_view.h"
 #include "ui/ui_state.h"
+#include "app/app_runtime.h"
 #include "imgui.h"
 
 namespace ui {
+
+// Render the shared "Add" submenu used by both the tree and the canvas
+// context menus. Selecting an item dispatches via app::RequestAddChild,
+// which targets the currently selected element.
+void RenderAddElementMenu() {
+    if (ImGui::BeginMenu("Add")) {
+        if (ImGui::MenuItem("Goal"))          app::RequestAddChild(core::NewElementKind::Goal);
+        if (ImGui::MenuItem("Strategy"))      app::RequestAddChild(core::NewElementKind::Strategy);
+        if (ImGui::MenuItem("Solution"))      app::RequestAddChild(core::NewElementKind::Solution);
+        if (ImGui::MenuItem("Context"))       app::RequestAddChild(core::NewElementKind::Context);
+        if (ImGui::MenuItem("Assumption"))    app::RequestAddChild(core::NewElementKind::Assumption);
+        if (ImGui::MenuItem("Justification")) app::RequestAddChild(core::NewElementKind::Justification);
+        ImGui::Separator();
+        if (ImGui::MenuItem("Challenge"))     app::RequestNotImplemented("Challenge");
+        ImGui::EndMenu();
+    }
+}
 
 static const char* RoleLabel(core::NodeRole role) {
     switch (role) {
@@ -63,6 +81,13 @@ static void RenderTreeNode(const core::TreeNode* node) {
     if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
         state.selected_element_id = node->id;
         state.center_on_selection = true;
+    }
+
+    // Right-click context menu: select the node, then offer the Add submenu.
+    if (ImGui::BeginPopupContextItem(node->id.c_str())) {
+        state.selected_element_id = node->id;
+        RenderAddElementMenu();
+        ImGui::EndPopup();
     }
 
     if (has_children && open) {
