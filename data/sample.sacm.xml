@@ -1,29 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<sacm:AssuranceCasePackage
-    xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation"
-    id="SAMPLE" name="Sample Assurance Case" description="A minimal sample for demonstration">
-
-    <terminologyPackage id="TP1" name="Terminology">
-        <expression id="TERM_SAFE" value="System operates without causing harm"/>
-        <expression id="TERM_TEST" value="Verification through testing"/>
-    </terminologyPackage>
-
-    <argumentPackage id="AP1" name="Safety Argument">
-        <claim id="G1" name="Top Goal" content="The system is safe">
-            <description>Top-level safety claim</description>
-        </claim>
-        <claim id="G2" name="Sub Goal 1" content="Hazards are identified"/>
-        <claim id="G3" name="Sub Goal 2" content="Risks are mitigated"/>
-
-        <argumentReasoning id="S1" name="Strategy 1" content="Argue over identified hazards"/>
-        <argumentReasoning id="S2" name="Strategy 2" content="Argue over mitigation measures"/>
-
-        <artifactReference id="EV1" name="Evidence 1" referencedArtifact="ART_HazardAnalysis"/>
-        <artifactReference id="EV2" name="Evidence 2" referencedArtifact="ART_TestReport"/>
-    </argumentPackage>
-
-    <artifactPackage id="ARP1" name="Artifacts">
-        <artifact id="ART_HazardAnalysis" name="Hazard Analysis Report"/>
-        <artifact id="ART_TestReport" name="System Test Report"/>
-    </artifactPackage>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="SAMPLE" name="Sample Assurance Case">
+  <description>
+    <content lang="en">A minimal sample for demonstration</content>
+  </description>
+  <terminologyPackage id="TP1" name="Terminology">
+    <expression id="TERM_SAFE" value="System operates without causing harm" />
+    <expression id="TERM_TEST" value="Verification through testing" />
+  </terminologyPackage>
+  <artifactPackage id="ARP1" name="Artifacts">
+    <artifact id="ART_HazardAnalysis" name="Hazard Analysis Report" />
+    <artifact id="ART_TestReport" name="System Test Report" />
+  </artifactPackage>
+  <argumentPackage id="AP1" name="Safety Argument">
+    <claim id="G1" name="Top Goal" content="The system is safe">
+      <description>
+        <content lang="en">Top-level safety claim</content>
+      </description>
+    </claim>
+    <claim id="G2" name="Sub Goal 1" content="Hazards are identified" />
+    <claim id="G3" name="Sub Goal 2" content="Risks are mitigated" />
+    <claim id="G4" name="New Goal" />
+    <argumentReasoning id="S1" name="Strategy 1" content="Argue over identified hazards" />
+    <argumentReasoning id="S2" name="Strategy 2" content="Argue over mitigation measures" />
+    <artifactReference id="EV1" name="Evidence 1" referencedArtifact="ART_HazardAnalysis" />
+    <artifactReference id="EV2" name="Evidence 2" referencedArtifact="ART_TestReport" />
+    <assertedInference id="R1">
+      <source href="#G4" />
+      <target href="#G1" />
+    </assertedInference>
+  </argumentPackage>
 </sacm:AssuranceCasePackage>

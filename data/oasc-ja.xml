@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='UTF-8'?>
+<?xml version="1.0" encoding="UTF-8"?>
 <sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="OASC" name="Open Autonomy Safety Case">
   <name>
     <content lang="en">Open Autonomy Safety Case</content>
@@ -6,31 +6,32 @@
   </name>
   <description>
     <content lang="en">A safety case template for autonomous vehicle deployment based on Positive Trust Balance</content>
-  <content lang="ja">ポジティブ・トラスト・バランスに基づく自動運転車導入のためのセーフティケーステンプレート</content></description>
+    <content lang="ja">ポジティブ・トラスト・バランスに基づく自動運転車導入のためのセーフティケーステンプレート</content>
+  </description>
   <terminologyPackage id="TP_Standards" name="Referenced Standards">
     <name>
       <content lang="en">Referenced Standards</content>
       <content lang="ja">参照規格</content>
     </name>
-    <expression id="TERM_UL4600" value="UL 4600 - Standard for Evaluation of Autonomous Products"/>
-    <expression id="TERM_ISO26262" value="ISO 26262 - Road vehicles Functional Safety"/>
-    <expression id="TERM_ISO21448" value="ISO 21448 - Safety of the Intended Functionality (SOTIF)"/>
-    <expression id="TERM_ISO21434" value="ISO 21434 - Road vehicles Cybersecurity engineering"/>
-    <expression id="TERM_ISO10007" value="ISO 10007 - Quality management Configuration management"/>
-    <expression id="TERM_ISOPAS8800" value="ISO/PAS 8800 - Road vehicles Safety and AI"/>
-    <expression id="TERM_FMVSS" value="Federal Motor Vehicle Safety Standards"/>
-    <expression id="TERM_SAE_J3307" value="SAE J3307 - STPA Hazard Analysis"/>
-    <expression id="TERM_SAE_AVSC00003" value="SAE AVSC 00003 - Trip Interruption"/>
-    <expression id="TERM_SAE_AVSC00004" value="SAE AVSC 00004 - Data Recording"/>
-    <expression id="TERM_SAE_AVSC00006" value="SAE AVSC 00006 - Safety Metrics"/>
-    <expression id="TERM_SAE_AVSCI01" value="SAE AVSC-I-01 - First Responder Interaction"/>
-    <expression id="TERM_SAE_AVSCI04" value="SAE AVSC-I-04 - Remote Operations"/>
-    <expression id="TERM_SAE_AVSCI05" value="SAE AVSC-I-05 - Post-Crash Operations"/>
-    <expression id="TERM_SAE_AVSCD03" value="SAE AVSC-D-03 - Safety Inspections"/>
-    <expression id="TERM_14CFR5" value="14 CFR Part 5 - Safety Management Systems"/>
-    <expression id="TERM_IATF16949" value="IATF 16949 - Automotive Quality Management"/>
-    <expression id="TERM_GermanEthics" value="German Ethics Commission Report on Automated Driving"/>
-    <expression id="TERM_SMS" value="Safety Management System"/>
+    <expression id="TERM_UL4600" value="UL 4600 - Standard for Evaluation of Autonomous Products" />
+    <expression id="TERM_ISO26262" value="ISO 26262 - Road vehicles Functional Safety" />
+    <expression id="TERM_ISO21448" value="ISO 21448 - Safety of the Intended Functionality (SOTIF)" />
+    <expression id="TERM_ISO21434" value="ISO 21434 - Road vehicles Cybersecurity engineering" />
+    <expression id="TERM_ISO10007" value="ISO 10007 - Quality management Configuration management" />
+    <expression id="TERM_ISOPAS8800" value="ISO/PAS 8800 - Road vehicles Safety and AI" />
+    <expression id="TERM_FMVSS" value="Federal Motor Vehicle Safety Standards" />
+    <expression id="TERM_SAE_J3307" value="SAE J3307 - STPA Hazard Analysis" />
+    <expression id="TERM_SAE_AVSC00003" value="SAE AVSC 00003 - Trip Interruption" />
+    <expression id="TERM_SAE_AVSC00004" value="SAE AVSC 00004 - Data Recording" />
+    <expression id="TERM_SAE_AVSC00006" value="SAE AVSC 00006 - Safety Metrics" />
+    <expression id="TERM_SAE_AVSCI01" value="SAE AVSC-I-01 - First Responder Interaction" />
+    <expression id="TERM_SAE_AVSCI04" value="SAE AVSC-I-04 - Remote Operations" />
+    <expression id="TERM_SAE_AVSCI05" value="SAE AVSC-I-05 - Post-Crash Operations" />
+    <expression id="TERM_SAE_AVSCD03" value="SAE AVSC-D-03 - Safety Inspections" />
+    <expression id="TERM_14CFR5" value="14 CFR Part 5 - Safety Management Systems" />
+    <expression id="TERM_IATF16949" value="IATF 16949 - Automotive Quality Management" />
+    <expression id="TERM_GermanEthics" value="German Ethics Commission Report on Automated Driving" />
+    <expression id="TERM_SMS" value="Safety Management System" />
   </terminologyPackage>
   <artifactPackage id="AP_Evidence" name="Evidence and Context Artifacts">
     <name>
@@ -44,7 +45,8 @@
       </name>
       <description>
         <content lang="en">Description of vehicle, operations, and stakeholder requirements</content>
-      <content lang="ja">車両、運用、およびステークホルダー要求事項の説明</content></description>
+        <content lang="ja">車両、運用、およびステークホルダー要求事項の説明</content>
+      </description>
     </artifact>
     <artifact id="ART_SMSClaims" name="SMS Claims">
       <name>
@@ -53,7 +55,8 @@
       </name>
       <description>
         <content lang="en">Relevant Safety Management System claims</content>
-      <content lang="ja">関連する安全マネジメントシステム（SMS）の主張</content></description>
+        <content lang="ja">関連する安全マネジメントシステム（SMS）の主張</content>
+      </description>
     </artifact>
     <artifact id="ART_SafetyAdvisoryBoard" name="Safety Advisory Board">
       <name>
@@ -62,7 +65,8 @@
       </name>
       <description>
         <content lang="en">Our safety advisory board includes a full set of stakeholder responsibilities</content>
-      <content lang="ja">当社の安全諮問委員会はステークホルダーの責任一式を含んでいる</content></description>
+        <content lang="ja">当社の安全諮問委員会はステークホルダーの責任一式を含んでいる</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_13" name="Independent Assessment 13">
       <name>
@@ -71,7 +75,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Transparency assessment results</content>
-      <content lang="ja">独立評価結果 - 透明性評価の結果</content></description>
+        <content lang="ja">独立評価結果 - 透明性評価の結果</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_14" name="Independent Assessment 14">
       <name>
@@ -80,7 +85,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Assessor independence verification</content>
-      <content lang="ja">独立評価結果 - 評価者の独立性の検証</content></description>
+        <content lang="ja">独立評価結果 - 評価者の独立性の検証</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_27" name="Independent Assessment 27">
       <name>
@@ -89,7 +95,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Safety advisory board approval</content>
-      <content lang="ja">独立評価結果 - 安全諮問委員会の承認</content></description>
+        <content lang="ja">独立評価結果 - 安全諮問委員会の承認</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_28" name="Independent Assessment 28">
       <name>
@@ -98,7 +105,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Regulatory compliance</content>
-      <content lang="ja">独立評価結果 - 規制適合</content></description>
+        <content lang="ja">独立評価結果 - 規制適合</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_29" name="Independent Assessment 29">
       <name>
@@ -107,7 +115,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Ethics guidelines compliance</content>
-      <content lang="ja">独立評価結果 - 倫理指針適合</content></description>
+        <content lang="ja">独立評価結果 - 倫理指針適合</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_30" name="Independent Assessment 30">
       <name>
@@ -116,7 +125,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - 14 CFR Part 5 compliance</content>
-      <content lang="ja">独立評価結果 - 14 CFR Part 5適合</content></description>
+        <content lang="ja">独立評価結果 - 14 CFR Part 5適合</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_31" name="Independent Assessment 31">
       <name>
@@ -125,7 +135,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - UL 4600 continuous improvement</content>
-      <content lang="ja">独立評価結果 - UL 4600に基づく継続的改善</content></description>
+        <content lang="ja">独立評価結果 - UL 4600に基づく継続的改善</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_32" name="Independent Assessment 32">
       <name>
@@ -134,7 +145,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - IATF 16949 conformance</content>
-      <content lang="ja">独立評価結果 - IATF 16949適合</content></description>
+        <content lang="ja">独立評価結果 - IATF 16949適合</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_61" name="Independent Assessment 61">
       <name>
@@ -143,7 +155,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - STPA hazard analysis</content>
-      <content lang="ja">独立評価結果 - STPAハザード分析</content></description>
+        <content lang="ja">独立評価結果 - STPAハザード分析</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_62" name="Independent Assessment 62">
       <name>
@@ -152,7 +165,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - FMVSS conformance</content>
-      <content lang="ja">独立評価結果 - FMVSS適合</content></description>
+        <content lang="ja">独立評価結果 - FMVSS適合</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_63" name="Independent Assessment 63">
       <name>
@@ -161,7 +175,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - ISO 26262 conformance</content>
-      <content lang="ja">独立評価結果 - ISO 26262適合</content></description>
+        <content lang="ja">独立評価結果 - ISO 26262適合</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_64" name="Independent Assessment 64">
       <name>
@@ -170,7 +185,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - ISO/PAS 8800 conformance</content>
-      <content lang="ja">独立評価結果 - ISO/PAS 8800適合</content></description>
+        <content lang="ja">独立評価結果 - ISO/PAS 8800適合</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_65" name="Independent Assessment 65">
       <name>
@@ -179,7 +195,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - ISO 21448 conformance</content>
-      <content lang="ja">独立評価結果 - ISO 21448適合</content></description>
+        <content lang="ja">独立評価結果 - ISO 21448適合</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_66" name="Independent Assessment 66">
       <name>
@@ -188,7 +205,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - ISO 21434 conformance</content>
-      <content lang="ja">独立評価結果 - ISO 21434適合</content></description>
+        <content lang="ja">独立評価結果 - ISO 21434適合</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_67" name="Independent Assessment 67">
       <name>
@@ -197,7 +215,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - ISO 10007 conformance</content>
-      <content lang="ja">独立評価結果 - ISO 10007適合</content></description>
+        <content lang="ja">独立評価結果 - ISO 10007適合</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_68" name="Independent Assessment 68">
       <name>
@@ -206,7 +225,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - SAE AVSC 00004 conformance</content>
-      <content lang="ja">独立評価結果 - SAE AVSC 00004適合</content></description>
+        <content lang="ja">独立評価結果 - SAE AVSC 00004適合</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_80" name="Independent Assessment 80">
       <name>
@@ -215,7 +235,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Trip interruption operations</content>
-      <content lang="ja">独立評価結果 - 運行中断対応</content></description>
+        <content lang="ja">独立評価結果 - 運行中断対応</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_81" name="Independent Assessment 81">
       <name>
@@ -224,7 +245,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Post-crash operations</content>
-      <content lang="ja">独立評価結果 - 事故後運用</content></description>
+        <content lang="ja">独立評価結果 - 事故後運用</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_82" name="Independent Assessment 82">
       <name>
@@ -233,7 +255,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Remote operations</content>
-      <content lang="ja">独立評価結果 - 遠隔運用</content></description>
+        <content lang="ja">独立評価結果 - 遠隔運用</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_83" name="Independent Assessment 83">
       <name>
@@ -242,7 +265,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - First responder interactions</content>
-      <content lang="ja">独立評価結果 - ファーストレスポンダー対応</content></description>
+        <content lang="ja">独立評価結果 - ファーストレスポンダー対応</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_84" name="Independent Assessment 84">
       <name>
@@ -251,7 +275,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Safety inspections</content>
-      <content lang="ja">独立評価結果 - 安全点検</content></description>
+        <content lang="ja">独立評価結果 - 安全点検</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_85" name="Independent Assessment 85">
       <name>
@@ -260,7 +285,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Operational metrics monitoring</content>
-      <content lang="ja">独立評価結果 - 運用指標の監視</content></description>
+        <content lang="ja">独立評価結果 - 運用指標の監視</content>
+      </description>
     </artifact>
     <artifact id="ART_Assessment_86" name="Independent Assessment 86">
       <name>
@@ -269,7 +295,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Procedural hazard mitigations</content>
-      <content lang="ja">独立評価結果 - 手順的ハザード緩和策</content></description>
+        <content lang="ja">独立評価結果 - 手順的ハザード緩和策</content>
+      </description>
     </artifact>
   </artifactPackage>
   <argumentPackage id="ARG_Main" name="Open Autonomy Safety Case - Main Argument">
@@ -286,7 +313,8 @@
       <content lang="ja">自動運転車は導入するのに十分安全である。</content>
       <description>
         <content lang="en">Top-level safety claim for the autonomous vehicle deployment</content>
-      <content lang="ja">自動運転車の導入に関する最上位の安全主張</content></description>
+        <content lang="ja">自動運転車の導入に関する最上位の安全主張</content>
+      </description>
     </claim>
     <claim id="G3" name="Goal 3">
       <name>
@@ -297,7 +325,8 @@
       <content lang="ja">組織は信頼に値する。</content>
       <description>
         <content lang="en">Organizational trustworthiness claim - "Live It Right"</content>
-      <content lang="ja">組織の信頼性に関する主張 - 「正しく実践する」</content></description>
+        <content lang="ja">組織の信頼性に関する主張 - 「正しく実践する」</content>
+      </description>
     </claim>
     <claim id="G4" name="Goal 4">
       <name>
@@ -308,7 +337,8 @@
       <content lang="ja">車両は安全に運用できる。</content>
       <description>
         <content lang="en">Vehicle safety claim - "Build It Right"</content>
-      <content lang="ja">車両安全に関する主張 - 「正しく構築する」</content></description>
+        <content lang="ja">車両安全に関する主張 - 「正しく構築する」</content>
+      </description>
     </claim>
     <claim id="G5" name="Goal 5">
       <name>
@@ -319,7 +349,8 @@
       <content lang="ja">私たちは車両を安全に運用している。</content>
       <description>
         <content lang="en">Operational safety claim - "Operate It Right"</content>
-      <content lang="ja">運用安全に関する主張 - 「正しく運用する」</content></description>
+        <content lang="ja">運用安全に関する主張 - 「正しく運用する」</content>
+      </description>
     </claim>
     <argumentReasoning id="S2" name="Strategy 2">
       <name>
@@ -330,7 +361,8 @@
       <content lang="ja">ポジティブ・トラスト・バランスへの訴え。</content>
       <description>
         <content lang="en">The argument strategy based on achieving a positive trust balance through organizational trustworthiness, vehicle safety, and safe operations</content>
-      <content lang="ja">組織の信頼性、車両の安全性、および安全な運用を通じてポジティブ・トラスト・バランスを達成することに基づく論証戦略</content></description>
+        <content lang="ja">組織の信頼性、車両の安全性、および安全な運用を通じてポジティブ・トラスト・バランスを達成することに基づく論証戦略</content>
+      </description>
     </argumentReasoning>
     <artifactReference id="CTX_VehicleOps" name="Vehicle Operations Context" referencedArtifact="ART_VehicleDescription">
       <name>
@@ -339,7 +371,8 @@
       </name>
       <description>
         <content lang="en">Description of vehicle, operations, and stakeholder requirements</content>
-      <content lang="ja">車両、運用、およびステークホルダー要求事項の説明</content></description>
+        <content lang="ja">車両、運用、およびステークホルダー要求事項の説明</content>
+      </description>
     </artifactReference>
     <assertedInference id="AI_TopLevel" name="Top-Level Inference">
       <name>
@@ -348,12 +381,13 @@
       </name>
       <description>
         <content lang="en">The top-level claim is supported by organizational trustworthiness, vehicle safety, and operational safety through positive trust balance</content>
-      <content lang="ja">最上位の主張は、ポジティブ・トラスト・バランスを通じて、組織の信頼性、車両の安全性、および運用安全によって支持される</content></description>
-      <source href="#G3"/>
-      <source href="#G4"/>
-      <source href="#G5"/>
-      <target href="#G1"/>
-      <reasoning href="#S2"/>
+        <content lang="ja">最上位の主張は、ポジティブ・トラスト・バランスを通じて、組織の信頼性、車両の安全性、および運用安全によって支持される</content>
+      </description>
+      <source href="#G3" />
+      <source href="#G4" />
+      <source href="#G5" />
+      <target href="#G1" />
+      <reasoning href="#S2" />
     </assertedInference>
     <assertedContext id="AC_TopLevel" name="Top-Level Context">
       <name>
@@ -362,9 +396,10 @@
       </name>
       <description>
         <content lang="en">Vehicle and operations context informs the positive trust balance strategy</content>
-      <content lang="ja">車両および運用の文脈はポジティブ・トラスト・バランス戦略に情報を与える</content></description>
-      <source href="#CTX_VehicleOps"/>
-      <target href="#S2"/>
+        <content lang="ja">車両および運用の文脈はポジティブ・トラスト・バランス戦略に情報を与える</content>
+      </description>
+      <source href="#CTX_VehicleOps" />
+      <target href="#S2" />
     </assertedContext>
   </argumentPackage>
   <argumentPackage id="ARG_OrgTrust" name="Organization Trustworthiness">
@@ -379,7 +414,8 @@
       </name>
       <description>
         <content lang="en">Transparency through sharing assessment results</content>
-      <content lang="ja">評価結果の共有による透明性</content></description>
+        <content lang="ja">評価結果の共有による透明性</content>
+      </description>
     </claim>
     <claim id="G9" name="Goal 9" content="Assessor independence satisfies requirements of UL 4600.">
       <name>
@@ -388,7 +424,8 @@
       </name>
       <description>
         <content lang="en">Independent assessor qualification per UL 4600</content>
-      <content lang="ja">UL 4600に基づく独立評価者の資格</content></description>
+        <content lang="ja">UL 4600に基づく独立評価者の資格</content>
+      </description>
     </claim>
     <claim id="G10" name="Goal 10" content="SMS safety policies are aligned with stakeholder requirements.">
       <name>
@@ -397,7 +434,8 @@
       </name>
       <description>
         <content lang="en">Safety Management System policies meet stakeholder needs</content>
-      <content lang="ja">安全マネジメントシステムの方針はステークホルダーのニーズを満たす</content></description>
+        <content lang="ja">安全マネジメントシステムの方針はステークホルダーのニーズを満たす</content>
+      </description>
     </claim>
     <claim id="G11" name="Goal 11" content="SMS processes are in use.">
       <name>
@@ -406,7 +444,8 @@
       </name>
       <description>
         <content lang="en">Safety Management System processes are actively implemented</content>
-      <content lang="ja">安全マネジメントシステムのプロセスが積極的に実施されている</content></description>
+        <content lang="ja">安全マネジメントシステムのプロセスが積極的に実施されている</content>
+      </description>
     </claim>
     <claim id="G12" name="Goal 12" content="Our safety case is monitored &amp; improved.">
       <name>
@@ -415,7 +454,8 @@
       </name>
       <description>
         <content lang="en">Continuous monitoring and improvement of the safety case</content>
-      <content lang="ja">セーフティケースの継続的な監視と改善</content></description>
+        <content lang="ja">セーフティケースの継続的な監視と改善</content>
+      </description>
     </claim>
     <claim id="G21" name="Goal 21" content="SRCs are approved by our safety advisory board.">
       <name>
@@ -424,7 +464,8 @@
       </name>
       <description>
         <content lang="en">Safety-related claims approved by safety advisory board</content>
-      <content lang="ja">安全関連主張は安全諮問委員会により承認されている</content></description>
+        <content lang="ja">安全関連主張は安全諮問委員会により承認されている</content>
+      </description>
     </claim>
     <claim id="G22" name="Goal 22" content="Our SRCs satisfy regulations in our operational area.">
       <name>
@@ -433,7 +474,8 @@
       </name>
       <description>
         <content lang="en">Safety-related claims satisfy applicable regulations</content>
-      <content lang="ja">安全関連主張は適用される規制を満たす</content></description>
+        <content lang="ja">安全関連主張は適用される規制を満たす</content>
+      </description>
     </claim>
     <claim id="G23" name="Goal 23" content="Our SRCs satisfy report guidelines.">
       <name>
@@ -442,7 +484,8 @@
       </name>
       <description>
         <content lang="en">Safety-related claims satisfy German Ethics Commission guidelines</content>
-      <content lang="ja">安全関連主張はドイツ倫理委員会指針を満たす</content></description>
+        <content lang="ja">安全関連主張はドイツ倫理委員会指針を満たす</content>
+      </description>
     </claim>
     <claim id="G24" name="Goal 24" content="Our SMS conforms with 14 CFR part 5.">
       <name>
@@ -451,7 +494,8 @@
       </name>
       <description>
         <content lang="en">Safety Management System conformance with aviation SMS standards</content>
-      <content lang="ja">航空SMS規格への安全マネジメントシステムの適合</content></description>
+        <content lang="ja">航空SMS規格への安全マネジメントシステムの適合</content>
+      </description>
     </claim>
     <claim id="G25" name="Goal 25" content="Our safety case is continuously improved in conformance with relevant sections of UL 4600.">
       <name>
@@ -460,7 +504,8 @@
       </name>
       <description>
         <content lang="en">Continuous improvement per UL 4600 requirements</content>
-      <content lang="ja">UL 4600要求事項に基づく継続的改善</content></description>
+        <content lang="ja">UL 4600要求事項に基づく継続的改善</content>
+      </description>
     </claim>
     <claim id="G26" name="Goal 26" content="Our organization conforms with IATF 16949.">
       <name>
@@ -469,15 +514,18 @@
       </name>
       <description>
         <content lang="en">Automotive quality management system conformance</content>
-      <content lang="ja">自動車品質マネジメントシステムへの適合</content></description>
+        <content lang="ja">自動車品質マネジメントシステムへの適合</content>
+      </description>
     </claim>
     <argumentReasoning id="S6" name="Strategy 6" content="Transparency enables trust.">
       <name>
         <content lang="en">Strategy 6</content>
-        <content lang="ja">戦略6</content></name>
+        <content lang="ja">戦略6</content>
+      </name>
       <description>
         <content lang="en">Argument that transparency through sharing assessments builds stakeholder trust</content>
-        <content lang="ja">評価結果の共有による透明性がステークホルダーの信頼を構築するという論証</content></description>
+        <content lang="ja">評価結果の共有による透明性がステークホルダーの信頼を構築するという論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S7" name="Strategy 7" content="An SMS is a best practice for managing system safety.">
       <name>
@@ -486,7 +534,8 @@
       </name>
       <description>
         <content lang="en">Argument that a Safety Management System represents best practice</content>
-      <content lang="ja">安全マネジメントシステムがベストプラクティスであるという論証</content></description>
+        <content lang="ja">安全マネジメントシステムがベストプラクティスであるという論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S16" name="Strategy 16" content="Appeal to relevant regulation.">
       <name>
@@ -495,7 +544,8 @@
       </name>
       <description>
         <content lang="en">Argument based on regulatory compliance</content>
-      <content lang="ja">規制適合に基づく論証</content></description>
+        <content lang="ja">規制適合に基づく論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S17" name="Strategy 17" content="Appeal to German Ethics Commission report.">
       <name>
@@ -504,7 +554,8 @@
       </name>
       <description>
         <content lang="en">Argument based on ethical guidelines for automated driving</content>
-      <content lang="ja">自動運転に関する倫理指針に基づく論証</content></description>
+        <content lang="ja">自動運転に関する倫理指針に基づく論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S18" name="Strategy 18" content="Appeal to 14 CFR part 5.">
       <name>
@@ -513,7 +564,8 @@
       </name>
       <description>
         <content lang="en">Argument based on aviation safety management standards</content>
-      <content lang="ja">航空安全マネジメント規格に基づく論証</content></description>
+        <content lang="ja">航空安全マネジメント規格に基づく論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S19" name="Strategy 19" content="Appeal to UL 4600.">
       <name>
@@ -522,7 +574,8 @@
       </name>
       <description>
         <content lang="en">Argument based on autonomous products evaluation standard</content>
-      <content lang="ja">自律製品評価規格に基づく論証</content></description>
+        <content lang="ja">自律製品評価規格に基づく論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S20" name="Strategy 20" content="Appeal to IATF 16949.">
       <name>
@@ -531,7 +584,8 @@
       </name>
       <description>
         <content lang="en">Argument based on automotive quality management standard</content>
-      <content lang="ja">自動車品質マネジメント規格に基づく論証</content></description>
+        <content lang="ja">自動車品質マネジメント規格に基づく論証</content>
+      </description>
     </argumentReasoning>
     <artifactReference id="CTX_15" name="Context 15" referencedArtifact="ART_SafetyAdvisoryBoard">
       <name>
@@ -540,7 +594,8 @@
       </name>
       <description>
         <content lang="en">Our safety advisory board includes a full set of stakeholder responsibilities</content>
-      <content lang="ja">当社の安全諮問委員会はステークホルダーの責任一式を含んでいる</content></description>
+        <content lang="ja">当社の安全諮問委員会はステークホルダーの責任一式を含んでいる</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_13" name="Evidence 13" referencedArtifact="ART_Assessment_13">
       <name>
@@ -549,7 +604,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Transparency</content>
-      <content lang="ja">独立評価結果 - 透明性</content></description>
+        <content lang="ja">独立評価結果 - 透明性</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_14" name="Evidence 14" referencedArtifact="ART_Assessment_14">
       <name>
@@ -558,7 +614,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Assessor independence</content>
-      <content lang="ja">独立評価結果 - 評価者の独立性</content></description>
+        <content lang="ja">独立評価結果 - 評価者の独立性</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_27" name="Evidence 27" referencedArtifact="ART_Assessment_27">
       <name>
@@ -567,7 +624,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Safety advisory board</content>
-      <content lang="ja">独立評価結果 - 安全諮問委員会</content></description>
+        <content lang="ja">独立評価結果 - 安全諮問委員会</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_28" name="Evidence 28" referencedArtifact="ART_Assessment_28">
       <name>
@@ -576,7 +634,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Regulatory compliance</content>
-      <content lang="ja">独立評価結果 - 規制適合</content></description>
+        <content lang="ja">独立評価結果 - 規制適合</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_29" name="Evidence 29" referencedArtifact="ART_Assessment_29">
       <name>
@@ -585,7 +644,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Ethics guidelines</content>
-      <content lang="ja">独立評価結果 - 倫理指針</content></description>
+        <content lang="ja">独立評価結果 - 倫理指針</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_30" name="Evidence 30" referencedArtifact="ART_Assessment_30">
       <name>
@@ -594,7 +654,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - 14 CFR Part 5</content>
-      <content lang="ja">独立評価結果 - 14 CFR Part 5</content></description>
+        <content lang="ja">独立評価結果 - 14 CFR Part 5</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_31" name="Evidence 31" referencedArtifact="ART_Assessment_31">
       <name>
@@ -603,7 +664,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - UL 4600 improvement</content>
-      <content lang="ja">独立評価結果 - UL 4600改善</content></description>
+        <content lang="ja">独立評価結果 - UL 4600改善</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_32" name="Evidence 32" referencedArtifact="ART_Assessment_32">
       <name>
@@ -612,7 +674,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - IATF 16949</content>
-      <content lang="ja">独立評価結果 - IATF 16949</content></description>
+        <content lang="ja">独立評価結果 - IATF 16949</content>
+      </description>
     </artifactReference>
     <assertedInference id="AI_OrgTrust_Transparency" name="Transparency Inference">
       <name>
@@ -621,11 +684,12 @@
       </name>
       <description>
         <content lang="en">Transparency and assessor independence support organizational trustworthiness</content>
-      <content lang="ja">透明性および評価者の独立性は組織の信頼性を支持する</content></description>
-      <source href="#G8"/>
-      <source href="#G9"/>
-      <target href="#G3"/>
-      <reasoning href="#S6"/>
+        <content lang="ja">透明性および評価者の独立性は組織の信頼性を支持する</content>
+      </description>
+      <source href="#G8" />
+      <source href="#G9" />
+      <target href="#G3" />
+      <reasoning href="#S6" />
     </assertedInference>
     <assertedInference id="AI_OrgTrust_SMS" name="SMS Inference">
       <name>
@@ -634,12 +698,13 @@
       </name>
       <description>
         <content lang="en">SMS policies, processes, and monitoring support organizational trustworthiness</content>
-      <content lang="ja">SMSの方針、プロセス、および監視は組織の信頼性を支持する</content></description>
-      <source href="#G10"/>
-      <source href="#G11"/>
-      <source href="#G12"/>
-      <target href="#G3"/>
-      <reasoning href="#S7"/>
+        <content lang="ja">SMSの方針、プロセス、および監視は組織の信頼性を支持する</content>
+      </description>
+      <source href="#G10" />
+      <source href="#G11" />
+      <source href="#G12" />
+      <target href="#G3" />
+      <reasoning href="#S7" />
     </assertedInference>
     <assertedInference id="AI_G21_G10" name="Advisory Board Approval Inference">
       <name>
@@ -648,9 +713,10 @@
       </name>
       <description>
         <content lang="en">Safety advisory board approval supports SMS policy alignment</content>
-      <content lang="ja">安全諮問委員会の承認はSMS方針の整合を支持する</content></description>
-      <source href="#G21"/>
-      <target href="#G10"/>
+        <content lang="ja">安全諮問委員会の承認はSMS方針の整合を支持する</content>
+      </description>
+      <source href="#G21" />
+      <target href="#G10" />
     </assertedInference>
     <assertedInference id="AI_G22_G10" name="Regulatory Compliance Inference">
       <name>
@@ -659,10 +725,11 @@
       </name>
       <description>
         <content lang="en">Regulatory compliance supports SMS policy alignment</content>
-      <content lang="ja">規制適合はSMS方針の整合を支持する</content></description>
-      <source href="#G22"/>
-      <target href="#G10"/>
-      <reasoning href="#S16"/>
+        <content lang="ja">規制適合はSMS方針の整合を支持する</content>
+      </description>
+      <source href="#G22" />
+      <target href="#G10" />
+      <reasoning href="#S16" />
     </assertedInference>
     <assertedInference id="AI_G23_G10" name="Ethics Guidelines Inference">
       <name>
@@ -671,10 +738,11 @@
       </name>
       <description>
         <content lang="en">Ethics guidelines compliance supports SMS policy alignment</content>
-      <content lang="ja">倫理指針への適合はSMS方針の整合を支持する</content></description>
-      <source href="#G23"/>
-      <target href="#G10"/>
-      <reasoning href="#S17"/>
+        <content lang="ja">倫理指針への適合はSMS方針の整合を支持する</content>
+      </description>
+      <source href="#G23" />
+      <target href="#G10" />
+      <reasoning href="#S17" />
     </assertedInference>
     <assertedInference id="AI_G24_G11" name="14 CFR Part 5 Inference">
       <name>
@@ -683,10 +751,11 @@
       </name>
       <description>
         <content lang="en">14 CFR Part 5 conformance supports SMS processes</content>
-      <content lang="ja">14 CFR Part 5への適合はSMSプロセスを支持する</content></description>
-      <source href="#G24"/>
-      <target href="#G11"/>
-      <reasoning href="#S18"/>
+        <content lang="ja">14 CFR Part 5への適合はSMSプロセスを支持する</content>
+      </description>
+      <source href="#G24" />
+      <target href="#G11" />
+      <reasoning href="#S18" />
     </assertedInference>
     <assertedInference id="AI_G25_G12" name="UL 4600 Improvement Inference">
       <name>
@@ -695,10 +764,11 @@
       </name>
       <description>
         <content lang="en">UL 4600 continuous improvement supports safety case monitoring</content>
-      <content lang="ja">UL 4600に基づく継続的改善はセーフティケースの監視を支持する</content></description>
-      <source href="#G25"/>
-      <target href="#G12"/>
-      <reasoning href="#S19"/>
+        <content lang="ja">UL 4600に基づく継続的改善はセーフティケースの監視を支持する</content>
+      </description>
+      <source href="#G25" />
+      <target href="#G12" />
+      <reasoning href="#S19" />
     </assertedInference>
     <assertedInference id="AI_G26_G12" name="IATF 16949 Inference">
       <name>
@@ -707,10 +777,11 @@
       </name>
       <description>
         <content lang="en">IATF 16949 conformance supports safety case monitoring</content>
-      <content lang="ja">IATF 16949への適合はセーフティケースの監視を支持する</content></description>
-      <source href="#G26"/>
-      <target href="#G12"/>
-      <reasoning href="#S20"/>
+        <content lang="ja">IATF 16949への適合はセーフティケースの監視を支持する</content>
+      </description>
+      <source href="#G26" />
+      <target href="#G12" />
+      <reasoning href="#S20" />
     </assertedInference>
     <assertedContext id="AC_G21_CTX15" name="Advisory Board Context">
       <name>
@@ -719,9 +790,10 @@
       </name>
       <description>
         <content lang="en">Safety advisory board context for SRC approval</content>
-      <content lang="ja">SRC承認のための安全諮問委員会の文脈</content></description>
-      <source href="#CTX_15"/>
-      <target href="#G21"/>
+        <content lang="ja">SRC承認のための安全諮問委員会の文脈</content>
+      </description>
+      <source href="#CTX_15" />
+      <target href="#G21" />
     </assertedContext>
     <assertedEvidence id="AE_G8_EV13" name="Transparency Evidence">
       <name>
@@ -730,9 +802,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support transparency claim</content>
-      <content lang="ja">評価結果は透明性の主張を支持する</content></description>
-      <source href="#EV_13"/>
-      <target href="#G8"/>
+        <content lang="ja">評価結果は透明性の主張を支持する</content>
+      </description>
+      <source href="#EV_13" />
+      <target href="#G8" />
     </assertedEvidence>
     <assertedEvidence id="AE_G9_EV14" name="Assessor Independence Evidence">
       <name>
@@ -741,9 +814,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support assessor independence claim</content>
-      <content lang="ja">評価結果は評価者の独立性に関する主張を支持する</content></description>
-      <source href="#EV_14"/>
-      <target href="#G9"/>
+        <content lang="ja">評価結果は評価者の独立性に関する主張を支持する</content>
+      </description>
+      <source href="#EV_14" />
+      <target href="#G9" />
     </assertedEvidence>
     <assertedEvidence id="AE_G21_EV27" name="Advisory Board Approval Evidence">
       <name>
@@ -752,9 +826,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support safety advisory board approval claim</content>
-      <content lang="ja">評価結果は安全諮問委員会の承認に関する主張を支持する</content></description>
-      <source href="#EV_27"/>
-      <target href="#G21"/>
+        <content lang="ja">評価結果は安全諮問委員会の承認に関する主張を支持する</content>
+      </description>
+      <source href="#EV_27" />
+      <target href="#G21" />
     </assertedEvidence>
     <assertedEvidence id="AE_G22_EV28" name="Regulatory Compliance Evidence">
       <name>
@@ -763,9 +838,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support regulatory compliance claim</content>
-      <content lang="ja">評価結果は規制適合の主張を支持する</content></description>
-      <source href="#EV_28"/>
-      <target href="#G22"/>
+        <content lang="ja">評価結果は規制適合の主張を支持する</content>
+      </description>
+      <source href="#EV_28" />
+      <target href="#G22" />
     </assertedEvidence>
     <assertedEvidence id="AE_G23_EV29" name="Ethics Guidelines Evidence">
       <name>
@@ -774,9 +850,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support ethics guidelines compliance claim</content>
-      <content lang="ja">評価結果は倫理指針適合の主張を支持する</content></description>
-      <source href="#EV_29"/>
-      <target href="#G23"/>
+        <content lang="ja">評価結果は倫理指針適合の主張を支持する</content>
+      </description>
+      <source href="#EV_29" />
+      <target href="#G23" />
     </assertedEvidence>
     <assertedEvidence id="AE_G24_EV30" name="14 CFR Part 5 Evidence">
       <name>
@@ -785,9 +862,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support 14 CFR Part 5 conformance claim</content>
-      <content lang="ja">評価結果は14 CFR Part 5適合の主張を支持する</content></description>
-      <source href="#EV_30"/>
-      <target href="#G24"/>
+        <content lang="ja">評価結果は14 CFR Part 5適合の主張を支持する</content>
+      </description>
+      <source href="#EV_30" />
+      <target href="#G24" />
     </assertedEvidence>
     <assertedEvidence id="AE_G25_EV31" name="UL 4600 Improvement Evidence">
       <name>
@@ -796,9 +874,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support UL 4600 continuous improvement claim</content>
-      <content lang="ja">評価結果はUL 4600に基づく継続的改善の主張を支持する</content></description>
-      <source href="#EV_31"/>
-      <target href="#G25"/>
+        <content lang="ja">評価結果はUL 4600に基づく継続的改善の主張を支持する</content>
+      </description>
+      <source href="#EV_31" />
+      <target href="#G25" />
     </assertedEvidence>
     <assertedEvidence id="AE_G26_EV32" name="IATF 16949 Evidence">
       <name>
@@ -807,9 +886,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support IATF 16949 conformance claim</content>
-      <content lang="ja">評価結果はIATF 16949適合の主張を支持する</content></description>
-      <source href="#EV_32"/>
-      <target href="#G26"/>
+        <content lang="ja">評価結果はIATF 16949適合の主張を支持する</content>
+      </description>
+      <source href="#EV_32" />
+      <target href="#G26" />
     </assertedEvidence>
   </argumentPackage>
   <argumentPackage id="ARG_VehicleSafety" name="Vehicle Safety">
@@ -824,7 +904,8 @@
       </name>
       <description>
         <content lang="en">Comprehensive hazard analysis completion</content>
-      <content lang="ja">包括的なハザード分析の完了</content></description>
+        <content lang="ja">包括的なハザード分析の完了</content>
+      </description>
     </claim>
     <claim id="G38" name="Goal 38" content="The vehicle conforms with vehicle safety standards.">
       <name>
@@ -833,7 +914,8 @@
       </name>
       <description>
         <content lang="en">Conformance with vehicle safety standards</content>
-      <content lang="ja">車両安全規格への適合</content></description>
+        <content lang="ja">車両安全規格への適合</content>
+      </description>
     </claim>
     <claim id="G39" name="Goal 39" content="The vehicle conforms with functional safety standards.">
       <name>
@@ -842,7 +924,8 @@
       </name>
       <description>
         <content lang="en">Conformance with functional safety standards</content>
-      <content lang="ja">機能安全規格への適合</content></description>
+        <content lang="ja">機能安全規格への適合</content>
+      </description>
     </claim>
     <claim id="G40" name="Goal 40" content="The vehicle conforms with AI engineering rigor standards.">
       <name>
@@ -851,7 +934,8 @@
       </name>
       <description>
         <content lang="en">Conformance with AI/ML engineering standards</content>
-      <content lang="ja">AI/MLエンジニアリング規格への適合</content></description>
+        <content lang="ja">AI/MLエンジニアリング規格への適合</content>
+      </description>
     </claim>
     <claim id="G41" name="Goal 41" content="The vehicle's intended functions are safe.">
       <name>
@@ -860,7 +944,8 @@
       </name>
       <description>
         <content lang="en">Safety of intended functionality (SOTIF)</content>
-      <content lang="ja">意図した機能の安全性（SOTIF）</content></description>
+        <content lang="ja">意図した機能の安全性（SOTIF）</content>
+      </description>
     </claim>
     <claim id="G42" name="Goal 42" content="The vehicle conforms with security standards.">
       <name>
@@ -869,7 +954,8 @@
       </name>
       <description>
         <content lang="en">Conformance with cybersecurity standards</content>
-      <content lang="ja">サイバーセキュリティ規格への適合</content></description>
+        <content lang="ja">サイバーセキュリティ規格への適合</content>
+      </description>
     </claim>
     <claim id="G43" name="Goal 43" content="We follow configuration management standards.">
       <name>
@@ -878,7 +964,8 @@
       </name>
       <description>
         <content lang="en">Configuration management practices</content>
-      <content lang="ja">構成管理の実践</content></description>
+        <content lang="ja">構成管理の実践</content>
+      </description>
     </claim>
     <claim id="G44" name="Goal 44" content="The vehicle conforms with data recording best practices.">
       <name>
@@ -887,7 +974,8 @@
       </name>
       <description>
         <content lang="en">Forensic data recording capabilities</content>
-      <content lang="ja">フォレンジックデータ記録能力</content></description>
+        <content lang="ja">フォレンジックデータ記録能力</content>
+      </description>
     </claim>
     <claim id="G53" name="Goal 53" content="We completed a hazard analysis according to this standard.">
       <name>
@@ -896,7 +984,8 @@
       </name>
       <description>
         <content lang="en">Hazard analysis per SAE J3307 STPA</content>
-      <content lang="ja">SAE J3307 STPAに基づくハザード分析</content></description>
+        <content lang="ja">SAE J3307 STPAに基づくハザード分析</content>
+      </description>
     </claim>
     <claim id="G54" name="Goal 54" content="Our vehicle conforms with FMVSS.">
       <name>
@@ -905,7 +994,8 @@
       </name>
       <description>
         <content lang="en">Federal Motor Vehicle Safety Standards conformance</content>
-      <content lang="ja">連邦自動車安全基準への適合</content></description>
+        <content lang="ja">連邦自動車安全基準への適合</content>
+      </description>
     </claim>
     <claim id="G55" name="Goal 55" content="We developed our system according to ISO 26262.">
       <name>
@@ -914,7 +1004,8 @@
       </name>
       <description>
         <content lang="en">Functional safety development per ISO 26262</content>
-      <content lang="ja">ISO 26262に基づく機能安全開発</content></description>
+        <content lang="ja">ISO 26262に基づく機能安全開発</content>
+      </description>
     </claim>
     <claim id="G56" name="Goal 56" content="We developed our system according to ISO/PAS 8800.">
       <name>
@@ -923,7 +1014,8 @@
       </name>
       <description>
         <content lang="en">AI safety development per ISO/PAS 8800</content>
-      <content lang="ja">ISO/PAS 8800に基づくAI安全開発</content></description>
+        <content lang="ja">ISO/PAS 8800に基づくAI安全開発</content>
+      </description>
     </claim>
     <claim id="G57" name="Goal 57" content="We developed our system according to ISO 21448.">
       <name>
@@ -932,7 +1024,8 @@
       </name>
       <description>
         <content lang="en">SOTIF development per ISO 21448</content>
-      <content lang="ja">ISO 21448に基づくSOTIF開発</content></description>
+        <content lang="ja">ISO 21448に基づくSOTIF開発</content>
+      </description>
     </claim>
     <claim id="G58" name="Goal 58" content="We developed our system according to ISO 21434.">
       <name>
@@ -941,7 +1034,8 @@
       </name>
       <description>
         <content lang="en">Cybersecurity engineering per ISO 21434</content>
-      <content lang="ja">ISO 21434に基づくサイバーセキュリティエンジニアリング</content></description>
+        <content lang="ja">ISO 21434に基づくサイバーセキュリティエンジニアリング</content>
+      </description>
     </claim>
     <claim id="G59" name="Goal 59" content="We manage these risks according to ISO 10007.">
       <name>
@@ -950,7 +1044,8 @@
       </name>
       <description>
         <content lang="en">Configuration management per ISO 10007</content>
-      <content lang="ja">ISO 10007に基づく構成管理</content></description>
+        <content lang="ja">ISO 10007に基づく構成管理</content>
+      </description>
     </claim>
     <claim id="G60" name="Goal 60" content="Our system and operations conform with all recommendations in SAE AVSC 00004.">
       <name>
@@ -959,7 +1054,8 @@
       </name>
       <description>
         <content lang="en">Data recording per SAE AVSC 00004</content>
-      <content lang="ja">SAE AVSC 00004に基づくデータ記録</content></description>
+        <content lang="ja">SAE AVSC 00004に基づくデータ記録</content>
+      </description>
     </claim>
     <argumentReasoning id="S33" name="Strategy 33" content="Appeal to safety hazard analysis standards.">
       <name>
@@ -968,7 +1064,8 @@
       </name>
       <description>
         <content lang="en">Argument based on hazard analysis methodologies</content>
-      <content lang="ja">ハザード分析手法に基づく論証</content></description>
+        <content lang="ja">ハザード分析手法に基づく論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S34" name="Strategy 34" content="Appeal to safety risk mitigation standards.">
       <name>
@@ -977,7 +1074,8 @@
       </name>
       <description>
         <content lang="en">Argument based on risk mitigation through standards conformance</content>
-      <content lang="ja">規格適合によるリスク低減に基づく論証</content></description>
+        <content lang="ja">規格適合によるリスク低減に基づく論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S35" name="Strategy 35" content="Appeal to config mgmt standards.">
       <name>
@@ -986,7 +1084,8 @@
       </name>
       <description>
         <content lang="en">Argument based on configuration management standards</content>
-      <content lang="ja">構成管理規格に基づく論証</content></description>
+        <content lang="ja">構成管理規格に基づく論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S36" name="Strategy 36" content="Appeal to forensic data recording best practices.">
       <name>
@@ -995,7 +1094,8 @@
       </name>
       <description>
         <content lang="en">Argument based on data recording for incident investigation</content>
-      <content lang="ja">インシデント調査のためのデータ記録に基づく論証</content></description>
+        <content lang="ja">インシデント調査のためのデータ記録に基づく論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S45" name="Strategy 45" content="Appeal to SAE J3307 (STPA).">
       <name>
@@ -1004,7 +1104,8 @@
       </name>
       <description>
         <content lang="en">Argument based on STPA hazard analysis methodology</content>
-      <content lang="ja">STPAハザード分析手法に基づく論証</content></description>
+        <content lang="ja">STPAハザード分析手法に基づく論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S46" name="Strategy 46" content="Appeal to FMVSS.">
       <name>
@@ -1013,7 +1114,8 @@
       </name>
       <description>
         <content lang="en">Argument based on Federal Motor Vehicle Safety Standards</content>
-      <content lang="ja">連邦自動車安全基準に基づく論証</content></description>
+        <content lang="ja">連邦自動車安全基準に基づく論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S47" name="Strategy 47" content="Appeal to ISO 26262.">
       <name>
@@ -1022,7 +1124,8 @@
       </name>
       <description>
         <content lang="en">Argument based on functional safety standard</content>
-      <content lang="ja">機能安全規格に基づく論証</content></description>
+        <content lang="ja">機能安全規格に基づく論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S48" name="Strategy 48" content="Appeal to ISO/PAS 8800.">
       <name>
@@ -1031,7 +1134,8 @@
       </name>
       <description>
         <content lang="en">Argument based on AI safety standard</content>
-      <content lang="ja">AI安全規格に基づく論証</content></description>
+        <content lang="ja">AI安全規格に基づく論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S49" name="Strategy 49" content="Appeal to ISO 21448.">
       <name>
@@ -1040,7 +1144,8 @@
       </name>
       <description>
         <content lang="en">Argument based on SOTIF standard</content>
-      <content lang="ja">SOTIF規格に基づく論証</content></description>
+        <content lang="ja">SOTIF規格に基づく論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S50" name="Strategy 50" content="Appeal to ISO 21434.">
       <name>
@@ -1049,7 +1154,8 @@
       </name>
       <description>
         <content lang="en">Argument based on cybersecurity engineering standard</content>
-      <content lang="ja">サイバーセキュリティエンジニアリング規格に基づく論証</content></description>
+        <content lang="ja">サイバーセキュリティエンジニアリング規格に基づく論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S51" name="Strategy 51" content="Appeal to ISO 10007.">
       <name>
@@ -1058,7 +1164,8 @@
       </name>
       <description>
         <content lang="en">Argument based on configuration management standard</content>
-      <content lang="ja">構成管理規格に基づく論証</content></description>
+        <content lang="ja">構成管理規格に基づく論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S52" name="Strategy 52" content="Appeal to SAE AVSC 00004.">
       <name>
@@ -1067,7 +1174,8 @@
       </name>
       <description>
         <content lang="en">Argument based on data recording standard</content>
-      <content lang="ja">データ記録規格に基づく論証</content></description>
+        <content lang="ja">データ記録規格に基づく論証</content>
+      </description>
     </argumentReasoning>
     <artifactReference id="EV_61" name="Evidence 61" referencedArtifact="ART_Assessment_61">
       <name>
@@ -1076,7 +1184,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - STPA hazard analysis</content>
-      <content lang="ja">独立評価結果 - STPAハザード分析</content></description>
+        <content lang="ja">独立評価結果 - STPAハザード分析</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_62" name="Evidence 62" referencedArtifact="ART_Assessment_62">
       <name>
@@ -1085,7 +1194,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - FMVSS</content>
-      <content lang="ja">独立評価結果 - FMVSS</content></description>
+        <content lang="ja">独立評価結果 - FMVSS</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_63" name="Evidence 63" referencedArtifact="ART_Assessment_63">
       <name>
@@ -1094,7 +1204,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - ISO 26262</content>
-      <content lang="ja">独立評価結果 - ISO 26262</content></description>
+        <content lang="ja">独立評価結果 - ISO 26262</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_64" name="Evidence 64" referencedArtifact="ART_Assessment_64">
       <name>
@@ -1103,7 +1214,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - ISO/PAS 8800</content>
-      <content lang="ja">独立評価結果 - ISO/PAS 8800</content></description>
+        <content lang="ja">独立評価結果 - ISO/PAS 8800</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_65" name="Evidence 65" referencedArtifact="ART_Assessment_65">
       <name>
@@ -1112,7 +1224,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - ISO 21448</content>
-      <content lang="ja">独立評価結果 - ISO 21448</content></description>
+        <content lang="ja">独立評価結果 - ISO 21448</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_66" name="Evidence 66" referencedArtifact="ART_Assessment_66">
       <name>
@@ -1121,7 +1234,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - ISO 21434</content>
-      <content lang="ja">独立評価結果 - ISO 21434</content></description>
+        <content lang="ja">独立評価結果 - ISO 21434</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_67" name="Evidence 67" referencedArtifact="ART_Assessment_67">
       <name>
@@ -1130,7 +1244,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - ISO 10007</content>
-      <content lang="ja">独立評価結果 - ISO 10007</content></description>
+        <content lang="ja">独立評価結果 - ISO 10007</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_68" name="Evidence 68" referencedArtifact="ART_Assessment_68">
       <name>
@@ -1139,7 +1254,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - SAE AVSC 00004</content>
-      <content lang="ja">独立評価結果 - SAE AVSC 00004</content></description>
+        <content lang="ja">独立評価結果 - SAE AVSC 00004</content>
+      </description>
     </artifactReference>
     <assertedInference id="AI_G37_G4" name="Hazard Analysis Inference">
       <name>
@@ -1148,10 +1264,11 @@
       </name>
       <description>
         <content lang="en">Hazard analysis supports vehicle safety</content>
-      <content lang="ja">ハザード分析は車両安全性を支持する</content></description>
-      <source href="#G37"/>
-      <target href="#G4"/>
-      <reasoning href="#S33"/>
+        <content lang="ja">ハザード分析は車両安全性を支持する</content>
+      </description>
+      <source href="#G37" />
+      <target href="#G4" />
+      <reasoning href="#S33" />
     </assertedInference>
     <assertedInference id="AI_RiskMitigation_G4" name="Risk Mitigation Inference">
       <name>
@@ -1160,14 +1277,15 @@
       </name>
       <description>
         <content lang="en">Standards conformance supports vehicle safety through risk mitigation</content>
-      <content lang="ja">規格適合はリスク低減を通じて車両安全性を支持する</content></description>
-      <source href="#G38"/>
-      <source href="#G39"/>
-      <source href="#G40"/>
-      <source href="#G41"/>
-      <source href="#G42"/>
-      <target href="#G4"/>
-      <reasoning href="#S34"/>
+        <content lang="ja">規格適合はリスク低減を通じて車両安全性を支持する</content>
+      </description>
+      <source href="#G38" />
+      <source href="#G39" />
+      <source href="#G40" />
+      <source href="#G41" />
+      <source href="#G42" />
+      <target href="#G4" />
+      <reasoning href="#S34" />
     </assertedInference>
     <assertedInference id="AI_G43_G4" name="Configuration Management Inference">
       <name>
@@ -1176,10 +1294,11 @@
       </name>
       <description>
         <content lang="en">Configuration management supports vehicle safety</content>
-      <content lang="ja">構成管理は車両安全性を支持する</content></description>
-      <source href="#G43"/>
-      <target href="#G4"/>
-      <reasoning href="#S35"/>
+        <content lang="ja">構成管理は車両安全性を支持する</content>
+      </description>
+      <source href="#G43" />
+      <target href="#G4" />
+      <reasoning href="#S35" />
     </assertedInference>
     <assertedInference id="AI_G44_G4" name="Data Recording Inference">
       <name>
@@ -1188,10 +1307,11 @@
       </name>
       <description>
         <content lang="en">Data recording supports vehicle safety through incident investigation capability</content>
-      <content lang="ja">データ記録はインシデント調査能力を通じて車両安全性を支持する</content></description>
-      <source href="#G44"/>
-      <target href="#G4"/>
-      <reasoning href="#S36"/>
+        <content lang="ja">データ記録はインシデント調査能力を通じて車両安全性を支持する</content>
+      </description>
+      <source href="#G44" />
+      <target href="#G4" />
+      <reasoning href="#S36" />
     </assertedInference>
     <assertedInference id="AI_G53_G37" name="STPA Inference">
       <name>
@@ -1200,10 +1320,11 @@
       </name>
       <description>
         <content lang="en">STPA hazard analysis supports hazard identification claim</content>
-      <content lang="ja">STPAハザード分析はハザード特定の主張を支持する</content></description>
-      <source href="#G53"/>
-      <target href="#G37"/>
-      <reasoning href="#S45"/>
+        <content lang="ja">STPAハザード分析はハザード特定の主張を支持する</content>
+      </description>
+      <source href="#G53" />
+      <target href="#G37" />
+      <reasoning href="#S45" />
     </assertedInference>
     <assertedInference id="AI_G54_G38" name="FMVSS Inference">
       <name>
@@ -1212,10 +1333,11 @@
       </name>
       <description>
         <content lang="en">FMVSS conformance supports vehicle safety standards claim</content>
-      <content lang="ja">FMVSSへの適合は車両安全規格適合の主張を支持する</content></description>
-      <source href="#G54"/>
-      <target href="#G38"/>
-      <reasoning href="#S46"/>
+        <content lang="ja">FMVSSへの適合は車両安全規格適合の主張を支持する</content>
+      </description>
+      <source href="#G54" />
+      <target href="#G38" />
+      <reasoning href="#S46" />
     </assertedInference>
     <assertedInference id="AI_G55_G39" name="ISO 26262 Inference">
       <name>
@@ -1224,10 +1346,11 @@
       </name>
       <description>
         <content lang="en">ISO 26262 development supports functional safety claim</content>
-      <content lang="ja">ISO 26262に基づく開発は機能安全の主張を支持する</content></description>
-      <source href="#G55"/>
-      <target href="#G39"/>
-      <reasoning href="#S47"/>
+        <content lang="ja">ISO 26262に基づく開発は機能安全の主張を支持する</content>
+      </description>
+      <source href="#G55" />
+      <target href="#G39" />
+      <reasoning href="#S47" />
     </assertedInference>
     <assertedInference id="AI_G56_G40" name="ISO/PAS 8800 Inference">
       <name>
@@ -1236,10 +1359,11 @@
       </name>
       <description>
         <content lang="en">ISO/PAS 8800 development supports AI engineering rigor claim</content>
-      <content lang="ja">ISO/PAS 8800に基づく開発はAIエンジニアリングの厳格性に関する主張を支持する</content></description>
-      <source href="#G56"/>
-      <target href="#G40"/>
-      <reasoning href="#S48"/>
+        <content lang="ja">ISO/PAS 8800に基づく開発はAIエンジニアリングの厳格性に関する主張を支持する</content>
+      </description>
+      <source href="#G56" />
+      <target href="#G40" />
+      <reasoning href="#S48" />
     </assertedInference>
     <assertedInference id="AI_G57_G41" name="ISO 21448 Inference">
       <name>
@@ -1248,10 +1372,11 @@
       </name>
       <description>
         <content lang="en">ISO 21448 development supports intended functions safety claim</content>
-      <content lang="ja">ISO 21448に基づく開発は意図した機能の安全性に関する主張を支持する</content></description>
-      <source href="#G57"/>
-      <target href="#G41"/>
-      <reasoning href="#S49"/>
+        <content lang="ja">ISO 21448に基づく開発は意図した機能の安全性に関する主張を支持する</content>
+      </description>
+      <source href="#G57" />
+      <target href="#G41" />
+      <reasoning href="#S49" />
     </assertedInference>
     <assertedInference id="AI_G58_G42" name="ISO 21434 Inference">
       <name>
@@ -1260,10 +1385,11 @@
       </name>
       <description>
         <content lang="en">ISO 21434 development supports security standards claim</content>
-      <content lang="ja">ISO 21434に基づく開発はセキュリティ規格適合の主張を支持する</content></description>
-      <source href="#G58"/>
-      <target href="#G42"/>
-      <reasoning href="#S50"/>
+        <content lang="ja">ISO 21434に基づく開発はセキュリティ規格適合の主張を支持する</content>
+      </description>
+      <source href="#G58" />
+      <target href="#G42" />
+      <reasoning href="#S50" />
     </assertedInference>
     <assertedInference id="AI_G59_G43" name="ISO 10007 Inference">
       <name>
@@ -1272,10 +1398,11 @@
       </name>
       <description>
         <content lang="en">ISO 10007 risk management supports configuration management claim</content>
-      <content lang="ja">ISO 10007に基づくリスク管理は構成管理の主張を支持する</content></description>
-      <source href="#G59"/>
-      <target href="#G43"/>
-      <reasoning href="#S51"/>
+        <content lang="ja">ISO 10007に基づくリスク管理は構成管理の主張を支持する</content>
+      </description>
+      <source href="#G59" />
+      <target href="#G43" />
+      <reasoning href="#S51" />
     </assertedInference>
     <assertedInference id="AI_G60_G44" name="SAE AVSC 00004 Inference">
       <name>
@@ -1284,10 +1411,11 @@
       </name>
       <description>
         <content lang="en">SAE AVSC 00004 conformance supports data recording claim</content>
-      <content lang="ja">SAE AVSC 00004への適合はデータ記録の主張を支持する</content></description>
-      <source href="#G60"/>
-      <target href="#G44"/>
-      <reasoning href="#S52"/>
+        <content lang="ja">SAE AVSC 00004への適合はデータ記録の主張を支持する</content>
+      </description>
+      <source href="#G60" />
+      <target href="#G44" />
+      <reasoning href="#S52" />
     </assertedInference>
     <assertedEvidence id="AE_G53_EV61" name="STPA Evidence">
       <name>
@@ -1296,9 +1424,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support STPA hazard analysis claim</content>
-      <content lang="ja">評価結果はSTPAハザード分析の主張を支持する</content></description>
-      <source href="#EV_61"/>
-      <target href="#G53"/>
+        <content lang="ja">評価結果はSTPAハザード分析の主張を支持する</content>
+      </description>
+      <source href="#EV_61" />
+      <target href="#G53" />
     </assertedEvidence>
     <assertedEvidence id="AE_G54_EV62" name="FMVSS Evidence">
       <name>
@@ -1307,9 +1436,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support FMVSS conformance claim</content>
-      <content lang="ja">評価結果はFMVSS適合の主張を支持する</content></description>
-      <source href="#EV_62"/>
-      <target href="#G54"/>
+        <content lang="ja">評価結果はFMVSS適合の主張を支持する</content>
+      </description>
+      <source href="#EV_62" />
+      <target href="#G54" />
     </assertedEvidence>
     <assertedEvidence id="AE_G55_EV63" name="ISO 26262 Evidence">
       <name>
@@ -1318,9 +1448,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support ISO 26262 development claim</content>
-      <content lang="ja">評価結果はISO 26262に基づく開発の主張を支持する</content></description>
-      <source href="#EV_63"/>
-      <target href="#G55"/>
+        <content lang="ja">評価結果はISO 26262に基づく開発の主張を支持する</content>
+      </description>
+      <source href="#EV_63" />
+      <target href="#G55" />
     </assertedEvidence>
     <assertedEvidence id="AE_G56_EV64" name="ISO/PAS 8800 Evidence">
       <name>
@@ -1329,9 +1460,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support ISO/PAS 8800 development claim</content>
-      <content lang="ja">評価結果はISO/PAS 8800に基づく開発の主張を支持する</content></description>
-      <source href="#EV_64"/>
-      <target href="#G56"/>
+        <content lang="ja">評価結果はISO/PAS 8800に基づく開発の主張を支持する</content>
+      </description>
+      <source href="#EV_64" />
+      <target href="#G56" />
     </assertedEvidence>
     <assertedEvidence id="AE_G57_EV65" name="ISO 21448 Evidence">
       <name>
@@ -1340,9 +1472,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support ISO 21448 development claim</content>
-      <content lang="ja">評価結果はISO 21448に基づく開発の主張を支持する</content></description>
-      <source href="#EV_65"/>
-      <target href="#G57"/>
+        <content lang="ja">評価結果はISO 21448に基づく開発の主張を支持する</content>
+      </description>
+      <source href="#EV_65" />
+      <target href="#G57" />
     </assertedEvidence>
     <assertedEvidence id="AE_G58_EV66" name="ISO 21434 Evidence">
       <name>
@@ -1351,9 +1484,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support ISO 21434 development claim</content>
-      <content lang="ja">評価結果はISO 21434に基づく開発の主張を支持する</content></description>
-      <source href="#EV_66"/>
-      <target href="#G58"/>
+        <content lang="ja">評価結果はISO 21434に基づく開発の主張を支持する</content>
+      </description>
+      <source href="#EV_66" />
+      <target href="#G58" />
     </assertedEvidence>
     <assertedEvidence id="AE_G59_EV67" name="ISO 10007 Evidence">
       <name>
@@ -1362,9 +1496,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support ISO 10007 risk management claim</content>
-      <content lang="ja">評価結果はISO 10007に基づくリスク管理の主張を支持する</content></description>
-      <source href="#EV_67"/>
-      <target href="#G59"/>
+        <content lang="ja">評価結果はISO 10007に基づくリスク管理の主張を支持する</content>
+      </description>
+      <source href="#EV_67" />
+      <target href="#G59" />
     </assertedEvidence>
     <assertedEvidence id="AE_G60_EV68" name="SAE AVSC 00004 Evidence">
       <name>
@@ -1373,9 +1508,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support SAE AVSC 00004 conformance claim</content>
-      <content lang="ja">評価結果はSAE AVSC 00004適合の主張を支持する</content></description>
-      <source href="#EV_68"/>
-      <target href="#G60"/>
+        <content lang="ja">評価結果はSAE AVSC 00004適合の主張を支持する</content>
+      </description>
+      <source href="#EV_68" />
+      <target href="#G60" />
     </assertedEvidence>
   </argumentPackage>
   <argumentPackage id="ARG_OpSafety" name="Operational Safety">
@@ -1390,7 +1526,8 @@
       </name>
       <description>
         <content lang="en">Trip interruption operations per SAE AVSC 00003</content>
-      <content lang="ja">SAE AVSC 00003に基づく運行中断対応</content></description>
+        <content lang="ja">SAE AVSC 00003に基づく運行中断対応</content>
+      </description>
     </claim>
     <claim id="G73" name="Goal 73" content="Our post-crash operations conform with all recommendations in SAE AVSC-I-05.">
       <name>
@@ -1399,7 +1536,8 @@
       </name>
       <description>
         <content lang="en">Post-crash operations per SAE AVSC-I-05</content>
-      <content lang="ja">SAE AVSC-I-05に基づく事故後運用</content></description>
+        <content lang="ja">SAE AVSC-I-05に基づく事故後運用</content>
+      </description>
     </claim>
     <claim id="G74" name="Goal 74" content="Our remote operations conform with all recommendations in SAE AVSC-I-04.">
       <name>
@@ -1408,7 +1546,8 @@
       </name>
       <description>
         <content lang="en">Remote operations per SAE AVSC-I-04</content>
-      <content lang="ja">SAE AVSC-I-04に基づく遠隔運用</content></description>
+        <content lang="ja">SAE AVSC-I-04に基づく遠隔運用</content>
+      </description>
     </claim>
     <claim id="G75" name="Goal 75" content="Our first responder interactions conform with all recommendations in SAE AVSC-I-01.">
       <name>
@@ -1417,7 +1556,8 @@
       </name>
       <description>
         <content lang="en">First responder interaction procedures per SAE AVSC-I-01</content>
-      <content lang="ja">SAE AVSC-I-01に基づくファーストレスポンダー対応手順</content></description>
+        <content lang="ja">SAE AVSC-I-01に基づくファーストレスポンダー対応手順</content>
+      </description>
     </claim>
     <claim id="G76" name="Goal 76" content="Our safety inspections conform with all recommendations in SAE AVSC-D-03.">
       <name>
@@ -1426,7 +1566,8 @@
       </name>
       <description>
         <content lang="en">Safety inspection procedures per SAE AVSC-D-03</content>
-      <content lang="ja">SAE AVSC-D-03に基づく安全点検手順</content></description>
+        <content lang="ja">SAE AVSC-D-03に基づく安全点検手順</content>
+      </description>
     </claim>
     <claim id="G77" name="Goal 77" content="We monitor metrics in operations IAW all recommendations in SAE AVSC 00006.">
       <name>
@@ -1435,7 +1576,8 @@
       </name>
       <description>
         <content lang="en">Operational metrics monitoring per SAE AVSC 00006</content>
-      <content lang="ja">SAE AVSC 00006に基づく運用指標の監視</content></description>
+        <content lang="ja">SAE AVSC 00006に基づく運用指標の監視</content>
+      </description>
     </claim>
     <claim id="G78" name="Goal 78" content="Our operating procedures mitigate all hazards without technical mitigations.">
       <name>
@@ -1444,7 +1586,8 @@
       </name>
       <description>
         <content lang="en">Procedural mitigations for residual hazards</content>
-      <content lang="ja">残留ハザードに対する手順的緩和策</content></description>
+        <content lang="ja">残留ハザードに対する手順的緩和策</content>
+      </description>
     </claim>
     <argumentReasoning id="S69" name="Strategy 69" content="Appeal to all relevant operational safety best practices.">
       <name>
@@ -1453,7 +1596,8 @@
       </name>
       <description>
         <content lang="en">Argument based on operational safety best practices</content>
-      <content lang="ja">運用安全のベストプラクティスに基づく論証</content></description>
+        <content lang="ja">運用安全のベストプラクティスに基づく論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S70" name="Strategy 70" content="Argument over procedural mitigations.">
       <name>
@@ -1462,7 +1606,8 @@
       </name>
       <description>
         <content lang="en">Argument that operating procedures address residual hazards</content>
-      <content lang="ja">運用手順が残留ハザードに対処するという論証</content></description>
+        <content lang="ja">運用手順が残留ハザードに対処するという論証</content>
+      </description>
     </argumentReasoning>
     <argumentReasoning id="S71" name="Strategy 71" content="Appeal to effective safety management.">
       <name>
@@ -1471,7 +1616,8 @@
       </name>
       <description>
         <content lang="en">Argument based on safety management effectiveness</content>
-      <content lang="ja">安全マネジメントの有効性に基づく論証</content></description>
+        <content lang="ja">安全マネジメントの有効性に基づく論証</content>
+      </description>
     </argumentReasoning>
     <artifactReference id="CTX_79" name="Context 79" referencedArtifact="ART_SMSClaims">
       <name>
@@ -1480,7 +1626,8 @@
       </name>
       <description>
         <content lang="en">Relevant SMS claims providing context for operational safety</content>
-      <content lang="ja">運用安全の文脈を提供する関連SMS主張</content></description>
+        <content lang="ja">運用安全の文脈を提供する関連SMS主張</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_80" name="Evidence 80" referencedArtifact="ART_Assessment_80">
       <name>
@@ -1489,7 +1636,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Trip interruptions</content>
-      <content lang="ja">独立評価結果 - 運行中断</content></description>
+        <content lang="ja">独立評価結果 - 運行中断</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_81" name="Evidence 81" referencedArtifact="ART_Assessment_81">
       <name>
@@ -1498,7 +1646,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Post-crash operations</content>
-      <content lang="ja">独立評価結果 - 事故後運用</content></description>
+        <content lang="ja">独立評価結果 - 事故後運用</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_82" name="Evidence 82" referencedArtifact="ART_Assessment_82">
       <name>
@@ -1507,7 +1656,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Remote operations</content>
-      <content lang="ja">独立評価結果 - 遠隔運用</content></description>
+        <content lang="ja">独立評価結果 - 遠隔運用</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_83" name="Evidence 83" referencedArtifact="ART_Assessment_83">
       <name>
@@ -1516,7 +1666,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - First responder interactions</content>
-      <content lang="ja">独立評価結果 - ファーストレスポンダー対応</content></description>
+        <content lang="ja">独立評価結果 - ファーストレスポンダー対応</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_84" name="Evidence 84" referencedArtifact="ART_Assessment_84">
       <name>
@@ -1525,7 +1676,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Safety inspections</content>
-      <content lang="ja">独立評価結果 - 安全点検</content></description>
+        <content lang="ja">独立評価結果 - 安全点検</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_85" name="Evidence 85" referencedArtifact="ART_Assessment_85">
       <name>
@@ -1534,7 +1686,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Metrics monitoring</content>
-      <content lang="ja">独立評価結果 - 指標監視</content></description>
+        <content lang="ja">独立評価結果 - 指標監視</content>
+      </description>
     </artifactReference>
     <artifactReference id="EV_86" name="Evidence 86" referencedArtifact="ART_Assessment_86">
       <name>
@@ -1543,7 +1696,8 @@
       </name>
       <description>
         <content lang="en">Results of independent assessment - Procedural mitigations</content>
-      <content lang="ja">独立評価結果 - 手順的緩和策</content></description>
+        <content lang="ja">独立評価結果 - 手順的緩和策</content>
+      </description>
     </artifactReference>
     <assertedInference id="AI_OpBestPractices_G5" name="Operational Best Practices Inference">
       <name>
@@ -1552,15 +1706,16 @@
       </name>
       <description>
         <content lang="en">Operational best practices conformance supports safe vehicle operation</content>
-      <content lang="ja">運用ベストプラクティスへの適合は安全な車両運用を支持する</content></description>
-      <source href="#G72"/>
-      <source href="#G73"/>
-      <source href="#G74"/>
-      <source href="#G75"/>
-      <source href="#G76"/>
-      <source href="#G77"/>
-      <target href="#G5"/>
-      <reasoning href="#S69"/>
+        <content lang="ja">運用ベストプラクティスへの適合は安全な車両運用を支持する</content>
+      </description>
+      <source href="#G72" />
+      <source href="#G73" />
+      <source href="#G74" />
+      <source href="#G75" />
+      <source href="#G76" />
+      <source href="#G77" />
+      <target href="#G5" />
+      <reasoning href="#S69" />
     </assertedInference>
     <assertedInference id="AI_G78_G5" name="Procedural Mitigations Inference">
       <name>
@@ -1569,10 +1724,11 @@
       </name>
       <description>
         <content lang="en">Procedural mitigations support safe vehicle operation</content>
-      <content lang="ja">手順的緩和策は安全な車両運用を支持する</content></description>
-      <source href="#G78"/>
-      <target href="#G5"/>
-      <reasoning href="#S70"/>
+        <content lang="ja">手順的緩和策は安全な車両運用を支持する</content>
+      </description>
+      <source href="#G78" />
+      <target href="#G5" />
+      <reasoning href="#S70" />
     </assertedInference>
     <assertedContext id="AC_SMS_S71" name="SMS Context for Safety Management">
       <name>
@@ -1581,9 +1737,10 @@
       </name>
       <description>
         <content lang="en">SMS claims provide context for effective safety management strategy</content>
-      <content lang="ja">SMS主張は有効な安全マネジメント戦略の文脈を提供する</content></description>
-      <source href="#CTX_79"/>
-      <target href="#S71"/>
+        <content lang="ja">SMS主張は有効な安全マネジメント戦略の文脈を提供する</content>
+      </description>
+      <source href="#CTX_79" />
+      <target href="#S71" />
     </assertedContext>
     <assertedEvidence id="AE_G72_EV80" name="Trip Interruption Evidence">
       <name>
@@ -1592,9 +1749,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support trip interruption operations claim</content>
-      <content lang="ja">評価結果は運行中断対応の主張を支持する</content></description>
-      <source href="#EV_80"/>
-      <target href="#G72"/>
+        <content lang="ja">評価結果は運行中断対応の主張を支持する</content>
+      </description>
+      <source href="#EV_80" />
+      <target href="#G72" />
     </assertedEvidence>
     <assertedEvidence id="AE_G73_EV81" name="Post-Crash Evidence">
       <name>
@@ -1603,9 +1761,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support post-crash operations claim</content>
-      <content lang="ja">評価結果は事故後運用の主張を支持する</content></description>
-      <source href="#EV_81"/>
-      <target href="#G73"/>
+        <content lang="ja">評価結果は事故後運用の主張を支持する</content>
+      </description>
+      <source href="#EV_81" />
+      <target href="#G73" />
     </assertedEvidence>
     <assertedEvidence id="AE_G74_EV82" name="Remote Operations Evidence">
       <name>
@@ -1614,9 +1773,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support remote operations claim</content>
-      <content lang="ja">評価結果は遠隔運用の主張を支持する</content></description>
-      <source href="#EV_82"/>
-      <target href="#G74"/>
+        <content lang="ja">評価結果は遠隔運用の主張を支持する</content>
+      </description>
+      <source href="#EV_82" />
+      <target href="#G74" />
     </assertedEvidence>
     <assertedEvidence id="AE_G75_EV83" name="First Responder Evidence">
       <name>
@@ -1625,9 +1785,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support first responder interactions claim</content>
-      <content lang="ja">評価結果はファーストレスポンダー対応の主張を支持する</content></description>
-      <source href="#EV_83"/>
-      <target href="#G75"/>
+        <content lang="ja">評価結果はファーストレスポンダー対応の主張を支持する</content>
+      </description>
+      <source href="#EV_83" />
+      <target href="#G75" />
     </assertedEvidence>
     <assertedEvidence id="AE_G76_EV84" name="Safety Inspections Evidence">
       <name>
@@ -1636,9 +1797,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support safety inspections claim</content>
-      <content lang="ja">評価結果は安全点検の主張を支持する</content></description>
-      <source href="#EV_84"/>
-      <target href="#G76"/>
+        <content lang="ja">評価結果は安全点検の主張を支持する</content>
+      </description>
+      <source href="#EV_84" />
+      <target href="#G76" />
     </assertedEvidence>
     <assertedEvidence id="AE_G77_EV85" name="Metrics Monitoring Evidence">
       <name>
@@ -1647,9 +1809,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support metrics monitoring claim</content>
-      <content lang="ja">評価結果は指標監視の主張を支持する</content></description>
-      <source href="#EV_85"/>
-      <target href="#G77"/>
+        <content lang="ja">評価結果は指標監視の主張を支持する</content>
+      </description>
+      <source href="#EV_85" />
+      <target href="#G77" />
     </assertedEvidence>
     <assertedEvidence id="AE_G78_EV86" name="Procedural Mitigations Evidence">
       <name>
@@ -1658,9 +1821,10 @@
       </name>
       <description>
         <content lang="en">Assessment results support procedural mitigations claim</content>
-      <content lang="ja">評価結果は手順的緩和策の主張を支持する</content></description>
-      <source href="#EV_86"/>
-      <target href="#G78"/>
+        <content lang="ja">評価結果は手順的緩和策の主張を支持する</content>
+      </description>
+      <source href="#EV_86" />
+      <target href="#G78" />
     </assertedEvidence>
   </argumentPackage>
 </sacm:AssuranceCasePackage>
