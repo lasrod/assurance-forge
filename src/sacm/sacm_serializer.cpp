@@ -88,11 +88,17 @@ static void add_refs(pugi::xml_node parent, const char* tag,
     }
 }
 
-// Serialize common SacmElement attributes.
-// Serialize common SacmElement attributes and name translations.
+// Serialize common SACMElement attributes (clause 8.2) plus name translations.
 static void set_base(pugi::xml_node node, const SacmElement& elem) {
     if (!elem.id.empty())   node.append_attribute("id") = elem.id.c_str();
     if (!elem.name.empty()) node.append_attribute("name") = elem.name.c_str();
+    if (!elem.gid.empty())  node.append_attribute("gid") = elem.gid.c_str();
+    if (elem.isCitation)    node.append_attribute("isCitation") = "true";
+    if (elem.isAbstract)    node.append_attribute("isAbstract") = "true";
+    if (!elem.citedElement.empty())
+        node.append_attribute("citedElement") = elem.citedElement.c_str();
+    if (!elem.abstractForm.empty())
+        node.append_attribute("abstractForm") = elem.abstractForm.c_str();
     add_name_ml(node, elem.name_ml);
 }
 
@@ -116,6 +122,8 @@ static void serialize_terminology_package(pugi::xml_node parent, const Terminolo
 static void serialize_artifact(pugi::xml_node parent, const Artifact& a) {
     auto node = parent.append_child("artifact");
     set_base(node, a);
+    if (!a.version.empty()) node.append_attribute("version") = a.version.c_str();
+    if (!a.date.empty())    node.append_attribute("date") = a.date.c_str();
     add_description(node, a.description, a.description_ml);
 }
 
@@ -155,6 +163,7 @@ static void serialize_artifact_reference(pugi::xml_node parent, const ArtifactRe
 static void serialize_relationship_common(pugi::xml_node node, const AssertedRelationship& rel) {
     if (!rel.assertionDeclaration.empty())
         node.append_attribute("assertionDeclaration") = rel.assertionDeclaration.c_str();
+    if (rel.isCounter) node.append_attribute("isCounter") = "true";
     add_description(node, rel.description, rel.description_ml);
     add_refs(node, "source", rel.sources);
     add_refs(node, "target", rel.targets);
