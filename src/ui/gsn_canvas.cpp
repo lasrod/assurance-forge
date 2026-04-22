@@ -1,5 +1,6 @@
 #include "ui/gsn_canvas.h"
 #include "ui/gsn_canvas_renderer.h"
+#include "ui/tree_view.h"
 #include "ui/ui_state.h"
 
 #include <iostream>
@@ -197,6 +198,13 @@ void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin, float zoom) {
     ImGui::InvisibleButton(node.id.c_str(), scaled_size);
     if (ImGui::IsItemClicked() && !g_overlay_hovered) {
         GetUiState().selected_element_id = node.id;
+    }
+
+    // Right-click context menu: select the node, then offer the Add submenu.
+    if (ImGui::BeginPopupContextItem(node.id.c_str())) {
+        GetUiState().selected_element_id = node.id;
+        RenderAddElementMenu();
+        ImGui::EndPopup();
     }
 
     // Highlight selected node

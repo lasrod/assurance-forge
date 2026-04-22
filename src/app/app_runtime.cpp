@@ -3,6 +3,7 @@
 #include "imgui.h"
 
 #include "core/app_state.h"
+#include "core/element_factory.h"
 #include "ui/gsn_canvas.h"
 #include "ui/register_views.h"
 #include "ui/tree_view.h"
@@ -100,6 +101,11 @@ void SummaryMetric(const char* label, int value) {
 
 }  // namespace
 
+// Pointer to the currently constructed AppRuntime, used by free functions
+// (RequestAddChild / RequestNotImplemented) so UI code can poke the runtime
+// without a circular include or callback plumbing.
+static AppRuntime* g_active_runtime = nullptr;
+
 struct AppRuntime::Impl {
     core::AppState app_state;
 
@@ -117,9 +123,14 @@ struct AppRuntime::Impl {
 
     float left_ratio = kInitialLeftPanelRatio;
     float right_ratio = kInitialRightPanelRatio;
+
+    // Modal for unimplemented features
+    bool show_not_implemented_modal = false;
+    std::string not_implemented_feature;
 };
 
 AppRuntime::AppRuntime() : impl_(new Impl()) {
+    g_active_runtime = this;
     ScanDirectory();
 
     if (impl_->app_state.load_file(impl_->file_path_buf)) {
@@ -130,7 +141,58 @@ AppRuntime::AppRuntime() : impl_(new Impl()) {
 }
 
 AppRuntime::~AppRuntime() {
+    if (g_active_runtime == this) g_active_runtime = nullptr;
     delete impl_;
+}
+
+void RequestAddChild(core::NewElementKind kind) {
+    if (g_active_runtime) g_active_runtime->AddChildToSelected(kind);
+}
+
+void RequestNotImplemented(const char* feature) {
+    if (g_active_runtime && feature) {
+        g_active_runtime->ShowNotImplementedModal(feature);
+    }
+}
+
+bool AppRuntime::AddChildToSelected(core::NewElementKind kind) {
+    if (!impl_->app_state.loaded_case.has_value()) {
+        SetStatus("No assurance case loaded.");
+        return false;
+    }
+    const std::string& selected_id = ui::GetUiState().selected_element_id;
+    if (selected_id.empty()) {
+        SetStatus("No element selected.");
+        return false;
+    }
+
+    parser::AssuranceCase& ac = impl_->app_state.loaded_case.value();
+    sacm::AssuranceCasePackage* pkg = impl_->app_state.sacm_package.has_value()
+                                          ? &impl_->app_state.sacm_package.value()
+                                          : nullptr;
+
+    std::string new_id;
+    std::string error;
+    if (!core::AddChildElement(ac, pkg, selected_id, kind, new_id, error)) {
+        SetStatus("Add failed: " + error);
+        return false;
+    }
+
+    impl_->tree_needs_rebuild = true;
+    ui::UiState& s = ui::GetUiState();
+    s.selected_element_id = new_id;
+    s.center_on_selection = true;
+    SetStatus("Added " + new_id);
+    return true;
+}
+
+void AppRuntime::SetStatus(const std::string& message) {
+    impl_->app_state.status_message = message;
+}
+
+void AppRuntime::ShowNotImplementedModal(const std::string& feature) {
+    impl_->show_not_implemented_modal = true;
+    impl_->not_implemented_feature = feature;
 }
 
 void AppRuntime::ScanDirectory() {
@@ -452,6 +514,29 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
     ImGui::End();
 }
 
+void AppRuntime::RenderNotImplementedModal() {
+    if (!impl_->show_not_implemented_modal) return;
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal("##not_implemented_modal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("%s is not implemented yet.", impl_->not_implemented_feature.c_str());
+        ImGui::Spacing();
+        ImGui::Spacing();
+
+        float button_width = 100.0f;
+        float modal_width = ImGui::GetWindowWidth();
+        float center_x = (modal_width - button_width) * 0.5f;
+        ImGui::SetCursorPosX(center_x);
+        if (ImGui::Button("OK", ImVec2(button_width, 0))) {
+            impl_->show_not_implemented_modal = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    } else if (impl_->show_not_implemented_modal) {
+        ImGui::OpenPopup("##not_implemented_modal");
+    }
+}
+
 void AppRuntime::RenderFrame(bool& done) {
     ImVec2 display = ImGui::GetIO().DisplaySize;
 
@@ -472,6 +557,8 @@ void AppRuntime::RenderFrame(bool& done) {
     float center_x = left_w + kSplitterThickness;
     RenderCenterPanel(center_x, center_w, display.y);
     RenderElementPropertiesPanel(center_x, center_w, right_w);
+
+    RenderNotImplementedModal();
 }
 
 }  // namespace app
