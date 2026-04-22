@@ -42,10 +42,10 @@ std::unordered_set<std::string> CollectIds(const parser::AssuranceCase& ac) {
 std::string GenerateUniqueId(const std::unordered_set<std::string>& existing,
                              const std::string& prefix) {
     for (int i = 1; i < 100000; ++i) {
-        std::string candidate = prefix + "_" + std::to_string(i);
+        std::string candidate = prefix + std::to_string(i);
         if (existing.find(candidate) == existing.end()) return candidate;
     }
-    return prefix + "_x";
+    return prefix + "x";
 }
 
 const parser::SacmElement* FindElement(const parser::AssuranceCase& ac, const std::string& id) {
