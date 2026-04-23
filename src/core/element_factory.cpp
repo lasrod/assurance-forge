@@ -351,19 +351,6 @@ void CollectGroup2AttachmentIds(const parser::AssuranceCase& ac,
     for (const auto& s : idx.Group2Of(node_id)) out.insert(s);
 }
 
-// All siblings of `node_id` (children of the same tree-parent), including
-// `node_id` itself. If `node_id` is a root, returns just `{node_id}`.
-std::unordered_set<std::string> CollectSiblingSet(const parser::AssuranceCase& ac,
-                                                  const std::string& node_id) {
-    std::unordered_set<std::string> result;
-    result.insert(node_id);
-    auto idx = BuildTreeIndex(ac);
-    const std::string& parent = idx.ParentOf(node_id);
-    if (parent.empty()) return result;
-    for (const auto& c : idx.ChildrenOf(parent)) result.insert(c);
-    return result;
-}
-
 }  // namespace
 
 namespace {
@@ -465,31 +452,16 @@ std::unordered_set<std::string> PlanRemoval(const parser::AssuranceCase& ac,
     std::unordered_set<std::string> result;
     if (id.empty() || !FindElement(ac, id)) return result;
 
-    auto add_attachments_for_all = [&]() {
-        std::vector<std::string> snapshot(result.begin(), result.end());
-        for (const auto& nid : snapshot) {
-            CollectGroup2AttachmentIds(ac, nid, result);
-        }
-    };
-
-    switch (mode) {
-        case RemoveMode::NodeOnly:
-            result.insert(id);
-            CollectGroup2AttachmentIds(ac, id, result);
-            break;
-        case RemoveMode::NodeAndDescendants:
-            result = CollectSubtreeIds(ac, id);
-            add_attachments_for_all();
-            break;
-        case RemoveMode::NodeAndSiblings: {
-            auto siblings = CollectSiblingSet(ac, id);
-            for (const auto& s : siblings) {
-                auto sub = CollectSubtreeIds(ac, s);
-                result.insert(sub.begin(), sub.end());
-            }
-            add_attachments_for_all();
-            break;
-        }
+    if (mode == RemoveMode::NodeOnly) {
+        result.insert(id);
+    } else {  // NodeAndDescendants
+        result = CollectSubtreeIds(ac, id);
+    }
+    // Sweep Group2 attachments (Context/Assumption/Justification) for every
+    // node in the plan so they don't dangle after deletion.
+    std::vector<std::string> snapshot(result.begin(), result.end());
+    for (const auto& nid : snapshot) {
+        CollectGroup2AttachmentIds(ac, nid, result);
     }
     return result;
 }

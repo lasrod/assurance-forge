@@ -26,9 +26,10 @@ void RenderAddElementMenu() {
 }
 
 // Render the shared "Remove" submenu used by both the tree and the canvas
-// context menus. Three modes are offered, each labeled with the count of
-// elements that would be removed (computed via core::PlanRemoval). Modes that
-// degenerate to a no-op for the current selection are disabled.
+// context menus. Two modes are offered, each labeled with the count of
+// elements that would be removed (computed via core::PlanRemoval). The
+// "descendants" option is disabled when it would not remove anything more
+// than the "this node only" option.
 void RenderRemoveSubmenu() {
     const std::string& selected_id = GetUiState().selected_element_id;
     if (ImGui::BeginMenu("Remove")) {
@@ -48,7 +49,6 @@ void RenderRemoveSubmenu() {
 
         const int n_only        = count_for(core::RemoveMode::NodeOnly);
         const int n_descendants = count_for(core::RemoveMode::NodeAndDescendants);
-        const int n_siblings    = count_for(core::RemoveMode::NodeAndSiblings);
 
         char label[96];
 
@@ -60,11 +60,6 @@ void RenderRemoveSubmenu() {
         std::snprintf(label, sizeof(label), "Node and descendants (%d)", n_descendants);
         if (ImGui::MenuItem(label, nullptr, false, n_descendants > n_only)) {
             app::RequestRemove(core::RemoveMode::NodeAndDescendants);
-        }
-
-        std::snprintf(label, sizeof(label), "Node and siblings (%d)", n_siblings);
-        if (ImGui::MenuItem(label, nullptr, false, n_siblings > n_only)) {
-            app::RequestRemove(core::RemoveMode::NodeAndSiblings);
         }
 
         ImGui::EndMenu();

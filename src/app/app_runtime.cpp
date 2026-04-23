@@ -614,9 +614,9 @@ void AppRuntime::RenderRemoveConfirmModal() {
     if (ImGui::BeginPopupModal("##remove_confirm_modal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         const int n = static_cast<int>(impl_->pending_remove_ids.size());
         const char* mode_label =
-            impl_->pending_remove_mode == core::RemoveMode::NodeOnly         ? "this node and its attachments" :
-            impl_->pending_remove_mode == core::RemoveMode::NodeAndDescendants ? "this node and its descendants" :
-                                                                                 "this node and its siblings";
+            impl_->pending_remove_mode == core::RemoveMode::NodeOnly
+                ? "this node and its attachments"
+                : "this node and its descendants";
         ImGui::Text("Remove %s?", mode_label);
         ImGui::Text("%d element%s will be deleted (highlighted in red).",
                     n, n == 1 ? "" : "s");

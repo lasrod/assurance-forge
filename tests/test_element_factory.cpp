@@ -334,101 +334,11 @@ TEST(ElementFactoryRemove, RemoveNodeOnly_AlsoRemovesGroup2Attachments) {
         << "Context attachment must go away with its target node.";
 }
 
-// PlanRemoval(NodeAndSiblings) must include all siblings sharing the same
-// structural parent, plus their subtrees.
-TEST(ElementFactoryRemove, PlanRemoval_NodeAndSiblings_IncludesSiblingsAndSubtrees) {
-    auto mc = MakeRootGoalCase();
-
-    std::string strategy_id, g_a, g_b, g_b_child, err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1",
-                                      core::NewElementKind::Strategy, strategy_id, err)) << err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, strategy_id,
-                                      core::NewElementKind::Goal, g_a, err)) << err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, strategy_id,
-                                      core::NewElementKind::Goal, g_b, err)) << err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, g_b,
-                                      core::NewElementKind::Goal, g_b_child, err)) << err;
-
-    auto plan = core::PlanRemoval(mc.ac, g_a, core::RemoveMode::NodeAndSiblings);
-    EXPECT_TRUE(plan.count(g_a));
-    EXPECT_TRUE(plan.count(g_b));
-    EXPECT_TRUE(plan.count(g_b_child));
-    // Strategy itself is NOT a sibling of g_a (parent is the strategy), so it
-    // must NOT appear in the plan.
-    EXPECT_FALSE(plan.count(strategy_id));
-    EXPECT_FALSE(plan.count("G1"));
-}
-
-// Regression: a sub-claim under a strategy must NOT treat the strategy as a
-// sibling. Real-world XML wires sibling sub-claims as `sources` of an
-// inference whose `reasoning` is the strategy and whose `target` is the
-// strategy's parent goal — but the strategy is the tree-parent of those
-// sub-claims, not their sibling.
-TEST(ElementFactoryRemove, PlanRemoval_NodeAndSiblings_StrategyNotIncluded) {
-    auto mc = MakeRootGoalCase();
-
-    std::string strategy_id, g_a, g_b, err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1",
-                                      core::NewElementKind::Strategy, strategy_id, err)) << err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, strategy_id,
-                                      core::NewElementKind::Goal, g_a, err)) << err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, strategy_id,
-                                      core::NewElementKind::Goal, g_b, err)) << err;
-
-    auto plan = core::PlanRemoval(mc.ac, g_a, core::RemoveMode::NodeAndSiblings);
-    EXPECT_TRUE(plan.count(g_a));
-    EXPECT_TRUE(plan.count(g_b));
-    EXPECT_FALSE(plan.count(strategy_id))
-        << "Strategy is the parent of the sub-claims, not a sibling.";
-    EXPECT_FALSE(plan.count("G1"));
-
-    // And actually removing must keep the strategy and its parent intact.
-    err.clear();
-    ASSERT_TRUE(core::RemoveElement(mc.ac, &mc.pkg, g_a,
-                                    core::RemoveMode::NodeAndSiblings, err)) << err;
-    EXPECT_FALSE(ParserHasId(mc.ac, g_a));
-    EXPECT_FALSE(ParserHasId(mc.ac, g_b));
-    EXPECT_TRUE(ParserHasId(mc.ac, strategy_id));
-    EXPECT_TRUE(ParserHasId(mc.ac, "G1"));
-}
-
-// Regression: the same wiring with the real-world shared-inference shape
-// (one inference, reasoning=strategy, sources=[sub_claims]) must also exclude
-// the strategy from the "Node and siblings" plan.
-TEST(ElementFactoryRemove, PlanRemoval_SharedInferenceStrategyNotSibling) {
-    parser::AssuranceCase ac;
-    sacm::AssuranceCasePackage pkg;
-
-    auto add_node = [&](const char* id, const char* type) {
-        parser::SacmElement e;
-        e.id = id; e.type = type; e.name = id;
-        ac.elements.push_back(e);
-    };
-    add_node("CL_TOP", "claim");
-    add_node("AR_1",   "argumentreasoning");
-    add_node("CL_A",   "claim");
-    add_node("CL_B",   "claim");
-
-    parser::SacmElement inf;
-    inf.id = "INF_1"; inf.type = "assertedinference";
-    inf.target_refs = {"CL_TOP"};
-    inf.reasoning_ref = "AR_1";
-    inf.source_refs = {"CL_A", "CL_B"};
-    ac.elements.push_back(inf);
-
-    auto plan = core::PlanRemoval(ac, "CL_A", core::RemoveMode::NodeAndSiblings);
-    EXPECT_TRUE(plan.count("CL_A"));
-    EXPECT_TRUE(plan.count("CL_B"));
-    EXPECT_FALSE(plan.count("AR_1"))
-        << "Strategy AR_1 must not appear in the sibling plan of CL_A.";
-    EXPECT_FALSE(plan.count("CL_TOP"));
-}
-
 // Comprehensive regression for the canonical shared-inference shape (matches
 // data/sacm_example_core_argument.xml: cl_top / ar_1 / [cl_sub_1, cl_sub_2]
-// wired by a single inference inf_1). Exercises all three remove modes from
-// every relevant vantage point so a sub-claim's removal never disturbs the
-// strategy or its other children unexpectedly.
+// wired by a single inference inf_1). Exercises both remove modes from every
+// relevant vantage point so a sub-claim's removal never disturbs the strategy
+// or its other children unexpectedly.
 TEST(ElementFactoryRemove, StrategyShape_AllRemoveModes) {
     parser::AssuranceCase ac;
     sacm::AssuranceCasePackage pkg;
@@ -464,29 +374,20 @@ TEST(ElementFactoryRemove, StrategyShape_AllRemoveModes) {
     ap.assertedInferences.push_back(si);
 
     // --- 1. Plan size from a sub-claim --------------------------------------
-    auto plan_node      = core::PlanRemoval(ac, "CL_SUB_1", core::RemoveMode::NodeOnly);
-    auto plan_desc      = core::PlanRemoval(ac, "CL_SUB_1", core::RemoveMode::NodeAndDescendants);
-    auto plan_siblings  = core::PlanRemoval(ac, "CL_SUB_1", core::RemoveMode::NodeAndSiblings);
+    auto plan_node = core::PlanRemoval(ac, "CL_SUB_1", core::RemoveMode::NodeOnly);
+    auto plan_desc = core::PlanRemoval(ac, "CL_SUB_1", core::RemoveMode::NodeAndDescendants);
 
-    EXPECT_EQ(plan_node.size(),     1u) << "NodeOnly on a leaf sub-claim removes just itself.";
+    EXPECT_EQ(plan_node.size(), 1u) << "NodeOnly on a leaf sub-claim removes just itself.";
     EXPECT_TRUE(plan_node.count("CL_SUB_1"));
 
-    EXPECT_EQ(plan_desc.size(),     1u) << "Sub-claim has no descendants here.";
+    EXPECT_EQ(plan_desc.size(), 1u) << "Sub-claim has no descendants here.";
     EXPECT_TRUE(plan_desc.count("CL_SUB_1"));
     EXPECT_FALSE(plan_desc.count("AR_1"));
     EXPECT_FALSE(plan_desc.count("CL_TOP"));
 
-    EXPECT_EQ(plan_siblings.size(), 2u) << "Siblings are CL_SUB_1 and CL_SUB_2.";
-    EXPECT_TRUE(plan_siblings.count("CL_SUB_1"));
-    EXPECT_TRUE(plan_siblings.count("CL_SUB_2"));
-    EXPECT_FALSE(plan_siblings.count("AR_1"))
-        << "Strategy is the parent of the sub-claims, not their sibling.";
-    EXPECT_FALSE(plan_siblings.count("CL_TOP"));
-
     // --- 2. Plan size from the strategy itself ------------------------------
     auto plan_strat_node = core::PlanRemoval(ac, "AR_1", core::RemoveMode::NodeOnly);
     auto plan_strat_desc = core::PlanRemoval(ac, "AR_1", core::RemoveMode::NodeAndDescendants);
-    auto plan_strat_sib  = core::PlanRemoval(ac, "AR_1", core::RemoveMode::NodeAndSiblings);
 
     EXPECT_EQ(plan_strat_node.size(), 1u);
     EXPECT_TRUE(plan_strat_node.count("AR_1"));
@@ -498,14 +399,7 @@ TEST(ElementFactoryRemove, StrategyShape_AllRemoveModes) {
     EXPECT_TRUE(plan_strat_desc.count("CL_SUB_2"));
     EXPECT_FALSE(plan_strat_desc.count("CL_TOP"));
 
-    EXPECT_EQ(plan_strat_sib.size(), 3u)
-        << "Strategy is the only sibling, but its subtree (sub-claims) is included.";
-    EXPECT_TRUE(plan_strat_sib.count("AR_1"));
-    EXPECT_TRUE(plan_strat_sib.count("CL_SUB_1"));
-    EXPECT_TRUE(plan_strat_sib.count("CL_SUB_2"));
-    EXPECT_FALSE(plan_strat_sib.count("CL_TOP"));
-
-    // --- 3. Actually remove a sub-claim with NodeOnly: AR_1 + CL_TOP survive.
+    // --- 3. Removing a sub-claim with NodeOnly: AR_1 + CL_TOP survive.
     {
         auto ac2 = ac; auto pkg2 = pkg; std::string err;
         ASSERT_TRUE(core::RemoveElement(ac2, &pkg2, "CL_SUB_1",
@@ -515,18 +409,7 @@ TEST(ElementFactoryRemove, StrategyShape_AllRemoveModes) {
         EXPECT_TRUE(ParserHasId(ac2, "AR_1"));
         EXPECT_TRUE(ParserHasId(ac2, "CL_TOP"));
     }
-    // --- 4. NodeAndSiblings on a sub-claim: both sub-claims gone, strategy stays.
-    {
-        auto ac2 = ac; auto pkg2 = pkg; std::string err;
-        ASSERT_TRUE(core::RemoveElement(ac2, &pkg2, "CL_SUB_1",
-                                        core::RemoveMode::NodeAndSiblings, err)) << err;
-        EXPECT_FALSE(ParserHasId(ac2, "CL_SUB_1"));
-        EXPECT_FALSE(ParserHasId(ac2, "CL_SUB_2"));
-        EXPECT_TRUE(ParserHasId(ac2, "AR_1"))
-            << "Strategy must survive removing all of its children.";
-        EXPECT_TRUE(ParserHasId(ac2, "CL_TOP"));
-    }
-    // --- 5. NodeAndDescendants on the strategy: strategy + sub-claims gone, top stays.
+    // --- 4. NodeAndDescendants on the strategy: strategy + sub-claims gone, top stays.
     {
         auto ac2 = ac; auto pkg2 = pkg; std::string err;
         ASSERT_TRUE(core::RemoveElement(ac2, &pkg2, "AR_1",
@@ -536,27 +419,4 @@ TEST(ElementFactoryRemove, StrategyShape_AllRemoveModes) {
         EXPECT_FALSE(ParserHasId(ac2, "CL_SUB_2"));
         EXPECT_TRUE(ParserHasId(ac2, "CL_TOP"));
     }
-}
-
-// NodeAndSiblings remove must clear the whole sibling row and leave the parent
-// (strategy) and grandparent (G1) intact.
-TEST(ElementFactoryRemove, RemoveNodeAndSiblings_ClearsRowKeepsParent) {
-    auto mc = MakeRootGoalCase();
-
-    std::string strategy_id, g_a, g_b, err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1",
-                                      core::NewElementKind::Strategy, strategy_id, err)) << err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, strategy_id,
-                                      core::NewElementKind::Goal, g_a, err)) << err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, strategy_id,
-                                      core::NewElementKind::Goal, g_b, err)) << err;
-
-    err.clear();
-    ASSERT_TRUE(core::RemoveElement(mc.ac, &mc.pkg, g_a,
-                                    core::RemoveMode::NodeAndSiblings, err)) << err;
-
-    EXPECT_FALSE(ParserHasId(mc.ac, g_a));
-    EXPECT_FALSE(ParserHasId(mc.ac, g_b));
-    EXPECT_TRUE(ParserHasId(mc.ac, strategy_id));
-    EXPECT_TRUE(ParserHasId(mc.ac, "G1"));
 }

@@ -1,5 +1,5 @@
 {
-  "tests": 59,
+  "tests": 55,
   "name": "AllTests",
   "testsuites": [
     {
@@ -276,7 +276,7 @@
     },
     {
       "name": "ElementFactoryRemove",
-      "tests": 13,
+      "tests": 9,
       "testsuite": [
         {
           "name": "RemoveLeafElement",
@@ -319,29 +319,9 @@
           "line": 315
         },
         {
-          "name": "PlanRemoval_NodeAndSiblings_IncludesSiblingsAndSubtrees",
-          "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
-          "line": 339
-        },
-        {
-          "name": "PlanRemoval_NodeAndSiblings_StrategyNotIncluded",
-          "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
-          "line": 367
-        },
-        {
-          "name": "PlanRemoval_SharedInferenceStrategyNotSibling",
-          "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
-          "line": 398
-        },
-        {
           "name": "StrategyShape_AllRemoveModes",
           "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
-          "line": 432
-        },
-        {
-          "name": "RemoveNodeAndSiblings_ClearsRowKeepsParent",
-          "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
-          "line": 543
+          "line": 342
         }
       ]
     }

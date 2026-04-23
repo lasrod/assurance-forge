@@ -40,12 +40,9 @@ int CountDescendants(const parser::AssuranceCase& ac, const std::string& id);
 //                         (Context, Assumption, Justification). Structural
 //                         children are reparented to the element's parent.
 //   NodeAndDescendants  - the element and every descendant in its subtree.
-//   NodeAndSiblings     - the element, every sibling sharing the same
-//                         structural parent, and each of their subtrees.
 enum class RemoveMode {
     NodeOnly,
     NodeAndDescendants,
-    NodeAndSiblings,
 };
 
 // Compute the closed set of NODE ids that would be deleted by RemoveElement
