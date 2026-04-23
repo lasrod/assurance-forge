@@ -169,7 +169,11 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac) {
         node->id = element.id.empty() ? element.name : element.id;
 
         // Build label: "ID: Name\nDetail"
-        std::string detail = (element.type == "claim") ? element.content : element.description;
+        // Per SACM spec: Claim (11.11) and ArgumentReasoning (11.12) carry their primary
+        // text in the dedicated 'content' field.  All other elements (Artifact, ArtifactReference,
+        // etc.) inherit descriptive text from the SACMElement 'description' field.
+        bool uses_content = (element.type == "claim" || element.type == "argumentreasoning");
+        std::string detail = uses_content ? element.content : element.description;
         node->label = node->id + ": " + element.name;
         if (!detail.empty()) {
             node->label += "\n" + detail;
@@ -179,7 +183,7 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac) {
         {
             std::string sec_lang = "ja";
             std::string sec_detail;
-            if (element.type == "claim") {
+            if (uses_content) {
                 auto cit = element.content_langs.find(sec_lang);
                 if (cit != element.content_langs.end() && !cit->second.empty()) {
                     sec_detail = cit->second;
