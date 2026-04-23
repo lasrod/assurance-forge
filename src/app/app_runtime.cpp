@@ -140,6 +140,33 @@ struct AppRuntime::Impl {
     std::vector<std::string> pending_remove_ids;
 };
 
+void NormalizeCenterViewSelection(AppRuntime::Impl* impl, ui::UiState& ui_state) {
+    if (!impl->show_gsn_tab && !impl->show_cse_tab && !impl->show_evidence_tab) {
+        // Keep at least one center tab visible.
+        impl->show_gsn_tab = true;
+    }
+
+    auto is_tab_visible = [&](ui::CenterView view) {
+        switch (view) {
+            case ui::CenterView::GsnCanvas: return impl->show_gsn_tab;
+            case ui::CenterView::CseRegister: return impl->show_cse_tab;
+            case ui::CenterView::EvidenceRegister: return impl->show_evidence_tab;
+        }
+        return false;
+    };
+
+    if (!is_tab_visible(ui_state.center_view)) {
+        if (impl->show_gsn_tab) {
+            ui_state.center_view = ui::CenterView::GsnCanvas;
+        } else if (impl->show_cse_tab) {
+            ui_state.center_view = ui::CenterView::CseRegister;
+        } else {
+            ui_state.center_view = ui::CenterView::EvidenceRegister;
+        }
+        impl->force_center_tab_selection = true;
+    }
+}
+
 AppRuntime::AppRuntime() : impl_(new Impl()) {
     g_active_runtime = this;
     ScanDirectory();
@@ -350,31 +377,7 @@ float AppRuntime::RenderMainMenuBar(bool& done) {
         ImGui::MenuItem("GSN Canvas", nullptr, &impl_->show_gsn_tab);
         ImGui::MenuItem("CSE Register", nullptr, &impl_->show_cse_tab);
         ImGui::MenuItem("Evidence Register", nullptr, &impl_->show_evidence_tab);
-
-        if (!impl_->show_gsn_tab && !impl_->show_cse_tab && !impl_->show_evidence_tab) {
-            // Keep at least one center tab visible.
-            impl_->show_gsn_tab = true;
-        }
-
-        auto is_tab_visible = [&](ui::CenterView view) {
-            switch (view) {
-                case ui::CenterView::GsnCanvas: return impl_->show_gsn_tab;
-                case ui::CenterView::CseRegister: return impl_->show_cse_tab;
-                case ui::CenterView::EvidenceRegister: return impl_->show_evidence_tab;
-            }
-            return false;
-        };
-
-        if (!is_tab_visible(ui_state.center_view)) {
-            if (impl_->show_gsn_tab) {
-                ui_state.center_view = ui::CenterView::GsnCanvas;
-            } else if (impl_->show_cse_tab) {
-                ui_state.center_view = ui::CenterView::CseRegister;
-            } else {
-                ui_state.center_view = ui::CenterView::EvidenceRegister;
-            }
-            impl_->force_center_tab_selection = true;
-        }
+        NormalizeCenterViewSelection(impl_, ui_state);
 
         ImGui::EndMenu();
     }
@@ -553,26 +556,7 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
     ImGui::Begin("Center View", nullptr, kPanelFlags | ImGuiWindowFlags_NoTitleBar);
 
     ui::UiState& ui_state = ui::GetUiState();
-
-    auto is_tab_visible = [&](ui::CenterView view) {
-        switch (view) {
-            case ui::CenterView::GsnCanvas: return impl_->show_gsn_tab;
-            case ui::CenterView::CseRegister: return impl_->show_cse_tab;
-            case ui::CenterView::EvidenceRegister: return impl_->show_evidence_tab;
-        }
-        return false;
-    };
-
-    if (!is_tab_visible(ui_state.center_view)) {
-        if (impl_->show_gsn_tab) {
-            ui_state.center_view = ui::CenterView::GsnCanvas;
-        } else if (impl_->show_cse_tab) {
-            ui_state.center_view = ui::CenterView::CseRegister;
-        } else if (impl_->show_evidence_tab) {
-            ui_state.center_view = ui::CenterView::EvidenceRegister;
-        }
-        impl_->force_center_tab_selection = true;
-    }
+    NormalizeCenterViewSelection(impl_, ui_state);
 
     if (ImGui::BeginTabBar("##center_tabs")) {
         if (impl_->show_gsn_tab) {
