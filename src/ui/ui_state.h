@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <string>
+#include <unordered_set>
 #include "parser/xml_parser.h"
 
 namespace ui {
@@ -21,6 +22,12 @@ struct UiState {
 
     // Set to true when the canvas should center on the selected element
     bool center_on_selection = false;
+
+    // Nodes pending confirmation of removal. The canvas tints these red.
+    std::unordered_set<std::string> marked_for_removal;
+
+    // Set to true when the canvas should fit-to-view the marked_for_removal set.
+    bool center_on_marked = false;
 
     // Active center panel view
     CenterView center_view = CenterView::GsnCanvas;

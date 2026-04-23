@@ -3,6 +3,8 @@
 #include "gsn_model.h"
 #include "core/assurance_tree.h"
 #include <vector>
+#include <unordered_set>
+#include <string>
 
 namespace ui {
 
@@ -30,6 +32,12 @@ public:
 
     // Center the view on a specific node by ID. Returns true if found.
     bool CenterOnNode(const std::string& node_id, ImVec2 viewport_size);
+
+    // Fit-to-view the AABB of every layout node whose id is in `ids`. Adjusts
+    // both `view_offset_` and `zoom_level_` so the AABB is centered with a
+    // small padding. Returns true if at least one matching node was found.
+    bool CenterOnIds(const std::unordered_set<std::string>& ids,
+                     ImVec2 viewport_size);
 
     // Get the bounding box of all content in layout-space (unzoomed).
     // Returns min and max corners. If no nodes, both are (0,0).

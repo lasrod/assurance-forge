@@ -174,6 +174,14 @@ void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin, float zoom) {
 
     ImU32 fill_color = ColorForType(node.type);
 
+    // If this node is marked for pending removal, override the fill with a
+    // strong red tint so the user can see exactly what will be removed.
+    const bool marked_for_removal =
+        GetUiState().marked_for_removal.count(node.id) > 0;
+    if (marked_for_removal) {
+        fill_color = IM_COL32(220, 80, 80, 255);
+    }
+
     // Draw the GSN shape
     if (node.type == "Strategy") {
         DrawParallelogram(draw_list, top_left, bottom_right, fill_color);
@@ -204,6 +212,8 @@ void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin, float zoom) {
     if (ImGui::BeginPopupContextItem(node.id.c_str())) {
         GetUiState().selected_element_id = node.id;
         RenderAddElementMenu();
+        ImGui::Separator();
+        RenderRemoveSubmenu();
         ImGui::EndPopup();
     }
 
@@ -213,6 +223,15 @@ void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin, float zoom) {
             ImVec2(top_left.x - 2.0f, top_left.y - 2.0f),
             ImVec2(bottom_right.x + 2.0f, bottom_right.y + 2.0f),
             IM_COL32(255, 200, 0, 255), kClaimRounding + 2.0f, 0, 3.0f);
+    }
+
+    // Marked-for-removal border (drawn after the selection highlight so a
+    // selected & marked node still looks unambiguously red).
+    if (marked_for_removal) {
+        draw_list->AddRect(
+            ImVec2(top_left.x - 3.0f, top_left.y - 3.0f),
+            ImVec2(bottom_right.x + 3.0f, bottom_right.y + 3.0f),
+            IM_COL32(180, 30, 30, 255), kClaimRounding + 3.0f, 0, 4.0f);
     }
 }
 
@@ -233,6 +252,11 @@ void ShowGsnCanvasContent() {
                 ImVec2 viewport_size = ImGui::GetWindowSize();
                 renderer.CenterOnNode(state.selected_element_id, viewport_size);
                 state.center_on_selection = false;
+            }
+            if (state.center_on_marked && !state.marked_for_removal.empty()) {
+                ImVec2 viewport_size = ImGui::GetWindowSize();
+                renderer.CenterOnIds(state.marked_for_removal, viewport_size);
+                state.center_on_marked = false;
             }
         }
 
