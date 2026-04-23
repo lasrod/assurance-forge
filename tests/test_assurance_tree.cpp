@@ -178,7 +178,7 @@ TEST(AssuranceTreeTest, OrphanedElementsAtRootLevel) {
     EXPECT_EQ(tree.orphans[0]->id, "orphan_1");
 }
 
-// ----- Full example from sacm_example_core_argument.xml -----
+// ----- Full example mirrored from tests/data/fixture_roundtrip_core_argument.sacm.xml -----
 
 TEST(AssuranceTreeTest, FullVehicleBrakingExample) {
     const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>

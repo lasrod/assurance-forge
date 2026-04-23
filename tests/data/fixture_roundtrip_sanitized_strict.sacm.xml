@@ -1,0 +1,1921 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.3" id="ACP_SANITIZED" name="Sanitized Safety Case Structure" description="Sanitized SACM package preserving structure and relationships while removing proprietary prose.">
+  <artifactPackage id="AP_001" name="AP_001">
+    <artifact id="ART_001" name="ART_001">
+      <description>Artifact ART_001</description>
+    </artifact>
+    <artifact id="ART_002" name="ART_002">
+      <description>Artifact ART_002</description>
+    </artifact>
+    <artifact id="ART_003" name="ART_003">
+      <description>Artifact ART_003</description>
+    </artifact>
+    <artifact id="ART_004" name="ART_004">
+      <description>Artifact ART_004</description>
+    </artifact>
+    <artifact id="ART_005" name="ART_005">
+      <description>Artifact ART_005</description>
+    </artifact>
+    <artifact id="ART_006" name="ART_006">
+      <description>Artifact ART_006</description>
+    </artifact>
+    <artifact id="ART_007" name="ART_007">
+      <description>Artifact ART_007</description>
+    </artifact>
+    <artifact id="ART_008" name="ART_008">
+      <description>Artifact ART_008</description>
+    </artifact>
+    <artifact id="ART_009" name="ART_009">
+      <description>Artifact ART_009</description>
+    </artifact>
+    <artifact id="ART_010" name="ART_010">
+      <description>Artifact ART_010</description>
+    </artifact>
+    <artifact id="ART_011" name="ART_011">
+      <description>Artifact ART_011</description>
+    </artifact>
+    <artifact id="ART_012" name="ART_012">
+      <description>Artifact ART_012</description>
+    </artifact>
+    <artifact id="ART_013" name="ART_013">
+      <description>Artifact ART_013</description>
+    </artifact>
+    <artifact id="ART_014" name="ART_014">
+      <description>Artifact ART_014</description>
+    </artifact>
+    <artifact id="ART_015" name="ART_015">
+      <description>Artifact ART_015</description>
+    </artifact>
+    <artifact id="ART_016" name="ART_016">
+      <description>Artifact ART_016</description>
+    </artifact>
+    <artifact id="ART_017" name="ART_017">
+      <description>Artifact ART_017</description>
+    </artifact>
+    <artifact id="ART_018" name="ART_018">
+      <description>Artifact ART_018</description>
+    </artifact>
+    <artifact id="ART_019" name="ART_019">
+      <description>Artifact ART_019</description>
+    </artifact>
+    <artifact id="ART_020" name="ART_020">
+      <description>Artifact ART_020</description>
+    </artifact>
+    <artifact id="ART_021" name="ART_021">
+      <description>Artifact ART_021</description>
+    </artifact>
+    <artifact id="ART_022" name="ART_022">
+      <description>Artifact ART_022</description>
+    </artifact>
+    <artifact id="ART_023" name="ART_023">
+      <description>Artifact ART_023</description>
+    </artifact>
+    <artifact id="ART_024" name="ART_024">
+      <description>Artifact ART_024</description>
+    </artifact>
+    <artifact id="ART_025" name="ART_025">
+      <description>Artifact ART_025</description>
+    </artifact>
+    <artifact id="ART_026" name="ART_026">
+      <description>Artifact ART_026</description>
+    </artifact>
+    <artifact id="ART_027" name="ART_027">
+      <description>Artifact ART_027</description>
+    </artifact>
+    <artifact id="ART_028" name="ART_028">
+      <description>Artifact ART_028</description>
+    </artifact>
+    <artifact id="ART_029" name="ART_029">
+      <description>Artifact ART_029</description>
+    </artifact>
+    <artifact id="ART_030" name="ART_030">
+      <description>Artifact ART_030</description>
+    </artifact>
+    <artifact id="ART_031" name="ART_031">
+      <description>Artifact ART_031</description>
+    </artifact>
+    <artifact id="ART_032" name="ART_032">
+      <description>Artifact ART_032</description>
+    </artifact>
+    <artifact id="ART_033" name="ART_033">
+      <description>Artifact ART_033</description>
+    </artifact>
+    <artifact id="ART_034" name="ART_034">
+      <description>Artifact ART_034</description>
+    </artifact>
+    <artifact id="ART_035" name="ART_035">
+      <description>Artifact ART_035</description>
+    </artifact>
+    <artifact id="ART_036" name="ART_036">
+      <description>Artifact ART_036</description>
+    </artifact>
+    <artifact id="ART_037" name="ART_037">
+      <description>Artifact ART_037</description>
+    </artifact>
+    <artifact id="ART_038" name="ART_038">
+      <description>Artifact ART_038</description>
+    </artifact>
+    <artifact id="ART_039" name="ART_039">
+      <description>Artifact ART_039</description>
+    </artifact>
+    <artifact id="ART_040" name="ART_040">
+      <description>Artifact ART_040</description>
+    </artifact>
+    <artifact id="ART_041" name="ART_041">
+      <description>Artifact ART_041</description>
+    </artifact>
+    <artifact id="ART_042" name="ART_042">
+      <description>Artifact ART_042</description>
+    </artifact>
+    <artifact id="ART_043" name="ART_043">
+      <description>Artifact ART_043</description>
+    </artifact>
+    <artifact id="ART_044" name="ART_044">
+      <description>Artifact ART_044</description>
+    </artifact>
+    <artifact id="ART_045" name="ART_045">
+      <description>Artifact ART_045</description>
+    </artifact>
+    <artifact id="ART_046" name="ART_046">
+      <description>Artifact ART_046</description>
+    </artifact>
+    <artifact id="ART_047" name="ART_047">
+      <description>Artifact ART_047</description>
+    </artifact>
+    <artifact id="ART_048" name="ART_048">
+      <description>Artifact ART_048</description>
+    </artifact>
+    <artifact id="ART_049" name="ART_049">
+      <description>Artifact ART_049</description>
+    </artifact>
+    <artifact id="ART_050" name="ART_050">
+      <description>Artifact ART_050</description>
+    </artifact>
+    <artifact id="ART_051" name="ART_051">
+      <description>Artifact ART_051</description>
+    </artifact>
+    <artifact id="ART_052" name="ART_052">
+      <description>Artifact ART_052</description>
+    </artifact>
+    <artifact id="ART_053" name="ART_053">
+      <description>Artifact ART_053</description>
+    </artifact>
+    <artifact id="ART_054" name="ART_054">
+      <description>Artifact ART_054</description>
+    </artifact>
+    <artifact id="ART_055" name="ART_055">
+      <description>Artifact ART_055</description>
+    </artifact>
+    <artifact id="ART_056" name="ART_056">
+      <description>Artifact ART_056</description>
+    </artifact>
+  </artifactPackage>
+  <argumentPackage id="PKG_001" name="PKG_001">
+    <claim id="CLM_001" name="G_001" assertionDeclaration="asserted">
+      <statement>Claim G_001</statement>
+      <description>Claim G_001</description>
+    </claim>
+    <claim id="CLM_002" name="G_002" assertionDeclaration="needsSupport">
+      <statement>Claim G_002</statement>
+      <description>Claim G_002</description>
+    </claim>
+    <claim id="CLM_003" name="G_003" assertionDeclaration="needsSupport">
+      <statement>Claim G_003</statement>
+      <description>Claim G_003</description>
+    </claim>
+    <claim id="CLM_004" name="G_004" assertionDeclaration="needsSupport">
+      <statement>Claim G_004</statement>
+      <description>Claim G_004</description>
+    </claim>
+    <claim id="CLM_005" name="G_005" assertionDeclaration="asserted">
+      <statement>Claim G_005</statement>
+      <description>Claim G_005</description>
+    </claim>
+    <claim id="CLM_006" name="G_006" assertionDeclaration="needsSupport">
+      <statement>Claim G_006</statement>
+      <description>Claim G_006</description>
+    </claim>
+    <claim id="CLM_007" name="G_007" assertionDeclaration="needsSupport">
+      <statement>Claim G_007</statement>
+      <description>Claim G_007</description>
+    </claim>
+    <claim id="CLM_008" name="G_008" assertionDeclaration="needsSupport">
+      <statement>Claim G_008</statement>
+      <description>Claim G_008</description>
+    </claim>
+    <claim id="CLM_009" name="G_009" assertionDeclaration="asserted">
+      <statement>Claim G_009</statement>
+      <description>Claim G_009</description>
+    </claim>
+    <claim id="CLM_010" name="J_010" assertionDeclaration="axiomatic">
+      <statement>Justification J_010</statement>
+      <description>Justification J_010</description>
+    </claim>
+    <claim id="CLM_011" name="J_011" assertionDeclaration="axiomatic">
+      <statement>Justification J_011</statement>
+      <description>Justification J_011</description>
+    </claim>
+    <argumentReasoning id="ARGR_001" name="S_001">
+      <statement>Strategy S_001</statement>
+      <description>Strategy S_001</description>
+    </argumentReasoning>
+    <argumentReasoning id="ARGR_002" name="S_002">
+      <statement>Strategy S_002</statement>
+      <description>Strategy S_002</description>
+    </argumentReasoning>
+    <artifactReference id="REF_001" name="REF_001" referencedArtifact="ART_001">
+      <description>Reference REF_001</description>
+    </artifactReference>
+    <artifactReference id="REF_002" name="REF_002" referencedArtifact="ART_002">
+      <description>Reference REF_002</description>
+    </artifactReference>
+    <artifactReference id="REF_003" name="REF_003" referencedArtifact="ART_003">
+      <description>Reference REF_003</description>
+    </artifactReference>
+    <artifactReference id="REF_004" name="REF_004" referencedArtifact="ART_004">
+      <description>Reference REF_004</description>
+    </artifactReference>
+    <artifactReference id="REF_005" name="REF_005" referencedArtifact="ART_005">
+      <description>Reference REF_005</description>
+    </artifactReference>
+    <artifactReference id="REF_006" name="REF_006" referencedArtifact="ART_006">
+      <description>Reference REF_006</description>
+    </artifactReference>
+    <artifactReference id="REF_007" name="REF_007" referencedArtifact="ART_007">
+      <description>Reference REF_007</description>
+    </artifactReference>
+    <assertedInference id="AI_001" name="AI_001">
+      <description>AssertedInference AI_001</description>
+      <source href="#CLM_009"/>
+      <target href="#CLM_001"/>
+      <reasoning href="#ARGR_002"/>
+    </assertedInference>
+    <assertedInference id="AI_002" name="AI_002">
+      <description>AssertedInference AI_002</description>
+      <source href="#CLM_004"/>
+      <source href="#CLM_003"/>
+      <source href="#CLM_002"/>
+      <source href="#CLM_005"/>
+      <source href="#CLM_006"/>
+      <source href="#CLM_007"/>
+      <source href="#CLM_008"/>
+      <target href="#CLM_001"/>
+      <reasoning href="#ARGR_001"/>
+    </assertedInference>
+    <assertedEvidence id="AE_001" name="AE_001">
+      <description>AssertedEvidence AE_001</description>
+      <source href="#REF_001"/>
+      <target href="#CLM_009"/>
+    </assertedEvidence>
+    <assertedContext id="AC_001" name="AC_001">
+      <description>AssertedContext AC_001</description>
+      <source href="#REF_004"/>
+      <target href="#CLM_001"/>
+    </assertedContext>
+    <assertedContext id="AC_002" name="AC_002">
+      <description>AssertedContext AC_002</description>
+      <source href="#REF_005"/>
+      <target href="#CLM_001"/>
+    </assertedContext>
+    <assertedContext id="AC_003" name="AC_003">
+      <description>AssertedContext AC_003</description>
+      <source href="#CLM_010"/>
+      <target href="#CLM_001"/>
+    </assertedContext>
+    <assertedContext id="AC_004" name="AC_004">
+      <description>AssertedContext AC_004</description>
+      <source href="#REF_002"/>
+      <target href="#ARGR_002"/>
+    </assertedContext>
+    <assertedContext id="AC_005" name="AC_005">
+      <description>AssertedContext AC_005</description>
+      <source href="#REF_006"/>
+      <target href="#ARGR_001"/>
+    </assertedContext>
+    <assertedContext id="AC_006" name="AC_006">
+      <description>AssertedContext AC_006</description>
+      <source href="#CLM_011"/>
+      <target href="#ARGR_001"/>
+    </assertedContext>
+    <assertedContext id="AC_007" name="AC_007">
+      <description>AssertedContext AC_007</description>
+      <source href="#REF_007"/>
+      <target href="#ARGR_001"/>
+    </assertedContext>
+  </argumentPackage>
+  <argumentPackage id="PKG_002" name="PKG_002">
+    <claim id="CLM_012" name="J_012" assertionDeclaration="axiomatic">
+      <statement>Justification J_012</statement>
+      <description>Justification J_012</description>
+    </claim>
+    <claim id="CLM_013" name="J_013" assertionDeclaration="axiomatic">
+      <statement>Justification J_013</statement>
+      <description>Justification J_013</description>
+    </claim>
+    <claim id="CLM_014" name="J_014" assertionDeclaration="axiomatic">
+      <statement>Justification J_014</statement>
+      <description>Justification J_014</description>
+    </claim>
+    <claim id="CLM_015" name="G_015" assertionDeclaration="asserted">
+      <statement>Claim G_015</statement>
+      <description>Claim G_015</description>
+    </claim>
+    <claim id="CLM_016" name="G_016" assertionDeclaration="asserted">
+      <statement>Claim G_016</statement>
+      <description>Claim G_016</description>
+    </claim>
+    <claim id="CLM_017" name="G_017" assertionDeclaration="asserted">
+      <statement>Claim G_017</statement>
+      <description>Claim G_017</description>
+    </claim>
+    <claim id="CLM_018" name="G_018" assertionDeclaration="asserted">
+      <statement>Claim G_018</statement>
+      <description>Claim G_018</description>
+    </claim>
+    <argumentReasoning id="ARGR_003" name="S_003">
+      <statement>Strategy S_003</statement>
+      <description>Strategy S_003</description>
+    </argumentReasoning>
+    <artifactReference id="REF_008" name="REF_008" referencedArtifact="ART_008">
+      <description>Reference REF_008</description>
+    </artifactReference>
+    <artifactReference id="REF_009" name="REF_009" referencedArtifact="ART_009">
+      <description>Reference REF_009</description>
+    </artifactReference>
+    <artifactReference id="REF_010" name="REF_010" referencedArtifact="ART_010">
+      <description>Reference REF_010</description>
+    </artifactReference>
+    <assertedInference id="AI_003" name="AI_003">
+      <description>AssertedInference AI_003</description>
+      <source href="#CLM_017"/>
+      <source href="#CLM_016"/>
+      <source href="#CLM_018"/>
+      <source href="#CLM_015"/>
+      <target href="#CLM_005"/>
+      <reasoning href="#ARGR_003"/>
+    </assertedInference>
+    <assertedContext id="AC_008" name="AC_008">
+      <description>AssertedContext AC_008</description>
+      <source href="#REF_008"/>
+      <target href="#CLM_005"/>
+    </assertedContext>
+    <assertedContext id="AC_009" name="AC_009">
+      <description>AssertedContext AC_009</description>
+      <source href="#REF_009"/>
+      <target href="#CLM_005"/>
+    </assertedContext>
+    <assertedContext id="AC_010" name="AC_010">
+      <description>AssertedContext AC_010</description>
+      <source href="#REF_010"/>
+      <target href="#CLM_005"/>
+    </assertedContext>
+    <assertedContext id="AC_011" name="AC_011">
+      <description>AssertedContext AC_011</description>
+      <source href="#CLM_012"/>
+      <target href="#CLM_005"/>
+    </assertedContext>
+    <assertedContext id="AC_012" name="AC_012">
+      <description>AssertedContext AC_012</description>
+      <source href="#CLM_013"/>
+      <target href="#ARGR_003"/>
+    </assertedContext>
+  </argumentPackage>
+  <argumentPackage id="PKG_003" name="PKG_003">
+    <claim id="CLM_019" name="G_019" assertionDeclaration="asserted">
+      <statement>Claim G_019</statement>
+      <description>Claim G_019</description>
+    </claim>
+    <claim id="CLM_020" name="G_020" assertionDeclaration="asserted">
+      <statement>Claim G_020</statement>
+      <description>Claim G_020</description>
+    </claim>
+    <claim id="CLM_021" name="G_021" assertionDeclaration="asserted">
+      <statement>Claim G_021</statement>
+      <description>Claim G_021</description>
+    </claim>
+    <claim id="CLM_022" name="G_022" assertionDeclaration="asserted">
+      <statement>Claim G_022</statement>
+      <description>Claim G_022</description>
+    </claim>
+    <argumentReasoning id="ARGR_004" name="S_004">
+      <statement>Strategy S_004</statement>
+      <description>Strategy S_004</description>
+    </argumentReasoning>
+    <artifactReference id="REF_011" name="REF_011" referencedArtifact="ART_011">
+      <description>Reference REF_011</description>
+    </artifactReference>
+    <artifactReference id="REF_012" name="REF_012" referencedArtifact="ART_012">
+      <description>Reference REF_012</description>
+    </artifactReference>
+    <artifactReference id="REF_013" name="REF_013" referencedArtifact="ART_013">
+      <description>Reference REF_013</description>
+    </artifactReference>
+    <artifactReference id="REF_014" name="REF_014" referencedArtifact="ART_014">
+      <description>Reference REF_014</description>
+    </artifactReference>
+    <artifactReference id="REF_015" name="REF_015" referencedArtifact="ART_015">
+      <description>Reference REF_015</description>
+    </artifactReference>
+    <artifactReference id="REF_016" name="REF_016" referencedArtifact="ART_016">
+      <description>Reference REF_016</description>
+    </artifactReference>
+    <assertedInference id="AI_004" name="AI_004">
+      <description>AssertedInference AI_004</description>
+      <source href="#CLM_019"/>
+      <source href="#CLM_020"/>
+      <source href="#CLM_021"/>
+      <source href="#CLM_022"/>
+      <target href="#CLM_016"/>
+      <reasoning href="#ARGR_004"/>
+    </assertedInference>
+    <assertedEvidence id="AE_002" name="AE_002">
+      <description>AssertedEvidence AE_002</description>
+      <source href="#REF_011"/>
+      <target href="#CLM_019"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_003" name="AE_003">
+      <description>AssertedEvidence AE_003</description>
+      <source href="#REF_015"/>
+      <target href="#CLM_022"/>
+    </assertedEvidence>
+    <assertedContext id="AC_013" name="AC_013">
+      <description>AssertedContext AC_013</description>
+      <source href="#REF_016"/>
+      <target href="#CLM_016"/>
+    </assertedContext>
+    <assertedContext id="AC_014" name="AC_014">
+      <description>AssertedContext AC_014</description>
+      <source href="#REF_013"/>
+      <target href="#CLM_019"/>
+    </assertedContext>
+  </argumentPackage>
+  <argumentPackage id="PKG_004" name="PKG_004">
+    <claim id="CLM_023" name="G_023" assertionDeclaration="asserted">
+      <statement>Claim G_023</statement>
+      <description>Claim G_023</description>
+    </claim>
+    <claim id="CLM_024" name="G_024" assertionDeclaration="asserted">
+      <statement>Claim G_024</statement>
+      <description>Claim G_024</description>
+    </claim>
+    <claim id="CLM_025" name="G_025" assertionDeclaration="asserted">
+      <statement>Claim G_025</statement>
+      <description>Claim G_025</description>
+    </claim>
+    <claim id="CLM_026" name="G_026" assertionDeclaration="asserted">
+      <statement>Claim G_026</statement>
+      <description>Claim G_026</description>
+    </claim>
+    <claim id="CLM_027" name="G_027" assertionDeclaration="asserted">
+      <statement>Claim G_027</statement>
+      <description>Claim G_027</description>
+    </claim>
+    <claim id="CLM_028" name="G_028" assertionDeclaration="asserted">
+      <statement>Claim G_028</statement>
+      <description>Claim G_028</description>
+    </claim>
+    <claim id="CLM_029" name="G_029" assertionDeclaration="asserted">
+      <statement>Claim G_029</statement>
+      <description>Claim G_029</description>
+    </claim>
+    <claim id="CLM_030" name="G_030" assertionDeclaration="asserted">
+      <statement>Claim G_030</statement>
+      <description>Claim G_030</description>
+    </claim>
+    <claim id="CLM_031" name="G_031" assertionDeclaration="asserted">
+      <statement>Claim G_031</statement>
+      <description>Claim G_031</description>
+    </claim>
+    <claim id="CLM_032" name="G_032" assertionDeclaration="asserted">
+      <statement>Claim G_032</statement>
+      <description>Claim G_032</description>
+    </claim>
+    <claim id="CLM_033" name="G_033" assertionDeclaration="asserted">
+      <statement>Claim G_033</statement>
+      <description>Claim G_033</description>
+    </claim>
+    <claim id="CLM_034" name="G_034" assertionDeclaration="asserted">
+      <statement>Claim G_034</statement>
+      <description>Claim G_034</description>
+    </claim>
+    <claim id="CLM_035" name="G_035" assertionDeclaration="asserted">
+      <statement>Claim G_035</statement>
+      <description>Claim G_035</description>
+    </claim>
+    <claim id="CLM_036" name="G_036" assertionDeclaration="asserted">
+      <statement>Claim G_036</statement>
+      <description>Claim G_036</description>
+    </claim>
+    <claim id="CLM_037" name="G_037" assertionDeclaration="asserted">
+      <statement>Claim G_037</statement>
+      <description>Claim G_037</description>
+    </claim>
+    <claim id="CLM_038" name="G_038" assertionDeclaration="asserted">
+      <statement>Claim G_038</statement>
+      <description>Claim G_038</description>
+    </claim>
+    <claim id="CLM_039" name="G_039" assertionDeclaration="asserted">
+      <statement>Claim G_039</statement>
+      <description>Claim G_039</description>
+    </claim>
+    <claim id="CLM_040" name="G_040" assertionDeclaration="asserted">
+      <statement>Claim G_040</statement>
+      <description>Claim G_040</description>
+    </claim>
+    <claim id="CLM_041" name="J_041" assertionDeclaration="axiomatic">
+      <statement>Justification J_041</statement>
+      <description>Justification J_041</description>
+    </claim>
+    <claim id="CLM_042" name="G_042" assertionDeclaration="needsSupport">
+      <statement>Claim G_042</statement>
+      <description>Claim G_042</description>
+    </claim>
+    <claim id="CLM_043" name="G_043" assertionDeclaration="needsSupport">
+      <statement>Claim G_043</statement>
+      <description>Claim G_043</description>
+    </claim>
+    <claim id="CLM_044" name="G_044" assertionDeclaration="needsSupport">
+      <statement>Claim G_044</statement>
+      <description>Claim G_044</description>
+    </claim>
+    <claim id="CLM_045" name="G_045" assertionDeclaration="needsSupport">
+      <statement>Claim G_045</statement>
+      <description>Claim G_045</description>
+    </claim>
+    <claim id="CLM_046" name="G_046" assertionDeclaration="needsSupport">
+      <statement>Claim G_046</statement>
+      <description>Claim G_046</description>
+    </claim>
+    <claim id="CLM_047" name="G_047" assertionDeclaration="needsSupport">
+      <statement>Claim G_047</statement>
+      <description>Claim G_047</description>
+    </claim>
+    <claim id="CLM_048" name="G_048" assertionDeclaration="needsSupport">
+      <statement>Claim G_048</statement>
+      <description>Claim G_048</description>
+    </claim>
+    <claim id="CLM_049" name="G_049" assertionDeclaration="needsSupport">
+      <statement>Claim G_049</statement>
+      <description>Claim G_049</description>
+    </claim>
+    <claim id="CLM_050" name="G_050" assertionDeclaration="needsSupport">
+      <statement>Claim G_050</statement>
+      <description>Claim G_050</description>
+    </claim>
+    <claim id="CLM_051" name="G_051" assertionDeclaration="needsSupport">
+      <statement>Claim G_051</statement>
+      <description>Claim G_051</description>
+    </claim>
+    <claim id="CLM_052" name="G_052" assertionDeclaration="needsSupport">
+      <statement>Claim G_052</statement>
+      <description>Claim G_052</description>
+    </claim>
+    <claim id="CLM_053" name="J_053" assertionDeclaration="axiomatic">
+      <statement>Justification J_053</statement>
+      <description>Justification J_053</description>
+    </claim>
+    <claim id="CLM_054" name="J_054" assertionDeclaration="axiomatic">
+      <statement>Justification J_054</statement>
+      <description>Justification J_054</description>
+    </claim>
+    <argumentReasoning id="ARGR_005" name="S_005">
+      <statement>Strategy S_005</statement>
+      <description>Strategy S_005</description>
+    </argumentReasoning>
+    <argumentReasoning id="ARGR_006" name="S_006">
+      <statement>Strategy S_006</statement>
+      <description>Strategy S_006</description>
+    </argumentReasoning>
+    <argumentReasoning id="ARGR_007" name="S_007">
+      <statement>Strategy S_007</statement>
+      <description>Strategy S_007</description>
+    </argumentReasoning>
+    <argumentReasoning id="ARGR_008" name="S_008">
+      <statement>Strategy S_008</statement>
+      <description>Strategy S_008</description>
+    </argumentReasoning>
+    <argumentReasoning id="ARGR_009" name="S_009">
+      <statement>Strategy S_009</statement>
+      <description>Strategy S_009</description>
+    </argumentReasoning>
+    <artifactReference id="REF_017" name="REF_017" referencedArtifact="ART_017">
+      <description>Reference REF_017</description>
+    </artifactReference>
+    <artifactReference id="REF_018" name="REF_018" referencedArtifact="ART_018">
+      <description>Reference REF_018</description>
+    </artifactReference>
+    <artifactReference id="REF_019" name="REF_019" referencedArtifact="ART_018">
+      <description>Reference REF_019</description>
+    </artifactReference>
+    <artifactReference id="REF_020" name="REF_020" referencedArtifact="ART_018">
+      <description>Reference REF_020</description>
+    </artifactReference>
+    <artifactReference id="REF_021" name="REF_021" referencedArtifact="ART_018">
+      <description>Reference REF_021</description>
+    </artifactReference>
+    <artifactReference id="REF_022" name="REF_022" referencedArtifact="ART_018">
+      <description>Reference REF_022</description>
+    </artifactReference>
+    <artifactReference id="REF_023" name="REF_023" referencedArtifact="ART_018">
+      <description>Reference REF_023</description>
+    </artifactReference>
+    <artifactReference id="REF_024" name="REF_024" referencedArtifact="ART_018">
+      <description>Reference REF_024</description>
+    </artifactReference>
+    <artifactReference id="REF_025" name="REF_025" referencedArtifact="ART_018">
+      <description>Reference REF_025</description>
+    </artifactReference>
+    <artifactReference id="REF_026" name="REF_026" referencedArtifact="ART_019">
+      <description>Reference REF_026</description>
+    </artifactReference>
+    <artifactReference id="REF_027" name="REF_027" referencedArtifact="ART_020">
+      <description>Reference REF_027</description>
+    </artifactReference>
+    <artifactReference id="REF_028" name="REF_028" referencedArtifact="ART_021">
+      <description>Reference REF_028</description>
+    </artifactReference>
+    <artifactReference id="REF_029" name="REF_029" referencedArtifact="ART_022">
+      <description>Reference REF_029</description>
+    </artifactReference>
+    <artifactReference id="REF_030" name="REF_030" referencedArtifact="ART_023">
+      <description>Reference REF_030</description>
+    </artifactReference>
+    <artifactReference id="REF_031" name="REF_031" referencedArtifact="ART_024">
+      <description>Reference REF_031</description>
+    </artifactReference>
+    <artifactReference id="REF_032" name="REF_032" referencedArtifact="ART_025">
+      <description>Reference REF_032</description>
+    </artifactReference>
+    <artifactReference id="REF_033" name="REF_033" referencedArtifact="ART_026">
+      <description>Reference REF_033</description>
+    </artifactReference>
+    <artifactReference id="REF_034" name="REF_034" referencedArtifact="ART_027">
+      <description>Reference REF_034</description>
+    </artifactReference>
+    <artifactReference id="REF_035" name="REF_035" referencedArtifact="ART_028">
+      <description>Reference REF_035</description>
+    </artifactReference>
+    <artifactReference id="REF_036" name="REF_036" referencedArtifact="ART_029">
+      <description>Reference REF_036</description>
+    </artifactReference>
+    <artifactReference id="REF_037" name="REF_037" referencedArtifact="ART_030">
+      <description>Reference REF_037</description>
+    </artifactReference>
+    <artifactReference id="REF_038" name="REF_038" referencedArtifact="ART_031">
+      <description>Reference REF_038</description>
+    </artifactReference>
+    <artifactReference id="REF_039" name="REF_039" referencedArtifact="ART_032">
+      <description>Reference REF_039</description>
+    </artifactReference>
+    <artifactReference id="REF_040" name="REF_040" referencedArtifact="ART_018">
+      <description>Reference REF_040</description>
+    </artifactReference>
+    <assertedInference id="AI_005" name="AI_005">
+      <description>AssertedInference AI_005</description>
+      <source href="#CLM_025"/>
+      <source href="#CLM_023"/>
+      <source href="#CLM_026"/>
+      <source href="#CLM_027"/>
+      <source href="#CLM_028"/>
+      <source href="#CLM_029"/>
+      <source href="#CLM_030"/>
+      <source href="#CLM_031"/>
+      <source href="#CLM_039"/>
+      <source href="#CLM_024"/>
+      <target href="#CLM_015"/>
+      <reasoning href="#ARGR_005"/>
+    </assertedInference>
+    <assertedInference id="AI_006" name="AI_006">
+      <description>AssertedInference AI_006</description>
+      <source href="#CLM_032"/>
+      <source href="#CLM_033"/>
+      <source href="#CLM_034"/>
+      <source href="#CLM_035"/>
+      <source href="#CLM_036"/>
+      <source href="#CLM_037"/>
+      <source href="#CLM_038"/>
+      <target href="#CLM_015"/>
+      <reasoning href="#ARGR_006"/>
+    </assertedInference>
+    <assertedInference id="AI_007" name="AI_007">
+      <description>AssertedInference AI_007</description>
+      <source href="#CLM_040"/>
+      <target href="#CLM_015"/>
+      <reasoning href="#ARGR_007"/>
+    </assertedInference>
+    <assertedInference id="AI_008" name="AI_008">
+      <description>AssertedInference AI_008</description>
+      <source href="#CLM_042"/>
+      <source href="#CLM_043"/>
+      <source href="#CLM_044"/>
+      <source href="#CLM_045"/>
+      <source href="#CLM_046"/>
+      <target href="#CLM_015"/>
+      <reasoning href="#ARGR_008"/>
+    </assertedInference>
+    <assertedInference id="AI_009" name="AI_009">
+      <description>AssertedInference AI_009</description>
+      <source href="#CLM_047"/>
+      <source href="#CLM_048"/>
+      <source href="#CLM_049"/>
+      <source href="#CLM_050"/>
+      <source href="#CLM_051"/>
+      <source href="#CLM_052"/>
+      <target href="#CLM_015"/>
+      <reasoning href="#ARGR_009"/>
+    </assertedInference>
+    <assertedEvidence id="AE_004" name="AE_004">
+      <description>AssertedEvidence AE_004</description>
+      <source href="#REF_018"/>
+      <target href="#CLM_025"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_005" name="AE_005">
+      <description>AssertedEvidence AE_005</description>
+      <source href="#REF_019"/>
+      <target href="#CLM_026"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_006" name="AE_006">
+      <description>AssertedEvidence AE_006</description>
+      <source href="#REF_020"/>
+      <target href="#CLM_027"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_007" name="AE_007">
+      <description>AssertedEvidence AE_007</description>
+      <source href="#REF_023"/>
+      <target href="#CLM_030"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_008" name="AE_008">
+      <description>AssertedEvidence AE_008</description>
+      <source href="#REF_026"/>
+      <target href="#CLM_040"/>
+    </assertedEvidence>
+    <assertedContext id="AC_015" name="AC_015">
+      <description>AssertedContext AC_015</description>
+      <source href="#CLM_013"/>
+      <target href="#ARGR_005"/>
+    </assertedContext>
+    <assertedContext id="AC_016" name="AC_016">
+      <description>AssertedContext AC_016</description>
+      <source href="#REF_017"/>
+      <target href="#ARGR_005"/>
+    </assertedContext>
+    <assertedContext id="AC_017" name="AC_017">
+      <description>AssertedContext AC_017</description>
+      <source href="#CLM_053"/>
+      <target href="#ARGR_008"/>
+    </assertedContext>
+    <assertedContext id="AC_018" name="AC_018">
+      <description>AssertedContext AC_018</description>
+      <source href="#CLM_054"/>
+      <target href="#ARGR_009"/>
+    </assertedContext>
+    <assertedContext id="AC_019" name="AC_019">
+      <description>AssertedContext AC_019</description>
+      <source href="#REF_027"/>
+      <target href="#CLM_025"/>
+    </assertedContext>
+    <assertedContext id="AC_020" name="AC_020">
+      <description>AssertedContext AC_020</description>
+      <source href="#REF_028"/>
+      <target href="#CLM_026"/>
+    </assertedContext>
+    <assertedContext id="AC_021" name="AC_021">
+      <description>AssertedContext AC_021</description>
+      <source href="#REF_029"/>
+      <target href="#CLM_027"/>
+    </assertedContext>
+    <assertedContext id="AC_022" name="AC_022">
+      <description>AssertedContext AC_022</description>
+      <source href="#REF_030"/>
+      <target href="#CLM_030"/>
+    </assertedContext>
+  </argumentPackage>
+  <argumentPackage id="PKG_005" name="PKG_005">
+    <claim id="CLM_055" name="G_055" assertionDeclaration="asserted">
+      <statement>Claim G_055</statement>
+      <description>Claim G_055</description>
+    </claim>
+    <claim id="CLM_056" name="G_056" assertionDeclaration="asserted">
+      <statement>Claim G_056</statement>
+      <description>Claim G_056</description>
+    </claim>
+    <claim id="CLM_057" name="G_057" assertionDeclaration="asserted">
+      <statement>Claim G_057</statement>
+      <description>Claim G_057</description>
+    </claim>
+    <claim id="CLM_058" name="G_058" assertionDeclaration="asserted">
+      <statement>Claim G_058</statement>
+      <description>Claim G_058</description>
+    </claim>
+    <claim id="CLM_059" name="G_059" assertionDeclaration="asserted">
+      <statement>Claim G_059</statement>
+      <description>Claim G_059</description>
+    </claim>
+    <claim id="CLM_060" name="G_060" assertionDeclaration="needsSupport">
+      <statement>Claim G_060</statement>
+      <description>Claim G_060</description>
+    </claim>
+    <claim id="CLM_061" name="G_061" assertionDeclaration="needsSupport">
+      <statement>Claim G_061</statement>
+      <description>Claim G_061</description>
+    </claim>
+    <claim id="CLM_062" name="J_062" assertionDeclaration="axiomatic">
+      <statement>Justification J_062</statement>
+      <description>Justification J_062</description>
+    </claim>
+    <claim id="CLM_063" name="J_063" assertionDeclaration="axiomatic">
+      <statement>Justification J_063</statement>
+      <description>Justification J_063</description>
+    </claim>
+    <artifactReference id="REF_041" name="REF_041" referencedArtifact="ART_033">
+      <description>Reference REF_041</description>
+    </artifactReference>
+    <artifactReference id="REF_042" name="REF_042" referencedArtifact="ART_034">
+      <description>Reference REF_042</description>
+    </artifactReference>
+    <artifactReference id="REF_043" name="REF_043" referencedArtifact="ART_035">
+      <description>Reference REF_043</description>
+    </artifactReference>
+    <assertedInference id="AI_010" name="AI_010">
+      <description>AssertedInference AI_010</description>
+      <source href="#CLM_057"/>
+      <source href="#CLM_060"/>
+      <source href="#CLM_061"/>
+      <source href="#CLM_058"/>
+      <source href="#CLM_059"/>
+      <target href="#CLM_017"/>
+    </assertedInference>
+    <assertedContext id="AC_023" name="AC_023">
+      <description>AssertedContext AC_023</description>
+      <source href="#REF_041"/>
+      <target href="#CLM_017"/>
+    </assertedContext>
+    <assertedContext id="AC_024" name="AC_024">
+      <description>AssertedContext AC_024</description>
+      <source href="#REF_042"/>
+      <target href="#CLM_017"/>
+    </assertedContext>
+    <assertedContext id="AC_025" name="AC_025">
+      <description>AssertedContext AC_025</description>
+      <source href="#REF_043"/>
+      <target href="#CLM_017"/>
+    </assertedContext>
+    <assertedContext id="AC_026" name="AC_026">
+      <description>AssertedContext AC_026</description>
+      <source href="#CLM_062"/>
+      <target href="#CLM_060"/>
+    </assertedContext>
+    <assertedContext id="AC_027" name="AC_027">
+      <description>AssertedContext AC_027</description>
+      <source href="#CLM_063"/>
+      <target href="#CLM_061"/>
+    </assertedContext>
+  </argumentPackage>
+  <argumentPackage id="PKG_006" name="PKG_006">
+    <claim id="CLM_064" name="G_064" assertionDeclaration="asserted">
+      <statement>Claim G_064</statement>
+      <description>Claim G_064</description>
+    </claim>
+    <claim id="CLM_065" name="G_065" assertionDeclaration="needsSupport">
+      <statement>Claim G_065</statement>
+      <description>Claim G_065</description>
+    </claim>
+    <claim id="CLM_066" name="G_066" assertionDeclaration="asserted">
+      <statement>Claim G_066</statement>
+      <description>Claim G_066</description>
+    </claim>
+    <claim id="CLM_067" name="G_067" assertionDeclaration="asserted">
+      <statement>Claim G_067</statement>
+      <description>Claim G_067</description>
+    </claim>
+    <claim id="CLM_068" name="G_068" assertionDeclaration="asserted">
+      <statement>Claim G_068</statement>
+      <description>Claim G_068</description>
+    </claim>
+    <claim id="CLM_069" name="G_069" assertionDeclaration="asserted">
+      <statement>Claim G_069</statement>
+      <description>Claim G_069</description>
+    </claim>
+    <claim id="CLM_070" name="G_070" assertionDeclaration="asserted">
+      <statement>Claim G_070</statement>
+      <description>Claim G_070</description>
+    </claim>
+    <claim id="CLM_071" name="G_071" assertionDeclaration="asserted">
+      <statement>Claim G_071</statement>
+      <description>Claim G_071</description>
+    </claim>
+    <claim id="CLM_072" name="G_072" assertionDeclaration="needsSupport">
+      <statement>Claim G_072</statement>
+      <description>Claim G_072</description>
+    </claim>
+    <claim id="CLM_073" name="G_073" assertionDeclaration="asserted">
+      <statement>Claim G_073</statement>
+      <description>Claim G_073</description>
+    </claim>
+    <claim id="CLM_074" name="G_074" assertionDeclaration="asserted">
+      <statement>Claim G_074</statement>
+      <description>Claim G_074</description>
+    </claim>
+    <argumentReasoning id="ARGR_010" name="S_010">
+      <statement>Strategy S_010</statement>
+      <description>Strategy S_010</description>
+    </argumentReasoning>
+    <argumentReasoning id="ARGR_011" name="S_011">
+      <statement>Strategy S_011</statement>
+      <description>Strategy S_011</description>
+    </argumentReasoning>
+    <argumentReasoning id="ARGR_012" name="S_012">
+      <statement>Strategy S_012</statement>
+      <description>Strategy S_012</description>
+    </argumentReasoning>
+    <argumentReasoning id="ARGR_013" name="S_013">
+      <statement>Strategy S_013</statement>
+      <description>Strategy S_013</description>
+    </argumentReasoning>
+    <artifactReference id="REF_044" name="REF_044" referencedArtifact="ART_036">
+      <description>Reference REF_044</description>
+    </artifactReference>
+    <artifactReference id="REF_045" name="REF_045" referencedArtifact="ART_037">
+      <description>Reference REF_045</description>
+    </artifactReference>
+    <artifactReference id="REF_046" name="REF_046" referencedArtifact="ART_038">
+      <description>Reference REF_046</description>
+    </artifactReference>
+    <artifactReference id="REF_047" name="REF_047" referencedArtifact="ART_039">
+      <description>Reference REF_047</description>
+    </artifactReference>
+    <artifactReference id="REF_048" name="REF_048" referencedArtifact="ART_037">
+      <description>Reference REF_048</description>
+    </artifactReference>
+    <artifactReference id="REF_049" name="REF_049" referencedArtifact="ART_036">
+      <description>Reference REF_049</description>
+    </artifactReference>
+    <artifactReference id="REF_050" name="REF_050" referencedArtifact="ART_040">
+      <description>Reference REF_050</description>
+    </artifactReference>
+    <artifactReference id="REF_051" name="REF_051" referencedArtifact="ART_036">
+      <description>Reference REF_051</description>
+    </artifactReference>
+    <artifactReference id="REF_052" name="REF_052" referencedArtifact="ART_041">
+      <description>Reference REF_052</description>
+    </artifactReference>
+    <artifactReference id="REF_053" name="REF_053" referencedArtifact="ART_037">
+      <description>Reference REF_053</description>
+    </artifactReference>
+    <artifactReference id="REF_054" name="REF_054" referencedArtifact="ART_036">
+      <description>Reference REF_054</description>
+    </artifactReference>
+    <artifactReference id="REF_055" name="REF_055" referencedArtifact="ART_042">
+      <description>Reference REF_055</description>
+    </artifactReference>
+    <assertedInference id="AI_011" name="AI_011">
+      <description>AssertedInference AI_011</description>
+      <source href="#CLM_064"/>
+      <source href="#CLM_065"/>
+      <source href="#CLM_066"/>
+      <source href="#CLM_067"/>
+      <source href="#CLM_068"/>
+      <source href="#CLM_069"/>
+      <source href="#CLM_070"/>
+      <source href="#CLM_071"/>
+      <source href="#CLM_072"/>
+      <source href="#CLM_073"/>
+      <target href="#CLM_057"/>
+      <reasoning href="#ARGR_010"/>
+    </assertedInference>
+    <assertedEvidence id="AE_009" name="AE_009">
+      <description>AssertedEvidence AE_009</description>
+      <source href="#REF_044"/>
+      <target href="#CLM_064"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_010" name="AE_010">
+      <description>AssertedEvidence AE_010</description>
+      <source href="#REF_045"/>
+      <target href="#CLM_064"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_011" name="AE_011">
+      <description>AssertedEvidence AE_011</description>
+      <source href="#REF_048"/>
+      <target href="#CLM_066"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_012" name="AE_012">
+      <description>AssertedEvidence AE_012</description>
+      <source href="#REF_049"/>
+      <target href="#CLM_066"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_013" name="AE_013">
+      <description>AssertedEvidence AE_013</description>
+      <source href="#REF_051"/>
+      <target href="#CLM_067"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_014" name="AE_014">
+      <description>AssertedEvidence AE_014</description>
+      <source href="#REF_052"/>
+      <target href="#CLM_070"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_015" name="AE_015">
+      <description>AssertedEvidence AE_015</description>
+      <source href="#REF_053"/>
+      <target href="#CLM_070"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_016" name="AE_016">
+      <description>AssertedEvidence AE_016</description>
+      <source href="#REF_050"/>
+      <target href="#CLM_071"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_017" name="AE_017">
+      <description>AssertedEvidence AE_017</description>
+      <source href="#REF_054"/>
+      <target href="#CLM_073"/>
+    </assertedEvidence>
+    <assertedContext id="AC_028" name="AC_028">
+      <description>AssertedContext AC_028</description>
+      <source href="#REF_046"/>
+      <target href="#CLM_065"/>
+    </assertedContext>
+    <assertedContext id="AC_029" name="AC_029">
+      <description>AssertedContext AC_029</description>
+      <source href="#REF_047"/>
+      <target href="#CLM_065"/>
+    </assertedContext>
+  </argumentPackage>
+  <argumentPackage id="PKG_007" name="PKG_007">
+    <claim id="CLM_075" name="J_075" assertionDeclaration="axiomatic">
+      <statement>Justification J_075</statement>
+      <description>Justification J_075</description>
+    </claim>
+    <claim id="CLM_076" name="G_076" assertionDeclaration="asserted">
+      <statement>Claim G_076</statement>
+      <description>Claim G_076</description>
+    </claim>
+    <claim id="CLM_077" name="G_077" assertionDeclaration="asserted">
+      <statement>Claim G_077</statement>
+      <description>Claim G_077</description>
+    </claim>
+    <claim id="CLM_078" name="G_078" assertionDeclaration="asserted">
+      <statement>Claim G_078</statement>
+      <description>Claim G_078</description>
+    </claim>
+    <claim id="CLM_079" name="J_079" assertionDeclaration="axiomatic">
+      <statement>Justification J_079</statement>
+      <description>Justification J_079</description>
+    </claim>
+    <argumentReasoning id="ARGR_014" name="S_014">
+      <statement>Strategy S_014</statement>
+      <description>Strategy S_014</description>
+    </argumentReasoning>
+    <artifactReference id="REF_056" name="REF_056" referencedArtifact="ART_043">
+      <description>Reference REF_056</description>
+    </artifactReference>
+    <artifactReference id="REF_057" name="REF_057" referencedArtifact="ART_044">
+      <description>Reference REF_057</description>
+    </artifactReference>
+    <artifactReference id="REF_058" name="REF_058" referencedArtifact="ART_045">
+      <description>Reference REF_058</description>
+    </artifactReference>
+    <artifactReference id="REF_059" name="REF_059" referencedArtifact="ART_045">
+      <description>Reference REF_059</description>
+    </artifactReference>
+    <artifactReference id="REF_060" name="REF_060" referencedArtifact="ART_045">
+      <description>Reference REF_060</description>
+    </artifactReference>
+    <artifactReference id="REF_061" name="REF_061" referencedArtifact="ART_036">
+      <description>Reference REF_061</description>
+    </artifactReference>
+    <assertedInference id="AI_012" name="AI_012">
+      <description>AssertedInference AI_012</description>
+      <source href="#CLM_077"/>
+      <source href="#CLM_076"/>
+      <source href="#CLM_078"/>
+      <source href="#CLM_055"/>
+      <source href="#CLM_056"/>
+      <target href="#CLM_058"/>
+      <reasoning href="#ARGR_014"/>
+    </assertedInference>
+    <assertedEvidence id="AE_018" name="AE_018">
+      <description>AssertedEvidence AE_018</description>
+      <source href="#REF_061"/>
+      <target href="#CLM_076"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_019" name="AE_019">
+      <description>AssertedEvidence AE_019</description>
+      <source href="#REF_058"/>
+      <target href="#CLM_077"/>
+    </assertedEvidence>
+    <assertedContext id="AC_030" name="AC_030">
+      <description>AssertedContext AC_030</description>
+      <source href="#REF_056"/>
+      <target href="#ARGR_014"/>
+    </assertedContext>
+    <assertedContext id="AC_031" name="AC_031">
+      <description>AssertedContext AC_031</description>
+      <source href="#REF_057"/>
+      <target href="#ARGR_014"/>
+    </assertedContext>
+    <assertedContext id="AC_032" name="AC_032">
+      <description>AssertedContext AC_032</description>
+      <source href="#CLM_075"/>
+      <target href="#ARGR_014"/>
+    </assertedContext>
+    <assertedContext id="AC_033" name="AC_033">
+      <description>AssertedContext AC_033</description>
+      <source href="#CLM_079"/>
+      <target href="#CLM_077"/>
+    </assertedContext>
+  </argumentPackage>
+  <argumentPackage id="PKG_008" name="PKG_008">
+    <claim id="CLM_080" name="G_080" assertionDeclaration="asserted">
+      <statement>Claim G_080</statement>
+      <description>Claim G_080</description>
+    </claim>
+    <claim id="CLM_081" name="G_081" assertionDeclaration="asserted">
+      <statement>Claim G_081</statement>
+      <description>Claim G_081</description>
+    </claim>
+    <claim id="CLM_082" name="G_082" assertionDeclaration="asserted">
+      <statement>Claim G_082</statement>
+      <description>Claim G_082</description>
+    </claim>
+    <claim id="CLM_083" name="G_083" assertionDeclaration="asserted">
+      <statement>Claim G_083</statement>
+      <description>Claim G_083</description>
+    </claim>
+    <claim id="CLM_084" name="G_084" assertionDeclaration="asserted">
+      <statement>Claim G_084</statement>
+      <description>Claim G_084</description>
+    </claim>
+    <argumentReasoning id="ARGR_015" name="S_015">
+      <statement>Strategy S_015</statement>
+      <description>Strategy S_015</description>
+    </argumentReasoning>
+    <artifactReference id="REF_062" name="REF_062" referencedArtifact="ART_046">
+      <description>Reference REF_062</description>
+    </artifactReference>
+    <artifactReference id="REF_063" name="REF_063" referencedArtifact="ART_047">
+      <description>Reference REF_063</description>
+    </artifactReference>
+    <artifactReference id="REF_064" name="REF_064" referencedArtifact="ART_048">
+      <description>Reference REF_064</description>
+    </artifactReference>
+    <artifactReference id="REF_065" name="REF_065" referencedArtifact="ART_048">
+      <description>Reference REF_065</description>
+    </artifactReference>
+    <artifactReference id="REF_066" name="REF_066" referencedArtifact="ART_048">
+      <description>Reference REF_066</description>
+    </artifactReference>
+    <artifactReference id="REF_067" name="REF_067" referencedArtifact="ART_048">
+      <description>Reference REF_067</description>
+    </artifactReference>
+    <artifactReference id="REF_068" name="REF_068" referencedArtifact="ART_046">
+      <description>Reference REF_068</description>
+    </artifactReference>
+    <assertedInference id="AI_013" name="AI_013">
+      <description>AssertedInference AI_013</description>
+      <source href="#CLM_080"/>
+      <source href="#CLM_081"/>
+      <source href="#CLM_082"/>
+      <source href="#CLM_083"/>
+      <source href="#CLM_084"/>
+      <target href="#CLM_059"/>
+      <reasoning href="#ARGR_015"/>
+    </assertedInference>
+    <assertedEvidence id="AE_020" name="AE_020">
+      <description>AssertedEvidence AE_020</description>
+      <source href="#REF_062"/>
+      <target href="#CLM_080"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_021" name="AE_021">
+      <description>AssertedEvidence AE_021</description>
+      <source href="#REF_063"/>
+      <target href="#CLM_080"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_022" name="AE_022">
+      <description>AssertedEvidence AE_022</description>
+      <source href="#REF_064"/>
+      <target href="#CLM_081"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_023" name="AE_023">
+      <description>AssertedEvidence AE_023</description>
+      <source href="#REF_065"/>
+      <target href="#CLM_082"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_024" name="AE_024">
+      <description>AssertedEvidence AE_024</description>
+      <source href="#REF_066"/>
+      <target href="#CLM_083"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_025" name="AE_025">
+      <description>AssertedEvidence AE_025</description>
+      <source href="#REF_068"/>
+      <target href="#CLM_084"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_026" name="AE_026">
+      <description>AssertedEvidence AE_026</description>
+      <source href="#REF_067"/>
+      <target href="#CLM_084"/>
+    </assertedEvidence>
+  </argumentPackage>
+  <argumentPackage id="PKG_009" name="PKG_009">
+    <claim id="CLM_085" name="J_085" assertionDeclaration="axiomatic">
+      <statement>Justification J_085</statement>
+      <description>Justification J_085</description>
+    </claim>
+    <claim id="CLM_086" name="G_086" assertionDeclaration="asserted">
+      <statement>Claim G_086</statement>
+      <description>Claim G_086</description>
+    </claim>
+    <claim id="CLM_087" name="G_087" assertionDeclaration="asserted">
+      <statement>Claim G_087</statement>
+      <description>Claim G_087</description>
+    </claim>
+    <argumentReasoning id="ARGR_016" name="S_016">
+      <statement>Strategy S_016</statement>
+      <description>Strategy S_016</description>
+    </argumentReasoning>
+    <argumentReasoning id="ARGR_017" name="S_017">
+      <statement>Strategy S_017</statement>
+      <description>Strategy S_017</description>
+    </argumentReasoning>
+    <artifactReference id="REF_069" name="REF_069" referencedArtifact="ART_049">
+      <description>Reference REF_069</description>
+    </artifactReference>
+    <artifactReference id="REF_070" name="REF_070" referencedArtifact="ART_011">
+      <description>Reference REF_070</description>
+    </artifactReference>
+    <artifactReference id="REF_071" name="REF_071" referencedArtifact="ART_049">
+      <description>Reference REF_071</description>
+    </artifactReference>
+    <assertedInference id="AI_014" name="AI_014">
+      <description>AssertedInference AI_014</description>
+      <source href="#CLM_086"/>
+      <target href="#CLM_018"/>
+      <reasoning href="#ARGR_016"/>
+    </assertedInference>
+    <assertedInference id="AI_015" name="AI_015">
+      <description>AssertedInference AI_015</description>
+      <source href="#CLM_087"/>
+      <target href="#CLM_018"/>
+      <reasoning href="#ARGR_017"/>
+    </assertedInference>
+    <assertedEvidence id="AE_027" name="AE_027">
+      <description>AssertedEvidence AE_027</description>
+      <source href="#REF_070"/>
+      <target href="#CLM_086"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_028" name="AE_028">
+      <description>AssertedEvidence AE_028</description>
+      <source href="#REF_069"/>
+      <target href="#CLM_086"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_029" name="AE_029">
+      <description>AssertedEvidence AE_029</description>
+      <source href="#REF_071"/>
+      <target href="#CLM_087"/>
+    </assertedEvidence>
+    <assertedContext id="AC_034" name="AC_034">
+      <description>AssertedContext AC_034</description>
+      <source href="#CLM_085"/>
+      <target href="#CLM_018"/>
+    </assertedContext>
+  </argumentPackage>
+  <argumentPackage id="PKG_010" name="PKG_010">
+    <claim id="CLM_088" name="G_088" assertionDeclaration="asserted">
+      <statement>Claim G_088</statement>
+      <description>Claim G_088</description>
+    </claim>
+    <claim id="CLM_089" name="G_089" assertionDeclaration="asserted">
+      <statement>Claim G_089</statement>
+      <description>Claim G_089</description>
+    </claim>
+    <claim id="CLM_090" name="G_090" assertionDeclaration="asserted">
+      <statement>Claim G_090</statement>
+      <description>Claim G_090</description>
+    </claim>
+    <claim id="CLM_091" name="G_091" assertionDeclaration="asserted">
+      <statement>Claim G_091</statement>
+      <description>Claim G_091</description>
+    </claim>
+    <claim id="CLM_092" name="G_092" assertionDeclaration="asserted">
+      <statement>Claim G_092</statement>
+      <description>Claim G_092</description>
+    </claim>
+    <claim id="CLM_093" name="G_093" assertionDeclaration="asserted">
+      <statement>Claim G_093</statement>
+      <description>Claim G_093</description>
+    </claim>
+    <claim id="CLM_094" name="G_094" assertionDeclaration="asserted">
+      <statement>Claim G_094</statement>
+      <description>Claim G_094</description>
+    </claim>
+    <claim id="CLM_095" name="G_095" assertionDeclaration="asserted">
+      <statement>Claim G_095</statement>
+      <description>Claim G_095</description>
+    </claim>
+    <claim id="CLM_096" name="G_096" assertionDeclaration="asserted">
+      <statement>Claim G_096</statement>
+      <description>Claim G_096</description>
+    </claim>
+    <claim id="CLM_097" name="G_097" assertionDeclaration="asserted">
+      <statement>Claim G_097</statement>
+      <description>Claim G_097</description>
+    </claim>
+    <claim id="CLM_098" name="G_098" assertionDeclaration="asserted">
+      <statement>Claim G_098</statement>
+      <description>Claim G_098</description>
+    </claim>
+    <claim id="CLM_099" name="G_099" assertionDeclaration="asserted">
+      <statement>Claim G_099</statement>
+      <description>Claim G_099</description>
+    </claim>
+    <claim id="CLM_100" name="G_100" assertionDeclaration="asserted">
+      <statement>Claim G_100</statement>
+      <description>Claim G_100</description>
+    </claim>
+    <claim id="CLM_101" name="G_101" assertionDeclaration="asserted">
+      <statement>Claim G_101</statement>
+      <description>Claim G_101</description>
+    </claim>
+    <argumentReasoning id="ARGR_018" name="S_018">
+      <statement>Strategy S_018</statement>
+      <description>Strategy S_018</description>
+    </argumentReasoning>
+    <argumentReasoning id="ARGR_019" name="S_019">
+      <statement>Strategy S_019</statement>
+      <description>Strategy S_019</description>
+    </argumentReasoning>
+    <argumentReasoning id="ARGR_020" name="S_020">
+      <statement>Strategy S_020</statement>
+      <description>Strategy S_020</description>
+    </argumentReasoning>
+    <argumentReasoning id="ARGR_021" name="S_021">
+      <statement>Strategy S_021</statement>
+      <description>Strategy S_021</description>
+    </argumentReasoning>
+    <artifactReference id="REF_072" name="REF_072" referencedArtifact="ART_014">
+      <description>Reference REF_072</description>
+    </artifactReference>
+    <artifactReference id="REF_073" name="REF_073" referencedArtifact="ART_014">
+      <description>Reference REF_073</description>
+    </artifactReference>
+    <artifactReference id="REF_074" name="REF_074" referencedArtifact="ART_014">
+      <description>Reference REF_074</description>
+    </artifactReference>
+    <artifactReference id="REF_075" name="REF_075" referencedArtifact="ART_050">
+      <description>Reference REF_075</description>
+    </artifactReference>
+    <artifactReference id="REF_076" name="REF_076" referencedArtifact="ART_050">
+      <description>Reference REF_076</description>
+    </artifactReference>
+    <artifactReference id="REF_077" name="REF_077" referencedArtifact="ART_050">
+      <description>Reference REF_077</description>
+    </artifactReference>
+    <artifactReference id="REF_078" name="REF_078" referencedArtifact="ART_050">
+      <description>Reference REF_078</description>
+    </artifactReference>
+    <artifactReference id="REF_079" name="REF_079" referencedArtifact="ART_050">
+      <description>Reference REF_079</description>
+    </artifactReference>
+    <artifactReference id="REF_080" name="REF_080" referencedArtifact="ART_014">
+      <description>Reference REF_080</description>
+    </artifactReference>
+    <artifactReference id="REF_081" name="REF_081" referencedArtifact="ART_050">
+      <description>Reference REF_081</description>
+    </artifactReference>
+    <artifactReference id="REF_082" name="REF_082" referencedArtifact="ART_014">
+      <description>Reference REF_082</description>
+    </artifactReference>
+    <artifactReference id="REF_083" name="REF_083" referencedArtifact="ART_050">
+      <description>Reference REF_083</description>
+    </artifactReference>
+    <artifactReference id="REF_084" name="REF_084" referencedArtifact="ART_014">
+      <description>Reference REF_084</description>
+    </artifactReference>
+    <artifactReference id="REF_085" name="REF_085" referencedArtifact="ART_050">
+      <description>Reference REF_085</description>
+    </artifactReference>
+    <artifactReference id="REF_086" name="REF_086" referencedArtifact="ART_014">
+      <description>Reference REF_086</description>
+    </artifactReference>
+    <artifactReference id="REF_087" name="REF_087" referencedArtifact="ART_050">
+      <description>Reference REF_087</description>
+    </artifactReference>
+    <artifactReference id="REF_088" name="REF_088" referencedArtifact="ART_014">
+      <description>Reference REF_088</description>
+    </artifactReference>
+    <artifactReference id="REF_089" name="REF_089" referencedArtifact="ART_050">
+      <description>Reference REF_089</description>
+    </artifactReference>
+    <artifactReference id="REF_090" name="REF_090" referencedArtifact="ART_014">
+      <description>Reference REF_090</description>
+    </artifactReference>
+    <artifactReference id="REF_091" name="REF_091" referencedArtifact="ART_051">
+      <description>Reference REF_091</description>
+    </artifactReference>
+    <artifactReference id="REF_092" name="REF_092" referencedArtifact="ART_052">
+      <description>Reference REF_092</description>
+    </artifactReference>
+    <assertedInference id="AI_016" name="AI_016">
+      <description>AssertedInference AI_016</description>
+      <source href="#CLM_090"/>
+      <source href="#CLM_089"/>
+      <source href="#CLM_091"/>
+      <target href="#CLM_088"/>
+      <reasoning href="#ARGR_018"/>
+    </assertedInference>
+    <assertedInference id="AI_017" name="AI_017">
+      <description>AssertedInference AI_017</description>
+      <source href="#CLM_092"/>
+      <source href="#CLM_093"/>
+      <source href="#CLM_094"/>
+      <source href="#CLM_095"/>
+      <target href="#CLM_088"/>
+      <reasoning href="#ARGR_019"/>
+    </assertedInference>
+    <assertedInference id="AI_018" name="AI_018">
+      <description>AssertedInference AI_018</description>
+      <source href="#CLM_098"/>
+      <source href="#CLM_097"/>
+      <source href="#CLM_096"/>
+      <target href="#CLM_088"/>
+      <reasoning href="#ARGR_020"/>
+    </assertedInference>
+    <assertedInference id="AI_019" name="AI_019">
+      <description>AssertedInference AI_019</description>
+      <source href="#CLM_100"/>
+      <source href="#CLM_101"/>
+      <source href="#CLM_099"/>
+      <target href="#CLM_088"/>
+      <reasoning href="#ARGR_021"/>
+    </assertedInference>
+    <assertedEvidence id="AE_030" name="AE_030">
+      <description>AssertedEvidence AE_030</description>
+      <source href="#REF_072"/>
+      <target href="#CLM_089"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_031" name="AE_031">
+      <description>AssertedEvidence AE_031</description>
+      <source href="#REF_073"/>
+      <target href="#CLM_090"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_032" name="AE_032">
+      <description>AssertedEvidence AE_032</description>
+      <source href="#REF_092"/>
+      <target href="#CLM_090"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_033" name="AE_033">
+      <description>AssertedEvidence AE_033</description>
+      <source href="#REF_074"/>
+      <target href="#CLM_091"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_034" name="AE_034">
+      <description>AssertedEvidence AE_034</description>
+      <source href="#REF_075"/>
+      <target href="#CLM_092"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_035" name="AE_035">
+      <description>AssertedEvidence AE_035</description>
+      <source href="#REF_076"/>
+      <target href="#CLM_093"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_036" name="AE_036">
+      <description>AssertedEvidence AE_036</description>
+      <source href="#REF_078"/>
+      <target href="#CLM_094"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_037" name="AE_037">
+      <description>AssertedEvidence AE_037</description>
+      <source href="#REF_077"/>
+      <target href="#CLM_095"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_038" name="AE_038">
+      <description>AssertedEvidence AE_038</description>
+      <source href="#REF_080"/>
+      <target href="#CLM_096"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_039" name="AE_039">
+      <description>AssertedEvidence AE_039</description>
+      <source href="#REF_079"/>
+      <target href="#CLM_096"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_040" name="AE_040">
+      <description>AssertedEvidence AE_040</description>
+      <source href="#REF_081"/>
+      <target href="#CLM_097"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_041" name="AE_041">
+      <description>AssertedEvidence AE_041</description>
+      <source href="#REF_082"/>
+      <target href="#CLM_097"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_042" name="AE_042">
+      <description>AssertedEvidence AE_042</description>
+      <source href="#REF_083"/>
+      <target href="#CLM_098"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_043" name="AE_043">
+      <description>AssertedEvidence AE_043</description>
+      <source href="#REF_084"/>
+      <target href="#CLM_098"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_044" name="AE_044">
+      <description>AssertedEvidence AE_044</description>
+      <source href="#REF_085"/>
+      <target href="#CLM_099"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_045" name="AE_045">
+      <description>AssertedEvidence AE_045</description>
+      <source href="#REF_086"/>
+      <target href="#CLM_099"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_046" name="AE_046">
+      <description>AssertedEvidence AE_046</description>
+      <source href="#REF_087"/>
+      <target href="#CLM_100"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_047" name="AE_047">
+      <description>AssertedEvidence AE_047</description>
+      <source href="#REF_088"/>
+      <target href="#CLM_100"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_048" name="AE_048">
+      <description>AssertedEvidence AE_048</description>
+      <source href="#REF_090"/>
+      <target href="#CLM_101"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_049" name="AE_049">
+      <description>AssertedEvidence AE_049</description>
+      <source href="#REF_089"/>
+      <target href="#CLM_101"/>
+    </assertedEvidence>
+    <assertedContext id="AC_035" name="AC_035">
+      <description>AssertedContext AC_035</description>
+      <source href="#REF_091"/>
+      <target href="#CLM_090"/>
+    </assertedContext>
+  </argumentPackage>
+  <argumentPackage id="PKG_011" name="PKG_011">
+    <claim id="CLM_102" name="G_102" assertionDeclaration="asserted">
+      <statement>Claim G_102</statement>
+      <description>Claim G_102</description>
+    </claim>
+    <claim id="CLM_103" name="G_103" assertionDeclaration="needsSupport">
+      <statement>Claim G_103</statement>
+      <description>Claim G_103</description>
+    </claim>
+    <claim id="CLM_104" name="G_104" assertionDeclaration="needsSupport">
+      <statement>Claim G_104</statement>
+      <description>Claim G_104</description>
+    </claim>
+    <claim id="CLM_105" name="G_105" assertionDeclaration="needsSupport">
+      <statement>Claim G_105</statement>
+      <description>Claim G_105</description>
+    </claim>
+    <claim id="CLM_106" name="G_106" assertionDeclaration="needsSupport">
+      <statement>Claim G_106</statement>
+      <description>Claim G_106</description>
+    </claim>
+    <claim id="CLM_107" name="G_107" assertionDeclaration="needsSupport">
+      <statement>Claim G_107</statement>
+      <description>Claim G_107</description>
+    </claim>
+    <claim id="CLM_108" name="G_108" assertionDeclaration="needsSupport">
+      <statement>Claim G_108</statement>
+      <description>Claim G_108</description>
+    </claim>
+    <claim id="CLM_109" name="G_109" assertionDeclaration="needsSupport">
+      <statement>Claim G_109</statement>
+      <description>Claim G_109</description>
+    </claim>
+    <claim id="CLM_110" name="G_110" assertionDeclaration="needsSupport">
+      <statement>Claim G_110</statement>
+      <description>Claim G_110</description>
+    </claim>
+  </argumentPackage>
+  <argumentPackage id="PKG_012" name="PKG_012">
+    <claim id="CLM_111" name="G_111" assertionDeclaration="asserted">
+      <statement>Claim G_111</statement>
+      <description>Claim G_111</description>
+    </claim>
+    <claim id="CLM_112" name="G_112" assertionDeclaration="asserted">
+      <statement>Claim G_112</statement>
+      <description>Claim G_112</description>
+    </claim>
+    <claim id="CLM_113" name="G_113" assertionDeclaration="asserted">
+      <statement>Claim G_113</statement>
+      <description>Claim G_113</description>
+    </claim>
+    <claim id="CLM_114" name="G_114" assertionDeclaration="asserted">
+      <statement>Claim G_114</statement>
+      <description>Claim G_114</description>
+    </claim>
+    <claim id="CLM_115" name="G_115" assertionDeclaration="asserted">
+      <statement>Claim G_115</statement>
+      <description>Claim G_115</description>
+    </claim>
+    <claim id="CLM_116" name="G_116" assertionDeclaration="asserted">
+      <statement>Claim G_116</statement>
+      <description>Claim G_116</description>
+    </claim>
+    <argumentReasoning id="ARGR_022" name="S_022">
+      <statement>Strategy S_022</statement>
+      <description>Strategy S_022</description>
+    </argumentReasoning>
+    <artifactReference id="REF_093" name="REF_093" referencedArtifact="ART_012">
+      <description>Reference REF_093</description>
+    </artifactReference>
+    <artifactReference id="REF_094" name="REF_094" referencedArtifact="ART_012">
+      <description>Reference REF_094</description>
+    </artifactReference>
+    <artifactReference id="REF_095" name="REF_095" referencedArtifact="ART_012">
+      <description>Reference REF_095</description>
+    </artifactReference>
+    <artifactReference id="REF_096" name="REF_096" referencedArtifact="ART_012">
+      <description>Reference REF_096</description>
+    </artifactReference>
+    <artifactReference id="REF_097" name="REF_097" referencedArtifact="ART_012">
+      <description>Reference REF_097</description>
+    </artifactReference>
+    <artifactReference id="REF_098" name="REF_098" referencedArtifact="ART_018">
+      <description>Reference REF_098</description>
+    </artifactReference>
+    <assertedInference id="AI_020" name="AI_020">
+      <description>AssertedInference AI_020</description>
+      <source href="#CLM_111"/>
+      <source href="#CLM_112"/>
+      <source href="#CLM_113"/>
+      <source href="#CLM_116"/>
+      <source href="#CLM_115"/>
+      <target href="#CLM_114"/>
+      <reasoning href="#ARGR_022"/>
+    </assertedInference>
+    <assertedEvidence id="AE_050" name="AE_050">
+      <description>AssertedEvidence AE_050</description>
+      <source href="#REF_093"/>
+      <target href="#CLM_111"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_051" name="AE_051">
+      <description>AssertedEvidence AE_051</description>
+      <source href="#REF_094"/>
+      <target href="#CLM_112"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_052" name="AE_052">
+      <description>AssertedEvidence AE_052</description>
+      <source href="#REF_095"/>
+      <target href="#CLM_113"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_053" name="AE_053">
+      <description>AssertedEvidence AE_053</description>
+      <source href="#REF_096"/>
+      <target href="#CLM_115"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_054" name="AE_054">
+      <description>AssertedEvidence AE_054</description>
+      <source href="#REF_097"/>
+      <target href="#CLM_116"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_055" name="AE_055">
+      <description>AssertedEvidence AE_055</description>
+      <source href="#REF_098"/>
+      <target href="#CLM_116"/>
+    </assertedEvidence>
+  </argumentPackage>
+  <argumentPackage id="PKG_013" name="PKG_013">
+    <claim id="CLM_117" name="G_117" assertionDeclaration="asserted">
+      <statement>Claim G_117</statement>
+      <description>Claim G_117</description>
+    </claim>
+    <claim id="CLM_118" name="G_118" assertionDeclaration="asserted">
+      <statement>Claim G_118</statement>
+      <description>Claim G_118</description>
+    </claim>
+    <claim id="CLM_119" name="G_119" assertionDeclaration="asserted">
+      <statement>Claim G_119</statement>
+      <description>Claim G_119</description>
+    </claim>
+    <claim id="CLM_120" name="G_120" assertionDeclaration="asserted">
+      <statement>Claim G_120</statement>
+      <description>Claim G_120</description>
+    </claim>
+    <claim id="CLM_121" name="G_121" assertionDeclaration="asserted">
+      <statement>Claim G_121</statement>
+      <description>Claim G_121</description>
+    </claim>
+    <claim id="CLM_122" name="G_122" assertionDeclaration="asserted">
+      <statement>Claim G_122</statement>
+      <description>Claim G_122</description>
+    </claim>
+    <claim id="CLM_123" name="G_123" assertionDeclaration="asserted">
+      <statement>Claim G_123</statement>
+      <description>Claim G_123</description>
+    </claim>
+    <argumentReasoning id="ARGR_023" name="S_023">
+      <statement>Strategy S_023</statement>
+      <description>Strategy S_023</description>
+    </argumentReasoning>
+    <argumentReasoning id="ARGR_024" name="S_024">
+      <statement>Strategy S_024</statement>
+      <description>Strategy S_024</description>
+    </argumentReasoning>
+    <argumentReasoning id="ARGR_025" name="S_025">
+      <statement>Strategy S_025</statement>
+      <description>Strategy S_025</description>
+    </argumentReasoning>
+    <artifactReference id="REF_099" name="REF_099" referencedArtifact="ART_011">
+      <description>Reference REF_099</description>
+    </artifactReference>
+    <artifactReference id="REF_100" name="REF_100" referencedArtifact="ART_011">
+      <description>Reference REF_100</description>
+    </artifactReference>
+    <artifactReference id="REF_101" name="REF_101" referencedArtifact="ART_011">
+      <description>Reference REF_101</description>
+    </artifactReference>
+    <artifactReference id="REF_102" name="REF_102" referencedArtifact="ART_011">
+      <description>Reference REF_102</description>
+    </artifactReference>
+    <artifactReference id="REF_103" name="REF_103" referencedArtifact="ART_011">
+      <description>Reference REF_103</description>
+    </artifactReference>
+    <artifactReference id="REF_104" name="REF_104" referencedArtifact="ART_011">
+      <description>Reference REF_104</description>
+    </artifactReference>
+    <artifactReference id="REF_105" name="REF_105" referencedArtifact="ART_053">
+      <description>Reference REF_105</description>
+    </artifactReference>
+    <assertedInference id="AI_021" name="AI_021">
+      <description>AssertedInference AI_021</description>
+      <source href="#CLM_119"/>
+      <source href="#CLM_118"/>
+      <target href="#CLM_117"/>
+      <reasoning href="#ARGR_023"/>
+    </assertedInference>
+    <assertedInference id="AI_022" name="AI_022">
+      <description>AssertedInference AI_022</description>
+      <source href="#CLM_120"/>
+      <source href="#CLM_121"/>
+      <target href="#CLM_117"/>
+      <reasoning href="#ARGR_024"/>
+    </assertedInference>
+    <assertedInference id="AI_023" name="AI_023">
+      <description>AssertedInference AI_023</description>
+      <source href="#CLM_122"/>
+      <source href="#CLM_123"/>
+      <target href="#CLM_117"/>
+      <reasoning href="#ARGR_025"/>
+    </assertedInference>
+    <assertedEvidence id="AE_056" name="AE_056">
+      <description>AssertedEvidence AE_056</description>
+      <source href="#REF_104"/>
+      <target href="#CLM_118"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_057" name="AE_057">
+      <description>AssertedEvidence AE_057</description>
+      <source href="#REF_103"/>
+      <target href="#CLM_119"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_058" name="AE_058">
+      <description>AssertedEvidence AE_058</description>
+      <source href="#REF_102"/>
+      <target href="#CLM_120"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_059" name="AE_059">
+      <description>AssertedEvidence AE_059</description>
+      <source href="#REF_101"/>
+      <target href="#CLM_121"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_060" name="AE_060">
+      <description>AssertedEvidence AE_060</description>
+      <source href="#REF_100"/>
+      <target href="#CLM_122"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_061" name="AE_061">
+      <description>AssertedEvidence AE_061</description>
+      <source href="#REF_099"/>
+      <target href="#CLM_123"/>
+    </assertedEvidence>
+    <assertedContext id="AC_036" name="AC_036">
+      <description>AssertedContext AC_036</description>
+      <source href="#REF_105"/>
+      <target href="#CLM_117"/>
+    </assertedContext>
+  </argumentPackage>
+  <argumentPackage id="PKG_014" name="PKG_014">
+    <claim id="CLM_124" name="G_124" assertionDeclaration="asserted">
+      <statement>Claim G_124</statement>
+      <description>Claim G_124</description>
+    </claim>
+    <claim id="CLM_125" name="G_125" assertionDeclaration="needsSupport">
+      <statement>Claim G_125</statement>
+      <description>Claim G_125</description>
+    </claim>
+    <claim id="CLM_126" name="G_126" assertionDeclaration="needsSupport">
+      <statement>Claim G_126</statement>
+      <description>Claim G_126</description>
+    </claim>
+    <claim id="CLM_127" name="G_127" assertionDeclaration="needsSupport">
+      <statement>Claim G_127</statement>
+      <description>Claim G_127</description>
+    </claim>
+    <claim id="CLM_128" name="G_128" assertionDeclaration="needsSupport">
+      <statement>Claim G_128</statement>
+      <description>Claim G_128</description>
+    </claim>
+    <claim id="CLM_129" name="G_129" assertionDeclaration="needsSupport">
+      <statement>Claim G_129</statement>
+      <description>Claim G_129</description>
+    </claim>
+    <argumentReasoning id="ARGR_026" name="S_026">
+      <statement>Strategy S_026</statement>
+      <description>Strategy S_026</description>
+    </argumentReasoning>
+    <argumentReasoning id="ARGR_027" name="S_027">
+      <statement>Strategy S_027</statement>
+      <description>Strategy S_027</description>
+    </argumentReasoning>
+    <argumentReasoning id="ARGR_028" name="S_028">
+      <statement>Strategy S_028</statement>
+      <description>Strategy S_028</description>
+    </argumentReasoning>
+    <assertedInference id="AI_024" name="AI_024">
+      <description>AssertedInference AI_024</description>
+      <source href="#CLM_125"/>
+      <target href="#CLM_124"/>
+      <reasoning href="#ARGR_026"/>
+    </assertedInference>
+    <assertedInference id="AI_025" name="AI_025">
+      <description>AssertedInference AI_025</description>
+      <source href="#CLM_126"/>
+      <source href="#CLM_127"/>
+      <target href="#CLM_124"/>
+      <reasoning href="#ARGR_027"/>
+    </assertedInference>
+    <assertedInference id="AI_026" name="AI_026">
+      <description>AssertedInference AI_026</description>
+      <source href="#CLM_128"/>
+      <source href="#CLM_129"/>
+      <target href="#CLM_124"/>
+      <reasoning href="#ARGR_028"/>
+    </assertedInference>
+  </argumentPackage>
+  <argumentPackage id="PKG_015" name="PKG_015">
+    <claim id="CLM_130" name="G_130" assertionDeclaration="asserted">
+      <statement>Claim G_130</statement>
+      <description>Claim G_130</description>
+    </claim>
+    <claim id="CLM_131" name="G_131" assertionDeclaration="asserted">
+      <statement>Claim G_131</statement>
+      <description>Claim G_131</description>
+    </claim>
+    <claim id="CLM_132" name="G_132" assertionDeclaration="asserted">
+      <statement>Claim G_132</statement>
+      <description>Claim G_132</description>
+    </claim>
+    <claim id="CLM_133" name="G_133" assertionDeclaration="asserted">
+      <statement>Claim G_133</statement>
+      <description>Claim G_133</description>
+    </claim>
+    <argumentReasoning id="ARGR_029" name="S_029">
+      <statement>Strategy S_029</statement>
+      <description>Strategy S_029</description>
+    </argumentReasoning>
+    <artifactReference id="REF_106" name="REF_106" referencedArtifact="ART_054">
+      <description>Reference REF_106</description>
+    </artifactReference>
+    <artifactReference id="REF_107" name="REF_107" referencedArtifact="ART_049">
+      <description>Reference REF_107</description>
+    </artifactReference>
+    <artifactReference id="REF_108" name="REF_108" referencedArtifact="ART_055">
+      <description>Reference REF_108</description>
+    </artifactReference>
+    <artifactReference id="REF_109" name="REF_109" referencedArtifact="ART_056">
+      <description>Reference REF_109</description>
+    </artifactReference>
+    <assertedInference id="AI_027" name="AI_027">
+      <description>AssertedInference AI_027</description>
+      <source href="#CLM_131"/>
+      <source href="#CLM_132"/>
+      <source href="#CLM_133"/>
+      <target href="#CLM_130"/>
+      <reasoning href="#ARGR_029"/>
+    </assertedInference>
+    <assertedEvidence id="AE_062" name="AE_062">
+      <description>AssertedEvidence AE_062</description>
+      <source href="#REF_106"/>
+      <target href="#CLM_131"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_063" name="AE_063">
+      <description>AssertedEvidence AE_063</description>
+      <source href="#REF_107"/>
+      <target href="#CLM_132"/>
+    </assertedEvidence>
+    <assertedEvidence id="AE_064" name="AE_064">
+      <description>AssertedEvidence AE_064</description>
+      <source href="#REF_108"/>
+      <target href="#CLM_133"/>
+    </assertedEvidence>
+    <assertedContext id="AC_037" name="AC_037">
+      <description>AssertedContext AC_037</description>
+      <source href="#REF_109"/>
+      <target href="#CLM_132"/>
+    </assertedContext>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>

@@ -335,7 +335,7 @@ TEST(ElementFactoryRemove, RemoveNodeOnly_AlsoRemovesGroup2Attachments) {
 }
 
 // Comprehensive regression for the canonical shared-inference shape (matches
-// data/sacm_example_core_argument.xml: cl_top / ar_1 / [cl_sub_1, cl_sub_2]
+// tests/data/fixture_roundtrip_core_argument.sacm.xml: cl_top / ar_1 / [cl_sub_1, cl_sub_2]
 // wired by a single inference inf_1). Exercises both remove modes from every
 // relevant vantage point so a sub-claim's removal never disturbs the strategy
 // or its other children unexpectedly.
