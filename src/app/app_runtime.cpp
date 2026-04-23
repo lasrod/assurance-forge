@@ -55,10 +55,11 @@ void DrawVerticalSplitter(const char* id,
                           float x,
                           float width,
                           float height,
+                          float top_y,
                           float display_w,
                           float& ratio,
                           bool subtract_delta) {
-    ImGui::SetNextWindowPos(ImVec2(x, 0));
+    ImGui::SetNextWindowPos(ImVec2(x, top_y));
     ImGui::SetNextWindowSize(ImVec2(width, height));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(1, 1));
@@ -120,6 +121,9 @@ struct AppRuntime::Impl {
     bool show_overwrite_confirm = false;
     bool force_center_tab_selection = false;
     bool pending_focus_root = false;
+    bool show_gsn_tab = true;
+    bool show_cse_tab = false;
+    bool show_evidence_tab = false;
 
     float left_ratio = kInitialLeftPanelRatio;
     float right_ratio = kInitialRightPanelRatio;
@@ -329,53 +333,75 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     impl_->tree_needs_rebuild = false;
 }
 
-void AppRuntime::RenderSplitters(float display_w, float display_h, float left_w, float center_w) {
-    DrawVerticalSplitter("##left_splitter", left_w, kSplitterThickness, display_h, display_w, impl_->left_ratio, false);
+float AppRuntime::RenderMainMenuBar(bool& done) {
+    if (!ImGui::BeginMainMenuBar()) {
+        return 0.0f;
+    }
 
-    float center_x = left_w + kSplitterThickness;
-    DrawVerticalSplitter("##right_splitter", center_x + center_w, kSplitterThickness, display_h, display_w, impl_->right_ratio, true);
+    if (ImGui::BeginMenu("File")) {
+        if (ImGui::MenuItem("Exit")) {
+            done = true;
+        }
+        ImGui::EndMenu();
+    }
+
+    if (ImGui::BeginMenu("View")) {
+        ui::UiState& ui_state = ui::GetUiState();
+        ImGui::MenuItem("GSN Canvas", nullptr, &impl_->show_gsn_tab);
+        ImGui::MenuItem("CSE Register", nullptr, &impl_->show_cse_tab);
+        ImGui::MenuItem("Evidence Register", nullptr, &impl_->show_evidence_tab);
+
+        if (!impl_->show_gsn_tab && !impl_->show_cse_tab && !impl_->show_evidence_tab) {
+            // Keep at least one center tab visible.
+            impl_->show_gsn_tab = true;
+        }
+
+        auto is_tab_visible = [&](ui::CenterView view) {
+            switch (view) {
+                case ui::CenterView::GsnCanvas: return impl_->show_gsn_tab;
+                case ui::CenterView::CseRegister: return impl_->show_cse_tab;
+                case ui::CenterView::EvidenceRegister: return impl_->show_evidence_tab;
+            }
+            return false;
+        };
+
+        if (!is_tab_visible(ui_state.center_view)) {
+            if (impl_->show_gsn_tab) {
+                ui_state.center_view = ui::CenterView::GsnCanvas;
+            } else if (impl_->show_cse_tab) {
+                ui_state.center_view = ui::CenterView::CseRegister;
+            } else {
+                ui_state.center_view = ui::CenterView::EvidenceRegister;
+            }
+            impl_->force_center_tab_selection = true;
+        }
+
+        ImGui::EndMenu();
+    }
+
+    ImGui::EndMainMenuBar();
+    return ImGui::GetFrameHeight();
 }
 
-void AppRuntime::RenderTreePanel(float left_w, float top_left_h) {
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
+void AppRuntime::RenderSplitters(float display_w, float content_h, float left_w, float center_w, float top_y) {
+    DrawVerticalSplitter("##left_splitter", left_w, kSplitterThickness, content_h, top_y, display_w, impl_->left_ratio, false);
+
+    float center_x = left_w + kSplitterThickness;
+    DrawVerticalSplitter("##right_splitter", center_x + center_w, kSplitterThickness, content_h, top_y, display_w, impl_->right_ratio, true);
+}
+
+void AppRuntime::RenderTreePanel(float left_w, float top_left_h, float top_y) {
+    ImGui::SetNextWindowPos(ImVec2(0, top_y));
     ImGui::SetNextWindowSize(ImVec2(left_w, top_left_h));
     ImGui::Begin("Safety Case Tree", nullptr, kPanelFlags);
     ui::ShowTreeViewPanel(impl_->current_tree.root ? &impl_->current_tree : nullptr);
     ImGui::End();
 }
 
-void AppRuntime::RenderSacmViewerPanel(float left_w, float top_left_h, float bottom_left_h, bool& done) {
-    ImGui::SetNextWindowPos(ImVec2(0, top_left_h));
+void AppRuntime::RenderSacmViewerPanel(float left_w, float top_left_h, float bottom_left_h, float top_y) {
+    ImGui::SetNextWindowPos(ImVec2(0, top_y + top_left_h));
     ImGui::SetNextWindowSize(ImVec2(left_w, bottom_left_h));
-    ImGui::Begin("SACM Viewer", nullptr, kPanelFlags | ImGuiWindowFlags_MenuBar);
-
-    if (ImGui::BeginMenuBar()) {
-        if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("Exit")) {
-                done = true;
-            }
-            ImGui::EndMenu();
-        }
-
-        if (ImGui::BeginMenu("View")) {
-            ui::UiState& ui_state = ui::GetUiState();
-            if (ImGui::MenuItem("GSN Canvas", nullptr, ui_state.center_view == ui::CenterView::GsnCanvas)) {
-                ui_state.center_view = ui::CenterView::GsnCanvas;
-                impl_->force_center_tab_selection = true;
-            }
-            if (ImGui::MenuItem("CSE Register", nullptr, ui_state.center_view == ui::CenterView::CseRegister)) {
-                ui_state.center_view = ui::CenterView::CseRegister;
-                impl_->force_center_tab_selection = true;
-            }
-            if (ImGui::MenuItem("Evidence Register", nullptr, ui_state.center_view == ui::CenterView::EvidenceRegister)) {
-                ui_state.center_view = ui::CenterView::EvidenceRegister;
-                impl_->force_center_tab_selection = true;
-            }
-            ImGui::EndMenu();
-        }
-
-        ImGui::EndMenuBar();
-    }
+    ImGui::Begin("SACM Viewer", nullptr, kPanelFlags);
 
     ImGui::Text("Directory:");
     ImGui::SetNextItemWidth(-1);
@@ -521,38 +547,65 @@ void AppRuntime::RenderSacmViewerPanel(float left_w, float top_left_h, float bot
     ImGui::End();
 }
 
-void AppRuntime::RenderCenterPanel(float center_x, float center_w, float display_h) {
-    ImGui::SetNextWindowPos(ImVec2(center_x, 0));
-    ImGui::SetNextWindowSize(ImVec2(center_w, display_h));
+void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content_h, float top_y) {
+    ImGui::SetNextWindowPos(ImVec2(center_x, top_y));
+    ImGui::SetNextWindowSize(ImVec2(center_w, content_h));
     ImGui::Begin("Center View", nullptr, kPanelFlags | ImGuiWindowFlags_NoTitleBar);
 
     ui::UiState& ui_state = ui::GetUiState();
-    if (ImGui::BeginTabBar("##center_tabs")) {
-        ImGuiTabItemFlags gsn_flags = (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::GsnCanvas)
-                                      ? ImGuiTabItemFlags_SetSelected
-                                      : 0;
-        if (ImGui::BeginTabItem("GSN Canvas", nullptr, gsn_flags)) {
+
+    auto is_tab_visible = [&](ui::CenterView view) {
+        switch (view) {
+            case ui::CenterView::GsnCanvas: return impl_->show_gsn_tab;
+            case ui::CenterView::CseRegister: return impl_->show_cse_tab;
+            case ui::CenterView::EvidenceRegister: return impl_->show_evidence_tab;
+        }
+        return false;
+    };
+
+    if (!is_tab_visible(ui_state.center_view)) {
+        if (impl_->show_gsn_tab) {
             ui_state.center_view = ui::CenterView::GsnCanvas;
-            ui::ShowGsnCanvasContent();
-            ImGui::EndTabItem();
-        }
-
-        ImGuiTabItemFlags cse_flags = (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::CseRegister)
-                                      ? ImGuiTabItemFlags_SetSelected
-                                      : 0;
-        if (ImGui::BeginTabItem("CSE Register", nullptr, cse_flags)) {
+        } else if (impl_->show_cse_tab) {
             ui_state.center_view = ui::CenterView::CseRegister;
-            ui::ShowCseRegisterView();
-            ImGui::EndTabItem();
+        } else if (impl_->show_evidence_tab) {
+            ui_state.center_view = ui::CenterView::EvidenceRegister;
+        }
+        impl_->force_center_tab_selection = true;
+    }
+
+    if (ImGui::BeginTabBar("##center_tabs")) {
+        if (impl_->show_gsn_tab) {
+            ImGuiTabItemFlags gsn_flags = (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::GsnCanvas)
+                                          ? ImGuiTabItemFlags_SetSelected
+                                          : 0;
+            if (ImGui::BeginTabItem("GSN Canvas", nullptr, gsn_flags)) {
+                ui_state.center_view = ui::CenterView::GsnCanvas;
+                ui::ShowGsnCanvasContent();
+                ImGui::EndTabItem();
+            }
         }
 
-        ImGuiTabItemFlags evidence_flags = (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::EvidenceRegister)
-                                           ? ImGuiTabItemFlags_SetSelected
-                                           : 0;
-        if (ImGui::BeginTabItem("Evidence Register", nullptr, evidence_flags)) {
-            ui_state.center_view = ui::CenterView::EvidenceRegister;
-            ui::ShowEvidenceRegisterView();
-            ImGui::EndTabItem();
+        if (impl_->show_cse_tab) {
+            ImGuiTabItemFlags cse_flags = (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::CseRegister)
+                                          ? ImGuiTabItemFlags_SetSelected
+                                          : 0;
+            if (ImGui::BeginTabItem("CSE Register", nullptr, cse_flags)) {
+                ui_state.center_view = ui::CenterView::CseRegister;
+                ui::ShowCseRegisterView();
+                ImGui::EndTabItem();
+            }
+        }
+
+        if (impl_->show_evidence_tab) {
+            ImGuiTabItemFlags evidence_flags = (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::EvidenceRegister)
+                                               ? ImGuiTabItemFlags_SetSelected
+                                               : 0;
+            if (ImGui::BeginTabItem("Evidence Register", nullptr, evidence_flags)) {
+                ui_state.center_view = ui::CenterView::EvidenceRegister;
+                ui::ShowEvidenceRegisterView();
+                ImGui::EndTabItem();
+            }
         }
 
         ImGui::EndTabBar();
@@ -562,10 +615,10 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float display
     ImGui::End();
 }
 
-void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, float right_w) {
+void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, float right_w, float content_h, float top_y) {
     float right_x = center_x + center_w + kSplitterThickness;
-    ImGui::SetNextWindowPos(ImVec2(right_x, 0));
-    ImGui::SetNextWindowSize(ImVec2(right_w, ImGui::GetIO().DisplaySize.y));
+    ImGui::SetNextWindowPos(ImVec2(right_x, top_y));
+    ImGui::SetNextWindowSize(ImVec2(right_w, content_h));
     ImGui::Begin("Element Properties", nullptr, kPanelFlags);
 
     parser::AssuranceCase* ac_ptr = impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
@@ -668,24 +721,27 @@ const parser::AssuranceCase* AppRuntime::GetLoadedCase() const {
 
 void AppRuntime::RenderFrame(bool& done) {
     ImVec2 display = ImGui::GetIO().DisplaySize;
+    float top_y = RenderMainMenuBar(done);
+
+    float content_h = std::max(0.0f, display.y - top_y);
 
     float left_w = display.x * impl_->left_ratio;
     float right_w = display.x * impl_->right_ratio;
     float center_w = display.x - left_w - right_w - kSplitterThickness * 2.0f;
 
-    float top_left_h = display.y * kTopLeftHeightRatio;
-    float bottom_left_h = display.y - top_left_h;
+    float top_left_h = content_h * kTopLeftHeightRatio;
+    float bottom_left_h = content_h - top_left_h;
 
     RebuildDerivedViewsIfNeeded();
 
-    RenderSplitters(display.x, display.y, left_w, center_w);
+    RenderSplitters(display.x, content_h, left_w, center_w, top_y);
 
-    RenderTreePanel(left_w, top_left_h);
-    RenderSacmViewerPanel(left_w, top_left_h, bottom_left_h, done);
+    RenderTreePanel(left_w, top_left_h, top_y);
+    RenderSacmViewerPanel(left_w, top_left_h, bottom_left_h, top_y);
 
     float center_x = left_w + kSplitterThickness;
-    RenderCenterPanel(center_x, center_w, display.y);
-    RenderElementPropertiesPanel(center_x, center_w, right_w);
+    RenderCenterPanel(center_x, center_w, content_h, top_y);
+    RenderElementPropertiesPanel(center_x, center_w, right_w, content_h, top_y);
 
     RenderNotImplementedModal();
     RenderRemoveConfirmModal();
