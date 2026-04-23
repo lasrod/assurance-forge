@@ -171,7 +171,7 @@ TEST(SacmParser, SampleFileStructure) {
     // Argument package
     ASSERT_EQ(pkg.argumentPackages.size(), 1u);
     const auto& arg = pkg.argumentPackages[0];
-    EXPECT_EQ(arg.claims.size(), 3u);
+    EXPECT_EQ(arg.claims.size(), 4u);
     EXPECT_EQ(arg.argumentReasonings.size(), 2u);
     EXPECT_EQ(arg.artifactReferences.size(), 2u);
 

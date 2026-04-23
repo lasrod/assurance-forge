@@ -63,8 +63,10 @@ add_executable(tests
     tests/test_assurance_tree.cpp
     tests/test_layout.cpp
     tests/test_sacm_roundtrip.cpp
+    tests/test_element_factory.cpp
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp
+    src/core/element_factory.cpp
     src/ui/gsn_layout.cpp
     src/sacm/sacm_parser.cpp
     src/sacm/sacm_serializer.cpp

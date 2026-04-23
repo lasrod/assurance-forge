@@ -12,4 +12,8 @@ void ShowTreeViewPanel(const core::AssuranceTree* tree);
 // Must be called inside an active popup.
 void RenderAddElementMenu();
 
+// Render the shared "Remove" menu item (used by tree and canvas context menus).
+// Must be called inside an active popup.
+void RenderRemoveElementMenuItem();
+
 }  // namespace ui

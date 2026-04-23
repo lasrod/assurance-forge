@@ -26,4 +26,23 @@ bool AddChildElement(parser::AssuranceCase& ac,
                      std::string& out_new_id,
                      std::string& out_error);
 
+// Count the number of descendant elements (children, grandchildren, ...) of
+// the element with id `id`. Descendants are derived by walking relationship
+// elements: an element X is a child of Y if some relationship has Y in its
+// target_refs and X in its source_refs (or as the reasoning_ref). Relationship
+// elements themselves are NOT counted as descendants.
+int CountDescendants(const parser::AssuranceCase& ac, const std::string& id);
+
+// Remove the element with id `id` from both the parser and sacm models, plus
+// any relationship elements that reference removed ids.
+//   - cascade=false: fails (returns false, sets out_error) if the element has
+//     descendants. Use for the "leaf-only" remove path.
+//   - cascade=true:  also removes every descendant reachable from `id`.
+// Returns true on success.
+bool RemoveElement(parser::AssuranceCase& ac,
+                   sacm::AssuranceCasePackage* pkg,
+                   const std::string& id,
+                   bool cascade,
+                   std::string& out_error);
+
 }  // namespace core

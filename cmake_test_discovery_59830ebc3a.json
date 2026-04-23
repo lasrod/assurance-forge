@@ -1,5 +1,5 @@
 {
-  "tests": 46,
+  "tests": 51,
   "name": "AllTests",
   "testsuites": [
     {
@@ -271,6 +271,37 @@
           "name": "ProducesValidXml",
           "file": "C:\\development\\assurance-forge\\tests\\test_sacm_roundtrip.cpp",
           "line": 239
+        }
+      ]
+    },
+    {
+      "name": "ElementFactoryRemove",
+      "tests": 5,
+      "testsuite": [
+        {
+          "name": "RemoveLeafElement",
+          "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
+          "line": 49
+        },
+        {
+          "name": "RemoveElementWithChildrenCascade",
+          "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
+          "line": 82
+        },
+        {
+          "name": "RemoveUnknownIdReturnsError",
+          "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
+          "line": 121
+        },
+        {
+          "name": "RemoveSourceOfSharedInferencePreservesSiblings",
+          "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
+          "line": 133
+        },
+        {
+          "name": "RemoveSingleSubGoalUnderStrategyKeepsStrategy",
+          "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
+          "line": 204
         }
       ]
     }

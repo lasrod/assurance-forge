@@ -11,6 +11,11 @@ namespace app {
 // runtime is active or no element is selected.
 void RequestAddChild(core::NewElementKind kind);
 
+// Request that the active AppRuntime remove the currently selected element.
+// If the element has no children it is removed immediately. If it has
+// descendants, a confirmation modal is shown before cascade removal.
+void RequestRemoveSelected();
+
 // Request that the active AppRuntime show a "not implemented yet" status for
 // the given feature name.
 void RequestNotImplemented(const char* feature);
@@ -29,6 +34,10 @@ public:
     // Returns true on success; updates selection to the new element.
     bool AddChildToSelected(core::NewElementKind kind);
 
+    // Remove the currently selected element. If it has children, opens the
+    // remove-confirmation modal instead of removing immediately.
+    void RemoveSelected();
+
     // Set a transient status message (shown next frame in the SACM viewer panel).
     void SetStatus(const std::string& message);
 
@@ -43,6 +52,7 @@ private:
     void RenderCenterPanel(float center_x, float center_w, float display_h);
     void RenderElementPropertiesPanel(float center_x, float center_w, float right_w);
     void RenderNotImplementedModal();
+    void RenderRemoveConfirmModal();
 
     void RebuildDerivedViewsIfNeeded();
 

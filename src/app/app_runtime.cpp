@@ -127,6 +127,11 @@ struct AppRuntime::Impl {
     // Modal for unimplemented features
     bool show_not_implemented_modal = false;
     std::string not_implemented_feature;
+
+    // Modal for confirming cascade-removal of an element with descendants.
+    bool show_remove_confirm = false;
+    std::string pending_remove_id;
+    int pending_remove_descendant_count = 0;
 };
 
 AppRuntime::AppRuntime() : impl_(new Impl()) {
@@ -147,6 +152,10 @@ AppRuntime::~AppRuntime() {
 
 void RequestAddChild(core::NewElementKind kind) {
     if (g_active_runtime) g_active_runtime->AddChildToSelected(kind);
+}
+
+void RequestRemoveSelected() {
+    if (g_active_runtime) g_active_runtime->RemoveSelected();
 }
 
 void RequestNotImplemented(const char* feature) {
@@ -184,6 +193,41 @@ bool AppRuntime::AddChildToSelected(core::NewElementKind kind) {
     s.center_on_selection = true;
     SetStatus("Added " + new_id);
     return true;
+}
+
+void AppRuntime::RemoveSelected() {
+    if (!impl_->app_state.loaded_case.has_value()) {
+        SetStatus("No assurance case loaded.");
+        return;
+    }
+    const std::string& selected_id = ui::GetUiState().selected_element_id;
+    if (selected_id.empty()) {
+        SetStatus("No element selected.");
+        return;
+    }
+
+    parser::AssuranceCase& ac = impl_->app_state.loaded_case.value();
+    int descendants = core::CountDescendants(ac, selected_id);
+    if (descendants > 0) {
+        // Defer to the confirmation modal; nothing is removed yet.
+        impl_->show_remove_confirm = true;
+        impl_->pending_remove_id = selected_id;
+        impl_->pending_remove_descendant_count = descendants;
+        return;
+    }
+
+    // Leaf: remove immediately.
+    sacm::AssuranceCasePackage* pkg = impl_->app_state.sacm_package.has_value()
+                                          ? &impl_->app_state.sacm_package.value()
+                                          : nullptr;
+    std::string error;
+    if (!core::RemoveElement(ac, pkg, selected_id, /*cascade=*/false, error)) {
+        SetStatus("Remove failed: " + error);
+        return;
+    }
+    impl_->tree_needs_rebuild = true;
+    ui::GetUiState().selected_element_id.clear();
+    SetStatus("Removed " + selected_id);
 }
 
 void AppRuntime::SetStatus(const std::string& message) {
@@ -537,6 +581,59 @@ void AppRuntime::RenderNotImplementedModal() {
     }
 }
 
+void AppRuntime::RenderRemoveConfirmModal() {
+    if (!impl_->show_remove_confirm) return;
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal("##remove_confirm_modal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Remove '%s' and %d descendant%s?",
+                    impl_->pending_remove_id.c_str(),
+                    impl_->pending_remove_descendant_count,
+                    impl_->pending_remove_descendant_count == 1 ? "" : "s");
+        ImGui::Spacing();
+        ImGui::Spacing();
+
+        const float button_width = 110.0f;
+        const float spacing = 10.0f;
+        const float total_width = button_width * 2.0f + spacing;
+        const float center_x = (ImGui::GetWindowWidth() - total_width) * 0.5f;
+        ImGui::SetCursorPosX(center_x);
+
+        if (ImGui::Button("Remove all", ImVec2(button_width, 0))) {
+            std::string id = impl_->pending_remove_id;
+            impl_->show_remove_confirm = false;
+            impl_->pending_remove_id.clear();
+            impl_->pending_remove_descendant_count = 0;
+            ImGui::CloseCurrentPopup();
+
+            if (impl_->app_state.loaded_case.has_value()) {
+                parser::AssuranceCase& ac = impl_->app_state.loaded_case.value();
+                sacm::AssuranceCasePackage* pkg = impl_->app_state.sacm_package.has_value()
+                                                      ? &impl_->app_state.sacm_package.value()
+                                                      : nullptr;
+                std::string error;
+                if (!core::RemoveElement(ac, pkg, id, /*cascade=*/true, error)) {
+                    SetStatus("Remove failed: " + error);
+                } else {
+                    impl_->tree_needs_rebuild = true;
+                    ui::GetUiState().selected_element_id.clear();
+                    SetStatus("Removed " + id + " and subtree");
+                }
+            }
+        }
+        ImGui::SameLine(0.0f, spacing);
+        if (ImGui::Button("Cancel", ImVec2(button_width, 0))) {
+            impl_->show_remove_confirm = false;
+            impl_->pending_remove_id.clear();
+            impl_->pending_remove_descendant_count = 0;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    } else if (impl_->show_remove_confirm) {
+        ImGui::OpenPopup("##remove_confirm_modal");
+    }
+}
+
 void AppRuntime::RenderFrame(bool& done) {
     ImVec2 display = ImGui::GetIO().DisplaySize;
 
@@ -559,6 +656,7 @@ void AppRuntime::RenderFrame(bool& done) {
     RenderElementPropertiesPanel(center_x, center_w, right_w);
 
     RenderNotImplementedModal();
+    RenderRemoveConfirmModal();
 }
 
 }  // namespace app

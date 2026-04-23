@@ -1,5 +1,6 @@
 #include "core/element_factory.h"
 
+#include <algorithm>
 #include <unordered_set>
 
 namespace core {
@@ -247,6 +248,218 @@ bool AddChildElement(parser::AssuranceCase& ac,
     // Append to parser model (drives the tree/canvas rebuild).
     ac.elements.push_back(std::move(new_elem));
     ac.elements.push_back(std::move(rel));
+
+    return true;
+}
+
+// ===== Remove ===============================================================
+
+namespace {
+
+// True for parser element types that represent relationships (not nodes).
+bool IsRelationshipType(const std::string& t) {
+    return t == "assertedinference"
+        || t == "assertedcontext"
+        || t == "assertedevidence";
+}
+
+// Collect the ids of all direct children of `parent_id` by scanning
+// relationship elements. A child is any element referenced as a source or as
+// the reasoning of a relationship whose targets include the parent.
+void CollectDirectChildren(const parser::AssuranceCase& ac,
+                           const std::string& parent_id,
+                           std::vector<std::string>& out_children) {
+    for (const auto& e : ac.elements) {
+        if (!IsRelationshipType(e.type)) continue;
+        bool targets_parent = false;
+        for (const auto& t : e.target_refs) {
+            if (t == parent_id) { targets_parent = true; break; }
+        }
+        if (!targets_parent) continue;
+
+        for (const auto& s : e.source_refs) {
+            if (!s.empty()) out_children.push_back(s);
+        }
+        if (!e.reasoning_ref.empty()) {
+            out_children.push_back(e.reasoning_ref);
+        }
+    }
+}
+
+// Collect the closed set of ids reachable as descendants of `root_id`.
+// `root_id` itself is included in the result.
+std::unordered_set<std::string> CollectSubtreeIds(const parser::AssuranceCase& ac,
+                                                  const std::string& root_id) {
+    std::unordered_set<std::string> visited;
+    std::vector<std::string> stack;
+    stack.push_back(root_id);
+    while (!stack.empty()) {
+        std::string current = std::move(stack.back());
+        stack.pop_back();
+        if (!visited.insert(current).second) continue;  // already seen
+
+        std::vector<std::string> children;
+        CollectDirectChildren(ac, current, children);
+        for (auto& c : children) stack.push_back(std::move(c));
+    }
+    return visited;
+}
+
+// Remove from `vec` every element whose id is in `removed_ids`.
+template <typename T>
+void EraseByIdSet(std::vector<T>& vec, const std::unordered_set<std::string>& removed_ids) {
+    vec.erase(std::remove_if(vec.begin(), vec.end(),
+                             [&](const T& item) { return removed_ids.count(item.id) > 0; }),
+              vec.end());
+}
+
+// Strip removed ids from the source/target vectors of a SACM relationship.
+void ScrubRelationshipRefs(sacm::AssertedRelationship& rel,
+                           const std::unordered_set<std::string>& removed_ids) {
+    rel.sources.erase(std::remove_if(rel.sources.begin(), rel.sources.end(),
+                                     [&](const std::string& r) { return removed_ids.count(r) > 0; }),
+                      rel.sources.end());
+    rel.targets.erase(std::remove_if(rel.targets.begin(), rel.targets.end(),
+                                     [&](const std::string& r) { return removed_ids.count(r) > 0; }),
+                      rel.targets.end());
+}
+
+// True if a SACM relationship is now structurally empty: has no targets, or
+// has neither sources nor a reasoning reference. A relationship that still
+// connects at least one source (or a reasoning) to at least one target is
+// kept so siblings of the removed element survive.
+bool IsRelationshipDangling(const sacm::AssertedRelationship& rel) {
+    if (rel.targets.empty()) return true;
+    return rel.sources.empty();
+}
+bool IsInferenceDangling(const sacm::AssertedInference& inf) {
+    if (inf.targets.empty()) return true;
+    return inf.sources.empty() && inf.reasoning.empty();
+}
+
+// Strip removed ids from a parser-side relationship's source/target/reasoning
+// references.
+void ScrubParserRelationshipRefs(parser::SacmElement& rel,
+                                 const std::unordered_set<std::string>& removed_ids) {
+    rel.source_refs.erase(
+        std::remove_if(rel.source_refs.begin(), rel.source_refs.end(),
+                       [&](const std::string& r) { return removed_ids.count(r) > 0; }),
+        rel.source_refs.end());
+    rel.target_refs.erase(
+        std::remove_if(rel.target_refs.begin(), rel.target_refs.end(),
+                       [&](const std::string& r) { return removed_ids.count(r) > 0; }),
+        rel.target_refs.end());
+    if (!rel.reasoning_ref.empty() && removed_ids.count(rel.reasoning_ref)) {
+        rel.reasoning_ref.clear();
+    }
+}
+
+// True if a parser-side relationship has been emptied out by scrubbing.
+bool IsParserRelationshipDangling(const parser::SacmElement& rel) {
+    if (rel.target_refs.empty()) return true;
+    if (rel.type == "assertedinference") {
+        return rel.source_refs.empty() && rel.reasoning_ref.empty();
+    }
+    return rel.source_refs.empty();
+}
+
+}  // namespace
+
+int CountDescendants(const parser::AssuranceCase& ac, const std::string& id) {
+    if (id.empty()) return 0;
+    auto subtree = CollectSubtreeIds(ac, id);
+    // subtree includes the root itself; descendants = everything else.
+    return subtree.empty() ? 0 : static_cast<int>(subtree.size() - 1);
+}
+
+bool RemoveElement(parser::AssuranceCase& ac,
+                   sacm::AssuranceCasePackage* pkg,
+                   const std::string& id,
+                   bool cascade,
+                   std::string& out_error) {
+    out_error.clear();
+    if (id.empty()) {
+        out_error = "No element id supplied.";
+        return false;
+    }
+    if (!FindElement(ac, id)) {
+        out_error = "Element not found in model.";
+        return false;
+    }
+
+    // Determine the set of node ids to remove.
+    std::unordered_set<std::string> removed_ids;
+    if (cascade) {
+        removed_ids = CollectSubtreeIds(ac, id);
+    } else {
+        std::vector<std::string> direct_children;
+        CollectDirectChildren(ac, id, direct_children);
+        if (!direct_children.empty()) {
+            out_error = "Element has children; remove with cascade.";
+            return false;
+        }
+        removed_ids.insert(id);
+    }
+
+    // ---- Parser model ------------------------------------------------------
+    // 1) Drop the node elements themselves.
+    // 2) For surviving relationships, scrub references to removed ids and
+    //    only drop the relationship if it becomes structurally empty. This
+    //    preserves a shared inference (e.g. one inference with multiple
+    //    sub-goal sources and a reasoning strategy) when only one of its
+    //    participants is being removed.
+    for (auto& e : ac.elements) {
+        if (IsRelationshipType(e.type)) {
+            ScrubParserRelationshipRefs(e, removed_ids);
+        }
+    }
+    ac.elements.erase(
+        std::remove_if(ac.elements.begin(), ac.elements.end(),
+                       [&](const parser::SacmElement& e) {
+                           if (removed_ids.count(e.id)) return true;
+                           if (!IsRelationshipType(e.type)) return false;
+                           return IsParserRelationshipDangling(e);
+                       }),
+        ac.elements.end());
+
+    // ---- SACM model --------------------------------------------------------
+    if (pkg) {
+        for (auto& ap : pkg->argumentPackages) {
+            EraseByIdSet(ap.claims, removed_ids);
+            EraseByIdSet(ap.argumentReasonings, removed_ids);
+            EraseByIdSet(ap.artifactReferences, removed_ids);
+
+            // Scrub source/target lists, then drop dangling relationships.
+            for (auto& r : ap.assertedInferences) {
+                ScrubRelationshipRefs(r, removed_ids);
+                if (!r.reasoning.empty() && removed_ids.count(r.reasoning)) {
+                    r.reasoning.clear();
+                }
+            }
+            for (auto& r : ap.assertedContexts)   ScrubRelationshipRefs(r, removed_ids);
+            for (auto& r : ap.assertedEvidences)  ScrubRelationshipRefs(r, removed_ids);
+
+            ap.assertedInferences.erase(
+                std::remove_if(ap.assertedInferences.begin(), ap.assertedInferences.end(),
+                               [&](const sacm::AssertedInference& r) {
+                                   if (removed_ids.count(r.id)) return true;
+                                   return IsInferenceDangling(r);
+                               }),
+                ap.assertedInferences.end());
+            ap.assertedContexts.erase(
+                std::remove_if(ap.assertedContexts.begin(), ap.assertedContexts.end(),
+                               [&](const sacm::AssertedContext& r) {
+                                   return removed_ids.count(r.id) > 0 || IsRelationshipDangling(r);
+                               }),
+                ap.assertedContexts.end());
+            ap.assertedEvidences.erase(
+                std::remove_if(ap.assertedEvidences.begin(), ap.assertedEvidences.end(),
+                               [&](const sacm::AssertedEvidence& r) {
+                                   return removed_ids.count(r.id) > 0 || IsRelationshipDangling(r);
+                               }),
+                ap.assertedEvidences.end());
+        }
+    }
 
     return true;
 }

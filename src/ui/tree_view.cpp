@@ -22,6 +22,13 @@ void RenderAddElementMenu() {
     }
 }
 
+// Render the shared "Remove" item used by both the tree and the canvas
+// context menus. Dispatches via app::RequestRemoveSelected, which targets the
+// currently selected element and prompts for confirmation if it has children.
+void RenderRemoveElementMenuItem() {
+    if (ImGui::MenuItem("Remove")) app::RequestRemoveSelected();
+}
+
 static const char* RoleLabel(core::NodeRole role) {
     switch (role) {
         case core::NodeRole::Claim:         return "[Claim]";
@@ -87,6 +94,8 @@ static void RenderTreeNode(const core::TreeNode* node) {
     if (ImGui::BeginPopupContextItem(node->id.c_str())) {
         state.selected_element_id = node->id;
         RenderAddElementMenu();
+        ImGui::Separator();
+        RenderRemoveElementMenuItem();
         ImGui::EndPopup();
     }
 

@@ -204,6 +204,8 @@ void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin, float zoom) {
     if (ImGui::BeginPopupContextItem(node.id.c_str())) {
         GetUiState().selected_element_id = node.id;
         RenderAddElementMenu();
+        ImGui::Separator();
+        RenderRemoveElementMenuItem();
         ImGui::EndPopup();
     }
 
