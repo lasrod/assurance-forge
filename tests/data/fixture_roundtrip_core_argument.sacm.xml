@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SACM:AssuranceCasePackage
+    xmlns:SACM="http://example.org/sacm/2.3"
+    id="acp_vehicle_braking"
+    name="VehicleBrakingAssuranceCase">
+
+  <description>
+    <content lang="en">Simple assurance case demonstrating core SACM argumentation elements.</content>
+  </description>
+
+  <argumentPackage id="argpkg_braking" name="BrakingArgumentPackage">
+
+    <Claim id="cl_top" name="TopClaim" assertionDeclaration="asserted">
+      <description>
+        <content lang="en">The braking function is acceptably safe in the defined operational context.</content>
+      </description>
+    </Claim>
+
+    <Claim id="cl_sub_1" name="SubClaim_Architecture" assertionDeclaration="asserted">
+      <description>
+        <content lang="en">The braking system architecture mitigates identified hazardous failures.</content>
+      </description>
+    </Claim>
+
+    <Claim id="cl_sub_2" name="SubClaim_Verification" assertionDeclaration="needsSupport">
+      <description>
+        <content lang="en">Verification activities demonstrate braking requirements are satisfied.</content>
+      </description>
+    </Claim>
+
+    <Claim id="cl_assumption_1" name="Assumption_Environment" assertionDeclaration="assumed">
+      <description>
+        <content lang="en">Road friction remains within the assumed operating envelope.</content>
+      </description>
+    </Claim>
+
+    <ArgumentReasoning id="ar_1" name="Reasoning_ArchitectureAndVerification">
+      <description>
+        <content lang="en">If the architecture mitigates hazards and verification shows requirements satisfaction, then the top safety claim is supported.</content>
+      </description>
+    </ArgumentReasoning>
+
+    <ArtifactReference id="ctx_1" name="OperationalDesignDomainContext">
+      <description>
+        <content lang="en">Operational design domain definition for the braking function.</content>
+      </description>
+    </ArtifactReference>
+
+    <ArtifactReference id="ev_1" name="BrakeFMEAReference">
+      <description>
+        <content lang="en">Reference to brake system FMEA report.</content>
+      </description>
+    </ArtifactReference>
+
+    <ArtifactReference id="ev_2" name="BrakeVerificationReportReference">
+      <description>
+        <content lang="en">Reference to braking verification report.</content>
+      </description>
+    </ArtifactReference>
+
+    <AssertedInference id="inf_1" name="Inference_ToTop" assertionDeclaration="asserted" reasoning="ar_1">
+      <source ref="cl_sub_1"/>
+      <source ref="cl_sub_2"/>
+      <target ref="cl_top"/>
+    </AssertedInference>
+
+    <AssertedInference id="inf_2" name="Inference_AssumptionToArchitecture" assertionDeclaration="asserted">
+      <source ref="cl_assumption_1"/>
+      <target ref="cl_sub_1"/>
+    </AssertedInference>
+
+    <AssertedContext id="acx_1" name="Context_ForTopClaim" assertionDeclaration="asserted">
+      <source ref="ctx_1"/>
+      <target ref="cl_top"/>
+    </AssertedContext>
+
+    <AssertedEvidence id="ae_1" name="Evidence_ForArchitectureClaim" assertionDeclaration="asserted">
+      <source ref="ev_1"/>
+      <target ref="cl_sub_1"/>
+    </AssertedEvidence>
+
+    <AssertedEvidence id="ae_2" name="Evidence_ForVerificationClaim" assertionDeclaration="asserted">
+      <source ref="ev_2"/>
+      <target ref="cl_sub_2"/>
+    </AssertedEvidence>
+
+  </argumentPackage>
+
+</SACM:AssuranceCasePackage>

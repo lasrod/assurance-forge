@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "sacm/sacm_parser.h"
 #include "sacm/sacm_serializer.h"
+#include <filesystem>
 
 // ===== Helpers for deep comparison =====
 
@@ -114,6 +115,11 @@ static void expect_packages_eq(const sacm::AssuranceCasePackage& a,
 
 // ===== File-based round-trip helper =====
 
+static std::string test_data_path(const std::string& filename) {
+    const std::filesystem::path base_dir = std::filesystem::path(__FILE__).parent_path() / "data";
+    return (base_dir / filename).string();
+}
+
 static void round_trip_file(const std::string& file_path) {
     auto result1 = sacm::parse_sacm(file_path);
     ASSERT_TRUE(result1.success) << "Parse failed: " << result1.error_message;
@@ -130,29 +136,29 @@ static void round_trip_file(const std::string& file_path) {
 // ===== Tests =====
 
 TEST(SacmRoundTrip, SampleFile) {
-    round_trip_file("data/sample.sacm.xml");
+    round_trip_file(test_data_path("fixture_roundtrip_sample.sacm.xml"));
 }
 
 TEST(SacmRoundTrip, CoreArgumentFile) {
-    round_trip_file("data/sacm_example_core_argument.xml");
+    round_trip_file(test_data_path("fixture_roundtrip_core_argument.sacm.xml"));
 }
 
 TEST(SacmRoundTrip, OpenAutonomySafetyCase) {
-    round_trip_file("data/open-autonomy-safety-case.sacm.xml");
+    round_trip_file(test_data_path("fixture_roundtrip_open_autonomy.sacm.xml"));
 }
 
 TEST(SacmRoundTrip, SanitizedStrictFile) {
-    round_trip_file("data/safety-case-sanitized-strict.sacm.xml");
+    round_trip_file(test_data_path("fixture_roundtrip_sanitized_strict.sacm.xml"));
 }
 
 TEST(SacmRoundTrip, UpdatedV2File) {
-    round_trip_file("data/open-autonomy-safety-case.updated.v2.sacm.xml");
+    round_trip_file(test_data_path("fixture_roundtrip_open_autonomy_updated_v2.sacm.xml"));
 }
 
 // ===== Parse correctness tests =====
 
 TEST(SacmParser, SampleFileStructure) {
-    auto result = sacm::parse_sacm("data/sample.sacm.xml");
+    auto result = sacm::parse_sacm(test_data_path("fixture_roundtrip_sample.sacm.xml"));
     ASSERT_TRUE(result.success);
 
     const auto& pkg = result.package;
@@ -181,7 +187,7 @@ TEST(SacmParser, SampleFileStructure) {
 }
 
 TEST(SacmParser, CoreArgumentFileStructure) {
-    auto result = sacm::parse_sacm("data/sacm_example_core_argument.xml");
+    auto result = sacm::parse_sacm(test_data_path("fixture_roundtrip_core_argument.sacm.xml"));
     ASSERT_TRUE(result.success);
 
     const auto& pkg = result.package;
@@ -206,13 +212,13 @@ TEST(SacmParser, CoreArgumentFileStructure) {
 
 TEST(SacmParser, NamespacePreservation) {
     // SACM: prefix (uppercase)
-    auto r1 = sacm::parse_sacm("data/sacm_example_core_argument.xml");
+    auto r1 = sacm::parse_sacm(test_data_path("fixture_roundtrip_core_argument.sacm.xml"));
     ASSERT_TRUE(r1.success);
     EXPECT_EQ(r1.package.namespace_prefix, "SACM");
     EXPECT_EQ(r1.package.namespace_uri, "http://example.org/sacm/2.3");
 
     // sacm: prefix (lowercase)
-    auto r2 = sacm::parse_sacm("data/sample.sacm.xml");
+    auto r2 = sacm::parse_sacm(test_data_path("fixture_roundtrip_sample.sacm.xml"));
     ASSERT_TRUE(r2.success);
     EXPECT_EQ(r2.package.namespace_prefix, "sacm");
     EXPECT_EQ(r2.package.namespace_uri, "http://www.omg.org/spec/SACM/2.2/Argumentation");
