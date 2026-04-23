@@ -3,6 +3,7 @@
 #include "gsn_canvas.h" // for DrawGsnNode
 #include <imgui.h>
 #include <cmath>
+#include <algorithm>
 #include <unordered_map>
 
 namespace ui {
@@ -346,6 +347,51 @@ bool GsnCanvas::CenterOnNode(const std::string& node_id, ImVec2 viewport_size) {
         }
     }
     return false;
+}
+
+bool GsnCanvas::CenterOnIds(const std::unordered_set<std::string>& ids,
+                            ImVec2 viewport_size) {
+    if (ids.empty()) return false;
+
+    bool found_any = false;
+    float min_x = 0, min_y = 0, max_x = 0, max_y = 0;
+    for (const auto& node : layout_nodes_) {
+        if (!ids.count(node.id)) continue;
+        const float nx0 = node.position.x;
+        const float ny0 = node.position.y;
+        const float nx1 = nx0 + node.size.x;
+        const float ny1 = ny0 + node.size.y;
+        if (!found_any) {
+            min_x = nx0; min_y = ny0; max_x = nx1; max_y = ny1;
+            found_any = true;
+        } else {
+            if (nx0 < min_x) min_x = nx0;
+            if (ny0 < min_y) min_y = ny0;
+            if (nx1 > max_x) max_x = nx1;
+            if (ny1 > max_y) max_y = ny1;
+        }
+    }
+    if (!found_any) return false;
+
+    // Pad the AABB so the marked nodes don't sit flush with the viewport edge.
+    const float padding = 80.0f;  // layout-space pixels
+    const float aabb_w = std::max(1.0f, (max_x - min_x) + padding * 2.0f);
+    const float aabb_h = std::max(1.0f, (max_y - min_y) + padding * 2.0f);
+
+    // Compute zoom that fits AABB in viewport, then clamp.
+    const float zoom_x = viewport_size.x / aabb_w;
+    const float zoom_y = viewport_size.y / aabb_h;
+    float new_zoom = std::min(zoom_x, zoom_y);
+    // Clamp to a sensible range; do not zoom further IN than 1.0 (no need).
+    if (new_zoom > 1.0f) new_zoom = 1.0f;
+    if (new_zoom < 0.1f) new_zoom = 0.1f;
+    zoom_level_ = new_zoom;
+
+    const float cx = (min_x + max_x) * 0.5f;
+    const float cy = (min_y + max_y) * 0.5f;
+    view_offset_.x = cx * zoom_level_ - viewport_size.x * 0.5f;
+    view_offset_.y = cy * zoom_level_ - viewport_size.y * 0.5f;
+    return true;
 }
 
 } // namespace ui

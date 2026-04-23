@@ -1,6 +1,7 @@
 #include "core/element_factory.h"
 
 #include <algorithm>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace core {
@@ -252,7 +253,118 @@ bool AddChildElement(parser::AssuranceCase& ac,
     return true;
 }
 
-// ===== Remove ===============================================================
+// ===== Remove helpers (planner) ============================================
+
+namespace {
+
+// Mutable lookup for a parser element by id.
+parser::SacmElement* FindElementMut(parser::AssuranceCase& ac, const std::string& id) {
+    for (auto& e : ac.elements) {
+        if (e.id == id) return &e;
+    }
+    return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// TreeIndex: a single canonical view of the visual tree, computed from the
+// parser model the same way `AssuranceTree::Build` wires the canvas. All
+// removal logic (parent lookup, descendants, siblings) goes through this so
+// strategies behave like ordinary tree nodes:
+//
+//   * For an AssertedInference with target T:
+//       - if reasoning R is set: parent[R] = T, parent[S] = R for each source S
+//       - else                 : parent[S] = T for each source S
+//   * For an AssertedContext with target T: parent[S] = T for each source S
+//     (Group2 attachment, but a child of T for removal purposes).
+//   * For an AssertedEvidence with target T: parent[S] = T for each source S.
+//
+// First-write-wins so a node that already has a parent isn't reparented (this
+// matches AssuranceTree::Build's `parent == nullptr` guard).
+// ---------------------------------------------------------------------------
+struct TreeIndex {
+    std::unordered_map<std::string, std::string> parent_of;
+    std::unordered_map<std::string, std::vector<std::string>> children_of;
+    // Group2 (context) attachment children, separated so NodeOnly removal can
+    // sweep them with the node while leaving other children behind.
+    std::unordered_map<std::string, std::vector<std::string>> group2_of;
+
+    const std::string& ParentOf(const std::string& id) const {
+        static const std::string empty;
+        auto it = parent_of.find(id);
+        return it == parent_of.end() ? empty : it->second;
+    }
+    const std::vector<std::string>& ChildrenOf(const std::string& id) const {
+        static const std::vector<std::string> empty;
+        auto it = children_of.find(id);
+        return it == children_of.end() ? empty : it->second;
+    }
+    const std::vector<std::string>& Group2Of(const std::string& id) const {
+        static const std::vector<std::string> empty;
+        auto it = group2_of.find(id);
+        return it == group2_of.end() ? empty : it->second;
+    }
+};
+
+void AddEdge(TreeIndex& idx, const std::string& parent, const std::string& child,
+             bool group2 = false) {
+    if (parent.empty() || child.empty() || parent == child) return;
+    auto inserted = idx.parent_of.emplace(child, parent);
+    if (!inserted.second) return;  // first-write-wins
+    idx.children_of[parent].push_back(child);
+    if (group2) idx.group2_of[parent].push_back(child);
+}
+
+TreeIndex BuildTreeIndex(const parser::AssuranceCase& ac) {
+    TreeIndex idx;
+    for (const auto& e : ac.elements) {
+        if (e.target_refs.empty()) continue;
+        const std::string& target = e.target_refs[0];
+        if (target.empty()) continue;
+
+        if (e.type == "assertedinference") {
+            std::string attach_parent = target;
+            if (!e.reasoning_ref.empty()) {
+                AddEdge(idx, target, e.reasoning_ref);
+                attach_parent = e.reasoning_ref;
+            }
+            for (const auto& s : e.source_refs) AddEdge(idx, attach_parent, s);
+        } else if (e.type == "assertedcontext") {
+            for (const auto& s : e.source_refs) AddEdge(idx, target, s, /*group2=*/true);
+        } else if (e.type == "assertedevidence") {
+            for (const auto& s : e.source_refs) AddEdge(idx, target, s);
+        }
+    }
+    return idx;
+}
+
+// Find the structural parent of `id` in the visual tree.
+std::string FindStructuralParent(const parser::AssuranceCase& ac, const std::string& id) {
+    return BuildTreeIndex(ac).ParentOf(id);
+}
+
+// Collect ids of Group2 attachments (Context/Assumption/Justification claims)
+// that hang off `node_id` via assertedcontext relationships.
+void CollectGroup2AttachmentIds(const parser::AssuranceCase& ac,
+                                const std::string& node_id,
+                                std::unordered_set<std::string>& out) {
+    auto idx = BuildTreeIndex(ac);
+    for (const auto& s : idx.Group2Of(node_id)) out.insert(s);
+}
+
+// All siblings of `node_id` (children of the same tree-parent), including
+// `node_id` itself. If `node_id` is a root, returns just `{node_id}`.
+std::unordered_set<std::string> CollectSiblingSet(const parser::AssuranceCase& ac,
+                                                  const std::string& node_id) {
+    std::unordered_set<std::string> result;
+    result.insert(node_id);
+    auto idx = BuildTreeIndex(ac);
+    const std::string& parent = idx.ParentOf(node_id);
+    if (parent.empty()) return result;
+    for (const auto& c : idx.ChildrenOf(parent)) result.insert(c);
+    return result;
+}
+
+}  // namespace
 
 namespace {
 
@@ -263,44 +375,19 @@ bool IsRelationshipType(const std::string& t) {
         || t == "assertedevidence";
 }
 
-// Collect the ids of all direct children of `parent_id` by scanning
-// relationship elements. A child is any element referenced as a source or as
-// the reasoning of a relationship whose targets include the parent.
-void CollectDirectChildren(const parser::AssuranceCase& ac,
-                           const std::string& parent_id,
-                           std::vector<std::string>& out_children) {
-    for (const auto& e : ac.elements) {
-        if (!IsRelationshipType(e.type)) continue;
-        bool targets_parent = false;
-        for (const auto& t : e.target_refs) {
-            if (t == parent_id) { targets_parent = true; break; }
-        }
-        if (!targets_parent) continue;
-
-        for (const auto& s : e.source_refs) {
-            if (!s.empty()) out_children.push_back(s);
-        }
-        if (!e.reasoning_ref.empty()) {
-            out_children.push_back(e.reasoning_ref);
-        }
-    }
-}
-
-// Collect the closed set of ids reachable as descendants of `root_id`.
-// `root_id` itself is included in the result.
+// Collect the closed set of ids reachable as descendants of `root_id` in the
+// canonical visual tree (see TreeIndex above). `root_id` itself is included.
 std::unordered_set<std::string> CollectSubtreeIds(const parser::AssuranceCase& ac,
                                                   const std::string& root_id) {
     std::unordered_set<std::string> visited;
+    auto idx = BuildTreeIndex(ac);
     std::vector<std::string> stack;
     stack.push_back(root_id);
     while (!stack.empty()) {
         std::string current = std::move(stack.back());
         stack.pop_back();
-        if (!visited.insert(current).second) continue;  // already seen
-
-        std::vector<std::string> children;
-        CollectDirectChildren(ac, current, children);
-        for (auto& c : children) stack.push_back(std::move(c));
+        if (!visited.insert(current).second) continue;
+        for (const auto& c : idx.ChildrenOf(current)) stack.push_back(c);
     }
     return visited;
 }
@@ -372,10 +459,95 @@ int CountDescendants(const parser::AssuranceCase& ac, const std::string& id) {
     return subtree.empty() ? 0 : static_cast<int>(subtree.size() - 1);
 }
 
+std::unordered_set<std::string> PlanRemoval(const parser::AssuranceCase& ac,
+                                            const std::string& id,
+                                            RemoveMode mode) {
+    std::unordered_set<std::string> result;
+    if (id.empty() || !FindElement(ac, id)) return result;
+
+    auto add_attachments_for_all = [&]() {
+        std::vector<std::string> snapshot(result.begin(), result.end());
+        for (const auto& nid : snapshot) {
+            CollectGroup2AttachmentIds(ac, nid, result);
+        }
+    };
+
+    switch (mode) {
+        case RemoveMode::NodeOnly:
+            result.insert(id);
+            CollectGroup2AttachmentIds(ac, id, result);
+            break;
+        case RemoveMode::NodeAndDescendants:
+            result = CollectSubtreeIds(ac, id);
+            add_attachments_for_all();
+            break;
+        case RemoveMode::NodeAndSiblings: {
+            auto siblings = CollectSiblingSet(ac, id);
+            for (const auto& s : siblings) {
+                auto sub = CollectSubtreeIds(ac, s);
+                result.insert(sub.begin(), sub.end());
+            }
+            add_attachments_for_all();
+            break;
+        }
+    }
+    return result;
+}
+
+namespace {
+
+// Reparent the structural children of `node_id` to its structural parent.
+// Mutates both models so the subsequent scrub-then-drop pass leaves a coherent
+// tree. No-op if the node has no structural parent (root or orphan).
+void ReparentChildrenToParent(parser::AssuranceCase& ac,
+                              sacm::AssuranceCasePackage* pkg,
+                              const std::string& node_id) {
+    std::string parent_id = FindStructuralParent(ac, node_id);
+    if (parent_id.empty()) return;
+
+    // If `node_id` is interposed as a strategy (reasoning of an inference),
+    // its sub-goals are already sources of the same inference. Clearing the
+    // reasoning_ref promotes them to direct children of the inference target.
+    for (auto& e : ac.elements) {
+        if (e.type != "assertedinference") continue;
+        if (e.reasoning_ref == node_id) e.reasoning_ref.clear();
+    }
+    if (pkg) {
+        for (auto& ap : pkg->argumentPackages) {
+            for (auto& inf : ap.assertedInferences) {
+                if (inf.reasoning == node_id) inf.reasoning.clear();
+            }
+        }
+    }
+
+    // For inferences/evidence relationships targeting `node_id`, rewrite the
+    // target to `parent_id` so the children get promoted up the tree.
+    for (auto& e : ac.elements) {
+        if (e.type != "assertedinference" && e.type != "assertedevidence") continue;
+        for (auto& t : e.target_refs) {
+            if (t == node_id) t = parent_id;
+        }
+    }
+    if (pkg) {
+        for (auto& ap : pkg->argumentPackages) {
+            auto rewrite = [&](std::vector<std::string>& targets) {
+                for (auto& t : targets) {
+                    if (t == node_id) t = parent_id;
+                }
+            };
+            for (auto& inf : ap.assertedInferences) rewrite(inf.targets);
+            for (auto& ev : ap.assertedEvidences)   rewrite(ev.targets);
+            // Don't rewrite assertedContexts: contexts of node_id go away with it.
+        }
+    }
+}
+
+}  // namespace
+
 bool RemoveElement(parser::AssuranceCase& ac,
                    sacm::AssuranceCasePackage* pkg,
                    const std::string& id,
-                   bool cascade,
+                   RemoveMode mode,
                    std::string& out_error) {
     out_error.clear();
     if (id.empty()) {
@@ -387,27 +559,20 @@ bool RemoveElement(parser::AssuranceCase& ac,
         return false;
     }
 
-    // Determine the set of node ids to remove.
-    std::unordered_set<std::string> removed_ids;
-    if (cascade) {
-        removed_ids = CollectSubtreeIds(ac, id);
-    } else {
-        std::vector<std::string> direct_children;
-        CollectDirectChildren(ac, id, direct_children);
-        if (!direct_children.empty()) {
-            out_error = "Element has children; remove with cascade.";
-            return false;
-        }
-        removed_ids.insert(id);
+    auto removed_ids = PlanRemoval(ac, id, mode);
+    if (removed_ids.empty()) {
+        out_error = "Nothing to remove.";
+        return false;
     }
 
-    // ---- Parser model ------------------------------------------------------
-    // 1) Drop the node elements themselves.
-    // 2) For surviving relationships, scrub references to removed ids and
-    //    only drop the relationship if it becomes structurally empty. This
-    //    preserves a shared inference (e.g. one inference with multiple
-    //    sub-goal sources and a reasoning strategy) when only one of its
-    //    participants is being removed.
+    // For NodeOnly, reparent structural children before we scrub references
+    // so they end up attached to the grandparent (or, for a strategy, become
+    // direct sources of the parent inference).
+    if (mode == RemoveMode::NodeOnly) {
+        ReparentChildrenToParent(ac, pkg, id);
+    }
+
+    // ---- Parser model: scrub references then drop dead/empty relationships -
     for (auto& e : ac.elements) {
         if (IsRelationshipType(e.type)) {
             ScrubParserRelationshipRefs(e, removed_ids);
@@ -422,14 +587,13 @@ bool RemoveElement(parser::AssuranceCase& ac,
                        }),
         ac.elements.end());
 
-    // ---- SACM model --------------------------------------------------------
+    // ---- SACM model: scrub references then drop dead/empty relationships ---
     if (pkg) {
         for (auto& ap : pkg->argumentPackages) {
             EraseByIdSet(ap.claims, removed_ids);
             EraseByIdSet(ap.argumentReasonings, removed_ids);
             EraseByIdSet(ap.artifactReferences, removed_ids);
 
-            // Scrub source/target lists, then drop dangling relationships.
             for (auto& r : ap.assertedInferences) {
                 ScrubRelationshipRefs(r, removed_ids);
                 if (!r.reasoning.empty() && removed_ids.count(r.reasoning)) {

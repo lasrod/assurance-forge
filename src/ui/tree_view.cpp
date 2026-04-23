@@ -1,7 +1,10 @@
 #include "ui/tree_view.h"
 #include "ui/ui_state.h"
 #include "app/app_runtime.h"
+#include "core/element_factory.h"
 #include "imgui.h"
+#include <cstdio>
+#include <string>
 
 namespace ui {
 
@@ -22,11 +25,50 @@ void RenderAddElementMenu() {
     }
 }
 
-// Render the shared "Remove" item used by both the tree and the canvas
-// context menus. Dispatches via app::RequestRemoveSelected, which targets the
-// currently selected element and prompts for confirmation if it has children.
-void RenderRemoveElementMenuItem() {
-    if (ImGui::MenuItem("Remove")) app::RequestRemoveSelected();
+// Render the shared "Remove" submenu used by both the tree and the canvas
+// context menus. Three modes are offered, each labeled with the count of
+// elements that would be removed (computed via core::PlanRemoval). Modes that
+// degenerate to a no-op for the current selection are disabled.
+void RenderRemoveSubmenu() {
+    const std::string& selected_id = GetUiState().selected_element_id;
+    if (ImGui::BeginMenu("Remove")) {
+        if (selected_id.empty()) {
+            ImGui::TextDisabled("No element selected.");
+            ImGui::EndMenu();
+            return;
+        }
+
+        // We need access to the model to compute counts. Without it the menu
+        // shows the items in a disabled state.
+        const parser::AssuranceCase* ac = app::GetActiveAssuranceCase();
+        auto count_for = [&](core::RemoveMode mode) -> int {
+            if (!ac) return 0;
+            return static_cast<int>(core::PlanRemoval(*ac, selected_id, mode).size());
+        };
+
+        const int n_only        = count_for(core::RemoveMode::NodeOnly);
+        const int n_descendants = count_for(core::RemoveMode::NodeAndDescendants);
+        const int n_siblings    = count_for(core::RemoveMode::NodeAndSiblings);
+
+        char label[96];
+
+        std::snprintf(label, sizeof(label), "This node only (%d)", n_only);
+        if (ImGui::MenuItem(label, nullptr, false, n_only > 0)) {
+            app::RequestRemove(core::RemoveMode::NodeOnly);
+        }
+
+        std::snprintf(label, sizeof(label), "Node and descendants (%d)", n_descendants);
+        if (ImGui::MenuItem(label, nullptr, false, n_descendants > n_only)) {
+            app::RequestRemove(core::RemoveMode::NodeAndDescendants);
+        }
+
+        std::snprintf(label, sizeof(label), "Node and siblings (%d)", n_siblings);
+        if (ImGui::MenuItem(label, nullptr, false, n_siblings > n_only)) {
+            app::RequestRemove(core::RemoveMode::NodeAndSiblings);
+        }
+
+        ImGui::EndMenu();
+    }
 }
 
 static const char* RoleLabel(core::NodeRole role) {
@@ -95,7 +137,7 @@ static void RenderTreeNode(const core::TreeNode* node) {
         state.selected_element_id = node->id;
         RenderAddElementMenu();
         ImGui::Separator();
-        RenderRemoveElementMenuItem();
+        RenderRemoveSubmenu();
         ImGui::EndPopup();
     }
 

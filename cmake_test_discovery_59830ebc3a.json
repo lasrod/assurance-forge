@@ -1,5 +1,5 @@
 {
-  "tests": 51,
+  "tests": 59,
   "name": "AllTests",
   "testsuites": [
     {
@@ -276,7 +276,7 @@
     },
     {
       "name": "ElementFactoryRemove",
-      "tests": 5,
+      "tests": 13,
       "testsuite": [
         {
           "name": "RemoveLeafElement",
@@ -286,22 +286,62 @@
         {
           "name": "RemoveElementWithChildrenCascade",
           "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
-          "line": 82
+          "line": 83
         },
         {
           "name": "RemoveUnknownIdReturnsError",
           "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
-          "line": 121
+          "line": 119
         },
         {
           "name": "RemoveSourceOfSharedInferencePreservesSiblings",
           "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
-          "line": 133
+          "line": 131
         },
         {
           "name": "RemoveSingleSubGoalUnderStrategyKeepsStrategy",
           "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
-          "line": 204
+          "line": 203
+        },
+        {
+          "name": "RemoveNodeOnly_ReparentsStructuralChildrenToParent",
+          "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
+          "line": 253
+        },
+        {
+          "name": "RemoveNodeOnly_PromotesGrandchildrenToGrandparent",
+          "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
+          "line": 288
+        },
+        {
+          "name": "RemoveNodeOnly_AlsoRemovesGroup2Attachments",
+          "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
+          "line": 315
+        },
+        {
+          "name": "PlanRemoval_NodeAndSiblings_IncludesSiblingsAndSubtrees",
+          "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
+          "line": 339
+        },
+        {
+          "name": "PlanRemoval_NodeAndSiblings_StrategyNotIncluded",
+          "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
+          "line": 367
+        },
+        {
+          "name": "PlanRemoval_SharedInferenceStrategyNotSibling",
+          "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
+          "line": 398
+        },
+        {
+          "name": "StrategyShape_AllRemoveModes",
+          "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
+          "line": 432
+        },
+        {
+          "name": "RemoveNodeAndSiblings_ClearsRowKeepsParent",
+          "file": "C:\\development\\assurance-forge\\tests\\test_element_factory.cpp",
+          "line": 543
         }
       ]
     }

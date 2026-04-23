@@ -128,10 +128,12 @@ struct AppRuntime::Impl {
     bool show_not_implemented_modal = false;
     std::string not_implemented_feature;
 
-    // Modal for confirming cascade-removal of an element with descendants.
+    // Modal for confirming a multi-element removal. Populated by RemoveSelected
+    // when the planned removal targets more than one element.
     bool show_remove_confirm = false;
     std::string pending_remove_id;
-    int pending_remove_descendant_count = 0;
+    core::RemoveMode pending_remove_mode = core::RemoveMode::NodeOnly;
+    std::vector<std::string> pending_remove_ids;
 };
 
 AppRuntime::AppRuntime() : impl_(new Impl()) {
@@ -154,8 +156,13 @@ void RequestAddChild(core::NewElementKind kind) {
     if (g_active_runtime) g_active_runtime->AddChildToSelected(kind);
 }
 
-void RequestRemoveSelected() {
-    if (g_active_runtime) g_active_runtime->RemoveSelected();
+void RequestRemove(core::RemoveMode mode) {
+    if (g_active_runtime) g_active_runtime->RemoveSelected(mode);
+}
+
+const parser::AssuranceCase* GetActiveAssuranceCase() {
+    if (!g_active_runtime) return nullptr;
+    return g_active_runtime->GetLoadedCase();
 }
 
 void RequestNotImplemented(const char* feature) {
@@ -195,7 +202,7 @@ bool AppRuntime::AddChildToSelected(core::NewElementKind kind) {
     return true;
 }
 
-void AppRuntime::RemoveSelected() {
+void AppRuntime::RemoveSelected(core::RemoveMode mode) {
     if (!impl_->app_state.loaded_case.has_value()) {
         SetStatus("No assurance case loaded.");
         return;
@@ -207,27 +214,39 @@ void AppRuntime::RemoveSelected() {
     }
 
     parser::AssuranceCase& ac = impl_->app_state.loaded_case.value();
-    int descendants = core::CountDescendants(ac, selected_id);
-    if (descendants > 0) {
-        // Defer to the confirmation modal; nothing is removed yet.
-        impl_->show_remove_confirm = true;
-        impl_->pending_remove_id = selected_id;
-        impl_->pending_remove_descendant_count = descendants;
+    auto planned = core::PlanRemoval(ac, selected_id, mode);
+    if (planned.empty()) {
+        SetStatus("Nothing to remove for this selection.");
         return;
     }
 
-    // Leaf: remove immediately.
     sacm::AssuranceCasePackage* pkg = impl_->app_state.sacm_package.has_value()
                                           ? &impl_->app_state.sacm_package.value()
                                           : nullptr;
-    std::string error;
-    if (!core::RemoveElement(ac, pkg, selected_id, /*cascade=*/false, error)) {
-        SetStatus("Remove failed: " + error);
+
+    // Single-element removal: act immediately, no confirmation.
+    if (planned.size() == 1) {
+        std::string error;
+        if (!core::RemoveElement(ac, pkg, selected_id, mode, error)) {
+            SetStatus("Remove failed: " + error);
+            return;
+        }
+        impl_->tree_needs_rebuild = true;
+        ui::GetUiState().selected_element_id.clear();
+        SetStatus("Removed " + selected_id);
         return;
     }
-    impl_->tree_needs_rebuild = true;
-    ui::GetUiState().selected_element_id.clear();
-    SetStatus("Removed " + selected_id);
+
+    // Multi-element removal: stash the plan, mark nodes on the canvas, request
+    // a fit-to-view of the marked set, and open the confirmation modal.
+    impl_->show_remove_confirm = true;
+    impl_->pending_remove_id = selected_id;
+    impl_->pending_remove_mode = mode;
+    impl_->pending_remove_ids.assign(planned.begin(), planned.end());
+
+    auto& s = ui::GetUiState();
+    s.marked_for_removal = std::move(planned);
+    s.center_on_marked = true;
 }
 
 void AppRuntime::SetStatus(const std::string& message) {
@@ -584,12 +603,23 @@ void AppRuntime::RenderNotImplementedModal() {
 void AppRuntime::RenderRemoveConfirmModal() {
     if (!impl_->show_remove_confirm) return;
 
+    auto cancel = [&]() {
+        impl_->show_remove_confirm = false;
+        impl_->pending_remove_id.clear();
+        impl_->pending_remove_ids.clear();
+        ui::GetUiState().marked_for_removal.clear();
+    };
+
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal("##remove_confirm_modal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("Remove '%s' and %d descendant%s?",
-                    impl_->pending_remove_id.c_str(),
-                    impl_->pending_remove_descendant_count,
-                    impl_->pending_remove_descendant_count == 1 ? "" : "s");
+        const int n = static_cast<int>(impl_->pending_remove_ids.size());
+        const char* mode_label =
+            impl_->pending_remove_mode == core::RemoveMode::NodeOnly         ? "this node and its attachments" :
+            impl_->pending_remove_mode == core::RemoveMode::NodeAndDescendants ? "this node and its descendants" :
+                                                                                 "this node and its siblings";
+        ImGui::Text("Remove %s?", mode_label);
+        ImGui::Text("%d element%s will be deleted (highlighted in red).",
+                    n, n == 1 ? "" : "s");
         ImGui::Spacing();
         ImGui::Spacing();
 
@@ -599,11 +629,10 @@ void AppRuntime::RenderRemoveConfirmModal() {
         const float center_x = (ImGui::GetWindowWidth() - total_width) * 0.5f;
         ImGui::SetCursorPosX(center_x);
 
-        if (ImGui::Button("Remove all", ImVec2(button_width, 0))) {
+        if (ImGui::Button("Remove", ImVec2(button_width, 0))) {
             std::string id = impl_->pending_remove_id;
-            impl_->show_remove_confirm = false;
-            impl_->pending_remove_id.clear();
-            impl_->pending_remove_descendant_count = 0;
+            core::RemoveMode mode = impl_->pending_remove_mode;
+            cancel();
             ImGui::CloseCurrentPopup();
 
             if (impl_->app_state.loaded_case.has_value()) {
@@ -612,26 +641,29 @@ void AppRuntime::RenderRemoveConfirmModal() {
                                                       ? &impl_->app_state.sacm_package.value()
                                                       : nullptr;
                 std::string error;
-                if (!core::RemoveElement(ac, pkg, id, /*cascade=*/true, error)) {
+                if (!core::RemoveElement(ac, pkg, id, mode, error)) {
                     SetStatus("Remove failed: " + error);
                 } else {
                     impl_->tree_needs_rebuild = true;
                     ui::GetUiState().selected_element_id.clear();
-                    SetStatus("Removed " + id + " and subtree");
+                    SetStatus("Removed " + std::to_string(n) + " element" + (n == 1 ? "" : "s"));
                 }
             }
         }
         ImGui::SameLine(0.0f, spacing);
         if (ImGui::Button("Cancel", ImVec2(button_width, 0))) {
-            impl_->show_remove_confirm = false;
-            impl_->pending_remove_id.clear();
-            impl_->pending_remove_descendant_count = 0;
+            cancel();
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
     } else if (impl_->show_remove_confirm) {
         ImGui::OpenPopup("##remove_confirm_modal");
     }
+}
+
+const parser::AssuranceCase* AppRuntime::GetLoadedCase() const {
+    if (!impl_->app_state.loaded_case.has_value()) return nullptr;
+    return &impl_->app_state.loaded_case.value();
 }
 
 void AppRuntime::RenderFrame(bool& done) {
