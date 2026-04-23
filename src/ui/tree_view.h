@@ -13,7 +13,7 @@ void ShowTreeViewPanel(const core::AssuranceTree* tree);
 void RenderAddElementMenu();
 
 // Render the shared "Remove" submenu (used by tree and canvas context menus).
-// The submenu offers three modes; each item is labeled with the count of
+// The submenu offers two modes; each item is labeled with the count of
 // elements that would be removed. Must be called inside an active popup.
 void RenderRemoveSubmenu();
 

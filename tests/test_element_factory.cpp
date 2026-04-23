@@ -420,3 +420,67 @@ TEST(ElementFactoryRemove, StrategyShape_AllRemoveModes) {
         EXPECT_TRUE(ParserHasId(ac2, "CL_TOP"));
     }
 }
+
+TEST(ElementFactoryRemove, RemovalPlannerUsesFirstExistingTargetRef) {
+    parser::AssuranceCase ac;
+    parser::SacmElement top;
+    top.id = "CL_TOP";
+    top.type = "claim";
+    ac.elements.push_back(top);
+
+    parser::SacmElement strategy;
+    strategy.id = "AR_1";
+    strategy.type = "argumentreasoning";
+    ac.elements.push_back(strategy);
+
+    parser::SacmElement sub;
+    sub.id = "CL_SUB";
+    sub.type = "claim";
+    ac.elements.push_back(sub);
+
+    parser::SacmElement inf;
+    inf.id = "INF_1";
+    inf.type = "assertedinference";
+    inf.target_refs = {"MISSING_TARGET", "CL_TOP"};
+    inf.reasoning_ref = "AR_1";
+    inf.source_refs = {"CL_SUB"};
+    ac.elements.push_back(inf);
+
+    EXPECT_EQ(core::CountDescendants(ac, "CL_TOP"), 2);
+
+    auto plan = core::PlanRemoval(ac, "CL_TOP", core::RemoveMode::NodeAndDescendants);
+    EXPECT_EQ(plan.size(), 3u);
+    EXPECT_TRUE(plan.count("CL_TOP"));
+    EXPECT_TRUE(plan.count("AR_1"));
+    EXPECT_TRUE(plan.count("CL_SUB"));
+}
+
+TEST(ElementFactoryRemove, RemovalPlannerIgnoresDanglingReasoningAndSourceRefs) {
+    parser::AssuranceCase ac;
+    parser::SacmElement top;
+    top.id = "CL_TOP";
+    top.type = "claim";
+    ac.elements.push_back(top);
+
+    parser::SacmElement sub;
+    sub.id = "CL_SUB";
+    sub.type = "claim";
+    ac.elements.push_back(sub);
+
+    parser::SacmElement inf;
+    inf.id = "INF_1";
+    inf.type = "assertedinference";
+    inf.target_refs = {"CL_TOP"};
+    inf.reasoning_ref = "MISSING_REASONING";
+    inf.source_refs = {"MISSING_SOURCE", "CL_SUB"};
+    ac.elements.push_back(inf);
+
+    EXPECT_EQ(core::CountDescendants(ac, "CL_TOP"), 1);
+
+    auto plan = core::PlanRemoval(ac, "CL_TOP", core::RemoveMode::NodeAndDescendants);
+    EXPECT_EQ(plan.size(), 2u);
+    EXPECT_TRUE(plan.count("CL_TOP"));
+    EXPECT_TRUE(plan.count("CL_SUB"));
+    EXPECT_FALSE(plan.count("MISSING_REASONING"));
+    EXPECT_FALSE(plan.count("MISSING_SOURCE"));
+}

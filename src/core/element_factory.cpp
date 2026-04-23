@@ -57,6 +57,12 @@ const parser::SacmElement* FindElement(const parser::AssuranceCase& ac, const st
     return nullptr;
 }
 
+bool IsRelationshipType(const std::string& t) {
+    return t == "assertedinference"
+        || t == "assertedcontext"
+        || t == "assertedevidence";
+}
+
 // Determine which ArgumentPackage in the sacm model owns the parent element.
 // Falls back to the first package, creating one if necessary.
 sacm::ArgumentPackage* FindOwningArgumentPackage(sacm::AssuranceCasePackage* pkg,
@@ -257,14 +263,6 @@ bool AddChildElement(parser::AssuranceCase& ac,
 
 namespace {
 
-// Mutable lookup for a parser element by id.
-parser::SacmElement* FindElementMut(parser::AssuranceCase& ac, const std::string& id) {
-    for (auto& e : ac.elements) {
-        if (e.id == id) return &e;
-    }
-    return nullptr;
-}
-
 // ---------------------------------------------------------------------------
 // TreeIndex: a single canonical view of the visual tree, computed from the
 // parser model the same way `AssuranceTree::Build` wires the canvas. All
@@ -314,27 +312,59 @@ void AddEdge(TreeIndex& idx, const std::string& parent, const std::string& child
     if (group2) idx.group2_of[parent].push_back(child);
 }
 
-TreeIndex BuildTreeIndex(const parser::AssuranceCase& ac) {
+std::unordered_set<std::string> BuildNodeIdSet(const parser::AssuranceCase& ac) {
+    std::unordered_set<std::string> ids;
+    for (const auto& e : ac.elements) {
+        if (!IsRelationshipType(e.type) && !e.id.empty()) ids.insert(e.id);
+    }
+    return ids;
+}
+
+std::string FindFirstExistingTarget(const std::vector<std::string>& target_refs,
+                                    const std::unordered_set<std::string>& node_ids) {
+    for (const auto& target : target_refs) {
+        if (!target.empty() && node_ids.find(target) != node_ids.end()) return target;
+    }
+    return {};
+}
+
+TreeIndex BuildTreeIndex(const parser::AssuranceCase& ac,
+                         const std::unordered_set<std::string>& node_ids) {
     TreeIndex idx;
     for (const auto& e : ac.elements) {
-        if (e.target_refs.empty()) continue;
-        const std::string& target = e.target_refs[0];
+        const std::string target = FindFirstExistingTarget(e.target_refs, node_ids);
         if (target.empty()) continue;
 
         if (e.type == "assertedinference") {
             std::string attach_parent = target;
-            if (!e.reasoning_ref.empty()) {
+            if (!e.reasoning_ref.empty() && node_ids.find(e.reasoning_ref) != node_ids.end()) {
                 AddEdge(idx, target, e.reasoning_ref);
                 attach_parent = e.reasoning_ref;
             }
-            for (const auto& s : e.source_refs) AddEdge(idx, attach_parent, s);
+            for (const auto& s : e.source_refs) {
+                if (!s.empty() && node_ids.find(s) != node_ids.end()) {
+                    AddEdge(idx, attach_parent, s);
+                }
+            }
         } else if (e.type == "assertedcontext") {
-            for (const auto& s : e.source_refs) AddEdge(idx, target, s, /*group2=*/true);
+            for (const auto& s : e.source_refs) {
+                if (!s.empty() && node_ids.find(s) != node_ids.end()) {
+                    AddEdge(idx, target, s, /*group2=*/true);
+                }
+            }
         } else if (e.type == "assertedevidence") {
-            for (const auto& s : e.source_refs) AddEdge(idx, target, s);
+            for (const auto& s : e.source_refs) {
+                if (!s.empty() && node_ids.find(s) != node_ids.end()) {
+                    AddEdge(idx, target, s);
+                }
+            }
         }
     }
     return idx;
+}
+
+TreeIndex BuildTreeIndex(const parser::AssuranceCase& ac) {
+    return BuildTreeIndex(ac, BuildNodeIdSet(ac));
 }
 
 // Find the structural parent of `id` in the visual tree.
@@ -344,10 +374,9 @@ std::string FindStructuralParent(const parser::AssuranceCase& ac, const std::str
 
 // Collect ids of Group2 attachments (Context/Assumption/Justification claims)
 // that hang off `node_id` via assertedcontext relationships.
-void CollectGroup2AttachmentIds(const parser::AssuranceCase& ac,
+void CollectGroup2AttachmentIds(const TreeIndex& idx,
                                 const std::string& node_id,
                                 std::unordered_set<std::string>& out) {
-    auto idx = BuildTreeIndex(ac);
     for (const auto& s : idx.Group2Of(node_id)) out.insert(s);
 }
 
@@ -355,19 +384,11 @@ void CollectGroup2AttachmentIds(const parser::AssuranceCase& ac,
 
 namespace {
 
-// True for parser element types that represent relationships (not nodes).
-bool IsRelationshipType(const std::string& t) {
-    return t == "assertedinference"
-        || t == "assertedcontext"
-        || t == "assertedevidence";
-}
-
 // Collect the closed set of ids reachable as descendants of `root_id` in the
 // canonical visual tree (see TreeIndex above). `root_id` itself is included.
-std::unordered_set<std::string> CollectSubtreeIds(const parser::AssuranceCase& ac,
-                                                  const std::string& root_id) {
+std::unordered_set<std::string> CollectSubtreeIds(const TreeIndex& idx,
+                                                   const std::string& root_id) {
     std::unordered_set<std::string> visited;
-    auto idx = BuildTreeIndex(ac);
     std::vector<std::string> stack;
     stack.push_back(root_id);
     while (!stack.empty()) {
@@ -441,7 +462,8 @@ bool IsParserRelationshipDangling(const parser::SacmElement& rel) {
 
 int CountDescendants(const parser::AssuranceCase& ac, const std::string& id) {
     if (id.empty()) return 0;
-    auto subtree = CollectSubtreeIds(ac, id);
+    auto idx = BuildTreeIndex(ac);
+    auto subtree = CollectSubtreeIds(idx, id);
     // subtree includes the root itself; descendants = everything else.
     return subtree.empty() ? 0 : static_cast<int>(subtree.size() - 1);
 }
@@ -451,17 +473,18 @@ std::unordered_set<std::string> PlanRemoval(const parser::AssuranceCase& ac,
                                             RemoveMode mode) {
     std::unordered_set<std::string> result;
     if (id.empty() || !FindElement(ac, id)) return result;
+    auto idx = BuildTreeIndex(ac);
 
     if (mode == RemoveMode::NodeOnly) {
         result.insert(id);
     } else {  // NodeAndDescendants
-        result = CollectSubtreeIds(ac, id);
+        result = CollectSubtreeIds(idx, id);
     }
     // Sweep Group2 attachments (Context/Assumption/Justification) for every
     // node in the plan so they don't dangle after deletion.
     std::vector<std::string> snapshot(result.begin(), result.end());
     for (const auto& nid : snapshot) {
-        CollectGroup2AttachmentIds(ac, nid, result);
+        CollectGroup2AttachmentIds(idx, nid, result);
     }
     return result;
 }
