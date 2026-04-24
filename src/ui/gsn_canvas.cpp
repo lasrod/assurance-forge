@@ -21,7 +21,7 @@ static constexpr float kClaimRounding      = 6.0f;   // corner rounding for rect
 static constexpr float kOutlineThickness   = 2.0f;   // shape outline stroke width
 static constexpr int   kCircleSegments     = 36;     // number of segments for circle rendering
 static constexpr float kUndDiamondRadius   = 20.0f;
-static constexpr float kUndGap             = 2.0f;
+static constexpr float kUndGap             = 0.50f;
 
 static const ImU32 kOutlineColor = IM_COL32(0, 0, 0, 200);
 static const ImU32 kTextColor    = IM_COL32(10, 10, 10, 255);
