@@ -1,4 +1,5 @@
 #include "ui/tree_view.h"
+#include "ui/theme.h"
 #include "ui/ui_state.h"
 #include "app/app_runtime.h"
 #include "core/element_factory.h"
@@ -79,14 +80,15 @@ static const char* RoleLabel(core::NodeRole role) {
 }
 
 static ImVec4 RoleColor(core::NodeRole role) {
+    const Theme& t = GetTheme();
     switch (role) {
-        case core::NodeRole::Claim:         return ImVec4(0.4f, 0.8f, 0.4f, 1.0f);
-        case core::NodeRole::Strategy:      return ImVec4(0.4f, 0.6f, 0.9f, 1.0f);
-        case core::NodeRole::Solution:      return ImVec4(0.9f, 0.7f, 0.3f, 1.0f);
-        case core::NodeRole::Context:       return ImVec4(0.78f, 0.78f, 0.78f, 1.0f);
-        case core::NodeRole::Assumption:    return ImVec4(0.94f, 0.63f, 0.63f, 1.0f);
-        case core::NodeRole::Justification: return ImVec4(0.7f, 0.78f, 0.94f, 1.0f);
-        default:                            return ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        case core::NodeRole::Claim:         return ImGui::ColorConvertU32ToFloat4(t.node_claim);
+        case core::NodeRole::Strategy:      return ImGui::ColorConvertU32ToFloat4(t.node_strategy);
+        case core::NodeRole::Solution:      return ImGui::ColorConvertU32ToFloat4(t.node_solution);
+        case core::NodeRole::Context:       return ImGui::ColorConvertU32ToFloat4(t.node_context);
+        case core::NodeRole::Assumption:    return ImGui::ColorConvertU32ToFloat4(t.node_assumption);
+        case core::NodeRole::Justification: return ImGui::ColorConvertU32ToFloat4(t.node_justification);
+        default:                            return ImGui::ColorConvertU32ToFloat4(t.text_secondary);
     }
 }
 
@@ -118,9 +120,21 @@ static void RenderTreeNode(const core::TreeNode* node) {
     ImVec4 color = RoleColor(node->role);
     std::string display = std::string(RoleLabel(node->role)) + " " + ShortName(node);
 
-    ImGui::PushStyleColor(ImGuiCol_Text, color);
+    // Leading colored swatch (rounded square) + neutral text label.
     bool open = ImGui::TreeNodeEx(node->id.c_str(), flags, "%s", display.c_str());
-    ImGui::PopStyleColor();
+
+    // Draw the swatch over the tree node arrow gutter so it acts as a role badge.
+    {
+        ImVec2 item_min = ImGui::GetItemRectMin();
+        ImVec2 item_max = ImGui::GetItemRectMax();
+        float h = item_max.y - item_min.y;
+        float sw = std::max(6.0f, h * 0.45f);
+        float sx = item_max.x - sw - 4.0f;
+        float sy = item_min.y + (h - sw) * 0.5f;
+        ImGui::GetWindowDrawList()->AddRectFilled(
+            ImVec2(sx, sy), ImVec2(sx + sw, sy + sw),
+            ImGui::ColorConvertFloat4ToU32(color), 3.0f);
+    }
 
     if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
         state.selected_element_id = node->id;

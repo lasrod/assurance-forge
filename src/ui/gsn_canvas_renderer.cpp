@@ -1,6 +1,7 @@
 ﻿#include "gsn_canvas_renderer.h"
 #include "gsn_layout.h"
 #include "gsn_canvas.h" // for DrawGsnNode
+#include "ui/theme.h"
 #include <imgui.h>
 #include <cmath>
 #include <algorithm>
@@ -9,19 +10,21 @@
 namespace ui {
 
 // ===== Edge rendering constants =====
-static constexpr float kArrowSize           = 8.0f;   // arrowhead triangle side length
+static constexpr float kArrowSize           = 9.0f;   // arrowhead triangle side length
 static constexpr float kArrowOutlineWidth   = 1.5f;   // hollow arrowhead outline thickness
-static constexpr float kSolidEdgeWidth      = 2.0f;   // Group1 solid line thickness
-static constexpr float kDashedEdgeWidth     = 1.5f;   // Group2 dashed line thickness
-static constexpr float kDashLength          = 8.0f;   // dash on-length for dashed lines
-static constexpr float kDashGap             = 5.0f;   // dash off-length for dashed lines
+static constexpr float kSolidEdgeWidth      = 2.2f;   // Group1 solid line thickness
+static constexpr float kDashedEdgeWidth     = 1.8f;   // Group2 dashed line thickness
+static constexpr float kDashLength          = 6.0f;   // dash on-length for dashed lines
+static constexpr float kDashGap             = 4.0f;   // dash off-length for dashed lines
 static constexpr float kStubLength          = 12.0f;  // straight segment at each end of a Bezier curve
 static constexpr float kVerticalControlPct  = 0.4f;   // Bezier control point distance (fraction of vertical span)
 static constexpr float kScrollPadding       = 40.0f;  // extra padding beyond outermost node for scrolling
 static constexpr int   kBezierSamples       = 64;     // arc-length sample count for dashed Bezier rendering
 
-static const ImU32 kGroup1EdgeColor = IM_COL32(180, 180, 180, 255);
-static const ImU32 kGroup2EdgeColor = IM_COL32(120, 120, 200, 200);
+// Edge colors are sourced from the theme on every call so they update if the
+// theme is ever swapped at runtime.
+static ImU32 Group1EdgeColor() { return GetTheme().edge_group1; }
+static ImU32 Group2EdgeColor() { return GetTheme().edge_group2; }
 
 // ===== Zoom constants =====
 static constexpr float kZoomMin      = 0.25f;  // minimum zoom level (25%)
@@ -227,10 +230,11 @@ static void DrawGroup1Edge(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 c
     ImVec2 ctrl_1(stub_start.x, stub_start.y + vertical_span * kVerticalControlPct);
     ImVec2 ctrl_2(stub_end.x,   stub_end.y   - vertical_span * kVerticalControlPct);
 
-    draw_list->AddLine(parent_bottom, stub_start, kGroup1EdgeColor, scaled_edge_width);
-    DrawSolidBezier(draw_list, stub_start, ctrl_1, ctrl_2, stub_end, kGroup1EdgeColor, scaled_edge_width);
-    draw_list->AddLine(stub_end, child_top, kGroup1EdgeColor, scaled_edge_width);
-    DrawSolidArrow(draw_list, child_top, 0.0f, 1.0f, kGroup1EdgeColor, scaled_arrow);
+    ImU32 col = Group1EdgeColor();
+    draw_list->AddLine(parent_bottom, stub_start, col, scaled_edge_width);
+    DrawSolidBezier(draw_list, stub_start, ctrl_1, ctrl_2, stub_end, col, scaled_edge_width);
+    draw_list->AddLine(stub_end, child_top, col, scaled_edge_width);
+    DrawSolidArrow(draw_list, child_top, 0.0f, 1.0f, col, scaled_arrow);
 }
 
 // Compute screen-space endpoints for a Group2 (side-attached) edge.
@@ -267,11 +271,12 @@ static void DrawGroup2Edge(ImDrawList* draw_list, ImVec2 parent_side, ImVec2 att
     ImVec2 ctrl_2(stub_end.x   - horizontal_sign * horizontal_span, stub_end.y);
 
     // Straight stub from parent â†’ dashed Bezier â†’ straight stub into attachment
-    DrawDashedBezier(draw_list, parent_side, parent_side, parent_side, stub_start, kGroup2EdgeColor, scaled_edge_width);
-    DrawDashedBezier(draw_list, stub_start, ctrl_1, ctrl_2, stub_end, kGroup2EdgeColor, scaled_edge_width);
-    DrawDashedBezier(draw_list, stub_end, stub_end, stub_end, attachment_edge, kGroup2EdgeColor, scaled_edge_width);
+    ImU32 col = Group2EdgeColor();
+    DrawDashedBezier(draw_list, parent_side, parent_side, parent_side, stub_start, col, scaled_edge_width);
+    DrawDashedBezier(draw_list, stub_start, ctrl_1, ctrl_2, stub_end, col, scaled_edge_width);
+    DrawDashedBezier(draw_list, stub_end, stub_end, stub_end, attachment_edge, col, scaled_edge_width);
     // Arrow points into the attachment node
-    DrawHollowArrow(draw_list, attachment_edge, horizontal_sign, 0.0f, kGroup2EdgeColor, kArrowSize * zoom);
+    DrawHollowArrow(draw_list, attachment_edge, horizontal_sign, 0.0f, col, kArrowSize * zoom);
 }
 
 // ===== Main rendering =====
