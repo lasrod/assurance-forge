@@ -18,6 +18,7 @@
 #include <cstring>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace app {
@@ -45,9 +46,11 @@ static ImVec4 SplitterHoverColor() {
 // Element type colors in the SACM viewer list (sourced from theme palette).
 static ImVec4 ElementTypeColor(const char* type) {
     const ui::Theme& t = ui::GetTheme();
-    if (type && std::string(type) == "claim")              return ImGui::ColorConvertU32ToFloat4(t.node_claim);
-    if (type && std::string(type) == "argumentreasoning")  return ImGui::ColorConvertU32ToFloat4(t.node_strategy);
-    if (type && (std::string(type) == "artifact" || std::string(type) == "artifactreference"))
+    if (!type) return ImGui::ColorConvertU32ToFloat4(t.text_primary);
+    std::string_view sv(type);
+    if (sv == "claim")             return ImGui::ColorConvertU32ToFloat4(t.node_claim);
+    if (sv == "argumentreasoning") return ImGui::ColorConvertU32ToFloat4(t.node_strategy);
+    if (sv == "artifact" || sv == "artifactreference")
         return ImGui::ColorConvertU32ToFloat4(t.node_solution);
     return ImGui::ColorConvertU32ToFloat4(t.text_primary);
 }

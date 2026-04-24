@@ -200,7 +200,6 @@ static void DrawUndevelopedMarker(ImDrawList* draw_list, const GsnNode& node,
         ImVec2(center.x - radius, center.y)
     };
     DrawPolyShadow(draw_list, diamond, 4);
-    const Theme& th = GetTheme();
     ImU32 und_fill = IM_COL32(245, 247, 252, 255); // near-white for high contrast
     ImU32 und_ink  = InkOn(und_fill);
     draw_list->AddConvexPolyFilled(diamond, 4, und_fill);
@@ -416,23 +415,31 @@ void ShowGsnCanvasContent() {
             float zoom = renderer.GetZoom();
             ImVec2 offset = renderer.GetViewOffset();
             float spacing = th_grid.canvas_grid_spacing * zoom;
-            if (spacing >= 6.0f) {  // skip when zoomed out so dots don't merge
-                // Compute first visible grid index along each axis.
-                float start_x = -fmodf(offset.x, spacing);
-                float start_y = -fmodf(offset.y, spacing);
-                int ix = (int)floorf(offset.x / spacing);
-                int iy0 = (int)floorf(offset.y / spacing);
-                float dot = std::max(1.0f, zoom * 0.9f);
-                for (float x = start_x; x < sz.x; x += spacing, ++ix) {
-                    int iy = iy0;
-                    for (float y = start_y; y < sz.y; y += spacing, ++iy) {
-                        bool major = (ix % 4 == 0) && (iy % 4 == 0);
-                        ImU32 c = major ? th_grid.canvas_grid_major : th_grid.canvas_grid_minor;
-                        ImVec2 p(child_pos.x + x, child_pos.y + y);
-                        bg->AddRectFilled(
-                            ImVec2(p.x - dot * 0.5f, p.y - dot * 0.5f),
-                            ImVec2(p.x + dot * 0.5f, p.y + dot * 0.5f),
-                            c);
+            // Raise skip threshold to avoid merging dots and excessive draw calls
+            // at low zoom levels. Pre-check total dot count so we either draw the
+            // full grid or skip it entirely (avoids mid-loop cutoff artifacts).
+            constexpr float kMinSpacing = 10.0f;
+            constexpr int   kMaxDots    = 4000;
+            if (spacing >= kMinSpacing) {
+                int est_x = static_cast<int>(sz.x / spacing) + 1;
+                int est_y = static_cast<int>(sz.y / spacing) + 1;
+                if (est_x * est_y <= kMaxDots) {
+                    float start_x = -fmodf(offset.x, spacing);
+                    float start_y = -fmodf(offset.y, spacing);
+                    int ix = (int)floorf(offset.x / spacing);
+                    int iy0 = (int)floorf(offset.y / spacing);
+                    float dot = std::max(1.0f, zoom * 0.9f);
+                    for (float x = start_x; x < sz.x; x += spacing, ++ix) {
+                        int iy = iy0;
+                        for (float y = start_y; y < sz.y; y += spacing, ++iy) {
+                            bool major = (ix % 4 == 0) && (iy % 4 == 0);
+                            ImU32 c = major ? th_grid.canvas_grid_major : th_grid.canvas_grid_minor;
+                            ImVec2 p(child_pos.x + x, child_pos.y + y);
+                            bg->AddRectFilled(
+                                ImVec2(p.x - dot * 0.5f, p.y - dot * 0.5f),
+                                ImVec2(p.x + dot * 0.5f, p.y + dot * 0.5f),
+                                c);
+                        }
                     }
                 }
             }

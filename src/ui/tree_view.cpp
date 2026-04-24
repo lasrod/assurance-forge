@@ -116,26 +116,40 @@ static void RenderTreeNode(const core::TreeNode* node) {
     if (state.selected_element_id == node->id)
         flags |= ImGuiTreeNodeFlags_Selected;
 
-    // Color the role tag
-    ImVec4 color = RoleColor(node->role);
-    std::string display = std::string(RoleLabel(node->role)) + " " + ShortName(node);
-
-    // Render arrow + selection only; the visible label is drawn after as two
-    // separate text spans so the role tag can be colored independently of the
-    // node name.
+    // Render arrow + selection background only; the visible label is drawn
+    // directly onto the draw list so no extra ImGui items are created that
+    // could intercept hover / click events on the tree node.
     bool open = ImGui::TreeNodeEx(node->id.c_str(), flags, "%s", "");
 
     bool clicked = ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen();
+
+    // Capture item rect before BeginPopupContextItem advances the last item.
+    ImVec2 item_min  = ImGui::GetItemRectMin();
+    ImVec2 item_size = ImGui::GetItemRectSize();
+
     bool popup_open = ImGui::BeginPopupContextItem(node->id.c_str());
 
-    // Draw the colored [Tag] and the neutral name immediately after the arrow,
-    // on the same visual row as the tree node.
+    // Overlay the colored [Tag] and node name using AddText (no new ImGui
+    // items, so clicks/right-clicks always land on the tree node).
     {
-        ImVec4 color = RoleColor(node->role);
-        ImGui::SameLine(0.0f, 0.0f);
-        ImGui::TextColored(color, "%s", RoleLabel(node->role));
-        ImGui::SameLine();
-        ImGui::TextUnformatted(ShortName(node).c_str());
+        float text_x = item_min.x + ImGui::GetTreeNodeToLabelSpacing();
+        float text_y = item_min.y + (item_size.y - ImGui::GetTextLineHeight()) * 0.5f;
+
+        ImDrawList* dl   = ImGui::GetWindowDrawList();
+        ImFont*     font = ImGui::GetFont();
+        float font_size  = ImGui::GetFontSize();
+
+        const char* tag  = RoleLabel(node->role);
+        ImU32 tag_col    = ImGui::ColorConvertFloat4ToU32(RoleColor(node->role));
+        dl->AddText(font, font_size, ImVec2(text_x, text_y), tag_col, tag);
+
+        float tag_w   = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, tag).x;
+        float space_w = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, " ").x;
+
+        std::string name  = ShortName(node);
+        ImU32       name_col = ImGui::GetColorU32(ImGuiCol_Text);
+        dl->AddText(font, font_size, ImVec2(text_x + tag_w + space_w, text_y),
+                    name_col, name.c_str());
     }
 
     if (clicked) {

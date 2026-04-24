@@ -33,9 +33,7 @@ void MergeJapaneseGlyphs(ImGuiIO& io, float font_size, const ImFontConfig& base_
 
 void ConfigureImGuiFonts() {
     ImGuiIO& io = ImGui::GetIO();
-    constexpr float kFontSize       = 15.0f;
-    constexpr float kFontSizeSmall  = 12.5f;
-    constexpr float kFontSizeLarge  = 17.0f;
+    constexpr float kFontSize = 15.0f;
 
     const char* regular_font = "C:\\Windows\\Fonts\\segoeui.ttf";
     const char* bold_font    = "C:\\Windows\\Fonts\\segoeuib.ttf";
@@ -58,16 +56,6 @@ void ConfigureImGuiFonts() {
     } else {
         ui::g_BoldFont = io.Fonts->Fonts[0];
     }
-
-    // Optional small / large / header tiers - registered for future use.
-    io.Fonts->AddFontFromFileTTF(regular_font, kFontSizeSmall, &base_cfg);
-    MergeJapaneseGlyphs(io, kFontSizeSmall, merge_cfg);
-
-    io.Fonts->AddFontFromFileTTF(regular_font, kFontSizeLarge, &base_cfg);
-    MergeJapaneseGlyphs(io, kFontSizeLarge, merge_cfg);
-
-    io.Fonts->AddFontFromFileTTF(bold_font, kFontSizeLarge, &base_cfg);
-    MergeJapaneseGlyphs(io, kFontSizeLarge, merge_cfg);
 }
 
 }  // namespace
