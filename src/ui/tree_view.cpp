@@ -120,29 +120,30 @@ static void RenderTreeNode(const core::TreeNode* node) {
     ImVec4 color = RoleColor(node->role);
     std::string display = std::string(RoleLabel(node->role)) + " " + ShortName(node);
 
-    // Leading colored swatch (rounded square) + neutral text label.
-    bool open = ImGui::TreeNodeEx(node->id.c_str(), flags, "%s", display.c_str());
+    // Render arrow + selection only; the visible label is drawn after as two
+    // separate text spans so the role tag can be colored independently of the
+    // node name.
+    bool open = ImGui::TreeNodeEx(node->id.c_str(), flags, "%s", "");
 
-    // Draw the swatch over the tree node arrow gutter so it acts as a role badge.
+    bool clicked = ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen();
+    bool popup_open = ImGui::BeginPopupContextItem(node->id.c_str());
+
+    // Draw the colored [Tag] and the neutral name immediately after the arrow,
+    // on the same visual row as the tree node.
     {
-        ImVec2 item_min = ImGui::GetItemRectMin();
-        ImVec2 item_max = ImGui::GetItemRectMax();
-        float h = item_max.y - item_min.y;
-        float sw = std::max(6.0f, h * 0.45f);
-        float sx = item_max.x - sw - 4.0f;
-        float sy = item_min.y + (h - sw) * 0.5f;
-        ImGui::GetWindowDrawList()->AddRectFilled(
-            ImVec2(sx, sy), ImVec2(sx + sw, sy + sw),
-            ImGui::ColorConvertFloat4ToU32(color), 3.0f);
+        ImVec4 color = RoleColor(node->role);
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::TextColored(color, "%s", RoleLabel(node->role));
+        ImGui::SameLine();
+        ImGui::TextUnformatted(ShortName(node).c_str());
     }
 
-    if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
+    if (clicked) {
         state.selected_element_id = node->id;
         state.center_on_selection = true;
     }
 
-    // Right-click context menu: select the node, then offer the Add submenu.
-    if (ImGui::BeginPopupContextItem(node->id.c_str())) {
+    if (popup_open) {
         state.selected_element_id = node->id;
         RenderAddElementMenu();
         ImGui::Separator();

@@ -146,7 +146,7 @@ static void DrawParallelogram(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bot
         corners[0],
         corners[1],
         ImVec2(corners[1].x - skew * 0.15f, corners[1].y + (bottom_right.y - top_left.y) * 0.18f),
-        ImVec2(corners[0].x + skew * 0.15f, corners[0].y + (bottom_right.y - top_left.y) * 0.18f)
+        ImVec2(corners[0].x - skew * 0.15f, corners[0].y + (bottom_right.y - top_left.y) * 0.18f)
     };
     draw_list->AddConvexPolyFilled(hl_pts, 4, hl);
     draw_list->AddPolyline(corners, 4, OutlineColor(), ImDrawFlags_Closed, kOutlineThickness);
