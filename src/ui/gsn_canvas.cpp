@@ -109,8 +109,20 @@ static void DrawUndevelopedMarker(ImDrawList* draw_list, const GsnNode& node,
     draw_list->AddPolyline(diamond, 4, kOutlineColor, ImDrawFlags_Closed, kOutlineThickness);
 
     const char* und = "UND";
-    float font_size = std::max(ImGui::GetFontSize() * zoom * 0.85f, 10.0f);
     ImFont* font = ImGui::GetFont();
+    float desired_font_size = ImGui::GetFontSize() * zoom * 0.85f;
+
+    // Keep the label readable at normal zoom levels, but do not let a fixed
+    // minimum font size outgrow the zoom-scaled diamond marker.
+    ImVec2 unit_text_size = font->CalcTextSizeA(1.0f, FLT_MAX, 0.0f, und);
+    float max_text_extent = radius * 1.1f;
+    float max_font_size_from_width =
+        (unit_text_size.x > 0.0f) ? (max_text_extent / unit_text_size.x) : desired_font_size;
+    float max_font_size_from_height =
+        (unit_text_size.y > 0.0f) ? (max_text_extent / unit_text_size.y) : desired_font_size;
+    float max_font_size = std::min(max_font_size_from_width, max_font_size_from_height);
+    float min_font_size = std::min(10.0f, max_font_size);
+    float font_size = std::clamp(desired_font_size, min_font_size, max_font_size);
     ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, und);
     ImVec2 text_pos(center.x - text_size.x * 0.5f,
                     center.y - text_size.y * 0.5f);
