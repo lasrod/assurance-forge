@@ -22,7 +22,7 @@ static constexpr float kStadiumTextInset   = 0.15f;  // fraction of height for s
 static constexpr float kClaimRounding      = 8.0f;   // corner rounding for rectangular Claim nodes
 static constexpr float kOutlineThickness   = 1.0f;   // shape outline stroke width (hairline)
 static constexpr int   kCircleSegments     = 48;     // number of segments for circle rendering
-static constexpr float kUndDiamondRadius   = 20.0f;
+static constexpr float kUndDiamondRadius   = 24.0f;
 static constexpr float kUndGap             = 0.50f;
 
 // Number of stacked offset layers used for soft drop shadows under nodes.
@@ -207,12 +207,12 @@ static void DrawUndevelopedMarker(ImDrawList* draw_list, const GsnNode& node,
 
     const char* und = "UND";
     ImFont* font = ImGui::GetFont();
-    float desired_font_size = ImGui::GetFontSize() * zoom * 0.85f;
+    float desired_font_size = ImGui::GetFontSize() * zoom * 1.4f;
 
     // Keep the label readable at normal zoom levels, but do not let a fixed
     // minimum font size outgrow the zoom-scaled diamond marker.
     ImVec2 unit_text_size = font->CalcTextSizeA(1.0f, FLT_MAX, 0.0f, und);
-    float max_text_extent = radius * 1.1f;
+    float max_text_extent = radius * 1.8f;
     float max_font_size_from_width =
         (unit_text_size.x > 0.0f) ? (max_text_extent / unit_text_size.x) : desired_font_size;
     float max_font_size_from_height =
