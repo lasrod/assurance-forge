@@ -391,6 +391,7 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
                           ? ElementGroup::Group1 : ElementGroup::Group2;
         layout_node.label = placement.node->label;
         layout_node.label_secondary = placement.node->label_secondary;
+        layout_node.undeveloped = placement.node->undeveloped;
         layout_node.size  = node_sizes[placement.node->id];
         layout_node.parent_id = placement.node->parent ? placement.node->parent->id : "";
         layout_node.is_left_side = placement.is_left_side;
@@ -436,6 +437,7 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const std::vector<CanvasElem
         layout_node.role = claims[i].role;
         layout_node.label = claims[i].label;
         layout_node.label_secondary = claims[i].label_secondary;
+        layout_node.undeveloped = claims[i].undeveloped;
         layout_node.size = default_size;
         layout_node.position = ImVec2(kLeftMargin + (float)i * (kNodeWidth + kHSpacing), kTopMargin);
         layout_node.parent_id = claims[i].parent_id;
@@ -454,6 +456,7 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const std::vector<CanvasElem
             layout_node.role = row_elements[i].role;
             layout_node.label = row_elements[i].label;
             layout_node.label_secondary = row_elements[i].label_secondary;
+            layout_node.undeveloped = row_elements[i].undeveloped;
             layout_node.size = default_size;
             layout_node.position = ImVec2(kLeftMargin + (float)i * (kNodeWidth + kHSpacing),
                                           kTopMargin + (float)row_index * (kNodeHeight + kVSpacing));

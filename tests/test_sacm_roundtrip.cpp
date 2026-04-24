@@ -70,6 +70,7 @@ static void expect_packages_eq(const sacm::AssuranceCasePackage& a,
             expect_base_eq(pa.claims[j], pb.claims[j], cctx);
             EXPECT_EQ(pa.claims[j].content, pb.claims[j].content) << cctx;
             EXPECT_EQ(pa.claims[j].assertionDeclaration, pb.claims[j].assertionDeclaration) << cctx;
+            EXPECT_EQ(pa.claims[j].undeveloped, pb.claims[j].undeveloped) << cctx;
         }
 
         // ArgumentReasonings
@@ -78,6 +79,7 @@ static void expect_packages_eq(const sacm::AssuranceCasePackage& a,
             std::string rctx = ctx + ".reasoning[" + std::to_string(j) + "]";
             expect_base_eq(pa.argumentReasonings[j], pb.argumentReasonings[j], rctx);
             EXPECT_EQ(pa.argumentReasonings[j].content, pb.argumentReasonings[j].content) << rctx;
+            EXPECT_EQ(pa.argumentReasonings[j].undeveloped, pb.argumentReasonings[j].undeveloped) << rctx;
         }
 
         // ArtifactReferences
@@ -254,6 +256,7 @@ TEST(SacmSerializer, ProducesValidXml) {
     c.name = "Claim 1";
     c.content = "Test claim";
     c.description = "A test claim";
+    c.undeveloped = true;
 
     sacm::ArgumentPackage ap;
     ap.id = "AP1";
@@ -265,9 +268,11 @@ TEST(SacmSerializer, ProducesValidXml) {
     EXPECT_NE(xml.find("sacm:AssuranceCasePackage"), std::string::npos);
     EXPECT_NE(xml.find("Test Package"), std::string::npos);
     EXPECT_NE(xml.find("Test claim"), std::string::npos);
+    EXPECT_NE(xml.find("undeveloped=\"true\""), std::string::npos);
 
     // Parse it back
     auto result = sacm::parse_sacm_string(xml);
     ASSERT_TRUE(result.success);
     EXPECT_EQ(result.package.argumentPackages[0].claims[0].content, "Test claim");
+    EXPECT_TRUE(result.package.argumentPackages[0].claims[0].undeveloped);
 }

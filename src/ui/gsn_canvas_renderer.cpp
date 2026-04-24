@@ -330,6 +330,7 @@ void GsnCanvas::Render() {
         gsn_node.size = node.size;
         gsn_node.label = node.label;
         gsn_node.label_secondary = node.label_secondary;
+        gsn_node.undeveloped = node.undeveloped;
         DrawGsnNode(gsn_node, origin, zoom);
     }
 }

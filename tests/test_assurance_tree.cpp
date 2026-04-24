@@ -258,6 +258,29 @@ TEST(AssuranceTreeTest, FullVehicleBrakingExample) {
     EXPECT_EQ(tree.root->group2_attachments[0]->role, NodeRole::Context);
 }
 
+TEST(AssuranceTreeTest, UndevelopedCarriesToClaimAndStrategyNodes) {
+    const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="urn:test" id="T" name="T">
+  <argumentPackage id="AP" name="AP">
+    <claim id="cl_top" name="Top" undeveloped="true" assertionDeclaration="asserted"/>
+    <claim id="cl_sub" name="Sub" assertionDeclaration="asserted"/>
+    <argumentReasoning id="ar_1" name="Strategy1" undeveloped="true"/>
+    <assertedInference id="inf_1" name="Inf1" reasoning="ar_1">
+      <source ref="cl_sub"/>
+      <target ref="cl_top"/>
+    </assertedInference>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    auto tree = build_tree_from_xml(xml);
+    ASSERT_NE(tree.root, nullptr);
+    EXPECT_TRUE(tree.root->undeveloped);
+    ASSERT_EQ(tree.root->group1_children.size(), 1);
+    EXPECT_TRUE(tree.root->group1_children[0]->undeveloped);
+    ASSERT_EQ(tree.root->group1_children[0]->group1_children.size(), 1);
+    EXPECT_FALSE(tree.root->group1_children[0]->group1_children[0]->undeveloped);
+}
+
 // ----- Multi-language label_secondary -----
 
 TEST(AssuranceTreeTest, SecondaryLabelFromDescriptionLangs) {

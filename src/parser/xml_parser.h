@@ -14,6 +14,7 @@ struct SacmElement {
     std::string type;  // "claim", "argumentreasoning", "artifact", etc. (lowercased local-name)
     std::string content;
     std::string description;
+    bool undeveloped = false;
 
     // Multi-language maps: lang code -> text (e.g. "en" -> "...", "ja" -> "...")
     std::map<std::string, std::string> name_langs;

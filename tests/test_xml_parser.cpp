@@ -195,6 +195,26 @@ TEST(XmlParserTest, ParseAssertionDeclaration) {
     EXPECT_EQ(result.assurance_case.elements[1].assertion_declaration, "assumed");
 }
 
+TEST(XmlParserTest, ParseUndevelopedOnlyForClaimAndStrategy) {
+    const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage
+    xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation"
+    id="TEST" name="Test" description="Test">
+    <argumentPackage id="AP1" name="Args">
+        <claim id="cl_1" name="Claim" undeveloped="true" content="Claim text"/>
+        <argumentReasoning id="ar_1" name="Strategy" undeveloped="true" content="Strategy text"/>
+        <artifactReference id="ev_1" name="Evidence" undeveloped="true"/>
+    </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    ParseResult result = parse_sacm_xml_string(xml);
+    ASSERT_TRUE(result.success);
+    ASSERT_EQ(result.assurance_case.elements.size(), 3);
+    EXPECT_TRUE(result.assurance_case.elements[0].undeveloped);
+    EXPECT_TRUE(result.assurance_case.elements[1].undeveloped);
+    EXPECT_FALSE(result.assurance_case.elements[2].undeveloped);
+}
+
 // Test parsing href attributes with # prefix (OASC-style XML)
 TEST(XmlParserTest, ParseHrefWithHashPrefix) {
     const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>

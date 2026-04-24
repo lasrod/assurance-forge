@@ -141,6 +141,8 @@ static void serialize_claim(pugi::xml_node parent, const Claim& c) {
     set_base(node, c);
     if (!c.assertionDeclaration.empty())
         node.append_attribute("assertionDeclaration") = c.assertionDeclaration.c_str();
+    if (c.undeveloped)
+        node.append_attribute("undeveloped") = "true";
     add_content_ml(node, c.content, c.content_ml);
     add_description(node, c.description, c.description_ml);
 }
@@ -148,6 +150,8 @@ static void serialize_claim(pugi::xml_node parent, const Claim& c) {
 static void serialize_argument_reasoning(pugi::xml_node parent, const ArgumentReasoning& ar) {
     auto node = parent.append_child("argumentReasoning");
     set_base(node, ar);
+    if (ar.undeveloped)
+        node.append_attribute("undeveloped") = "true";
     add_content_ml(node, ar.content, ar.content_ml);
     add_description(node, ar.description, ar.description_ml);
 }

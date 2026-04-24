@@ -134,12 +134,14 @@ struct Claim : SacmElement {
     std::string content;
     std::string assertionDeclaration;
     MultiLangText content_ml;
+    bool undeveloped = false;
 };
 
 // ArgumentReasoning (11.12): provides additional explanation of a relationship.
 struct ArgumentReasoning : SacmElement {
     std::string content;
     MultiLangText content_ml;
+    bool undeveloped = false;
 };
 
 // ArtifactReference (11.9): citation of an artifact from within an argument.

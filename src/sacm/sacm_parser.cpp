@@ -262,6 +262,7 @@ static Claim parse_claim(pugi::xml_node node) {
         }
     }
     claim.assertionDeclaration = node.attribute("assertionDeclaration").as_string();
+    claim.undeveloped = read_bool_attr(node, "undeveloped", false);
     return claim;
 }
 
@@ -269,6 +270,7 @@ static ArgumentReasoning parse_argument_reasoning(pugi::xml_node node) {
     ArgumentReasoning reasoning;
     parse_element_base(node, reasoning);
     parse_content_field(node, reasoning.content, reasoning.content_ml);
+    reasoning.undeveloped = read_bool_attr(node, "undeveloped", false);
     return reasoning;
 }
 
