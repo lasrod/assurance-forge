@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <cmath>
 #include <iostream>
 
 namespace ui {
@@ -99,26 +100,31 @@ static void DrawPolyShadow(ImDrawList* draw_list, const ImVec2* points, int coun
 }
 
 // Add a thin top highlight + subtle bottom shading inside a rounded rect.
-// Gives the node a soft 3D feel without breaking the flat color identity.
+// Draws a full-size rounded rect (so ImGui doesn't clamp the rounding) and
+// clips it to the band's vertical slice. The band edges then perfectly trace
+// the shape's curvature - which matters for stadiums whose end-cap radius is
+// far larger than the band height.
 static void AddInteriorShading(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right,
                                ImU32 base_color, float rounding) {
     float h = bottom_right.y - top_left.y;
     if (h < 6.0f) return;
-    ImU32 highlight = WithAlpha(ShadeColor(base_color, 0.25f), 0.55f);
+    ImU32 highlight = WithAlpha(ShadeColor(base_color,  0.25f), 0.55f);
     ImU32 shade     = WithAlpha(ShadeColor(base_color, -0.25f), 0.35f);
     float band_h = h * 0.18f;
+
     // Top highlight band
-    draw_list->AddRectFilled(
-        top_left,
-        ImVec2(bottom_right.x, top_left.y + band_h),
-        highlight, rounding,
-        ImDrawFlags_RoundCornersTop);
+    draw_list->PushClipRect(
+        ImVec2(top_left.x, top_left.y),
+        ImVec2(bottom_right.x, top_left.y + band_h), true);
+    draw_list->AddRectFilled(top_left, bottom_right, highlight, rounding);
+    draw_list->PopClipRect();
+
     // Bottom shade band
-    draw_list->AddRectFilled(
+    draw_list->PushClipRect(
         ImVec2(top_left.x, bottom_right.y - band_h),
-        bottom_right,
-        shade, rounding,
-        ImDrawFlags_RoundCornersBottom);
+        ImVec2(bottom_right.x, bottom_right.y), true);
+    draw_list->AddRectFilled(top_left, bottom_right, shade, rounding);
+    draw_list->PopClipRect();
 }
 
 // ===== Shape drawing helpers =====
@@ -148,7 +154,7 @@ static void DrawParallelogram(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bot
 
 // Draw a stadium / rounded rectangle (Context, Assumption, Justification shapes).
 static void DrawStadium(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color) {
-    float rounding = (bottom_right.y - top_left.y) * 0.5f; // fully round the short edges
+    float rounding = (bottom_right.y - top_left.y) * 0.5f;
     DrawRectShadow(draw_list, top_left, bottom_right, rounding);
     draw_list->AddRectFilled(top_left, bottom_right, fill_color, rounding);
     AddInteriorShading(draw_list, top_left, bottom_right, fill_color, rounding);
@@ -195,7 +201,9 @@ static void DrawUndevelopedMarker(ImDrawList* draw_list, const GsnNode& node,
     };
     DrawPolyShadow(draw_list, diamond, 4);
     const Theme& th = GetTheme();
-    draw_list->AddConvexPolyFilled(diamond, 4, th.surface_3);
+    ImU32 und_fill = IM_COL32(245, 247, 252, 255); // near-white for high contrast
+    ImU32 und_ink  = InkOn(und_fill);
+    draw_list->AddConvexPolyFilled(diamond, 4, und_fill);
     draw_list->AddPolyline(diamond, 4, OutlineColor(), ImDrawFlags_Closed, kOutlineThickness);
 
     const char* und = "UND";
@@ -216,7 +224,7 @@ static void DrawUndevelopedMarker(ImDrawList* draw_list, const GsnNode& node,
     ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, und);
     ImVec2 text_pos(center.x - text_size.x * 0.5f,
                     center.y - text_size.y * 0.5f);
-    draw_list->AddText(font, font_size, text_pos, th.text_primary, und);
+    draw_list->AddText(font, font_size, text_pos, und_ink, und);
 }
 
 // ===== Text layout helper =====
