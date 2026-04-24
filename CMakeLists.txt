@@ -38,6 +38,7 @@ add_executable(assurance-forge WIN32
     src/ui/element_panel.cpp
     src/ui/register_views.cpp
     src/ui/ui_state.cpp
+    src/ui/theme.cpp
     src/core/app_state.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp

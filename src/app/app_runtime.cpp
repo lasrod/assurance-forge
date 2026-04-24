@@ -6,6 +6,7 @@
 #include "core/element_factory.h"
 #include "ui/gsn_canvas.h"
 #include "ui/register_views.h"
+#include "ui/theme.h"
 #include "ui/tree_view.h"
 #include "ui/element_panel.h"
 #include "ui/gsn_adapter.h"
@@ -17,6 +18,7 @@
 #include <cstring>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace app {
@@ -29,20 +31,31 @@ constexpr float kInitialLeftPanelRatio = 0.20f;
 constexpr float kInitialRightPanelRatio = 0.20f;
 constexpr float kMinPanelRatio = 0.10f;
 constexpr float kMaxPanelRatio = 0.40f;
-constexpr float kSplitterThickness = 6.0f;
+constexpr float kSplitterThickness = 4.0f;
 constexpr float kTopLeftHeightRatio = 0.50f;
 constexpr float kSummaryStripHeight = 88.0f;
 
-// Splitter color: medium-dark neutral gray (#262626)
-const ImVec4 kSplitterColor = ImVec4(0.15f, 0.15f, 0.15f, 1.0f);
+// Splitter color comes from the theme (matches app background tier).
+static ImVec4 SplitterColor() {
+    return ImGui::ColorConvertU32ToFloat4(ui::GetTheme().bg_app);
+}
+static ImVec4 SplitterHoverColor() {
+    return ImGui::ColorConvertU32ToFloat4(ui::WithAlpha(ui::GetTheme().accent, 0.55f));
+}
 
-// Element type colors in the SACM viewer list.
-const ImVec4 kElementTypeDefaultColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);  // white
-const ImVec4 kElementTypeClaimColor = ImVec4(0.4f, 0.8f, 0.4f, 1.0f);    // green
-const ImVec4 kElementTypeStrategyColor = ImVec4(0.4f, 0.6f, 0.9f, 1.0f); // blue
-const ImVec4 kElementTypeEvidenceColor = ImVec4(0.9f, 0.7f, 0.3f, 1.0f); // amber
-const ImVec4 kSummaryLabelColor = ImVec4(0.70f, 0.70f, 0.70f, 1.0f);      // light gray
-const ImVec4 kSummaryValueColor = ImVec4(0.96f, 0.96f, 0.96f, 1.0f);      // near-white
+// Element type colors in the SACM viewer list (sourced from theme palette).
+static ImVec4 ElementTypeColor(const char* type) {
+    const ui::Theme& t = ui::GetTheme();
+    if (!type) return ImGui::ColorConvertU32ToFloat4(t.text_primary);
+    std::string_view sv(type);
+    if (sv == "claim")             return ImGui::ColorConvertU32ToFloat4(t.node_claim);
+    if (sv == "argumentreasoning") return ImGui::ColorConvertU32ToFloat4(t.node_strategy);
+    if (sv == "artifact" || sv == "artifactreference")
+        return ImGui::ColorConvertU32ToFloat4(t.node_solution);
+    return ImGui::ColorConvertU32ToFloat4(t.text_primary);
+}
+static ImVec4 SummaryLabelColor() { return ImGui::ColorConvertU32ToFloat4(ui::GetTheme().text_secondary); }
+static ImVec4 SummaryValueColor() { return ImGui::ColorConvertU32ToFloat4(ui::GetTheme().text_primary); }
 
 constexpr float kOverwriteButtonWidth = 130.0f;
 
@@ -63,12 +76,22 @@ void DrawVerticalSplitter(const char* id,
     ImGui::SetNextWindowSize(ImVec2(width, height));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(1, 1));
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, kSplitterColor);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, SplitterColor());
 
     ImGui::Begin(id, nullptr, kPanelFlags | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar);
     ImGui::InvisibleButton("##splitter_btn", ImVec2(width, height));
-    if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
+    bool hovered = ImGui::IsItemHovered() || ImGui::IsItemActive();
+    if (hovered) {
         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+        // Draw a 1px accent stripe down the middle while hovered/dragging.
+        ImVec2 wp = ImGui::GetWindowPos();
+        ImVec2 ws = ImGui::GetWindowSize();
+        float cx = wp.x + ws.x * 0.5f;
+        ImGui::GetWindowDrawList()->AddLine(
+            ImVec2(cx, wp.y), ImVec2(cx, wp.y + ws.y),
+            ImGui::ColorConvertFloat4ToU32(SplitterHoverColor()), 2.0f);
     }
 
     if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)) {
@@ -80,7 +103,7 @@ void DrawVerticalSplitter(const char* id,
 
     ImGui::End();
     ImGui::PopStyleColor();
-    ImGui::PopStyleVar(2);
+    ImGui::PopStyleVar(4);
 }
 
 int CountElementsOfType(const parser::AssuranceCase& ac, const char* type_a, const char* type_b = nullptr) {
@@ -95,8 +118,8 @@ int CountElementsOfType(const parser::AssuranceCase& ac, const char* type_a, con
 
 void SummaryMetric(const char* label, int value) {
     ImGui::BeginGroup();
-    ImGui::TextColored(kSummaryLabelColor, "%s", label);
-    ImGui::TextColored(kSummaryValueColor, "%d", value);
+    ImGui::TextColored(SummaryLabelColor(), "%s", label);
+    ImGui::TextColored(SummaryValueColor(), "%d", value);
     ImGui::EndGroup();
 }
 
@@ -533,14 +556,7 @@ void AppRuntime::RenderSacmViewerPanel(float left_w, float top_left_h, float bot
             for (const auto& elem : ac.elements) {
                 ImGui::PushID(elem.id.c_str());
 
-                ImVec4 color = kElementTypeDefaultColor;
-                if (elem.type == "claim") {
-                    color = kElementTypeClaimColor;
-                } else if (elem.type == "argumentreasoning") {
-                    color = kElementTypeStrategyColor;
-                } else if (elem.type == "artifact" || elem.type == "artifactreference") {
-                    color = kElementTypeEvidenceColor;
-                }
+                ImVec4 color = ElementTypeColor(elem.type.c_str());
 
                 ImGui::TextColored(color, "[%s]", elem.type.c_str());
                 ImGui::SameLine();

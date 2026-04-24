@@ -7,6 +7,7 @@
 #include "imgui.h"
 
 #include "ui/gsn_canvas.h"
+#include "ui/theme.h"
 
 #include <cstdio>
 
@@ -35,15 +36,21 @@ void ConfigureImGuiFonts() {
     constexpr float kFontSize = 15.0f;
 
     const char* regular_font = "C:\\Windows\\Fonts\\segoeui.ttf";
-    const char* bold_font = "C:\\Windows\\Fonts\\segoeuib.ttf";
+    const char* bold_font    = "C:\\Windows\\Fonts\\segoeuib.ttf";
 
-    io.Fonts->AddFontFromFileTTF(regular_font, kFontSize);
+    ImFontConfig base_cfg;
+    base_cfg.PixelSnapH = true;
+
+    // Default UI font (regular, 15)
+    io.Fonts->AddFontFromFileTTF(regular_font, kFontSize, &base_cfg);
 
     ImFontConfig merge_cfg;
-    merge_cfg.MergeMode = true;
+    merge_cfg.MergeMode  = true;
+    merge_cfg.PixelSnapH = true;
     MergeJapaneseGlyphs(io, kFontSize, merge_cfg);
 
-    ui::g_BoldFont = io.Fonts->AddFontFromFileTTF(bold_font, kFontSize);
+    // Bold (15) used for node label first lines and panel headers
+    ui::g_BoldFont = io.Fonts->AddFontFromFileTTF(bold_font, kFontSize, &base_cfg);
     if (ui::g_BoldFont) {
         MergeJapaneseGlyphs(io, kFontSize, merge_cfg);
     } else {
@@ -68,6 +75,7 @@ int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE h_prev_instance, LPSTR lp_cmd
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.IniFilename = nullptr;
     ImGui::StyleColorsDark();
+    ui::ApplyImGuiStyle();
     ConfigureImGuiFonts();
 
     if (!app::platform::InitializeImGuiBackends(platform_ctx)) {
@@ -78,8 +86,10 @@ int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE h_prev_instance, LPSTR lp_cmd
 
     app::AppRuntime runtime;
 
-    // App clear color: dark neutral gray (#1A1A1A)
-    const float clear_color[4] = { 0.1f, 0.1f, 0.1f, 1.0f };
+    // Framebuffer clear color: matches the theme's app-background tier so
+    // panel rounding has a consistent surround.
+    const ImVec4 bg_v = ImGui::ColorConvertU32ToFloat4(ui::GetTheme().bg_app);
+    const float clear_color[4] = { bg_v.x, bg_v.y, bg_v.z, 1.0f };
 
     bool done = false;
     while (!done) {
@@ -98,3 +108,5 @@ int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE h_prev_instance, LPSTR lp_cmd
 
     return 0;
 }
+// Assurance Forge application bootstrap.
+// Platform details are intentionally delegated to app/platform_win32_dx11.cpp.

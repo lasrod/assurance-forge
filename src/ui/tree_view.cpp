@@ -1,4 +1,5 @@
 #include "ui/tree_view.h"
+#include "ui/theme.h"
 #include "ui/ui_state.h"
 #include "app/app_runtime.h"
 #include "core/element_factory.h"
@@ -79,14 +80,15 @@ static const char* RoleLabel(core::NodeRole role) {
 }
 
 static ImVec4 RoleColor(core::NodeRole role) {
+    const Theme& t = GetTheme();
     switch (role) {
-        case core::NodeRole::Claim:         return ImVec4(0.4f, 0.8f, 0.4f, 1.0f);
-        case core::NodeRole::Strategy:      return ImVec4(0.4f, 0.6f, 0.9f, 1.0f);
-        case core::NodeRole::Solution:      return ImVec4(0.9f, 0.7f, 0.3f, 1.0f);
-        case core::NodeRole::Context:       return ImVec4(0.78f, 0.78f, 0.78f, 1.0f);
-        case core::NodeRole::Assumption:    return ImVec4(0.94f, 0.63f, 0.63f, 1.0f);
-        case core::NodeRole::Justification: return ImVec4(0.7f, 0.78f, 0.94f, 1.0f);
-        default:                            return ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        case core::NodeRole::Claim:         return ImGui::ColorConvertU32ToFloat4(t.node_claim);
+        case core::NodeRole::Strategy:      return ImGui::ColorConvertU32ToFloat4(t.node_strategy);
+        case core::NodeRole::Solution:      return ImGui::ColorConvertU32ToFloat4(t.node_solution);
+        case core::NodeRole::Context:       return ImGui::ColorConvertU32ToFloat4(t.node_context);
+        case core::NodeRole::Assumption:    return ImGui::ColorConvertU32ToFloat4(t.node_assumption);
+        case core::NodeRole::Justification: return ImGui::ColorConvertU32ToFloat4(t.node_justification);
+        default:                            return ImGui::ColorConvertU32ToFloat4(t.text_secondary);
     }
 }
 
@@ -114,21 +116,48 @@ static void RenderTreeNode(const core::TreeNode* node) {
     if (state.selected_element_id == node->id)
         flags |= ImGuiTreeNodeFlags_Selected;
 
-    // Color the role tag
-    ImVec4 color = RoleColor(node->role);
-    std::string display = std::string(RoleLabel(node->role)) + " " + ShortName(node);
+    // Render arrow + selection background only; the visible label is drawn
+    // directly onto the draw list so no extra ImGui items are created that
+    // could intercept hover / click events on the tree node.
+    bool open = ImGui::TreeNodeEx(node->id.c_str(), flags, "%s", "");
 
-    ImGui::PushStyleColor(ImGuiCol_Text, color);
-    bool open = ImGui::TreeNodeEx(node->id.c_str(), flags, "%s", display.c_str());
-    ImGui::PopStyleColor();
+    bool clicked = ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen();
 
-    if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
+    // Capture item rect before BeginPopupContextItem advances the last item.
+    ImVec2 item_min  = ImGui::GetItemRectMin();
+    ImVec2 item_size = ImGui::GetItemRectSize();
+
+    bool popup_open = ImGui::BeginPopupContextItem(node->id.c_str());
+
+    // Overlay the colored [Tag] and node name using AddText (no new ImGui
+    // items, so clicks/right-clicks always land on the tree node).
+    {
+        float text_x = item_min.x + ImGui::GetTreeNodeToLabelSpacing();
+        float text_y = item_min.y + (item_size.y - ImGui::GetTextLineHeight()) * 0.5f;
+
+        ImDrawList* dl   = ImGui::GetWindowDrawList();
+        ImFont*     font = ImGui::GetFont();
+        float font_size  = ImGui::GetFontSize();
+
+        const char* tag  = RoleLabel(node->role);
+        ImU32 tag_col    = ImGui::ColorConvertFloat4ToU32(RoleColor(node->role));
+        dl->AddText(font, font_size, ImVec2(text_x, text_y), tag_col, tag);
+
+        float tag_w   = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, tag).x;
+        float space_w = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, " ").x;
+
+        std::string name  = ShortName(node);
+        ImU32       name_col = ImGui::GetColorU32(ImGuiCol_Text);
+        dl->AddText(font, font_size, ImVec2(text_x + tag_w + space_w, text_y),
+                    name_col, name.c_str());
+    }
+
+    if (clicked) {
         state.selected_element_id = node->id;
         state.center_on_selection = true;
     }
 
-    // Right-click context menu: select the node, then offer the Add submenu.
-    if (ImGui::BeginPopupContextItem(node->id.c_str())) {
+    if (popup_open) {
         state.selected_element_id = node->id;
         RenderAddElementMenu();
         ImGui::Separator();
