@@ -3,6 +3,8 @@
 #include "ui/tree_view.h"
 #include "ui/ui_state.h"
 
+#include <algorithm>
+#include <cfloat>
 #include <iostream>
 
 namespace ui {
@@ -18,9 +20,12 @@ static constexpr float kStadiumTextInset   = 0.15f;  // fraction of height for s
 static constexpr float kClaimRounding      = 6.0f;   // corner rounding for rectangular Claim nodes
 static constexpr float kOutlineThickness   = 2.0f;   // shape outline stroke width
 static constexpr int   kCircleSegments     = 36;     // number of segments for circle rendering
+static constexpr float kUndDiamondRadius   = 20.0f;
+static constexpr float kUndGap             = 2.0f;
 
 static const ImU32 kOutlineColor = IM_COL32(0, 0, 0, 200);
 static const ImU32 kTextColor    = IM_COL32(10, 10, 10, 255);
+static const ImU32 kUndColor     = IM_COL32(245, 245, 245, 255);
 
 // Zoom step used by keyboard and button controls (matches renderer constant)
 static constexpr float kZoomStep = 0.1f;
@@ -85,6 +90,31 @@ static void DrawCircle(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_rig
 static void DrawRoundedRect(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color) {
     draw_list->AddRectFilled(top_left, bottom_right, fill_color, kClaimRounding);
     draw_list->AddRect(top_left, bottom_right, kOutlineColor, kClaimRounding, 0, kOutlineThickness);
+}
+
+static void DrawUndevelopedMarker(ImDrawList* draw_list, const GsnNode& node,
+                                  ImVec2 top_left, ImVec2 bottom_right, float zoom) {
+    if (!node.undeveloped) return;
+
+    float radius = kUndDiamondRadius * zoom;
+    float gap = kUndGap * zoom;
+    ImVec2 center((top_left.x + bottom_right.x) * 0.5f, bottom_right.y + gap + radius);
+    ImVec2 diamond[4] = {
+        ImVec2(center.x, center.y - radius),
+        ImVec2(center.x + radius, center.y),
+        ImVec2(center.x, center.y + radius),
+        ImVec2(center.x - radius, center.y)
+    };
+    draw_list->AddConvexPolyFilled(diamond, 4, kUndColor);
+    draw_list->AddPolyline(diamond, 4, kOutlineColor, ImDrawFlags_Closed, kOutlineThickness);
+
+    const char* und = "UND";
+    float font_size = std::max(ImGui::GetFontSize() * zoom * 0.85f, 10.0f);
+    ImFont* font = ImGui::GetFont();
+    ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, und);
+    ImVec2 text_pos(center.x - text_size.x * 0.5f,
+                    center.y - text_size.y * 0.5f);
+    draw_list->AddText(font, font_size, text_pos, kTextColor, und);
 }
 
 // ===== Text layout helper =====
@@ -197,6 +227,7 @@ void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin, float zoom) {
     float text_left, text_wrap;
     ComputeTextRegion(node, top_left, bottom_right, zoom, text_left, text_wrap);
     DrawNodeLabel(draw_list, node, top_left, bottom_right, text_left, text_wrap, zoom);
+    DrawUndevelopedMarker(draw_list, node, top_left, bottom_right, zoom);
 
     // Invisible button for hit-testing.
     // SetNextItemAllowOverlap lets overlay buttons (zoom/language) receive clicks

@@ -275,3 +275,21 @@ TEST(LayoutTest, OddChildrenMiddleCenteredUnderParent) {
     EXPECT_NEAR(strat_center, mid_center, 1.0f)
         << "Middle child should be centered under parent";
 }
+
+TEST(LayoutTest, UndevelopedFlagPropagatesToLayoutNode) {
+    const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="urn:test" id="T" name="T">
+  <argumentPackage id="AP" name="AP">
+    <claim id="Top" name="Top" undeveloped="true" assertionDeclaration="asserted"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    auto tree = build_tree(xml);
+    ASSERT_NE(tree.root, nullptr);
+
+    ui::LayoutEngine engine;
+    auto layout = engine.ComputeLayout(tree);
+    ASSERT_EQ(layout.size(), 1u);
+    EXPECT_EQ(layout[0].id, "Top");
+    EXPECT_TRUE(layout[0].undeveloped);
+}

@@ -32,6 +32,16 @@ static pugi::xml_node find_child_by_local_name(pugi::xml_node node, const char* 
     return pugi::xml_node();
 }
 
+static bool read_bool_attr(pugi::xml_node node, const char* attr_name, bool default_value) {
+    const char* raw = node.attribute(attr_name).as_string(nullptr);
+    if (!raw || !*raw) return default_value;
+    std::string s(raw);
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
+    if (s == "true" || s == "1") return true;
+    if (s == "false" || s == "0") return false;
+    return default_value;
+}
+
 // Extract description text and multi-language variants from a node.
 // Populates element.description (primary) and element.description_langs (all languages).
 static void extract_description(pugi::xml_node child, SacmElement& element) {
@@ -161,6 +171,9 @@ void extract_elements_recursive(pugi::xml_node node, std::vector<SacmElement>& e
             element.type = local_name;
             element.content = child.attribute("content").as_string();
             element.assertion_declaration = child.attribute("assertionDeclaration").as_string();
+            if (local_name == "claim" || local_name == "argumentreasoning") {
+                element.undeveloped = read_bool_attr(child, "undeveloped", false);
+            }
 
             if (local_name == "expression") {
                 element.content = child.attribute("value").as_string();

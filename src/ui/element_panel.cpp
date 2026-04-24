@@ -21,7 +21,7 @@ parser::SacmElement* find_parser_element(parser::AssuranceCase* ac, const std::s
 // We search across all argument packages, artifact packages, and terminology packages.
 void sync_to_sacm(sacm::AssuranceCasePackage* pkg, const std::string& id,
                   const std::string& new_name, const std::string& new_description,
-                  const std::string& new_content,
+                  const std::string& new_content, bool undeveloped,
                   const std::map<std::string, std::string>& name_langs,
                   const std::map<std::string, std::string>& desc_langs,
                   const std::map<std::string, std::string>& content_langs) {
@@ -41,6 +41,7 @@ void sync_to_sacm(sacm::AssuranceCasePackage* pkg, const std::string& id,
                 update_ml(c);
                 c.content = new_content;
                 c.content_ml.texts = content_langs;
+                c.undeveloped = undeveloped;
                 return;
             }
         }
@@ -49,6 +50,7 @@ void sync_to_sacm(sacm::AssuranceCasePackage* pkg, const std::string& id,
                 update_ml(ar);
                 ar.content = new_content;
                 ar.content_ml.texts = content_langs;
+                ar.undeveloped = undeveloped;
                 return;
             }
         }
@@ -195,6 +197,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac, sacm::AssuranceCasePackage* sac
 
     // Content (editable, for claims and argument reasonings)
     bool has_content = (elem->type == "claim" || elem->type == "argumentreasoning");
+    bool supports_undeveloped = has_content;
     if (has_content) {
         ImGui::Text("Content");
         ImGui::Separator();
@@ -210,6 +213,15 @@ bool ShowElementPanel(parser::AssuranceCase* ac, sacm::AssuranceCasePackage* sac
                 elem->content_langs[sec_lang] = sec_content;
                 modified = true;
             }
+        }
+        ImGui::Spacing();
+    }
+
+    if (supports_undeveloped) {
+        bool undeveloped = elem->undeveloped;
+        if (ImGui::Checkbox("Undeveloped", &undeveloped)) {
+            elem->undeveloped = undeveloped;
+            modified = true;
         }
         ImGui::Spacing();
     }
@@ -273,7 +285,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac, sacm::AssuranceCasePackage* sac
 
     // Sync edits to SACM model
     if (modified) {
-        sync_to_sacm(sacm_pkg, elem->id, elem->name, elem->description, elem->content,
+        sync_to_sacm(sacm_pkg, elem->id, elem->name, elem->description, elem->content, elem->undeveloped,
                       elem->name_langs, elem->description_langs, elem->content_langs);
     }
 
