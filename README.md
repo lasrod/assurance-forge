@@ -53,6 +53,20 @@ Users work with assurance content, not diagram layout.
 See docs/ROADMAP.md
 
 ---
+
+## 📦 Releases
+
+Pre-built Windows binaries are published on the [Releases page](https://github.com/lasrod/assurance-forge/releases).
+
+1. Download `assurance-forge.<version>-windows-x64.zip` from the latest release.
+2. Unzip anywhere.
+3. Run `assurance-forge.exe` from the extracted folder.
+
+Each zip contains the executable, the `data/` sample files, `README.md`, and `LICENSE.md`.
+
+Releases are currently Windows x64 only. To build on other platforms, see [Build Instructions](#build-instructions) below.
+
+---
 ## Requirements
 
 - Windows 10/11
