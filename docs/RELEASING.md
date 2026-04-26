@@ -21,7 +21,7 @@ Tags containing `-` are automatically marked as **prerelease** by the workflow.
    git push origin 0.2.0
    ```
 
-3. The `Release` workflow builds the project, runs tests, packages a zip, and creates a GitHub Release named `assurance-forge <tag>` with the zip attached.
+3. The `Release` workflow builds the project, packages a zip, and creates a GitHub Release named `assurance-forge <tag>` with the zip attached.
 4. Edit the Release on GitHub to add a description. The workflow leaves the body empty intentionally so the release notes can be written by hand.
 
 The release zip is named `assurance-forge.<tag>.zip` and contains:
