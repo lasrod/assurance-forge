@@ -58,7 +58,7 @@ See docs/ROADMAP.md
 
 Pre-built Windows binaries are published on the [Releases page](https://github.com/lasrod/assurance-forge/releases).
 
-1. Download `assurance-forge.<version>.zip` from the latest release.
+1. Download `assurance-forge.<version>-windows-x64.zip` from the latest release.
 2. Unzip anywhere.
 3. Run `assurance-forge.exe` from the extracted folder.
 
