@@ -9,7 +9,6 @@
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/panels/element_panel.h"
 #include "ui/panels/project_files_panel.h"
-#include "ui/panels/sacm_viewer_panel.h"
 #include "ui/panels/welcome_modal.h"
 #include "ui/register_views.h"
 #include "ui/theme.h"
@@ -248,15 +247,8 @@ FolderBrowseResult BrowseForProjectManifest(std::string& selected_path, std::str
 struct AppRuntime::Impl {
     core::AppState app_state;
 
-    char file_path_buf[kPathBufferSize] = "data/oasc-ja.xml";
-    char dir_path_buf[kPathBufferSize] = "data";
-
-    std::vector<std::string> xml_files;
-    int selected_file_idx = -1;
-
     bool tree_needs_rebuild = false;
     core::AssuranceTree current_tree;
-    bool show_overwrite_confirm = false;
     bool force_center_tab_selection = false;
     bool pending_focus_root = false;
     bool show_gsn_tab = true;
@@ -461,48 +453,6 @@ void AppRuntime::ShowNotImplementedModal(const std::string& feature) {
     impl_->not_implemented_feature = feature;
 }
 
-void AppRuntime::ScanDirectory() {
-    impl_->xml_files.clear();
-    impl_->selected_file_idx = -1;
-
-    std::error_code ec;
-    if (!std::filesystem::is_directory(impl_->dir_path_buf, ec)) {
-        return;
-    }
-
-    for (const auto& entry : std::filesystem::directory_iterator(impl_->dir_path_buf, ec)) {
-        if (!entry.is_regular_file()) continue;
-
-        auto ext = entry.path().extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(),
-            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        if (ext == ".xml") {
-            impl_->xml_files.push_back(entry.path().string());
-        }
-    }
-
-    std::sort(impl_->xml_files.begin(), impl_->xml_files.end());
-
-    std::error_code path_ec;
-    std::filesystem::path selected_path = std::filesystem::weakly_canonical(std::filesystem::path(impl_->file_path_buf), path_ec);
-    if (path_ec) {
-        selected_path = std::filesystem::path(impl_->file_path_buf).lexically_normal();
-    }
-
-    for (int i = 0; i < static_cast<int>(impl_->xml_files.size()); ++i) {
-        std::filesystem::path candidate_path = std::filesystem::weakly_canonical(std::filesystem::path(impl_->xml_files[i]), path_ec);
-        if (path_ec) {
-            path_ec.clear();
-            candidate_path = std::filesystem::path(impl_->xml_files[i]).lexically_normal();
-        }
-
-        if (candidate_path == selected_path) {
-            impl_->selected_file_idx = i;
-            break;
-        }
-    }
-}
-
 void AppRuntime::RebuildDerivedViewsIfNeeded() {
     if (impl_->tree_needs_rebuild && !impl_->app_state.loaded_case.has_value()) {
         ui::RebuildRegisterViews(nullptr);
@@ -657,33 +607,6 @@ void AppRuntime::RenderTreePanel(float left_w, float safety_tree_h, float top_y)
                           ui_state,
                           actions);
     ImGui::End();
-}
-
-void AppRuntime::RenderSacmViewerPanel(float left_w, float sacm_h, float top_y) {
-    ui::panels::SacmViewerPanelModel model{
-        impl_->app_state,
-        impl_->dir_path_buf,
-        sizeof(impl_->dir_path_buf),
-        impl_->file_path_buf,
-        sizeof(impl_->file_path_buf),
-        impl_->xml_files,
-        impl_->selected_file_idx,
-        impl_->show_overwrite_confirm,
-    };
-    ui::panels::SacmViewerPanelCallbacks callbacks{
-        [this]() { ScanDirectory(); },
-        [this]() {
-            impl_->tree_needs_rebuild = true;
-            impl_->pending_focus_root = true;
-        },
-        [this]() {
-            impl_->current_tree = core::AssuranceTree();
-            ui::gsn::SetCanvasTree(impl_->current_tree);
-            ui::RebuildRegisterViews(nullptr);
-            ui::GetUiState().selected_element_id.clear();
-        },
-    };
-    ui::panels::ShowSacmViewerPanel(left_w, sacm_h, top_y, kPanelFlags, model, callbacks);
 }
 
 void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content_h, float top_y) {
