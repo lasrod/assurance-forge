@@ -9,6 +9,9 @@
 namespace ui::panels {
 namespace {
 
+constexpr float kWelcomeBodyFontScale = 1.04f;
+constexpr float kWelcomeTitleFontScale = 2.08f;
+
 ImVec4 ToVec4(ImU32 color) {
     return ImGui::ColorConvertU32ToFloat4(color);
 }
@@ -54,7 +57,7 @@ bool RecentLink(const char* id, const RecentProjectEntry& entry) {
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     ImVec2 pos = ImGui::GetCursorScreenPos();
     float width = ImGui::GetContentRegionAvail().x;
-    constexpr float height = 58.0f;
+    constexpr float height = 62.0f;
 
     ImGui::InvisibleButton(id, ImVec2(width, height));
     bool hovered = ImGui::IsItemHovered();
@@ -75,8 +78,8 @@ bool RecentLink(const char* id, const RecentProjectEntry& entry) {
     std::snprintf(stats, sizeof(stats),
         "%d claims \xC2\xB7 %d strategies \xC2\xB7 %d evidence \xC2\xB7 %d undeveloped",
         entry.claims, entry.strategies, entry.evidence, entry.undeveloped);
-    draw_list->AddText(ImVec2(pos.x + 8.0f, pos.y + 23.0f), theme.text_secondary, stats);
-    draw_list->AddText(ImVec2(pos.x + 8.0f, pos.y + 41.0f), theme.text_muted, entry.path.c_str());
+    draw_list->AddText(ImVec2(pos.x + 8.0f, pos.y + 24.0f), theme.text_secondary, stats);
+    draw_list->AddText(ImVec2(pos.x + 8.0f, pos.y + 43.0f), theme.text_muted, entry.path.c_str());
 
     return clicked;
 }
@@ -134,13 +137,15 @@ void ShowWelcomeModal(bool& is_open,
     if (ImGui::BeginPopupModal("Welcome!", &is_open, ImGuiWindowFlags_NoResize)) {
         const ui::Theme& theme = ui::GetTheme();
 
-        ImGui::SetWindowFontScale(2.0f);
+        ImGui::SetWindowFontScale(kWelcomeBodyFontScale);
+
+        ImGui::SetWindowFontScale(kWelcomeTitleFontScale);
         ImGui::PushFont(ui::gsn::g_BoldFont);
         ImGui::PushStyleColor(ImGuiCol_Text, ToVec4(theme.text_primary));
         ImGui::TextUnformatted("Assurance Forge");
         ImGui::PopStyleColor();
         ImGui::PopFont();
-        ImGui::SetWindowFontScale(1.0f);
+        ImGui::SetWindowFontScale(kWelcomeBodyFontScale);
 
         ImGui::PushStyleColor(ImGuiCol_Text, ToVec4(theme.text_secondary));
         ImGui::TextUnformatted("Forge Confidence in Safety");
