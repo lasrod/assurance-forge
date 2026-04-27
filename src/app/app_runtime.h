@@ -4,7 +4,6 @@
 
 #include "core/element_factory.h"
 #include "core/project_model.h"
-#include "core/project_model.h"
 
 namespace app {
 

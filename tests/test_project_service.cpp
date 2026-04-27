@@ -10,6 +10,14 @@
 
 namespace {
 
+struct TempDir {
+    std::filesystem::path path;
+    explicit TempDir(std::filesystem::path p) : path(std::move(p)) {}
+    ~TempDir() { std::filesystem::remove_all(path); }
+    TempDir(const TempDir&) = delete;
+    TempDir& operator=(const TempDir&) = delete;
+};
+
 std::filesystem::path MakeTempParent() {
     auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
     std::filesystem::path path = std::filesystem::temp_directory_path() /
@@ -30,7 +38,8 @@ bool ContainsFileWithRole(const core::AssuranceProject& project,
 }  // namespace
 
 TEST(ProjectServiceTest, CreateEmptyProjectCreatesRequiredStructureAndManifest) {
-    auto parent = MakeTempParent();
+    TempDir tmp(MakeTempParent());
+    auto& parent = tmp.path;
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     std::string error;
@@ -52,12 +61,11 @@ TEST(ProjectServiceTest, CreateEmptyProjectCreatesRequiredStructureAndManifest) 
     EXPECT_TRUE(parser::parse_sacm_xml((root / "arguments" / "main.sacm").string()).success);
     EXPECT_TRUE(ContainsFileWithRole(project, "arguments/main.sacm", core::ProjectFileRole::SacmArgument));
     EXPECT_FALSE(report.steps.empty());
-
-    std::filesystem::remove_all(parent);
 }
 
 TEST(ProjectServiceTest, AddProjectFilesNormalizesNamesAndTracksManifestEntries) {
-    auto parent = MakeTempParent();
+    TempDir tmp(MakeTempParent());
+    auto& parent = tmp.path;
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     core::ProjectFileEntry entry;
@@ -82,12 +90,11 @@ TEST(ProjectServiceTest, AddProjectFilesNormalizesNamesAndTracksManifestEntries)
     EXPECT_TRUE(ContainsFileWithRole(reopened, "arguments/safety-core.sacm", core::ProjectFileRole::SacmArgument));
     EXPECT_TRUE(ContainsFileWithRole(reopened, "registers/evidence-register.af.json", core::ProjectFileRole::EvidenceRegister));
     EXPECT_TRUE(ContainsFileWithRole(reopened, "registers/j3377-cae-register.af.json", core::ProjectFileRole::J3377CaeRegister));
-
-    std::filesystem::remove_all(parent);
 }
 
 TEST(ProjectServiceTest, OpenProjectReportsExternallyModifiedAndMissingFiles) {
-    auto parent = MakeTempParent();
+    TempDir tmp(MakeTempParent());
+    auto& parent = tmp.path;
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     core::ProjectFileEntry entry;
@@ -122,6 +129,4 @@ TEST(ProjectServiceTest, OpenProjectReportsExternallyModifiedAndMissingFiles) {
     ASSERT_NE(evidence_it, reopened.files.end());
     EXPECT_EQ(evidence_it->state, core::ProjectFileState::Missing);
     EXPECT_TRUE(missing_report.has_failures());
-
-    std::filesystem::remove_all(parent);
 }

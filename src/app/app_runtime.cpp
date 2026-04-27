@@ -22,6 +22,7 @@
 #include <cstring>
 #include <cwchar>
 #include <filesystem>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -44,7 +45,6 @@ constexpr size_t kPathBufferSize = 512;
 constexpr float kInitialLeftPanelRatio = 0.20f;
 constexpr float kInitialRightPanelRatio = 0.20f;
 constexpr float kInitialProjectBoundaryRatio = 0.50f;
-constexpr float kInitialSafetyBoundaryRatio = 0.52f;
 constexpr float kMinPanelRatio = 0.10f;
 constexpr float kMaxPanelRatio = 0.40f;
 constexpr float kSplitterThickness = 4.0f;
@@ -266,7 +266,6 @@ struct AppRuntime::Impl {
     float left_ratio = kInitialLeftPanelRatio;
     float right_ratio = kInitialRightPanelRatio;
     float project_boundary_ratio = kInitialProjectBoundaryRatio;
-    float safety_boundary_ratio = kInitialSafetyBoundaryRatio;
 
     // Modal for unimplemented features
     bool show_not_implemented_modal = false;
@@ -279,7 +278,6 @@ struct AppRuntime::Impl {
     ProjectFileCreateKind pending_project_file_kind = ProjectFileCreateKind::Sacm;
     char project_name_buf[128] = "MySafetyCase";
     char project_parent_buf[kPathBufferSize] = ".";
-    char project_open_path_buf[kPathBufferSize] = ".";
     char project_file_name_buf[256] = "main.sacm";
     bool show_save_before_exit_modal = false;
 
@@ -866,8 +864,7 @@ void AppRuntime::RenderStartupProjectWindow() {
         [this]() { ShowNotImplementedModal("Create Assurance Project from Template"); },
         [this]() { BeginOpenProject(); },
         [this]() { ShowNotImplementedModal("Import SACM"); },
-        [this](const ui::panels::RecentProjectEntry& entry) {
-            CopyToBuffer(impl_->project_open_path_buf, sizeof(impl_->project_open_path_buf), entry.path);
+        [this](const ui::panels::RecentProjectEntry& /*entry*/) {
             BeginOpenProject();
         },
     };

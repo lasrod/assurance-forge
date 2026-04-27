@@ -10,12 +10,14 @@
 #include <array>
 #include <chrono>
 #include <cctype>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <random>
 #include <sstream>
 #include <unordered_set>
+#include <vector>
 
 namespace core {
 namespace {
@@ -540,17 +542,22 @@ void ComputeSacmHashes(ProjectFileEntry& entry, const std::filesystem::path& abs
         }
     }
 
-    auto join_and_hash = [](std::vector<std::string> lines, std::string& hash) {
+    auto join_and_hash = [&entry](std::vector<std::string> lines, std::string& hash) -> bool {
         std::sort(lines.begin(), lines.end());
         std::ostringstream normalized;
         for (const auto& line : lines) normalized << line << '\n';
-        std::string error;
-        Sha256String(normalized.str(), hash, error);
+        std::string hash_error;
+        if (!Sha256String(normalized.str(), hash, hash_error)) {
+            entry.state = ProjectFileState::ParseError;
+            entry.lastError = "Hash computation failed: " + hash_error;
+            return false;
+        }
+        return true;
     };
 
-    join_and_hash(semantic_lines, entry.semanticHash);
-    join_and_hash(element_ids, entry.elementIndexHash);
-    join_and_hash(relationship_lines, entry.relationshipGraphHash);
+    if (!join_and_hash(semantic_lines, entry.semanticHash)) return;
+    if (!join_and_hash(element_ids, entry.elementIndexHash)) return;
+    if (!join_and_hash(relationship_lines, entry.relationshipGraphHash)) return;
 }
 
 bool RefreshEntryHashes(AssuranceProject& project,
