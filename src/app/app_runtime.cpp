@@ -29,10 +29,12 @@ constexpr const char* kDefaultDemoFilePath = "data/oasc-ja.xml";
 
 constexpr float kInitialLeftPanelRatio = 0.20f;
 constexpr float kInitialRightPanelRatio = 0.20f;
+constexpr float kInitialProjectBoundaryRatio = 0.22f;
+constexpr float kInitialSafetyBoundaryRatio = 0.52f;
 constexpr float kMinPanelRatio = 0.10f;
 constexpr float kMaxPanelRatio = 0.40f;
 constexpr float kSplitterThickness = 4.0f;
-constexpr float kTopLeftHeightRatio = 0.50f;
+constexpr float kMinLeftSectionHeight = 120.0f;
 constexpr float kSummaryStripHeight = 88.0f;
 
 // Splitter color comes from the theme (matches app background tier).
@@ -106,6 +108,43 @@ void DrawVerticalSplitter(const char* id,
     ImGui::PopStyleVar(4);
 }
 
+float DrawHorizontalSplitter(const char* id,
+                             float x,
+                             float y,
+                             float width,
+                             float height) {
+    ImGui::SetNextWindowPos(ImVec2(x, y));
+    ImGui::SetNextWindowSize(ImVec2(width, height));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(1, 1));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, SplitterColor());
+
+    float delta_y = 0.0f;
+    ImGui::Begin(id, nullptr, kPanelFlags | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar);
+    ImGui::InvisibleButton("##splitter_btn", ImVec2(width, height));
+    bool hovered = ImGui::IsItemHovered() || ImGui::IsItemActive();
+    if (hovered) {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+        ImVec2 wp = ImGui::GetWindowPos();
+        ImVec2 ws = ImGui::GetWindowSize();
+        float cy = wp.y + ws.y * 0.5f;
+        ImGui::GetWindowDrawList()->AddLine(
+            ImVec2(wp.x, cy), ImVec2(wp.x + ws.x, cy),
+            ImGui::ColorConvertFloat4ToU32(SplitterHoverColor()), 2.0f);
+    }
+
+    if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)) {
+        delta_y = ImGui::GetIO().MouseDelta.y;
+    }
+
+    ImGui::End();
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(4);
+    return delta_y;
+}
+
 int CountElementsOfType(const parser::AssuranceCase& ac, const char* type_a, const char* type_b = nullptr) {
     int count = 0;
     for (const auto& elem : ac.elements) {
@@ -150,10 +189,13 @@ struct AppRuntime::Impl {
 
     float left_ratio = kInitialLeftPanelRatio;
     float right_ratio = kInitialRightPanelRatio;
+    float project_boundary_ratio = kInitialProjectBoundaryRatio;
+    float safety_boundary_ratio = kInitialSafetyBoundaryRatio;
 
     // Modal for unimplemented features
     bool show_not_implemented_modal = false;
     std::string not_implemented_feature;
+    bool show_startup_project_window = true;
 
     // Modal for confirming a multi-element removal. Populated by RemoveSelected
     // when the planned removal targets more than one element.
@@ -423,19 +465,98 @@ void AppRuntime::RenderSplitters(float display_w, float content_h, float left_w,
 
     float center_x = left_w + kSplitterThickness;
     DrawVerticalSplitter("##right_splitter", center_x + center_w, kSplitterThickness, content_h, top_y, display_w, impl_->right_ratio, true);
+
+    float available_h = content_h - kSplitterThickness * 2.0f;
+    if (available_h <= 0.0f) return;
+
+    float min_ratio = kMinLeftSectionHeight / available_h;
+    if (min_ratio > 0.30f) min_ratio = 0.30f;
+
+    auto clamp_boundaries = [&]() {
+        if (impl_->project_boundary_ratio < min_ratio) impl_->project_boundary_ratio = min_ratio;
+        if (impl_->project_boundary_ratio > 1.0f - min_ratio * 2.0f) impl_->project_boundary_ratio = 1.0f - min_ratio * 2.0f;
+
+        if (impl_->safety_boundary_ratio < impl_->project_boundary_ratio + min_ratio) {
+            impl_->safety_boundary_ratio = impl_->project_boundary_ratio + min_ratio;
+        }
+        if (impl_->safety_boundary_ratio > 1.0f - min_ratio) impl_->safety_boundary_ratio = 1.0f - min_ratio;
+    };
+
+    clamp_boundaries();
+
+    float splitter1_y = top_y + available_h * impl_->project_boundary_ratio;
+    float splitter2_y = top_y + available_h * impl_->safety_boundary_ratio + kSplitterThickness;
+
+    float delta1 = DrawHorizontalSplitter("##left_h_splitter_1", 0.0f, splitter1_y, left_w, kSplitterThickness);
+    if (delta1 != 0.0f) {
+        impl_->project_boundary_ratio += delta1 / available_h;
+        clamp_boundaries();
+    }
+
+    float delta2 = DrawHorizontalSplitter("##left_h_splitter_2", 0.0f, splitter2_y, left_w, kSplitterThickness);
+    if (delta2 != 0.0f) {
+        impl_->safety_boundary_ratio += delta2 / available_h;
+        clamp_boundaries();
+    }
 }
 
-void AppRuntime::RenderTreePanel(float left_w, float top_left_h, float top_y) {
+void AppRuntime::RenderTreePanel(float left_w, float safety_tree_h, float top_y) {
     ImGui::SetNextWindowPos(ImVec2(0, top_y));
-    ImGui::SetNextWindowSize(ImVec2(left_w, top_left_h));
+    ImGui::SetNextWindowSize(ImVec2(left_w, safety_tree_h));
     ImGui::Begin("Safety Case Tree", nullptr, kPanelFlags);
     ui::ShowTreeViewPanel(impl_->current_tree.root ? &impl_->current_tree : nullptr);
     ImGui::End();
 }
 
-void AppRuntime::RenderSacmViewerPanel(float left_w, float top_left_h, float bottom_left_h, float top_y) {
-    ImGui::SetNextWindowPos(ImVec2(0, top_y + top_left_h));
-    ImGui::SetNextWindowSize(ImVec2(left_w, bottom_left_h));
+void AppRuntime::RenderProjectFilesPanel(float left_w, float project_h, float top_y) {
+    ImGui::SetNextWindowPos(ImVec2(0, top_y));
+    ImGui::SetNextWindowSize(ImVec2(left_w, project_h));
+    ImGui::Begin("Project Files", nullptr, kPanelFlags);
+
+    if (ImGui::BeginChild("ProjectFilesTree", ImVec2(0, 0), false)) {
+        RenderProjectFilesTree();
+    }
+    ImGui::EndChild();
+
+    ImGui::End();
+}
+
+void AppRuntime::RenderProjectFilesTree() {
+    auto render_file = [](const char* filename) {
+        ImGui::TreeNodeEx(filename,
+                          ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen,
+                          "%s", filename);
+    };
+
+    if (ImGui::TreeNodeEx("arguments/", ImGuiTreeNodeFlags_DefaultOpen, "%s", "arguments/")) {
+        render_file("main.sacm");
+        render_file("perception.sacm");
+        render_file("braking.sacm");
+        ImGui::TreePop();
+    }
+
+    if (ImGui::TreeNodeEx("registers/", ImGuiTreeNodeFlags_DefaultOpen, "%s", "registers/")) {
+        render_file("evidence-register.af.json");
+        render_file("cse-register.af.json");
+        ImGui::TreePop();
+    }
+
+    if (ImGui::TreeNodeEx("conformance/", ImGuiTreeNodeFlags_DefaultOpen, "%s", "conformance/")) {
+        render_file("ul4600-conformance.af.json");
+        render_file("iso26262-conformance.af.json");
+        ImGui::TreePop();
+    }
+
+    if (ImGui::TreeNodeEx("exports/", ImGuiTreeNodeFlags_DefaultOpen, "%s", "exports/")) {
+        render_file("review-pack.pdf");
+        render_file("conformance-summary.xlsx");
+        ImGui::TreePop();
+    }
+}
+
+void AppRuntime::RenderSacmViewerPanel(float left_w, float sacm_h, float top_y) {
+    ImGui::SetNextWindowPos(ImVec2(0, top_y));
+    ImGui::SetNextWindowSize(ImVec2(left_w, sacm_h));
     ImGui::Begin("SACM Viewer", nullptr, kPanelFlags);
 
     ImGui::Text("Directory:");
@@ -728,6 +849,41 @@ void AppRuntime::RenderRemoveConfirmModal() {
     }
 }
 
+void AppRuntime::RenderStartupProjectWindow() {
+    if (!impl_->show_startup_project_window) return;
+
+    auto dismiss = [&]() {
+        impl_->show_startup_project_window = false;
+        ImGui::CloseCurrentPopup();
+    };
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal("Assurance Forge", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Assurance Forge");
+        ImGui::Spacing();
+
+        // TODO: Implement recent projects list.
+
+        if (ImGui::Button("Create New Project", ImVec2(240.0f, 0.0f))) {
+            // TODO: Implement project folder creation and af.proj generation.
+            dismiss();
+        }
+
+        if (ImGui::Button("Open Existing Project", ImVec2(240.0f, 0.0f))) {
+            // TODO: Implement opening an existing af.proj project manifest.
+            dismiss();
+        }
+
+        if (ImGui::Button("Continue Without Project", ImVec2(240.0f, 0.0f))) {
+            dismiss();
+        }
+
+        ImGui::EndPopup();
+    } else {
+        ImGui::OpenPopup("Assurance Forge");
+    }
+}
+
 const parser::AssuranceCase* AppRuntime::GetLoadedCase() const {
     if (!impl_->app_state.loaded_case.has_value()) return nullptr;
     return &impl_->app_state.loaded_case.value();
@@ -743,15 +899,26 @@ void AppRuntime::RenderFrame(bool& done) {
     float right_w = display.x * impl_->right_ratio;
     float center_w = display.x - left_w - right_w - kSplitterThickness * 2.0f;
 
-    float top_left_h = content_h * kTopLeftHeightRatio;
-    float bottom_left_h = content_h - top_left_h;
-
     RebuildDerivedViewsIfNeeded();
 
     RenderSplitters(display.x, content_h, left_w, center_w, top_y);
 
-    RenderTreePanel(left_w, top_left_h, top_y);
-    RenderSacmViewerPanel(left_w, top_left_h, bottom_left_h, top_y);
+    left_w = display.x * impl_->left_ratio;
+    right_w = display.x * impl_->right_ratio;
+    center_w = display.x - left_w - right_w - kSplitterThickness * 2.0f;
+
+    float available_h = std::max(0.0f, content_h - kSplitterThickness * 2.0f);
+    float project_h = available_h * impl_->project_boundary_ratio;
+    float safety_tree_h = available_h * (impl_->safety_boundary_ratio - impl_->project_boundary_ratio);
+    float sacm_h = std::max(0.0f, available_h - project_h - safety_tree_h);
+
+    float project_y = top_y;
+    float safety_y = project_y + project_h + kSplitterThickness;
+    float sacm_y = safety_y + safety_tree_h + kSplitterThickness;
+
+    RenderProjectFilesPanel(left_w, project_h, project_y);
+    RenderTreePanel(left_w, safety_tree_h, safety_y);
+    RenderSacmViewerPanel(left_w, sacm_h, sacm_y);
 
     float center_x = left_w + kSplitterThickness;
     RenderCenterPanel(center_x, center_w, content_h, top_y);
@@ -759,6 +926,7 @@ void AppRuntime::RenderFrame(bool& done) {
 
     RenderNotImplementedModal();
     RenderRemoveConfirmModal();
+    RenderStartupProjectWindow();
 }
 
 }  // namespace app
