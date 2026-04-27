@@ -1,4 +1,5 @@
 #include "app/app_runtime.h"
+#include "app/welcome_modal.h"
 
 #include "imgui.h"
 
@@ -850,38 +851,7 @@ void AppRuntime::RenderRemoveConfirmModal() {
 }
 
 void AppRuntime::RenderStartupProjectWindow() {
-    if (!impl_->show_startup_project_window) return;
-
-    auto dismiss = [&]() {
-        impl_->show_startup_project_window = false;
-        ImGui::CloseCurrentPopup();
-    };
-
-    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal("Assurance Forge", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("Assurance Forge");
-        ImGui::Spacing();
-
-        // TODO: Implement recent projects list.
-
-        if (ImGui::Button("Create New Project", ImVec2(240.0f, 0.0f))) {
-            // TODO: Implement project folder creation and af.proj generation.
-            dismiss();
-        }
-
-        if (ImGui::Button("Open Existing Project", ImVec2(240.0f, 0.0f))) {
-            // TODO: Implement opening an existing af.proj project manifest.
-            dismiss();
-        }
-
-        if (ImGui::Button("Continue Without Project", ImVec2(240.0f, 0.0f))) {
-            dismiss();
-        }
-
-        ImGui::EndPopup();
-    } else {
-        ImGui::OpenPopup("Assurance Forge");
-    }
+    ShowWelcomeModal(impl_->show_startup_project_window);
 }
 
 const parser::AssuranceCase* AppRuntime::GetLoadedCase() const {

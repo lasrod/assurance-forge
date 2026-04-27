@@ -555,7 +555,7 @@ void ShowGsnCanvasContent() {
                 float lang_x = child_pos.x + child_size_lang.x - (lang_btn_w + lang_margin);
                 float lang_y = child_pos.y + child_size_lang.y - (28.0f + lang_margin) - lang_btn_h - 6.0f;
 
-                ImDrawList* fg_lang = ImGui::GetForegroundDrawList();
+                ImDrawList* fg_lang = ImGui::GetWindowDrawList();
                 fg_lang->AddRectFilled(ImVec2(lang_x - 4.0f, lang_y - 3.0f),
                                        ImVec2(lang_x + lang_btn_w + 4.0f, lang_y + lang_btn_h + 3.0f),
                                        WithAlpha(GetTheme().surface_2, 0.85f), 8.0f);
@@ -581,7 +581,7 @@ void ShowGsnCanvasContent() {
             const char* hint_1 = "Ctrl+Wheel  Zoom";
             const char* hint_2 = "Middle Drag  Pan";
 
-            ImDrawList* fg_hints = ImGui::GetForegroundDrawList();
+            ImDrawList* fg_hints = ImGui::GetWindowDrawList();
             ImVec2 hint_pos(child_pos.x + 12.0f, child_pos.y + 12.0f);
             ImVec2 hint_size(164.0f, 44.0f);
 
@@ -611,7 +611,7 @@ void ShowGsnCanvasContent() {
             float buttons_y = child_pos.y + child_size.y - (button_size + margin);
 
             // Semi-transparent background for the zoom control strip
-            ImDrawList* fg = ImGui::GetForegroundDrawList();
+            ImDrawList* fg = ImGui::GetWindowDrawList();
             float strip_width = button_size * 2 + label_width + 12.0f;
             ImVec2 strip_tl(buttons_x - 4.0f, buttons_y - 2.0f);
             ImVec2 strip_br(buttons_x + strip_width, buttons_y + button_size + 2.0f);
