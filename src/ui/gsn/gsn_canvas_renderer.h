@@ -1,6 +1,9 @@
 #pragma once
 
 #include "ui/gsn/gsn_model.h"
+#include "parser/xml_parser.h"
+#include "ui/element_context_menu.h"
+#include "ui/ui_state.h"
 #include "core/assurance_tree.h"
 #include <vector>
 #include <unordered_set>
@@ -16,7 +19,9 @@ public:
     // Set elements (legacy flat list)
     void SetElements(const std::vector<CanvasElement>& elements);
     // Render into the current ImGui window/child
-    void Render();
+    void Render(UiState& ui_state,
+                const parser::AssuranceCase* active_case,
+                const ElementContextActions& actions);
 
     // Zoom controls
     void ZoomIn();

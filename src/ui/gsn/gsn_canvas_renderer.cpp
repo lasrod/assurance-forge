@@ -281,7 +281,9 @@ static void DrawGroup2Edge(ImDrawList* draw_list, ImVec2 parent_side, ImVec2 att
 
 // ===== Main rendering =====
 
-void GsnCanvas::Render() {
+void GsnCanvas::Render(UiState& ui_state,
+                       const parser::AssuranceCase* active_case,
+                       const ElementContextActions& actions) {
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
     float zoom = zoom_level_;
@@ -336,7 +338,7 @@ void GsnCanvas::Render() {
         gsn_node.label = node.label;
         gsn_node.label_secondary = node.label_secondary;
         gsn_node.undeveloped = node.undeveloped;
-        DrawGsnNode(gsn_node, origin, zoom);
+        DrawGsnNode(gsn_node, origin, ui_state, active_case, actions, zoom);
     }
 }
 

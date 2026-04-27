@@ -3,7 +3,10 @@
 #include <string>
 #include <vector>
 #include "imgui.h"
+#include "parser/xml_parser.h"
+#include "ui/element_context_menu.h"
 #include "ui/gsn/gsn_model.h"
+#include "ui/ui_state.h"
 #include "core/assurance_tree.h"
 
 namespace ui::gsn {
@@ -24,7 +27,12 @@ extern ImFont* g_BoldFont;
 // Draw a single GSN node (rectangle + label) and handle clicks.
 // canvas_origin is the fixed screen-space origin of the canvas.
 // zoom scales all positions and sizes (default 1.0 = no zoom).
-void DrawGsnNode(const GsnNode& node, ImVec2 canvas_origin, float zoom = 1.0f);
+void DrawGsnNode(const GsnNode& node,
+                 ImVec2 canvas_origin,
+                 UiState& ui_state,
+                 const parser::AssuranceCase* active_case,
+                 const ElementContextActions& actions,
+                 float zoom = 1.0f);
 
 // Backwards-compatible function used by `main.cpp`.
 // Internally uses the new `GsnCanvas` renderer.
@@ -32,7 +40,9 @@ void ShowGsnCanvasWindow();
 
 // Render only the canvas content in the current window.
 // This enables embedding the canvas under tab views.
-void ShowGsnCanvasContent();
+void ShowGsnCanvasContent(UiState& ui_state,
+                          const parser::AssuranceCase* active_case,
+                          const ElementContextActions& actions);
 
 // High-level renderer class (in implementation file)
 class GsnCanvas;

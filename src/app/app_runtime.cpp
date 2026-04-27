@@ -42,11 +42,6 @@ const ImGuiWindowFlags kPanelFlags = ImGuiWindowFlags_NoMove
 
 }  // namespace
 
-// Pointer to the currently constructed AppRuntime, used by free functions
-// (RequestAddChild / RequestNotImplemented) so UI code can poke the runtime
-// without a circular include or callback plumbing.
-static AppRuntime* g_active_runtime = nullptr;
-
 struct AppRuntime::Impl {
     core::AppState app_state;
 
@@ -114,8 +109,17 @@ void NormalizeCenterViewSelection(bool& show_gsn_tab,
     }
 }
 
+ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
+    return ui::ElementContextActions{
+        [&runtime](core::NewElementKind kind) { runtime.AddChildToSelected(kind); },
+        [&runtime](core::RemoveMode mode) { runtime.RemoveSelected(mode); },
+        [&runtime](const char* feature) {
+            if (feature) runtime.ShowNotImplementedModal(feature);
+        },
+    };
+}
+
 AppRuntime::AppRuntime() : impl_(new Impl()) {
-    g_active_runtime = this;
     ScanDirectory();
 
     if (impl_->app_state.load_file(impl_->file_path_buf)) {
@@ -126,27 +130,7 @@ AppRuntime::AppRuntime() : impl_(new Impl()) {
 }
 
 AppRuntime::~AppRuntime() {
-    if (g_active_runtime == this) g_active_runtime = nullptr;
     delete impl_;
-}
-
-void RequestAddChild(core::NewElementKind kind) {
-    if (g_active_runtime) g_active_runtime->AddChildToSelected(kind);
-}
-
-void RequestRemove(core::RemoveMode mode) {
-    if (g_active_runtime) g_active_runtime->RemoveSelected(mode);
-}
-
-const parser::AssuranceCase* GetActiveAssuranceCase() {
-    if (!g_active_runtime) return nullptr;
-    return g_active_runtime->GetLoadedCase();
-}
-
-void RequestNotImplemented(const char* feature) {
-    if (g_active_runtime && feature) {
-        g_active_runtime->ShowNotImplementedModal(feature);
-    }
 }
 
 bool AppRuntime::AddChildToSelected(core::NewElementKind kind) {
@@ -407,7 +391,12 @@ void AppRuntime::RenderTreePanel(float left_w, float safety_tree_h, float top_y)
     ImGui::SetNextWindowPos(ImVec2(0, top_y));
     ImGui::SetNextWindowSize(ImVec2(left_w, safety_tree_h));
     ImGui::Begin("Safety Case Tree", nullptr, kPanelFlags);
-    ui::ShowTreeViewPanel(impl_->current_tree.root ? &impl_->current_tree : nullptr);
+    ui::UiState& ui_state = ui::GetUiState();
+    ui::ElementContextActions actions = MakeElementContextActions(*this);
+    ui::ShowTreeViewPanel(impl_->current_tree.root ? &impl_->current_tree : nullptr,
+                          GetLoadedCase(),
+                          ui_state,
+                          actions);
     ImGui::End();
 }
 
@@ -458,7 +447,8 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                                           : 0;
             if (ImGui::BeginTabItem("GSN Canvas", nullptr, gsn_flags)) {
                 ui_state.center_view = ui::CenterView::GsnCanvas;
-                ui::gsn::ShowGsnCanvasContent();
+                ui::ElementContextActions actions = MakeElementContextActions(*this);
+                ui::gsn::ShowGsnCanvasContent(ui_state, GetLoadedCase(), actions);
                 ImGui::EndTabItem();
             }
         }

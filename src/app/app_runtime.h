@@ -6,26 +6,6 @@
 
 namespace app {
 
-// Request that the active AppRuntime add a child of the given kind to the
-// currently selected element. Safe to call from any UI code; no-op if no
-// runtime is active or no element is selected.
-void RequestAddChild(core::NewElementKind kind);
-
-// Request that the active AppRuntime remove the currently selected element
-// using the given mode. If the planned removal targets a single element it is
-// removed immediately; otherwise the targeted nodes are highlighted on the
-// canvas, the view fits to them, and a confirmation modal is shown.
-void RequestRemove(core::RemoveMode mode);
-
-// Request that the active AppRuntime show a "not implemented yet" status for
-// the given feature name.
-void RequestNotImplemented(const char* feature);
-
-// Returns a pointer to the currently loaded assurance case, or nullptr if no
-// case is loaded. Used by UI menus that need to compute model-derived labels
-// (e.g. the Remove submenu's element counts) without owning model access.
-const parser::AssuranceCase* GetActiveAssuranceCase();
-
 class AppRuntime {
 public:
     AppRuntime();
