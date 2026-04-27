@@ -454,6 +454,11 @@ float AppRuntime::RenderMainMenuBar(bool& done) {
             impl_->force_center_tab_selection,
             ui_state.center_view);
 
+        ImGui::Separator();
+        if (ImGui::MenuItem("Welcome Screen")) {
+            impl_->show_startup_project_window = true;
+        }
+
         ImGui::EndMenu();
     }
 
@@ -851,7 +856,11 @@ void AppRuntime::RenderRemoveConfirmModal() {
 }
 
 void AppRuntime::RenderStartupProjectWindow() {
-    ShowWelcomeModal(impl_->show_startup_project_window);
+    // TODO: Populate from persisted recent-projects list. Placeholder data shown for now.
+    static const std::vector<RecentProjectEntry> kDemoRecent = {
+        { "Open Autonomy Safety Case", "data/oasc-ja.xml", 42, 9, 16, 3 },
+    };
+    ShowWelcomeModal(impl_->show_startup_project_window, kDemoRecent);
 }
 
 const parser::AssuranceCase* AppRuntime::GetLoadedCase() const {

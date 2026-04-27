@@ -4,6 +4,8 @@
 #include "ui/gsn_canvas.h"
 #include "ui/theme.h"
 
+#include <cstdio>
+
 namespace {
 
 ImVec4 ToVec4(ImU32 color) {
@@ -18,6 +20,7 @@ void SectionTitle(const char* label) {
     ImGui::PopFont();
 }
 
+// Clickable link row with title + subtitle (used for Start actions).
 bool ActionLink(const char* id, const char* title, const char* subtitle) {
     const ui::Theme& theme = ui::GetTheme();
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
@@ -42,6 +45,42 @@ bool ActionLink(const char* id, const char* title, const char* subtitle) {
     if (subtitle && subtitle[0]) {
         draw_list->AddText(ImVec2(pos.x + 8.0f, pos.y + 25.0f), theme.text_secondary, subtitle);
     }
+
+    return clicked;
+}
+
+// Recent project entry row: project name, assurance stats below, path dimmed below that.
+bool RecentLink(const char* id, const RecentProjectEntry& entry) {
+    const ui::Theme& theme = ui::GetTheme();
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    ImVec2 pos = ImGui::GetCursorScreenPos();
+    float width = ImGui::GetContentRegionAvail().x;
+    constexpr float height = 58.0f;
+
+    ImGui::InvisibleButton(id, ImVec2(width, height));
+    bool hovered = ImGui::IsItemHovered();
+    bool clicked = ImGui::IsItemClicked();
+
+    if (hovered) {
+        draw_list->AddRectFilled(
+            pos,
+            ImVec2(pos.x + width, pos.y + height),
+            ui::WithAlpha(theme.surface_3, 0.72f),
+            theme.rounding_ui);
+    }
+
+    ImU32 name_color = hovered ? theme.accent_hover : theme.accent;
+    draw_list->AddText(ImVec2(pos.x + 8.0f, pos.y + 5.0f), name_color, entry.name.c_str());
+
+    // Stats line: "42 claims · 9 strategies · 16 evidence · 3 undeveloped"
+    char stats[128];
+    std::snprintf(stats, sizeof(stats),
+        "%d claims \xC2\xB7 %d strategies \xC2\xB7 %d evidence \xC2\xB7 %d undeveloped",
+        entry.claims, entry.strategies, entry.evidence, entry.undeveloped);
+    draw_list->AddText(ImVec2(pos.x + 8.0f, pos.y + 23.0f), theme.text_secondary, stats);
+
+    // Path dimmed at the bottom
+    draw_list->AddText(ImVec2(pos.x + 8.0f, pos.y + 41.0f), theme.text_muted, entry.path.c_str());
 
     return clicked;
 }
@@ -74,8 +113,16 @@ void WalkthroughCard(const char* id, const char* title, const char* subtitle, fl
 
 }  // namespace
 
-void ShowWelcomeModal(bool& is_open) {
-    if (!is_open) return;
+void ShowWelcomeModal(bool& is_open, const std::vector<RecentProjectEntry>& recent) {
+    // Open the modal exactly once when requested.
+    if (is_open && !ImGui::IsPopupOpen("Welcome!")) {
+        ImGui::OpenPopup("Welcome!");
+    }
+
+    // Nothing to render if the modal isn't requested and isn't currently open.
+    if (!is_open && !ImGui::IsPopupOpen("Welcome!")) {
+        return;
+    }
 
     auto dismiss = [&is_open]() {
         is_open = false;
@@ -83,12 +130,12 @@ void ShowWelcomeModal(bool& is_open) {
     };
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(920.0f, 560.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(920.0f, 560.0f), ImGuiCond_Always);
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(28.0f, 24.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10.0f, 10.0f));
 
-    if (ImGui::BeginPopupModal("Welcome!", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal("Welcome!", &is_open, ImGuiWindowFlags_NoResize)) {
         const ui::Theme& theme = ui::GetTheme();
 
         ImGui::SetWindowFontScale(2.0f);
@@ -113,28 +160,44 @@ void ShowWelcomeModal(bool& is_open) {
             ImGui::TableNextColumn();
             SectionTitle("Start");
             ImGui::Dummy(ImVec2(0.0f, 8.0f));
-            if (ActionLink("##new_project", "New Project...", "Create a new assurance project workspace")) {
-                // TODO: Implement project folder creation and af.proj generation.
+            if (ActionLink("##create_empty", "Create Empty Assurance Project",
+                           "Start with a blank assurance project workspace")) {
+                // TODO: Implement blank project creation.
                 dismiss();
             }
-            if (ActionLink("##open_project", "Open Project...", "Open an existing Assurance Forge project")) {
+            if (ActionLink("##create_template", "Create Assurance Project from Template",
+                           "Create a project from a predefined assurance case template")) {
+                // TODO: Implement template-based project creation.
+                dismiss();
+            }
+            if (ActionLink("##open_project", "Open Project",
+                           "Open an existing Assurance Forge project")) {
                 // TODO: Implement opening an existing af.proj project manifest.
                 dismiss();
             }
-            if (ActionLink("##open_sacm", "Open SACM File...", "Load a SACM XML assurance case directly")) {
-                // TODO: Implement direct SACM file picker.
+            if (ActionLink("##import_sacm", "Import SACM",
+                           "Import a SACM XML assurance case")) {
+                // TODO: Implement SACM import.
                 dismiss();
             }
 
             ImGui::Dummy(ImVec2(0.0f, 28.0f));
-            SectionTitle("Recent");
+            SectionTitle("Open Recent Assurance Projects");
             ImGui::Dummy(ImVec2(0.0f, 8.0f));
-            if (ActionLink("##recent_demo", "Open Autonomy Safety Case", "data/oasc-ja.xml")) {
-                dismiss();
+            if (recent.empty()) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ToVec4(theme.text_muted));
+                ImGui::TextUnformatted("No recent projects.");
+                ImGui::PopStyleColor();
+            } else {
+                for (int i = 0; i < static_cast<int>(recent.size()); ++i) {
+                    char row_id[32];
+                    std::snprintf(row_id, sizeof(row_id), "##recent_%d", i);
+                    if (RecentLink(row_id, recent[i])) {
+                        // TODO: Open the selected recent project.
+                        dismiss();
+                    }
+                }
             }
-            ImGui::PushStyleColor(ImGuiCol_Text, ToVec4(theme.text_muted));
-            ImGui::TextUnformatted("More recent projects will appear here.");
-            ImGui::PopStyleColor();
 
             ImGui::TableNextColumn();
             SectionTitle("Walkthroughs");
@@ -149,8 +212,11 @@ void ShowWelcomeModal(bool& is_open) {
         }
 
         ImGui::EndPopup();
-    } else {
-        ImGui::OpenPopup("Welcome!");
+    }
+
+    // Keep external state synchronized if closed via titlebar X/Escape.
+    if (!ImGui::IsPopupOpen("Welcome!")) {
+        is_open = false;
     }
 
     ImGui::PopStyleVar(2);
