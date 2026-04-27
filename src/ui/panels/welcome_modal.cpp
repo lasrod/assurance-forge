@@ -1,11 +1,12 @@
-#include "app/welcome_modal.h"
+#include "ui/panels/welcome_modal.h"
 
 #include "imgui.h"
-#include "ui/gsn_canvas.h"
+#include "ui/gsn/gsn_canvas.h"
 #include "ui/theme.h"
 
 #include <cstdio>
 
+namespace ui::panels {
 namespace {
 
 ImVec4 ToVec4(ImU32 color) {
@@ -13,14 +14,13 @@ ImVec4 ToVec4(ImU32 color) {
 }
 
 void SectionTitle(const char* label) {
-    ImGui::PushFont(ui::g_BoldFont);
+    ImGui::PushFont(ui::gsn::g_BoldFont);
     ImGui::PushStyleColor(ImGuiCol_Text, ToVec4(ui::GetTheme().text_primary));
     ImGui::TextUnformatted(label);
     ImGui::PopStyleColor();
     ImGui::PopFont();
 }
 
-// Clickable link row with title + subtitle (used for Start actions).
 bool ActionLink(const char* id, const char* title, const char* subtitle) {
     const ui::Theme& theme = ui::GetTheme();
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
@@ -49,7 +49,6 @@ bool ActionLink(const char* id, const char* title, const char* subtitle) {
     return clicked;
 }
 
-// Recent project entry row: project name, assurance stats below, path dimmed below that.
 bool RecentLink(const char* id, const RecentProjectEntry& entry) {
     const ui::Theme& theme = ui::GetTheme();
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
@@ -72,14 +71,11 @@ bool RecentLink(const char* id, const RecentProjectEntry& entry) {
     ImU32 name_color = hovered ? theme.accent_hover : theme.accent;
     draw_list->AddText(ImVec2(pos.x + 8.0f, pos.y + 5.0f), name_color, entry.name.c_str());
 
-    // Stats line: "42 claims · 9 strategies · 16 evidence · 3 undeveloped"
     char stats[128];
     std::snprintf(stats, sizeof(stats),
         "%d claims \xC2\xB7 %d strategies \xC2\xB7 %d evidence \xC2\xB7 %d undeveloped",
         entry.claims, entry.strategies, entry.evidence, entry.undeveloped);
     draw_list->AddText(ImVec2(pos.x + 8.0f, pos.y + 23.0f), theme.text_secondary, stats);
-
-    // Path dimmed at the bottom
     draw_list->AddText(ImVec2(pos.x + 8.0f, pos.y + 41.0f), theme.text_muted, entry.path.c_str());
 
     return clicked;
@@ -114,12 +110,10 @@ void WalkthroughCard(const char* id, const char* title, const char* subtitle, fl
 }  // namespace
 
 void ShowWelcomeModal(bool& is_open, const std::vector<RecentProjectEntry>& recent) {
-    // Open the modal exactly once when requested.
     if (is_open && !ImGui::IsPopupOpen("Welcome!")) {
         ImGui::OpenPopup("Welcome!");
     }
 
-    // Nothing to render if the modal isn't requested and isn't currently open.
     if (!is_open && !ImGui::IsPopupOpen("Welcome!")) {
         return;
     }
@@ -139,7 +133,7 @@ void ShowWelcomeModal(bool& is_open, const std::vector<RecentProjectEntry>& rece
         const ui::Theme& theme = ui::GetTheme();
 
         ImGui::SetWindowFontScale(2.0f);
-        ImGui::PushFont(ui::g_BoldFont);
+        ImGui::PushFont(ui::gsn::g_BoldFont);
         ImGui::PushStyleColor(ImGuiCol_Text, ToVec4(theme.text_primary));
         ImGui::TextUnformatted("Assurance Forge");
         ImGui::PopStyleColor();
@@ -162,22 +156,18 @@ void ShowWelcomeModal(bool& is_open, const std::vector<RecentProjectEntry>& rece
             ImGui::Dummy(ImVec2(0.0f, 8.0f));
             if (ActionLink("##create_empty", "Create Empty Assurance Project",
                            "Start with a blank assurance project workspace")) {
-                // TODO: Implement blank project creation.
                 dismiss();
             }
             if (ActionLink("##create_template", "Create Assurance Project from Template",
                            "Create a project from a predefined assurance case template")) {
-                // TODO: Implement template-based project creation.
                 dismiss();
             }
             if (ActionLink("##open_project", "Open Project",
                            "Open an existing Assurance Forge project")) {
-                // TODO: Implement opening an existing af.proj project manifest.
                 dismiss();
             }
             if (ActionLink("##import_sacm", "Import SACM",
                            "Import a SACM XML assurance case")) {
-                // TODO: Implement SACM import.
                 dismiss();
             }
 
@@ -193,7 +183,6 @@ void ShowWelcomeModal(bool& is_open, const std::vector<RecentProjectEntry>& rece
                     char row_id[32];
                     std::snprintf(row_id, sizeof(row_id), "##recent_%d", i);
                     if (RecentLink(row_id, recent[i])) {
-                        // TODO: Open the selected recent project.
                         dismiss();
                     }
                 }
@@ -214,10 +203,11 @@ void ShowWelcomeModal(bool& is_open, const std::vector<RecentProjectEntry>& rece
         ImGui::EndPopup();
     }
 
-    // Keep external state synchronized if closed via titlebar X/Escape.
     if (!ImGui::IsPopupOpen("Welcome!")) {
         is_open = false;
     }
 
     ImGui::PopStyleVar(2);
 }
+
+}  // namespace ui::panels

@@ -1,6 +1,6 @@
-#include "gsn_adapter.h"
+#include "ui/gsn/gsn_adapter.h"
 
-namespace ui {
+namespace ui::gsn {
 
 static ElementRole MapType(const std::string& t) {
     if (t == "claim") return ElementRole::Claim;
@@ -30,4 +30,4 @@ core::AssuranceTree BuildAssuranceTree(const parser::AssuranceCase& ac) {
     return core::AssuranceTree::Build(ac);
 }
 
-} // namespace ui
+} // namespace ui::gsn

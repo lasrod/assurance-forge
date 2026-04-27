@@ -6,7 +6,7 @@
 
 #include "imgui.h"
 
-#include "ui/gsn_canvas.h"
+#include "ui/gsn/gsn_canvas.h"
 #include "ui/theme.h"
 
 #include <cstdio>
@@ -50,11 +50,11 @@ void ConfigureImGuiFonts() {
     MergeJapaneseGlyphs(io, kFontSize, merge_cfg);
 
     // Bold (15) used for node label first lines and panel headers
-    ui::g_BoldFont = io.Fonts->AddFontFromFileTTF(bold_font, kFontSize, &base_cfg);
-    if (ui::g_BoldFont) {
+    ui::gsn::g_BoldFont = io.Fonts->AddFontFromFileTTF(bold_font, kFontSize, &base_cfg);
+    if (ui::gsn::g_BoldFont) {
         MergeJapaneseGlyphs(io, kFontSize, merge_cfg);
     } else {
-        ui::g_BoldFont = io.Fonts->Fonts[0];
+        ui::gsn::g_BoldFont = io.Fonts->Fonts[0];
     }
 }
 

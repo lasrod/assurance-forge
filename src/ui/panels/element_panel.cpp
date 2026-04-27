@@ -1,10 +1,10 @@
-﻿#include "ui/element_panel.h"
+﻿#include "ui/panels/element_panel.h"
 #include "ui/ui_state.h"
-#include "ui/gsn_canvas.h"
+#include "ui/gsn/gsn_canvas.h"
 #include "imgui.h"
 #include <cstring>
 
-namespace ui {
+namespace ui::panels {
 
 namespace {
 
@@ -185,13 +185,13 @@ bool ShowElementPanel(parser::AssuranceCase* ac, sacm::AssuranceCasePackage* sac
     // Secondary language name (only show if this field has the secondary language)
     if (elem->name_langs.count(sec_lang)) {
         ImGui::Text("Name (%s)", sec_lang.c_str());
-        if (g_BoldFont) ImGui::PushFont(g_BoldFont);
+        if (ui::gsn::g_BoldFont) ImGui::PushFont(ui::gsn::g_BoldFont);
         std::string sec_name = elem->name_langs.at(sec_lang);
         if (EditableSingleLine("name_sec", sec_name)) {
             elem->name_langs[sec_lang] = sec_name;
             modified = true;
         }
-        if (g_BoldFont) ImGui::PopFont();
+        if (ui::gsn::g_BoldFont) ImGui::PopFont();
     }
     ImGui::Spacing();
 
@@ -293,4 +293,4 @@ bool ShowElementPanel(parser::AssuranceCase* ac, sacm::AssuranceCasePackage* sac
     return modified;
 }
 
-}  // namespace ui
+}  // namespace ui::panels

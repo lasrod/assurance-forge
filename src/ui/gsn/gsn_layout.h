@@ -1,10 +1,10 @@
 #pragma once
 
-#include "gsn_model.h"
+#include "ui/gsn/gsn_model.h"
 #include "core/assurance_tree.h"
 #include <vector>
 
-namespace ui {
+namespace ui::gsn {
 
 // Pure layout engine: deterministic placement of nodes.
 class LayoutEngine {
@@ -16,4 +16,4 @@ public:
     std::vector<LayoutNode> ComputeLayout(const std::vector<CanvasElement>& elements);
 };
 
-} // namespace ui
+} // namespace ui::gsn

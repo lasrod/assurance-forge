@@ -1,5 +1,5 @@
-#include "ui/gsn_canvas.h"
-#include "ui/gsn_canvas_renderer.h"
+#include "ui/gsn/gsn_canvas.h"
+#include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/theme.h"
 #include "ui/tree_view.h"
 #include "ui/ui_state.h"
@@ -9,7 +9,7 @@
 #include <cmath>
 #include <iostream>
 
-namespace ui {
+namespace ui::gsn {
 
 // g_BoldFont is defined in gsn_layout.cpp (shared between layout and drawing)
 
@@ -764,4 +764,4 @@ void SetCanvasTree(const core::AssuranceTree& tree) {
     GlobalRenderer().SetTree(tree);
 }
 
-} // namespace ui
+} // namespace ui::gsn

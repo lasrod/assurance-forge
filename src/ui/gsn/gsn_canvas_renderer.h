@@ -1,12 +1,12 @@
 #pragma once
 
-#include "gsn_model.h"
+#include "ui/gsn/gsn_model.h"
 #include "core/assurance_tree.h"
 #include <vector>
 #include <unordered_set>
 #include <string>
 
-namespace ui {
+namespace ui::gsn {
 
 class GsnCanvas {
 public:
@@ -50,4 +50,4 @@ private:
     ImVec2 view_offset_ = ImVec2(0.0f, 0.0f); // pixel-space pan offset
 };
 
-} // namespace ui
+} // namespace ui::gsn

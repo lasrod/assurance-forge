@@ -1,13 +1,13 @@
-﻿#include "gsn_canvas_renderer.h"
-#include "gsn_layout.h"
-#include "gsn_canvas.h" // for DrawGsnNode
+﻿#include "ui/gsn/gsn_canvas_renderer.h"
+#include "ui/gsn/gsn_layout.h"
+#include "ui/gsn/gsn_canvas.h" // for DrawGsnNode
 #include "ui/theme.h"
 #include <imgui.h>
 #include <cmath>
 #include <algorithm>
 #include <unordered_map>
 
-namespace ui {
+namespace ui::gsn {
 
 // ===== Edge rendering constants =====
 static constexpr float kArrowSize           = 9.0f;   // arrowhead triangle side length
@@ -400,4 +400,4 @@ bool GsnCanvas::CenterOnIds(const std::unordered_set<std::string>& ids,
     return true;
 }
 
-} // namespace ui
+} // namespace ui::gsn

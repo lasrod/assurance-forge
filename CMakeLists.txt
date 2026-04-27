@@ -28,15 +28,18 @@ add_subdirectory(external/pugixml)
 add_executable(assurance-forge WIN32
     src/app/main.cpp
     src/app/app_runtime.cpp
-    src/app/welcome_modal.cpp
     src/app/platform_win32_dx11.cpp
     src/parser/xml_parser.cpp
-    src/ui/gsn_canvas.cpp
-    src/ui/gsn_layout.cpp
-    src/ui/gsn_canvas_renderer.cpp
-    src/ui/gsn_adapter.cpp
+    src/ui/panels/welcome_modal.cpp
+    src/ui/panels/element_panel.cpp
+    src/ui/panels/project_files_panel.cpp
+    src/ui/panels/sacm_viewer_panel.cpp
+    src/ui/widgets/splitter.cpp
+    src/ui/gsn/gsn_canvas.cpp
+    src/ui/gsn/gsn_layout.cpp
+    src/ui/gsn/gsn_canvas_renderer.cpp
+    src/ui/gsn/gsn_adapter.cpp
     src/ui/tree_view.cpp
-    src/ui/element_panel.cpp
     src/ui/register_views.cpp
     src/ui/ui_state.cpp
     src/ui/theme.cpp
@@ -69,7 +72,7 @@ add_executable(tests
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
-    src/ui/gsn_layout.cpp
+    src/ui/gsn/gsn_layout.cpp
     src/sacm/sacm_parser.cpp
     src/sacm/sacm_serializer.cpp
 )

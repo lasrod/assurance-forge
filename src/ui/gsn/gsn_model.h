@@ -4,7 +4,7 @@
 #include <vector>
 #include "imgui.h"
 
-namespace ui {
+namespace ui::gsn {
 
 enum class ElementRole {
     Claim,
@@ -46,4 +46,4 @@ struct LayoutNode {
     bool is_left_side = true; // for Group2: which side of parent
 };
 
-} // namespace ui
+} // namespace ui::gsn

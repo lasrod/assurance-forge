@@ -1,11 +1,11 @@
-﻿#include "gsn_layout.h"
-#include "gsn_canvas.h" // for g_BoldFont
+﻿#include "ui/gsn/gsn_layout.h"
+#include "ui/gsn/gsn_canvas.h" // for g_BoldFont
 #include <algorithm>
 #include <unordered_map>
 #include <cmath>
 #include <cstring>
 
-namespace ui {
+namespace ui::gsn {
 
 // Bold font pointer shared between layout engine and node drawing code.
 // Set by main.cpp at startup.
@@ -477,4 +477,4 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const std::vector<CanvasElem
     return nodes;
 }
 
-} // namespace ui
+} // namespace ui::gsn

@@ -3,10 +3,10 @@
 #include <string>
 #include <vector>
 #include "imgui.h"
-#include "gsn_model.h"
+#include "ui/gsn/gsn_model.h"
 #include "core/assurance_tree.h"
 
-namespace ui {
+namespace ui::gsn {
 
 struct GsnNode {
     std::string id;
@@ -44,4 +44,4 @@ void SetCanvasElements(const std::vector<CanvasElement>& elements);
 // Push an AssuranceTree to the canvas renderer (new).
 void SetCanvasTree(const core::AssuranceTree& tree);
 
-} // namespace ui
+} // namespace ui::gsn

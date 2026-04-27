@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include "core/assurance_tree.h"
 #include "parser/xml_parser.h"
-#include "ui/gsn_layout.h"
+#include "ui/gsn/gsn_layout.h"
 
 // We test the layout engine indirectly through the tree since the layout
 // engine is coupled to ImGui types. Instead, we test the tree structure
@@ -212,12 +212,12 @@ TEST(LayoutTest, Group2AttachmentNoOverlapWithSibling) {
     auto tree = build_tree(xml);
     ASSERT_NE(tree.root, nullptr);
 
-    ui::LayoutEngine engine;
+    ui::gsn::LayoutEngine engine;
     auto layout = engine.ComputeLayout(tree);
 
     // Find the nodes we care about
-    const ui::LayoutNode* ctx_node = nullptr;
-    const ui::LayoutNode* ev_node = nullptr;
+    const ui::gsn::LayoutNode* ctx_node = nullptr;
+    const ui::gsn::LayoutNode* ev_node = nullptr;
     for (const auto& ln : layout) {
         if (ln.id == "CtxMidChild") ctx_node = &ln;
         if (ln.id == "EvidenceLeft") ev_node = &ln;
@@ -257,11 +257,11 @@ TEST(LayoutTest, OddChildrenMiddleCenteredUnderParent) {
     auto tree = build_tree(xml);
     ASSERT_NE(tree.root, nullptr);
 
-    ui::LayoutEngine engine;
+    ui::gsn::LayoutEngine engine;
     auto layout = engine.ComputeLayout(tree);
 
-    const ui::LayoutNode* strat = nullptr;
-    const ui::LayoutNode* mid = nullptr;
+    const ui::gsn::LayoutNode* strat = nullptr;
+    const ui::gsn::LayoutNode* mid = nullptr;
     for (const auto& ln : layout) {
         if (ln.id == "Strat") strat = &ln;
         if (ln.id == "B") mid = &ln;
@@ -287,7 +287,7 @@ TEST(LayoutTest, UndevelopedFlagPropagatesToLayoutNode) {
     auto tree = build_tree(xml);
     ASSERT_NE(tree.root, nullptr);
 
-    ui::LayoutEngine engine;
+    ui::gsn::LayoutEngine engine;
     auto layout = engine.ComputeLayout(tree);
     ASSERT_EQ(layout.size(), 1u);
     EXPECT_EQ(layout[0].id, "Top");

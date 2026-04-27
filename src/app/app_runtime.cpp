@@ -1,32 +1,30 @@
 #include "app/app_runtime.h"
-#include "app/welcome_modal.h"
 
 #include "imgui.h"
 
 #include "core/app_state.h"
 #include "core/element_factory.h"
-#include "ui/gsn_canvas.h"
+#include "ui/gsn/gsn_adapter.h"
+#include "ui/gsn/gsn_canvas.h"
+#include "ui/panels/element_panel.h"
+#include "ui/panels/project_files_panel.h"
+#include "ui/panels/sacm_viewer_panel.h"
+#include "ui/panels/welcome_modal.h"
 #include "ui/register_views.h"
-#include "ui/theme.h"
 #include "ui/tree_view.h"
-#include "ui/element_panel.h"
-#include "ui/gsn_adapter.h"
 #include "ui/ui_state.h"
+#include "ui/widgets/splitter.h"
 
 #include <algorithm>
 #include <cctype>
-#include <cstdio>
-#include <cstring>
 #include <filesystem>
 #include <string>
-#include <string_view>
 #include <vector>
 
 namespace app {
 namespace {
 
 constexpr size_t kPathBufferSize = 512;
-constexpr const char* kDefaultDemoFilePath = "data/oasc-ja.xml";
 
 constexpr float kInitialLeftPanelRatio = 0.20f;
 constexpr float kInitialRightPanelRatio = 0.20f;
@@ -36,132 +34,11 @@ constexpr float kMinPanelRatio = 0.10f;
 constexpr float kMaxPanelRatio = 0.40f;
 constexpr float kSplitterThickness = 4.0f;
 constexpr float kMinLeftSectionHeight = 120.0f;
-constexpr float kSummaryStripHeight = 88.0f;
-
-// Splitter color comes from the theme (matches app background tier).
-static ImVec4 SplitterColor() {
-    return ImGui::ColorConvertU32ToFloat4(ui::GetTheme().bg_app);
-}
-static ImVec4 SplitterHoverColor() {
-    return ImGui::ColorConvertU32ToFloat4(ui::WithAlpha(ui::GetTheme().accent, 0.55f));
-}
-
-// Element type colors in the SACM viewer list (sourced from theme palette).
-static ImVec4 ElementTypeColor(const char* type) {
-    const ui::Theme& t = ui::GetTheme();
-    if (!type) return ImGui::ColorConvertU32ToFloat4(t.text_primary);
-    std::string_view sv(type);
-    if (sv == "claim")             return ImGui::ColorConvertU32ToFloat4(t.node_claim);
-    if (sv == "argumentreasoning") return ImGui::ColorConvertU32ToFloat4(t.node_strategy);
-    if (sv == "artifact" || sv == "artifactreference")
-        return ImGui::ColorConvertU32ToFloat4(t.node_solution);
-    return ImGui::ColorConvertU32ToFloat4(t.text_primary);
-}
-static ImVec4 SummaryLabelColor() { return ImGui::ColorConvertU32ToFloat4(ui::GetTheme().text_secondary); }
-static ImVec4 SummaryValueColor() { return ImGui::ColorConvertU32ToFloat4(ui::GetTheme().text_primary); }
-
-constexpr float kOverwriteButtonWidth = 130.0f;
 
 const ImGuiWindowFlags kPanelFlags = ImGuiWindowFlags_NoMove
                                    | ImGuiWindowFlags_NoResize
                                    | ImGuiWindowFlags_NoCollapse
                                    | ImGuiWindowFlags_NoBringToFrontOnFocus;
-
-void DrawVerticalSplitter(const char* id,
-                          float x,
-                          float width,
-                          float height,
-                          float top_y,
-                          float display_w,
-                          float& ratio,
-                          bool subtract_delta) {
-    ImGui::SetNextWindowPos(ImVec2(x, top_y));
-    ImGui::SetNextWindowSize(ImVec2(width, height));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(1, 1));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, SplitterColor());
-
-    ImGui::Begin(id, nullptr, kPanelFlags | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar);
-    ImGui::InvisibleButton("##splitter_btn", ImVec2(width, height));
-    bool hovered = ImGui::IsItemHovered() || ImGui::IsItemActive();
-    if (hovered) {
-        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-        // Draw a 1px accent stripe down the middle while hovered/dragging.
-        ImVec2 wp = ImGui::GetWindowPos();
-        ImVec2 ws = ImGui::GetWindowSize();
-        float cx = wp.x + ws.x * 0.5f;
-        ImGui::GetWindowDrawList()->AddLine(
-            ImVec2(cx, wp.y), ImVec2(cx, wp.y + ws.y),
-            ImGui::ColorConvertFloat4ToU32(SplitterHoverColor()), 2.0f);
-    }
-
-    if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)) {
-        float delta = ImGui::GetIO().MouseDelta.x / display_w;
-        ratio += subtract_delta ? -delta : delta;
-        if (ratio < kMinPanelRatio) ratio = kMinPanelRatio;
-        if (ratio > kMaxPanelRatio) ratio = kMaxPanelRatio;
-    }
-
-    ImGui::End();
-    ImGui::PopStyleColor();
-    ImGui::PopStyleVar(4);
-}
-
-float DrawHorizontalSplitter(const char* id,
-                             float x,
-                             float y,
-                             float width,
-                             float height) {
-    ImGui::SetNextWindowPos(ImVec2(x, y));
-    ImGui::SetNextWindowSize(ImVec2(width, height));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(1, 1));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, SplitterColor());
-
-    float delta_y = 0.0f;
-    ImGui::Begin(id, nullptr, kPanelFlags | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar);
-    ImGui::InvisibleButton("##splitter_btn", ImVec2(width, height));
-    bool hovered = ImGui::IsItemHovered() || ImGui::IsItemActive();
-    if (hovered) {
-        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
-        ImVec2 wp = ImGui::GetWindowPos();
-        ImVec2 ws = ImGui::GetWindowSize();
-        float cy = wp.y + ws.y * 0.5f;
-        ImGui::GetWindowDrawList()->AddLine(
-            ImVec2(wp.x, cy), ImVec2(wp.x + ws.x, cy),
-            ImGui::ColorConvertFloat4ToU32(SplitterHoverColor()), 2.0f);
-    }
-
-    if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)) {
-        delta_y = ImGui::GetIO().MouseDelta.y;
-    }
-
-    ImGui::End();
-    ImGui::PopStyleColor();
-    ImGui::PopStyleVar(4);
-    return delta_y;
-}
-
-int CountElementsOfType(const parser::AssuranceCase& ac, const char* type_a, const char* type_b = nullptr) {
-    int count = 0;
-    for (const auto& elem : ac.elements) {
-        if (elem.type == type_a || (type_b && elem.type == type_b)) {
-            ++count;
-        }
-    }
-    return count;
-}
-
-void SummaryMetric(const char* label, int value) {
-    ImGui::BeginGroup();
-    ImGui::TextColored(SummaryLabelColor(), "%s", label);
-    ImGui::TextColored(SummaryValueColor(), "%d", value);
-    ImGui::EndGroup();
-}
 
 }  // namespace
 
@@ -413,8 +290,8 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     }
 
     const auto& ac = impl_->app_state.loaded_case.value();
-    impl_->current_tree = ui::BuildAssuranceTree(ac);
-    ui::SetCanvasTree(impl_->current_tree);
+    impl_->current_tree = ui::gsn::BuildAssuranceTree(ac);
+    ui::gsn::SetCanvasTree(impl_->current_tree);
     ui::RebuildRegisterViews(&ac);
     ui::GetUiState().model_has_translations = ui::ModelHasTranslations(ac);
 
@@ -467,10 +344,30 @@ float AppRuntime::RenderMainMenuBar(bool& done) {
 }
 
 void AppRuntime::RenderSplitters(float display_w, float content_h, float left_w, float center_w, float top_y) {
-    DrawVerticalSplitter("##left_splitter", left_w, kSplitterThickness, content_h, top_y, display_w, impl_->left_ratio, false);
+    ui::widgets::DrawVerticalSplitter("##left_splitter",
+                             left_w,
+                             kSplitterThickness,
+                             content_h,
+                             top_y,
+                             display_w,
+                             impl_->left_ratio,
+                             false,
+                             kMinPanelRatio,
+                             kMaxPanelRatio,
+                             kPanelFlags);
 
     float center_x = left_w + kSplitterThickness;
-    DrawVerticalSplitter("##right_splitter", center_x + center_w, kSplitterThickness, content_h, top_y, display_w, impl_->right_ratio, true);
+    ui::widgets::DrawVerticalSplitter("##right_splitter",
+                             center_x + center_w,
+                             kSplitterThickness,
+                             content_h,
+                             top_y,
+                             display_w,
+                             impl_->right_ratio,
+                             true,
+                             kMinPanelRatio,
+                             kMaxPanelRatio,
+                             kPanelFlags);
 
     float available_h = content_h - kSplitterThickness * 2.0f;
     if (available_h <= 0.0f) return;
@@ -493,13 +390,13 @@ void AppRuntime::RenderSplitters(float display_w, float content_h, float left_w,
     float splitter1_y = top_y + available_h * impl_->project_boundary_ratio;
     float splitter2_y = top_y + available_h * impl_->safety_boundary_ratio + kSplitterThickness;
 
-    float delta1 = DrawHorizontalSplitter("##left_h_splitter_1", 0.0f, splitter1_y, left_w, kSplitterThickness);
+    float delta1 = ui::widgets::DrawHorizontalSplitter("##left_h_splitter_1", 0.0f, splitter1_y, left_w, kSplitterThickness, kPanelFlags);
     if (delta1 != 0.0f) {
         impl_->project_boundary_ratio += delta1 / available_h;
         clamp_boundaries();
     }
 
-    float delta2 = DrawHorizontalSplitter("##left_h_splitter_2", 0.0f, splitter2_y, left_w, kSplitterThickness);
+    float delta2 = ui::widgets::DrawHorizontalSplitter("##left_h_splitter_2", 0.0f, splitter2_y, left_w, kSplitterThickness, kPanelFlags);
     if (delta2 != 0.0f) {
         impl_->safety_boundary_ratio += delta2 / available_h;
         clamp_boundaries();
@@ -514,192 +411,31 @@ void AppRuntime::RenderTreePanel(float left_w, float safety_tree_h, float top_y)
     ImGui::End();
 }
 
-void AppRuntime::RenderProjectFilesPanel(float left_w, float project_h, float top_y) {
-    ImGui::SetNextWindowPos(ImVec2(0, top_y));
-    ImGui::SetNextWindowSize(ImVec2(left_w, project_h));
-    ImGui::Begin("Project Files", nullptr, kPanelFlags);
-
-    if (ImGui::BeginChild("ProjectFilesTree", ImVec2(0, 0), false)) {
-        RenderProjectFilesTree();
-    }
-    ImGui::EndChild();
-
-    ImGui::End();
-}
-
-void AppRuntime::RenderProjectFilesTree() {
-    auto render_file = [](const char* filename) {
-        ImGui::TreeNodeEx(filename,
-                          ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen,
-                          "%s", filename);
-    };
-
-    if (ImGui::TreeNodeEx("arguments/", ImGuiTreeNodeFlags_DefaultOpen, "%s", "arguments/")) {
-        render_file("main.sacm");
-        render_file("perception.sacm");
-        render_file("braking.sacm");
-        ImGui::TreePop();
-    }
-
-    if (ImGui::TreeNodeEx("registers/", ImGuiTreeNodeFlags_DefaultOpen, "%s", "registers/")) {
-        render_file("evidence-register.af.json");
-        render_file("cse-register.af.json");
-        ImGui::TreePop();
-    }
-
-    if (ImGui::TreeNodeEx("conformance/", ImGuiTreeNodeFlags_DefaultOpen, "%s", "conformance/")) {
-        render_file("ul4600-conformance.af.json");
-        render_file("iso26262-conformance.af.json");
-        ImGui::TreePop();
-    }
-
-    if (ImGui::TreeNodeEx("exports/", ImGuiTreeNodeFlags_DefaultOpen, "%s", "exports/")) {
-        render_file("review-pack.pdf");
-        render_file("conformance-summary.xlsx");
-        ImGui::TreePop();
-    }
-}
-
 void AppRuntime::RenderSacmViewerPanel(float left_w, float sacm_h, float top_y) {
-    ImGui::SetNextWindowPos(ImVec2(0, top_y));
-    ImGui::SetNextWindowSize(ImVec2(left_w, sacm_h));
-    ImGui::Begin("SACM Viewer", nullptr, kPanelFlags);
-
-    ImGui::Text("Directory:");
-    ImGui::SetNextItemWidth(-1);
-    if (ImGui::InputText("##dirpath", impl_->dir_path_buf, sizeof(impl_->dir_path_buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
-        ScanDirectory();
-    }
-
-    ImGui::Text("XML File:");
-    ImGui::SetNextItemWidth(-1);
-    if (impl_->xml_files.empty()) {
-        ImGui::TextDisabled("No XML files found");
-    } else {
-        const char* preview = "";
-        if (impl_->selected_file_idx >= 0 && impl_->selected_file_idx < static_cast<int>(impl_->xml_files.size())) {
-            const std::string& sel = impl_->xml_files[impl_->selected_file_idx];
-            auto pos = sel.find_last_of("\\/");
-            preview = (pos != std::string::npos) ? sel.c_str() + pos + 1 : sel.c_str();
-        }
-
-        if (ImGui::BeginCombo("##fileselect", preview)) {
-            for (int i = 0; i < static_cast<int>(impl_->xml_files.size()); ++i) {
-                const std::string& path = impl_->xml_files[i];
-                auto pos = path.find_last_of("\\/");
-                const char* label = (pos != std::string::npos) ? path.c_str() + pos + 1 : path.c_str();
-                bool is_selected = (i == impl_->selected_file_idx);
-
-                if (ImGui::Selectable(label, is_selected)) {
-                    impl_->selected_file_idx = i;
-                    size_t len = path.size();
-                    if (len >= sizeof(impl_->file_path_buf)) len = sizeof(impl_->file_path_buf) - 1;
-                    memcpy(impl_->file_path_buf, path.c_str(), len);
-                    impl_->file_path_buf[len] = '\0';
-                }
-                if (is_selected) ImGui::SetItemDefaultFocus();
-            }
-            ImGui::EndCombo();
-        }
-    }
-
-    if (ImGui::Button("Load")) {
-        if (impl_->app_state.load_file(impl_->file_path_buf)) {
+    ui::panels::SacmViewerPanelModel model{
+        impl_->app_state,
+        impl_->dir_path_buf,
+        sizeof(impl_->dir_path_buf),
+        impl_->file_path_buf,
+        sizeof(impl_->file_path_buf),
+        impl_->xml_files,
+        impl_->selected_file_idx,
+        impl_->show_overwrite_confirm,
+    };
+    ui::panels::SacmViewerPanelCallbacks callbacks{
+        [this]() { ScanDirectory(); },
+        [this]() {
             impl_->tree_needs_rebuild = true;
             impl_->pending_focus_root = true;
-        } else {
+        },
+        [this]() {
             impl_->current_tree = core::AssuranceTree();
-            ui::SetCanvasTree(impl_->current_tree);
+            ui::gsn::SetCanvasTree(impl_->current_tree);
             ui::RebuildRegisterViews(nullptr);
             ui::GetUiState().selected_element_id.clear();
-        }
-    }
-
-    ImGui::SameLine();
-    {
-        bool can_save = impl_->app_state.sacm_package.has_value();
-        if (!can_save) ImGui::BeginDisabled();
-        if (ImGui::Button("Save")) {
-            FILE* f = fopen(impl_->file_path_buf, "r");
-            if (f) {
-                fclose(f);
-                impl_->show_overwrite_confirm = true;
-            } else {
-                impl_->app_state.save_file(impl_->file_path_buf);
-            }
-        }
-        if (!can_save) ImGui::EndDisabled();
-    }
-
-    if (impl_->show_overwrite_confirm) {
-        ImGui::OpenPopup("Overwrite File?");
-        impl_->show_overwrite_confirm = false;
-    }
-
-    if (ImGui::BeginPopupModal("Overwrite File?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("File already exists:\n%s", impl_->file_path_buf);
-        ImGui::Separator();
-        ImGui::Text("Are you sure you want to overwrite it?");
-        ImGui::Spacing();
-
-        if (ImGui::Button("Yes, Overwrite", ImVec2(kOverwriteButtonWidth, 0))) {
-            impl_->app_state.save_file(impl_->file_path_buf);
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(kOverwriteButtonWidth, 0))) {
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
-
-    if (!impl_->app_state.status_message.empty()) {
-        ImGui::TextWrapped("%s", impl_->app_state.status_message.c_str());
-    }
-
-    ImGui::Separator();
-
-    if (impl_->app_state.loaded_case.has_value()) {
-        const auto& ac = impl_->app_state.loaded_case.value();
-
-        if (ImGui::BeginChild("ProjectSummary", ImVec2(0, kSummaryStripHeight), true, ImGuiWindowFlags_NoScrollbar)) {
-            ImGui::Text("Project Summary");
-            if (ImGui::BeginTable("ProjectSummaryMetrics", 5, ImGuiTableFlags_SizingStretchSame)) {
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn(); SummaryMetric("Claims", CountElementsOfType(ac, "claim"));
-                ImGui::TableNextColumn(); SummaryMetric("Strategies", CountElementsOfType(ac, "argumentreasoning"));
-                ImGui::TableNextColumn(); SummaryMetric("Evidence", CountElementsOfType(ac, "artifact", "artifactreference") + CountElementsOfType(ac, "expression"));
-                ImGui::TableNextColumn(); SummaryMetric("CSE Rows", static_cast<int>(ui::GetCseRegisterRowCount()));
-                ImGui::TableNextColumn(); SummaryMetric("Evidence Rows", static_cast<int>(ui::GetEvidenceRegisterRowCount()));
-                ImGui::EndTable();
-            }
-        }
-        ImGui::EndChild();
-
-        ImGui::Text("Assurance Case: %s", ac.name.c_str());
-        ImGui::Separator();
-
-        if (ImGui::BeginChild("ElementList", ImVec2(0, 0), true)) {
-            for (const auto& elem : ac.elements) {
-                ImGui::PushID(elem.id.c_str());
-
-                ImVec4 color = ElementTypeColor(elem.type.c_str());
-
-                ImGui::TextColored(color, "[%s]", elem.type.c_str());
-                ImGui::SameLine();
-                ImGui::Text("%s: %s", elem.id.c_str(), elem.name.c_str());
-
-                if (!elem.content.empty()) {
-                    ImGui::TextWrapped("  Content: %s", elem.content.c_str());
-                }
-
-                ImGui::PopID();
-            }
-        }
-        ImGui::EndChild();
-    }
-
-    ImGui::End();
+        },
+    };
+    ui::panels::ShowSacmViewerPanel(left_w, sacm_h, top_y, kPanelFlags, model, callbacks);
 }
 
 void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content_h, float top_y) {
@@ -722,7 +458,7 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                                           : 0;
             if (ImGui::BeginTabItem("GSN Canvas", nullptr, gsn_flags)) {
                 ui_state.center_view = ui::CenterView::GsnCanvas;
-                ui::ShowGsnCanvasContent();
+                ui::gsn::ShowGsnCanvasContent();
                 ImGui::EndTabItem();
             }
         }
@@ -764,7 +500,7 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
 
     parser::AssuranceCase* ac_ptr = impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
     sacm::AssuranceCasePackage* sacm_ptr = impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
-    if (ui::ShowElementPanel(ac_ptr, sacm_ptr)) {
+    if (ui::panels::ShowElementPanel(ac_ptr, sacm_ptr)) {
         impl_->tree_needs_rebuild = true;
     }
 
@@ -857,10 +593,10 @@ void AppRuntime::RenderRemoveConfirmModal() {
 
 void AppRuntime::RenderStartupProjectWindow() {
     // TODO: Populate from persisted recent-projects list. Placeholder data shown for now.
-    static const std::vector<RecentProjectEntry> kDemoRecent = {
+    static const std::vector<ui::panels::RecentProjectEntry> kDemoRecent = {
         { "Open Autonomy Safety Case", "data/oasc-ja.xml", 42, 9, 16, 3 },
     };
-    ShowWelcomeModal(impl_->show_startup_project_window, kDemoRecent);
+    ui::panels::ShowWelcomeModal(impl_->show_startup_project_window, kDemoRecent);
 }
 
 const parser::AssuranceCase* AppRuntime::GetLoadedCase() const {
@@ -895,7 +631,7 @@ void AppRuntime::RenderFrame(bool& done) {
     float safety_y = project_y + project_h + kSplitterThickness;
     float sacm_y = safety_y + safety_tree_h + kSplitterThickness;
 
-    RenderProjectFilesPanel(left_w, project_h, project_y);
+    ui::panels::ShowProjectFilesPanel(left_w, project_h, project_y, kPanelFlags);
     RenderTreePanel(left_w, safety_tree_h, safety_y);
     RenderSacmViewerPanel(left_w, sacm_h, sacm_y);
 
