@@ -3,6 +3,8 @@
 #include <string>
 
 #include "core/element_factory.h"
+#include "core/project_model.h"
+#include "core/project_model.h"
 
 namespace app {
 
@@ -19,6 +21,9 @@ public:
     // Add a new child element to the currently selected element.
     // Returns true on success; updates selection to the new element.
     bool AddChildToSelected(core::NewElementKind kind);
+
+    // Add a new top-level Goal (root claim) to the current model.
+    bool AddTopGoal();
 
     // Remove the currently selected element using the given mode. If the
     // planned removal targets more than one element, opens the confirmation
@@ -45,6 +50,20 @@ private:
     void RenderStartupProjectWindow();
     void RenderNotImplementedModal();
     void RenderRemoveConfirmModal();
+    void RenderCreateProjectModal();
+    void RenderOpenProjectModal();
+    void RenderProjectFileNameModal();
+    void RenderProjectLoadReportModal();
+    void RenderSaveBeforeExitModal(bool& done);
+
+    void BeginCreateProject();
+    void BeginOpenProject();
+    void BeginCreateProjectSacmFile();
+    void BeginCreateProjectEvidenceRegister();
+    void BeginCreateProjectJ3377CaeRegister();
+    void OpenProjectFile(const core::ProjectFileEntry& entry);
+    bool SaveProject();
+    void RequestExit(bool& done);
 
     void RebuildDerivedViewsIfNeeded();
 

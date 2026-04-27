@@ -10,6 +10,7 @@ namespace ui {
 
 struct ElementContextActions {
     std::function<void(core::NewElementKind)> add_child;
+    std::function<void()> add_top_goal;
     std::function<void(core::RemoveMode)> remove_selected;
     std::function<void(const char*)> not_implemented;
 };

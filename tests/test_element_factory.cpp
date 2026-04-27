@@ -46,6 +46,19 @@ bool SacmHasClaim(const sacm::AssuranceCasePackage& pkg, const std::string& id) 
 
 }  // namespace
 
+TEST(ElementFactoryAdd, AddTopGoalCreatesClaimInParserAndSacm) {
+    parser::AssuranceCase ac;
+    sacm::AssuranceCasePackage pkg;
+
+    std::string new_id;
+    std::string err;
+    ASSERT_TRUE(core::AddTopGoal(ac, &pkg, new_id, err)) << err;
+    ASSERT_FALSE(new_id.empty());
+
+    EXPECT_TRUE(ParserHasId(ac, new_id));
+    EXPECT_TRUE(SacmHasClaim(pkg, new_id));
+}
+
 TEST(ElementFactoryRemove, RemoveLeafElement) {
     auto mc = MakeRootGoalCase();
 

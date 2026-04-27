@@ -259,6 +259,30 @@ bool AddChildElement(parser::AssuranceCase& ac,
     return true;
 }
 
+bool AddTopGoal(parser::AssuranceCase& ac,
+                sacm::AssuranceCasePackage* pkg,
+                std::string& out_new_id,
+                std::string& out_error) {
+    out_new_id.clear();
+    out_error.clear();
+
+    auto existing_ids = CollectIds(ac);
+    parser::SacmElement goal;
+    goal.id = GenerateUniqueId(existing_ids, PrefixFor(NewElementKind::Goal));
+    goal.type = "claim";
+    goal.name = DefaultNameFor(NewElementKind::Goal);
+
+    out_new_id = goal.id;
+
+    sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, goal.id);
+    if (ap) {
+        MirrorClaim(ap, goal);
+    }
+
+    ac.elements.push_back(std::move(goal));
+    return true;
+}
+
 // ===== Remove helpers (planner) ============================================
 
 namespace {

@@ -28,6 +28,13 @@ bool AddChildElement(parser::AssuranceCase& ac,
                      std::string& out_new_id,
                      std::string& out_error);
 
+// Add a new top-level Goal (root claim) without creating a relationship.
+// Useful for starting a fresh argument from the canvas background.
+bool AddTopGoal(parser::AssuranceCase& ac,
+                sacm::AssuranceCasePackage* pkg,
+                std::string& out_new_id,
+                std::string& out_error);
+
 // Count the number of descendant elements (children, grandchildren, ...) of
 // the element with id `id`. Descendants are derived by walking relationship
 // elements: an element X is a child of Y if some relationship has Y in its

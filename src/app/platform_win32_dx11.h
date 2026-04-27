@@ -1,5 +1,12 @@
 #pragma once
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+
 #include <windows.h>
 #include <d3d11.h>
 
@@ -20,6 +27,7 @@ bool InitializeImGuiBackends(const Win32Dx11Context& ctx);
 void ShutdownImGuiBackends();
 
 bool PollEvents(bool& done);
+bool ConsumeCloseRequest();
 void BeginFrame();
 void RenderFrame(Win32Dx11Context& ctx, const float clear_color[4]);
 

@@ -10,6 +10,7 @@ namespace app::platform {
 namespace {
 
 static Win32Dx11Context* g_ctx = nullptr;
+static bool g_close_requested = false;
 
 void CleanupRenderTarget(Win32Dx11Context& ctx) {
     if (ctx.main_render_target_view) {
@@ -116,6 +117,9 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
+    case WM_CLOSE:
+        g_close_requested = true;
+        return 0;
     }
 
     return DefWindowProcW(hWnd, msg, wParam, lParam);
@@ -202,6 +206,12 @@ bool PollEvents(bool& done) {
         }
     }
     return !done;
+}
+
+bool ConsumeCloseRequest() {
+    bool requested = g_close_requested;
+    g_close_requested = false;
+    return requested;
 }
 
 void BeginFrame() {

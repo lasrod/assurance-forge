@@ -109,7 +109,9 @@ void WalkthroughCard(const char* id, const char* title, const char* subtitle, fl
 
 }  // namespace
 
-void ShowWelcomeModal(bool& is_open, const std::vector<RecentProjectEntry>& recent) {
+void ShowWelcomeModal(bool& is_open,
+                      const std::vector<RecentProjectEntry>& recent,
+                      const WelcomeModalCallbacks& callbacks) {
     if (is_open && !ImGui::IsPopupOpen("Welcome!")) {
         ImGui::OpenPopup("Welcome!");
     }
@@ -156,18 +158,22 @@ void ShowWelcomeModal(bool& is_open, const std::vector<RecentProjectEntry>& rece
             ImGui::Dummy(ImVec2(0.0f, 8.0f));
             if (ActionLink("##create_empty", "Create Empty Assurance Project",
                            "Start with a blank assurance project workspace")) {
+                if (callbacks.create_empty_project) callbacks.create_empty_project();
                 dismiss();
             }
             if (ActionLink("##create_template", "Create Assurance Project from Template",
                            "Create a project from a predefined assurance case template")) {
+                if (callbacks.create_project_from_template) callbacks.create_project_from_template();
                 dismiss();
             }
             if (ActionLink("##open_project", "Open Project",
                            "Open an existing Assurance Forge project")) {
+                if (callbacks.open_project) callbacks.open_project();
                 dismiss();
             }
             if (ActionLink("##import_sacm", "Import SACM",
                            "Import a SACM XML assurance case")) {
+                if (callbacks.import_sacm) callbacks.import_sacm();
                 dismiss();
             }
 
@@ -183,6 +189,7 @@ void ShowWelcomeModal(bool& is_open, const std::vector<RecentProjectEntry>& rece
                     char row_id[32];
                     std::snprintf(row_id, sizeof(row_id), "##recent_%d", i);
                     if (RecentLink(row_id, recent[i])) {
+                        if (callbacks.open_recent_project) callbacks.open_recent_project(recent[i]);
                         dismiss();
                     }
                 }

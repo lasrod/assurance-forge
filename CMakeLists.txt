@@ -47,11 +47,13 @@ add_executable(assurance-forge WIN32
     src/core/app_state.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
+    src/core/project_model.cpp
+    src/core/project_service.cpp
     src/sacm/sacm_parser.cpp
     src/sacm/sacm_serializer.cpp
 )
 target_include_directories(assurance-forge PRIVATE src)
-target_link_libraries(assurance-forge PRIVATE imgui pugixml)
+target_link_libraries(assurance-forge PRIVATE imgui pugixml bcrypt ole32 shell32)
 
 # --- Tests ---
 include(FetchContent)
@@ -70,14 +72,17 @@ add_executable(tests
     tests/test_layout.cpp
     tests/test_sacm_roundtrip.cpp
     tests/test_element_factory.cpp
+    tests/test_project_service.cpp
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
+    src/core/project_model.cpp
+    src/core/project_service.cpp
     src/ui/gsn/gsn_layout.cpp
     src/sacm/sacm_parser.cpp
     src/sacm/sacm_serializer.cpp
 )
 target_include_directories(tests PRIVATE src)
-target_link_libraries(tests PRIVATE GTest::gtest_main pugixml imgui)
+target_link_libraries(tests PRIVATE GTest::gtest_main pugixml imgui bcrypt)
 include(GoogleTest)
 gtest_discover_tests(tests WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

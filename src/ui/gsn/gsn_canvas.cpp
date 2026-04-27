@@ -547,6 +547,15 @@ void ShowGsnCanvasContent(UiState& ui_state,
         // Render the canvas content
         renderer.Render(ui_state, active_case, actions);
 
+        if (ImGui::BeginPopupContextWindow("##gsn_canvas_background_context",
+                                           ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems)) {
+            const bool can_add_top_goal = static_cast<bool>(actions.add_top_goal);
+            if (ImGui::MenuItem("Add New Top Goal", nullptr, false, can_add_top_goal)) {
+                actions.add_top_goal();
+            }
+            ImGui::EndPopup();
+        }
+
         // --- Language toggle button above zoom strip (bottom-right) ---
         {
             // Only show when model has translations

@@ -1,0 +1,113 @@
+#include <gtest/gtest.h>
+
+#include "core/project_service.h"
+#include "parser/xml_parser.h"
+
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+
+namespace {
+
+std::filesystem::path MakeTempParent() {
+    auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    std::filesystem::path path = std::filesystem::temp_directory_path() /
+                                 ("assurance_forge_project_test_" + std::to_string(stamp));
+    std::filesystem::create_directories(path);
+    return path;
+}
+
+bool ContainsFileWithRole(const core::AssuranceProject& project,
+                          const char* relative_path,
+                          core::ProjectFileRole role) {
+    for (const auto& file : project.files) {
+        if (file.relativePath.generic_string() == relative_path && file.role == role) return true;
+    }
+    return false;
+}
+
+}  // namespace
+
+TEST(ProjectServiceTest, CreateEmptyProjectCreatesRequiredStructureAndManifest) {
+    auto parent = MakeTempParent();
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    std::string error;
+
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("MySafetyCase", parent, project, report, error)) << error;
+
+    auto root = parent / "MySafetyCase";
+    EXPECT_EQ(project.rootPath, root);
+    EXPECT_TRUE(std::filesystem::exists(root / "af.proj"));
+    EXPECT_TRUE(std::filesystem::is_directory(root / "arguments"));
+    EXPECT_TRUE(std::filesystem::is_directory(root / "registers"));
+    EXPECT_TRUE(std::filesystem::is_directory(root / "conformance"));
+    EXPECT_TRUE(std::filesystem::is_directory(root / "exports"));
+    EXPECT_TRUE(std::filesystem::is_directory(root / ".af" / "cache"));
+    EXPECT_TRUE(std::filesystem::is_directory(root / ".af" / "backups"));
+    EXPECT_TRUE(std::filesystem::is_directory(root / ".af" / "snapshots"));
+    EXPECT_TRUE(std::filesystem::is_directory(root / ".af" / "history"));
+    EXPECT_TRUE(project.files.empty());
+    EXPECT_FALSE(report.steps.empty());
+
+    std::filesystem::remove_all(parent);
+}
+
+TEST(ProjectServiceTest, AddProjectFilesNormalizesNamesAndTracksManifestEntries) {
+    auto parent = MakeTempParent();
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    core::ProjectFileEntry entry;
+    std::string error;
+
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("MySafetyCase", parent, project, report, error)) << error;
+    ASSERT_TRUE(core::ProjectService::AddSacmFile(project, "main", entry, error)) << error;
+    EXPECT_EQ(entry.relativePath.generic_string(), "arguments/main.sacm");
+    EXPECT_TRUE(std::filesystem::exists(project.rootPath / entry.relativePath));
+    EXPECT_TRUE(parser::parse_sacm_xml((project.rootPath / entry.relativePath).string()).success);
+
+    ASSERT_TRUE(core::ProjectService::AddEvidenceRegister(project, "", entry, error)) << error;
+    EXPECT_EQ(entry.relativePath.generic_string(), "registers/evidence-register.af.json");
+
+    ASSERT_TRUE(core::ProjectService::AddJ3377CaeRegister(project, "j3377-cae-register.af.json", entry, error)) << error;
+    EXPECT_EQ(entry.relativePath.generic_string(), "registers/j3377-cae-register.af.json");
+
+    core::AssuranceProject reopened;
+    core::ProjectLoadReport open_report;
+    ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, reopened, open_report, error)) << error;
+    EXPECT_TRUE(ContainsFileWithRole(reopened, "arguments/main.sacm", core::ProjectFileRole::SacmArgument));
+    EXPECT_TRUE(ContainsFileWithRole(reopened, "registers/evidence-register.af.json", core::ProjectFileRole::EvidenceRegister));
+    EXPECT_TRUE(ContainsFileWithRole(reopened, "registers/j3377-cae-register.af.json", core::ProjectFileRole::J3377CaeRegister));
+
+    std::filesystem::remove_all(parent);
+}
+
+TEST(ProjectServiceTest, OpenProjectReportsExternallyModifiedAndMissingFiles) {
+    auto parent = MakeTempParent();
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    core::ProjectFileEntry entry;
+    std::string error;
+
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("MySafetyCase", parent, project, report, error)) << error;
+    ASSERT_TRUE(core::ProjectService::AddEvidenceRegister(project, "", entry, error)) << error;
+
+    {
+        std::ofstream file(project.rootPath / entry.relativePath, std::ios::app | std::ios::binary);
+        file << "\n";
+    }
+
+    core::AssuranceProject reopened;
+    core::ProjectLoadReport open_report;
+    ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, reopened, open_report, error)) << error;
+    ASSERT_EQ(reopened.files.size(), 1u);
+    EXPECT_EQ(reopened.files[0].state, core::ProjectFileState::ModifiedOutsideAssuranceForge);
+    EXPECT_FALSE(open_report.warnings.empty());
+
+    std::filesystem::remove(project.rootPath / entry.relativePath);
+    core::ProjectLoadReport missing_report = core::ProjectService::RefreshFileStatus(reopened);
+    EXPECT_EQ(reopened.files[0].state, core::ProjectFileState::Missing);
+    EXPECT_TRUE(missing_report.has_failures());
+
+    std::filesystem::remove_all(parent);
+}
