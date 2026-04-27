@@ -485,8 +485,10 @@ std::filesystem::path NormalizeFileName(const std::string& requested_file_name,
 std::string MinimalSacmXml(const std::string& case_name) {
     return std::string("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n") +
            "<sacm:AssuranceCasePackage xmlns:sacm=\"http://www.omg.org/spec/SACM/2.2/Argumentation\" "
-           "id=\"ACP_EMPTY\" name=\"" + EscapeXmlAttribute(case_name) + "\" description=\"\">\n"
-           "  <argumentPackage id=\"AP_MAIN\" name=\"Main Argument\" />\n"
+           "id=\"ACP_EMPTY\" name=\"" + EscapeXmlAttribute(case_name) + "\">\n"
+           "  <argumentPackage id=\"AP_MAIN\" name=\"Main Argument\">\n"
+           "    <claim id=\"G1\" name=\"New Goal\" />\n"
+           "  </argumentPackage>\n"
            "</sacm:AssuranceCasePackage>\n";
 }
 
@@ -686,6 +688,9 @@ bool ProjectService::CreateEmptyProject(const std::string& project_name,
     project.modifiedUtc = project.createdUtc;
 
     if (!WriteManifestSafely(project, error)) return false;
+
+    ProjectFileEntry main_entry;
+    if (!AddSacmFile(project, "main.sacm", main_entry, error)) return false;
 
     report = RefreshFileStatus(project);
     report.showPopup = true;

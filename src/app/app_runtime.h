@@ -62,6 +62,7 @@ private:
     void BeginCreateProjectEvidenceRegister();
     void BeginCreateProjectJ3377CaeRegister();
     void OpenProjectFile(const core::ProjectFileEntry& entry);
+    bool OpenFirstProjectSacmFile();
     bool SaveProject();
     void RequestExit(bool& done);
 

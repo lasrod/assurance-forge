@@ -43,7 +43,7 @@ constexpr size_t kPathBufferSize = 512;
 
 constexpr float kInitialLeftPanelRatio = 0.20f;
 constexpr float kInitialRightPanelRatio = 0.20f;
-constexpr float kInitialProjectBoundaryRatio = 0.22f;
+constexpr float kInitialProjectBoundaryRatio = 0.50f;
 constexpr float kInitialSafetyBoundaryRatio = 0.52f;
 constexpr float kMinPanelRatio = 0.10f;
 constexpr float kMaxPanelRatio = 0.40f;
@@ -334,13 +334,13 @@ ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
 }
 
 AppRuntime::AppRuntime() : impl_(new Impl()) {
-    ScanDirectory();
+    impl_->current_tree = core::AssuranceTree();
+    ui::gsn::SetCanvasTree(impl_->current_tree);
+    ui::RebuildRegisterViews(nullptr);
 
-    if (impl_->app_state.load_file(impl_->file_path_buf)) {
-        impl_->tree_needs_rebuild = true;
-        impl_->pending_focus_root = true;
-        ui::GetUiState().center_view = ui::CenterView::GsnCanvas;
-    }
+    ui::UiState& ui_state = ui::GetUiState();
+    ui_state.center_view = ui::CenterView::GsnCanvas;
+    ui_state.selected_element_id.clear();
 }
 
 AppRuntime::~AppRuntime() {
@@ -626,7 +626,7 @@ void AppRuntime::RenderSplitters(float display_w, float content_h, float left_w,
                              kMaxPanelRatio,
                              kPanelFlags);
 
-    float available_h = content_h - kSplitterThickness * 2.0f;
+    float available_h = content_h - kSplitterThickness;
     if (available_h <= 0.0f) return;
 
     float min_ratio = kMinLeftSectionHeight / available_h;
@@ -634,28 +634,16 @@ void AppRuntime::RenderSplitters(float display_w, float content_h, float left_w,
 
     auto clamp_boundaries = [&]() {
         if (impl_->project_boundary_ratio < min_ratio) impl_->project_boundary_ratio = min_ratio;
-        if (impl_->project_boundary_ratio > 1.0f - min_ratio * 2.0f) impl_->project_boundary_ratio = 1.0f - min_ratio * 2.0f;
-
-        if (impl_->safety_boundary_ratio < impl_->project_boundary_ratio + min_ratio) {
-            impl_->safety_boundary_ratio = impl_->project_boundary_ratio + min_ratio;
-        }
-        if (impl_->safety_boundary_ratio > 1.0f - min_ratio) impl_->safety_boundary_ratio = 1.0f - min_ratio;
+        if (impl_->project_boundary_ratio > 1.0f - min_ratio) impl_->project_boundary_ratio = 1.0f - min_ratio;
     };
 
     clamp_boundaries();
 
     float splitter1_y = top_y + available_h * impl_->project_boundary_ratio;
-    float splitter2_y = top_y + available_h * impl_->safety_boundary_ratio + kSplitterThickness;
 
     float delta1 = ui::widgets::DrawHorizontalSplitter("##left_h_splitter_1", 0.0f, splitter1_y, left_w, kSplitterThickness, kPanelFlags);
     if (delta1 != 0.0f) {
         impl_->project_boundary_ratio += delta1 / available_h;
-        clamp_boundaries();
-    }
-
-    float delta2 = ui::widgets::DrawHorizontalSplitter("##left_h_splitter_2", 0.0f, splitter2_y, left_w, kSplitterThickness, kPanelFlags);
-    if (delta2 != 0.0f) {
-        impl_->safety_boundary_ratio += delta2 / available_h;
         clamp_boundaries();
     }
 }
@@ -945,6 +933,27 @@ void AppRuntime::OpenProjectFile(const core::ProjectFileEntry& entry) {
     }
 }
 
+bool AppRuntime::OpenFirstProjectSacmFile() {
+    if (!impl_->app_state.current_project.has_value()) return false;
+
+    for (const auto& entry : impl_->app_state.current_project->files) {
+        if (entry.role != core::ProjectFileRole::SacmArgument) continue;
+        if (entry.state == core::ProjectFileState::Missing) continue;
+        if (impl_->app_state.open_project_file(entry)) {
+            impl_->tree_needs_rebuild = true;
+            impl_->pending_focus_root = true;
+            impl_->show_gsn_tab = true;
+            ui::UiState& ui_state = ui::GetUiState();
+            ui_state.center_view = ui::CenterView::GsnCanvas;
+            impl_->force_center_tab_selection = true;
+            return true;
+        }
+    }
+
+    SetStatus("Project opened, but no SACM file could be loaded.");
+    return false;
+}
+
 void AppRuntime::RenderCreateProjectModal() {
     if (!impl_->show_create_project_modal) return;
 
@@ -984,6 +993,7 @@ void AppRuntime::RenderCreateProjectModal() {
 
         if (ImGui::Button("Create", ImVec2(110.0f, 0.0f))) {
             if (impl_->app_state.create_empty_project(impl_->project_name_buf, impl_->project_parent_buf)) {
+                OpenFirstProjectSacmFile();
                 impl_->show_create_project_modal = false;
                 ImGui::CloseCurrentPopup();
             }
@@ -1018,6 +1028,7 @@ void AppRuntime::RenderOpenProjectModal() {
                 if (file_name != "af.proj") {
                     SetStatus("Please select an af.proj file.");
                 } else if (impl_->app_state.open_project(selected_path)) {
+                    OpenFirstProjectSacmFile();
                     impl_->show_open_project_modal = false;
                     ImGui::CloseCurrentPopup();
                 }
@@ -1195,14 +1206,12 @@ void AppRuntime::RenderFrame(bool& done) {
     right_w = display.x * impl_->right_ratio;
     center_w = display.x - left_w - right_w - kSplitterThickness * 2.0f;
 
-    float available_h = std::max(0.0f, content_h - kSplitterThickness * 2.0f);
+    float available_h = std::max(0.0f, content_h - kSplitterThickness);
     float project_h = available_h * impl_->project_boundary_ratio;
-    float safety_tree_h = available_h * (impl_->safety_boundary_ratio - impl_->project_boundary_ratio);
-    float sacm_h = std::max(0.0f, available_h - project_h - safety_tree_h);
+    float safety_tree_h = std::max(0.0f, available_h - project_h);
 
     float project_y = top_y;
     float safety_y = project_y + project_h + kSplitterThickness;
-    float sacm_y = safety_y + safety_tree_h + kSplitterThickness;
 
     ui::panels::ProjectFilesPanelModel project_model{
         impl_->app_state.current_project.has_value() ? &impl_->app_state.current_project.value() : nullptr,
@@ -1215,7 +1224,6 @@ void AppRuntime::RenderFrame(bool& done) {
     };
     ui::panels::ShowProjectFilesPanel(left_w, project_h, project_y, kPanelFlags, project_model, project_callbacks);
     RenderTreePanel(left_w, safety_tree_h, safety_y);
-    RenderSacmViewerPanel(left_w, sacm_h, sacm_y);
 
     float center_x = left_w + kSplitterThickness;
     RenderCenterPanel(center_x, center_w, content_h, top_y);

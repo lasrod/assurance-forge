@@ -3,6 +3,7 @@
 #include "core/project_service.h"
 #include "parser/xml_parser.h"
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -47,7 +48,9 @@ TEST(ProjectServiceTest, CreateEmptyProjectCreatesRequiredStructureAndManifest) 
     EXPECT_TRUE(std::filesystem::is_directory(root / ".af" / "backups"));
     EXPECT_TRUE(std::filesystem::is_directory(root / ".af" / "snapshots"));
     EXPECT_TRUE(std::filesystem::is_directory(root / ".af" / "history"));
-    EXPECT_TRUE(project.files.empty());
+    EXPECT_TRUE(std::filesystem::exists(root / "arguments" / "main.sacm"));
+    EXPECT_TRUE(parser::parse_sacm_xml((root / "arguments" / "main.sacm").string()).success);
+    EXPECT_TRUE(ContainsFileWithRole(project, "arguments/main.sacm", core::ProjectFileRole::SacmArgument));
     EXPECT_FALSE(report.steps.empty());
 
     std::filesystem::remove_all(parent);
@@ -61,8 +64,8 @@ TEST(ProjectServiceTest, AddProjectFilesNormalizesNamesAndTracksManifestEntries)
     std::string error;
 
     ASSERT_TRUE(core::ProjectService::CreateEmptyProject("MySafetyCase", parent, project, report, error)) << error;
-    ASSERT_TRUE(core::ProjectService::AddSacmFile(project, "main", entry, error)) << error;
-    EXPECT_EQ(entry.relativePath.generic_string(), "arguments/main.sacm");
+    ASSERT_TRUE(core::ProjectService::AddSacmFile(project, "safety-core", entry, error)) << error;
+    EXPECT_EQ(entry.relativePath.generic_string(), "arguments/safety-core.sacm");
     EXPECT_TRUE(std::filesystem::exists(project.rootPath / entry.relativePath));
     EXPECT_TRUE(parser::parse_sacm_xml((project.rootPath / entry.relativePath).string()).success);
 
@@ -76,6 +79,7 @@ TEST(ProjectServiceTest, AddProjectFilesNormalizesNamesAndTracksManifestEntries)
     core::ProjectLoadReport open_report;
     ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, reopened, open_report, error)) << error;
     EXPECT_TRUE(ContainsFileWithRole(reopened, "arguments/main.sacm", core::ProjectFileRole::SacmArgument));
+    EXPECT_TRUE(ContainsFileWithRole(reopened, "arguments/safety-core.sacm", core::ProjectFileRole::SacmArgument));
     EXPECT_TRUE(ContainsFileWithRole(reopened, "registers/evidence-register.af.json", core::ProjectFileRole::EvidenceRegister));
     EXPECT_TRUE(ContainsFileWithRole(reopened, "registers/j3377-cae-register.af.json", core::ProjectFileRole::J3377CaeRegister));
 
@@ -100,13 +104,23 @@ TEST(ProjectServiceTest, OpenProjectReportsExternallyModifiedAndMissingFiles) {
     core::AssuranceProject reopened;
     core::ProjectLoadReport open_report;
     ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, reopened, open_report, error)) << error;
-    ASSERT_EQ(reopened.files.size(), 1u);
-    EXPECT_EQ(reopened.files[0].state, core::ProjectFileState::ModifiedOutsideAssuranceForge);
+    ASSERT_EQ(reopened.files.size(), 2u);
+    auto evidence_it = std::find_if(reopened.files.begin(), reopened.files.end(),
+        [](const core::ProjectFileEntry& file) {
+            return file.role == core::ProjectFileRole::EvidenceRegister;
+        });
+    ASSERT_NE(evidence_it, reopened.files.end());
+    EXPECT_EQ(evidence_it->state, core::ProjectFileState::ModifiedOutsideAssuranceForge);
     EXPECT_FALSE(open_report.warnings.empty());
 
     std::filesystem::remove(project.rootPath / entry.relativePath);
     core::ProjectLoadReport missing_report = core::ProjectService::RefreshFileStatus(reopened);
-    EXPECT_EQ(reopened.files[0].state, core::ProjectFileState::Missing);
+    evidence_it = std::find_if(reopened.files.begin(), reopened.files.end(),
+        [](const core::ProjectFileEntry& file) {
+            return file.role == core::ProjectFileRole::EvidenceRegister;
+        });
+    ASSERT_NE(evidence_it, reopened.files.end());
+    EXPECT_EQ(evidence_it->state, core::ProjectFileState::Missing);
     EXPECT_TRUE(missing_report.has_failures());
 
     std::filesystem::remove_all(parent);
