@@ -10,7 +10,6 @@
 #include "ui/panels/element_panel.h"
 #include "ui/panels/project_files_panel.h"
 #include "ui/panels/welcome_modal.h"
-#include "ui/register_views.h"
 #include "ui/theme.h"
 #include "ui/tree_view.h"
 #include "ui/ui_state.h"
