@@ -73,8 +73,10 @@ TEST(GuidelinesParserTest, ParsesMinimalYamlAndFetchesGuidelines) {
     const parser::Guideline* guideline = result.document.FindGuidelineById("CL.1");
     ASSERT_NE(guideline, nullptr);
     EXPECT_EQ(guideline->category, "CL");
+    ASSERT_FALSE(guideline->references.empty());
     EXPECT_EQ(guideline->references[0].source_id, "UL4600");
     ASSERT_EQ(guideline->references[0].clauses.size(), 1);
+    ASSERT_FALSE(guideline->references[0].clauses.empty());
     EXPECT_EQ(guideline->references[0].clauses[0], "5.2.3");
 
     std::vector<const parser::Guideline*> category_matches = result.document.FindGuidelinesByCategory("CL");
@@ -154,8 +156,8 @@ TEST(GuidelinesParserTest, ParsesRealGuidelinesFile) {
     ASSERT_TRUE(result.success) << result.error_message;
     EXPECT_EQ(result.document.schema_version, "0.4.0");
     EXPECT_EQ(result.document.metadata.title, "Safety Case Core Guidelines");
-    EXPECT_NE(result.document.categories.empty(), true);
-    EXPECT_NE(result.document.reference_sources.empty(), true);
+    EXPECT_FALSE(result.document.categories.empty());
+    EXPECT_FALSE(result.document.reference_sources.empty());
     EXPECT_GT(result.document.guidelines.size(), 30);
 
     const parser::GuidelineCategory* claim_category = result.document.FindCategoryById("CL");
