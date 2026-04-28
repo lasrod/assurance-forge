@@ -49,3 +49,7 @@ Large UI surfaces should receive the state and actions they need as parameters. 
 UI rendering code should avoid depending directly on `app`. If a panel needs to request an application command, `AppRuntime` passes a small action object into that panel.
 
 This keeps dependencies visible at the call site and preserves the simple immediate-mode style.
+
+## HelloImGui Scope
+
+HelloImGui is used only as a thin platform layer: window creation, event loop, DPI scaling, and macOS bundling. Higher-level HelloImGui features (docking layout, theming, log/INI persistence, status bar, asset image utilities) are intentionally not used so the dependency stays cheap to swap if needed.
