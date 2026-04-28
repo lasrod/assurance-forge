@@ -16,6 +16,26 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
+# --- YAML ---
+set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+FetchContent_Declare(
+    yaml-cpp
+    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+    GIT_TAG 0.8.0
+)
+FetchContent_MakeAvailable(yaml-cpp)
+
+if(TARGET yaml-cpp::yaml-cpp)
+    set(AF_YAML_CPP_TARGET yaml-cpp::yaml-cpp)
+elseif(TARGET yaml-cpp)
+    set(AF_YAML_CPP_TARGET yaml-cpp)
+else()
+    message(FATAL_ERROR "yaml-cpp target was not created")
+endif()
+
 # --- libcurl ---
 find_package(CURL QUIET)
 if(NOT CURL_FOUND)
@@ -74,6 +94,21 @@ target_link_libraries(imgui_backends PUBLIC imgui_core d3d11 d3dcompiler dxgi)
 # --- pugixml ---
 add_subdirectory(external/pugixml)
 
+set(AF_GUIDELINES_SOURCE_FILE "${CMAKE_SOURCE_DIR}/external/safety-case-core-guidelines/data/guidelines.yaml")
+if(NOT EXISTS "${AF_GUIDELINES_SOURCE_FILE}")
+    message(FATAL_ERROR "Missing ${AF_GUIDELINES_SOURCE_FILE}. Run git submodule update --init --recursive.")
+endif()
+
+function(af_copy_guidelines_data target_name)
+    add_custom_command(TARGET ${target_name} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${target_name}>/data"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${AF_GUIDELINES_SOURCE_FILE}"
+            "$<TARGET_FILE_DIR:${target_name}>/data/guidelines.yaml"
+        VERBATIM
+    )
+endfunction()
+
 # --- Main application ---
 add_executable(assurance-forge WIN32
     src/ai/ai_service.cpp
@@ -87,6 +122,7 @@ add_executable(assurance-forge WIN32
     src/app/main.cpp
     src/app/app_runtime.cpp
     src/app/platform_win32_dx11.cpp
+    src/parser/guidelines_parser.cpp
     src/parser/xml_parser.cpp
     src/ui/panels/welcome_modal.cpp
     src/ui/panels/element_panel.cpp
@@ -115,10 +151,11 @@ add_executable(assurance-forge WIN32
     src/sacm/sacm_serializer.cpp
 )
 target_include_directories(assurance-forge PRIVATE src)
-target_link_libraries(assurance-forge PRIVATE imgui_core imgui_backends pugixml nlohmann_json::nlohmann_json CURL::libcurl bcrypt ole32 shell32)
+target_link_libraries(assurance-forge PRIVATE imgui_core imgui_backends pugixml nlohmann_json::nlohmann_json ${AF_YAML_CPP_TARGET} CURL::libcurl bcrypt ole32 shell32)
 if(WIN32)
     target_link_libraries(assurance-forge PRIVATE advapi32)
 endif()
+af_copy_guidelines_data(assurance-forge)
 
 # --- Tests ---
 FetchContent_Declare(
@@ -142,6 +179,7 @@ add_executable(tests
     tests/test_ai_service.cpp
     tests/test_openai_provider.cpp
     tests/test_ai_task_runner.cpp
+    tests/test_guidelines_parser.cpp
     src/ai/ai_service.cpp
     src/ai/ai_settings.cpp
     src/ai/ai_task_runner.cpp
@@ -149,6 +187,7 @@ add_executable(tests
     src/ai/http_client.cpp
     src/ai/openai_provider.cpp
     src/ai/secret_store.cpp
+    src/parser/guidelines_parser.cpp
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
@@ -161,7 +200,7 @@ add_executable(tests
     src/sacm/sacm_serializer.cpp
 )
 target_include_directories(tests PRIVATE src)
-target_link_libraries(tests PRIVATE GTest::gtest_main pugixml imgui_core nlohmann_json::nlohmann_json bcrypt)
+target_link_libraries(tests PRIVATE GTest::gtest_main pugixml imgui_core nlohmann_json::nlohmann_json ${AF_YAML_CPP_TARGET} bcrypt)
 if(WIN32)
     target_link_libraries(tests PRIVATE advapi32)
 
@@ -170,5 +209,12 @@ if(WIN32)
         COMMAND_EXPAND_LISTS
     )
 endif()
+af_copy_guidelines_data(tests)
 include(GoogleTest)
 gtest_discover_tests(tests WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(
+    NAME GuidelinesDataRuntimeCopy
+    COMMAND ${CMAKE_COMMAND} -E compare_files
+        "${AF_GUIDELINES_SOURCE_FILE}"
+        "$<TARGET_FILE_DIR:tests>/data/guidelines.yaml"
+)

@@ -48,6 +48,8 @@ jobs:
           mkdir -p "$stage"
           cp build/Release/assurance-forge.exe "$stage/"
           cp -r data "$stage/"
+          mkdir -p "$stage/data"
+          cp external/safety-case-core-guidelines/data/guidelines.yaml "$stage/data/guidelines.yaml"
           cp README.md "$stage/"
           cp LICENSE.md "$stage/"
 
