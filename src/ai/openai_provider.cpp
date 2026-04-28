@@ -39,6 +39,8 @@ std::string ExtractOutputText(const nlohmann::json& root) {
     return {};
 }
 
+// Builds the JSON request body. May throw nlohmann::json::parse_error if
+// request.jsonSchema contains malformed JSON; callers should handle this.
 nlohmann::json BuildRequestBody(const AiProviderSettings& settings, const AiRequest& request) {
     nlohmann::json body;
     body["model"] = settings.model.empty() ? kDefaultOpenAiModel : settings.model;

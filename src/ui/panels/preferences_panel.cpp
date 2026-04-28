@@ -60,8 +60,8 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
     ImGui::TextUnformatted("Provider");
     ImGui::SetNextItemWidth(220.0f);
     ImGui::BeginDisabled();
-    static const char* provider_name = "OpenAI";
-    ImGui::InputText("##ai_provider", const_cast<char*>(provider_name), std::strlen(provider_name) + 1,
+    static char provider_name[] = "OpenAI";
+    ImGui::InputText("##ai_provider", provider_name, sizeof(provider_name),
                      ImGuiInputTextFlags_ReadOnly);
     ImGui::EndDisabled();
 
