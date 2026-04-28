@@ -1,8 +1,10 @@
-﻿cmake_minimum_required(VERSION 3.20)
+﻿cmake_minimum_required(VERSION 3.21)
 project(assurance-forge LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
 include(FetchContent)
 
@@ -162,6 +164,11 @@ target_include_directories(tests PRIVATE src)
 target_link_libraries(tests PRIVATE GTest::gtest_main pugixml imgui_core nlohmann_json::nlohmann_json bcrypt)
 if(WIN32)
     target_link_libraries(tests PRIVATE advapi32)
+
+    add_custom_command(TARGET tests POST_BUILD
+        COMMAND "$<$<BOOL:$<TARGET_RUNTIME_DLLS:tests>>:${CMAKE_COMMAND};-E;copy_if_different;$<TARGET_RUNTIME_DLLS:tests>;$<TARGET_FILE_DIR:tests>>"
+        COMMAND_EXPAND_LISTS
+    )
 endif()
 include(GoogleTest)
 gtest_discover_tests(tests WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
