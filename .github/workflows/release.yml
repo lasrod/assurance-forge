@@ -21,14 +21,19 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Set up CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '4.2.3'
+
       - name: Configure CMake
-        run: cmake -B build -G "Visual Studio 17 2022" -A x64
+        run: cmake --preset default
 
       - name: Build (Release)
-        run: cmake --build build --config Release
+        run: cmake --build --preset release
 
       - name: Run tests
-        run: ctest --test-dir build -C Release --output-on-failure --no-tests=error
+        run: ctest --preset release --no-tests=error
 
       - name: Determine package version
         id: version

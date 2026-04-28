@@ -98,8 +98,8 @@ git submodule update --init --recursive
 ### 3. Configure and Build
 
 ```bash
-cmake -B build
-cmake --build build --config Release
+cmake --preset default
+cmake --build --preset release
 ```
 
 ### 4. Run the Application
@@ -111,7 +111,7 @@ build\Release\assurance-forge.exe
 ### 5. Run Tests
 
 ```bash
-ctest --test-dir build -C Release --output-on-failure
+ctest --preset release
 ```
 
 Or run the test executable directly:

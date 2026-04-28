@@ -6,6 +6,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
+# yaml-cpp 0.8.0 still declares cmake_minimum_required(VERSION 3.4).
+# Raise the policy floor for fetched dependencies without patching their sources.
+set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
+
 include(FetchContent)
 
 # --- JSON ---
