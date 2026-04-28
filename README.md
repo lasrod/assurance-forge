@@ -170,6 +170,7 @@ https://github.com/EdgeCaseResearch/oasc
 - [PicoSHA2](https://github.com/okdshin/PicoSHA2) - Header-only SHA-256 implementation (MIT License)
 - [pugixml](https://github.com/zeux/pugixml) - XML parser (MIT License)
 - [GoogleTest](https://github.com/google/googletest) - Testing framework, fetched via CMake (BSD-3-Clause)
+- [Noto Sans JP](https://github.com/notofonts/noto-cjk) - Bundled font for Latin and Japanese rendering (SIL Open Font License 1.1)
 
 
 ## Copyright and license
