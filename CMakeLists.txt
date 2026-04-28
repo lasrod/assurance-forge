@@ -50,20 +50,23 @@ endif()
 
 # --- ImGui ---
 set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/external/imgui)
-add_library(imgui STATIC
+add_library(imgui_core STATIC
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_demo.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
     ${IMGUI_DIR}/imgui_tables.cpp
     ${IMGUI_DIR}/imgui_widgets.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_win32.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_dx11.cpp
 )
-target_include_directories(imgui PUBLIC
+target_include_directories(imgui_core PUBLIC
     ${IMGUI_DIR}
     ${IMGUI_DIR}/backends
 )
-target_link_libraries(imgui PUBLIC d3d11 d3dcompiler dxgi)
+
+add_library(imgui_backends STATIC
+    ${IMGUI_DIR}/backends/imgui_impl_win32.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_dx11.cpp
+)
+target_link_libraries(imgui_backends PUBLIC imgui_core d3d11 d3dcompiler dxgi)
 
 # --- pugixml ---
 add_subdirectory(external/pugixml)
@@ -108,7 +111,7 @@ add_executable(assurance-forge WIN32
     src/sacm/sacm_serializer.cpp
 )
 target_include_directories(assurance-forge PRIVATE src)
-target_link_libraries(assurance-forge PRIVATE imgui pugixml nlohmann_json::nlohmann_json CURL::libcurl bcrypt ole32 shell32)
+target_link_libraries(assurance-forge PRIVATE imgui_core imgui_backends pugixml nlohmann_json::nlohmann_json CURL::libcurl bcrypt ole32 shell32)
 if(WIN32)
     target_link_libraries(assurance-forge PRIVATE advapi32)
 endif()
@@ -153,7 +156,7 @@ add_executable(tests
     src/sacm/sacm_serializer.cpp
 )
 target_include_directories(tests PRIVATE src)
-target_link_libraries(tests PRIVATE GTest::gtest_main pugixml imgui nlohmann_json::nlohmann_json bcrypt)
+target_link_libraries(tests PRIVATE GTest::gtest_main pugixml imgui_core nlohmann_json::nlohmann_json bcrypt)
 if(WIN32)
     target_link_libraries(tests PRIVATE advapi32)
 endif()
