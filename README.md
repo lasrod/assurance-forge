@@ -100,12 +100,14 @@ git submodule update --init --recursive
 
 ### 3. Configure and Build
 
+**Windows** (Visual Studio):
+
 ```bash
 cmake -B build
 cmake --build build --config Release
 ```
 
-On Linux, install the OpenGL/X11 and GTK development packages before configuring:
+**Linux** (install dependencies first):
 
 ```bash
 sudo apt-get install xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev
@@ -113,22 +115,59 @@ cmake -B build -DHELLOIMGUI_DOWNLOAD_GLFW_IF_NEEDED=ON -DCMAKE_BUILD_TYPE=Releas
 cmake --build build
 ```
 
+**macOS**:
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
 ### 4. Run the Application
+
+**Windows**:
 
 ```bash
 build\Release\assurance-forge.exe
 ```
 
+**Linux**:
+
+```bash
+./build/assurance-forge
+```
+
+**macOS**:
+
+```bash
+open build/assurance-forge.app
+```
+
 ### 5. Run Tests
+
+**Windows**:
 
 ```bash
 ctest --test-dir build -C Release --output-on-failure
 ```
 
+**Linux / macOS**:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
 Or run the test executable directly:
+
+**Windows**:
 
 ```bash
 build\Release\tests.exe
+```
+
+**Linux / macOS**:
+
+```bash
+./build/tests
 ```
 
 ## Usage
