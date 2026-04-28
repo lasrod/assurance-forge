@@ -58,7 +58,7 @@ void DrawFilterButton(const FilterButtonSpec& spec,
                       ui::ProblemFilter& active_filter) {
     const bool active = active_filter == spec.filter;
     const ui::Theme& theme = ui::GetTheme();
-    std::string label = std::string(spec.label) + " (" + std::to_string(count) + ")";
+    std::string label = std::string(spec.label) + " (" + std::to_string(count) + ")###filter_" + spec.label;
 
     if (active) {
         ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::WithAlpha(theme.accent, 0.72f)));

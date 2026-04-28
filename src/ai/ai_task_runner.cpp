@@ -18,6 +18,14 @@ bool AiTaskHandle::IsRunning() const {
     return Snapshot().state == AiTaskState::Running;
 }
 
+bool AiTaskHandle::WaitUntilComplete(std::chrono::milliseconds timeout) const {
+    if (!state_) return false;
+    std::unique_lock<std::mutex> lock(state_->mutex);
+    return state_->cv.wait_for(lock, timeout, [&] {
+        return state_->snapshot.state != AiTaskState::Running;
+    });
+}
+
 std::shared_ptr<AiTaskHandle> AiTaskRunner::RunConnectionTest(std::function<AiConnectionStatus()> job) {
     auto state = std::make_shared<AiTaskHandle::SharedState>();
     {
@@ -37,9 +45,12 @@ std::shared_ptr<AiTaskHandle> AiTaskRunner::RunConnectionTest(std::function<AiCo
             status = ErrorStatus(AiErrorCode::Unknown, "AI task failed.");
         }
 
-        std::lock_guard<std::mutex> lock(state->mutex);
-        state->snapshot.state = status.state == AiTaskState::Success ? AiTaskState::Success : AiTaskState::Error;
-        state->snapshot.status = std::move(status);
+        {
+            std::lock_guard<std::mutex> lock(state->mutex);
+            state->snapshot.state = status.state == AiTaskState::Success ? AiTaskState::Success : AiTaskState::Error;
+            state->snapshot.status = std::move(status);
+        }
+        state->cv.notify_all();
     }).detach();
 
     return handle;

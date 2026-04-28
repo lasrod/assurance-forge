@@ -57,11 +57,13 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
         *model.settings = draft;
     }
 
-    const char* providers[] = {"OpenAI"};
-    int provider_index = 0;
     ImGui::TextUnformatted("Provider");
     ImGui::SetNextItemWidth(220.0f);
-    ImGui::Combo("##ai_provider", &provider_index, providers, 1);
+    ImGui::BeginDisabled();
+    static const char* provider_name = "OpenAI";
+    ImGui::InputText("##ai_provider", const_cast<char*>(provider_name), std::strlen(provider_name) + 1,
+                     ImGuiInputTextFlags_ReadOnly);
+    ImGui::EndDisabled();
 
     ImGui::TextUnformatted("Model");
     ImGui::SetNextItemWidth(280.0f);

@@ -39,6 +39,7 @@ if(CURL_FOUND AND NOT TARGET CURL::libcurl)
     set_target_properties(CURL::libcurl PROPERTIES
         IMPORTED_LOCATION "${CURL_LIBRARY}"
         INTERFACE_INCLUDE_DIRECTORIES "${CURL_INCLUDE_DIRS}"
+        INTERFACE_LINK_LIBRARIES "${CURL_LIBRARIES}"
     )
 endif()
 if(NOT TARGET CURL::libcurl AND TARGET libcurl)
@@ -104,6 +105,7 @@ add_executable(assurance-forge WIN32
     src/core/app_state.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
+    src/core/problems/problem_item.cpp
     src/core/problems/problems_manager.cpp
     src/core/project_model.cpp
     src/core/project_service.cpp
@@ -148,6 +150,7 @@ add_executable(tests
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
+    src/core/problems/problem_item.cpp
     src/core/problems/problems_manager.cpp
     src/core/project_model.cpp
     src/core/project_service.cpp

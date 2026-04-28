@@ -48,14 +48,11 @@ nlohmann::json BuildRequestBody(const AiProviderSettings& settings, const AiRequ
     }
 
     if (request.jsonSchemaName.has_value() && request.jsonSchema.has_value()) {
-        try {
-            body["text"]["format"] = {
-                {"type", "json_schema"},
-                {"name", request.jsonSchemaName.value()},
-                {"schema", nlohmann::json::parse(request.jsonSchema.value())},
-            };
-        } catch (...) {
-        }
+        body["text"]["format"] = {
+            {"type", "json_schema"},
+            {"name", request.jsonSchemaName.value()},
+            {"schema", nlohmann::json::parse(request.jsonSchema.value())},
+        };
     }
 
     return body;
@@ -109,7 +106,13 @@ AiResponse OpenAiProvider::Generate(const AiProviderSettings& settings,
         {"Content-Type", "application/json"},
         {"Authorization", "Bearer " + api_key},
     };
-    http_request.body = BuildRequestBody(settings, request).dump();
+
+    try {
+        http_request.body = BuildRequestBody(settings, request).dump();
+    } catch (const nlohmann::json::parse_error& e) {
+        return ErrorResponse(AiErrorCode::SettingsError,
+                             std::string("Invalid JSON schema: ") + e.what());
+    }
 
     HttpResponse http_response = http_client_->Post(http_request);
     if (http_response.timedOut) {

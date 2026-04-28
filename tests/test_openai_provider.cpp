@@ -100,3 +100,19 @@ TEST(OpenAiProviderTest, MalformedSuccessResponseIsReported) {
     EXPECT_FALSE(response.success);
     EXPECT_EQ(response.errorCode, ai::AiErrorCode::MalformedResponse);
 }
+
+TEST(OpenAiProviderTest, InvalidJsonSchemaReturnsSettingsError) {
+    auto http = std::make_shared<FakeHttpClient>();
+    ai::OpenAiProvider provider(http);
+    ai::AiProviderSettings settings;
+    ai::AiRequest request;
+    request.userPrompt = "test";
+    request.jsonSchemaName = "my_schema";
+    request.jsonSchema = "{ this is not valid json }";
+
+    ai::AiResponse response = provider.Generate(settings, request, "sk-test");
+
+    EXPECT_FALSE(response.success);
+    EXPECT_EQ(response.errorCode, ai::AiErrorCode::SettingsError);
+    EXPECT_NE(response.errorMessage.find("Invalid JSON schema"), std::string::npos);
+}
