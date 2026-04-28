@@ -32,6 +32,7 @@ add_executable(assurance-forge WIN32
     src/parser/xml_parser.cpp
     src/ui/panels/welcome_modal.cpp
     src/ui/panels/element_panel.cpp
+    src/ui/panels/problems_panel.cpp
     src/ui/panels/project_files_panel.cpp
     src/ui/panels/sacm_viewer_panel.cpp
     src/ui/widgets/splitter.cpp
@@ -47,6 +48,7 @@ add_executable(assurance-forge WIN32
     src/core/app_state.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
+    src/core/problems/problems_manager.cpp
     src/core/project_model.cpp
     src/core/project_service.cpp
     src/sacm/sacm_parser.cpp
@@ -70,12 +72,14 @@ add_executable(tests
     tests/test_xml_parser.cpp
     tests/test_assurance_tree.cpp
     tests/test_layout.cpp
+    tests/test_problems_manager.cpp
     tests/test_sacm_roundtrip.cpp
     tests/test_element_factory.cpp
     tests/test_project_service.cpp
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
+    src/core/problems/problems_manager.cpp
     src/core/project_model.cpp
     src/core/project_service.cpp
     src/ui/gsn/gsn_layout.cpp

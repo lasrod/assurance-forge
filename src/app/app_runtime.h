@@ -45,6 +45,7 @@ private:
     void RenderTreePanel(float left_w, float safety_tree_h, float top_y);
     void RenderSacmViewerPanel(float left_w, float sacm_h, float top_y);
     void RenderCenterPanel(float center_x, float center_w, float content_h, float top_y);
+    void RenderProblemsPanel(float center_x, float center_w, float problems_h, float top_y);
     void RenderElementPropertiesPanel(float center_x, float center_w, float right_w, float content_h, float top_y);
     void RenderStartupProjectWindow();
     void RenderNotImplementedModal();

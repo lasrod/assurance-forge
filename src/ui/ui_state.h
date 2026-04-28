@@ -12,6 +12,14 @@ enum class CenterView {
     EvidenceRegister,
 };
 
+enum class ProblemFilter {
+    All,
+    Validation,
+    Review,
+    Warnings,
+    Info,
+};
+
 struct UiState {
     std::string selected_element_id;
 
@@ -31,6 +39,11 @@ struct UiState {
 
     // Active center panel view
     CenterView center_view = CenterView::GsnCanvas;
+
+    // Active lower Problems panel state
+    ProblemFilter active_problem_filter = ProblemFilter::All;
+    std::string selected_problem_id;
+    std::string selected_problem_element_id;
 };
 
 // Global shared UI state accessible from all panels.
