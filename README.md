@@ -69,23 +69,26 @@ Releases are currently Windows x64 only. To build on other platforms, see [Build
 ---
 ## Requirements
 
-- Windows 10/11
-- [Visual Studio 2022 Build Tools](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022) (select "Desktop development with C++", includes CMake)
+- Windows 10/11, Linux, or macOS
+- [CMake](https://cmake.org/) 3.20 or newer
+- A C++17 compiler, such as Visual Studio 2022, GCC, or Clang
 - [Git](https://git-scm.com/download/win)
 
-Tested with Visual Studio 2022 (v18), CMake 4.2.3, Git 2.53.
+The application uses `hello_imgui` with GLFW/OpenGL as its UI backend and Native File Dialog Extended for OS-native file and folder pickers.
 
 ## Build Instructions
 
-### 1. Open Developer Command Prompt
+### 1. Prepare a C++ Build Environment
 
-Launch "Developer Command Prompt for VS 2022" from the Start menu.
+On Windows, launch "Developer Command Prompt for VS 2022" from the Start menu.
 
 Or in cmd:
 
 ```cmd
 "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
 ```
+
+On Linux or macOS, use a shell where CMake and your C++ compiler are available on `PATH`.
 
 ### 2. Clone and Initialize Submodules
 
@@ -100,6 +103,14 @@ git submodule update --init --recursive
 ```bash
 cmake -B build
 cmake --build build --config Release
+```
+
+On Linux, install the OpenGL/X11 and GTK development packages before configuring:
+
+```bash
+sudo apt-get install xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev
+cmake -B build -DHELLOIMGUI_DOWNLOAD_GLFW_IF_NEEDED=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build
 ```
 
 ### 4. Run the Application
@@ -142,18 +153,20 @@ https://github.com/EdgeCaseResearch/oasc
 **"The CXX compiler identification is unknown"**
 - Run from Developer Command Prompt for VS 2022, not regular PowerShell/cmd
 
-**Build fails with missing DirectX headers**
-- Install Windows SDK via Visual Studio Installer
+**Build fails on Linux with missing OpenGL or X11 headers**
+- Install the OpenGL/X11 development packages shown in the Linux build example
 
 **Application starts but window is blank**
-- Ensure your GPU supports DirectX 11
+- Ensure your GPU and drivers support OpenGL
 
 **Tests fail to build**
 - GoogleTest is fetched automatically; ensure internet connection during first build
 
 ## Dependencies
 
-- [Dear ImGui](https://github.com/ocornut/imgui) - Immediate mode GUI (MIT License)
+- [hello_imgui](https://github.com/pthom/hello_imgui) - Cross-platform Dear ImGui application runner (MIT License)
+- [Dear ImGui](https://github.com/ocornut/imgui) - Immediate mode GUI, supplied by hello_imgui (MIT License)
+- [Native File Dialog Extended](https://github.com/btzy/nativefiledialog-extended) - Native file and folder dialogs (Zlib License)
 - [pugixml](https://github.com/zeux/pugixml) - XML parser (MIT License)
 - [GoogleTest](https://github.com/google/googletest) - Testing framework, fetched via CMake (BSD-3-Clause)
 

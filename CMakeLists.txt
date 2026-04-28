@@ -4,31 +4,34 @@ project(assurance-forge LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# --- ImGui ---
-set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/external/imgui)
-add_library(imgui STATIC
-    ${IMGUI_DIR}/imgui.cpp
-    ${IMGUI_DIR}/imgui_demo.cpp
-    ${IMGUI_DIR}/imgui_draw.cpp
-    ${IMGUI_DIR}/imgui_tables.cpp
-    ${IMGUI_DIR}/imgui_widgets.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_win32.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_dx11.cpp
+if(MSVC)
+    add_compile_options(/FS)
+endif()
+
+set(HELLOIMGUI_BUILD_DEMOS OFF CACHE BOOL "" FORCE)
+set(HELLOIMGUI_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(HELLOIMGUI_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(HELLOIMGUI_USE_FREETYPE OFF CACHE BOOL "" FORCE)
+set(HELLOIMGUI_USE_GLFW3 ON CACHE BOOL "" FORCE)
+set(HELLOIMGUI_HAS_OPENGL3 ON CACHE BOOL "" FORCE)
+add_subdirectory(external/hello_imgui)
+
+set(NFD_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(NFD_BUILD_SDL2_TESTS OFF CACHE BOOL "" FORCE)
+set(NFD_BUILD_GLFW3_TESTS OFF CACHE BOOL "" FORCE)
+set(NFD_INSTALL OFF CACHE BOOL "" FORCE)
+set(NFD_WAYLAND OFF CACHE BOOL "" FORCE)
+add_subdirectory(external/nativefiledialog-extended)
+
+set(ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS
+    ${CMAKE_SOURCE_DIR}/external/hello_imgui/external/imgui
+    ${CMAKE_SOURCE_DIR}/external/hello_imgui/external/imgui/backends
 )
-target_include_directories(imgui PUBLIC
-    ${IMGUI_DIR}
-    ${IMGUI_DIR}/backends
-)
-target_link_libraries(imgui PUBLIC d3d11 d3dcompiler dxgi)
 
 # --- pugixml ---
 add_subdirectory(external/pugixml)
 
-# --- Main application ---
-add_executable(assurance-forge WIN32
-    src/app/main.cpp
-    src/app/app_runtime.cpp
-    src/app/platform_win32_dx11.cpp
+set(ASSURANCE_FORGE_SHARED_SOURCES
     src/parser/xml_parser.cpp
     src/ui/panels/welcome_modal.cpp
     src/ui/panels/element_panel.cpp
@@ -52,8 +55,19 @@ add_executable(assurance-forge WIN32
     src/sacm/sacm_parser.cpp
     src/sacm/sacm_serializer.cpp
 )
-target_include_directories(assurance-forge PRIVATE src)
-target_link_libraries(assurance-forge PRIVATE imgui pugixml bcrypt ole32 shell32)
+
+set(ASSURANCE_FORGE_APP_SOURCES
+    src/app/main.cpp
+    src/app/app_ui_bootstrap.cpp
+    src/app/app_runtime.cpp
+    src/app/native_file_dialogs.cpp
+    ${ASSURANCE_FORGE_SHARED_SOURCES}
+)
+
+# --- Main application ---
+hello_imgui_add_app(assurance-forge ${ASSURANCE_FORGE_APP_SOURCES})
+target_include_directories(assurance-forge PRIVATE src ${ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS})
+target_link_libraries(assurance-forge PRIVATE imgui pugixml nfd)
 
 # --- Tests ---
 include(FetchContent)
@@ -82,7 +96,7 @@ add_executable(tests
     src/sacm/sacm_parser.cpp
     src/sacm/sacm_serializer.cpp
 )
-target_include_directories(tests PRIVATE src)
-target_link_libraries(tests PRIVATE GTest::gtest_main pugixml imgui bcrypt)
+target_include_directories(tests PRIVATE src ${ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS})
+target_link_libraries(tests PRIVATE GTest::gtest_main pugixml imgui)
 include(GoogleTest)
 gtest_discover_tests(tests WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

@@ -16,6 +16,7 @@ public:
     AppRuntime& operator=(const AppRuntime&) = delete;
 
     void RenderFrame(bool& done);
+    void RequestClose();
 
     // Add a new child element to the currently selected element.
     // Returns true on success; updates selection to the new element.
@@ -62,6 +63,7 @@ private:
     void BeginCreateProjectJ3377CaeRegister();
     void OpenProjectFile(const core::ProjectFileEntry& entry);
     bool OpenFirstProjectSacmFile();
+    bool TryOpenProjectManifest(const std::string& selected_path);
     bool SaveProject();
     void RequestExit(bool& done);
 
