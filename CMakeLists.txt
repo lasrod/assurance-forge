@@ -23,6 +23,10 @@ set(NFD_INSTALL OFF CACHE BOOL "" FORCE)
 set(NFD_WAYLAND OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/nativefiledialog-extended)
 
+set(PICOSHA2_TEST OFF CACHE BOOL "" FORCE)
+set(PICOSHA2_EXAMPLE OFF CACHE BOOL "" FORCE)
+add_subdirectory(external/picosha2)
+
 set(ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/external/hello_imgui/external/imgui
     ${CMAKE_SOURCE_DIR}/external/hello_imgui/external/imgui/backends
@@ -52,6 +56,7 @@ set(ASSURANCE_FORGE_SHARED_SOURCES
     src/core/element_factory.cpp
     src/core/project_model.cpp
     src/core/project_service.cpp
+    src/core/sha256.cpp
     src/sacm/sacm_parser.cpp
     src/sacm/sacm_serializer.cpp
 )
@@ -67,7 +72,7 @@ set(ASSURANCE_FORGE_APP_SOURCES
 # --- Main application ---
 hello_imgui_add_app(assurance-forge ${ASSURANCE_FORGE_APP_SOURCES})
 target_include_directories(assurance-forge PRIVATE src ${ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS})
-target_link_libraries(assurance-forge PRIVATE imgui pugixml nfd)
+target_link_libraries(assurance-forge PRIVATE imgui pugixml nfd picosha2)
 
 # --- Tests ---
 include(FetchContent)
@@ -87,16 +92,18 @@ add_executable(tests
     tests/test_sacm_roundtrip.cpp
     tests/test_element_factory.cpp
     tests/test_project_service.cpp
+    tests/test_sha256.cpp
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
     src/core/project_model.cpp
     src/core/project_service.cpp
+    src/core/sha256.cpp
     src/ui/gsn/gsn_layout.cpp
     src/sacm/sacm_parser.cpp
     src/sacm/sacm_serializer.cpp
 )
 target_include_directories(tests PRIVATE src ${ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS})
-target_link_libraries(tests PRIVATE GTest::gtest_main pugixml imgui)
+target_link_libraries(tests PRIVATE GTest::gtest_main pugixml imgui picosha2)
 include(GoogleTest)
 gtest_discover_tests(tests WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
