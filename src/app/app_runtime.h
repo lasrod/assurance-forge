@@ -55,6 +55,7 @@ private:
     void RenderProjectFileNameModal();
     void RenderProjectLoadReportModal();
     void RenderSaveBeforeExitModal(bool& done);
+    void RenderPreferencesWindow();
 
     void BeginCreateProject();
     void BeginOpenProject();

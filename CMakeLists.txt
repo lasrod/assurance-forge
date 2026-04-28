@@ -1,8 +1,52 @@
 ﻿cmake_minimum_required(VERSION 3.20)
-project(assurance-forge LANGUAGES CXX)
+project(assurance-forge LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+include(FetchContent)
+
+# --- JSON ---
+FetchContent_Declare(
+    nlohmann_json
+    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
+# --- libcurl ---
+find_package(CURL QUIET)
+if(NOT CURL_FOUND)
+    set(BUILD_CURL_EXE OFF CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(BUILD_LIBCURL_DOCS OFF CACHE BOOL "" FORCE)
+    set(ENABLE_CURL_MANUAL OFF CACHE BOOL "" FORCE)
+    if(WIN32)
+        set(CURL_USE_SCHANNEL ON CACHE BOOL "" FORCE)
+        set(CURL_WINDOWS_SSPI ON CACHE BOOL "" FORCE)
+    endif()
+    FetchContent_Declare(
+        curl
+        URL https://github.com/curl/curl/releases/download/curl-8_9_1/curl-8.9.1.tar.xz
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    )
+    FetchContent_MakeAvailable(curl)
+endif()
+
+if(CURL_FOUND AND NOT TARGET CURL::libcurl)
+    add_library(CURL::libcurl UNKNOWN IMPORTED)
+    set_target_properties(CURL::libcurl PROPERTIES
+        IMPORTED_LOCATION "${CURL_LIBRARY}"
+        INTERFACE_INCLUDE_DIRECTORIES "${CURL_INCLUDE_DIRS}"
+    )
+endif()
+if(NOT TARGET CURL::libcurl AND TARGET libcurl)
+    add_library(CURL::libcurl ALIAS libcurl)
+endif()
+if(NOT TARGET CURL::libcurl AND TARGET libcurl_static)
+    add_library(CURL::libcurl ALIAS libcurl_static)
+endif()
 
 # --- ImGui ---
 set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/external/imgui)
@@ -26,12 +70,21 @@ add_subdirectory(external/pugixml)
 
 # --- Main application ---
 add_executable(assurance-forge WIN32
+    src/ai/ai_service.cpp
+    src/ai/ai_settings.cpp
+    src/ai/ai_task_runner.cpp
+    src/ai/ai_types.cpp
+    src/ai/http_client.cpp
+    src/ai/libcurl_http_client.cpp
+    src/ai/openai_provider.cpp
+    src/ai/secret_store.cpp
     src/app/main.cpp
     src/app/app_runtime.cpp
     src/app/platform_win32_dx11.cpp
     src/parser/xml_parser.cpp
     src/ui/panels/welcome_modal.cpp
     src/ui/panels/element_panel.cpp
+    src/ui/panels/preferences_panel.cpp
     src/ui/panels/problems_panel.cpp
     src/ui/panels/project_files_panel.cpp
     src/ui/panels/sacm_viewer_panel.cpp
@@ -55,10 +108,12 @@ add_executable(assurance-forge WIN32
     src/sacm/sacm_serializer.cpp
 )
 target_include_directories(assurance-forge PRIVATE src)
-target_link_libraries(assurance-forge PRIVATE imgui pugixml bcrypt ole32 shell32)
+target_link_libraries(assurance-forge PRIVATE imgui pugixml nlohmann_json::nlohmann_json CURL::libcurl bcrypt ole32 shell32)
+if(WIN32)
+    target_link_libraries(assurance-forge PRIVATE advapi32)
+endif()
 
 # --- Tests ---
-include(FetchContent)
 FetchContent_Declare(
     googletest
     GIT_REPOSITORY https://github.com/google/googletest.git
@@ -76,6 +131,17 @@ add_executable(tests
     tests/test_sacm_roundtrip.cpp
     tests/test_element_factory.cpp
     tests/test_project_service.cpp
+    tests/test_ai_settings.cpp
+    tests/test_ai_service.cpp
+    tests/test_openai_provider.cpp
+    tests/test_ai_task_runner.cpp
+    src/ai/ai_service.cpp
+    src/ai/ai_settings.cpp
+    src/ai/ai_task_runner.cpp
+    src/ai/ai_types.cpp
+    src/ai/http_client.cpp
+    src/ai/openai_provider.cpp
+    src/ai/secret_store.cpp
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
@@ -87,6 +153,9 @@ add_executable(tests
     src/sacm/sacm_serializer.cpp
 )
 target_include_directories(tests PRIVATE src)
-target_link_libraries(tests PRIVATE GTest::gtest_main pugixml imgui bcrypt)
+target_link_libraries(tests PRIVATE GTest::gtest_main pugixml imgui nlohmann_json::nlohmann_json bcrypt)
+if(WIN32)
+    target_link_libraries(tests PRIVATE advapi32)
+endif()
 include(GoogleTest)
 gtest_discover_tests(tests WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

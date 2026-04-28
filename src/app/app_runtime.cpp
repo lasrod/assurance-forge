@@ -1,6 +1,11 @@
 #include "app/app_runtime.h"
 #include "app/platform_win32_dx11.h"
 
+#include "ai/ai_service.h"
+#include "ai/ai_task_runner.h"
+#include "ai/libcurl_http_client.h"
+#include "ai/openai_provider.h"
+#include "ai/secret_store.h"
 #include "imgui.h"
 
 #include "core/app_state.h"
@@ -10,6 +15,7 @@
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/panels/element_panel.h"
 #include "ui/panels/problems_panel.h"
+#include "ui/panels/preferences_panel.h"
 #include "ui/panels/project_files_panel.h"
 #include "ui/panels/sacm_viewer_panel.h"
 #include "ui/panels/welcome_modal.h"
@@ -25,6 +31,7 @@
 #include <cwchar>
 #include <filesystem>
 #include <iterator>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -251,8 +258,24 @@ FolderBrowseResult BrowseForProjectManifest(std::string& selected_path, std::str
 }  // namespace
 
 struct AppRuntime::Impl {
+    Impl();
+
     core::AppState app_state;
     core::ProblemsManager problems_manager;
+
+    std::shared_ptr<ai::AiSettingsStore> ai_settings_store;
+    std::shared_ptr<ai::ISecretStore> ai_secret_store;
+    std::shared_ptr<ai::IHttpClient> ai_http_client;
+    std::shared_ptr<ai::IAiProvider> ai_provider;
+    std::shared_ptr<ai::AiService> ai_service;
+    ai::AiTaskRunner ai_task_runner;
+    std::shared_ptr<ai::AiTaskHandle> ai_test_task;
+    ai::AiProviderSettings ai_settings;
+    ai::AiConnectionStatus ai_connection_status;
+    bool ai_key_stored = false;
+    bool ai_secure_store_available = false;
+    char ai_api_key_buf[256] = {};
+    char ai_model_buf[128] = {};
 
     char file_path_buf[kPathBufferSize] = "data/oasc-ja.xml";
     char dir_path_buf[kPathBufferSize] = "data";
@@ -294,7 +317,36 @@ struct AppRuntime::Impl {
     std::string pending_remove_id;
     core::RemoveMode pending_remove_mode = core::RemoveMode::NodeOnly;
     std::vector<std::string> pending_remove_ids;
+
+    bool show_preferences_window = false;
+
+    void LoadAiSettingsState();
+    void RefreshStoredAiKeyState();
 };
+
+AppRuntime::Impl::Impl()
+    : ai_settings_store(std::make_shared<ai::AiSettingsStore>()),
+      ai_secret_store(ai::CreatePlatformSecretStore()),
+      ai_http_client(std::make_shared<ai::LibCurlHttpClient>()),
+      ai_provider(std::make_shared<ai::OpenAiProvider>(ai_http_client)),
+      ai_service(std::make_shared<ai::AiService>(ai_settings_store, ai_secret_store, ai_provider)) {
+    LoadAiSettingsState();
+}
+
+void AppRuntime::Impl::LoadAiSettingsState() {
+    std::string warning;
+    ai_settings = ai_service->LoadSettings(&warning);
+    CopyToBuffer(ai_model_buf, sizeof(ai_model_buf), ai_settings.model);
+    ai_secure_store_available = ai_secret_store && ai_secret_store->IsAvailable();
+    RefreshStoredAiKeyState();
+    if (!warning.empty()) {
+        ai_connection_status = ai::ErrorStatus(ai::AiErrorCode::SettingsError, warning);
+    }
+}
+
+void AppRuntime::Impl::RefreshStoredAiKeyState() {
+    ai_key_stored = ai_service && ai_service->HasStoredApiKey();
+}
 
 void NormalizeCenterViewSelection(bool& show_gsn_tab,
                                   bool& show_cse_tab,
@@ -625,6 +677,13 @@ float AppRuntime::RenderMainMenuBar(bool& done) {
         ImGui::EndMenu();
     }
 
+    if (ImGui::BeginMenu("Edit")) {
+        if (ImGui::MenuItem("Preferences...")) {
+            impl_->show_preferences_window = true;
+        }
+        ImGui::EndMenu();
+    }
+
     if (ImGui::BeginMenu("View")) {
         ui::UiState& ui_state = ui::GetUiState();
         ImGui::MenuItem("GSN Canvas", nullptr, &impl_->show_gsn_tab);
@@ -647,6 +706,82 @@ float AppRuntime::RenderMainMenuBar(bool& done) {
 
     ImGui::EndMainMenuBar();
     return ImGui::GetFrameHeight();
+}
+
+void AppRuntime::RenderPreferencesWindow() {
+    if (!impl_->show_preferences_window) return;
+
+    bool test_running = false;
+    if (impl_->ai_test_task) {
+        ai::AiTaskSnapshot snapshot = impl_->ai_test_task->Snapshot();
+        test_running = snapshot.state == ai::AiTaskState::Running;
+        impl_->ai_connection_status = snapshot.status;
+        if (!test_running) {
+            impl_->ai_test_task.reset();
+            impl_->RefreshStoredAiKeyState();
+        }
+    }
+
+    ui::panels::PreferencesPanelModel model;
+    model.settings = &impl_->ai_settings;
+    model.keyStored = impl_->ai_key_stored;
+    model.secureStoreAvailable = impl_->ai_secure_store_available;
+    model.testRunning = test_running;
+    model.connectionStatus = impl_->ai_connection_status;
+    model.apiKeyBuffer = impl_->ai_api_key_buf;
+    model.apiKeyBufferSize = sizeof(impl_->ai_api_key_buf);
+    model.modelBuffer = impl_->ai_model_buf;
+    model.modelBufferSize = sizeof(impl_->ai_model_buf);
+
+    ui::panels::PreferencesPanelCallbacks callbacks;
+    callbacks.save_settings = [this](const ai::AiProviderSettings& settings) {
+        impl_->ai_settings = settings;
+        if (impl_->ai_settings.model.empty()) impl_->ai_settings.model = ai::kDefaultOpenAiModel;
+        std::string error;
+        if (!impl_->ai_service->SaveSettings(impl_->ai_settings, error)) {
+            impl_->ai_connection_status = ai::ErrorStatus(ai::AiErrorCode::SettingsError, error);
+            return;
+        }
+        CopyToBuffer(impl_->ai_model_buf, sizeof(impl_->ai_model_buf), impl_->ai_settings.model);
+        impl_->ai_connection_status = ai::SuccessStatus("AI settings saved.");
+    };
+    callbacks.save_api_key = [this](const char* api_key) {
+        if (!api_key || api_key[0] == '\0') {
+            impl_->ai_connection_status = ai::ErrorStatus(ai::AiErrorCode::MissingApiKey, "Enter an API key before saving.");
+            return;
+        }
+        ai::SecretStoreResult result = impl_->ai_service->SaveApiKey(api_key);
+        std::memset(impl_->ai_api_key_buf, 0, sizeof(impl_->ai_api_key_buf));
+        impl_->RefreshStoredAiKeyState();
+        impl_->ai_connection_status = result.success
+            ? ai::SuccessStatus("API key saved securely.")
+            : ai::ErrorStatus(result.errorCode, result.errorMessage);
+    };
+    callbacks.remove_api_key = [this]() {
+        ai::SecretStoreResult result = impl_->ai_service->DeleteApiKey();
+        std::memset(impl_->ai_api_key_buf, 0, sizeof(impl_->ai_api_key_buf));
+        impl_->RefreshStoredAiKeyState();
+        impl_->ai_connection_status = result.success
+            ? ai::SuccessStatus("API key removed.")
+            : ai::ErrorStatus(result.errorCode, result.errorMessage);
+    };
+    callbacks.test_connection = [this]() {
+        if (impl_->ai_test_task && impl_->ai_test_task->IsRunning()) return;
+        impl_->ai_connection_status = ai::MakeStatus(ai::AiTaskState::Running, ai::AiErrorCode::None, "Testing connection...");
+        impl_->ai_settings.model = impl_->ai_model_buf;
+        if (impl_->ai_settings.model.empty()) impl_->ai_settings.model = ai::kDefaultOpenAiModel;
+        std::string error;
+        if (!impl_->ai_service->SaveSettings(impl_->ai_settings, error)) {
+            impl_->ai_connection_status = ai::ErrorStatus(ai::AiErrorCode::SettingsError, error);
+            return;
+        }
+        std::shared_ptr<ai::AiService> service = impl_->ai_service;
+        impl_->ai_test_task = impl_->ai_task_runner.RunConnectionTest([service]() {
+            return service->TestConnection();
+        });
+    };
+
+    ui::panels::ShowPreferencesWindow(impl_->show_preferences_window, model, callbacks);
 }
 
 void AppRuntime::RenderSplitters(float display_w, float content_h, float left_w, float center_w, float top_y) {
@@ -1319,6 +1454,8 @@ void AppRuntime::RenderFrame(bool& done) {
     RenderCenterPanel(center_x, center_w, center_panel_h, top_y);
     RenderProblemsPanel(center_x, center_w, problems_h, problems_y);
     RenderElementPropertiesPanel(center_x, center_w, right_w, content_h, top_y);
+
+    RenderPreferencesWindow();
 
     RenderNotImplementedModal();
     RenderRemoveConfirmModal();
