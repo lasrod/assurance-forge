@@ -129,10 +129,13 @@ void ShowWelcomeModal(bool& is_open,
         ImGui::CloseCurrentPopup();
     };
 
-    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    ImVec2 viewport_size = ImGui::GetMainViewport()->WorkSize;
-    ImGui::SetNextWindowSize(ImVec2(std::min(1000.0f, std::max(320.0f, viewport_size.x - 48.0f)),
-                                    std::min(620.0f, std::max(320.0f, viewport_size.y - 48.0f))),
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImVec2 viewport_center(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f,
+                           viewport->WorkPos.y + viewport->WorkSize.y * 0.5f);
+    ImGui::SetNextWindowPos(viewport_center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImVec2 viewport_size = viewport->WorkSize;
+    ImGui::SetNextWindowSize(ImVec2(std::min(1080.0f, std::max(360.0f, viewport_size.x - 40.0f)),
+                                    std::min(680.0f, std::max(360.0f, viewport_size.y - 40.0f))),
                              ImGuiCond_Always);
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(28.0f, 24.0f));
@@ -157,7 +160,7 @@ void ShowWelcomeModal(bool& is_open,
 
         ImGui::Dummy(ImVec2(0.0f, 20.0f));
 
-        if (ImGui::BeginTable("WelcomeLayout", 2, ImGuiTableFlags_SizingStretchProp, ImVec2(0.0f, 450.0f))) {
+        if (ImGui::BeginTable("WelcomeLayout", 2, ImGuiTableFlags_SizingStretchProp, ImVec2(0.0f, 500.0f))) {
             ImGui::TableSetupColumn("StartColumn", ImGuiTableColumnFlags_WidthStretch, 0.48f);
             ImGui::TableSetupColumn("WalkthroughColumn", ImGuiTableColumnFlags_WidthStretch, 0.52f);
             ImGui::TableNextRow();
