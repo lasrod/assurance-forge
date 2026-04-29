@@ -10,3 +10,6 @@
 [submodule "external/picosha2"]
 	path = external/picosha2
 	url = https://github.com/okdshin/PicoSHA2.git
+[submodule "external/safety-case-core-guidelines"]
+	path = external/safety-case-core-guidelines
+	url = https://github.com/lasrod/safety-case-core-guidelines.git

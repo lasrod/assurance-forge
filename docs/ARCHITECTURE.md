@@ -7,6 +7,7 @@ This document captures the current intended shape of the application. It is deli
 - `app`: owns runtime orchestration, layout composition, file workflow state, modal state, and commands that mutate the loaded project.
 - `core`: owns application/domain operations that are independent of ImGui, such as tree building and add/remove behavior.
 - `parser` and `sacm`: own XML parsing, SACM model types, and serialization.
+- `parser::GuidelinesParser`: owns loading and querying Safety Case Core Guidelines from the bundled `data/guidelines.yaml` runtime asset.
 - `ui`: owns immediate-mode rendering, transient UI state, and small shared UI helpers.
 - `ui/panels`: owns larger panel/modal surfaces.
 - `ui/widgets`: owns reusable low-level widgets.
@@ -53,3 +54,13 @@ This keeps dependencies visible at the call site and preserves the simple immedi
 ## HelloImGui Scope
 
 HelloImGui is used only as a thin platform layer: window creation, event loop, DPI scaling, and macOS bundling. Higher-level HelloImGui features (docking layout, theming, log/INI persistence, status bar, asset image utilities) are intentionally not used so the dependency stays cheap to swap if needed.
+
+## Core Data
+
+Safety Case Core Guidelines are tracked as the `external/safety-case-core-guidelines` submodule. The build copies `external/safety-case-core-guidelines/data/guidelines.yaml` into each target runtime directory as `data/guidelines.yaml`, and release packaging overlays that file into the shipped `data` folder.
+
+After cloning, initialize data dependencies with:
+
+```text
+git submodule update --init --recursive
+```

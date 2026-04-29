@@ -103,8 +103,8 @@ git submodule update --init --recursive
 **Windows** (Visual Studio):
 
 ```bash
-cmake -B build
-cmake --build build --config Release
+cmake --preset default
+cmake --build --preset release
 ```
 
 **Linux** (install dependencies first):
@@ -147,7 +147,7 @@ open build/assurance-forge.app
 **Windows**:
 
 ```bash
-ctest --test-dir build -C Release --output-on-failure
+ctest --preset release
 ```
 
 **Linux / macOS**:
