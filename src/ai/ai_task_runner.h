@@ -13,6 +13,7 @@ namespace ai {
 struct AiTaskSnapshot {
     AiTaskState state = AiTaskState::Idle;
     AiConnectionStatus status;
+    AiResponse response;
 };
 
 class AiTaskHandle {
@@ -38,6 +39,7 @@ private:
 class AiTaskRunner {
 public:
     std::shared_ptr<AiTaskHandle> RunConnectionTest(std::function<AiConnectionStatus()> job);
+    std::shared_ptr<AiTaskHandle> RunGenerate(std::function<AiResponse()> job);
 };
 
 }  // namespace ai

@@ -43,6 +43,12 @@ void ProblemsManager::ClearProblemsForElement(const std::string& element_id) {
     }), problems_.end());
 }
 
+void ProblemsManager::ClearProblemsForElementAndSource(const std::string& element_id, ProblemSource source) {
+    problems_.erase(std::remove_if(problems_.begin(), problems_.end(), [&](const ProblemItem& problem) {
+        return problem.element_id == element_id && problem.source == source;
+    }), problems_.end());
+}
+
 const std::vector<ProblemItem>& ProblemsManager::GetProblems() const {
     return problems_;
 }

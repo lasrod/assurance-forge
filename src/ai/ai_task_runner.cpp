@@ -56,4 +56,46 @@ std::shared_ptr<AiTaskHandle> AiTaskRunner::RunConnectionTest(std::function<AiCo
     return handle;
 }
 
+std::shared_ptr<AiTaskHandle> AiTaskRunner::RunGenerate(std::function<AiResponse()> job) {
+    auto state = std::make_shared<AiTaskHandle::SharedState>();
+    {
+        std::lock_guard<std::mutex> lock(state->mutex);
+        state->snapshot.state = AiTaskState::Running;
+        state->snapshot.status = MakeStatus(AiTaskState::Running, AiErrorCode::None, "Running AI review...");
+    }
+
+    auto handle = std::shared_ptr<AiTaskHandle>(new AiTaskHandle(state));
+    std::thread([state, job = std::move(job)]() mutable {
+        AiResponse response;
+        try {
+            response = job ? job() : AiResponse{};
+            if (!job) {
+                response.success = false;
+                response.errorCode = AiErrorCode::Unknown;
+                response.errorMessage = "AI task was not configured.";
+            }
+        } catch (const std::exception& exception) {
+            response.success = false;
+            response.errorCode = AiErrorCode::Unknown;
+            response.errorMessage = exception.what();
+        } catch (...) {
+            response.success = false;
+            response.errorCode = AiErrorCode::Unknown;
+            response.errorMessage = "AI task failed.";
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(state->mutex);
+            state->snapshot.state = response.success ? AiTaskState::Success : AiTaskState::Error;
+            state->snapshot.status = response.success
+                ? SuccessStatus("AI review completed.")
+                : ErrorStatus(response.errorCode, response.errorMessage.empty() ? ToString(response.errorCode) : response.errorMessage);
+            state->snapshot.response = std::move(response);
+        }
+        state->cv.notify_all();
+    }).detach();
+
+    return handle;
+}
+
 }  // namespace ai

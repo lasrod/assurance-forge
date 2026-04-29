@@ -114,6 +114,7 @@ endfunction()
 
 # --- Main application ---
 add_executable(assurance-forge WIN32
+    src/ai/ai_claim_review.cpp
     src/ai/ai_service.cpp
     src/ai/ai_settings.cpp
     src/ai/ai_task_runner.cpp
@@ -180,10 +181,12 @@ add_executable(tests
     tests/test_project_service.cpp
     tests/test_ai_settings.cpp
     tests/test_ai_service.cpp
+    tests/test_ai_claim_review.cpp
     tests/test_openai_provider.cpp
     tests/test_ai_task_runner.cpp
     tests/test_guidelines_parser.cpp
     src/ai/ai_service.cpp
+    src/ai/ai_claim_review.cpp
     src/ai/ai_settings.cpp
     src/ai/ai_task_runner.cpp
     src/ai/ai_types.cpp

@@ -12,10 +12,12 @@ namespace ui::panels {
 struct ProblemsPanelModel {
     const core::ProblemsManager& problems_manager;
     ui::UiState& ui_state;
+    bool ai_review_running = false;
 };
 
 struct ProblemsPanelCallbacks {
     std::function<void(const core::ProblemItem&)> on_problem_activated;
+    std::function<void()> on_ai_review_requested;
 };
 
 void ShowProblemsPanel(float x,

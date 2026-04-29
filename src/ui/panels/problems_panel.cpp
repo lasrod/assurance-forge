@@ -1,7 +1,8 @@
-#include "ui/panels/problems_panel.h"
+﻿#include "ui/panels/problems_panel.h"
 
 #include "ui/theme.h"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -53,6 +54,22 @@ ImVec4 SeverityColor(core::ProblemSeverity severity) {
     return ImGui::ColorConvertU32ToFloat4(theme.text_primary);
 }
 
+void DrawHeader(bool ai_review_running, const ProblemsPanelCallbacks& callbacks) {
+    ImGui::TextUnformatted("Problems");
+
+    const char* label = ai_review_running ? "AI Review..." : "AI Review";
+    const float button_width = ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float right_edge = ImGui::GetWindowContentRegionMax().x;
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), right_edge - button_width));
+
+    if (ai_review_running) ImGui::BeginDisabled();
+    if (ImGui::Button(label, ImVec2(button_width, 0.0f)) && callbacks.on_ai_review_requested) {
+        callbacks.on_ai_review_requested();
+    }
+    if (ai_review_running) ImGui::EndDisabled();
+}
+
 void DrawFilterButton(const FilterButtonSpec& spec,
                       int count,
                       ui::ProblemFilter& active_filter) {
@@ -84,9 +101,9 @@ void DrawFilters(const std::vector<core::ProblemItem>& problems, ui::ProblemFilt
         { ui::ProblemFilter::Info, "Info" },
     };
 
-    for (int i = 0; i < 5; ++i) {
-        if (i > 0) ImGui::SameLine();
-        DrawFilterButton(specs[i], CountMatches(problems, specs[i].filter), active_filter);
+    for (int index = 0; index < 5; ++index) {
+        if (index > 0) ImGui::SameLine();
+        DrawFilterButton(specs[index], CountMatches(problems, specs[index].filter), active_filter);
     }
 }
 
@@ -165,6 +182,8 @@ void ShowProblemsPanel(float x,
     const std::vector<core::ProblemItem>& problems = model.problems_manager.GetProblems();
     ClearRemovedSelection(problems, model.ui_state);
 
+    DrawHeader(model.ai_review_running, callbacks);
+    ImGui::Separator();
     DrawFilters(problems, model.ui_state.active_problem_filter);
     ImGui::Separator();
 

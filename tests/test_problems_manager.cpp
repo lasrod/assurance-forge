@@ -109,6 +109,20 @@ TEST(ProblemsManagerTest, ClearsProblemsForElement) {
     EXPECT_TRUE(manager.GetProblemById("p3").has_value());
 }
 
+TEST(ProblemsManagerTest, ClearsProblemsForElementAndSourceOnly) {
+    core::ProblemsManager manager;
+    manager.AddProblem(MakeProblem("ai-g1", core::ProblemSeverity::Warning, core::ProblemSource::AIReview, "G-1"));
+    manager.AddProblem(MakeProblem("validation-g1", core::ProblemSeverity::Error, core::ProblemSource::ModelValidation, "G-1"));
+    manager.AddProblem(MakeProblem("ai-g2", core::ProblemSeverity::Info, core::ProblemSource::AIReview, "G-2"));
+
+    manager.ClearProblemsForElementAndSource("G-1", core::ProblemSource::AIReview);
+
+    ASSERT_EQ(manager.GetProblems().size(), 2u);
+    EXPECT_FALSE(manager.GetProblemById("ai-g1").has_value());
+    EXPECT_TRUE(manager.GetProblemById("validation-g1").has_value());
+    EXPECT_TRUE(manager.GetProblemById("ai-g2").has_value());
+}
+
 TEST(ProblemsManagerTest, ClearsAllProblems) {
     core::ProblemsManager manager;
     manager.AddProblem(MakeProblem("p1", core::ProblemSeverity::Info, core::ProblemSource::Manual, "G-1"));

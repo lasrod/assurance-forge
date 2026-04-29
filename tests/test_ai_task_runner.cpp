@@ -35,3 +35,38 @@ TEST(AiTaskRunnerTest, CapturesThrownExceptionAsError) {
     EXPECT_EQ(latest.state, ai::AiTaskState::Error);
     EXPECT_EQ(latest.status.errorCode, ai::AiErrorCode::Unknown);
 }
+
+TEST(AiTaskRunnerTest, RunsGenerateTaskAndCapturesResponse) {
+    ai::AiTaskRunner runner;
+    auto handle = runner.RunGenerate([]() {
+        ai::AiResponse response;
+        response.success = true;
+        response.text = R"({"findings":[]})";
+        return response;
+    });
+
+    bool completed = handle->WaitUntilComplete(std::chrono::milliseconds(5000));
+    EXPECT_TRUE(completed);
+
+    ai::AiTaskSnapshot latest = handle->Snapshot();
+    EXPECT_EQ(latest.state, ai::AiTaskState::Success);
+    EXPECT_TRUE(latest.response.success);
+    EXPECT_EQ(latest.response.text, R"({"findings":[]})");
+}
+
+TEST(AiTaskRunnerTest, GenerateExceptionBecomesErrorResponse) {
+    ai::AiTaskRunner runner;
+    auto handle = runner.RunGenerate([]() -> ai::AiResponse {
+        throw std::runtime_error("generate failed");
+    });
+
+    bool completed = handle->WaitUntilComplete(std::chrono::milliseconds(5000));
+    EXPECT_TRUE(completed);
+
+    ai::AiTaskSnapshot latest = handle->Snapshot();
+    EXPECT_EQ(latest.state, ai::AiTaskState::Error);
+    EXPECT_FALSE(latest.response.success);
+    EXPECT_EQ(latest.response.errorCode, ai::AiErrorCode::Unknown);
+    EXPECT_EQ(latest.response.errorMessage, "generate failed");
+}
+

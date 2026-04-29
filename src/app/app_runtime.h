@@ -56,6 +56,7 @@ private:
     void RenderProjectLoadReportModal();
     void RenderSaveBeforeExitModal(bool& done);
     void RenderPreferencesWindow();
+    void RenderAiReviewDebugModal();
 
     void BeginCreateProject();
     void BeginOpenProject();
@@ -68,6 +69,9 @@ private:
     void RequestExit(bool& done);
 
     void RebuildDerivedViewsIfNeeded();
+    void BeginAiReviewForSelection();
+    void StartPendingAiReviewRequest();
+    void PollAiReviewTask();
 
 private:
     struct Impl;
