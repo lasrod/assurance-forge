@@ -459,6 +459,7 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
 
     // Step 4: Compute row Y positions (variable height from Group2 stacking and tall nodes)
     std::vector<float> row_y(max_row + 1, 0.0f);
+    std::vector<float> row_heights(max_row + 1, node_height);
     float cumulative_y = top_margin;
     for (int row = 0; row <= max_row; ++row) {
         row_y[row] = cumulative_y;
@@ -467,8 +468,8 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
         if (stack_it != row_group2_stack_height.end()) {
             group2_height = stack_it->second;
         }
-        float row_height = std::max(row_max_height[row], group2_height);
-        cumulative_y += row_height + v_spacing;
+        row_heights[row] = std::max(row_max_height[row], group2_height);
+        cumulative_y += row_heights[row] + v_spacing;
     }
 
     // Step 5: Convert grid positions to pixel positions
@@ -490,12 +491,18 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
 
         float x = left_margin + placement.grid_pos.column * column_unit
             + (node_width - layout_node.size.x) * 0.5f;
-        float y = row_y[placement.grid_pos.row];
+        const float row_height = row_heights[placement.grid_pos.row];
+        float y = row_y[placement.grid_pos.row]
+            + std::max(0.0f, (row_height - layout_node.size.y) * 0.5f);
 
         if (placement.is_group2) {
             auto offset_it = group2_stack_offsets.find(placement.node->id);
             if (offset_it != group2_stack_offsets.end()) {
-                y += offset_it->second;
+                const std::string stack_key = Group2StackKey(placement);
+                const float stack_height = group2_stack_heights[stack_key];
+                y = row_y[placement.grid_pos.row]
+                    + std::max(0.0f, (row_height - stack_height) * 0.5f)
+                    + offset_it->second;
             }
         }
 
