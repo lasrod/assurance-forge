@@ -119,7 +119,12 @@ Theme MakeThemeFromStyle() {
 
 const Theme& GetTheme() {
     static Theme theme;
-    theme = MakeThemeFromStyle();
+    static int cached_frame = -1;
+    int current_frame = (ImGui::GetCurrentContext() != nullptr) ? ImGui::GetFrameCount() : -1;
+    if (current_frame != cached_frame) {
+        theme = MakeThemeFromStyle();
+        cached_frame = current_frame;
+    }
     return theme;
 }
 

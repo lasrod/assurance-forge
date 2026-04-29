@@ -151,7 +151,7 @@ void ShowPreferencesWindow(bool& open,
 
     SyncModelBuffer(model);
     ImGui::SetNextWindowSize(ImVec2(560.0f, 0.0f), ImGuiCond_Appearing);
-    if (ImGui::Begin(ui::Tr(ui::MessageId::Preferences), &open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
+    if (ImGui::Begin(ui::Tr(ui::MessageId::PreferencesTitle), &open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
         RenderAppearanceSection(model, callbacks);
         ImGui::Spacing();
         RenderAiSection(model, callbacks);

@@ -572,22 +572,22 @@ void ShowGsnCanvasContent(UiState& ui_state,
             // Only show when model has translations
             if (ui_state.show_secondary_language || ui_state.model_has_translations) {
                 ImVec2 child_size_lang = ImGui::GetWindowSize();
-                                float lang_btn_w = DpiSize(36.0f);
-                                float lang_btn_h = DpiSize(24.0f);
-                                float lang_margin = DpiSize(12.0f);
+                float lang_btn_w = DpiSize(36.0f);
+                float lang_btn_h = DpiSize(24.0f);
+                float lang_margin = DpiSize(12.0f);
                 float lang_x = child_pos.x + child_size_lang.x - (lang_btn_w + lang_margin);
-                                float lang_y = child_pos.y + child_size_lang.y
-                                                         - (DpiSize(28.0f) + lang_margin) - lang_btn_h - DpiSize(6.0f);
+                float lang_y = child_pos.y + child_size_lang.y
+                               - (DpiSize(28.0f) + lang_margin) - lang_btn_h - DpiSize(6.0f);
 
                 ImDrawList* fg_lang = ImGui::GetWindowDrawList();
-                                fg_lang->AddRectFilled(ImVec2(lang_x - DpiSize(4.0f), lang_y - DpiSize(3.0f)),
-                                                                             ImVec2(lang_x + lang_btn_w + DpiSize(4.0f),
-                                                                                            lang_y + lang_btn_h + DpiSize(3.0f)),
-                                                                             WithAlpha(GetTheme().surface_2, 0.85f), DpiSize(8.0f));
-                                fg_lang->AddRect(ImVec2(lang_x - DpiSize(4.0f), lang_y - DpiSize(3.0f)),
-                                                                 ImVec2(lang_x + lang_btn_w + DpiSize(4.0f),
-                                                                                lang_y + lang_btn_h + DpiSize(3.0f)),
-                                                                 GetTheme().border, DpiSize(8.0f), 0, DpiSize(1.0f));
+                fg_lang->AddRectFilled(ImVec2(lang_x - DpiSize(4.0f), lang_y - DpiSize(3.0f)),
+                                       ImVec2(lang_x + lang_btn_w + DpiSize(4.0f),
+                                              lang_y + lang_btn_h + DpiSize(3.0f)),
+                                       WithAlpha(GetTheme().surface_2, 0.85f), DpiSize(8.0f));
+                fg_lang->AddRect(ImVec2(lang_x - DpiSize(4.0f), lang_y - DpiSize(3.0f)),
+                                 ImVec2(lang_x + lang_btn_w + DpiSize(4.0f),
+                                        lang_y + lang_btn_h + DpiSize(3.0f)),
+                                 GetTheme().border, DpiSize(8.0f), 0, DpiSize(1.0f));
 
                 ImGui::SetCursorScreenPos(ImVec2(lang_x, lang_y));
                 // Show "EN" when primary, or the active secondary language code (uppercased)

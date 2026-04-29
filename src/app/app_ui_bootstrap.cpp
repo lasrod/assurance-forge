@@ -34,6 +34,7 @@ void ConfigureImGuiFonts() {
 
     HelloImGui::FontLoadingParams bold_params;
     bold_params.fontConfig.PixelSnapH = true;
+    bold_params.fontConfig.GlyphRanges = io.Fonts->GetGlyphRangesJapanese();
     ImFont* bold_font = HelloImGui::LoadFont("fonts/NotoSansJP-Bold.otf", kFontSize, bold_params);
 
     ui::gsn::g_BoldFont = bold_font;

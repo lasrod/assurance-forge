@@ -21,6 +21,7 @@ enum class MessageId {
     NewJ3377CaeRegister,
     EditMenu,
     Preferences,
+    PreferencesTitle,
     ViewMenu,
     GsnCanvas,
     CseRegister,

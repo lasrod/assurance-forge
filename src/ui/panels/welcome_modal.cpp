@@ -132,7 +132,7 @@ void ShowWelcomeModal(bool& is_open,
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImVec2 viewport_center(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f,
                            viewport->WorkPos.y + viewport->WorkSize.y * 0.5f);
-    ImGui::SetNextWindowPos(viewport_center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowPos(viewport_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     ImVec2 viewport_size = viewport->WorkSize;
     ImGui::SetNextWindowSize(ImVec2(std::min(1080.0f, std::max(360.0f, viewport_size.x - 40.0f)),
                                     std::min(680.0f, std::max(360.0f, viewport_size.y - 40.0f))),
