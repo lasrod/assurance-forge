@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include "imgui.h"
 #include "core/assurance_tree.h"
 #include "parser/xml_parser.h"
 #include "ui/gsn/gsn_layout.h"
@@ -9,6 +10,56 @@
 
 using namespace core;
 using namespace parser;
+
+class ScopedImGuiFrame {
+public:
+    ScopedImGuiFrame() : previous_(ImGui::GetCurrentContext()) {
+        context_ = ImGui::CreateContext();
+        ImGui::SetCurrentContext(context_);
+        ImGui::GetIO().DisplaySize = ImVec2(1200.0f, 800.0f);
+        unsigned char* pixels = nullptr;
+        int width = 0;
+        int height = 0;
+        ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+        ImGui::NewFrame();
+    }
+
+    ~ScopedImGuiFrame() {
+        ImGui::EndFrame();
+        ImGui::DestroyContext(context_);
+        if (previous_) {
+            ImGui::SetCurrentContext(previous_);
+        }
+    }
+
+private:
+    ImGuiContext* previous_ = nullptr;
+    ImGuiContext* context_ = nullptr;
+};
+
+static TreeNode* add_layout_node(AssuranceTree& tree,
+                                 const std::string& id,
+                                 NodeRole role,
+                                 ElementGroup group,
+                                 const std::string& label) {
+    auto node = std::make_unique<TreeNode>();
+    node->id = id;
+    node->role = role;
+    node->group = group;
+    node->label = label;
+    TreeNode* raw_node = node.get();
+    tree.nodes.push_back(std::move(node));
+    return raw_node;
+}
+
+static std::string long_layout_label(const std::string& id) {
+    return id + ": Long label\n"
+           "This element contains a detailed safety argument explanation that needs enough "
+           "room to wrap cleanly after HiDPI font scaling. The layout should widen the node "
+           "before allowing it to become a tall narrow shape, because narrow GSN elements are "
+           "hard to read and make nearby canvas elements overlap. The text is intentionally "
+           "long so the measured bounds exercise both horizontal growth and vertical growth.";
+}
 
 static AssuranceTree build_tree(const char* xml) {
     ParseResult r = parse_sacm_xml_string(xml);
@@ -158,6 +209,65 @@ static bool rects_overlap(ImVec2 pos1, ImVec2 size1, ImVec2 pos2, ImVec2 size2) 
     float l1 = pos1.x, r1 = pos1.x + size1.x, t1 = pos1.y, b1 = pos1.y + size1.y;
     float l2 = pos2.x, r2 = pos2.x + size2.x, t2 = pos2.y, b2 = pos2.y + size2.y;
     return l1 < r2 && r1 > l2 && t1 < b2 && b1 > t2;
+}
+
+TEST(LayoutTest, LongNonSolutionLabelsGrowHorizontally) {
+    ScopedImGuiFrame imgui_frame;
+
+    struct RoleCase {
+        NodeRole role;
+        ElementGroup group;
+        const char* id;
+    };
+
+    const RoleCase cases[] = {
+        {NodeRole::Claim, ElementGroup::Group1, "Claim"},
+        {NodeRole::Strategy, ElementGroup::Group1, "Strategy"},
+        {NodeRole::Context, ElementGroup::Group2, "Context"},
+        {NodeRole::Assumption, ElementGroup::Group2, "Assumption"},
+        {NodeRole::Justification, ElementGroup::Group2, "Justification"},
+    };
+
+    for (const auto& role_case : cases) {
+        AssuranceTree tree;
+        TreeNode* node = add_layout_node(tree, role_case.id, role_case.role, role_case.group,
+                                         long_layout_label(role_case.id));
+        tree.root = node;
+
+        ui::gsn::LayoutEngine engine;
+        auto layout = engine.ComputeLayout(tree);
+        ASSERT_EQ(layout.size(), 1u) << role_case.id;
+        EXPECT_GT(layout[0].size.x, 220.0f) << role_case.id;
+        EXPECT_GE(layout[0].size.y, 100.0f) << role_case.id;
+    }
+}
+
+TEST(LayoutTest, WideGroup2AttachmentNoOverlapWithParent) {
+    ScopedImGuiFrame imgui_frame;
+
+    AssuranceTree tree;
+    TreeNode* parent = add_layout_node(tree, "Parent", NodeRole::Claim, ElementGroup::Group1,
+                                       "Parent: Claim");
+    TreeNode* context = add_layout_node(tree, "Context", NodeRole::Context, ElementGroup::Group2,
+                                        long_layout_label("Context"));
+    context->parent = parent;
+    parent->group2_attachments.push_back(context);
+    tree.root = parent;
+
+    ui::gsn::LayoutEngine engine;
+    auto layout = engine.ComputeLayout(tree);
+
+    const ui::gsn::LayoutNode* parent_node = nullptr;
+    const ui::gsn::LayoutNode* context_node = nullptr;
+    for (const auto& ln : layout) {
+        if (ln.id == "Parent") parent_node = &ln;
+        if (ln.id == "Context") context_node = &ln;
+    }
+    ASSERT_NE(parent_node, nullptr);
+    ASSERT_NE(context_node, nullptr);
+    EXPECT_GT(context_node->size.x, 220.0f);
+    EXPECT_FALSE(rects_overlap(parent_node->position, parent_node->size,
+                               context_node->position, context_node->size));
 }
 
 TEST(LayoutTest, Group2AttachmentNoOverlapWithSibling) {

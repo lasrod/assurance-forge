@@ -29,10 +29,82 @@ static constexpr float kParallelogramSkew  = 0.15f;  // fraction of width for St
 static constexpr float kCircleTextInset    = 0.29f;  // fraction of radius for circle text area
 static constexpr float kStadiumTextInset   = 0.15f;  // fraction of height for stadium text inset
 static constexpr float kCircleTextRatio    = 0.7f;   // effective text height as fraction of circle diameter
+static constexpr float kNodeWidthGrowthStep = 20.0f;
+static constexpr float kMaxNodeWidth        = 460.0f;
+static constexpr float kMaxStadiumWidth     = 520.0f;
+
+static bool is_stadium_role(core::NodeRole role) {
+    return role == core::NodeRole::Context ||
+           role == core::NodeRole::Assumption ||
+           role == core::NodeRole::Justification;
+}
+
+static float max_width_for_role(core::NodeRole role) {
+    return is_stadium_role(role) ? kMaxStadiumWidth : kMaxNodeWidth;
+}
+
+static float preferred_height_ratio_for_role(core::NodeRole role) {
+    if (is_stadium_role(role)) return 0.45f;
+    if (role == core::NodeRole::Strategy) return 0.55f;
+    return 0.65f;
+}
+
+static float ComputeTextWrapWidth(core::NodeRole role, float width, float height) {
+    float text_wrap = width - kTextPadding * 2.0f;
+    if (role == core::NodeRole::Strategy) {
+        float skew = width * kParallelogramSkew;
+        text_wrap = width - skew * 2.0f - kTextPadding * 2.0f;
+    } else if (role == core::NodeRole::Solution) {
+        float radius = width * 0.5f;
+        float inset = radius * kCircleTextInset;
+        text_wrap = (radius - inset) * 2.0f - kTextPadding * 2.0f;
+    } else if (is_stadium_role(role)) {
+        float inset = height * kStadiumTextInset;
+        text_wrap = width - inset * 2.0f - kTextPadding * 2.0f;
+    }
+    return std::max(text_wrap, kMinTextWrap);
+}
+
+static float MeasureLabelHeight(const std::string& label,
+                                float font_size,
+                                float text_wrap,
+                                ImFont* bold_font,
+                                ImFont* normal_font) {
+    const char* label_start = label.c_str();
+    const char* first_newline = strchr(label_start, '\n');
+    ImVec2 bold_text_size(0, 0);
+    ImVec2 rest_text_size(0, 0);
+    if (first_newline) {
+        bold_text_size = bold_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, label_start, first_newline);
+        rest_text_size = normal_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, first_newline + 1, nullptr);
+    } else {
+        bold_text_size = bold_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, label_start, nullptr);
+    }
+    return bold_text_size.y + rest_text_size.y;
+}
+
+static float ComputeRequiredHeight(const std::string& label,
+                                   core::NodeRole role,
+                                   float width,
+                                   float base_height,
+                                   float font_size,
+                                   ImFont* bold_font,
+                                   ImFont* normal_font) {
+    float height = base_height;
+    for (int i = 0; i < 6; ++i) {
+        float text_wrap = ComputeTextWrapWidth(role, width, height);
+        float required_height = MeasureLabelHeight(label, font_size, text_wrap, bold_font, normal_font)
+                              + kTextPadding * 2.0f;
+        float next_height = std::max(base_height, required_height);
+        if (std::fabs(next_height - height) < 0.5f) return next_height;
+        height = next_height;
+    }
+    return height;
+}
 
 // ===== Compute node size based on text content =====
 // Measures text using ImGui font metrics and returns the required node dimensions.
-// Width stays fixed at the base size; height grows if text overflows.
+// Nodes grow horizontally before becoming tall so wrapped text keeps a readable shape.
 static ImVec2 ComputeNodeSize(const std::string& label, core::NodeRole role) {
     bool is_solution = (role == core::NodeRole::Solution);
     float base_width  = is_solution ? kSolutionWidth : kNodeWidth;
@@ -47,45 +119,33 @@ static ImVec2 ComputeNodeSize(const std::string& label, core::NodeRole role) {
     ImFont* bold_font   = g_BoldFont ? g_BoldFont : ImGui::GetFont();
     ImFont* normal_font = ImGui::GetFont();
 
-    // Compute text wrap width matching the drawing insets in gsn_canvas.cpp
-    float text_wrap = base_width - kTextPadding * 2.0f;
-    if (role == core::NodeRole::Strategy) {
-        float skew = base_width * kParallelogramSkew;
-        text_wrap = base_width - skew * 2.0f - kTextPadding * 2.0f;
-    } else if (is_solution) {
-        float radius = base_width * 0.5f;
-        float inset = radius * kCircleTextInset;
-        text_wrap = (radius - inset) * 2.0f - kTextPadding * 2.0f;
-    } else if (role == core::NodeRole::Context || role == core::NodeRole::Assumption || role == core::NodeRole::Justification) {
-        float inset = base_height * kStadiumTextInset;
-        text_wrap = base_width - inset * 2.0f - kTextPadding * 2.0f;
-    }
-    if (text_wrap < kMinTextWrap) text_wrap = kMinTextWrap;
-
-    // Measure text height (bold first line + normal rest)
-    const char* label_start = label.c_str();
-    const char* first_newline = strchr(label_start, '\n');
-    ImVec2 bold_text_size(0, 0);
-    ImVec2 rest_text_size(0, 0);
-    if (first_newline) {
-        bold_text_size = bold_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, label_start, first_newline);
-        rest_text_size = normal_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, first_newline + 1, nullptr);
-    } else {
-        bold_text_size = bold_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, label_start, nullptr);
-    }
-    float required_text_height = bold_text_size.y + rest_text_size.y + kTextPadding * 2.0f;
-
-    // Grow height if text overflows, keeping width fixed
-    float final_height = base_height;
     if (is_solution) {
         // For circles, grow diameter so text area (kCircleTextRatio * diameter) fits
+        float text_wrap = ComputeTextWrapWidth(role, base_width, base_height);
+        float required_text_height = MeasureLabelHeight(label, font_size, text_wrap, bold_font, normal_font)
+                                   + kTextPadding * 2.0f;
+        float final_height = base_height;
         float needed_diameter = required_text_height / kCircleTextRatio;
         if (needed_diameter > final_height) final_height = needed_diameter;
         // Keep square (width = height for circles)
         return ImVec2(std::max(base_width, final_height), final_height);
     }
-    if (required_text_height > final_height) final_height = required_text_height;
-    return ImVec2(base_width, final_height);
+
+    float final_width = base_width;
+    float final_height = ComputeRequiredHeight(label, role, final_width, base_height,
+                                               font_size, bold_font, normal_font);
+    const float max_width = max_width_for_role(role);
+    while (final_width < max_width) {
+        float preferred_max_height = std::max(base_height,
+                                             final_width * preferred_height_ratio_for_role(role));
+        if (final_height <= preferred_max_height) break;
+
+        final_width = std::min(max_width, final_width + kNodeWidthGrowthStep);
+        final_height = ComputeRequiredHeight(label, role, final_width, base_height,
+                                             font_size, bold_font, normal_font);
+    }
+
+    return ImVec2(final_width, final_height);
 }
 
 // ===== Helper: map core roles to UI roles =====
@@ -224,6 +284,12 @@ struct NodePlacement {
     int             stack_index; // for Group2: 0-based index in the stacked column
 };
 
+static std::string Group2StackKey(const NodePlacement& placement) {
+    std::string parent_id = placement.node->parent ? placement.node->parent->id : "";
+    return parent_id + "|" + std::to_string(placement.grid_pos.row) +
+           (placement.is_left_side ? "|L" : "|R");
+}
+
 // Place Group2 attachments for a node at the given row and column,
 // updating placements and tracking the max stack depth per row.
 static void PlaceGroup2Attachments(
@@ -355,13 +421,29 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
     }
 
     std::unordered_map<std::string, ImVec2> node_sizes;
+    std::unordered_map<std::string, float> group2_stack_offsets;
+    std::unordered_map<std::string, float> group2_stack_heights;
+    std::unordered_map<int, float> row_group2_stack_height;
     std::vector<float> row_max_height(max_row + 1, kNodeHeight);
+    float max_node_width = kNodeWidth;
 
     for (const auto& placement : placements) {
         ImVec2 node_size = ComputeNodeSize(placement.node->label, placement.node->role);
         node_sizes[placement.node->id] = node_size;
+        max_node_width = std::max(max_node_width, node_size.x);
         if (!placement.is_group2 && node_size.y > row_max_height[placement.grid_pos.row]) {
             row_max_height[placement.grid_pos.row] = node_size.y;
+        }
+
+        if (placement.is_group2) {
+            std::string key = Group2StackKey(placement);
+            float& stack_height = group2_stack_heights[key];
+            if (stack_height > 0.0f) stack_height += kSideGap;
+            group2_stack_offsets[placement.node->id] = stack_height;
+            stack_height += node_size.y;
+
+            float& row_stack_height = row_group2_stack_height[placement.grid_pos.row];
+            row_stack_height = std::max(row_stack_height, stack_height);
         }
     }
 
@@ -370,18 +452,17 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
     float cumulative_y = kTopMargin;
     for (int row = 0; row <= max_row; ++row) {
         row_y[row] = cumulative_y;
-        int group2_stack_count = 1;
-        auto stack_it = row_max_group2_stack.find(row);
-        if (stack_it != row_max_group2_stack.end()) {
-            group2_stack_count = std::max(group2_stack_count, stack_it->second);
+        float group2_height = 0.0f;
+        auto stack_it = row_group2_stack_height.find(row);
+        if (stack_it != row_group2_stack_height.end()) {
+            group2_height = stack_it->second;
         }
-        float row_height = std::max(row_max_height[row],
-                                    (float)group2_stack_count * (kNodeHeight + kSideGap) - kSideGap);
+        float row_height = std::max(row_max_height[row], group2_height);
         cumulative_y += row_height + kVSpacing;
     }
 
     // Step 5: Convert grid positions to pixel positions
-    float column_unit = kNodeWidth + kHSpacing;
+    float column_unit = max_node_width + kHSpacing;
 
     for (const auto& placement : placements) {
         LayoutNode layout_node;
@@ -397,17 +478,15 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
         layout_node.is_left_side = placement.is_left_side;
         layout_node.side_stack_index = placement.stack_index;
 
-        float x = kLeftMargin + placement.grid_pos.column * column_unit;
-        // Center solution circles within the column
-        bool is_solution = (placement.node->role == core::NodeRole::Solution);
-        if (is_solution) {
-            x += (kNodeWidth - layout_node.size.x) * 0.5f;
-        }
+        float x = kLeftMargin + placement.grid_pos.column * column_unit
+                + (kNodeWidth - layout_node.size.x) * 0.5f;
         float y = row_y[placement.grid_pos.row];
 
         if (placement.is_group2) {
-            // Stack Group2 nodes vertically from the base row position
-            y += (float)placement.stack_index * (kNodeHeight + kSideGap);
+            auto offset_it = group2_stack_offsets.find(placement.node->id);
+            if (offset_it != group2_stack_offsets.end()) {
+                y += offset_it->second;
+            }
         }
 
         layout_node.position = ImVec2(x, y);
