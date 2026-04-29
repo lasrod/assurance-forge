@@ -61,7 +61,7 @@ std::shared_ptr<AiTaskHandle> AiTaskRunner::RunGenerate(std::function<AiResponse
     {
         std::lock_guard<std::mutex> lock(state->mutex);
         state->snapshot.state = AiTaskState::Running;
-        state->snapshot.status = MakeStatus(AiTaskState::Running, AiErrorCode::None, "Running AI review...");
+        state->snapshot.status = MakeStatus(AiTaskState::Running, AiErrorCode::None, "Running AI request...");
     }
 
     auto handle = std::shared_ptr<AiTaskHandle>(new AiTaskHandle(state));
@@ -88,7 +88,7 @@ std::shared_ptr<AiTaskHandle> AiTaskRunner::RunGenerate(std::function<AiResponse
             std::lock_guard<std::mutex> lock(state->mutex);
             state->snapshot.state = response.success ? AiTaskState::Success : AiTaskState::Error;
             state->snapshot.status = response.success
-                ? SuccessStatus("AI review completed.")
+                ? SuccessStatus("AI request completed.")
                 : ErrorStatus(response.errorCode, response.errorMessage.empty() ? ToString(response.errorCode) : response.errorMessage);
             state->snapshot.response = std::move(response);
         }

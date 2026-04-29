@@ -1167,15 +1167,31 @@ void AppRuntime::PollAiReviewTask() {
         return;
     }
 
+    if (!parse_result.reviewedElementId.empty() &&
+        parse_result.reviewedElementId != impl_->pending_ai_review_element_id) {
+        impl_->last_ai_review_parse_error =
+            "AI response reviewed_element_id did not match the requested element.";
+        std::string message = impl_->last_ai_review_parse_error;
+        if (!impl_->last_ai_review_raw_response.empty()) {
+            message += " Raw response: " + TruncateForProblemMessage(impl_->last_ai_review_raw_response);
+        }
+        impl_->problems_manager.AddOrUpdateProblem(MakeAiReviewProblem(
+            "ai-review:" + impl_->pending_ai_review_element_id + ":parse-error",
+            core::ProblemSeverity::Error,
+            impl_->pending_ai_review_element_id,
+            impl_->pending_ai_review_element_type,
+            message));
+        SetStatus("AI review response could not be validated.");
+        return;
+    }
+
     if (parse_result.reviewedElementType.empty()) parse_result.reviewedElementType = impl_->pending_ai_review_element_type;
     for (core::ProblemItem& problem : parse_result.problems) {
         if (problem.type.empty()) problem.type = parse_result.reviewedElementType;
     }
 
-    const std::string reviewed_element_id = parse_result.reviewedElementId.empty()
-        ? impl_->pending_ai_review_element_id
-        : parse_result.reviewedElementId;
-    impl_->problems_manager.ClearProblemsForElementAndSource(reviewed_element_id, core::ProblemSource::AIReview);
+    impl_->problems_manager.ClearProblemsForElementAndSource(
+        impl_->pending_ai_review_element_id, core::ProblemSource::AIReview);
     for (const core::ProblemItem& problem : parse_result.problems) {
         impl_->problems_manager.AddOrUpdateProblem(problem);
     }
