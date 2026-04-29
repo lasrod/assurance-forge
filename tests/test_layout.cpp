@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <gtest/gtest.h>
 #include "imgui.h"
 #include "core/assurance_tree.h"
