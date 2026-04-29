@@ -651,7 +651,6 @@ bool ProjectService::CreateEmptyProject(const std::string& project_name,
     if (!AddSacmFile(project, "main.sacm", main_entry, error)) return false;
 
     report = RefreshFileStatus(project);
-    report.showPopup = true;
     return true;
 }
 
@@ -684,7 +683,6 @@ bool ProjectService::OpenProject(const std::filesystem::path& project_or_manifes
     loaded.lastOpenedWith = "Assurance Forge";
     report = RefreshFileStatus(loaded);
     report.steps.insert(report.steps.begin(), ProjectLoadStep{"Load af.proj", ProjectLoadStepStatus::Passed, manifest.string()});
-    report.showPopup = true;
 
     project = std::move(loaded);
     return true;
@@ -821,7 +819,7 @@ ProjectLoadReport ProjectService::RefreshFileStatus(AssuranceProject& project) {
             (!report.warnings.empty() ? ProjectLoadStepStatus::Warning : ProjectLoadStepStatus::Passed),
             report.has_failures() ? "Project needs attention" :
             (!report.warnings.empty() ? "Project loaded with warnings" : "Project is healthy"));
-    report.showPopup = true;
+    report.showPopup = report.has_failures() || !report.warnings.empty();
     return report;
 }
 

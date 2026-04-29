@@ -35,6 +35,17 @@ bool ContainsFileWithRole(const core::AssuranceProject& project,
     return false;
 }
 
+std::string ReportSummary(const core::ProjectLoadReport& report) {
+    std::string summary;
+    for (const auto& step : report.steps) {
+        summary += step.label + ":" + std::to_string(static_cast<int>(step.status)) + ":" + step.message + "\n";
+    }
+    for (const auto& warning : report.warnings) {
+        summary += "warning:" + warning + "\n";
+    }
+    return summary;
+}
+
 }  // namespace
 
 TEST(ProjectServiceTest, CreateEmptyProjectCreatesRequiredStructureAndManifest) {
@@ -61,6 +72,12 @@ TEST(ProjectServiceTest, CreateEmptyProjectCreatesRequiredStructureAndManifest) 
     EXPECT_TRUE(parser::parse_sacm_xml((root / "arguments" / "main.sacm").string()).success);
     EXPECT_TRUE(ContainsFileWithRole(project, "arguments/main.sacm", core::ProjectFileRole::SacmArgument));
     EXPECT_FALSE(report.steps.empty());
+    EXPECT_FALSE(report.showPopup);
+
+    core::AssuranceProject reopened;
+    core::ProjectLoadReport open_report;
+    ASSERT_TRUE(core::ProjectService::OpenProject(root, reopened, open_report, error)) << error;
+    EXPECT_FALSE(open_report.showPopup) << ReportSummary(open_report);
 }
 
 TEST(ProjectServiceTest, AddProjectFilesNormalizesNamesAndTracksManifestEntries) {
@@ -119,6 +136,7 @@ TEST(ProjectServiceTest, OpenProjectReportsExternallyModifiedAndMissingFiles) {
     ASSERT_NE(evidence_it, reopened.files.end());
     EXPECT_EQ(evidence_it->state, core::ProjectFileState::ModifiedOutsideAssuranceForge);
     EXPECT_FALSE(open_report.warnings.empty());
+    EXPECT_TRUE(open_report.showPopup);
 
     std::filesystem::remove(project.rootPath / entry.relativePath);
     core::ProjectLoadReport missing_report = core::ProjectService::RefreshFileStatus(reopened);
@@ -129,4 +147,5 @@ TEST(ProjectServiceTest, OpenProjectReportsExternallyModifiedAndMissingFiles) {
     ASSERT_NE(evidence_it, reopened.files.end());
     EXPECT_EQ(evidence_it->state, core::ProjectFileState::Missing);
     EXPECT_TRUE(missing_report.has_failures());
+    EXPECT_TRUE(missing_report.showPopup);
 }
