@@ -8,8 +8,8 @@
 
 namespace {
 
-ui::panels::RecentProjectEntry Entry(const std::string& name, const std::filesystem::path& path, int claims) {
-    ui::panels::RecentProjectEntry entry;
+app::RecentProjectEntry Entry(const std::string& name, const std::filesystem::path& path, int claims) {
+    app::RecentProjectEntry entry;
     entry.name = name;
     entry.path = path.u8string();
     entry.claims = claims;
@@ -27,11 +27,11 @@ TEST(RecentProjectsTest, InvalidPreferenceReturnsEmptyList) {
 }
 
 TEST(RecentProjectsTest, SavesAndLoadsRoundTrip) {
-    std::vector<ui::panels::RecentProjectEntry> recent;
+    std::vector<app::RecentProjectEntry> recent;
     app::TouchRecentProject(recent, Entry("Alpha", std::filesystem::temp_directory_path() / "alpha" / "af.proj", 7));
     app::TouchRecentProject(recent, Entry("Beta", std::filesystem::temp_directory_path() / "beta" / "af.proj", 3));
 
-    std::vector<ui::panels::RecentProjectEntry> loaded =
+    std::vector<app::RecentProjectEntry> loaded =
         app::LoadRecentProjectsPreference(app::SaveRecentProjectsPreference(recent));
 
     ASSERT_EQ(loaded.size(), 2u);
@@ -46,7 +46,7 @@ TEST(RecentProjectsTest, SavesAndLoadsRoundTrip) {
 TEST(RecentProjectsTest, TouchMovesDuplicateToFront) {
     const std::filesystem::path manifest = std::filesystem::temp_directory_path() / "same" / "af.proj";
 
-    std::vector<ui::panels::RecentProjectEntry> recent;
+    std::vector<app::RecentProjectEntry> recent;
     app::TouchRecentProject(recent, Entry("Original", manifest, 1));
     app::TouchRecentProject(recent, Entry("Other", std::filesystem::temp_directory_path() / "other" / "af.proj", 2));
     app::TouchRecentProject(recent, Entry("Updated", manifest, 9));
@@ -58,7 +58,7 @@ TEST(RecentProjectsTest, TouchMovesDuplicateToFront) {
 }
 
 TEST(RecentProjectsTest, KeepsOnlyLatestFive) {
-    std::vector<ui::panels::RecentProjectEntry> recent;
+    std::vector<app::RecentProjectEntry> recent;
     for (int index = 0; index < 7; ++index) {
         app::TouchRecentProject(
             recent,
@@ -76,7 +76,7 @@ TEST(RecentProjectsTest, RemoveDeletesMatchingPath) {
     const std::filesystem::path keep = std::filesystem::temp_directory_path() / "keep" / "af.proj";
     const std::filesystem::path remove = std::filesystem::temp_directory_path() / "remove" / "af.proj";
 
-    std::vector<ui::panels::RecentProjectEntry> recent;
+    std::vector<app::RecentProjectEntry> recent;
     app::TouchRecentProject(recent, Entry("Keep", keep, 1));
     app::TouchRecentProject(recent, Entry("Remove", remove, 2));
 

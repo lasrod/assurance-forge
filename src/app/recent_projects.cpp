@@ -12,8 +12,6 @@
 namespace app {
 namespace {
 
-using ui::panels::RecentProjectEntry;
-
 std::string RecentProjectKey(const std::string& path) {
     std::string key = NormalizeRecentProjectPath(path);
 #ifdef _WIN32
