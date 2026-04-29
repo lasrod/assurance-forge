@@ -169,6 +169,7 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/app/app_ui_bootstrap.cpp
     src/app/app_runtime.cpp
     src/app/native_file_dialogs.cpp
+    src/app/recent_projects.cpp
     src/parser/guidelines_parser.cpp
     ${ASSURANCE_FORGE_SHARED_SOURCES}
 )
@@ -208,6 +209,7 @@ add_executable(tests
     tests/test_ai_task_runner.cpp
     tests/test_guidelines_parser.cpp
     tests/test_localization.cpp
+    tests/test_recent_projects.cpp
     src/ai/ai_service.cpp
     src/ai/ai_claim_review.cpp
     src/ai/ai_settings.cpp
@@ -216,6 +218,7 @@ add_executable(tests
     src/ai/http_client.cpp
     src/ai/openai_provider.cpp
     src/ai/secret_store.cpp
+    src/app/recent_projects.cpp
     src/parser/guidelines_parser.cpp
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp

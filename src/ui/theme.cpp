@@ -119,11 +119,15 @@ Theme MakeThemeFromStyle() {
 
 const Theme& GetTheme() {
     static Theme theme;
+    static bool initialized = false;
     static int cached_frame = -1;
-    int current_frame = (ImGui::GetCurrentContext() != nullptr) ? ImGui::GetFrameCount() : -1;
-    if (current_frame != cached_frame) {
-        theme = MakeThemeFromStyle();
+    const bool has_context = (ImGui::GetCurrentContext() != nullptr);
+    const int current_frame = has_context ? ImGui::GetFrameCount() : -1;
+
+    if (!initialized || current_frame != cached_frame) {
+        theme = has_context ? MakeThemeFromStyle() : MakeFallbackTheme();
         cached_frame = current_frame;
+        initialized = true;
     }
     return theme;
 }

@@ -11,6 +11,7 @@
 #endif
 
 #include "app/native_file_dialogs.h"
+#include "app/recent_projects.h"
 
 #include "ai/ai_claim_review.h"
 #include "ai/ai_service.h"
@@ -25,6 +26,7 @@
 #include "core/app_state.h"
 #include "core/element_factory.h"
 #include "core/problems/problems_manager.h"
+#include "core/project_service.h"
 #include "parser/guidelines_parser.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas.h"
@@ -47,6 +49,7 @@
 #include <memory>
 #include <string>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 namespace app {
@@ -188,6 +191,30 @@ bool IsProjectManifestPath(const std::filesystem::path& path) {
     return LowercaseAscii(path.filename().string()) == "af.proj";
 }
 
+ui::panels::RecentProjectEntry MakeRecentProjectEntry(const core::AppState& app_state) {
+    ui::panels::RecentProjectEntry entry;
+    if (!app_state.current_project.has_value()) return entry;
+
+    const core::AssuranceProject& project = app_state.current_project.value();
+    entry.name = project.name;
+    entry.path = core::ProjectService::ManifestPath(project).u8string();
+
+    if (!app_state.loaded_case.has_value()) return entry;
+    for (const parser::SacmElement& element : app_state.loaded_case->elements) {
+        const std::string type = LowercaseAscii(element.type);
+        if (type == "claim") {
+            ++entry.claims;
+        } else if (type == "argumentreasoning") {
+            ++entry.strategies;
+        } else if (type == "artifact" || type == "artifactreference") {
+            ++entry.evidence;
+        }
+        if (element.undeveloped) ++entry.undeveloped;
+    }
+
+    return entry;
+}
+
 }  // namespace
 
 struct AppRuntime::Impl {
@@ -237,13 +264,13 @@ struct AppRuntime::Impl {
     bool show_startup_project_window = true;
 
     bool show_create_project_modal = false;
-    bool show_open_project_modal = false;
     bool show_project_file_name_modal = false;
     ProjectFileCreateKind pending_project_file_kind = ProjectFileCreateKind::Sacm;
     char project_name_buf[128] = "MySafetyCase";
     char project_parent_buf[kPathBufferSize] = ".";
     char open_project_path_buf[kPathBufferSize] = "";
     char project_file_name_buf[256] = "main.sacm";
+    std::vector<ui::panels::RecentProjectEntry> recent_projects;
     bool show_save_before_exit_modal = false;
     bool close_requested = false;
 
@@ -1248,28 +1275,59 @@ void AppRuntime::RenderRemoveConfirmModal() {
 }
 
 void AppRuntime::RenderStartupProjectWindow() {
-    // TODO: Populate from persisted recent-projects list. Placeholder data shown for now.
-    static const std::vector<ui::panels::RecentProjectEntry> kDemoRecent = {
-        { "Open Autonomy Safety Case", "data/oasc-ja.xml", 42, 9, 16, 3 },
-    };
     ui::panels::WelcomeModalCallbacks callbacks{
         [this]() { BeginCreateProject(); },
         [this]() { ShowNotImplementedModal("Create Assurance Project from Template"); },
         [this]() { BeginOpenProject(); },
         [this]() { ShowNotImplementedModal("Import SACM"); },
-        [this](const ui::panels::RecentProjectEntry& /*entry*/) {
-            BeginOpenProject();
+        [this](const ui::panels::RecentProjectEntry& entry) {
+            if (!TryOpenProjectManifest(entry.path)) {
+                RemoveRecentProject(impl_->recent_projects, entry.path);
+            }
         },
     };
-    ui::panels::ShowWelcomeModal(impl_->show_startup_project_window, kDemoRecent, callbacks);
+    ui::panels::ShowWelcomeModal(impl_->show_startup_project_window, impl_->recent_projects, callbacks);
 }
 
 void AppRuntime::BeginCreateProject() {
-    impl_->show_create_project_modal = true;
+    std::string selected_path;
+    std::string error_message;
+    const dialogs::DialogResult result = dialogs::BrowseForProjectParentFolder(
+        impl_->project_parent_buf, selected_path, error_message);
+    if (result == dialogs::DialogResult::Selected) {
+        CopyToBuffer(impl_->project_parent_buf, sizeof(impl_->project_parent_buf), selected_path);
+        if (impl_->project_name_buf[0] == '\0') {
+            CopyToBuffer(impl_->project_name_buf, sizeof(impl_->project_name_buf), "MySafetyCase");
+        }
+        impl_->show_create_project_modal = true;
+    } else if (result == dialogs::DialogResult::Failed) {
+        SetStatus("Browse failed: " + error_message);
+    }
 }
 
 void AppRuntime::BeginOpenProject() {
-    impl_->show_open_project_modal = true;
+    std::string default_path = impl_->open_project_path_buf;
+    if (default_path.empty() && !impl_->recent_projects.empty()) {
+        default_path = impl_->recent_projects.front().path;
+    }
+
+    std::string selected_path;
+    std::string error_message;
+    const dialogs::DialogResult result = dialogs::BrowseForProjectManifest(
+        default_path, selected_path, error_message);
+    if (result == dialogs::DialogResult::Selected) {
+        CopyToBuffer(impl_->open_project_path_buf, sizeof(impl_->open_project_path_buf), selected_path);
+        TryOpenProjectManifest(selected_path);
+    } else if (result == dialogs::DialogResult::Failed) {
+        SetStatus("Browse failed: " + error_message);
+    }
+}
+
+void AppRuntime::TouchCurrentProjectRecent() {
+    ui::panels::RecentProjectEntry entry = MakeRecentProjectEntry(impl_->app_state);
+    if (!entry.path.empty()) {
+        TouchRecentProject(impl_->recent_projects, std::move(entry));
+    }
 }
 
 void AppRuntime::BeginCreateProjectSacmFile() {
@@ -1354,7 +1412,8 @@ bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {
         return false;
     }
     OpenFirstProjectSacmFile();
-    impl_->show_open_project_modal = false;
+    TouchCurrentProjectRecent();
+    CopyToBuffer(impl_->open_project_path_buf, sizeof(impl_->open_project_path_buf), selected_path);
     ImGui::CloseCurrentPopup();
     return true;
 }
@@ -1369,26 +1428,14 @@ void AppRuntime::RenderCreateProjectModal() {
         ImGui::InputText("##project_name", impl_->project_name_buf, sizeof(impl_->project_name_buf));
 
         ImGui::TextUnformatted("Parent location");
-        ImGui::SetNextItemWidth(330.0f);
-        ImGui::InputText("##project_parent", impl_->project_parent_buf, sizeof(impl_->project_parent_buf));
-        ImGui::SameLine();
-        if (ImGui::Button("Browse...", ImVec2(84.0f, 0.0f))) {
-            std::string selected_path;
-            std::string error_message;
-            const dialogs::DialogResult result = dialogs::BrowseForProjectParentFolder(
-                impl_->project_parent_buf, selected_path, error_message);
-            if (result == dialogs::DialogResult::Selected) {
-                CopyToBuffer(impl_->project_parent_buf, sizeof(impl_->project_parent_buf), selected_path);
-            } else if (result == dialogs::DialogResult::Failed) {
-                SetStatus("Browse failed: " + error_message);
-            }
-        }
+        ImGui::TextDisabled("%s", impl_->project_parent_buf);
 
         ImGui::Spacing();
 
         if (ImGui::Button("Create", ImVec2(110.0f, 0.0f))) {
             if (impl_->app_state.create_empty_project(impl_->project_name_buf, impl_->project_parent_buf)) {
                 OpenFirstProjectSacmFile();
+                TouchCurrentProjectRecent();
                 impl_->show_create_project_modal = false;
                 ImGui::CloseCurrentPopup();
             }
@@ -1401,43 +1448,6 @@ void AppRuntime::RenderCreateProjectModal() {
         ImGui::EndPopup();
     } else if (impl_->show_create_project_modal) {
         ImGui::OpenPopup("Create Empty Assurance Project");
-    }
-}
-
-void AppRuntime::RenderOpenProjectModal() {
-    if (!impl_->show_open_project_modal) return;
-
-    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal("Open Project", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("Select an af.proj file to open");
-        ImGui::SetNextItemWidth(330.0f);
-        ImGui::InputText("##open_project_path", impl_->open_project_path_buf, sizeof(impl_->open_project_path_buf));
-        ImGui::SameLine();
-        if (ImGui::Button("Browse...", ImVec2(84.0f, 0.0f))) {
-            std::string selected_path;
-            std::string error_message;
-            const dialogs::DialogResult result = dialogs::BrowseForProjectManifest(
-                impl_->open_project_path_buf, selected_path, error_message);
-            if (result == dialogs::DialogResult::Selected) {
-                CopyToBuffer(impl_->open_project_path_buf, sizeof(impl_->open_project_path_buf), selected_path);
-                TryOpenProjectManifest(selected_path);
-            } else if (result == dialogs::DialogResult::Failed) {
-                SetStatus("Browse failed: " + error_message);
-            }
-        }
-
-        if (ImGui::Button("Open", ImVec2(110.0f, 0.0f))) {
-            TryOpenProjectManifest(impl_->open_project_path_buf);
-        }
-        ImGui::Spacing();
-
-        if (ImGui::Button("Cancel", ImVec2(110.0f, 0.0f))) {
-            impl_->show_open_project_modal = false;
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    } else if (impl_->show_open_project_modal) {
-        ImGui::OpenPopup("Open Project");
     }
 }
 
@@ -1567,6 +1577,14 @@ const parser::AssuranceCase* AppRuntime::GetLoadedCase() const {
     return &impl_->app_state.loaded_case.value();
 }
 
+void AppRuntime::LoadRecentProjectsPreference(const std::string& content) {
+    impl_->recent_projects = app::LoadRecentProjectsPreference(content);
+}
+
+std::string AppRuntime::RecentProjectsPreferenceJson() const {
+    return app::SaveRecentProjectsPreference(impl_->recent_projects);
+}
+
 void AppRuntime::RenderFrame(bool& done) {
     if (impl_->close_requested) {
         impl_->close_requested = false;
@@ -1627,7 +1645,6 @@ void AppRuntime::RenderFrame(bool& done) {
     RenderNotImplementedModal();
     RenderRemoveConfirmModal();
     RenderCreateProjectModal();
-    RenderOpenProjectModal();
     RenderProjectFileNameModal();
     RenderProjectLoadReportModal();
     RenderSaveBeforeExitModal(done);

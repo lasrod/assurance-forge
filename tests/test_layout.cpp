@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <gtest/gtest.h>
 #include "imgui.h"
 #include "core/assurance_tree.h"
@@ -216,6 +217,26 @@ static bool rects_overlap(ImVec2 pos1, ImVec2 size1, ImVec2 pos2, ImVec2 size2) 
     return l1 < r2 && r1 > l2 && t1 < b2 && b1 > t2;
 }
 
+static const ui::gsn::LayoutNode* find_layout_node(const std::vector<ui::gsn::LayoutNode>& layout,
+                                                   const std::string& id) {
+    for (const auto& layout_node : layout) {
+        if (layout_node.id == id) return &layout_node;
+    }
+    return nullptr;
+}
+
+static float node_center_y(const ui::gsn::LayoutNode& layout_node) {
+    return layout_node.position.y + layout_node.size.y * 0.5f;
+}
+
+static float stack_center_y(const ui::gsn::LayoutNode& first,
+                            const ui::gsn::LayoutNode& second) {
+    const float stack_top = std::min(first.position.y, second.position.y);
+    const float stack_bottom = std::max(first.position.y + first.size.y,
+                                        second.position.y + second.size.y);
+    return (stack_top + stack_bottom) * 0.5f;
+}
+
 TEST(LayoutTest, LongNonSolutionLabelsGrowHorizontally) {
     ScopedImGuiFrame imgui_frame;
 
@@ -317,6 +338,93 @@ TEST(LayoutTest, WideGroup2AttachmentNoOverlapWithParent) {
     EXPECT_GT(context_node->size.x, scaled_size(220.0f));
     EXPECT_FALSE(rects_overlap(parent_node->position, parent_node->size,
                                context_node->position, context_node->size));
+}
+
+TEST(LayoutTest, Group2SideStacksAreCenteredAroundOwner) {
+    ScopedImGuiFrame imgui_frame;
+
+    AssuranceTree tree;
+    TreeNode* parent = add_layout_node(tree, "Parent", NodeRole::Claim, ElementGroup::Group1,
+                                       "Parent: Claim");
+
+    struct AttachmentCase {
+        const char* id;
+        NodeRole role;
+    };
+
+    const AttachmentCase attachment_cases[] = {
+        {"ContextA", NodeRole::Context},
+        {"AssumptionB", NodeRole::Assumption},
+        {"JustificationC", NodeRole::Justification},
+        {"ContextD", NodeRole::Context},
+        {"AssumptionE", NodeRole::Assumption},
+    };
+
+    for (const auto& attachment_case : attachment_cases) {
+        TreeNode* attachment = add_layout_node(tree, attachment_case.id, attachment_case.role,
+                                               ElementGroup::Group2, attachment_case.id);
+        attachment->parent = parent;
+        parent->group2_attachments.push_back(attachment);
+    }
+    tree.root = parent;
+
+    ui::gsn::LayoutEngine engine;
+    auto layout = engine.ComputeLayout(tree);
+
+    const ui::gsn::LayoutNode* parent_node = find_layout_node(layout, "Parent");
+    const ui::gsn::LayoutNode* left_top = find_layout_node(layout, "ContextA");
+    const ui::gsn::LayoutNode* left_middle = find_layout_node(layout, "AssumptionB");
+    const ui::gsn::LayoutNode* left_bottom = find_layout_node(layout, "JustificationC");
+    const ui::gsn::LayoutNode* right_top = find_layout_node(layout, "ContextD");
+    const ui::gsn::LayoutNode* right_bottom = find_layout_node(layout, "AssumptionE");
+
+    ASSERT_NE(parent_node, nullptr);
+    ASSERT_NE(left_top, nullptr);
+    ASSERT_NE(left_middle, nullptr);
+    ASSERT_NE(left_bottom, nullptr);
+    ASSERT_NE(right_top, nullptr);
+    ASSERT_NE(right_bottom, nullptr);
+
+    const float parent_center_y = node_center_y(*parent_node);
+    EXPECT_LT(node_center_y(*left_top), parent_center_y);
+    EXPECT_NEAR(node_center_y(*left_middle), parent_center_y, 1.0f);
+    EXPECT_GT(node_center_y(*left_bottom), parent_center_y);
+    EXPECT_NEAR(stack_center_y(*right_top, *right_bottom), parent_center_y, 1.0f);
+}
+
+TEST(LayoutTest, CenteredGroup2StackExpandsRowBoundsForChildren) {
+    ScopedImGuiFrame imgui_frame;
+
+    AssuranceTree tree;
+    TreeNode* parent = add_layout_node(tree, "Parent", NodeRole::Claim, ElementGroup::Group1,
+                                       "Parent: Claim");
+    TreeNode* child = add_layout_node(tree, "Child", NodeRole::Claim, ElementGroup::Group1,
+                                      "Child: Claim");
+    child->parent = parent;
+    parent->group1_children.push_back(child);
+
+    for (int attachment_index = 0; attachment_index < 5; ++attachment_index) {
+        const std::string id = "Context" + std::to_string(attachment_index);
+        TreeNode* attachment = add_layout_node(tree, id, NodeRole::Context, ElementGroup::Group2, id);
+        attachment->parent = parent;
+        parent->group2_attachments.push_back(attachment);
+    }
+    tree.root = parent;
+
+    ui::gsn::LayoutEngine engine;
+    auto layout = engine.ComputeLayout(tree);
+
+    const ui::gsn::LayoutNode* child_node = find_layout_node(layout, "Child");
+    ASSERT_NE(child_node, nullptr);
+
+    for (int attachment_index = 0; attachment_index < 5; ++attachment_index) {
+        const std::string id = "Context" + std::to_string(attachment_index);
+        const ui::gsn::LayoutNode* attachment_node = find_layout_node(layout, id);
+        ASSERT_NE(attachment_node, nullptr);
+        EXPECT_FALSE(rects_overlap(attachment_node->position, attachment_node->size,
+                                   child_node->position, child_node->size))
+            << id << " overlaps the child row";
+    }
 }
 
 TEST(LayoutTest, Group2AttachmentNoOverlapWithSibling) {

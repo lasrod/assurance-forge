@@ -18,6 +18,9 @@ public:
     void RenderFrame(bool& done);
     void RequestClose();
 
+    void LoadRecentProjectsPreference(const std::string& content);
+    std::string RecentProjectsPreferenceJson() const;
+
     // Add a new child element to the currently selected element.
     // Returns true on success; updates selection to the new element.
     bool AddChildToSelected(core::NewElementKind kind);
@@ -52,7 +55,6 @@ private:
     void RenderNotImplementedModal();
     void RenderRemoveConfirmModal();
     void RenderCreateProjectModal();
-    void RenderOpenProjectModal();
     void RenderProjectFileNameModal();
     void RenderProjectLoadReportModal();
     void RenderSaveBeforeExitModal(bool& done);
@@ -68,6 +70,7 @@ private:
     void OpenProjectFile(const core::ProjectFileEntry& entry);
     bool OpenFirstProjectSacmFile();
     bool TryOpenProjectManifest(const std::string& selected_path);
+    void TouchCurrentProjectRecent();
     bool SaveProject();
     void RequestExit(bool& done);
 

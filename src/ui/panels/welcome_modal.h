@@ -1,19 +1,15 @@
 #pragma once
 
+#include "app/recent_projects.h"
+
 #include <string>
 #include <vector>
 #include <functional>
 
 namespace ui::panels {
 
-struct RecentProjectEntry {
-    std::string name;
-    std::string path;
-    int claims = 0;
-    int strategies = 0;
-    int evidence = 0;
-    int undeveloped = 0;
-};
+using RecentProjectEntry = app::RecentProjectEntry;
+
 struct WelcomeModalCallbacks {
     std::function<void()> create_empty_project;
     std::function<void()> create_project_from_template;
