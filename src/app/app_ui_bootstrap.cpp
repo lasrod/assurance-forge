@@ -21,17 +21,29 @@ void ConfigureImGuiStyle() {
 
 void ConfigureImGuiFonts() {
     constexpr float kFontSize = 15.0f;
-    const ImWchar* jp_ranges = ImGui::GetIO().Fonts->GetGlyphRangesJapanese();
+    ImGuiIO& io = ImGui::GetIO();
+    const ImWchar* jp_ranges = io.Fonts->GetGlyphRangesJapanese();
 
     HelloImGui::FontLoadingParams regular_params;
     regular_params.fontConfig.PixelSnapH = true;
     regular_params.fontConfig.GlyphRanges = jp_ranges;
-    HelloImGui::LoadFont("fonts/NotoSansJP-Regular.otf", kFontSize, regular_params);
+    ImFont* regular_font = HelloImGui::LoadFont("fonts/NotoSansJP-Regular.otf", kFontSize, regular_params);
 
     HelloImGui::FontLoadingParams bold_params;
     bold_params.fontConfig.PixelSnapH = true;
     bold_params.fontConfig.GlyphRanges = jp_ranges;
-    ui::gsn::g_BoldFont = HelloImGui::LoadFont("fonts/NotoSansJP-Bold.otf", kFontSize, bold_params);
+    ImFont* bold_font = HelloImGui::LoadFont("fonts/NotoSansJP-Bold.otf", kFontSize, bold_params);
+
+    ui::gsn::g_BoldFont = bold_font;
+    if (ui::gsn::g_BoldFont == nullptr) {
+        if (regular_font != nullptr) {
+            ui::gsn::g_BoldFont = regular_font;
+        } else if (!io.Fonts->Fonts.empty()) {
+            ui::gsn::g_BoldFont = io.Fonts->Fonts[0];
+        } else {
+            ui::gsn::g_BoldFont = ImGui::GetFont();
+        }
+    }
 }
 
 }  // namespace app

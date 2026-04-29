@@ -15,8 +15,8 @@ std::string AbsoluteFolderForDialog(const std::filesystem::path& path) {
         ec.clear();
         absolute_path = std::filesystem::absolute(path, ec);
     }
-    if (ec || absolute_path.empty()) return path.string();
-    return absolute_path.string();
+    if (ec || absolute_path.empty()) return path.u8string();
+    return absolute_path.u8string();
 }
 
 std::string ExistingFolderForDialog(const std::string& raw_path) {
@@ -26,7 +26,7 @@ std::string ExistingFolderForDialog(const std::string& raw_path) {
 
     if (raw_path.empty()) return AbsoluteFolderForDialog(fallback);
 
-    std::filesystem::path path(raw_path);
+    std::filesystem::path path = std::filesystem::u8path(raw_path);
     if (std::filesystem::is_directory(path, ec)) return AbsoluteFolderForDialog(path);
 
     ec.clear();

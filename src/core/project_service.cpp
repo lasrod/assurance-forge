@@ -54,7 +54,9 @@ std::string NowUtc() {
     auto now = std::chrono::system_clock::now();
     std::time_t time = std::chrono::system_clock::to_time_t(now);
     std::tm utc{};
-    MakeUtcTime(time, utc);
+    if (!MakeUtcTime(time, utc)) {
+        return "1970-01-01T00:00:00Z";
+    }
     std::ostringstream out;
     out << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
     return out.str();
