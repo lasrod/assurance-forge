@@ -1,5 +1,6 @@
 ﻿#include "ui/gsn/gsn_layout.h"
 #include "ui/gsn/gsn_canvas.h" // for g_BoldFont
+#include "ui/gsn/gsn_dpi.h"
 #include <algorithm>
 #include <unordered_map>
 #include <cmath>
@@ -12,7 +13,7 @@ namespace ui::gsn {
 ImFont* g_BoldFont = nullptr;
 
 // ===== Layout constants =====
-static constexpr float kNodeWidth      = 220.0f;  // default node width (px)
+static constexpr float kNodeWidth      = 260.0f;  // default node width (px)
 static constexpr float kNodeHeight     = 100.0f;  // default node height (px)
 static constexpr float kSolutionWidth  = 160.0f;  // circle diameter for Solution/Evidence nodes
 static constexpr float kSolutionHeight = 160.0f;
@@ -50,19 +51,20 @@ static float preferred_height_ratio_for_role(core::NodeRole role) {
 }
 
 static float ComputeTextWrapWidth(core::NodeRole role, float width, float height) {
-    float text_wrap = width - kTextPadding * 2.0f;
+    float text_padding = DpiSize(kTextPadding);
+    float text_wrap = width - text_padding * 2.0f;
     if (role == core::NodeRole::Strategy) {
         float skew = width * kParallelogramSkew;
-        text_wrap = width - skew * 2.0f - kTextPadding * 2.0f;
+        text_wrap = width - skew * 2.0f - text_padding * 2.0f;
     } else if (role == core::NodeRole::Solution) {
         float radius = width * 0.5f;
         float inset = radius * kCircleTextInset;
-        text_wrap = (radius - inset) * 2.0f - kTextPadding * 2.0f;
+        text_wrap = (radius - inset) * 2.0f - text_padding * 2.0f;
     } else if (is_stadium_role(role)) {
         float inset = height * kStadiumTextInset;
-        text_wrap = width - inset * 2.0f - kTextPadding * 2.0f;
+        text_wrap = width - inset * 2.0f - text_padding * 2.0f;
     }
-    return std::max(text_wrap, kMinTextWrap);
+    return std::max(text_wrap, DpiSize(kMinTextWrap));
 }
 
 static float MeasureLabelHeight(const std::string& label,
@@ -94,7 +96,7 @@ static float ComputeRequiredHeight(const std::string& label,
     for (int i = 0; i < 6; ++i) {
         float text_wrap = ComputeTextWrapWidth(role, width, height);
         float required_height = MeasureLabelHeight(label, font_size, text_wrap, bold_font, normal_font)
-                              + kTextPadding * 2.0f;
+                              + DpiSize(kTextPadding) * 2.0f;
         float next_height = std::max(base_height, required_height);
         if (std::fabs(next_height - height) < 0.5f) return next_height;
         height = next_height;
@@ -107,8 +109,8 @@ static float ComputeRequiredHeight(const std::string& label,
 // Nodes grow horizontally before becoming tall so wrapped text keeps a readable shape.
 static ImVec2 ComputeNodeSize(const std::string& label, core::NodeRole role) {
     bool is_solution = (role == core::NodeRole::Solution);
-    float base_width  = is_solution ? kSolutionWidth : kNodeWidth;
-    float base_height = is_solution ? kSolutionHeight : kNodeHeight;
+    float base_width  = DpiSize(is_solution ? kSolutionWidth : kNodeWidth);
+    float base_height = DpiSize(is_solution ? kSolutionHeight : kNodeHeight);
 
     // If no ImGui context (e.g. in unit tests), use base size
     if (!ImGui::GetCurrentContext() || !ImGui::GetFont()) {
@@ -123,7 +125,7 @@ static ImVec2 ComputeNodeSize(const std::string& label, core::NodeRole role) {
         // For circles, grow diameter so text area (kCircleTextRatio * diameter) fits
         float text_wrap = ComputeTextWrapWidth(role, base_width, base_height);
         float required_text_height = MeasureLabelHeight(label, font_size, text_wrap, bold_font, normal_font)
-                                   + kTextPadding * 2.0f;
+                                   + DpiSize(kTextPadding) * 2.0f;
         float final_height = base_height;
         float needed_diameter = required_text_height / kCircleTextRatio;
         if (needed_diameter > final_height) final_height = needed_diameter;
@@ -134,13 +136,13 @@ static ImVec2 ComputeNodeSize(const std::string& label, core::NodeRole role) {
     float final_width = base_width;
     float final_height = ComputeRequiredHeight(label, role, final_width, base_height,
                                                font_size, bold_font, normal_font);
-    const float max_width = max_width_for_role(role);
+    const float max_width = DpiSize(max_width_for_role(role));
     while (final_width < max_width) {
         float preferred_max_height = std::max(base_height,
                                              final_width * preferred_height_ratio_for_role(role));
         if (final_height <= preferred_max_height) break;
 
-        final_width = std::min(max_width, final_width + kNodeWidthGrowthStep);
+        final_width = std::min(max_width, final_width + DpiSize(kNodeWidthGrowthStep));
         final_height = ComputeRequiredHeight(label, role, final_width, base_height,
                                              font_size, bold_font, normal_font);
     }
@@ -424,8 +426,16 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
     std::unordered_map<std::string, float> group2_stack_offsets;
     std::unordered_map<std::string, float> group2_stack_heights;
     std::unordered_map<int, float> row_group2_stack_height;
-    std::vector<float> row_max_height(max_row + 1, kNodeHeight);
-    float max_node_width = kNodeWidth;
+    const float node_width = DpiSize(kNodeWidth);
+    const float node_height = DpiSize(kNodeHeight);
+    const float h_spacing = DpiSize(kHSpacing);
+    const float v_spacing = DpiSize(kVSpacing);
+    const float left_margin = DpiSize(kLeftMargin);
+    const float top_margin = DpiSize(kTopMargin);
+    const float side_gap = DpiSize(kSideGap);
+
+    std::vector<float> row_max_height(max_row + 1, node_height);
+    float max_node_width = node_width;
 
     for (const auto& placement : placements) {
         ImVec2 node_size = ComputeNodeSize(placement.node->label, placement.node->role);
@@ -438,7 +448,7 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
         if (placement.is_group2) {
             std::string key = Group2StackKey(placement);
             float& stack_height = group2_stack_heights[key];
-            if (stack_height > 0.0f) stack_height += kSideGap;
+            if (stack_height > 0.0f) stack_height += side_gap;
             group2_stack_offsets[placement.node->id] = stack_height;
             stack_height += node_size.y;
 
@@ -449,7 +459,7 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
 
     // Step 4: Compute row Y positions (variable height from Group2 stacking and tall nodes)
     std::vector<float> row_y(max_row + 1, 0.0f);
-    float cumulative_y = kTopMargin;
+    float cumulative_y = top_margin;
     for (int row = 0; row <= max_row; ++row) {
         row_y[row] = cumulative_y;
         float group2_height = 0.0f;
@@ -458,11 +468,11 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
             group2_height = stack_it->second;
         }
         float row_height = std::max(row_max_height[row], group2_height);
-        cumulative_y += row_height + kVSpacing;
+        cumulative_y += row_height + v_spacing;
     }
 
     // Step 5: Convert grid positions to pixel positions
-    float column_unit = max_node_width + kHSpacing;
+    float column_unit = max_node_width + h_spacing;
 
     for (const auto& placement : placements) {
         LayoutNode layout_node;
@@ -478,8 +488,8 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
         layout_node.is_left_side = placement.is_left_side;
         layout_node.side_stack_index = placement.stack_index;
 
-        float x = kLeftMargin + placement.grid_pos.column * column_unit
-                + (kNodeWidth - layout_node.size.x) * 0.5f;
+        float x = left_margin + placement.grid_pos.column * column_unit
+            + (node_width - layout_node.size.x) * 0.5f;
         float y = row_y[placement.grid_pos.row];
 
         if (placement.is_group2) {
@@ -499,7 +509,13 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
 // ===== Legacy flat layout (deprecated â€” kept for backwards compatibility) =====
 std::vector<LayoutNode> LayoutEngine::ComputeLayout(const std::vector<CanvasElement>& elements) {
     std::vector<LayoutNode> nodes;
-    const ImVec2 default_size = ImVec2(kNodeWidth, kNodeHeight);
+    const float node_width = DpiSize(kNodeWidth);
+    const float node_height = DpiSize(kNodeHeight);
+    const float h_spacing = DpiSize(kHSpacing);
+    const float v_spacing = DpiSize(kVSpacing);
+    const float left_margin = DpiSize(kLeftMargin);
+    const float top_margin = DpiSize(kTopMargin);
+    const ImVec2 default_size = ImVec2(node_width, node_height);
 
     // Separate claims (top row) from everything else
     std::vector<CanvasElement> claims;
@@ -518,7 +534,7 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const std::vector<CanvasElem
         layout_node.label_secondary = claims[i].label_secondary;
         layout_node.undeveloped = claims[i].undeveloped;
         layout_node.size = default_size;
-        layout_node.position = ImVec2(kLeftMargin + (float)i * (kNodeWidth + kHSpacing), kTopMargin);
+        layout_node.position = ImVec2(left_margin + (float)i * (node_width + h_spacing), top_margin);
         layout_node.parent_id = claims[i].parent_id;
         nodes.push_back(layout_node);
     }
@@ -537,8 +553,8 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const std::vector<CanvasElem
             layout_node.label_secondary = row_elements[i].label_secondary;
             layout_node.undeveloped = row_elements[i].undeveloped;
             layout_node.size = default_size;
-            layout_node.position = ImVec2(kLeftMargin + (float)i * (kNodeWidth + kHSpacing),
-                                          kTopMargin + (float)row_index * (kNodeHeight + kVSpacing));
+            layout_node.position = ImVec2(left_margin + (float)i * (node_width + h_spacing),
+                                          top_margin + (float)row_index * (node_height + v_spacing));
             layout_node.parent_id = row_elements[i].parent_id;
             nodes.push_back(layout_node);
         }

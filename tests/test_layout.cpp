@@ -2,6 +2,7 @@
 #include "imgui.h"
 #include "core/assurance_tree.h"
 #include "parser/xml_parser.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/gsn/gsn_layout.h"
 
 // We test the layout engine indirectly through the tree since the layout
@@ -10,6 +11,10 @@
 
 using namespace core;
 using namespace parser;
+
+static float scaled_size(float reference_pixels) {
+  return ui::gsn::DpiSize(reference_pixels);
+}
 
 class ScopedImGuiFrame {
 public:
@@ -237,9 +242,53 @@ TEST(LayoutTest, LongNonSolutionLabelsGrowHorizontally) {
         ui::gsn::LayoutEngine engine;
         auto layout = engine.ComputeLayout(tree);
         ASSERT_EQ(layout.size(), 1u) << role_case.id;
-        EXPECT_GT(layout[0].size.x, 220.0f) << role_case.id;
-        EXPECT_GE(layout[0].size.y, 100.0f) << role_case.id;
+        EXPECT_GT(layout[0].size.x, scaled_size(260.0f)) << role_case.id;
+        EXPECT_GE(layout[0].size.y, scaled_size(100.0f)) << role_case.id;
     }
+}
+
+TEST(LayoutTest, NonSolutionElementsUseWiderMinimumWidth) {
+    ScopedImGuiFrame imgui_frame;
+
+    struct RoleCase {
+        NodeRole role;
+        ElementGroup group;
+        const char* id;
+    };
+
+    const RoleCase cases[] = {
+        {NodeRole::Claim, ElementGroup::Group1, "Claim"},
+        {NodeRole::Strategy, ElementGroup::Group1, "Strategy"},
+        {NodeRole::Context, ElementGroup::Group2, "Context"},
+        {NodeRole::Assumption, ElementGroup::Group2, "Assumption"},
+        {NodeRole::Justification, ElementGroup::Group2, "Justification"},
+    };
+
+    for (const auto& role_case : cases) {
+        AssuranceTree tree;
+        TreeNode* node = add_layout_node(tree, role_case.id, role_case.role, role_case.group, role_case.id);
+        tree.root = node;
+
+        ui::gsn::LayoutEngine engine;
+        auto layout = engine.ComputeLayout(tree);
+        ASSERT_EQ(layout.size(), 1u) << role_case.id;
+        EXPECT_FLOAT_EQ(layout[0].size.x, scaled_size(260.0f)) << role_case.id;
+        EXPECT_FLOAT_EQ(layout[0].size.y, scaled_size(100.0f)) << role_case.id;
+    }
+}
+
+TEST(LayoutTest, SolutionMinimumSizeIsUnchanged) {
+    ScopedImGuiFrame imgui_frame;
+
+    AssuranceTree tree;
+    TreeNode* node = add_layout_node(tree, "Solution", NodeRole::Solution, ElementGroup::Group1, "Solution");
+    tree.root = node;
+
+    ui::gsn::LayoutEngine engine;
+    auto layout = engine.ComputeLayout(tree);
+    ASSERT_EQ(layout.size(), 1u);
+    EXPECT_FLOAT_EQ(layout[0].size.x, scaled_size(160.0f));
+    EXPECT_FLOAT_EQ(layout[0].size.y, scaled_size(160.0f));
 }
 
 TEST(LayoutTest, WideGroup2AttachmentNoOverlapWithParent) {
@@ -265,7 +314,7 @@ TEST(LayoutTest, WideGroup2AttachmentNoOverlapWithParent) {
     }
     ASSERT_NE(parent_node, nullptr);
     ASSERT_NE(context_node, nullptr);
-    EXPECT_GT(context_node->size.x, 220.0f);
+    EXPECT_GT(context_node->size.x, scaled_size(220.0f));
     EXPECT_FALSE(rects_overlap(parent_node->position, parent_node->size,
                                context_node->position, context_node->size));
 }

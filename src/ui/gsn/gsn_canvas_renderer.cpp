@@ -1,6 +1,7 @@
 ﻿#include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/gsn/gsn_layout.h"
 #include "ui/gsn/gsn_canvas.h" // for DrawGsnNode
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/theme.h"
 #include <imgui.h>
 #include <cmath>
@@ -199,7 +200,7 @@ void GsnCanvas::GetContentBounds(ImVec2& out_min, ImVec2& out_max) const {
         if (b > max_y) max_y = b;
     }
     // Add some padding around the content
-    float pad = 40.0f;
+    float pad = DpiSize(kScrollPadding);
     out_min = ImVec2(min_x - pad, min_y - pad);
     out_max = ImVec2(max_x + pad, max_y + pad);
 }
@@ -219,9 +220,10 @@ static void ComputeGroup1Endpoints(const LayoutNode& parent, const LayoutNode& c
 
 // Draw a Group1 (structural) edge: straight stubs â†’ solid Bezier â†’ solid arrowhead.
 static void DrawGroup1Edge(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 child_top, float zoom) {
-    float scaled_stub = kStubLength * zoom;
-    float scaled_edge_width = kSolidEdgeWidth * zoom;
-    float scaled_arrow = kArrowSize * zoom;
+    float scale = DpiScale() * zoom;
+    float scaled_stub = kStubLength * scale;
+    float scaled_edge_width = kSolidEdgeWidth * scale;
+    float scaled_arrow = kArrowSize * scale;
 
     ImVec2 stub_start(parent_bottom.x, parent_bottom.y + scaled_stub);
     ImVec2 stub_end(child_top.x, child_top.y - scaled_stub);
@@ -260,8 +262,11 @@ static void DrawGroup2Edge(ImDrawList* draw_list, ImVec2 parent_side, ImVec2 att
                            bool is_left_side, float zoom) {
     // Sign encodes horizontal direction: -1 toward left, +1 toward right
     float horizontal_sign = is_left_side ? -1.0f : 1.0f;
-    float scaled_stub = kStubLength * zoom;
-    float scaled_edge_width = kDashedEdgeWidth * zoom;
+    float scale = DpiScale() * zoom;
+    float scaled_stub = kStubLength * scale;
+    float scaled_edge_width = kDashedEdgeWidth * scale;
+    float scaled_dash = kDashLength * scale;
+    float scaled_gap = kDashGap * scale;
 
     ImVec2 stub_start(parent_side.x + horizontal_sign * scaled_stub, parent_side.y);
     ImVec2 stub_end(attachment_edge.x - horizontal_sign * scaled_stub, attachment_edge.y);
@@ -272,11 +277,15 @@ static void DrawGroup2Edge(ImDrawList* draw_list, ImVec2 parent_side, ImVec2 att
 
     // Straight stub from parent â†’ dashed Bezier â†’ straight stub into attachment
     ImU32 col = Group2EdgeColor();
-    DrawDashedBezier(draw_list, parent_side, parent_side, parent_side, stub_start, col, scaled_edge_width);
-    DrawDashedBezier(draw_list, stub_start, ctrl_1, ctrl_2, stub_end, col, scaled_edge_width);
-    DrawDashedBezier(draw_list, stub_end, stub_end, stub_end, attachment_edge, col, scaled_edge_width);
+    DrawDashedBezier(draw_list, parent_side, parent_side, parent_side, stub_start, col,
+                     scaled_edge_width, scaled_dash, scaled_gap);
+    DrawDashedBezier(draw_list, stub_start, ctrl_1, ctrl_2, stub_end, col,
+                     scaled_edge_width, scaled_dash, scaled_gap);
+    DrawDashedBezier(draw_list, stub_end, stub_end, stub_end, attachment_edge, col,
+                     scaled_edge_width, scaled_dash, scaled_gap);
     // Arrow points into the attachment node
-    DrawHollowArrow(draw_list, attachment_edge, horizontal_sign, 0.0f, col, kArrowSize * zoom);
+    DrawHollowArrow(draw_list, attachment_edge, horizontal_sign, 0.0f, col,
+                    kArrowSize * scale, kArrowOutlineWidth * scale);
 }
 
 // ===== Main rendering =====
@@ -382,7 +391,7 @@ bool GsnCanvas::CenterOnIds(const std::unordered_set<std::string>& ids,
     if (!found_any) return false;
 
     // Pad the AABB so the marked nodes don't sit flush with the viewport edge.
-    const float padding = 80.0f;  // layout-space pixels
+    const float padding = DpiSize(80.0f);  // layout-space pixels
     const float aabb_w = std::max(1.0f, (max_x - min_x) + padding * 2.0f);
     const float aabb_h = std::max(1.0f, (max_y - min_y) + padding * 2.0f);
 

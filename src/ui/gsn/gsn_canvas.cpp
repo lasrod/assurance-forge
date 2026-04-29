@@ -1,4 +1,5 @@
 #include "ui/gsn/gsn_canvas.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/theme.h"
 #include "ui/ui_state.h"
@@ -57,10 +58,11 @@ static ImU32 ColorForType(const std::string& type) {
 static ImU32 OutlineColor() { return WithAlpha(GetTheme().border_strong, 0.85f); }
 
 // Draw a soft 3-layer drop shadow under a rounded rectangle.
-static void DrawRectShadow(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, float rounding) {
+static void DrawRectShadow(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, float rounding, float zoom) {
     const Theme& th = GetTheme();
+    float scale = DpiScale() * zoom;
     for (int i = 0; i < kShadowLayers; ++i) {
-        float oy = (i + 1) * th.shadow_offset;
+        float oy = (i + 1) * th.shadow_offset * scale;
         float ox = oy * 0.25f;
         float alpha_mul = th.shadow_alpha_top * (1.0f - (float)i / (float)kShadowLayers);
         ImU32 col = WithAlpha(IM_COL32(0, 0, 0, 255), alpha_mul);
@@ -72,10 +74,11 @@ static void DrawRectShadow(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom
 }
 
 // Draw a soft 3-layer drop shadow under a circle.
-static void DrawCircleShadow(ImDrawList* draw_list, ImVec2 center, float radius) {
+static void DrawCircleShadow(ImDrawList* draw_list, ImVec2 center, float radius, float zoom) {
     const Theme& th = GetTheme();
+    float scale = DpiScale() * zoom;
     for (int i = 0; i < kShadowLayers; ++i) {
-        float oy = (i + 1) * th.shadow_offset;
+        float oy = (i + 1) * th.shadow_offset * scale;
         float ox = oy * 0.25f;
         float alpha_mul = th.shadow_alpha_top * (1.0f - (float)i / (float)kShadowLayers);
         ImU32 col = WithAlpha(IM_COL32(0, 0, 0, 255), alpha_mul);
@@ -84,10 +87,11 @@ static void DrawCircleShadow(ImDrawList* draw_list, ImVec2 center, float radius)
 }
 
 // Draw a soft drop shadow under an arbitrary convex polygon.
-static void DrawPolyShadow(ImDrawList* draw_list, const ImVec2* points, int count) {
+static void DrawPolyShadow(ImDrawList* draw_list, const ImVec2* points, int count, float zoom) {
     const Theme& th = GetTheme();
+    float scale = DpiScale() * zoom;
     for (int i = 0; i < kShadowLayers; ++i) {
-        float oy = (i + 1) * th.shadow_offset;
+        float oy = (i + 1) * th.shadow_offset * scale;
         float ox = oy * 0.25f;
         float alpha_mul = th.shadow_alpha_top * (1.0f - (float)i / (float)kShadowLayers);
         ImU32 col = WithAlpha(IM_COL32(0, 0, 0, 255), alpha_mul);
@@ -129,15 +133,16 @@ static void AddInteriorShading(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bo
 // ===== Shape drawing helpers =====
 
 // Draw a parallelogram (Strategy shape) with inward-skewed top/bottom edges.
-static void DrawParallelogram(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color) {
+static void DrawParallelogram(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color, float zoom) {
     float skew = (bottom_right.x - top_left.x) * kParallelogramSkew;
+    float outline = DpiSize(kOutlineThickness) * zoom;
     ImVec2 corners[4] = {
         ImVec2(top_left.x + skew, top_left.y),         // top-left (inset right)
         ImVec2(bottom_right.x, top_left.y),            // top-right
         ImVec2(bottom_right.x - skew, bottom_right.y), // bottom-right (inset left)
         ImVec2(top_left.x, bottom_right.y)             // bottom-left
     };
-    DrawPolyShadow(draw_list, corners, 4);
+    DrawPolyShadow(draw_list, corners, 4, zoom);
     draw_list->AddConvexPolyFilled(corners, 4, fill_color);
     // Subtle top highlight via a thin lighter strip across the inside top edge.
     ImU32 hl = WithAlpha(ShadeColor(fill_color, 0.30f), 0.55f);
@@ -148,49 +153,53 @@ static void DrawParallelogram(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bot
         ImVec2(corners[0].x - skew * 0.15f, corners[0].y + (bottom_right.y - top_left.y) * 0.18f)
     };
     draw_list->AddConvexPolyFilled(hl_pts, 4, hl);
-    draw_list->AddPolyline(corners, 4, OutlineColor(), ImDrawFlags_Closed, kOutlineThickness);
+    draw_list->AddPolyline(corners, 4, OutlineColor(), ImDrawFlags_Closed, outline);
 }
 
 // Draw a stadium / rounded rectangle (Context, Assumption, Justification shapes).
-static void DrawStadium(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color) {
+static void DrawStadium(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color, float zoom) {
     float rounding = (bottom_right.y - top_left.y) * 0.5f;
-    DrawRectShadow(draw_list, top_left, bottom_right, rounding);
+    float outline = DpiSize(kOutlineThickness) * zoom;
+    DrawRectShadow(draw_list, top_left, bottom_right, rounding, zoom);
     draw_list->AddRectFilled(top_left, bottom_right, fill_color, rounding);
     AddInteriorShading(draw_list, top_left, bottom_right, fill_color, rounding);
-    draw_list->AddRect(top_left, bottom_right, OutlineColor(), rounding, 0, kOutlineThickness);
+    draw_list->AddRect(top_left, bottom_right, OutlineColor(), rounding, 0, outline);
 }
 
 // Draw a circle (Solution, Evidence shapes) centered in the bounding box.
-static void DrawCircle(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color) {
+static void DrawCircle(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color, float zoom) {
     float width  = bottom_right.x - top_left.x;
     float height = bottom_right.y - top_left.y;
     ImVec2 center((top_left.x + bottom_right.x) * 0.5f,
                   (top_left.y + bottom_right.y) * 0.5f);
     float radius = (width < height ? width : height) * 0.5f;
-    DrawCircleShadow(draw_list, center, radius);
+    float outline = DpiSize(kOutlineThickness) * zoom;
+    DrawCircleShadow(draw_list, center, radius, zoom);
     draw_list->AddCircleFilled(center, radius, fill_color, kCircleSegments);
     // Soft inner highlight: an offset lighter circle clipped within the disc.
     ImU32 hl = WithAlpha(ShadeColor(fill_color, 0.35f), 0.45f);
     draw_list->AddCircleFilled(
         ImVec2(center.x - radius * 0.18f, center.y - radius * 0.30f),
         radius * 0.55f, hl, kCircleSegments);
-    draw_list->AddCircle(center, radius, OutlineColor(), kCircleSegments, kOutlineThickness);
+    draw_list->AddCircle(center, radius, OutlineColor(), kCircleSegments, outline);
 }
 
 // Draw a rounded rectangle (Claim / default shape).
-static void DrawRoundedRect(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color) {
-    DrawRectShadow(draw_list, top_left, bottom_right, kClaimRounding);
-    draw_list->AddRectFilled(top_left, bottom_right, fill_color, kClaimRounding);
-    AddInteriorShading(draw_list, top_left, bottom_right, fill_color, kClaimRounding);
-    draw_list->AddRect(top_left, bottom_right, OutlineColor(), kClaimRounding, 0, kOutlineThickness);
+static void DrawRoundedRect(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color, float zoom) {
+    float rounding = DpiSize(kClaimRounding) * zoom;
+    float outline = DpiSize(kOutlineThickness) * zoom;
+    DrawRectShadow(draw_list, top_left, bottom_right, rounding, zoom);
+    draw_list->AddRectFilled(top_left, bottom_right, fill_color, rounding);
+    AddInteriorShading(draw_list, top_left, bottom_right, fill_color, rounding);
+    draw_list->AddRect(top_left, bottom_right, OutlineColor(), rounding, 0, outline);
 }
 
 static void DrawUndevelopedMarker(ImDrawList* draw_list, const GsnNode& node,
                                   ImVec2 top_left, ImVec2 bottom_right, float zoom) {
     if (!node.undeveloped) return;
 
-    float radius = kUndDiamondRadius * zoom;
-    float gap = kUndGap * zoom;
+    float radius = DpiSize(kUndDiamondRadius) * zoom;
+    float gap = DpiSize(kUndGap) * zoom;
     ImVec2 center((top_left.x + bottom_right.x) * 0.5f, bottom_right.y + gap + radius);
     ImVec2 diamond[4] = {
         ImVec2(center.x, center.y - radius),
@@ -198,11 +207,11 @@ static void DrawUndevelopedMarker(ImDrawList* draw_list, const GsnNode& node,
         ImVec2(center.x, center.y + radius),
         ImVec2(center.x - radius, center.y)
     };
-    DrawPolyShadow(draw_list, diamond, 4);
+    DrawPolyShadow(draw_list, diamond, 4, zoom);
     ImU32 und_fill = IM_COL32(245, 247, 252, 255); // near-white for high contrast
     ImU32 und_ink  = InkOn(und_fill);
     draw_list->AddConvexPolyFilled(diamond, 4, und_fill);
-    draw_list->AddPolyline(diamond, 4, OutlineColor(), ImDrawFlags_Closed, kOutlineThickness);
+    draw_list->AddPolyline(diamond, 4, OutlineColor(), ImDrawFlags_Closed, DpiSize(kOutlineThickness) * zoom);
 
     const char* und = "UND";
     ImFont* font = ImGui::GetFont();
@@ -217,7 +226,7 @@ static void DrawUndevelopedMarker(ImDrawList* draw_list, const GsnNode& node,
     float max_font_size_from_height =
         (unit_text_size.y > 0.0f) ? (max_text_extent / unit_text_size.y) : desired_font_size;
     float max_font_size = std::min(max_font_size_from_width, max_font_size_from_height);
-    float min_font_size = std::min(10.0f, max_font_size);
+    float min_font_size = std::min(DpiSize(10.0f), max_font_size);
     float font_size = std::clamp(desired_font_size, min_font_size, max_font_size);
     ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, und);
     ImVec2 text_pos(center.x - text_size.x * 0.5f,
@@ -231,7 +240,7 @@ static void DrawUndevelopedMarker(ImDrawList* draw_list, const GsnNode& node,
 // All outputs are in screen-space (already scaled by zoom).
 static void ComputeTextRegion(const GsnNode& node, ImVec2 top_left, ImVec2 bottom_right,
                               float zoom, float& out_text_left, float& out_text_wrap) {
-    float scaled_padding = kTextPadding * zoom;
+    float scaled_padding = DpiSize(kTextPadding) * zoom;
     float scaled_width  = node.size.x * zoom;
     float scaled_height = node.size.y * zoom;
 
@@ -254,7 +263,7 @@ static void ComputeTextRegion(const GsnNode& node, ImVec2 top_left, ImVec2 botto
         out_text_wrap = scaled_width - inset * 2.0f - scaled_padding * 2.0f;
     }
 
-    float scaled_min_wrap = kMinTextWrap * zoom;
+    float scaled_min_wrap = DpiSize(kMinTextWrap) * zoom;
     if (out_text_wrap < scaled_min_wrap) out_text_wrap = scaled_min_wrap;
 }
 
@@ -268,7 +277,7 @@ static void DrawNodeLabel(ImDrawList* draw_list, const GsnNode& node,
     ImFont* bold_font   = g_BoldFont ? g_BoldFont : ImGui::GetFont();
     ImFont* normal_font = ImGui::GetFont();
     float font_size = ImGui::GetFontSize() * zoom;
-    float scaled_padding = kTextPadding * zoom;
+    float scaled_padding = DpiSize(kTextPadding) * zoom;
 
     // Pick label based on language toggle
     const std::string& active_label = (ui_state.show_secondary_language && !node.label_secondary.empty())
@@ -338,13 +347,13 @@ void DrawGsnNode(const GsnNode& node,
 
     // Draw the GSN shape
     if (node.type == "Strategy") {
-        DrawParallelogram(draw_list, top_left, bottom_right, fill_color);
+        DrawParallelogram(draw_list, top_left, bottom_right, fill_color, zoom);
     } else if (node.type == "Context" || node.type == "Assumption" || node.type == "Justification") {
-        DrawStadium(draw_list, top_left, bottom_right, fill_color);
+        DrawStadium(draw_list, top_left, bottom_right, fill_color, zoom);
     } else if (node.type == "Solution" || node.type == "Evidence") {
-        DrawCircle(draw_list, top_left, bottom_right, fill_color);
+        DrawCircle(draw_list, top_left, bottom_right, fill_color, zoom);
     } else {
-        DrawRoundedRect(draw_list, top_left, bottom_right, fill_color);
+        DrawRoundedRect(draw_list, top_left, bottom_right, fill_color, zoom);
     }
 
     // Draw label text
@@ -377,14 +386,15 @@ void DrawGsnNode(const GsnNode& node,
     // decreasing alpha) instead of a hard outline.
     if (ui_state.selected_element_id == node.id) {
         const Theme& th_sel = GetTheme();
+        float scale = DpiScale() * zoom;
         for (int i = 0; i < 3; ++i) {
-            float pad = 2.0f + (float)i * 2.0f;
+            float pad = (2.0f + (float)i * 2.0f) * scale;
             float alpha = 0.55f - (float)i * 0.15f;
             draw_list->AddRect(
                 ImVec2(top_left.x - pad, top_left.y - pad),
                 ImVec2(bottom_right.x + pad, bottom_right.y + pad),
                 WithAlpha(th_sel.accent, alpha),
-                kClaimRounding + pad, 0, 1.5f);
+                DpiSize(kClaimRounding) * zoom + pad, 0, 1.5f * scale);
         }
     }
 
@@ -392,10 +402,11 @@ void DrawGsnNode(const GsnNode& node,
     // selected & marked node still looks unambiguously red).
     if (marked_for_removal) {
         const Theme& th_rm = GetTheme();
+        float scale = DpiScale() * zoom;
         draw_list->AddRect(
-            ImVec2(top_left.x - 3.0f, top_left.y - 3.0f),
-            ImVec2(bottom_right.x + 3.0f, bottom_right.y + 3.0f),
-            ShadeColor(th_rm.danger, -0.20f), kClaimRounding + 3.0f, 0, 2.5f);
+            ImVec2(top_left.x - 3.0f * scale, top_left.y - 3.0f * scale),
+            ImVec2(bottom_right.x + 3.0f * scale, bottom_right.y + 3.0f * scale),
+            ShadeColor(th_rm.danger, -0.20f), DpiSize(kClaimRounding) * zoom + 3.0f * scale, 0, 2.5f * scale);
     }
 }
 
@@ -420,13 +431,13 @@ void ShowGsnCanvasContent(UiState& ui_state,
             ImVec2 sz = ImGui::GetWindowSize();
             float zoom = renderer.GetZoom();
             ImVec2 offset = renderer.GetViewOffset();
-            float spacing = th_grid.canvas_grid_spacing * zoom;
+            float spacing = DpiSize(th_grid.canvas_grid_spacing) * zoom;
             // Raise skip threshold to avoid merging dots and excessive draw calls
             // at low zoom levels. Pre-check total dot count so we either draw the
             // full grid or skip it entirely (avoids mid-loop cutoff artifacts).
-            constexpr float kMinSpacing = 10.0f;
+            const float min_spacing = DpiSize(10.0f);
             constexpr int   kMaxDots    = 4000;
-            if (spacing >= kMinSpacing) {
+            if (spacing >= min_spacing) {
                 int est_x = static_cast<int>(sz.x / spacing) + 1;
                 int est_y = static_cast<int>(sz.y / spacing) + 1;
                 if (est_x * est_y <= kMaxDots) {
@@ -434,7 +445,7 @@ void ShowGsnCanvasContent(UiState& ui_state,
                     float start_y = -fmodf(offset.y, spacing);
                     int ix = (int)floorf(offset.x / spacing);
                     int iy0 = (int)floorf(offset.y / spacing);
-                    float dot = std::max(1.0f, zoom * 0.9f);
+                    float dot = std::max(1.0f, DpiScale() * zoom * 0.9f);
                     for (float x = start_x; x < sz.x; x += spacing, ++ix) {
                         int iy = iy0;
                         for (float y = start_y; y < sz.y; y += spacing, ++iy) {
@@ -482,7 +493,7 @@ void ShowGsnCanvasContent(UiState& ui_state,
                 renderer.ZoomAtPoint(new_zoom, focus_content);
             } else if (wheel != 0.0f) {
                 // Scroll wheel without Ctrl: pan vertically (Shift+wheel: pan horizontally)
-                float scroll_speed = 60.0f;
+                float scroll_speed = DpiSize(60.0f);
                 if (ImGui::GetIO().KeyShift)
                     renderer.Pan(-wheel * scroll_speed, 0.0f);
                 else
@@ -517,14 +528,14 @@ void ShowGsnCanvasContent(UiState& ui_state,
             g_overlay_hovered = false;
 
             // Zoom strip rect
-            float btn_sz = 28.0f;
-            float mgn = 12.0f;
-            float lbl_w = 50.0f;
-            float strip_w = btn_sz * 2 + lbl_w + 12.0f;
-            float zx = child_pos.x + child_size_pre.x - (btn_sz * 2 + lbl_w + mgn + 8.0f);
+            float btn_sz = DpiSize(28.0f);
+            float mgn = DpiSize(12.0f);
+            float lbl_w = DpiSize(50.0f);
+            float strip_w = btn_sz * 2 + lbl_w + DpiSize(12.0f);
+            float zx = child_pos.x + child_size_pre.x - (btn_sz * 2 + lbl_w + mgn + DpiSize(8.0f));
             float zy = child_pos.y + child_size_pre.y - (btn_sz + mgn);
-            ImVec2 zoom_tl(zx - 4.0f, zy - 2.0f);
-            ImVec2 zoom_br(zx + strip_w, zy + btn_sz + 2.0f);
+            ImVec2 zoom_tl(zx - DpiSize(4.0f), zy - DpiSize(2.0f));
+            ImVec2 zoom_br(zx + strip_w, zy + btn_sz + DpiSize(2.0f));
             if (mouse_pos.x >= zoom_tl.x && mouse_pos.x <= zoom_br.x &&
                 mouse_pos.y >= zoom_tl.y && mouse_pos.y <= zoom_br.y) {
                 g_overlay_hovered = true;
@@ -532,11 +543,11 @@ void ShowGsnCanvasContent(UiState& ui_state,
 
             // Language button rect
             if (ui_state.show_secondary_language || ui_state.model_has_translations) {
-                float lbw = 36.0f, lbh = 24.0f, lmgn = 12.0f;
+                float lbw = DpiSize(36.0f), lbh = DpiSize(24.0f), lmgn = DpiSize(12.0f);
                 float lx = child_pos.x + child_size_pre.x - (lbw + lmgn);
-                float ly = child_pos.y + child_size_pre.y - (28.0f + lmgn) - lbh - 6.0f;
-                ImVec2 lang_tl(lx - 2.0f, ly - 2.0f);
-                ImVec2 lang_br(lx + lbw + 2.0f, ly + lbh + 2.0f);
+                float ly = child_pos.y + child_size_pre.y - (DpiSize(28.0f) + lmgn) - lbh - DpiSize(6.0f);
+                ImVec2 lang_tl(lx - DpiSize(2.0f), ly - DpiSize(2.0f));
+                ImVec2 lang_br(lx + lbw + DpiSize(2.0f), ly + lbh + DpiSize(2.0f));
                 if (mouse_pos.x >= lang_tl.x && mouse_pos.x <= lang_br.x &&
                     mouse_pos.y >= lang_tl.y && mouse_pos.y <= lang_br.y) {
                     g_overlay_hovered = true;
@@ -561,19 +572,22 @@ void ShowGsnCanvasContent(UiState& ui_state,
             // Only show when model has translations
             if (ui_state.show_secondary_language || ui_state.model_has_translations) {
                 ImVec2 child_size_lang = ImGui::GetWindowSize();
-                float lang_btn_w = 36.0f;
-                float lang_btn_h = 24.0f;
-                float lang_margin = 12.0f;
+                                float lang_btn_w = DpiSize(36.0f);
+                                float lang_btn_h = DpiSize(24.0f);
+                                float lang_margin = DpiSize(12.0f);
                 float lang_x = child_pos.x + child_size_lang.x - (lang_btn_w + lang_margin);
-                float lang_y = child_pos.y + child_size_lang.y - (28.0f + lang_margin) - lang_btn_h - 6.0f;
+                                float lang_y = child_pos.y + child_size_lang.y
+                                                         - (DpiSize(28.0f) + lang_margin) - lang_btn_h - DpiSize(6.0f);
 
                 ImDrawList* fg_lang = ImGui::GetWindowDrawList();
-                fg_lang->AddRectFilled(ImVec2(lang_x - 4.0f, lang_y - 3.0f),
-                                       ImVec2(lang_x + lang_btn_w + 4.0f, lang_y + lang_btn_h + 3.0f),
-                                       WithAlpha(GetTheme().surface_2, 0.85f), 8.0f);
-                fg_lang->AddRect(ImVec2(lang_x - 4.0f, lang_y - 3.0f),
-                                 ImVec2(lang_x + lang_btn_w + 4.0f, lang_y + lang_btn_h + 3.0f),
-                                 GetTheme().border, 8.0f, 0, 1.0f);
+                                fg_lang->AddRectFilled(ImVec2(lang_x - DpiSize(4.0f), lang_y - DpiSize(3.0f)),
+                                                                             ImVec2(lang_x + lang_btn_w + DpiSize(4.0f),
+                                                                                            lang_y + lang_btn_h + DpiSize(3.0f)),
+                                                                             WithAlpha(GetTheme().surface_2, 0.85f), DpiSize(8.0f));
+                                fg_lang->AddRect(ImVec2(lang_x - DpiSize(4.0f), lang_y - DpiSize(3.0f)),
+                                                                 ImVec2(lang_x + lang_btn_w + DpiSize(4.0f),
+                                                                                lang_y + lang_btn_h + DpiSize(3.0f)),
+                                                                 GetTheme().border, DpiSize(8.0f), 0, DpiSize(1.0f));
 
                 ImGui::SetCursorScreenPos(ImVec2(lang_x, lang_y));
                 // Show "EN" when primary, or the active secondary language code (uppercased)
@@ -594,42 +608,44 @@ void ShowGsnCanvasContent(UiState& ui_state,
             const char* hint_2 = "Middle Drag  Pan";
 
             ImDrawList* fg_hints = ImGui::GetWindowDrawList();
-            ImVec2 hint_pos(child_pos.x + 12.0f, child_pos.y + 12.0f);
-            ImVec2 hint_size(164.0f, 44.0f);
+            ImVec2 hint_pos(child_pos.x + DpiSize(12.0f), child_pos.y + DpiSize(12.0f));
+            ImVec2 hint_size(DpiSize(164.0f), DpiSize(44.0f));
 
             const Theme& th_hint = GetTheme();
             fg_hints->AddRectFilled(
                 hint_pos,
                 ImVec2(hint_pos.x + hint_size.x, hint_pos.y + hint_size.y),
-                WithAlpha(th_hint.surface_2, 0.85f), 8.0f);
+                WithAlpha(th_hint.surface_2, 0.85f), DpiSize(8.0f));
             fg_hints->AddRect(
                 hint_pos,
                 ImVec2(hint_pos.x + hint_size.x, hint_pos.y + hint_size.y),
-                th_hint.border, 8.0f, 0, 1.0f);
+                th_hint.border, DpiSize(8.0f), 0, DpiSize(1.0f));
 
-            fg_hints->AddText(ImVec2(hint_pos.x + 10.0f, hint_pos.y + 8.0f),  th_hint.text_secondary, hint_1);
-            fg_hints->AddText(ImVec2(hint_pos.x + 10.0f, hint_pos.y + 26.0f), th_hint.text_secondary, hint_2);
+            fg_hints->AddText(ImVec2(hint_pos.x + DpiSize(10.0f), hint_pos.y + DpiSize(8.0f)),
+                              th_hint.text_secondary, hint_1);
+            fg_hints->AddText(ImVec2(hint_pos.x + DpiSize(10.0f), hint_pos.y + DpiSize(26.0f)),
+                              th_hint.text_secondary, hint_2);
         }
 
         // --- Overlay zoom buttons in bottom-right corner ---
         {
             ImVec2 child_size = ImGui::GetWindowSize();
-            float button_size = 28.0f;
-            float margin = 12.0f;
-            float label_width = 50.0f;
+            float button_size = DpiSize(28.0f);
+            float margin = DpiSize(12.0f);
+            float label_width = DpiSize(50.0f);
 
             // Position: bottom-right of the child window
-            float buttons_x = child_pos.x + child_size.x - (button_size * 2 + label_width + margin + 8.0f);
+            float buttons_x = child_pos.x + child_size.x - (button_size * 2 + label_width + margin + DpiSize(8.0f));
             float buttons_y = child_pos.y + child_size.y - (button_size + margin);
 
             // Semi-transparent background for the zoom control strip
             ImDrawList* fg = ImGui::GetWindowDrawList();
-            float strip_width = button_size * 2 + label_width + 12.0f;
-            ImVec2 strip_tl(buttons_x - 4.0f, buttons_y - 2.0f);
-            ImVec2 strip_br(buttons_x + strip_width, buttons_y + button_size + 2.0f);
+            float strip_width = button_size * 2 + label_width + DpiSize(12.0f);
+            ImVec2 strip_tl(buttons_x - DpiSize(4.0f), buttons_y - DpiSize(2.0f));
+            ImVec2 strip_br(buttons_x + strip_width, buttons_y + button_size + DpiSize(2.0f));
             const Theme& th_zoom = GetTheme();
-            fg->AddRectFilled(strip_tl, strip_br, WithAlpha(th_zoom.surface_2, 0.85f), 8.0f);
-            fg->AddRect(strip_tl, strip_br, th_zoom.border, 8.0f, 0, 1.0f);
+            fg->AddRectFilled(strip_tl, strip_br, WithAlpha(th_zoom.surface_2, 0.85f), DpiSize(8.0f));
+            fg->AddRect(strip_tl, strip_br, th_zoom.border, DpiSize(8.0f), 0, DpiSize(1.0f));
 
             ImGui::SetCursorScreenPos(ImVec2(buttons_x, buttons_y));
             if (ImGui::Button("-##zoom_out", ImVec2(button_size, button_size))) {
@@ -669,8 +685,8 @@ void ShowGsnCanvasContent(UiState& ui_state,
             float viewport_x = offset.x - content_min.x * zoom;
             float viewport_y = offset.y - content_min.y * zoom;
 
-            float scrollbar_thickness = 10.0f;
-            float scrollbar_margin = 2.0f;
+            float scrollbar_thickness = DpiSize(10.0f);
+            float scrollbar_margin = DpiSize(2.0f);
             const Theme& th_sb = GetTheme();
             ImU32 track_color = WithAlpha(th_sb.surface_1, 0.55f);
             ImU32 thumb_color = th_sb.surface_3;
@@ -688,12 +704,12 @@ void ShowGsnCanvasContent(UiState& ui_state,
                 draw_list->AddRectFilled(
                     ImVec2(bar_x, bar_y),
                     ImVec2(bar_x + bar_w, bar_y + scrollbar_thickness),
-                    track_color, 4.0f);
+                    track_color, DpiSize(4.0f));
 
                 // Thumb
                 float thumb_ratio = child_size.x / content_w;
                 float thumb_w = bar_w * thumb_ratio;
-                if (thumb_w < 20.0f) thumb_w = 20.0f;
+                if (thumb_w < DpiSize(20.0f)) thumb_w = DpiSize(20.0f);
                 float scroll_ratio = viewport_x / (content_w - child_size.x);
                 if (scroll_ratio < 0.0f) scroll_ratio = 0.0f;
                 if (scroll_ratio > 1.0f) scroll_ratio = 1.0f;
@@ -712,7 +728,7 @@ void ShowGsnCanvasContent(UiState& ui_state,
                     renderer.Pan(delta_scroll, 0.0f);
                 }
 
-                draw_list->AddRectFilled(thumb_tl, thumb_br, h_hovered ? thumb_hover : thumb_color, 4.0f);
+                draw_list->AddRectFilled(thumb_tl, thumb_br, h_hovered ? thumb_hover : thumb_color, DpiSize(4.0f));
             }
 
             // Vertical scrollbar (along right edge)
@@ -725,12 +741,12 @@ void ShowGsnCanvasContent(UiState& ui_state,
                 draw_list->AddRectFilled(
                     ImVec2(bar_x, bar_y),
                     ImVec2(bar_x + scrollbar_thickness, bar_y + bar_h),
-                    track_color, 4.0f);
+                    track_color, DpiSize(4.0f));
 
                 // Thumb
                 float thumb_ratio = child_size.y / content_h;
                 float thumb_h = bar_h * thumb_ratio;
-                if (thumb_h < 20.0f) thumb_h = 20.0f;
+                if (thumb_h < DpiSize(20.0f)) thumb_h = DpiSize(20.0f);
                 float scroll_ratio = viewport_y / (content_h - child_size.y);
                 if (scroll_ratio < 0.0f) scroll_ratio = 0.0f;
                 if (scroll_ratio > 1.0f) scroll_ratio = 1.0f;
@@ -749,7 +765,7 @@ void ShowGsnCanvasContent(UiState& ui_state,
                     renderer.Pan(0.0f, delta_scroll);
                 }
 
-                draw_list->AddRectFilled(thumb_tl, thumb_br, v_hovered ? thumb_hover : thumb_color, 4.0f);
+                draw_list->AddRectFilled(thumb_tl, thumb_br, v_hovered ? thumb_hover : thumb_color, DpiSize(4.0f));
             }
         }
 
