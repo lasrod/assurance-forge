@@ -1,6 +1,10 @@
 ﻿cmake_minimum_required(VERSION 3.21)
 project(assurance-forge LANGUAGES C CXX)
 
+if(APPLE)
+    enable_language(OBJC OBJCXX)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -235,7 +239,11 @@ if(WIN32)
 endif()
 af_copy_guidelines_data(tests)
 include(GoogleTest)
-gtest_discover_tests(tests WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+gtest_discover_tests(tests
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    DISCOVERY_MODE PRE_TEST
+)
 add_test(
     NAME GuidelinesDataRuntimeCopy
     COMMAND ${CMAKE_COMMAND} -E compare_files
