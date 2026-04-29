@@ -11,7 +11,7 @@ constexpr ImU32 RGB(int r, int g, int b, int a = 255) {
     return IM_COL32(r, g, b, a);
 }
 
-Theme MakeAuroraDark() {
+Theme MakeFallbackTheme() {
     Theme t{};
 
     // Surfaces
@@ -69,11 +69,6 @@ Theme MakeAuroraDark() {
     return t;
 }
 
-const Theme& Aurora() {
-    static const Theme t = MakeAuroraDark();
-    return t;
-}
-
 ImVec4 ToVec4(ImU32 c) {
     return ImGui::ColorConvertU32ToFloat4(c);
 }
@@ -82,10 +77,50 @@ ImU32 ToU32(ImVec4 v) {
     return ImGui::ColorConvertFloat4ToU32(v);
 }
 
+Theme MakeThemeFromStyle() {
+    Theme t = MakeFallbackTheme();
+    if (ImGui::GetCurrentContext() == nullptr) return t;
+
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const ImVec4* colors = style.Colors;
+
+    t.bg_app = ToU32(colors[ImGuiCol_WindowBg]);
+    t.surface_1 = ToU32(colors[ImGuiCol_WindowBg]);
+    t.surface_2 = ToU32(colors[ImGuiCol_ChildBg]);
+    if (((t.surface_2 >> IM_COL32_A_SHIFT) & 0xFF) == 0) {
+        t.surface_2 = ToU32(colors[ImGuiCol_FrameBg]);
+    }
+    t.surface_3 = ToU32(colors[ImGuiCol_FrameBgHovered]);
+
+    t.border = ToU32(colors[ImGuiCol_Border]);
+    t.border_strong = ToU32(colors[ImGuiCol_SeparatorHovered]);
+
+    t.text_primary = ToU32(colors[ImGuiCol_Text]);
+    t.text_secondary = ToU32(colors[ImGuiCol_TextDisabled]);
+    t.text_muted = WithAlpha(t.text_secondary, 0.72f);
+
+    t.accent = ToU32(colors[ImGuiCol_CheckMark]);
+    t.accent_hover = ToU32(colors[ImGuiCol_HeaderHovered]);
+    t.accent_pressed = ToU32(colors[ImGuiCol_ButtonActive]);
+
+    t.edge_group1 = WithAlpha(t.text_secondary, 0.88f);
+    t.edge_group2 = WithAlpha(t.accent, 0.72f);
+
+    t.rounding_ui = style.FrameRounding;
+    t.rounding_panel = style.WindowRounding;
+    t.canvas_bg = ShadeColor(t.bg_app, -0.08f);
+    t.canvas_grid_minor = WithAlpha(t.border, 0.55f);
+    t.canvas_grid_major = WithAlpha(t.border_strong, 0.65f);
+
+    return t;
+}
+
 }  // namespace
 
 const Theme& GetTheme() {
-    return Aurora();
+    static Theme theme;
+    theme = MakeThemeFromStyle();
+    return theme;
 }
 
 ImU32 LerpColor(ImU32 a, ImU32 b, float t) {
@@ -127,102 +162,8 @@ ImU32 InkOn(ImU32 background) {
     ImVec4 v = ToVec4(background);
     // Perceived luminance (Rec. 601 weights)
     float lum = 0.299f * v.x + 0.587f * v.y + 0.114f * v.z;
-    return (lum > 0.55f) ? Aurora().ink_dark : Aurora().text_primary;
-}
-
-void ApplyImGuiStyle() {
-    const Theme& t = Aurora();
-    ImGuiStyle& s = ImGui::GetStyle();
-
-    // Geometry
-    s.WindowRounding    = t.rounding_panel;
-    s.ChildRounding     = t.rounding_panel;
-    s.PopupRounding     = t.rounding_panel;
-    s.FrameRounding     = t.rounding_ui;
-    s.GrabRounding      = t.rounding_ui;
-    s.ScrollbarRounding = t.rounding_ui + 2.0f;
-    s.TabRounding       = t.rounding_ui;
-
-    s.WindowBorderSize  = 1.0f;
-    s.ChildBorderSize   = 1.0f;
-    s.FrameBorderSize   = 0.0f;
-    s.PopupBorderSize   = 1.0f;
-    s.TabBorderSize     = 0.0f;
-
-    s.WindowPadding     = ImVec2(12.0f, 10.0f);
-    s.FramePadding      = ImVec2(10.0f, 6.0f);
-    s.ItemSpacing       = ImVec2(8.0f, 6.0f);
-    s.ItemInnerSpacing  = ImVec2(6.0f, 4.0f);
-    s.IndentSpacing     = 18.0f;
-    s.ScrollbarSize     = 12.0f;
-    s.GrabMinSize       = 14.0f;
-    s.SeparatorTextBorderSize = 1.0f;
-
-    s.AntiAliasedLines       = true;
-    s.AntiAliasedLinesUseTex = true;
-    s.AntiAliasedFill        = true;
-
-    // Colors
-    auto V = [](ImU32 c) { return ToVec4(c); };
-
-    s.Colors[ImGuiCol_WindowBg]            = V(t.surface_1);
-    s.Colors[ImGuiCol_ChildBg]             = V(t.surface_1);
-    s.Colors[ImGuiCol_PopupBg]             = V(t.surface_2);
-    s.Colors[ImGuiCol_MenuBarBg]           = V(t.surface_2);
-    s.Colors[ImGuiCol_Border]              = V(WithAlpha(t.border, 0.85f));
-    s.Colors[ImGuiCol_BorderShadow]        = ImVec4(0, 0, 0, 0);
-
-    s.Colors[ImGuiCol_Text]                = V(t.text_primary);
-    s.Colors[ImGuiCol_TextDisabled]        = V(t.text_muted);
-    s.Colors[ImGuiCol_TextSelectedBg]      = V(WithAlpha(t.accent, 0.40f));
-
-    s.Colors[ImGuiCol_FrameBg]             = V(t.surface_2);
-    s.Colors[ImGuiCol_FrameBgHovered]      = V(t.surface_3);
-    s.Colors[ImGuiCol_FrameBgActive]       = V(WithAlpha(t.accent, 0.30f));
-
-    s.Colors[ImGuiCol_TitleBg]             = V(t.surface_2);
-    s.Colors[ImGuiCol_TitleBgActive]       = V(t.surface_2);
-    s.Colors[ImGuiCol_TitleBgCollapsed]    = V(WithAlpha(t.surface_2, 0.75f));
-
-    s.Colors[ImGuiCol_Button]              = V(t.surface_3);
-    s.Colors[ImGuiCol_ButtonHovered]       = V(LerpColor(t.surface_3, t.accent, 0.35f));
-    s.Colors[ImGuiCol_ButtonActive]        = V(t.accent_pressed);
-
-    s.Colors[ImGuiCol_Header]              = V(WithAlpha(t.accent, 0.20f));
-    s.Colors[ImGuiCol_HeaderHovered]       = V(WithAlpha(t.accent, 0.32f));
-    s.Colors[ImGuiCol_HeaderActive]        = V(WithAlpha(t.accent, 0.45f));
-
-    s.Colors[ImGuiCol_Separator]           = V(t.border);
-    s.Colors[ImGuiCol_SeparatorHovered]    = V(t.accent_hover);
-    s.Colors[ImGuiCol_SeparatorActive]     = V(t.accent);
-
-    s.Colors[ImGuiCol_ResizeGrip]          = V(WithAlpha(t.accent, 0.30f));
-    s.Colors[ImGuiCol_ResizeGripHovered]   = V(WithAlpha(t.accent, 0.55f));
-    s.Colors[ImGuiCol_ResizeGripActive]    = V(t.accent);
-
-    s.Colors[ImGuiCol_Tab]                 = V(t.surface_1);
-    s.Colors[ImGuiCol_TabHovered]          = V(LerpColor(t.surface_2, t.accent, 0.30f));
-    s.Colors[ImGuiCol_TabActive]           = V(t.surface_2);
-    s.Colors[ImGuiCol_TabUnfocused]        = V(t.surface_1);
-    s.Colors[ImGuiCol_TabUnfocusedActive]  = V(t.surface_2);
-
-    s.Colors[ImGuiCol_ScrollbarBg]         = V(WithAlpha(t.surface_1, 0.50f));
-    s.Colors[ImGuiCol_ScrollbarGrab]       = V(t.surface_3);
-    s.Colors[ImGuiCol_ScrollbarGrabHovered]= V(LerpColor(t.surface_3, t.accent, 0.40f));
-    s.Colors[ImGuiCol_ScrollbarGrabActive] = V(t.accent);
-
-    s.Colors[ImGuiCol_CheckMark]           = V(t.accent);
-    s.Colors[ImGuiCol_SliderGrab]          = V(t.accent);
-    s.Colors[ImGuiCol_SliderGrabActive]    = V(t.accent_hover);
-
-    s.Colors[ImGuiCol_NavHighlight]        = V(t.accent_hover);
-    s.Colors[ImGuiCol_NavWindowingHighlight] = V(WithAlpha(t.text_primary, 0.70f));
-
-    s.Colors[ImGuiCol_TableHeaderBg]       = V(t.surface_2);
-    s.Colors[ImGuiCol_TableBorderStrong]   = V(t.border_strong);
-    s.Colors[ImGuiCol_TableBorderLight]    = V(t.border);
-    s.Colors[ImGuiCol_TableRowBg]          = ImVec4(0, 0, 0, 0);
-    s.Colors[ImGuiCol_TableRowBgAlt]       = V(WithAlpha(t.surface_2, 0.40f));
+    const Theme& theme = GetTheme();
+    return (lum > 0.55f) ? theme.ink_dark : theme.text_primary;
 }
 
 }  // namespace ui

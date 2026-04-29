@@ -18,6 +18,8 @@
 #include "ai/libcurl_http_client.h"
 #include "ai/openai_provider.h"
 #include "ai/secret_store.h"
+#include "hello_imgui/hello_imgui.h"
+#include "hello_imgui/hello_imgui_theme.h"
 #include "imgui.h"
 
 #include "core/app_state.h"
@@ -26,6 +28,7 @@
 #include "parser/guidelines_parser.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas.h"
+#include "ui/localization.h"
 #include "ui/panels/element_panel.h"
 #include "ui/panels/problems_panel.h"
 #include "ui/panels/preferences_panel.h"
@@ -33,7 +36,6 @@
 #include "ui/panels/sacm_viewer_panel.h"
 #include "ui/panels/welcome_modal.h"
 #include "ui/register_views.h"
-#include "ui/theme.h"
 #include "ui/tree_view.h"
 #include "ui/ui_state.h"
 #include "ui/widgets/splitter.h"
@@ -66,7 +68,8 @@ constexpr float kMinProblemsPanelHeight = 160.0f;
 const ImGuiWindowFlags kPanelFlags = ImGuiWindowFlags_NoMove
                                    | ImGuiWindowFlags_NoResize
                                    | ImGuiWindowFlags_NoCollapse
-                                   | ImGuiWindowFlags_NoBringToFrontOnFocus;
+                                   | ImGuiWindowFlags_NoBringToFrontOnFocus
+                                   | ImGuiWindowFlags_NoSavedSettings;
 
 enum class ProjectFileCreateKind {
     Sacm,
@@ -90,8 +93,39 @@ const char* ProjectFileCreateTitle(ProjectFileCreateKind kind) {
     return "New Project File";
 }
 
-ImVec4 ColorFromU32(ImU32 color) {
-    return ImGui::ColorConvertU32ToFloat4(color);
+void RenderLanguageMenu() {
+    if (!ImGui::BeginMenu(ui::Tr(ui::MessageId::Language))) return;
+
+    const ui::Language current = ui::CurrentLanguage();
+    if (ImGui::MenuItem(ui::Tr(ui::MessageId::English), nullptr, current == ui::Language::English)) {
+        ui::SetCurrentLanguage(ui::Language::English);
+    }
+    if (ImGui::MenuItem(ui::Tr(ui::MessageId::Japanese), nullptr, current == ui::Language::Japanese)) {
+        ui::SetCurrentLanguage(ui::Language::Japanese);
+    }
+
+    ImGui::EndMenu();
+}
+
+void RenderThemeMenu() {
+    if (!ImGui::BeginMenu(ui::Tr(ui::MessageId::Theme))) return;
+
+    HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
+    if (!runner_params) {
+        ImGui::EndMenu();
+        return;
+    }
+
+    for (int i = 0; i < ImGuiTheme::ImGuiTheme_Count; ++i) {
+        auto theme = static_cast<ImGuiTheme::ImGuiTheme_>(i);
+        bool selected = runner_params->imGuiWindowParams.tweakedTheme.Theme == theme;
+        if (ImGui::MenuItem(ImGuiTheme::ImGuiTheme_Name(theme), nullptr, selected)) {
+            runner_params->imGuiWindowParams.tweakedTheme.Theme = theme;
+            ImGuiTheme::ApplyTweakedTheme(runner_params->imGuiWindowParams.tweakedTheme);
+        }
+    }
+
+    ImGui::EndMenu();
 }
 
 std::string LowercaseAscii(std::string value) {
@@ -221,6 +255,7 @@ struct AppRuntime::Impl {
     std::vector<std::string> pending_remove_ids;
 
     bool show_preferences_window = false;
+    bool show_theme_tweak_window = false;
 
     bool show_ai_review_debug_modal = false;
     ai::AiReviewRequestArtifacts pending_ai_review;
@@ -511,55 +546,55 @@ float AppRuntime::RenderMainMenuBar(bool& done) {
         return 0.0f;
     }
 
-    if (ImGui::BeginMenu("File")) {
-        if (ImGui::MenuItem("Create Empty Assurance Project")) {
+    if (ImGui::BeginMenu(ui::Tr(ui::MessageId::FileMenu))) {
+        if (ImGui::MenuItem(ui::Tr(ui::MessageId::CreateEmptyProject))) {
             BeginCreateProject();
         }
-        if (ImGui::MenuItem("Open Project")) {
+        if (ImGui::MenuItem(ui::Tr(ui::MessageId::OpenProject))) {
             BeginOpenProject();
         }
         ImGui::Separator();
         bool has_project = impl_->app_state.current_project.has_value();
         if (!has_project) ImGui::BeginDisabled();
-        if (ImGui::MenuItem("Save Project")) {
+        if (ImGui::MenuItem(ui::Tr(ui::MessageId::SaveProject))) {
             SaveProject();
         }
         if (!has_project) ImGui::EndDisabled();
         ImGui::Separator();
-        if (ImGui::MenuItem("Exit")) {
+        if (ImGui::MenuItem(ui::Tr(ui::MessageId::Exit))) {
             RequestExit(done);
         }
         ImGui::EndMenu();
     }
 
-    if (ImGui::BeginMenu("Add")) {
+    if (ImGui::BeginMenu(ui::Tr(ui::MessageId::AddMenu))) {
         bool has_project = impl_->app_state.current_project.has_value();
         if (!has_project) ImGui::BeginDisabled();
-        if (ImGui::MenuItem("New GSN / SACM File")) {
+        if (ImGui::MenuItem(ui::Tr(ui::MessageId::NewGsnSacmFile))) {
             BeginCreateProjectSacmFile();
         }
-        if (ImGui::MenuItem("New Evidence Register")) {
+        if (ImGui::MenuItem(ui::Tr(ui::MessageId::NewEvidenceRegister))) {
             BeginCreateProjectEvidenceRegister();
         }
-        if (ImGui::MenuItem("New J3377 CAE Register")) {
+        if (ImGui::MenuItem(ui::Tr(ui::MessageId::NewJ3377CaeRegister))) {
             BeginCreateProjectJ3377CaeRegister();
         }
         if (!has_project) ImGui::EndDisabled();
         ImGui::EndMenu();
     }
 
-    if (ImGui::BeginMenu("Edit")) {
-        if (ImGui::MenuItem("Preferences...")) {
+    if (ImGui::BeginMenu(ui::Tr(ui::MessageId::EditMenu))) {
+        if (ImGui::MenuItem(ui::Tr(ui::MessageId::Preferences))) {
             impl_->show_preferences_window = true;
         }
         ImGui::EndMenu();
     }
 
-    if (ImGui::BeginMenu("View")) {
+    if (ImGui::BeginMenu(ui::Tr(ui::MessageId::ViewMenu))) {
         ui::UiState& ui_state = ui::GetUiState();
-        ImGui::MenuItem("GSN Canvas", nullptr, &impl_->show_gsn_tab);
-        ImGui::MenuItem("CSE Register", nullptr, &impl_->show_cse_tab);
-        ImGui::MenuItem("Evidence Register", nullptr, &impl_->show_evidence_tab);
+        ImGui::MenuItem(ui::Tr(ui::MessageId::GsnCanvas), nullptr, &impl_->show_gsn_tab);
+        ImGui::MenuItem(ui::Tr(ui::MessageId::CseRegister), nullptr, &impl_->show_cse_tab);
+        ImGui::MenuItem(ui::Tr(ui::MessageId::EvidenceRegister), nullptr, &impl_->show_evidence_tab);
         NormalizeCenterViewSelection(
             impl_->show_gsn_tab,
             impl_->show_cse_tab,
@@ -568,7 +603,17 @@ float AppRuntime::RenderMainMenuBar(bool& done) {
             ui_state.center_view);
 
         ImGui::Separator();
-        if (ImGui::MenuItem("Welcome Screen")) {
+        if (ImGui::BeginMenu(ui::Tr(ui::MessageId::Appearance))) {
+            if (ImGui::MenuItem(ui::Tr(ui::MessageId::ThemeTweaks))) {
+                impl_->show_theme_tweak_window = true;
+            }
+            RenderThemeMenu();
+            RenderLanguageMenu();
+            ImGui::EndMenu();
+        }
+
+        ImGui::Separator();
+        if (ImGui::MenuItem(ui::Tr(ui::MessageId::WelcomeScreen))) {
             impl_->show_startup_project_window = true;
         }
 
@@ -603,6 +648,7 @@ void AppRuntime::RenderPreferencesWindow() {
     model.apiKeyBufferSize = sizeof(impl_->ai_api_key_buf);
     model.modelBuffer = impl_->ai_model_buf;
     model.modelBufferSize = sizeof(impl_->ai_model_buf);
+    model.language = ui::CurrentLanguage();
 
     ui::panels::PreferencesPanelCallbacks callbacks;
     callbacks.save_settings = [this](const ai::AiProviderSettings& settings) {
@@ -651,8 +697,16 @@ void AppRuntime::RenderPreferencesWindow() {
             return service->TestConnection();
         });
     };
+    callbacks.set_language = [](ui::Language language) {
+        ui::SetCurrentLanguage(language);
+    };
 
     ui::panels::ShowPreferencesWindow(impl_->show_preferences_window, model, callbacks);
+}
+
+void AppRuntime::RenderThemeTweaksWindow() {
+    if (!impl_->show_theme_tweak_window) return;
+    HelloImGui::ShowThemeTweakGuiWindow(&impl_->show_theme_tweak_window);
 }
 
 void AppRuntime::RenderSplitters(float display_w, float content_h, float left_w, float center_w, float top_y) {
@@ -785,7 +839,7 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
             ImGuiTabItemFlags gsn_flags = (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::GsnCanvas)
                                           ? ImGuiTabItemFlags_SetSelected
                                           : 0;
-            if (ImGui::BeginTabItem("GSN Canvas", nullptr, gsn_flags)) {
+            if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::GsnCanvas), nullptr, gsn_flags)) {
                 ui_state.center_view = ui::CenterView::GsnCanvas;
                 ui::ElementContextActions actions = MakeElementContextActions(*this);
                 ui::gsn::ShowGsnCanvasContent(ui_state, GetLoadedCase(), actions);
@@ -797,7 +851,7 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
             ImGuiTabItemFlags cse_flags = (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::CseRegister)
                                           ? ImGuiTabItemFlags_SetSelected
                                           : 0;
-            if (ImGui::BeginTabItem("CSE Register", nullptr, cse_flags)) {
+            if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::CseRegister), nullptr, cse_flags)) {
                 ui_state.center_view = ui::CenterView::CseRegister;
                 if (impl_->app_state.active_project_file_role == core::ProjectFileRole::J3377CaeRegister) {
                     ImGui::TextWrapped("J3377 CAE register file: %s",
@@ -814,7 +868,7 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
             ImGuiTabItemFlags evidence_flags = (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::EvidenceRegister)
                                                ? ImGuiTabItemFlags_SetSelected
                                                : 0;
-            if (ImGui::BeginTabItem("Evidence Register", nullptr, evidence_flags)) {
+            if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::EvidenceRegister), nullptr, evidence_flags)) {
                 ui_state.center_view = ui::CenterView::EvidenceRegister;
                 if (impl_->app_state.active_project_file_role == core::ProjectFileRole::EvidenceRegister) {
                     ImGui::TextWrapped("Evidence register file: %s",
@@ -1310,12 +1364,6 @@ void AppRuntime::RenderCreateProjectModal() {
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal("Create Empty Assurance Project", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        const ui::Theme& theme = ui::GetTheme();
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ColorFromU32(theme.surface_3));
-        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ColorFromU32(ui::WithAlpha(theme.surface_3, 0.90f)));
-        ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ColorFromU32(ui::WithAlpha(theme.accent, 0.28f)));
-        ImGui::PushStyleColor(ImGuiCol_Border, ColorFromU32(theme.border_strong));
-
         ImGui::TextUnformatted("Project name");
         ImGui::SetNextItemWidth(420.0f);
         ImGui::InputText("##project_name", impl_->project_name_buf, sizeof(impl_->project_name_buf));
@@ -1336,7 +1384,6 @@ void AppRuntime::RenderCreateProjectModal() {
             }
         }
 
-        ImGui::PopStyleColor(4);
         ImGui::Spacing();
 
         if (ImGui::Button("Create", ImVec2(110.0f, 0.0f))) {
@@ -1400,16 +1447,9 @@ void AppRuntime::RenderProjectFileNameModal() {
     const char* title = ProjectFileCreateTitle(impl_->pending_project_file_kind);
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        const ui::Theme& theme = ui::GetTheme();
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ColorFromU32(theme.surface_3));
-        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ColorFromU32(ui::WithAlpha(theme.surface_3, 0.90f)));
-        ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ColorFromU32(ui::WithAlpha(theme.accent, 0.28f)));
-        ImGui::PushStyleColor(ImGuiCol_Border, ColorFromU32(theme.border_strong));
-
         ImGui::TextUnformatted("File name");
         ImGui::SetNextItemWidth(420.0f);
         ImGui::InputText("##project_file_name", impl_->project_file_name_buf, sizeof(impl_->project_file_name_buf));
-        ImGui::PopStyleColor(4);
         ImGui::Spacing();
 
         if (ImGui::Button("Create", ImVec2(110.0f, 0.0f))) {
@@ -1581,6 +1621,7 @@ void AppRuntime::RenderFrame(bool& done) {
     RenderElementPropertiesPanel(center_x, center_w, right_w, content_h, top_y);
 
     RenderPreferencesWindow();
+    RenderThemeTweaksWindow();
     RenderAiReviewDebugModal();
 
     RenderNotImplementedModal();

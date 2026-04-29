@@ -57,6 +57,7 @@ private:
     void RenderProjectLoadReportModal();
     void RenderSaveBeforeExitModal(bool& done);
     void RenderPreferencesWindow();
+    void RenderThemeTweaksWindow();
     void RenderAiReviewDebugModal();
 
     void BeginCreateProject();

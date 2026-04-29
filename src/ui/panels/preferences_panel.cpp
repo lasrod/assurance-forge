@@ -1,6 +1,7 @@
 #include "ui/panels/preferences_panel.h"
 
 #include "imgui.h"
+#include "ui/localization.h"
 #include "ui/theme.h"
 
 #include <algorithm>
@@ -42,22 +43,22 @@ void RenderConnectionStatus(const ai::AiConnectionStatus& status) {
 
 void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallbacks& callbacks) {
     if (!model.settings) {
-        ImGui::TextDisabled("AI settings are unavailable.");
+        ImGui::TextDisabled("%s", ui::Tr(ui::MessageId::AiSettingsUnavailable));
         return;
     }
 
     ai::AiProviderSettings draft = *model.settings;
 
-    ImGui::TextUnformatted("AI");
+    ImGui::TextUnformatted(ui::Tr(ui::MessageId::Ai));
     ImGui::Separator();
 
     bool enabled = draft.enabled;
-    if (ImGui::Checkbox("Enable AI support", &enabled)) {
+    if (ImGui::Checkbox(ui::Tr(ui::MessageId::EnableAiSupport), &enabled)) {
         draft.enabled = enabled;
         *model.settings = draft;
     }
 
-    ImGui::TextUnformatted("Provider");
+    ImGui::TextUnformatted(ui::Tr(ui::MessageId::Provider));
     ImGui::SetNextItemWidth(220.0f);
     ImGui::BeginDisabled();
     static char provider_name[] = "OpenAI";
@@ -65,14 +66,14 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
                      ImGuiInputTextFlags_ReadOnly);
     ImGui::EndDisabled();
 
-    ImGui::TextUnformatted("Model");
+    ImGui::TextUnformatted(ui::Tr(ui::MessageId::Model));
     ImGui::SetNextItemWidth(280.0f);
     if (model.modelBuffer && model.modelBufferSize > 0 &&
         ImGui::InputText("##ai_model", model.modelBuffer, model.modelBufferSize)) {
         model.settings->model = model.modelBuffer;
     }
 
-    if (ImGui::Button("Save AI Settings")) {
+    if (ImGui::Button(ui::Tr(ui::MessageId::SaveAiSettings))) {
         if (model.modelBuffer && model.modelBufferSize > 0) {
             model.settings->model = model.modelBuffer;
         }
@@ -80,14 +81,14 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
     }
 
     ImGui::Spacing();
-    ImGui::TextUnformatted("API Key");
+    ImGui::TextUnformatted(ui::Tr(ui::MessageId::ApiKey));
     if (!model.secureStoreAvailable) {
         ImGui::TextColored(StatusColor(ai::ErrorStatus(ai::AiErrorCode::SecureStoreUnavailable, "")),
-                           "Secure storage is unavailable on this platform.");
+                           "%s", ui::Tr(ui::MessageId::SecureStorageUnavailable));
     } else if (model.keyStored) {
-        ImGui::TextDisabled("Key stored: ********");
+        ImGui::TextDisabled("%s", ui::Tr(ui::MessageId::KeyStored));
     } else {
-        ImGui::TextDisabled("No API key stored.");
+        ImGui::TextDisabled("%s", ui::Tr(ui::MessageId::NoApiKeyStored));
     }
 
     ImGuiInputTextFlags key_flags = ImGuiInputTextFlags_Password;
@@ -97,12 +98,12 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
     }
 
     if (!model.secureStoreAvailable) ImGui::BeginDisabled();
-    if (ImGui::Button(model.keyStored ? "Update Key" : "Save Key")) {
+    if (ImGui::Button(model.keyStored ? ui::Tr(ui::MessageId::UpdateKey) : ui::Tr(ui::MessageId::SaveKey))) {
         if (callbacks.save_api_key && model.apiKeyBuffer) callbacks.save_api_key(model.apiKeyBuffer);
     }
     ImGui::SameLine();
     if (!model.keyStored) ImGui::BeginDisabled();
-    if (ImGui::Button("Remove Key")) {
+    if (ImGui::Button(ui::Tr(ui::MessageId::RemoveKey))) {
         if (callbacks.remove_api_key) callbacks.remove_api_key();
     }
     if (!model.keyStored) ImGui::EndDisabled();
@@ -111,7 +112,7 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
     ImGui::Spacing();
     const bool can_test = model.secureStoreAvailable && model.keyStored && model.settings->enabled && !model.testRunning;
     if (!can_test) ImGui::BeginDisabled();
-    if (ImGui::Button("Test Connection")) {
+    if (ImGui::Button(ui::Tr(ui::MessageId::TestConnection))) {
         if (callbacks.test_connection) callbacks.test_connection();
     }
     if (!can_test) ImGui::EndDisabled();
@@ -119,7 +120,26 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
     RenderConnectionStatus(model.connectionStatus);
 
     ImGui::Spacing();
-    ImGui::TextWrapped("AI features may send selected safety case content and prompts to the configured AI provider. Assurance Forge will not send project data automatically; data is sent only when you explicitly use an AI action.");
+    ImGui::TextWrapped("%s", ui::Tr(ui::MessageId::AiPrivacyNotice));
+}
+
+void RenderAppearanceSection(PreferencesPanelModel model, const PreferencesPanelCallbacks& callbacks) {
+    ImGui::TextUnformatted(ui::Tr(ui::MessageId::Appearance));
+    ImGui::Separator();
+
+    ImGui::TextUnformatted(ui::Tr(ui::MessageId::Language));
+    ImGui::SetNextItemWidth(220.0f);
+    if (ImGui::BeginCombo("##language", ui::LanguageDisplayName(model.language))) {
+        const ui::Language languages[] = {ui::Language::English, ui::Language::Japanese};
+        for (ui::Language language : languages) {
+            const bool selected = model.language == language;
+            if (ImGui::Selectable(ui::LanguageDisplayName(language), selected)) {
+                if (callbacks.set_language) callbacks.set_language(language);
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
 }
 
 }  // namespace
@@ -130,8 +150,10 @@ void ShowPreferencesWindow(bool& open,
     if (!open) return;
 
     SyncModelBuffer(model);
-    ImGui::SetNextWindowSize(ImVec2(520.0f, 0.0f), ImGuiCond_Appearing);
-    if (ImGui::Begin("Preferences", &open, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ImGui::SetNextWindowSize(ImVec2(560.0f, 0.0f), ImGuiCond_Appearing);
+    if (ImGui::Begin(ui::Tr(ui::MessageId::Preferences), &open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
+        RenderAppearanceSection(model, callbacks);
+        ImGui::Spacing();
         RenderAiSection(model, callbacks);
     }
     ImGui::End();

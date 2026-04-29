@@ -1,7 +1,6 @@
-// Centralized visual theme for Assurance Forge ("Aurora Dark").
-// Provides a single source of truth for colors, rounding, and the global
-// ImGui style. All UI / canvas code should pull colors from GetTheme()
-// instead of using hard-coded literals.
+// Semantic colors for Assurance Forge. Generic widgets are styled by
+// Hello ImGui themes; this adapter exposes current-style colors plus
+// domain colors for GSN/canvas rendering.
 #pragma once
 
 #include <imgui.h>
@@ -62,12 +61,8 @@ struct Theme {
     float canvas_grid_spacing;  // Cell size in content-space pixels
 };
 
-// Global theme accessor.
+// Current semantic palette accessor.
 const Theme& GetTheme();
-
-// Apply theme colors and metrics to ImGui's global style. Call once after
-// ImGui::CreateContext() and StyleColorsDark().
-void ApplyImGuiStyle();
 
 // Linear-interpolate two ImU32 colors in straight-alpha space.
 ImU32 LerpColor(ImU32 a, ImU32 b, float t);

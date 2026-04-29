@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ai/ai_types.h"
+#include "ui/localization.h"
 
 #include <cstddef>
 #include <functional>
@@ -17,6 +18,7 @@ struct PreferencesPanelModel {
     size_t apiKeyBufferSize = 0;
     char* modelBuffer = nullptr;
     size_t modelBufferSize = 0;
+    ui::Language language = ui::Language::English;
 };
 
 struct PreferencesPanelCallbacks {
@@ -24,6 +26,7 @@ struct PreferencesPanelCallbacks {
     std::function<void(const char*)> save_api_key;
     std::function<void()> remove_api_key;
     std::function<void()> test_connection;
+    std::function<void(ui::Language)> set_language;
 };
 
 void ShowPreferencesWindow(bool& open,

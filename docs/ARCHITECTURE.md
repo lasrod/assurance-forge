@@ -53,7 +53,11 @@ This keeps dependencies visible at the call site and preserves the simple immedi
 
 ## HelloImGui Scope
 
-HelloImGui is used only as a thin platform layer: window creation, event loop, DPI scaling, and macOS bundling. Higher-level HelloImGui features (docking layout, theming, log/INI persistence, status bar, asset image utilities) are intentionally not used so the dependency stays cheap to swap if needed.
+HelloImGui provides the platform runner, window creation, event loop, DPI scaling, macOS bundling, global ImGui themes, and application settings/user preferences. Assurance Forge keeps its manual `NoDefaultWindow` layout and custom menu flow, but generic widget styling now comes from HelloImGui themes and the selected theme is remembered through HelloImGui settings.
+
+Higher-level HelloImGui features such as docking layouts, default layout management, status bars, logging windows, and asset image utilities remain outside the current architecture. The `ui` layer keeps a small semantic palette for GSN node colors, canvas colors, edge colors, and status severity colors because those values carry domain meaning beyond generic ImGui theme colors.
+
+Application chrome localization is handled by a lightweight Assurance Forge message catalog. This is separate from SACM/model translations, which remain part of the parsed assurance-case data and UI state.
 
 ## Core Data
 
