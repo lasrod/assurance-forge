@@ -8,12 +8,27 @@ if(MSVC)
     add_compile_options(/FS)
 endif()
 
+# yaml-cpp 0.8.0 still declares cmake_minimum_required(VERSION 3.4).
+# Raise the policy floor for fetched dependencies without patching their sources.
+set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
+
+include(FetchContent)
+
+# --- JSON ---
+FetchContent_Declare(
+    nlohmann_json
+    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 set(HELLOIMGUI_BUILD_DEMOS OFF CACHE BOOL "" FORCE)
 set(HELLOIMGUI_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(HELLOIMGUI_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(HELLOIMGUI_USE_FREETYPE OFF CACHE BOOL "" FORCE)
 set(HELLOIMGUI_USE_GLFW3 ON CACHE BOOL "" FORCE)
 set(HELLOIMGUI_HAS_OPENGL3 ON CACHE BOOL "" FORCE)
+set(HELLOIMGUI_USE_EXTERNAL_JSON ON CACHE BOOL "" FORCE)
 add_subdirectory(external/hello_imgui)
 
 set(NFD_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -33,20 +48,6 @@ set(ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS
 )
 
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
-
-# yaml-cpp 0.8.0 still declares cmake_minimum_required(VERSION 3.4).
-# Raise the policy floor for fetched dependencies without patching their sources.
-set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
-
-include(FetchContent)
-
-# --- JSON ---
-FetchContent_Declare(
-    nlohmann_json
-    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-)
-FetchContent_MakeAvailable(nlohmann_json)
 
 # --- YAML ---
 set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
