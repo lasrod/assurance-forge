@@ -124,4 +124,13 @@ bool ReviewItemManager::SetProposal(const std::string& review_item_id, const std
     return false;
 }
 
+bool ReviewItemManager::ClearProposal(const std::string& review_item_id) {
+    for (ReviewItem& item : items_) {
+        if (item.id != review_item_id) continue;
+        item.proposal_id.reset();
+        return true;
+    }
+    return false;
+}
+
 }  // namespace core

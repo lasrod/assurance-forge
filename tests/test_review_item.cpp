@@ -106,6 +106,11 @@ TEST(ReviewItemManagerTest, UpdatesAndRemovesItems) {
     EXPECT_EQ(found->element_id, "G2");
     EXPECT_EQ(found->proposal_id, "proposal-0001");
 
+    ASSERT_TRUE(manager.ClearProposal("review-1"));
+    found = manager.GetItemById("review-1");
+    ASSERT_TRUE(found.has_value());
+    EXPECT_FALSE(found->proposal_id.has_value());
+
     ASSERT_TRUE(manager.RemoveItem("review-1"));
     EXPECT_FALSE(manager.GetItemById("review-1").has_value());
 }

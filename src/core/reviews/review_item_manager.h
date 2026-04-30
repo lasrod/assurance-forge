@@ -25,6 +25,7 @@ public:
     bool AddOrUpdateItem(ReviewItem item);
     bool RemoveItem(const std::string& id);
     bool SetProposal(const std::string& review_item_id, const std::string& proposal_id);
+    bool ClearProposal(const std::string& review_item_id);
 
 private:
     std::filesystem::path file_path_;

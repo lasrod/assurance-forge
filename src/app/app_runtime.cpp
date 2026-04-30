@@ -28,6 +28,7 @@
 #include "core/problems/problems_manager.h"
 #include "core/project_service.h"
 #include "core/reviews/review_item_manager.h"
+#include "core/reviews/review_proposal_manager.h"
 #include "parser/guidelines_parser.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas.h"
@@ -182,6 +183,14 @@ std::string GenerateReviewItemId() {
     return out.str();
 }
 
+std::string GenerateReviewProposalId() {
+    static unsigned long long counter = 0;
+    auto ticks = std::chrono::system_clock::now().time_since_epoch().count();
+    std::ostringstream out;
+    out << "proposal-" << std::hex << ticks << "-" << ++counter;
+    return out.str();
+}
+
 std::filesystem::path ReviewItemsPath(const core::AssuranceProject& project) {
     for (const core::ProjectFileEntry& entry : project.files) {
         if (entry.role == core::ProjectFileRole::ReviewItems) return project.rootPath / entry.relativePath;
@@ -189,9 +198,44 @@ std::filesystem::path ReviewItemsPath(const core::AssuranceProject& project) {
     return {};
 }
 
+std::filesystem::path ReviewProposalRelativePath(const std::string& proposal_id) {
+    return std::filesystem::path("reviews") / "proposals" / (proposal_id + ".afpatch.json");
+}
+
 std::string TruncateForProblemMessage(const std::string& value, size_t limit = 400) {
     if (value.size() <= limit) return value;
     return value.substr(0, limit) + "...";
+}
+
+const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model, const std::string& element_id) {
+    auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
+        return element.id == element_id;
+    });
+    return found == model.elements.end() ? nullptr : &*found;
+}
+
+bool ProjectTracksFile(const core::AssuranceProject& project, const std::filesystem::path& relative_path) {
+    const std::string normalized = relative_path.generic_string();
+    return std::any_of(project.files.begin(), project.files.end(), [&](const core::ProjectFileEntry& entry) {
+        return entry.relativePath.generic_string() == normalized;
+    });
+}
+
+core::ReviewProposal BuildDraftReviewProposal(const core::ReviewItem& item,
+                                              const parser::AssuranceCase& model,
+                                              const parser::SacmElement& anchor) {
+    core::ReviewProposal proposal;
+    proposal.id = GenerateReviewProposalId();
+    proposal.review_item_id = item.id;
+    proposal.title = item.title.empty() ? "Proposed change" : item.title;
+    proposal.summary = item.message.empty() ? "Draft proposed change." : TruncateForProblemMessage(item.message, 180);
+    proposal.author_name = "Manual reviewer";
+    proposal.created_utc = NowUtcString();
+    proposal.anchor_element_id = anchor.id;
+    proposal.affected_existing_element_ids = {anchor.id};
+    proposal.base_model_hash = core::ComputeModelSemanticHash(model);
+    proposal.base_element_hashes[anchor.id] = core::ComputeElementSemanticHash(anchor);
+    return proposal;
 }
 
 std::filesystem::path ExecutableDirectory() {
@@ -258,6 +302,7 @@ struct AppRuntime::Impl {
     core::AppState app_state;
     core::ProblemsManager problems_manager;
     core::ReviewItemManager review_item_manager;
+    core::ReviewProposalManager review_proposal_manager;
 
     std::shared_ptr<ai::AiSettingsStore> ai_settings_store;
     std::shared_ptr<ai::ISecretStore> ai_secret_store;
@@ -1282,17 +1327,96 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
         }
         SetStatus("Review comment added.");
     };
-    callbacks.create_proposed_change = [this](const core::ReviewItem&) {
-        SetStatus("Proposal edit mode will be implemented in the next slice.");
+    callbacks.create_proposed_change = [this](const core::ReviewItem& item) {
+        if (item.proposal_id.has_value()) {
+            SetStatus("This review comment already has a proposed change.");
+            return;
+        }
+        if (!impl_->app_state.current_project.has_value() || !impl_->app_state.loaded_case.has_value()) {
+            SetStatus("Open a project and SACM file before creating proposed changes.");
+            return;
+        }
+
+        const parser::SacmElement* anchor = FindParserElement(impl_->app_state.loaded_case.value(), item.element_id);
+        if (!anchor) {
+            SetStatus("The reviewed element no longer exists in the loaded model.");
+            return;
+        }
+
+        core::ReviewProposal proposal = BuildDraftReviewProposal(item, impl_->app_state.loaded_case.value(), *anchor);
+        core::AssuranceProject& project = impl_->app_state.current_project.value();
+        core::ProjectFileEntry entry;
+        std::string error;
+        if (!core::ProjectService::AddReviewProposalFile(project, proposal.id, core::SerializeReviewProposal(proposal), entry, error)) {
+            SetStatus("Proposal creation failed: " + error);
+            return;
+        }
+        if (!impl_->review_item_manager.SetProposal(item.id, proposal.id) || !impl_->review_item_manager.Save(error)) {
+            std::string cleanup_error;
+            core::ProjectService::RemoveTrackedFile(project, entry.relativePath, true, cleanup_error);
+            SetStatus("Proposal link save failed: " + error);
+            return;
+        }
+
+        core::ProjectService::RefreshFileStatus(project);
+        SetStatus("Created proposed change " + proposal.id + ".");
     };
-    callbacks.preview_proposal = [this](const core::ReviewItem&) {
-        SetStatus("Proposal preview will be implemented in the next slice.");
+    callbacks.preview_proposal = [this](const core::ReviewItem& item) {
+        if (!item.proposal_id.has_value()) {
+            SetStatus("This review comment has no proposed change to preview.");
+            return;
+        }
+        std::string error;
+        std::optional<core::ReviewProposal> proposal = impl_->review_proposal_manager.LoadProposal(item.proposal_id.value(), error);
+        if (!proposal.has_value()) {
+            SetStatus("Proposal preview failed: " + error);
+            return;
+        }
+
+        std::ostringstream status;
+        status << "Proposal " << proposal->id << " has " << proposal->operations.size() << " operation(s)";
+        if (impl_->app_state.loaded_case.has_value()) {
+            core::ProposalValidityResult validity = core::EvaluateReviewProposalValidity(*proposal, impl_->app_state.loaded_case.value());
+            status << (validity.validity == core::ProposalValidity::Valid ? " and is valid." : " and is broken: " + validity.reason);
+        } else {
+            status << ".";
+        }
+        SetStatus(status.str());
     };
     callbacks.apply_proposal = [this](const core::ReviewItem&) {
         SetStatus("Proposal apply will be implemented in the next slice.");
     };
-    callbacks.delete_proposal = [this](const core::ReviewItem&) {
-        SetStatus("Proposal delete will be implemented in the next slice.");
+    callbacks.delete_proposal = [this](const core::ReviewItem& item) {
+        if (!item.proposal_id.has_value()) {
+            SetStatus("This review comment has no proposed change to delete.");
+            return;
+        }
+        if (!impl_->app_state.current_project.has_value()) {
+            SetStatus("Open a project before deleting proposed changes.");
+            return;
+        }
+
+        core::AssuranceProject& project = impl_->app_state.current_project.value();
+        const std::filesystem::path relative_path = ReviewProposalRelativePath(item.proposal_id.value());
+        std::string error;
+        bool deleted = false;
+        if (ProjectTracksFile(project, relative_path)) {
+            deleted = core::ProjectService::RemoveTrackedFile(project, relative_path, true, error);
+        } else {
+            deleted = impl_->review_proposal_manager.DeleteProposal(item.proposal_id.value(), error);
+        }
+        if (!deleted) {
+            SetStatus("Proposal delete failed: " + error);
+            return;
+        }
+
+        if (!impl_->review_item_manager.ClearProposal(item.id) || !impl_->review_item_manager.Save(error)) {
+            SetStatus("Proposal deleted, but review link update failed: " + error);
+            return;
+        }
+
+        core::ProjectService::RefreshFileStatus(project);
+        SetStatus("Deleted proposed change " + item.proposal_id.value() + ".");
     };
     ui::panels::ShowReviewPanel(model, callbacks);
 
@@ -1524,6 +1648,7 @@ bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {
     if (impl_->app_state.current_project.has_value()) {
         std::filesystem::path review_path = ReviewItemsPath(impl_->app_state.current_project.value());
         impl_->review_item_manager.SetFilePath(review_path);
+        impl_->review_proposal_manager.SetProjectRoot(impl_->app_state.current_project->rootPath);
         std::string error;
         if (!review_path.empty() && !impl_->review_item_manager.Load(error)) {
             SetStatus("Review items could not be loaded: " + error);
@@ -1555,6 +1680,7 @@ void AppRuntime::RenderCreateProjectModal() {
                 if (impl_->app_state.current_project.has_value()) {
                     std::filesystem::path review_path = ReviewItemsPath(impl_->app_state.current_project.value());
                     impl_->review_item_manager.SetFilePath(review_path);
+                    impl_->review_proposal_manager.SetProjectRoot(impl_->app_state.current_project->rootPath);
                     std::string error;
                     if (!review_path.empty()) impl_->review_item_manager.Load(error);
                 }
