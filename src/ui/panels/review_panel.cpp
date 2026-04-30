@@ -134,10 +134,17 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
             DrawStatusBadge(item);
             ImGui::SameLine();
             ImGui::TextWrapped("%s", item.title.empty() ? "Review comment" : item.title.c_str());
+            ImGui::TextDisabled("Reviewed by %s", item.reviewer_name.empty() ? "not recorded" : item.reviewer_name.c_str());
             if (!item.message.empty()) {
                 ImGui::TextWrapped("%s", item.message.c_str());
             }
             DrawProposalActions(item, model, callbacks);
+            if (item.status == core::ReviewItemStatus::Open) {
+                if (ImGui::Button("Resolve") && callbacks.resolve_review_item) {
+                    callbacks.resolve_review_item(item);
+                }
+                ImGui::SameLine();
+            }
             if (ImGui::Button("Delete") && callbacks.delete_review_item) {
                 callbacks.delete_review_item(item);
             }

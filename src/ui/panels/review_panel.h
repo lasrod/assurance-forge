@@ -28,6 +28,7 @@ struct ReviewPanelCallbacks {
     std::function<void(const core::ReviewItem& item)> preview_proposal;
     std::function<void(const core::ReviewItem& item)> apply_proposal;
     std::function<void(const core::ReviewItem& item)> delete_proposal;
+    std::function<void(const core::ReviewItem& item)> resolve_review_item;
     std::function<void(const core::ReviewItem& item)> delete_review_item;
 };
 

@@ -21,6 +21,8 @@ public:
 
     void LoadRecentProjectsPreference(const std::string& content);
     std::string RecentProjectsPreferenceJson() const;
+    void LoadReviewerNamePreference(const std::string& content);
+    std::string ReviewerNamePreference() const;
 
     // Add a new child element to the currently selected element.
     // Returns true on success; updates selection to the new element.
@@ -57,6 +59,7 @@ private:
     void RenderNotImplementedModal();
     void RenderRemoveConfirmModal();
     void RenderDeleteReviewItemConfirmModal();
+    void RenderReviewerNamePromptModal();
     void RenderCreateProjectModal();
     void RenderProjectFileNameModal();
     void RenderProjectLoadReportModal();
@@ -84,6 +87,7 @@ private:
     void CancelActiveProposal();
     void BeginDeleteReviewItem(const core::ReviewItem& item);
     bool DeleteReviewItem(const core::ReviewItem& item);
+    bool ResolveReviewItem(const core::ReviewItem& item);
     bool RefreshProposalCreatorPreview();
     void ProcessPendingProposalCreatorPreviewRefresh();
     bool AddProposalChildToSelected(core::NewElementKind kind);

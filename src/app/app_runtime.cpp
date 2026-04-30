@@ -98,6 +98,14 @@ void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
     buffer[count] = '\0';
 }
 
+std::string TrimWhitespace(const std::string& value) {
+    auto begin = value.begin();
+    while (begin != value.end() && std::isspace(static_cast<unsigned char>(*begin))) ++begin;
+    auto end = value.end();
+    while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1)))) --end;
+    return std::string(begin, end);
+}
+
 const char* ProjectFileCreateTitle(ProjectFileCreateKind kind) {
     switch (kind) {
         case ProjectFileCreateKind::Sacm: return "New GSN / SACM File";
@@ -679,6 +687,9 @@ struct AppRuntime::Impl {
     core::ReviewProposalManager review_proposal_manager;
     bool document_dirty = false;
     bool review_items_dirty = false;
+    std::string reviewer_name;
+    char reviewer_name_buf[128] = {};
+    bool show_reviewer_name_prompt = false;
 
     std::shared_ptr<ai::AiSettingsStore> ai_settings_store;
     std::shared_ptr<ai::ISecretStore> ai_secret_store;
@@ -1048,6 +1059,7 @@ bool AppRuntime::BeginProposalForReviewItem(const core::ReviewItem& item) {
     }
 
     impl_->proposal_draft = BuildDraftReviewProposal(item, impl_->app_state.loaded_case.value(), *anchor);
+    if (!impl_->reviewer_name.empty()) impl_->proposal_draft.author_name = impl_->reviewer_name;
     impl_->proposal_creator_active = true;
     impl_->proposal_creator_generated_ids.clear();
     if (!RefreshProposalCreatorPreview()) {
@@ -1245,6 +1257,34 @@ bool AppRuntime::DeleteReviewItem(const core::ReviewItem& item) {
     SetStatus(item.proposal_id.has_value()
         ? "Deleted review comment and proposed change."
         : "Deleted review comment.");
+    return true;
+}
+
+bool AppRuntime::ResolveReviewItem(const core::ReviewItem& item) {
+    if (impl_->proposal_creator_active) {
+        SetStatus("Save or discard the active proposal before resolving review comments.");
+        return false;
+    }
+    if (item.status == core::ReviewItemStatus::Resolved) {
+        SetStatus("Review comment is already resolved.");
+        return true;
+    }
+    if (!impl_->app_state.current_project.has_value()) {
+        SetStatus("Open a project before resolving review comments.");
+        return false;
+    }
+
+    core::ReviewItem updated = item;
+    updated.status = core::ReviewItemStatus::Resolved;
+    updated.updated_utc = NowUtcString();
+    if (!impl_->review_item_manager.AddOrUpdateItem(std::move(updated))) {
+        SetStatus("Could not resolve review comment.");
+        return false;
+    }
+
+    impl_->review_items_dirty = true;
+    impl_->app_state.mark_dirty();
+    SetStatus("Review comment resolved.");
     return true;
 }
 
@@ -1559,6 +1599,8 @@ void AppRuntime::RenderPreferencesWindow() {
     model.apiKeyBufferSize = sizeof(impl_->ai_api_key_buf);
     model.modelBuffer = impl_->ai_model_buf;
     model.modelBufferSize = sizeof(impl_->ai_model_buf);
+    model.reviewerNameBuffer = impl_->reviewer_name_buf;
+    model.reviewerNameBufferSize = sizeof(impl_->reviewer_name_buf);
     model.language = ui::CurrentLanguage();
 
     ui::panels::PreferencesPanelCallbacks callbacks;
@@ -1610,6 +1652,12 @@ void AppRuntime::RenderPreferencesWindow() {
     };
     callbacks.set_language = [](ui::Language language) {
         ui::SetCurrentLanguage(language);
+    };
+    callbacks.save_reviewer_name = [this](const char* reviewer_name) {
+        impl_->reviewer_name = TrimWhitespace(reviewer_name ? reviewer_name : "");
+        CopyToBuffer(impl_->reviewer_name_buf, sizeof(impl_->reviewer_name_buf), impl_->reviewer_name);
+        impl_->show_reviewer_name_prompt = impl_->reviewer_name.empty();
+        SetStatus(impl_->reviewer_name.empty() ? "Reviewer name is required for new reviews." : "Reviewer name saved.");
     };
 
     ui::panels::ShowPreferencesWindow(impl_->show_preferences_window, model, callbacks);
@@ -2319,6 +2367,11 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
         if (!EnsureReviewItemStorage()) {
             return;
         }
+        if (impl_->reviewer_name.empty()) {
+            impl_->show_reviewer_name_prompt = true;
+            SetStatus("Enter a reviewer name before adding review comments.");
+            return;
+        }
         const std::string element_id = ui::GetUiState().selected_element_id;
         if (element_id.empty()) {
             SetStatus("Select an element before adding a review comment.");
@@ -2331,6 +2384,7 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
         item.title = title;
         item.message = message;
         item.severity = "warning";
+        item.reviewer_name = impl_->reviewer_name;
         item.source = core::ReviewItemSource::Manual;
         item.status = core::ReviewItemStatus::Open;
         item.created_utc = NowUtcString();
@@ -2483,6 +2537,9 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
 
         core::ProjectService::RefreshFileStatus(project);
         SetStatus("Deleted proposed change " + item.proposal_id.value() + ".");
+    };
+    callbacks.resolve_review_item = [this](const core::ReviewItem& item) {
+        ResolveReviewItem(item);
     };
     callbacks.delete_review_item = [this](const core::ReviewItem& item) {
         BeginDeleteReviewItem(item);
@@ -2962,6 +3019,37 @@ void AppRuntime::RenderSaveBeforeExitModal(bool& done) {
     }
 }
 
+void AppRuntime::RenderReviewerNamePromptModal() {
+    if (!impl_->show_reviewer_name_prompt) return;
+    if (impl_->show_startup_project_window) return;
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal("Reviewer Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped("Enter the name to use for review comments.");
+        ImGui::SetNextItemWidth(360.0f);
+        ImGui::InputText("##startup_reviewer_name", impl_->reviewer_name_buf, sizeof(impl_->reviewer_name_buf));
+        ImGui::Spacing();
+
+        const std::string draft = TrimWhitespace(impl_->reviewer_name_buf);
+        if (draft.empty()) ImGui::BeginDisabled();
+        if (ImGui::Button("Save", ImVec2(100.0f, 0.0f))) {
+            impl_->reviewer_name = draft;
+            CopyToBuffer(impl_->reviewer_name_buf, sizeof(impl_->reviewer_name_buf), impl_->reviewer_name);
+            impl_->show_reviewer_name_prompt = false;
+            ImGui::CloseCurrentPopup();
+        }
+        if (draft.empty()) ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Later", ImVec2(100.0f, 0.0f))) {
+            impl_->show_reviewer_name_prompt = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    } else if (impl_->show_reviewer_name_prompt) {
+        ImGui::OpenPopup("Reviewer Name");
+    }
+}
+
 bool AppRuntime::SaveProject() {
     if (!impl_->app_state.current_project.has_value()) {
         impl_->app_state.status_message = "Create or open a project first.";
@@ -3024,6 +3112,16 @@ void AppRuntime::LoadRecentProjectsPreference(const std::string& content) {
 
 std::string AppRuntime::RecentProjectsPreferenceJson() const {
     return app::SaveRecentProjectsPreference(impl_->recent_projects);
+}
+
+void AppRuntime::LoadReviewerNamePreference(const std::string& content) {
+    impl_->reviewer_name = TrimWhitespace(content);
+    CopyToBuffer(impl_->reviewer_name_buf, sizeof(impl_->reviewer_name_buf), impl_->reviewer_name);
+    impl_->show_reviewer_name_prompt = impl_->reviewer_name.empty();
+}
+
+std::string AppRuntime::ReviewerNamePreference() const {
+    return impl_->reviewer_name;
 }
 
 void AppRuntime::RenderFrame(bool& done) {
@@ -3099,6 +3197,7 @@ void AppRuntime::RenderFrame(bool& done) {
     RenderProjectLoadReportModal();
     RenderSaveBeforeExitModal(done);
     RenderStartupProjectWindow();
+    RenderReviewerNamePromptModal();
 }
 
 }  // namespace app

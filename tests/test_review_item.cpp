@@ -45,6 +45,7 @@ TEST(ReviewItemTest, RoundTripsReviewItemsJson) {
     item.title = "Split mixed claim";
     item.message = "Claim combines safety and cybersecurity.";
     item.severity = "warning";
+    item.reviewer_name = "Case Reviewer";
     item.source = core::ReviewItemSource::AIReview;
     item.status = core::ReviewItemStatus::Resolved;
     item.proposal_id = "proposal-0001";
@@ -59,6 +60,7 @@ TEST(ReviewItemTest, RoundTripsReviewItemsJson) {
     ASSERT_EQ(items.size(), 1u);
     EXPECT_EQ(items[0].id, item.id);
     EXPECT_EQ(items[0].proposal_id, item.proposal_id);
+    EXPECT_EQ(items[0].reviewer_name, item.reviewer_name);
     EXPECT_EQ(items[0].source, core::ReviewItemSource::AIReview);
     EXPECT_EQ(items[0].status, core::ReviewItemStatus::Resolved);
 }

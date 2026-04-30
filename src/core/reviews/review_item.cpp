@@ -16,6 +16,7 @@ nlohmann::json ToJson(const ReviewItem& item) {
     object["title"] = item.title;
     object["message"] = item.message;
     object["severity"] = item.severity;
+    object["reviewer_name"] = item.reviewer_name;
     object["source"] = ReviewItemSourceToString(item.source);
     object["status"] = ReviewItemStatusToString(item.status);
     if (item.proposal_id.has_value()) object["proposal_id"] = item.proposal_id.value();
@@ -32,6 +33,7 @@ ReviewItem FromJson(const nlohmann::json& object) {
     item.title = object.value("title", "");
     item.message = object.value("message", "");
     item.severity = object.value("severity", "");
+    item.reviewer_name = object.value("reviewer_name", "");
     item.source = ReviewItemSourceFromString(object.value("source", "manual"));
     item.status = ReviewItemStatusFromString(object.value("status", "open"));
     if (object.contains("proposal_id") && object["proposal_id"].is_string()) {

@@ -11,6 +11,7 @@ namespace {
 
 constexpr const char* kLanguagePreference = "AssuranceForge.Language";
 constexpr const char* kRecentProjectsPreference = "AssuranceForge.RecentProjects";
+constexpr const char* kReviewerNamePreference = "AssuranceForge.ReviewerName";
 
 }  // namespace
 
@@ -35,10 +36,12 @@ int main(int, char**) {
     params.callbacks.PostInit = [&runtime]() {
         ui::SetCurrentLanguage(ui::ParseLanguageCode(HelloImGui::LoadUserPref(kLanguagePreference)));
         runtime.LoadRecentProjectsPreference(HelloImGui::LoadUserPref(kRecentProjectsPreference));
+        runtime.LoadReviewerNamePreference(HelloImGui::LoadUserPref(kReviewerNamePreference));
     };
     params.callbacks.BeforeExit = [&runtime]() {
         HelloImGui::SaveUserPref(kLanguagePreference, ui::LanguageCode(ui::CurrentLanguage()));
         HelloImGui::SaveUserPref(kRecentProjectsPreference, runtime.RecentProjectsPreferenceJson());
+        HelloImGui::SaveUserPref(kReviewerNamePreference, runtime.ReviewerNamePreference());
     };
     params.callbacks.ShowGui = [&]() {
         HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();

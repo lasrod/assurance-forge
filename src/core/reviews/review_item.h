@@ -22,6 +22,7 @@ struct ReviewItem {
     std::string title;
     std::string message;
     std::string severity;
+    std::string reviewer_name;
     ReviewItemSource source = ReviewItemSource::Manual;
     ReviewItemStatus status = ReviewItemStatus::Open;
     std::optional<std::string> proposal_id;
