@@ -56,6 +56,7 @@ private:
     void RenderStartupProjectWindow();
     void RenderNotImplementedModal();
     void RenderRemoveConfirmModal();
+    void RenderDeleteReviewItemConfirmModal();
     void RenderCreateProjectModal();
     void RenderProjectFileNameModal();
     void RenderProjectLoadReportModal();
@@ -81,6 +82,8 @@ private:
     bool PreviewProposalById(const std::string& proposal_id);
     bool SaveActiveProposal(const core::ReviewItem& item);
     void CancelActiveProposal();
+    void BeginDeleteReviewItem(const core::ReviewItem& item);
+    bool DeleteReviewItem(const core::ReviewItem& item);
     bool RefreshProposalCreatorPreview();
     void ProcessPendingProposalCreatorPreviewRefresh();
     bool AddProposalChildToSelected(core::NewElementKind kind);

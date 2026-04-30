@@ -748,6 +748,53 @@ bool ProjectService::AddReviewItemsFile(AssuranceProject& project,
                           ReviewItemsJson(), entry, error);
 }
 
+bool ProjectService::SaveReviewItemsFile(AssuranceProject& project,
+                                         const std::string& requested_file_name,
+                                         const std::string& content,
+                                         ProjectFileEntry& entry,
+                                         std::string& error) {
+    std::filesystem::path file_name = NormalizeFileName(requested_file_name, "review-items.af.json", ".json");
+    std::filesystem::path relative_path = std::filesystem::path("reviews") / file_name;
+    if (!IsSafeRelativePath(relative_path)) {
+        error = "Invalid project file path";
+        return false;
+    }
+
+    auto found = std::find_if(project.files.begin(), project.files.end(), [&](const ProjectFileEntry& candidate) {
+        return candidate.relativePath.generic_string() == relative_path.generic_string();
+    });
+
+    const std::filesystem::path absolute_path = project.rootPath / relative_path;
+    std::error_code ec;
+    if (!std::filesystem::create_directories(absolute_path.parent_path(), ec) && ec) {
+        error = "Could not create project directory: " + absolute_path.parent_path().string();
+        return false;
+    }
+    if (!WriteTextFile(absolute_path, content, error)) return false;
+
+    if (found == project.files.end()) {
+        ProjectFileEntry new_entry;
+        new_entry.id = GenerateId("af-file");
+        new_entry.relativePath = relative_path;
+        new_entry.role = ProjectFileRole::ReviewItems;
+        new_entry.hashAlgorithm = "sha256";
+        if (!RefreshEntryHashes(project, new_entry, false, error)) return false;
+        project.files.push_back(new_entry);
+        found = project.files.end() - 1;
+    } else if (found->role != ProjectFileRole::ReviewItems) {
+        error = "Tracked file is not a review item file: " + relative_path.generic_string();
+        return false;
+    } else if (!RefreshEntryHashes(project, *found, false, error)) {
+        return false;
+    }
+
+    project.modifiedUtc = NowUtc();
+    if (!WriteManifestSafely(project, error)) return false;
+
+    entry = *found;
+    return true;
+}
+
 bool ProjectService::AddReviewProposalFile(AssuranceProject& project,
                                            const std::string& requested_file_name,
                                            const std::string& content,

@@ -188,6 +188,37 @@ TEST(ProjectServiceTest, SaveReviewProposalFileRefreshesTrackedHash) {
     EXPECT_FALSE(refresh_report.warnings.empty()) << ReportSummary(refresh_report);
 }
 
+TEST(ProjectServiceTest, SaveReviewItemsFileRefreshesTrackedHash) {
+    TempDir tmp(MakeTempParent());
+    auto& parent = tmp.path;
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    core::ProjectFileEntry entry;
+    std::string error;
+
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("MySafetyCase", parent, project, report, error)) << error;
+
+    const std::string first_json = "{\n  \"schema\": \"assurance-forge.review-items.v1\",\n  \"items\": []\n}\n";
+    ASSERT_TRUE(core::ProjectService::SaveReviewItemsFile(project, "review-items.af.json", first_json, entry, error)) << error;
+    const std::string first_hash = entry.rawHash;
+
+    const std::string second_json =
+        "{\n"
+        "  \"schema\": \"assurance-forge.review-items.v1\",\n"
+        "  \"items\": [\n"
+        "    {\"id\": \"review-1\", \"element_id\": \"G1\", \"title\": \"Review comment\", \"message\": \"Check this\", \"status\": \"open\"}\n"
+        "  ]\n"
+        "}\n";
+    ASSERT_TRUE(core::ProjectService::SaveReviewItemsFile(project, "review-items.af.json", second_json, entry, error)) << error;
+    EXPECT_EQ(entry.relativePath.generic_string(), "reviews/review-items.af.json");
+    EXPECT_EQ(entry.role, core::ProjectFileRole::ReviewItems);
+    EXPECT_NE(entry.rawHash, first_hash);
+
+    core::ProjectLoadReport refresh_report = core::ProjectService::RefreshFileStatus(project);
+    EXPECT_FALSE(refresh_report.showPopup) << ReportSummary(refresh_report);
+    EXPECT_TRUE(refresh_report.warnings.empty()) << ReportSummary(refresh_report);
+}
+
 TEST(ProjectServiceTest, OpenProjectReportsExternallyModifiedAndMissingFiles) {
     TempDir tmp(MakeTempParent());
     auto& parent = tmp.path;

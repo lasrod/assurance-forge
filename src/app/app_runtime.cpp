@@ -677,6 +677,8 @@ struct AppRuntime::Impl {
     core::ProblemsManager problems_manager;
     core::ReviewItemManager review_item_manager;
     core::ReviewProposalManager review_proposal_manager;
+    bool document_dirty = false;
+    bool review_items_dirty = false;
 
     std::shared_ptr<ai::AiSettingsStore> ai_settings_store;
     std::shared_ptr<ai::ISecretStore> ai_secret_store;
@@ -745,6 +747,8 @@ struct AppRuntime::Impl {
     std::string pending_remove_id;
     core::RemoveMode pending_remove_mode = core::RemoveMode::NodeOnly;
     std::vector<std::string> pending_remove_ids;
+    bool show_delete_review_item_confirm = false;
+    core::ReviewItem pending_delete_review_item;
 
     bool show_preferences_window = false;
     bool show_theme_tweak_window = false;
@@ -875,6 +879,7 @@ bool AppRuntime::AddChildToSelected(core::NewElementKind kind) {
     ui::UiState& s = ui::GetUiState();
     s.selected_element_id = new_id;
     s.center_on_selection = true;
+    impl_->document_dirty = true;
     impl_->app_state.mark_dirty();
     SetStatus("Added " + new_id);
     return true;
@@ -902,6 +907,7 @@ bool AppRuntime::AddTopGoal() {
     ui::UiState& s = ui::GetUiState();
     s.selected_element_id = new_id;
     s.center_on_selection = true;
+    impl_->document_dirty = true;
     impl_->app_state.mark_dirty();
     SetStatus("Added " + new_id);
     return true;
@@ -938,6 +944,7 @@ void AppRuntime::RemoveSelected(core::RemoveMode mode) {
         }
         impl_->tree_needs_rebuild = true;
         ui::GetUiState().selected_element_id.clear();
+        impl_->document_dirty = true;
         impl_->app_state.mark_dirty();
         SetStatus("Removed " + selected_id);
         return;
@@ -1139,13 +1146,14 @@ bool AppRuntime::SaveActiveProposal(const core::ReviewItem& item) {
         return false;
     }
 
-    if (!impl_->review_item_manager.SetProposal(item.id, impl_->proposal_draft.id) ||
-        !impl_->review_item_manager.Save(error)) {
+    if (!impl_->review_item_manager.SetProposal(item.id, impl_->proposal_draft.id)) {
         std::string cleanup_error;
         core::ProjectService::RemoveTrackedFile(project, entry.relativePath, true, cleanup_error);
-        SetStatus("Proposal link save failed: " + error);
+        SetStatus("Proposal link update failed.");
         return false;
     }
+    impl_->review_items_dirty = true;
+    impl_->app_state.mark_dirty();
 
     const std::string saved_id = impl_->proposal_draft.id;
     CancelActiveProposal();
@@ -1172,6 +1180,72 @@ void AppRuntime::CancelActiveProposal() {
     } else {
         impl_->tree_needs_rebuild = true;
     }
+}
+
+void AppRuntime::BeginDeleteReviewItem(const core::ReviewItem& item) {
+    if (impl_->proposal_creator_active) {
+        SetStatus("Save or discard the active proposal before deleting review comments.");
+        return;
+    }
+    if (item.proposal_id.has_value()) {
+        impl_->pending_delete_review_item = item;
+        impl_->show_delete_review_item_confirm = true;
+        return;
+    }
+    DeleteReviewItem(item);
+}
+
+bool AppRuntime::DeleteReviewItem(const core::ReviewItem& item) {
+    if (impl_->proposal_creator_active) {
+        SetStatus("Save or discard the active proposal before deleting review comments.");
+        return false;
+    }
+    if (!impl_->app_state.current_project.has_value()) {
+        SetStatus("Open a project before deleting review comments.");
+        return false;
+    }
+
+    core::AssuranceProject& project = impl_->app_state.current_project.value();
+    if (item.proposal_id.has_value()) {
+        const std::filesystem::path relative_path = ReviewProposalRelativePath(item.proposal_id.value());
+        std::string error;
+        bool deleted = false;
+        if (ProjectTracksFile(project, relative_path)) {
+            deleted = core::ProjectService::RemoveTrackedFile(project, relative_path, true, error);
+        } else {
+            deleted = impl_->review_proposal_manager.DeleteProposal(item.proposal_id.value(), error);
+        }
+        if (!deleted) {
+            SetStatus("Review comment delete failed while deleting proposal: " + error);
+            return false;
+        }
+
+        if (impl_->proposal_preview_active && impl_->proposal_preview_id == item.proposal_id.value()) {
+            impl_->proposal_preview_active = false;
+            impl_->proposal_preview_id.clear();
+            impl_->proposal_preview_model = {};
+            ClearProposalHighlightState(ui::GetUiState());
+            if (impl_->app_state.loaded_case.has_value()) {
+                impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->app_state.loaded_case.value());
+                ui::gsn::SetCanvasTree(impl_->current_tree);
+            } else {
+                impl_->tree_needs_rebuild = true;
+            }
+        }
+    }
+
+    if (!impl_->review_item_manager.RemoveItem(item.id)) {
+        SetStatus("Review comment was already removed.");
+        return false;
+    }
+
+    impl_->review_items_dirty = true;
+    impl_->app_state.mark_dirty();
+    core::ProjectService::RefreshFileStatus(project);
+    SetStatus(item.proposal_id.has_value()
+        ? "Deleted review comment and proposed change."
+        : "Deleted review comment.");
+    return true;
 }
 
 bool AppRuntime::AddProposalChildToSelected(core::NewElementKind kind) {
@@ -2180,6 +2254,7 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
         sacm::AssuranceCasePackage* sacm_ptr = impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
         if (ui::panels::ShowElementPanel(ac_ptr, sacm_ptr)) {
             impl_->tree_needs_rebuild = true;
+            impl_->document_dirty = true;
             impl_->app_state.mark_dirty();
         }
     }
@@ -2265,14 +2340,8 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
             SetStatus("Could not add review comment.");
             return;
         }
-        std::string error;
-        if (!impl_->review_item_manager.Save(error)) {
-            SetStatus("Review comment save failed: " + error);
-            return;
-        }
-        if (impl_->app_state.current_project.has_value()) {
-            core::ProjectService::RefreshFileStatus(impl_->app_state.current_project.value());
-        }
+        impl_->review_items_dirty = true;
+        impl_->app_state.mark_dirty();
         SetStatus("Review comment added.");
     };
     callbacks.create_proposed_change = [this](const core::ReviewItem& item) {
@@ -2328,6 +2397,7 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
         ClearProposalHighlightState(ui::GetUiState());
         if (!impl_->app_state.sacm_package.has_value()) impl_->app_state.sacm_package.emplace();
         RebuildSacmArgumentPackageFromParser(impl_->app_state.loaded_case.value(), impl_->app_state.sacm_package.value());
+        impl_->document_dirty = true;
         impl_->app_state.mark_dirty();
         if (!SaveProject()) {
             SetStatus("Proposal applied in memory, but project save failed: " + impl_->app_state.status_message);
@@ -2352,10 +2422,12 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
         updated.status = core::ReviewItemStatus::Resolved;
         updated.applied_note = "Proposal applied at " + NowUtcString() + ".";
         updated.updated_utc = NowUtcString();
-        if (!impl_->review_item_manager.AddOrUpdateItem(std::move(updated)) || !impl_->review_item_manager.Save(error)) {
-            SetStatus("Proposal applied, but review item update failed: " + error);
+        if (!impl_->review_item_manager.AddOrUpdateItem(std::move(updated))) {
+            SetStatus("Proposal applied, but review item update failed.");
             return;
         }
+        impl_->review_items_dirty = true;
+        impl_->app_state.mark_dirty();
 
         core::ProjectService::RefreshFileStatus(project);
         impl_->tree_needs_rebuild = true;
@@ -2389,10 +2461,12 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
             return;
         }
 
-        if (!impl_->review_item_manager.ClearProposal(item.id) || !impl_->review_item_manager.Save(error)) {
-            SetStatus("Proposal deleted, but review link update failed: " + error);
+        if (!impl_->review_item_manager.ClearProposal(item.id)) {
+            SetStatus("Proposal deleted, but review link update failed.");
             return;
         }
+        impl_->review_items_dirty = true;
+        impl_->app_state.mark_dirty();
 
         if (impl_->proposal_preview_active && impl_->proposal_preview_id == item.proposal_id.value()) {
             impl_->proposal_preview_active = false;
@@ -2409,6 +2483,9 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
 
         core::ProjectService::RefreshFileStatus(project);
         SetStatus("Deleted proposed change " + item.proposal_id.value() + ".");
+    };
+    callbacks.delete_review_item = [this](const core::ReviewItem& item) {
+        BeginDeleteReviewItem(item);
     };
     ui::panels::ShowReviewPanel(model, callbacks);
 
@@ -2484,6 +2561,7 @@ void AppRuntime::RenderRemoveConfirmModal() {
                 } else {
                     impl_->tree_needs_rebuild = true;
                     ui::GetUiState().selected_element_id.clear();
+                    impl_->document_dirty = true;
                     impl_->app_state.mark_dirty();
                     SetStatus("Removed " + std::to_string(n) + " element" + (n == 1 ? "" : "s"));
                 }
@@ -2497,6 +2575,48 @@ void AppRuntime::RenderRemoveConfirmModal() {
         ImGui::EndPopup();
     } else if (impl_->show_remove_confirm) {
         ImGui::OpenPopup("##remove_confirm_modal");
+    }
+}
+
+void AppRuntime::RenderDeleteReviewItemConfirmModal() {
+    if (!impl_->show_delete_review_item_confirm) return;
+
+    auto cancel = [&]() {
+        impl_->show_delete_review_item_confirm = false;
+        impl_->pending_delete_review_item = {};
+    };
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal("Delete Review Comment", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        const core::ReviewItem& item = impl_->pending_delete_review_item;
+        ImGui::TextWrapped("Delete this review comment?");
+        ImGui::TextWrapped("The attached proposal will also be deleted.");
+        if (item.proposal_id.has_value()) {
+            ImGui::TextDisabled("Proposal: %s", item.proposal_id->c_str());
+        }
+        ImGui::Spacing();
+        ImGui::Spacing();
+
+        const float button_width = 130.0f;
+        const float spacing = 10.0f;
+        const float total_width = button_width * 2.0f + spacing;
+        const float center_x = (ImGui::GetWindowWidth() - total_width) * 0.5f;
+        ImGui::SetCursorPosX(center_x);
+
+        if (ImGui::Button("Delete Both", ImVec2(button_width, 0))) {
+            core::ReviewItem pending = impl_->pending_delete_review_item;
+            cancel();
+            ImGui::CloseCurrentPopup();
+            DeleteReviewItem(pending);
+        }
+        ImGui::SameLine(0.0f, spacing);
+        if (ImGui::Button("Cancel", ImVec2(button_width, 0))) {
+            cancel();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    } else if (impl_->show_delete_review_item_confirm) {
+        ImGui::OpenPopup("Delete Review Comment");
     }
 }
 
@@ -2596,6 +2716,7 @@ void AppRuntime::OpenProjectFile(const core::ProjectFileEntry& entry) {
         impl_->proposal_preview_id.clear();
         impl_->proposal_preview_model = {};
         ClearProposalHighlightState(ui_state);
+        impl_->document_dirty = false;
         impl_->tree_needs_rebuild = true;
         impl_->pending_focus_root = true;
         impl_->show_gsn_tab = true;
@@ -2650,15 +2771,7 @@ bool AppRuntime::EnsureReviewItemStorage() {
     core::AssuranceProject& project = impl_->app_state.current_project.value();
     std::filesystem::path review_path = ReviewItemsPath(project);
     if (review_path.empty()) {
-        core::ProjectFileEntry entry;
-        std::string error;
-        if (!core::ProjectService::AddReviewItemsFile(project, "review-items.af.json", entry, error)) {
-            impl_->review_item_manager.Clear();
-            SetStatus("Review comment storage could not be prepared: " + error);
-            return false;
-        }
-        review_path = project.rootPath / entry.relativePath;
-        core::ProjectService::RefreshFileStatus(project);
+        review_path = project.rootPath / "reviews" / "review-items.af.json";
     }
 
     impl_->review_item_manager.SetFilePath(review_path);
@@ -2670,16 +2783,9 @@ bool AppRuntime::EnsureReviewItemStorage() {
 
     std::error_code ec;
     if (!std::filesystem::exists(review_path, ec)) {
-        std::string save_error;
-        if (!impl_->review_item_manager.Save(save_error)) {
-            SetStatus("Review comment storage could not be created: " + save_error);
-            return false;
-        }
-        core::ProjectService::RefreshFileStatus(project);
-        error.clear();
-        if (impl_->review_item_manager.Load(error)) {
-            return true;
-        }
+        impl_->review_item_manager.Clear();
+        impl_->review_item_manager.SetFilePath(review_path);
+        return true;
     }
 
     SetStatus("Review items could not be loaded: " + error);
@@ -2695,6 +2801,8 @@ bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {
     if (!impl_->app_state.open_project(selected_path)) {
         return false;
     }
+    impl_->document_dirty = false;
+    impl_->review_items_dirty = false;
     if (impl_->app_state.current_project.has_value()) {
         impl_->review_proposal_manager.SetProjectRoot(impl_->app_state.current_project->rootPath);
         EnsureReviewItemStorage();
@@ -2722,6 +2830,8 @@ void AppRuntime::RenderCreateProjectModal() {
 
         if (ImGui::Button("Create", ImVec2(110.0f, 0.0f))) {
             if (impl_->app_state.create_empty_project(impl_->project_name_buf, impl_->project_parent_buf)) {
+                impl_->document_dirty = false;
+                impl_->review_items_dirty = false;
                 if (impl_->app_state.current_project.has_value()) {
                     impl_->review_proposal_manager.SetProjectRoot(impl_->app_state.current_project->rootPath);
                     EnsureReviewItemStorage();
@@ -2853,13 +2963,45 @@ void AppRuntime::RenderSaveBeforeExitModal(bool& done) {
 }
 
 bool AppRuntime::SaveProject() {
-    if (!impl_->review_item_manager.FilePath().empty()) {
+    if (!impl_->app_state.current_project.has_value()) {
+        impl_->app_state.status_message = "Create or open a project first.";
+        return false;
+    }
+
+    if (impl_->review_items_dirty && !impl_->review_item_manager.FilePath().empty()) {
+        core::AssuranceProject& project = impl_->app_state.current_project.value();
+        std::filesystem::path requested_name = impl_->review_item_manager.FilePath().filename();
+        if (requested_name.empty()) requested_name = "review-items.af.json";
+
+        core::ProjectFileEntry entry;
         std::string error;
-        if (!impl_->review_item_manager.Save(error)) {
+        const std::string content = core::SerializeReviewItems(impl_->review_item_manager.GetItems());
+        if (!core::ProjectService::SaveReviewItemsFile(project, requested_name.string(), content, entry, error)) {
             impl_->app_state.status_message = "Review item save failed: " + error;
             return false;
         }
+        impl_->review_item_manager.SetFilePath(project.rootPath / entry.relativePath);
+        impl_->review_items_dirty = false;
     }
+
+    if (impl_->document_dirty) {
+        if (!impl_->app_state.save_project()) return false;
+        impl_->document_dirty = false;
+        impl_->app_state.has_unsaved_changes = impl_->review_items_dirty;
+        return true;
+    }
+
+    if (impl_->review_items_dirty) {
+        impl_->app_state.status_message = "Review item save failed: review storage path is not set.";
+        return false;
+    }
+
+    if (impl_->app_state.has_unsaved_changes) {
+        impl_->app_state.has_unsaved_changes = false;
+        impl_->app_state.status_message = "Project saved: " + impl_->app_state.current_project->name;
+        return true;
+    }
+
     return impl_->app_state.save_project();
 }
 
@@ -2951,6 +3093,7 @@ void AppRuntime::RenderFrame(bool& done) {
 
     RenderNotImplementedModal();
     RenderRemoveConfirmModal();
+    RenderDeleteReviewItemConfirmModal();
     RenderCreateProjectModal();
     RenderProjectFileNameModal();
     RenderProjectLoadReportModal();

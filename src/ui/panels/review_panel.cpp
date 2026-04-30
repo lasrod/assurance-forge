@@ -138,6 +138,9 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
                 ImGui::TextWrapped("%s", item.message.c_str());
             }
             DrawProposalActions(item, model, callbacks);
+            if (ImGui::Button("Delete") && callbacks.delete_review_item) {
+                callbacks.delete_review_item(item);
+            }
             ImGui::PopID();
         }
     }

@@ -40,6 +40,12 @@ public:
                                    ProjectFileEntry& entry,
                                    std::string& error);
 
+    static bool SaveReviewItemsFile(AssuranceProject& project,
+                                    const std::string& requested_file_name,
+                                    const std::string& content,
+                                    ProjectFileEntry& entry,
+                                    std::string& error);
+
     static bool AddReviewProposalFile(AssuranceProject& project,
                                       const std::string& requested_file_name,
                                       const std::string& content,
