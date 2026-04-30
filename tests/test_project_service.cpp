@@ -142,6 +142,52 @@ TEST(ProjectServiceTest, AddAndRemoveReviewProposalTracksManifestEntry) {
     EXPECT_FALSE(ContainsFileWithRole(project, "reviews/proposals/proposal-0001.afpatch.json", core::ProjectFileRole::ReviewProposal));
 }
 
+TEST(ProjectServiceTest, SaveReviewProposalFileRefreshesTrackedHash) {
+    TempDir tmp(MakeTempParent());
+    auto& parent = tmp.path;
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    core::ProjectFileEntry entry;
+    std::string error;
+
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("MySafetyCase", parent, project, report, error)) << error;
+
+    const std::string first_json =
+        "{\n"
+        "  \"schema\": \"assurance-forge.review-proposal.v1\",\n"
+        "  \"id\": \"proposal-0001\",\n"
+        "  \"anchor_element_id\": \"G1\",\n"
+        "  \"operations\": []\n"
+        "}\n";
+    ASSERT_TRUE(core::ProjectService::SaveReviewProposalFile(project, "proposal-0001", first_json, entry, error)) << error;
+    const std::string first_hash = entry.rawHash;
+
+    const std::string second_json =
+        "{\n"
+        "  \"schema\": \"assurance-forge.review-proposal.v1\",\n"
+        "  \"id\": \"proposal-0001\",\n"
+        "  \"anchor_element_id\": \"G1\",\n"
+        "  \"operations\": [\n"
+        "    {\"type\": \"CreateClaim\", \"create_ref\": \"$new_claim_1\", \"text\": \"Draft claim\"}\n"
+        "  ]\n"
+        "}\n";
+    ASSERT_TRUE(core::ProjectService::SaveReviewProposalFile(project, "proposal-0001", second_json, entry, error)) << error;
+    EXPECT_EQ(entry.relativePath.generic_string(), "reviews/proposals/proposal-0001.afpatch.json");
+    EXPECT_NE(entry.rawHash, first_hash);
+
+    core::ProjectLoadReport refresh_report = core::ProjectService::RefreshFileStatus(project);
+    EXPECT_FALSE(refresh_report.showPopup) << ReportSummary(refresh_report);
+    EXPECT_TRUE(refresh_report.warnings.empty()) << ReportSummary(refresh_report);
+
+    {
+        std::ofstream file(project.rootPath / entry.relativePath, std::ios::app | std::ios::binary);
+        file << "\n";
+    }
+
+    refresh_report = core::ProjectService::RefreshFileStatus(project);
+    EXPECT_FALSE(refresh_report.warnings.empty()) << ReportSummary(refresh_report);
+}
+
 TEST(ProjectServiceTest, OpenProjectReportsExternallyModifiedAndMissingFiles) {
     TempDir tmp(MakeTempParent());
     auto& parent = tmp.path;

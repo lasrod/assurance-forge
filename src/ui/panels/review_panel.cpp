@@ -27,7 +27,22 @@ void DrawStatusBadge(const core::ReviewItem& item) {
 void DrawProposalActions(const core::ReviewItem& item,
                          const ReviewPanelModel& model,
                          const ReviewPanelCallbacks& callbacks) {
+    const bool is_active_draft = model.active_proposal_review_item_id == item.id;
+    if (is_active_draft) {
+        ImGui::Text("Proposal draft: %d operation(s)", static_cast<int>(model.active_proposal_operation_count));
+        if (!model.active_proposal_can_save) ImGui::BeginDisabled();
+        if (ImGui::Button("Save Proposal") && callbacks.save_proposal) {
+            callbacks.save_proposal(item);
+        }
+        if (!model.active_proposal_can_save) ImGui::EndDisabled();
+        return;
+    }
+
     if (!item.proposal_id.has_value()) {
+        if (item.status != core::ReviewItemStatus::Open) {
+            ImGui::TextDisabled("No proposal for resolved comment.");
+            return;
+        }
         if (ImGui::Button("Create Proposed Change") && callbacks.create_proposed_change) {
             callbacks.create_proposed_change(item);
         }
@@ -50,12 +65,12 @@ void DrawProposalActions(const core::ReviewItem& item,
     }
 
     if (is_valid) {
-        if (ImGui::Button("Preview Proposal") && callbacks.preview_proposal) callbacks.preview_proposal(item);
+        if (ImGui::Button("View Proposal") && callbacks.preview_proposal) callbacks.preview_proposal(item);
         ImGui::SameLine();
         if (ImGui::Button("Apply Proposal") && callbacks.apply_proposal) callbacks.apply_proposal(item);
         ImGui::SameLine();
     }
-    if (ImGui::Button("Delete") && callbacks.delete_proposal) callbacks.delete_proposal(item);
+    if (ImGui::Button("Delete Proposal") && callbacks.delete_proposal) callbacks.delete_proposal(item);
 }
 
 }  // namespace

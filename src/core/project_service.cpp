@@ -758,6 +758,43 @@ bool ProjectService::AddReviewProposalFile(AssuranceProject& project,
                           content, entry, error);
 }
 
+bool ProjectService::SaveReviewProposalFile(AssuranceProject& project,
+                                            const std::string& requested_file_name,
+                                            const std::string& content,
+                                            ProjectFileEntry& entry,
+                                            std::string& error) {
+    std::filesystem::path file_name = NormalizeProposalPatchName(requested_file_name);
+    std::filesystem::path relative_path = std::filesystem::path("reviews") / "proposals" / file_name;
+    if (!IsSafeRelativePath(relative_path)) {
+        error = "Invalid project file path";
+        return false;
+    }
+
+    auto found = std::find_if(project.files.begin(), project.files.end(), [&](const ProjectFileEntry& candidate) {
+        return candidate.relativePath.generic_string() == relative_path.generic_string();
+    });
+
+    if (found == project.files.end()) {
+        return AddTrackedFile(project, "reviews/proposals", file_name, ProjectFileRole::ReviewProposal,
+                              content, entry, error);
+    }
+
+    if (found->role != ProjectFileRole::ReviewProposal) {
+        error = "Tracked file is not a review proposal: " + relative_path.generic_string();
+        return false;
+    }
+
+    const std::filesystem::path absolute_path = project.rootPath / relative_path;
+    if (!WriteTextFile(absolute_path, content, error)) return false;
+
+    if (!RefreshEntryHashes(project, *found, false, error)) return false;
+    project.modifiedUtc = NowUtc();
+    if (!WriteManifestSafely(project, error)) return false;
+
+    entry = *found;
+    return true;
+}
+
 bool ProjectService::RemoveTrackedFile(AssuranceProject& project,
                                        const std::filesystem::path& relative_path,
                                        bool delete_file,

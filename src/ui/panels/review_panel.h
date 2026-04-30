@@ -3,6 +3,7 @@
 #include "core/reviews/review_item.h"
 #include "core/reviews/review_proposal.h"
 
+#include <cstddef>
 #include <functional>
 #include <map>
 #include <string>
@@ -14,12 +15,16 @@ struct ReviewPanelModel {
     std::string selected_element_id;
     std::vector<core::ReviewItem> review_items;
     std::map<std::string, core::ProposalValidityResult> proposal_validity;
+    std::string active_proposal_review_item_id;
+    size_t active_proposal_operation_count = 0;
+    bool active_proposal_can_save = false;
     bool has_project = false;
 };
 
 struct ReviewPanelCallbacks {
     std::function<void(const std::string& title, const std::string& message)> add_review_item;
     std::function<void(const core::ReviewItem& item)> create_proposed_change;
+    std::function<void(const core::ReviewItem& item)> save_proposal;
     std::function<void(const core::ReviewItem& item)> preview_proposal;
     std::function<void(const core::ReviewItem& item)> apply_proposal;
     std::function<void(const core::ReviewItem& item)> delete_proposal;

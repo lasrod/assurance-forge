@@ -46,6 +46,12 @@ public:
                                       ProjectFileEntry& entry,
                                       std::string& error);
 
+    static bool SaveReviewProposalFile(AssuranceProject& project,
+                                       const std::string& requested_file_name,
+                                       const std::string& content,
+                                       ProjectFileEntry& entry,
+                                       std::string& error);
+
     static bool RemoveTrackedFile(AssuranceProject& project,
                                   const std::filesystem::path& relative_path,
                                   bool delete_file,

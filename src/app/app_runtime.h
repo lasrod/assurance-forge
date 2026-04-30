@@ -4,6 +4,7 @@
 
 #include "core/element_factory.h"
 #include "core/project_model.h"
+#include "core/reviews/review_item.h"
 
 namespace app {
 
@@ -51,6 +52,7 @@ private:
     void RenderCenterPanel(float center_x, float center_w, float content_h, float top_y);
     void RenderProblemsPanel(float center_x, float center_w, float problems_h, float top_y);
     void RenderElementPropertiesPanel(float center_x, float center_w, float right_w, float content_h, float top_y);
+    void RenderProposalElementEditor();
     void RenderStartupProjectWindow();
     void RenderNotImplementedModal();
     void RenderRemoveConfirmModal();
@@ -74,6 +76,15 @@ private:
     void TouchCurrentProjectRecent();
     bool SaveProject();
     void RequestExit(bool& done);
+
+    bool BeginProposalForReviewItem(const core::ReviewItem& item);
+    bool SaveActiveProposal(const core::ReviewItem& item);
+    void CancelActiveProposal();
+    bool RefreshProposalCreatorPreview();
+    void ProcessPendingProposalCreatorPreviewRefresh();
+    bool AddProposalChildToSelected(core::NewElementKind kind);
+    bool AddProposalTopGoal();
+    void RemoveProposalSelected(core::RemoveMode mode);
 
     void RebuildDerivedViewsIfNeeded();
     void BeginAiReviewForSelection();
