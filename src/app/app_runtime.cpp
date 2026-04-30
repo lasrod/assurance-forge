@@ -1939,14 +1939,10 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
         RebuildSacmArgumentPackageFromParser(impl_->app_state.loaded_case.value(), impl_->app_state.sacm_package.value());
         impl_->document_dirty = true;
         impl_->app_state.mark_dirty();
-        if (!SaveProject()) {
-            SetStatus("Proposal applied in memory, but project save failed: " + impl_->app_state.status_message);
-            return;
-        }
 
         core::AssuranceProject& project = impl_->app_state.current_project.value();
         if (!DeleteProposalPatchFile(item.proposal_id.value(), error)) {
-            SetStatus("Proposal applied, but proposal file removal failed: " + error);
+            SetStatus("Proposal applied in memory, but proposal file removal failed: " + error);
             return;
         }
 
@@ -1960,6 +1956,11 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
             return;
         }
         MarkReviewItemsDirty();
+
+        if (!SaveProject()) {
+            SetStatus("Proposal applied, but project save failed: " + impl_->app_state.status_message);
+            return;
+        }
 
         core::ProjectService::RefreshFileStatus(project);
         impl_->tree_needs_rebuild = true;

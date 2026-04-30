@@ -442,7 +442,14 @@ std::filesystem::path NormalizeProposalPatchName(const std::string& requested_fi
     std::string trimmed = Trim(requested_file_name);
     if (trimmed.empty()) trimmed = "proposal-0001.afpatch.json";
     const std::string suffix = ".afpatch.json";
-    if (trimmed.size() < suffix.size() || trimmed.compare(trimmed.size() - suffix.size(), suffix.size(), suffix) != 0) {
+    bool has_suffix = false;
+    if (trimmed.size() >= suffix.size()) {
+        std::string actual_tail = trimmed.substr(trimmed.size() - suffix.size());
+        std::transform(actual_tail.begin(), actual_tail.end(), actual_tail.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        has_suffix = (actual_tail == suffix);
+    }
+    if (!has_suffix) {
         trimmed += suffix;
     }
     return std::filesystem::path(trimmed).filename();
