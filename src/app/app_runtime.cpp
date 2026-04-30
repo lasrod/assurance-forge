@@ -1,4 +1,6 @@
 #include "app/app_runtime.h"
+#include "app/app_layout_controller.h"
+#include "app/app_runtime_state.h"
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -11,13 +13,12 @@
 #endif
 
 #include "app/native_file_dialogs.h"
+#include "app/project_workflow.h"
 #include "app/recent_projects.h"
 
 #include "ai/ai_claim_review.h"
 #include "ai/ai_service.h"
 #include "ai/ai_task_runner.h"
-#include "ai/libcurl_http_client.h"
-#include "ai/openai_provider.h"
 #include "ai/secret_store.h"
 #include "hello_imgui/hello_imgui.h"
 #include "hello_imgui/hello_imgui_theme.h"
@@ -66,30 +67,13 @@
 namespace app {
 namespace {
 
-constexpr size_t kPathBufferSize = 512;
-
-constexpr float kInitialLeftPanelRatio = 0.20f;
-constexpr float kInitialRightPanelRatio = 0.20f;
-constexpr float kInitialProjectBoundaryRatio = 0.50f;
-constexpr float kInitialProblemsPanelHeight = 220.0f;
-constexpr float kMinPanelRatio = 0.10f;
-constexpr float kMaxPanelRatio = 0.40f;
 constexpr float kSplitterThickness = 4.0f;
-constexpr float kMinLeftSectionHeight = 120.0f;
-constexpr float kMinCenterSectionHeight = 220.0f;
-constexpr float kMinProblemsPanelHeight = 160.0f;
 
 const ImGuiWindowFlags kPanelFlags = ImGuiWindowFlags_NoMove
                                    | ImGuiWindowFlags_NoResize
                                    | ImGuiWindowFlags_NoCollapse
                                    | ImGuiWindowFlags_NoBringToFrontOnFocus
                                    | ImGuiWindowFlags_NoSavedSettings;
-
-enum class ProjectFileCreateKind {
-    Sacm,
-    EvidenceRegister,
-    J3377CaeRegister
-};
 
 void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
     if (!buffer || buffer_size == 0) return;
@@ -104,15 +88,6 @@ std::string TrimWhitespace(const std::string& value) {
     auto end = value.end();
     while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1)))) --end;
     return std::string(begin, end);
-}
-
-const char* ProjectFileCreateTitle(ProjectFileCreateKind kind) {
-    switch (kind) {
-        case ProjectFileCreateKind::Sacm: return "New GSN / SACM File";
-        case ProjectFileCreateKind::EvidenceRegister: return "New Evidence Register";
-        case ProjectFileCreateKind::J3377CaeRegister: return "New J3377 CAE Register";
-    }
-    return "New Project File";
 }
 
 void RenderLanguageMenu() {
@@ -148,12 +123,6 @@ void RenderThemeMenu() {
     }
 
     ImGui::EndMenu();
-}
-
-std::string LowercaseAscii(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(),
-        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return value;
 }
 
 core::ProblemItem MakeAiReviewProblem(const std::string& id,
@@ -203,17 +172,6 @@ std::string GenerateReviewProposalId() {
     return out.str();
 }
 
-std::filesystem::path ReviewItemsPath(const core::AssuranceProject& project) {
-    for (const core::ProjectFileEntry& entry : project.files) {
-        if (entry.role == core::ProjectFileRole::ReviewItems) return project.rootPath / entry.relativePath;
-    }
-    return {};
-}
-
-std::filesystem::path ReviewProposalRelativePath(const std::string& proposal_id) {
-    return std::filesystem::path("reviews") / "proposals" / (proposal_id + ".afpatch.json");
-}
-
 std::string TruncateForProblemMessage(const std::string& value, size_t limit = 400) {
     if (value.size() <= limit) return value;
     return value.substr(0, limit) + "...";
@@ -224,13 +182,6 @@ const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model,
         return element.id == element_id;
     });
     return found == model.elements.end() ? nullptr : &*found;
-}
-
-bool ProjectTracksFile(const core::AssuranceProject& project, const std::filesystem::path& relative_path) {
-    const std::string normalized = relative_path.generic_string();
-    return std::any_of(project.files.begin(), project.files.end(), [&](const core::ProjectFileEntry& entry) {
-        return entry.relativePath.generic_string() == normalized;
-    });
 }
 
 core::reviews::ReviewProposal BuildDraftReviewProposal(const core::reviews::ReviewItem& item,
@@ -647,193 +598,7 @@ std::filesystem::path FindGuidelinesFile() {
     return {};
 }
 
-bool IsProjectManifestPath(const std::filesystem::path& path) {
-    if (LowercaseAscii(path.filename().string()) == "af.proj") return true;
-
-    std::error_code error;
-    return std::filesystem::is_directory(path, error) &&
-           std::filesystem::exists(path / "af.proj", error);
-}
-
-ui::panels::RecentProjectEntry MakeRecentProjectEntry(const core::AppState& app_state) {
-    ui::panels::RecentProjectEntry entry;
-    if (!app_state.current_project.has_value()) return entry;
-
-    const core::AssuranceProject& project = app_state.current_project.value();
-    entry.name = project.name;
-    entry.path = core::ProjectService::ManifestPath(project).u8string();
-
-    if (!app_state.loaded_case.has_value()) return entry;
-    for (const parser::SacmElement& element : app_state.loaded_case->elements) {
-        const std::string type = LowercaseAscii(element.type);
-        if (type == "claim") {
-            ++entry.claims;
-        } else if (type == "argumentreasoning") {
-            ++entry.strategies;
-        } else if (type == "artifact" || type == "artifactreference") {
-            ++entry.evidence;
-        }
-        if (element.undeveloped) ++entry.undeveloped;
-    }
-
-    return entry;
-}
-
 }  // namespace
-
-struct AppRuntime::Impl {
-    Impl();
-
-    core::AppState app_state;
-    core::ProblemsManager problems_manager;
-    core::reviews::ReviewItemManager review_item_manager;
-    core::reviews::ReviewProposalManager review_proposal_manager;
-    bool document_dirty = false;
-    bool review_items_dirty = false;
-    std::string reviewer_name;
-    char reviewer_name_buf[128] = {};
-    bool show_reviewer_name_prompt = false;
-
-    std::shared_ptr<ai::AiSettingsStore> ai_settings_store;
-    std::shared_ptr<ai::ISecretStore> ai_secret_store;
-    std::shared_ptr<ai::IHttpClient> ai_http_client;
-    std::shared_ptr<ai::IAiProvider> ai_provider;
-    std::shared_ptr<ai::AiService> ai_service;
-    ai::AiTaskRunner ai_task_runner;
-    std::shared_ptr<ai::AiTaskHandle> ai_test_task;
-    std::shared_ptr<ai::AiTaskHandle> ai_review_task;
-    ai::AiProviderSettings ai_settings;
-    ai::AiConnectionStatus ai_connection_status;
-    bool ai_key_stored = false;
-    bool ai_secure_store_available = false;
-    char ai_api_key_buf[256] = {};
-    char ai_model_buf[128] = {};
-
-    char file_path_buf[kPathBufferSize] = "data/oasc-ja.xml";
-    char dir_path_buf[kPathBufferSize] = "data";
-
-    std::vector<std::string> xml_files;
-    int selected_file_idx = -1;
-
-    bool tree_needs_rebuild = false;
-    core::AssuranceTree current_tree;
-    bool proposal_preview_active = false;
-    bool proposal_creator_active = false;
-    parser::AssuranceCase proposal_preview_model;
-    std::string proposal_preview_id;
-    core::reviews::ReviewProposal proposal_draft;
-    std::map<std::string, std::string> proposal_creator_generated_ids;
-    bool proposal_creator_preview_refresh_pending = false;
-    std::optional<std::string> proposal_creator_pending_select_create_ref;
-    bool proposal_creator_pending_clear_selection = false;
-    bool show_overwrite_confirm = false;
-    bool force_center_tab_selection = false;
-    bool pending_focus_root = false;
-    bool show_gsn_tab = true;
-    bool show_cse_tab = false;
-    bool show_evidence_tab = false;
-
-    float left_ratio = kInitialLeftPanelRatio;
-    float right_ratio = kInitialRightPanelRatio;
-    float right_panel_split_ratio = 0.5f;
-    float project_boundary_ratio = kInitialProjectBoundaryRatio;
-    float problems_panel_height = kInitialProblemsPanelHeight;
-
-    // Modal for unimplemented features
-    bool show_not_implemented_modal = false;
-    std::string not_implemented_feature;
-    bool show_startup_project_window = true;
-
-    bool show_create_project_modal = false;
-    bool show_project_file_name_modal = false;
-    ProjectFileCreateKind pending_project_file_kind = ProjectFileCreateKind::Sacm;
-    char project_name_buf[128] = "MySafetyCase";
-    char project_parent_buf[kPathBufferSize] = ".";
-    char open_project_path_buf[kPathBufferSize] = "";
-    char project_file_name_buf[256] = "main.sacm";
-    std::vector<ui::panels::RecentProjectEntry> recent_projects;
-    bool show_save_before_exit_modal = false;
-    bool close_requested = false;
-
-    // Modal for confirming a multi-element removal. Populated by RemoveSelected
-    // when the planned removal targets more than one element.
-    bool show_remove_confirm = false;
-    std::string pending_remove_id;
-    core::RemoveMode pending_remove_mode = core::RemoveMode::NodeOnly;
-    std::vector<std::string> pending_remove_ids;
-    bool show_delete_review_item_confirm = false;
-    core::reviews::ReviewItem pending_delete_review_item;
-
-    bool show_preferences_window = false;
-    bool show_theme_tweak_window = false;
-
-    bool show_ai_review_debug_modal = false;
-    ai::AiReviewRequestArtifacts pending_ai_review;
-    std::string pending_ai_review_element_id;
-    std::string pending_ai_review_element_type;
-    std::string last_ai_review_raw_response;
-    std::string last_ai_review_parse_error;
-
-    bool IsProposalCanvasActive() const { return proposal_preview_active || proposal_creator_active; }
-
-    void LoadAiSettingsState();
-    void RefreshStoredAiKeyState();
-};
-
-AppRuntime::Impl::Impl()
-    : ai_settings_store(std::make_shared<ai::AiSettingsStore>()),
-      ai_secret_store(ai::CreatePlatformSecretStore()),
-      ai_http_client(std::make_shared<ai::LibCurlHttpClient>()),
-      ai_provider(std::make_shared<ai::OpenAiProvider>(ai_http_client)),
-      ai_service(std::make_shared<ai::AiService>(ai_settings_store, ai_secret_store, ai_provider)) {
-    LoadAiSettingsState();
-}
-
-void AppRuntime::Impl::LoadAiSettingsState() {
-    std::string warning;
-    ai_settings = ai_service->LoadSettings(&warning);
-    CopyToBuffer(ai_model_buf, sizeof(ai_model_buf), ai_settings.model);
-    ai_secure_store_available = ai_secret_store && ai_secret_store->IsAvailable();
-    RefreshStoredAiKeyState();
-    if (!warning.empty()) {
-        ai_connection_status = ai::ErrorStatus(ai::AiErrorCode::SettingsError, warning);
-    }
-}
-
-void AppRuntime::Impl::RefreshStoredAiKeyState() {
-    ai_key_stored = ai_service && ai_service->HasStoredApiKey();
-}
-
-void NormalizeCenterViewSelection(bool& show_gsn_tab,
-                                  bool& show_cse_tab,
-                                  bool& show_evidence_tab,
-                                  bool& force_center_tab_selection,
-                                  ui::CenterView& center_view) {
-    if (!show_gsn_tab && !show_cse_tab && !show_evidence_tab) {
-        // Keep at least one center tab visible.
-        show_gsn_tab = true;
-    }
-
-    auto is_tab_visible = [&](ui::CenterView view) {
-        switch (view) {
-            case ui::CenterView::GsnCanvas: return show_gsn_tab;
-            case ui::CenterView::CseRegister: return show_cse_tab;
-            case ui::CenterView::EvidenceRegister: return show_evidence_tab;
-        }
-        return false;
-    };
-
-    if (!is_tab_visible(center_view)) {
-        if (show_gsn_tab) {
-            center_view = ui::CenterView::GsnCanvas;
-        } else if (show_cse_tab) {
-            center_view = ui::CenterView::CseRegister;
-        } else {
-            center_view = ui::CenterView::EvidenceRegister;
-        }
-        force_center_tab_selection = true;
-    }
-}
 
 ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
     return ui::ElementContextActions{
@@ -846,7 +611,7 @@ ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
     };
 }
 
-AppRuntime::AppRuntime() : impl_(new Impl()) {
+AppRuntime::AppRuntime() : impl_(new AppRuntimeState()) {
     impl_->current_tree = core::AssuranceTree();
     ui::gsn::SetCanvasTree(impl_->current_tree);
     ui::RebuildRegisterViews(nullptr);
@@ -1634,12 +1399,7 @@ float AppRuntime::RenderMainMenuBar(bool& done) {
         ImGui::MenuItem(ui::Tr(ui::MessageId::GsnCanvas), nullptr, &impl_->show_gsn_tab);
         ImGui::MenuItem(ui::Tr(ui::MessageId::CseRegister), nullptr, &impl_->show_cse_tab);
         ImGui::MenuItem(ui::Tr(ui::MessageId::EvidenceRegister), nullptr, &impl_->show_evidence_tab);
-        NormalizeCenterViewSelection(
-            impl_->show_gsn_tab,
-            impl_->show_cse_tab,
-            impl_->show_evidence_tab,
-            impl_->force_center_tab_selection,
-            ui_state.center_view);
+        NormalizeCenterViewSelection(*impl_, ui_state.center_view);
 
         ImGui::Separator();
         if (ImGui::BeginMenu(ui::Tr(ui::MessageId::Appearance))) {
@@ -1756,78 +1516,6 @@ void AppRuntime::RenderThemeTweaksWindow() {
     HelloImGui::ShowThemeTweakGuiWindow(&impl_->show_theme_tweak_window);
 }
 
-void AppRuntime::RenderSplitters(float display_w, float content_h, float left_w, float center_w, float top_y) {
-    ui::widgets::DrawVerticalSplitter("##left_splitter",
-                             left_w,
-                             kSplitterThickness,
-                             content_h,
-                             top_y,
-                             display_w,
-                             impl_->left_ratio,
-                             false,
-                             kMinPanelRatio,
-                             kMaxPanelRatio,
-                             kPanelFlags);
-
-    float center_x = left_w + kSplitterThickness;
-    ui::widgets::DrawVerticalSplitter("##right_splitter",
-                             center_x + center_w,
-                             kSplitterThickness,
-                             content_h,
-                             top_y,
-                             display_w,
-                             impl_->right_ratio,
-                             true,
-                             kMinPanelRatio,
-                             kMaxPanelRatio,
-                             kPanelFlags);
-
-    float available_h = content_h - kSplitterThickness;
-    if (available_h <= 0.0f) return;
-
-    float min_ratio = kMinLeftSectionHeight / available_h;
-    if (min_ratio > 0.30f) min_ratio = 0.30f;
-
-        auto clamp_boundaries = [&]() {
-            if (impl_->project_boundary_ratio < min_ratio) 
-                impl_->project_boundary_ratio = min_ratio;
-            if (impl_->project_boundary_ratio > 1.0f - min_ratio) 
-                impl_->project_boundary_ratio = 1.0f - min_ratio;
-        };
-
-    clamp_boundaries();
-
-    float splitter1_y = top_y + available_h * impl_->project_boundary_ratio;
-
-    float delta1 = ui::widgets::DrawHorizontalSplitter("##left_h_splitter_1", 0.0f, splitter1_y, left_w, kSplitterThickness, kPanelFlags);
-    if (delta1 != 0.0f) {
-        impl_->project_boundary_ratio += delta1 / available_h;
-        clamp_boundaries();
-    }
-
-    auto clamp_problems_height = [&]() {
-        float min_problems_h = std::min(kMinProblemsPanelHeight, available_h * 0.5f);
-        float min_center_h = std::min(kMinCenterSectionHeight, available_h - min_problems_h);
-        float max_problems_h = std::max(min_problems_h, available_h - min_center_h);
-        impl_->problems_panel_height = std::clamp(impl_->problems_panel_height, min_problems_h, max_problems_h);
-    };
-
-    clamp_problems_height();
-    float center_panel_h = std::max(0.0f, available_h - impl_->problems_panel_height);
-    float center_splitter_y = top_y + center_panel_h;
-    float delta_center = ui::widgets::DrawHorizontalSplitter(
-        "##center_problems_splitter",
-        center_x,
-        center_splitter_y,
-        center_w,
-        kSplitterThickness,
-        kPanelFlags);
-    if (delta_center != 0.0f) {
-        impl_->problems_panel_height -= delta_center;
-        clamp_problems_height();
-    }
-}
-
 void AppRuntime::RenderTreePanel(float left_w, float safety_tree_h, float top_y) {
     ImGui::SetNextWindowPos(ImVec2(0, top_y));
     ImGui::SetNextWindowSize(ImVec2(left_w, safety_tree_h));
@@ -1891,12 +1579,7 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
     ImGui::Begin("Center View", nullptr, kPanelFlags | ImGuiWindowFlags_NoTitleBar);
 
     ui::UiState& ui_state = ui::GetUiState();
-    NormalizeCenterViewSelection(
-        impl_->show_gsn_tab,
-        impl_->show_cse_tab,
-        impl_->show_evidence_tab,
-        impl_->force_center_tab_selection,
-        ui_state.center_view);
+    NormalizeCenterViewSelection(*impl_, ui_state.center_view);
 
     if (ImGui::BeginTabBar("##center_tabs")) {
         if (impl_->show_gsn_tab) {
@@ -3212,7 +2895,7 @@ void AppRuntime::RenderFrame(bool& done) {
     ProcessPendingProposalCreatorPreviewRefresh();
     PollAiReviewTask();
 
-    RenderSplitters(display.x, content_h, left_w, center_w, top_y);
+    RenderAppSplitters(*impl_, display.x, content_h, left_w, center_w, top_y, kPanelFlags);
 
     left_w = display.x * impl_->left_ratio;
     right_w = display.x * impl_->right_ratio;

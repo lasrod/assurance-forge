@@ -8,6 +8,8 @@
 
 namespace app {
 
+struct AppRuntimeState;
+
 class AppRuntime {
 public:
     AppRuntime();
@@ -48,7 +50,6 @@ public:
 private:
     float RenderMainMenuBar(bool& done);
     void ScanDirectory();
-    void RenderSplitters(float display_w, float content_h, float left_w, float center_w, float top_y);
     void RenderTreePanel(float left_w, float safety_tree_h, float top_y);
     void RenderSacmViewerPanel(float left_w, float sacm_h, float top_y);
     void RenderCenterPanel(float center_x, float center_w, float content_h, float top_y);
@@ -105,8 +106,7 @@ private:
     void PollAiReviewTask();
 
 private:
-    struct Impl;
-    Impl* impl_ = nullptr;
+    AppRuntimeState* impl_ = nullptr;
 };
 
 }  // namespace app

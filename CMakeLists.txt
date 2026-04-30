@@ -173,8 +173,11 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/ai/secret_store.cpp
     src/app/main.cpp
     src/app/app_ui_bootstrap.cpp
+    src/app/app_layout_controller.cpp
     src/app/app_runtime.cpp
+    src/app/app_runtime_state.cpp
     src/app/native_file_dialogs.cpp
+    src/app/project_workflow.cpp
     src/app/recent_projects.cpp
     src/parser/guidelines_parser.cpp
     ${ASSURANCE_FORGE_SHARED_SOURCES}
