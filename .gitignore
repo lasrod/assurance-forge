@@ -1,5 +1,6 @@
 # Build directories
 build/
+build-coverage/
 out/
 cmake-build-*/
 
@@ -38,6 +39,10 @@ Thumbs.db
 
 # Temporary files
 tmp/
+
+# Coverage HTML reports
+coverage_full/
+coverage_core/
 
 # ImGui state
 imgui.ini

@@ -170,6 +170,15 @@ build\Release\tests.exe
 ./build/tests
 ```
 
+### 6. Code Coverage (Linux)
+
+A dedicated GitHub Actions workflow (`.github/workflows/coverage.yml`)
+generates HTML coverage reports for the Linux build using `gcovr` and
+GCC 14. To produce the same reports locally, configure with
+`-DENABLE_COVERAGE=ON` and use a GCC 14 toolchain. See
+[docs/COVERAGE.md](docs/COVERAGE.md) for the full procedure and the
+rationale behind the gcovr flags and the two report views.
+
 ## Usage
 
 1. Launch the application

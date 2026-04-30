@@ -1,0 +1,83 @@
+name: Coverage
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  coverage:
+    name: Coverage (Linux, GCC 14)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev \
+            libssl-dev libcurl4-openssl-dev \
+            gcc-14 g++-14 \
+            pipx
+          pipx install gcovr==8.6
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Configure CMake (coverage build)
+        run: |
+          cmake -B build-coverage \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER=gcc-14 \
+            -DCMAKE_CXX_COMPILER=g++-14 \
+            -DHELLOIMGUI_DOWNLOAD_GLFW_IF_NEEDED=ON \
+            -DENABLE_COVERAGE=ON
+
+      - name: Build
+        run: cmake --build build-coverage
+
+      - name: Run tests
+        run: ctest --test-dir build-coverage --output-on-failure --no-tests=error
+
+      - name: Generate coverage report (full src/)
+        run: |
+          mkdir -p coverage_full
+          gcovr -r . build-coverage \
+            --filter 'src/' \
+            --exclude 'external/' \
+            --exclude 'build-coverage/' \
+            --exclude '_deps/' \
+            --exclude-throw-branches \
+            --exclude-unreachable-branches \
+            --gcov-executable gcov-14 \
+            --html-details coverage_full/index.html \
+            --print-summary
+
+      - name: Generate coverage report (core scope)
+        run: |
+          mkdir -p coverage_core
+          gcovr -r . build-coverage \
+            --filter 'src/' \
+            --exclude 'src/app/' \
+            --exclude 'src/ui/' \
+            --exclude 'external/' \
+            --exclude 'build-coverage/' \
+            --exclude '_deps/' \
+            --exclude-throw-branches \
+            --exclude-unreachable-branches \
+            --gcov-executable gcov-14 \
+            --html-details coverage_core/index.html \
+            --print-summary
+
+      - name: Upload coverage HTML reports
+        uses: actions/upload-artifact@v6
+        with:
+          name: coverage-reports
+          path: |
+            coverage_full/
+            coverage_core/
