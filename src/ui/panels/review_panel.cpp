@@ -16,15 +16,15 @@ void CopyToBuffer(char* buffer, size_t size, const std::string& value) {
     buffer[count] = '\0';
 }
 
-void DrawStatusBadge(const core::ReviewItem& item) {
-    const bool resolved = item.status == core::ReviewItemStatus::Resolved;
+void DrawStatusBadge(const core::reviews::ReviewItem& item) {
+    const bool resolved = item.status == core::reviews::ReviewItemStatus::Resolved;
     ImU32 color = resolved ? ui::GetTheme().success : ui::GetTheme().warning;
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(color));
     ImGui::TextUnformatted(resolved ? "Resolved" : "Open");
     ImGui::PopStyleColor();
 }
 
-void DrawProposalActions(const core::ReviewItem& item,
+void DrawProposalActions(const core::reviews::ReviewItem& item,
                          const ReviewPanelModel& model,
                          const ReviewPanelCallbacks& callbacks) {
     const bool is_active_draft = model.active_proposal_review_item_id == item.id;
@@ -39,7 +39,7 @@ void DrawProposalActions(const core::ReviewItem& item,
     }
 
     if (!item.proposal_id.has_value()) {
-        if (item.status != core::ReviewItemStatus::Open) {
+        if (item.status != core::reviews::ReviewItemStatus::Open) {
             ImGui::TextDisabled("No proposal for resolved comment.");
             return;
         }
@@ -49,13 +49,13 @@ void DrawProposalActions(const core::ReviewItem& item,
         return;
     }
 
-    core::ProposalValidityResult validity;
-    auto found = model.proposal_validity.find(item.proposal_id.value());
-    if (found != model.proposal_validity.end()) {
-        validity = found->second;
+    core::reviews::ProposalValidityResult validity;
+    auto validity_it = model.proposal_validity.find(item.proposal_id.value());
+    if (validity_it != model.proposal_validity.end()) {
+        validity = validity_it->second;
     }
 
-    const bool is_valid = validity.validity == core::ProposalValidity::Valid;
+    const bool is_valid = validity.validity == core::reviews::ProposalValidity::Valid;
     ImU32 proposal_color = is_valid ? ui::GetTheme().success : ui::GetTheme().danger;
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(proposal_color));
     ImGui::TextUnformatted(is_valid ? "Proposed change: Valid" : "Proposed change: Broken");
@@ -71,6 +71,21 @@ void DrawProposalActions(const core::ReviewItem& item,
         ImGui::SameLine();
     }
     if (ImGui::Button("Delete Proposal") && callbacks.delete_proposal) callbacks.delete_proposal(item);
+}
+
+void DrawReviewItemActions(const core::reviews::ReviewItem& item,
+                           const ReviewPanelModel& model,
+                           const ReviewPanelCallbacks& callbacks) {
+    DrawProposalActions(item, model, callbacks);
+    if (item.status == core::reviews::ReviewItemStatus::Open) {
+        if (ImGui::Button("Resolve") && callbacks.resolve_review_item) {
+            callbacks.resolve_review_item(item);
+        }
+        ImGui::SameLine();
+    }
+    if (ImGui::Button("Delete") && callbacks.delete_review_item) {
+        callbacks.delete_review_item(item);
+    }
 }
 
 }  // namespace
@@ -128,7 +143,7 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
     }
 
     if (ImGui::BeginChild("##review_items", ImVec2(0.0f, 0.0f), false)) {
-        for (const core::ReviewItem& item : model.review_items) {
+        for (const core::reviews::ReviewItem& item : model.review_items) {
             ImGui::PushID(item.id.c_str());
             ImGui::Separator();
             DrawStatusBadge(item);
@@ -138,16 +153,7 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
             if (!item.message.empty()) {
                 ImGui::TextWrapped("%s", item.message.c_str());
             }
-            DrawProposalActions(item, model, callbacks);
-            if (item.status == core::ReviewItemStatus::Open) {
-                if (ImGui::Button("Resolve") && callbacks.resolve_review_item) {
-                    callbacks.resolve_review_item(item);
-                }
-                ImGui::SameLine();
-            }
-            if (ImGui::Button("Delete") && callbacks.delete_review_item) {
-                callbacks.delete_review_item(item);
-            }
+            DrawReviewItemActions(item, model, callbacks);
             ImGui::PopID();
         }
     }

@@ -81,13 +81,16 @@ private:
     bool SaveProject();
     void RequestExit(bool& done);
 
-    bool BeginProposalForReviewItem(const core::ReviewItem& item);
+    bool BeginProposalForReviewItem(const core::reviews::ReviewItem& item);
     bool PreviewProposalById(const std::string& proposal_id);
-    bool SaveActiveProposal(const core::ReviewItem& item);
+    bool SaveActiveProposal(const core::reviews::ReviewItem& item);
     void CancelActiveProposal();
-    void BeginDeleteReviewItem(const core::ReviewItem& item);
-    bool DeleteReviewItem(const core::ReviewItem& item);
-    bool ResolveReviewItem(const core::ReviewItem& item);
+    void MarkReviewItemsDirty();
+    bool DeleteProposalPatchFile(const std::string& proposal_id, std::string& error);
+    void CloseProposalPreviewIfOpen(const std::string& proposal_id);
+    void BeginDeleteReviewItem(const core::reviews::ReviewItem& item);
+    bool DeleteReviewItem(const core::reviews::ReviewItem& item);
+    bool ResolveReviewItem(const core::reviews::ReviewItem& item);
     bool RefreshProposalCreatorPreview();
     void ProcessPendingProposalCreatorPreviewRefresh();
     bool AddProposalChildToSelected(core::NewElementKind kind);

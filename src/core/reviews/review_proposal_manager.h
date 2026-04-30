@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace core {
+namespace core::reviews {
 
 class ReviewProposalManager {
 public:
@@ -28,4 +28,4 @@ private:
     std::filesystem::path project_root_;
 };
 
-}  // namespace core
+}  // namespace core::reviews

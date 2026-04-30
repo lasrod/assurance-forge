@@ -5,7 +5,7 @@
 #include <fstream>
 #include <sstream>
 
-namespace core {
+namespace core::reviews {
 
 namespace {
 
@@ -133,4 +133,4 @@ bool ReviewItemManager::ClearProposal(const std::string& review_item_id) {
     return false;
 }
 
-}  // namespace core
+}  // namespace core::reviews

@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace core {
+namespace core::reviews {
 
 namespace {
 
@@ -363,4 +363,4 @@ ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& prop
     return result;
 }
 
-}  // namespace core
+}  // namespace core::reviews

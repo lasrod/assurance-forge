@@ -44,7 +44,7 @@ void RenderFile(const core::ProjectFileEntry& entry,
     } else if (entry.role == core::ProjectFileRole::ReviewProposal) {
         auto found = model.proposal_validity_by_path.find(entry.relativePath.generic_string());
         if (found != model.proposal_validity_by_path.end()) {
-            const bool valid = found->second.validity == core::ProposalValidity::Valid;
+            const bool valid = found->second.validity == core::reviews::ProposalValidity::Valid;
             ImGui::SameLine();
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(valid ? ui::GetTheme().success : ui::GetTheme().danger));
             ImGui::TextUnformatted(valid ? "(Valid)" : "(Broken)");

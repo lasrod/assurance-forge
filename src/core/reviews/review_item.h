@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace core {
+namespace core::reviews {
 
 enum class ReviewItemStatus {
     Open,
@@ -40,4 +40,4 @@ ReviewItemSource ReviewItemSourceFromString(const std::string& value);
 std::string SerializeReviewItems(const std::vector<ReviewItem>& items);
 bool DeserializeReviewItems(const std::string& content, std::vector<ReviewItem>& items, std::string& error);
 
-}  // namespace core
+}  // namespace core::reviews

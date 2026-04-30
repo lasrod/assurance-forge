@@ -2,7 +2,7 @@
 
 #include <nlohmann/json.hpp>
 
-namespace core {
+namespace core::reviews {
 
 namespace {
 
@@ -114,4 +114,4 @@ bool DeserializeReviewItems(const std::string& content, std::vector<ReviewItem>&
     return true;
 }
 
-}  // namespace core
+}  // namespace core::reviews

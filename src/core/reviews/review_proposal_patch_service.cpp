@@ -10,7 +10,7 @@
 #include <sstream>
 #include <unordered_set>
 
-namespace core {
+namespace core::reviews {
 namespace {
 
 bool IsCreateOperation(PatchOperationType type) {
@@ -246,8 +246,8 @@ bool RemoveValue(std::vector<std::string>& values, const std::string& value) {
 
 std::optional<RemoveMode> RemoveModeFromField(const std::string& field, std::string& error) {
     if (field.empty()) return std::nullopt;
-    if (field == "node_only") return RemoveMode::NodeOnly;
-    if (field == "node_and_descendants") return RemoveMode::NodeAndDescendants;
+    if (field == kReviewProposalRemoveModeNodeOnly) return RemoveMode::NodeOnly;
+    if (field == kReviewProposalRemoveModeNodeAndDescendants) return RemoveMode::NodeAndDescendants;
     error = "Unsupported RemoveElement mode: " + field;
     return std::nullopt;
 }
@@ -503,4 +503,4 @@ ApplyProposalResult ReviewProposalPatchService::ApplyProposal(const ReviewPropos
     return result;
 }
 
-}  // namespace core
+}  // namespace core::reviews

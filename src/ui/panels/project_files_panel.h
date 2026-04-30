@@ -13,7 +13,7 @@ namespace ui::panels {
 
 struct ProjectFilesPanelModel {
     const core::AssuranceProject* project = nullptr;
-    std::map<std::string, core::ProposalValidityResult> proposal_validity_by_path;
+    std::map<std::string, core::reviews::ProposalValidityResult> proposal_validity_by_path;
 };
 
 struct ProjectFilesPanelCallbacks {

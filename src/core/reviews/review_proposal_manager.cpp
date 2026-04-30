@@ -4,7 +4,7 @@
 #include <fstream>
 #include <sstream>
 
-namespace core {
+namespace core::reviews {
 
 namespace {
 
@@ -152,4 +152,4 @@ bool ReviewProposalManager::DeleteProposal(const std::string& proposal_id, std::
     return true;
 }
 
-}  // namespace core
+}  // namespace core::reviews

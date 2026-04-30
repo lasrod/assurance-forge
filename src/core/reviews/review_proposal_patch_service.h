@@ -5,7 +5,7 @@
 #include <map>
 #include <string>
 
-namespace core {
+namespace core::reviews {
 
 struct ApplyProposalResult {
     bool success = false;
@@ -29,4 +29,4 @@ public:
                                       parser::AssuranceCase& current_model) const;
 };
 
-}  // namespace core
+}  // namespace core::reviews

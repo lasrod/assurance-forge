@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace core {
+namespace core::reviews {
 
 class ReviewItemManager {
 public:
@@ -32,4 +32,4 @@ private:
     std::vector<ReviewItem> items_;
 };
 
-}  // namespace core
+}  // namespace core::reviews

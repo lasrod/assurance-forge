@@ -24,8 +24,8 @@ std::filesystem::path MakeTempDir() {
     return path;
 }
 
-core::ReviewItem MakeItem(const std::string& id, const std::string& element_id) {
-    core::ReviewItem item;
+core::reviews::ReviewItem MakeItem(const std::string& id, const std::string& element_id) {
+    core::reviews::ReviewItem item;
     item.id = id;
     item.element_id = element_id;
     item.title = "Review comment";
@@ -39,37 +39,37 @@ core::ReviewItem MakeItem(const std::string& id, const std::string& element_id) 
 }  // namespace
 
 TEST(ReviewItemTest, RoundTripsReviewItemsJson) {
-    core::ReviewItem item;
+    core::reviews::ReviewItem item;
     item.id = "review-0017";
     item.element_id = "G12";
     item.title = "Split mixed claim";
     item.message = "Claim combines safety and cybersecurity.";
     item.severity = "warning";
     item.reviewer_name = "Case Reviewer";
-    item.source = core::ReviewItemSource::AIReview;
-    item.status = core::ReviewItemStatus::Resolved;
+    item.source = core::reviews::ReviewItemSource::AIReview;
+    item.status = core::reviews::ReviewItemStatus::Resolved;
     item.proposal_id = "proposal-0001";
     item.applied_note = "Applied proposal proposal-0001.";
     item.created_utc = "2026-04-30T12:00:00Z";
     item.updated_utc = "2026-04-30T12:05:00Z";
 
     std::string error;
-    std::vector<core::ReviewItem> items;
-    ASSERT_TRUE(core::DeserializeReviewItems(core::SerializeReviewItems({item}), items, error)) << error;
+    std::vector<core::reviews::ReviewItem> items;
+    ASSERT_TRUE(core::reviews::DeserializeReviewItems(core::reviews::SerializeReviewItems({item}), items, error)) << error;
 
     ASSERT_EQ(items.size(), 1u);
     EXPECT_EQ(items[0].id, item.id);
     EXPECT_EQ(items[0].proposal_id, item.proposal_id);
     EXPECT_EQ(items[0].reviewer_name, item.reviewer_name);
-    EXPECT_EQ(items[0].source, core::ReviewItemSource::AIReview);
-    EXPECT_EQ(items[0].status, core::ReviewItemStatus::Resolved);
+    EXPECT_EQ(items[0].source, core::reviews::ReviewItemSource::AIReview);
+    EXPECT_EQ(items[0].status, core::reviews::ReviewItemStatus::Resolved);
 }
 
 TEST(ReviewItemTest, RejectsUnsupportedReviewItemFormat) {
     std::string error;
-    std::vector<core::ReviewItem> items;
+    std::vector<core::reviews::ReviewItem> items;
 
-    EXPECT_FALSE(core::DeserializeReviewItems("{\"format\":\"other\",\"items\":[]}", items, error));
+    EXPECT_FALSE(core::reviews::DeserializeReviewItems("{\"format\":\"other\",\"items\":[]}", items, error));
     EXPECT_FALSE(error.empty());
 }
 
@@ -77,7 +77,7 @@ TEST(ReviewItemManagerTest, SavesLoadsAndFiltersItemsByElement) {
     TempDir temp(MakeTempDir());
     std::filesystem::path review_path = temp.path / "reviews" / "review-items.af.json";
 
-    core::ReviewItemManager manager;
+    core::reviews::ReviewItemManager manager;
     manager.SetFilePath(review_path);
     ASSERT_TRUE(manager.AddOrUpdateItem(MakeItem("review-1", "G1")));
     ASSERT_TRUE(manager.AddOrUpdateItem(MakeItem("review-2", "G2")));
@@ -85,25 +85,25 @@ TEST(ReviewItemManagerTest, SavesLoadsAndFiltersItemsByElement) {
     std::string error;
     ASSERT_TRUE(manager.Save(error)) << error;
 
-    core::ReviewItemManager loaded;
+    core::reviews::ReviewItemManager loaded;
     loaded.SetFilePath(review_path);
     ASSERT_TRUE(loaded.Load(error)) << error;
 
     EXPECT_EQ(loaded.GetItems().size(), 2u);
-    std::vector<core::ReviewItem> g1_items = loaded.GetItemsForElement("G1");
+    std::vector<core::reviews::ReviewItem> g1_items = loaded.GetItemsForElement("G1");
     ASSERT_EQ(g1_items.size(), 1u);
     EXPECT_EQ(g1_items[0].id, "review-1");
 }
 
 TEST(ReviewItemManagerTest, UpdatesAndRemovesItems) {
-    core::ReviewItemManager manager;
+    core::reviews::ReviewItemManager manager;
     ASSERT_TRUE(manager.AddOrUpdateItem(MakeItem("review-1", "G1")));
 
-    core::ReviewItem updated = MakeItem("review-1", "G2");
+    core::reviews::ReviewItem updated = MakeItem("review-1", "G2");
     updated.proposal_id = "proposal-0001";
     ASSERT_TRUE(manager.AddOrUpdateItem(updated));
 
-    std::optional<core::ReviewItem> found = manager.GetItemById("review-1");
+    std::optional<core::reviews::ReviewItem> found = manager.GetItemById("review-1");
     ASSERT_TRUE(found.has_value());
     EXPECT_EQ(found->element_id, "G2");
     EXPECT_EQ(found->proposal_id, "proposal-0001");

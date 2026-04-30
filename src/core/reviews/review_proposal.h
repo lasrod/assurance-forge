@@ -8,9 +8,11 @@
 #include <string>
 #include <vector>
 
-namespace core {
+namespace core::reviews {
 
 constexpr const char* kReviewProposalSchema = "assurance-forge.review-proposal.v1";
+constexpr const char* kReviewProposalRemoveModeNodeOnly = "node_only";
+constexpr const char* kReviewProposalRemoveModeNodeAndDescendants = "node_and_descendants";
 
 enum class PatchOperationType {
     CreateClaim,
@@ -93,4 +95,4 @@ std::string ComputeElementSemanticHash(const parser::SacmElement& element);
 ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& proposal,
                                                       const parser::AssuranceCase& current_model);
 
-}  // namespace core
+}  // namespace core::reviews

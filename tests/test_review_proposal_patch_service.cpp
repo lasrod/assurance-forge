@@ -75,27 +75,27 @@ bool HasEvidenceSourceTarget(const parser::AssuranceCase& model, const std::stri
     return false;
 }
 
-core::ReviewProposal ProposalFor(const parser::AssuranceCase& model) {
-    core::ReviewProposal proposal;
+core::reviews::ReviewProposal ProposalFor(const parser::AssuranceCase& model) {
+    core::reviews::ReviewProposal proposal;
     proposal.id = "proposal-1";
     proposal.anchor_element_id = "G1";
     proposal.affected_existing_element_ids = {"G1"};
-    proposal.base_model_hash = core::ComputeModelSemanticHash(model);
-    proposal.base_element_hashes["G1"] = core::ComputeElementSemanticHash(*FindElement(model, "G1"));
+    proposal.base_model_hash = core::reviews::ComputeModelSemanticHash(model);
+    proposal.base_element_hashes["G1"] = core::reviews::ComputeElementSemanticHash(*FindElement(model, "G1"));
     return proposal;
 }
 
-core::PatchOperation Create(core::PatchOperationType type, std::string create_ref, std::string text) {
-    core::PatchOperation operation;
+core::reviews::PatchOperation Create(core::reviews::PatchOperationType type, std::string create_ref, std::string text) {
+    core::reviews::PatchOperation operation;
     operation.type = type;
     operation.create_ref = std::move(create_ref);
     operation.text = std::move(text);
     return operation;
 }
 
-core::PatchOperation AddSupportedBy(core::ElementRef source, core::ElementRef target) {
-    core::PatchOperation operation;
-    operation.type = core::PatchOperationType::AddSupportedBy;
+core::reviews::PatchOperation AddSupportedBy(core::reviews::ElementRef source, core::reviews::ElementRef target) {
+    core::reviews::PatchOperation operation;
+    operation.type = core::reviews::PatchOperationType::AddSupportedBy;
     operation.source = std::move(source);
     operation.target = std::move(target);
     return operation;
@@ -105,17 +105,17 @@ core::PatchOperation AddSupportedBy(core::ElementRef source, core::ElementRef ta
 
 TEST(ReviewProposalPatchServiceTest, AppliesUpdateElementText) {
     parser::AssuranceCase model = MakeModel();
-    core::ReviewProposal proposal = ProposalFor(model);
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
 
-    core::PatchOperation update;
-    update.type = core::PatchOperationType::UpdateElementText;
-    update.element = core::ElementRef{"G1", std::nullopt};
+    core::reviews::PatchOperation update;
+    update.type = core::reviews::PatchOperationType::UpdateElementText;
+    update.element = core::reviews::ElementRef{"G1", std::nullopt};
     update.field = "content";
     update.new_value = "Updated claim content";
     proposal.operations.push_back(update);
 
-    core::ReviewProposalPatchService service;
-    core::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
 
     ASSERT_TRUE(result.success) << result.error;
     ASSERT_NE(FindElement(model, "G1"), nullptr);
@@ -124,18 +124,18 @@ TEST(ReviewProposalPatchServiceTest, AppliesUpdateElementText) {
 
 TEST(ReviewProposalPatchServiceTest, BuildsPreviewWithExistingElementEditWithoutMutatingCurrentModel) {
     parser::AssuranceCase model = MakeModel();
-    core::ReviewProposal proposal = ProposalFor(model);
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
 
-    core::PatchOperation update;
-    update.type = core::PatchOperationType::UpdateElementText;
-    update.element = core::ElementRef{"G1", std::nullopt};
+    core::reviews::PatchOperation update;
+    update.type = core::reviews::PatchOperationType::UpdateElementText;
+    update.element = core::reviews::ElementRef{"G1", std::nullopt};
     update.field = "content";
     update.old_value = "Original content";
     update.new_value = "Proposed content";
     proposal.operations.push_back(update);
 
-    core::ReviewProposalPatchService service;
-    core::ProposalPreviewResult preview = service.BuildPreviewModel(proposal, model);
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ProposalPreviewResult preview = service.BuildPreviewModel(proposal, model);
 
     ASSERT_TRUE(preview.success) << preview.error;
     EXPECT_EQ(FindElement(model, "G1")->content, "Original content");
@@ -156,18 +156,18 @@ TEST(ReviewProposalPatchServiceTest, BuildsPreviewWithExistingElementRemovalWith
     child_inference.source_refs.push_back("G3");
     model.elements.push_back(child_inference);
 
-    core::ReviewProposal proposal = ProposalFor(model);
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
     proposal.affected_existing_element_ids.push_back("G2");
-    proposal.base_element_hashes["G2"] = core::ComputeElementSemanticHash(*FindElement(model, "G2"));
+    proposal.base_element_hashes["G2"] = core::reviews::ComputeElementSemanticHash(*FindElement(model, "G2"));
 
-    core::PatchOperation remove;
-    remove.type = core::PatchOperationType::RemoveElement;
-    remove.element = core::ElementRef{"G2", std::nullopt};
+    core::reviews::PatchOperation remove;
+    remove.type = core::reviews::PatchOperationType::RemoveElement;
+    remove.element = core::reviews::ElementRef{"G2", std::nullopt};
     remove.field = "node_only";
     proposal.operations.push_back(remove);
 
-    core::ReviewProposalPatchService service;
-    core::ProposalPreviewResult preview = service.BuildPreviewModel(proposal, model);
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ProposalPreviewResult preview = service.BuildPreviewModel(proposal, model);
 
     ASSERT_TRUE(preview.success) << preview.error;
     EXPECT_NE(FindElement(model, "G2"), nullptr);
@@ -178,12 +178,12 @@ TEST(ReviewProposalPatchServiceTest, BuildsPreviewWithExistingElementRemovalWith
 
 TEST(ReviewProposalPatchServiceTest, BuildsPreviewWithoutMutatingCurrentModel) {
     parser::AssuranceCase model = MakeModel();
-    core::ReviewProposal proposal = ProposalFor(model);
-    proposal.operations.push_back(Create(core::PatchOperationType::CreateClaim, "$new_claim_1", "Generated claim content"));
-    proposal.operations.push_back(AddSupportedBy(core::ElementRef{std::nullopt, "$new_claim_1"}, core::ElementRef{"G1", std::nullopt}));
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
+    proposal.operations.push_back(Create(core::reviews::PatchOperationType::CreateClaim, "$new_claim_1", "Generated claim content"));
+    proposal.operations.push_back(AddSupportedBy(core::reviews::ElementRef{std::nullopt, "$new_claim_1"}, core::reviews::ElementRef{"G1", std::nullopt}));
 
-    core::ReviewProposalPatchService service;
-    core::ProposalPreviewResult preview = service.BuildPreviewModel(proposal, model);
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ProposalPreviewResult preview = service.BuildPreviewModel(proposal, model);
 
     ASSERT_TRUE(preview.success) << preview.error;
     ASSERT_TRUE(preview.generated_ids.count("$new_claim_1") > 0);
@@ -196,12 +196,12 @@ TEST(ReviewProposalPatchServiceTest, BuildsPreviewWithoutMutatingCurrentModel) {
 
 TEST(ReviewProposalPatchServiceTest, CreatesSolutionAsEvidenceRelationship) {
     parser::AssuranceCase model = MakeModel();
-    core::ReviewProposal proposal = ProposalFor(model);
-    proposal.operations.push_back(Create(core::PatchOperationType::CreateSolution, "$new_solution_1", "Verification evidence"));
-    proposal.operations.push_back(AddSupportedBy(core::ElementRef{std::nullopt, "$new_solution_1"}, core::ElementRef{"G1", std::nullopt}));
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
+    proposal.operations.push_back(Create(core::reviews::PatchOperationType::CreateSolution, "$new_solution_1", "Verification evidence"));
+    proposal.operations.push_back(AddSupportedBy(core::reviews::ElementRef{std::nullopt, "$new_solution_1"}, core::reviews::ElementRef{"G1", std::nullopt}));
 
-    core::ReviewProposalPatchService service;
-    core::ProposalPreviewResult preview = service.BuildPreviewModel(proposal, model);
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ProposalPreviewResult preview = service.BuildPreviewModel(proposal, model);
 
     ASSERT_TRUE(preview.success) << preview.error;
     const std::string generated_id = preview.generated_ids.at("$new_solution_1");
@@ -215,16 +215,16 @@ TEST(ReviewProposalPatchServiceTest, CreatesStrategyAndClaimsWithNonCollidingIds
     parser::AssuranceCase model = MakeModel();
     model.elements.push_back(Element("G3", "claim", "Existing G3"));
     model.elements.push_back(Element("S1", "argumentreasoning", "Existing S1"));
-    core::ReviewProposal proposal = ProposalFor(model);
-    proposal.operations.push_back(Create(core::PatchOperationType::CreateStrategy, "$new_strategy_1", "Strategy content"));
-    proposal.operations.push_back(Create(core::PatchOperationType::CreateClaim, "$new_claim_1", "Claim one"));
-    proposal.operations.push_back(Create(core::PatchOperationType::CreateClaim, "$new_claim_2", "Claim two"));
-    proposal.operations.push_back(AddSupportedBy(core::ElementRef{std::nullopt, "$new_strategy_1"}, core::ElementRef{"G1", std::nullopt}));
-    proposal.operations.push_back(AddSupportedBy(core::ElementRef{std::nullopt, "$new_claim_1"}, core::ElementRef{std::nullopt, "$new_strategy_1"}));
-    proposal.operations.push_back(AddSupportedBy(core::ElementRef{std::nullopt, "$new_claim_2"}, core::ElementRef{std::nullopt, "$new_strategy_1"}));
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
+    proposal.operations.push_back(Create(core::reviews::PatchOperationType::CreateStrategy, "$new_strategy_1", "Strategy content"));
+    proposal.operations.push_back(Create(core::reviews::PatchOperationType::CreateClaim, "$new_claim_1", "Claim one"));
+    proposal.operations.push_back(Create(core::reviews::PatchOperationType::CreateClaim, "$new_claim_2", "Claim two"));
+    proposal.operations.push_back(AddSupportedBy(core::reviews::ElementRef{std::nullopt, "$new_strategy_1"}, core::reviews::ElementRef{"G1", std::nullopt}));
+    proposal.operations.push_back(AddSupportedBy(core::reviews::ElementRef{std::nullopt, "$new_claim_1"}, core::reviews::ElementRef{std::nullopt, "$new_strategy_1"}));
+    proposal.operations.push_back(AddSupportedBy(core::reviews::ElementRef{std::nullopt, "$new_claim_2"}, core::reviews::ElementRef{std::nullopt, "$new_strategy_1"}));
 
-    core::ReviewProposalPatchService service;
-    core::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
 
     ASSERT_TRUE(result.success) << result.error;
     EXPECT_EQ(result.generated_ids.at("$new_strategy_1"), "S2");
@@ -240,23 +240,23 @@ TEST(ReviewProposalPatchServiceTest, CreatesStrategyAndClaimsWithNonCollidingIds
 
 TEST(ReviewProposalPatchServiceTest, AddsAndRemovesRelationships) {
     parser::AssuranceCase model = MakeModel();
-    core::ReviewProposal proposal = ProposalFor(model);
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
 
-    core::PatchOperation remove;
-    remove.type = core::PatchOperationType::RemoveSupportedBy;
-    remove.source = core::ElementRef{"G2", std::nullopt};
-    remove.target = core::ElementRef{"G1", std::nullopt};
+    core::reviews::PatchOperation remove;
+    remove.type = core::reviews::PatchOperationType::RemoveSupportedBy;
+    remove.source = core::reviews::ElementRef{"G2", std::nullopt};
+    remove.target = core::reviews::ElementRef{"G1", std::nullopt};
     proposal.operations.push_back(remove);
 
-    proposal.operations.push_back(Create(core::PatchOperationType::CreateContext, "$new_context_1", "Operational context"));
-    core::PatchOperation add_context;
-    add_context.type = core::PatchOperationType::AddInContextOf;
-    add_context.source = core::ElementRef{std::nullopt, "$new_context_1"};
-    add_context.target = core::ElementRef{"G1", std::nullopt};
+    proposal.operations.push_back(Create(core::reviews::PatchOperationType::CreateContext, "$new_context_1", "Operational context"));
+    core::reviews::PatchOperation add_context;
+    add_context.type = core::reviews::PatchOperationType::AddInContextOf;
+    add_context.source = core::reviews::ElementRef{std::nullopt, "$new_context_1"};
+    add_context.target = core::reviews::ElementRef{"G1", std::nullopt};
     proposal.operations.push_back(add_context);
 
-    core::ReviewProposalPatchService service;
-    core::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
 
     ASSERT_TRUE(result.success) << result.error;
     EXPECT_FALSE(HasInferenceSourceTarget(model, "G2", "G1"));
@@ -273,21 +273,21 @@ TEST(ReviewProposalPatchServiceTest, AddsAndRemovesRelationships) {
 
 TEST(ReviewProposalPatchServiceTest, FailedApplyLeavesModelUnchanged) {
     parser::AssuranceCase model = MakeModel();
-    const std::string before_hash = core::ComputeModelSemanticHash(model);
-    core::ReviewProposal proposal = ProposalFor(model);
+    const std::string before_hash = core::reviews::ComputeModelSemanticHash(model);
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
 
-    core::PatchOperation update;
-    update.type = core::PatchOperationType::UpdateElementText;
-    update.element = core::ElementRef{"DOES_NOT_EXIST", std::nullopt};
+    core::reviews::PatchOperation update;
+    update.type = core::reviews::PatchOperationType::UpdateElementText;
+    update.element = core::reviews::ElementRef{"DOES_NOT_EXIST", std::nullopt};
     update.field = "content";
     update.new_value = "This should not apply";
     proposal.operations.push_back(update);
 
-    core::ReviewProposalPatchService service;
-    core::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
 
     EXPECT_FALSE(result.success);
     EXPECT_FALSE(result.error.empty());
-    EXPECT_EQ(core::ComputeModelSemanticHash(model), before_hash);
+    EXPECT_EQ(core::reviews::ComputeModelSemanticHash(model), before_hash);
     EXPECT_EQ(FindElement(model, "G1")->content, "Original content");
 }

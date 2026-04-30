@@ -449,7 +449,7 @@ std::filesystem::path NormalizeProposalPatchName(const std::string& requested_fi
 }
 
 std::string ReviewItemsJson() {
-    return SerializeReviewItems({});
+    return reviews::SerializeReviewItems({});
 }
 
 std::string MinimalSacmXml(const std::string& case_name) {
