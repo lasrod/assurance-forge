@@ -241,6 +241,10 @@ bool RemoveValue(std::vector<std::string>& values, const std::string& value) {
     return values.size() != old_size;
 }
 
+bool IsEvidenceLikeElement(const parser::SacmElement& element) {
+    return element.type == "artifact" || element.type == "artifactreference" || element.type == "expression";
+}
+
 bool ApplyUpdateOperation(const PatchOperation& operation,
                           parser::AssuranceCase& model,
                           const std::map<std::string, std::string>& generated_ids,
@@ -311,6 +315,9 @@ bool ApplyAddRelationshipOperation(const PatchOperation& operation,
     if (operation.type == PatchOperationType::AddInContextOf) {
         relationship.type = "assertedcontext";
         relationship.source_refs.push_back(source_id);
+    } else if (IsEvidenceLikeElement(*source)) {
+        relationship.type = "assertedevidence";
+        relationship.source_refs.push_back(source_id);
     } else {
         relationship.type = "assertedinference";
         if (source->type == "argumentreasoning") {
@@ -334,6 +341,10 @@ bool RelationshipMatches(const parser::SacmElement& relationship,
     if (operation_type == PatchOperationType::RemoveInContextOf) {
         return relationship.type == "assertedcontext" &&
                std::find(relationship.source_refs.begin(), relationship.source_refs.end(), source_id) != relationship.source_refs.end();
+    }
+
+    if (relationship.type == "assertedevidence") {
+        return std::find(relationship.source_refs.begin(), relationship.source_refs.end(), source_id) != relationship.source_refs.end();
     }
 
     if (relationship.type != "assertedinference") return false;

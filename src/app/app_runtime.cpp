@@ -338,6 +338,41 @@ void TrackAffectedRef(core::ReviewProposal& proposal,
     if (ref.existing_id.has_value()) TrackAffectedExistingElement(proposal, base_model, ref.existing_id.value());
 }
 
+void AddHighlightRef(std::unordered_set<std::string>& ids,
+                     const core::ElementRef& ref,
+                     const std::map<std::string, std::string>& generated_ids) {
+    if (ref.existing_id.has_value() && !ref.existing_id->empty()) {
+        ids.insert(ref.existing_id.value());
+    }
+    if (ref.create_ref.has_value()) {
+        auto found = generated_ids.find(ref.create_ref.value());
+        if (found != generated_ids.end() && !found->second.empty()) ids.insert(found->second);
+    }
+}
+
+std::unordered_set<std::string> CollectProposalHighlightIds(const core::ReviewProposal& proposal,
+                                                           const std::map<std::string, std::string>& generated_ids) {
+    std::unordered_set<std::string> ids;
+    if (!proposal.anchor_element_id.empty()) ids.insert(proposal.anchor_element_id);
+    for (const std::string& id : proposal.affected_existing_element_ids) {
+        if (!id.empty()) ids.insert(id);
+    }
+    for (const auto& generated : generated_ids) {
+        if (!generated.second.empty()) ids.insert(generated.second);
+    }
+    for (const core::PatchOperation& operation : proposal.operations) {
+        if (operation.element.has_value()) AddHighlightRef(ids, operation.element.value(), generated_ids);
+        if (operation.source.has_value()) AddHighlightRef(ids, operation.source.value(), generated_ids);
+        if (operation.target.has_value()) AddHighlightRef(ids, operation.target.value(), generated_ids);
+    }
+    return ids;
+}
+
+void ClearProposalHighlightState(ui::UiState& ui_state) {
+    ui_state.proposal_highlight_ids.clear();
+    ui_state.dim_non_proposal_nodes = false;
+}
+
 bool IsUpdateForElement(const core::PatchOperation& operation,
                         core::PatchOperationType type,
                         const core::ElementRef& ref,
@@ -851,6 +886,9 @@ bool AppRuntime::RefreshProposalCreatorPreview() {
     impl_->proposal_creator_generated_ids = std::move(preview.generated_ids);
     impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->proposal_preview_model);
     ui::gsn::SetCanvasTree(impl_->current_tree);
+    ui::UiState& ui_state = ui::GetUiState();
+    ui_state.proposal_highlight_ids = CollectProposalHighlightIds(impl_->proposal_draft, impl_->proposal_creator_generated_ids);
+    ui_state.dim_non_proposal_nodes = !ui_state.proposal_highlight_ids.empty();
     return true;
 }
 
@@ -916,6 +954,58 @@ bool AppRuntime::BeginProposalForReviewItem(const core::ReviewItem& item) {
     return true;
 }
 
+bool AppRuntime::PreviewProposalById(const std::string& proposal_id) {
+    if (impl_->proposal_creator_active) {
+        SetStatus("Save or discard the active proposal before viewing another proposal.");
+        return false;
+    }
+    if (proposal_id.empty()) {
+        SetStatus("No proposal id was provided.");
+        return false;
+    }
+
+    std::string error;
+    std::optional<core::ReviewProposal> proposal = impl_->review_proposal_manager.LoadProposal(proposal_id, error);
+    if (!proposal.has_value()) {
+        SetStatus("Proposal preview failed: " + error);
+        return false;
+    }
+
+    if (!impl_->app_state.loaded_case.has_value()) {
+        SetStatus("Load a SACM model before previewing proposals.");
+        return false;
+    }
+
+    core::ReviewProposalPatchService patch_service;
+    core::ProposalPreviewResult preview = patch_service.BuildPreviewModel(*proposal, impl_->app_state.loaded_case.value());
+    if (!preview.success) {
+        SetStatus("Proposal preview failed: " + preview.error);
+        return false;
+    }
+
+    const std::map<std::string, std::string> generated_ids = preview.generated_ids;
+    impl_->proposal_preview_active = true;
+    impl_->proposal_preview_id = proposal->id;
+    impl_->proposal_preview_model = std::move(preview.preview_model);
+    impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->proposal_preview_model);
+    ui::gsn::SetCanvasTree(impl_->current_tree);
+
+    ui::UiState& preview_ui_state = ui::GetUiState();
+    preview_ui_state.proposal_highlight_ids = CollectProposalHighlightIds(*proposal, generated_ids);
+    preview_ui_state.dim_non_proposal_nodes = !preview_ui_state.proposal_highlight_ids.empty();
+    preview_ui_state.center_view = ui::CenterView::GsnCanvas;
+    preview_ui_state.selected_element_id = proposal->anchor_element_id;
+    preview_ui_state.center_on_selection = true;
+    impl_->show_gsn_tab = true;
+    impl_->force_center_tab_selection = true;
+
+    std::ostringstream status;
+    status << "Previewing proposal " << proposal->id << " with " << proposal->operations.size() << " operation(s). ";
+    status << "The project model has not been changed.";
+    SetStatus(status.str());
+    return true;
+}
+
 bool AppRuntime::SaveActiveProposal(const core::ReviewItem& item) {
     if (!impl_->proposal_creator_active || impl_->proposal_draft.review_item_id != item.id) {
         SetStatus("No active proposal draft for this review comment.");
@@ -968,6 +1058,7 @@ void AppRuntime::CancelActiveProposal() {
     impl_->proposal_preview_active = false;
     impl_->proposal_preview_id.clear();
     impl_->proposal_preview_model = {};
+    ClearProposalHighlightState(ui::GetUiState());
 
     if (impl_->app_state.loaded_case.has_value()) {
         impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->app_state.loaded_case.value());
@@ -1512,6 +1603,7 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                         impl_->proposal_preview_model = {};
                         impl_->proposal_draft = {};
                         impl_->proposal_creator_generated_ids.clear();
+                        ClearProposalHighlightState(ui::GetUiState());
                         if (impl_->app_state.loaded_case.has_value()) {
                             impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->app_state.loaded_case.value());
                             ui::gsn::SetCanvasTree(impl_->current_tree);
@@ -2064,48 +2156,11 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
         SaveActiveProposal(item);
     };
     callbacks.preview_proposal = [this](const core::ReviewItem& item) {
-        if (impl_->proposal_creator_active) {
-            SetStatus("Save or discard the active proposal before viewing another proposal.");
-            return;
-        }
         if (!item.proposal_id.has_value()) {
             SetStatus("This review comment has no proposed change to preview.");
             return;
         }
-        std::string error;
-        std::optional<core::ReviewProposal> proposal = impl_->review_proposal_manager.LoadProposal(item.proposal_id.value(), error);
-        if (!proposal.has_value()) {
-            SetStatus("Proposal preview failed: " + error);
-            return;
-        }
-
-        if (!impl_->app_state.loaded_case.has_value()) {
-            SetStatus("Load a SACM model before previewing proposals.");
-            return;
-        }
-
-        core::ReviewProposalPatchService patch_service;
-        core::ProposalPreviewResult preview = patch_service.BuildPreviewModel(*proposal, impl_->app_state.loaded_case.value());
-        if (!preview.success) {
-            SetStatus("Proposal preview failed: " + preview.error);
-            return;
-        }
-
-        impl_->proposal_preview_active = true;
-        impl_->proposal_preview_id = proposal->id;
-        impl_->proposal_preview_model = std::move(preview.preview_model);
-        impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->proposal_preview_model);
-        ui::gsn::SetCanvasTree(impl_->current_tree);
-        ui::UiState& preview_ui_state = ui::GetUiState();
-        preview_ui_state.center_view = ui::CenterView::GsnCanvas;
-        preview_ui_state.selected_element_id = proposal->anchor_element_id;
-        preview_ui_state.center_on_selection = true;
-        impl_->force_center_tab_selection = true;
-
-        std::ostringstream status;
-        status << "Previewing proposal " << proposal->id << " with " << proposal->operations.size() << " operation(s). ";
-        status << "The project model has not been changed.";
-        SetStatus(status.str());
+        PreviewProposalById(item.proposal_id.value());
     };
     callbacks.apply_proposal = [this](const core::ReviewItem& item) {
         if (impl_->proposal_creator_active) {
@@ -2144,6 +2199,7 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
         impl_->proposal_preview_active = false;
         impl_->proposal_preview_id.clear();
         impl_->proposal_preview_model = {};
+        ClearProposalHighlightState(ui::GetUiState());
         if (!impl_->app_state.sacm_package.has_value()) impl_->app_state.sacm_package.emplace();
         RebuildSacmArgumentPackageFromParser(impl_->app_state.loaded_case.value(), impl_->app_state.sacm_package.value());
         impl_->app_state.mark_dirty();
@@ -2216,6 +2272,7 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
             impl_->proposal_preview_active = false;
             impl_->proposal_preview_id.clear();
             impl_->proposal_preview_model = {};
+            ClearProposalHighlightState(ui::GetUiState());
             if (impl_->app_state.loaded_case.has_value()) {
                 impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->app_state.loaded_case.value());
                 ui::gsn::SetCanvasTree(impl_->current_tree);
@@ -2408,6 +2465,11 @@ void AppRuntime::OpenProjectFile(const core::ProjectFileEntry& entry) {
 
     ui::UiState& ui_state = ui::GetUiState();
     if (entry.role == core::ProjectFileRole::SacmArgument) {
+        impl_->proposal_preview_active = false;
+        impl_->proposal_creator_active = false;
+        impl_->proposal_preview_id.clear();
+        impl_->proposal_preview_model = {};
+        ClearProposalHighlightState(ui_state);
         impl_->tree_needs_rebuild = true;
         impl_->pending_focus_root = true;
         impl_->show_gsn_tab = true;
@@ -2428,29 +2490,7 @@ void AppRuntime::OpenProjectFile(const core::ProjectFileEntry& entry) {
             proposal_id.compare(proposal_id.size() - suffix.size(), suffix.size(), suffix) == 0) {
             proposal_id.erase(proposal_id.size() - suffix.size());
         }
-
-        std::string error;
-        std::optional<core::ReviewProposal> proposal = impl_->review_proposal_manager.LoadProposal(proposal_id, error);
-        if (!proposal.has_value()) {
-            SetStatus("Proposal file is broken: " + error);
-            return;
-        }
-
-        if (impl_->app_state.loaded_case.has_value()) {
-            core::ProposalValidityResult validity = core::EvaluateReviewProposalValidity(*proposal, impl_->app_state.loaded_case.value());
-            if (FindParserElement(impl_->app_state.loaded_case.value(), proposal->anchor_element_id)) {
-                ui_state.selected_element_id = proposal->anchor_element_id;
-                ui_state.center_on_selection = true;
-                ui_state.center_view = ui::CenterView::GsnCanvas;
-                impl_->show_gsn_tab = true;
-                impl_->force_center_tab_selection = true;
-            }
-            SetStatus(validity.validity == core::ProposalValidity::Valid
-                ? "Proposal is valid: " + proposal->title
-                : "Proposal is broken: " + validity.reason);
-        } else {
-            SetStatus("Loaded proposal " + proposal->id + ", but no SACM model is open for validation.");
-        }
+        PreviewProposalById(proposal_id);
     }
 }
 

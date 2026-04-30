@@ -34,6 +34,11 @@ struct UiState {
     // Nodes pending confirmation of removal. The canvas tints these red.
     std::unordered_set<std::string> marked_for_removal;
 
+    // Proposal preview/creator highlighting. When enabled, nodes outside this
+    // set are rendered subdued so proposed changes stand out.
+    std::unordered_set<std::string> proposal_highlight_ids;
+    bool dim_non_proposal_nodes = false;
+
     // Set to true when the canvas should fit-to-view the marked_for_removal set.
     bool center_on_marked = false;
 

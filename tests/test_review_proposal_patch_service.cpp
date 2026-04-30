@@ -65,6 +65,16 @@ bool HasInferenceReasoningTarget(const parser::AssuranceCase& model, const std::
     return false;
 }
 
+bool HasEvidenceSourceTarget(const parser::AssuranceCase& model, const std::string& source_id, const std::string& target_id) {
+    for (const parser::SacmElement& element : model.elements) {
+        if (element.type != "assertedevidence") continue;
+        const bool has_source = std::find(element.source_refs.begin(), element.source_refs.end(), source_id) != element.source_refs.end();
+        const bool has_target = std::find(element.target_refs.begin(), element.target_refs.end(), target_id) != element.target_refs.end();
+        if (has_source && has_target) return true;
+    }
+    return false;
+}
+
 core::ReviewProposal ProposalFor(const parser::AssuranceCase& model) {
     core::ReviewProposal proposal;
     proposal.id = "proposal-1";
@@ -128,6 +138,23 @@ TEST(ReviewProposalPatchServiceTest, BuildsPreviewWithoutMutatingCurrentModel) {
     ASSERT_NE(FindElement(preview.preview_model, generated_id), nullptr);
     EXPECT_EQ(FindElement(preview.preview_model, generated_id)->content, "Generated claim content");
     EXPECT_TRUE(HasInferenceSourceTarget(preview.preview_model, generated_id, "G1"));
+}
+
+TEST(ReviewProposalPatchServiceTest, CreatesSolutionAsEvidenceRelationship) {
+    parser::AssuranceCase model = MakeModel();
+    core::ReviewProposal proposal = ProposalFor(model);
+    proposal.operations.push_back(Create(core::PatchOperationType::CreateSolution, "$new_solution_1", "Verification evidence"));
+    proposal.operations.push_back(AddSupportedBy(core::ElementRef{std::nullopt, "$new_solution_1"}, core::ElementRef{"G1", std::nullopt}));
+
+    core::ReviewProposalPatchService service;
+    core::ProposalPreviewResult preview = service.BuildPreviewModel(proposal, model);
+
+    ASSERT_TRUE(preview.success) << preview.error;
+    const std::string generated_id = preview.generated_ids.at("$new_solution_1");
+    ASSERT_NE(FindElement(preview.preview_model, generated_id), nullptr);
+    EXPECT_EQ(FindElement(preview.preview_model, generated_id)->type, "artifactreference");
+    EXPECT_TRUE(HasEvidenceSourceTarget(preview.preview_model, generated_id, "G1"));
+    EXPECT_FALSE(HasInferenceSourceTarget(preview.preview_model, generated_id, "G1"));
 }
 
 TEST(ReviewProposalPatchServiceTest, CreatesStrategyAndClaimsWithNonCollidingIds) {

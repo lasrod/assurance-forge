@@ -55,6 +55,13 @@ static ImU32 ColorForType(const std::string& type) {
     return th.node_context;
 }
 
+static ImU32 DimmedProposalColor(ImU32 color) {
+    ImVec4 value = ImGui::ColorConvertU32ToFloat4(color);
+    float gray = value.x * 0.299f + value.y * 0.587f + value.z * 0.114f;
+    ImVec4 dimmed(gray * 0.62f, gray * 0.62f, gray * 0.62f, value.w * 0.58f);
+    return ImGui::ColorConvertFloat4ToU32(dimmed);
+}
+
 static ImU32 OutlineColor() { return WithAlpha(GetTheme().border_strong, 0.85f); }
 
 // Draw a soft 3-layer drop shadow under a rounded rectangle.
@@ -325,7 +332,14 @@ void DrawGsnNode(const GsnNode& node,
                                  top_left.y + node.size.y * zoom);
     ImVec2 scaled_size = ImVec2(node.size.x * zoom, node.size.y * zoom);
 
+    const bool proposal_dim_active = ui_state.dim_non_proposal_nodes && !ui_state.proposal_highlight_ids.empty();
+    const bool proposal_highlighted = proposal_dim_active && ui_state.proposal_highlight_ids.count(node.id) > 0;
+    const bool proposal_dimmed = proposal_dim_active && !proposal_highlighted;
+
     ImU32 fill_color = ColorForType(node.type);
+    if (proposal_dimmed) {
+        fill_color = DimmedProposalColor(fill_color);
+    }
 
     // If this node is marked for pending removal, override the fill with a
     // strong red tint so the user can see exactly what will be removed.
@@ -360,6 +374,7 @@ void DrawGsnNode(const GsnNode& node,
     float text_left, text_wrap;
     ComputeTextRegion(node, top_left, bottom_right, zoom, text_left, text_wrap);
     ImU32 ink = marked_for_removal ? GetTheme().text_primary : InkOn(fill_color);
+    if (proposal_dimmed) ink = WithAlpha(GetTheme().text_secondary, 0.62f);
     DrawNodeLabel(draw_list, node, top_left, bottom_right, text_left, text_wrap, zoom, ink, ui_state);
     DrawUndevelopedMarker(draw_list, node, top_left, bottom_right, zoom);
 
@@ -396,6 +411,17 @@ void DrawGsnNode(const GsnNode& node,
                 WithAlpha(th_sel.accent, alpha),
                 DpiSize(kClaimRounding) * zoom + pad, 0, 1.5f * scale);
         }
+    }
+
+    if (proposal_highlighted) {
+        const Theme& th_prop = GetTheme();
+        float scale = DpiScale() * zoom;
+        float pad = 5.0f * scale;
+        draw_list->AddRect(
+            ImVec2(top_left.x - pad, top_left.y - pad),
+            ImVec2(bottom_right.x + pad, bottom_right.y + pad),
+            WithAlpha(th_prop.accent, 0.85f),
+            DpiSize(kClaimRounding) * zoom + pad, 0, 2.4f * scale);
     }
 
     // Marked-for-removal border (drawn after the selection highlight so a
