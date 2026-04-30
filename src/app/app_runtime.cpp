@@ -2248,6 +2248,7 @@ void AppRuntime::RenderProposalElementEditor() {
     }
     ImGui::Separator();
 
+    ImGui::PushID(editor_key.c_str());
     ImGui::SetNextItemWidth(-1.0f);
     const bool name_changed = ImGui::InputText("Name", name_buf, sizeof(name_buf));
     ImGui::SetNextItemWidth(-1.0f);
@@ -2255,6 +2256,7 @@ void AppRuntime::RenderProposalElementEditor() {
                                                         ImVec2(-1.0f, ImGui::GetTextLineHeight() * 5.0f));
     bool undeveloped_value = element_snapshot.undeveloped;
     const bool undeveloped_changed = ImGui::Checkbox("Undeveloped", &undeveloped_value);
+    ImGui::PopID();
 
     if (!name_changed && !text_changed && !undeveloped_changed) return;
 
