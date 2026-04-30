@@ -172,8 +172,11 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/ai/openai_provider.cpp
     src/ai/secret_store.cpp
     src/app/main.cpp
+    src/app/app_runtime_ai.cpp
     src/app/app_ui_bootstrap.cpp
     src/app/app_layout_controller.cpp
+    src/app/app_runtime_modals.cpp
+    src/app/app_runtime_project.cpp
     src/app/app_runtime.cpp
     src/app/app_runtime_state.cpp
     src/app/native_file_dialogs.cpp
