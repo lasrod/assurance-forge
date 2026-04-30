@@ -1530,8 +1530,13 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
             if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::GsnCanvas), nullptr, gsn_flags)) {
                 ui_state.center_view = ui::CenterView::GsnCanvas;
                 if (impl_->IsProposalCanvasActive()) {
+                    const float banner_h = ImGui::GetStyle().WindowPadding.y * 2.0f
+                                         + ImGui::GetTextLineHeight()
+                                         + ImGui::GetStyle().ItemSpacing.y
+                                         + ImGui::GetFrameHeight()
+                                         + 2.0f;  // border pixels
                     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(IM_COL32(42, 45, 30, 255)));
-                    ImGui::BeginChild("##proposal_preview_banner", ImVec2(0.0f, 58.0f), true, ImGuiWindowFlags_NoScrollbar);
+                    ImGui::BeginChild("##proposal_preview_banner", ImVec2(0.0f, banner_h), true, ImGuiWindowFlags_NoScrollbar);
                     ImGui::TextUnformatted(impl_->proposal_creator_active ? "PROPOSAL CREATOR" : "PROPOSAL PREVIEW");
                     if (impl_->proposal_creator_active) {
                         ImGui::TextDisabled("Changes are recorded in the proposal draft. Save it from the review panel.");
@@ -1587,6 +1592,7 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                 const parser::AssuranceCase* visible_case = impl_->IsProposalCanvasActive()
                     ? &impl_->proposal_preview_model
                     : GetLoadedCase();
+                ui_state.proposal_canvas_active = impl_->IsProposalCanvasActive();
                 ui::gsn::ShowGsnCanvasContent(ui_state, visible_case, actions);
                 ImGui::EndTabItem();
             }

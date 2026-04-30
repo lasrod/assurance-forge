@@ -441,7 +441,18 @@ void ShowGsnCanvasContent(UiState& ui_state,
                           const ElementContextActions& actions) {
     // Child region with clipping; we manage our own pan/zoom offset
     // so no ImGui scrollbars are needed.
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(GetTheme().canvas_bg));
+    ImU32 canvas_bg = GetTheme().canvas_bg;
+    if (ui_state.proposal_canvas_active) {
+        // Blend canvas_bg toward a dark olive tone to signal proposal mode.
+        ImVec4 bg   = ImGui::ColorConvertU32ToFloat4(canvas_bg);
+        const ImVec4 tint = ImGui::ColorConvertU32ToFloat4(IM_COL32(42, 45, 30, 255));
+        const float t = 0.45f;
+        bg.x = bg.x * (1.0f - t) + tint.x * t;
+        bg.y = bg.y * (1.0f - t) + tint.y * t;
+        bg.z = bg.z * (1.0f - t) + tint.z * t;
+        canvas_bg = ImGui::ColorConvertFloat4ToU32(bg);
+    }
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(canvas_bg));
     ImGui::BeginChild("gsn_canvas_child", ImVec2(0, 0), false,
                       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     ImGui::PopStyleColor();

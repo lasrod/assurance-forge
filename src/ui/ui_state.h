@@ -39,6 +39,10 @@ struct UiState {
     std::unordered_set<std::string> proposal_highlight_ids;
     bool dim_non_proposal_nodes = false;
 
+    // True while any proposal canvas mode (creator or preview) is active.
+    // Used by the GSN canvas to apply a distinct background tint.
+    bool proposal_canvas_active = false;
+
     // Set to true when the canvas should fit-to-view the marked_for_removal set.
     bool center_on_marked = false;
 
