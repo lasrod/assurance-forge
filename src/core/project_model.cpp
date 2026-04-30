@@ -14,6 +14,8 @@ const char* ProjectFileRoleToString(ProjectFileRole role) {
         case ProjectFileRole::SacmArgument: return "sacm.argument";
         case ProjectFileRole::EvidenceRegister: return "af.evidenceRegister";
         case ProjectFileRole::J3377CaeRegister: return "af.j3377CaeRegister";
+        case ProjectFileRole::ReviewItems: return "af.reviewItems";
+        case ProjectFileRole::ReviewProposal: return "af.reviewProposal";
         case ProjectFileRole::ConformanceSheet: return "af.conformanceSheet";
         case ProjectFileRole::ExportedReport: return "af.exportedReport";
         case ProjectFileRole::Unknown: return "unknown";
@@ -26,6 +28,8 @@ const char* ProjectFileRoleToDisplayString(ProjectFileRole role) {
         case ProjectFileRole::SacmArgument: return "SACM Argument";
         case ProjectFileRole::EvidenceRegister: return "Evidence Register";
         case ProjectFileRole::J3377CaeRegister: return "J3377 CAE Register";
+        case ProjectFileRole::ReviewItems: return "Review Items";
+        case ProjectFileRole::ReviewProposal: return "Review Proposal";
         case ProjectFileRole::ConformanceSheet: return "Conformance Sheet";
         case ProjectFileRole::ExportedReport: return "Exported Report";
         case ProjectFileRole::Unknown: return "Unknown";
@@ -37,6 +41,8 @@ ProjectFileRole ProjectFileRoleFromString(const std::string& value) {
     if (value == "sacm.argument") return ProjectFileRole::SacmArgument;
     if (value == "af.evidenceRegister") return ProjectFileRole::EvidenceRegister;
     if (value == "af.j3377CaeRegister") return ProjectFileRole::J3377CaeRegister;
+    if (value == "af.reviewItems") return ProjectFileRole::ReviewItems;
+    if (value == "af.reviewProposal") return ProjectFileRole::ReviewProposal;
     if (value == "af.conformanceSheet") return ProjectFileRole::ConformanceSheet;
     if (value == "af.exportedReport") return ProjectFileRole::ExportedReport;
     return ProjectFileRole::Unknown;

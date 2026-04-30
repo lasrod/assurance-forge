@@ -4,8 +4,11 @@
 
 #include "core/element_factory.h"
 #include "core/project_model.h"
+#include "core/reviews/review_item.h"
 
 namespace app {
+
+struct AppRuntimeState;
 
 class AppRuntime {
 public:
@@ -20,6 +23,8 @@ public:
 
     void LoadRecentProjectsPreference(const std::string& content);
     std::string RecentProjectsPreferenceJson() const;
+    void LoadReviewerNamePreference(const std::string& content);
+    std::string ReviewerNamePreference() const;
 
     // Add a new child element to the currently selected element.
     // Returns true on success; updates selection to the new element.
@@ -45,15 +50,17 @@ public:
 private:
     float RenderMainMenuBar(bool& done);
     void ScanDirectory();
-    void RenderSplitters(float display_w, float content_h, float left_w, float center_w, float top_y);
     void RenderTreePanel(float left_w, float safety_tree_h, float top_y);
     void RenderSacmViewerPanel(float left_w, float sacm_h, float top_y);
     void RenderCenterPanel(float center_x, float center_w, float content_h, float top_y);
     void RenderProblemsPanel(float center_x, float center_w, float problems_h, float top_y);
     void RenderElementPropertiesPanel(float center_x, float center_w, float right_w, float content_h, float top_y);
+    void RenderProposalElementEditor();
     void RenderStartupProjectWindow();
     void RenderNotImplementedModal();
     void RenderRemoveConfirmModal();
+    void RenderDeleteReviewItemConfirmModal();
+    void RenderReviewerNamePromptModal();
     void RenderCreateProjectModal();
     void RenderProjectFileNameModal();
     void RenderProjectLoadReportModal();
@@ -70,9 +77,28 @@ private:
     void OpenProjectFile(const core::ProjectFileEntry& entry);
     bool OpenFirstProjectSacmFile();
     bool TryOpenProjectManifest(const std::string& selected_path);
+    bool EnsureReviewItemStorage();
     void TouchCurrentProjectRecent();
     bool SaveProject();
     void RequestExit(bool& done);
+
+    bool BeginProposalForReviewItem(const core::reviews::ReviewItem& item);
+    bool BeginEditProposalForReviewItem(const core::reviews::ReviewItem& item);
+    bool BeginEditProposalById(const std::string& proposal_id);
+    bool PreviewProposalById(const std::string& proposal_id);
+    bool SaveActiveProposal(const core::reviews::ReviewItem& item);
+    void CancelActiveProposal();
+    void MarkReviewItemsDirty();
+    bool DeleteProposalPatchFile(const std::string& proposal_id, std::string& error);
+    void CloseProposalPreviewIfOpen(const std::string& proposal_id);
+    void BeginDeleteReviewItem(const core::reviews::ReviewItem& item);
+    bool DeleteReviewItem(const core::reviews::ReviewItem& item);
+    bool ResolveReviewItem(const core::reviews::ReviewItem& item);
+    bool RefreshProposalCreatorPreview();
+    void ProcessPendingProposalCreatorPreviewRefresh();
+    bool AddProposalChildToSelected(core::NewElementKind kind);
+    bool AddProposalTopGoal();
+    void RemoveProposalSelected(core::RemoveMode mode);
 
     void RebuildDerivedViewsIfNeeded();
     void BeginAiReviewForSelection();
@@ -80,8 +106,7 @@ private:
     void PollAiReviewTask();
 
 private:
-    struct Impl;
-    Impl* impl_ = nullptr;
+    AppRuntimeState* impl_ = nullptr;
 };
 
 }  // namespace app

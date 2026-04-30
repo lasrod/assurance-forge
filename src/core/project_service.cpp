@@ -1,5 +1,6 @@
 #include "core/project_service.h"
 
+#include "core/reviews/review_item.h"
 #include "core/sha256.h"
 #include "parser/xml_parser.h"
 
@@ -23,9 +24,11 @@ constexpr const char* kProjectFormat = "assurance-forge-project";
 constexpr const char* kProjectFormatVersion = "0.1.0";
 constexpr const char* kManifestFileName = "af.proj";
 
-const std::array<const char*, 8> kProjectDirectories = {
+const std::array<const char*, 10> kProjectDirectories = {
     "arguments",
     "registers",
+    "reviews",
+    "reviews/proposals",
     "conformance",
     "exports",
     ".af/cache",
@@ -435,6 +438,27 @@ std::filesystem::path NormalizeFileName(const std::string& requested_file_name,
     return name.filename();
 }
 
+std::filesystem::path NormalizeProposalPatchName(const std::string& requested_file_name) {
+    std::string trimmed = Trim(requested_file_name);
+    if (trimmed.empty()) trimmed = "proposal-0001.afpatch.json";
+    const std::string suffix = ".afpatch.json";
+    bool has_suffix = false;
+    if (trimmed.size() >= suffix.size()) {
+        std::string actual_tail = trimmed.substr(trimmed.size() - suffix.size());
+        std::transform(actual_tail.begin(), actual_tail.end(), actual_tail.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        has_suffix = (actual_tail == suffix);
+    }
+    if (!has_suffix) {
+        trimmed += suffix;
+    }
+    return std::filesystem::path(trimmed).filename();
+}
+
+std::string ReviewItemsJson() {
+    return reviews::SerializeReviewItems({});
+}
+
 std::string MinimalSacmXml(const std::string& case_name) {
     return std::string("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n") +
            "<sacm:AssuranceCasePackage xmlns:sacm=\"http://www.omg.org/spec/SACM/2.2/Argumentation\" "
@@ -566,6 +590,10 @@ bool AddTrackedFile(AssuranceProject& project,
 
     std::filesystem::path absolute_path = project.rootPath / relative_path;
     std::error_code ec;
+    if (!std::filesystem::create_directories(absolute_path.parent_path(), ec) && ec) {
+        error = "Could not create project directory: " + absolute_path.parent_path().string();
+        return false;
+    }
     if (std::filesystem::exists(absolute_path, ec)) {
         error = "File already exists: " + relative_path.generic_string();
         return false;
@@ -650,6 +678,9 @@ bool ProjectService::CreateEmptyProject(const std::string& project_name,
     ProjectFileEntry main_entry;
     if (!AddSacmFile(project, "main.sacm", main_entry, error)) return false;
 
+    ProjectFileEntry review_entry;
+    if (!AddReviewItemsFile(project, "review-items.af.json", review_entry, error)) return false;
+
     report = RefreshFileStatus(project);
     return true;
 }
@@ -713,6 +744,148 @@ bool ProjectService::AddJ3377CaeRegister(AssuranceProject& project,
     std::filesystem::path file_name = NormalizeFileName(requested_file_name, "j3377-cae-register.af.json", ".json");
     return AddTrackedFile(project, "registers", file_name, ProjectFileRole::J3377CaeRegister,
                           J3377RegisterJson(), entry, error);
+}
+
+bool ProjectService::AddReviewItemsFile(AssuranceProject& project,
+                                        const std::string& requested_file_name,
+                                        ProjectFileEntry& entry,
+                                        std::string& error) {
+    std::filesystem::path file_name = NormalizeFileName(requested_file_name, "review-items.af.json", ".json");
+    return AddTrackedFile(project, "reviews", file_name, ProjectFileRole::ReviewItems,
+                          ReviewItemsJson(), entry, error);
+}
+
+bool ProjectService::SaveReviewItemsFile(AssuranceProject& project,
+                                         const std::string& requested_file_name,
+                                         const std::string& content,
+                                         ProjectFileEntry& entry,
+                                         std::string& error) {
+    std::filesystem::path file_name = NormalizeFileName(requested_file_name, "review-items.af.json", ".json");
+    std::filesystem::path relative_path = std::filesystem::path("reviews") / file_name;
+    if (!IsSafeRelativePath(relative_path)) {
+        error = "Invalid project file path";
+        return false;
+    }
+
+    auto found = std::find_if(project.files.begin(), project.files.end(), [&](const ProjectFileEntry& candidate) {
+        return candidate.relativePath.generic_string() == relative_path.generic_string();
+    });
+
+    const std::filesystem::path absolute_path = project.rootPath / relative_path;
+    std::error_code ec;
+    if (!std::filesystem::create_directories(absolute_path.parent_path(), ec) && ec) {
+        error = "Could not create project directory: " + absolute_path.parent_path().string();
+        return false;
+    }
+    if (!WriteTextFile(absolute_path, content, error)) return false;
+
+    if (found == project.files.end()) {
+        ProjectFileEntry new_entry;
+        new_entry.id = GenerateId("af-file");
+        new_entry.relativePath = relative_path;
+        new_entry.role = ProjectFileRole::ReviewItems;
+        new_entry.hashAlgorithm = "sha256";
+        if (!RefreshEntryHashes(project, new_entry, false, error)) return false;
+        project.files.push_back(new_entry);
+        found = project.files.end() - 1;
+    } else if (found->role != ProjectFileRole::ReviewItems) {
+        error = "Tracked file is not a review item file: " + relative_path.generic_string();
+        return false;
+    } else if (!RefreshEntryHashes(project, *found, false, error)) {
+        return false;
+    }
+
+    project.modifiedUtc = NowUtc();
+    if (!WriteManifestSafely(project, error)) return false;
+
+    entry = *found;
+    return true;
+}
+
+bool ProjectService::AddReviewProposalFile(AssuranceProject& project,
+                                           const std::string& requested_file_name,
+                                           const std::string& content,
+                                           ProjectFileEntry& entry,
+                                           std::string& error) {
+    std::filesystem::path file_name = NormalizeProposalPatchName(requested_file_name);
+    return AddTrackedFile(project, "reviews/proposals", file_name, ProjectFileRole::ReviewProposal,
+                          content, entry, error);
+}
+
+bool ProjectService::SaveReviewProposalFile(AssuranceProject& project,
+                                            const std::string& requested_file_name,
+                                            const std::string& content,
+                                            ProjectFileEntry& entry,
+                                            std::string& error) {
+    std::filesystem::path file_name = NormalizeProposalPatchName(requested_file_name);
+    std::filesystem::path relative_path = std::filesystem::path("reviews") / "proposals" / file_name;
+    if (!IsSafeRelativePath(relative_path)) {
+        error = "Invalid project file path";
+        return false;
+    }
+
+    auto found = std::find_if(project.files.begin(), project.files.end(), [&](const ProjectFileEntry& candidate) {
+        return candidate.relativePath.generic_string() == relative_path.generic_string();
+    });
+
+    if (found == project.files.end()) {
+        return AddTrackedFile(project, "reviews/proposals", file_name, ProjectFileRole::ReviewProposal,
+                              content, entry, error);
+    }
+
+    if (found->role != ProjectFileRole::ReviewProposal) {
+        error = "Tracked file is not a review proposal: " + relative_path.generic_string();
+        return false;
+    }
+
+    const std::filesystem::path absolute_path = project.rootPath / relative_path;
+    if (!WriteTextFile(absolute_path, content, error)) return false;
+
+    if (!RefreshEntryHashes(project, *found, false, error)) return false;
+    project.modifiedUtc = NowUtc();
+    if (!WriteManifestSafely(project, error)) return false;
+
+    entry = *found;
+    return true;
+}
+
+bool ProjectService::RemoveTrackedFile(AssuranceProject& project,
+                                       const std::filesystem::path& relative_path,
+                                       bool delete_file,
+                                       std::string& error) {
+    if (!IsSafeRelativePath(relative_path)) {
+        error = "Invalid project file path";
+        return false;
+    }
+
+    auto found = std::find_if(project.files.begin(), project.files.end(), [&](const ProjectFileEntry& entry) {
+        return entry.relativePath.generic_string() == relative_path.generic_string();
+    });
+    if (found == project.files.end()) {
+        error = "Tracked file was not found: " + relative_path.generic_string();
+        return false;
+    }
+
+    ProjectFileEntry removed_entry = *found;
+    project.files.erase(found);
+    project.modifiedUtc = NowUtc();
+
+    std::error_code ec;
+    if (delete_file) {
+        std::filesystem::remove(project.rootPath / relative_path, ec);
+        if (ec) {
+            project.files.push_back(std::move(removed_entry));
+            error = "Could not delete file: " + ec.message();
+            return false;
+        }
+    }
+
+    if (!WriteManifestSafely(project, error)) {
+        project.files.push_back(std::move(removed_entry));
+        return false;
+    }
+
+    return true;
 }
 
 bool ProjectService::WriteManifestSafely(const AssuranceProject& project, std::string& error) {

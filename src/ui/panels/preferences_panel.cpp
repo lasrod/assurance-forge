@@ -142,6 +142,24 @@ void RenderAppearanceSection(PreferencesPanelModel model, const PreferencesPanel
     }
 }
 
+void RenderReviewSection(PreferencesPanelModel model, const PreferencesPanelCallbacks& callbacks) {
+    ImGui::TextUnformatted("Review");
+    ImGui::Separator();
+
+    ImGui::TextUnformatted("Reviewer name");
+    ImGui::SetNextItemWidth(320.0f);
+    if (model.reviewerNameBuffer && model.reviewerNameBufferSize > 0) {
+        ImGui::InputText("##reviewer_name", model.reviewerNameBuffer, model.reviewerNameBufferSize);
+    }
+
+    const bool can_save = model.reviewerNameBuffer && model.reviewerNameBuffer[0] != '\0';
+    if (!can_save) ImGui::BeginDisabled();
+    if (ImGui::Button("Save Reviewer Name") && callbacks.save_reviewer_name && model.reviewerNameBuffer) {
+        callbacks.save_reviewer_name(model.reviewerNameBuffer);
+    }
+    if (!can_save) ImGui::EndDisabled();
+}
+
 }  // namespace
 
 void ShowPreferencesWindow(bool& open,
@@ -153,6 +171,8 @@ void ShowPreferencesWindow(bool& open,
     ImGui::SetNextWindowSize(ImVec2(560.0f, 0.0f), ImGuiCond_Appearing);
     if (ImGui::Begin(ui::Tr(ui::MessageId::PreferencesTitle), &open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
         RenderAppearanceSection(model, callbacks);
+        ImGui::Spacing();
+        RenderReviewSection(model, callbacks);
         ImGui::Spacing();
         RenderAiSection(model, callbacks);
     }
