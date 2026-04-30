@@ -10,6 +10,8 @@ enum class ProjectFileRole {
     SacmArgument,
     EvidenceRegister,
     J3377CaeRegister,
+    ReviewItems,
+    ReviewProposal,
     ConformanceSheet,
     ExportedReport,
     Unknown

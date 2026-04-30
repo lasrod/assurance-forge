@@ -12,9 +12,10 @@ struct FolderSpec {
     const char* label;
 };
 
-constexpr std::array<FolderSpec, 4> kVisibleFolders = {{
+constexpr std::array<FolderSpec, 5> kVisibleFolders = {{
     {"arguments", "arguments/"},
     {"registers", "registers/"},
+    {"reviews", "reviews/"},
     {"conformance", "conformance/"},
     {"exports", "exports/"},
 }};

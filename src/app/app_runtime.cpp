@@ -27,6 +27,7 @@
 #include "core/element_factory.h"
 #include "core/problems/problems_manager.h"
 #include "core/project_service.h"
+#include "core/reviews/review_item_manager.h"
 #include "parser/guidelines_parser.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas.h"
@@ -35,6 +36,7 @@
 #include "ui/panels/problems_panel.h"
 #include "ui/panels/preferences_panel.h"
 #include "ui/panels/project_files_panel.h"
+#include "ui/panels/review_panel.h"
 #include "ui/panels/sacm_viewer_panel.h"
 #include "ui/panels/welcome_modal.h"
 #include "ui/register_views.h"
@@ -44,9 +46,13 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cstring>
+#include <ctime>
 #include <filesystem>
+#include <iomanip>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -154,6 +160,35 @@ core::ProblemItem MakeAiReviewProblem(const std::string& id,
     return problem;
 }
 
+std::string NowUtcString() {
+    auto now = std::chrono::system_clock::now();
+    std::time_t time = std::chrono::system_clock::to_time_t(now);
+    std::tm utc{};
+#if defined(_WIN32)
+    if (gmtime_s(&utc, &time) != 0) return "1970-01-01T00:00:00Z";
+#else
+    if (!gmtime_r(&time, &utc)) return "1970-01-01T00:00:00Z";
+#endif
+    std::ostringstream out;
+    out << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
+    return out.str();
+}
+
+std::string GenerateReviewItemId() {
+    static unsigned long long counter = 0;
+    auto ticks = std::chrono::system_clock::now().time_since_epoch().count();
+    std::ostringstream out;
+    out << "review-" << std::hex << ticks << "-" << ++counter;
+    return out.str();
+}
+
+std::filesystem::path ReviewItemsPath(const core::AssuranceProject& project) {
+    for (const core::ProjectFileEntry& entry : project.files) {
+        if (entry.role == core::ProjectFileRole::ReviewItems) return project.rootPath / entry.relativePath;
+    }
+    return {};
+}
+
 std::string TruncateForProblemMessage(const std::string& value, size_t limit = 400) {
     if (value.size() <= limit) return value;
     return value.substr(0, limit) + "...";
@@ -222,6 +257,7 @@ struct AppRuntime::Impl {
 
     core::AppState app_state;
     core::ProblemsManager problems_manager;
+    core::ReviewItemManager review_item_manager;
 
     std::shared_ptr<ai::AiSettingsStore> ai_settings_store;
     std::shared_ptr<ai::ISecretStore> ai_secret_store;
@@ -1175,8 +1211,17 @@ void AppRuntime::RenderAiReviewDebugModal() {
 
 void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, float right_w, float content_h, float top_y) {
     float right_x = center_x + center_w + kSplitterThickness;
+    const float min_element_h = 180.0f;
+    const float min_review_h = 140.0f;
+    float element_h = content_h * 0.58f;
+    if (content_h > min_element_h + min_review_h + kSplitterThickness) {
+        element_h = std::max(min_element_h, std::min(element_h, content_h - min_review_h - kSplitterThickness));
+    }
+    float review_y = top_y + element_h + kSplitterThickness;
+    float review_h = std::max(0.0f, content_h - element_h - kSplitterThickness);
+
     ImGui::SetNextWindowPos(ImVec2(right_x, top_y));
-    ImGui::SetNextWindowSize(ImVec2(right_w, content_h));
+    ImGui::SetNextWindowSize(ImVec2(right_w, element_h));
     ImGui::Begin("Element Properties", nullptr, kPanelFlags);
 
     parser::AssuranceCase* ac_ptr = impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
@@ -1185,6 +1230,71 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
         impl_->tree_needs_rebuild = true;
         impl_->app_state.mark_dirty();
     }
+
+    ImGui::End();
+
+    ImGui::SetNextWindowPos(ImVec2(right_x, review_y));
+    ImGui::SetNextWindowSize(ImVec2(right_w, review_h));
+    ImGui::Begin("Review", nullptr, kPanelFlags);
+
+    const ui::UiState& ui_state = ui::GetUiState();
+    ui::panels::ReviewPanelModel model;
+    model.selected_element_id = ui_state.selected_element_id;
+    model.has_project = impl_->app_state.current_project.has_value() && !impl_->review_item_manager.FilePath().empty();
+    if (!model.selected_element_id.empty()) {
+        model.review_items = impl_->review_item_manager.GetItemsForElement(model.selected_element_id);
+    }
+
+    ui::panels::ReviewPanelCallbacks callbacks;
+    callbacks.add_review_item = [this](const std::string& title, const std::string& message) {
+        if (!impl_->app_state.current_project.has_value()) {
+            SetStatus("Open or create a project before adding review comments.");
+            return;
+        }
+        const std::string element_id = ui::GetUiState().selected_element_id;
+        if (element_id.empty()) {
+            SetStatus("Select an element before adding a review comment.");
+            return;
+        }
+
+        core::ReviewItem item;
+        item.id = GenerateReviewItemId();
+        item.element_id = element_id;
+        item.title = title;
+        item.message = message;
+        item.severity = "warning";
+        item.source = core::ReviewItemSource::Manual;
+        item.status = core::ReviewItemStatus::Open;
+        item.created_utc = NowUtcString();
+        item.updated_utc = item.created_utc;
+
+        if (!impl_->review_item_manager.AddOrUpdateItem(std::move(item))) {
+            SetStatus("Could not add review comment.");
+            return;
+        }
+        std::string error;
+        if (!impl_->review_item_manager.Save(error)) {
+            SetStatus("Review comment save failed: " + error);
+            return;
+        }
+        if (impl_->app_state.current_project.has_value()) {
+            core::ProjectService::RefreshFileStatus(impl_->app_state.current_project.value());
+        }
+        SetStatus("Review comment added.");
+    };
+    callbacks.create_proposed_change = [this](const core::ReviewItem&) {
+        SetStatus("Proposal edit mode will be implemented in the next slice.");
+    };
+    callbacks.preview_proposal = [this](const core::ReviewItem&) {
+        SetStatus("Proposal preview will be implemented in the next slice.");
+    };
+    callbacks.apply_proposal = [this](const core::ReviewItem&) {
+        SetStatus("Proposal apply will be implemented in the next slice.");
+    };
+    callbacks.delete_proposal = [this](const core::ReviewItem&) {
+        SetStatus("Proposal delete will be implemented in the next slice.");
+    };
+    ui::panels::ShowReviewPanel(model, callbacks);
 
     ImGui::End();
 }
@@ -1411,6 +1521,14 @@ bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {
     if (!impl_->app_state.open_project(selected_path)) {
         return false;
     }
+    if (impl_->app_state.current_project.has_value()) {
+        std::filesystem::path review_path = ReviewItemsPath(impl_->app_state.current_project.value());
+        impl_->review_item_manager.SetFilePath(review_path);
+        std::string error;
+        if (!review_path.empty() && !impl_->review_item_manager.Load(error)) {
+            SetStatus("Review items could not be loaded: " + error);
+        }
+    }
     OpenFirstProjectSacmFile();
     TouchCurrentProjectRecent();
     CopyToBuffer(impl_->open_project_path_buf, sizeof(impl_->open_project_path_buf), selected_path);
@@ -1434,6 +1552,12 @@ void AppRuntime::RenderCreateProjectModal() {
 
         if (ImGui::Button("Create", ImVec2(110.0f, 0.0f))) {
             if (impl_->app_state.create_empty_project(impl_->project_name_buf, impl_->project_parent_buf)) {
+                if (impl_->app_state.current_project.has_value()) {
+                    std::filesystem::path review_path = ReviewItemsPath(impl_->app_state.current_project.value());
+                    impl_->review_item_manager.SetFilePath(review_path);
+                    std::string error;
+                    if (!review_path.empty()) impl_->review_item_manager.Load(error);
+                }
                 OpenFirstProjectSacmFile();
                 TouchCurrentProjectRecent();
                 impl_->show_create_project_modal = false;
@@ -1561,6 +1685,13 @@ void AppRuntime::RenderSaveBeforeExitModal(bool& done) {
 }
 
 bool AppRuntime::SaveProject() {
+    if (!impl_->review_item_manager.FilePath().empty()) {
+        std::string error;
+        if (!impl_->review_item_manager.Save(error)) {
+            impl_->app_state.status_message = "Review item save failed: " + error;
+            return false;
+        }
+    }
     return impl_->app_state.save_project();
 }
 

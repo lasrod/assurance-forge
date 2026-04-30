@@ -132,6 +132,7 @@ set(ASSURANCE_FORGE_SHARED_SOURCES
     src/ui/panels/preferences_panel.cpp
     src/ui/panels/problems_panel.cpp
     src/ui/panels/project_files_panel.cpp
+    src/ui/panels/review_panel.cpp
     src/ui/panels/sacm_viewer_panel.cpp
     src/ui/widgets/splitter.cpp
     src/ui/gsn/gsn_canvas.cpp
@@ -151,6 +152,10 @@ set(ASSURANCE_FORGE_SHARED_SOURCES
     src/core/problems/problems_manager.cpp
     src/core/project_model.cpp
     src/core/project_service.cpp
+    src/core/reviews/review_item.cpp
+    src/core/reviews/review_item_manager.cpp
+    src/core/reviews/review_proposal.cpp
+    src/core/reviews/review_proposal_manager.cpp
     src/core/sha256.cpp
     src/sacm/sacm_parser.cpp
     src/sacm/sacm_serializer.cpp
@@ -198,6 +203,8 @@ add_executable(tests
     tests/test_assurance_tree.cpp
     tests/test_layout.cpp
     tests/test_problems_manager.cpp
+    tests/test_review_item.cpp
+    tests/test_review_proposal.cpp
     tests/test_sacm_roundtrip.cpp
     tests/test_element_factory.cpp
     tests/test_project_service.cpp
@@ -227,6 +234,10 @@ add_executable(tests
     src/core/problems/problems_manager.cpp
     src/core/project_model.cpp
     src/core/project_service.cpp
+    src/core/reviews/review_item.cpp
+    src/core/reviews/review_item_manager.cpp
+    src/core/reviews/review_proposal.cpp
+    src/core/reviews/review_proposal_manager.cpp
     src/core/sha256.cpp
     src/ui/gsn/gsn_layout.cpp
     src/ui/localization.cpp

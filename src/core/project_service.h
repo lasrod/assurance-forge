@@ -35,6 +35,22 @@ public:
                                     ProjectFileEntry& entry,
                                     std::string& error);
 
+    static bool AddReviewItemsFile(AssuranceProject& project,
+                                   const std::string& requested_file_name,
+                                   ProjectFileEntry& entry,
+                                   std::string& error);
+
+    static bool AddReviewProposalFile(AssuranceProject& project,
+                                      const std::string& requested_file_name,
+                                      const std::string& content,
+                                      ProjectFileEntry& entry,
+                                      std::string& error);
+
+    static bool RemoveTrackedFile(AssuranceProject& project,
+                                  const std::filesystem::path& relative_path,
+                                  bool delete_file,
+                                  std::string& error);
+
     static bool WriteManifestSafely(const AssuranceProject& project, std::string& error);
     static std::filesystem::path ManifestPath(const AssuranceProject& project);
     static ProjectLoadReport RefreshFileStatus(AssuranceProject& project);

@@ -62,6 +62,8 @@ TEST(ProjectServiceTest, CreateEmptyProjectCreatesRequiredStructureAndManifest) 
     EXPECT_TRUE(std::filesystem::exists(root / "af.proj"));
     EXPECT_TRUE(std::filesystem::is_directory(root / "arguments"));
     EXPECT_TRUE(std::filesystem::is_directory(root / "registers"));
+    EXPECT_TRUE(std::filesystem::is_directory(root / "reviews"));
+    EXPECT_TRUE(std::filesystem::is_directory(root / "reviews" / "proposals"));
     EXPECT_TRUE(std::filesystem::is_directory(root / "conformance"));
     EXPECT_TRUE(std::filesystem::is_directory(root / "exports"));
     EXPECT_TRUE(std::filesystem::is_directory(root / ".af" / "cache"));
@@ -69,8 +71,10 @@ TEST(ProjectServiceTest, CreateEmptyProjectCreatesRequiredStructureAndManifest) 
     EXPECT_TRUE(std::filesystem::is_directory(root / ".af" / "snapshots"));
     EXPECT_TRUE(std::filesystem::is_directory(root / ".af" / "history"));
     EXPECT_TRUE(std::filesystem::exists(root / "arguments" / "main.sacm"));
+    EXPECT_TRUE(std::filesystem::exists(root / "reviews" / "review-items.af.json"));
     EXPECT_TRUE(parser::parse_sacm_xml((root / "arguments" / "main.sacm").string()).success);
     EXPECT_TRUE(ContainsFileWithRole(project, "arguments/main.sacm", core::ProjectFileRole::SacmArgument));
+    EXPECT_TRUE(ContainsFileWithRole(project, "reviews/review-items.af.json", core::ProjectFileRole::ReviewItems));
     EXPECT_FALSE(report.steps.empty());
     EXPECT_FALSE(report.showPopup);
 
@@ -105,8 +109,37 @@ TEST(ProjectServiceTest, AddProjectFilesNormalizesNamesAndTracksManifestEntries)
     ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, reopened, open_report, error)) << error;
     EXPECT_TRUE(ContainsFileWithRole(reopened, "arguments/main.sacm", core::ProjectFileRole::SacmArgument));
     EXPECT_TRUE(ContainsFileWithRole(reopened, "arguments/safety-core.sacm", core::ProjectFileRole::SacmArgument));
+    EXPECT_TRUE(ContainsFileWithRole(reopened, "reviews/review-items.af.json", core::ProjectFileRole::ReviewItems));
     EXPECT_TRUE(ContainsFileWithRole(reopened, "registers/evidence-register.af.json", core::ProjectFileRole::EvidenceRegister));
     EXPECT_TRUE(ContainsFileWithRole(reopened, "registers/j3377-cae-register.af.json", core::ProjectFileRole::J3377CaeRegister));
+}
+
+TEST(ProjectServiceTest, AddAndRemoveReviewProposalTracksManifestEntry) {
+    TempDir tmp(MakeTempParent());
+    auto& parent = tmp.path;
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    core::ProjectFileEntry entry;
+    std::string error;
+
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("MySafetyCase", parent, project, report, error)) << error;
+
+    const std::string proposal_json =
+        "{\n"
+        "  \"schema\": \"assurance-forge.review-proposal.v1\",\n"
+        "  \"id\": \"proposal-0001\",\n"
+        "  \"anchor_element_id\": \"G1\",\n"
+        "  \"operations\": []\n"
+        "}\n";
+    ASSERT_TRUE(core::ProjectService::AddReviewProposalFile(project, "proposal-0001", proposal_json, entry, error)) << error;
+    EXPECT_EQ(entry.relativePath.generic_string(), "reviews/proposals/proposal-0001.afpatch.json");
+    EXPECT_EQ(entry.role, core::ProjectFileRole::ReviewProposal);
+    EXPECT_TRUE(std::filesystem::exists(project.rootPath / entry.relativePath));
+    EXPECT_TRUE(ContainsFileWithRole(project, "reviews/proposals/proposal-0001.afpatch.json", core::ProjectFileRole::ReviewProposal));
+
+    ASSERT_TRUE(core::ProjectService::RemoveTrackedFile(project, entry.relativePath, true, error)) << error;
+    EXPECT_FALSE(std::filesystem::exists(project.rootPath / entry.relativePath));
+    EXPECT_FALSE(ContainsFileWithRole(project, "reviews/proposals/proposal-0001.afpatch.json", core::ProjectFileRole::ReviewProposal));
 }
 
 TEST(ProjectServiceTest, OpenProjectReportsExternallyModifiedAndMissingFiles) {
@@ -128,7 +161,7 @@ TEST(ProjectServiceTest, OpenProjectReportsExternallyModifiedAndMissingFiles) {
     core::AssuranceProject reopened;
     core::ProjectLoadReport open_report;
     ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, reopened, open_report, error)) << error;
-    ASSERT_EQ(reopened.files.size(), 2u);
+    ASSERT_EQ(reopened.files.size(), 3u);
     auto evidence_it = std::find_if(reopened.files.begin(), reopened.files.end(),
         [](const core::ProjectFileEntry& file) {
             return file.role == core::ProjectFileRole::EvidenceRegister;
