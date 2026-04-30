@@ -1079,6 +1079,79 @@ bool AppRuntime::BeginProposalForReviewItem(const core::reviews::ReviewItem& ite
     return true;
 }
 
+bool AppRuntime::BeginEditProposalForReviewItem(const core::reviews::ReviewItem& item) {
+    if (impl_->proposal_creator_active) {
+        SetStatus("Save or discard the active proposal before editing another one.");
+        return false;
+    }
+    if (item.status != core::reviews::ReviewItemStatus::Open) {
+        SetStatus("Resolved review comments cannot edit proposed changes.");
+        return false;
+    }
+    if (!item.proposal_id.has_value()) {
+        SetStatus("This review comment has no proposed change to edit.");
+        return false;
+    }
+    if (!impl_->app_state.current_project.has_value() || !impl_->app_state.loaded_case.has_value()) {
+        SetStatus("Open a project and SACM file before editing proposed changes.");
+        return false;
+    }
+
+    std::string error;
+    std::optional<core::reviews::ReviewProposal> proposal = impl_->review_proposal_manager.LoadProposal(item.proposal_id.value(), error);
+    if (!proposal.has_value()) {
+        SetStatus("Proposal edit failed: " + error);
+        return false;
+    }
+    if (proposal->review_item_id != item.id) {
+        SetStatus("Proposal edit failed: the proposal belongs to a different review comment.");
+        return false;
+    }
+
+    impl_->proposal_draft = std::move(proposal.value());
+    if (!impl_->reviewer_name.empty()) impl_->proposal_draft.author_name = impl_->reviewer_name;
+    impl_->proposal_creator_active = true;
+    impl_->proposal_creator_generated_ids.clear();
+    if (!RefreshProposalCreatorPreview()) {
+        CancelActiveProposal();
+        return false;
+    }
+
+    ui::UiState& ui_state = ui::GetUiState();
+    ui_state.center_view = ui::CenterView::GsnCanvas;
+    ui_state.selected_element_id = impl_->proposal_draft.anchor_element_id;
+    ui_state.center_on_selection = !ui_state.selected_element_id.empty();
+    impl_->force_center_tab_selection = true;
+    SetStatus("Editing proposal " + impl_->proposal_draft.id + ". Use Save Proposal to update it.");
+    return true;
+}
+
+bool AppRuntime::BeginEditProposalById(const std::string& proposal_id) {
+    if (proposal_id.empty()) {
+        SetStatus("No proposal id was provided.");
+        return false;
+    }
+
+    std::string error;
+    std::optional<core::reviews::ReviewProposal> proposal = impl_->review_proposal_manager.LoadProposal(proposal_id, error);
+    if (!proposal.has_value()) {
+        SetStatus("Proposal edit failed: " + error);
+        return false;
+    }
+
+    std::optional<core::reviews::ReviewItem> item = impl_->review_item_manager.GetItemById(proposal->review_item_id);
+    if (!item.has_value()) {
+        SetStatus("Proposal edit failed: the owning review comment was not found.");
+        return false;
+    }
+    if (!item->proposal_id.has_value() || item->proposal_id.value() != proposal_id) {
+        SetStatus("Proposal edit failed: the owning review comment no longer points to this proposal.");
+        return false;
+    }
+
+    return BeginEditProposalForReviewItem(item.value());
+}
+
 bool AppRuntime::PreviewProposalById(const std::string& proposal_id) {
     if (impl_->proposal_creator_active) {
         SetStatus("Save or discard the active proposal before viewing another proposal.");
@@ -1845,6 +1918,11 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                     if (impl_->proposal_creator_active) {
                         ImGui::TextDisabled("%d operation(s)", static_cast<int>(impl_->proposal_draft.operations.size()));
                         ImGui::SameLine();
+                    } else if (!impl_->proposal_preview_id.empty()) {
+                        if (ImGui::Button("Edit Proposal")) {
+                            BeginEditProposalById(impl_->proposal_preview_id);
+                        }
+                        ImGui::SameLine();
                     }
                     const char* exit_label = impl_->proposal_creator_active ? "Discard Draft" : "Exit Preview";
                     if (ImGui::Button(exit_label)) {
@@ -2419,6 +2497,9 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
     };
     callbacks.save_proposal = [this](const core::reviews::ReviewItem& item) {
         SaveActiveProposal(item);
+    };
+    callbacks.edit_proposal = [this](const core::reviews::ReviewItem& item) {
+        BeginEditProposalForReviewItem(item);
     };
     callbacks.preview_proposal = [this](const core::reviews::ReviewItem& item) {
         if (!item.proposal_id.has_value()) {

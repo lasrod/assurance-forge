@@ -82,6 +82,8 @@ private:
     void RequestExit(bool& done);
 
     bool BeginProposalForReviewItem(const core::reviews::ReviewItem& item);
+    bool BeginEditProposalForReviewItem(const core::reviews::ReviewItem& item);
+    bool BeginEditProposalById(const std::string& proposal_id);
     bool PreviewProposalById(const std::string& proposal_id);
     bool SaveActiveProposal(const core::reviews::ReviewItem& item);
     void CancelActiveProposal();

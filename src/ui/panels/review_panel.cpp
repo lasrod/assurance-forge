@@ -64,6 +64,10 @@ void DrawProposalActions(const core::reviews::ReviewItem& item,
         ImGui::TextWrapped("Reason: %s", validity.reason.c_str());
     }
 
+    if (item.status == core::reviews::ReviewItemStatus::Open) {
+        if (ImGui::Button("Edit Proposal") && callbacks.edit_proposal) callbacks.edit_proposal(item);
+        ImGui::SameLine();
+    }
     if (is_valid) {
         if (ImGui::Button("View Proposal") && callbacks.preview_proposal) callbacks.preview_proposal(item);
         ImGui::SameLine();
