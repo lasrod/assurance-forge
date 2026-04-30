@@ -29,6 +29,7 @@
 #include "core/project_service.h"
 #include "core/reviews/review_item_manager.h"
 #include "core/reviews/review_proposal_manager.h"
+#include "core/reviews/review_proposal_patch_service.h"
 #include "parser/guidelines_parser.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas.h"
@@ -52,6 +53,7 @@
 #include <ctime>
 #include <filesystem>
 #include <iomanip>
+#include <map>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -238,6 +240,76 @@ core::ReviewProposal BuildDraftReviewProposal(const core::ReviewItem& item,
     return proposal;
 }
 
+void CopyCommonSacmFields(sacm::SacmElement& target, const parser::SacmElement& source) {
+    target.id = source.id;
+    target.name = source.name;
+    target.description = source.description;
+    target.name_ml.texts = source.name_langs;
+    target.description_ml.texts = source.description_langs;
+    if (target.name_ml.texts.empty() && !source.name.empty()) target.name_ml.set("en", source.name);
+    if (target.description_ml.texts.empty() && !source.description.empty()) target.description_ml.set("en", source.description);
+}
+
+void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sacm::AssuranceCasePackage& package) {
+    if (package.argumentPackages.empty()) package.argumentPackages.emplace_back();
+    for (sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        argument_package.claims.clear();
+        argument_package.argumentReasonings.clear();
+        argument_package.artifactReferences.clear();
+        argument_package.assertedInferences.clear();
+        argument_package.assertedContexts.clear();
+        argument_package.assertedEvidences.clear();
+    }
+
+    sacm::ArgumentPackage& argument_package = package.argumentPackages.front();
+    for (const parser::SacmElement& element : model.elements) {
+        if (element.type == "claim") {
+            sacm::Claim claim;
+            CopyCommonSacmFields(claim, element);
+            claim.content = element.content;
+            claim.content_ml.texts = element.content_langs;
+            if (claim.content_ml.texts.empty() && !element.content.empty()) claim.content_ml.set("en", element.content);
+            claim.assertionDeclaration = element.assertion_declaration;
+            claim.undeveloped = element.undeveloped;
+            argument_package.claims.push_back(std::move(claim));
+        } else if (element.type == "argumentreasoning") {
+            sacm::ArgumentReasoning reasoning;
+            CopyCommonSacmFields(reasoning, element);
+            reasoning.content = element.content;
+            reasoning.content_ml.texts = element.content_langs;
+            if (reasoning.content_ml.texts.empty() && !element.content.empty()) reasoning.content_ml.set("en", element.content);
+            reasoning.undeveloped = element.undeveloped;
+            argument_package.argumentReasonings.push_back(std::move(reasoning));
+        } else if (element.type == "artifactreference" || element.type == "artifact") {
+            sacm::ArtifactReference artifact_reference;
+            CopyCommonSacmFields(artifact_reference, element);
+            argument_package.artifactReferences.push_back(std::move(artifact_reference));
+        } else if (element.type == "assertedinference") {
+            sacm::AssertedInference inference;
+            CopyCommonSacmFields(inference, element);
+            inference.sources = element.source_refs;
+            inference.targets = element.target_refs;
+            inference.reasoning = element.reasoning_ref;
+            inference.assertionDeclaration = element.assertion_declaration;
+            argument_package.assertedInferences.push_back(std::move(inference));
+        } else if (element.type == "assertedcontext") {
+            sacm::AssertedContext context;
+            CopyCommonSacmFields(context, element);
+            context.sources = element.source_refs;
+            context.targets = element.target_refs;
+            context.assertionDeclaration = element.assertion_declaration;
+            argument_package.assertedContexts.push_back(std::move(context));
+        } else if (element.type == "assertedevidence") {
+            sacm::AssertedEvidence evidence;
+            CopyCommonSacmFields(evidence, element);
+            evidence.sources = element.source_refs;
+            evidence.targets = element.target_refs;
+            evidence.assertionDeclaration = element.assertion_declaration;
+            argument_package.assertedEvidences.push_back(std::move(evidence));
+        }
+    }
+}
+
 std::filesystem::path ExecutableDirectory() {
 #ifdef _WIN32
     char path[MAX_PATH] = {};
@@ -267,7 +339,11 @@ std::filesystem::path FindGuidelinesFile() {
 }
 
 bool IsProjectManifestPath(const std::filesystem::path& path) {
-    return LowercaseAscii(path.filename().string()) == "af.proj";
+    if (LowercaseAscii(path.filename().string()) == "af.proj") return true;
+
+    std::error_code error;
+    return std::filesystem::is_directory(path, error) &&
+           std::filesystem::exists(path / "af.proj", error);
 }
 
 ui::panels::RecentProjectEntry MakeRecentProjectEntry(const core::AppState& app_state) {
@@ -327,6 +403,9 @@ struct AppRuntime::Impl {
 
     bool tree_needs_rebuild = false;
     core::AssuranceTree current_tree;
+    bool proposal_preview_active = false;
+    parser::AssuranceCase proposal_preview_model;
+    std::string proposal_preview_id;
     bool show_overwrite_confirm = false;
     bool force_center_tab_selection = false;
     bool pending_focus_root = false;
@@ -621,6 +700,10 @@ void AppRuntime::ScanDirectory() {
 }
 
 void AppRuntime::RebuildDerivedViewsIfNeeded() {
+    if (impl_->proposal_preview_active) {
+        return;
+    }
+
     if (impl_->tree_needs_rebuild && !impl_->app_state.loaded_case.has_value()) {
         ui::RebuildRegisterViews(nullptr);
         impl_->tree_needs_rebuild = false;
@@ -949,8 +1032,33 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                                           : 0;
             if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::GsnCanvas), nullptr, gsn_flags)) {
                 ui_state.center_view = ui::CenterView::GsnCanvas;
-                ui::ElementContextActions actions = MakeElementContextActions(*this);
-                ui::gsn::ShowGsnCanvasContent(ui_state, GetLoadedCase(), actions);
+                if (impl_->proposal_preview_active) {
+                    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(IM_COL32(42, 45, 30, 255)));
+                    ImGui::BeginChild("##proposal_preview_banner", ImVec2(0.0f, 58.0f), true, ImGuiWindowFlags_NoScrollbar);
+                    ImGui::TextUnformatted("PROPOSAL PREVIEW");
+                    ImGui::TextDisabled("This is a preview. The project model has not been changed.");
+                    ImGui::SameLine();
+                    if (ImGui::Button("Exit Preview")) {
+                        impl_->proposal_preview_active = false;
+                        impl_->proposal_preview_id.clear();
+                        impl_->proposal_preview_model = {};
+                        if (impl_->app_state.loaded_case.has_value()) {
+                            impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->app_state.loaded_case.value());
+                            ui::gsn::SetCanvasTree(impl_->current_tree);
+                        } else {
+                            impl_->tree_needs_rebuild = true;
+                        }
+                    }
+                    ImGui::EndChild();
+                    ImGui::PopStyleColor();
+                }
+                ui::ElementContextActions actions = impl_->proposal_preview_active
+                    ? ui::ElementContextActions{}
+                    : MakeElementContextActions(*this);
+                const parser::AssuranceCase* visible_case = impl_->proposal_preview_active
+                    ? &impl_->proposal_preview_model
+                    : GetLoadedCase();
+                ui::gsn::ShowGsnCanvasContent(ui_state, visible_case, actions);
                 ImGui::EndTabItem();
             }
         }
@@ -1269,11 +1377,15 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
     ImGui::SetNextWindowSize(ImVec2(right_w, element_h));
     ImGui::Begin("Element Properties", nullptr, kPanelFlags);
 
-    parser::AssuranceCase* ac_ptr = impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
-    sacm::AssuranceCasePackage* sacm_ptr = impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
-    if (ui::panels::ShowElementPanel(ac_ptr, sacm_ptr)) {
-        impl_->tree_needs_rebuild = true;
-        impl_->app_state.mark_dirty();
+    if (impl_->proposal_preview_active) {
+        ImGui::TextWrapped("Proposal preview is active. Exit preview before editing element properties.");
+    } else {
+        parser::AssuranceCase* ac_ptr = impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
+        sacm::AssuranceCasePackage* sacm_ptr = impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
+        if (ui::panels::ShowElementPanel(ac_ptr, sacm_ptr)) {
+            impl_->tree_needs_rebuild = true;
+            impl_->app_state.mark_dirty();
+        }
     }
 
     ImGui::End();
@@ -1285,15 +1397,31 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
     const ui::UiState& ui_state = ui::GetUiState();
     ui::panels::ReviewPanelModel model;
     model.selected_element_id = ui_state.selected_element_id;
-    model.has_project = impl_->app_state.current_project.has_value() && !impl_->review_item_manager.FilePath().empty();
+    model.has_project = impl_->app_state.current_project.has_value();
     if (!model.selected_element_id.empty()) {
         model.review_items = impl_->review_item_manager.GetItemsForElement(model.selected_element_id);
+        for (const core::ReviewItem& item : model.review_items) {
+            if (!item.proposal_id.has_value()) continue;
+            std::string error;
+            std::optional<core::ReviewProposal> proposal = impl_->review_proposal_manager.LoadProposal(item.proposal_id.value(), error);
+            if (!proposal.has_value()) {
+                model.proposal_validity[item.proposal_id.value()] = {core::ProposalValidity::Broken, error};
+            } else if (impl_->app_state.loaded_case.has_value()) {
+                model.proposal_validity[item.proposal_id.value()] =
+                    core::EvaluateReviewProposalValidity(proposal.value(), impl_->app_state.loaded_case.value());
+            } else {
+                model.proposal_validity[item.proposal_id.value()] = {core::ProposalValidity::Broken, "No SACM model is loaded."};
+            }
+        }
     }
 
     ui::panels::ReviewPanelCallbacks callbacks;
     callbacks.add_review_item = [this](const std::string& title, const std::string& message) {
         if (!impl_->app_state.current_project.has_value()) {
             SetStatus("Open or create a project before adding review comments.");
+            return;
+        }
+        if (!EnsureReviewItemStorage()) {
             return;
         }
         const std::string element_id = ui::GetUiState().selected_element_id;
@@ -1373,18 +1501,101 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
             return;
         }
 
-        std::ostringstream status;
-        status << "Proposal " << proposal->id << " has " << proposal->operations.size() << " operation(s)";
-        if (impl_->app_state.loaded_case.has_value()) {
-            core::ProposalValidityResult validity = core::EvaluateReviewProposalValidity(*proposal, impl_->app_state.loaded_case.value());
-            status << (validity.validity == core::ProposalValidity::Valid ? " and is valid." : " and is broken: " + validity.reason);
-        } else {
-            status << ".";
+        if (!impl_->app_state.loaded_case.has_value()) {
+            SetStatus("Load a SACM model before previewing proposals.");
+            return;
         }
+
+        core::ReviewProposalPatchService patch_service;
+        core::ProposalPreviewResult preview = patch_service.BuildPreviewModel(*proposal, impl_->app_state.loaded_case.value());
+        if (!preview.success) {
+            SetStatus("Proposal preview failed: " + preview.error);
+            return;
+        }
+
+        impl_->proposal_preview_active = true;
+        impl_->proposal_preview_id = proposal->id;
+        impl_->proposal_preview_model = std::move(preview.preview_model);
+        impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->proposal_preview_model);
+        ui::gsn::SetCanvasTree(impl_->current_tree);
+        ui::UiState& preview_ui_state = ui::GetUiState();
+        preview_ui_state.center_view = ui::CenterView::GsnCanvas;
+        preview_ui_state.selected_element_id = proposal->anchor_element_id;
+        preview_ui_state.center_on_selection = true;
+        impl_->force_center_tab_selection = true;
+
+        std::ostringstream status;
+        status << "Previewing proposal " << proposal->id << " with " << proposal->operations.size() << " operation(s). ";
+        status << "The project model has not been changed.";
         SetStatus(status.str());
     };
-    callbacks.apply_proposal = [this](const core::ReviewItem&) {
-        SetStatus("Proposal apply will be implemented in the next slice.");
+    callbacks.apply_proposal = [this](const core::ReviewItem& item) {
+        if (!item.proposal_id.has_value()) {
+            SetStatus("This review comment has no proposed change to apply.");
+            return;
+        }
+        if (!impl_->app_state.current_project.has_value() || !impl_->app_state.loaded_case.has_value()) {
+            SetStatus("Open a project and SACM file before applying proposed changes.");
+            return;
+        }
+
+        std::string error;
+        std::optional<core::ReviewProposal> proposal = impl_->review_proposal_manager.LoadProposal(item.proposal_id.value(), error);
+        if (!proposal.has_value()) {
+            SetStatus("Proposal apply failed: " + error);
+            return;
+        }
+
+        core::ProposalValidityResult validity = core::EvaluateReviewProposalValidity(*proposal, impl_->app_state.loaded_case.value());
+        if (validity.validity != core::ProposalValidity::Valid) {
+            SetStatus("Proposal is broken: " + validity.reason);
+            return;
+        }
+
+        core::ReviewProposalPatchService patch_service;
+        core::ApplyProposalResult apply_result = patch_service.ApplyProposal(*proposal, impl_->app_state.loaded_case.value());
+        if (!apply_result.success) {
+            SetStatus("Proposal apply failed: " + apply_result.error);
+            return;
+        }
+
+        impl_->proposal_preview_active = false;
+        impl_->proposal_preview_id.clear();
+        impl_->proposal_preview_model = {};
+        if (!impl_->app_state.sacm_package.has_value()) impl_->app_state.sacm_package.emplace();
+        RebuildSacmArgumentPackageFromParser(impl_->app_state.loaded_case.value(), impl_->app_state.sacm_package.value());
+        impl_->app_state.mark_dirty();
+        if (!SaveProject()) {
+            SetStatus("Proposal applied in memory, but project save failed: " + impl_->app_state.status_message);
+            return;
+        }
+
+        core::AssuranceProject& project = impl_->app_state.current_project.value();
+        const std::filesystem::path relative_path = ReviewProposalRelativePath(item.proposal_id.value());
+        bool deleted = false;
+        if (ProjectTracksFile(project, relative_path)) {
+            deleted = core::ProjectService::RemoveTrackedFile(project, relative_path, true, error);
+        } else {
+            deleted = impl_->review_proposal_manager.DeleteProposal(item.proposal_id.value(), error);
+        }
+        if (!deleted) {
+            SetStatus("Proposal applied, but proposal file removal failed: " + error);
+            return;
+        }
+
+        core::ReviewItem updated = item;
+        updated.proposal_id.reset();
+        updated.status = core::ReviewItemStatus::Resolved;
+        updated.applied_note = "Proposal applied at " + NowUtcString() + ".";
+        updated.updated_utc = NowUtcString();
+        if (!impl_->review_item_manager.AddOrUpdateItem(std::move(updated)) || !impl_->review_item_manager.Save(error)) {
+            SetStatus("Proposal applied, but review item update failed: " + error);
+            return;
+        }
+
+        core::ProjectService::RefreshFileStatus(project);
+        impl_->tree_needs_rebuild = true;
+        SetStatus("Applied proposal " + proposal->id + ".");
     };
     callbacks.delete_proposal = [this](const core::ReviewItem& item) {
         if (!item.proposal_id.has_value()) {
@@ -1612,6 +1823,36 @@ void AppRuntime::OpenProjectFile(const core::ProjectFileEntry& entry) {
         impl_->show_cse_tab = true;
         ui_state.center_view = ui::CenterView::CseRegister;
         impl_->force_center_tab_selection = true;
+    } else if (entry.role == core::ProjectFileRole::ReviewProposal) {
+        std::string proposal_id = entry.relativePath.filename().generic_string();
+        const std::string suffix = ".afpatch.json";
+        if (proposal_id.size() >= suffix.size() &&
+            proposal_id.compare(proposal_id.size() - suffix.size(), suffix.size(), suffix) == 0) {
+            proposal_id.erase(proposal_id.size() - suffix.size());
+        }
+
+        std::string error;
+        std::optional<core::ReviewProposal> proposal = impl_->review_proposal_manager.LoadProposal(proposal_id, error);
+        if (!proposal.has_value()) {
+            SetStatus("Proposal file is broken: " + error);
+            return;
+        }
+
+        if (impl_->app_state.loaded_case.has_value()) {
+            core::ProposalValidityResult validity = core::EvaluateReviewProposalValidity(*proposal, impl_->app_state.loaded_case.value());
+            if (FindParserElement(impl_->app_state.loaded_case.value(), proposal->anchor_element_id)) {
+                ui_state.selected_element_id = proposal->anchor_element_id;
+                ui_state.center_on_selection = true;
+                ui_state.center_view = ui::CenterView::GsnCanvas;
+                impl_->show_gsn_tab = true;
+                impl_->force_center_tab_selection = true;
+            }
+            SetStatus(validity.validity == core::ProposalValidity::Valid
+                ? "Proposal is valid: " + proposal->title
+                : "Proposal is broken: " + validity.reason);
+        } else {
+            SetStatus("Loaded proposal " + proposal->id + ", but no SACM model is open for validation.");
+        }
     }
 }
 
@@ -1636,6 +1877,51 @@ bool AppRuntime::OpenFirstProjectSacmFile() {
     return false;
 }
 
+bool AppRuntime::EnsureReviewItemStorage() {
+    if (!impl_->app_state.current_project.has_value()) {
+        impl_->review_item_manager.Clear();
+        return false;
+    }
+
+    core::AssuranceProject& project = impl_->app_state.current_project.value();
+    std::filesystem::path review_path = ReviewItemsPath(project);
+    if (review_path.empty()) {
+        core::ProjectFileEntry entry;
+        std::string error;
+        if (!core::ProjectService::AddReviewItemsFile(project, "review-items.af.json", entry, error)) {
+            impl_->review_item_manager.Clear();
+            SetStatus("Review comment storage could not be prepared: " + error);
+            return false;
+        }
+        review_path = project.rootPath / entry.relativePath;
+        core::ProjectService::RefreshFileStatus(project);
+    }
+
+    impl_->review_item_manager.SetFilePath(review_path);
+
+    std::string error;
+    if (impl_->review_item_manager.Load(error)) {
+        return true;
+    }
+
+    std::error_code ec;
+    if (!std::filesystem::exists(review_path, ec)) {
+        std::string save_error;
+        if (!impl_->review_item_manager.Save(save_error)) {
+            SetStatus("Review comment storage could not be created: " + save_error);
+            return false;
+        }
+        core::ProjectService::RefreshFileStatus(project);
+        error.clear();
+        if (impl_->review_item_manager.Load(error)) {
+            return true;
+        }
+    }
+
+    SetStatus("Review items could not be loaded: " + error);
+    return false;
+}
+
 bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {
     std::filesystem::path manifest_path(selected_path);
     if (!IsProjectManifestPath(manifest_path)) {
@@ -1646,13 +1932,8 @@ bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {
         return false;
     }
     if (impl_->app_state.current_project.has_value()) {
-        std::filesystem::path review_path = ReviewItemsPath(impl_->app_state.current_project.value());
-        impl_->review_item_manager.SetFilePath(review_path);
         impl_->review_proposal_manager.SetProjectRoot(impl_->app_state.current_project->rootPath);
-        std::string error;
-        if (!review_path.empty() && !impl_->review_item_manager.Load(error)) {
-            SetStatus("Review items could not be loaded: " + error);
-        }
+        EnsureReviewItemStorage();
     }
     OpenFirstProjectSacmFile();
     TouchCurrentProjectRecent();
@@ -1678,11 +1959,8 @@ void AppRuntime::RenderCreateProjectModal() {
         if (ImGui::Button("Create", ImVec2(110.0f, 0.0f))) {
             if (impl_->app_state.create_empty_project(impl_->project_name_buf, impl_->project_parent_buf)) {
                 if (impl_->app_state.current_project.has_value()) {
-                    std::filesystem::path review_path = ReviewItemsPath(impl_->app_state.current_project.value());
-                    impl_->review_item_manager.SetFilePath(review_path);
                     impl_->review_proposal_manager.SetProjectRoot(impl_->app_state.current_project->rootPath);
-                    std::string error;
-                    if (!review_path.empty()) impl_->review_item_manager.Load(error);
+                    EnsureReviewItemStorage();
                 }
                 OpenFirstProjectSacmFile();
                 TouchCurrentProjectRecent();
@@ -1873,9 +2151,16 @@ void AppRuntime::RenderFrame(bool& done) {
     float project_y = top_y;
     float safety_y = project_y + project_h + kSplitterThickness;
 
-    ui::panels::ProjectFilesPanelModel project_model{
-        impl_->app_state.current_project.has_value() ? &impl_->app_state.current_project.value() : nullptr,
-    };
+    ui::panels::ProjectFilesPanelModel project_model;
+    project_model.project = impl_->app_state.current_project.has_value() ? &impl_->app_state.current_project.value() : nullptr;
+    if (project_model.project) {
+        const parser::AssuranceCase* loaded_case = impl_->app_state.loaded_case.has_value()
+            ? &impl_->app_state.loaded_case.value()
+            : nullptr;
+        for (const core::ReviewProposalSummary& summary : impl_->review_proposal_manager.ListProposals(loaded_case)) {
+            project_model.proposal_validity_by_path[summary.relative_path.generic_string()] = summary.validity;
+        }
+    }
     ui::panels::ProjectFilesPanelCallbacks project_callbacks{
         [this]() { BeginCreateProjectSacmFile(); },
         [this]() { BeginCreateProjectEvidenceRegister(); },

@@ -3,13 +3,17 @@
 #include "imgui.h"
 
 #include "core/project_model.h"
+#include "core/reviews/review_proposal.h"
 
 #include <functional>
+#include <map>
+#include <string>
 
 namespace ui::panels {
 
 struct ProjectFilesPanelModel {
     const core::AssuranceProject* project = nullptr;
+    std::map<std::string, core::ProposalValidityResult> proposal_validity_by_path;
 };
 
 struct ProjectFilesPanelCallbacks {

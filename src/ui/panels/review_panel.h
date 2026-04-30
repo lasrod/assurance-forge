@@ -1,8 +1,10 @@
 #pragma once
 
 #include "core/reviews/review_item.h"
+#include "core/reviews/review_proposal.h"
 
 #include <functional>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -11,6 +13,7 @@ namespace ui::panels {
 struct ReviewPanelModel {
     std::string selected_element_id;
     std::vector<core::ReviewItem> review_items;
+    std::map<std::string, core::ProposalValidityResult> proposal_validity;
     bool has_project = false;
 };
 

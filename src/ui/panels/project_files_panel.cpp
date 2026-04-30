@@ -1,5 +1,7 @@
 #include "ui/panels/project_files_panel.h"
 
+#include "ui/theme.h"
+
 #include <array>
 #include <string_view>
 #include <vector>
@@ -25,7 +27,9 @@ bool EntryBelongsToFolder(const core::ProjectFileEntry& entry, std::string_view 
     return relative == folder || relative.rfind(std::string(folder) + "/", 0) == 0;
 }
 
-void RenderFile(const core::ProjectFileEntry& entry, const ProjectFilesPanelCallbacks& callbacks) {
+void RenderFile(const core::ProjectFileEntry& entry,
+                const ProjectFilesPanelModel& model,
+                const ProjectFilesPanelCallbacks& callbacks) {
     std::string label = entry.relativePath.filename().generic_string();
     ImGui::PushID(entry.relativePath.generic_string().c_str());
     ImGui::TreeNodeEx("file",
@@ -37,6 +41,15 @@ void RenderFile(const core::ProjectFileEntry& entry, const ProjectFilesPanelCall
     if (entry.state != core::ProjectFileState::Clean) {
         ImGui::SameLine();
         ImGui::TextDisabled("(%s)", core::ProjectFileStateToDisplayString(entry.state));
+    } else if (entry.role == core::ProjectFileRole::ReviewProposal) {
+        auto found = model.proposal_validity_by_path.find(entry.relativePath.generic_string());
+        if (found != model.proposal_validity_by_path.end()) {
+            const bool valid = found->second.validity == core::ProposalValidity::Valid;
+            ImGui::SameLine();
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(valid ? ui::GetTheme().success : ui::GetTheme().danger));
+            ImGui::TextUnformatted(valid ? "(Valid)" : "(Broken)");
+            ImGui::PopStyleColor();
+        }
     }
     ImGui::PopID();
 }
@@ -65,7 +78,8 @@ void RenderFolderContextMenu(std::string_view folder, const ProjectFilesPanelCal
     }
 }
 
-void ShowProjectFilesTree(const core::AssuranceProject& project, const ProjectFilesPanelCallbacks& callbacks) {
+void ShowProjectFilesTree(const ProjectFilesPanelModel& model, const ProjectFilesPanelCallbacks& callbacks) {
+    const core::AssuranceProject& project = *model.project;
     ImGui::TextWrapped("%s", project.name.c_str());
     ImGui::TextDisabled("%s", project.rootPath.string().c_str());
     ImGui::Separator();
@@ -79,7 +93,7 @@ void ShowProjectFilesTree(const core::AssuranceProject& project, const ProjectFi
         for (const auto& entry : project.files) {
             if (!EntryBelongsToFolder(entry, folder.path)) continue;
             has_files = true;
-            RenderFile(entry, callbacks);
+            RenderFile(entry, model, callbacks);
         }
         if (!has_files) {
             ImGui::TextDisabled("No files");
@@ -102,7 +116,7 @@ void ShowProjectFilesPanel(float width,
 
     if (ImGui::BeginChild("ProjectFilesTree", ImVec2(0, 0), false)) {
         if (model.project) {
-            ShowProjectFilesTree(*model.project, callbacks);
+            ShowProjectFilesTree(model, callbacks);
         } else {
             ImGui::TextDisabled("No project open.");
         }

@@ -1,5 +1,6 @@
 #include "core/reviews/review_proposal.h"
 
+#include "core/reviews/review_proposal_patch_service.h"
 #include "core/sha256.h"
 
 #include <algorithm>
@@ -348,6 +349,13 @@ ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& prop
             result.reason = "UpdateElementText operations must specify a field.";
             return result;
         }
+    }
+
+    ReviewProposalPatchService patch_service;
+    ProposalPreviewResult preview = patch_service.BuildPreviewModel(proposal, current_model);
+    if (!preview.success) {
+        result.reason = preview.error;
+        return result;
     }
 
     result.validity = ProposalValidity::Valid;

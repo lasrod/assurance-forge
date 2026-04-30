@@ -24,7 +24,9 @@ void DrawStatusBadge(const core::ReviewItem& item) {
     ImGui::PopStyleColor();
 }
 
-void DrawProposalActions(const core::ReviewItem& item, const ReviewPanelCallbacks& callbacks) {
+void DrawProposalActions(const core::ReviewItem& item,
+                         const ReviewPanelModel& model,
+                         const ReviewPanelCallbacks& callbacks) {
     if (!item.proposal_id.has_value()) {
         if (ImGui::Button("Create Proposed Change") && callbacks.create_proposed_change) {
             callbacks.create_proposed_change(item);
@@ -32,11 +34,27 @@ void DrawProposalActions(const core::ReviewItem& item, const ReviewPanelCallback
         return;
     }
 
-    ImGui::TextDisabled("Proposed change: %s", item.proposal_id->c_str());
-    if (ImGui::Button("Preview Proposal") && callbacks.preview_proposal) callbacks.preview_proposal(item);
-    ImGui::SameLine();
-    if (ImGui::Button("Apply") && callbacks.apply_proposal) callbacks.apply_proposal(item);
-    ImGui::SameLine();
+    core::ProposalValidityResult validity;
+    auto found = model.proposal_validity.find(item.proposal_id.value());
+    if (found != model.proposal_validity.end()) {
+        validity = found->second;
+    }
+
+    const bool is_valid = validity.validity == core::ProposalValidity::Valid;
+    ImU32 proposal_color = is_valid ? ui::GetTheme().success : ui::GetTheme().danger;
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(proposal_color));
+    ImGui::TextUnformatted(is_valid ? "Proposed change: Valid" : "Proposed change: Broken");
+    ImGui::PopStyleColor();
+    if (!is_valid && !validity.reason.empty()) {
+        ImGui::TextWrapped("Reason: %s", validity.reason.c_str());
+    }
+
+    if (is_valid) {
+        if (ImGui::Button("Preview Proposal") && callbacks.preview_proposal) callbacks.preview_proposal(item);
+        ImGui::SameLine();
+        if (ImGui::Button("Apply Proposal") && callbacks.apply_proposal) callbacks.apply_proposal(item);
+        ImGui::SameLine();
+    }
     if (ImGui::Button("Delete") && callbacks.delete_proposal) callbacks.delete_proposal(item);
 }
 
@@ -104,7 +122,7 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
             if (!item.message.empty()) {
                 ImGui::TextWrapped("%s", item.message.c_str());
             }
-            DrawProposalActions(item, callbacks);
+            DrawProposalActions(item, model, callbacks);
             ImGui::PopID();
         }
     }

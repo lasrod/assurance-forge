@@ -1,0 +1,212 @@
+#include <gtest/gtest.h>
+
+#include "core/reviews/review_proposal_patch_service.h"
+
+#include <algorithm>
+#include <optional>
+#include <string>
+
+namespace {
+
+parser::SacmElement Element(std::string id, std::string type, std::string name) {
+    parser::SacmElement element;
+    element.id = std::move(id);
+    element.type = std::move(type);
+    element.name = std::move(name);
+    return element;
+}
+
+parser::AssuranceCase MakeModel() {
+    parser::AssuranceCase model;
+    model.id = "case-1";
+    model.name = "Patch Service Case";
+
+    parser::SacmElement root = Element("G1", "claim", "Top Goal");
+    root.content = "Original content";
+    model.elements.push_back(root);
+
+    parser::SacmElement child = Element("G2", "claim", "Existing Child");
+    child.content = "Existing child content";
+    model.elements.push_back(child);
+
+    parser::SacmElement inference;
+    inference.id = "R1";
+    inference.type = "assertedinference";
+    inference.target_refs.push_back("G1");
+    inference.source_refs.push_back("G2");
+    model.elements.push_back(inference);
+
+    return model;
+}
+
+const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const std::string& id) {
+    for (const parser::SacmElement& element : model.elements) {
+        if (element.id == id) return &element;
+    }
+    return nullptr;
+}
+
+bool HasInferenceSourceTarget(const parser::AssuranceCase& model, const std::string& source_id, const std::string& target_id) {
+    for (const parser::SacmElement& element : model.elements) {
+        if (element.type != "assertedinference") continue;
+        const bool has_source = std::find(element.source_refs.begin(), element.source_refs.end(), source_id) != element.source_refs.end();
+        const bool has_target = std::find(element.target_refs.begin(), element.target_refs.end(), target_id) != element.target_refs.end();
+        if (has_source && has_target) return true;
+    }
+    return false;
+}
+
+bool HasInferenceReasoningTarget(const parser::AssuranceCase& model, const std::string& reasoning_id, const std::string& target_id) {
+    for (const parser::SacmElement& element : model.elements) {
+        if (element.type != "assertedinference") continue;
+        const bool has_target = std::find(element.target_refs.begin(), element.target_refs.end(), target_id) != element.target_refs.end();
+        if (element.reasoning_ref == reasoning_id && has_target) return true;
+    }
+    return false;
+}
+
+core::ReviewProposal ProposalFor(const parser::AssuranceCase& model) {
+    core::ReviewProposal proposal;
+    proposal.id = "proposal-1";
+    proposal.anchor_element_id = "G1";
+    proposal.affected_existing_element_ids = {"G1"};
+    proposal.base_model_hash = core::ComputeModelSemanticHash(model);
+    proposal.base_element_hashes["G1"] = core::ComputeElementSemanticHash(*FindElement(model, "G1"));
+    return proposal;
+}
+
+core::PatchOperation Create(core::PatchOperationType type, std::string create_ref, std::string text) {
+    core::PatchOperation operation;
+    operation.type = type;
+    operation.create_ref = std::move(create_ref);
+    operation.text = std::move(text);
+    return operation;
+}
+
+core::PatchOperation AddSupportedBy(core::ElementRef source, core::ElementRef target) {
+    core::PatchOperation operation;
+    operation.type = core::PatchOperationType::AddSupportedBy;
+    operation.source = std::move(source);
+    operation.target = std::move(target);
+    return operation;
+}
+
+}  // namespace
+
+TEST(ReviewProposalPatchServiceTest, AppliesUpdateElementText) {
+    parser::AssuranceCase model = MakeModel();
+    core::ReviewProposal proposal = ProposalFor(model);
+
+    core::PatchOperation update;
+    update.type = core::PatchOperationType::UpdateElementText;
+    update.element = core::ElementRef{"G1", std::nullopt};
+    update.field = "content";
+    update.new_value = "Updated claim content";
+    proposal.operations.push_back(update);
+
+    core::ReviewProposalPatchService service;
+    core::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+
+    ASSERT_TRUE(result.success) << result.error;
+    ASSERT_NE(FindElement(model, "G1"), nullptr);
+    EXPECT_EQ(FindElement(model, "G1")->content, "Updated claim content");
+}
+
+TEST(ReviewProposalPatchServiceTest, BuildsPreviewWithoutMutatingCurrentModel) {
+    parser::AssuranceCase model = MakeModel();
+    core::ReviewProposal proposal = ProposalFor(model);
+    proposal.operations.push_back(Create(core::PatchOperationType::CreateClaim, "$new_claim_1", "Generated claim content"));
+    proposal.operations.push_back(AddSupportedBy(core::ElementRef{std::nullopt, "$new_claim_1"}, core::ElementRef{"G1", std::nullopt}));
+
+    core::ReviewProposalPatchService service;
+    core::ProposalPreviewResult preview = service.BuildPreviewModel(proposal, model);
+
+    ASSERT_TRUE(preview.success) << preview.error;
+    ASSERT_TRUE(preview.generated_ids.count("$new_claim_1") > 0);
+    const std::string generated_id = preview.generated_ids["$new_claim_1"];
+    EXPECT_EQ(FindElement(model, generated_id), nullptr);
+    ASSERT_NE(FindElement(preview.preview_model, generated_id), nullptr);
+    EXPECT_EQ(FindElement(preview.preview_model, generated_id)->content, "Generated claim content");
+    EXPECT_TRUE(HasInferenceSourceTarget(preview.preview_model, generated_id, "G1"));
+}
+
+TEST(ReviewProposalPatchServiceTest, CreatesStrategyAndClaimsWithNonCollidingIds) {
+    parser::AssuranceCase model = MakeModel();
+    model.elements.push_back(Element("G3", "claim", "Existing G3"));
+    model.elements.push_back(Element("S1", "argumentreasoning", "Existing S1"));
+    core::ReviewProposal proposal = ProposalFor(model);
+    proposal.operations.push_back(Create(core::PatchOperationType::CreateStrategy, "$new_strategy_1", "Strategy content"));
+    proposal.operations.push_back(Create(core::PatchOperationType::CreateClaim, "$new_claim_1", "Claim one"));
+    proposal.operations.push_back(Create(core::PatchOperationType::CreateClaim, "$new_claim_2", "Claim two"));
+    proposal.operations.push_back(AddSupportedBy(core::ElementRef{std::nullopt, "$new_strategy_1"}, core::ElementRef{"G1", std::nullopt}));
+    proposal.operations.push_back(AddSupportedBy(core::ElementRef{std::nullopt, "$new_claim_1"}, core::ElementRef{std::nullopt, "$new_strategy_1"}));
+    proposal.operations.push_back(AddSupportedBy(core::ElementRef{std::nullopt, "$new_claim_2"}, core::ElementRef{std::nullopt, "$new_strategy_1"}));
+
+    core::ReviewProposalPatchService service;
+    core::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+
+    ASSERT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.generated_ids.at("$new_strategy_1"), "S2");
+    EXPECT_EQ(result.generated_ids.at("$new_claim_1"), "G4");
+    EXPECT_EQ(result.generated_ids.at("$new_claim_2"), "G5");
+    EXPECT_NE(FindElement(model, "S2"), nullptr);
+    EXPECT_NE(FindElement(model, "G4"), nullptr);
+    EXPECT_NE(FindElement(model, "G5"), nullptr);
+    EXPECT_TRUE(HasInferenceReasoningTarget(model, "S2", "G1"));
+    EXPECT_TRUE(HasInferenceSourceTarget(model, "G4", "S2"));
+    EXPECT_TRUE(HasInferenceSourceTarget(model, "G5", "S2"));
+}
+
+TEST(ReviewProposalPatchServiceTest, AddsAndRemovesRelationships) {
+    parser::AssuranceCase model = MakeModel();
+    core::ReviewProposal proposal = ProposalFor(model);
+
+    core::PatchOperation remove;
+    remove.type = core::PatchOperationType::RemoveSupportedBy;
+    remove.source = core::ElementRef{"G2", std::nullopt};
+    remove.target = core::ElementRef{"G1", std::nullopt};
+    proposal.operations.push_back(remove);
+
+    proposal.operations.push_back(Create(core::PatchOperationType::CreateContext, "$new_context_1", "Operational context"));
+    core::PatchOperation add_context;
+    add_context.type = core::PatchOperationType::AddInContextOf;
+    add_context.source = core::ElementRef{std::nullopt, "$new_context_1"};
+    add_context.target = core::ElementRef{"G1", std::nullopt};
+    proposal.operations.push_back(add_context);
+
+    core::ReviewProposalPatchService service;
+    core::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+
+    ASSERT_TRUE(result.success) << result.error;
+    EXPECT_FALSE(HasInferenceSourceTarget(model, "G2", "G1"));
+    const std::string context_id = result.generated_ids.at("$new_context_1");
+    bool has_context = false;
+    for (const parser::SacmElement& element : model.elements) {
+        if (element.type != "assertedcontext") continue;
+        const bool has_source = std::find(element.source_refs.begin(), element.source_refs.end(), context_id) != element.source_refs.end();
+        const bool has_target = std::find(element.target_refs.begin(), element.target_refs.end(), "G1") != element.target_refs.end();
+        has_context = has_context || (has_source && has_target);
+    }
+    EXPECT_TRUE(has_context);
+}
+
+TEST(ReviewProposalPatchServiceTest, FailedApplyLeavesModelUnchanged) {
+    parser::AssuranceCase model = MakeModel();
+    const std::string before_hash = core::ComputeModelSemanticHash(model);
+    core::ReviewProposal proposal = ProposalFor(model);
+
+    core::PatchOperation update;
+    update.type = core::PatchOperationType::UpdateElementText;
+    update.element = core::ElementRef{"DOES_NOT_EXIST", std::nullopt};
+    update.field = "content";
+    update.new_value = "This should not apply";
+    proposal.operations.push_back(update);
+
+    core::ReviewProposalPatchService service;
+    core::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+
+    EXPECT_FALSE(result.success);
+    EXPECT_FALSE(result.error.empty());
+    EXPECT_EQ(core::ComputeModelSemanticHash(model), before_hash);
+    EXPECT_EQ(FindElement(model, "G1")->content, "Original content");
+}
