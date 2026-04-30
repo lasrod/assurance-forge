@@ -122,6 +122,60 @@ TEST(ReviewProposalPatchServiceTest, AppliesUpdateElementText) {
     EXPECT_EQ(FindElement(model, "G1")->content, "Updated claim content");
 }
 
+TEST(ReviewProposalPatchServiceTest, BuildsPreviewWithExistingElementEditWithoutMutatingCurrentModel) {
+    parser::AssuranceCase model = MakeModel();
+    core::ReviewProposal proposal = ProposalFor(model);
+
+    core::PatchOperation update;
+    update.type = core::PatchOperationType::UpdateElementText;
+    update.element = core::ElementRef{"G1", std::nullopt};
+    update.field = "content";
+    update.old_value = "Original content";
+    update.new_value = "Proposed content";
+    proposal.operations.push_back(update);
+
+    core::ReviewProposalPatchService service;
+    core::ProposalPreviewResult preview = service.BuildPreviewModel(proposal, model);
+
+    ASSERT_TRUE(preview.success) << preview.error;
+    EXPECT_EQ(FindElement(model, "G1")->content, "Original content");
+    ASSERT_NE(FindElement(preview.preview_model, "G1"), nullptr);
+    EXPECT_EQ(FindElement(preview.preview_model, "G1")->content, "Proposed content");
+}
+
+TEST(ReviewProposalPatchServiceTest, BuildsPreviewWithExistingElementRemovalWithoutMutatingCurrentModel) {
+    parser::AssuranceCase model = MakeModel();
+    parser::SacmElement grandchild = Element("G3", "claim", "Grandchild");
+    grandchild.content = "Grandchild content";
+    model.elements.push_back(grandchild);
+
+    parser::SacmElement child_inference;
+    child_inference.id = "R2";
+    child_inference.type = "assertedinference";
+    child_inference.target_refs.push_back("G2");
+    child_inference.source_refs.push_back("G3");
+    model.elements.push_back(child_inference);
+
+    core::ReviewProposal proposal = ProposalFor(model);
+    proposal.affected_existing_element_ids.push_back("G2");
+    proposal.base_element_hashes["G2"] = core::ComputeElementSemanticHash(*FindElement(model, "G2"));
+
+    core::PatchOperation remove;
+    remove.type = core::PatchOperationType::RemoveElement;
+    remove.element = core::ElementRef{"G2", std::nullopt};
+    remove.field = "node_only";
+    proposal.operations.push_back(remove);
+
+    core::ReviewProposalPatchService service;
+    core::ProposalPreviewResult preview = service.BuildPreviewModel(proposal, model);
+
+    ASSERT_TRUE(preview.success) << preview.error;
+    EXPECT_NE(FindElement(model, "G2"), nullptr);
+    EXPECT_TRUE(HasInferenceSourceTarget(model, "G2", "G1"));
+    EXPECT_EQ(FindElement(preview.preview_model, "G2"), nullptr);
+    EXPECT_TRUE(HasInferenceSourceTarget(preview.preview_model, "G3", "G1"));
+}
+
 TEST(ReviewProposalPatchServiceTest, BuildsPreviewWithoutMutatingCurrentModel) {
     parser::AssuranceCase model = MakeModel();
     core::ReviewProposal proposal = ProposalFor(model);

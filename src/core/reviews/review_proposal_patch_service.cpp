@@ -1,8 +1,11 @@
 #include "core/reviews/review_proposal_patch_service.h"
 
+#include "core/element_factory.h"
+
 #include <algorithm>
 #include <cctype>
 #include <map>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <unordered_set>
@@ -241,6 +244,14 @@ bool RemoveValue(std::vector<std::string>& values, const std::string& value) {
     return values.size() != old_size;
 }
 
+std::optional<RemoveMode> RemoveModeFromField(const std::string& field, std::string& error) {
+    if (field.empty()) return std::nullopt;
+    if (field == "node_only") return RemoveMode::NodeOnly;
+    if (field == "node_and_descendants") return RemoveMode::NodeAndDescendants;
+    error = "Unsupported RemoveElement mode: " + field;
+    return std::nullopt;
+}
+
 bool IsEvidenceLikeElement(const parser::SacmElement& element) {
     return element.type == "artifact" || element.type == "artifactreference" || element.type == "expression";
 }
@@ -402,6 +413,12 @@ bool ApplyRemoveElementOperation(const PatchOperation& operation,
     if (!FindElement(model, element_id)) {
         error = "RemoveElement references missing element " + element_id + ".";
         return false;
+    }
+
+    if (!operation.field.empty()) {
+        std::optional<RemoveMode> mode = RemoveModeFromField(operation.field, error);
+        if (!mode.has_value()) return false;
+        return RemoveElement(model, nullptr, element_id, mode.value(), error);
     }
 
     model.elements.erase(std::remove_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {

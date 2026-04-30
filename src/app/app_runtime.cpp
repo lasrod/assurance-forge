@@ -272,6 +272,10 @@ bool IsContextLike(core::NewElementKind kind) {
            kind == core::NewElementKind::Justification;
 }
 
+const char* RemoveModeField(core::RemoveMode mode) {
+    return mode == core::RemoveMode::NodeAndDescendants ? "node_and_descendants" : "node_only";
+}
+
 std::string GenerateCreateRef(const core::ReviewProposal& proposal, core::NewElementKind kind) {
     std::unordered_set<std::string> used;
     for (const core::PatchOperation& operation : proposal.operations) {
@@ -350,6 +354,86 @@ void AddHighlightRef(std::unordered_set<std::string>& ids,
     }
 }
 
+bool IsPreviewRelationshipType(const std::string& type) {
+    return type == "assertedinference" || type == "assertedcontext" || type == "assertedevidence";
+}
+
+bool RelationshipTouchesAny(const parser::SacmElement& relationship,
+                            const std::unordered_set<std::string>& ids) {
+    if (!IsPreviewRelationshipType(relationship.type)) return false;
+    if (ids.count(relationship.reasoning_ref) > 0) return true;
+    for (const std::string& source : relationship.source_refs) {
+        if (ids.count(source) > 0) return true;
+    }
+    for (const std::string& target : relationship.target_refs) {
+        if (ids.count(target) > 0) return true;
+    }
+    return false;
+}
+
+bool SameRelationship(const parser::SacmElement& lhs, const parser::SacmElement& rhs) {
+    return lhs.type == rhs.type &&
+           lhs.reasoning_ref == rhs.reasoning_ref &&
+           lhs.source_refs == rhs.source_refs &&
+           lhs.target_refs == rhs.target_refs;
+}
+
+bool RelationshipExists(const parser::AssuranceCase& model, const parser::SacmElement& relationship) {
+    for (const parser::SacmElement& element : model.elements) {
+        if (!IsPreviewRelationshipType(element.type)) continue;
+        if (!relationship.id.empty() && element.id == relationship.id) return true;
+        if (SameRelationship(element, relationship)) return true;
+    }
+    return false;
+}
+
+std::optional<core::RemoveMode> ProposalRemoveModeFromField(const std::string& field) {
+    if (field == "node_only") return core::RemoveMode::NodeOnly;
+    if (field == "node_and_descendants") return core::RemoveMode::NodeAndDescendants;
+    return std::nullopt;
+}
+
+std::unordered_set<std::string> CollectProposalRemovedExistingIds(
+    const core::ReviewProposal& proposal,
+    const parser::AssuranceCase& base_model,
+    const std::map<std::string, std::string>& generated_ids) {
+    std::unordered_set<std::string> ids;
+    for (const core::PatchOperation& operation : proposal.operations) {
+        if (operation.type != core::PatchOperationType::RemoveElement || !operation.element.has_value()) continue;
+        const std::string element_id = PreviewIdForProposalRef(operation.element.value(), generated_ids);
+        if (element_id.empty() || !FindParserElement(base_model, element_id)) continue;
+
+        std::optional<core::RemoveMode> mode = ProposalRemoveModeFromField(operation.field);
+        if (mode.has_value()) {
+            std::unordered_set<std::string> planned = core::PlanRemoval(base_model, element_id, mode.value());
+            ids.insert(planned.begin(), planned.end());
+        } else {
+            ids.insert(element_id);
+        }
+    }
+    return ids;
+}
+
+void RestoreRemovedExistingElementsForProposalPreview(
+    parser::AssuranceCase& preview_model,
+    const parser::AssuranceCase& base_model,
+    const std::unordered_set<std::string>& removed_ids) {
+    if (removed_ids.empty()) return;
+
+    for (const parser::SacmElement& element : base_model.elements) {
+        if (IsPreviewRelationshipType(element.type)) continue;
+        if (removed_ids.count(element.id) == 0) continue;
+        if (FindParserElement(preview_model, element.id)) continue;
+        preview_model.elements.push_back(element);
+    }
+
+    for (const parser::SacmElement& relationship : base_model.elements) {
+        if (!RelationshipTouchesAny(relationship, removed_ids)) continue;
+        if (RelationshipExists(preview_model, relationship)) continue;
+        preview_model.elements.push_back(relationship);
+    }
+}
+
 std::unordered_set<std::string> CollectProposalHighlightIds(const core::ReviewProposal& proposal,
                                                            const std::map<std::string, std::string>& generated_ids) {
     std::unordered_set<std::string> ids;
@@ -370,7 +454,23 @@ std::unordered_set<std::string> CollectProposalHighlightIds(const core::ReviewPr
 
 void ClearProposalHighlightState(ui::UiState& ui_state) {
     ui_state.proposal_highlight_ids.clear();
+    ui_state.marked_for_removal.clear();
+    ui_state.center_on_marked = false;
     ui_state.dim_non_proposal_nodes = false;
+}
+
+void ApplyProposalPreviewVisualState(ui::UiState& ui_state,
+                                     parser::AssuranceCase& preview_model,
+                                     const parser::AssuranceCase& base_model,
+                                     const core::ReviewProposal& proposal,
+                                     const std::map<std::string, std::string>& generated_ids) {
+    std::unordered_set<std::string> removed_ids = CollectProposalRemovedExistingIds(proposal, base_model, generated_ids);
+    RestoreRemovedExistingElementsForProposalPreview(preview_model, base_model, removed_ids);
+
+    ui_state.proposal_highlight_ids = CollectProposalHighlightIds(proposal, generated_ids);
+    ui_state.proposal_highlight_ids.insert(removed_ids.begin(), removed_ids.end());
+    ui_state.marked_for_removal = std::move(removed_ids);
+    ui_state.dim_non_proposal_nodes = !ui_state.proposal_highlight_ids.empty();
 }
 
 bool IsUpdateForElement(const core::PatchOperation& operation,
@@ -884,11 +984,14 @@ bool AppRuntime::RefreshProposalCreatorPreview() {
     impl_->proposal_preview_id = impl_->proposal_draft.id;
     impl_->proposal_preview_model = std::move(preview.preview_model);
     impl_->proposal_creator_generated_ids = std::move(preview.generated_ids);
+    ui::UiState& ui_state = ui::GetUiState();
+    ApplyProposalPreviewVisualState(ui_state,
+                                    impl_->proposal_preview_model,
+                                    impl_->app_state.loaded_case.value(),
+                                    impl_->proposal_draft,
+                                    impl_->proposal_creator_generated_ids);
     impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->proposal_preview_model);
     ui::gsn::SetCanvasTree(impl_->current_tree);
-    ui::UiState& ui_state = ui::GetUiState();
-    ui_state.proposal_highlight_ids = CollectProposalHighlightIds(impl_->proposal_draft, impl_->proposal_creator_generated_ids);
-    ui_state.dim_non_proposal_nodes = !ui_state.proposal_highlight_ids.empty();
     return true;
 }
 
@@ -987,12 +1090,15 @@ bool AppRuntime::PreviewProposalById(const std::string& proposal_id) {
     impl_->proposal_preview_active = true;
     impl_->proposal_preview_id = proposal->id;
     impl_->proposal_preview_model = std::move(preview.preview_model);
-    impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->proposal_preview_model);
-    ui::gsn::SetCanvasTree(impl_->current_tree);
 
     ui::UiState& preview_ui_state = ui::GetUiState();
-    preview_ui_state.proposal_highlight_ids = CollectProposalHighlightIds(*proposal, generated_ids);
-    preview_ui_state.dim_non_proposal_nodes = !preview_ui_state.proposal_highlight_ids.empty();
+    ApplyProposalPreviewVisualState(preview_ui_state,
+                                    impl_->proposal_preview_model,
+                                    impl_->app_state.loaded_case.value(),
+                                    *proposal,
+                                    generated_ids);
+    impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->proposal_preview_model);
+    ui::gsn::SetCanvasTree(impl_->current_tree);
     preview_ui_state.center_view = ui::CenterView::GsnCanvas;
     preview_ui_state.selected_element_id = proposal->anchor_element_id;
     preview_ui_state.center_on_selection = true;
@@ -1165,22 +1271,31 @@ void AppRuntime::RemoveProposalSelected(core::RemoveMode mode) {
         return;
     }
 
-    const size_t old_operation_count = impl_->proposal_draft.operations.size();
     for (const std::string& id : planned_ids) {
         std::optional<core::ElementRef> ref = ProposalRefForPreviewId(id, impl_->proposal_creator_generated_ids);
         if (!ref.has_value()) continue;
         TrackAffectedRef(impl_->proposal_draft, impl_->app_state.loaded_case.value(), ref.value());
-
-        core::PatchOperation remove;
-        remove.type = core::PatchOperationType::RemoveElement;
-        remove.element = ref.value();
-        impl_->proposal_draft.operations.push_back(std::move(remove));
     }
 
-    if (impl_->proposal_draft.operations.size() == old_operation_count) {
-        SetStatus("Could not resolve selected elements for proposal removal.");
+    std::optional<core::ElementRef> selected_ref = ProposalRefForPreviewId(selected_id, impl_->proposal_creator_generated_ids);
+    if (!selected_ref.has_value()) {
+        SetStatus("Could not resolve selected element for proposal removal.");
         return;
     }
+
+    impl_->proposal_draft.operations.erase(
+        std::remove_if(impl_->proposal_draft.operations.begin(), impl_->proposal_draft.operations.end(), [&](const core::PatchOperation& operation) {
+            return operation.type == core::PatchOperationType::RemoveElement &&
+                   operation.element.has_value() &&
+                   SameElementRef(operation.element.value(), selected_ref.value());
+        }),
+        impl_->proposal_draft.operations.end());
+
+    core::PatchOperation remove;
+    remove.type = core::PatchOperationType::RemoveElement;
+    remove.element = selected_ref.value();
+    remove.field = RemoveModeField(mode);
+    impl_->proposal_draft.operations.push_back(std::move(remove));
 
     impl_->proposal_creator_preview_refresh_pending = true;
     impl_->proposal_creator_pending_select_create_ref.reset();
@@ -1984,7 +2099,18 @@ void AppRuntime::RenderProposalElementEditor() {
         }
     }
 
-    ImGui::TextDisabled("%s", selected_id.c_str());
+    ImGui::TextDisabled("%s  %s", ref->existing_id.has_value() ? "Existing" : "New", selected_id.c_str());
+    if (ImGui::Button("Remove")) {
+        RemoveProposalSelected(core::RemoveMode::NodeOnly);
+        return;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Remove Subtree")) {
+        RemoveProposalSelected(core::RemoveMode::NodeAndDescendants);
+        return;
+    }
+    ImGui::Separator();
+
     ImGui::SetNextItemWidth(-1.0f);
     const bool name_changed = ImGui::InputText("Name", name_buf, sizeof(name_buf));
     ImGui::SetNextItemWidth(-1.0f);
