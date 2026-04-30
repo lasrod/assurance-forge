@@ -1,4 +1,4 @@
-#include "app/project_controller.h"
+#include "app/controllers/project_controller.h"
 
 #include <algorithm>
 #include <cctype>
@@ -7,7 +7,7 @@
 #include <string>
 #include <system_error>
 
-namespace app {
+namespace app::controllers {
 namespace {
 
 void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
@@ -86,4 +86,4 @@ void ProjectController::RemoveRecentProjectByPath(const std::string& path) {
     app::RemoveRecentProject(recent_projects, path);
 }
 
-}  // namespace app
+}  // namespace app::controllers

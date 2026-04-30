@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
 
-#include "app/modal_coordinator.h"
+#include "app/controllers/modal_coordinator.h"
 
 TEST(ModalCoordinatorTest, AppliesGenericModalRequests) {
-    app::ModalCoordinator coordinator;
+    app::controllers::ModalCoordinator coordinator;
 
     coordinator.ApplyModalRequest(app::ModalRequestEvent{app::ModalKind::NotImplemented, true, "Export"});
     EXPECT_TRUE(coordinator.show_not_implemented_modal);
@@ -17,7 +17,7 @@ TEST(ModalCoordinatorTest, AppliesGenericModalRequests) {
 }
 
 TEST(ModalCoordinatorTest, ConsumeCloseRequestReturnsAndClearsRequest) {
-    app::ModalCoordinator coordinator;
+    app::controllers::ModalCoordinator coordinator;
 
     coordinator.RequestClose();
 

@@ -11,7 +11,7 @@
 #include <memory>
 #include <string>
 
-namespace app {
+namespace app::controllers {
 
 class AiReviewController {
 public:
@@ -50,4 +50,4 @@ private:
     bool show_debug_modal_ = false;
 };
 
-}  // namespace app
+}  // namespace app::controllers

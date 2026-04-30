@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace app {
+namespace app::controllers {
 
 class ElementEditController {
 public:
@@ -39,4 +39,4 @@ private:
     std::vector<std::string> pending_remove_ids_;
 };
 
-}  // namespace app
+}  // namespace app::controllers

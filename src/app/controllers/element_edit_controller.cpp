@@ -1,9 +1,9 @@
-#include "app/element_edit_controller.h"
+#include "app/controllers/element_edit_controller.h"
 
 #include <algorithm>
 #include <cstddef>
 
-namespace app {
+namespace app::controllers {
 
 ElementEditController::ElementEditController(AppEvents& events) : events_(events) {}
 
@@ -124,4 +124,4 @@ const std::vector<std::string>& ElementEditController::PendingRemoveIds() const 
     return pending_remove_ids_;
 }
 
-}  // namespace app
+}  // namespace app::controllers

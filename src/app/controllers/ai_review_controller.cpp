@@ -1,4 +1,4 @@
-#include "app/ai_review_controller.h"
+#include "app/controllers/ai_review_controller.h"
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-namespace app {
+namespace app::controllers {
 namespace {
 
 core::ProblemItem MakeAiReviewProblem(const std::string& id,
@@ -314,4 +314,4 @@ const std::string& AiReviewController::LastParseError() const {
     return last_parse_error_;
 }
 
-}  // namespace app
+}  // namespace app::controllers

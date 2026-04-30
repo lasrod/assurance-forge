@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "app/project_controller.h"
+#include "app/controllers/project_controller.h"
 
 #include <chrono>
 #include <algorithm>
@@ -36,7 +36,7 @@ void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
 }  // namespace
 
 TEST(ProjectControllerTest, BeginProjectFileCreateStoresKindNameAndShowsModal) {
-    app::ProjectController controller;
+    app::controllers::ProjectController controller;
 
     controller.BeginProjectFileCreate(app::ProjectFileCreateKind::EvidenceRegister,
                                       "evidence-register.af.json");
@@ -47,7 +47,7 @@ TEST(ProjectControllerTest, BeginProjectFileCreateStoresKindNameAndShowsModal) {
 }
 
 TEST(ProjectControllerTest, RecentProjectsPreferenceRoundTrips) {
-    app::ProjectController controller;
+    app::controllers::ProjectController controller;
     std::vector<app::RecentProjectEntry> recent;
     app::RecentProjectEntry entry;
     entry.name = "Alpha";
@@ -69,7 +69,7 @@ TEST(ProjectControllerTest, ScanDirectoryFindsXmlAndSelectsCurrentFile) {
     std::ofstream(selected) << "<b/>";
     std::ofstream(temp.path / "ignore.txt") << "ignore";
 
-    app::ProjectController controller;
+    app::controllers::ProjectController controller;
     CopyToBuffer(controller.dir_path_buf, sizeof(controller.dir_path_buf), temp.path.string());
     CopyToBuffer(controller.file_path_buf, sizeof(controller.file_path_buf), selected.string());
 

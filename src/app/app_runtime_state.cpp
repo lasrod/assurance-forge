@@ -28,12 +28,12 @@ AppRuntimeState::AppRuntimeState()
       ai_http_client(std::make_shared<ai::LibCurlHttpClient>()),
       ai_provider(std::make_shared<ai::OpenAiProvider>(ai_http_client)),
       ai_service(std::make_shared<ai::AiService>(ai_settings_store, ai_secret_store, ai_provider)) {
-        element_edit_controller = std::make_unique<ElementEditController>(events);
-        modal_coordinator = std::make_unique<ModalCoordinator>();
-        project_controller = std::make_unique<ProjectController>();
-        proposal_controller = std::make_unique<ProposalController>();
-        review_controller = std::make_unique<ReviewController>(events);
-        ai_review_controller = std::make_unique<AiReviewController>(events, problems_manager, ai_task_runner, ai_service);
+        element_edit_controller = std::make_unique<controllers::ElementEditController>(events);
+        modal_coordinator = std::make_unique<controllers::ModalCoordinator>();
+        project_controller = std::make_unique<controllers::ProjectController>();
+        proposal_controller = std::make_unique<controllers::ProposalController>();
+        review_controller = std::make_unique<controllers::ReviewController>(events);
+        ai_review_controller = std::make_unique<controllers::AiReviewController>(events, problems_manager, ai_task_runner, ai_service);
     LoadAiSettingsState();
 }
 

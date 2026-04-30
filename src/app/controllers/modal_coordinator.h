@@ -4,7 +4,7 @@
 
 #include <string>
 
-namespace app {
+namespace app::controllers {
 
 class ModalCoordinator {
 public:
@@ -21,4 +21,4 @@ public:
     void ApplyModalRequest(const ModalRequestEvent& event);
 };
 
-}  // namespace app
+}  // namespace app::controllers

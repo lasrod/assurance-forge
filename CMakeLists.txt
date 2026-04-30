@@ -185,7 +185,7 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/ai/openai_provider.cpp
     src/ai/secret_store.cpp
     src/app/main.cpp
-    src/app/ai_review_controller.cpp
+    src/app/controllers/ai_review_controller.cpp
     src/app/app_runtime_ai.cpp
     src/app/app_ui_bootstrap.cpp
     src/app/app_layout_controller.cpp
@@ -193,14 +193,14 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/app/app_runtime_project.cpp
     src/app/app_runtime.cpp
     src/app/app_runtime_state.cpp
-    src/app/element_edit_controller.cpp
-    src/app/modal_coordinator.cpp
+    src/app/controllers/element_edit_controller.cpp
+    src/app/controllers/modal_coordinator.cpp
     src/app/native_file_dialogs.cpp
-    src/app/project_controller.cpp
-    src/app/proposal_controller.cpp
+    src/app/controllers/project_controller.cpp
+    src/app/controllers/proposal_controller.cpp
     src/app/project_workflow.cpp
     src/app/recent_projects.cpp
-    src/app/review_controller.cpp
+    src/app/controllers/review_controller.cpp
     src/parser/guidelines_parser.cpp
     ${ASSURANCE_FORGE_SHARED_SOURCES}
 )
@@ -259,14 +259,14 @@ add_executable(tests
     src/ai/http_client.cpp
     src/ai/openai_provider.cpp
     src/ai/secret_store.cpp
-    src/app/ai_review_controller.cpp
-    src/app/element_edit_controller.cpp
-    src/app/modal_coordinator.cpp
-    src/app/project_controller.cpp
+    src/app/controllers/ai_review_controller.cpp
+    src/app/controllers/element_edit_controller.cpp
+    src/app/controllers/modal_coordinator.cpp
+    src/app/controllers/project_controller.cpp
     src/app/project_workflow.cpp
-    src/app/proposal_controller.cpp
+    src/app/controllers/proposal_controller.cpp
     src/app/recent_projects.cpp
-    src/app/review_controller.cpp
+    src/app/controllers/review_controller.cpp
     src/parser/guidelines_parser.cpp
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp

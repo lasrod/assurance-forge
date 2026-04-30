@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "app/ai_review_controller.h"
+#include "app/controllers/ai_review_controller.h"
 
 #include <memory>
 #include <string>
@@ -12,7 +12,7 @@ struct ControllerHarness {
     app::AppEvents events;
     core::ProblemsManager problems;
     ai::AiTaskRunner task_runner;
-    app::AiReviewController controller;
+    app::controllers::AiReviewController controller;
     std::vector<std::string> statuses;
 
     ControllerHarness()

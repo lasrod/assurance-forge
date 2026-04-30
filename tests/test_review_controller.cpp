@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "app/review_controller.h"
+#include "app/controllers/review_controller.h"
 
 #include <string>
 #include <vector>
@@ -9,7 +9,7 @@ namespace {
 
 struct ReviewHarness {
     app::AppEvents events;
-    app::ReviewController controller;
+    app::controllers::ReviewController controller;
     std::vector<std::string> statuses;
     int dirty_events = 0;
 

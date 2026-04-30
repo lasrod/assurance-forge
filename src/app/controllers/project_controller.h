@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace app {
+namespace app::controllers {
 
 constexpr size_t kPathBufferSize = 512;
 
@@ -39,4 +39,4 @@ public:
     void RemoveRecentProjectByPath(const std::string& path);
 };
 
-}  // namespace app
+}  // namespace app::controllers

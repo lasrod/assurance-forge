@@ -1,4 +1,4 @@
-#include "app/review_controller.h"
+#include "app/controllers/review_controller.h"
 
 #include "core/project_service.h"
 #include "core/reviews/review_item.h"
@@ -7,7 +7,7 @@
 #include <string>
 #include <utility>
 
-namespace app {
+namespace app::controllers {
 
 ReviewController::ReviewController(AppEvents& events) : events_(events) {}
 
@@ -196,4 +196,4 @@ void ReviewController::CancelDeleteReviewItem() {
     pending_delete_item_ = {};
 }
 
-}  // namespace app
+}  // namespace app::controllers

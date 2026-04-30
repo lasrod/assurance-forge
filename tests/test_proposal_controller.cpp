@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "app/proposal_controller.h"
+#include "app/controllers/proposal_controller.h"
 
 namespace {
 
@@ -28,7 +28,7 @@ core::reviews::ReviewItem MakeReviewItem() {
 }  // namespace
 
 TEST(ProposalControllerTest, BeginDraftInitializesDraftAndCreatorState) {
-    app::ProposalController controller;
+    app::controllers::ProposalController controller;
     parser::AssuranceCase model = MakeCaseWithClaim();
     core::reviews::ReviewItem item = MakeReviewItem();
 
@@ -44,7 +44,7 @@ TEST(ProposalControllerTest, BeginDraftInitializesDraftAndCreatorState) {
 }
 
 TEST(ProposalControllerTest, ClearActiveStateResetsDraftPreviewAndPendingRefresh) {
-    app::ProposalController controller;
+    app::controllers::ProposalController controller;
     parser::AssuranceCase model = MakeCaseWithClaim();
     controller.BeginDraft(MakeReviewItem(), model, model.elements.front(), "");
     controller.preview_active = true;

@@ -1,6 +1,6 @@
-#include "app/modal_coordinator.h"
+#include "app/controllers/modal_coordinator.h"
 
-namespace app {
+namespace app::controllers {
 
 void ModalCoordinator::RequestClose() {
     close_requested = true;
@@ -35,4 +35,4 @@ void ModalCoordinator::ApplyModalRequest(const ModalRequestEvent& event) {
     }
 }
 
-}  // namespace app
+}  // namespace app::controllers

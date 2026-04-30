@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
 
-#include "app/element_edit_controller.h"
+#include "app/controllers/element_edit_controller.h"
 
 TEST(ElementEditControllerTest, AddTopGoalUpdatesModelAndEmitsEvents) {
     app::AppEvents events;
-    app::ElementEditController controller(events);
+    app::controllers::ElementEditController controller(events);
     parser::AssuranceCase model;
 
     std::string selected_id;
@@ -28,7 +28,7 @@ TEST(ElementEditControllerTest, AddTopGoalUpdatesModelAndEmitsEvents) {
 
 TEST(ElementEditControllerTest, AddChildWithoutSelectionEmitsStatusOnly) {
     app::AppEvents events;
-    app::ElementEditController controller(events);
+    app::controllers::ElementEditController controller(events);
     parser::AssuranceCase model;
     bool tree_dirty = false;
     std::string status;

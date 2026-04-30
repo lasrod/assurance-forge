@@ -3,13 +3,13 @@
 #include <memory>
 #include <string>
 
-#include "app/ai_review_controller.h"
 #include "app/app_events.h"
-#include "app/element_edit_controller.h"
-#include "app/modal_coordinator.h"
-#include "app/project_controller.h"
-#include "app/proposal_controller.h"
-#include "app/review_controller.h"
+#include "app/controllers/ai_review_controller.h"
+#include "app/controllers/element_edit_controller.h"
+#include "app/controllers/modal_coordinator.h"
+#include "app/controllers/project_controller.h"
+#include "app/controllers/proposal_controller.h"
+#include "app/controllers/review_controller.h"
 #include "ai/ai_service.h"
 #include "ai/ai_task_runner.h"
 #include "ai/http_client.h"
@@ -26,11 +26,11 @@ struct AppRuntimeState {
     core::AppState app_state;
     AppEvents events;
     core::ProblemsManager problems_manager;
-    std::unique_ptr<ElementEditController> element_edit_controller;
-    std::unique_ptr<ModalCoordinator> modal_coordinator;
-    std::unique_ptr<ProjectController> project_controller;
-    std::unique_ptr<ProposalController> proposal_controller;
-    std::unique_ptr<ReviewController> review_controller;
+    std::unique_ptr<controllers::ElementEditController> element_edit_controller;
+    std::unique_ptr<controllers::ModalCoordinator> modal_coordinator;
+    std::unique_ptr<controllers::ProjectController> project_controller;
+    std::unique_ptr<controllers::ProposalController> proposal_controller;
+    std::unique_ptr<controllers::ReviewController> review_controller;
     bool document_dirty = false;
     std::string reviewer_name;
     char reviewer_name_buf[128] = {};
@@ -42,7 +42,7 @@ struct AppRuntimeState {
     std::shared_ptr<ai::AiService> ai_service;
     ai::AiTaskRunner ai_task_runner;
     std::shared_ptr<ai::AiTaskHandle> ai_test_task;
-    std::unique_ptr<AiReviewController> ai_review_controller;
+    std::unique_ptr<controllers::AiReviewController> ai_review_controller;
     ai::AiProviderSettings ai_settings;
     ai::AiConnectionStatus ai_connection_status;
     bool ai_key_stored = false;

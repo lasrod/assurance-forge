@@ -1,4 +1,4 @@
-#include "app/proposal_controller.h"
+#include "app/controllers/proposal_controller.h"
 
 #include <chrono>
 #include <ctime>
@@ -6,7 +6,7 @@
 #include <sstream>
 #include <utility>
 
-namespace app {
+namespace app::controllers {
 namespace {
 
 std::string NowUtcString() {
@@ -109,4 +109,4 @@ bool ProposalController::ClosePreviewIfOpen(const std::string& proposal_id) {
     return true;
 }
 
-}  // namespace app
+}  // namespace app::controllers

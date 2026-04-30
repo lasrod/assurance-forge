@@ -11,7 +11,7 @@
 #include <optional>
 #include <string>
 
-namespace app {
+namespace app::controllers {
 
 class ProposalController {
 public:
@@ -41,4 +41,4 @@ public:
     bool ClosePreviewIfOpen(const std::string& proposal_id);
 };
 
-}  // namespace app
+}  // namespace app::controllers

@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-namespace app {
+namespace app::controllers {
 
 class ReviewController {
 public:
@@ -61,4 +61,4 @@ private:
     core::reviews::ReviewItem pending_delete_item_;
 };
 
-}  // namespace app
+}  // namespace app::controllers
