@@ -12,6 +12,11 @@ namespace app::controllers {
 ReviewController::ReviewController(AppEvents& events) : events_(events) {}
 
 bool ReviewController::ConfigureStorage(const std::filesystem::path& review_path, std::string& error) {
+    if (dirty_ && !manager_.FilePath().empty() && manager_.FilePath() == review_path) {
+        error.clear();
+        return true;
+    }
+
     manager_.SetFilePath(review_path);
     if (manager_.Load(error)) return true;
 

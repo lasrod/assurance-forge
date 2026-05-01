@@ -161,6 +161,7 @@ set(ASSURANCE_FORGE_SHARED_SOURCES
     src/core/app_state.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
+    src/core/problems/problem_attention.cpp
     src/core/problems/problem_item.cpp
     src/core/problems/problems_manager.cpp
     src/core/project_model.cpp
@@ -193,6 +194,8 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/app/app_runtime_project.cpp
     src/app/app_runtime.cpp
     src/app/app_runtime_state.cpp
+    src/app/guideline_catalog.cpp
+    src/app/review_problem_sync.cpp
     src/app/controllers/element_edit_controller.cpp
     src/app/controllers/modal_coordinator.cpp
     src/app/native_file_dialogs.cpp
@@ -228,6 +231,7 @@ add_executable(tests
     tests/test_xml_parser.cpp
     tests/test_assurance_tree.cpp
     tests/test_layout.cpp
+    tests/test_problem_attention.cpp
     tests/test_problems_manager.cpp
     tests/test_review_item.cpp
     tests/test_review_proposal.cpp
@@ -240,6 +244,7 @@ add_executable(tests
     tests/test_sha256.cpp
     tests/test_app_events.cpp
     tests/test_ai_review_controller.cpp
+    tests/test_review_problem_sync.cpp
     tests/test_review_controller.cpp
     tests/test_element_edit_controller.cpp
     tests/test_modal_coordinator.cpp
@@ -249,6 +254,7 @@ add_executable(tests
     tests/test_openai_provider.cpp
     tests/test_ai_task_runner.cpp
     tests/test_guidelines_parser.cpp
+    tests/test_guideline_catalog.cpp
     tests/test_localization.cpp
     tests/test_recent_projects.cpp
     src/ai/ai_service.cpp
@@ -266,11 +272,14 @@ add_executable(tests
     src/app/project_workflow.cpp
     src/app/controllers/proposal_controller.cpp
     src/app/recent_projects.cpp
+    src/app/guideline_catalog.cpp
+    src/app/review_problem_sync.cpp
     src/app/controllers/review_controller.cpp
     src/parser/guidelines_parser.cpp
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
+    src/core/problems/problem_attention.cpp
     src/core/problems/problem_item.cpp
     src/core/problems/problems_manager.cpp
     src/core/project_model.cpp

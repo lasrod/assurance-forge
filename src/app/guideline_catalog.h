@@ -1,0 +1,30 @@
+#pragma once
+
+#include "parser/guidelines_parser.h"
+
+#include <filesystem>
+#include <string>
+#include <unordered_set>
+#include <vector>
+
+namespace app {
+
+struct GuidelineCatalogEntry {
+    std::string id;
+    std::string category;
+    std::string title;
+};
+
+struct GuidelineCatalog {
+    std::filesystem::path source_path;
+    parser::GuidelinesDocument document;
+    std::vector<GuidelineCatalogEntry> entries;
+    std::unordered_set<std::string> ids;
+};
+
+std::filesystem::path FindGuidelinesFile();
+GuidelineCatalog BuildGuidelineCatalog(parser::GuidelinesDocument document,
+                                       std::filesystem::path source_path = {});
+bool LoadGuidelineCatalog(GuidelineCatalog& catalog, std::string& error);
+
+}  // namespace app

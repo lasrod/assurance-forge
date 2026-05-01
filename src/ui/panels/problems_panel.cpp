@@ -21,6 +21,7 @@ bool IsValidationSource(core::ProblemSource source) {
 
 bool IsReviewSource(core::ProblemSource source) {
     return source == core::ProblemSource::Manual ||
+           source == core::ProblemSource::ReviewComment ||
            source == core::ProblemSource::GuidelineReview ||
            source == core::ProblemSource::AIReview;
 }

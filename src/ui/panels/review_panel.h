@@ -11,9 +11,17 @@
 
 namespace ui::panels {
 
+struct ReviewGuidelineOption {
+    std::string id;
+    std::string category;
+    std::string title;
+};
+
 struct ReviewPanelModel {
     std::string selected_element_id;
     std::vector<core::reviews::ReviewItem> review_items;
+    std::vector<ReviewGuidelineOption> guideline_options;
+    std::string guideline_status;
     std::map<std::string, core::reviews::ProposalValidityResult> proposal_validity;
     std::string active_proposal_review_item_id;
     size_t active_proposal_operation_count = 0;
@@ -22,7 +30,9 @@ struct ReviewPanelModel {
 };
 
 struct ReviewPanelCallbacks {
-    std::function<void(const std::string& title, const std::string& message)> add_review_item;
+    std::function<void(const std::string& title,
+                       const std::string& message,
+                       const std::vector<std::string>& guideline_ids)> add_review_item;
     std::function<void(const core::reviews::ReviewItem& item)> create_proposed_change;
     std::function<void(const core::reviews::ReviewItem& item)> save_proposal;
     std::function<void(const core::reviews::ReviewItem& item)> edit_proposal;

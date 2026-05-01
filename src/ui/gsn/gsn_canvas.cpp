@@ -24,6 +24,9 @@ static constexpr float kOutlineThickness   = 1.0f;   // shape outline stroke wid
 static constexpr int   kCircleSegments     = 48;     // number of segments for circle rendering
 static constexpr float kUndDiamondRadius   = 24.0f;
 static constexpr float kUndGap             = 0.50f;
+static constexpr float kAttentionBadgeSize = 18.0f;
+static constexpr float kAttentionBadgeGap  = 6.0f;
+static constexpr float kAttentionFontScale = 0.95f;
 
 // Number of stacked offset layers used for soft drop shadows under nodes.
 static constexpr int   kShadowLayers       = 3;
@@ -241,12 +244,42 @@ static void DrawUndevelopedMarker(ImDrawList* draw_list, const GsnNode& node,
     draw_list->AddText(font, font_size, text_pos, und_ink, und);
 }
 
+static void DrawAttentionBadge(ImDrawList* draw_list,
+                               const GsnNode& node,
+                               ImVec2 top_left,
+                               ImVec2 bottom_right,
+                               float zoom) {
+    const Theme& theme = GetTheme();
+    float badge_size = DpiSize(kAttentionBadgeSize) * zoom;
+    float badge_gap = DpiSize(kAttentionBadgeGap) * zoom;
+    float rounding = badge_size * 0.32f;
+    float center_x = (top_left.x + bottom_right.x) * 0.5f;
+    float badge_y = top_left.y - badge_size * 0.45f;
+    float badge_x = center_x - badge_size * 0.5f + badge_gap * 0.35f;
+
+    ImVec2 badge_min(badge_x, badge_y);
+    ImVec2 badge_max(badge_min.x + badge_size,
+                     badge_min.y + badge_size);
+
+    draw_list->AddRectFilled(badge_min, badge_max, theme.warning, rounding);
+    draw_list->AddRect(badge_min, badge_max, ShadeColor(theme.warning, -0.30f), rounding, 0, DpiSize(1.0f) * zoom);
+
+    const char* glyph = "!";
+    ImFont* font = g_BoldFont ? g_BoldFont : ImGui::GetFont();
+    float font_size = ImGui::GetFontSize() * zoom * kAttentionFontScale;
+    ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, glyph);
+    ImVec2 text_pos((badge_min.x + badge_max.x - text_size.x) * 0.5f,
+                    (badge_min.y + badge_max.y - text_size.y) * 0.5f - DpiScale() * zoom * 0.5f);
+    draw_list->AddText(font, font_size, text_pos, theme.ink_dark, glyph);
+}
+
 // ===== Text layout helper =====
 
 // Compute the horizontal text region (left edge and wrap width) for a given node shape.
 // All outputs are in screen-space (already scaled by zoom).
 static void ComputeTextRegion(const GsnNode& node, ImVec2 top_left, ImVec2 bottom_right,
-                              float zoom, float& out_text_left, float& out_text_wrap) {
+                              float zoom, bool reserve_attention_badge,
+                              float& out_text_left, float& out_text_wrap) {
     float scaled_padding = DpiSize(kTextPadding) * zoom;
     float scaled_width  = node.size.x * zoom;
     float scaled_height = node.size.y * zoom;
@@ -335,6 +368,7 @@ void DrawGsnNode(const GsnNode& node,
     const bool proposal_dim_active = ui_state.dim_non_proposal_nodes && !ui_state.proposal_highlight_ids.empty();
     const bool proposal_highlighted = proposal_dim_active && ui_state.proposal_highlight_ids.count(node.id) > 0;
     const bool proposal_dimmed = proposal_dim_active && !proposal_highlighted;
+    const bool has_attention = ui_state.attention_element_ids.count(node.id) > 0;
 
     ImU32 fill_color = ColorForType(node.type);
     if (proposal_dimmed) {
@@ -372,7 +406,7 @@ void DrawGsnNode(const GsnNode& node,
 
     // Draw label text
     float text_left, text_wrap;
-    ComputeTextRegion(node, top_left, bottom_right, zoom, text_left, text_wrap);
+    ComputeTextRegion(node, top_left, bottom_right, zoom, has_attention, text_left, text_wrap);
     ImU32 ink = marked_for_removal ? GetTheme().text_primary : InkOn(fill_color);
     if (proposal_dimmed) ink = WithAlpha(GetTheme().text_secondary, 0.62f);
     DrawNodeLabel(draw_list, node, top_left, bottom_right, text_left, text_wrap, zoom, ink, ui_state);
@@ -433,6 +467,11 @@ void DrawGsnNode(const GsnNode& node,
             ImVec2(top_left.x - 3.0f * scale, top_left.y - 3.0f * scale),
             ImVec2(bottom_right.x + 3.0f * scale, bottom_right.y + 3.0f * scale),
             ShadeColor(th_rm.danger, -0.20f), DpiSize(kClaimRounding) * zoom + 3.0f * scale, 0, 2.5f * scale);
+    }
+
+    // Attention badge drawn last so it always renders above all outlines.
+    if (has_attention) {
+        DrawAttentionBadge(draw_list, node, top_left, bottom_right, zoom);
     }
 }
 

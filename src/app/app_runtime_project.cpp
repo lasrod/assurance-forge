@@ -154,6 +154,7 @@ bool AppRuntime::OpenFirstProjectSacmFile() {
 bool AppRuntime::EnsureReviewItemStorage() {
     if (!impl_->app_state.current_project.has_value()) {
         impl_->review_controller->ClearStorage();
+        SyncReviewProblems();
         return false;
     }
 
@@ -165,9 +166,11 @@ bool AppRuntime::EnsureReviewItemStorage() {
 
     std::string error;
     if (impl_->review_controller->ConfigureStorage(review_path, error)) {
+        SyncReviewProblems();
         return true;
     }
 
+    SyncReviewProblems();
     SetStatus("Review items could not be loaded: " + error);
     return false;
 }
@@ -183,6 +186,7 @@ bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {
     }
     impl_->document_dirty = false;
     impl_->review_controller->ClearDirty();
+    impl_->guideline_catalog_load_attempted = false;
     if (impl_->app_state.current_project.has_value()) {
         impl_->proposal_controller->manager.SetProjectRoot(impl_->app_state.current_project->rootPath);
         EnsureReviewItemStorage();
