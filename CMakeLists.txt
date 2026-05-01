@@ -194,6 +194,7 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/app/app_runtime_project.cpp
     src/app/app_runtime.cpp
     src/app/app_runtime_state.cpp
+    src/app/guideline_catalog.cpp
     src/app/review_problem_sync.cpp
     src/app/controllers/element_edit_controller.cpp
     src/app/controllers/modal_coordinator.cpp
@@ -253,6 +254,7 @@ add_executable(tests
     tests/test_openai_provider.cpp
     tests/test_ai_task_runner.cpp
     tests/test_guidelines_parser.cpp
+    tests/test_guideline_catalog.cpp
     tests/test_localization.cpp
     tests/test_recent_projects.cpp
     src/ai/ai_service.cpp
@@ -270,6 +272,7 @@ add_executable(tests
     src/app/project_workflow.cpp
     src/app/controllers/proposal_controller.cpp
     src/app/recent_projects.cpp
+    src/app/guideline_catalog.cpp
     src/app/review_problem_sync.cpp
     src/app/controllers/review_controller.cpp
     src/parser/guidelines_parser.cpp

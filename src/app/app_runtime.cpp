@@ -2,6 +2,7 @@
 #include "app/app_layout_controller.h"
 #include "app/app_runtime_state.h"
 
+#include "app/guideline_catalog.h"
 #include "app/review_problem_sync.h"
 
 #include "app/project_workflow.h"
@@ -182,6 +183,21 @@ core::reviews::PatchOperationType CreateOperationFor(core::NewElementKind kind) 
         case core::NewElementKind::Justification: return core::reviews::PatchOperationType::CreateJustification;
     }
     return core::reviews::PatchOperationType::CreateClaim;
+}
+
+void EnsureGuidelineCatalogLoaded(AppRuntimeState& state) {
+    if (state.guideline_catalog_load_attempted) return;
+
+    GuidelineCatalog catalog;
+    std::string error;
+    if (LoadGuidelineCatalog(catalog, error)) {
+        state.guideline_catalog = std::move(catalog);
+        state.guideline_catalog_error.clear();
+    } else {
+        state.guideline_catalog.reset();
+        state.guideline_catalog_error = error;
+    }
+    state.guideline_catalog_load_attempted = true;
 }
 
 const char* CreateRefPrefixFor(core::NewElementKind kind) {
@@ -1729,6 +1745,18 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
     model.selected_element_id = proposals.creator_active ? proposals.draft.anchor_element_id
                                                                : ui_state.selected_element_id;
     model.has_project = impl_->app_state.current_project.has_value();
+    EnsureGuidelineCatalogLoaded(*impl_);
+    if (impl_->guideline_catalog.has_value()) {
+        for (const GuidelineCatalogEntry& entry : impl_->guideline_catalog->entries) {
+            model.guideline_options.push_back(ui::panels::ReviewGuidelineOption{
+                entry.id,
+                entry.category,
+                entry.title,
+            });
+        }
+    } else {
+        model.guideline_status = impl_->guideline_catalog_error;
+    }
     if (proposals.creator_active) {
         model.active_proposal_review_item_id = proposals.draft.review_item_id;
         model.active_proposal_operation_count = proposals.ActiveOperationCount();
@@ -1752,7 +1780,9 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
     }
 
     ui::panels::ReviewPanelCallbacks callbacks;
-    callbacks.add_review_item = [this](const std::string& title, const std::string& message) {
+    callbacks.add_review_item = [this](const std::string& title,
+                                       const std::string& message,
+                                       const std::vector<std::string>& guideline_ids) {
         if (impl_->proposal_controller->creator_active) {
             SetStatus("Save or discard the active proposal before adding more review comments.");
             return;
@@ -1775,6 +1805,26 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
             return;
         }
 
+        std::vector<std::string> validated_guideline_ids;
+        if (!guideline_ids.empty()) {
+            EnsureGuidelineCatalogLoaded(*impl_);
+            if (!impl_->guideline_catalog.has_value()) {
+                SetStatus("SCCG guidelines are not available: " + impl_->guideline_catalog_error);
+                return;
+            }
+
+            std::unordered_set<std::string> seen_guideline_ids;
+            for (const std::string& guideline_id : guideline_ids) {
+                if (guideline_id.empty() || seen_guideline_ids.count(guideline_id) > 0) continue;
+                if (impl_->guideline_catalog->ids.count(guideline_id) == 0) {
+                    SetStatus("Unknown SCCG guideline id: " + guideline_id);
+                    return;
+                }
+                validated_guideline_ids.push_back(guideline_id);
+                seen_guideline_ids.insert(guideline_id);
+            }
+        }
+
         core::reviews::ReviewItem item;
         item.id = GenerateReviewItemId();
         item.element_id = element_id;
@@ -1782,6 +1832,7 @@ void AppRuntime::RenderElementPropertiesPanel(float center_x, float center_w, fl
         item.message = message;
         item.severity = "warning";
         item.reviewer_name = impl_->reviewer_name;
+        item.guideline_ids = std::move(validated_guideline_ids);
         item.source = core::reviews::ReviewItemSource::Manual;
         item.status = core::reviews::ReviewItemStatus::Open;
         item.created_utc = NowUtcString();

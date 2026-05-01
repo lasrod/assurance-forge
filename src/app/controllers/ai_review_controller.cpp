@@ -1,20 +1,9 @@
 #include "app/controllers/ai_review_controller.h"
 
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
-#endif
-
+#include "app/guideline_catalog.h"
 #include "parser/guidelines_parser.h"
 
-#include <filesystem>
 #include <string>
-#include <vector>
 
 namespace app::controllers {
 namespace {
@@ -39,34 +28,6 @@ core::ProblemItem MakeAiReviewProblem(const std::string& id,
 std::string TruncateForProblemMessage(const std::string& value, size_t limit = 400) {
     if (value.size() <= limit) return value;
     return value.substr(0, limit) + "...";
-}
-
-std::filesystem::path ExecutableDirectory() {
-#ifdef _WIN32
-    char path[MAX_PATH] = {};
-    DWORD length = GetModuleFileNameA(nullptr, path, MAX_PATH);
-    if (length > 0 && length < MAX_PATH) {
-        return std::filesystem::path(path).parent_path();
-    }
-#endif
-    return std::filesystem::current_path();
-}
-
-std::filesystem::path FindGuidelinesFile() {
-    const std::filesystem::path executable_dir = ExecutableDirectory();
-    const std::filesystem::path current_dir = std::filesystem::current_path();
-    const std::vector<std::filesystem::path> candidates = {
-        executable_dir / "data" / "guidelines.yaml",
-        current_dir / "data" / "guidelines.yaml",
-        current_dir / "external" / "safety-case-core-guidelines" / "data" / "guidelines.yaml",
-        current_dir.parent_path() / "external" / "safety-case-core-guidelines" / "data" / "guidelines.yaml",
-    };
-
-    for (const std::filesystem::path& candidate : candidates) {
-        std::error_code error;
-        if (std::filesystem::exists(candidate, error)) return candidate;
-    }
-    return {};
 }
 
 }  // namespace
@@ -146,31 +107,20 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
         return;
     }
 
-    const std::filesystem::path guidelines_path = FindGuidelinesFile();
-    if (guidelines_path.empty()) {
+    GuidelineCatalog guideline_catalog;
+    std::string guideline_error;
+    if (!LoadGuidelineCatalog(guideline_catalog, guideline_error)) {
         problems_manager_.AddOrUpdateProblem(MakeAiReviewProblem(
             "ai-review:" + selected_element_id + ":guidelines-missing",
             core::ProblemSeverity::Error,
             selected_element_id,
             payload.selected.type,
-            "SCCG guidelines.yaml could not be found for AI review."));
-        events_.Emit(StatusMessageEvent{"SCCG guidelines.yaml could not be found for AI review."});
+            "SCCG guidelines could not be loaded for AI review: " + guideline_error));
+        events_.Emit(StatusMessageEvent{"SCCG guidelines could not be loaded for AI review."});
         return;
     }
 
-    parser::GuidelinesParseResult guidelines_result = parser::GuidelinesParser::ParseFile(guidelines_path.string());
-    if (!guidelines_result.success) {
-        problems_manager_.AddOrUpdateProblem(MakeAiReviewProblem(
-            "ai-review:" + selected_element_id + ":guidelines-parse-error",
-            core::ProblemSeverity::Error,
-            selected_element_id,
-            payload.selected.type,
-            "SCCG guidelines could not be parsed for AI review: " + guidelines_result.error_message));
-        events_.Emit(StatusMessageEvent{"SCCG guidelines could not be parsed for AI review."});
-        return;
-    }
-
-    std::vector<const parser::Guideline*> claim_guidelines = guidelines_result.document.FindGuidelinesByCategory("CL");
+    std::vector<const parser::Guideline*> claim_guidelines = guideline_catalog.document.FindGuidelinesByCategory("CL");
     if (claim_guidelines.empty()) {
         problems_manager_.AddOrUpdateProblem(MakeAiReviewProblem(
             "ai-review:" + selected_element_id + ":guidelines-empty",

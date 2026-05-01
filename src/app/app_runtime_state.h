@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "app/app_events.h"
@@ -10,6 +11,7 @@
 #include "app/controllers/project_controller.h"
 #include "app/controllers/proposal_controller.h"
 #include "app/controllers/review_controller.h"
+#include "app/guideline_catalog.h"
 #include "ai/ai_service.h"
 #include "ai/ai_task_runner.h"
 #include "ai/http_client.h"
@@ -31,6 +33,9 @@ struct AppRuntimeState {
     std::unique_ptr<controllers::ProjectController> project_controller;
     std::unique_ptr<controllers::ProposalController> proposal_controller;
     std::unique_ptr<controllers::ReviewController> review_controller;
+    std::optional<GuidelineCatalog> guideline_catalog;
+    bool guideline_catalog_load_attempted = false;
+    std::string guideline_catalog_error;
     bool document_dirty = false;
     std::string reviewer_name;
     char reviewer_name_buf[128] = {};
