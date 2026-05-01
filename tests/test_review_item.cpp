@@ -62,13 +62,13 @@ TEST(ReviewItemTest, RoundTripsReviewItemsJson) {
     EXPECT_EQ(items[0].id, item.id);
     EXPECT_EQ(items[0].proposal_id, item.proposal_id);
     EXPECT_EQ(items[0].reviewer_name, item.reviewer_name);
-        EXPECT_EQ(items[0].guideline_ids, item.guideline_ids);
+    EXPECT_EQ(items[0].guideline_ids, item.guideline_ids);
     EXPECT_EQ(items[0].source, core::reviews::ReviewItemSource::AIReview);
     EXPECT_EQ(items[0].status, core::reviews::ReviewItemStatus::Resolved);
 }
 
 TEST(ReviewItemTest, DeserializesOldReviewItemsWithoutGuidelineIds) {
-        const std::string content = R"json({
+    const std::string content = R"json({
     "format": "assurance-forge-review-items",
     "formatVersion": "0.1.0",
     "items": [
@@ -88,13 +88,13 @@ TEST(ReviewItemTest, DeserializesOldReviewItemsWithoutGuidelineIds) {
     ]
 })json";
 
-        std::string error;
-        std::vector<core::reviews::ReviewItem> items;
-        ASSERT_TRUE(core::reviews::DeserializeReviewItems(content, items, error)) << error;
+    std::string error;
+    std::vector<core::reviews::ReviewItem> items;
+    ASSERT_TRUE(core::reviews::DeserializeReviewItems(content, items, error)) << error;
 
-        ASSERT_EQ(items.size(), 1u);
-        EXPECT_EQ(items[0].id, "review-legacy");
-        EXPECT_TRUE(items[0].guideline_ids.empty());
+    ASSERT_EQ(items.size(), 1u);
+    EXPECT_EQ(items[0].id, "review-legacy");
+    EXPECT_TRUE(items[0].guideline_ids.empty());
 }
 
 TEST(ReviewItemTest, RejectsUnsupportedReviewItemFormat) {

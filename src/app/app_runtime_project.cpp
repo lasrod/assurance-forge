@@ -186,6 +186,7 @@ bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {
     }
     impl_->document_dirty = false;
     impl_->review_controller->ClearDirty();
+    impl_->guideline_catalog_load_attempted = false;
     if (impl_->app_state.current_project.has_value()) {
         impl_->proposal_controller->manager.SetProjectRoot(impl_->app_state.current_project->rootPath);
         EnsureReviewItemStorage();
