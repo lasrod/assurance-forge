@@ -45,9 +45,8 @@ const ReviewGuidelineOption* FindGuidelineOption(const ReviewPanelModel& model, 
     return found == model.guideline_options.end() ? nullptr : &*found;
 }
 
-bool MatchesGuidelineFilter(const ReviewGuidelineOption& option, const std::string& filter) {
-    if (filter.empty()) return true;
-    const std::string lowered_filter = LowerCopy(filter);
+bool MatchesGuidelineFilter(const ReviewGuidelineOption& option, const std::string& lowered_filter) {
+    if (lowered_filter.empty()) return true;
     return LowerCopy(option.id).find(lowered_filter) != std::string::npos ||
            LowerCopy(option.category).find(lowered_filter) != std::string::npos ||
            LowerCopy(option.title).find(lowered_filter) != std::string::npos;
@@ -155,10 +154,11 @@ void DrawGuidelineSelector(const ReviewPanelModel& model,
                 : model.guideline_status.c_str());
         } else {
             const std::string filter(filter_buffer);
+            const std::string lowered_filter = LowerCopy(filter);
             int shown = 0;
             for (const ReviewGuidelineOption& option : model.guideline_options) {
                 if (ContainsGuidelineId(selected_guideline_ids, option.id)) continue;
-                if (!MatchesGuidelineFilter(option, filter)) continue;
+                if (!MatchesGuidelineFilter(option, lowered_filter)) continue;
 
                 const std::string label = GuidelineDisplayLabel(option);
                 if (ImGui::Selectable(label.c_str())) {

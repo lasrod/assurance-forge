@@ -13,16 +13,39 @@ namespace {
 struct TempDir {
     std::filesystem::path path;
     explicit TempDir(std::filesystem::path p) : path(std::move(p)) {}
-    ~TempDir() { std::filesystem::remove_all(path); }
+    ~TempDir() noexcept {
+        std::error_code ec;
+        std::filesystem::remove_all(path, ec);
+    }
     TempDir(const TempDir&) = delete;
     TempDir& operator=(const TempDir&) = delete;
 };
 
 std::filesystem::path MakeTempDir() {
     auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::filesystem::path path = std::filesystem::temp_directory_path() /
-                                 ("assurance_forge_review_controller_test_" + std::to_string(stamp));
-    std::filesystem::create_directories(path);
+
+    std::error_code ec;
+    std::filesystem::path temp_root = std::filesystem::temp_directory_path(ec);
+    if (ec) {
+        ADD_FAILURE() << "Failed to obtain temporary directory path: " << ec.message();
+        return {};
+    }
+
+    std::filesystem::path path =
+        temp_root / ("assurance_forge_review_controller_test_" + std::to_string(stamp));
+
+    std::filesystem::create_directories(path, ec);
+    if (ec) {
+        ADD_FAILURE() << "Failed to create temporary directory '" << path.string()
+                      << "': " << ec.message();
+        return {};
+    }
+
+    if (!std::filesystem::is_directory(path)) {
+        ADD_FAILURE() << "Temporary directory was not created: '" << path.string() << "'";
+        return {};
+    }
+
     return path;
 }
 
