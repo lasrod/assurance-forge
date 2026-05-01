@@ -80,6 +80,7 @@ private:
     bool OpenFirstProjectSacmFile();
     bool TryOpenProjectManifest(const std::string& selected_path);
     bool EnsureReviewItemStorage();
+    void SyncReviewProblems();
     void TouchCurrentProjectRecent();
     bool SaveProject();
     void RequestExit(bool& done);

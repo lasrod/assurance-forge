@@ -2,6 +2,8 @@
 #include "app/app_layout_controller.h"
 #include "app/app_runtime_state.h"
 
+#include "app/review_problem_sync.h"
+
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
 
@@ -583,6 +585,7 @@ void AppRuntime::RegisterAppEventListeners() {
     });
     impl_->events.Subscribe<ReviewItemsDirtyEvent>([this](const ReviewItemsDirtyEvent& event) {
         if (event.mark_app_dirty) impl_->app_state.mark_dirty();
+        SyncReviewProblems();
     });
     impl_->events.Subscribe<SelectionChangedEvent>([](const SelectionChangedEvent& event) {
         ui::UiState& ui_state = ui::GetUiState();
@@ -1550,11 +1553,16 @@ void AppRuntime::RenderProblemsPanel(float center_x, float center_w, float probl
         [this](const core::ProblemItem& problem) {
             if (problem.element_id.empty()) return;
             ui::GetUiState().selected_problem_element_id = problem.element_id;
-            SetStatus("Problem targets element " + problem.element_id + ". Element focus will be added in a later workflow.");
+            impl_->events.Emit(SelectionChangedEvent{problem.element_id, true});
+            impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
         },
         [this]() { BeginAiReviewForSelection(); },
     };
     ui::panels::ShowProblemsPanel(center_x, center_w, problems_h, top_y, kPanelFlags, model, callbacks);
+}
+
+void AppRuntime::SyncReviewProblems() {
+    app::SyncReviewProblems(impl_->problems_manager, impl_->review_controller->Items());
 }
 
 void AppRuntime::RenderProposalElementEditor() {

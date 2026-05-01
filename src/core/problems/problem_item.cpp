@@ -14,6 +14,7 @@ const char* ToString(ProblemSeverity severity) {
 const char* ToString(ProblemSource source) {
     switch (source) {
         case ProblemSource::Manual: return "Manual";
+        case ProblemSource::ReviewComment: return "ReviewComment";
         case ProblemSource::ModelValidation: return "ModelValidation";
         case ProblemSource::GuidelineReview: return "GuidelineReview";
         case ProblemSource::AIReview: return "AIReview";

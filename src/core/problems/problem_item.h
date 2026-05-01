@@ -12,6 +12,7 @@ enum class ProblemSeverity {
 
 enum class ProblemSource {
     Manual,
+    ReviewComment,
     ModelValidation,
     GuidelineReview,
     AIReview,
