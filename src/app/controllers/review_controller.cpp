@@ -28,6 +28,8 @@ bool ReviewController::ConfigureStorage(const std::filesystem::path& review_path
 void ReviewController::ClearStorage() {
     manager_.Clear();
     dirty_ = false;
+    show_delete_confirm_ = false;
+    pending_delete_item_ = {};
 }
 
 bool ReviewController::SaveIfDirty(core::AssuranceProject& project, std::string& error) {
@@ -108,6 +110,9 @@ bool ReviewController::ClearProposal(const std::string& item_id) {
 }
 
 void ReviewController::BeginDeleteReviewItem(const core::reviews::ReviewItem& item, bool proposal_creator_active) {
+    show_delete_confirm_ = false;
+    pending_delete_item_ = {};
+
     if (proposal_creator_active) {
         events_.Emit(StatusMessageEvent{"Save or discard the active proposal before deleting review comments."});
         return;

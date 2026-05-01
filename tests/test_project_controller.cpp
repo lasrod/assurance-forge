@@ -16,7 +16,10 @@ namespace {
 struct TempDir {
     std::filesystem::path path;
     explicit TempDir(std::filesystem::path value) : path(std::move(value)) {}
-    ~TempDir() { std::filesystem::remove_all(path); }
+    ~TempDir() {
+        std::error_code ec;
+        std::filesystem::remove_all(path, ec);
+    }
 };
 
 std::filesystem::path MakeTempDir() {
