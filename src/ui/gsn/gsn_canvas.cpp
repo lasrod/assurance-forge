@@ -410,9 +410,6 @@ void DrawGsnNode(const GsnNode& node,
     ImU32 ink = marked_for_removal ? GetTheme().text_primary : InkOn(fill_color);
     if (proposal_dimmed) ink = WithAlpha(GetTheme().text_secondary, 0.62f);
     DrawNodeLabel(draw_list, node, top_left, bottom_right, text_left, text_wrap, zoom, ink, ui_state);
-    if (has_attention) {
-        DrawAttentionBadge(draw_list, node, top_left, bottom_right, zoom);
-    }
     DrawUndevelopedMarker(draw_list, node, top_left, bottom_right, zoom);
 
     // Invisible button for hit-testing.
@@ -470,6 +467,11 @@ void DrawGsnNode(const GsnNode& node,
             ImVec2(top_left.x - 3.0f * scale, top_left.y - 3.0f * scale),
             ImVec2(bottom_right.x + 3.0f * scale, bottom_right.y + 3.0f * scale),
             ShadeColor(th_rm.danger, -0.20f), DpiSize(kClaimRounding) * zoom + 3.0f * scale, 0, 2.5f * scale);
+    }
+
+    // Attention badge drawn last so it always renders above all outlines.
+    if (has_attention) {
+        DrawAttentionBadge(draw_list, node, top_left, bottom_right, zoom);
     }
 }
 
