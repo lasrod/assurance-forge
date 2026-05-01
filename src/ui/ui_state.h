@@ -34,6 +34,9 @@ struct UiState {
     // Nodes pending confirmation of removal. The canvas tints these red.
     std::unordered_set<std::string> marked_for_removal;
 
+    // Nodes with element-scoped problems that need user attention.
+    std::unordered_set<std::string> attention_element_ids;
+
     // Proposal preview/creator highlighting. When enabled, nodes outside this
     // set are rendered subdued so proposed changes stand out.
     std::unordered_set<std::string> proposal_highlight_ids;

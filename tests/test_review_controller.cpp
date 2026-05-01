@@ -1,11 +1,30 @@
 #include <gtest/gtest.h>
 
 #include "app/controllers/review_controller.h"
+#include "core/project_service.h"
 
+#include <chrono>
+#include <filesystem>
 #include <string>
 #include <vector>
 
 namespace {
+
+struct TempDir {
+    std::filesystem::path path;
+    explicit TempDir(std::filesystem::path p) : path(std::move(p)) {}
+    ~TempDir() { std::filesystem::remove_all(path); }
+    TempDir(const TempDir&) = delete;
+    TempDir& operator=(const TempDir&) = delete;
+};
+
+std::filesystem::path MakeTempDir() {
+    auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    std::filesystem::path path = std::filesystem::temp_directory_path() /
+                                 ("assurance_forge_review_controller_test_" + std::to_string(stamp));
+    std::filesystem::create_directories(path);
+    return path;
+}
 
 struct ReviewHarness {
     app::AppEvents events;
@@ -113,4 +132,66 @@ TEST(ReviewControllerTest, DeleteReviewItemDeletesLinkedProposalAndItem) {
     EXPECT_TRUE(harness.controller.IsDirty());
     EXPECT_EQ(harness.dirty_events, 1);
     EXPECT_EQ(harness.statuses.back(), "Deleted review comment and proposed change.");
+}
+
+TEST(ReviewControllerTest, SavingAndAddingAnotherCommentKeepsEarlierCommentOpen) {
+    TempDir temp(MakeTempDir());
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("MySafetyCase", temp.path, project, report, error)) << error;
+
+    ReviewHarness harness;
+    const std::filesystem::path review_path = project.rootPath / "reviews" / "review-items.af.json";
+    ASSERT_TRUE(harness.controller.ConfigureStorage(review_path, error));
+
+    core::reviews::ReviewItem first = MakeReviewItem("review-1");
+    first.element_id = "claim-1";
+    ASSERT_TRUE(harness.controller.AddManualItem(first));
+    ASSERT_TRUE(harness.controller.SaveIfDirty(project, error)) << error;
+
+    ASSERT_TRUE(harness.controller.ConfigureStorage(review_path, error)) << error;
+
+    core::reviews::ReviewItem second = MakeReviewItem("review-2");
+    second.element_id = "claim-2";
+    ASSERT_TRUE(harness.controller.AddManualItem(second));
+
+    std::optional<core::reviews::ReviewItem> reloaded_first = harness.controller.GetItemById("review-1");
+    ASSERT_TRUE(reloaded_first.has_value());
+    EXPECT_EQ(reloaded_first->status, core::reviews::ReviewItemStatus::Open);
+
+    std::optional<core::reviews::ReviewItem> reloaded_second = harness.controller.GetItemById("review-2");
+    ASSERT_TRUE(reloaded_second.has_value());
+    EXPECT_EQ(reloaded_second->status, core::reviews::ReviewItemStatus::Open);
+}
+
+TEST(ReviewControllerTest, ConfigureStorageSamePathDoesNotReloadAndClobberInMemoryState) {
+    TempDir temp(MakeTempDir());
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("MySafetyCase", temp.path, project, report, error)) << error;
+
+    ReviewHarness harness;
+    const std::filesystem::path review_path = project.rootPath / "reviews" / "review-items.af.json";
+    ASSERT_TRUE(harness.controller.ConfigureStorage(review_path, error)) << error;
+
+    core::reviews::ReviewItem item = MakeReviewItem("review-1");
+    item.status = core::reviews::ReviewItemStatus::Resolved;
+    ASSERT_TRUE(harness.controller.AddOrUpdateItem(item));
+    ASSERT_TRUE(harness.controller.SaveIfDirty(project, error)) << error;
+
+    ASSERT_TRUE(harness.controller.ConfigureStorage(review_path, error)) << error;
+
+    core::reviews::ReviewItem reopened = item;
+    reopened.status = core::reviews::ReviewItemStatus::Open;
+    reopened.updated_utc = "2026-05-01T02:00:00Z";
+    ASSERT_TRUE(harness.controller.AddOrUpdateItem(reopened));
+
+    ASSERT_TRUE(harness.controller.ConfigureStorage(review_path, error)) << error;
+
+    std::optional<core::reviews::ReviewItem> found = harness.controller.GetItemById("review-1");
+    ASSERT_TRUE(found.has_value());
+    EXPECT_EQ(found->status, core::reviews::ReviewItemStatus::Open);
+    EXPECT_EQ(found->updated_utc, "2026-05-01T02:00:00Z");
 }

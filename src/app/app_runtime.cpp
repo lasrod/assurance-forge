@@ -16,6 +16,7 @@
 
 #include "core/app_state.h"
 #include "core/element_factory.h"
+#include "core/problems/problem_attention.h"
 #include "core/problems/problems_manager.h"
 #include "core/project_service.h"
 #include "core/reviews/review_proposal_manager.h"
@@ -1497,6 +1498,8 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                     ? &impl_->proposal_controller->preview_model
                     : GetLoadedCase();
                 ui_state.proposal_canvas_active = impl_->IsProposalCanvasActive();
+                ui_state.attention_element_ids = core::CollectAttentionElementIds(
+                    impl_->problems_manager.GetProblems());
                 ui::gsn::ShowGsnCanvasContent(ui_state, visible_case, actions);
                 ImGui::EndTabItem();
             }
