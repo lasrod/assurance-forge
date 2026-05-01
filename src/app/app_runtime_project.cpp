@@ -40,22 +40,22 @@ void AppRuntime::BeginCreateProject() {
     std::string selected_path;
     std::string error_message;
     const dialogs::DialogResult result = dialogs::BrowseForProjectParentFolder(
-        impl_->project_parent_buf, selected_path, error_message);
+        impl_->project_controller->project_parent_buf, selected_path, error_message);
     if (result == dialogs::DialogResult::Selected) {
-        CopyToBuffer(impl_->project_parent_buf, sizeof(impl_->project_parent_buf), selected_path);
-        if (impl_->project_name_buf[0] == '\0') {
-            CopyToBuffer(impl_->project_name_buf, sizeof(impl_->project_name_buf), "MySafetyCase");
+        CopyToBuffer(impl_->project_controller->project_parent_buf, sizeof(impl_->project_controller->project_parent_buf), selected_path);
+        if (impl_->project_controller->project_name_buf[0] == '\0') {
+            CopyToBuffer(impl_->project_controller->project_name_buf, sizeof(impl_->project_controller->project_name_buf), "MySafetyCase");
         }
-        impl_->show_create_project_modal = true;
+        impl_->project_controller->show_create_project_modal = true;
     } else if (result == dialogs::DialogResult::Failed) {
         SetStatus("Browse failed: " + error_message);
     }
 }
 
 void AppRuntime::BeginOpenProject() {
-    std::string default_path = impl_->open_project_path_buf;
-    if (default_path.empty() && !impl_->recent_projects.empty()) {
-        default_path = impl_->recent_projects.front().path;
+    std::string default_path = impl_->project_controller->open_project_path_buf;
+    if (default_path.empty() && !impl_->project_controller->recent_projects.empty()) {
+        default_path = impl_->project_controller->recent_projects.front().path;
     }
 
     std::string selected_path;
@@ -63,7 +63,7 @@ void AppRuntime::BeginOpenProject() {
     const dialogs::DialogResult result = dialogs::BrowseForProjectManifest(
         default_path, selected_path, error_message);
     if (result == dialogs::DialogResult::Selected) {
-        CopyToBuffer(impl_->open_project_path_buf, sizeof(impl_->open_project_path_buf), selected_path);
+        CopyToBuffer(impl_->project_controller->open_project_path_buf, sizeof(impl_->project_controller->open_project_path_buf), selected_path);
         TryOpenProjectManifest(selected_path);
     } else if (result == dialogs::DialogResult::Failed) {
         SetStatus("Browse failed: " + error_message);
@@ -71,10 +71,7 @@ void AppRuntime::BeginOpenProject() {
 }
 
 void AppRuntime::TouchCurrentProjectRecent() {
-    RecentProjectEntry entry = MakeRecentProjectEntry(impl_->app_state);
-    if (!entry.path.empty()) {
-        TouchRecentProject(impl_->recent_projects, std::move(entry));
-    }
+    impl_->project_controller->TouchCurrentProjectRecent(impl_->app_state);
 }
 
 void AppRuntime::BeginCreateProjectSacmFile() {
@@ -82,9 +79,7 @@ void AppRuntime::BeginCreateProjectSacmFile() {
         SetStatus("Create or open a project first.");
         return;
     }
-    impl_->pending_project_file_kind = ProjectFileCreateKind::Sacm;
-    CopyToBuffer(impl_->project_file_name_buf, sizeof(impl_->project_file_name_buf), "main.sacm");
-    impl_->show_project_file_name_modal = true;
+    impl_->project_controller->BeginProjectFileCreate(ProjectFileCreateKind::Sacm, "main.sacm");
 }
 
 void AppRuntime::BeginCreateProjectEvidenceRegister() {
@@ -92,9 +87,7 @@ void AppRuntime::BeginCreateProjectEvidenceRegister() {
         SetStatus("Create or open a project first.");
         return;
     }
-    impl_->pending_project_file_kind = ProjectFileCreateKind::EvidenceRegister;
-    CopyToBuffer(impl_->project_file_name_buf, sizeof(impl_->project_file_name_buf), "evidence-register.af.json");
-    impl_->show_project_file_name_modal = true;
+    impl_->project_controller->BeginProjectFileCreate(ProjectFileCreateKind::EvidenceRegister, "evidence-register.af.json");
 }
 
 void AppRuntime::BeginCreateProjectJ3377CaeRegister() {
@@ -102,9 +95,7 @@ void AppRuntime::BeginCreateProjectJ3377CaeRegister() {
         SetStatus("Create or open a project first.");
         return;
     }
-    impl_->pending_project_file_kind = ProjectFileCreateKind::J3377CaeRegister;
-    CopyToBuffer(impl_->project_file_name_buf, sizeof(impl_->project_file_name_buf), "j3377-cae-register.af.json");
-    impl_->show_project_file_name_modal = true;
+    impl_->project_controller->BeginProjectFileCreate(ProjectFileCreateKind::J3377CaeRegister, "j3377-cae-register.af.json");
 }
 
 void AppRuntime::OpenProjectFile(const core::ProjectFileEntry& entry) {
@@ -112,10 +103,7 @@ void AppRuntime::OpenProjectFile(const core::ProjectFileEntry& entry) {
 
     ui::UiState& ui_state = ui::GetUiState();
     if (entry.role == core::ProjectFileRole::SacmArgument) {
-        impl_->proposal_preview_active = false;
-        impl_->proposal_creator_active = false;
-        impl_->proposal_preview_id.clear();
-        impl_->proposal_preview_model = {};
+        impl_->proposal_controller->ClearActiveState();
         ClearProposalHighlightState(ui_state);
         impl_->document_dirty = false;
         impl_->tree_needs_rebuild = true;
@@ -165,7 +153,7 @@ bool AppRuntime::OpenFirstProjectSacmFile() {
 
 bool AppRuntime::EnsureReviewItemStorage() {
     if (!impl_->app_state.current_project.has_value()) {
-        impl_->review_item_manager.Clear();
+        impl_->review_controller->ClearStorage();
         return false;
     }
 
@@ -175,17 +163,8 @@ bool AppRuntime::EnsureReviewItemStorage() {
         review_path = project.rootPath / "reviews" / "review-items.af.json";
     }
 
-    impl_->review_item_manager.SetFilePath(review_path);
-
     std::string error;
-    if (impl_->review_item_manager.Load(error)) {
-        return true;
-    }
-
-    std::error_code ec;
-    if (!std::filesystem::exists(review_path, ec)) {
-        impl_->review_item_manager.Clear();
-        impl_->review_item_manager.SetFilePath(review_path);
+    if (impl_->review_controller->ConfigureStorage(review_path, error)) {
         return true;
     }
 
@@ -203,14 +182,14 @@ bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {
         return false;
     }
     impl_->document_dirty = false;
-    impl_->review_items_dirty = false;
+    impl_->review_controller->ClearDirty();
     if (impl_->app_state.current_project.has_value()) {
-        impl_->review_proposal_manager.SetProjectRoot(impl_->app_state.current_project->rootPath);
+        impl_->proposal_controller->manager.SetProjectRoot(impl_->app_state.current_project->rootPath);
         EnsureReviewItemStorage();
     }
     OpenFirstProjectSacmFile();
     TouchCurrentProjectRecent();
-    CopyToBuffer(impl_->open_project_path_buf, sizeof(impl_->open_project_path_buf), selected_path);
+    CopyToBuffer(impl_->project_controller->open_project_path_buf, sizeof(impl_->project_controller->open_project_path_buf), selected_path);
     ImGui::CloseCurrentPopup();
     return true;
 }
@@ -221,32 +200,20 @@ bool AppRuntime::SaveProject() {
         return false;
     }
 
-    if (impl_->review_items_dirty && !impl_->review_item_manager.FilePath().empty()) {
+    if (impl_->review_controller->IsDirty()) {
         core::AssuranceProject& project = impl_->app_state.current_project.value();
-        std::filesystem::path requested_name = impl_->review_item_manager.FilePath().filename();
-        if (requested_name.empty()) requested_name = "review-items.af.json";
-
-        core::ProjectFileEntry entry;
         std::string error;
-        const std::string content = core::reviews::SerializeReviewItems(impl_->review_item_manager.GetItems());
-        if (!core::ProjectService::SaveReviewItemsFile(project, requested_name.string(), content, entry, error)) {
+        if (!impl_->review_controller->SaveIfDirty(project, error)) {
             impl_->app_state.status_message = "Review item save failed: " + error;
             return false;
         }
-        impl_->review_item_manager.SetFilePath(project.rootPath / entry.relativePath);
-        impl_->review_items_dirty = false;
     }
 
     if (impl_->document_dirty) {
         if (!impl_->app_state.save_project()) return false;
         impl_->document_dirty = false;
-        impl_->app_state.has_unsaved_changes = impl_->review_items_dirty;
+        impl_->app_state.has_unsaved_changes = impl_->review_controller->IsDirty();
         return true;
-    }
-
-    if (impl_->review_items_dirty) {
-        impl_->app_state.status_message = "Review item save failed: review storage path is not set.";
-        return false;
     }
 
     if (impl_->app_state.has_unsaved_changes) {

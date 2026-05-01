@@ -48,6 +48,8 @@ public:
     const parser::AssuranceCase* GetLoadedCase() const;
 
 private:
+    void RegisterAppEventListeners();
+
     float RenderMainMenuBar(bool& done);
     void ScanDirectory();
     void RenderTreePanel(float left_w, float safety_tree_h, float top_y);
