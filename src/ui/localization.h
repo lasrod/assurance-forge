@@ -31,6 +31,7 @@ enum class MessageId {
     Theme,
     ThemeTweaks,
     Language,
+    ShowFps,
     English,
     Japanese,
     Ai,

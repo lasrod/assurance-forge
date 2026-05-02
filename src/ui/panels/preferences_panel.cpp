@@ -140,6 +140,11 @@ void RenderAppearanceSection(PreferencesPanelModel model, const PreferencesPanel
         }
         ImGui::EndCombo();
     }
+
+    bool show_fps = model.showFps;
+    if (ImGui::Checkbox(ui::Tr(ui::MessageId::ShowFps), &show_fps)) {
+        if (callbacks.set_show_fps) callbacks.set_show_fps(show_fps);
+    }
 }
 
 void RenderReviewSection(PreferencesPanelModel model, const PreferencesPanelCallbacks& callbacks) {

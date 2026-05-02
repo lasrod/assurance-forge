@@ -39,6 +39,7 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <cstdio>
 #include <cstring>
 #include <ctime>
 #include <filesystem>
@@ -1285,6 +1286,18 @@ float AppRuntime::RenderMainMenuBar(bool& done) {
         ImGui::EndMenu();
     }
 
+    HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
+    if (runner_params && runner_params->imGuiWindowParams.showStatus_Fps) {
+        char fps_label[32];
+        std::snprintf(fps_label, sizeof(fps_label), "FPS: %.1f", ImGui::GetIO().Framerate);
+
+        const float label_width = ImGui::CalcTextSize(fps_label).x;
+        const float right_x = ImGui::GetWindowContentRegionMax().x - label_width;
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), right_x));
+        ImGui::TextUnformatted(fps_label);
+    }
+
     ImGui::EndMainMenuBar();
     return ImGui::GetFrameHeight();
 }
@@ -1316,6 +1329,9 @@ void AppRuntime::RenderPreferencesWindow() {
     model.reviewerNameBuffer = impl_->reviewer_name_buf;
     model.reviewerNameBufferSize = sizeof(impl_->reviewer_name_buf);
     model.language = ui::CurrentLanguage();
+    if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams()) {
+        model.showFps = runner_params->imGuiWindowParams.showStatus_Fps;
+    }
 
     ui::panels::PreferencesPanelCallbacks callbacks;
     callbacks.save_settings = [this](const ai::AiProviderSettings& settings) {
@@ -1366,6 +1382,11 @@ void AppRuntime::RenderPreferencesWindow() {
     };
     callbacks.set_language = [](ui::Language language) {
         ui::SetCurrentLanguage(language);
+    };
+    callbacks.set_show_fps = [](bool show_fps) {
+        if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams()) {
+            runner_params->imGuiWindowParams.showStatus_Fps = show_fps;
+        }
     };
     callbacks.save_reviewer_name = [this](const char* reviewer_name) {
         impl_->reviewer_name = TrimWhitespace(reviewer_name ? reviewer_name : "");
