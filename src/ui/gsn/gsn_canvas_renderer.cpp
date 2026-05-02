@@ -10,12 +10,6 @@
 
 namespace ui::gsn {
 
-static CanvasRenderStats g_last_render_stats;
-
-CanvasRenderStats GetLastCanvasRenderStats() {
-    return g_last_render_stats;
-}
-
 // ===== Edge rendering constants =====
 static constexpr float kArrowSize           = 9.0f;   // arrowhead triangle side length
 static constexpr float kArrowOutlineWidth   = 1.5f;   // hollow arrowhead outline thickness
@@ -380,9 +374,11 @@ void GsnCanvas::Render(UiState& ui_state,
     ImVec2 origin(canvas_pos.x - view_offset_.x, canvas_pos.y - view_offset_.y);
 
     const float cull_margin = DpiSize(kCullMarginPx);
-    ImVec2 viewport_min = ImGui::GetWindowPos();
-    ImVec2 viewport_max(viewport_min.x + ImGui::GetWindowSize().x,
-                        viewport_min.y + ImGui::GetWindowSize().y);
+    ImVec2 window_pos = ImGui::GetWindowPos();
+    ImVec2 content_min = ImGui::GetWindowContentRegionMin();
+    ImVec2 content_max = ImGui::GetWindowContentRegionMax();
+    ImVec2 viewport_min(window_pos.x + content_min.x, window_pos.y + content_min.y);
+    ImVec2 viewport_max(window_pos.x + content_max.x, window_pos.y + content_max.y);
     ImVec2 cull_min(viewport_min.x - cull_margin, viewport_min.y - cull_margin);
     ImVec2 cull_max(viewport_max.x + cull_margin, viewport_max.y + cull_margin);
 
@@ -461,7 +457,7 @@ void GsnCanvas::Render(UiState& ui_state,
         ++frame_stats.nodes_drawn;
     }
 
-    g_last_render_stats = frame_stats;
+    last_render_stats_ = frame_stats;
 }
 
 bool GsnCanvas::CenterOnNode(const std::string& node_id, ImVec2 viewport_size) {

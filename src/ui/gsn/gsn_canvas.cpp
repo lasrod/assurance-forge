@@ -869,4 +869,8 @@ void SetCanvasTree(const core::AssuranceTree& tree) {
     GlobalRenderer().SetTree(tree);
 }
 
+CanvasRenderStats GetLastCanvasRenderStats() {
+    return GlobalRenderer().GetLastRenderStats();
+}
+
 } // namespace ui::gsn

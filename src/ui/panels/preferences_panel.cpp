@@ -10,12 +10,6 @@
 namespace ui::panels {
 namespace {
 
-ImVec4 CullRatioColor(float ratio) {
-    if (ratio >= 0.70f) return ImVec4(0.33f, 0.82f, 0.45f, 1.0f);
-    if (ratio >= 0.35f) return ImVec4(0.93f, 0.79f, 0.30f, 1.0f);
-    return ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
-}
-
 ImVec4 StatusColor(const ai::AiConnectionStatus& status) {
     const ui::Theme& theme = ui::GetTheme();
     if (status.state == ai::AiTaskState::Running) return ImGui::ColorConvertU32ToFloat4(theme.warning);
@@ -151,11 +145,11 @@ void RenderAppearanceSection(PreferencesPanelModel model, const PreferencesPanel
     if (ImGui::Checkbox(ui::Tr(ui::MessageId::ShowFps), &show_fps)) {
         if (callbacks.set_show_fps) callbacks.set_show_fps(show_fps);
     }
-    ImGui::TextColored(CullRatioColor(0.8f), "%s", ui::Tr(ui::MessageId::PerfLegendHigh));
+    ImGui::TextColored(ui::CullRatioColor(0.8f), "%s", ui::Tr(ui::MessageId::PerfLegendHigh));
     ImGui::SameLine();
-    ImGui::TextColored(CullRatioColor(0.5f), "%s", ui::Tr(ui::MessageId::PerfLegendMedium));
+    ImGui::TextColored(ui::CullRatioColor(0.5f), "%s", ui::Tr(ui::MessageId::PerfLegendMedium));
     ImGui::SameLine();
-    ImGui::TextColored(CullRatioColor(0.0f), "%s", ui::Tr(ui::MessageId::PerfLegendLow));
+    ImGui::TextColored(ui::CullRatioColor(0.0f), "%s", ui::Tr(ui::MessageId::PerfLegendLow));
 }
 
 void RenderReviewSection(PreferencesPanelModel model, const PreferencesPanelCallbacks& callbacks) {

@@ -58,11 +58,15 @@ public:
     // Returns min and max corners. If no nodes, both are (0,0).
     void GetContentBounds(ImVec2& out_min, ImVec2& out_max) const;
 
+    // Returns the stats from the most recent Render() call for this canvas.
+    CanvasRenderStats GetLastRenderStats() const { return last_render_stats_; }
+
 private:
     std::vector<CanvasElement> elements_;
     std::vector<LayoutNode> layout_nodes_;
     float zoom_level_ = 1.0f;
     ImVec2 view_offset_ = ImVec2(0.0f, 0.0f); // pixel-space pan offset
+    CanvasRenderStats last_render_stats_{};
 };
 
 } // namespace ui::gsn

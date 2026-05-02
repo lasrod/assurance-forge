@@ -167,6 +167,13 @@ ImU32 ShadeColor(ImU32 c, float amount) {
     return ToU32(v);
 }
 
+ImVec4 CullRatioColor(float ratio) {
+    const Theme& theme = GetTheme();
+    if (ratio >= 0.70f) return ImGui::ColorConvertU32ToFloat4(theme.success);
+    if (ratio >= 0.35f) return ImGui::ColorConvertU32ToFloat4(theme.warning);
+    return ImGui::ColorConvertU32ToFloat4(theme.text_secondary);
+}
+
 ImU32 InkOn(ImU32 background) {
     ImVec4 v = ToVec4(background);
     // Perceived luminance (Rec. 601 weights)

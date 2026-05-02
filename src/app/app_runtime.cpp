@@ -34,6 +34,7 @@
 #include "ui/panels/sacm_viewer_panel.h"
 #include "ui/register_views.h"
 #include "ui/tree_view.h"
+#include "ui/theme.h"
 #include "ui/ui_state.h"
 #include "ui/widgets/splitter.h"
 
@@ -218,12 +219,6 @@ bool IsContextLike(core::NewElementKind kind) {
     return kind == core::NewElementKind::Context ||
            kind == core::NewElementKind::Assumption ||
            kind == core::NewElementKind::Justification;
-}
-
-ImVec4 CullRatioColor(float ratio) {
-    if (ratio >= 0.70f) return ImVec4(0.33f, 0.82f, 0.45f, 1.0f);
-    if (ratio >= 0.35f) return ImVec4(0.93f, 0.79f, 0.30f, 1.0f);
-    return ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
 }
 
 const char* RemoveModeField(core::RemoveMode mode) {
@@ -1324,11 +1319,11 @@ float AppRuntime::RenderMainMenuBar(bool& done) {
         ImGui::SameLine(0.0f, 0.0f);
         ImGui::TextUnformatted(sep);
         ImGui::SameLine(0.0f, 0.0f);
-        ImGui::TextColored(CullRatioColor(node_ratio), "%s", nodes_text);
+        ImGui::TextColored(ui::CullRatioColor(node_ratio), "%s", nodes_text);
         ImGui::SameLine(0.0f, 0.0f);
         ImGui::TextUnformatted(sep);
         ImGui::SameLine(0.0f, 0.0f);
-        ImGui::TextColored(CullRatioColor(edge_ratio), "%s", edges_text);
+        ImGui::TextColored(ui::CullRatioColor(edge_ratio), "%s", edges_text);
     }
 
     ImGui::EndMainMenuBar();
