@@ -4,9 +4,12 @@
 #include "ui/theme.h"
 #include "ui/ui_state.h"
 
+#include "hello_imgui/icons_font_awesome_4.h"
+
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
+#include <cstdio>
 #include <iostream>
 
 namespace ui::gsn {
@@ -66,6 +69,259 @@ static ImU32 DimmedProposalColor(ImU32 color) {
 }
 
 static ImU32 OutlineColor() { return WithAlpha(GetTheme().border_strong, 0.85f); }
+
+struct ToolbarButtonSpec {
+    const char* id;
+    const char* icon;
+    const char* label;
+    float width;
+    ImU32 accent_color;
+    bool enabled;
+};
+
+static const ToolbarButtonSpec kCreateToolbarButtons[] = {
+    {"add_goal",     ICON_FA_BULLSEYE, "Goal",     56.0f, 0, true},
+    {"add_strategy", ICON_FA_SITEMAP,  "Strategy", 70.0f, 0, true},
+    {"add_solution", ICON_FA_CIRCLE,   "Solution", 68.0f, 0, true},
+};
+
+static const ToolbarButtonSpec kSupportToolbarButtons[] = {
+    {"add_context",       ICON_FA_DATABASE, "Context", 68.0f, 0, true},
+    {"add_justification", ICON_FA_CHECK,    "Just...", 64.0f, 0, true},
+    {"add_assumption",    ICON_FA_QUESTION, "Assump.", 70.0f, 0, true},
+};
+
+static const ToolbarButtonSpec kChallengeToolbarButtons[] = {
+    {"add_challenge", ICON_FA_EXCLAMATION_TRIANGLE, "Challenge", 76.0f, 0, false},
+};
+
+static const ToolbarButtonSpec kEditToolbarButtons[] = {
+    {"remove_element", ICON_FA_TRASH, "Remove", 70.0f, 0, true},
+    {"undo",           ICON_FA_UNDO,  "Undo",   54.0f, 0, false},
+    {"redo",           ICON_FA_REDO,  "Redo",   54.0f, 0, false},
+};
+
+static const ToolbarButtonSpec kAiToolbarButtons[] = {
+    {"ai_review",  ICON_FA_SEARCH,          "Review",  70.0f, IM_COL32(42, 151, 142, 255), true},
+    {"ai_suggest", ICON_FA_LIGHTBULB,       "Suggest", 72.0f, IM_COL32(42, 151, 142, 255), true},
+};
+
+static const ToolbarButtonSpec kOtherToolbarButtons[] = {
+    {"guided_development", ICON_FA_COMPASS, "Guided Dev.", 84.0f, 0, true},
+};
+
+static constexpr float kToolbarHeight = 104.0f;
+static constexpr float kToolbarButtonHeight = 58.0f;
+static constexpr float kToolbarButtonSpacing = 5.0f;
+static constexpr float kToolbarGroupSpacing = 8.0f;
+static constexpr float kToolbarDividerWidth = 8.0f;
+static constexpr float kToolbarHorizontalPadding = 8.0f;
+
+static float g_toolbar_scroll_x = 0.0f;
+
+static int ToolbarArrayCount(const ToolbarButtonSpec* begin, const ToolbarButtonSpec* end) {
+    return static_cast<int>(end - begin);
+}
+
+static float ToolbarGroupWidth(const ToolbarButtonSpec* buttons, int button_count) {
+    float width = 0.0f;
+    for (int i = 0; i < button_count; ++i) {
+        if (i > 0) width += DpiSize(kToolbarButtonSpacing);
+        width += DpiSize(buttons[i].width);
+    }
+    return width;
+}
+
+static float ToolbarPrototypeContentWidth() {
+    const int create_count = ToolbarArrayCount(kCreateToolbarButtons, kCreateToolbarButtons + 3);
+    const int support_count = ToolbarArrayCount(kSupportToolbarButtons, kSupportToolbarButtons + 3);
+    const int challenge_count = ToolbarArrayCount(kChallengeToolbarButtons, kChallengeToolbarButtons + 1);
+    const int edit_count = ToolbarArrayCount(kEditToolbarButtons, kEditToolbarButtons + 3);
+    const int ai_count = ToolbarArrayCount(kAiToolbarButtons, kAiToolbarButtons + 2);
+    const int other_count = ToolbarArrayCount(kOtherToolbarButtons, kOtherToolbarButtons + 1);
+
+    float width = DpiSize(kToolbarHorizontalPadding * 2.0f);
+    width += ToolbarGroupWidth(kCreateToolbarButtons, create_count);
+    width += ToolbarGroupWidth(kSupportToolbarButtons, support_count);
+    width += ToolbarGroupWidth(kChallengeToolbarButtons, challenge_count);
+    width += ToolbarGroupWidth(kEditToolbarButtons, edit_count);
+    width += ToolbarGroupWidth(kAiToolbarButtons, ai_count);
+    width += ToolbarGroupWidth(kOtherToolbarButtons, other_count);
+    width += DpiSize(kToolbarGroupSpacing * 10.0f + kToolbarDividerWidth * 5.0f);
+    return width;
+}
+
+static void RenderToolbarButton(const ToolbarButtonSpec& button) {
+    const Theme& th = GetTheme();
+    const ImVec2 button_size(DpiSize(button.width), DpiSize(kToolbarButtonHeight));
+    const bool accented = button.accent_color != 0;
+    const ImU32 base_normal = accented ? WithAlpha(button.accent_color, 0.82f) : WithAlpha(th.surface_2, 0.95f);
+    const ImU32 base_hovered = accented ? WithAlpha(ShadeColor(button.accent_color, 0.12f), 0.96f) : th.surface_3;
+    const ImU32 base_active = accented ? WithAlpha(ShadeColor(button.accent_color, -0.14f), 0.98f) : ShadeColor(th.surface_3, -0.10f);
+    const ImU32 base_border = accented ? WithAlpha(ShadeColor(button.accent_color, 0.26f), 0.92f) : th.border;
+    const ImU32 normal = button.enabled ? base_normal : WithAlpha(th.surface_2, 0.42f);
+    const ImU32 hovered = button.enabled ? base_hovered : WithAlpha(th.surface_2, 0.42f);
+    const ImU32 active = button.enabled ? base_active : WithAlpha(th.surface_2, 0.42f);
+    const ImU32 border = button.enabled ? base_border : WithAlpha(th.border, 0.46f);
+    const ImU32 text = button.enabled ? th.text_primary : th.text_muted;
+
+    const ImVec2 button_pos = ImGui::GetCursorScreenPos();
+    const ImVec2 button_end(button_pos.x + button_size.x, button_pos.y + button_size.y);
+    char item_id[96];
+    snprintf(item_id, sizeof(item_id), "##toolbar_%s", button.id);
+
+    if (!button.enabled) ImGui::BeginDisabled();
+    ImGui::InvisibleButton(item_id, button_size);
+    if (!button.enabled) ImGui::EndDisabled();
+
+    const bool is_hovered = button.enabled && ImGui::IsItemHovered();
+    const bool is_active = button.enabled && ImGui::IsItemActive();
+    const ImU32 fill = is_active ? active : (is_hovered ? hovered : normal);
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    const float rounding = DpiSize(7.0f);
+
+    draw_list->AddRectFilled(button_pos, button_end, fill, rounding);
+    draw_list->AddRect(button_pos, button_end, border, rounding, 0, DpiSize(1.0f));
+
+    const ImVec2 icon_size = ImGui::CalcTextSize(button.icon);
+    const ImVec2 label_size = ImGui::CalcTextSize(button.label);
+    const float gap = DpiSize(6.0f);
+    const float content_height = icon_size.y + gap + label_size.y;
+    const float content_y = button_pos.y + std::max(0.0f, (button_size.y - content_height) * 0.5f);
+    const float icon_x = button_pos.x + std::max(0.0f, (button_size.x - icon_size.x) * 0.5f);
+    const float label_x = button_pos.x + std::max(0.0f, (button_size.x - label_size.x) * 0.5f);
+
+    draw_list->AddText(ImVec2(icon_x, content_y), text, button.icon);
+    draw_list->AddText(ImVec2(label_x, content_y + icon_size.y + gap), text, button.label);
+}
+
+static void RenderToolbarGroup(const char* title, const ToolbarButtonSpec* buttons, int button_count) {
+    const Theme& th = GetTheme();
+    const float group_width = ToolbarGroupWidth(buttons, button_count);
+    const float group_start_x = ImGui::GetCursorPosX();
+    const float group_start_y = ImGui::GetCursorPosY();
+    const ImVec2 title_size = ImGui::CalcTextSize(title);
+    const float title_x = group_start_x + std::max(0.0f, (group_width - title_size.x) * 0.5f);
+
+    ImGui::BeginGroup();
+    ImGui::SetCursorPosX(title_x);
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(th.text_secondary));
+    if (g_BoldFont != nullptr) ImGui::PushFont(g_BoldFont);
+    ImGui::TextUnformatted(title);
+    if (g_BoldFont != nullptr) ImGui::PopFont();
+    ImGui::PopStyleColor();
+
+    ImGui::SetCursorPos(ImVec2(group_start_x, group_start_y + DpiSize(18.0f)));
+    for (int i = 0; i < button_count; ++i) {
+        if (i > 0) ImGui::SameLine(0.0f, DpiSize(kToolbarButtonSpacing));
+        RenderToolbarButton(buttons[i]);
+    }
+    ImGui::EndGroup();
+}
+
+static void RenderToolbarDivider(float toolbar_height) {
+    const Theme& th = GetTheme();
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    const ImVec2 cursor = ImGui::GetCursorScreenPos();
+    const float x = cursor.x + DpiSize(kToolbarDividerWidth * 0.5f);
+    const float top = ImGui::GetWindowPos().y + DpiSize(12.0f);
+    const float bottom = ImGui::GetWindowPos().y + toolbar_height - DpiSize(12.0f);
+    draw_list->AddLine(ImVec2(x, top), ImVec2(x, bottom), WithAlpha(th.border, 0.85f), DpiSize(1.0f));
+    ImGui::Dummy(ImVec2(DpiSize(kToolbarDividerWidth), DpiSize(kToolbarButtonHeight + 18.0f)));
+}
+
+static void RenderGsnCanvasToolbarPrototype() {
+    const Theme& th = GetTheme();
+    const float toolbar_height = DpiSize(kToolbarHeight);
+    const float viewport_width = ImGui::GetContentRegionAvail().x;
+    const float content_width = ToolbarPrototypeContentWidth();
+    const float max_scroll_x = std::max(0.0f, content_width - viewport_width);
+    g_toolbar_scroll_x = std::clamp(g_toolbar_scroll_x, 0.0f, max_scroll_x);
+
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(WithAlpha(ShadeColor(th.surface_3, 0.06f), 0.98f)));
+    ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(th.border));
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, DpiSize(4.0f));
+    ImGui::BeginChild("##gsn_canvas_toolbar", ImVec2(0.0f, toolbar_height), true,
+                      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+
+    if (max_scroll_x > 0.0f && ImGui::IsWindowHovered()) {
+        const float wheel_x = ImGui::GetIO().MouseWheelH;
+        const float wheel_y = ImGui::GetIO().MouseWheel;
+        if (wheel_x != 0.0f) {
+            g_toolbar_scroll_x = std::clamp(g_toolbar_scroll_x - wheel_x * DpiSize(48.0f), 0.0f, max_scroll_x);
+        } else if (wheel_y != 0.0f && ImGui::GetIO().KeyShift) {
+            g_toolbar_scroll_x = std::clamp(g_toolbar_scroll_x - wheel_y * DpiSize(48.0f), 0.0f, max_scroll_x);
+        }
+    }
+
+    ImGui::PushClipRect(ImGui::GetWindowPos(), ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowSize().x,
+                                                      ImGui::GetWindowPos().y + ImGui::GetWindowSize().y), true);
+    ImGui::SetCursorPos(ImVec2(DpiSize(kToolbarHorizontalPadding) - g_toolbar_scroll_x, DpiSize(6.0f)));
+    RenderToolbarGroup("CREATE", kCreateToolbarButtons, 3);
+    ImGui::SameLine(0.0f, DpiSize(kToolbarGroupSpacing));
+    RenderToolbarDivider(toolbar_height);
+    ImGui::SameLine(0.0f, DpiSize(kToolbarGroupSpacing));
+    RenderToolbarGroup("SUPPORT", kSupportToolbarButtons, 3);
+    ImGui::SameLine(0.0f, DpiSize(kToolbarGroupSpacing));
+    RenderToolbarDivider(toolbar_height);
+    ImGui::SameLine(0.0f, DpiSize(kToolbarGroupSpacing));
+    RenderToolbarGroup("CHALLENGE", kChallengeToolbarButtons, 1);
+    ImGui::SameLine(0.0f, DpiSize(kToolbarGroupSpacing));
+    RenderToolbarDivider(toolbar_height);
+    ImGui::SameLine(0.0f, DpiSize(kToolbarGroupSpacing));
+    RenderToolbarGroup("EDIT", kEditToolbarButtons, 3);
+    ImGui::SameLine(0.0f, DpiSize(kToolbarGroupSpacing));
+    RenderToolbarDivider(toolbar_height);
+    ImGui::SameLine(0.0f, DpiSize(kToolbarGroupSpacing));
+    RenderToolbarGroup("AI", kAiToolbarButtons, 2);
+    ImGui::SameLine(0.0f, DpiSize(kToolbarGroupSpacing));
+    RenderToolbarDivider(toolbar_height);
+    ImGui::SameLine(0.0f, DpiSize(kToolbarGroupSpacing));
+    RenderToolbarGroup("OTHER", kOtherToolbarButtons, 1);
+    ImGui::PopClipRect();
+
+    if (max_scroll_x > 0.0f) {
+        const float scrollbar_thickness = DpiSize(10.0f);
+        const float scrollbar_margin = DpiSize(2.0f);
+        const ImVec2 child_pos = ImGui::GetWindowPos();
+        const ImVec2 child_size = ImGui::GetWindowSize();
+        const float bar_x = child_pos.x + scrollbar_margin;
+        const float bar_y = child_pos.y + child_size.y - scrollbar_thickness - scrollbar_margin;
+        const float bar_w = child_size.x - scrollbar_margin * 2.0f;
+        const ImU32 track_color = WithAlpha(th.surface_1, 0.55f);
+        const ImU32 thumb_color = th.surface_3;
+        const ImU32 thumb_hover = LerpColor(th.surface_3, th.accent, 0.45f);
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+
+        draw_list->AddRectFilled(
+            ImVec2(bar_x, bar_y),
+            ImVec2(bar_x + bar_w, bar_y + scrollbar_thickness),
+            track_color, DpiSize(4.0f));
+
+        const float thumb_ratio = viewport_width / content_width;
+        float thumb_w = bar_w * thumb_ratio;
+        if (thumb_w < DpiSize(20.0f)) thumb_w = DpiSize(20.0f);
+        const float scroll_ratio = max_scroll_x > 0.0f ? g_toolbar_scroll_x / max_scroll_x : 0.0f;
+        const float thumb_x = bar_x + scroll_ratio * (bar_w - thumb_w);
+        const ImVec2 thumb_tl(thumb_x, bar_y);
+        const ImVec2 thumb_br(thumb_x + thumb_w, bar_y + scrollbar_thickness);
+
+        ImGui::SetCursorScreenPos(thumb_tl);
+        ImGui::InvisibleButton("##toolbar_hscroll_thumb", ImVec2(thumb_w, scrollbar_thickness));
+        const bool hovered = ImGui::IsItemHovered();
+        if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)) {
+            const float delta_px = ImGui::GetIO().MouseDelta.x;
+            const float delta_scroll = delta_px / (bar_w - thumb_w) * max_scroll_x;
+            g_toolbar_scroll_x = std::clamp(g_toolbar_scroll_x + delta_scroll, 0.0f, max_scroll_x);
+        }
+
+        draw_list->AddRectFilled(thumb_tl, thumb_br, hovered ? thumb_hover : thumb_color, DpiSize(4.0f));
+    }
+
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor(2);
+}
 
 // Draw a soft 3-layer drop shadow under a rounded rectangle.
 static void DrawRectShadow(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, float rounding, float zoom) {
@@ -491,6 +747,9 @@ void ShowGsnCanvasContent(UiState& ui_state,
         bg.z = bg.z * (1.0f - t) + tint.z * t;
         canvas_bg = ImGui::ColorConvertFloat4ToU32(bg);
     }
+
+    RenderGsnCanvasToolbarPrototype();
+
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(canvas_bg));
     ImGui::BeginChild("gsn_canvas_child", ImVec2(0, 0), false,
                       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
@@ -676,31 +935,6 @@ void ShowGsnCanvasContent(UiState& ui_state,
                     ui_state.show_secondary_language = !ui_state.show_secondary_language;
                 }
             }
-        }
-
-        // --- Keyboard and mouse shortcut hints (top-left) ---
-        {
-            const char* hint_1 = "Ctrl+Wheel  Zoom";
-            const char* hint_2 = "Middle Drag  Pan";
-
-            ImDrawList* fg_hints = ImGui::GetWindowDrawList();
-            ImVec2 hint_pos(child_pos.x + DpiSize(12.0f), child_pos.y + DpiSize(12.0f));
-            ImVec2 hint_size(DpiSize(164.0f), DpiSize(44.0f));
-
-            const Theme& th_hint = GetTheme();
-            fg_hints->AddRectFilled(
-                hint_pos,
-                ImVec2(hint_pos.x + hint_size.x, hint_pos.y + hint_size.y),
-                WithAlpha(th_hint.surface_2, 0.85f), DpiSize(8.0f));
-            fg_hints->AddRect(
-                hint_pos,
-                ImVec2(hint_pos.x + hint_size.x, hint_pos.y + hint_size.y),
-                th_hint.border, DpiSize(8.0f), 0, DpiSize(1.0f));
-
-            fg_hints->AddText(ImVec2(hint_pos.x + DpiSize(10.0f), hint_pos.y + DpiSize(8.0f)),
-                              th_hint.text_secondary, hint_1);
-            fg_hints->AddText(ImVec2(hint_pos.x + DpiSize(10.0f), hint_pos.y + DpiSize(26.0f)),
-                              th_hint.text_secondary, hint_2);
         }
 
         // --- Overlay zoom buttons in bottom-right corner ---
