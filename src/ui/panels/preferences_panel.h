@@ -21,6 +21,7 @@ struct PreferencesPanelModel {
     char* reviewerNameBuffer = nullptr;
     size_t reviewerNameBufferSize = 0;
     ui::Language language = ui::Language::English;
+    bool showFps = false;
 };
 
 struct PreferencesPanelCallbacks {
@@ -29,6 +30,7 @@ struct PreferencesPanelCallbacks {
     std::function<void()> remove_api_key;
     std::function<void()> test_connection;
     std::function<void(ui::Language)> set_language;
+    std::function<void(bool)> set_show_fps;
     std::function<void(const char*)> save_reviewer_name;
 };
 

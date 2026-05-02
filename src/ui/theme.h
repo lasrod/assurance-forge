@@ -77,4 +77,8 @@ ImU32 InkOn(ImU32 background);
 // Lighten/darken an ImU32 by mixing toward white/black. amount in [-1..1].
 ImU32 ShadeColor(ImU32 c, float amount);
 
+// Returns a color for a viewport cull ratio (culled/total). Uses theme
+// semantic colors: success (high cull), warning (medium), text_secondary (low).
+ImVec4 CullRatioColor(float ratio);
+
 }  // namespace ui

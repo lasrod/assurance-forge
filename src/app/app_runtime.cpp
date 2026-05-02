@@ -24,6 +24,7 @@
 #include "core/reviews/review_proposal_patch_service.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas.h"
+#include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/localization.h"
 #include "ui/panels/element_panel.h"
 #include "ui/panels/problems_panel.h"
@@ -33,12 +34,14 @@
 #include "ui/panels/sacm_viewer_panel.h"
 #include "ui/register_views.h"
 #include "ui/tree_view.h"
+#include "ui/theme.h"
 #include "ui/ui_state.h"
 #include "ui/widgets/splitter.h"
 
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <cstdio>
 #include <cstring>
 #include <ctime>
 #include <filesystem>
@@ -1285,6 +1288,44 @@ float AppRuntime::RenderMainMenuBar(bool& done) {
         ImGui::EndMenu();
     }
 
+    HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
+    if (runner_params && runner_params->imGuiWindowParams.showStatus_Fps) {
+        ui::gsn::CanvasRenderStats stats = ui::gsn::GetLastCanvasRenderStats();
+        const int node_total = stats.nodes_drawn + stats.nodes_culled;
+        const int edge_total = stats.edges_drawn + stats.edges_culled;
+        const float node_ratio = node_total > 0 ? static_cast<float>(stats.nodes_culled) / static_cast<float>(node_total) : 0.0f;
+        const float edge_ratio = edge_total > 0 ? static_cast<float>(stats.edges_culled) / static_cast<float>(edge_total) : 0.0f;
+
+        char fps_text[32];
+        char nodes_text[32];
+        char edges_text[32];
+        std::snprintf(fps_text, sizeof(fps_text), "FPS: %.1f", ImGui::GetIO().Framerate);
+        std::snprintf(nodes_text, sizeof(nodes_text), "N %d/%d", stats.nodes_drawn, node_total);
+        std::snprintf(edges_text, sizeof(edges_text), "E %d/%d", stats.edges_drawn, edge_total);
+
+        const char* sep = "  ";
+        const float total_width =
+            ImGui::CalcTextSize(fps_text).x +
+            ImGui::CalcTextSize(sep).x +
+            ImGui::CalcTextSize(nodes_text).x +
+            ImGui::CalcTextSize(sep).x +
+            ImGui::CalcTextSize(edges_text).x;
+
+        const float right_x = ImGui::GetWindowContentRegionMax().x - total_width;
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), right_x));
+
+        ImGui::TextUnformatted(fps_text);
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::TextUnformatted(sep);
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::TextColored(ui::CullRatioColor(node_ratio), "%s", nodes_text);
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::TextUnformatted(sep);
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::TextColored(ui::CullRatioColor(edge_ratio), "%s", edges_text);
+    }
+
     ImGui::EndMainMenuBar();
     return ImGui::GetFrameHeight();
 }
@@ -1316,6 +1357,9 @@ void AppRuntime::RenderPreferencesWindow() {
     model.reviewerNameBuffer = impl_->reviewer_name_buf;
     model.reviewerNameBufferSize = sizeof(impl_->reviewer_name_buf);
     model.language = ui::CurrentLanguage();
+    if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams()) {
+        model.showFps = runner_params->imGuiWindowParams.showStatus_Fps;
+    }
 
     ui::panels::PreferencesPanelCallbacks callbacks;
     callbacks.save_settings = [this](const ai::AiProviderSettings& settings) {
@@ -1366,6 +1410,11 @@ void AppRuntime::RenderPreferencesWindow() {
     };
     callbacks.set_language = [](ui::Language language) {
         ui::SetCurrentLanguage(language);
+    };
+    callbacks.set_show_fps = [](bool show_fps) {
+        if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams()) {
+            runner_params->imGuiWindowParams.showStatus_Fps = show_fps;
+        }
     };
     callbacks.save_reviewer_name = [this](const char* reviewer_name) {
         impl_->reviewer_name = TrimWhitespace(reviewer_name ? reviewer_name : "");

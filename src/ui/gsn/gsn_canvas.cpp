@@ -33,6 +33,9 @@ static constexpr int   kShadowLayers       = 3;
 
 // Zoom step used by keyboard and button controls (matches renderer constant)
 static constexpr float kZoomStep = 0.1f;
+static constexpr float kDetailedNodeZoom = 0.70f;
+static constexpr float kFullLabelZoom    = 0.75f;
+static constexpr float kUndLabelZoom     = 0.55f;
 
 // Flag: true when mouse is hovering over overlay controls (zoom/language buttons).
 // Set each frame before node rendering so that node clicks are suppressed.
@@ -42,6 +45,16 @@ static bool g_overlay_hovered = false;
 static GsnCanvas& GlobalRenderer() {
     static GsnCanvas instance;
     return instance;
+}
+
+static bool ShouldDrawDetailedNodeEffects(float zoom) {
+    return zoom >= kDetailedNodeZoom;
+}
+
+static int CircleSegmentsForZoom(float zoom) {
+    if (zoom < 0.50f) return 16;
+    if (zoom < 0.85f) return 24;
+    return kCircleSegments;
 }
 
 // ===== Shape color mapping =====
@@ -152,17 +165,18 @@ static void DrawParallelogram(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bot
         ImVec2(bottom_right.x - skew, bottom_right.y), // bottom-right (inset left)
         ImVec2(top_left.x, bottom_right.y)             // bottom-left
     };
-    DrawPolyShadow(draw_list, corners, 4, zoom);
+    if (ShouldDrawDetailedNodeEffects(zoom)) DrawPolyShadow(draw_list, corners, 4, zoom);
     draw_list->AddConvexPolyFilled(corners, 4, fill_color);
-    // Subtle top highlight via a thin lighter strip across the inside top edge.
-    ImU32 hl = WithAlpha(ShadeColor(fill_color, 0.30f), 0.55f);
-    ImVec2 hl_pts[4] = {
-        corners[0],
-        corners[1],
-        ImVec2(corners[1].x - skew * 0.15f, corners[1].y + (bottom_right.y - top_left.y) * 0.18f),
-        ImVec2(corners[0].x - skew * 0.15f, corners[0].y + (bottom_right.y - top_left.y) * 0.18f)
-    };
-    draw_list->AddConvexPolyFilled(hl_pts, 4, hl);
+    if (ShouldDrawDetailedNodeEffects(zoom)) {
+        ImU32 hl = WithAlpha(ShadeColor(fill_color, 0.30f), 0.55f);
+        ImVec2 hl_pts[4] = {
+            corners[0],
+            corners[1],
+            ImVec2(corners[1].x - skew * 0.15f, corners[1].y + (bottom_right.y - top_left.y) * 0.18f),
+            ImVec2(corners[0].x - skew * 0.15f, corners[0].y + (bottom_right.y - top_left.y) * 0.18f)
+        };
+        draw_list->AddConvexPolyFilled(hl_pts, 4, hl);
+    }
     draw_list->AddPolyline(corners, 4, OutlineColor(), ImDrawFlags_Closed, outline);
 }
 
@@ -170,9 +184,9 @@ static void DrawParallelogram(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bot
 static void DrawStadium(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color, float zoom) {
     float rounding = (bottom_right.y - top_left.y) * 0.5f;
     float outline = DpiSize(kOutlineThickness) * zoom;
-    DrawRectShadow(draw_list, top_left, bottom_right, rounding, zoom);
+    if (ShouldDrawDetailedNodeEffects(zoom)) DrawRectShadow(draw_list, top_left, bottom_right, rounding, zoom);
     draw_list->AddRectFilled(top_left, bottom_right, fill_color, rounding);
-    AddInteriorShading(draw_list, top_left, bottom_right, fill_color, rounding);
+    if (ShouldDrawDetailedNodeEffects(zoom)) AddInteriorShading(draw_list, top_left, bottom_right, fill_color, rounding);
     draw_list->AddRect(top_left, bottom_right, OutlineColor(), rounding, 0, outline);
 }
 
@@ -184,23 +198,25 @@ static void DrawCircle(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_rig
                   (top_left.y + bottom_right.y) * 0.5f);
     float radius = (width < height ? width : height) * 0.5f;
     float outline = DpiSize(kOutlineThickness) * zoom;
-    DrawCircleShadow(draw_list, center, radius, zoom);
-    draw_list->AddCircleFilled(center, radius, fill_color, kCircleSegments);
-    // Soft inner highlight: an offset lighter circle clipped within the disc.
-    ImU32 hl = WithAlpha(ShadeColor(fill_color, 0.35f), 0.45f);
-    draw_list->AddCircleFilled(
-        ImVec2(center.x - radius * 0.18f, center.y - radius * 0.30f),
-        radius * 0.55f, hl, kCircleSegments);
-    draw_list->AddCircle(center, radius, OutlineColor(), kCircleSegments, outline);
+    int segments = CircleSegmentsForZoom(zoom);
+    if (ShouldDrawDetailedNodeEffects(zoom)) DrawCircleShadow(draw_list, center, radius, zoom);
+    draw_list->AddCircleFilled(center, radius, fill_color, segments);
+    if (ShouldDrawDetailedNodeEffects(zoom)) {
+        ImU32 hl = WithAlpha(ShadeColor(fill_color, 0.35f), 0.45f);
+        draw_list->AddCircleFilled(
+            ImVec2(center.x - radius * 0.18f, center.y - radius * 0.30f),
+            radius * 0.55f, hl, segments);
+    }
+    draw_list->AddCircle(center, radius, OutlineColor(), segments, outline);
 }
 
 // Draw a rounded rectangle (Claim / default shape).
 static void DrawRoundedRect(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color, float zoom) {
     float rounding = DpiSize(kClaimRounding) * zoom;
     float outline = DpiSize(kOutlineThickness) * zoom;
-    DrawRectShadow(draw_list, top_left, bottom_right, rounding, zoom);
+    if (ShouldDrawDetailedNodeEffects(zoom)) DrawRectShadow(draw_list, top_left, bottom_right, rounding, zoom);
     draw_list->AddRectFilled(top_left, bottom_right, fill_color, rounding);
-    AddInteriorShading(draw_list, top_left, bottom_right, fill_color, rounding);
+    if (ShouldDrawDetailedNodeEffects(zoom)) AddInteriorShading(draw_list, top_left, bottom_right, fill_color, rounding);
     draw_list->AddRect(top_left, bottom_right, OutlineColor(), rounding, 0, outline);
 }
 
@@ -217,11 +233,13 @@ static void DrawUndevelopedMarker(ImDrawList* draw_list, const GsnNode& node,
         ImVec2(center.x, center.y + radius),
         ImVec2(center.x - radius, center.y)
     };
-    DrawPolyShadow(draw_list, diamond, 4, zoom);
+    if (ShouldDrawDetailedNodeEffects(zoom)) DrawPolyShadow(draw_list, diamond, 4, zoom);
     ImU32 und_fill = IM_COL32(245, 247, 252, 255); // near-white for high contrast
     ImU32 und_ink  = InkOn(und_fill);
     draw_list->AddConvexPolyFilled(diamond, 4, und_fill);
     draw_list->AddPolyline(diamond, 4, OutlineColor(), ImDrawFlags_Closed, DpiSize(kOutlineThickness) * zoom);
+
+    if (zoom < kUndLabelZoom) return;
 
     const char* und = "UND";
     ImFont* font = ImGui::GetFont();
@@ -318,6 +336,7 @@ static void DrawNodeLabel(ImDrawList* draw_list, const GsnNode& node,
     ImFont* normal_font = ImGui::GetFont();
     float font_size = ImGui::GetFontSize() * zoom;
     float scaled_padding = DpiSize(kTextPadding) * zoom;
+    const bool compact_label = zoom < kFullLabelZoom;
 
     // Pick label based on language toggle
     const std::string& active_label = (ui_state.show_secondary_language && !node.label_secondary.empty())
@@ -330,7 +349,9 @@ static void DrawNodeLabel(ImDrawList* draw_list, const GsnNode& node,
     ImVec2 rest_text_size(0, 0);
     if (first_newline) {
         bold_text_size = bold_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, label_start, first_newline);
-        rest_text_size = normal_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, first_newline + 1, nullptr);
+        if (!compact_label) {
+            rest_text_size = normal_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, first_newline + 1, nullptr);
+        }
     } else {
         bold_text_size = bold_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, label_start, nullptr);
     }
@@ -344,7 +365,7 @@ static void DrawNodeLabel(ImDrawList* draw_list, const GsnNode& node,
     draw_list->AddText(bold_font, font_size, ImVec2(text_left, text_y), ink_color,
                        label_start, first_newline ? first_newline : nullptr, text_wrap);
     // Normal rest
-    if (first_newline) {
+    if (first_newline && !compact_label) {
         draw_list->AddText(normal_font, font_size, ImVec2(text_left, text_y + bold_text_size.y), ink_color,
                            first_newline + 1, nullptr, text_wrap);
     }
@@ -867,6 +888,10 @@ void SetCanvasElements(const std::vector<CanvasElement>& elements) {
 
 void SetCanvasTree(const core::AssuranceTree& tree) {
     GlobalRenderer().SetTree(tree);
+}
+
+CanvasRenderStats GetLastCanvasRenderStats() {
+    return GlobalRenderer().GetLastRenderStats();
 }
 
 } // namespace ui::gsn

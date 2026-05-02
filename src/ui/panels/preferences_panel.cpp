@@ -140,6 +140,16 @@ void RenderAppearanceSection(PreferencesPanelModel model, const PreferencesPanel
         }
         ImGui::EndCombo();
     }
+
+    bool show_fps = model.showFps;
+    if (ImGui::Checkbox(ui::Tr(ui::MessageId::ShowFps), &show_fps)) {
+        if (callbacks.set_show_fps) callbacks.set_show_fps(show_fps);
+    }
+    ImGui::TextColored(ui::CullRatioColor(0.8f), "%s", ui::Tr(ui::MessageId::PerfLegendHigh));
+    ImGui::SameLine();
+    ImGui::TextColored(ui::CullRatioColor(0.5f), "%s", ui::Tr(ui::MessageId::PerfLegendMedium));
+    ImGui::SameLine();
+    ImGui::TextColored(ui::CullRatioColor(0.0f), "%s", ui::Tr(ui::MessageId::PerfLegendLow));
 }
 
 void RenderReviewSection(PreferencesPanelModel model, const PreferencesPanelCallbacks& callbacks) {
