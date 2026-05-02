@@ -7,6 +7,7 @@
 #include "core/assurance_tree.h"
 #include <vector>
 #include <unordered_set>
+#include <unordered_map>
 #include <string>
 
 namespace ui::gsn {
@@ -62,8 +63,11 @@ public:
     CanvasRenderStats GetLastRenderStats() const { return last_render_stats_; }
 
 private:
+    void RebuildNodeLookup();
+
     std::vector<CanvasElement> elements_;
     std::vector<LayoutNode> layout_nodes_;
+    std::unordered_map<std::string, const LayoutNode*> node_by_id_;
     float zoom_level_ = 1.0f;
     ImVec2 view_offset_ = ImVec2(0.0f, 0.0f); // pixel-space pan offset
     CanvasRenderStats last_render_stats_{};

@@ -6,7 +6,6 @@
 #include <imgui.h>
 #include <cmath>
 #include <algorithm>
-#include <unordered_map>
 
 namespace ui::gsn {
 
@@ -154,18 +153,55 @@ static void DrawDashedBezier(ImDrawList* draw_list, ImVec2 p0, ImVec2 p1, ImVec2
     }
 }
 
+static void DrawDashedLine(ImDrawList* draw_list, ImVec2 start, ImVec2 end,
+                           ImU32 color, float thickness,
+                           float dash_on, float dash_off) {
+    float dx = end.x - start.x;
+    float dy = end.y - start.y;
+    float length = sqrtf(dx * dx + dy * dy);
+    if (length < 1.0f) return;
+
+    float dir_x = dx / length;
+    float dir_y = dy / length;
+    float pos = 0.0f;
+    bool is_visible = true;
+    while (pos < length) {
+        float segment_end = pos + (is_visible ? dash_on : dash_off);
+        if (segment_end > length) segment_end = length;
+
+        if (is_visible) {
+            ImVec2 dash_start(start.x + dir_x * pos, start.y + dir_y * pos);
+            ImVec2 dash_end(start.x + dir_x * segment_end, start.y + dir_y * segment_end);
+            draw_list->AddLine(dash_start, dash_end, color, thickness);
+        }
+
+        pos = segment_end;
+        is_visible = !is_visible;
+    }
+}
+
 GsnCanvas::GsnCanvas() {
+}
+
+void GsnCanvas::RebuildNodeLookup() {
+    node_by_id_.clear();
+    node_by_id_.reserve(layout_nodes_.size());
+    for (const auto& node : layout_nodes_) {
+        node_by_id_[node.id] = &node;
+    }
 }
 
 void GsnCanvas::SetTree(const core::AssuranceTree& tree) {
     LayoutEngine le;
     layout_nodes_ = le.ComputeLayout(tree);
+    RebuildNodeLookup();
 }
 
 void GsnCanvas::SetElements(const std::vector<CanvasElement>& elements) {
     elements_ = elements;
     LayoutEngine le;
     layout_nodes_ = le.ComputeLayout(elements_);
+    RebuildNodeLookup();
 }
 
 void GsnCanvas::ZoomIn() {
@@ -316,14 +352,13 @@ static void DrawGroup2Edge(ImDrawList* draw_list, ImVec2 parent_side, ImVec2 att
     ImVec2 ctrl_1(stub_start.x + horizontal_sign * horizontal_span, stub_start.y);
     ImVec2 ctrl_2(stub_end.x   - horizontal_sign * horizontal_span, stub_end.y);
 
-    // Straight stub from parent â†’ dashed Bezier â†’ straight stub into attachment
     ImU32 col = Group2EdgeColor();
-    DrawDashedBezier(draw_list, parent_side, parent_side, parent_side, stub_start, col,
-                     scaled_edge_width, scaled_dash, scaled_gap);
+    DrawDashedLine(draw_list, parent_side, stub_start, col,
+                   scaled_edge_width, scaled_dash, scaled_gap);
     DrawDashedBezier(draw_list, stub_start, ctrl_1, ctrl_2, stub_end, col,
                      scaled_edge_width, scaled_dash, scaled_gap);
-    DrawDashedBezier(draw_list, stub_end, stub_end, stub_end, attachment_edge, col,
-                     scaled_edge_width, scaled_dash, scaled_gap);
+    DrawDashedLine(draw_list, stub_end, attachment_edge, col,
+                   scaled_edge_width, scaled_dash, scaled_gap);
     // Arrow points into the attachment node
     DrawHollowArrow(draw_list, attachment_edge, horizontal_sign, 0.0f, col,
                     kArrowSize * scale, kArrowOutlineWidth * scale);
@@ -382,19 +417,12 @@ void GsnCanvas::Render(UiState& ui_state,
     ImVec2 cull_min(viewport_min.x - cull_margin, viewport_min.y - cull_margin);
     ImVec2 cull_max(viewport_max.x + cull_margin, viewport_max.y + cull_margin);
 
-    // Build a lookup map for finding parent nodes by ID
-    std::unordered_map<std::string, const LayoutNode*> node_by_id;
-    node_by_id.reserve(layout_nodes_.size());
-    for (const auto& node : layout_nodes_) {
-        node_by_id[node.id] = &node;
-    }
-
     // Draw edges first (beneath nodes)
     for (const auto& child_node : layout_nodes_) {
         if (child_node.parent_id.empty()) continue;
 
-        auto parent_it = node_by_id.find(child_node.parent_id);
-        if (parent_it == node_by_id.end()) continue;
+        auto parent_it = node_by_id_.find(child_node.parent_id);
+        if (parent_it == node_by_id_.end()) continue;
         const LayoutNode& parent_node = *parent_it->second;
 
         if (child_node.group == ElementGroup::Group2) {
