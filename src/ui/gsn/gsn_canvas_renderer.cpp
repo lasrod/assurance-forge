@@ -10,6 +10,12 @@
 
 namespace ui::gsn {
 
+static CanvasRenderStats g_last_render_stats;
+
+CanvasRenderStats GetLastCanvasRenderStats() {
+    return g_last_render_stats;
+}
+
 // ===== Edge rendering constants =====
 static constexpr float kArrowSize           = 9.0f;   // arrowhead triangle side length
 static constexpr float kArrowOutlineWidth   = 1.5f;   // hollow arrowhead outline thickness
@@ -21,11 +27,24 @@ static constexpr float kStubLength          = 12.0f;  // straight segment at eac
 static constexpr float kVerticalControlPct  = 0.4f;   // Bezier control point distance (fraction of vertical span)
 static constexpr float kScrollPadding       = 40.0f;  // extra padding beyond outermost node for scrolling
 static constexpr int   kBezierSamples       = 64;     // arc-length sample count for dashed Bezier rendering
+static constexpr float kCullMarginPx        = 120.0f; // screen-space culling margin around viewport
 
 // Edge colors are sourced from the theme on every call so they update if the
 // theme is ever swapped at runtime.
 static ImU32 Group1EdgeColor() { return GetTheme().edge_group1; }
 static ImU32 Group2EdgeColor() { return GetTheme().edge_group2; }
+
+static bool RectsIntersect(ImVec2 a_min, ImVec2 a_max, ImVec2 b_min, ImVec2 b_max) {
+    return a_max.x >= b_min.x && a_min.x <= b_max.x &&
+           a_max.y >= b_min.y && a_min.y <= b_max.y;
+}
+
+static void ExpandRectToInclude(ImVec2 point, ImVec2& out_min, ImVec2& out_max) {
+    out_min.x = std::min(out_min.x, point.x);
+    out_min.y = std::min(out_min.y, point.y);
+    out_max.x = std::max(out_max.x, point.x);
+    out_max.y = std::max(out_max.y, point.y);
+}
 
 // ===== Zoom constants =====
 static constexpr float kZoomMin      = 0.25f;  // minimum zoom level (25%)
@@ -239,6 +258,34 @@ static void DrawGroup1Edge(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 c
     DrawSolidArrow(draw_list, child_top, 0.0f, 1.0f, col, scaled_arrow);
 }
 
+static void ComputeGroup1EdgeBounds(ImVec2 parent_bottom, ImVec2 child_top, float zoom,
+                                    ImVec2& out_min, ImVec2& out_max) {
+    float scale = DpiScale() * zoom;
+    float scaled_stub = kStubLength * scale;
+    float scaled_edge_width = kSolidEdgeWidth * scale;
+    float scaled_arrow = kArrowSize * scale;
+
+    ImVec2 stub_start(parent_bottom.x, parent_bottom.y + scaled_stub);
+    ImVec2 stub_end(child_top.x, child_top.y - scaled_stub);
+    float vertical_span = fabsf(stub_end.y - stub_start.y);
+    ImVec2 ctrl_1(stub_start.x, stub_start.y + vertical_span * kVerticalControlPct);
+    ImVec2 ctrl_2(stub_end.x,   stub_end.y   - vertical_span * kVerticalControlPct);
+
+    out_min = parent_bottom;
+    out_max = parent_bottom;
+    ExpandRectToInclude(child_top, out_min, out_max);
+    ExpandRectToInclude(stub_start, out_min, out_max);
+    ExpandRectToInclude(stub_end, out_min, out_max);
+    ExpandRectToInclude(ctrl_1, out_min, out_max);
+    ExpandRectToInclude(ctrl_2, out_min, out_max);
+
+    float pad = std::max(scaled_edge_width, scaled_arrow) + 1.0f;
+    out_min.x -= pad;
+    out_min.y -= pad;
+    out_max.x += pad;
+    out_max.y += pad;
+}
+
 // Compute screen-space endpoints for a Group2 (side-attached) edge.
 // Parent side â†’ attachment nearest edge, depending on which side.
 static void ComputeGroup2Endpoints(const LayoutNode& parent, const LayoutNode& attachment,
@@ -288,17 +335,56 @@ static void DrawGroup2Edge(ImDrawList* draw_list, ImVec2 parent_side, ImVec2 att
                     kArrowSize * scale, kArrowOutlineWidth * scale);
 }
 
+static void ComputeGroup2EdgeBounds(ImVec2 parent_side, ImVec2 attachment_edge,
+                                    bool is_left_side, float zoom,
+                                    ImVec2& out_min, ImVec2& out_max) {
+    float horizontal_sign = is_left_side ? -1.0f : 1.0f;
+    float scale = DpiScale() * zoom;
+    float scaled_stub = kStubLength * scale;
+    float scaled_edge_width = kDashedEdgeWidth * scale;
+    float scaled_arrow = kArrowSize * scale;
+
+    ImVec2 stub_start(parent_side.x + horizontal_sign * scaled_stub, parent_side.y);
+    ImVec2 stub_end(attachment_edge.x - horizontal_sign * scaled_stub, attachment_edge.y);
+    float horizontal_span = fabsf(stub_end.x - stub_start.x) * 0.5f;
+    ImVec2 ctrl_1(stub_start.x + horizontal_sign * horizontal_span, stub_start.y);
+    ImVec2 ctrl_2(stub_end.x   - horizontal_sign * horizontal_span, stub_end.y);
+
+    out_min = parent_side;
+    out_max = parent_side;
+    ExpandRectToInclude(attachment_edge, out_min, out_max);
+    ExpandRectToInclude(stub_start, out_min, out_max);
+    ExpandRectToInclude(stub_end, out_min, out_max);
+    ExpandRectToInclude(ctrl_1, out_min, out_max);
+    ExpandRectToInclude(ctrl_2, out_min, out_max);
+
+    float pad = std::max(scaled_edge_width, scaled_arrow) + 1.0f;
+    out_min.x -= pad;
+    out_min.y -= pad;
+    out_max.x += pad;
+    out_max.y += pad;
+}
+
 // ===== Main rendering =====
 
 void GsnCanvas::Render(UiState& ui_state,
                        const parser::AssuranceCase* active_case,
                        const ElementContextActions& actions) {
+    CanvasRenderStats frame_stats{};
+
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
     float zoom = zoom_level_;
 
     // Apply our own view offset to the drawing origin (replaces ImGui scroll)
     ImVec2 origin(canvas_pos.x - view_offset_.x, canvas_pos.y - view_offset_.y);
+
+    const float cull_margin = DpiSize(kCullMarginPx);
+    ImVec2 viewport_min = ImGui::GetWindowPos();
+    ImVec2 viewport_max(viewport_min.x + ImGui::GetWindowSize().x,
+                        viewport_min.y + ImGui::GetWindowSize().y);
+    ImVec2 cull_min(viewport_min.x - cull_margin, viewport_min.y - cull_margin);
+    ImVec2 cull_max(viewport_max.x + cull_margin, viewport_max.y + cull_margin);
 
     // Build a lookup map for finding parent nodes by ID
     std::unordered_map<std::string, const LayoutNode*> node_by_id;
@@ -319,17 +405,41 @@ void GsnCanvas::Render(UiState& ui_state,
             ImVec2 parent_side, attachment_edge;
             ComputeGroup2Endpoints(parent_node, child_node, origin, zoom,
                                    parent_side, attachment_edge);
+            ImVec2 edge_min, edge_max;
+            ComputeGroup2EdgeBounds(parent_side, attachment_edge, child_node.is_left_side, zoom,
+                                    edge_min, edge_max);
+            if (!RectsIntersect(edge_min, edge_max, cull_min, cull_max)) {
+                ++frame_stats.edges_culled;
+                continue;
+            }
             DrawGroup2Edge(draw_list, parent_side, attachment_edge, child_node.is_left_side, zoom);
+            ++frame_stats.edges_drawn;
         } else {
             ImVec2 parent_bottom, child_top;
             ComputeGroup1Endpoints(parent_node, child_node, origin, zoom,
                                    parent_bottom, child_top);
+            ImVec2 edge_min, edge_max;
+            ComputeGroup1EdgeBounds(parent_bottom, child_top, zoom, edge_min, edge_max);
+            if (!RectsIntersect(edge_min, edge_max, cull_min, cull_max)) {
+                ++frame_stats.edges_culled;
+                continue;
+            }
             DrawGroup1Edge(draw_list, parent_bottom, child_top, zoom);
+            ++frame_stats.edges_drawn;
         }
     }
 
     // Draw nodes on top of edges
     for (const auto& node : layout_nodes_) {
+        ImVec2 node_min(origin.x + node.position.x * zoom,
+                        origin.y + node.position.y * zoom);
+        ImVec2 node_max(node_min.x + node.size.x * zoom,
+                        node_min.y + node.size.y * zoom);
+        if (!RectsIntersect(node_min, node_max, cull_min, cull_max)) {
+            ++frame_stats.nodes_culled;
+            continue;
+        }
+
         GsnNode gsn_node;
         gsn_node.id = node.id;
         switch (node.role) {
@@ -348,7 +458,10 @@ void GsnCanvas::Render(UiState& ui_state,
         gsn_node.label_secondary = node.label_secondary;
         gsn_node.undeveloped = node.undeveloped;
         DrawGsnNode(gsn_node, origin, ui_state, active_case, actions, zoom);
+        ++frame_stats.nodes_drawn;
     }
+
+    g_last_render_stats = frame_stats;
 }
 
 bool GsnCanvas::CenterOnNode(const std::string& node_id, ImVec2 viewport_size) {

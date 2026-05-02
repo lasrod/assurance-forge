@@ -24,6 +24,7 @@
 #include "core/reviews/review_proposal_patch_service.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas.h"
+#include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/localization.h"
 #include "ui/panels/element_panel.h"
 #include "ui/panels/problems_panel.h"
@@ -217,6 +218,12 @@ bool IsContextLike(core::NewElementKind kind) {
     return kind == core::NewElementKind::Context ||
            kind == core::NewElementKind::Assumption ||
            kind == core::NewElementKind::Justification;
+}
+
+ImVec4 CullRatioColor(float ratio) {
+    if (ratio >= 0.70f) return ImVec4(0.33f, 0.82f, 0.45f, 1.0f);
+    if (ratio >= 0.35f) return ImVec4(0.93f, 0.79f, 0.30f, 1.0f);
+    return ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
 }
 
 const char* RemoveModeField(core::RemoveMode mode) {
@@ -1288,14 +1295,40 @@ float AppRuntime::RenderMainMenuBar(bool& done) {
 
     HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
     if (runner_params && runner_params->imGuiWindowParams.showStatus_Fps) {
-        char fps_label[32];
-        std::snprintf(fps_label, sizeof(fps_label), "FPS: %.1f", ImGui::GetIO().Framerate);
+        ui::gsn::CanvasRenderStats stats = ui::gsn::GetLastCanvasRenderStats();
+        const int node_total = stats.nodes_drawn + stats.nodes_culled;
+        const int edge_total = stats.edges_drawn + stats.edges_culled;
+        const float node_ratio = node_total > 0 ? static_cast<float>(stats.nodes_culled) / static_cast<float>(node_total) : 0.0f;
+        const float edge_ratio = edge_total > 0 ? static_cast<float>(stats.edges_culled) / static_cast<float>(edge_total) : 0.0f;
 
-        const float label_width = ImGui::CalcTextSize(fps_label).x;
-        const float right_x = ImGui::GetWindowContentRegionMax().x - label_width;
+        char fps_text[32];
+        char nodes_text[32];
+        char edges_text[32];
+        std::snprintf(fps_text, sizeof(fps_text), "FPS: %.1f", ImGui::GetIO().Framerate);
+        std::snprintf(nodes_text, sizeof(nodes_text), "N %d/%d", stats.nodes_drawn, node_total);
+        std::snprintf(edges_text, sizeof(edges_text), "E %d/%d", stats.edges_drawn, edge_total);
+
+        const char* sep = "  ";
+        const float total_width =
+            ImGui::CalcTextSize(fps_text).x +
+            ImGui::CalcTextSize(sep).x +
+            ImGui::CalcTextSize(nodes_text).x +
+            ImGui::CalcTextSize(sep).x +
+            ImGui::CalcTextSize(edges_text).x;
+
+        const float right_x = ImGui::GetWindowContentRegionMax().x - total_width;
         ImGui::SameLine();
         ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), right_x));
-        ImGui::TextUnformatted(fps_label);
+
+        ImGui::TextUnformatted(fps_text);
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::TextUnformatted(sep);
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::TextColored(CullRatioColor(node_ratio), "%s", nodes_text);
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::TextUnformatted(sep);
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::TextColored(CullRatioColor(edge_ratio), "%s", edges_text);
     }
 
     ImGui::EndMainMenuBar();

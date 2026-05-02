@@ -11,6 +11,16 @@
 
 namespace ui::gsn {
 
+struct CanvasRenderStats {
+    int nodes_drawn = 0;
+    int nodes_culled = 0;
+    int edges_drawn = 0;
+    int edges_culled = 0;
+};
+
+// Returns stats from the most recent GSN canvas render pass.
+CanvasRenderStats GetLastCanvasRenderStats();
+
 class GsnCanvas {
 public:
     GsnCanvas();
