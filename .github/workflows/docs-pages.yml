@@ -1,6 +1,15 @@
 name: Docs Pages
 
 on:
+  pull_request:
+    paths:
+      - docs/**
+      - mkdocs.yml
+      - requirements-docs.txt
+      - .clang-uml
+      - src/**
+      - .github/workflows/docs-pages.yml
+      - .github/workflows/docs.yml
   push:
     branches:
       - main
@@ -16,17 +25,15 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
     name: Build docs site
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout (with submodules)
@@ -52,33 +59,23 @@ jobs:
       - name: Install clang-uml (pinned release)
         env:
           CLANG_UML_VERSION: "0.6.2"
+          CLANG_UML_SHA256: "992be77258b9c6f1bd7c8883bd1e2491c0d55ae8a884308848eb3b76a35089a3"
         run: |
           set -euo pipefail
 
-          api_url="https://api.github.com/repos/bkryza/clang-uml/releases/tags/${CLANG_UML_VERSION}"
-          asset_url=$(curl -fsSL "$api_url" \
-            | grep -oE 'https://[^\"]+' \
-            | grep -Ei '/download/.*/.*(linux|ubuntu).*(x86_64|amd64).*(tar\.gz|tgz)$' \
-            | head -n1)
+          package_url="https://github.com/bkryza/clang-uml/releases/download/${CLANG_UML_VERSION}/clang-uml_${CLANG_UML_VERSION}-0ubuntu1ppa1.noble_amd64.deb"
+          package_path="${RUNNER_TEMP}/clang-uml.deb"
 
-          if [ -z "$asset_url" ]; then
-            echo "Failed to find Linux x86_64 release asset for clang-uml ${CLANG_UML_VERSION}" >&2
+          curl -fL "$package_url" -o "$package_path"
+          actual_sha256="$(sha256sum "$package_path" | cut -d ' ' -f 1)"
+          if [ "$actual_sha256" != "$CLANG_UML_SHA256" ]; then
+            echo "clang-uml checksum mismatch" >&2
+            echo "Expected: $CLANG_UML_SHA256" >&2
+            echo "Actual:   $actual_sha256" >&2
             exit 1
           fi
 
-          tmp_dir=$(mktemp -d)
-          archive_path="$tmp_dir/clang-uml.tar.gz"
-
-          curl -fL "$asset_url" -o "$archive_path"
-          tar -xzf "$archive_path" -C "$tmp_dir"
-
-          clang_uml_bin=$(find "$tmp_dir" -type f -name clang-uml | head -n1)
-          if [ -z "$clang_uml_bin" ]; then
-            echo "clang-uml binary was not found in extracted archive" >&2
-            exit 1
-          fi
-
-          sudo install -m 0755 "$clang_uml_bin" /usr/local/bin/clang-uml
+          sudo apt-get install -y "$package_path"
           clang-uml --version
 
       - name: Generate compile database
@@ -111,7 +108,12 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     needs: build
-    runs-on: ubuntu-latest
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
