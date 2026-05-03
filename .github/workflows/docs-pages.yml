@@ -1,6 +1,15 @@
 name: Docs Pages
 
 on:
+  pull_request:
+    paths:
+      - docs/**
+      - mkdocs.yml
+      - requirements-docs.txt
+      - .clang-uml
+      - src/**
+      - .github/workflows/docs-pages.yml
+      - .github/workflows/docs.yml
   push:
     branches:
       - main
@@ -16,11 +25,9 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -52,6 +59,7 @@ jobs:
       - name: Install clang-uml (pinned release)
         env:
           CLANG_UML_VERSION: "0.6.2"
+          CLANG_UML_SHA256: "992be77258b9c6f1bd7c8883bd1e2491c0d55ae8a884308848eb3b76a35089a3"
         run: |
           set -euo pipefail
 
@@ -59,6 +67,14 @@ jobs:
           package_path="${RUNNER_TEMP}/clang-uml.deb"
 
           curl -fL "$package_url" -o "$package_path"
+          actual_sha256="$(sha256sum "$package_path" | cut -d ' ' -f 1)"
+          if [ "$actual_sha256" != "$CLANG_UML_SHA256" ]; then
+            echo "clang-uml checksum mismatch" >&2
+            echo "Expected: $CLANG_UML_SHA256" >&2
+            echo "Actual:   $actual_sha256" >&2
+            exit 1
+          fi
+
           sudo apt-get install -y "$package_path"
           clang-uml --version
 
@@ -92,7 +108,12 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     needs: build
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
