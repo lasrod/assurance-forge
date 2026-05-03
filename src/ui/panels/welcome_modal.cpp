@@ -37,6 +37,11 @@ constexpr float kFundamentalsProgress = 0.18f;
 constexpr float kConformanceProgress = 0.12f;
 constexpr float kWalkthroughPopupButtonWidth = 110.0f;
 
+constexpr const char* kWelcomePopupId = "Welcome!";
+constexpr const char* kWelcomeLayoutTableId = "WelcomeLayout";
+constexpr const char* kWelcomeStartColumnId = "StartColumn";
+constexpr const char* kWelcomeWalkthroughColumnId = "WalkthroughColumn";
+
 constexpr const char* kWalkthroughPopupId = "Walkthroughs##not_implemented_popup";
 constexpr const char* kWalkthroughPopupTitle = "Walkthroughs";
 constexpr const char* kWalkthroughPopupMessage = "Walkthroughs are not yet implemented.";
@@ -46,12 +51,42 @@ constexpr const char* kUtf8MiddleDot = "\xC2\xB7";
 
 constexpr int kWelcomeStyleVarCount = 2;
 
+struct ItemInteraction {
+    bool hovered;
+    bool clicked;
+};
+
 float Px(float reference_pixels) {
     return ui::gsn::DpiSize(reference_pixels);
 }
 
 ImVec4 ToVec4(ImU32 color) {
     return ImGui::ColorConvertU32ToFloat4(color);
+}
+
+ItemInteraction InvisibleButtonInteraction(std::string_view id, const ImVec2& size) {
+    const std::string id_string(id);
+    ImGui::InvisibleButton(id_string.c_str(), size);
+    return ItemInteraction{ImGui::IsItemHovered(), ImGui::IsItemClicked()};
+}
+
+void DrawText(ImDrawList* draw_list, const ImVec2& pos, ImU32 color, std::string_view text) {
+    draw_list->AddText(pos, color, text.data(), text.data() + text.size());
+}
+
+std::string FormatRecentStats(const RecentProjectEntry& entry) {
+    constexpr int kRecentStatsBufferSize = 128;
+    char stats[kRecentStatsBufferSize];
+    std::snprintf(stats, sizeof(stats),
+                  "%d claims %s %d strategies %s %d evidence %s %d undeveloped",
+                  entry.claims,
+                  kUtf8MiddleDot,
+                  entry.strategies,
+                  kUtf8MiddleDot,
+                  entry.evidence,
+                  kUtf8MiddleDot,
+                  entry.undeveloped);
+    return std::string(stats);
 }
 
 void SectionTitle(std::string_view label) {
@@ -77,13 +112,9 @@ bool ActionLink(std::string_view id, std::string_view title, std::string_view su
     const float width = ImGui::GetContentRegionAvail().x;
     const bool has_subtitle = !subtitle.empty();
     const float height = has_subtitle ? Px(kLinkHeightWithSubtitle) : Px(kLinkHeightWithoutSubtitle);
-    const std::string id_string(id);
+    const ItemInteraction interaction = InvisibleButtonInteraction(id, ImVec2(width, height));
 
-    ImGui::InvisibleButton(id_string.c_str(), ImVec2(width, height));
-    const bool hovered = ImGui::IsItemHovered();
-    const bool clicked = ImGui::IsItemClicked();
-
-    if (hovered) {
+    if (interaction.hovered) {
         draw_list->AddRectFilled(
             pos,
             ImVec2(pos.x + width, pos.y + height),
@@ -91,21 +122,19 @@ bool ActionLink(std::string_view id, std::string_view title, std::string_view su
             theme.rounding_ui);
     }
 
-    const ImU32 title_color = hovered ? theme.accent_hover : theme.accent;
-    draw_list->AddText(
-        ImVec2(pos.x + Px(kLinkTextOffsetX), pos.y + Px(kLinkTitleOffsetY)),
-        title_color,
-        title.data(),
-        title.data() + title.size());
+    const ImU32 title_color = interaction.hovered ? theme.accent_hover : theme.accent;
+    DrawText(draw_list,
+             ImVec2(pos.x + Px(kLinkTextOffsetX), pos.y + Px(kLinkTitleOffsetY)),
+             title_color,
+             title);
     if (has_subtitle) {
-        draw_list->AddText(
-            ImVec2(pos.x + Px(kLinkTextOffsetX), pos.y + Px(kLinkSubtitleOffsetY)),
-            theme.text_secondary,
-            subtitle.data(),
-            subtitle.data() + subtitle.size());
+        DrawText(draw_list,
+                 ImVec2(pos.x + Px(kLinkTextOffsetX), pos.y + Px(kLinkSubtitleOffsetY)),
+                 theme.text_secondary,
+                 subtitle);
     }
 
-    return clicked;
+    return interaction.clicked;
 }
 
 bool RecentLink(std::string_view id, const RecentProjectEntry& entry) {
@@ -114,20 +143,14 @@ bool RecentLink(std::string_view id, const RecentProjectEntry& entry) {
     constexpr float kRecentNameOffsetY = 6.0f;
     constexpr float kRecentStatsOffsetY = 24.0f;
     constexpr float kRecentPathOffsetY = 40.0f;
-    constexpr int kRecentStatsBufferSize = 128;
-
     const ui::Theme& theme = ui::GetTheme();
     ImDrawList* const draw_list = ImGui::GetWindowDrawList();
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const float width = ImGui::GetContentRegionAvail().x;
     const float height = Px(kRecentItemHeight);
-    const std::string id_string(id);
+    const ItemInteraction interaction = InvisibleButtonInteraction(id, ImVec2(width, height));
 
-    ImGui::InvisibleButton(id_string.c_str(), ImVec2(width, height));
-    const bool hovered = ImGui::IsItemHovered();
-    const bool clicked = ImGui::IsItemClicked();
-
-    if (hovered) {
+    if (interaction.hovered) {
         draw_list->AddRectFilled(
             pos,
             ImVec2(pos.x + width, pos.y + height),
@@ -135,17 +158,23 @@ bool RecentLink(std::string_view id, const RecentProjectEntry& entry) {
             theme.rounding_ui);
     }
 
-    const ImU32 name_color = hovered ? theme.accent_hover : theme.accent;
-    draw_list->AddText(ImVec2(pos.x + Px(kRecentTextOffsetX), pos.y + Px(kRecentNameOffsetY)), name_color, entry.name.c_str());
+    const ImU32 name_color = interaction.hovered ? theme.accent_hover : theme.accent;
+    DrawText(draw_list,
+             ImVec2(pos.x + Px(kRecentTextOffsetX), pos.y + Px(kRecentNameOffsetY)),
+             name_color,
+             entry.name);
 
-    char stats[kRecentStatsBufferSize];
-    std::snprintf(stats, sizeof(stats),
-        "%d claims %s %d strategies %s %d evidence %s %d undeveloped",
-        entry.claims, kUtf8MiddleDot, entry.strategies, kUtf8MiddleDot, entry.evidence, kUtf8MiddleDot, entry.undeveloped);
-    draw_list->AddText(ImVec2(pos.x + Px(kRecentTextOffsetX), pos.y + Px(kRecentStatsOffsetY)), theme.text_secondary, stats);
-    draw_list->AddText(ImVec2(pos.x + Px(kRecentTextOffsetX), pos.y + Px(kRecentPathOffsetY)), theme.text_muted, entry.path.c_str());
+    const std::string stats = FormatRecentStats(entry);
+    DrawText(draw_list,
+             ImVec2(pos.x + Px(kRecentTextOffsetX), pos.y + Px(kRecentStatsOffsetY)),
+             theme.text_secondary,
+             stats);
+    DrawText(draw_list,
+             ImVec2(pos.x + Px(kRecentTextOffsetX), pos.y + Px(kRecentPathOffsetY)),
+             theme.text_muted,
+             entry.path);
 
-    return clicked;
+    return interaction.clicked;
 }
 
 bool WalkthroughCard(std::string_view id, std::string_view title, std::string_view subtitle, float progress) {
@@ -161,13 +190,9 @@ bool WalkthroughCard(std::string_view id, std::string_view title, std::string_vi
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const float width = ImGui::GetContentRegionAvail().x;
     const float height = Px(kCardHeight);
-    const std::string id_string(id);
+    const ItemInteraction interaction = InvisibleButtonInteraction(id, ImVec2(width, height));
 
-    ImGui::InvisibleButton(id_string.c_str(), ImVec2(width, height));
-    const bool hovered = ImGui::IsItemHovered();
-    const bool clicked = ImGui::IsItemClicked();
-
-    const ImU32 fill = hovered ? theme.surface_3 : theme.surface_2;
+    const ImU32 fill = interaction.hovered ? theme.surface_3 : theme.surface_2;
     draw_list->AddRectFilled(pos, ImVec2(pos.x + width, pos.y + height), fill, theme.rounding_ui);
     draw_list->AddRect(pos, ImVec2(pos.x + width, pos.y + height), theme.border, theme.rounding_ui, 0, Px(kCardBorderThickness));
 
@@ -179,18 +204,16 @@ bool WalkthroughCard(std::string_view id, std::string_view title, std::string_vi
         theme.rounding_ui,
         ImDrawFlags_RoundCornersBottomLeft);
 
-    draw_list->AddText(
-        ImVec2(pos.x + Px(kCardTextOffsetX), pos.y + Px(kCardTitleOffsetY)),
-        theme.text_primary,
-        title.data(),
-        title.data() + title.size());
-    draw_list->AddText(
-        ImVec2(pos.x + Px(kCardTextOffsetX), pos.y + Px(kCardSubtitleOffsetY)),
-        theme.text_secondary,
-        subtitle.data(),
-        subtitle.data() + subtitle.size());
+    DrawText(draw_list,
+             ImVec2(pos.x + Px(kCardTextOffsetX), pos.y + Px(kCardTitleOffsetY)),
+             theme.text_primary,
+             title);
+    DrawText(draw_list,
+             ImVec2(pos.x + Px(kCardTextOffsetX), pos.y + Px(kCardSubtitleOffsetY)),
+             theme.text_secondary,
+             subtitle);
 
-    return clicked;
+    return interaction.clicked;
 }
 
 }  // namespace
@@ -198,11 +221,11 @@ bool WalkthroughCard(std::string_view id, std::string_view title, std::string_vi
 void ShowWelcomeModal(bool& is_open,
                       const std::vector<RecentProjectEntry>& recent,
                       const WelcomeModalCallbacks& callbacks) {
-    if (is_open && !ImGui::IsPopupOpen("Welcome!")) {
-        ImGui::OpenPopup("Welcome!");
+    if (is_open && !ImGui::IsPopupOpen(kWelcomePopupId)) {
+        ImGui::OpenPopup(kWelcomePopupId);
     }
 
-    if (!is_open && !ImGui::IsPopupOpen("Welcome!")) {
+    if (!is_open && !ImGui::IsPopupOpen(kWelcomePopupId)) {
         return;
     }
 
@@ -220,7 +243,7 @@ void ShowWelcomeModal(bool& is_open,
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Px(kWelcomeWindowPaddingX), Px(kWelcomeWindowPaddingY)));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(Px(kWelcomeItemSpacingX), Px(kWelcomeItemSpacingY)));
 
-    if (ImGui::BeginPopupModal("Welcome!", &is_open, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings)) {
+    if (ImGui::BeginPopupModal(kWelcomePopupId, &is_open, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings)) {
         const ui::Theme& theme = ui::GetTheme();
         bool show_walkthrough_not_implemented = false;
 
@@ -240,9 +263,9 @@ void ShowWelcomeModal(bool& is_open,
 
         ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeTaglineTopSpacing)));
 
-        if (ImGui::BeginTable("WelcomeLayout", 2, ImGuiTableFlags_SizingStretchProp, ImVec2(0.0f, Px(kWelcomeTableHeight)))) {
-            ImGui::TableSetupColumn("StartColumn", ImGuiTableColumnFlags_WidthStretch, kWelcomeStartColumnRatio);
-            ImGui::TableSetupColumn("WalkthroughColumn", ImGuiTableColumnFlags_WidthStretch, kWelcomeWalkthroughColumnRatio);
+        if (ImGui::BeginTable(kWelcomeLayoutTableId, 2, ImGuiTableFlags_SizingStretchProp, ImVec2(0.0f, Px(kWelcomeTableHeight)))) {
+            ImGui::TableSetupColumn(kWelcomeStartColumnId, ImGuiTableColumnFlags_WidthStretch, kWelcomeStartColumnRatio);
+            ImGui::TableSetupColumn(kWelcomeWalkthroughColumnId, ImGuiTableColumnFlags_WidthStretch, kWelcomeWalkthroughColumnRatio);
             ImGui::TableNextRow();
 
             ImGui::TableNextColumn();
@@ -325,7 +348,7 @@ void ShowWelcomeModal(bool& is_open,
         ImGui::EndPopup();
     }
 
-    if (!ImGui::IsPopupOpen("Welcome!")) {
+    if (!ImGui::IsPopupOpen(kWelcomePopupId)) {
         is_open = false;
     }
 
