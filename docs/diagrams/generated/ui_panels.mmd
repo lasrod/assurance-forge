@@ -1,0 +1,165 @@
+classDiagram
+    class C_0017619047408976424711["ui::gsn::GsnNode"]
+    class C_0017619047408976424711 {
+        +id : std::string
+        +label : std::string
+        +label_secondary : std::string
+        +position : ImVec2
+        +size : ImVec2
+        +type : std::string
+        +undeveloped : bool
+    }
+    class C_0000959793702575646777["ui::panels::PreferencesPanelModel"]
+    class C_0000959793702575646777 {
+        +apiKeyBuffer : char *
+        +apiKeyBufferSize : size_t
+        +connectionStatus : ai::AiConnectionStatus
+        +keyStored : bool
+        +language : ui::Language
+        +modelBuffer : char *
+        +modelBufferSize : size_t
+        +reviewerNameBuffer : char *
+        +reviewerNameBufferSize : size_t
+        +secureStoreAvailable : bool
+        +settings : ai::AiProviderSettings *
+        +showFps : bool
+        +testRunning : bool
+    }
+    class C_0000124404354980924732["ui::panels::PreferencesPanelCallbacks"]
+    class C_0000124404354980924732 {
+        +remove_api_key : std::function&lt;void &lpar;&rpar;&gt;
+        +save_api_key : std::function&lt;void &lpar;const char *&rpar;&gt;
+        +save_reviewer_name : std::function&lt;void &lpar;const char *&rpar;&gt;
+        +save_settings : std::function&lt;void &lpar;const ai::AiProviderSettings &&rpar;&gt;
+        +set_language : std::function&lt;void &lpar;ui::Language&rpar;&gt;
+        +set_show_fps : std::function&lt;void &lpar;bool&rpar;&gt;
+        +test_connection : std::function&lt;void &lpar;&rpar;&gt;
+    }
+    class C_0003699041686715214899["ui::panels::ProblemsPanelModel"]
+    class C_0003699041686715214899 {
+        +ai_review_running : bool
+        +problems_manager : const core::ProblemsManager &
+        +ui_state : ui::UiState &
+    }
+    class C_0004722388747884174846["ui::panels::ProblemsPanelCallbacks"]
+    class C_0004722388747884174846 {
+        +on_ai_review_requested : std::function&lt;void &lpar;&rpar;&gt;
+        +on_problem_activated : std::function&lt;void &lpar;const core::ProblemItem &&rpar;&gt;
+    }
+    class C_0006198266850458626743["ui::panels::ProjectFilesPanelModel"]
+    class C_0006198266850458626743 {
+        +project : const core::AssuranceProject *
+        +proposal_validity_by_path : std::map&lt;std::string,core::reviews::ProposalValidityResult&gt;
+    }
+    class C_0007151013292163442346["ui::panels::ProjectFilesPanelCallbacks"]
+    class C_0007151013292163442346 {
+        +add_evidence_register : std::function&lt;void &lpar;&rpar;&gt;
+        +add_j3377_cae_register : std::function&lt;void &lpar;&rpar;&gt;
+        +add_sacm_file : std::function&lt;void &lpar;&rpar;&gt;
+        +open_file : std::function&lt;void &lpar;const core::ProjectFileEntry &&rpar;&gt;
+    }
+    class C_0003696604191690353867["ui::panels::ReviewPanelModel"]
+    class C_0003696604191690353867 {
+        +active_proposal_can_save : bool
+        +active_proposal_operation_count : size_t
+        +active_proposal_review_item_id : std::string
+        +guideline_options : std::vector&lt;ReviewGuidelineOption&gt;
+        +guideline_status : std::string
+        +has_project : bool
+        +proposal_validity : std::map&lt;std::string,core::reviews::ProposalValidityResult&gt;
+        +review_items : std::vector&lt;core::reviews::ReviewItem&gt;
+        +selected_element_id : std::string
+    }
+    class C_0000866513250259195958["ui::panels::ReviewPanelCallbacks"]
+    class C_0000866513250259195958 {
+        +add_review_item : std::function&lt;void &lpar;const std::string &,const std::string &,const std::vector&lt;std::string&gt; &&rpar;&gt;
+        +apply_proposal : std::function&lt;void &lpar;const core::reviews::ReviewItem &&rpar;&gt;
+        +create_proposed_change : std::function&lt;void &lpar;const core::reviews::ReviewItem &&rpar;&gt;
+        +delete_proposal : std::function&lt;void &lpar;const core::reviews::ReviewItem &&rpar;&gt;
+        +delete_review_item : std::function&lt;void &lpar;const core::reviews::ReviewItem &&rpar;&gt;
+        +edit_proposal : std::function&lt;void &lpar;const core::reviews::ReviewItem &&rpar;&gt;
+        +preview_proposal : std::function&lt;void &lpar;const core::reviews::ReviewItem &&rpar;&gt;
+        +resolve_review_item : std::function&lt;void &lpar;const core::reviews::ReviewItem &&rpar;&gt;
+        +save_proposal : std::function&lt;void &lpar;const core::reviews::ReviewItem &&rpar;&gt;
+    }
+    class C_0005674361565849133597["ui::panels::SacmViewerPanelModel"]
+    class C_0005674361565849133597 {
+        +app_state : core::AppState &
+        +dir_path_buf : char *
+        +dir_path_buf_size : std::size_t
+        +file_path_buf : char *
+        +file_path_buf_size : std::size_t
+        +selected_file_idx : int &
+        +show_overwrite_confirm : bool &
+        +xml_files : std::vector&lt;std::string&gt; &
+    }
+    class C_0005685068917753774760["ui::panels::SacmViewerPanelCallbacks"]
+    class C_0005685068917753774760 {
+        +on_load_failure : std::function&lt;void &lpar;&rpar;&gt;
+        +on_load_success : std::function&lt;void &lpar;&rpar;&gt;
+        +scan_directory : std::function&lt;void &lpar;&rpar;&gt;
+    }
+    class C_0002169444651622881139["ui::panels::WelcomeModalCallbacks"]
+    class C_0002169444651622881139 {
+        +create_empty_project : std::function&lt;void &lpar;&rpar;&gt;
+        +create_project_from_template : std::function&lt;void &lpar;&rpar;&gt;
+        +import_sacm : std::function&lt;void &lpar;&rpar;&gt;
+        +open_project : std::function&lt;void &lpar;&rpar;&gt;
+        +open_recent_project : std::function&lt;void &lpar;const RecentProjectEntry &&rpar;&gt;
+    }
+    class C_0008998290058328269355["ui::CseRegisterRow"]
+    class C_0008998290058328269355 {
+        +assessment_status : std::string
+        +claim : std::string
+        +claim_criteria : std::string
+        +claim_id : std::string
+        +claim_owner : std::string
+        +cse_id : std::string
+        +evidence : std::string
+        +evidence_criteria : std::string
+        +evidence_id : std::string
+        +evidence_owner : std::string
+        +notes : std::string
+        +safety_case_owner : std::string
+    }
+    class C_0015703289685510135373["ui::EvidenceRegisterRow"]
+    class C_0015703289685510135373 {
+        +controlled_environment : std::string
+        +evidence : std::string
+        +evidence_id : std::string
+        +evidence_owner : std::string
+        +maturity : std::string
+        +notes : std::string
+        +recency : std::string
+        +type : std::string
+        +used_by_cse_count : int
+    }
+    class C_0005790896321181908735["ui::ElementContextActions"]
+    class C_0005790896321181908735 {
+        +add_child : std::function&lt;void &lpar;core::NewElementKind&rpar;&gt;
+        +add_top_goal : std::function&lt;void &lpar;&rpar;&gt;
+        +not_implemented : std::function&lt;void &lpar;const char *&rpar;&gt;
+        +remove_selected : std::function&lt;void &lpar;core::RemoveMode&rpar;&gt;
+    }
+    class C_0004887625161356621930["ui::UiState"]
+    class C_0004887625161356621930 {
+        +active_problem_filter : ProblemFilter
+        +active_secondary_lang : std::string
+        +attention_element_ids : std::unordered_set&lt;std::string&gt;
+        +center_on_marked : bool
+        +center_on_selection : bool
+        +center_view : CenterView
+        +dim_non_proposal_nodes : bool
+        +marked_for_removal : std::unordered_set&lt;std::string&gt;
+        +model_has_translations : bool
+        +proposal_canvas_active : bool
+        +proposal_highlight_ids : std::unordered_set&lt;std::string&gt;
+        +selected_element_id : std::string
+        +selected_problem_element_id : std::string
+        +selected_problem_id : std::string
+        +show_secondary_language : bool
+    }
+    C_0003699041686715214899 --> C_0004887625161356621930 : +ui_state
+
+%% Generated with clang-uml, version 0.6.2
+%% LLVM version clang version 20.1.7 (https://github.com/llvm/llvm-project.git 6146a88f60492b520a36f8f8f3231e15f3cc6082)

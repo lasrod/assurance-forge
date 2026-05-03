@@ -29,7 +29,7 @@ flowchart TD
 | `ai_*` | AI settings, secret storage, HTTP client, provider, service, and task runner. |
 | `current_tree` | Derived hierarchy built from `app_state.loaded_case`. |
 | `tree_needs_rebuild` | Marks `current_tree` stale after model changes. |
-| layout ratios | Persisted frame layout sizes for side panels and bottom panel. |
+| layout ratios | Runtime layout sizes for side panels and bottom panel. These are not persisted in the current code. |
 
 `core::AppState` owns the loaded data:
 
@@ -79,7 +79,7 @@ flowchart LR
 | `StatusMessageEvent` | Replace the status message shown by the app. |
 | `TreeDirtyEvent` | Rebuild `current_tree` from the parser model. |
 | `DocumentDirtyEvent` | Mark document state dirty. |
-| `ReviewItemsDirtyEvent` | Mark review item storage dirty. |
+| `ReviewItemsDirtyEvent` | Mark review items dirty and resync review-derived problems into `ProblemsManager`. |
 | `ProjectFilesChangedEvent` | Project manifest or tracked file state changed. |
 | `ActiveModelChangedEvent` | A new model is loaded and derived views must refresh. |
 | `SelectionChangedEvent` | Selected element changed. |
@@ -106,4 +106,4 @@ sequenceDiagram
     Runtime->>UI: render updated views
 ```
 
-Only the parser model and SACM package are durable editing state. Tree, GSN layout, register rows, and proposal preview state are derived.
+Only the parser model and SACM package are durable editing state. Tree, GSN layout, register rows, proposal preview state, and layout ratios are derived or runtime-only.

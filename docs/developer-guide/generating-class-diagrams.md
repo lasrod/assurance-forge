@@ -84,6 +84,8 @@ Generated Mermaid files should appear under:
 docs/diagrams/generated/
 ```
 
+These generated `.mmd` files are documentation assets for the architecture section. When they change, review and commit the updated outputs.
+
 ## Diagram Strategy
 
 Prefer small diagrams such as:

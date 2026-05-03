@@ -1,0 +1,192 @@
+classDiagram
+    class C_0016999682384651646340["core::reviews::ReviewItem"]
+    class C_0016999682384651646340 {
+        +applied_note : std::string
+        +created_utc : std::string
+        +element_id : std::string
+        +guideline_ids : std::vector&lt;std::string&gt;
+        +id : std::string
+        +message : std::string
+        +proposal_id : std::optional&lt;std::string&gt;
+        +reviewer_name : std::string
+        +severity : std::string
+        +source : ReviewItemSource
+        +status : ReviewItemStatus
+        +title : std::string
+        +updated_utc : std::string
+    }
+    class C_0009182410735050953243["core::reviews::ReviewItemManager"]
+    class C_0009182410735050953243 {
+        +AddOrUpdateItem() bool
+        +Clear() void
+        +ClearProposal() bool
+        +FilePath() [const] const std::filesystem::path &
+        +GetItemById() [const] std::optional&lt;ReviewItem&gt;
+        +GetItems() [const] const std::vector&lt;ReviewItem&gt; &
+        +GetItemsForElement() [const] std::vector&lt;ReviewItem&gt;
+        +Load() bool
+        +RemoveItem() bool
+        +Save() [const] bool
+        +SetFilePath() void
+        +SetProposal() bool
+    }
+    class C_0000946338164996858756["core::reviews::ReviewProposalManager"]
+    class C_0000946338164996858756 {
+        +ReviewProposalManager() [default] void
+        +ReviewProposalManager() void
+        +DeleteProposal() [const] bool
+        +ListProposals() [const] std::vector&lt;ReviewProposalSummary&gt;
+        +LoadProposal() [const] std::optional&lt;ReviewProposal&gt;
+        +ProposalPath() [const] std::filesystem::path
+        +ProposalsDirectory() [const] std::filesystem::path
+        +SaveProposal() [const] bool
+        +SetProjectRoot() void
+    }
+    class C_0016641456174933430124["core::reviews::PatchOperation"]
+    class C_0016641456174933430124 {
+        +create_ref : std::optional&lt;std::string&gt;
+        +element : std::optional&lt;ElementRef&gt;
+        +field : std::string
+        +new_value : std::string
+        +old_value : std::string
+        +source : std::optional&lt;ElementRef&gt;
+        +target : std::optional&lt;ElementRef&gt;
+        +text : std::string
+        +type : PatchOperationType
+    }
+    class C_0003931808061425075181["core::reviews::ReviewProposal"]
+    class C_0003931808061425075181 {
+        +affected_existing_element_ids : std::vector&lt;std::string&gt;
+        +anchor_element_id : std::string
+        +author_name : std::string
+        +base_element_hashes : std::map&lt;std::string,std::string&gt;
+        +base_model_hash : std::string
+        +created_utc : std::string
+        +id : std::string
+        +operations : std::vector&lt;PatchOperation&gt;
+        +review_item_id : std::string
+        +schema : std::string
+        +summary : std::string
+        +title : std::string
+    }
+    class C_0012883618019977309886["core::reviews::ProposalValidityResult"]
+    class C_0012883618019977309886 {
+        +reason : std::string
+        +validity : ProposalValidity
+    }
+    class C_0004717972371594441408["core::reviews::ReviewProposalPatchService"]
+    class C_0004717972371594441408 {
+        +ApplyProposal() [const] ApplyProposalResult
+        +BuildPreviewModel() [const] ProposalPreviewResult
+    }
+    class C_0010658984403031796949["core::ProblemsManager"]
+    class C_0010658984403031796949 {
+        +AddOrUpdateProblem() void
+        +AddProblem() void
+        +ClearProblems() void
+        +ClearProblemsBySource() void
+        +ClearProblemsForElement() void
+        +ClearProblemsForElementAndSource() void
+        +GetProblemById() [const] std::optional&lt;ProblemItem&gt;
+        +GetProblems() [const] const std::vector&lt;ProblemItem&gt; &
+        +RemoveProblem() void
+    }
+    class C_0002151586101114783866["core::ProblemItem"]
+    class C_0002151586101114783866 {
+        +element_id : std::string
+        +guideline_id : std::string
+        +id : std::string
+        +message : std::string
+        +severity : ProblemSeverity
+        +source : ProblemSource
+        +type : std::string
+    }
+    class C_0010245723990062244501["ai::AiReviewPayload"]
+    class C_0010245723990062244501 {
+        +children : std::vector&lt;AiReviewElement&gt;
+        +parent : std::optional&lt;AiReviewElement&gt;
+        +selected : AiReviewElement
+    }
+    class C_0005649554479386210609["ai::AiReviewRequestArtifacts"]
+    class C_0005649554479386210609 {
+        +childElementsJson : std::string
+        +debugText : std::string
+        +expectedResponseSchema : std::string
+        +guidelinesJson : std::string
+        +parentElementJson : std::string
+        +prompt : std::string
+        +responseSchemaJson : std::string
+        +selectedElementJson : std::string
+        +systemInstruction : std::string
+    }
+    class C_0011354165501113072869["ai::AiReviewParseResult"]
+    class C_0011354165501113072869 {
+        +errorMessage : std::string
+        +problems : std::vector&lt;core::ProblemItem&gt;
+        +reviewedElementId : std::string
+        +reviewedElementType : std::string
+        +sanitizedJson : std::string
+        +success : bool
+    }
+    class C_0010934040251334375480["ai::AiService"]
+    class C_0010934040251334375480 {
+        +AiService() void
+        +DeleteApiKey() [const] SecretStoreResult
+        +Generate() [const] AiResponse
+        +HasConfiguredProvider() [const] bool
+        +HasStoredApiKey() [const] bool
+        +IsEnabled() [const] bool
+        +LoadSettings() [const] AiProviderSettings
+        +SaveApiKey() [const] SecretStoreResult
+        +SaveSettings() [const] bool
+        +TestConnection() [const] AiConnectionStatus
+    }
+    class C_0013475600322202897534["ai::AiTaskHandle"]
+    class C_0013475600322202897534 {
+        +IsRunning() [const] bool
+        +Snapshot() [const] AiTaskSnapshot
+        +WaitUntilComplete() [const] bool
+    }
+    class C_0009702960692756929634["ai::AiTaskRunner"]
+    class C_0009702960692756929634 {
+        +RunConnectionTest() std::shared_ptr&lt;AiTaskHandle&gt;
+        +RunGenerate() std::shared_ptr&lt;AiTaskHandle&gt;
+    }
+    class C_0016410527304159765629["ai::AiProviderSettings"]
+    class C_0016410527304159765629 {
+        +displayName : std::string
+        +enabled : bool
+        +model : std::string
+        +provider : AiProviderId
+        +sendProjectDataOnlyOnExplicitUserAction : bool
+    }
+    class C_0003575893567296355054["ai::AiRequest"]
+    class C_0003575893567296355054 {
+        +jsonSchema : std::optional&lt;std::string&gt;
+        +jsonSchemaName : std::optional&lt;std::string&gt;
+        +systemInstruction : std::string
+        +userPrompt : std::string
+    }
+    class C_0014653764526778817426["ai::AiResponse"]
+    class C_0014653764526778817426 {
+        +errorCode : AiErrorCode
+        +errorMessage : std::string
+        +httpStatus : long
+        +rawJson : std::string
+        +success : bool
+        +text : std::string
+    }
+    C_0009182410735050953243 o-- C_0016999682384651646340 : -items_
+    C_0000946338164996858756 ..> C_0003931808061425075181 : 
+    C_0003931808061425075181 o-- C_0016641456174933430124 : +operations
+    C_0004717972371594441408 ..> C_0003931808061425075181 : 
+    C_0010658984403031796949 o-- C_0002151586101114783866 : -problems_
+    C_0011354165501113072869 o-- C_0002151586101114783866 : +problems
+    C_0010934040251334375480 ..> C_0016410527304159765629 : 
+    C_0010934040251334375480 ..> C_0003575893567296355054 : 
+    C_0010934040251334375480 ..> C_0014653764526778817426 : 
+    C_0013475600322202897534 <.. C_0009702960692756929634 : +[friend]
+    C_0009702960692756929634 ..> C_0013475600322202897534 : 
+
+%% Generated with clang-uml, version 0.6.2
+%% LLVM version clang version 20.1.7 (https://github.com/llvm/llvm-project.git 6146a88f60492b520a36f8f8f3231e15f3cc6082)

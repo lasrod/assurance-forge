@@ -47,6 +47,8 @@ The problems panel activates a problem by selecting its element and requesting f
 
 `ReviewController` wraps `ReviewItemManager`, tracks dirty state, and saves review items through project storage.
 
+When review items change, `ReviewItemsDirtyEvent` causes AppRuntime to call `SyncReviewProblems()`, which converts open review items into `ReviewComment` and `GuidelineReview` problem entries in `ProblemsManager`.
+
 ## Review Proposals
 
 `core::reviews::ReviewProposal` stores structured patch operations.

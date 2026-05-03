@@ -1,6 +1,6 @@
 # UI Panels
 
-The UI layer renders Dear ImGui views. Panels receive data models and callbacks from `AppRuntime`; controllers perform the business work.
+The UI layer renders Dear ImGui views. Most panels receive data models and callbacks from `AppRuntime`, and controllers perform the business work. The main exception is the element properties panel, which edits the active parser element directly and syncs those field changes back into the SACM package.
 
 ```mermaid
 flowchart TD
@@ -21,11 +21,11 @@ flowchart TD
 | --- | --- | --- | --- |
 | Tree view | `ui::ShowTreeViewPanel` | `core::AssuranceTree`, parser model, `ui::UiState` | `ElementContextActions`, selection state. |
 | GSN canvas | `ui::gsn::ShowGsnCanvasContent` | `core::AssuranceTree`, parser model, `ui::UiState` | `ElementContextActions`, selection state. |
-| Element panel | `ui::panels::ShowElementPanel` | Selected parser element and SACM package | Direct edit plus `sync_to_sacm()`. |
+| Element panel | `ui::panels::ShowElementPanel` | Selected parser element and SACM package | Direct in-panel edits plus `sync_to_sacm()`, then AppRuntime emits dirty events. |
 | Problems panel | `ui::panels::ShowProblemsPanel` | `core::ProblemsManager`, `ui::UiState` | Problem activation and AI review callbacks. |
 | Review panel | `ui::panels::ShowReviewPanel` | Review items, guidelines, proposal validity | Review/proposal callbacks. |
 | Project files panel | `ui::panels::ShowProjectFilesPanel` | `core::AssuranceProject` | Add/open file callbacks. |
-| SACM viewer panel | `ui::panels::ShowSacmViewerPanel` | `core::AppState`, directory buffers, XML file list | Scan/load callbacks. |
+| SACM viewer panel | `ui::panels::ShowSacmViewerPanel` | `core::AppState`, directory buffers, XML file list | Scan/load callbacks. Defined in the codebase, but not mounted in the current `RenderFrame()` layout. |
 | Preferences window | `ui::panels::ShowPreferencesWindow` | AI settings, language, FPS, reviewer name | Settings, API key, language, FPS callbacks. |
 | Welcome modal | `ui::panels::ShowWelcomeModal` | Recent project list | Create/open/import callbacks. |
 | CSE register | `ui::ShowCseRegisterView` | Register rows derived from parser model | None. |
@@ -116,3 +116,12 @@ Tree and canvas context menus share `ui::ElementContextActions`:
 | `not_implemented` | Route unavailable commands to the modal system. |
 
 Panels do not own project or document state. They render current state, collect input, and call callbacks.
+
+The current main-frame layout is:
+
+- Left top: project files panel
+- Left bottom: safety case tree
+- Center: GSN canvas or register tabs
+- Bottom center: problems panel
+- Right top: element properties
+- Right bottom: review panel

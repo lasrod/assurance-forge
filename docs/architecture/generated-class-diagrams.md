@@ -1,6 +1,6 @@
 # Generated Class Diagrams
 
-Class diagrams are generated from the C++ codebase by [`clang-uml`](https://github.com/bkryza/clang-uml). The generated files are written to `docs/diagrams/generated/` during the documentation workflow.
+Class diagrams are generated from the C++ codebase by [`clang-uml`](https://github.com/bkryza/clang-uml). The generated Mermaid files live under `docs/diagrams/generated/` and are expected to be refreshed when the diagram config changes.
 
 The diagrams are focused by subsystem. Do not generate a repository-wide class diagram.
 
@@ -17,7 +17,7 @@ The diagrams are focused by subsystem. Do not generate a repository-wide class d
 
 ## Core Relationships
 
-This hand-authored diagram mirrors the generated groups and stays visible even before CI produces `.mmd` files.
+This hand-authored diagram mirrors the generated groups and stays visible even if the generated Mermaid files have not been refreshed yet.
 
 ```mermaid
 classDiagram
@@ -97,3 +97,5 @@ Generated output appears under:
 ```text
 docs/diagrams/generated/
 ```
+
+The generated `.mmd` files are part of the documentation assets. If they are out of date, rerun `clang-uml -g mermaid` and review the diff.

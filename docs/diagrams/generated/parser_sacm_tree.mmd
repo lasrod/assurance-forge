@@ -1,0 +1,157 @@
+classDiagram
+    class C_0006263608242708909058["parser::SacmElement"]
+    class C_0006263608242708909058 {
+        +assertion_declaration : std::string
+        +content : std::string
+        +content_langs : std::map&lt;std::string,std::string&gt;
+        +description : std::string
+        +description_langs : std::map&lt;std::string,std::string&gt;
+        +id : std::string
+        +name : std::string
+        +name_langs : std::map&lt;std::string,std::string&gt;
+        +reasoning_ref : std::string
+        +source_refs : std::vector&lt;std::string&gt;
+        +target_refs : std::vector&lt;std::string&gt;
+        +type : std::string
+        +undeveloped : bool
+    }
+    class C_0013713948501498241247["parser::AssuranceCase"]
+    class C_0013713948501498241247 {
+        +description : std::string
+        +elements : std::vector&lt;SacmElement&gt;
+        +id : std::string
+        +name : std::string
+    }
+    class C_0012739361560749126208["parser::ParseResult"]
+    class C_0012739361560749126208 {
+        +assurance_case : AssuranceCase
+        +error_message : std::string
+        +success : bool
+    }
+    class C_0017919998396293923545["sacm::MultiLangText"]
+    class C_0017919998396293923545 {
+        +get() [const] std::string
+        +get_primary() [const] std::string
+        +has() [const] bool
+        +has_secondary() [const] bool
+        +set() void
+        +texts : std::map&lt;std::string,std::string&gt;
+    }
+    class C_0012442822666216988727["sacm::SacmElement"]
+    class C_0012442822666216988727 {
+        +abstractForm : std::string
+        +citedElement : std::string
+        +description : std::string
+        +description_ml : MultiLangText
+        +gid : std::string
+        +id : std::string
+        +isAbstract : bool
+        +isCitation : bool
+        +name : std::string
+        +name_ml : MultiLangText
+    }
+    class C_0006914431236402278891["sacm::Claim"]
+    class C_0006914431236402278891 {
+        +assertionDeclaration : std::string
+        +content : std::string
+        +content_ml : MultiLangText
+        +undeveloped : bool
+    }
+    class C_0000221947954733190674["sacm::ArgumentReasoning"]
+    class C_0000221947954733190674 {
+        +content : std::string
+        +content_ml : MultiLangText
+        +undeveloped : bool
+    }
+    class C_0007850271152066243180["sacm::ArtifactReference"]
+    class C_0007850271152066243180 {
+        +referencedArtifact : std::string
+    }
+    class C_0011160212031445639292["sacm::AssertedRelationship"]
+    class C_0011160212031445639292 {
+        +assertionDeclaration : std::string
+        +isCounter : bool
+        +sources : std::vector&lt;std::string&gt;
+        +targets : std::vector&lt;std::string&gt;
+    }
+    class C_0013021424073241615845["sacm::AssertedInference"]
+    class C_0013021424073241615845 {
+        +reasoning : std::string
+    }
+    class C_0011094606916294712569["sacm::AssertedContext"]
+    class C_0011094606916294712569 {
+    }
+    class C_0004615167674896600095["sacm::AssertedEvidence"]
+    class C_0004615167674896600095 {
+    }
+    class C_0003961088887131244194["sacm::ArgumentPackage"]
+    class C_0003961088887131244194 {
+        +argumentReasonings : std::vector&lt;ArgumentReasoning&gt;
+        +artifactReferences : std::vector&lt;ArtifactReference&gt;
+        +assertedContexts : std::vector&lt;AssertedContext&gt;
+        +assertedEvidences : std::vector&lt;AssertedEvidence&gt;
+        +assertedInferences : std::vector&lt;AssertedInference&gt;
+        +claims : std::vector&lt;Claim&gt;
+    }
+    class C_0001104147169173580806["sacm::AssuranceCasePackage"]
+    class C_0001104147169173580806 {
+        +argumentPackages : std::vector&lt;ArgumentPackage&gt;
+        +artifactPackages : std::vector&lt;ArtifactPackage&gt;
+        +namespace_prefix : std::string
+        +namespace_uri : std::string
+        +terminologyPackages : std::vector&lt;TerminologyPackage&gt;
+    }
+    class C_0014187719946001895722["core::TreeNode"]
+    class C_0014187719946001895722 {
+        +group : ElementGroup
+        +group1_children : std::vector&lt;TreeNode *&gt;
+        +group2_attachments : std::vector&lt;TreeNode *&gt;
+        +id : std::string
+        +label : std::string
+        +label_secondary : std::string
+        +left_overhang : int
+        +parent : TreeNode *
+        +right_overhang : int
+        +role : NodeRole
+        +subtree_width : int
+        +undeveloped : bool
+    }
+    class C_0013033699509429474571["core::AssuranceTree"]
+    class C_0013033699509429474571 {
+        +Build() AssuranceTree$
+        +nodes : std::vector&lt;std::unique_ptr&lt;TreeNode&gt;&gt;
+        +orphans : std::vector&lt;TreeNode *&gt;
+        +root : TreeNode *
+    }
+    C_0013713948501498241247 o-- C_0006263608242708909058 : +elements
+    C_0012739361560749126208 o-- C_0013713948501498241247 : +assurance_case
+    C_0012442822666216988727 o-- C_0017919998396293923545 : +name_ml
+    C_0012442822666216988727 o-- C_0017919998396293923545 : +description_ml
+    C_0006914431236402278891 o-- C_0017919998396293923545 : +content_ml
+    C_0012442822666216988727 <|-- C_0006914431236402278891 : 
+    C_0000221947954733190674 o-- C_0017919998396293923545 : +content_ml
+    C_0012442822666216988727 <|-- C_0000221947954733190674 : 
+    C_0012442822666216988727 <|-- C_0007850271152066243180 : 
+    C_0012442822666216988727 <|-- C_0011160212031445639292 : 
+    C_0011160212031445639292 <|-- C_0013021424073241615845 : 
+    C_0011160212031445639292 <|-- C_0011094606916294712569 : 
+    C_0011160212031445639292 <|-- C_0004615167674896600095 : 
+    C_0003961088887131244194 o-- C_0006914431236402278891 : +claims
+    C_0003961088887131244194 o-- C_0000221947954733190674 : +argumentReasonings
+    C_0003961088887131244194 o-- C_0007850271152066243180 : +artifactReferences
+    C_0003961088887131244194 o-- C_0013021424073241615845 : +assertedInferences
+    C_0003961088887131244194 o-- C_0011094606916294712569 : +assertedContexts
+    C_0003961088887131244194 o-- C_0004615167674896600095 : +assertedEvidences
+    C_0012442822666216988727 <|-- C_0003961088887131244194 : 
+    C_0001104147169173580806 o-- C_0003961088887131244194 : +argumentPackages
+    C_0012442822666216988727 <|-- C_0001104147169173580806 : 
+    C_0014187719946001895722 --> C_0014187719946001895722 : +group1_children
+    C_0014187719946001895722 --> C_0014187719946001895722 : +group2_attachments
+    C_0014187719946001895722 --> C_0014187719946001895722 : +parent
+    C_0013033699509429474571 ..> C_0013713948501498241247 : 
+    C_0013033699509429474571 --> C_0014187719946001895722 : +root
+    C_0013033699509429474571 --> C_0014187719946001895722 : +orphans
+    C_0013033699509429474571 o-- C_0014187719946001895722 : +nodes
+
+%% Generated with clang-uml, version 0.6.2
+%% LLVM version clang version 20.1.7 (https://github.com/llvm/llvm-project.git 6146a88f60492b520a36f8f8f3231e15f3cc6082)
