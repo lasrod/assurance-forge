@@ -20,3 +20,172 @@ diagrams:
     exclude:
       access:
         - private
+
+  parser_sacm_tree:
+    type: class
+    glob:
+      - src/parser/*.cpp
+      - src/parser/*.h
+      - src/sacm/*.cpp
+      - src/sacm/*.h
+      - src/core/assurance_tree.cpp
+      - src/core/assurance_tree.h
+    include:
+      elements:
+        - parser::AssuranceCase
+        - parser::SacmElement
+        - parser::ParseResult
+        - sacm::MultiLangText
+        - sacm::SacmElement
+        - sacm::AssuranceCasePackage
+        - sacm::ArgumentPackage
+        - sacm::Claim
+        - sacm::ArgumentReasoning
+        - sacm::ArtifactReference
+        - sacm::AssertedRelationship
+        - sacm::AssertedInference
+        - sacm::AssertedContext
+        - sacm::AssertedEvidence
+        - core::AssuranceTree
+        - core::TreeNode
+      context:
+        - parser::AssuranceCase
+        - sacm::AssuranceCasePackage
+        - core::AssuranceTree
+    exclude:
+      access:
+        - private
+
+  project_storage:
+    type: class
+    glob:
+      - src/core/project_model.cpp
+      - src/core/project_model.h
+      - src/core/project_service.cpp
+      - src/core/project_service.h
+      - src/core/app_state.cpp
+      - src/core/app_state.h
+    include:
+      elements:
+        - core::AppState
+        - core::AssuranceProject
+        - core::ProjectFileEntry
+        - core::ProjectLoadReport
+        - core::ProjectLoadStep
+        - core::ProjectService
+      context:
+        - core::AppState
+        - core::AssuranceProject
+        - core::ProjectService
+    exclude:
+      access:
+        - private
+
+  controllers:
+    type: class
+    glob:
+      - src/app/app_events.h
+      - src/app/app_runtime_state.h
+      - src/app/controllers/*.cpp
+      - src/app/controllers/*.h
+      - src/core/element_factory.cpp
+      - src/core/element_factory.h
+    include:
+      elements:
+        - app::AppRuntimeState
+        - app::AppEvents
+        - app::controllers::ElementEditController
+        - app::controllers::AiReviewController
+        - app::controllers::ReviewController
+        - app::controllers::ProposalController
+        - app::controllers::ProjectController
+        - app::controllers::ModalCoordinator
+      context:
+        - app::AppRuntimeState
+        - app::controllers::ElementEditController
+        - app::controllers::AiReviewController
+        - app::controllers::ReviewController
+        - app::controllers::ProposalController
+        - app::controllers::ProjectController
+        - app::controllers::ModalCoordinator
+    exclude:
+      access:
+        - private
+
+  ui_panels:
+    type: class
+    glob:
+      - src/ui/*.cpp
+      - src/ui/*.h
+      - src/ui/gsn/*.cpp
+      - src/ui/gsn/*.h
+      - src/ui/panels/*.cpp
+      - src/ui/panels/*.h
+    include:
+      elements:
+        - ui::UiState
+        - ui::ElementContextActions
+        - ui::CseRegisterRow
+        - ui::EvidenceRegisterRow
+        - ui::gsn::GsnNode
+        - ui::panels::ProblemsPanelModel
+        - ui::panels::ProblemsPanelCallbacks
+        - ui::panels::ReviewPanelModel
+        - ui::panels::ReviewPanelCallbacks
+        - ui::panels::ProjectFilesPanelModel
+        - ui::panels::ProjectFilesPanelCallbacks
+        - ui::panels::SacmViewerPanelModel
+        - ui::panels::SacmViewerPanelCallbacks
+        - ui::panels::PreferencesPanelModel
+        - ui::panels::PreferencesPanelCallbacks
+        - ui::panels::WelcomeModalCallbacks
+      context:
+        - ui::UiState
+        - ui::ElementContextActions
+        - ui::panels::ReviewPanelModel
+        - ui::panels::ProblemsPanelModel
+        - ui::panels::ProjectFilesPanelModel
+    exclude:
+      access:
+        - private
+
+  review_ai:
+    type: class
+    glob:
+      - src/core/reviews/*.cpp
+      - src/core/reviews/*.h
+      - src/core/problems/*.cpp
+      - src/core/problems/*.h
+      - src/ai/*.cpp
+      - src/ai/*.h
+    include:
+      elements:
+        - core::ProblemItem
+        - core::ProblemsManager
+        - core::reviews::ReviewItem
+        - core::reviews::ReviewItemManager
+        - core::reviews::ReviewProposal
+        - core::reviews::PatchOperation
+        - core::reviews::ReviewProposalManager
+        - core::reviews::ReviewProposalPatchService
+        - core::reviews::ProposalValidityResult
+        - ai::AiService
+        - ai::AiTaskRunner
+        - ai::AiTaskHandle
+        - ai::AiProviderSettings
+        - ai::AiRequest
+        - ai::AiResponse
+        - ai::AiReviewPayload
+        - ai::AiReviewRequestArtifacts
+        - ai::AiReviewParseResult
+      context:
+        - core::ProblemsManager
+        - core::reviews::ReviewItemManager
+        - core::reviews::ReviewProposalManager
+        - core::reviews::ReviewProposalPatchService
+        - ai::AiService
+        - ai::AiTaskRunner
+        - ai::AiReviewPayload
+    exclude:
+      access:
+        - private

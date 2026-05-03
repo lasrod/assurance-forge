@@ -1,6 +1,7 @@
 # Build directories
 build/
 build-coverage/
+build-docs/
 out/
 cmake-build-*/
 

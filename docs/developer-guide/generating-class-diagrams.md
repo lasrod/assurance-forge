@@ -89,9 +89,10 @@ docs/diagrams/generated/
 Prefer small diagrams such as:
 
 - Problem manager
-- Review system
-- SACM import/export
-- Core domain model
-- UI panels
+- Parser, SACM, and tree model
+- Project storage
+- Controllers
+- UI panels and panel callbacks
+- Review, proposal, problems, and AI service
 
 Avoid repository-wide diagrams because they become unreadable quickly.
