@@ -16,13 +16,7 @@ namespace {
 constexpr float kWelcomeBodyFontScale = 1.04f;
 constexpr float kWelcomeSectionTitleFontScale = kWelcomeBodyFontScale * 1.15f;
 constexpr float kWelcomeTitleFontScale = 2.30f;
-constexpr float kWelcomeCenterPivot = 0.5f;
-
-constexpr float kWelcomeViewportPadding = 32.0f;
-constexpr float kWelcomeMinWidth = 450.0f;
-constexpr float kWelcomeMinHeight = 450.0f;
-constexpr float kWelcomeTargetWidthRatio = 0.72f;
-constexpr float kWelcomeTargetHeightRatio = 0.78f;
+constexpr float kWelcomeWindowAnchor = 0.0f;
 constexpr float kWelcomeHoverSurfaceAlpha = 0.72f;
 
 constexpr float kWelcomeWindowPaddingX = 28.0f;
@@ -41,6 +35,12 @@ constexpr float kWelcomeWalkthroughCardSpacing = 8.0f;
 constexpr float kGetStartedProgress = 0.34f;
 constexpr float kFundamentalsProgress = 0.18f;
 constexpr float kConformanceProgress = 0.12f;
+constexpr float kWalkthroughPopupButtonWidth = 110.0f;
+
+constexpr const char* kWalkthroughPopupId = "Walkthroughs##not_implemented_popup";
+constexpr const char* kWalkthroughPopupTitle = "Walkthroughs";
+constexpr const char* kWalkthroughPopupMessage = "Walkthroughs are not yet implemented.";
+constexpr const char* kWalkthroughPopupButtonLabel = "OK";
 
 constexpr const char* kUtf8MiddleDot = "\xC2\xB7";
 
@@ -148,7 +148,7 @@ bool RecentLink(std::string_view id, const RecentProjectEntry& entry) {
     return clicked;
 }
 
-void WalkthroughCard(std::string_view id, std::string_view title, std::string_view subtitle, float progress) {
+bool WalkthroughCard(std::string_view id, std::string_view title, std::string_view subtitle, float progress) {
     constexpr float kCardHeight = 84.0f;
     constexpr float kCardBorderThickness = 1.0f;
     constexpr float kCardStripeHeight = 4.0f;
@@ -165,6 +165,7 @@ void WalkthroughCard(std::string_view id, std::string_view title, std::string_vi
 
     ImGui::InvisibleButton(id_string.c_str(), ImVec2(width, height));
     const bool hovered = ImGui::IsItemHovered();
+    const bool clicked = ImGui::IsItemClicked();
 
     const ImU32 fill = hovered ? theme.surface_3 : theme.surface_2;
     draw_list->AddRectFilled(pos, ImVec2(pos.x + width, pos.y + height), fill, theme.rounding_ui);
@@ -188,6 +189,8 @@ void WalkthroughCard(std::string_view id, std::string_view title, std::string_vi
         theme.text_secondary,
         subtitle.data(),
         subtitle.data() + subtitle.size());
+
+    return clicked;
 }
 
 }  // namespace
@@ -209,24 +212,17 @@ void ShowWelcomeModal(bool& is_open,
     };
 
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    const ImVec2 viewport_center(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f,
-                                 viewport->WorkPos.y + viewport->WorkSize.y * 0.5f);
-    ImGui::SetNextWindowPos(viewport_center, ImGuiCond_Always, ImVec2(kWelcomeCenterPivot, kWelcomeCenterPivot));
+    const ImVec2 viewport_pos = viewport->WorkPos;
     const ImVec2 viewport_size = viewport->WorkSize;
-    const float viewport_padding = Px(kWelcomeViewportPadding);
-    const float desired_width = std::max(Px(kWelcomeMinWidth), viewport_size.x * kWelcomeTargetWidthRatio);
-    const float desired_height = std::max(Px(kWelcomeMinHeight), viewport_size.y * kWelcomeTargetHeightRatio);
-    const float max_width = std::max(Px(kWelcomeMinWidth), viewport_size.x - viewport_padding);
-    const float max_height = std::max(Px(kWelcomeMinHeight), viewport_size.y - viewport_padding);
-    ImGui::SetNextWindowSize(ImVec2(std::min(desired_width, max_width),
-                                    std::min(desired_height, max_height)),
-                             ImGuiCond_Always);
+    ImGui::SetNextWindowPos(viewport_pos, ImGuiCond_Always, ImVec2(kWelcomeWindowAnchor, kWelcomeWindowAnchor));
+    ImGui::SetNextWindowSize(viewport_size, ImGuiCond_Always);
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Px(kWelcomeWindowPaddingX), Px(kWelcomeWindowPaddingY)));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(Px(kWelcomeItemSpacingX), Px(kWelcomeItemSpacingY)));
 
-    if (ImGui::BeginPopupModal("Welcome!", &is_open, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings)) {
+    if (ImGui::BeginPopupModal("Welcome!", &is_open, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings)) {
         const ui::Theme& theme = ui::GetTheme();
+        bool show_walkthrough_not_implemented = false;
 
         ImGui::SetWindowFontScale(kWelcomeBodyFontScale);
 
@@ -294,13 +290,36 @@ void ShowWelcomeModal(bool& is_open,
             ImGui::TableNextColumn();
             SectionTitle("Walkthroughs");
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeSectionTopSpacing)));
-            WalkthroughCard("##walkthrough_get_started", "Get started with Assurance Forge", "Create, inspect, and navigate a safety case", kGetStartedProgress);
+            if (WalkthroughCard("##walkthrough_get_started", "Get started with Assurance Forge", "Create, inspect, and navigate a safety case", kGetStartedProgress)) {
+                show_walkthrough_not_implemented = true;
+            }
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeWalkthroughCardSpacing)));
-            WalkthroughCard("##walkthrough_fundamentals", "Learn the Fundamentals", "GSN structure, SACM imports, evidence, and registers", kFundamentalsProgress);
+            if (WalkthroughCard("##walkthrough_fundamentals", "Learn the Fundamentals", "GSN structure, SACM imports, evidence, and registers", kFundamentalsProgress)) {
+                show_walkthrough_not_implemented = true;
+            }
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeWalkthroughCardSpacing)));
-            WalkthroughCard("##walkthrough_conformance", "Prepare a Conformance Review", "Trace claims, evidence, and review outputs", kConformanceProgress);
+            if (WalkthroughCard("##walkthrough_conformance", "Prepare a Conformance Review", "Trace claims, evidence, and review outputs", kConformanceProgress)) {
+                show_walkthrough_not_implemented = true;
+            }
 
             ImGui::EndTable();
+        }
+
+        if (show_walkthrough_not_implemented) {
+            ImGui::OpenPopup(kWalkthroughPopupId);
+        }
+
+        if (ImGui::BeginPopupModal(kWalkthroughPopupId, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::TextUnformatted(kWalkthroughPopupTitle);
+            ImGui::Separator();
+            ImGui::TextUnformatted(kWalkthroughPopupMessage);
+            ImGui::Spacing();
+            const float button_width = Px(kWalkthroughPopupButtonWidth);
+            ImGui::SetCursorPosX((ImGui::GetWindowWidth() - button_width) * 0.5f);
+            if (ImGui::Button(kWalkthroughPopupButtonLabel, ImVec2(button_width, 0.0f))) {
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
         }
 
         ImGui::EndPopup();
