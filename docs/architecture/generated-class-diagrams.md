@@ -1,10 +1,10 @@
 # Generated Class Diagrams
 
-This page contains class diagrams generated from the C++ codebase.
+Class diagrams on this page are generated from the C++ codebase by [`clang-uml`](https://github.com/bkryza/clang-uml) and injected automatically whenever `main` is deployed to GitHub Pages. Diagrams are kept focused by subsystem rather than spanning the whole repository.
 
-Generated diagrams should be focused by subsystem. Avoid creating one large class diagram for the entire repository.
+## Smoke-test placeholder
 
-## Smoke-test diagram
+The diagram below is a hand-written placeholder used to verify that Mermaid rendering is working. It will be replaced by an auto-generated diagram once the CI pipeline produces output for the `problem_system` subsystem.
 
 ```mermaid
 classDiagram
@@ -13,12 +13,12 @@ classDiagram
     ProblemsManager --> ProblemItem : manages
 ```
 
-## Planned generated diagrams
+## Planned subsystem diagrams
 
-Planned subsystem diagrams:
+The following subsystems are queued for diagram generation in `.clang-uml`:
 
-- Core domain model
-- Problem manager
+- Problem manager (`problem_system`)
 - Review and proposal workflow
 - SACM import/export
+- Core domain model
 - UI panels

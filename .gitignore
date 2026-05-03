@@ -47,6 +47,9 @@ coverage_core/
 # Generated docs output
 site/
 
+# Vendored Mermaid JS (download with: curl -fsSL https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js -o docs/javascripts/mermaid.min.js)
+docs/javascripts/mermaid.min.js
+
 # Generated docs diagrams (keep folder placeholder)
 docs/diagrams/generated/*
 !docs/diagrams/generated/.gitkeep
