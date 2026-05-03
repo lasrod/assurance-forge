@@ -44,5 +44,8 @@ tmp/
 coverage_full/
 coverage_core/
 
+# Generated docs output
+site/
+
 # ImGui state
 imgui.ini
