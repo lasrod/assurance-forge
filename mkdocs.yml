@@ -1,0 +1,54 @@
+site_name: Assurance Forge
+site_description: Open-source tooling for structured assurance and safety cases
+site_url: https://lasrod.github.io/assurance-forge/
+repo_url: https://github.com/lasrod/assurance-forge
+repo_name: lasrod/assurance-forge
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - content.code.copy
+    - content.tabs.link
+    - search.suggest
+    - search.highlight
+  palette:
+    - scheme: slate
+      primary: blue grey
+      accent: cyan
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - scheme: default
+      primary: blue grey
+      accent: cyan
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid-source
+          format: !!python/name:pymdownx.superfences.fence_div_format
+
+extra_javascript:
+  - javascripts/mermaid-config.js
+  - javascripts/mermaid.min.js
+  - javascripts/mermaid-init.js
+
+nav:
+  - Home: index.md
+  - Architecture:
+      - Overview: architecture/index.md
+      - Generated Class Diagrams: architecture/generated-class-diagrams.md
+  - Developer Guide:
+      - Overview: developer-guide/index.md
+      - Generating Class Diagrams: developer-guide/generating-class-diagrams.md

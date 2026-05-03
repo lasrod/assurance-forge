@@ -1,0 +1,3 @@
+window.mermaid = {
+  startOnLoad: false,
+};

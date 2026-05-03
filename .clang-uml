@@ -1,0 +1,22 @@
+compilation_database_dir: build-docs
+output_directory: docs/diagrams/generated
+generate_method_arguments: none
+generate_packages: true
+package_type: directory
+
+diagrams:
+  problem_system:
+    type: class
+    glob:
+      - src/core/problems/*.cpp
+      - src/core/problems/*.h
+    include:
+      elements:
+        - core::ProblemsManager
+        - core::ProblemItem
+      context:
+        - core::ProblemsManager
+        - core::ProblemItem
+    exclude:
+      access:
+        - private
