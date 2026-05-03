@@ -52,37 +52,37 @@ classDiagram
 ## Problem System
 
 ```mermaid
---8<-- "diagrams/generated/problem_system.mmd"
+--8<-- "docs/diagrams/generated/problem_system.mmd"
 ```
 
 ## Parser, SACM, And Tree
 
 ```mermaid
---8<-- "diagrams/generated/parser_sacm_tree.mmd"
+--8<-- "docs/diagrams/generated/parser_sacm_tree.mmd"
 ```
 
 ## Project Storage
 
 ```mermaid
---8<-- "diagrams/generated/project_storage.mmd"
+--8<-- "docs/diagrams/generated/project_storage.mmd"
 ```
 
 ## Controllers
 
 ```mermaid
---8<-- "diagrams/generated/controllers.mmd"
+--8<-- "docs/diagrams/generated/controllers.mmd"
 ```
 
 ## UI Panels
 
 ```mermaid
---8<-- "diagrams/generated/ui_panels.mmd"
+--8<-- "docs/diagrams/generated/ui_panels.mmd"
 ```
 
 ## Review And AI
 
 ```mermaid
---8<-- "diagrams/generated/review_ai.mmd"
+--8<-- "docs/diagrams/generated/review_ai.mmd"
 ```
 
 ## Generation Commands
