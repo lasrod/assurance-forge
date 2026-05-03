@@ -1,0 +1,93 @@
+classDiagram
+    class C_0006492155329873332603["core::ProjectFileEntry"]
+    class C_0006492155329873332603 {
+        +elementIndexHash : std::string
+        +hashAlgorithm : std::string
+        +id : std::string
+        +lastError : std::string
+        +parseStatus : std::string
+        +rawHash : std::string
+        +relationshipGraphHash : std::string
+        +relativePath : std::filesystem::path
+        +role : ProjectFileRole
+        +semanticHash : std::string
+        +state : ProjectFileState
+    }
+    class C_0016650468173840262292["core::AssuranceProject"]
+    class C_0016650468173840262292 {
+        +createdUtc : std::string
+        +createdWith : std::string
+        +defaultLanguage : std::string
+        +description : std::string
+        +files : std::vector&lt;ProjectFileEntry&gt;
+        +formatVersion : std::string
+        +id : std::string
+        +lastOpenedWith : std::string
+        +modifiedUtc : std::string
+        +name : std::string
+        +rootPath : std::filesystem::path
+        +validationMode : std::string
+    }
+    class C_0011658685545826616321["core::ProjectLoadStep"]
+    class C_0011658685545826616321 {
+        +label : std::string
+        +message : std::string
+        +status : ProjectLoadStepStatus
+    }
+    class C_0008174467001683259965["core::ProjectLoadReport"]
+    class C_0008174467001683259965 {
+        +has_failures() [const] bool
+        +showPopup : bool
+        +steps : std::vector&lt;ProjectLoadStep&gt;
+        +warnings : std::vector&lt;std::string&gt;
+    }
+    class C_0011895974459674442706["core::AppState"]
+    class C_0011895974459674442706 {
+        +create_empty_project() bool
+        +create_project_evidence_register() bool
+        +create_project_j3377_cae_register() bool
+        +create_project_sacm_file() bool
+        +load_file() bool
+        +mark_dirty() void
+        +open_project() bool
+        +open_project_file() bool
+        +save_current_document() bool
+        +save_file() bool
+        +save_project() bool
+        +active_project_file_path : std::filesystem::path
+        +active_project_file_role : ProjectFileRole
+        +current_project : std::optional&lt;AssuranceProject&gt;
+        +has_unsaved_changes : bool
+        +last_project_load_report : ProjectLoadReport
+        +loaded_case : std::optional&lt;parser::AssuranceCase&gt;
+        +loaded_file_path : std::filesystem::path
+        +sacm_package : std::optional&lt;sacm::AssuranceCasePackage&gt;
+        +status_message : std::string
+    }
+    class C_0007283506460794282918["core::ProjectService"]
+    class C_0007283506460794282918 {
+        +AddEvidenceRegister() bool$
+        +AddJ3377CaeRegister() bool$
+        +AddReviewItemsFile() bool$
+        +AddReviewProposalFile() bool$
+        +AddSacmFile() bool$
+        +CreateEmptyProject() bool$
+        +ManifestPath() std::filesystem::path$
+        +OpenProject() bool$
+        +RefreshFileStatus() ProjectLoadReport$
+        +RemoveTrackedFile() bool$
+        +SaveReviewItemsFile() bool$
+        +SaveReviewProposalFile() bool$
+        +WriteManifestSafely() bool$
+    }
+    C_0016650468173840262292 o-- C_0006492155329873332603 : +files
+    C_0008174467001683259965 o-- C_0011658685545826616321 : +steps
+    C_0011895974459674442706 ..> C_0006492155329873332603 : 
+    C_0011895974459674442706 o-- C_0016650468173840262292 : +current_project
+    C_0011895974459674442706 o-- C_0008174467001683259965 : +last_project_load_report
+    C_0007283506460794282918 ..> C_0016650468173840262292 : 
+    C_0007283506460794282918 ..> C_0008174467001683259965 : 
+    C_0007283506460794282918 ..> C_0006492155329873332603 : 
+
+%% Generated with clang-uml, version 0.6.2
+%% LLVM version clang version 20.1.7 (https://github.com/llvm/llvm-project.git 6146a88f60492b520a36f8f8f3231e15f3cc6082)

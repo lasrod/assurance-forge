@@ -6,12 +6,13 @@ The application is built in C++ using Dear ImGui and is designed around structur
 
 ## Documentation
 
-This documentation will grow together with the implementation and will cover:
+Start with the architecture section for the current component layout and data flow:
 
 - Architecture
-- Developer guidance
 - Generated class diagrams
 - Project storage
 - SACM import/export
 - GSN rendering and layout
 - Review and proposal workflows
+
+Use the developer guide for local documentation and diagram generation commands.

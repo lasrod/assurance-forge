@@ -1,6 +1,7 @@
 # Build directories
 build/
 build-coverage/
+build-docs/
 out/
 cmake-build-*/
 
@@ -53,6 +54,7 @@ docs/javascripts/mermaid.min.js
 # Generated docs diagrams (keep folder placeholder)
 docs/diagrams/generated/*
 !docs/diagrams/generated/.gitkeep
+!docs/diagrams/generated/*.mmd
 
 # ImGui state
 imgui.ini

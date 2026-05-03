@@ -32,7 +32,10 @@ markdown_extensions:
   - admonition
   - attr_list
   - md_in_html
+  - tables
   - pymdownx.details
+  - pymdownx.snippets:
+      check_paths: true
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -48,6 +51,12 @@ nav:
   - Home: index.md
   - Architecture:
       - Overview: architecture/index.md
+      - Runtime and State: architecture/runtime-state.md
+      - Parser and SACM: architecture/parser-sacm.md
+      - UI Panels: architecture/ui-panels.md
+      - Controllers: architecture/controllers.md
+      - Project Storage: architecture/project-storage.md
+      - Review and AI: architecture/review-ai.md
       - Generated Class Diagrams: architecture/generated-class-diagrams.md
   - Developer Guide:
       - Overview: developer-guide/index.md

@@ -84,14 +84,17 @@ Generated Mermaid files should appear under:
 docs/diagrams/generated/
 ```
 
+These generated `.mmd` files are documentation assets for the architecture section. When they change, review and commit the updated outputs.
+
 ## Diagram Strategy
 
 Prefer small diagrams such as:
 
 - Problem manager
-- Review system
-- SACM import/export
-- Core domain model
-- UI panels
+- Parser, SACM, and tree model
+- Project storage
+- Controllers
+- UI panels and panel callbacks
+- Review, proposal, problems, and AI service
 
 Avoid repository-wide diagrams because they become unreadable quickly.

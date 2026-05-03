@@ -1,0 +1,123 @@
+classDiagram
+    class C_0012468702361613751671["app::controllers::AiReviewController"]
+    class C_0012468702361613751671 {
+        +AiReviewController() void
+        +BeginReviewForSelection() void
+        +CancelPendingRequest() void
+        +IsReviewRunning() [const] bool
+        +LastParseError() [const] const std::string &
+        +LastRawResponse() [const] const std::string &
+        +PendingDebugText() [const] const std::string &
+        +PollTask() void
+        +SetDebugModalVisible() void
+        +ShouldShowDebugModal() [const] bool
+        +StartPendingRequest() void
+    }
+    class C_0017874619840306434091["app::controllers::ElementEditController"]
+    class C_0017874619840306434091 {
+        +ElementEditController() void
+        +AddChildToSelected() bool
+        +AddTopGoal() bool
+        +CancelPendingRemoval() void
+        +ConfirmPendingRemoval() bool
+        +PendingRemoveId() [const] const std::string &
+        +PendingRemoveIds() [const] const std::vector&lt;std::string&gt; &
+        +PendingRemoveMode() [const] core::RemoveMode
+        +RemoveSelected() bool
+        +ShouldShowRemoveConfirm() [const] bool
+    }
+    class C_0001821925321469351544["app::controllers::ModalCoordinator"]
+    class C_0001821925321469351544 {
+        +ApplyModalRequest() void
+        +ConsumeCloseRequest() bool
+        +RequestClose() void
+        +close_requested : bool
+        +not_implemented_feature : std::string
+        +show_not_implemented_modal : bool
+        +show_preferences_window : bool
+        +show_reviewer_name_prompt : bool
+        +show_save_before_exit_modal : bool
+        +show_theme_tweak_window : bool
+    }
+    class C_0016111147372304534330["app::controllers::ProjectController"]
+    class C_0016111147372304534330 {
+        +BeginProjectFileCreate() void
+        +LoadRecentProjectsPreference() void
+        +RecentProjectsPreferenceJson() [const] std::string
+        +RemoveRecentProjectByPath() void
+        +ScanDirectory() void
+        +TouchCurrentProjectRecent() void
+        +dir_path_buf : char[512]
+        +file_path_buf : char[512]
+        +open_project_path_buf : char[512]
+        +pending_project_file_kind : ProjectFileCreateKind
+        +project_file_name_buf : char[256]
+        +project_name_buf : char[128]
+        +project_parent_buf : char[512]
+        +recent_projects : std::vector&lt;RecentProjectEntry&gt;
+        +selected_file_idx : int
+        +show_create_project_modal : bool
+        +show_overwrite_confirm : bool
+        +show_project_file_name_modal : bool
+        +show_startup_project_window : bool
+        +xml_files : std::vector&lt;std::string&gt;
+    }
+    class C_0012230555191862721015["app::controllers::ProposalController"]
+    class C_0012230555191862721015 {
+        +ActiveOperationCount() [const] size_t
+        +BeginDraft() void
+        +BeginEditDraft() void
+        +CanSaveActiveDraft() [const] bool
+        +ClearActiveState() void
+        +ClosePreviewIfOpen() bool
+        +HasActiveDraftForItem() [const] bool
+        +IsCanvasActive() [const] bool
+        +creator_active : bool
+        +creator_generated_ids : std::map&lt;std::string,std::string&gt;
+        +creator_pending_clear_selection : bool
+        +creator_pending_select_create_ref : std::optional&lt;std::string&gt;
+        +creator_preview_refresh_pending : bool
+        +draft : core::reviews::ReviewProposal
+        +manager : core::reviews::ReviewProposalManager
+        +preview_active : bool
+        +preview_id : std::string
+        +preview_model : parser::AssuranceCase
+    }
+    class C_0016340071886420828369["app::controllers::ReviewController"]
+    class C_0016340071886420828369 {
+        +ReviewController() void
+        +AddManualItem() bool
+        +AddOrUpdateItem() bool
+        +BeginDeleteReviewItem() void
+        +CancelDeleteReviewItem() void
+        +ClearDirty() void
+        +ClearProposal() bool
+        +ClearStorage() void
+        +ConfigureStorage() bool
+        +DeleteReviewItem() bool
+        +FilePath() [const] const std::filesystem::path &
+        +GetItemById() [const] std::optional&lt;core::reviews::ReviewItem&gt;
+        +IsDirty() [const] bool
+        +Items() [const] const std::vector&lt;core::reviews::ReviewItem&gt; &
+        +ItemsForElement() [const] std::vector&lt;core::reviews::ReviewItem&gt;
+        +MarkDirty() void
+        +PendingDeleteReviewItem() [const] const core::reviews::ReviewItem &
+        +ResolveReviewItem() bool
+        +SaveIfDirty() bool
+        +SetProposal() bool
+        +ShouldShowDeleteConfirm() [const] bool
+    }
+    class C_0006989158059260082374["app::AppEvents"]
+    class C_0006989158059260082374 {
+        +Clear() void
+        +Emit() [const] void
+        +Emit<EventT>() [const] void
+        +Subscribe<EventT,ListenerT>() SubscriptionId
+        +Unsubscribe() void
+    }
+    C_0012468702361613751671 --> C_0006989158059260082374 : -events_
+    C_0017874619840306434091 --> C_0006989158059260082374 : -events_
+    C_0016340071886420828369 --> C_0006989158059260082374 : -events_
+
+%% Generated with clang-uml, version 0.6.2
+%% LLVM version clang version 20.1.7 (https://github.com/llvm/llvm-project.git 6146a88f60492b520a36f8f8f3231e15f3cc6082)
