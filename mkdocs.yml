@@ -1,5 +1,6 @@
 site_name: Assurance Forge
 site_description: Open-source tooling for structured assurance and safety cases
+site_url: https://lasrod.github.io/assurance-forge/
 repo_url: https://github.com/lasrod/assurance-forge
 repo_name: lasrod/assurance-forge
 
