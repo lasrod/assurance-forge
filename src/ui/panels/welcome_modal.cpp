@@ -26,6 +26,7 @@ constexpr float kWelcomeItemSpacingY = 6.0f;
 
 constexpr float kWelcomeTaglineTopSpacing = 14.0f;
 constexpr float kWelcomeTableHeight = 460.0f;
+constexpr float kWelcomeTableMaxWidth = 1320.0f;
 constexpr float kWelcomeStartColumnRatio = 0.48f;
 constexpr float kWelcomeWalkthroughColumnRatio = 0.52f;
 constexpr float kWelcomeSectionTopSpacing = 6.0f;
@@ -263,7 +264,8 @@ void ShowWelcomeModal(bool& is_open,
 
         ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeTaglineTopSpacing)));
 
-        if (ImGui::BeginTable(kWelcomeLayoutTableId, 2, ImGuiTableFlags_SizingStretchProp, ImVec2(0.0f, Px(kWelcomeTableHeight)))) {
+        const float layout_width = std::min(ImGui::GetContentRegionAvail().x, Px(kWelcomeTableMaxWidth));
+        if (ImGui::BeginTable(kWelcomeLayoutTableId, 2, ImGuiTableFlags_SizingStretchProp, ImVec2(layout_width, Px(kWelcomeTableHeight)))) {
             ImGui::TableSetupColumn(kWelcomeStartColumnId, ImGuiTableColumnFlags_WidthStretch, kWelcomeStartColumnRatio);
             ImGui::TableSetupColumn(kWelcomeWalkthroughColumnId, ImGuiTableColumnFlags_WidthStretch, kWelcomeWalkthroughColumnRatio);
             ImGui::TableNextRow();
