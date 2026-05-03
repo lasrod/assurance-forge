@@ -48,6 +48,11 @@ constexpr const char* kWalkthroughPopupTitle = "Walkthroughs";
 constexpr const char* kWalkthroughPopupMessage = "Walkthroughs are not yet implemented.";
 constexpr const char* kWalkthroughPopupButtonLabel = "OK";
 
+constexpr const char* kImportSacmPopupId = "ImportSACM##not_implemented_popup";
+constexpr const char* kImportSacmPopupTitle = "Import SACM";
+constexpr const char* kImportSacmPopupMessage = "Import SACM is not yet implemented.";
+constexpr const char* kImportSacmPopupButtonLabel = "OK";
+
 constexpr const char* kUtf8MiddleDot = "\xC2\xB7";
 
 constexpr int kWelcomeStyleVarCount = 2;
@@ -247,6 +252,7 @@ void ShowWelcomeModal(bool& is_open,
     if (ImGui::BeginPopupModal(kWelcomePopupId, &is_open, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings)) {
         const ui::Theme& theme = ui::GetTheme();
         bool show_walkthrough_not_implemented = false;
+        bool show_import_sacm_not_implemented = false;
 
         ImGui::SetWindowFontScale(kWelcomeBodyFontScale);
 
@@ -276,7 +282,6 @@ void ShowWelcomeModal(bool& is_open,
             if (ActionLink("##create_empty", "Create Empty Assurance Project",
                            "Start with a blank assurance project workspace")) {
                 if (callbacks.create_empty_project) callbacks.create_empty_project();
-                dismiss();
             }
             if (ActionLink("##create_template", "Create Assurance Project from Template",
                            "Create a project from a predefined assurance case template")) {
@@ -286,12 +291,10 @@ void ShowWelcomeModal(bool& is_open,
             if (ActionLink("##open_project", "Open Project",
                            "Open an existing Assurance Forge project")) {
                 if (callbacks.open_project) callbacks.open_project();
-                dismiss();
             }
             if (ActionLink("##import_sacm", "Import SACM",
                            "Import a SACM XML assurance case")) {
-                if (callbacks.import_sacm) callbacks.import_sacm();
-                dismiss();
+                show_import_sacm_not_implemented = true;
             }
 
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeRecentSectionSpacing)));
@@ -334,6 +337,10 @@ void ShowWelcomeModal(bool& is_open,
             ImGui::OpenPopup(kWalkthroughPopupId);
         }
 
+        if (show_import_sacm_not_implemented) {
+            ImGui::OpenPopup(kImportSacmPopupId);
+        }
+
         if (ImGui::BeginPopupModal(kWalkthroughPopupId, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::TextUnformatted(kWalkthroughPopupTitle);
             ImGui::Separator();
@@ -342,6 +349,19 @@ void ShowWelcomeModal(bool& is_open,
             const float button_width = Px(kWalkthroughPopupButtonWidth);
             ImGui::SetCursorPosX((ImGui::GetWindowWidth() - button_width) * 0.5f);
             if (ImGui::Button(kWalkthroughPopupButtonLabel, ImVec2(button_width, 0.0f))) {
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
+        if (ImGui::BeginPopupModal(kImportSacmPopupId, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::TextUnformatted(kImportSacmPopupTitle);
+            ImGui::Separator();
+            ImGui::TextUnformatted(kImportSacmPopupMessage);
+            ImGui::Spacing();
+            const float button_width = Px(kWalkthroughPopupButtonWidth);
+            ImGui::SetCursorPosX((ImGui::GetWindowWidth() - button_width) * 0.5f);
+            if (ImGui::Button(kImportSacmPopupButtonLabel, ImVec2(button_width, 0.0f))) {
                 ImGui::CloseCurrentPopup();
             }
             ImGui::EndPopup();
