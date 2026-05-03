@@ -47,5 +47,9 @@ coverage_core/
 # Generated docs output
 site/
 
+# Generated docs diagrams (keep folder placeholder)
+docs/diagrams/generated/*
+!docs/diagrams/generated/.gitkeep
+
 # ImGui state
 imgui.ini
