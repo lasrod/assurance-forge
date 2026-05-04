@@ -31,6 +31,7 @@ struct AiReviewRequestArtifacts {
     std::string selectedElementJson;
     std::string parentElementJson;
     std::string childElementsJson;
+    std::string reviewProfileJson;
     std::string guidelinesJson;
     std::string responseSchemaJson;
     std::string expectedResponseSchema;
@@ -64,15 +65,20 @@ bool BuildAiReviewPayload(const parser::AssuranceCase& assurance_case,
 
 AiReviewRequestArtifacts BuildAiReviewRequestArtifacts(
     const AiReviewPayload& payload,
-    const std::vector<const parser::Guideline*>& claim_guidelines);
+    const std::vector<const parser::Guideline*>& guidelines,
+    const parser::ReviewProfile* review_profile = nullptr);
 AiReviewPromptParts BuildAiReviewPrompt(
     const AiReviewPayload& payload,
-    const std::vector<const parser::Guideline*>& claim_guidelines);
+    const std::vector<const parser::Guideline*>& guidelines,
+    const parser::ReviewProfile* review_profile = nullptr);
 
 std::string BuildExpectedAiReviewResponseSchemaText();
 std::string StripJsonCodeFence(const std::string& response_text);
 AiReviewParseResult ParseAiReviewResponse(const std::string& response_text,
                                           const std::string& selected_element_id);
+AiReviewParseResult ParseAiReviewResponse(const std::string& response_text,
+                                          const std::string& selected_element_id,
+                                          const std::vector<std::string>& allowed_guideline_ids);
 ParsedAiReviewResponse ParseAiReviewResponse(const std::string& response_text,
                                              const std::string& selected_element_id,
                                              const std::string& fallback_element_type);

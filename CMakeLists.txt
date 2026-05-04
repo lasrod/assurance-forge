@@ -123,17 +123,17 @@ endif()
 # --- pugixml ---
 add_subdirectory(external/pugixml)
 
-set(AF_GUIDELINES_SOURCE_FILE "${CMAKE_SOURCE_DIR}/external/safety-case-core-guidelines/data/guidelines.yaml")
-if(NOT EXISTS "${AF_GUIDELINES_SOURCE_FILE}")
-    message(FATAL_ERROR "Missing ${AF_GUIDELINES_SOURCE_FILE}. Run git submodule update --init --recursive.")
+set(AF_SCCG_SOURCE_FILE "${CMAKE_SOURCE_DIR}/external/safety-case-core-guidelines/dist/sccg.full.yaml")
+if(NOT EXISTS "${AF_SCCG_SOURCE_FILE}")
+    message(FATAL_ERROR "Missing SCCG distribution file: external/safety-case-core-guidelines/dist/sccg.full.yaml\n\nRun:\ngit submodule update --init --recursive\n\nIf the SCCG submodule is checked out but dist is missing, run the SCCG repository generation command.")
 endif()
 
-function(af_copy_guidelines_data target_name)
+function(af_copy_sccg_data target_name)
     add_custom_command(TARGET ${target_name} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${target_name}>/data"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${AF_GUIDELINES_SOURCE_FILE}"
-            "$<TARGET_FILE_DIR:${target_name}>/data/guidelines.yaml"
+            "${AF_SCCG_SOURCE_FILE}"
+            "$<TARGET_FILE_DIR:${target_name}>/data/sccg.full.yaml"
         VERBATIM
     )
 endfunction()
@@ -215,7 +215,7 @@ target_link_libraries(assurance-forge PRIVATE imgui pugixml nfd picosha2 nlohman
 if(WIN32)
     target_link_libraries(assurance-forge PRIVATE bcrypt advapi32 ole32 shell32)
 endif()
-af_copy_guidelines_data(assurance-forge)
+af_copy_sccg_data(assurance-forge)
 
 # --- Tests ---
 FetchContent_Declare(
@@ -226,7 +226,7 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
-enable_testing()
+include(CTest)
 add_executable(tests
     tests/test_xml_parser.cpp
     tests/test_assurance_tree.cpp
@@ -305,7 +305,7 @@ if(WIN32)
         COMMAND_EXPAND_LISTS
     )
 endif()
-af_copy_guidelines_data(tests)
+af_copy_sccg_data(tests)
 include(GoogleTest)
 
 gtest_discover_tests(tests
@@ -313,8 +313,8 @@ gtest_discover_tests(tests
     DISCOVERY_MODE PRE_TEST
 )
 add_test(
-    NAME GuidelinesDataRuntimeCopy
+    NAME SccgDataRuntimeCopy
     COMMAND ${CMAKE_COMMAND} -E compare_files
-        "${AF_GUIDELINES_SOURCE_FILE}"
-        "$<TARGET_FILE_DIR:tests>/data/guidelines.yaml"
+        "${AF_SCCG_SOURCE_FILE}"
+        "$<TARGET_FILE_DIR:tests>/data/sccg.full.yaml"
 )

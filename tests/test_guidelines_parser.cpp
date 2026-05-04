@@ -7,20 +7,23 @@
 namespace {
 
 const char* kMinimalGuidelinesYaml = R"yaml(
-schema_version: "0.4.0"
+schema_version: "1.0.0"
+sccg_version: "0.5.0"
 document:
   title: "Safety Case Core Guidelines"
   license:
     id: "CC-BY-4.0"
-  method_application_guidance:
-    recommendations:
-      - method: "GSN-based development"
-        recommendation: "Apply GSN mappings."
-  id_scheme:
-    - prefix: "CL"
-      meaning: "Claim guidance"
-  required_guideline_sections:
-    - "Guideline"
+source_policy:
+  summary: "Paraphrased source guidance."
+method_application_guidance:
+  recommendations:
+    - method: "GSN-based development"
+      recommendation: "Apply GSN mappings."
+id_scheme:
+  - prefix: "CL"
+    meaning: "Claim guidance"
+required_guideline_sections:
+  - "Guideline"
 reference_sources:
   - id: "UL4600"
     display_name: "UL 4600"
@@ -33,29 +36,51 @@ guidelines:
   - id: "CL.1"
     category: "CL"
     title: "Write each claim as a falsifiable proposition"
-    guideline: "State each claim as a sentence that can be shown true or false."
-    why: "Reviewers need challengeable claims."
+    statement: "State each claim as a sentence that can be shown true or false."
+    rationale: "Reviewers need challengeable claims."
     review_prompts:
       - "Could a reviewer tell what would make this claim false?"
-    example:
+    examples:
       bad: "Brake monitor safety"
       problem: "This is a topic label."
       good: "Brake monitor response time meets the acceptance criterion."
     references:
       - source_id: "UL4600"
         clauses: ["5.2.3"]
-    tool_guidance:
+    tool:
       applicable_elements: ["GSN Goal", "SACM Claim"]
       detection_hints:
         - "Look for topic labels."
       suggested_checks:
         - id: "check-claim-is-proposition"
           description: "Check whether claim text is a complete proposition."
+review_profiles:
+  - id: "claim_wording_review"
+    display_name: "Claim wording review"
+    description: "Reviews claim wording."
+    applies_to: ["GSN Goal", "SACM Claim"]
+    guideline_ids: ["CL.1"]
+    required_data: ["SEL"]
+    optional_data: ["PARENT"]
+data_packages:
+  - id: "SEL"
+    display_name: "Selected element"
+    description: "Selected element."
+    required_fields: ["element_id", "element_type", "text"]
+    optional_fields: []
+prechecks:
+  - id: "check-claim-is-proposition"
+    display_name: "Claim is proposition"
+    related_guideline_ids: ["CL.1"]
+    expected_data: ["SEL"]
+    result_type: "boolean_candidate"
+    description: "Detects non-proposition claim text."
+    interpretation: "Candidate finding only."
 )yaml";
 
 std::filesystem::path RepositoryGuidelinesPath() {
     return std::filesystem::path(__FILE__).parent_path().parent_path() /
-           "external" / "safety-case-core-guidelines" / "data" / "guidelines.yaml";
+           "external" / "safety-case-core-guidelines" / "dist" / "sccg.full.yaml";
 }
 
 }  // namespace
@@ -64,7 +89,8 @@ TEST(GuidelinesParserTest, ParsesMinimalYamlAndFetchesGuidelines) {
     parser::GuidelinesParseResult result = parser::GuidelinesParser::ParseString(kMinimalGuidelinesYaml);
 
     ASSERT_TRUE(result.success) << result.error_message;
-    EXPECT_EQ(result.document.schema_version, "0.4.0");
+    EXPECT_EQ(result.document.schema_version, "1.0.0");
+    EXPECT_EQ(result.document.sccg_version, "0.5.0");
     EXPECT_EQ(result.document.metadata.title, "Safety Case Core Guidelines");
     EXPECT_EQ(result.document.metadata.license.id, "CC-BY-4.0");
     ASSERT_EQ(result.document.metadata.recommendations.size(), 1);
@@ -73,6 +99,10 @@ TEST(GuidelinesParserTest, ParsesMinimalYamlAndFetchesGuidelines) {
     const parser::Guideline* guideline = result.document.FindGuidelineById("CL.1");
     ASSERT_NE(guideline, nullptr);
     EXPECT_EQ(guideline->category, "CL");
+    EXPECT_EQ(guideline->statement, "State each claim as a sentence that can be shown true or false.");
+    EXPECT_EQ(guideline->rationale, "Reviewers need challengeable claims.");
+    EXPECT_EQ(guideline->examples.good, "Brake monitor response time meets the acceptance criterion.");
+    ASSERT_FALSE(guideline->tool.applicable_elements.empty());
     ASSERT_FALSE(guideline->references.empty());
     EXPECT_EQ(guideline->references[0].source_id, "UL4600");
     ASSERT_EQ(guideline->references[0].clauses.size(), 1);
@@ -103,6 +133,48 @@ TEST(GuidelinesParserTest, ParsesMinimalYamlAndFetchesGuidelines) {
     const parser::GuidelineCategory* category = result.document.FindCategoryById("CL");
     ASSERT_NE(category, nullptr);
     EXPECT_EQ(category->title, "Claim rules");
+
+    const parser::ReviewProfile* profile = result.document.FindReviewProfileById("claim_wording_review");
+    ASSERT_NE(profile, nullptr);
+    EXPECT_EQ(profile->display_name, "Claim wording review");
+    ASSERT_EQ(profile->guideline_ids.size(), 1u);
+    EXPECT_EQ(profile->guideline_ids[0], "CL.1");
+
+    std::vector<const parser::Guideline*> profile_matches =
+      result.document.FindGuidelinesByReviewProfile("claim_wording_review");
+    ASSERT_EQ(profile_matches.size(), 1u);
+    EXPECT_EQ(profile_matches[0]->id, "CL.1");
+
+    ASSERT_EQ(result.document.data_packages.size(), 1u);
+    EXPECT_EQ(result.document.data_packages[0].id, "SEL");
+    ASSERT_EQ(result.document.prechecks.size(), 1u);
+    EXPECT_EQ(result.document.prechecks[0].related_guideline_ids[0], "CL.1");
+}
+
+TEST(GuidelinesParserTest, ParsesOldGuidelineFieldNamesAsFallback) {
+    const char* yaml = R"yaml(
+schema_version: "0.4.0"
+guidelines:
+  - id: "CL.1"
+    category: "CL"
+    title: "Old format"
+    guideline: "Old statement."
+    why: "Old rationale."
+    example:
+      good: "Old good example."
+    tool_guidance:
+      applicable_elements: ["GSN Goal"]
+)yaml";
+
+    parser::GuidelinesParseResult result = parser::GuidelinesParser::ParseString(yaml);
+
+    ASSERT_TRUE(result.success) << result.error_message;
+    const parser::Guideline* guideline = result.document.FindGuidelineById("CL.1");
+    ASSERT_NE(guideline, nullptr);
+    EXPECT_EQ(guideline->statement, "Old statement.");
+    EXPECT_EQ(guideline->rationale, "Old rationale.");
+    EXPECT_EQ(guideline->examples.good, "Old good example.");
+    ASSERT_EQ(guideline->tool.applicable_elements.size(), 1u);
 }
 
 TEST(GuidelinesParserTest, ReportsInvalidYaml) {
@@ -121,7 +193,7 @@ TEST(GuidelinesParserTest, ReportsMissingFile) {
 
 TEST(GuidelinesParserTest, RejectsMissingGuidelineIdentity) {
     const char* yaml = R"yaml(
-schema_version: "0.4.0"
+schema_version: "1.0.0"
 document:
   title: "Safety Case Core Guidelines"
 reference_sources:
@@ -133,10 +205,10 @@ categories:
 guidelines:
   - category: "CL"
     title: "Missing id"
-    guideline: "Text"
-    why: "Reason"
+    statement: "Text"
+    rationale: "Reason"
     review_prompts: ["Prompt"]
-    example:
+    examples:
       bad: "Bad"
       problem: "Problem"
       good: "Good"
@@ -154,7 +226,8 @@ TEST(GuidelinesParserTest, ParsesRealGuidelinesFile) {
     parser::GuidelinesParseResult result = parser::GuidelinesParser::ParseFile(RepositoryGuidelinesPath().string());
 
     ASSERT_TRUE(result.success) << result.error_message;
-    EXPECT_EQ(result.document.schema_version, "0.4.0");
+    EXPECT_EQ(result.document.schema_version, "1.0.0");
+    EXPECT_EQ(result.document.sccg_version, "0.5.0");
     EXPECT_EQ(result.document.metadata.title, "Safety Case Core Guidelines");
     EXPECT_FALSE(result.document.categories.empty());
     EXPECT_FALSE(result.document.reference_sources.empty());
@@ -168,7 +241,16 @@ TEST(GuidelinesParserTest, ParsesRealGuidelinesFile) {
     ASSERT_NE(claim_guideline, nullptr);
     EXPECT_EQ(claim_guideline->category, "CL");
     EXPECT_EQ(claim_guideline->title, "Write each claim as a falsifiable proposition");
-    EXPECT_FALSE(claim_guideline->tool_guidance.applicable_elements.empty());
+    EXPECT_FALSE(claim_guideline->statement.empty());
+    EXPECT_FALSE(claim_guideline->rationale.empty());
+    EXPECT_FALSE(claim_guideline->tool.applicable_elements.empty());
+
+    const parser::ReviewProfile* profile = result.document.FindReviewProfileById("claim_wording_review");
+    ASSERT_NE(profile, nullptr);
+    EXPECT_FALSE(profile->guideline_ids.empty());
+    EXPECT_FALSE(result.document.FindGuidelinesByReviewProfile("claim_wording_review").empty());
+    EXPECT_FALSE(result.document.data_packages.empty());
+    EXPECT_FALSE(result.document.prechecks.empty());
 
     std::vector<const parser::Guideline*> goal_guidelines = result.document.FindGuidelinesByApplicableElement("GSN Goal");
     EXPECT_FALSE(goal_guidelines.empty());

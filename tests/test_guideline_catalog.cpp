@@ -24,7 +24,13 @@ TEST(GuidelineCatalogTest, BuildsFlatEntriesAndLookupIds) {
     ignored.title = "Missing ID";
     document.guidelines.push_back(ignored);
 
-    app::GuidelineCatalog catalog = app::BuildGuidelineCatalog(std::move(document), "guidelines.yaml");
+    parser::ReviewProfile profile;
+    profile.id = "claim_wording_review";
+    profile.display_name = "Claim wording review";
+    profile.description = "Reviews claim wording.";
+    document.review_profiles.push_back(profile);
+
+    app::GuidelineCatalog catalog = app::BuildGuidelineCatalog(std::move(document), "sccg.full.yaml");
 
     ASSERT_EQ(catalog.entries.size(), 2u);
     EXPECT_EQ(catalog.entries[0].id, "CL.1");
@@ -33,7 +39,10 @@ TEST(GuidelineCatalogTest, BuildsFlatEntriesAndLookupIds) {
     EXPECT_EQ(catalog.ids.size(), 2u);
     EXPECT_TRUE(catalog.ids.count("CL.1") > 0);
     EXPECT_TRUE(catalog.ids.count("AR.1") > 0);
-    EXPECT_EQ(catalog.source_path.filename().string(), "guidelines.yaml");
+    ASSERT_EQ(catalog.review_profile_entries.size(), 1u);
+    EXPECT_EQ(catalog.review_profile_entries[0].id, "claim_wording_review");
+    EXPECT_TRUE(catalog.review_profile_ids.count("claim_wording_review") > 0);
+    EXPECT_EQ(catalog.source_path.filename().string(), "sccg.full.yaml");
 }
 
 TEST(GuidelineCatalogTest, LoadsRepositoryGuidelines) {
@@ -43,4 +52,6 @@ TEST(GuidelineCatalogTest, LoadsRepositoryGuidelines) {
     ASSERT_TRUE(app::LoadGuidelineCatalog(catalog, error)) << error;
     EXPECT_FALSE(catalog.entries.empty());
     EXPECT_TRUE(catalog.ids.count("CL.1") > 0);
+    EXPECT_EQ(catalog.source_path.filename().string(), "sccg.full.yaml");
+    EXPECT_TRUE(catalog.review_profile_ids.count("claim_wording_review") > 0);
 }

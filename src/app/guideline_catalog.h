@@ -15,13 +15,22 @@ struct GuidelineCatalogEntry {
     std::string title;
 };
 
+struct ReviewProfileCatalogEntry {
+    std::string id;
+    std::string display_name;
+    std::string description;
+};
+
 struct GuidelineCatalog {
     std::filesystem::path source_path;
     parser::GuidelinesDocument document;
     std::vector<GuidelineCatalogEntry> entries;
     std::unordered_set<std::string> ids;
+    std::vector<ReviewProfileCatalogEntry> review_profile_entries;
+    std::unordered_set<std::string> review_profile_ids;
 };
 
+std::filesystem::path FindSccgCatalogFile();
 std::filesystem::path FindGuidelinesFile();
 GuidelineCatalog BuildGuidelineCatalog(parser::GuidelinesDocument document,
                                        std::filesystem::path source_path = {});

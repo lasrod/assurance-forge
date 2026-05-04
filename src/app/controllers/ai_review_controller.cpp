@@ -4,9 +4,12 @@
 #include "parser/guidelines_parser.h"
 
 #include <string>
+#include <vector>
 
 namespace app::controllers {
 namespace {
+
+constexpr const char* kDefaultClaimReviewProfileId = "claim_wording_review";
 
 core::ProblemItem MakeAiReviewProblem(const std::string& id,
                                       core::ProblemSeverity severity,
@@ -30,7 +33,31 @@ std::string TruncateForProblemMessage(const std::string& value, size_t limit = 4
     return value.substr(0, limit) + "...";
 }
 
+std::vector<std::string> GuidelineIds(const std::vector<const parser::Guideline*>& guidelines) {
+    std::vector<std::string> ids;
+    for (const parser::Guideline* guideline : guidelines) {
+        if (guideline && !guideline->id.empty()) ids.push_back(guideline->id);
+    }
+    return ids;
+}
+
 }  // namespace
+
+AiReviewGuidelineSelection SelectClaimReviewGuidelines(const GuidelineCatalog& guideline_catalog) {
+    AiReviewGuidelineSelection selection;
+    selection.review_profile = guideline_catalog.document.FindReviewProfileById(kDefaultClaimReviewProfileId);
+    selection.guidelines = selection.review_profile
+        ? guideline_catalog.document.FindGuidelinesByReviewProfile(kDefaultClaimReviewProfileId)
+        : guideline_catalog.document.FindGuidelinesByCategory("CL");
+
+    if (selection.review_profile && selection.guidelines.empty()) {
+        selection.error_message =
+            std::string("SCCG catalog contains review profile '") + kDefaultClaimReviewProfileId + "' but it references no valid guidelines.";
+    } else if (selection.guidelines.empty()) {
+        selection.error_message = "No SCCG guidelines were found for AI review.";
+    }
+    return selection;
+}
 
 AiReviewController::AiReviewController(AppEvents& events,
                                        core::ProblemsManager& problems_manager,
@@ -120,21 +147,26 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
         return;
     }
 
-    std::vector<const parser::Guideline*> claim_guidelines = guideline_catalog.document.FindGuidelinesByCategory("CL");
-    if (claim_guidelines.empty()) {
+    AiReviewGuidelineSelection guideline_selection = SelectClaimReviewGuidelines(guideline_catalog);
+
+    if (!guideline_selection.error_message.empty()) {
         problems_manager_.AddOrUpdateProblem(MakeAiReviewProblem(
             "ai-review:" + selected_element_id + ":guidelines-empty",
             core::ProblemSeverity::Error,
             selected_element_id,
             payload.selected.type,
-            "No SCCG CL guidelines were found for AI review."));
-        events_.Emit(StatusMessageEvent{"No SCCG CL guidelines were found for AI review."});
+            guideline_selection.error_message));
+        events_.Emit(StatusMessageEvent{guideline_selection.error_message});
         return;
     }
 
-    pending_review_ = ai::BuildAiReviewRequestArtifacts(payload, claim_guidelines);
+    pending_review_ = ai::BuildAiReviewRequestArtifacts(
+        payload,
+        guideline_selection.guidelines,
+        guideline_selection.review_profile);
     pending_review_element_id_ = payload.selected.id;
     pending_review_element_type_ = payload.selected.type;
+    pending_guideline_ids_ = GuidelineIds(guideline_selection.guidelines);
     last_raw_response_.clear();
     last_parse_error_.clear();
     show_debug_modal_ = true;
@@ -183,7 +215,8 @@ void AiReviewController::PollTask() {
     }
 
     last_raw_response_ = response.text.empty() ? response.rawJson : response.text;
-    ai::AiReviewParseResult parse_result = ai::ParseAiReviewResponse(response.text, pending_review_element_id_);
+    ai::AiReviewParseResult parse_result =
+        ai::ParseAiReviewResponse(last_raw_response_, pending_review_element_id_, pending_guideline_ids_);
     if (!parse_result.success) {
         last_parse_error_ = parse_result.errorMessage;
         std::string message = "AI response could not be parsed as the expected JSON format.";
@@ -238,6 +271,7 @@ void AiReviewController::CancelPendingRequest() {
     pending_review_ = {};
     pending_review_element_id_.clear();
     pending_review_element_type_.clear();
+    pending_guideline_ids_.clear();
 }
 
 bool AiReviewController::IsReviewRunning() const {
