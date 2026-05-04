@@ -2107,7 +2107,6 @@ void AppRuntime::RenderFrame(bool& done) {
     RenderThemeTweaksWindow();
     RenderAiReviewDebugModal();
 
-    RenderNotImplementedModal();
     RenderRemoveConfirmModal();
     RenderDeleteReviewItemConfirmModal();
     RenderCreateProjectModal();
@@ -2115,6 +2114,7 @@ void AppRuntime::RenderFrame(bool& done) {
     RenderProjectLoadReportModal();
     RenderSaveBeforeExitModal(done);
     RenderStartupProjectWindow();
+    RenderNotImplementedModal();
     RenderReviewerNamePromptModal();
 }
 
