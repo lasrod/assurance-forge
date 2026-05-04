@@ -30,3 +30,27 @@ TEST(LocalizationTest, FallsBackToEnglishForMissingJapaneseEntry) {
 
     ui::SetCurrentLanguage(ui::Language::English);
 }
+
+TEST(LocalizationTest, LooksUpNewWelcomeStringsInEnglish) {
+    ui::SetCurrentLanguage(ui::Language::English);
+
+    EXPECT_STREQ(ui::Tr(ui::MessageId::WelcomeTagline), "Forge Confidence in Safety");
+    EXPECT_STREQ(ui::Tr(ui::MessageId::WelcomeNoRecentProjects), "No recent projects.");
+    EXPECT_STREQ(ui::Tr(ui::MessageId::WelcomeActionCreateEmptyTitle), "Create Empty Assurance Project");
+    EXPECT_STREQ(ui::Tr(ui::MessageId::WelcomeWalkthroughGetStartedTitle), "Get started with Assurance Forge");
+    EXPECT_STREQ(ui::Tr(ui::MessageId::WelcomeWalkthroughConformanceSubtitle), "Trace claims, evidence, and review outputs");
+
+    ui::SetCurrentLanguage(ui::Language::English);
+}
+
+TEST(LocalizationTest, LooksUpNewWelcomeStringsInJapanese) {
+    ui::SetCurrentLanguage(ui::Language::Japanese);
+
+    EXPECT_STREQ(ui::Tr(ui::MessageId::WelcomeTagline), u8"安全への確信を鍛える");
+    EXPECT_STREQ(ui::Tr(ui::MessageId::WelcomeNoRecentProjects), u8"最近のプロジェクトはありません。");
+    EXPECT_STREQ(ui::Tr(ui::MessageId::WelcomeActionCreateEmptyTitle), u8"空の保証プロジェクトを作成");
+    EXPECT_STREQ(ui::Tr(ui::MessageId::WelcomeWalkthroughGetStartedTitle), u8"Assurance Forge の開始ガイド");
+    EXPECT_STREQ(ui::Tr(ui::MessageId::WelcomeWalkthroughConformanceSubtitle), u8"主張、エビデンス、レビュー出力を追跡します");
+
+    ui::SetCurrentLanguage(ui::Language::English);
+}
