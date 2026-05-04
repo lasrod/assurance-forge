@@ -149,9 +149,12 @@ void AppRuntime::RenderDeleteReviewItemConfirmModal() {
 void AppRuntime::RenderStartupProjectWindow() {
     ui::panels::WelcomeModalCallbacks callbacks{
         [this]() { BeginCreateProject(); },
-        [this]() { ShowNotImplementedModal("Create Assurance Project from Template"); },
+        []() {},
         [this]() { BeginOpenProject(); },
-        [this]() { ShowNotImplementedModal("Import SACM"); },
+        []() {},
+        []() {},
+        []() {},
+        []() {},
         [this](const ui::panels::RecentProjectEntry& entry) {
             if (!TryOpenProjectManifest(entry.path)) {
                 impl_->project_controller->RemoveRecentProjectByPath(entry.path);
