@@ -4,14 +4,24 @@
 #include "ai/ai_service.h"
 #include "ai/ai_task_runner.h"
 #include "app/app_events.h"
+#include "app/guideline_catalog.h"
 #include "core/assurance_tree.h"
 #include "core/problems/problems_manager.h"
 #include "parser/xml_parser.h"
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace app::controllers {
+
+struct AiReviewGuidelineSelection {
+    const parser::ReviewProfile* review_profile = nullptr;
+    std::vector<const parser::Guideline*> guidelines;
+    std::string error_message;
+};
+
+AiReviewGuidelineSelection SelectClaimReviewGuidelines(const GuidelineCatalog& guideline_catalog);
 
 class AiReviewController {
 public:
@@ -45,6 +55,7 @@ private:
     ai::AiReviewRequestArtifacts pending_review_;
     std::string pending_review_element_id_;
     std::string pending_review_element_type_;
+    std::vector<std::string> pending_guideline_ids_;
     std::string last_raw_response_;
     std::string last_parse_error_;
     bool show_debug_modal_ = false;

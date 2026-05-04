@@ -66,18 +66,31 @@ void AddChildIfPresent(const parser::AssuranceCase& assurance_case,
     children.push_back(MakeReviewElement(*child, "child"));
 }
 
-nlohmann::json GuidelinesToJson(const std::vector<const parser::Guideline*>& claim_guidelines) {
+nlohmann::json StringVectorToJson(const std::vector<std::string>& values) {
+    nlohmann::json array = nlohmann::json::array();
+    for (const std::string& value : values) {
+        array.push_back(value);
+    }
+    return array;
+}
+
+nlohmann::json ReviewProfileToJson(const parser::ReviewProfile* review_profile) {
+    if (!review_profile) return nlohmann::json(nullptr);
+    return {
+        {"id", review_profile->id},
+        {"display_name", review_profile->display_name},
+        {"description", review_profile->description},
+        {"guideline_ids", StringVectorToJson(review_profile->guideline_ids)},
+    };
+}
+
+nlohmann::json GuidelinesToJson(const std::vector<const parser::Guideline*>& guidelines_to_review) {
     nlohmann::json guidelines = nlohmann::json::array();
-    for (const parser::Guideline* guideline : claim_guidelines) {
+    for (const parser::Guideline* guideline : guidelines_to_review) {
         if (!guideline) continue;
 
-        nlohmann::json review_prompts = nlohmann::json::array();
-        for (const std::string& prompt : guideline->review_prompts) {
-            review_prompts.push_back(prompt);
-        }
-
         nlohmann::json suggested_checks = nlohmann::json::array();
-        for (const parser::SuggestedCheck& check : guideline->tool_guidance.suggested_checks) {
+        for (const parser::SuggestedCheck& check : guideline->tool.suggested_checks) {
             suggested_checks.push_back({
                 {"id", check.id},
                 {"description", check.description},
@@ -88,18 +101,26 @@ nlohmann::json GuidelinesToJson(const std::vector<const parser::Guideline*>& cla
             {"id", guideline->id},
             {"category", guideline->category},
             {"title", guideline->title},
-            {"guideline", guideline->guideline},
-            {"why", guideline->why},
-            {"review_prompts", review_prompts},
-            {"example", {
-                {"bad", guideline->example.bad},
-                {"problem", guideline->example.problem},
-                {"good", guideline->example.good},
+            {"statement", guideline->statement},
+            {"rationale", guideline->rationale},
+            {"review_prompts", StringVectorToJson(guideline->review_prompts)},
+            {"examples", {
+                {"bad", guideline->examples.bad},
+                {"problem", guideline->examples.problem},
+                {"good", guideline->examples.good},
             }},
-            {"suggested_checks", suggested_checks},
+            {"tool", {
+                {"applicable_elements", StringVectorToJson(guideline->tool.applicable_elements)},
+                {"detection_hints", StringVectorToJson(guideline->tool.detection_hints)},
+                {"suggested_checks", suggested_checks},
+            }},
         });
     }
     return guidelines;
+}
+
+bool IsAllowedGuidelineId(const std::string& guideline_id, const std::vector<std::string>& allowed_guideline_ids) {
+    return std::find(allowed_guideline_ids.begin(), allowed_guideline_ids.end(), guideline_id) != allowed_guideline_ids.end();
 }
 
 core::ProblemSeverity SeverityFromString(const std::string& value) {
@@ -198,7 +219,8 @@ bool BuildAiReviewPayload(const parser::AssuranceCase& assurance_case,
 
 AiReviewRequestArtifacts BuildAiReviewRequestArtifacts(
     const AiReviewPayload& payload,
-    const std::vector<const parser::Guideline*>& claim_guidelines) {
+    const std::vector<const parser::Guideline*>& guidelines_to_review,
+    const parser::ReviewProfile* review_profile) {
     nlohmann::json selected = ReviewElementToJson(payload.selected);
     nlohmann::json parent = payload.parent.has_value()
         ? ReviewElementToJson(payload.parent.value())
@@ -207,13 +229,15 @@ AiReviewRequestArtifacts BuildAiReviewRequestArtifacts(
     for (const AiReviewElement& child : payload.children) {
         children.push_back(ReviewElementToJson(child));
     }
-    nlohmann::json guidelines = GuidelinesToJson(claim_guidelines);
+    nlohmann::json review_profile_json = ReviewProfileToJson(review_profile);
+    nlohmann::json guidelines = GuidelinesToJson(guidelines_to_review);
 
     AiReviewRequestArtifacts artifacts;
     artifacts.systemInstruction = kAiReviewSystemInstruction;
     artifacts.selectedElementJson = selected.dump(2);
     artifacts.parentElementJson = parent.dump(2);
     artifacts.childElementsJson = children.dump(2);
+    artifacts.reviewProfileJson = review_profile_json.dump(2);
     artifacts.guidelinesJson = guidelines.dump(2);
     artifacts.responseSchemaJson = BuildExpectedAiReviewResponseSchemaText();
     artifacts.expectedResponseSchema = artifacts.responseSchemaJson;
@@ -221,13 +245,16 @@ AiReviewRequestArtifacts BuildAiReviewRequestArtifacts(
     std::ostringstream prompt;
     prompt << "You are reviewing a safety case claim for Assurance Forge.\n\n"
            << "Assurance Forge is an assurance case tool using SACM as the domain model and GSN as one graphical view. In this review, treat GSN Goals as claims.\n\n"
-           << "Your task is to review the selected claim against the SCCG CL claim rules provided below.\n\n"
+           << "Your task is to review the selected claim against the SCCG guidelines provided below for this review profile.\n\n"
            << "Review only the selected claim. Use the parent and child/sub-element information only as context for understanding the claim and its decomposition.\n\n"
            << "Do not invent missing project information.\n"
            << "Do not claim that a rule is violated unless the provided data supports that finding.\n"
            << "If there is no clear violation, return an empty findings array.\n"
            << "Return JSON only. Do not include Markdown. Do not include explanations outside the JSON object.\n\n"
-           << "## SCCG CL rules\n\n"
+           << "## SCCG review profile"
+           << (review_profile ? ": " + review_profile->id : ": CL category fallback") << "\n\n"
+           << artifacts.reviewProfileJson << "\n\n"
+           << "## SCCG guidelines\n\n"
            << artifacts.guidelinesJson << "\n\n"
            << "## Selected element\n\n"
            << artifacts.selectedElementJson << "\n\n"
@@ -245,7 +272,9 @@ AiReviewRequestArtifacts BuildAiReviewRequestArtifacts(
           << artifacts.parentElementJson << "\n\n"
           << "Child/sub-element data\n"
           << artifacts.childElementsJson << "\n\n"
-          << "SCCG CL guideline data\n"
+          << "SCCG review profile data\n"
+          << artifacts.reviewProfileJson << "\n\n"
+          << "SCCG guideline data\n"
           << artifacts.guidelinesJson << "\n\n"
           << "Final AI prompt text\n"
           << artifacts.prompt << "\n\n"
@@ -257,8 +286,9 @@ AiReviewRequestArtifacts BuildAiReviewRequestArtifacts(
 
 AiReviewPromptParts BuildAiReviewPrompt(
     const AiReviewPayload& payload,
-    const std::vector<const parser::Guideline*>& claim_guidelines) {
-    return BuildAiReviewRequestArtifacts(payload, claim_guidelines);
+    const std::vector<const parser::Guideline*>& guidelines,
+    const parser::ReviewProfile* review_profile) {
+    return BuildAiReviewRequestArtifacts(payload, guidelines, review_profile);
 }
 
 std::string BuildExpectedAiReviewResponseSchemaText() {
@@ -286,7 +316,7 @@ std::string BuildExpectedAiReviewResponseSchemaText() {
 Field rules:
 
 - source must be "SCCG".
-- guideline_id must match one of the provided SCCG CL rule IDs.
+- guideline_id must match one of the provided SCCG guideline IDs.
 - guideline_title must match the title of the referenced guideline.
 - severity should normally be "warning" for claim quality issues.
 - message should describe what is violated.
@@ -314,6 +344,12 @@ std::string StripJsonCodeFence(const std::string& response_text) {
 
 AiReviewParseResult ParseAiReviewResponse(const std::string& response_text,
                                           const std::string& selected_element_id) {
+    return ParseAiReviewResponse(response_text, selected_element_id, std::vector<std::string>{});
+}
+
+AiReviewParseResult ParseAiReviewResponse(const std::string& response_text,
+                                          const std::string& selected_element_id,
+                                          const std::vector<std::string>& allowed_guideline_ids) {
     AiReviewParseResult result;
     result.sanitizedJson = StripJsonCodeFence(response_text);
 
@@ -336,6 +372,13 @@ AiReviewParseResult ParseAiReviewResponse(const std::string& response_text,
             if (!finding.is_object()) continue;
 
             std::string guideline_id = JsonStringValue(finding, "guideline_id");
+            if (!allowed_guideline_ids.empty() &&
+                (guideline_id.empty() || !IsAllowedGuidelineId(guideline_id, allowed_guideline_ids))) {
+                result.errorMessage = "AI response referenced guideline_id '" +
+                    (guideline_id.empty() ? std::string("<empty>") : guideline_id) +
+                    "', which was not included in the SCCG guidelines provided to the prompt.";
+                return result;
+            }
             if (guideline_id.empty()) guideline_id = "unknown";
 
             core::ProblemItem problem;

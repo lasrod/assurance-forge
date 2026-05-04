@@ -34,6 +34,19 @@ parser::AssuranceCase MakeCaseWithElement(std::string id, std::string type) {
     return assurance_case;
 }
 
+parser::Guideline MakeGuideline(std::string id, std::string category) {
+    parser::Guideline guideline;
+    guideline.id = std::move(id);
+    guideline.category = std::move(category);
+    guideline.title = "Guideline";
+    guideline.statement = "Statement";
+    return guideline;
+}
+
+app::GuidelineCatalog MakeCatalog(parser::GuidelinesDocument document) {
+    return app::BuildGuidelineCatalog(std::move(document), "sccg.full.yaml");
+}
+
 }  // namespace
 
 TEST(AiReviewControllerTest, NoSelectionAddsInfoProblemAndStatus) {
@@ -97,4 +110,68 @@ TEST(AiReviewControllerTest, CancelPendingRequestClearsDebugModal) {
 
     EXPECT_FALSE(harness.controller.ShouldShowDebugModal());
     EXPECT_TRUE(harness.controller.PendingDebugText().empty());
+}
+
+TEST(AiReviewControllerTest, SelectClaimReviewGuidelinesUsesProfileWhenAvailable) {
+    parser::GuidelinesDocument document;
+    document.guidelines.push_back(MakeGuideline("CL.1", "CL"));
+    document.guidelines.push_back(MakeGuideline("RD.4", "RD"));
+    parser::ReviewProfile profile;
+    profile.id = "claim_wording_review";
+    profile.guideline_ids = {"RD.4"};
+    document.review_profiles.push_back(profile);
+
+    app::GuidelineCatalog catalog = MakeCatalog(std::move(document));
+    app::controllers::AiReviewGuidelineSelection selection =
+        app::controllers::SelectClaimReviewGuidelines(catalog);
+
+    ASSERT_NE(selection.review_profile, nullptr);
+    ASSERT_EQ(selection.guidelines.size(), 1u);
+    EXPECT_EQ(selection.guidelines[0]->id, "RD.4");
+    EXPECT_TRUE(selection.error_message.empty());
+}
+
+TEST(AiReviewControllerTest, SelectClaimReviewGuidelinesFallsBackToClWhenProfileMissing) {
+    parser::GuidelinesDocument document;
+    document.guidelines.push_back(MakeGuideline("CL.1", "CL"));
+    document.guidelines.push_back(MakeGuideline("RD.4", "RD"));
+
+    app::GuidelineCatalog catalog = MakeCatalog(std::move(document));
+    app::controllers::AiReviewGuidelineSelection selection =
+        app::controllers::SelectClaimReviewGuidelines(catalog);
+
+    EXPECT_EQ(selection.review_profile, nullptr);
+    ASSERT_EQ(selection.guidelines.size(), 1u);
+    EXPECT_EQ(selection.guidelines[0]->id, "CL.1");
+    EXPECT_TRUE(selection.error_message.empty());
+}
+
+TEST(AiReviewControllerTest, SelectClaimReviewGuidelinesReportsProfileWithNoValidGuidelines) {
+    parser::GuidelinesDocument document;
+    document.guidelines.push_back(MakeGuideline("CL.1", "CL"));
+    parser::ReviewProfile profile;
+    profile.id = "claim_wording_review";
+    profile.guideline_ids = {"missing-guideline"};
+    document.review_profiles.push_back(profile);
+
+    app::GuidelineCatalog catalog = MakeCatalog(std::move(document));
+    app::controllers::AiReviewGuidelineSelection selection =
+        app::controllers::SelectClaimReviewGuidelines(catalog);
+
+    ASSERT_NE(selection.review_profile, nullptr);
+    EXPECT_TRUE(selection.guidelines.empty());
+    EXPECT_NE(selection.error_message.find("no valid guidelines"), std::string::npos);
+}
+
+TEST(AiReviewControllerTest, BeginReviewForSelectionBuildsProfilePrompt) {
+    ControllerHarness harness;
+    parser::AssuranceCase assurance_case = MakeCaseWithElement("claim-1", "claim");
+    core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+
+    harness.controller.BeginReviewForSelection(&assurance_case, tree, "claim-1");
+
+    ASSERT_FALSE(harness.controller.PendingDebugText().empty());
+    EXPECT_NE(harness.controller.PendingDebugText().find("claim_wording_review"), std::string::npos);
+    EXPECT_EQ(harness.controller.PendingDebugText().find("SCCG CL rules"), std::string::npos);
+    EXPECT_EQ(harness.statuses.back(), "AI review request is ready for inspection.");
 }

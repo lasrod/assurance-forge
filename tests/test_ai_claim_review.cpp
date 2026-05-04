@@ -39,10 +39,22 @@ parser::Guideline MakeClaimGuideline(const std::string& id, const std::string& t
     guideline.id = id;
     guideline.category = "CL";
     guideline.title = title;
-    guideline.guideline = "Write a clear claim.";
-    guideline.why = "Reviewers need clear claims.";
+    guideline.statement = "Write a clear claim.";
+    guideline.rationale = "Reviewers need clear claims.";
     guideline.review_prompts = {"Is the claim reviewable?"};
+    guideline.examples.good = "The braking controller response time meets the acceptance criterion.";
+    guideline.tool.applicable_elements = {"GSN Goal", "SACM Claim"};
+    guideline.tool.detection_hints = {"Look for vague claim text."};
     return guideline;
+}
+
+parser::ReviewProfile MakeClaimWordingProfile() {
+    parser::ReviewProfile profile;
+    profile.id = "claim_wording_review";
+    profile.display_name = "Claim wording review";
+    profile.description = "Reviews claim wording.";
+    profile.guideline_ids = {"CL.1"};
+    return profile;
 }
 
 }  // namespace
@@ -85,15 +97,47 @@ TEST(AiClaimReviewTest, BuildsPromptWithProvidedClaimGuidelinesAndPayload) {
     payload.children.push_back({"child", "G2", "GSN Goal / SACM Claim", "Sub goal", "Braking is safe.", ""});
 
     parser::Guideline cl1 = MakeClaimGuideline("CL.1", "Write each claim as a falsifiable proposition");
+    parser::ReviewProfile profile = MakeClaimWordingProfile();
     std::vector<const parser::Guideline*> guidelines = {&cl1};
 
-    ai::AiReviewPromptParts parts = ai::BuildAiReviewPrompt(payload, guidelines);
+    ai::AiReviewPromptParts parts = ai::BuildAiReviewPrompt(payload, guidelines, &profile);
 
     EXPECT_NE(parts.prompt.find("Return JSON only"), std::string::npos);
+    EXPECT_NE(parts.prompt.find("claim_wording_review"), std::string::npos);
     EXPECT_NE(parts.prompt.find("CL.1"), std::string::npos);
+    EXPECT_NE(parts.prompt.find("statement"), std::string::npos);
+    EXPECT_NE(parts.prompt.find("rationale"), std::string::npos);
+    EXPECT_EQ(parts.prompt.find("SCCG CL rules"), std::string::npos);
     EXPECT_NE(parts.prompt.find("System is safe."), std::string::npos);
+    EXPECT_NE(parts.reviewProfileJson.find("claim_wording_review"), std::string::npos);
     EXPECT_NE(parts.debugText.find(parts.prompt), std::string::npos);
     EXPECT_NE(parts.expectedResponseSchema.find("findings"), std::string::npos);
+}
+
+TEST(AiClaimReviewTest, RejectsResponseGuidelineIdThatWasNotProvided) {
+    const std::string response = R"json({
+    "reviewed_element_id": "G1",
+    "reviewed_element_type": "GSN Goal / SACM Claim",
+    "findings": [
+        {
+            "source": "SCCG",
+            "guideline_id": "CL.9",
+            "guideline_title": "Unknown",
+            "severity": "warning",
+            "confidence": "high",
+            "message": "Message",
+            "why_it_matters": "Why",
+            "suggested_fix": "Fix",
+            "suggested_claim_wording": "Better wording.",
+            "related_element_ids": ["G1"]
+        }
+    ]
+})json";
+
+    ai::AiReviewParseResult parsed = ai::ParseAiReviewResponse(response, "G1", std::vector<std::string>{"CL.1"});
+
+    EXPECT_FALSE(parsed.success);
+    EXPECT_NE(parsed.errorMessage.find("CL.9"), std::string::npos);
 }
 
 TEST(AiClaimReviewTest, ParsesFencedJsonAndMapsFindingsToProblems) {
