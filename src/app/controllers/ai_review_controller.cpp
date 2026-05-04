@@ -52,7 +52,7 @@ AiReviewGuidelineSelection SelectClaimReviewGuidelines(const GuidelineCatalog& g
 
     if (selection.review_profile && selection.guidelines.empty()) {
         selection.error_message =
-            "SCCG catalog contains review profile 'claim_wording_review' but it references no valid guidelines.";
+            std::string("SCCG catalog contains review profile '") + kDefaultClaimReviewProfileId + "' but it references no valid guidelines.";
     } else if (selection.guidelines.empty()) {
         selection.error_message = "No SCCG guidelines were found for AI review.";
     }
@@ -216,7 +216,7 @@ void AiReviewController::PollTask() {
 
     last_raw_response_ = response.text.empty() ? response.rawJson : response.text;
     ai::AiReviewParseResult parse_result =
-        ai::ParseAiReviewResponse(response.text, pending_review_element_id_, pending_guideline_ids_);
+        ai::ParseAiReviewResponse(last_raw_response_, pending_review_element_id_, pending_guideline_ids_);
     if (!parse_result.success) {
         last_parse_error_ = parse_result.errorMessage;
         std::string message = "AI response could not be parsed as the expected JSON format.";
