@@ -148,7 +148,12 @@ void AppRuntime::RenderDeleteReviewItemConfirmModal() {
 
 void AppRuntime::RenderStartupProjectWindow() {
     ui::panels::WelcomeModalCallbacks callbacks{
-        [this]() { BeginCreateProject(); },
+        [this]() {
+            BeginCreateProject();
+            if (impl_->project_controller->show_create_project_modal) {
+                impl_->project_controller->show_startup_project_window = false;
+            }
+        },
         []() {},
         [this]() { BeginOpenProject(); },
         []() {},
