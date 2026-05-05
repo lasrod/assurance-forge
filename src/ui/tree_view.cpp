@@ -1,7 +1,8 @@
 #include "ui/tree_view.h"
 
-#include "imgui.h"
 #include "ui/theme.h"
+
+#include "imgui.h"
 
 #include <string>
 
