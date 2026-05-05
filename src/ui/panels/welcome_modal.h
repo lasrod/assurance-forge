@@ -2,9 +2,9 @@
 
 #include "app/recent_projects.h"
 
+#include <functional>
 #include <string>
 #include <vector>
-#include <functional>
 
 namespace ui::panels {
 
@@ -25,4 +25,4 @@ void ShowWelcomeModal(bool& is_open,
                       const std::vector<RecentProjectEntry>& recent,
                       const WelcomeModalCallbacks& callbacks = {});
 
-}  // namespace ui::panels
+} // namespace ui::panels

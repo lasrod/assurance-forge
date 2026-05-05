@@ -18,9 +18,11 @@ namespace {
 
 #ifdef _WIN32
 std::wstring Utf8ToWide(const std::string& value) {
-    if (value.empty()) return {};
+    if (value.empty())
+        return {};
     int required = MultiByteToWideChar(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0);
-    if (required <= 0) return {};
+    if (required <= 0)
+        return {};
     std::wstring wide(static_cast<size_t>(required), L'\0');
     MultiByteToWideChar(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), wide.data(), required);
     return wide;
@@ -32,11 +34,12 @@ std::wstring TargetName(const std::string& service, const std::string& account) 
 
 class WindowsCredentialStore final : public ISecretStore {
 public:
-    bool IsAvailable() const override { return true; }
+    bool IsAvailable() const override {
+        return true;
+    }
 
-    SecretStoreResult SaveSecret(const std::string& service,
-                                 const std::string& account,
-                                 const std::string& secret) override {
+    SecretStoreResult
+    SaveSecret(const std::string& service, const std::string& account, const std::string& secret) override {
         if (secret.empty()) {
             return SecretStoreFailure(AiErrorCode::MissingApiKey, "API key is empty.");
         }
@@ -56,7 +59,8 @@ public:
         credential.CredentialBlob = reinterpret_cast<LPBYTE>(const_cast<char*>(secret.data()));
 
         if (!CredWriteW(&credential, 0)) {
-            return SecretStoreFailure(AiErrorCode::SecureStoreUnavailable, "Could not save API key to Windows Credential Manager.");
+            return SecretStoreFailure(AiErrorCode::SecureStoreUnavailable,
+                                      "Could not save API key to Windows Credential Manager.");
         }
         return SecretStoreSuccess();
     }
@@ -69,7 +73,8 @@ public:
             if (error == ERROR_NOT_FOUND || error == ERROR_NO_SUCH_LOGON_SESSION) {
                 return SecretLoadSuccess(std::nullopt);
             }
-            return SecretLoadFailure(AiErrorCode::SecureStoreUnavailable, "Could not read API key from Windows Credential Manager.");
+            return SecretLoadFailure(AiErrorCode::SecureStoreUnavailable,
+                                     "Could not read API key from Windows Credential Manager.");
         }
 
         std::string secret;
@@ -78,7 +83,8 @@ public:
             secret.assign(begin, begin + raw->CredentialBlobSize);
         }
         CredFree(raw);
-        if (secret.empty()) return SecretLoadSuccess(std::nullopt);
+        if (secret.empty())
+            return SecretLoadSuccess(std::nullopt);
         return SecretLoadSuccess(secret);
     }
 
@@ -86,8 +92,10 @@ public:
         std::wstring target = TargetName(service, account);
         if (!CredDeleteW(target.c_str(), CRED_TYPE_GENERIC, 0)) {
             DWORD error = GetLastError();
-            if (error == ERROR_NOT_FOUND) return SecretStoreSuccess();
-            return SecretStoreFailure(AiErrorCode::SecureStoreUnavailable, "Could not remove API key from Windows Credential Manager.");
+            if (error == ERROR_NOT_FOUND)
+                return SecretStoreSuccess();
+            return SecretStoreFailure(AiErrorCode::SecureStoreUnavailable,
+                                      "Could not remove API key from Windows Credential Manager.");
         }
         return SecretStoreSuccess();
     }
@@ -95,23 +103,28 @@ public:
 #else
 class UnsupportedSecretStore final : public ISecretStore {
 public:
-    bool IsAvailable() const override { return false; }
+    bool IsAvailable() const override {
+        return false;
+    }
 
     SecretStoreResult SaveSecret(const std::string&, const std::string&, const std::string&) override {
-        return SecretStoreFailure(AiErrorCode::SecureStoreUnavailable, "Secure storage is unavailable on this platform.");
+        return SecretStoreFailure(AiErrorCode::SecureStoreUnavailable,
+                                  "Secure storage is unavailable on this platform.");
     }
 
     SecretLoadResult LoadSecret(const std::string&, const std::string&) override {
-        return SecretLoadFailure(AiErrorCode::SecureStoreUnavailable, "Secure storage is unavailable on this platform.");
+        return SecretLoadFailure(AiErrorCode::SecureStoreUnavailable,
+                                 "Secure storage is unavailable on this platform.");
     }
 
     SecretStoreResult DeleteSecret(const std::string&, const std::string&) override {
-        return SecretStoreFailure(AiErrorCode::SecureStoreUnavailable, "Secure storage is unavailable on this platform.");
+        return SecretStoreFailure(AiErrorCode::SecureStoreUnavailable,
+                                  "Secure storage is unavailable on this platform.");
     }
 };
 #endif
 
-}  // namespace
+} // namespace
 
 SecretStoreResult SecretStoreSuccess() {
     SecretStoreResult result;
@@ -152,4 +165,4 @@ std::shared_ptr<ISecretStore> CreatePlatformSecretStore() {
 #endif
 }
 
-}  // namespace ai
+} // namespace ai

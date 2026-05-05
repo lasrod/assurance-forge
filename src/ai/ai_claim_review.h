@@ -52,8 +52,7 @@ struct AiReviewParseResult {
 
 using ParsedAiReviewResponse = AiReviewParseResult;
 
-const parser::SacmElement* FindSacmElement(const parser::AssuranceCase& assurance_case,
-                                           const std::string& element_id);
+const parser::SacmElement* FindSacmElement(const parser::AssuranceCase& assurance_case, const std::string& element_id);
 bool IsSupportedAiReviewElement(const parser::SacmElement& element);
 std::string AiReviewElementType(const parser::SacmElement& element);
 
@@ -63,19 +62,16 @@ bool BuildAiReviewPayload(const parser::AssuranceCase& assurance_case,
                           AiReviewPayload& out_payload,
                           std::string& out_error);
 
-AiReviewRequestArtifacts BuildAiReviewRequestArtifacts(
-    const AiReviewPayload& payload,
-    const std::vector<const parser::Guideline*>& guidelines,
-    const parser::ReviewProfile* review_profile = nullptr);
-AiReviewPromptParts BuildAiReviewPrompt(
-    const AiReviewPayload& payload,
-    const std::vector<const parser::Guideline*>& guidelines,
-    const parser::ReviewProfile* review_profile = nullptr);
+AiReviewRequestArtifacts BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
+                                                       const std::vector<const parser::Guideline*>& guidelines,
+                                                       const parser::ReviewProfile* review_profile = nullptr);
+AiReviewPromptParts BuildAiReviewPrompt(const AiReviewPayload& payload,
+                                        const std::vector<const parser::Guideline*>& guidelines,
+                                        const parser::ReviewProfile* review_profile = nullptr);
 
 std::string BuildExpectedAiReviewResponseSchemaText();
 std::string StripJsonCodeFence(const std::string& response_text);
-AiReviewParseResult ParseAiReviewResponse(const std::string& response_text,
-                                          const std::string& selected_element_id);
+AiReviewParseResult ParseAiReviewResponse(const std::string& response_text, const std::string& selected_element_id);
 AiReviewParseResult ParseAiReviewResponse(const std::string& response_text,
                                           const std::string& selected_element_id,
                                           const std::vector<std::string>& allowed_guideline_ids);
@@ -83,4 +79,4 @@ ParsedAiReviewResponse ParseAiReviewResponse(const std::string& response_text,
                                              const std::string& selected_element_id,
                                              const std::string& fallback_element_type);
 
-}  // namespace ai
+} // namespace ai

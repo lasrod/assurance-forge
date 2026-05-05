@@ -9,12 +9,18 @@ namespace ui {
 void RenderAddElementMenu(const ElementContextActions& actions) {
     if (ImGui::BeginMenu("Add")) {
         const bool can_add = static_cast<bool>(actions.add_child);
-        if (ImGui::MenuItem("Goal", nullptr, false, can_add)) actions.add_child(core::NewElementKind::Goal);
-        if (ImGui::MenuItem("Strategy", nullptr, false, can_add)) actions.add_child(core::NewElementKind::Strategy);
-        if (ImGui::MenuItem("Solution", nullptr, false, can_add)) actions.add_child(core::NewElementKind::Solution);
-        if (ImGui::MenuItem("Context", nullptr, false, can_add)) actions.add_child(core::NewElementKind::Context);
-        if (ImGui::MenuItem("Assumption", nullptr, false, can_add)) actions.add_child(core::NewElementKind::Assumption);
-        if (ImGui::MenuItem("Justification", nullptr, false, can_add)) actions.add_child(core::NewElementKind::Justification);
+        if (ImGui::MenuItem("Goal", nullptr, false, can_add))
+            actions.add_child(core::NewElementKind::Goal);
+        if (ImGui::MenuItem("Strategy", nullptr, false, can_add))
+            actions.add_child(core::NewElementKind::Strategy);
+        if (ImGui::MenuItem("Solution", nullptr, false, can_add))
+            actions.add_child(core::NewElementKind::Solution);
+        if (ImGui::MenuItem("Context", nullptr, false, can_add))
+            actions.add_child(core::NewElementKind::Context);
+        if (ImGui::MenuItem("Assumption", nullptr, false, can_add))
+            actions.add_child(core::NewElementKind::Assumption);
+        if (ImGui::MenuItem("Justification", nullptr, false, can_add))
+            actions.add_child(core::NewElementKind::Justification);
         ImGui::Separator();
         if (ImGui::MenuItem("Challenge", nullptr, false, static_cast<bool>(actions.not_implemented))) {
             actions.not_implemented("Challenge");
@@ -34,7 +40,8 @@ void RenderRemoveSubmenu(const parser::AssuranceCase* active_case,
         }
 
         auto count_for = [&](core::RemoveMode mode) -> int {
-            if (!active_case) return 0;
+            if (!active_case)
+                return 0;
             return static_cast<int>(core::PlanRemoval(*active_case, selected_id, mode).size());
         };
 
@@ -58,4 +65,4 @@ void RenderRemoveSubmenu(const parser::AssuranceCase* active_case,
     }
 }
 
-}  // namespace ui
+} // namespace ui

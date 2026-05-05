@@ -3,12 +3,18 @@
 namespace ui::gsn {
 
 static ElementRole MapType(const std::string& t) {
-    if (t == "claim") return ElementRole::Claim;
-    if (t == "assertedcontext") return ElementRole::Context;
-    if (t == "assertedjustification" || t == "justification") return ElementRole::Justification;
-    if (t == "assumption") return ElementRole::Assumption;
-    if (t == "argumentreasoning") return ElementRole::Strategy;
-    if (t == "artifact" || t == "artifactreference" || t == "expression") return ElementRole::Evidence;
+    if (t == "claim")
+        return ElementRole::Claim;
+    if (t == "assertedcontext")
+        return ElementRole::Context;
+    if (t == "assertedjustification" || t == "justification")
+        return ElementRole::Justification;
+    if (t == "assumption")
+        return ElementRole::Assumption;
+    if (t == "argumentreasoning")
+        return ElementRole::Strategy;
+    if (t == "artifact" || t == "artifactreference" || t == "expression")
+        return ElementRole::Evidence;
     return ElementRole::Other;
 }
 

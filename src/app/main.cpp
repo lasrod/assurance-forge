@@ -2,9 +2,7 @@
 
 #include "app/app_runtime.h"
 #include "app/app_ui_bootstrap.h"
-
 #include "hello_imgui/hello_imgui.h"
-
 #include "ui/localization.h"
 
 namespace {
@@ -13,7 +11,7 @@ constexpr const char* kLanguagePreference = "AssuranceForge.Language";
 constexpr const char* kRecentProjectsPreference = "AssuranceForge.RecentProjects";
 constexpr const char* kReviewerNamePreference = "AssuranceForge.ReviewerName";
 
-}  // namespace
+} // namespace
 
 int main(int, char**) {
     app::AppRuntime runtime;

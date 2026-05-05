@@ -5,4 +5,4 @@ namespace app {
 void ConfigureImGuiFonts();
 void ConfigureImGuiConfig();
 
-}  // namespace app
+} // namespace app

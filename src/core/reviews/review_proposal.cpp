@@ -16,15 +16,15 @@ namespace {
 
 bool IsCreateOperation(PatchOperationType type) {
     switch (type) {
-        case PatchOperationType::CreateClaim:
-        case PatchOperationType::CreateStrategy:
-        case PatchOperationType::CreateSolution:
-        case PatchOperationType::CreateContext:
-        case PatchOperationType::CreateAssumption:
-        case PatchOperationType::CreateJustification:
-            return true;
-        default:
-            return false;
+    case PatchOperationType::CreateClaim:
+    case PatchOperationType::CreateStrategy:
+    case PatchOperationType::CreateSolution:
+    case PatchOperationType::CreateContext:
+    case PatchOperationType::CreateAssumption:
+    case PatchOperationType::CreateJustification:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -36,7 +36,8 @@ bool ElementExists(const parser::AssuranceCase& model, const std::string& id) {
 
 const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const std::string& id) {
     for (const parser::SacmElement& element : model.elements) {
-        if (element.id == id) return &element;
+        if (element.id == id)
+            return &element;
     }
     return nullptr;
 }
@@ -47,8 +48,10 @@ std::string WithHashPrefix(const std::string& digest) {
 
 nlohmann::json RefToJson(const ElementRef& ref, const char* id_key, const char* ref_key) {
     nlohmann::json object;
-    if (ref.existing_id.has_value()) object[id_key] = ref.existing_id.value();
-    if (ref.create_ref.has_value()) object[ref_key] = ref.create_ref.value();
+    if (ref.existing_id.has_value())
+        object[id_key] = ref.existing_id.value();
+    if (ref.create_ref.has_value())
+        object[ref_key] = ref.create_ref.value();
     return object;
 }
 
@@ -61,9 +64,12 @@ void WriteRefFields(nlohmann::json& object, const ElementRef& ref, const char* i
 
 std::optional<ElementRef> ReadRefFields(const nlohmann::json& object, const char* id_key, const char* ref_key) {
     ElementRef ref;
-    if (object.contains(id_key) && object[id_key].is_string()) ref.existing_id = object[id_key].get<std::string>();
-    if (object.contains(ref_key) && object[ref_key].is_string()) ref.create_ref = object[ref_key].get<std::string>();
-    if (!ref.existing_id.has_value() && !ref.create_ref.has_value()) return std::nullopt;
+    if (object.contains(id_key) && object[id_key].is_string())
+        ref.existing_id = object[id_key].get<std::string>();
+    if (object.contains(ref_key) && object[ref_key].is_string())
+        ref.create_ref = object[ref_key].get<std::string>();
+    if (!ref.existing_id.has_value() && !ref.create_ref.has_value())
+        return std::nullopt;
     return ref;
 }
 
@@ -88,25 +94,40 @@ bool ValidateElementRef(const ElementRef& ref,
     return true;
 }
 
-}  // namespace
+} // namespace
 
 const char* PatchOperationTypeToString(PatchOperationType type) {
     switch (type) {
-        case PatchOperationType::CreateClaim: return "CreateClaim";
-        case PatchOperationType::CreateStrategy: return "CreateStrategy";
-        case PatchOperationType::CreateSolution: return "CreateSolution";
-        case PatchOperationType::CreateContext: return "CreateContext";
-        case PatchOperationType::CreateAssumption: return "CreateAssumption";
-        case PatchOperationType::CreateJustification: return "CreateJustification";
-        case PatchOperationType::UpdateElementText: return "UpdateElementText";
-        case PatchOperationType::UpdateElementName: return "UpdateElementName";
-        case PatchOperationType::SetUndeveloped: return "SetUndeveloped";
-        case PatchOperationType::ClearUndeveloped: return "ClearUndeveloped";
-        case PatchOperationType::AddSupportedBy: return "AddSupportedBy";
-        case PatchOperationType::RemoveSupportedBy: return "RemoveSupportedBy";
-        case PatchOperationType::AddInContextOf: return "AddInContextOf";
-        case PatchOperationType::RemoveInContextOf: return "RemoveInContextOf";
-        case PatchOperationType::RemoveElement: return "RemoveElement";
+    case PatchOperationType::CreateClaim:
+        return "CreateClaim";
+    case PatchOperationType::CreateStrategy:
+        return "CreateStrategy";
+    case PatchOperationType::CreateSolution:
+        return "CreateSolution";
+    case PatchOperationType::CreateContext:
+        return "CreateContext";
+    case PatchOperationType::CreateAssumption:
+        return "CreateAssumption";
+    case PatchOperationType::CreateJustification:
+        return "CreateJustification";
+    case PatchOperationType::UpdateElementText:
+        return "UpdateElementText";
+    case PatchOperationType::UpdateElementName:
+        return "UpdateElementName";
+    case PatchOperationType::SetUndeveloped:
+        return "SetUndeveloped";
+    case PatchOperationType::ClearUndeveloped:
+        return "ClearUndeveloped";
+    case PatchOperationType::AddSupportedBy:
+        return "AddSupportedBy";
+    case PatchOperationType::RemoveSupportedBy:
+        return "RemoveSupportedBy";
+    case PatchOperationType::AddInContextOf:
+        return "AddInContextOf";
+    case PatchOperationType::RemoveInContextOf:
+        return "RemoveInContextOf";
+    case PatchOperationType::RemoveElement:
+        return "RemoveElement";
     }
     return "UpdateElementText";
 }
@@ -130,7 +151,8 @@ bool PatchOperationTypeFromString(const std::string& value, PatchOperationType& 
         {"RemoveElement", PatchOperationType::RemoveElement},
     };
     auto it = kTypes.find(value);
-    if (it == kTypes.end()) return false;
+    if (it == kTypes.end())
+        return false;
     type = it->second;
     return true;
 }
@@ -153,14 +175,22 @@ std::string SerializeReviewProposal(const ReviewProposal& proposal) {
     for (const PatchOperation& operation : proposal.operations) {
         nlohmann::json object;
         object["type"] = PatchOperationTypeToString(operation.type);
-        if (operation.create_ref.has_value()) object["create_ref"] = operation.create_ref.value();
-        if (operation.element.has_value()) WriteRefFields(object, operation.element.value(), "element_id", "element_ref");
-        if (operation.source.has_value()) WriteRefFields(object, operation.source.value(), "source_id", "source_ref");
-        if (operation.target.has_value()) WriteRefFields(object, operation.target.value(), "target_id", "target_ref");
-        if (!operation.field.empty()) object["field"] = operation.field;
-        if (!operation.old_value.empty()) object["old_value"] = operation.old_value;
-        if (!operation.new_value.empty()) object["new_value"] = operation.new_value;
-        if (!operation.text.empty()) object["text"] = operation.text;
+        if (operation.create_ref.has_value())
+            object["create_ref"] = operation.create_ref.value();
+        if (operation.element.has_value())
+            WriteRefFields(object, operation.element.value(), "element_id", "element_ref");
+        if (operation.source.has_value())
+            WriteRefFields(object, operation.source.value(), "source_id", "source_ref");
+        if (operation.target.has_value())
+            WriteRefFields(object, operation.target.value(), "target_id", "target_ref");
+        if (!operation.field.empty())
+            object["field"] = operation.field;
+        if (!operation.old_value.empty())
+            object["old_value"] = operation.old_value;
+        if (!operation.new_value.empty())
+            object["new_value"] = operation.new_value;
+        if (!operation.text.empty())
+            object["text"] = operation.text;
         root["operations"].push_back(std::move(object));
     }
 
@@ -187,11 +217,13 @@ bool DeserializeReviewProposal(const std::string& content, ReviewProposal& propo
         proposal.base_model_hash = root.value("base_model_hash", "");
 
         for (const auto& value : root.value("affected_existing_element_ids", nlohmann::json::array())) {
-            if (value.is_string()) proposal.affected_existing_element_ids.push_back(value.get<std::string>());
+            if (value.is_string())
+                proposal.affected_existing_element_ids.push_back(value.get<std::string>());
         }
         if (root.contains("base_element_hashes") && root["base_element_hashes"].is_object()) {
             for (auto it = root["base_element_hashes"].begin(); it != root["base_element_hashes"].end(); ++it) {
-                if (it.value().is_string()) proposal.base_element_hashes[it.key()] = it.value().get<std::string>();
+                if (it.value().is_string())
+                    proposal.base_element_hashes[it.key()] = it.value().get<std::string>();
             }
         }
 
@@ -239,8 +271,10 @@ std::string ComputeElementSemanticHash(const parser::SacmElement& element) {
                << (element.undeveloped ? "undeveloped" : "developed") << '\n'
                << element.assertion_declaration << '\n'
                << element.reasoning_ref << '\n';
-    for (const std::string& source : element.source_refs) normalized << "source:" << source << '\n';
-    for (const std::string& target : element.target_refs) normalized << "target:" << target << '\n';
+    for (const std::string& source : element.source_refs)
+        normalized << "source:" << source << '\n';
+    for (const std::string& target : element.target_refs)
+        normalized << "target:" << target << '\n';
     return WithHashPrefix(Sha256::HexDigest(normalized.str()));
 }
 
@@ -253,7 +287,8 @@ std::string ComputeModelSemanticHash(const parser::AssuranceCase& model) {
     std::sort(lines.begin(), lines.end());
     std::ostringstream normalized;
     normalized << model.id << '\n' << model.name << '\n' << model.description << '\n';
-    for (const std::string& line : lines) normalized << line << '\n';
+    for (const std::string& line : lines)
+        normalized << line << '\n';
     return WithHashPrefix(Sha256::HexDigest(normalized.str()));
 }
 
@@ -294,7 +329,8 @@ ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& prop
 
     std::unordered_set<std::string> create_refs;
     for (const PatchOperation& operation : proposal.operations) {
-        if (!IsCreateOperation(operation.type)) continue;
+        if (!IsCreateOperation(operation.type))
+            continue;
         if (!operation.create_ref.has_value() || operation.create_ref->empty()) {
             result.reason = "Create operations must use a patch-local create_ref.";
             return result;
@@ -311,38 +347,40 @@ ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& prop
 
     for (const PatchOperation& operation : proposal.operations) {
         std::string reason;
-        if (IsCreateOperation(operation.type)) continue;
+        if (IsCreateOperation(operation.type))
+            continue;
         switch (operation.type) {
-            case PatchOperationType::UpdateElementText:
-            case PatchOperationType::UpdateElementName:
-            case PatchOperationType::SetUndeveloped:
-            case PatchOperationType::ClearUndeveloped:
-            case PatchOperationType::RemoveElement:
-                if (!operation.element.has_value()) {
-                    result.reason = "Operation " + std::string(PatchOperationTypeToString(operation.type)) + " is missing element_id.";
-                    return result;
-                }
-                if (!ValidateElementRef(operation.element.value(), current_model, create_refs, reason)) {
-                    result.reason = reason;
-                    return result;
-                }
-                break;
-            case PatchOperationType::AddSupportedBy:
-            case PatchOperationType::RemoveSupportedBy:
-            case PatchOperationType::AddInContextOf:
-            case PatchOperationType::RemoveInContextOf:
-                if (!operation.source.has_value() || !operation.target.has_value()) {
-                    result.reason = "Relationship operations require source and target references.";
-                    return result;
-                }
-                if (!ValidateElementRef(operation.source.value(), current_model, create_refs, reason) ||
-                    !ValidateElementRef(operation.target.value(), current_model, create_refs, reason)) {
-                    result.reason = reason;
-                    return result;
-                }
-                break;
-            default:
-                break;
+        case PatchOperationType::UpdateElementText:
+        case PatchOperationType::UpdateElementName:
+        case PatchOperationType::SetUndeveloped:
+        case PatchOperationType::ClearUndeveloped:
+        case PatchOperationType::RemoveElement:
+            if (!operation.element.has_value()) {
+                result.reason =
+                    "Operation " + std::string(PatchOperationTypeToString(operation.type)) + " is missing element_id.";
+                return result;
+            }
+            if (!ValidateElementRef(operation.element.value(), current_model, create_refs, reason)) {
+                result.reason = reason;
+                return result;
+            }
+            break;
+        case PatchOperationType::AddSupportedBy:
+        case PatchOperationType::RemoveSupportedBy:
+        case PatchOperationType::AddInContextOf:
+        case PatchOperationType::RemoveInContextOf:
+            if (!operation.source.has_value() || !operation.target.has_value()) {
+                result.reason = "Relationship operations require source and target references.";
+                return result;
+            }
+            if (!ValidateElementRef(operation.source.value(), current_model, create_refs, reason) ||
+                !ValidateElementRef(operation.target.value(), current_model, create_refs, reason)) {
+                result.reason = reason;
+                return result;
+            }
+            break;
+        default:
+            break;
         }
 
         if (operation.type == PatchOperationType::UpdateElementText && operation.field.empty()) {
@@ -363,4 +401,4 @@ ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& prop
     return result;
 }
 
-}  // namespace core::reviews
+} // namespace core::reviews

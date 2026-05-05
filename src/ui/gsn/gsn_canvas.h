@@ -1,13 +1,14 @@
 ﻿#pragma once
 
-#include <string>
-#include <vector>
+#include "core/assurance_tree.h"
 #include "imgui.h"
 #include "parser/xml_parser.h"
 #include "ui/element_context_menu.h"
 #include "ui/gsn/gsn_model.h"
 #include "ui/ui_state.h"
-#include "core/assurance_tree.h"
+
+#include <string>
+#include <vector>
 
 namespace ui::gsn {
 
@@ -17,7 +18,7 @@ struct GsnNode {
     ImVec2 position;
     ImVec2 size;
     std::string label;
-    std::string label_secondary;  // secondary language label
+    std::string label_secondary; // secondary language label
     bool undeveloped = false;
 };
 

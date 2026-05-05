@@ -1,10 +1,10 @@
 #pragma once
 
-#include <string>
-
 #include "core/element_factory.h"
 #include "core/project_model.h"
 #include "core/reviews/review_item.h"
+
+#include <string>
 
 namespace app {
 
@@ -112,4 +112,4 @@ private:
     AppRuntimeState* impl_ = nullptr;
 };
 
-}  // namespace app
+} // namespace app

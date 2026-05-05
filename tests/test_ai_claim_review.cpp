@@ -1,8 +1,7 @@
-﻿#include <gtest/gtest.h>
-
-#include "ai/ai_claim_review.h"
+﻿#include "ai/ai_claim_review.h"
 #include "core/assurance_tree.h"
 
+#include <gtest/gtest.h>
 #include <utility>
 #include <vector>
 
@@ -23,9 +22,9 @@ parser::SacmElement MakeElement(const std::string& id,
 }
 
 parser::SacmElement MakeRelationship(const std::string& id,
-                                      const std::string& type,
-                                      std::vector<std::string> sources,
-                                      std::vector<std::string> targets) {
+                                     const std::string& type,
+                                     std::vector<std::string> sources,
+                                     std::vector<std::string> targets) {
     parser::SacmElement relationship;
     relationship.id = id;
     relationship.type = type;
@@ -57,7 +56,7 @@ parser::ReviewProfile MakeClaimWordingProfile() {
     return profile;
 }
 
-}  // namespace
+} // namespace
 
 TEST(AiClaimReviewTest, BuildsSelectedParentAndDirectChildrenPayload) {
     parser::AssuranceCase assurance_case;
@@ -174,9 +173,8 @@ TEST(AiClaimReviewTest, ParsesFencedJsonAndMapsFindingsToProblems) {
 }
 
 TEST(AiClaimReviewTest, ReportsMissingFindingsArray) {
-    ai::ParsedAiReviewResponse parsed = ai::ParseAiReviewResponse(R"({"reviewed_element_id":"G1"})",
-                                                                  "G1",
-                                                                  "GSN Goal / SACM Claim");
+    ai::ParsedAiReviewResponse parsed =
+        ai::ParseAiReviewResponse(R"({"reviewed_element_id":"G1"})", "G1", "GSN Goal / SACM Claim");
 
     EXPECT_FALSE(parsed.success);
     EXPECT_NE(parsed.errorMessage.find("findings"), std::string::npos);

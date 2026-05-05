@@ -1,10 +1,9 @@
-#include <gtest/gtest.h>
-
 #include "app/controllers/review_controller.h"
 #include "core/project_service.h"
 
 #include <chrono>
 #include <filesystem>
+#include <gtest/gtest.h>
 #include <string>
 #include <vector>
 
@@ -31,13 +30,11 @@ std::filesystem::path MakeTempDir() {
         return {};
     }
 
-    std::filesystem::path path =
-        temp_root / ("assurance_forge_review_controller_test_" + std::to_string(stamp));
+    std::filesystem::path path = temp_root / ("assurance_forge_review_controller_test_" + std::to_string(stamp));
 
     std::filesystem::create_directories(path, ec);
     if (ec) {
-        ADD_FAILURE() << "Failed to create temporary directory '" << path.string()
-                      << "': " << ec.message();
+        ADD_FAILURE() << "Failed to create temporary directory '" << path.string() << "': " << ec.message();
         return {};
     }
 
@@ -56,12 +53,9 @@ struct ReviewHarness {
     int dirty_events = 0;
 
     ReviewHarness() : controller(events) {
-        events.Subscribe<app::StatusMessageEvent>([this](const app::StatusMessageEvent& event) {
-            statuses.push_back(event.message);
-        });
-        events.Subscribe<app::ReviewItemsDirtyEvent>([this](const app::ReviewItemsDirtyEvent&) {
-            ++dirty_events;
-        });
+        events.Subscribe<app::StatusMessageEvent>(
+            [this](const app::StatusMessageEvent& event) { statuses.push_back(event.message); });
+        events.Subscribe<app::ReviewItemsDirtyEvent>([this](const app::ReviewItemsDirtyEvent&) { ++dirty_events; });
     }
 };
 
@@ -80,7 +74,7 @@ core::reviews::ReviewItem MakeReviewItem(std::string id = "review-1") {
     return item;
 }
 
-}  // namespace
+} // namespace
 
 TEST(ReviewControllerTest, AddManualItemStoresItemMarksDirtyAndEmitsStatus) {
     ReviewHarness harness;
@@ -145,9 +139,7 @@ TEST(ReviewControllerTest, DeleteReviewItemDeletesLinkedProposalAndItem) {
             deleted_linked_proposal = proposal_id == "proposal-1";
             return true;
         },
-        [&](const std::string& proposal_id) {
-            closed_preview = proposal_id == "proposal-1";
-        }));
+        [&](const std::string& proposal_id) { closed_preview = proposal_id == "proposal-1"; }));
 
     EXPECT_TRUE(deleted_linked_proposal);
     EXPECT_TRUE(closed_preview);

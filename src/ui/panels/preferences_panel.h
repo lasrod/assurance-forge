@@ -34,8 +34,6 @@ struct PreferencesPanelCallbacks {
     std::function<void(const char*)> save_reviewer_name;
 };
 
-void ShowPreferencesWindow(bool& open,
-                           PreferencesPanelModel model,
-                           const PreferencesPanelCallbacks& callbacks);
+void ShowPreferencesWindow(bool& open, PreferencesPanelModel model, const PreferencesPanelCallbacks& callbacks);
 
-}  // namespace ui::panels
+} // namespace ui::panels

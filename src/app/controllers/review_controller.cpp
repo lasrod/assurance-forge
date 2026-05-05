@@ -18,7 +18,8 @@ bool ReviewController::ConfigureStorage(const std::filesystem::path& review_path
     }
 
     manager_.SetFilePath(review_path);
-    if (manager_.Load(error)) return true;
+    if (manager_.Load(error))
+        return true;
 
     std::error_code exists_error;
     if (!std::filesystem::exists(review_path, exists_error)) {
@@ -38,14 +39,16 @@ void ReviewController::ClearStorage() {
 }
 
 bool ReviewController::SaveIfDirty(core::AssuranceProject& project, std::string& error) {
-    if (!dirty_) return true;
+    if (!dirty_)
+        return true;
     if (manager_.FilePath().empty()) {
         error = "review storage path is not set.";
         return false;
     }
 
     std::filesystem::path requested_name = manager_.FilePath().filename();
-    if (requested_name.empty()) requested_name = "review-items.af.json";
+    if (requested_name.empty())
+        requested_name = "review-items.af.json";
 
     core::ProjectFileEntry entry;
     const std::string content = core::reviews::SerializeReviewItems(manager_.GetItems());
@@ -97,19 +100,22 @@ bool ReviewController::AddManualItem(core::reviews::ReviewItem item) {
 }
 
 bool ReviewController::AddOrUpdateItem(core::reviews::ReviewItem item) {
-    if (!manager_.AddOrUpdateItem(std::move(item))) return false;
+    if (!manager_.AddOrUpdateItem(std::move(item)))
+        return false;
     MarkDirty();
     return true;
 }
 
 bool ReviewController::SetProposal(const std::string& item_id, const std::string& proposal_id) {
-    if (!manager_.SetProposal(item_id, proposal_id)) return false;
+    if (!manager_.SetProposal(item_id, proposal_id))
+        return false;
     MarkDirty();
     return true;
 }
 
 bool ReviewController::ClearProposal(const std::string& item_id) {
-    if (!manager_.ClearProposal(item_id)) return false;
+    if (!manager_.ClearProposal(item_id))
+        return false;
     MarkDirty();
     return true;
 }
@@ -148,7 +154,8 @@ bool ReviewController::DeleteReviewItem(const core::reviews::ReviewItem& item,
             events_.Emit(StatusMessageEvent{"Review comment delete failed while deleting proposal: " + error});
             return false;
         }
-        if (close_preview) close_preview(item.proposal_id.value());
+        if (close_preview)
+            close_preview(item.proposal_id.value());
     }
 
     if (!manager_.RemoveItem(item.id)) {
@@ -157,9 +164,8 @@ bool ReviewController::DeleteReviewItem(const core::reviews::ReviewItem& item,
     }
 
     MarkDirty();
-    events_.Emit(StatusMessageEvent{item.proposal_id.has_value()
-        ? "Deleted review comment and proposed change."
-        : "Deleted review comment."});
+    events_.Emit(StatusMessageEvent{item.proposal_id.has_value() ? "Deleted review comment and proposed change."
+                                                                 : "Deleted review comment."});
     return true;
 }
 
@@ -206,4 +212,4 @@ void ReviewController::CancelDeleteReviewItem() {
     pending_delete_item_ = {};
 }
 
-}  // namespace app::controllers
+} // namespace app::controllers

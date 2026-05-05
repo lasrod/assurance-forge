@@ -1,8 +1,7 @@
-#include <gtest/gtest.h>
-
 #include "app/recent_projects.h"
 
 #include <filesystem>
+#include <gtest/gtest.h>
 #include <string>
 #include <vector>
 
@@ -19,7 +18,7 @@ app::RecentProjectEntry Entry(const std::string& name, const std::filesystem::pa
     return entry;
 }
 
-}  // namespace
+} // namespace
 
 TEST(RecentProjectsTest, InvalidPreferenceReturnsEmptyList) {
     EXPECT_TRUE(app::LoadRecentProjectsPreference("not json").empty());

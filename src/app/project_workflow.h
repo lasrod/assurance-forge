@@ -9,11 +9,7 @@
 
 namespace app {
 
-enum class ProjectFileCreateKind {
-    Sacm,
-    EvidenceRegister,
-    J3377CaeRegister
-};
+enum class ProjectFileCreateKind { Sacm, EvidenceRegister, J3377CaeRegister };
 
 const char* ProjectFileCreateTitle(ProjectFileCreateKind kind);
 std::filesystem::path ReviewItemsPath(const core::AssuranceProject& project);
@@ -22,4 +18,4 @@ bool ProjectTracksFile(const core::AssuranceProject& project, const std::filesys
 bool IsProjectManifestPath(const std::filesystem::path& path);
 RecentProjectEntry MakeRecentProjectEntry(const core::AppState& app_state);
 
-}  // namespace app
+} // namespace app

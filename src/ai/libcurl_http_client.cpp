@@ -1,7 +1,6 @@
 #include "ai/libcurl_http_client.h"
 
 #include <curl/curl.h>
-
 #include <mutex>
 #include <string>
 #include <utility>
@@ -20,7 +19,7 @@ void EnsureCurlInitialized() {
     std::call_once(once, []() { curl_global_init(CURL_GLOBAL_DEFAULT); });
 }
 
-}  // namespace
+} // namespace
 
 HttpResponse LibCurlHttpClient::Post(const HttpRequest& request) {
     EnsureCurlInitialized();
@@ -63,9 +62,10 @@ HttpResponse LibCurlHttpClient::Post(const HttpRequest& request) {
         response.errorMessage = error_buffer[0] ? RedactSensitiveText(error_buffer) : curl_easy_strerror(code);
     }
 
-    if (headers) curl_slist_free_all(headers);
+    if (headers)
+        curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
     return response;
 }
 
-}  // namespace ai
+} // namespace ai

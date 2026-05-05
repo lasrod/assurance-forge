@@ -1,12 +1,11 @@
-#include <gtest/gtest.h>
-
 #include "app/controllers/project_controller.h"
 
-#include <chrono>
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <gtest/gtest.h>
 #include <string>
 #include <utility>
 #include <vector>
@@ -24,8 +23,8 @@ struct TempDir {
 
 std::filesystem::path MakeTempDir() {
     auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::filesystem::path path = std::filesystem::temp_directory_path() /
-                                 ("assurance_forge_project_controller_test_" + std::to_string(stamp));
+    std::filesystem::path path =
+        std::filesystem::temp_directory_path() / ("assurance_forge_project_controller_test_" + std::to_string(stamp));
     std::filesystem::create_directories(path);
     return path;
 }
@@ -36,13 +35,12 @@ void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
     buffer[count] = '\0';
 }
 
-}  // namespace
+} // namespace
 
 TEST(ProjectControllerTest, BeginProjectFileCreateStoresKindNameAndShowsModal) {
     app::controllers::ProjectController controller;
 
-    controller.BeginProjectFileCreate(app::ProjectFileCreateKind::EvidenceRegister,
-                                      "evidence-register.af.json");
+    controller.BeginProjectFileCreate(app::ProjectFileCreateKind::EvidenceRegister, "evidence-register.af.json");
 
     EXPECT_EQ(controller.pending_project_file_kind, app::ProjectFileCreateKind::EvidenceRegister);
     EXPECT_STREQ(controller.project_file_name_buf, "evidence-register.af.json");

@@ -9,10 +9,10 @@ namespace ui {
 
 struct Theme {
     // ===== Surfaces (background tiers) =====
-    ImU32 bg_app;        // Main framebuffer / app background (deepest)
-    ImU32 surface_1;     // Panel background
-    ImU32 surface_2;     // Card / elevated surface
-    ImU32 surface_3;     // Hover / pressed surface, badges
+    ImU32 bg_app;    // Main framebuffer / app background (deepest)
+    ImU32 surface_1; // Panel background
+    ImU32 surface_2; // Card / elevated surface
+    ImU32 surface_3; // Hover / pressed surface, badges
 
     // ===== Borders =====
     ImU32 border;        // Subtle 1px panel borders
@@ -22,11 +22,11 @@ struct Theme {
     ImU32 text_primary;
     ImU32 text_secondary;
     ImU32 text_muted;
-    ImU32 ink_dark;      // Text drawn on top of light node fills
-    ImU32 ink_darker;    // Text drawn on top of mid-tone node fills
+    ImU32 ink_dark;   // Text drawn on top of light node fills
+    ImU32 ink_darker; // Text drawn on top of mid-tone node fills
 
     // ===== Accent / semantic =====
-    ImU32 accent;        // Indigo - selection, focus, Group2 edges
+    ImU32 accent; // Indigo - selection, focus, Group2 edges
     ImU32 accent_hover;
     ImU32 accent_pressed;
     ImU32 success;
@@ -43,22 +43,22 @@ struct Theme {
     ImU32 node_evidence;
 
     // ===== Edges =====
-    ImU32 edge_group1;   // Structural (solid)
-    ImU32 edge_group2;   // Contextual (dashed) - accent tinted
+    ImU32 edge_group1; // Structural (solid)
+    ImU32 edge_group2; // Contextual (dashed) - accent tinted
 
     // ===== Geometry / elevation =====
-    float rounding_ui;          // Buttons, inputs, frames
-    float rounding_panel;       // Windows, child cards
-    float rounding_node;        // Rectangular GSN node corners
-    float outline_thickness;    // Hairline outline on shapes
-    float shadow_alpha_top;     // First (closest) shadow layer alpha [0..1]
-    float shadow_offset;        // Vertical offset of shadow stack (px)
+    float rounding_ui;       // Buttons, inputs, frames
+    float rounding_panel;    // Windows, child cards
+    float rounding_node;     // Rectangular GSN node corners
+    float outline_thickness; // Hairline outline on shapes
+    float shadow_alpha_top;  // First (closest) shadow layer alpha [0..1]
+    float shadow_offset;     // Vertical offset of shadow stack (px)
 
     // ===== Canvas =====
     ImU32 canvas_bg;
     ImU32 canvas_grid_minor;
     ImU32 canvas_grid_major;
-    float canvas_grid_spacing;  // Cell size in content-space pixels
+    float canvas_grid_spacing; // Cell size in content-space pixels
 };
 
 // Current semantic palette accessor.
@@ -81,4 +81,4 @@ ImU32 ShadeColor(ImU32 c, float amount);
 // semantic colors: success (high cull), warning (medium), text_secondary (low).
 ImVec4 CullRatioColor(float ratio);
 
-}  // namespace ui
+} // namespace ui

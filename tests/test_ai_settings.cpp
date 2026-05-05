@@ -1,10 +1,9 @@
-#include <gtest/gtest.h>
-
 #include "ai/ai_settings.h"
 
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <gtest/gtest.h>
 #include <sstream>
 #include <utility>
 
@@ -13,15 +12,17 @@ namespace {
 struct TempDir {
     std::filesystem::path path;
     explicit TempDir(std::filesystem::path value) : path(std::move(value)) {}
-    ~TempDir() { std::filesystem::remove_all(path); }
+    ~TempDir() {
+        std::filesystem::remove_all(path);
+    }
     TempDir(const TempDir&) = delete;
     TempDir& operator=(const TempDir&) = delete;
 };
 
 std::filesystem::path MakeTempDir() {
     auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::filesystem::path path = std::filesystem::temp_directory_path() /
-                                 ("assurance_forge_ai_settings_test_" + std::to_string(stamp));
+    std::filesystem::path path =
+        std::filesystem::temp_directory_path() / ("assurance_forge_ai_settings_test_" + std::to_string(stamp));
     std::filesystem::create_directories(path);
     return path;
 }
@@ -33,7 +34,7 @@ std::string ReadFile(const std::filesystem::path& path) {
     return buffer.str();
 }
 
-}  // namespace
+} // namespace
 
 TEST(AiSettingsTest, MissingFileReturnsSafeDefaults) {
     TempDir temp(MakeTempDir());

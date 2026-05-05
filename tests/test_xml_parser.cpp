@@ -1,5 +1,6 @@
-﻿#include <gtest/gtest.h>
-#include "parser/xml_parser.h"
+﻿#include "parser/xml_parser.h"
+
+#include <gtest/gtest.h>
 
 using namespace parser;
 
@@ -152,9 +153,12 @@ TEST(XmlParserTest, ParseRelationshipSourceTargetRefs) {
     const SacmElement* ctx = nullptr;
     const SacmElement* ev = nullptr;
     for (const auto& e : result.assurance_case.elements) {
-        if (e.id == "inf_1") inf = &e;
-        if (e.id == "acx_1") ctx = &e;
-        if (e.id == "ae_1") ev = &e;
+        if (e.id == "inf_1")
+            inf = &e;
+        if (e.id == "acx_1")
+            ctx = &e;
+        if (e.id == "ae_1")
+            ev = &e;
     }
 
     ASSERT_NE(inf, nullptr);
@@ -250,9 +254,12 @@ TEST(XmlParserTest, ParseHrefWithHashPrefix) {
     const SacmElement* ctx = nullptr;
     const SacmElement* ev = nullptr;
     for (const auto& e : result.assurance_case.elements) {
-        if (e.id == "AI1") inf = &e;
-        if (e.id == "AC1") ctx = &e;
-        if (e.id == "AE1") ev = &e;
+        if (e.id == "AI1")
+            inf = &e;
+        if (e.id == "AC1")
+            ctx = &e;
+        if (e.id == "AE1")
+            ev = &e;
     }
 
     // AssertedInference with href and reasoning child element
@@ -304,9 +311,12 @@ TEST(XmlParserTest, ParseCrossPackageReferences) {
     // Should find elements from both packages
     bool found_g1 = false, found_g3 = false, found_s2 = false, found_ai1 = false;
     for (const auto& e : result.assurance_case.elements) {
-        if (e.id == "G1") found_g1 = true;
-        if (e.id == "G3") found_g3 = true;
-        if (e.id == "S2") found_s2 = true;
+        if (e.id == "G1")
+            found_g1 = true;
+        if (e.id == "G3")
+            found_g3 = true;
+        if (e.id == "S2")
+            found_s2 = true;
         if (e.id == "AI1") {
             found_ai1 = true;
             // Cross-package ref should be parsed

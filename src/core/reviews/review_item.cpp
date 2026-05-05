@@ -20,7 +20,8 @@ nlohmann::json ToJson(const ReviewItem& item) {
     object["guideline_ids"] = item.guideline_ids;
     object["source"] = ReviewItemSourceToString(item.source);
     object["status"] = ReviewItemStatusToString(item.status);
-    if (item.proposal_id.has_value()) object["proposal_id"] = item.proposal_id.value();
+    if (item.proposal_id.has_value())
+        object["proposal_id"] = item.proposal_id.value();
     object["applied_note"] = item.applied_note;
     object["created_utc"] = item.created_utc;
     object["updated_utc"] = item.updated_utc;
@@ -37,7 +38,8 @@ ReviewItem FromJson(const nlohmann::json& object) {
     item.reviewer_name = object.value("reviewer_name", "");
     if (object.contains("guideline_ids") && object["guideline_ids"].is_array()) {
         for (const auto& guideline_id : object["guideline_ids"]) {
-            if (guideline_id.is_string()) item.guideline_ids.push_back(guideline_id.get<std::string>());
+            if (guideline_id.is_string())
+                item.guideline_ids.push_back(guideline_id.get<std::string>());
         }
     }
     item.source = ReviewItemSourceFromString(object.value("source", "manual"));
@@ -51,31 +53,37 @@ ReviewItem FromJson(const nlohmann::json& object) {
     return item;
 }
 
-}  // namespace
+} // namespace
 
 const char* ReviewItemStatusToString(ReviewItemStatus status) {
     switch (status) {
-        case ReviewItemStatus::Open: return "open";
-        case ReviewItemStatus::Resolved: return "resolved";
+    case ReviewItemStatus::Open:
+        return "open";
+    case ReviewItemStatus::Resolved:
+        return "resolved";
     }
     return "open";
 }
 
 ReviewItemStatus ReviewItemStatusFromString(const std::string& value) {
-    if (value == "resolved") return ReviewItemStatus::Resolved;
+    if (value == "resolved")
+        return ReviewItemStatus::Resolved;
     return ReviewItemStatus::Open;
 }
 
 const char* ReviewItemSourceToString(ReviewItemSource source) {
     switch (source) {
-        case ReviewItemSource::Manual: return "manual";
-        case ReviewItemSource::AIReview: return "aiReview";
+    case ReviewItemSource::Manual:
+        return "manual";
+    case ReviewItemSource::AIReview:
+        return "aiReview";
     }
     return "manual";
 }
 
 ReviewItemSource ReviewItemSourceFromString(const std::string& value) {
-    if (value == "aiReview") return ReviewItemSource::AIReview;
+    if (value == "aiReview")
+        return ReviewItemSource::AIReview;
     return ReviewItemSource::Manual;
 }
 
@@ -109,9 +117,11 @@ bool DeserializeReviewItems(const std::string& content, std::vector<ReviewItem>&
             return false;
         }
         for (const auto& entry : entries) {
-            if (!entry.is_object()) continue;
+            if (!entry.is_object())
+                continue;
             ReviewItem item = FromJson(entry);
-            if (!item.id.empty()) items.push_back(std::move(item));
+            if (!item.id.empty())
+                items.push_back(std::move(item));
         }
     } catch (const nlohmann::json::exception& e) {
         error = std::string("Review item JSON parse failed: ") + e.what();
@@ -120,4 +130,4 @@ bool DeserializeReviewItems(const std::string& content, std::vector<ReviewItem>&
     return true;
 }
 
-}  // namespace core::reviews
+} // namespace core::reviews

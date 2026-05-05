@@ -15,19 +15,23 @@ std::string AbsoluteFolderForDialog(const std::filesystem::path& path) {
         ec.clear();
         absolute_path = std::filesystem::absolute(path, ec);
     }
-    if (ec || absolute_path.empty()) return path.u8string();
+    if (ec || absolute_path.empty())
+        return path.u8string();
     return absolute_path.u8string();
 }
 
 std::string ExistingFolderForDialog(const std::string& raw_path) {
     std::error_code ec;
     std::filesystem::path fallback = std::filesystem::current_path(ec);
-    if (ec || fallback.empty()) fallback = ".";
+    if (ec || fallback.empty())
+        fallback = ".";
 
-    if (raw_path.empty()) return AbsoluteFolderForDialog(fallback);
+    if (raw_path.empty())
+        return AbsoluteFolderForDialog(fallback);
 
     std::filesystem::path path = std::filesystem::u8path(raw_path);
-    if (std::filesystem::is_directory(path, ec)) return AbsoluteFolderForDialog(path);
+    if (std::filesystem::is_directory(path, ec))
+        return AbsoluteFolderForDialog(path);
 
     ec.clear();
     if (std::filesystem::is_regular_file(path, ec) && path.has_parent_path()) {
@@ -44,10 +48,8 @@ std::string ExistingFolderForDialog(const std::string& raw_path) {
     return AbsoluteFolderForDialog(fallback);
 }
 
-DialogResult RunDialog(nfdresult_t result,
-                       const NFD::UniquePath& out_path,
-                       std::string& selected_path,
-                       std::string& error_message) {
+DialogResult
+RunDialog(nfdresult_t result, const NFD::UniquePath& out_path, std::string& selected_path, std::string& error_message) {
     if (result == NFD_OKAY) {
         selected_path = out_path.get() ? out_path.get() : "";
         error_message.clear();
@@ -72,7 +74,9 @@ public:
         }
     }
 
-    bool ok() const { return result_ == NFD_OKAY; }
+    bool ok() const {
+        return result_ == NFD_OKAY;
+    }
 
     std::string error_message() const {
         const char* error = NFD::GetError();
@@ -86,11 +90,10 @@ private:
     nfdresult_t result_ = NFD_ERROR;
 };
 
-}  // namespace
+} // namespace
 
-DialogResult BrowseForProjectParentFolder(const std::string& default_path,
-                                          std::string& selected_path,
-                                          std::string& error_message) {
+DialogResult
+BrowseForProjectParentFolder(const std::string& default_path, std::string& selected_path, std::string& error_message) {
     NfdSession session;
     if (!session.ok()) {
         error_message = session.error_message();
@@ -103,9 +106,8 @@ DialogResult BrowseForProjectParentFolder(const std::string& default_path,
     return RunDialog(result, out_path, selected_path, error_message);
 }
 
-DialogResult BrowseForProjectManifest(const std::string& default_path,
-                                      std::string& selected_path,
-                                      std::string& error_message) {
+DialogResult
+BrowseForProjectManifest(const std::string& default_path, std::string& selected_path, std::string& error_message) {
     NfdSession session;
     if (!session.ok()) {
         error_message = session.error_message();
@@ -119,4 +121,4 @@ DialogResult BrowseForProjectManifest(const std::string& default_path,
     return RunDialog(result, out_path, selected_path, error_message);
 }
 
-}  // namespace app::dialogs
+} // namespace app::dialogs

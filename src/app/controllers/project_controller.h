@@ -39,4 +39,4 @@ public:
     void RemoveRecentProjectByPath(const std::string& path);
 };
 
-}  // namespace app::controllers
+} // namespace app::controllers

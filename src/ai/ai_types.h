@@ -79,4 +79,4 @@ AiConnectionStatus MakeStatus(AiTaskState state, AiErrorCode errorCode, std::str
 AiConnectionStatus SuccessStatus(std::string message);
 AiConnectionStatus ErrorStatus(AiErrorCode errorCode, std::string message);
 
-}  // namespace ai
+} // namespace ai

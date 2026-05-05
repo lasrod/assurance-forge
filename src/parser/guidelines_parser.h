@@ -143,4 +143,4 @@ public:
     static GuidelinesParseResult ParseString(const std::string& yaml_content);
 };
 
-}  // namespace parser
+} // namespace parser

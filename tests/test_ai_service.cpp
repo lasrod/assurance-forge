@@ -1,9 +1,8 @@
-#include <gtest/gtest.h>
-
 #include "ai/ai_service.h"
 
 #include <chrono>
 #include <filesystem>
+#include <gtest/gtest.h>
 #include <map>
 #include <memory>
 #include <utility>
@@ -13,13 +12,15 @@ namespace {
 struct TempDir {
     std::filesystem::path path;
     explicit TempDir(std::filesystem::path value) : path(std::move(value)) {}
-    ~TempDir() { std::filesystem::remove_all(path); }
+    ~TempDir() {
+        std::filesystem::remove_all(path);
+    }
 };
 
 std::filesystem::path MakeTempDir() {
     auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::filesystem::path path = std::filesystem::temp_directory_path() /
-                                 ("assurance_forge_ai_service_test_" + std::to_string(stamp));
+    std::filesystem::path path =
+        std::filesystem::temp_directory_path() / ("assurance_forge_ai_service_test_" + std::to_string(stamp));
     std::filesystem::create_directories(path);
     return path;
 }
@@ -29,27 +30,30 @@ public:
     bool available = true;
     std::map<std::string, std::string> secrets;
 
-    bool IsAvailable() const override { return available; }
+    bool IsAvailable() const override {
+        return available;
+    }
 
-    ai::SecretStoreResult SaveSecret(const std::string& service,
-                                     const std::string& account,
-                                     const std::string& secret) override {
-        if (!available) return ai::SecretStoreFailure(ai::AiErrorCode::SecureStoreUnavailable, "No secure storage.");
+    ai::SecretStoreResult
+    SaveSecret(const std::string& service, const std::string& account, const std::string& secret) override {
+        if (!available)
+            return ai::SecretStoreFailure(ai::AiErrorCode::SecureStoreUnavailable, "No secure storage.");
         secrets[service + ":" + account] = secret;
         return ai::SecretStoreSuccess();
     }
 
-    ai::SecretLoadResult LoadSecret(const std::string& service,
-                                    const std::string& account) override {
-        if (!available) return ai::SecretLoadFailure(ai::AiErrorCode::SecureStoreUnavailable, "No secure storage.");
+    ai::SecretLoadResult LoadSecret(const std::string& service, const std::string& account) override {
+        if (!available)
+            return ai::SecretLoadFailure(ai::AiErrorCode::SecureStoreUnavailable, "No secure storage.");
         auto found = secrets.find(service + ":" + account);
-        if (found == secrets.end()) return ai::SecretLoadSuccess(std::nullopt);
+        if (found == secrets.end())
+            return ai::SecretLoadSuccess(std::nullopt);
         return ai::SecretLoadSuccess(found->second);
     }
 
-    ai::SecretStoreResult DeleteSecret(const std::string& service,
-                                       const std::string& account) override {
-        if (!available) return ai::SecretStoreFailure(ai::AiErrorCode::SecureStoreUnavailable, "No secure storage.");
+    ai::SecretStoreResult DeleteSecret(const std::string& service, const std::string& account) override {
+        if (!available)
+            return ai::SecretStoreFailure(ai::AiErrorCode::SecureStoreUnavailable, "No secure storage.");
         secrets.erase(service + ":" + account);
         return ai::SecretStoreSuccess();
     }
@@ -57,10 +61,13 @@ public:
 
 class FakeProvider final : public ai::IAiProvider {
 public:
-    ai::AiProviderId ProviderId() const override { return ai::AiProviderId::OpenAI; }
+    ai::AiProviderId ProviderId() const override {
+        return ai::AiProviderId::OpenAI;
+    }
 
     ai::AiConnectionStatus TestConnection(const ai::AiProviderSettings&, const std::string& api_key) override {
-        if (api_key.empty()) return ai::ErrorStatus(ai::AiErrorCode::MissingApiKey, "Missing API key.");
+        if (api_key.empty())
+            return ai::ErrorStatus(ai::AiErrorCode::MissingApiKey, "Missing API key.");
         return ai::SuccessStatus("Connection successful.");
     }
 
@@ -85,7 +92,7 @@ struct TestAiEnvironment {
           service(std::make_shared<ai::AiSettingsStore>(settings_path), secret_store, provider) {}
 };
 
-}  // namespace
+} // namespace
 
 TEST(AiServiceTest, DisabledSettingsBlockConnectionTest) {
     TempDir temp(MakeTempDir());

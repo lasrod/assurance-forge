@@ -1,7 +1,6 @@
-#include <gtest/gtest.h>
-
 #include "ai/openai_provider.h"
 
+#include <gtest/gtest.h>
 #include <memory>
 
 namespace {
@@ -17,7 +16,7 @@ public:
     }
 };
 
-}  // namespace
+} // namespace
 
 TEST(OpenAiProviderTest, GeneratesTextFromOutputTextField) {
     auto http = std::make_shared<FakeHttpClient>();

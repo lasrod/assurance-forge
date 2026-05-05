@@ -1,7 +1,8 @@
 #pragma once
 
-#include "ui/gsn/gsn_model.h"
 #include "core/assurance_tree.h"
+#include "ui/gsn/gsn_model.h"
+
 #include <vector>
 
 namespace ui::gsn {

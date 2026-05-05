@@ -1,10 +1,11 @@
-#include <algorithm>
-#include <gtest/gtest.h>
-#include "imgui.h"
 #include "core/assurance_tree.h"
+#include "imgui.h"
 #include "parser/xml_parser.h"
 #include "ui/gsn/gsn_dpi.h"
 #include "ui/gsn/gsn_layout.h"
+
+#include <algorithm>
+#include <gtest/gtest.h>
 
 // We test the layout engine indirectly through the tree since the layout
 // engine is coupled to ImGui types. Instead, we test the tree structure
@@ -14,7 +15,7 @@ using namespace core;
 using namespace parser;
 
 static float scaled_size(float reference_pixels) {
-  return ui::gsn::DpiSize(reference_pixels);
+    return ui::gsn::DpiSize(reference_pixels);
 }
 
 class ScopedImGuiFrame {
@@ -43,11 +44,8 @@ private:
     ImGuiContext* context_ = nullptr;
 };
 
-static TreeNode* add_layout_node(AssuranceTree& tree,
-                                 const std::string& id,
-                                 NodeRole role,
-                                 ElementGroup group,
-                                 const std::string& label) {
+static TreeNode* add_layout_node(
+    AssuranceTree& tree, const std::string& id, NodeRole role, ElementGroup group, const std::string& label) {
     auto node = std::make_unique<TreeNode>();
     node->id = id;
     node->role = role;
@@ -60,11 +58,11 @@ static TreeNode* add_layout_node(AssuranceTree& tree,
 
 static std::string long_layout_label(const std::string& id) {
     return id + ": Long label\n"
-           "This element contains a detailed safety argument explanation that needs enough "
-           "room to wrap cleanly after HiDPI font scaling. The layout should widen the node "
-           "before allowing it to become a tall narrow shape, because narrow GSN elements are "
-           "hard to read and make nearby canvas elements overlap. The text is intentionally "
-           "long so the measured bounds exercise both horizontal growth and vertical growth.";
+                "This element contains a detailed safety argument explanation that needs enough "
+                "room to wrap cleanly after HiDPI font scaling. The layout should widen the node "
+                "before allowing it to become a tall narrow shape, because narrow GSN elements are "
+                "hard to read and make nearby canvas elements overlap. The text is intentionally "
+                "long so the measured bounds exercise both horizontal growth and vertical growth.";
 }
 
 static AssuranceTree build_tree(const char* xml) {
@@ -76,9 +74,13 @@ static AssuranceTree build_tree(const char* xml) {
 // ----- Subtree width calculation -----
 
 static int compute_width(TreeNode* n) {
-    if (n->group1_children.empty()) { n->subtree_width = 1; return 1; }
+    if (n->group1_children.empty()) {
+        n->subtree_width = 1;
+        return 1;
+    }
     int total = 0;
-    for (auto* c : n->group1_children) total += compute_width(c);
+    for (auto* c : n->group1_children)
+        total += compute_width(c);
     n->subtree_width = total;
     return total;
 }
@@ -220,7 +222,8 @@ static bool rects_overlap(ImVec2 pos1, ImVec2 size1, ImVec2 pos2, ImVec2 size2) 
 static const ui::gsn::LayoutNode* find_layout_node(const std::vector<ui::gsn::LayoutNode>& layout,
                                                    const std::string& id) {
     for (const auto& layout_node : layout) {
-        if (layout_node.id == id) return &layout_node;
+        if (layout_node.id == id)
+            return &layout_node;
     }
     return nullptr;
 }
@@ -229,11 +232,9 @@ static float node_center_y(const ui::gsn::LayoutNode& layout_node) {
     return layout_node.position.y + layout_node.size.y * 0.5f;
 }
 
-static float stack_center_y(const ui::gsn::LayoutNode& first,
-                            const ui::gsn::LayoutNode& second) {
+static float stack_center_y(const ui::gsn::LayoutNode& first, const ui::gsn::LayoutNode& second) {
     const float stack_top = std::min(first.position.y, second.position.y);
-    const float stack_bottom = std::max(first.position.y + first.size.y,
-                                        second.position.y + second.size.y);
+    const float stack_bottom = std::max(first.position.y + first.size.y, second.position.y + second.size.y);
     return (stack_top + stack_bottom) * 0.5f;
 }
 
@@ -256,8 +257,8 @@ TEST(LayoutTest, LongNonSolutionLabelsGrowHorizontally) {
 
     for (const auto& role_case : cases) {
         AssuranceTree tree;
-        TreeNode* node = add_layout_node(tree, role_case.id, role_case.role, role_case.group,
-                                         long_layout_label(role_case.id));
+        TreeNode* node =
+            add_layout_node(tree, role_case.id, role_case.role, role_case.group, long_layout_label(role_case.id));
         tree.root = node;
 
         ui::gsn::LayoutEngine engine;
@@ -316,10 +317,9 @@ TEST(LayoutTest, WideGroup2AttachmentNoOverlapWithParent) {
     ScopedImGuiFrame imgui_frame;
 
     AssuranceTree tree;
-    TreeNode* parent = add_layout_node(tree, "Parent", NodeRole::Claim, ElementGroup::Group1,
-                                       "Parent: Claim");
-    TreeNode* context = add_layout_node(tree, "Context", NodeRole::Context, ElementGroup::Group2,
-                                        long_layout_label("Context"));
+    TreeNode* parent = add_layout_node(tree, "Parent", NodeRole::Claim, ElementGroup::Group1, "Parent: Claim");
+    TreeNode* context =
+        add_layout_node(tree, "Context", NodeRole::Context, ElementGroup::Group2, long_layout_label("Context"));
     context->parent = parent;
     parent->group2_attachments.push_back(context);
     tree.root = parent;
@@ -330,22 +330,22 @@ TEST(LayoutTest, WideGroup2AttachmentNoOverlapWithParent) {
     const ui::gsn::LayoutNode* parent_node = nullptr;
     const ui::gsn::LayoutNode* context_node = nullptr;
     for (const auto& ln : layout) {
-        if (ln.id == "Parent") parent_node = &ln;
-        if (ln.id == "Context") context_node = &ln;
+        if (ln.id == "Parent")
+            parent_node = &ln;
+        if (ln.id == "Context")
+            context_node = &ln;
     }
     ASSERT_NE(parent_node, nullptr);
     ASSERT_NE(context_node, nullptr);
     EXPECT_GT(context_node->size.x, scaled_size(220.0f));
-    EXPECT_FALSE(rects_overlap(parent_node->position, parent_node->size,
-                               context_node->position, context_node->size));
+    EXPECT_FALSE(rects_overlap(parent_node->position, parent_node->size, context_node->position, context_node->size));
 }
 
 TEST(LayoutTest, Group2SideStacksAreCenteredAroundOwner) {
     ScopedImGuiFrame imgui_frame;
 
     AssuranceTree tree;
-    TreeNode* parent = add_layout_node(tree, "Parent", NodeRole::Claim, ElementGroup::Group1,
-                                       "Parent: Claim");
+    TreeNode* parent = add_layout_node(tree, "Parent", NodeRole::Claim, ElementGroup::Group1, "Parent: Claim");
 
     struct AttachmentCase {
         const char* id;
@@ -361,8 +361,8 @@ TEST(LayoutTest, Group2SideStacksAreCenteredAroundOwner) {
     };
 
     for (const auto& attachment_case : attachment_cases) {
-        TreeNode* attachment = add_layout_node(tree, attachment_case.id, attachment_case.role,
-                                               ElementGroup::Group2, attachment_case.id);
+        TreeNode* attachment =
+            add_layout_node(tree, attachment_case.id, attachment_case.role, ElementGroup::Group2, attachment_case.id);
         attachment->parent = parent;
         parent->group2_attachments.push_back(attachment);
     }
@@ -396,10 +396,8 @@ TEST(LayoutTest, CenteredGroup2StackExpandsRowBoundsForChildren) {
     ScopedImGuiFrame imgui_frame;
 
     AssuranceTree tree;
-    TreeNode* parent = add_layout_node(tree, "Parent", NodeRole::Claim, ElementGroup::Group1,
-                                       "Parent: Claim");
-    TreeNode* child = add_layout_node(tree, "Child", NodeRole::Claim, ElementGroup::Group1,
-                                      "Child: Claim");
+    TreeNode* parent = add_layout_node(tree, "Parent", NodeRole::Claim, ElementGroup::Group1, "Parent: Claim");
+    TreeNode* child = add_layout_node(tree, "Child", NodeRole::Claim, ElementGroup::Group1, "Child: Claim");
     child->parent = parent;
     parent->group1_children.push_back(child);
 
@@ -421,8 +419,8 @@ TEST(LayoutTest, CenteredGroup2StackExpandsRowBoundsForChildren) {
         const std::string id = "Context" + std::to_string(attachment_index);
         const ui::gsn::LayoutNode* attachment_node = find_layout_node(layout, id);
         ASSERT_NE(attachment_node, nullptr);
-        EXPECT_FALSE(rects_overlap(attachment_node->position, attachment_node->size,
-                                   child_node->position, child_node->size))
+        EXPECT_FALSE(
+            rects_overlap(attachment_node->position, attachment_node->size, child_node->position, child_node->size))
             << id << " overlaps the child row";
     }
 }
@@ -486,15 +484,16 @@ TEST(LayoutTest, Group2AttachmentNoOverlapWithSibling) {
     const ui::gsn::LayoutNode* ctx_node = nullptr;
     const ui::gsn::LayoutNode* ev_node = nullptr;
     for (const auto& ln : layout) {
-        if (ln.id == "CtxMidChild") ctx_node = &ln;
-        if (ln.id == "EvidenceLeft") ev_node = &ln;
+        if (ln.id == "CtxMidChild")
+            ctx_node = &ln;
+        if (ln.id == "EvidenceLeft")
+            ev_node = &ln;
     }
     ASSERT_NE(ctx_node, nullptr) << "CtxMidChild not found in layout";
     ASSERT_NE(ev_node, nullptr) << "EvidenceLeft not found in layout";
 
     // They must NOT overlap
-    EXPECT_FALSE(rects_overlap(ctx_node->position, ctx_node->size,
-                               ev_node->position, ev_node->size))
+    EXPECT_FALSE(rects_overlap(ctx_node->position, ctx_node->size, ev_node->position, ev_node->size))
         << "Group2 context node overlaps with sibling's evidence node!"
         << " ctx=(" << ctx_node->position.x << "," << ctx_node->position.y << ")"
         << " ev=(" << ev_node->position.x << "," << ev_node->position.y << ")";
@@ -530,8 +529,10 @@ TEST(LayoutTest, OddChildrenMiddleCenteredUnderParent) {
     const ui::gsn::LayoutNode* strat = nullptr;
     const ui::gsn::LayoutNode* mid = nullptr;
     for (const auto& ln : layout) {
-        if (ln.id == "Strat") strat = &ln;
-        if (ln.id == "B") mid = &ln;
+        if (ln.id == "Strat")
+            strat = &ln;
+        if (ln.id == "B")
+            mid = &ln;
     }
     ASSERT_NE(strat, nullptr);
     ASSERT_NE(mid, nullptr);
@@ -539,8 +540,7 @@ TEST(LayoutTest, OddChildrenMiddleCenteredUnderParent) {
     // Middle child B should have the same X-center as its parent Strat
     float strat_center = strat->position.x + strat->size.x / 2.0f;
     float mid_center = mid->position.x + mid->size.x / 2.0f;
-    EXPECT_NEAR(strat_center, mid_center, 1.0f)
-        << "Middle child should be centered under parent";
+    EXPECT_NEAR(strat_center, mid_center, 1.0f) << "Middle child should be centered under parent";
 }
 
 TEST(LayoutTest, UndevelopedFlagPropagatesToLayoutNode) {

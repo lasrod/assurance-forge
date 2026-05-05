@@ -1,6 +1,6 @@
-#include <gtest/gtest.h>
-
 #include "app/controllers/proposal_controller.h"
+
+#include <gtest/gtest.h>
 
 namespace {
 
@@ -25,7 +25,7 @@ core::reviews::ReviewItem MakeReviewItem() {
     return item;
 }
 
-}  // namespace
+} // namespace
 
 TEST(ProposalControllerTest, BeginDraftInitializesDraftAndCreatorState) {
     app::controllers::ProposalController controller;

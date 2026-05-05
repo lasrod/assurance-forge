@@ -9,4 +9,4 @@ public:
     HttpResponse Post(const HttpRequest& request) override;
 };
 
-}  // namespace ai
+} // namespace ai

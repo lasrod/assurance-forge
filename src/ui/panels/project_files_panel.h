@@ -1,9 +1,8 @@
 #pragma once
 
-#include "imgui.h"
-
 #include "core/project_model.h"
 #include "core/reviews/review_proposal.h"
+#include "imgui.h"
 
 #include <functional>
 #include <map>
@@ -30,4 +29,4 @@ void ShowProjectFilesPanel(float width,
                            ProjectFilesPanelModel model,
                            const ProjectFilesPanelCallbacks& callbacks);
 
-}  // namespace ui::panels
+} // namespace ui::panels

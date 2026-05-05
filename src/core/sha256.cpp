@@ -18,4 +18,4 @@ std::string Sha256::HexDigest(const std::vector<unsigned char>& data) {
     return HexDigest(data.data(), data.size());
 }
 
-}  // namespace core
+} // namespace core

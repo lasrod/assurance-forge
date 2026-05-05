@@ -25,13 +25,10 @@ class ISecretStore {
 public:
     virtual ~ISecretStore() = default;
     virtual bool IsAvailable() const = 0;
-    virtual SecretStoreResult SaveSecret(const std::string& service,
-                                         const std::string& account,
-                                         const std::string& secret) = 0;
-    virtual SecretLoadResult LoadSecret(const std::string& service,
-                                        const std::string& account) = 0;
-    virtual SecretStoreResult DeleteSecret(const std::string& service,
-                                           const std::string& account) = 0;
+    virtual SecretStoreResult
+    SaveSecret(const std::string& service, const std::string& account, const std::string& secret) = 0;
+    virtual SecretLoadResult LoadSecret(const std::string& service, const std::string& account) = 0;
+    virtual SecretStoreResult DeleteSecret(const std::string& service, const std::string& account) = 0;
 };
 
 SecretStoreResult SecretStoreSuccess();
@@ -41,4 +38,4 @@ SecretLoadResult SecretLoadFailure(AiErrorCode errorCode, std::string message);
 
 std::shared_ptr<ISecretStore> CreatePlatformSecretStore();
 
-}  // namespace ai
+} // namespace ai

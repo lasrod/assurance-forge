@@ -9,7 +9,8 @@ namespace ai {
 AiTaskHandle::AiTaskHandle(std::shared_ptr<SharedState> state) : state_(std::move(state)) {}
 
 AiTaskSnapshot AiTaskHandle::Snapshot() const {
-    if (!state_) return {};
+    if (!state_)
+        return {};
     std::lock_guard<std::mutex> lock(state_->mutex);
     return state_->snapshot;
 }
@@ -19,11 +20,10 @@ bool AiTaskHandle::IsRunning() const {
 }
 
 bool AiTaskHandle::WaitUntilComplete(std::chrono::milliseconds timeout) const {
-    if (!state_) return false;
+    if (!state_)
+        return false;
     std::unique_lock<std::mutex> lock(state_->mutex);
-    return state_->cv.wait_for(lock, timeout, [&] {
-        return state_->snapshot.state != AiTaskState::Running;
-    });
+    return state_->cv.wait_for(lock, timeout, [&] { return state_->snapshot.state != AiTaskState::Running; });
 }
 
 std::shared_ptr<AiTaskHandle> AiTaskRunner::RunConnectionTest(std::function<AiConnectionStatus()> job) {
@@ -87,9 +87,11 @@ std::shared_ptr<AiTaskHandle> AiTaskRunner::RunGenerate(std::function<AiResponse
         {
             std::lock_guard<std::mutex> lock(state->mutex);
             state->snapshot.state = response.success ? AiTaskState::Success : AiTaskState::Error;
-            state->snapshot.status = response.success
-                ? SuccessStatus("AI request completed.")
-                : ErrorStatus(response.errorCode, response.errorMessage.empty() ? ToString(response.errorCode) : response.errorMessage);
+            state->snapshot.status =
+                response.success
+                    ? SuccessStatus("AI request completed.")
+                    : ErrorStatus(response.errorCode,
+                                  response.errorMessage.empty() ? ToString(response.errorCode) : response.errorMessage);
             state->snapshot.response = std::move(response);
         }
         state->cv.notify_all();
@@ -98,4 +100,4 @@ std::shared_ptr<AiTaskHandle> AiTaskRunner::RunGenerate(std::function<AiResponse
     return handle;
 }
 
-}  // namespace ai
+} // namespace ai

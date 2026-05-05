@@ -61,4 +61,4 @@ private:
     bool show_debug_modal_ = false;
 };
 
-}  // namespace app::controllers
+} // namespace app::controllers

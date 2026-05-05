@@ -1,25 +1,26 @@
-#include <gtest/gtest.h>
-
 #include "core/reviews/review_item.h"
 #include "core/reviews/review_item_manager.h"
 
 #include <chrono>
 #include <filesystem>
+#include <gtest/gtest.h>
 
 namespace {
 
 struct TempDir {
     std::filesystem::path path;
     explicit TempDir(std::filesystem::path p) : path(std::move(p)) {}
-    ~TempDir() { std::filesystem::remove_all(path); }
+    ~TempDir() {
+        std::filesystem::remove_all(path);
+    }
     TempDir(const TempDir&) = delete;
     TempDir& operator=(const TempDir&) = delete;
 };
 
 std::filesystem::path MakeTempDir() {
     auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::filesystem::path path = std::filesystem::temp_directory_path() /
-                                 ("assurance_forge_review_item_test_" + std::to_string(stamp));
+    std::filesystem::path path =
+        std::filesystem::temp_directory_path() / ("assurance_forge_review_item_test_" + std::to_string(stamp));
     std::filesystem::create_directories(path);
     return path;
 }
@@ -36,7 +37,7 @@ core::reviews::ReviewItem MakeItem(const std::string& id, const std::string& ele
     return item;
 }
 
-}  // namespace
+} // namespace
 
 TEST(ReviewItemTest, RoundTripsReviewItemsJson) {
     core::reviews::ReviewItem item;
@@ -56,7 +57,8 @@ TEST(ReviewItemTest, RoundTripsReviewItemsJson) {
 
     std::string error;
     std::vector<core::reviews::ReviewItem> items;
-    ASSERT_TRUE(core::reviews::DeserializeReviewItems(core::reviews::SerializeReviewItems({item}), items, error)) << error;
+    ASSERT_TRUE(core::reviews::DeserializeReviewItems(core::reviews::SerializeReviewItems({item}), items, error))
+        << error;
 
     ASSERT_EQ(items.size(), 1u);
     EXPECT_EQ(items[0].id, item.id);

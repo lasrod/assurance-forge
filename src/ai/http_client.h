@@ -33,4 +33,4 @@ public:
 
 std::string RedactSensitiveText(const std::string& value);
 
-}  // namespace ai
+} // namespace ai

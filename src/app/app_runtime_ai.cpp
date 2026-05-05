@@ -1,8 +1,9 @@
 #include "app/app_runtime.h"
+
 #include "app/app_runtime_state.h"
+#include "ui/ui_state.h"
 
 #include "imgui.h"
-#include "ui/ui_state.h"
 
 #include <algorithm>
 
@@ -22,7 +23,8 @@ void AppRuntime::PollAiReviewTask() {
 }
 
 void AppRuntime::RenderAiReviewDebugModal() {
-    if (!impl_->ai_review_controller->ShouldShowDebugModal()) return;
+    if (!impl_->ai_review_controller->ShouldShowDebugModal())
+        return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSize(ImVec2(920.0f, 700.0f), ImGuiCond_Appearing);
@@ -31,7 +33,8 @@ void AppRuntime::RenderAiReviewDebugModal() {
         ImGui::Spacing();
 
         const float child_height = std::max(240.0f, ImGui::GetContentRegionAvail().y - 58.0f);
-        ImGui::BeginChild("##ai_review_debug_text", ImVec2(0.0f, child_height), true, ImGuiWindowFlags_HorizontalScrollbar);
+        ImGui::BeginChild(
+            "##ai_review_debug_text", ImVec2(0.0f, child_height), true, ImGuiWindowFlags_HorizontalScrollbar);
         ImGui::TextUnformatted(impl_->ai_review_controller->PendingDebugText().c_str());
         ImGui::EndChild();
         ImGui::Spacing();
@@ -54,4 +57,4 @@ void AppRuntime::RenderAiReviewDebugModal() {
     }
 }
 
-}  // namespace app
+} // namespace app

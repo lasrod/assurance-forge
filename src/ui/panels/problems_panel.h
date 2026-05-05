@@ -1,8 +1,7 @@
 #pragma once
 
-#include "imgui.h"
-
 #include "core/problems/problems_manager.h"
+#include "imgui.h"
 #include "ui/ui_state.h"
 
 #include <functional>
@@ -28,4 +27,4 @@ void ShowProblemsPanel(float x,
                        ProblemsPanelModel model,
                        const ProblemsPanelCallbacks& callbacks);
 
-}  // namespace ui::panels
+} // namespace ui::panels

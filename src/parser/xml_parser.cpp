@@ -1,44 +1,52 @@
 ﻿#include "parser/xml_parser.h"
-#include <pugixml.hpp>
-#include <string>
+
 #include <algorithm>
 #include <cctype>
+#include <pugixml.hpp>
+#include <string>
 
 namespace parser {
 
 namespace {
 
 static std::string get_local_name(const char* name) {
-    if (!name) return std::string();
+    if (!name)
+        return std::string();
     std::string s(name);
     size_t pos = s.find(':');
     std::string local = (pos != std::string::npos) ? s.substr(pos + 1) : s;
-    std::transform(local.begin(), local.end(), local.begin(), [](unsigned char c){ return std::tolower(c); });
+    std::transform(local.begin(), local.end(), local.begin(), [](unsigned char c) { return std::tolower(c); });
     return local;
 }
 
 // Read a reference from an element, trying "ref" then "href", stripping leading '#'
 static std::string get_ref(pugi::xml_node node) {
     std::string ref = node.attribute("ref").as_string();
-    if (ref.empty()) ref = node.attribute("href").as_string();
-    if (!ref.empty() && ref[0] == '#') ref = ref.substr(1);
+    if (ref.empty())
+        ref = node.attribute("href").as_string();
+    if (!ref.empty() && ref[0] == '#')
+        ref = ref.substr(1);
     return ref;
 }
 
 static pugi::xml_node find_child_by_local_name(pugi::xml_node node, const char* local_name) {
     for (pugi::xml_node child : node.children()) {
-        if (get_local_name(child.name()) == local_name) return child;
+        if (get_local_name(child.name()) == local_name)
+            return child;
     }
     return pugi::xml_node();
 }
 
 static bool read_bool_attr(pugi::xml_node node, const char* attr_name, bool default_value) {
     const char* raw = node.attribute(attr_name).as_string(nullptr);
-    if (!raw || !*raw) return default_value;
+    if (!raw || !*raw)
+        return default_value;
     std::string s(raw);
-    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
-    if (s == "true" || s == "1") return true;
-    if (s == "false" || s == "0") return false;
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
+    if (s == "true" || s == "1")
+        return true;
+    if (s == "false" || s == "0")
+        return false;
     return default_value;
 }
 
@@ -51,7 +59,8 @@ static void extract_description(pugi::xml_node child, SacmElement& element) {
         for (pugi::xml_node content_child : desc_node.children()) {
             if (get_local_name(content_child.name()) == "content") {
                 std::string lang = content_child.attribute("lang").as_string();
-                if (lang.empty()) lang = "en";
+                if (lang.empty())
+                    lang = "en";
                 std::string text = content_child.text().as_string();
                 if (!text.empty()) {
                     element.description_langs[lang] = text;
@@ -90,7 +99,8 @@ static void extract_name(pugi::xml_node child, SacmElement& element) {
         for (pugi::xml_node content_child : name_node.children()) {
             if (get_local_name(content_child.name()) == "content") {
                 std::string lang = content_child.attribute("lang").as_string();
-                if (lang.empty()) lang = "en";
+                if (lang.empty())
+                    lang = "en";
                 std::string text = content_child.text().as_string();
                 if (!text.empty()) {
                     element.name_langs[lang] = text;
@@ -129,7 +139,8 @@ static void extract_content(pugi::xml_node child, SacmElement& element) {
     for (pugi::xml_node content_child : child.children()) {
         if (get_local_name(content_child.name()) == "content") {
             std::string lang = content_child.attribute("lang").as_string();
-            if (lang.empty()) lang = "en";
+            if (lang.empty())
+                lang = "en";
             std::string text = content_child.text().as_string();
             if (!text.empty()) {
                 element.content_langs[lang] = text;
@@ -152,17 +163,13 @@ void extract_elements_recursive(pugi::xml_node node, std::vector<SacmElement>& e
     for (pugi::xml_node child : node.children()) {
         std::string local_name = get_local_name(child.name());
 
-        if (local_name.empty()) continue;
+        if (local_name.empty())
+            continue;
 
-        bool is_relevant =
-            local_name == "claim" ||
-            local_name == "argumentreasoning" ||
-            local_name == "artifact" ||
-            local_name == "artifactreference" ||
-            local_name == "expression" ||
-            local_name == "assertedinference" ||
-            local_name == "assertedcontext" ||
-            local_name == "assertedevidence";
+        bool is_relevant = local_name == "claim" || local_name == "argumentreasoning" || local_name == "artifact" ||
+                           local_name == "artifactreference" || local_name == "expression" ||
+                           local_name == "assertedinference" || local_name == "assertedcontext" ||
+                           local_name == "assertedevidence";
 
         if (is_relevant) {
             SacmElement element;
@@ -194,30 +201,32 @@ void extract_elements_recursive(pugi::xml_node node, std::vector<SacmElement>& e
             extract_content(child, element);
 
             // Relationship elements: extract source/target refs and reasoning
-            bool is_relationship_element =
-                local_name == "assertedinference" ||
-                local_name == "assertedcontext" ||
-                local_name == "assertedevidence";
+            bool is_relationship_element = local_name == "assertedinference" || local_name == "assertedcontext" ||
+                                           local_name == "assertedevidence";
 
             if (is_relationship_element) {
                 for (pugi::xml_node ref_child : child.children()) {
                     std::string ref_local_name = get_local_name(ref_child.name());
                     if (ref_local_name == "source") {
                         std::string ref = get_ref(ref_child);
-                        if (!ref.empty()) element.source_refs.push_back(ref);
+                        if (!ref.empty())
+                            element.source_refs.push_back(ref);
                     } else if (ref_local_name == "target") {
                         std::string ref = get_ref(ref_child);
-                        if (!ref.empty()) element.target_refs.push_back(ref);
+                        if (!ref.empty())
+                            element.target_refs.push_back(ref);
                     } else if (ref_local_name == "reasoning") {
                         std::string ref = get_ref(ref_child);
-                        if (!ref.empty()) element.reasoning_ref = ref;
+                        if (!ref.empty())
+                            element.reasoning_ref = ref;
                     }
                 }
                 // Also check reasoning as attribute: reasoning="ar_1"
                 if (element.reasoning_ref.empty()) {
                     std::string attr_reasoning = child.attribute("reasoning").as_string();
                     if (!attr_reasoning.empty()) {
-                        if (attr_reasoning[0] == '#') attr_reasoning = attr_reasoning.substr(1);
+                        if (attr_reasoning[0] == '#')
+                            attr_reasoning = attr_reasoning.substr(1);
                         element.reasoning_ref = attr_reasoning;
                     }
                 }
@@ -252,7 +261,7 @@ ParseResult parse_document(pugi::xml_document& doc) {
     return result;
 }
 
-}  // namespace
+} // namespace
 
 ParseResult parse_sacm_xml(const std::string& file_path) {
     ParseResult result;
@@ -282,4 +291,4 @@ ParseResult parse_sacm_xml_string(const std::string& xml_content) {
     return parse_document(doc);
 }
 
-}  // namespace parser
+} // namespace parser

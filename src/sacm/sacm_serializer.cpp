@@ -1,6 +1,7 @@
 ﻿#include "sacm/sacm_serializer.h"
-#include <pugixml.hpp>
+
 #include <fstream>
+#include <pugixml.hpp>
 #include <sstream>
 
 namespace sacm {
@@ -16,18 +17,21 @@ struct StringWriter : pugi::xml_writer {
 };
 
 static std::string prefixed(const std::string& ns, const char* local) {
-    if (ns.empty()) return local;
+    if (ns.empty())
+        return local;
     return ns + ":" + local;
 }
 
 // Add description as child element with multi-language support.
 // Writes all languages from description_ml. Falls back to single desc string if ml is empty.
 static void add_description(pugi::xml_node parent, const std::string& desc, const MultiLangText& desc_ml) {
-    if (desc_ml.texts.empty() && desc.empty()) return;
+    if (desc_ml.texts.empty() && desc.empty())
+        return;
     auto desc_node = parent.append_child("description");
     if (!desc_ml.texts.empty()) {
         for (const auto& [lang, text] : desc_ml.texts) {
-            if (text.empty()) continue;
+            if (text.empty())
+                continue;
             auto content_node = desc_node.append_child("content");
             content_node.append_attribute("lang") = lang.c_str();
             content_node.text().set(text.c_str());
@@ -46,13 +50,18 @@ static void add_name_ml(pugi::xml_node parent, const MultiLangText& name_ml) {
     // Only add <name> element if there are translations beyond "en"
     bool has_translations = false;
     for (const auto& [lang, text] : name_ml.texts) {
-        if (lang != "en" && !text.empty()) { has_translations = true; break; }
+        if (lang != "en" && !text.empty()) {
+            has_translations = true;
+            break;
+        }
     }
-    if (!has_translations) return;
+    if (!has_translations)
+        return;
 
     auto name_node = parent.append_child("name");
     for (const auto& [lang, text] : name_ml.texts) {
-        if (text.empty()) continue;
+        if (text.empty())
+            continue;
         auto content_node = name_node.append_child("content");
         content_node.append_attribute("lang") = lang.c_str();
         content_node.text().set(text.c_str());
@@ -63,7 +72,10 @@ static void add_name_ml(pugi::xml_node parent, const MultiLangText& name_ml) {
 static void add_content_ml(pugi::xml_node parent, const std::string& content, const MultiLangText& content_ml) {
     bool has_translations = false;
     for (const auto& [lang, text] : content_ml.texts) {
-        if (lang != "en" && !text.empty()) { has_translations = true; break; }
+        if (lang != "en" && !text.empty()) {
+            has_translations = true;
+            break;
+        }
     }
     if (!has_translations) {
         if (!content.empty())
@@ -72,7 +84,8 @@ static void add_content_ml(pugi::xml_node parent, const std::string& content, co
     }
     // Has translations: write as child elements instead of attribute
     for (const auto& [lang, text] : content_ml.texts) {
-        if (text.empty()) continue;
+        if (text.empty())
+            continue;
         auto content_node = parent.append_child("content");
         content_node.append_attribute("lang") = lang.c_str();
         content_node.text().set(text.c_str());
@@ -80,8 +93,7 @@ static void add_content_ml(pugi::xml_node parent, const std::string& content, co
 }
 
 // Add source/target refs as child elements with href="#id"
-static void add_refs(pugi::xml_node parent, const char* tag,
-                     const std::vector<std::string>& refs) {
+static void add_refs(pugi::xml_node parent, const char* tag, const std::vector<std::string>& refs) {
     for (const auto& r : refs) {
         auto node = parent.append_child(tag);
         node.append_attribute("href") = ("#" + r).c_str();
@@ -90,11 +102,16 @@ static void add_refs(pugi::xml_node parent, const char* tag,
 
 // Serialize common SACMElement attributes (clause 8.2) plus name translations.
 static void set_base(pugi::xml_node node, const SacmElement& elem) {
-    if (!elem.id.empty())   node.append_attribute("id") = elem.id.c_str();
-    if (!elem.name.empty()) node.append_attribute("name") = elem.name.c_str();
-    if (!elem.gid.empty())  node.append_attribute("gid") = elem.gid.c_str();
-    if (elem.isCitation)    node.append_attribute("isCitation") = "true";
-    if (elem.isAbstract)    node.append_attribute("isAbstract") = "true";
+    if (!elem.id.empty())
+        node.append_attribute("id") = elem.id.c_str();
+    if (!elem.name.empty())
+        node.append_attribute("name") = elem.name.c_str();
+    if (!elem.gid.empty())
+        node.append_attribute("gid") = elem.gid.c_str();
+    if (elem.isCitation)
+        node.append_attribute("isCitation") = "true";
+    if (elem.isAbstract)
+        node.append_attribute("isAbstract") = "true";
     if (!elem.citedElement.empty())
         node.append_attribute("citedElement") = elem.citedElement.c_str();
     if (!elem.abstractForm.empty())
@@ -107,7 +124,8 @@ static void set_base(pugi::xml_node node, const SacmElement& elem) {
 static void serialize_expression(pugi::xml_node parent, const Expression& e) {
     auto node = parent.append_child("expression");
     set_base(node, e);
-    if (!e.value.empty()) node.append_attribute("value") = e.value.c_str();
+    if (!e.value.empty())
+        node.append_attribute("value") = e.value.c_str();
 }
 
 static void serialize_terminology_package(pugi::xml_node parent, const TerminologyPackage& tp) {
@@ -122,8 +140,10 @@ static void serialize_terminology_package(pugi::xml_node parent, const Terminolo
 static void serialize_artifact(pugi::xml_node parent, const Artifact& a) {
     auto node = parent.append_child("artifact");
     set_base(node, a);
-    if (!a.version.empty()) node.append_attribute("version") = a.version.c_str();
-    if (!a.date.empty())    node.append_attribute("date") = a.date.c_str();
+    if (!a.version.empty())
+        node.append_attribute("version") = a.version.c_str();
+    if (!a.date.empty())
+        node.append_attribute("date") = a.date.c_str();
     add_description(node, a.description, a.description_ml);
 }
 
@@ -167,7 +187,8 @@ static void serialize_artifact_reference(pugi::xml_node parent, const ArtifactRe
 static void serialize_relationship_common(pugi::xml_node node, const AssertedRelationship& rel) {
     if (!rel.assertionDeclaration.empty())
         node.append_attribute("assertionDeclaration") = rel.assertionDeclaration.c_str();
-    if (rel.isCounter) node.append_attribute("isCounter") = "true";
+    if (rel.isCounter)
+        node.append_attribute("isCounter") = "true";
     add_description(node, rel.description, rel.description_ml);
     add_refs(node, "source", rel.sources);
     add_refs(node, "target", rel.targets);
@@ -200,15 +221,21 @@ static void serialize_argument_package(pugi::xml_node parent, const ArgumentPack
     set_base(node, pkg);
     add_description(node, pkg.description, pkg.description_ml);
 
-    for (const auto& c : pkg.claims)              serialize_claim(node, c);
-    for (const auto& ar : pkg.argumentReasonings)  serialize_argument_reasoning(node, ar);
-    for (const auto& ar : pkg.artifactReferences)  serialize_artifact_reference(node, ar);
-    for (const auto& ai : pkg.assertedInferences)  serialize_asserted_inference(node, ai);
-    for (const auto& ac : pkg.assertedContexts)    serialize_asserted_context(node, ac);
-    for (const auto& ae : pkg.assertedEvidences)    serialize_asserted_evidence(node, ae);
+    for (const auto& c : pkg.claims)
+        serialize_claim(node, c);
+    for (const auto& ar : pkg.argumentReasonings)
+        serialize_argument_reasoning(node, ar);
+    for (const auto& ar : pkg.artifactReferences)
+        serialize_artifact_reference(node, ar);
+    for (const auto& ai : pkg.assertedInferences)
+        serialize_asserted_inference(node, ai);
+    for (const auto& ac : pkg.assertedContexts)
+        serialize_asserted_context(node, ac);
+    for (const auto& ae : pkg.assertedEvidences)
+        serialize_asserted_evidence(node, ae);
 }
 
-}  // namespace
+} // namespace
 
 std::string serialize_sacm(const AssuranceCasePackage& package) {
     pugi::xml_document doc;
@@ -241,9 +268,10 @@ std::string serialize_sacm(const AssuranceCasePackage& package) {
 bool serialize_sacm_to_file(const AssuranceCasePackage& package, const std::string& file_path) {
     std::string xml = serialize_sacm(package);
     std::ofstream ofs(file_path, std::ios::binary);
-    if (!ofs.is_open()) return false;
+    if (!ofs.is_open())
+        return false;
     ofs << xml;
     return ofs.good();
 }
 
-}  // namespace sacm
+} // namespace sacm

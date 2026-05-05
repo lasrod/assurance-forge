@@ -53,7 +53,7 @@ std::string ProposalIdFromPath(const std::filesystem::path& path) {
     return name;
 }
 
-}  // namespace
+} // namespace
 
 ReviewProposalManager::ReviewProposalManager(std::filesystem::path project_root)
     : project_root_(std::move(project_root)) {}
@@ -70,15 +70,19 @@ std::filesystem::path ReviewProposalManager::ProposalPath(const std::string& pro
     return ProposalsDirectory() / (proposal_id + ".afpatch.json");
 }
 
-std::vector<ReviewProposalSummary> ReviewProposalManager::ListProposals(const parser::AssuranceCase* current_model) const {
+std::vector<ReviewProposalSummary>
+ReviewProposalManager::ListProposals(const parser::AssuranceCase* current_model) const {
     std::vector<ReviewProposalSummary> summaries;
     std::error_code ec;
     const std::filesystem::path directory = ProposalsDirectory();
-    if (!std::filesystem::exists(directory, ec)) return summaries;
+    if (!std::filesystem::exists(directory, ec))
+        return summaries;
 
     for (const auto& entry : std::filesystem::directory_iterator(directory, ec)) {
-        if (ec || !entry.is_regular_file()) continue;
-        if (entry.path().extension() != ".json") continue;
+        if (ec || !entry.is_regular_file())
+            continue;
+        if (entry.path().extension() != ".json")
+            continue;
 
         std::string error;
         ReviewProposal proposal;
@@ -87,7 +91,8 @@ std::vector<ReviewProposalSummary> ReviewProposalManager::ListProposals(const pa
             summary.id = ProposalIdFromPath(entry.path());
             summary.title = summary.id;
             summary.relative_path = std::filesystem::relative(entry.path(), project_root_, ec);
-            if (ec) summary.relative_path = entry.path().filename();
+            if (ec)
+                summary.relative_path = entry.path().filename();
             summary.validity = {ProposalValidity::Broken, error};
             summaries.push_back(std::move(summary));
             continue;
@@ -100,19 +105,19 @@ std::vector<ReviewProposalSummary> ReviewProposalManager::ListProposals(const pa
         summary.review_item_id = proposal.review_item_id;
         summary.anchor_element_id = proposal.anchor_element_id;
         summary.relative_path = std::filesystem::relative(entry.path(), project_root_, ec);
-        if (ec) summary.relative_path = entry.path().filename();
+        if (ec)
+            summary.relative_path = entry.path().filename();
         summary.validity = current_model ? EvaluateReviewProposalValidity(proposal, *current_model)
                                          : ProposalValidityResult{ProposalValidity::Valid, {}};
         summaries.push_back(std::move(summary));
     }
 
-    std::sort(summaries.begin(), summaries.end(), [](const auto& lhs, const auto& rhs) {
-        return lhs.id < rhs.id;
-    });
+    std::sort(summaries.begin(), summaries.end(), [](const auto& lhs, const auto& rhs) { return lhs.id < rhs.id; });
     return summaries;
 }
 
-std::optional<ReviewProposal> ReviewProposalManager::LoadProposal(const std::string& proposal_id, std::string& error) const {
+std::optional<ReviewProposal> ReviewProposalManager::LoadProposal(const std::string& proposal_id,
+                                                                  std::string& error) const {
     ReviewProposal proposal;
     if (!DeserializeReviewProposal(ReadTextFile(ProposalPath(proposal_id), error), proposal, error)) {
         return std::nullopt;
@@ -128,11 +133,13 @@ bool ReviewProposalManager::SaveProposal(const ReviewProposal& proposal,
         return false;
     }
     const std::filesystem::path absolute_path = ProposalPath(proposal.id);
-    if (!WriteTextFile(absolute_path, SerializeReviewProposal(proposal), error)) return false;
+    if (!WriteTextFile(absolute_path, SerializeReviewProposal(proposal), error))
+        return false;
     if (relative_path) {
         std::error_code ec;
         *relative_path = std::filesystem::relative(absolute_path, project_root_, ec);
-        if (ec) *relative_path = absolute_path.filename();
+        if (ec)
+            *relative_path = absolute_path.filename();
     }
     return true;
 }
@@ -152,4 +159,4 @@ bool ReviewProposalManager::DeleteProposal(const std::string& proposal_id, std::
     return true;
 }
 
-}  // namespace core::reviews
+} // namespace core::reviews

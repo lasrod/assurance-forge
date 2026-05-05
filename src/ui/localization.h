@@ -86,4 +86,4 @@ const char* LanguageCode(Language language);
 const char* LanguageDisplayName(Language language);
 const char* Tr(MessageId id);
 
-}  // namespace ui
+} // namespace ui

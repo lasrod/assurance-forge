@@ -17,27 +17,29 @@ std::string ToLower(std::string value) {
 }
 
 std::string BuildProblemMessage(const core::reviews::ReviewItem& item) {
-    if (item.title.empty()) return item.message;
-    if (item.message.empty()) return item.title;
+    if (item.title.empty())
+        return item.message;
+    if (item.message.empty())
+        return item.title;
     return item.title + ": " + item.message;
 }
 
 bool StartsWith(const std::string& value, const std::string& prefix) {
-    return value.size() >= prefix.size() &&
-           std::equal(prefix.begin(), prefix.end(), value.begin());
+    return value.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), value.begin());
 }
 
 void ClearProblemsByIdPrefix(core::ProblemsManager& problems_manager, const std::string& prefix) {
     std::vector<std::string> problem_ids;
     for (const core::ProblemItem& problem : problems_manager.GetProblems()) {
-        if (StartsWith(problem.id, prefix)) problem_ids.push_back(problem.id);
+        if (StartsWith(problem.id, prefix))
+            problem_ids.push_back(problem.id);
     }
     for (const std::string& problem_id : problem_ids) {
         problems_manager.RemoveProblem(problem_id);
     }
 }
 
-}  // namespace
+} // namespace
 
 std::string ReviewProblemId(const core::reviews::ReviewItem& item) {
     return "review-comment:" + item.id;
@@ -49,8 +51,10 @@ std::string GuidelineReviewProblemId(const core::reviews::ReviewItem& item, cons
 
 core::ProblemSeverity ReviewProblemSeverity(const std::string& review_severity) {
     const std::string lowered = ToLower(review_severity);
-    if (lowered == "error") return core::ProblemSeverity::Error;
-    if (lowered == "warning") return core::ProblemSeverity::Warning;
+    if (lowered == "error")
+        return core::ProblemSeverity::Error;
+    if (lowered == "warning")
+        return core::ProblemSeverity::Warning;
     return core::ProblemSeverity::Info;
 }
 
@@ -84,17 +88,20 @@ void SyncReviewProblems(core::ProblemsManager& problems_manager,
     ClearProblemsByIdPrefix(problems_manager, "guideline-review:");
 
     for (const core::reviews::ReviewItem& item : review_items) {
-        if (item.status != core::reviews::ReviewItemStatus::Open) continue;
+        if (item.status != core::reviews::ReviewItemStatus::Open)
+            continue;
         problems_manager.AddOrUpdateProblem(MakeProblemFromReviewItem(item));
-        if (item.source != core::reviews::ReviewItemSource::Manual) continue;
+        if (item.source != core::reviews::ReviewItemSource::Manual)
+            continue;
 
         std::unordered_set<std::string> seen_guideline_ids;
         for (const std::string& guideline_id : item.guideline_ids) {
-            if (guideline_id.empty() || seen_guideline_ids.count(guideline_id) > 0) continue;
+            if (guideline_id.empty() || seen_guideline_ids.count(guideline_id) > 0)
+                continue;
             problems_manager.AddOrUpdateProblem(MakeGuidelineProblemFromReviewItem(item, guideline_id));
             seen_guideline_ids.insert(guideline_id);
         }
     }
 }
 
-}  // namespace app
+} // namespace app

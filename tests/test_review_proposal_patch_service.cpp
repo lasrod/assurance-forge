@@ -1,8 +1,7 @@
-#include <gtest/gtest.h>
-
 #include "core/reviews/review_proposal_patch_service.h"
 
 #include <algorithm>
+#include <gtest/gtest.h>
 #include <optional>
 #include <string>
 
@@ -41,36 +40,54 @@ parser::AssuranceCase MakeModel() {
 
 const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const std::string& id) {
     for (const parser::SacmElement& element : model.elements) {
-        if (element.id == id) return &element;
+        if (element.id == id)
+            return &element;
     }
     return nullptr;
 }
 
-bool HasInferenceSourceTarget(const parser::AssuranceCase& model, const std::string& source_id, const std::string& target_id) {
+bool HasInferenceSourceTarget(const parser::AssuranceCase& model,
+                              const std::string& source_id,
+                              const std::string& target_id) {
     for (const parser::SacmElement& element : model.elements) {
-        if (element.type != "assertedinference") continue;
-        const bool has_source = std::find(element.source_refs.begin(), element.source_refs.end(), source_id) != element.source_refs.end();
-        const bool has_target = std::find(element.target_refs.begin(), element.target_refs.end(), target_id) != element.target_refs.end();
-        if (has_source && has_target) return true;
+        if (element.type != "assertedinference")
+            continue;
+        const bool has_source =
+            std::find(element.source_refs.begin(), element.source_refs.end(), source_id) != element.source_refs.end();
+        const bool has_target =
+            std::find(element.target_refs.begin(), element.target_refs.end(), target_id) != element.target_refs.end();
+        if (has_source && has_target)
+            return true;
     }
     return false;
 }
 
-bool HasInferenceReasoningTarget(const parser::AssuranceCase& model, const std::string& reasoning_id, const std::string& target_id) {
+bool HasInferenceReasoningTarget(const parser::AssuranceCase& model,
+                                 const std::string& reasoning_id,
+                                 const std::string& target_id) {
     for (const parser::SacmElement& element : model.elements) {
-        if (element.type != "assertedinference") continue;
-        const bool has_target = std::find(element.target_refs.begin(), element.target_refs.end(), target_id) != element.target_refs.end();
-        if (element.reasoning_ref == reasoning_id && has_target) return true;
+        if (element.type != "assertedinference")
+            continue;
+        const bool has_target =
+            std::find(element.target_refs.begin(), element.target_refs.end(), target_id) != element.target_refs.end();
+        if (element.reasoning_ref == reasoning_id && has_target)
+            return true;
     }
     return false;
 }
 
-bool HasEvidenceSourceTarget(const parser::AssuranceCase& model, const std::string& source_id, const std::string& target_id) {
+bool HasEvidenceSourceTarget(const parser::AssuranceCase& model,
+                             const std::string& source_id,
+                             const std::string& target_id) {
     for (const parser::SacmElement& element : model.elements) {
-        if (element.type != "assertedevidence") continue;
-        const bool has_source = std::find(element.source_refs.begin(), element.source_refs.end(), source_id) != element.source_refs.end();
-        const bool has_target = std::find(element.target_refs.begin(), element.target_refs.end(), target_id) != element.target_refs.end();
-        if (has_source && has_target) return true;
+        if (element.type != "assertedevidence")
+            continue;
+        const bool has_source =
+            std::find(element.source_refs.begin(), element.source_refs.end(), source_id) != element.source_refs.end();
+        const bool has_target =
+            std::find(element.target_refs.begin(), element.target_refs.end(), target_id) != element.target_refs.end();
+        if (has_source && has_target)
+            return true;
     }
     return false;
 }
@@ -101,7 +118,7 @@ core::reviews::PatchOperation AddSupportedBy(core::reviews::ElementRef source, c
     return operation;
 }
 
-}  // namespace
+} // namespace
 
 TEST(ReviewProposalPatchServiceTest, AppliesUpdateElementText) {
     parser::AssuranceCase model = MakeModel();
@@ -179,8 +196,10 @@ TEST(ReviewProposalPatchServiceTest, BuildsPreviewWithExistingElementRemovalWith
 TEST(ReviewProposalPatchServiceTest, BuildsPreviewWithoutMutatingCurrentModel) {
     parser::AssuranceCase model = MakeModel();
     core::reviews::ReviewProposal proposal = ProposalFor(model);
-    proposal.operations.push_back(Create(core::reviews::PatchOperationType::CreateClaim, "$new_claim_1", "Generated claim content"));
-    proposal.operations.push_back(AddSupportedBy(core::reviews::ElementRef{std::nullopt, "$new_claim_1"}, core::reviews::ElementRef{"G1", std::nullopt}));
+    proposal.operations.push_back(
+        Create(core::reviews::PatchOperationType::CreateClaim, "$new_claim_1", "Generated claim content"));
+    proposal.operations.push_back(AddSupportedBy(core::reviews::ElementRef{std::nullopt, "$new_claim_1"},
+                                                 core::reviews::ElementRef{"G1", std::nullopt}));
 
     core::reviews::ReviewProposalPatchService service;
     core::reviews::ProposalPreviewResult preview = service.BuildPreviewModel(proposal, model);
@@ -197,8 +216,10 @@ TEST(ReviewProposalPatchServiceTest, BuildsPreviewWithoutMutatingCurrentModel) {
 TEST(ReviewProposalPatchServiceTest, CreatesSolutionAsEvidenceRelationship) {
     parser::AssuranceCase model = MakeModel();
     core::reviews::ReviewProposal proposal = ProposalFor(model);
-    proposal.operations.push_back(Create(core::reviews::PatchOperationType::CreateSolution, "$new_solution_1", "Verification evidence"));
-    proposal.operations.push_back(AddSupportedBy(core::reviews::ElementRef{std::nullopt, "$new_solution_1"}, core::reviews::ElementRef{"G1", std::nullopt}));
+    proposal.operations.push_back(
+        Create(core::reviews::PatchOperationType::CreateSolution, "$new_solution_1", "Verification evidence"));
+    proposal.operations.push_back(AddSupportedBy(core::reviews::ElementRef{std::nullopt, "$new_solution_1"},
+                                                 core::reviews::ElementRef{"G1", std::nullopt}));
 
     core::reviews::ReviewProposalPatchService service;
     core::reviews::ProposalPreviewResult preview = service.BuildPreviewModel(proposal, model);
@@ -216,12 +237,16 @@ TEST(ReviewProposalPatchServiceTest, CreatesStrategyAndClaimsWithNonCollidingIds
     model.elements.push_back(Element("G3", "claim", "Existing G3"));
     model.elements.push_back(Element("S1", "argumentreasoning", "Existing S1"));
     core::reviews::ReviewProposal proposal = ProposalFor(model);
-    proposal.operations.push_back(Create(core::reviews::PatchOperationType::CreateStrategy, "$new_strategy_1", "Strategy content"));
+    proposal.operations.push_back(
+        Create(core::reviews::PatchOperationType::CreateStrategy, "$new_strategy_1", "Strategy content"));
     proposal.operations.push_back(Create(core::reviews::PatchOperationType::CreateClaim, "$new_claim_1", "Claim one"));
     proposal.operations.push_back(Create(core::reviews::PatchOperationType::CreateClaim, "$new_claim_2", "Claim two"));
-    proposal.operations.push_back(AddSupportedBy(core::reviews::ElementRef{std::nullopt, "$new_strategy_1"}, core::reviews::ElementRef{"G1", std::nullopt}));
-    proposal.operations.push_back(AddSupportedBy(core::reviews::ElementRef{std::nullopt, "$new_claim_1"}, core::reviews::ElementRef{std::nullopt, "$new_strategy_1"}));
-    proposal.operations.push_back(AddSupportedBy(core::reviews::ElementRef{std::nullopt, "$new_claim_2"}, core::reviews::ElementRef{std::nullopt, "$new_strategy_1"}));
+    proposal.operations.push_back(AddSupportedBy(core::reviews::ElementRef{std::nullopt, "$new_strategy_1"},
+                                                 core::reviews::ElementRef{"G1", std::nullopt}));
+    proposal.operations.push_back(AddSupportedBy(core::reviews::ElementRef{std::nullopt, "$new_claim_1"},
+                                                 core::reviews::ElementRef{std::nullopt, "$new_strategy_1"}));
+    proposal.operations.push_back(AddSupportedBy(core::reviews::ElementRef{std::nullopt, "$new_claim_2"},
+                                                 core::reviews::ElementRef{std::nullopt, "$new_strategy_1"}));
 
     core::reviews::ReviewProposalPatchService service;
     core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
@@ -248,7 +273,8 @@ TEST(ReviewProposalPatchServiceTest, AddsAndRemovesRelationships) {
     remove.target = core::reviews::ElementRef{"G1", std::nullopt};
     proposal.operations.push_back(remove);
 
-    proposal.operations.push_back(Create(core::reviews::PatchOperationType::CreateContext, "$new_context_1", "Operational context"));
+    proposal.operations.push_back(
+        Create(core::reviews::PatchOperationType::CreateContext, "$new_context_1", "Operational context"));
     core::reviews::PatchOperation add_context;
     add_context.type = core::reviews::PatchOperationType::AddInContextOf;
     add_context.source = core::reviews::ElementRef{std::nullopt, "$new_context_1"};
@@ -263,9 +289,12 @@ TEST(ReviewProposalPatchServiceTest, AddsAndRemovesRelationships) {
     const std::string context_id = result.generated_ids.at("$new_context_1");
     bool has_context = false;
     for (const parser::SacmElement& element : model.elements) {
-        if (element.type != "assertedcontext") continue;
-        const bool has_source = std::find(element.source_refs.begin(), element.source_refs.end(), context_id) != element.source_refs.end();
-        const bool has_target = std::find(element.target_refs.begin(), element.target_refs.end(), "G1") != element.target_refs.end();
+        if (element.type != "assertedcontext")
+            continue;
+        const bool has_source =
+            std::find(element.source_refs.begin(), element.source_refs.end(), context_id) != element.source_refs.end();
+        const bool has_target =
+            std::find(element.target_refs.begin(), element.target_refs.end(), "G1") != element.target_refs.end();
         has_context = has_context || (has_source && has_target);
     }
     EXPECT_TRUE(has_context);

@@ -10,24 +10,36 @@ namespace {
 
 const char* PrefixFor(NewElementKind kind) {
     switch (kind) {
-        case NewElementKind::Goal:          return "G";
-        case NewElementKind::Strategy:      return "S";
-        case NewElementKind::Solution:      return "Sn";
-        case NewElementKind::Context:       return "C";
-        case NewElementKind::Assumption:    return "A";
-        case NewElementKind::Justification: return "J";
+    case NewElementKind::Goal:
+        return "G";
+    case NewElementKind::Strategy:
+        return "S";
+    case NewElementKind::Solution:
+        return "Sn";
+    case NewElementKind::Context:
+        return "C";
+    case NewElementKind::Assumption:
+        return "A";
+    case NewElementKind::Justification:
+        return "J";
     }
     return "N";
 }
 
 const char* DefaultNameFor(NewElementKind kind) {
     switch (kind) {
-        case NewElementKind::Goal:          return "New Goal";
-        case NewElementKind::Strategy:      return "New Strategy";
-        case NewElementKind::Solution:      return "New Solution";
-        case NewElementKind::Context:       return "New Context";
-        case NewElementKind::Assumption:    return "New Assumption";
-        case NewElementKind::Justification: return "New Justification";
+    case NewElementKind::Goal:
+        return "New Goal";
+    case NewElementKind::Strategy:
+        return "New Strategy";
+    case NewElementKind::Solution:
+        return "New Solution";
+    case NewElementKind::Context:
+        return "New Context";
+    case NewElementKind::Assumption:
+        return "New Assumption";
+    case NewElementKind::Justification:
+        return "New Justification";
     }
     return "New Element";
 }
@@ -36,42 +48,48 @@ std::unordered_set<std::string> CollectIds(const parser::AssuranceCase& ac) {
     std::unordered_set<std::string> ids;
     ids.reserve(ac.elements.size() * 2);
     for (const auto& e : ac.elements) {
-        if (!e.id.empty()) ids.insert(e.id);
+        if (!e.id.empty())
+            ids.insert(e.id);
     }
     return ids;
 }
 
-std::string GenerateUniqueId(const std::unordered_set<std::string>& existing,
-                             const std::string& prefix) {
+std::string GenerateUniqueId(const std::unordered_set<std::string>& existing, const std::string& prefix) {
     for (int i = 1; i < 100000; ++i) {
         std::string candidate = prefix + std::to_string(i);
-        if (existing.find(candidate) == existing.end()) return candidate;
+        if (existing.find(candidate) == existing.end())
+            return candidate;
     }
     return prefix + "x";
 }
 
 const parser::SacmElement* FindElement(const parser::AssuranceCase& ac, const std::string& id) {
     for (const auto& e : ac.elements) {
-        if (e.id == id) return &e;
+        if (e.id == id)
+            return &e;
     }
     return nullptr;
 }
 
 bool IsRelationshipType(const std::string& t) {
-    return t == "assertedinference"
-        || t == "assertedcontext"
-        || t == "assertedevidence";
+    return t == "assertedinference" || t == "assertedcontext" || t == "assertedevidence";
 }
 
 // Determine which ArgumentPackage in the sacm model owns the parent element.
 // Falls back to the first package, creating one if necessary.
-sacm::ArgumentPackage* FindOwningArgumentPackage(sacm::AssuranceCasePackage* pkg,
-                                                 const std::string& parent_id) {
-    if (!pkg) return nullptr;
+sacm::ArgumentPackage* FindOwningArgumentPackage(sacm::AssuranceCasePackage* pkg, const std::string& parent_id) {
+    if (!pkg)
+        return nullptr;
     for (auto& ap : pkg->argumentPackages) {
-        for (const auto& c : ap.claims)               if (c.id == parent_id)  return &ap;
-        for (const auto& ar : ap.argumentReasonings)  if (ar.id == parent_id) return &ap;
-        for (const auto& ar : ap.artifactReferences)  if (ar.id == parent_id) return &ap;
+        for (const auto& c : ap.claims)
+            if (c.id == parent_id)
+                return &ap;
+        for (const auto& ar : ap.argumentReasonings)
+            if (ar.id == parent_id)
+                return &ap;
+        for (const auto& ar : ap.artifactReferences)
+            if (ar.id == parent_id)
+                return &ap;
     }
     if (pkg->argumentPackages.empty()) {
         pkg->argumentPackages.emplace_back();
@@ -80,7 +98,8 @@ sacm::ArgumentPackage* FindOwningArgumentPackage(sacm::AssuranceCasePackage* pkg
 }
 
 void MirrorClaim(sacm::ArgumentPackage* ap, const parser::SacmElement& src) {
-    if (!ap) return;
+    if (!ap)
+        return;
     sacm::Claim c;
     c.id = src.id;
     c.name = src.name;
@@ -90,7 +109,8 @@ void MirrorClaim(sacm::ArgumentPackage* ap, const parser::SacmElement& src) {
 }
 
 void MirrorReasoning(sacm::ArgumentPackage* ap, const parser::SacmElement& src) {
-    if (!ap) return;
+    if (!ap)
+        return;
     sacm::ArgumentReasoning r;
     r.id = src.id;
     r.name = src.name;
@@ -99,7 +119,8 @@ void MirrorReasoning(sacm::ArgumentPackage* ap, const parser::SacmElement& src) 
 }
 
 void MirrorArtifactReference(sacm::ArgumentPackage* ap, const parser::SacmElement& src) {
-    if (!ap) return;
+    if (!ap)
+        return;
     sacm::ArtifactReference ar;
     ar.id = src.id;
     ar.name = src.name;
@@ -108,7 +129,8 @@ void MirrorArtifactReference(sacm::ArgumentPackage* ap, const parser::SacmElemen
 }
 
 void MirrorInference(sacm::ArgumentPackage* ap, const parser::SacmElement& rel) {
-    if (!ap) return;
+    if (!ap)
+        return;
     sacm::AssertedInference ai;
     ai.id = rel.id;
     ai.sources = rel.source_refs;
@@ -118,7 +140,8 @@ void MirrorInference(sacm::ArgumentPackage* ap, const parser::SacmElement& rel) 
 }
 
 void MirrorContext(sacm::ArgumentPackage* ap, const parser::SacmElement& rel) {
-    if (!ap) return;
+    if (!ap)
+        return;
     sacm::AssertedContext ac;
     ac.id = rel.id;
     ac.sources = rel.source_refs;
@@ -127,7 +150,8 @@ void MirrorContext(sacm::ArgumentPackage* ap, const parser::SacmElement& rel) {
 }
 
 void MirrorEvidence(sacm::ArgumentPackage* ap, const parser::SacmElement& rel) {
-    if (!ap) return;
+    if (!ap)
+        return;
     sacm::AssertedEvidence ae;
     ae.id = rel.id;
     ae.sources = rel.source_refs;
@@ -135,7 +159,7 @@ void MirrorEvidence(sacm::ArgumentPackage* ap, const parser::SacmElement& rel) {
     ap->assertedEvidences.push_back(std::move(ae));
 }
 
-}  // namespace
+} // namespace
 
 bool AddChildElement(parser::AssuranceCase& ac,
                      sacm::AssuranceCasePackage* pkg,
@@ -192,38 +216,38 @@ bool AddChildElement(parser::AssuranceCase& ac,
     rel.target_refs.push_back(parent_id);
 
     switch (kind) {
-        case NewElementKind::Goal:
-            new_elem.type = "claim";
-            rel.type = "assertedinference";
-            rel.source_refs.push_back(new_elem.id);
-            break;
-        case NewElementKind::Strategy:
-            new_elem.type = "argumentreasoning";
-            rel.type = "assertedinference";
-            rel.reasoning_ref = new_elem.id;
-            break;
-        case NewElementKind::Solution:
-            new_elem.type = "artifactreference";
-            rel.type = "assertedevidence";
-            rel.source_refs.push_back(new_elem.id);
-            break;
-        case NewElementKind::Context:
-            new_elem.type = "claim";
-            rel.type = "assertedcontext";
-            rel.source_refs.push_back(new_elem.id);
-            break;
-        case NewElementKind::Assumption:
-            new_elem.type = "claim";
-            new_elem.assertion_declaration = "assumed";
-            rel.type = "assertedcontext";
-            rel.source_refs.push_back(new_elem.id);
-            break;
-        case NewElementKind::Justification:
-            new_elem.type = "claim";
-            new_elem.assertion_declaration = "justification";
-            rel.type = "assertedcontext";
-            rel.source_refs.push_back(new_elem.id);
-            break;
+    case NewElementKind::Goal:
+        new_elem.type = "claim";
+        rel.type = "assertedinference";
+        rel.source_refs.push_back(new_elem.id);
+        break;
+    case NewElementKind::Strategy:
+        new_elem.type = "argumentreasoning";
+        rel.type = "assertedinference";
+        rel.reasoning_ref = new_elem.id;
+        break;
+    case NewElementKind::Solution:
+        new_elem.type = "artifactreference";
+        rel.type = "assertedevidence";
+        rel.source_refs.push_back(new_elem.id);
+        break;
+    case NewElementKind::Context:
+        new_elem.type = "claim";
+        rel.type = "assertedcontext";
+        rel.source_refs.push_back(new_elem.id);
+        break;
+    case NewElementKind::Assumption:
+        new_elem.type = "claim";
+        new_elem.assertion_declaration = "assumed";
+        rel.type = "assertedcontext";
+        rel.source_refs.push_back(new_elem.id);
+        break;
+    case NewElementKind::Justification:
+        new_elem.type = "claim";
+        new_elem.assertion_declaration = "justification";
+        rel.type = "assertedcontext";
+        rel.source_refs.push_back(new_elem.id);
+        break;
     }
 
     out_new_id = new_elem.id;
@@ -231,24 +255,24 @@ bool AddChildElement(parser::AssuranceCase& ac,
     // Mirror into sacm model first (uses a copy of new_elem before move).
     if (ap) {
         switch (kind) {
-            case NewElementKind::Goal:
-                MirrorClaim(ap, new_elem);
-                MirrorInference(ap, rel);
-                break;
-            case NewElementKind::Strategy:
-                MirrorReasoning(ap, new_elem);
-                MirrorInference(ap, rel);
-                break;
-            case NewElementKind::Solution:
-                MirrorArtifactReference(ap, new_elem);
-                MirrorEvidence(ap, rel);
-                break;
-            case NewElementKind::Context:
-            case NewElementKind::Assumption:
-            case NewElementKind::Justification:
-                MirrorClaim(ap, new_elem);
-                MirrorContext(ap, rel);
-                break;
+        case NewElementKind::Goal:
+            MirrorClaim(ap, new_elem);
+            MirrorInference(ap, rel);
+            break;
+        case NewElementKind::Strategy:
+            MirrorReasoning(ap, new_elem);
+            MirrorInference(ap, rel);
+            break;
+        case NewElementKind::Solution:
+            MirrorArtifactReference(ap, new_elem);
+            MirrorEvidence(ap, rel);
+            break;
+        case NewElementKind::Context:
+        case NewElementKind::Assumption:
+        case NewElementKind::Justification:
+            MirrorClaim(ap, new_elem);
+            MirrorContext(ap, rel);
+            break;
         }
     }
 
@@ -327,19 +351,22 @@ struct TreeIndex {
     }
 };
 
-void AddEdge(TreeIndex& idx, const std::string& parent, const std::string& child,
-             bool group2 = false) {
-    if (parent.empty() || child.empty() || parent == child) return;
+void AddEdge(TreeIndex& idx, const std::string& parent, const std::string& child, bool group2 = false) {
+    if (parent.empty() || child.empty() || parent == child)
+        return;
     auto inserted = idx.parent_of.emplace(child, parent);
-    if (!inserted.second) return;  // first-write-wins
+    if (!inserted.second)
+        return; // first-write-wins
     idx.children_of[parent].push_back(child);
-    if (group2) idx.group2_of[parent].push_back(child);
+    if (group2)
+        idx.group2_of[parent].push_back(child);
 }
 
 std::unordered_set<std::string> BuildNodeIdSet(const parser::AssuranceCase& ac) {
     std::unordered_set<std::string> ids;
     for (const auto& e : ac.elements) {
-        if (!IsRelationshipType(e.type) && !e.id.empty()) ids.insert(e.id);
+        if (!IsRelationshipType(e.type) && !e.id.empty())
+            ids.insert(e.id);
     }
     return ids;
 }
@@ -347,17 +374,18 @@ std::unordered_set<std::string> BuildNodeIdSet(const parser::AssuranceCase& ac) 
 std::string FindFirstExistingTarget(const std::vector<std::string>& target_refs,
                                     const std::unordered_set<std::string>& node_ids) {
     for (const auto& target : target_refs) {
-        if (!target.empty() && node_ids.find(target) != node_ids.end()) return target;
+        if (!target.empty() && node_ids.find(target) != node_ids.end())
+            return target;
     }
     return {};
 }
 
-TreeIndex BuildTreeIndex(const parser::AssuranceCase& ac,
-                         const std::unordered_set<std::string>& node_ids) {
+TreeIndex BuildTreeIndex(const parser::AssuranceCase& ac, const std::unordered_set<std::string>& node_ids) {
     TreeIndex idx;
     for (const auto& e : ac.elements) {
         const std::string target = FindFirstExistingTarget(e.target_refs, node_ids);
-        if (target.empty()) continue;
+        if (target.empty())
+            continue;
 
         if (e.type == "assertedinference") {
             std::string attach_parent = target;
@@ -401,25 +429,27 @@ std::string FindStructuralParent(const parser::AssuranceCase& ac, const std::str
 void CollectGroup2AttachmentIds(const TreeIndex& idx,
                                 const std::string& node_id,
                                 std::unordered_set<std::string>& out) {
-    for (const auto& s : idx.Group2Of(node_id)) out.insert(s);
+    for (const auto& s : idx.Group2Of(node_id))
+        out.insert(s);
 }
 
-}  // namespace
+} // namespace
 
 namespace {
 
 // Collect the closed set of ids reachable as descendants of `root_id` in the
 // canonical visual tree (see TreeIndex above). `root_id` itself is included.
-std::unordered_set<std::string> CollectSubtreeIds(const TreeIndex& idx,
-                                                   const std::string& root_id) {
+std::unordered_set<std::string> CollectSubtreeIds(const TreeIndex& idx, const std::string& root_id) {
     std::unordered_set<std::string> visited;
     std::vector<std::string> stack;
     stack.push_back(root_id);
     while (!stack.empty()) {
         std::string current = std::move(stack.back());
         stack.pop_back();
-        if (!visited.insert(current).second) continue;
-        for (const auto& c : idx.ChildrenOf(current)) stack.push_back(c);
+        if (!visited.insert(current).second)
+            continue;
+        for (const auto& c : idx.ChildrenOf(current))
+            stack.push_back(c);
     }
     return visited;
 }
@@ -427,18 +457,18 @@ std::unordered_set<std::string> CollectSubtreeIds(const TreeIndex& idx,
 // Remove from `vec` every element whose id is in `removed_ids`.
 template <typename T>
 void EraseByIdSet(std::vector<T>& vec, const std::unordered_set<std::string>& removed_ids) {
-    vec.erase(std::remove_if(vec.begin(), vec.end(),
-                             [&](const T& item) { return removed_ids.count(item.id) > 0; }),
+    vec.erase(std::remove_if(vec.begin(), vec.end(), [&](const T& item) { return removed_ids.count(item.id) > 0; }),
               vec.end());
 }
 
 // Strip removed ids from the source/target vectors of a SACM relationship.
-void ScrubRelationshipRefs(sacm::AssertedRelationship& rel,
-                           const std::unordered_set<std::string>& removed_ids) {
-    rel.sources.erase(std::remove_if(rel.sources.begin(), rel.sources.end(),
+void ScrubRelationshipRefs(sacm::AssertedRelationship& rel, const std::unordered_set<std::string>& removed_ids) {
+    rel.sources.erase(std::remove_if(rel.sources.begin(),
+                                     rel.sources.end(),
                                      [&](const std::string& r) { return removed_ids.count(r) > 0; }),
                       rel.sources.end());
-    rel.targets.erase(std::remove_if(rel.targets.begin(), rel.targets.end(),
+    rel.targets.erase(std::remove_if(rel.targets.begin(),
+                                     rel.targets.end(),
                                      [&](const std::string& r) { return removed_ids.count(r) > 0; }),
                       rel.targets.end());
 }
@@ -448,26 +478,27 @@ void ScrubRelationshipRefs(sacm::AssertedRelationship& rel,
 // connects at least one source (or a reasoning) to at least one target is
 // kept so siblings of the removed element survive.
 bool IsRelationshipDangling(const sacm::AssertedRelationship& rel) {
-    if (rel.targets.empty()) return true;
+    if (rel.targets.empty())
+        return true;
     return rel.sources.empty();
 }
 bool IsInferenceDangling(const sacm::AssertedInference& inf) {
-    if (inf.targets.empty()) return true;
+    if (inf.targets.empty())
+        return true;
     return inf.sources.empty() && inf.reasoning.empty();
 }
 
 // Strip removed ids from a parser-side relationship's source/target/reasoning
 // references.
-void ScrubParserRelationshipRefs(parser::SacmElement& rel,
-                                 const std::unordered_set<std::string>& removed_ids) {
-    rel.source_refs.erase(
-        std::remove_if(rel.source_refs.begin(), rel.source_refs.end(),
-                       [&](const std::string& r) { return removed_ids.count(r) > 0; }),
-        rel.source_refs.end());
-    rel.target_refs.erase(
-        std::remove_if(rel.target_refs.begin(), rel.target_refs.end(),
-                       [&](const std::string& r) { return removed_ids.count(r) > 0; }),
-        rel.target_refs.end());
+void ScrubParserRelationshipRefs(parser::SacmElement& rel, const std::unordered_set<std::string>& removed_ids) {
+    rel.source_refs.erase(std::remove_if(rel.source_refs.begin(),
+                                         rel.source_refs.end(),
+                                         [&](const std::string& r) { return removed_ids.count(r) > 0; }),
+                          rel.source_refs.end());
+    rel.target_refs.erase(std::remove_if(rel.target_refs.begin(),
+                                         rel.target_refs.end(),
+                                         [&](const std::string& r) { return removed_ids.count(r) > 0; }),
+                          rel.target_refs.end());
     if (!rel.reasoning_ref.empty() && removed_ids.count(rel.reasoning_ref)) {
         rel.reasoning_ref.clear();
     }
@@ -475,33 +506,34 @@ void ScrubParserRelationshipRefs(parser::SacmElement& rel,
 
 // True if a parser-side relationship has been emptied out by scrubbing.
 bool IsParserRelationshipDangling(const parser::SacmElement& rel) {
-    if (rel.target_refs.empty()) return true;
+    if (rel.target_refs.empty())
+        return true;
     if (rel.type == "assertedinference") {
         return rel.source_refs.empty() && rel.reasoning_ref.empty();
     }
     return rel.source_refs.empty();
 }
 
-}  // namespace
+} // namespace
 
 int CountDescendants(const parser::AssuranceCase& ac, const std::string& id) {
-    if (id.empty()) return 0;
+    if (id.empty())
+        return 0;
     auto idx = BuildTreeIndex(ac);
     auto subtree = CollectSubtreeIds(idx, id);
     // subtree includes the root itself; descendants = everything else.
     return subtree.empty() ? 0 : static_cast<int>(subtree.size() - 1);
 }
 
-std::unordered_set<std::string> PlanRemoval(const parser::AssuranceCase& ac,
-                                            const std::string& id,
-                                            RemoveMode mode) {
+std::unordered_set<std::string> PlanRemoval(const parser::AssuranceCase& ac, const std::string& id, RemoveMode mode) {
     std::unordered_set<std::string> result;
-    if (id.empty() || !FindElement(ac, id)) return result;
+    if (id.empty() || !FindElement(ac, id))
+        return result;
     auto idx = BuildTreeIndex(ac);
 
     if (mode == RemoveMode::NodeOnly) {
         result.insert(id);
-    } else {  // NodeAndDescendants
+    } else { // NodeAndDescendants
         result = CollectSubtreeIds(idx, id);
     }
     // Sweep Group2 attachments (Context/Assumption/Justification) for every
@@ -518,23 +550,25 @@ namespace {
 // Reparent the structural children of `node_id` to its structural parent.
 // Mutates both models so the subsequent scrub-then-drop pass leaves a coherent
 // tree. No-op if the node has no structural parent (root or orphan).
-void ReparentChildrenToParent(parser::AssuranceCase& ac,
-                              sacm::AssuranceCasePackage* pkg,
-                              const std::string& node_id) {
+void ReparentChildrenToParent(parser::AssuranceCase& ac, sacm::AssuranceCasePackage* pkg, const std::string& node_id) {
     std::string parent_id = FindStructuralParent(ac, node_id);
-    if (parent_id.empty()) return;
+    if (parent_id.empty())
+        return;
 
     // If `node_id` is interposed as a strategy (reasoning of an inference),
     // its sub-goals are already sources of the same inference. Clearing the
     // reasoning_ref promotes them to direct children of the inference target.
     for (auto& e : ac.elements) {
-        if (e.type != "assertedinference") continue;
-        if (e.reasoning_ref == node_id) e.reasoning_ref.clear();
+        if (e.type != "assertedinference")
+            continue;
+        if (e.reasoning_ref == node_id)
+            e.reasoning_ref.clear();
     }
     if (pkg) {
         for (auto& ap : pkg->argumentPackages) {
             for (auto& inf : ap.assertedInferences) {
-                if (inf.reasoning == node_id) inf.reasoning.clear();
+                if (inf.reasoning == node_id)
+                    inf.reasoning.clear();
             }
         }
     }
@@ -542,26 +576,31 @@ void ReparentChildrenToParent(parser::AssuranceCase& ac,
     // For inferences/evidence relationships targeting `node_id`, rewrite the
     // target to `parent_id` so the children get promoted up the tree.
     for (auto& e : ac.elements) {
-        if (e.type != "assertedinference" && e.type != "assertedevidence") continue;
+        if (e.type != "assertedinference" && e.type != "assertedevidence")
+            continue;
         for (auto& t : e.target_refs) {
-            if (t == node_id) t = parent_id;
+            if (t == node_id)
+                t = parent_id;
         }
     }
     if (pkg) {
         for (auto& ap : pkg->argumentPackages) {
             auto rewrite = [&](std::vector<std::string>& targets) {
                 for (auto& t : targets) {
-                    if (t == node_id) t = parent_id;
+                    if (t == node_id)
+                        t = parent_id;
                 }
             };
-            for (auto& inf : ap.assertedInferences) rewrite(inf.targets);
-            for (auto& ev : ap.assertedEvidences)   rewrite(ev.targets);
+            for (auto& inf : ap.assertedInferences)
+                rewrite(inf.targets);
+            for (auto& ev : ap.assertedEvidences)
+                rewrite(ev.targets);
             // Don't rewrite assertedContexts: contexts of node_id go away with it.
         }
     }
 }
 
-}  // namespace
+} // namespace
 
 bool RemoveElement(parser::AssuranceCase& ac,
                    sacm::AssuranceCasePackage* pkg,
@@ -597,14 +636,16 @@ bool RemoveElement(parser::AssuranceCase& ac,
             ScrubParserRelationshipRefs(e, removed_ids);
         }
     }
-    ac.elements.erase(
-        std::remove_if(ac.elements.begin(), ac.elements.end(),
-                       [&](const parser::SacmElement& e) {
-                           if (removed_ids.count(e.id)) return true;
-                           if (!IsRelationshipType(e.type)) return false;
-                           return IsParserRelationshipDangling(e);
-                       }),
-        ac.elements.end());
+    ac.elements.erase(std::remove_if(ac.elements.begin(),
+                                     ac.elements.end(),
+                                     [&](const parser::SacmElement& e) {
+                                         if (removed_ids.count(e.id))
+                                             return true;
+                                         if (!IsRelationshipType(e.type))
+                                             return false;
+                                         return IsParserRelationshipDangling(e);
+                                     }),
+                      ac.elements.end());
 
     // ---- SACM model: scrub references then drop dead/empty relationships ---
     if (pkg) {
@@ -619,32 +660,37 @@ bool RemoveElement(parser::AssuranceCase& ac,
                     r.reasoning.clear();
                 }
             }
-            for (auto& r : ap.assertedContexts)   ScrubRelationshipRefs(r, removed_ids);
-            for (auto& r : ap.assertedEvidences)  ScrubRelationshipRefs(r, removed_ids);
+            for (auto& r : ap.assertedContexts)
+                ScrubRelationshipRefs(r, removed_ids);
+            for (auto& r : ap.assertedEvidences)
+                ScrubRelationshipRefs(r, removed_ids);
 
-            ap.assertedInferences.erase(
-                std::remove_if(ap.assertedInferences.begin(), ap.assertedInferences.end(),
-                               [&](const sacm::AssertedInference& r) {
-                                   if (removed_ids.count(r.id)) return true;
-                                   return IsInferenceDangling(r);
-                               }),
-                ap.assertedInferences.end());
-            ap.assertedContexts.erase(
-                std::remove_if(ap.assertedContexts.begin(), ap.assertedContexts.end(),
-                               [&](const sacm::AssertedContext& r) {
-                                   return removed_ids.count(r.id) > 0 || IsRelationshipDangling(r);
-                               }),
-                ap.assertedContexts.end());
-            ap.assertedEvidences.erase(
-                std::remove_if(ap.assertedEvidences.begin(), ap.assertedEvidences.end(),
-                               [&](const sacm::AssertedEvidence& r) {
-                                   return removed_ids.count(r.id) > 0 || IsRelationshipDangling(r);
-                               }),
-                ap.assertedEvidences.end());
+            ap.assertedInferences.erase(std::remove_if(ap.assertedInferences.begin(),
+                                                       ap.assertedInferences.end(),
+                                                       [&](const sacm::AssertedInference& r) {
+                                                           if (removed_ids.count(r.id))
+                                                               return true;
+                                                           return IsInferenceDangling(r);
+                                                       }),
+                                        ap.assertedInferences.end());
+            ap.assertedContexts.erase(std::remove_if(ap.assertedContexts.begin(),
+                                                     ap.assertedContexts.end(),
+                                                     [&](const sacm::AssertedContext& r) {
+                                                         return removed_ids.count(r.id) > 0 ||
+                                                                IsRelationshipDangling(r);
+                                                     }),
+                                      ap.assertedContexts.end());
+            ap.assertedEvidences.erase(std::remove_if(ap.assertedEvidences.begin(),
+                                                      ap.assertedEvidences.end(),
+                                                      [&](const sacm::AssertedEvidence& r) {
+                                                          return removed_ids.count(r.id) > 0 ||
+                                                                 IsRelationshipDangling(r);
+                                                      }),
+                                       ap.assertedEvidences.end());
         }
     }
 
     return true;
 }
 
-}  // namespace core
+} // namespace core

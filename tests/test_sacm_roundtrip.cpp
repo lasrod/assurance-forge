@@ -1,27 +1,26 @@
-#include <gtest/gtest.h>
 #include "sacm/sacm_parser.h"
 #include "sacm/sacm_serializer.h"
+
 #include <filesystem>
+#include <gtest/gtest.h>
 
 // ===== Helpers for deep comparison =====
 
-static void expect_base_eq(const sacm::SacmElement& a, const sacm::SacmElement& b,
-                           const std::string& ctx) {
+static void expect_base_eq(const sacm::SacmElement& a, const sacm::SacmElement& b, const std::string& ctx) {
     EXPECT_EQ(a.id, b.id) << ctx << " id mismatch";
     EXPECT_EQ(a.name, b.name) << ctx << " name mismatch";
     EXPECT_EQ(a.description, b.description) << ctx << " description mismatch";
 }
 
-static void expect_rel_eq(const sacm::AssertedRelationship& a, const sacm::AssertedRelationship& b,
-                          const std::string& ctx) {
+static void
+expect_rel_eq(const sacm::AssertedRelationship& a, const sacm::AssertedRelationship& b, const std::string& ctx) {
     expect_base_eq(a, b, ctx);
     EXPECT_EQ(a.sources, b.sources) << ctx << " sources mismatch";
     EXPECT_EQ(a.targets, b.targets) << ctx << " targets mismatch";
     EXPECT_EQ(a.assertionDeclaration, b.assertionDeclaration) << ctx << " assertionDeclaration mismatch";
 }
 
-static void expect_packages_eq(const sacm::AssuranceCasePackage& a,
-                                const sacm::AssuranceCasePackage& b) {
+static void expect_packages_eq(const sacm::AssuranceCasePackage& a, const sacm::AssuranceCasePackage& b) {
     expect_base_eq(a, b, "root");
     EXPECT_EQ(a.namespace_prefix, b.namespace_prefix);
     EXPECT_EQ(a.namespace_uri, b.namespace_uri);
@@ -50,8 +49,7 @@ static void expect_packages_eq(const sacm::AssuranceCasePackage& a,
         expect_base_eq(aa, ab, ctx);
         ASSERT_EQ(aa.artifacts.size(), ab.artifacts.size()) << ctx;
         for (size_t j = 0; j < aa.artifacts.size(); ++j) {
-            expect_base_eq(aa.artifacts[j], ab.artifacts[j],
-                           ctx + ".art[" + std::to_string(j) + "]");
+            expect_base_eq(aa.artifacts[j], ab.artifacts[j], ctx + ".art[" + std::to_string(j) + "]");
         }
     }
 
@@ -87,8 +85,8 @@ static void expect_packages_eq(const sacm::AssuranceCasePackage& a,
         for (size_t j = 0; j < pa.artifactReferences.size(); ++j) {
             std::string arctx = ctx + ".artRef[" + std::to_string(j) + "]";
             expect_base_eq(pa.artifactReferences[j], pb.artifactReferences[j], arctx);
-            EXPECT_EQ(pa.artifactReferences[j].referencedArtifact,
-                      pb.artifactReferences[j].referencedArtifact) << arctx;
+            EXPECT_EQ(pa.artifactReferences[j].referencedArtifact, pb.artifactReferences[j].referencedArtifact)
+                << arctx;
         }
 
         // AssertedInferences
@@ -102,15 +100,13 @@ static void expect_packages_eq(const sacm::AssuranceCasePackage& a,
         // AssertedContexts
         ASSERT_EQ(pa.assertedContexts.size(), pb.assertedContexts.size()) << ctx << " contexts";
         for (size_t j = 0; j < pa.assertedContexts.size(); ++j) {
-            expect_rel_eq(pa.assertedContexts[j], pb.assertedContexts[j],
-                          ctx + ".ctx[" + std::to_string(j) + "]");
+            expect_rel_eq(pa.assertedContexts[j], pb.assertedContexts[j], ctx + ".ctx[" + std::to_string(j) + "]");
         }
 
         // AssertedEvidences
         ASSERT_EQ(pa.assertedEvidences.size(), pb.assertedEvidences.size()) << ctx << " evidences";
         for (size_t j = 0; j < pa.assertedEvidences.size(); ++j) {
-            expect_rel_eq(pa.assertedEvidences[j], pb.assertedEvidences[j],
-                          ctx + ".ev[" + std::to_string(j) + "]");
+            expect_rel_eq(pa.assertedEvidences[j], pb.assertedEvidences[j], ctx + ".ev[" + std::to_string(j) + "]");
         }
     }
 }
@@ -173,8 +169,7 @@ TEST(SacmParser, SampleFileStructure) {
     EXPECT_EQ(pkg.terminologyPackages[0].id, "TP1");
     ASSERT_EQ(pkg.terminologyPackages[0].expressions.size(), 2u);
     EXPECT_EQ(pkg.terminologyPackages[0].expressions[0].id, "TERM_SAFE");
-    EXPECT_EQ(pkg.terminologyPackages[0].expressions[0].value,
-              "System operates without causing harm");
+    EXPECT_EQ(pkg.terminologyPackages[0].expressions[0].value, "System operates without causing harm");
 
     // Argument package
     ASSERT_EQ(pkg.argumentPackages.size(), 1u);

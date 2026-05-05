@@ -61,4 +61,4 @@ private:
     core::reviews::ReviewItem pending_delete_item_;
 };
 
-}  // namespace app::controllers
+} // namespace app::controllers

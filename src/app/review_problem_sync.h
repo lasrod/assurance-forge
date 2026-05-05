@@ -18,4 +18,4 @@ core::ProblemItem MakeGuidelineProblemFromReviewItem(const core::reviews::Review
 void SyncReviewProblems(core::ProblemsManager& problems_manager,
                         const std::vector<core::reviews::ReviewItem>& review_items);
 
-}  // namespace app
+} // namespace app

@@ -1,26 +1,17 @@
 ﻿#pragma once
 
+#include "imgui.h"
+
 #include <string>
 #include <vector>
-#include "imgui.h"
 
 namespace ui::gsn {
 
-enum class ElementRole {
-    Claim,
-    Context,
-    Justification,
-    Assumption,
-    SubClaim,
-    Solution,
-    Evidence,
-    Strategy,
-    Other
-};
+enum class ElementRole { Claim, Context, Justification, Assumption, SubClaim, Solution, Evidence, Strategy, Other };
 
 enum class ElementGroup {
-    Group1,  // Structural (below parent)
-    Group2   // Contextual (side-attached)
+    Group1, // Structural (below parent)
+    Group2  // Contextual (side-attached)
 };
 
 struct CanvasElement {

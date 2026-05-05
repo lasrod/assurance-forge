@@ -21,4 +21,4 @@ public:
     void ApplyModalRequest(const ModalRequestEvent& event);
 };
 
-}  // namespace app::controllers
+} // namespace app::controllers

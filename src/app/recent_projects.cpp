@@ -1,11 +1,10 @@
 #include "app/recent_projects.h"
 
-#include <nlohmann/json.hpp>
-
 #include <algorithm>
 #include <cctype>
 #include <exception>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 #include <system_error>
 #include <utility>
 
@@ -15,8 +14,8 @@ namespace {
 std::string RecentProjectKey(const std::string& path) {
     std::string key = NormalizeRecentProjectPath(path);
 #ifdef _WIN32
-    std::transform(key.begin(), key.end(), key.begin(),
-        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::transform(
+        key.begin(), key.end(), key.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 #endif
     return key;
 }
@@ -25,32 +24,38 @@ std::string DefaultProjectNameForPath(const std::string& path) {
     std::filesystem::path manifest_path = std::filesystem::u8path(path);
     if (manifest_path.has_parent_path()) {
         std::filesystem::path project_folder = manifest_path.parent_path().filename();
-        if (!project_folder.empty()) return project_folder.u8string();
+        if (!project_folder.empty())
+            return project_folder.u8string();
     }
     return path;
 }
 
 int JsonInt(const nlohmann::json& object, const char* key) {
     auto iterator = object.find(key);
-    if (iterator == object.end() || !iterator->is_number_integer()) return 0;
+    if (iterator == object.end() || !iterator->is_number_integer())
+        return 0;
     return std::max(0, iterator->get<int>());
 }
 
 RecentProjectEntry EntryFromJson(const nlohmann::json& object) {
     RecentProjectEntry entry;
-    if (!object.is_object()) return entry;
+    if (!object.is_object())
+        return entry;
 
     auto path_iterator = object.find("path");
-    if (path_iterator == object.end() || !path_iterator->is_string()) return entry;
+    if (path_iterator == object.end() || !path_iterator->is_string())
+        return entry;
 
     entry.path = NormalizeRecentProjectPath(path_iterator->get<std::string>());
-    if (entry.path.empty()) return entry;
+    if (entry.path.empty())
+        return entry;
 
     auto name_iterator = object.find("name");
     if (name_iterator != object.end() && name_iterator->is_string()) {
         entry.name = name_iterator->get<std::string>();
     }
-    if (entry.name.empty()) entry.name = DefaultProjectNameForPath(entry.path);
+    if (entry.name.empty())
+        entry.name = DefaultProjectNameForPath(entry.path);
 
     entry.claims = JsonInt(object, "claims");
     entry.strategies = JsonInt(object, "strategies");
@@ -70,10 +75,11 @@ nlohmann::json EntryToJson(const RecentProjectEntry& entry) {
     };
 }
 
-}  // namespace
+} // namespace
 
 std::string NormalizeRecentProjectPath(const std::string& path) {
-    if (path.empty()) return {};
+    if (path.empty())
+        return {};
 
     std::filesystem::path raw_path = std::filesystem::u8path(path);
     std::error_code ec;
@@ -90,12 +96,14 @@ std::string NormalizeRecentProjectPath(const std::string& path) {
 
 std::vector<RecentProjectEntry> LoadRecentProjectsPreference(const std::string& content) {
     std::vector<RecentProjectEntry> recent_projects;
-    if (content.empty()) return recent_projects;
+    if (content.empty())
+        return recent_projects;
 
     try {
         nlohmann::json root = nlohmann::json::parse(content, nullptr, true, true);
         nlohmann::json entries = root.is_object() ? root.value("recentProjects", nlohmann::json::array()) : root;
-        if (!entries.is_array()) return recent_projects;
+        if (!entries.is_array())
+            return recent_projects;
 
         for (auto iterator = entries.rbegin(); iterator != entries.rend(); ++iterator) {
             TouchRecentProject(recent_projects, EntryFromJson(*iterator));
@@ -124,18 +132,18 @@ std::string SaveRecentProjectsPreference(const std::vector<RecentProjectEntry>& 
     return root.dump(2);
 }
 
-void TouchRecentProject(std::vector<RecentProjectEntry>& recent_projects,
-                        RecentProjectEntry entry) {
+void TouchRecentProject(std::vector<RecentProjectEntry>& recent_projects, RecentProjectEntry entry) {
     entry.path = NormalizeRecentProjectPath(entry.path);
-    if (entry.path.empty()) return;
-    if (entry.name.empty()) entry.name = DefaultProjectNameForPath(entry.path);
+    if (entry.path.empty())
+        return;
+    if (entry.name.empty())
+        entry.name = DefaultProjectNameForPath(entry.path);
 
     const std::string key = RecentProjectKey(entry.path);
     recent_projects.erase(
-        std::remove_if(recent_projects.begin(), recent_projects.end(),
-            [&](const RecentProjectEntry& existing) {
-                return RecentProjectKey(existing.path) == key;
-            }),
+        std::remove_if(recent_projects.begin(),
+                       recent_projects.end(),
+                       [&](const RecentProjectEntry& existing) { return RecentProjectKey(existing.path) == key; }),
         recent_projects.end());
     recent_projects.insert(recent_projects.begin(), std::move(entry));
 
@@ -144,16 +152,15 @@ void TouchRecentProject(std::vector<RecentProjectEntry>& recent_projects,
     }
 }
 
-void RemoveRecentProject(std::vector<RecentProjectEntry>& recent_projects,
-                         const std::string& path) {
+void RemoveRecentProject(std::vector<RecentProjectEntry>& recent_projects, const std::string& path) {
     const std::string key = RecentProjectKey(path);
-    if (key.empty()) return;
+    if (key.empty())
+        return;
     recent_projects.erase(
-        std::remove_if(recent_projects.begin(), recent_projects.end(),
-            [&](const RecentProjectEntry& existing) {
-                return RecentProjectKey(existing.path) == key;
-            }),
+        std::remove_if(recent_projects.begin(),
+                       recent_projects.end(),
+                       [&](const RecentProjectEntry& existing) { return RecentProjectKey(existing.path) == key; }),
         recent_projects.end());
 }
 
-}  // namespace app
+} // namespace app

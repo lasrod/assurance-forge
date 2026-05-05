@@ -1,35 +1,40 @@
 ﻿#include "ui/gsn/gsn_canvas_renderer.h"
-#include "ui/gsn/gsn_layout.h"
+
 #include "ui/gsn/gsn_canvas.h" // for DrawGsnNode
 #include "ui/gsn/gsn_dpi.h"
+#include "ui/gsn/gsn_layout.h"
 #include "ui/theme.h"
-#include <imgui.h>
-#include <cmath>
+
 #include <algorithm>
+#include <cmath>
+#include <imgui.h>
 
 namespace ui::gsn {
 
 // ===== Edge rendering constants =====
-static constexpr float kArrowSize           = 9.0f;   // arrowhead triangle side length
-static constexpr float kArrowOutlineWidth   = 1.5f;   // hollow arrowhead outline thickness
-static constexpr float kSolidEdgeWidth      = 2.2f;   // Group1 solid line thickness
-static constexpr float kDashedEdgeWidth     = 1.8f;   // Group2 dashed line thickness
-static constexpr float kDashLength          = 6.0f;   // dash on-length for dashed lines
-static constexpr float kDashGap             = 4.0f;   // dash off-length for dashed lines
-static constexpr float kStubLength          = 12.0f;  // straight segment at each end of a Bezier curve
-static constexpr float kVerticalControlPct  = 0.4f;   // Bezier control point distance (fraction of vertical span)
-static constexpr float kScrollPadding       = 40.0f;  // extra padding beyond outermost node for scrolling
-static constexpr int   kBezierSamples       = 64;     // arc-length sample count for dashed Bezier rendering
-static constexpr float kCullMarginPx        = 120.0f; // screen-space culling margin around viewport
+static constexpr float kArrowSize = 9.0f;          // arrowhead triangle side length
+static constexpr float kArrowOutlineWidth = 1.5f;  // hollow arrowhead outline thickness
+static constexpr float kSolidEdgeWidth = 2.2f;     // Group1 solid line thickness
+static constexpr float kDashedEdgeWidth = 1.8f;    // Group2 dashed line thickness
+static constexpr float kDashLength = 6.0f;         // dash on-length for dashed lines
+static constexpr float kDashGap = 4.0f;            // dash off-length for dashed lines
+static constexpr float kStubLength = 12.0f;        // straight segment at each end of a Bezier curve
+static constexpr float kVerticalControlPct = 0.4f; // Bezier control point distance (fraction of vertical span)
+static constexpr float kScrollPadding = 40.0f;     // extra padding beyond outermost node for scrolling
+static constexpr int kBezierSamples = 64;          // arc-length sample count for dashed Bezier rendering
+static constexpr float kCullMarginPx = 120.0f;     // screen-space culling margin around viewport
 
 // Edge colors are sourced from the theme on every call so they update if the
 // theme is ever swapped at runtime.
-static ImU32 Group1EdgeColor() { return GetTheme().edge_group1; }
-static ImU32 Group2EdgeColor() { return GetTheme().edge_group2; }
+static ImU32 Group1EdgeColor() {
+    return GetTheme().edge_group1;
+}
+static ImU32 Group2EdgeColor() {
+    return GetTheme().edge_group2;
+}
 
 static bool RectsIntersect(ImVec2 a_min, ImVec2 a_max, ImVec2 b_min, ImVec2 b_max) {
-    return a_max.x >= b_min.x && a_min.x <= b_max.x &&
-           a_max.y >= b_min.y && a_min.y <= b_max.y;
+    return a_max.x >= b_min.x && a_min.x <= b_max.x && a_max.y >= b_min.y && a_min.y <= b_max.y;
 }
 
 static void ExpandRectToInclude(ImVec2 point, ImVec2& out_min, ImVec2& out_max) {
@@ -40,31 +45,30 @@ static void ExpandRectToInclude(ImVec2 point, ImVec2& out_min, ImVec2& out_max) 
 }
 
 // ===== Zoom constants =====
-static constexpr float kZoomMin      = 0.25f;  // minimum zoom level (25%)
-static constexpr float kZoomMax      = 3.0f;   // maximum zoom level (300%)
-static constexpr float kZoomStep     = 0.1f;   // zoom increment per step (10%)
+static constexpr float kZoomMin = 0.25f; // minimum zoom level (25%)
+static constexpr float kZoomMax = 3.0f;  // maximum zoom level (300%)
+static constexpr float kZoomStep = 0.1f; // zoom increment per step (10%)
 
 // ===== Arrowhead helpers =====
 
 // Compute the two base corners of an arrowhead triangle given its tip,
 // a unit direction vector, and side length.
-static void ComputeArrowBasePoints(ImVec2 tip, float dir_x, float dir_y, float size,
-                                   ImVec2& out_left, ImVec2& out_right) {
+static void
+ComputeArrowBasePoints(ImVec2 tip, float dir_x, float dir_y, float size, ImVec2& out_left, ImVec2& out_right) {
     // Perpendicular to the direction vector
     float perp_x = -dir_y;
-    float perp_y =  dir_x;
+    float perp_y = dir_x;
     float half = size * 0.5f;
-    out_left  = ImVec2(tip.x - dir_x * size + perp_x * half,
-                       tip.y - dir_y * size + perp_y * half);
-    out_right = ImVec2(tip.x - dir_x * size - perp_x * half,
-                       tip.y - dir_y * size - perp_y * half);
+    out_left = ImVec2(tip.x - dir_x * size + perp_x * half, tip.y - dir_y * size + perp_y * half);
+    out_right = ImVec2(tip.x - dir_x * size - perp_x * half, tip.y - dir_y * size - perp_y * half);
 }
 
 // Draw a solid (filled) arrowhead at 'tip' pointing in direction (dir_x, dir_y).
-static void DrawSolidArrow(ImDrawList* draw_list, ImVec2 tip, float dir_x, float dir_y,
-                           ImU32 color, float size = kArrowSize) {
+static void
+DrawSolidArrow(ImDrawList* draw_list, ImVec2 tip, float dir_x, float dir_y, ImU32 color, float size = kArrowSize) {
     float length = sqrtf(dir_x * dir_x + dir_y * dir_y);
-    if (length < 1.0f) return;
+    if (length < 1.0f)
+        return;
     dir_x /= length;
     dir_y /= length;
     ImVec2 base_left, base_right;
@@ -73,10 +77,16 @@ static void DrawSolidArrow(ImDrawList* draw_list, ImVec2 tip, float dir_x, float
 }
 
 // Draw a hollow (outline-only) arrowhead at 'tip' pointing in direction (dir_x, dir_y).
-static void DrawHollowArrow(ImDrawList* draw_list, ImVec2 tip, float dir_x, float dir_y,
-                            ImU32 color, float size = kArrowSize, float thickness = kArrowOutlineWidth) {
+static void DrawHollowArrow(ImDrawList* draw_list,
+                            ImVec2 tip,
+                            float dir_x,
+                            float dir_y,
+                            ImU32 color,
+                            float size = kArrowSize,
+                            float thickness = kArrowOutlineWidth) {
     float length = sqrtf(dir_x * dir_x + dir_y * dir_y);
-    if (length < 1.0f) return;
+    if (length < 1.0f)
+        return;
     dir_x /= length;
     dir_y /= length;
     ImVec2 base_left, base_right;
@@ -91,25 +101,23 @@ static ImVec2 EvalBezier(ImVec2 p0, ImVec2 p1, ImVec2 p2, ImVec2 p3, float t) {
     float u = 1.0f - t;
     float uu = u * u, uuu = uu * u;
     float tt = t * t, ttt = tt * t;
-    return ImVec2(
-        uuu * p0.x + 3 * uu * t * p1.x + 3 * u * tt * p2.x + ttt * p3.x,
-        uuu * p0.y + 3 * uu * t * p1.y + 3 * u * tt * p2.y + ttt * p3.y);
+    return ImVec2(uuu * p0.x + 3 * uu * t * p1.x + 3 * u * tt * p2.x + ttt * p3.x,
+                  uuu * p0.y + 3 * uu * t * p1.y + 3 * u * tt * p2.y + ttt * p3.y);
 }
 
 // Draw a solid cubic Bezier curve.
-static void DrawSolidBezier(ImDrawList* draw_list, ImVec2 p0, ImVec2 p1, ImVec2 p2, ImVec2 p3,
-                            ImU32 color, float thickness = kSolidEdgeWidth) {
+static void DrawSolidBezier(
+    ImDrawList* draw_list, ImVec2 p0, ImVec2 p1, ImVec2 p2, ImVec2 p3, ImU32 color, float thickness = kSolidEdgeWidth) {
     draw_list->AddBezierCubic(p0, p1, p2, p3, color, thickness);
 }
 
 // Interpolate a point along a sampled polyline at the given arc-length distance.
-static ImVec2 InterpolateAtArcLength(const ImVec2* samples, const float* cumulative_lengths,
-                                     int sample_count, float target_arc) {
+static ImVec2
+InterpolateAtArcLength(const ImVec2* samples, const float* cumulative_lengths, int sample_count, float target_arc) {
     for (int i = 1; i <= sample_count; ++i) {
         if (cumulative_lengths[i] >= target_arc) {
             float segment_len = cumulative_lengths[i] - cumulative_lengths[i - 1];
-            float fraction = (segment_len < 1e-6f) ? 0.0f
-                           : (target_arc - cumulative_lengths[i - 1]) / segment_len;
+            float fraction = (segment_len < 1e-6f) ? 0.0f : (target_arc - cumulative_lengths[i - 1]) / segment_len;
             return ImVec2(samples[i - 1].x + fraction * (samples[i].x - samples[i - 1].x),
                           samples[i - 1].y + fraction * (samples[i].y - samples[i - 1].y));
         }
@@ -118,12 +126,18 @@ static ImVec2 InterpolateAtArcLength(const ImVec2* samples, const float* cumulat
 }
 
 // Draw a dashed cubic Bezier curve using arc-length parameterized sampling.
-static void DrawDashedBezier(ImDrawList* draw_list, ImVec2 p0, ImVec2 p1, ImVec2 p2, ImVec2 p3,
-                             ImU32 color, float thickness = kDashedEdgeWidth,
-                             float dash_on = kDashLength, float dash_off = kDashGap) {
+static void DrawDashedBezier(ImDrawList* draw_list,
+                             ImVec2 p0,
+                             ImVec2 p1,
+                             ImVec2 p2,
+                             ImVec2 p3,
+                             ImU32 color,
+                             float thickness = kDashedEdgeWidth,
+                             float dash_on = kDashLength,
+                             float dash_off = kDashGap) {
     // Sample the curve into a polyline and compute cumulative arc lengths
     ImVec2 samples[kBezierSamples + 1];
-    float  cumulative_lengths[kBezierSamples + 1];
+    float cumulative_lengths[kBezierSamples + 1];
     samples[0] = p0;
     cumulative_lengths[0] = 0.0f;
     for (int i = 1; i <= kBezierSamples; ++i) {
@@ -134,18 +148,20 @@ static void DrawDashedBezier(ImDrawList* draw_list, ImVec2 p0, ImVec2 p1, ImVec2
         cumulative_lengths[i] = cumulative_lengths[i - 1] + sqrtf(dx * dx + dy * dy);
     }
     float total_arc = cumulative_lengths[kBezierSamples];
-    if (total_arc < 1.0f) return;
+    if (total_arc < 1.0f)
+        return;
 
     // Walk along the curve alternating between drawing and skipping
     float arc_pos = 0.0f;
     bool is_visible = true;
     while (arc_pos < total_arc) {
         float segment_end = arc_pos + (is_visible ? dash_on : dash_off);
-        if (segment_end > total_arc) segment_end = total_arc;
+        if (segment_end > total_arc)
+            segment_end = total_arc;
 
         if (is_visible) {
             ImVec2 dash_start = InterpolateAtArcLength(samples, cumulative_lengths, kBezierSamples, arc_pos);
-            ImVec2 dash_end   = InterpolateAtArcLength(samples, cumulative_lengths, kBezierSamples, segment_end);
+            ImVec2 dash_end = InterpolateAtArcLength(samples, cumulative_lengths, kBezierSamples, segment_end);
             draw_list->AddLine(dash_start, dash_end, color, thickness);
         }
         arc_pos = segment_end;
@@ -153,13 +169,13 @@ static void DrawDashedBezier(ImDrawList* draw_list, ImVec2 p0, ImVec2 p1, ImVec2
     }
 }
 
-static void DrawDashedLine(ImDrawList* draw_list, ImVec2 start, ImVec2 end,
-                           ImU32 color, float thickness,
-                           float dash_on, float dash_off) {
+static void DrawDashedLine(
+    ImDrawList* draw_list, ImVec2 start, ImVec2 end, ImU32 color, float thickness, float dash_on, float dash_off) {
     float dx = end.x - start.x;
     float dy = end.y - start.y;
     float length = sqrtf(dx * dx + dy * dy);
-    if (length < 1.0f) return;
+    if (length < 1.0f)
+        return;
 
     float dir_x = dx / length;
     float dir_y = dy / length;
@@ -167,7 +183,8 @@ static void DrawDashedLine(ImDrawList* draw_list, ImVec2 start, ImVec2 end,
     bool is_visible = true;
     while (pos < length) {
         float segment_end = pos + (is_visible ? dash_on : dash_off);
-        if (segment_end > length) segment_end = length;
+        if (segment_end > length)
+            segment_end = length;
 
         if (is_visible) {
             ImVec2 dash_start(start.x + dir_x * pos, start.y + dir_y * pos);
@@ -180,8 +197,7 @@ static void DrawDashedLine(ImDrawList* draw_list, ImVec2 start, ImVec2 end,
     }
 }
 
-GsnCanvas::GsnCanvas() {
-}
+GsnCanvas::GsnCanvas() {}
 
 void GsnCanvas::RebuildNodeLookup() {
     node_by_id_.clear();
@@ -241,12 +257,16 @@ void GsnCanvas::GetContentBounds(ImVec2& out_min, ImVec2& out_max) const {
     float min_x = FLT_MAX, min_y = FLT_MAX;
     float max_x = -FLT_MAX, max_y = -FLT_MAX;
     for (const auto& node : layout_nodes_) {
-        if (node.position.x < min_x) min_x = node.position.x;
-        if (node.position.y < min_y) min_y = node.position.y;
+        if (node.position.x < min_x)
+            min_x = node.position.x;
+        if (node.position.y < min_y)
+            min_y = node.position.y;
         float r = node.position.x + node.size.x;
         float b = node.position.y + node.size.y;
-        if (r > max_x) max_x = r;
-        if (b > max_y) max_y = b;
+        if (r > max_x)
+            max_x = r;
+        if (b > max_y)
+            max_y = b;
     }
     // Add some padding around the content
     float pad = DpiSize(kScrollPadding);
@@ -258,13 +278,11 @@ void GsnCanvas::GetContentBounds(ImVec2& out_min, ImVec2& out_max) const {
 
 // Compute the screen-space connection points for a parentâ†’child edge.
 // Group1 edges go from parent's bottom center to child's top center.
-static void ComputeGroup1Endpoints(const LayoutNode& parent, const LayoutNode& child,
-                                   ImVec2 origin, float zoom,
-                                   ImVec2& out_start, ImVec2& out_end) {
+static void ComputeGroup1Endpoints(
+    const LayoutNode& parent, const LayoutNode& child, ImVec2 origin, float zoom, ImVec2& out_start, ImVec2& out_end) {
     out_start = ImVec2(origin.x + (parent.position.x + parent.size.x * 0.5f) * zoom,
                        origin.y + (parent.position.y + parent.size.y) * zoom);
-    out_end   = ImVec2(origin.x + (child.position.x + child.size.x * 0.5f) * zoom,
-                       origin.y + child.position.y * zoom);
+    out_end = ImVec2(origin.x + (child.position.x + child.size.x * 0.5f) * zoom, origin.y + child.position.y * zoom);
 }
 
 // Draw a Group1 (structural) edge: straight stubs â†’ solid Bezier â†’ solid arrowhead.
@@ -279,7 +297,7 @@ static void DrawGroup1Edge(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 c
 
     float vertical_span = fabsf(stub_end.y - stub_start.y);
     ImVec2 ctrl_1(stub_start.x, stub_start.y + vertical_span * kVerticalControlPct);
-    ImVec2 ctrl_2(stub_end.x,   stub_end.y   - vertical_span * kVerticalControlPct);
+    ImVec2 ctrl_2(stub_end.x, stub_end.y - vertical_span * kVerticalControlPct);
 
     ImU32 col = Group1EdgeColor();
     draw_list->AddLine(parent_bottom, stub_start, col, scaled_edge_width);
@@ -288,8 +306,8 @@ static void DrawGroup1Edge(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 c
     DrawSolidArrow(draw_list, child_top, 0.0f, 1.0f, col, scaled_arrow);
 }
 
-static void ComputeGroup1EdgeBounds(ImVec2 parent_bottom, ImVec2 child_top, float zoom,
-                                    ImVec2& out_min, ImVec2& out_max) {
+static void
+ComputeGroup1EdgeBounds(ImVec2 parent_bottom, ImVec2 child_top, float zoom, ImVec2& out_min, ImVec2& out_max) {
     float scale = DpiScale() * zoom;
     float scaled_stub = kStubLength * scale;
     float scaled_edge_width = kSolidEdgeWidth * scale;
@@ -299,7 +317,7 @@ static void ComputeGroup1EdgeBounds(ImVec2 parent_bottom, ImVec2 child_top, floa
     ImVec2 stub_end(child_top.x, child_top.y - scaled_stub);
     float vertical_span = fabsf(stub_end.y - stub_start.y);
     ImVec2 ctrl_1(stub_start.x, stub_start.y + vertical_span * kVerticalControlPct);
-    ImVec2 ctrl_2(stub_end.x,   stub_end.y   - vertical_span * kVerticalControlPct);
+    ImVec2 ctrl_2(stub_end.x, stub_end.y - vertical_span * kVerticalControlPct);
 
     out_min = parent_bottom;
     out_max = parent_bottom;
@@ -318,12 +336,15 @@ static void ComputeGroup1EdgeBounds(ImVec2 parent_bottom, ImVec2 child_top, floa
 
 // Compute screen-space endpoints for a Group2 (side-attached) edge.
 // Parent side â†’ attachment nearest edge, depending on which side.
-static void ComputeGroup2Endpoints(const LayoutNode& parent, const LayoutNode& attachment,
-                                   ImVec2 origin, float zoom,
-                                   ImVec2& out_parent_side, ImVec2& out_attachment_edge) {
+static void ComputeGroup2Endpoints(const LayoutNode& parent,
+                                   const LayoutNode& attachment,
+                                   ImVec2 origin,
+                                   float zoom,
+                                   ImVec2& out_parent_side,
+                                   ImVec2& out_attachment_edge) {
     if (attachment.is_left_side) {
-        out_parent_side = ImVec2(origin.x + parent.position.x * zoom,
-                                 origin.y + (parent.position.y + parent.size.y * 0.5f) * zoom);
+        out_parent_side =
+            ImVec2(origin.x + parent.position.x * zoom, origin.y + (parent.position.y + parent.size.y * 0.5f) * zoom);
         out_attachment_edge = ImVec2(origin.x + (attachment.position.x + attachment.size.x) * zoom,
                                      origin.y + (attachment.position.y + attachment.size.y * 0.5f) * zoom);
     } else {
@@ -335,8 +356,8 @@ static void ComputeGroup2Endpoints(const LayoutNode& parent, const LayoutNode& a
 }
 
 // Draw a Group2 (contextual) edge: dashed stubs â†’ dashed Bezier â†’ hollow arrowhead.
-static void DrawGroup2Edge(ImDrawList* draw_list, ImVec2 parent_side, ImVec2 attachment_edge,
-                           bool is_left_side, float zoom) {
+static void
+DrawGroup2Edge(ImDrawList* draw_list, ImVec2 parent_side, ImVec2 attachment_edge, bool is_left_side, float zoom) {
     // Sign encodes horizontal direction: -1 toward left, +1 toward right
     float horizontal_sign = is_left_side ? -1.0f : 1.0f;
     float scale = DpiScale() * zoom;
@@ -350,23 +371,19 @@ static void DrawGroup2Edge(ImDrawList* draw_list, ImVec2 parent_side, ImVec2 att
 
     float horizontal_span = fabsf(stub_end.x - stub_start.x) * 0.5f;
     ImVec2 ctrl_1(stub_start.x + horizontal_sign * horizontal_span, stub_start.y);
-    ImVec2 ctrl_2(stub_end.x   - horizontal_sign * horizontal_span, stub_end.y);
+    ImVec2 ctrl_2(stub_end.x - horizontal_sign * horizontal_span, stub_end.y);
 
     ImU32 col = Group2EdgeColor();
-    DrawDashedLine(draw_list, parent_side, stub_start, col,
-                   scaled_edge_width, scaled_dash, scaled_gap);
-    DrawDashedBezier(draw_list, stub_start, ctrl_1, ctrl_2, stub_end, col,
-                     scaled_edge_width, scaled_dash, scaled_gap);
-    DrawDashedLine(draw_list, stub_end, attachment_edge, col,
-                   scaled_edge_width, scaled_dash, scaled_gap);
+    DrawDashedLine(draw_list, parent_side, stub_start, col, scaled_edge_width, scaled_dash, scaled_gap);
+    DrawDashedBezier(draw_list, stub_start, ctrl_1, ctrl_2, stub_end, col, scaled_edge_width, scaled_dash, scaled_gap);
+    DrawDashedLine(draw_list, stub_end, attachment_edge, col, scaled_edge_width, scaled_dash, scaled_gap);
     // Arrow points into the attachment node
-    DrawHollowArrow(draw_list, attachment_edge, horizontal_sign, 0.0f, col,
-                    kArrowSize * scale, kArrowOutlineWidth * scale);
+    DrawHollowArrow(
+        draw_list, attachment_edge, horizontal_sign, 0.0f, col, kArrowSize * scale, kArrowOutlineWidth * scale);
 }
 
-static void ComputeGroup2EdgeBounds(ImVec2 parent_side, ImVec2 attachment_edge,
-                                    bool is_left_side, float zoom,
-                                    ImVec2& out_min, ImVec2& out_max) {
+static void ComputeGroup2EdgeBounds(
+    ImVec2 parent_side, ImVec2 attachment_edge, bool is_left_side, float zoom, ImVec2& out_min, ImVec2& out_max) {
     float horizontal_sign = is_left_side ? -1.0f : 1.0f;
     float scale = DpiScale() * zoom;
     float scaled_stub = kStubLength * scale;
@@ -377,7 +394,7 @@ static void ComputeGroup2EdgeBounds(ImVec2 parent_side, ImVec2 attachment_edge,
     ImVec2 stub_end(attachment_edge.x - horizontal_sign * scaled_stub, attachment_edge.y);
     float horizontal_span = fabsf(stub_end.x - stub_start.x) * 0.5f;
     ImVec2 ctrl_1(stub_start.x + horizontal_sign * horizontal_span, stub_start.y);
-    ImVec2 ctrl_2(stub_end.x   - horizontal_sign * horizontal_span, stub_end.y);
+    ImVec2 ctrl_2(stub_end.x - horizontal_sign * horizontal_span, stub_end.y);
 
     out_min = parent_side;
     out_max = parent_side;
@@ -419,19 +436,19 @@ void GsnCanvas::Render(UiState& ui_state,
 
     // Draw edges first (beneath nodes)
     for (const auto& child_node : layout_nodes_) {
-        if (child_node.parent_id.empty()) continue;
+        if (child_node.parent_id.empty())
+            continue;
 
         auto parent_it = node_by_id_.find(child_node.parent_id);
-        if (parent_it == node_by_id_.end()) continue;
+        if (parent_it == node_by_id_.end())
+            continue;
         const LayoutNode& parent_node = *parent_it->second;
 
         if (child_node.group == ElementGroup::Group2) {
             ImVec2 parent_side, attachment_edge;
-            ComputeGroup2Endpoints(parent_node, child_node, origin, zoom,
-                                   parent_side, attachment_edge);
+            ComputeGroup2Endpoints(parent_node, child_node, origin, zoom, parent_side, attachment_edge);
             ImVec2 edge_min, edge_max;
-            ComputeGroup2EdgeBounds(parent_side, attachment_edge, child_node.is_left_side, zoom,
-                                    edge_min, edge_max);
+            ComputeGroup2EdgeBounds(parent_side, attachment_edge, child_node.is_left_side, zoom, edge_min, edge_max);
             if (!RectsIntersect(edge_min, edge_max, cull_min, cull_max)) {
                 ++frame_stats.edges_culled;
                 continue;
@@ -440,8 +457,7 @@ void GsnCanvas::Render(UiState& ui_state,
             ++frame_stats.edges_drawn;
         } else {
             ImVec2 parent_bottom, child_top;
-            ComputeGroup1Endpoints(parent_node, child_node, origin, zoom,
-                                   parent_bottom, child_top);
+            ComputeGroup1Endpoints(parent_node, child_node, origin, zoom, parent_bottom, child_top);
             ImVec2 edge_min, edge_max;
             ComputeGroup1EdgeBounds(parent_bottom, child_top, zoom, edge_min, edge_max);
             if (!RectsIntersect(edge_min, edge_max, cull_min, cull_max)) {
@@ -455,10 +471,8 @@ void GsnCanvas::Render(UiState& ui_state,
 
     // Draw nodes on top of edges
     for (const auto& node : layout_nodes_) {
-        ImVec2 node_min(origin.x + node.position.x * zoom,
-                        origin.y + node.position.y * zoom);
-        ImVec2 node_max(node_min.x + node.size.x * zoom,
-                        node_min.y + node.size.y * zoom);
+        ImVec2 node_min(origin.x + node.position.x * zoom, origin.y + node.position.y * zoom);
+        ImVec2 node_max(node_min.x + node.size.x * zoom, node_min.y + node.size.y * zoom);
         if (!RectsIntersect(node_min, node_max, cull_min, cull_max)) {
             ++frame_stats.nodes_culled;
             continue;
@@ -467,14 +481,30 @@ void GsnCanvas::Render(UiState& ui_state,
         GsnNode gsn_node;
         gsn_node.id = node.id;
         switch (node.role) {
-            case ElementRole::Claim:         gsn_node.type = "Claim"; break;
-            case ElementRole::Strategy:      gsn_node.type = "Strategy"; break;
-            case ElementRole::Solution:      gsn_node.type = "Solution"; break;
-            case ElementRole::Context:       gsn_node.type = "Context"; break;
-            case ElementRole::Assumption:    gsn_node.type = "Assumption"; break;
-            case ElementRole::Justification: gsn_node.type = "Justification"; break;
-            case ElementRole::Evidence:      gsn_node.type = "Evidence"; break;
-            default:                         gsn_node.type = "Other"; break;
+        case ElementRole::Claim:
+            gsn_node.type = "Claim";
+            break;
+        case ElementRole::Strategy:
+            gsn_node.type = "Strategy";
+            break;
+        case ElementRole::Solution:
+            gsn_node.type = "Solution";
+            break;
+        case ElementRole::Context:
+            gsn_node.type = "Context";
+            break;
+        case ElementRole::Assumption:
+            gsn_node.type = "Assumption";
+            break;
+        case ElementRole::Justification:
+            gsn_node.type = "Justification";
+            break;
+        case ElementRole::Evidence:
+            gsn_node.type = "Evidence";
+            break;
+        default:
+            gsn_node.type = "Other";
+            break;
         }
         gsn_node.position = node.position;
         gsn_node.size = node.size;
@@ -503,32 +533,41 @@ bool GsnCanvas::CenterOnNode(const std::string& node_id, ImVec2 viewport_size) {
     return false;
 }
 
-bool GsnCanvas::CenterOnIds(const std::unordered_set<std::string>& ids,
-                            ImVec2 viewport_size) {
-    if (ids.empty()) return false;
+bool GsnCanvas::CenterOnIds(const std::unordered_set<std::string>& ids, ImVec2 viewport_size) {
+    if (ids.empty())
+        return false;
 
     bool found_any = false;
     float min_x = 0, min_y = 0, max_x = 0, max_y = 0;
     for (const auto& node : layout_nodes_) {
-        if (!ids.count(node.id)) continue;
+        if (!ids.count(node.id))
+            continue;
         const float nx0 = node.position.x;
         const float ny0 = node.position.y;
         const float nx1 = nx0 + node.size.x;
         const float ny1 = ny0 + node.size.y;
         if (!found_any) {
-            min_x = nx0; min_y = ny0; max_x = nx1; max_y = ny1;
+            min_x = nx0;
+            min_y = ny0;
+            max_x = nx1;
+            max_y = ny1;
             found_any = true;
         } else {
-            if (nx0 < min_x) min_x = nx0;
-            if (ny0 < min_y) min_y = ny0;
-            if (nx1 > max_x) max_x = nx1;
-            if (ny1 > max_y) max_y = ny1;
+            if (nx0 < min_x)
+                min_x = nx0;
+            if (ny0 < min_y)
+                min_y = ny0;
+            if (nx1 > max_x)
+                max_x = nx1;
+            if (ny1 > max_y)
+                max_y = ny1;
         }
     }
-    if (!found_any) return false;
+    if (!found_any)
+        return false;
 
     // Pad the AABB so the marked nodes don't sit flush with the viewport edge.
-    const float padding = DpiSize(80.0f);  // layout-space pixels
+    const float padding = DpiSize(80.0f); // layout-space pixels
     const float aabb_w = std::max(1.0f, (max_x - min_x) + padding * 2.0f);
     const float aabb_h = std::max(1.0f, (max_y - min_y) + padding * 2.0f);
 
@@ -537,8 +576,10 @@ bool GsnCanvas::CenterOnIds(const std::unordered_set<std::string>& ids,
     const float zoom_y = viewport_size.y / aabb_h;
     float new_zoom = std::min(zoom_x, zoom_y);
     // Clamp to a sensible range; do not zoom further IN than 1.0 (no need).
-    if (new_zoom > 1.0f) new_zoom = 1.0f;
-    if (new_zoom < 0.1f) new_zoom = 0.1f;
+    if (new_zoom > 1.0f)
+        new_zoom = 1.0f;
+    if (new_zoom < 0.1f)
+        new_zoom = 0.1f;
     zoom_level_ = new_zoom;
 
     const float cx = (min_x + max_x) * 0.5f;

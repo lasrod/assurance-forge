@@ -1,11 +1,12 @@
 #pragma once
 
-#include <string>
-#include <optional>
-#include <filesystem>
-#include "parser/xml_parser.h"
 #include "core/project_model.h"
+#include "parser/xml_parser.h"
 #include "sacm/sacm_model.h"
+
+#include <filesystem>
+#include <optional>
+#include <string>
 
 namespace core {
 
@@ -48,4 +49,4 @@ struct AppState {
     bool open_project_file(const ProjectFileEntry& entry);
 };
 
-}  // namespace core
+} // namespace core

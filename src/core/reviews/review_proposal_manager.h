@@ -28,4 +28,4 @@ private:
     std::filesystem::path project_root_;
 };
 
-}  // namespace core::reviews
+} // namespace core::reviews

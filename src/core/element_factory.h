@@ -1,10 +1,11 @@
 #pragma once
 
+#include "parser/xml_parser.h"
+#include "sacm/sacm_model.h"
+
 #include <string>
 #include <unordered_set>
 #include <vector>
-#include "parser/xml_parser.h"
-#include "sacm/sacm_model.h"
 
 namespace core {
 
@@ -56,9 +57,7 @@ enum class RemoveMode {
 // with the given mode. Pure: does not mutate the model. Used by the menu to
 // label items with the count, and by the UI to highlight nodes pending
 // confirmation. Relationship element ids are NOT included.
-std::unordered_set<std::string> PlanRemoval(const parser::AssuranceCase& ac,
-                                            const std::string& id,
-                                            RemoveMode mode);
+std::unordered_set<std::string> PlanRemoval(const parser::AssuranceCase& ac, const std::string& id, RemoveMode mode);
 
 // Remove the element with id `id` from both the parser and sacm models, plus
 // any relationship elements that become structurally empty as a result.
@@ -72,4 +71,4 @@ bool RemoveElement(parser::AssuranceCase& ac,
                    RemoveMode mode,
                    std::string& out_error);
 
-}  // namespace core
+} // namespace core
