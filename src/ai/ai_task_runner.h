@@ -42,4 +42,4 @@ public:
     std::shared_ptr<AiTaskHandle> RunGenerate(std::function<AiResponse()> job);
 };
 
-}  // namespace ai
+} // namespace ai

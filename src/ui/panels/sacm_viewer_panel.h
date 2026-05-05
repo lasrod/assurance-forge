@@ -1,8 +1,7 @@
 #pragma once
 
-#include "imgui.h"
-
 #include "core/app_state.h"
+#include "imgui.h"
 
 #include <cstddef>
 #include <functional>
@@ -35,4 +34,4 @@ void ShowSacmViewerPanel(float width,
                          SacmViewerPanelModel model,
                          const SacmViewerPanelCallbacks& callbacks);
 
-}  // namespace ui::panels
+} // namespace ui::panels

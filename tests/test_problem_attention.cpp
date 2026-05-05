@@ -1,12 +1,10 @@
-#include <gtest/gtest.h>
-
 #include "core/problems/problem_attention.h"
+
+#include <gtest/gtest.h>
 
 namespace {
 
-core::ProblemItem MakeProblem(const std::string& id,
-                              core::ProblemSource source,
-                              const std::string& element_id) {
+core::ProblemItem MakeProblem(const std::string& id, core::ProblemSource source, const std::string& element_id) {
     core::ProblemItem problem;
     problem.id = id;
     problem.source = source;
@@ -16,7 +14,7 @@ core::ProblemItem MakeProblem(const std::string& id,
     return problem;
 }
 
-}  // namespace
+} // namespace
 
 TEST(ProblemAttentionTest, HighlightsElementScopedReviewAndValidationProblems) {
     std::vector<core::ProblemItem> problems = {

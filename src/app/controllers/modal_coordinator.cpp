@@ -14,25 +14,26 @@ bool ModalCoordinator::ConsumeCloseRequest() {
 
 void ModalCoordinator::ApplyModalRequest(const ModalRequestEvent& event) {
     switch (event.kind) {
-        case ModalKind::NotImplemented:
-            show_not_implemented_modal = event.open;
-            if (!event.message.empty()) not_implemented_feature = event.message;
-            break;
-        case ModalKind::SaveBeforeExit:
-            show_save_before_exit_modal = event.open;
-            break;
-        case ModalKind::ReviewerNamePrompt:
-            show_reviewer_name_prompt = event.open;
-            break;
-        case ModalKind::Preferences:
-            show_preferences_window = event.open;
-            break;
-        case ModalKind::ThemeTweaks:
-            show_theme_tweak_window = event.open;
-            break;
-        default:
-            break;
+    case ModalKind::NotImplemented:
+        show_not_implemented_modal = event.open;
+        if (!event.message.empty())
+            not_implemented_feature = event.message;
+        break;
+    case ModalKind::SaveBeforeExit:
+        show_save_before_exit_modal = event.open;
+        break;
+    case ModalKind::ReviewerNamePrompt:
+        show_reviewer_name_prompt = event.open;
+        break;
+    case ModalKind::Preferences:
+        show_preferences_window = event.open;
+        break;
+    case ModalKind::ThemeTweaks:
+        show_theme_tweak_window = event.open;
+        break;
+    default:
+        break;
     }
 }
 
-}  // namespace app::controllers
+} // namespace app::controllers

@@ -1,7 +1,9 @@
 ﻿#include "ui/panels/element_panel.h"
-#include "ui/ui_state.h"
-#include "ui/gsn/gsn_canvas.h"
+
 #include "imgui.h"
+#include "ui/gsn/gsn_canvas.h"
+#include "ui/ui_state.h"
+
 #include <cstring>
 
 namespace ui::panels {
@@ -10,22 +12,28 @@ namespace {
 
 // Find a parser element by ID (mutable).
 parser::SacmElement* find_parser_element(parser::AssuranceCase* ac, const std::string& id) {
-    if (!ac) return nullptr;
+    if (!ac)
+        return nullptr;
     for (auto& elem : ac->elements) {
-        if (elem.id == id) return &elem;
+        if (elem.id == id)
+            return &elem;
     }
     return nullptr;
 }
 
 // Sync a parser element's editable fields into matching sacm model elements.
 // We search across all argument packages, artifact packages, and terminology packages.
-void sync_to_sacm(sacm::AssuranceCasePackage* pkg, const std::string& id,
-                  const std::string& new_name, const std::string& new_description,
-                  const std::string& new_content, bool undeveloped,
+void sync_to_sacm(sacm::AssuranceCasePackage* pkg,
+                  const std::string& id,
+                  const std::string& new_name,
+                  const std::string& new_description,
+                  const std::string& new_content,
+                  bool undeveloped,
                   const std::map<std::string, std::string>& name_langs,
                   const std::map<std::string, std::string>& desc_langs,
                   const std::map<std::string, std::string>& content_langs) {
-    if (!pkg) return;
+    if (!pkg)
+        return;
 
     // Helper lambda to update name_ml and description_ml from lang maps
     auto update_ml = [&](sacm::SacmElement& se) {
@@ -55,26 +63,44 @@ void sync_to_sacm(sacm::AssuranceCasePackage* pkg, const std::string& id,
             }
         }
         for (auto& ar : ap.artifactReferences) {
-            if (ar.id == id) { update_ml(ar); return; }
+            if (ar.id == id) {
+                update_ml(ar);
+                return;
+            }
         }
         for (auto& ai : ap.assertedInferences) {
-            if (ai.id == id) { update_ml(ai); return; }
+            if (ai.id == id) {
+                update_ml(ai);
+                return;
+            }
         }
         for (auto& ac : ap.assertedContexts) {
-            if (ac.id == id) { update_ml(ac); return; }
+            if (ac.id == id) {
+                update_ml(ac);
+                return;
+            }
         }
         for (auto& ae : ap.assertedEvidences) {
-            if (ae.id == id) { update_ml(ae); return; }
+            if (ae.id == id) {
+                update_ml(ae);
+                return;
+            }
         }
     }
     for (auto& artpkg : pkg->artifactPackages) {
         for (auto& a : artpkg.artifacts) {
-            if (a.id == id) { update_ml(a); return; }
+            if (a.id == id) {
+                update_ml(a);
+                return;
+            }
         }
     }
     for (auto& tp : pkg->terminologyPackages) {
         for (auto& e : tp.expressions) {
-            if (e.id == id) { update_ml(e); return; }
+            if (e.id == id) {
+                update_ml(e);
+                return;
+            }
         }
     }
 }
@@ -84,18 +110,19 @@ void sync_to_sacm(sacm::AssuranceCasePackage* pkg, const std::string& id,
 static bool EditableTextField(const char* label, std::string& text, float width = -1.0f) {
     char buf[2048];
     size_t len = text.size();
-    if (len >= sizeof(buf)) len = sizeof(buf) - 1;
+    if (len >= sizeof(buf))
+        len = sizeof(buf) - 1;
     memcpy(buf, text.c_str(), len);
     buf[len] = '\0';
 
     ImGui::PushID(label);
-    if (width > 0.0f) ImGui::SetNextItemWidth(width);
-    else ImGui::SetNextItemWidth(-1);
+    if (width > 0.0f)
+        ImGui::SetNextItemWidth(width);
+    else
+        ImGui::SetNextItemWidth(-1);
 
     bool changed = ImGui::InputTextMultiline(
-        "##edit", buf, sizeof(buf),
-        ImVec2(-1, ImGui::GetTextLineHeight() * 4),
-        ImGuiInputTextFlags_AllowTabInput);
+        "##edit", buf, sizeof(buf), ImVec2(-1, ImGui::GetTextLineHeight() * 4), ImGuiInputTextFlags_AllowTabInput);
 
     if (changed) {
         text = buf;
@@ -107,7 +134,8 @@ static bool EditableTextField(const char* label, std::string& text, float width 
 static bool EditableSingleLine(const char* label, std::string& text) {
     char buf[512];
     size_t len = text.size();
-    if (len >= sizeof(buf)) len = sizeof(buf) - 1;
+    if (len >= sizeof(buf))
+        len = sizeof(buf) - 1;
     memcpy(buf, text.c_str(), len);
     buf[len] = '\0';
 
@@ -123,18 +151,36 @@ static bool EditableSingleLine(const char* label, std::string& text) {
 
 // Check if element has a translation entry for the given language (key exists)
 static bool element_has_secondary(const parser::SacmElement& elem, const std::string& lang) {
-    if (elem.name_langs.count(lang)) return true;
-    if (elem.description_langs.count(lang)) return true;
-    if (elem.content_langs.count(lang)) return true;
+    if (elem.name_langs.count(lang))
+        return true;
+    if (elem.description_langs.count(lang))
+        return true;
+    if (elem.content_langs.count(lang))
+        return true;
     return false;
 }
 
 // Supported secondary languages (no special font requirements except ja which uses merged font)
-static const char* const kLangCodes[] = { "ja", "de", "fr", "es", "it", "pt", "nl", "sv", "no", "da", "fi", "pl", "cs", "ro", "hu" };
-static const char* const kLangLabels[] = { "Japanese", "German", "French", "Spanish", "Italian", "Portuguese", "Dutch", "Swedish", "Norwegian", "Danish", "Finnish", "Polish", "Czech", "Romanian", "Hungarian" };
+static const char* const kLangCodes[] = {
+    "ja", "de", "fr", "es", "it", "pt", "nl", "sv", "no", "da", "fi", "pl", "cs", "ro", "hu"};
+static const char* const kLangLabels[] = {"Japanese",
+                                          "German",
+                                          "French",
+                                          "Spanish",
+                                          "Italian",
+                                          "Portuguese",
+                                          "Dutch",
+                                          "Swedish",
+                                          "Norwegian",
+                                          "Danish",
+                                          "Finnish",
+                                          "Polish",
+                                          "Czech",
+                                          "Romanian",
+                                          "Hungarian"};
 static const int kLangCount = 15;
 
-}  // namespace
+} // namespace
 
 bool ShowElementPanel(parser::AssuranceCase* ac, sacm::AssuranceCasePackage* sacm_pkg) {
     const UiState& state = GetUiState();
@@ -185,13 +231,15 @@ bool ShowElementPanel(parser::AssuranceCase* ac, sacm::AssuranceCasePackage* sac
     // Secondary language name (only show if this field has the secondary language)
     if (elem->name_langs.count(sec_lang)) {
         ImGui::Text("Name (%s)", sec_lang.c_str());
-        if (ui::gsn::g_BoldFont) ImGui::PushFont(ui::gsn::g_BoldFont);
+        if (ui::gsn::g_BoldFont)
+            ImGui::PushFont(ui::gsn::g_BoldFont);
         std::string sec_name = elem->name_langs.at(sec_lang);
         if (EditableSingleLine("name_sec", sec_name)) {
             elem->name_langs[sec_lang] = sec_name;
             modified = true;
         }
-        if (ui::gsn::g_BoldFont) ImGui::PopFont();
+        if (ui::gsn::g_BoldFont)
+            ImGui::PopFont();
     }
     ImGui::Spacing();
 
@@ -254,7 +302,10 @@ bool ShowElementPanel(parser::AssuranceCase* ac, sacm::AssuranceCasePackage* sac
         ImGui::Text("Translation Language");
         int current_lang_idx = 0;
         for (int i = 0; i < kLangCount; ++i) {
-            if (mut_state.active_secondary_lang == kLangCodes[i]) { current_lang_idx = i; break; }
+            if (mut_state.active_secondary_lang == kLangCodes[i]) {
+                current_lang_idx = i;
+                break;
+            }
         }
         ImGui::SetNextItemWidth(-1);
         if (ImGui::Combo("##trans_lang", &current_lang_idx, kLangLabels, kLangCount)) {
@@ -285,12 +336,19 @@ bool ShowElementPanel(parser::AssuranceCase* ac, sacm::AssuranceCasePackage* sac
 
     // Sync edits to SACM model
     if (modified) {
-        sync_to_sacm(sacm_pkg, elem->id, elem->name, elem->description, elem->content, elem->undeveloped,
-                      elem->name_langs, elem->description_langs, elem->content_langs);
+        sync_to_sacm(sacm_pkg,
+                     elem->id,
+                     elem->name,
+                     elem->description,
+                     elem->content,
+                     elem->undeveloped,
+                     elem->name_langs,
+                     elem->description_langs,
+                     elem->content_langs);
     }
 
-    ImGui::PopID();  // element ID scope
+    ImGui::PopID(); // element ID scope
     return modified;
 }
 
-}  // namespace ui::panels
+} // namespace ui::panels

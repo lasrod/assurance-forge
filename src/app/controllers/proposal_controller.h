@@ -41,4 +41,4 @@ public:
     bool ClosePreviewIfOpen(const std::string& proposal_id);
 };
 
-}  // namespace app::controllers
+} // namespace app::controllers

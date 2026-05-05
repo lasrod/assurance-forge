@@ -68,4 +68,4 @@ public:
     static ProjectLoadReport RefreshFileStatus(AssuranceProject& project);
 };
 
-}  // namespace core
+} // namespace core

@@ -1,5 +1,3 @@
-#include <gtest/gtest.h>
-
 #include "core/project_service.h"
 #include "parser/xml_parser.h"
 
@@ -7,21 +5,24 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <gtest/gtest.h>
 
 namespace {
 
 struct TempDir {
     std::filesystem::path path;
     explicit TempDir(std::filesystem::path p) : path(std::move(p)) {}
-    ~TempDir() { std::filesystem::remove_all(path); }
+    ~TempDir() {
+        std::filesystem::remove_all(path);
+    }
     TempDir(const TempDir&) = delete;
     TempDir& operator=(const TempDir&) = delete;
 };
 
 std::filesystem::path MakeTempParent() {
     auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::filesystem::path path = std::filesystem::temp_directory_path() /
-                                 ("assurance_forge_project_test_" + std::to_string(stamp));
+    std::filesystem::path path =
+        std::filesystem::temp_directory_path() / ("assurance_forge_project_test_" + std::to_string(stamp));
     std::filesystem::create_directories(path);
     return path;
 }
@@ -30,7 +31,8 @@ bool ContainsFileWithRole(const core::AssuranceProject& project,
                           const char* relative_path,
                           core::ProjectFileRole role) {
     for (const auto& file : project.files) {
-        if (file.relativePath.generic_string() == relative_path && file.role == role) return true;
+        if (file.relativePath.generic_string() == relative_path && file.role == role)
+            return true;
     }
     return false;
 }
@@ -46,7 +48,7 @@ std::string ReportSummary(const core::ProjectLoadReport& report) {
     return summary;
 }
 
-}  // namespace
+} // namespace
 
 TEST(ProjectServiceTest, CreateEmptyProjectCreatesRequiredStructureAndManifest) {
     TempDir tmp(MakeTempParent());
@@ -101,7 +103,8 @@ TEST(ProjectServiceTest, AddProjectFilesNormalizesNamesAndTracksManifestEntries)
     ASSERT_TRUE(core::ProjectService::AddEvidenceRegister(project, "", entry, error)) << error;
     EXPECT_EQ(entry.relativePath.generic_string(), "registers/evidence-register.af.json");
 
-    ASSERT_TRUE(core::ProjectService::AddJ3377CaeRegister(project, "j3377-cae-register.af.json", entry, error)) << error;
+    ASSERT_TRUE(core::ProjectService::AddJ3377CaeRegister(project, "j3377-cae-register.af.json", entry, error))
+        << error;
     EXPECT_EQ(entry.relativePath.generic_string(), "registers/j3377-cae-register.af.json");
 
     core::AssuranceProject reopened;
@@ -110,8 +113,10 @@ TEST(ProjectServiceTest, AddProjectFilesNormalizesNamesAndTracksManifestEntries)
     EXPECT_TRUE(ContainsFileWithRole(reopened, "arguments/main.sacm", core::ProjectFileRole::SacmArgument));
     EXPECT_TRUE(ContainsFileWithRole(reopened, "arguments/safety-core.sacm", core::ProjectFileRole::SacmArgument));
     EXPECT_TRUE(ContainsFileWithRole(reopened, "reviews/review-items.af.json", core::ProjectFileRole::ReviewItems));
-    EXPECT_TRUE(ContainsFileWithRole(reopened, "registers/evidence-register.af.json", core::ProjectFileRole::EvidenceRegister));
-    EXPECT_TRUE(ContainsFileWithRole(reopened, "registers/j3377-cae-register.af.json", core::ProjectFileRole::J3377CaeRegister));
+    EXPECT_TRUE(
+        ContainsFileWithRole(reopened, "registers/evidence-register.af.json", core::ProjectFileRole::EvidenceRegister));
+    EXPECT_TRUE(ContainsFileWithRole(
+        reopened, "registers/j3377-cae-register.af.json", core::ProjectFileRole::J3377CaeRegister));
 }
 
 TEST(ProjectServiceTest, AddAndRemoveReviewProposalTracksManifestEntry) {
@@ -124,22 +129,24 @@ TEST(ProjectServiceTest, AddAndRemoveReviewProposalTracksManifestEntry) {
 
     ASSERT_TRUE(core::ProjectService::CreateEmptyProject("MySafetyCase", parent, project, report, error)) << error;
 
-    const std::string proposal_json =
-        "{\n"
-        "  \"schema\": \"assurance-forge.review-proposal.v1\",\n"
-        "  \"id\": \"proposal-0001\",\n"
-        "  \"anchor_element_id\": \"G1\",\n"
-        "  \"operations\": []\n"
-        "}\n";
-    ASSERT_TRUE(core::ProjectService::AddReviewProposalFile(project, "proposal-0001", proposal_json, entry, error)) << error;
+    const std::string proposal_json = "{\n"
+                                      "  \"schema\": \"assurance-forge.review-proposal.v1\",\n"
+                                      "  \"id\": \"proposal-0001\",\n"
+                                      "  \"anchor_element_id\": \"G1\",\n"
+                                      "  \"operations\": []\n"
+                                      "}\n";
+    ASSERT_TRUE(core::ProjectService::AddReviewProposalFile(project, "proposal-0001", proposal_json, entry, error))
+        << error;
     EXPECT_EQ(entry.relativePath.generic_string(), "reviews/proposals/proposal-0001.afpatch.json");
     EXPECT_EQ(entry.role, core::ProjectFileRole::ReviewProposal);
     EXPECT_TRUE(std::filesystem::exists(project.rootPath / entry.relativePath));
-    EXPECT_TRUE(ContainsFileWithRole(project, "reviews/proposals/proposal-0001.afpatch.json", core::ProjectFileRole::ReviewProposal));
+    EXPECT_TRUE(ContainsFileWithRole(
+        project, "reviews/proposals/proposal-0001.afpatch.json", core::ProjectFileRole::ReviewProposal));
 
     ASSERT_TRUE(core::ProjectService::RemoveTrackedFile(project, entry.relativePath, true, error)) << error;
     EXPECT_FALSE(std::filesystem::exists(project.rootPath / entry.relativePath));
-    EXPECT_FALSE(ContainsFileWithRole(project, "reviews/proposals/proposal-0001.afpatch.json", core::ProjectFileRole::ReviewProposal));
+    EXPECT_FALSE(ContainsFileWithRole(
+        project, "reviews/proposals/proposal-0001.afpatch.json", core::ProjectFileRole::ReviewProposal));
 }
 
 TEST(ProjectServiceTest, SaveReviewProposalFileRefreshesTrackedHash) {
@@ -152,14 +159,14 @@ TEST(ProjectServiceTest, SaveReviewProposalFileRefreshesTrackedHash) {
 
     ASSERT_TRUE(core::ProjectService::CreateEmptyProject("MySafetyCase", parent, project, report, error)) << error;
 
-    const std::string first_json =
-        "{\n"
-        "  \"schema\": \"assurance-forge.review-proposal.v1\",\n"
-        "  \"id\": \"proposal-0001\",\n"
-        "  \"anchor_element_id\": \"G1\",\n"
-        "  \"operations\": []\n"
-        "}\n";
-    ASSERT_TRUE(core::ProjectService::SaveReviewProposalFile(project, "proposal-0001", first_json, entry, error)) << error;
+    const std::string first_json = "{\n"
+                                   "  \"schema\": \"assurance-forge.review-proposal.v1\",\n"
+                                   "  \"id\": \"proposal-0001\",\n"
+                                   "  \"anchor_element_id\": \"G1\",\n"
+                                   "  \"operations\": []\n"
+                                   "}\n";
+    ASSERT_TRUE(core::ProjectService::SaveReviewProposalFile(project, "proposal-0001", first_json, entry, error))
+        << error;
     const std::string first_hash = entry.rawHash;
 
     const std::string second_json =
@@ -171,7 +178,8 @@ TEST(ProjectServiceTest, SaveReviewProposalFileRefreshesTrackedHash) {
         "    {\"type\": \"CreateClaim\", \"create_ref\": \"$new_claim_1\", \"text\": \"Draft claim\"}\n"
         "  ]\n"
         "}\n";
-    ASSERT_TRUE(core::ProjectService::SaveReviewProposalFile(project, "proposal-0001", second_json, entry, error)) << error;
+    ASSERT_TRUE(core::ProjectService::SaveReviewProposalFile(project, "proposal-0001", second_json, entry, error))
+        << error;
     EXPECT_EQ(entry.relativePath.generic_string(), "reviews/proposals/proposal-0001.afpatch.json");
     EXPECT_NE(entry.rawHash, first_hash);
 
@@ -199,17 +207,19 @@ TEST(ProjectServiceTest, SaveReviewItemsFileRefreshesTrackedHash) {
     ASSERT_TRUE(core::ProjectService::CreateEmptyProject("MySafetyCase", parent, project, report, error)) << error;
 
     const std::string first_json = "{\n  \"schema\": \"assurance-forge.review-items.v1\",\n  \"items\": []\n}\n";
-    ASSERT_TRUE(core::ProjectService::SaveReviewItemsFile(project, "review-items.af.json", first_json, entry, error)) << error;
+    ASSERT_TRUE(core::ProjectService::SaveReviewItemsFile(project, "review-items.af.json", first_json, entry, error))
+        << error;
     const std::string first_hash = entry.rawHash;
 
-    const std::string second_json =
-        "{\n"
-        "  \"schema\": \"assurance-forge.review-items.v1\",\n"
-        "  \"items\": [\n"
-        "    {\"id\": \"review-1\", \"element_id\": \"G1\", \"title\": \"Review comment\", \"message\": \"Check this\", \"status\": \"open\"}\n"
-        "  ]\n"
-        "}\n";
-    ASSERT_TRUE(core::ProjectService::SaveReviewItemsFile(project, "review-items.af.json", second_json, entry, error)) << error;
+    const std::string second_json = "{\n"
+                                    "  \"schema\": \"assurance-forge.review-items.v1\",\n"
+                                    "  \"items\": [\n"
+                                    "    {\"id\": \"review-1\", \"element_id\": \"G1\", \"title\": \"Review comment\", "
+                                    "\"message\": \"Check this\", \"status\": \"open\"}\n"
+                                    "  ]\n"
+                                    "}\n";
+    ASSERT_TRUE(core::ProjectService::SaveReviewItemsFile(project, "review-items.af.json", second_json, entry, error))
+        << error;
     EXPECT_EQ(entry.relativePath.generic_string(), "reviews/review-items.af.json");
     EXPECT_EQ(entry.role, core::ProjectFileRole::ReviewItems);
     EXPECT_NE(entry.rawHash, first_hash);
@@ -239,8 +249,8 @@ TEST(ProjectServiceTest, OpenProjectReportsExternallyModifiedAndMissingFiles) {
     core::ProjectLoadReport open_report;
     ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, reopened, open_report, error)) << error;
     ASSERT_EQ(reopened.files.size(), 3u);
-    auto evidence_it = std::find_if(reopened.files.begin(), reopened.files.end(),
-        [](const core::ProjectFileEntry& file) {
+    auto evidence_it =
+        std::find_if(reopened.files.begin(), reopened.files.end(), [](const core::ProjectFileEntry& file) {
             return file.role == core::ProjectFileRole::EvidenceRegister;
         });
     ASSERT_NE(evidence_it, reopened.files.end());
@@ -250,10 +260,9 @@ TEST(ProjectServiceTest, OpenProjectReportsExternallyModifiedAndMissingFiles) {
 
     std::filesystem::remove(project.rootPath / entry.relativePath);
     core::ProjectLoadReport missing_report = core::ProjectService::RefreshFileStatus(reopened);
-    evidence_it = std::find_if(reopened.files.begin(), reopened.files.end(),
-        [](const core::ProjectFileEntry& file) {
-            return file.role == core::ProjectFileRole::EvidenceRegister;
-        });
+    evidence_it = std::find_if(reopened.files.begin(), reopened.files.end(), [](const core::ProjectFileEntry& file) {
+        return file.role == core::ProjectFileRole::EvidenceRegister;
+    });
     ASSERT_NE(evidence_it, reopened.files.end());
     EXPECT_EQ(evidence_it->state, core::ProjectFileState::Missing);
     EXPECT_TRUE(missing_report.has_failures());

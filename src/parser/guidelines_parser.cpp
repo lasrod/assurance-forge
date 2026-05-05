@@ -1,11 +1,10 @@
 #include "parser/guidelines_parser.h"
 
-#include <yaml-cpp/yaml.h>
-
 #include <algorithm>
 #include <exception>
 #include <sstream>
 #include <utility>
+#include <yaml-cpp/yaml.h>
 
 namespace parser {
 
@@ -16,21 +15,26 @@ bool IsDefinedNode(const YAML::Node& node) {
 }
 
 YAML::Node ReadMapValue(const YAML::Node& node, const char* key) {
-    if (!IsDefinedNode(node) || !node.IsMap()) return YAML::Node();
+    if (!IsDefinedNode(node) || !node.IsMap())
+        return YAML::Node();
     for (const auto& item : node) {
-        if (item.first.IsScalar() && item.first.as<std::string>() == key) return item.second;
+        if (item.first.IsScalar() && item.first.as<std::string>() == key)
+            return item.second;
     }
     return YAML::Node();
 }
 
 std::string ReadString(const YAML::Node& node) {
-    if (!IsDefinedNode(node)) return std::string();
-    if (!node.IsScalar()) return std::string();
+    if (!IsDefinedNode(node))
+        return std::string();
+    if (!node.IsScalar())
+        return std::string();
     return node.as<std::string>();
 }
 
 std::string ReadStringKey(const YAML::Node& node, const char* key) {
-    if (!IsDefinedNode(node) || !node.IsMap()) return std::string();
+    if (!IsDefinedNode(node) || !node.IsMap())
+        return std::string();
     return ReadString(ReadMapValue(node, key));
 }
 
@@ -41,11 +45,13 @@ std::string ReadStringKeyFallback(const YAML::Node& node, const char* primary_ke
 
 std::vector<std::string> ReadStringSequence(const YAML::Node& node) {
     std::vector<std::string> values;
-    if (!IsDefinedNode(node) || !node.IsSequence()) return values;
+    if (!IsDefinedNode(node) || !node.IsSequence())
+        return values;
 
     for (const auto& item : node) {
         std::string value = ReadString(item);
-        if (!value.empty()) values.push_back(value);
+        if (!value.empty())
+            values.push_back(value);
     }
     return values;
 }
@@ -61,8 +67,10 @@ bool RequireSequence(const YAML::Node& root, const char* key, std::string& error
 
 YAML::Node ReadSectionFallback(const YAML::Node& root, const char* primary_key, const char* fallback_key) {
     const YAML::Node primary = ReadMapValue(root, primary_key);
-    if (IsDefinedNode(primary)) return primary;
-    if (const YAML::Node tool_support = ReadMapValue(root, "tool_support"); IsDefinedNode(tool_support) && tool_support.IsMap()) {
+    if (IsDefinedNode(primary))
+        return primary;
+    if (const YAML::Node tool_support = ReadMapValue(root, "tool_support");
+        IsDefinedNode(tool_support) && tool_support.IsMap()) {
         return ReadMapValue(tool_support, fallback_key);
     }
     return YAML::Node();
@@ -95,8 +103,8 @@ GuidelinesDocumentMetadata ParseMetadata(const YAML::Node& root) {
     }
     metadata.method_application_summary = ReadStringKey(method_guidance, "summary");
     const YAML::Node recommendations_node = IsDefinedNode(method_guidance) && method_guidance.IsMap()
-        ? ReadMapValue(method_guidance, "recommendations")
-        : YAML::Node();
+                                                ? ReadMapValue(method_guidance, "recommendations")
+                                                : YAML::Node();
     if (IsDefinedNode(recommendations_node) && recommendations_node.IsSequence()) {
         for (const auto& recommendation_node : recommendations_node) {
             GuidelinesRecommendation recommendation;
@@ -109,19 +117,22 @@ GuidelinesDocumentMetadata ParseMetadata(const YAML::Node& root) {
     }
 
     YAML::Node id_scheme_node = ReadMapValue(root, "id_scheme");
-    if (!IsDefinedNode(id_scheme_node) && has_document) id_scheme_node = ReadMapValue(document_node, "id_scheme");
+    if (!IsDefinedNode(id_scheme_node) && has_document)
+        id_scheme_node = ReadMapValue(document_node, "id_scheme");
     if (IsDefinedNode(id_scheme_node) && id_scheme_node.IsSequence()) {
         for (const auto& entry_node : id_scheme_node) {
             GuidelinesIdSchemeEntry entry;
             entry.prefix = ReadStringKey(entry_node, "prefix");
             entry.meaning = ReadStringKey(entry_node, "meaning");
-            if (!entry.prefix.empty() || !entry.meaning.empty()) metadata.id_scheme.push_back(entry);
+            if (!entry.prefix.empty() || !entry.meaning.empty())
+                metadata.id_scheme.push_back(entry);
         }
     }
 
     metadata.required_guideline_sections = ReadStringSequence(ReadMapValue(root, "required_guideline_sections"));
     if (metadata.required_guideline_sections.empty() && has_document) {
-        metadata.required_guideline_sections = ReadStringSequence(ReadMapValue(document_node, "required_guideline_sections"));
+        metadata.required_guideline_sections =
+            ReadStringSequence(ReadMapValue(document_node, "required_guideline_sections"));
     }
     return metadata;
 }
@@ -169,7 +180,8 @@ std::vector<GuidelineCategory> ParseCategories(const YAML::Node& node, std::stri
 
 GuidelineTool ParseTool(const YAML::Node& node) {
     GuidelineTool tool;
-    if (!IsDefinedNode(node) || !node.IsMap()) return tool;
+    if (!IsDefinedNode(node) || !node.IsMap())
+        return tool;
 
     tool.applicable_elements = ReadStringSequence(ReadMapValue(node, "applicable_elements"));
     tool.detection_hints = ReadStringSequence(ReadMapValue(node, "detection_hints"));
@@ -191,7 +203,8 @@ GuidelineTool ParseTool(const YAML::Node& node) {
 
 std::vector<GuidelineReference> ParseGuidelineReferences(const YAML::Node& node) {
     std::vector<GuidelineReference> references;
-    if (!IsDefinedNode(node) || !node.IsSequence()) return references;
+    if (!IsDefinedNode(node) || !node.IsSequence())
+        return references;
 
     for (const auto& reference_node : node) {
         GuidelineReference reference;
@@ -219,17 +232,20 @@ std::vector<Guideline> ParseGuidelines(const YAML::Node& node, std::string& erro
         guideline.review_prompts = ReadStringSequence(ReadMapValue(guideline_node, "review_prompts"));
 
         YAML::Node examples_node = ReadMapValue(guideline_node, "examples");
-        if (!IsDefinedNode(examples_node)) examples_node = ReadMapValue(guideline_node, "example");
+        if (!IsDefinedNode(examples_node))
+            examples_node = ReadMapValue(guideline_node, "example");
         guideline.examples.bad = ReadStringKey(examples_node, "bad");
         guideline.examples.problem = ReadStringKey(examples_node, "problem");
         guideline.examples.good = ReadStringKey(examples_node, "good");
 
         guideline.references = ParseGuidelineReferences(ReadMapValue(guideline_node, "references"));
         YAML::Node tool_node = ReadMapValue(guideline_node, "tool");
-        if (!IsDefinedNode(tool_node)) tool_node = ReadMapValue(guideline_node, "tool_guidance");
+        if (!IsDefinedNode(tool_node))
+            tool_node = ReadMapValue(guideline_node, "tool_guidance");
         guideline.tool = ParseTool(tool_node);
 
-        if (guideline.id.empty() || guideline.category.empty() || guideline.title.empty() || guideline.statement.empty()) {
+        if (guideline.id.empty() || guideline.category.empty() || guideline.title.empty() ||
+            guideline.statement.empty()) {
             std::ostringstream out;
             out << "Guideline at index " << index << " is missing id, category, title, or statement";
             error_message = out.str();
@@ -244,7 +260,8 @@ std::vector<Guideline> ParseGuidelines(const YAML::Node& node, std::string& erro
 
 std::vector<ReviewProfile> ParseReviewProfiles(const YAML::Node& node) {
     std::vector<ReviewProfile> review_profiles;
-    if (!IsDefinedNode(node) || !node.IsSequence()) return review_profiles;
+    if (!IsDefinedNode(node) || !node.IsSequence())
+        return review_profiles;
 
     for (const auto& profile_node : node) {
         ReviewProfile profile;
@@ -255,7 +272,8 @@ std::vector<ReviewProfile> ParseReviewProfiles(const YAML::Node& node) {
         profile.guideline_ids = ReadStringSequence(ReadMapValue(profile_node, "guideline_ids"));
         profile.required_data = ReadStringSequence(ReadMapValue(profile_node, "required_data"));
         profile.optional_data = ReadStringSequence(ReadMapValue(profile_node, "optional_data"));
-        if (!profile.id.empty()) review_profiles.push_back(std::move(profile));
+        if (!profile.id.empty())
+            review_profiles.push_back(std::move(profile));
     }
 
     return review_profiles;
@@ -263,7 +281,8 @@ std::vector<ReviewProfile> ParseReviewProfiles(const YAML::Node& node) {
 
 std::vector<DataPackage> ParseDataPackages(const YAML::Node& node) {
     std::vector<DataPackage> data_packages;
-    if (!IsDefinedNode(node) || !node.IsSequence()) return data_packages;
+    if (!IsDefinedNode(node) || !node.IsSequence())
+        return data_packages;
 
     for (const auto& package_node : node) {
         DataPackage data_package;
@@ -272,7 +291,8 @@ std::vector<DataPackage> ParseDataPackages(const YAML::Node& node) {
         data_package.description = ReadStringKey(package_node, "description");
         data_package.required_fields = ReadStringSequence(ReadMapValue(package_node, "required_fields"));
         data_package.optional_fields = ReadStringSequence(ReadMapValue(package_node, "optional_fields"));
-        if (!data_package.id.empty()) data_packages.push_back(std::move(data_package));
+        if (!data_package.id.empty())
+            data_packages.push_back(std::move(data_package));
     }
 
     return data_packages;
@@ -280,7 +300,8 @@ std::vector<DataPackage> ParseDataPackages(const YAML::Node& node) {
 
 std::vector<Precheck> ParsePrechecks(const YAML::Node& node) {
     std::vector<Precheck> prechecks;
-    if (!IsDefinedNode(node) || !node.IsSequence()) return prechecks;
+    if (!IsDefinedNode(node) || !node.IsSequence())
+        return prechecks;
 
     for (const auto& precheck_node : node) {
         Precheck precheck;
@@ -291,7 +312,8 @@ std::vector<Precheck> ParsePrechecks(const YAML::Node& node) {
         precheck.result_type = ReadStringKey(precheck_node, "result_type");
         precheck.description = ReadStringKey(precheck_node, "description");
         precheck.interpretation = ReadStringKey(precheck_node, "interpretation");
-        if (!precheck.id.empty()) prechecks.push_back(std::move(precheck));
+        if (!precheck.id.empty())
+            prechecks.push_back(std::move(precheck));
     }
 
     return prechecks;
@@ -320,7 +342,8 @@ GuidelinesParseResult ParseRoot(const YAML::Node& root) {
     }
 
     if (IsDefinedNode(ReadMapValue(root, "reference_sources"))) {
-        result.document.reference_sources = ParseReferenceSources(ReadMapValue(root, "reference_sources"), error_message);
+        result.document.reference_sources =
+            ParseReferenceSources(ReadMapValue(root, "reference_sources"), error_message);
         if (!error_message.empty()) {
             result.error_message = error_message;
             return result;
@@ -341,7 +364,8 @@ GuidelinesParseResult ParseRoot(const YAML::Node& root) {
         return result;
     }
 
-    result.document.review_profiles = ParseReviewProfiles(ReadSectionFallback(root, "review_profiles", "review_profiles"));
+    result.document.review_profiles =
+        ParseReviewProfiles(ReadSectionFallback(root, "review_profiles", "review_profiles"));
     result.document.data_packages = ParseDataPackages(ReadSectionFallback(root, "data_packages", "data_packages"));
     result.document.prechecks = ParsePrechecks(ReadSectionFallback(root, "prechecks", "prechecks"));
 
@@ -349,24 +373,25 @@ GuidelinesParseResult ParseRoot(const YAML::Node& root) {
     return result;
 }
 
-}  // namespace
+} // namespace
 
 const Guideline* GuidelinesDocument::FindGuidelineById(const std::string& id) const {
-    auto found = std::find_if(guidelines.begin(), guidelines.end(), [&](const Guideline& guideline) {
-        return guideline.id == id;
-    });
+    auto found = std::find_if(
+        guidelines.begin(), guidelines.end(), [&](const Guideline& guideline) { return guideline.id == id; });
     return found == guidelines.end() ? nullptr : &(*found);
 }
 
 std::vector<const Guideline*> GuidelinesDocument::FindGuidelinesByCategory(const std::string& category_id) const {
     std::vector<const Guideline*> matches;
     for (const auto& guideline : guidelines) {
-        if (guideline.category == category_id) matches.push_back(&guideline);
+        if (guideline.category == category_id)
+            matches.push_back(&guideline);
     }
     return matches;
 }
 
-std::vector<const Guideline*> GuidelinesDocument::FindGuidelinesByApplicableElement(const std::string& element_name) const {
+std::vector<const Guideline*>
+GuidelinesDocument::FindGuidelinesByApplicableElement(const std::string& element_name) const {
     std::vector<const Guideline*> matches;
     for (const auto& guideline : guidelines) {
         const auto& elements = guideline.tool.applicable_elements;
@@ -377,14 +402,17 @@ std::vector<const Guideline*> GuidelinesDocument::FindGuidelinesByApplicableElem
     return matches;
 }
 
-std::vector<const Guideline*> GuidelinesDocument::FindGuidelinesByReviewProfile(const std::string& review_profile_id) const {
+std::vector<const Guideline*>
+GuidelinesDocument::FindGuidelinesByReviewProfile(const std::string& review_profile_id) const {
     std::vector<const Guideline*> matches;
     const ReviewProfile* profile = FindReviewProfileById(review_profile_id);
-    if (!profile) return matches;
+    if (!profile)
+        return matches;
 
     for (const std::string& guideline_id : profile->guideline_ids) {
         const Guideline* guideline = FindGuidelineById(guideline_id);
-        if (guideline) matches.push_back(guideline);
+        if (guideline)
+            matches.push_back(guideline);
     }
     return matches;
 }
@@ -405,16 +433,16 @@ std::vector<const Guideline*> GuidelinesDocument::FindGuidelinesBySuggestedCheck
 const SuggestedCheck* GuidelinesDocument::FindSuggestedCheckById(const std::string& check_id) const {
     for (const auto& guideline : guidelines) {
         for (const auto& check : guideline.tool.suggested_checks) {
-            if (check.id == check_id) return &check;
+            if (check.id == check_id)
+                return &check;
         }
     }
     return nullptr;
 }
 
 const ReviewProfile* GuidelinesDocument::FindReviewProfileById(const std::string& id) const {
-    auto found = std::find_if(review_profiles.begin(), review_profiles.end(), [&](const ReviewProfile& profile) {
-        return profile.id == id;
-    });
+    auto found = std::find_if(
+        review_profiles.begin(), review_profiles.end(), [&](const ReviewProfile& profile) { return profile.id == id; });
     return found == review_profiles.end() ? nullptr : &(*found);
 }
 
@@ -460,4 +488,4 @@ GuidelinesParseResult GuidelinesParser::ParseString(const std::string& yaml_cont
     }
 }
 
-}  // namespace parser
+} // namespace parser

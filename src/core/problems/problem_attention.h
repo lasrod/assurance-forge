@@ -11,4 +11,4 @@ namespace core {
 bool ShouldHighlightProblemAttention(const ProblemItem& problem);
 std::unordered_set<std::string> CollectAttentionElementIds(const std::vector<ProblemItem>& problems);
 
-}  // namespace core
+} // namespace core

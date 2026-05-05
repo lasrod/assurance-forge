@@ -1,9 +1,9 @@
 #pragma once
 
+#include "parser/xml_parser.h"
+
 #include <string>
 #include <vector>
-
-#include "parser/xml_parser.h"
 
 namespace ui {
 
@@ -44,4 +44,4 @@ size_t GetEvidenceRegisterRowCount();
 void ShowCseRegisterView();
 void ShowEvidenceRegisterView();
 
-}  // namespace ui
+} // namespace ui

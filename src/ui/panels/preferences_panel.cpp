@@ -12,21 +12,26 @@ namespace {
 
 ImVec4 StatusColor(const ai::AiConnectionStatus& status) {
     const ui::Theme& theme = ui::GetTheme();
-    if (status.state == ai::AiTaskState::Running) return ImGui::ColorConvertU32ToFloat4(theme.warning);
-    if (status.state == ai::AiTaskState::Success) return ImGui::ColorConvertU32ToFloat4(theme.success);
-    if (status.state == ai::AiTaskState::Error || status.errorCode != ai::AiErrorCode::None) return ImGui::ColorConvertU32ToFloat4(theme.danger);
+    if (status.state == ai::AiTaskState::Running)
+        return ImGui::ColorConvertU32ToFloat4(theme.warning);
+    if (status.state == ai::AiTaskState::Success)
+        return ImGui::ColorConvertU32ToFloat4(theme.success);
+    if (status.state == ai::AiTaskState::Error || status.errorCode != ai::AiErrorCode::None)
+        return ImGui::ColorConvertU32ToFloat4(theme.danger);
     return ImGui::ColorConvertU32ToFloat4(theme.text_secondary);
 }
 
 void SyncModelBuffer(PreferencesPanelModel& model) {
-    if (!model.settings || !model.modelBuffer || model.modelBufferSize == 0) return;
+    if (!model.settings || !model.modelBuffer || model.modelBufferSize == 0)
+        return;
     size_t count = std::min(model.modelBufferSize - 1, model.settings->model.size());
     std::memcpy(model.modelBuffer, model.settings->model.data(), count);
     model.modelBuffer[count] = '\0';
 }
 
 void RenderConnectionStatus(const ai::AiConnectionStatus& status) {
-    if (status.message.empty()) return;
+    if (status.message.empty())
+        return;
 
     ImVec4 color = StatusColor(status);
     if (status.state == ai::AiTaskState::Running || status.state == ai::AiTaskState::Success) {
@@ -62,8 +67,7 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
     ImGui::SetNextItemWidth(220.0f);
     ImGui::BeginDisabled();
     static char provider_name[] = "OpenAI";
-    ImGui::InputText("##ai_provider", provider_name, sizeof(provider_name),
-                     ImGuiInputTextFlags_ReadOnly);
+    ImGui::InputText("##ai_provider", provider_name, sizeof(provider_name), ImGuiInputTextFlags_ReadOnly);
     ImGui::EndDisabled();
 
     ImGui::TextUnformatted(ui::Tr(ui::MessageId::Model));
@@ -77,14 +81,16 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
         if (model.modelBuffer && model.modelBufferSize > 0) {
             model.settings->model = model.modelBuffer;
         }
-        if (callbacks.save_settings) callbacks.save_settings(*model.settings);
+        if (callbacks.save_settings)
+            callbacks.save_settings(*model.settings);
     }
 
     ImGui::Spacing();
     ImGui::TextUnformatted(ui::Tr(ui::MessageId::ApiKey));
     if (!model.secureStoreAvailable) {
         ImGui::TextColored(StatusColor(ai::ErrorStatus(ai::AiErrorCode::SecureStoreUnavailable, "")),
-                           "%s", ui::Tr(ui::MessageId::SecureStorageUnavailable));
+                           "%s",
+                           ui::Tr(ui::MessageId::SecureStorageUnavailable));
     } else if (model.keyStored) {
         ImGui::TextDisabled("%s", ui::Tr(ui::MessageId::KeyStored));
     } else {
@@ -97,25 +103,35 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
         ImGui::InputText("##openai_key", model.apiKeyBuffer, model.apiKeyBufferSize, key_flags);
     }
 
-    if (!model.secureStoreAvailable) ImGui::BeginDisabled();
+    if (!model.secureStoreAvailable)
+        ImGui::BeginDisabled();
     if (ImGui::Button(model.keyStored ? ui::Tr(ui::MessageId::UpdateKey) : ui::Tr(ui::MessageId::SaveKey))) {
-        if (callbacks.save_api_key && model.apiKeyBuffer) callbacks.save_api_key(model.apiKeyBuffer);
+        if (callbacks.save_api_key && model.apiKeyBuffer)
+            callbacks.save_api_key(model.apiKeyBuffer);
     }
     ImGui::SameLine();
-    if (!model.keyStored) ImGui::BeginDisabled();
+    if (!model.keyStored)
+        ImGui::BeginDisabled();
     if (ImGui::Button(ui::Tr(ui::MessageId::RemoveKey))) {
-        if (callbacks.remove_api_key) callbacks.remove_api_key();
+        if (callbacks.remove_api_key)
+            callbacks.remove_api_key();
     }
-    if (!model.keyStored) ImGui::EndDisabled();
-    if (!model.secureStoreAvailable) ImGui::EndDisabled();
+    if (!model.keyStored)
+        ImGui::EndDisabled();
+    if (!model.secureStoreAvailable)
+        ImGui::EndDisabled();
 
     ImGui::Spacing();
-    const bool can_test = model.secureStoreAvailable && model.keyStored && model.settings->enabled && !model.testRunning;
-    if (!can_test) ImGui::BeginDisabled();
+    const bool can_test =
+        model.secureStoreAvailable && model.keyStored && model.settings->enabled && !model.testRunning;
+    if (!can_test)
+        ImGui::BeginDisabled();
     if (ImGui::Button(ui::Tr(ui::MessageId::TestConnection))) {
-        if (callbacks.test_connection) callbacks.test_connection();
+        if (callbacks.test_connection)
+            callbacks.test_connection();
     }
-    if (!can_test) ImGui::EndDisabled();
+    if (!can_test)
+        ImGui::EndDisabled();
 
     RenderConnectionStatus(model.connectionStatus);
 
@@ -134,16 +150,19 @@ void RenderAppearanceSection(PreferencesPanelModel model, const PreferencesPanel
         for (ui::Language language : languages) {
             const bool selected = model.language == language;
             if (ImGui::Selectable(ui::LanguageDisplayName(language), selected)) {
-                if (callbacks.set_language) callbacks.set_language(language);
+                if (callbacks.set_language)
+                    callbacks.set_language(language);
             }
-            if (selected) ImGui::SetItemDefaultFocus();
+            if (selected)
+                ImGui::SetItemDefaultFocus();
         }
         ImGui::EndCombo();
     }
 
     bool show_fps = model.showFps;
     if (ImGui::Checkbox(ui::Tr(ui::MessageId::ShowFps), &show_fps)) {
-        if (callbacks.set_show_fps) callbacks.set_show_fps(show_fps);
+        if (callbacks.set_show_fps)
+            callbacks.set_show_fps(show_fps);
     }
     ImGui::TextColored(ui::CullRatioColor(0.8f), "%s", ui::Tr(ui::MessageId::PerfLegendHigh));
     ImGui::SameLine();
@@ -163,23 +182,26 @@ void RenderReviewSection(PreferencesPanelModel model, const PreferencesPanelCall
     }
 
     const bool can_save = model.reviewerNameBuffer && model.reviewerNameBuffer[0] != '\0';
-    if (!can_save) ImGui::BeginDisabled();
+    if (!can_save)
+        ImGui::BeginDisabled();
     if (ImGui::Button("Save Reviewer Name") && callbacks.save_reviewer_name && model.reviewerNameBuffer) {
         callbacks.save_reviewer_name(model.reviewerNameBuffer);
     }
-    if (!can_save) ImGui::EndDisabled();
+    if (!can_save)
+        ImGui::EndDisabled();
 }
 
-}  // namespace
+} // namespace
 
-void ShowPreferencesWindow(bool& open,
-                           PreferencesPanelModel model,
-                           const PreferencesPanelCallbacks& callbacks) {
-    if (!open) return;
+void ShowPreferencesWindow(bool& open, PreferencesPanelModel model, const PreferencesPanelCallbacks& callbacks) {
+    if (!open)
+        return;
 
     SyncModelBuffer(model);
     ImGui::SetNextWindowSize(ImVec2(560.0f, 0.0f), ImGuiCond_Appearing);
-    if (ImGui::Begin(ui::Tr(ui::MessageId::PreferencesTitle), &open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
+    if (ImGui::Begin(ui::Tr(ui::MessageId::PreferencesTitle),
+                     &open,
+                     ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
         RenderAppearanceSection(model, callbacks);
         ImGui::Spacing();
         RenderReviewSection(model, callbacks);
@@ -189,4 +211,4 @@ void ShowPreferencesWindow(bool& open,
     ImGui::End();
 }
 
-}  // namespace ui::panels
+} // namespace ui::panels

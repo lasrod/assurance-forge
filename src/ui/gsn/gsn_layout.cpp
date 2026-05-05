@@ -1,10 +1,12 @@
 ﻿#include "ui/gsn/gsn_layout.h"
+
 #include "ui/gsn/gsn_canvas.h" // for g_BoldFont
 #include "ui/gsn/gsn_dpi.h"
+
 #include <algorithm>
-#include <unordered_map>
 #include <cmath>
 #include <cstring>
+#include <unordered_map>
 
 namespace ui::gsn {
 
@@ -13,30 +15,29 @@ namespace ui::gsn {
 ImFont* g_BoldFont = nullptr;
 
 // ===== Layout constants =====
-static constexpr float kNodeWidth      = 260.0f;  // default node width (px)
-static constexpr float kNodeHeight     = 100.0f;  // default node height (px)
-static constexpr float kSolutionWidth  = 160.0f;  // circle diameter for Solution/Evidence nodes
+static constexpr float kNodeWidth = 260.0f;     // default node width (px)
+static constexpr float kNodeHeight = 100.0f;    // default node height (px)
+static constexpr float kSolutionWidth = 160.0f; // circle diameter for Solution/Evidence nodes
 static constexpr float kSolutionHeight = 160.0f;
-static constexpr float kHSpacing       =  40.0f;  // horizontal gap between adjacent columns
-static constexpr float kVSpacing       =  80.0f;  // vertical gap between adjacent rows
-static constexpr float kLeftMargin     =  20.0f;  // canvas left margin
-static constexpr float kTopMargin      =  20.0f;  // canvas top margin
-static constexpr float kSideGap        =  20.0f;  // vertical gap between stacked Group2 nodes
+static constexpr float kHSpacing = 40.0f;   // horizontal gap between adjacent columns
+static constexpr float kVSpacing = 80.0f;   // vertical gap between adjacent rows
+static constexpr float kLeftMargin = 20.0f; // canvas left margin
+static constexpr float kTopMargin = 20.0f;  // canvas top margin
+static constexpr float kSideGap = 20.0f;    // vertical gap between stacked Group2 nodes
 
 // Text measurement constants (must match gsn_canvas.cpp drawing insets)
-static constexpr float kTextPadding        = 6.0f;   // inner padding between shape edge and text
-static constexpr float kMinTextWrap        = 40.0f;  // minimum text wrap width
-static constexpr float kParallelogramSkew  = 0.15f;  // fraction of width for Strategy shape inset
-static constexpr float kCircleTextInset    = 0.29f;  // fraction of radius for circle text area
-static constexpr float kStadiumTextInset   = 0.15f;  // fraction of height for stadium text inset
-static constexpr float kCircleTextRatio    = 0.7f;   // effective text height as fraction of circle diameter
+static constexpr float kTextPadding = 6.0f;        // inner padding between shape edge and text
+static constexpr float kMinTextWrap = 40.0f;       // minimum text wrap width
+static constexpr float kParallelogramSkew = 0.15f; // fraction of width for Strategy shape inset
+static constexpr float kCircleTextInset = 0.29f;   // fraction of radius for circle text area
+static constexpr float kStadiumTextInset = 0.15f;  // fraction of height for stadium text inset
+static constexpr float kCircleTextRatio = 0.7f;    // effective text height as fraction of circle diameter
 static constexpr float kNodeWidthGrowthStep = 20.0f;
-static constexpr float kMaxNodeWidth        = 460.0f;
-static constexpr float kMaxStadiumWidth     = 520.0f;
+static constexpr float kMaxNodeWidth = 460.0f;
+static constexpr float kMaxStadiumWidth = 520.0f;
 
 static bool is_stadium_role(core::NodeRole role) {
-    return role == core::NodeRole::Context ||
-           role == core::NodeRole::Assumption ||
+    return role == core::NodeRole::Context || role == core::NodeRole::Assumption ||
            role == core::NodeRole::Justification;
 }
 
@@ -45,8 +46,10 @@ static float max_width_for_role(core::NodeRole role) {
 }
 
 static float preferred_height_ratio_for_role(core::NodeRole role) {
-    if (is_stadium_role(role)) return 0.45f;
-    if (role == core::NodeRole::Strategy) return 0.55f;
+    if (is_stadium_role(role))
+        return 0.45f;
+    if (role == core::NodeRole::Strategy)
+        return 0.55f;
     return 0.65f;
 }
 
@@ -67,11 +70,8 @@ static float ComputeTextWrapWidth(core::NodeRole role, float width, float height
     return std::max(text_wrap, DpiSize(kMinTextWrap));
 }
 
-static float MeasureLabelHeight(const std::string& label,
-                                float font_size,
-                                float text_wrap,
-                                ImFont* bold_font,
-                                ImFont* normal_font) {
+static float
+MeasureLabelHeight(const std::string& label, float font_size, float text_wrap, ImFont* bold_font, ImFont* normal_font) {
     const char* label_start = label.c_str();
     const char* first_newline = strchr(label_start, '\n');
     ImVec2 bold_text_size(0, 0);
@@ -95,10 +95,11 @@ static float ComputeRequiredHeight(const std::string& label,
     float height = base_height;
     for (int i = 0; i < 6; ++i) {
         float text_wrap = ComputeTextWrapWidth(role, width, height);
-        float required_height = MeasureLabelHeight(label, font_size, text_wrap, bold_font, normal_font)
-                              + DpiSize(kTextPadding) * 2.0f;
+        float required_height =
+            MeasureLabelHeight(label, font_size, text_wrap, bold_font, normal_font) + DpiSize(kTextPadding) * 2.0f;
         float next_height = std::max(base_height, required_height);
-        if (std::fabs(next_height - height) < 0.5f) return next_height;
+        if (std::fabs(next_height - height) < 0.5f)
+            return next_height;
         height = next_height;
     }
     return height;
@@ -109,7 +110,7 @@ static float ComputeRequiredHeight(const std::string& label,
 // Nodes grow horizontally before becoming tall so wrapped text keeps a readable shape.
 static ImVec2 ComputeNodeSize(const std::string& label, core::NodeRole role) {
     bool is_solution = (role == core::NodeRole::Solution);
-    float base_width  = DpiSize(is_solution ? kSolutionWidth : kNodeWidth);
+    float base_width = DpiSize(is_solution ? kSolutionWidth : kNodeWidth);
     float base_height = DpiSize(is_solution ? kSolutionHeight : kNodeHeight);
 
     // If no ImGui context (e.g. in unit tests), use base size
@@ -118,33 +119,33 @@ static ImVec2 ComputeNodeSize(const std::string& label, core::NodeRole role) {
     }
 
     float font_size = ImGui::GetFontSize();
-    ImFont* bold_font   = g_BoldFont ? g_BoldFont : ImGui::GetFont();
+    ImFont* bold_font = g_BoldFont ? g_BoldFont : ImGui::GetFont();
     ImFont* normal_font = ImGui::GetFont();
 
     if (is_solution) {
         // For circles, grow diameter so text area (kCircleTextRatio * diameter) fits
         float text_wrap = ComputeTextWrapWidth(role, base_width, base_height);
-        float required_text_height = MeasureLabelHeight(label, font_size, text_wrap, bold_font, normal_font)
-                                   + DpiSize(kTextPadding) * 2.0f;
+        float required_text_height =
+            MeasureLabelHeight(label, font_size, text_wrap, bold_font, normal_font) + DpiSize(kTextPadding) * 2.0f;
         float final_height = base_height;
         float needed_diameter = required_text_height / kCircleTextRatio;
-        if (needed_diameter > final_height) final_height = needed_diameter;
+        if (needed_diameter > final_height)
+            final_height = needed_diameter;
         // Keep square (width = height for circles)
         return ImVec2(std::max(base_width, final_height), final_height);
     }
 
     float final_width = base_width;
-    float final_height = ComputeRequiredHeight(label, role, final_width, base_height,
-                                               font_size, bold_font, normal_font);
+    float final_height =
+        ComputeRequiredHeight(label, role, final_width, base_height, font_size, bold_font, normal_font);
     const float max_width = DpiSize(max_width_for_role(role));
     while (final_width < max_width) {
-        float preferred_max_height = std::max(base_height,
-                                             final_width * preferred_height_ratio_for_role(role));
-        if (final_height <= preferred_max_height) break;
+        float preferred_max_height = std::max(base_height, final_width * preferred_height_ratio_for_role(role));
+        if (final_height <= preferred_max_height)
+            break;
 
         final_width = std::min(max_width, final_width + DpiSize(kNodeWidthGrowthStep));
-        final_height = ComputeRequiredHeight(label, role, final_width, base_height,
-                                             font_size, bold_font, normal_font);
+        final_height = ComputeRequiredHeight(label, role, final_width, base_height, font_size, bold_font, normal_font);
     }
 
     return ImVec2(final_width, final_height);
@@ -153,13 +154,20 @@ static ImVec2 ComputeNodeSize(const std::string& label, core::NodeRole role) {
 // ===== Helper: map core roles to UI roles =====
 static ElementRole to_ui_role(core::NodeRole r) {
     switch (r) {
-        case core::NodeRole::Claim:         return ElementRole::Claim;
-        case core::NodeRole::Strategy:      return ElementRole::Strategy;
-        case core::NodeRole::Solution:      return ElementRole::Solution;
-        case core::NodeRole::Context:       return ElementRole::Context;
-        case core::NodeRole::Assumption:    return ElementRole::Assumption;
-        case core::NodeRole::Justification: return ElementRole::Justification;
-        default:                            return ElementRole::Other;
+    case core::NodeRole::Claim:
+        return ElementRole::Claim;
+    case core::NodeRole::Strategy:
+        return ElementRole::Strategy;
+    case core::NodeRole::Solution:
+        return ElementRole::Solution;
+    case core::NodeRole::Context:
+        return ElementRole::Context;
+    case core::NodeRole::Assumption:
+        return ElementRole::Assumption;
+    case core::NodeRole::Justification:
+        return ElementRole::Justification;
+    default:
+        return ElementRole::Other;
     }
 }
 
@@ -168,8 +176,7 @@ static ElementRole to_ui_role(core::NodeRole r) {
 // Compute the total column span needed for a contiguous range of children,
 // accounting for Group2 overhangs between adjacent siblings.
 // Range is [start_index, end_index) within the children vector.
-static int ComputeChildrenSpan(const std::vector<core::TreeNode*>& children,
-                               int start_index, int end_index) {
+static int ComputeChildrenSpan(const std::vector<core::TreeNode*>& children, int start_index, int end_index) {
     int span = 0;
     for (int i = start_index; i < end_index; ++i) {
         span += children[i]->subtree_width;
@@ -183,8 +190,7 @@ static int ComputeChildrenSpan(const std::vector<core::TreeNode*>& children,
 // Compute the gap between the middle child and an adjacent half.
 // For left half: gap = children[mid-1]->right_overhang + children[mid]->left_overhang
 // For right half: gap = children[mid]->right_overhang + children[mid+1]->left_overhang
-static int ComputeArmWidth(const std::vector<core::TreeNode*>& children,
-                           int mid, bool is_left_arm) {
+static int ComputeArmWidth(const std::vector<core::TreeNode*>& children, int mid, bool is_left_arm) {
     if (is_left_arm) {
         int arm = ComputeChildrenSpan(children, 0, mid);
         arm += children[mid - 1]->right_overhang + children[mid]->left_overhang;
@@ -213,7 +219,7 @@ static void compute_subtree_info(core::TreeNode* node) {
         // Odd children: the middle child is centered under the parent.
         // Each arm extends from center to the outermost child on that side.
         int mid = (int)children.size() / 2;
-        int left_arm  = ComputeArmWidth(children, mid, /*is_left_arm=*/true);
+        int left_arm = ComputeArmWidth(children, mid, /*is_left_arm=*/true);
         int right_arm = ComputeArmWidth(children, mid, /*is_left_arm=*/false);
         // Width must accommodate both arms symmetrically from center
         int max_arm = std::max(left_arm, right_arm);
@@ -225,36 +231,36 @@ static void compute_subtree_info(core::TreeNode* node) {
 
     // Determine whether this node has Group2 attachments on each side
     int attachment_count = (int)node->group2_attachments.size();
-    bool has_left_attachment  = (attachment_count > 0);   // first attachment goes left
-    bool has_right_attachment = (attachment_count >= 2);   // second+ goes right
+    bool has_left_attachment = (attachment_count > 0);   // first attachment goes left
+    bool has_right_attachment = (attachment_count >= 2); // second+ goes right
 
     // Own overhang: if the subtree is too narrow (< 2 columns) the Group2
     // node at column Â± 1 extends beyond the subtree boundary.
-    int own_left  = (has_left_attachment  && node->subtree_width < 2) ? 1 : 0;
+    int own_left = (has_left_attachment && node->subtree_width < 2) ? 1 : 0;
     int own_right = (has_right_attachment && node->subtree_width < 2) ? 1 : 0;
 
     // Propagate overhang from the leftmost / rightmost child.
     // For odd-centered layouts, the shorter arm has padding that absorbs
     // some child overhang, so we subtract it.
-    int child_left_overhang  = 0;
+    int child_left_overhang = 0;
     int child_right_overhang = 0;
     if (!children.empty()) {
-        child_left_overhang  = children.front()->left_overhang;
+        child_left_overhang = children.front()->left_overhang;
         child_right_overhang = children.back()->right_overhang;
 
         if (children.size() > 1 && children.size() % 2 == 1) {
             int mid = (int)children.size() / 2;
-            int left_arm  = ComputeArmWidth(children, mid, /*is_left_arm=*/true);
+            int left_arm = ComputeArmWidth(children, mid, /*is_left_arm=*/true);
             int right_arm = ComputeArmWidth(children, mid, /*is_left_arm=*/false);
             int max_arm = std::max(left_arm, right_arm);
-            int left_padding  = max_arm - left_arm;
+            int left_padding = max_arm - left_arm;
             int right_padding = max_arm - right_arm;
-            child_left_overhang  = std::max(0, child_left_overhang  - left_padding);
+            child_left_overhang = std::max(0, child_left_overhang - left_padding);
             child_right_overhang = std::max(0, child_right_overhang - right_padding);
         }
     }
 
-    node->left_overhang  = std::max(own_left,  child_left_overhang);
+    node->left_overhang = std::max(own_left, child_left_overhang);
     node->right_overhang = std::max(own_right, child_right_overhang);
 }
 
@@ -265,8 +271,10 @@ static std::pair<std::vector<int>, std::vector<int>> DistributeAttachmentSides(i
     std::vector<int> left_indices, right_indices;
     int left_count = (count + 1) / 2;
     for (int i = 0; i < count; ++i) {
-        if (i < left_count) left_indices.push_back(i);
-        else                right_indices.push_back(i);
+        if (i < left_count)
+            left_indices.push_back(i);
+        else
+            right_indices.push_back(i);
     }
     return {left_indices, right_indices};
 }
@@ -274,33 +282,33 @@ static std::pair<std::vector<int>, std::vector<int>> DistributeAttachmentSides(i
 // ===== Step 2: Assign grid positions top-down, then build LayoutNodes =====
 
 struct GridPosition {
-    float column;   // fractional column position (center of node)
-    int   row;
+    float column; // fractional column position (center of node)
+    int row;
 };
 
 struct NodePlacement {
     core::TreeNode* node;
-    GridPosition    grid_pos;
-    bool            is_group2;
-    bool            is_left_side;
-    int             stack_index; // for Group2: 0-based index in the stacked column
+    GridPosition grid_pos;
+    bool is_group2;
+    bool is_left_side;
+    int stack_index; // for Group2: 0-based index in the stacked column
 };
 
 static std::string Group2StackKey(const NodePlacement& placement) {
     std::string parent_id = placement.node->parent ? placement.node->parent->id : "";
-    return parent_id + "|" + std::to_string(placement.grid_pos.row) +
-           (placement.is_left_side ? "|L" : "|R");
+    return parent_id + "|" + std::to_string(placement.grid_pos.row) + (placement.is_left_side ? "|L" : "|R");
 }
 
 // Place Group2 attachments for a node at the given row and column,
 // updating placements and tracking the max stack depth per row.
-static void PlaceGroup2Attachments(
-    core::TreeNode* node, float column, int row,
-    std::vector<NodePlacement>& placements,
-    std::unordered_map<int, int>& row_max_group2_stack)
-{
+static void PlaceGroup2Attachments(core::TreeNode* node,
+                                   float column,
+                                   int row,
+                                   std::vector<NodePlacement>& placements,
+                                   std::unordered_map<int, int>& row_max_group2_stack) {
     int attachment_count = (int)node->group2_attachments.size();
-    if (attachment_count == 0) return;
+    if (attachment_count == 0)
+        return;
 
     auto [left_indices, right_indices] = DistributeAttachmentSides(attachment_count);
 
@@ -321,13 +329,11 @@ static void PlaceGroup2Attachments(
 }
 
 // Recursively assign grid positions to nodes in a depth-first traversal.
-static void AssignGridPositions(
-    core::TreeNode* node,
-    float column,
-    int row,
-    std::vector<NodePlacement>& placements,
-    std::unordered_map<int, int>& row_max_group2_stack)
-{
+static void AssignGridPositions(core::TreeNode* node,
+                                float column,
+                                int row,
+                                std::vector<NodePlacement>& placements,
+                                std::unordered_map<int, int>& row_max_group2_stack) {
     // Place this node at (column, row)
     placements.push_back({node, {column, row}, false, false, 0});
 
@@ -336,7 +342,8 @@ static void AssignGridPositions(
 
     // Place Group1 children (structural children in the row below)
     auto& children = node->group1_children;
-    if (children.empty()) return;
+    if (children.empty())
+        return;
 
     int child_row = row + 1;
 
@@ -373,16 +380,14 @@ static void AssignGridPositions(
         for (int i = 0; i < (int)children.size(); ++i) {
             total_width += (float)children[i]->subtree_width;
             if (i > 0) {
-                total_width += (float)(children[i - 1]->right_overhang
-                                     + children[i]->left_overhang);
+                total_width += (float)(children[i - 1]->right_overhang + children[i]->left_overhang);
             }
         }
 
         float cursor = column - total_width / 2.0f;
         for (int i = 0; i < (int)children.size(); ++i) {
             if (i > 0) {
-                cursor += (float)(children[i - 1]->right_overhang
-                                + children[i]->left_overhang);
+                cursor += (float)(children[i - 1]->right_overhang + children[i]->left_overhang);
             }
             float child_col = cursor + (float)children[i]->subtree_width / 2.0f;
             AssignGridPositions(children[i], child_col, child_row, placements, row_max_group2_stack);
@@ -394,7 +399,8 @@ static void AssignGridPositions(
 // ===== Main tree-based layout =====
 std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& tree) {
     std::vector<LayoutNode> result;
-    if (!tree.root) return result;
+    if (!tree.root)
+        return result;
 
     // Step 1: Compute subtree widths and Group2 overhang (bottom-up)
     compute_subtree_info(tree.root);
@@ -419,7 +425,8 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
     // Step 3: Compute per-node pixel sizes and track max height per row
     int max_row = 0;
     for (const auto& placement : placements) {
-        if (placement.grid_pos.row > max_row) max_row = placement.grid_pos.row;
+        if (placement.grid_pos.row > max_row)
+            max_row = placement.grid_pos.row;
     }
 
     std::unordered_map<std::string, ImVec2> node_sizes;
@@ -448,7 +455,8 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
         if (placement.is_group2) {
             std::string key = Group2StackKey(placement);
             float& stack_height = group2_stack_heights[key];
-            if (stack_height > 0.0f) stack_height += side_gap;
+            if (stack_height > 0.0f)
+                stack_height += side_gap;
             group2_stack_offsets[placement.node->id] = stack_height;
             stack_height += node_size.y;
 
@@ -477,32 +485,29 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
 
     for (const auto& placement : placements) {
         LayoutNode layout_node;
-        layout_node.id    = placement.node->id;
-        layout_node.role  = to_ui_role(placement.node->role);
-        layout_node.group = (placement.node->group == core::ElementGroup::Group1)
-                          ? ElementGroup::Group1 : ElementGroup::Group2;
+        layout_node.id = placement.node->id;
+        layout_node.role = to_ui_role(placement.node->role);
+        layout_node.group =
+            (placement.node->group == core::ElementGroup::Group1) ? ElementGroup::Group1 : ElementGroup::Group2;
         layout_node.label = placement.node->label;
         layout_node.label_secondary = placement.node->label_secondary;
         layout_node.undeveloped = placement.node->undeveloped;
-        layout_node.size  = node_sizes[placement.node->id];
+        layout_node.size = node_sizes[placement.node->id];
         layout_node.parent_id = placement.node->parent ? placement.node->parent->id : "";
         layout_node.is_left_side = placement.is_left_side;
         layout_node.side_stack_index = placement.stack_index;
 
-        float x = left_margin + placement.grid_pos.column * column_unit
-            + (node_width - layout_node.size.x) * 0.5f;
+        float x = left_margin + placement.grid_pos.column * column_unit + (node_width - layout_node.size.x) * 0.5f;
         const float row_height = row_heights[placement.grid_pos.row];
-        float y = row_y[placement.grid_pos.row]
-            + std::max(0.0f, (row_height - layout_node.size.y) * 0.5f);
+        float y = row_y[placement.grid_pos.row] + std::max(0.0f, (row_height - layout_node.size.y) * 0.5f);
 
         if (placement.is_group2) {
             auto offset_it = group2_stack_offsets.find(placement.node->id);
             if (offset_it != group2_stack_offsets.end()) {
                 const std::string stack_key = Group2StackKey(placement);
                 const float stack_height = group2_stack_heights[stack_key];
-                y = row_y[placement.grid_pos.row]
-                    + std::max(0.0f, (row_height - stack_height) * 0.5f)
-                    + offset_it->second;
+                y = row_y[placement.grid_pos.row] + std::max(0.0f, (row_height - stack_height) * 0.5f) +
+                    offset_it->second;
             }
         }
 
@@ -528,8 +533,10 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const std::vector<CanvasElem
     std::vector<CanvasElement> claims;
     std::vector<CanvasElement> others;
     for (const auto& element : elements) {
-        if (element.role == ElementRole::Claim) claims.push_back(element);
-        else others.push_back(element);
+        if (element.role == ElementRole::Claim)
+            claims.push_back(element);
+        else
+            others.push_back(element);
     }
 
     // Place claims in the first row
@@ -550,7 +557,8 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const std::vector<CanvasElem
     auto place_role_row = [&](ElementRole target_role, size_t row_index, const std::vector<CanvasElement>& pool) {
         std::vector<CanvasElement> row_elements;
         for (const auto& element : pool) {
-            if (element.role == target_role) row_elements.push_back(element);
+            if (element.role == target_role)
+                row_elements.push_back(element);
         }
         for (size_t i = 0; i < row_elements.size(); ++i) {
             LayoutNode layout_node;
@@ -567,11 +575,14 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const std::vector<CanvasElem
         }
     };
 
-    std::vector<ElementRole> role_order = {
-        ElementRole::Strategy, ElementRole::SubClaim, ElementRole::Solution,
-        ElementRole::Evidence, ElementRole::Context,  ElementRole::Justification,
-        ElementRole::Assumption, ElementRole::Other
-    };
+    std::vector<ElementRole> role_order = {ElementRole::Strategy,
+                                           ElementRole::SubClaim,
+                                           ElementRole::Solution,
+                                           ElementRole::Evidence,
+                                           ElementRole::Context,
+                                           ElementRole::Justification,
+                                           ElementRole::Assumption,
+                                           ElementRole::Other};
     for (size_t row = 0; row < role_order.size(); ++row) {
         place_role_row(role_order[row], 1 + row, others);
     }

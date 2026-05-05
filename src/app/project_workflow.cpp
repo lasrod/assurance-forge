@@ -10,25 +10,29 @@ namespace app {
 namespace {
 
 std::string LowercaseAscii(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(),
-        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::transform(
+        value.begin(), value.end(), value.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return value;
 }
 
-}  // namespace
+} // namespace
 
 const char* ProjectFileCreateTitle(ProjectFileCreateKind kind) {
     switch (kind) {
-        case ProjectFileCreateKind::Sacm: return "New GSN / SACM File";
-        case ProjectFileCreateKind::EvidenceRegister: return "New Evidence Register";
-        case ProjectFileCreateKind::J3377CaeRegister: return "New J3377 CAE Register";
+    case ProjectFileCreateKind::Sacm:
+        return "New GSN / SACM File";
+    case ProjectFileCreateKind::EvidenceRegister:
+        return "New Evidence Register";
+    case ProjectFileCreateKind::J3377CaeRegister:
+        return "New J3377 CAE Register";
     }
     return "New Project File";
 }
 
 std::filesystem::path ReviewItemsPath(const core::AssuranceProject& project) {
     for (const core::ProjectFileEntry& entry : project.files) {
-        if (entry.role == core::ProjectFileRole::ReviewItems) return project.rootPath / entry.relativePath;
+        if (entry.role == core::ProjectFileRole::ReviewItems)
+            return project.rootPath / entry.relativePath;
     }
     return {};
 }
@@ -45,22 +49,24 @@ bool ProjectTracksFile(const core::AssuranceProject& project, const std::filesys
 }
 
 bool IsProjectManifestPath(const std::filesystem::path& path) {
-    if (LowercaseAscii(path.filename().string()) == "af.proj") return true;
+    if (LowercaseAscii(path.filename().string()) == "af.proj")
+        return true;
 
     std::error_code error;
-    return std::filesystem::is_directory(path, error) &&
-           std::filesystem::exists(path / "af.proj", error);
+    return std::filesystem::is_directory(path, error) && std::filesystem::exists(path / "af.proj", error);
 }
 
 RecentProjectEntry MakeRecentProjectEntry(const core::AppState& app_state) {
     RecentProjectEntry entry;
-    if (!app_state.current_project.has_value()) return entry;
+    if (!app_state.current_project.has_value())
+        return entry;
 
     const core::AssuranceProject& project = app_state.current_project.value();
     entry.name = project.name;
     entry.path = core::ProjectService::ManifestPath(project).u8string();
 
-    if (!app_state.loaded_case.has_value()) return entry;
+    if (!app_state.loaded_case.has_value())
+        return entry;
     for (const parser::SacmElement& element : app_state.loaded_case->elements) {
         const std::string type = LowercaseAscii(element.type);
         if (type == "claim") {
@@ -70,10 +76,11 @@ RecentProjectEntry MakeRecentProjectEntry(const core::AppState& app_state) {
         } else if (type == "artifact" || type == "artifactreference") {
             ++entry.evidence;
         }
-        if (element.undeveloped) ++entry.undeveloped;
+        if (element.undeveloped)
+            ++entry.undeveloped;
     }
 
     return entry;
 }
 
-}  // namespace app
+} // namespace app

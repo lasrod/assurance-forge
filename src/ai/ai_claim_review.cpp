@@ -1,9 +1,8 @@
 #include "ai/ai_claim_review.h"
 
-#include <nlohmann/json.hpp>
-
 #include <algorithm>
 #include <cctype>
+#include <nlohmann/json.hpp>
 #include <sstream>
 
 namespace ai {
@@ -20,10 +19,12 @@ std::string ToLower(std::string value) {
 
 std::string Trim(const std::string& value) {
     size_t start = 0;
-    while (start < value.size() && std::isspace(static_cast<unsigned char>(value[start]))) ++start;
+    while (start < value.size() && std::isspace(static_cast<unsigned char>(value[start])))
+        ++start;
 
     size_t end = value.size();
-    while (end > start && std::isspace(static_cast<unsigned char>(value[end - 1]))) --end;
+    while (end > start && std::isspace(static_cast<unsigned char>(value[end - 1])))
+        --end;
 
     return value.substr(start, end - start);
 }
@@ -52,7 +53,8 @@ AiReviewElement MakeReviewElement(const parser::SacmElement& element, const std:
 
 const core::TreeNode* FindTreeNode(const core::AssuranceTree& tree, const std::string& element_id) {
     for (const auto& node : tree.nodes) {
-        if (node && node->id == element_id) return node.get();
+        if (node && node->id == element_id)
+            return node.get();
     }
     return nullptr;
 }
@@ -60,9 +62,11 @@ const core::TreeNode* FindTreeNode(const core::AssuranceTree& tree, const std::s
 void AddChildIfPresent(const parser::AssuranceCase& assurance_case,
                        const core::TreeNode* child_node,
                        std::vector<AiReviewElement>& children) {
-    if (!child_node) return;
+    if (!child_node)
+        return;
     const parser::SacmElement* child = FindSacmElement(assurance_case, child_node->id);
-    if (!child) return;
+    if (!child)
+        return;
     children.push_back(MakeReviewElement(*child, "child"));
 }
 
@@ -75,7 +79,8 @@ nlohmann::json StringVectorToJson(const std::vector<std::string>& values) {
 }
 
 nlohmann::json ReviewProfileToJson(const parser::ReviewProfile* review_profile) {
-    if (!review_profile) return nlohmann::json(nullptr);
+    if (!review_profile)
+        return nlohmann::json(nullptr);
     return {
         {"id", review_profile->id},
         {"display_name", review_profile->display_name},
@@ -87,7 +92,8 @@ nlohmann::json ReviewProfileToJson(const parser::ReviewProfile* review_profile) 
 nlohmann::json GuidelinesToJson(const std::vector<const parser::Guideline*>& guidelines_to_review) {
     nlohmann::json guidelines = nlohmann::json::array();
     for (const parser::Guideline* guideline : guidelines_to_review) {
-        if (!guideline) continue;
+        if (!guideline)
+            continue;
 
         nlohmann::json suggested_checks = nlohmann::json::array();
         for (const parser::SuggestedCheck& check : guideline->tool.suggested_checks) {
@@ -104,36 +110,43 @@ nlohmann::json GuidelinesToJson(const std::vector<const parser::Guideline*>& gui
             {"statement", guideline->statement},
             {"rationale", guideline->rationale},
             {"review_prompts", StringVectorToJson(guideline->review_prompts)},
-            {"examples", {
-                {"bad", guideline->examples.bad},
-                {"problem", guideline->examples.problem},
-                {"good", guideline->examples.good},
-            }},
-            {"tool", {
-                {"applicable_elements", StringVectorToJson(guideline->tool.applicable_elements)},
-                {"detection_hints", StringVectorToJson(guideline->tool.detection_hints)},
-                {"suggested_checks", suggested_checks},
-            }},
+            {"examples",
+             {
+                 {"bad", guideline->examples.bad},
+                 {"problem", guideline->examples.problem},
+                 {"good", guideline->examples.good},
+             }},
+            {"tool",
+             {
+                 {"applicable_elements", StringVectorToJson(guideline->tool.applicable_elements)},
+                 {"detection_hints", StringVectorToJson(guideline->tool.detection_hints)},
+                 {"suggested_checks", suggested_checks},
+             }},
         });
     }
     return guidelines;
 }
 
 bool IsAllowedGuidelineId(const std::string& guideline_id, const std::vector<std::string>& allowed_guideline_ids) {
-    return std::find(allowed_guideline_ids.begin(), allowed_guideline_ids.end(), guideline_id) != allowed_guideline_ids.end();
+    return std::find(allowed_guideline_ids.begin(), allowed_guideline_ids.end(), guideline_id) !=
+           allowed_guideline_ids.end();
 }
 
 core::ProblemSeverity SeverityFromString(const std::string& value) {
     std::string severity = ToLower(value);
-    if (severity == "info") return core::ProblemSeverity::Info;
-    if (severity == "error") return core::ProblemSeverity::Error;
+    if (severity == "info")
+        return core::ProblemSeverity::Info;
+    if (severity == "error")
+        return core::ProblemSeverity::Error;
     return core::ProblemSeverity::Warning;
 }
 
 std::string JsonStringValue(const nlohmann::json& object, const char* key) {
-    if (!object.is_object()) return {};
+    if (!object.is_object())
+        return {};
     auto value = object.find(key);
-    if (value == object.end() || !value->is_string()) return {};
+    if (value == object.end() || !value->is_string())
+        return {};
     return value->get<std::string>();
 }
 
@@ -144,38 +157,49 @@ std::string BuildProblemMessage(const nlohmann::json& finding) {
     std::string suggested_wording = JsonStringValue(finding, "suggested_claim_wording");
     std::string confidence = JsonStringValue(finding, "confidence");
 
-    if (!why.empty()) message += " Why it matters: " + why;
-    if (!suggested_fix.empty()) message += " Suggested fix: " + suggested_fix;
-    if (!suggested_wording.empty()) message += " Suggested claim wording: " + suggested_wording;
-    if (!confidence.empty()) message += " Confidence: " + confidence;
+    if (!why.empty())
+        message += " Why it matters: " + why;
+    if (!suggested_fix.empty())
+        message += " Suggested fix: " + suggested_fix;
+    if (!suggested_wording.empty())
+        message += " Suggested claim wording: " + suggested_wording;
+    if (!confidence.empty())
+        message += " Confidence: " + confidence;
     return message;
 }
 
-}  // namespace
+} // namespace
 
-const parser::SacmElement* FindSacmElement(const parser::AssuranceCase& assurance_case,
-                                           const std::string& element_id) {
+const parser::SacmElement* FindSacmElement(const parser::AssuranceCase& assurance_case, const std::string& element_id) {
     for (const parser::SacmElement& element : assurance_case.elements) {
-        if (element.id == element_id) return &element;
+        if (element.id == element_id)
+            return &element;
     }
     return nullptr;
 }
 
 bool IsSupportedAiReviewElement(const parser::SacmElement& element) {
-    if (element.type != "claim") return false;
-    if (element.assertion_declaration == "assumed") return false;
-    if (element.assertion_declaration == "justification") return false;
+    if (element.type != "claim")
+        return false;
+    if (element.assertion_declaration == "assumed")
+        return false;
+    if (element.assertion_declaration == "justification")
+        return false;
     return true;
 }
 
 std::string AiReviewElementType(const parser::SacmElement& element) {
     if (element.type == "claim") {
-        if (element.assertion_declaration == "assumed") return "GSN Assumption / SACM Claim";
-        if (element.assertion_declaration == "justification") return "GSN Justification / SACM Claim";
+        if (element.assertion_declaration == "assumed")
+            return "GSN Assumption / SACM Claim";
+        if (element.assertion_declaration == "justification")
+            return "GSN Justification / SACM Claim";
         return "GSN Goal / SACM Claim";
     }
-    if (element.type == "argumentreasoning") return "GSN Strategy / SACM ArgumentReasoning";
-    if (element.type == "artifact" || element.type == "artifactreference") return "GSN Solution / SACM Artifact";
+    if (element.type == "argumentreasoning")
+        return "GSN Strategy / SACM ArgumentReasoning";
+    if (element.type == "artifact" || element.type == "artifactreference")
+        return "GSN Solution / SACM Artifact";
     return element.type.empty() ? "SACM Element" : "SACM " + element.type;
 }
 
@@ -200,7 +224,8 @@ bool BuildAiReviewPayload(const parser::AssuranceCase& assurance_case,
     const core::TreeNode* selected_node = FindTreeNode(tree, selected_element_id);
     if (selected_node && selected_node->parent) {
         const parser::SacmElement* parent = FindSacmElement(assurance_case, selected_node->parent->id);
-        if (parent) payload.parent = MakeReviewElement(*parent, "parent");
+        if (parent)
+            payload.parent = MakeReviewElement(*parent, "parent");
     }
 
     if (selected_node) {
@@ -217,14 +242,13 @@ bool BuildAiReviewPayload(const parser::AssuranceCase& assurance_case,
     return true;
 }
 
-AiReviewRequestArtifacts BuildAiReviewRequestArtifacts(
-    const AiReviewPayload& payload,
-    const std::vector<const parser::Guideline*>& guidelines_to_review,
-    const parser::ReviewProfile* review_profile) {
+AiReviewRequestArtifacts
+BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
+                              const std::vector<const parser::Guideline*>& guidelines_to_review,
+                              const parser::ReviewProfile* review_profile) {
     nlohmann::json selected = ReviewElementToJson(payload.selected);
-    nlohmann::json parent = payload.parent.has_value()
-        ? ReviewElementToJson(payload.parent.value())
-        : nlohmann::json(nullptr);
+    nlohmann::json parent =
+        payload.parent.has_value() ? ReviewElementToJson(payload.parent.value()) : nlohmann::json(nullptr);
     nlohmann::json children = nlohmann::json::array();
     for (const AiReviewElement& child : payload.children) {
         children.push_back(ReviewElementToJson(child));
@@ -244,15 +268,18 @@ AiReviewRequestArtifacts BuildAiReviewRequestArtifacts(
 
     std::ostringstream prompt;
     prompt << "You are reviewing a safety case claim for Assurance Forge.\n\n"
-           << "Assurance Forge is an assurance case tool using SACM as the domain model and GSN as one graphical view. In this review, treat GSN Goals as claims.\n\n"
-           << "Your task is to review the selected claim against the SCCG guidelines provided below for this review profile.\n\n"
-           << "Review only the selected claim. Use the parent and child/sub-element information only as context for understanding the claim and its decomposition.\n\n"
+           << "Assurance Forge is an assurance case tool using SACM as the domain model and GSN as one graphical view. "
+              "In this review, treat GSN Goals as claims.\n\n"
+           << "Your task is to review the selected claim against the SCCG guidelines provided below for this review "
+              "profile.\n\n"
+           << "Review only the selected claim. Use the parent and child/sub-element information only as context for "
+              "understanding the claim and its decomposition.\n\n"
            << "Do not invent missing project information.\n"
            << "Do not claim that a rule is violated unless the provided data supports that finding.\n"
            << "If there is no clear violation, return an empty findings array.\n"
            << "Return JSON only. Do not include Markdown. Do not include explanations outside the JSON object.\n\n"
-           << "## SCCG review profile"
-           << (review_profile ? ": " + review_profile->id : ": CL category fallback") << "\n\n"
+           << "## SCCG review profile" << (review_profile ? ": " + review_profile->id : ": CL category fallback")
+           << "\n\n"
            << artifacts.reviewProfileJson << "\n\n"
            << "## SCCG guidelines\n\n"
            << artifacts.guidelinesJson << "\n\n"
@@ -284,10 +311,9 @@ AiReviewRequestArtifacts BuildAiReviewRequestArtifacts(
     return artifacts;
 }
 
-AiReviewPromptParts BuildAiReviewPrompt(
-    const AiReviewPayload& payload,
-    const std::vector<const parser::Guideline*>& guidelines,
-    const parser::ReviewProfile* review_profile) {
+AiReviewPromptParts BuildAiReviewPrompt(const AiReviewPayload& payload,
+                                        const std::vector<const parser::Guideline*>& guidelines,
+                                        const parser::ReviewProfile* review_profile) {
     return BuildAiReviewRequestArtifacts(payload, guidelines, review_profile);
 }
 
@@ -331,19 +357,21 @@ Return JSON only.)json";
 
 std::string StripJsonCodeFence(const std::string& response_text) {
     std::string trimmed = Trim(response_text);
-    if (trimmed.rfind("```", 0) != 0) return trimmed;
+    if (trimmed.rfind("```", 0) != 0)
+        return trimmed;
 
     size_t first_line_end = trimmed.find('\n');
-    if (first_line_end == std::string::npos) return trimmed;
+    if (first_line_end == std::string::npos)
+        return trimmed;
 
     size_t fence_start = trimmed.rfind("```");
-    if (fence_start == 0 || fence_start == std::string::npos) return trimmed;
+    if (fence_start == 0 || fence_start == std::string::npos)
+        return trimmed;
 
     return Trim(trimmed.substr(first_line_end + 1, fence_start - first_line_end - 1));
 }
 
-AiReviewParseResult ParseAiReviewResponse(const std::string& response_text,
-                                          const std::string& selected_element_id) {
+AiReviewParseResult ParseAiReviewResponse(const std::string& response_text, const std::string& selected_element_id) {
     return ParseAiReviewResponse(response_text, selected_element_id, std::vector<std::string>{});
 }
 
@@ -365,21 +393,24 @@ AiReviewParseResult ParseAiReviewResponse(const std::string& response_text,
         }
 
         result.reviewedElementId = JsonStringValue(root, "reviewed_element_id");
-        if (result.reviewedElementId.empty()) result.reviewedElementId = selected_element_id;
+        if (result.reviewedElementId.empty())
+            result.reviewedElementId = selected_element_id;
         result.reviewedElementType = JsonStringValue(root, "reviewed_element_type");
 
         for (const nlohmann::json& finding : root["findings"]) {
-            if (!finding.is_object()) continue;
+            if (!finding.is_object())
+                continue;
 
             std::string guideline_id = JsonStringValue(finding, "guideline_id");
             if (!allowed_guideline_ids.empty() &&
                 (guideline_id.empty() || !IsAllowedGuidelineId(guideline_id, allowed_guideline_ids))) {
                 result.errorMessage = "AI response referenced guideline_id '" +
-                    (guideline_id.empty() ? std::string("<empty>") : guideline_id) +
-                    "', which was not included in the SCCG guidelines provided to the prompt.";
+                                      (guideline_id.empty() ? std::string("<empty>") : guideline_id) +
+                                      "', which was not included in the SCCG guidelines provided to the prompt.";
                 return result;
             }
-            if (guideline_id.empty()) guideline_id = "unknown";
+            if (guideline_id.empty())
+                guideline_id = "unknown";
 
             core::ProblemItem problem;
             problem.id = "ai-review:" + result.reviewedElementId + ":" + guideline_id;
@@ -407,11 +438,13 @@ ParsedAiReviewResponse ParseAiReviewResponse(const std::string& response_text,
                                              const std::string& selected_element_id,
                                              const std::string& fallback_element_type) {
     ParsedAiReviewResponse result = ParseAiReviewResponse(response_text, selected_element_id);
-    if (result.reviewedElementType.empty()) result.reviewedElementType = fallback_element_type;
+    if (result.reviewedElementType.empty())
+        result.reviewedElementType = fallback_element_type;
     for (core::ProblemItem& problem : result.problems) {
-        if (problem.type.empty()) problem.type = result.reviewedElementType;
+        if (problem.type.empty())
+            problem.type = result.reviewedElementType;
     }
     return result;
 }
 
-}  // namespace ai
+} // namespace ai

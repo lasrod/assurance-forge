@@ -1,25 +1,26 @@
-#include <gtest/gtest.h>
-
 #include "core/reviews/review_proposal.h"
 #include "core/reviews/review_proposal_manager.h"
 
 #include <chrono>
 #include <filesystem>
+#include <gtest/gtest.h>
 
 namespace {
 
 struct TempDir {
     std::filesystem::path path;
     explicit TempDir(std::filesystem::path p) : path(std::move(p)) {}
-    ~TempDir() { std::filesystem::remove_all(path); }
+    ~TempDir() {
+        std::filesystem::remove_all(path);
+    }
     TempDir(const TempDir&) = delete;
     TempDir& operator=(const TempDir&) = delete;
 };
 
 std::filesystem::path MakeTempDir() {
     auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::filesystem::path path = std::filesystem::temp_directory_path() /
-                                 ("assurance_forge_review_proposal_test_" + std::to_string(stamp));
+    std::filesystem::path path =
+        std::filesystem::temp_directory_path() / ("assurance_forge_review_proposal_test_" + std::to_string(stamp));
     std::filesystem::create_directories(path);
     return path;
 }
@@ -75,7 +76,7 @@ core::reviews::ReviewProposal MakeProposal(const parser::AssuranceCase& model) {
     return proposal;
 }
 
-}  // namespace
+} // namespace
 
 TEST(ReviewProposalTest, RoundTripsSemanticPatchJson) {
     parser::AssuranceCase model = MakeCase();
@@ -83,7 +84,9 @@ TEST(ReviewProposalTest, RoundTripsSemanticPatchJson) {
 
     std::string error;
     core::reviews::ReviewProposal parsed;
-    ASSERT_TRUE(core::reviews::DeserializeReviewProposal(core::reviews::SerializeReviewProposal(original), parsed, error)) << error;
+    ASSERT_TRUE(
+        core::reviews::DeserializeReviewProposal(core::reviews::SerializeReviewProposal(original), parsed, error))
+        << error;
 
     EXPECT_EQ(parsed.schema, core::reviews::kReviewProposalSchema);
     EXPECT_EQ(parsed.id, original.id);

@@ -120,11 +120,10 @@ public:
     }
 
     void Unsubscribe(SubscriptionId id) {
-        listeners_.erase(
-            std::remove_if(listeners_.begin(), listeners_.end(), [id](const Subscription& listener) {
-                return listener.id == id;
-            }),
-            listeners_.end());
+        listeners_.erase(std::remove_if(listeners_.begin(),
+                                        listeners_.end(),
+                                        [id](const Subscription& listener) { return listener.id == id; }),
+                         listeners_.end());
     }
 
     template <typename EventT>
@@ -152,4 +151,4 @@ private:
     std::vector<Subscription> listeners_;
 };
 
-}  // namespace app
+} // namespace app

@@ -1,6 +1,6 @@
-#include <gtest/gtest.h>
-
 #include "core/problems/problems_manager.h"
+
+#include <gtest/gtest.h>
 
 namespace {
 
@@ -19,7 +19,7 @@ core::ProblemItem MakeProblem(const std::string& id,
     return problem;
 }
 
-}  // namespace
+} // namespace
 
 TEST(ProblemsManagerTest, AddsAndFindsProblems) {
     core::ProblemsManager manager;
@@ -49,7 +49,8 @@ TEST(ProblemsManagerTest, AddOrUpdateReplacesProblemWithSameId) {
     core::ProblemsManager manager;
     manager.AddOrUpdateProblem(MakeProblem("p1", core::ProblemSeverity::Info, core::ProblemSource::Manual, "G-1"));
 
-    core::ProblemItem updated = MakeProblem("p1", core::ProblemSeverity::Error, core::ProblemSource::ImportExport, "A-4");
+    core::ProblemItem updated =
+        MakeProblem("p1", core::ProblemSeverity::Error, core::ProblemSource::ImportExport, "A-4");
     updated.message = "Relationship target is missing";
     manager.AddOrUpdateProblem(updated);
 
@@ -84,8 +85,10 @@ TEST(ProblemsManagerTest, RemovesProblemById) {
 TEST(ProblemsManagerTest, ClearsProblemsBySource) {
     core::ProblemsManager manager;
     manager.AddProblem(MakeProblem("manual", core::ProblemSeverity::Info, core::ProblemSource::Manual, "G-1"));
-    manager.AddProblem(MakeProblem("guideline", core::ProblemSeverity::Warning, core::ProblemSource::GuidelineReview, "G-2"));
-    manager.AddProblem(MakeProblem("validation", core::ProblemSeverity::Error, core::ProblemSource::ModelValidation, "G-3"));
+    manager.AddProblem(
+        MakeProblem("guideline", core::ProblemSeverity::Warning, core::ProblemSource::GuidelineReview, "G-2"));
+    manager.AddProblem(
+        MakeProblem("validation", core::ProblemSeverity::Error, core::ProblemSource::ModelValidation, "G-3"));
 
     manager.ClearProblemsBySource(core::ProblemSource::GuidelineReview);
 
@@ -112,7 +115,8 @@ TEST(ProblemsManagerTest, ClearsProblemsForElement) {
 TEST(ProblemsManagerTest, ClearsProblemsForElementAndSourceOnly) {
     core::ProblemsManager manager;
     manager.AddProblem(MakeProblem("ai-g1", core::ProblemSeverity::Warning, core::ProblemSource::AIReview, "G-1"));
-    manager.AddProblem(MakeProblem("validation-g1", core::ProblemSeverity::Error, core::ProblemSource::ModelValidation, "G-1"));
+    manager.AddProblem(
+        MakeProblem("validation-g1", core::ProblemSeverity::Error, core::ProblemSource::ModelValidation, "G-1"));
     manager.AddProblem(MakeProblem("ai-g2", core::ProblemSeverity::Info, core::ProblemSource::AIReview, "G-2"));
 
     manager.ClearProblemsForElementAndSource("G-1", core::ProblemSource::AIReview);

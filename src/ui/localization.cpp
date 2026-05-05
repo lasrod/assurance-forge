@@ -56,7 +56,8 @@ const Catalog kEnglishCatalog = {
     "Save Key",
     "Remove Key",
     "Test Connection",
-    "AI features may send selected safety case content and prompts to the configured AI provider. Assurance Forge will not send project data automatically; data is sent only when you explicitly use an AI action.",
+    "AI features may send selected safety case content and prompts to the configured AI provider. Assurance Forge will "
+    "not send project data automatically; data is sent only when you explicitly use an AI action.",
     "OK",
     "Walkthroughs",
     "Walkthroughs are not yet implemented.",
@@ -158,7 +159,7 @@ const Catalog& CatalogFor(Language language) {
     return language == Language::Japanese ? kJapaneseCatalog : kEnglishCatalog;
 }
 
-}  // namespace
+} // namespace
 
 Language CurrentLanguage() {
     return g_currentLanguage;
@@ -169,7 +170,8 @@ void SetCurrentLanguage(Language language) {
 }
 
 Language ParseLanguageCode(const std::string& code) {
-    if (code == "ja" || code == "ja-JP" || code == "jp") return Language::Japanese;
+    if (code == "ja" || code == "ja-JP" || code == "jp")
+        return Language::Japanese;
     return Language::English;
 }
 
@@ -183,11 +185,13 @@ const char* LanguageDisplayName(Language language) {
 
 const char* Tr(MessageId id) {
     size_t index = Index(id);
-    if (index >= kMessageCount) return "";
+    if (index >= kMessageCount)
+        return "";
     const char* localized = CatalogFor(g_currentLanguage)[index];
-    if (localized && localized[0] != '\0') return localized;
+    if (localized && localized[0] != '\0')
+        return localized;
     const char* english = kEnglishCatalog[index];
     return english ? english : "";
 }
 
-}  // namespace ui
+} // namespace ui

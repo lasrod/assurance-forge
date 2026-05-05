@@ -1,7 +1,8 @@
-﻿#include <gtest/gtest.h>
-#include "core/assurance_tree.h"
+﻿#include "core/assurance_tree.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_model.h"
+
+#include <gtest/gtest.h>
 
 using namespace core;
 using namespace parser;
@@ -224,7 +225,7 @@ TEST(AssuranceTreeTest, FullVehicleBrakingExample) {
     // Top claim should have:
     //   Group 1: ar_1 (Strategy, with cl_sub_1 and cl_sub_2 as children)
     //   Group 2: ctx_1 (Context)
-    EXPECT_EQ(tree.root->group1_children.size(), 1); // ar_1
+    EXPECT_EQ(tree.root->group1_children.size(), 1);    // ar_1
     EXPECT_EQ(tree.root->group2_attachments.size(), 1); // ctx_1
 
     TreeNode* strategy = tree.root->group1_children[0];
@@ -238,8 +239,10 @@ TEST(AssuranceTreeTest, FullVehicleBrakingExample) {
     TreeNode* sub1 = nullptr;
     TreeNode* sub2 = nullptr;
     for (auto* c : strategy->group1_children) {
-        if (c->id == "cl_sub_1") sub1 = c;
-        if (c->id == "cl_sub_2") sub2 = c;
+        if (c->id == "cl_sub_1")
+            sub1 = c;
+        if (c->id == "cl_sub_2")
+            sub2 = c;
     }
     ASSERT_NE(sub1, nullptr);
     ASSERT_NE(sub2, nullptr);

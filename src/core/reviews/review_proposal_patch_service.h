@@ -25,8 +25,7 @@ public:
     ProposalPreviewResult BuildPreviewModel(const ReviewProposal& proposal,
                                             const parser::AssuranceCase& current_model) const;
 
-    ApplyProposalResult ApplyProposal(const ReviewProposal& proposal,
-                                      parser::AssuranceCase& current_model) const;
+    ApplyProposalResult ApplyProposal(const ReviewProposal& proposal, parser::AssuranceCase& current_model) const;
 };
 
-}  // namespace core::reviews
+} // namespace core::reviews

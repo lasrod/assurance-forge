@@ -32,4 +32,4 @@ struct ProblemItem {
 const char* ToString(ProblemSeverity severity);
 const char* ToString(ProblemSource source);
 
-}  // namespace core
+} // namespace core

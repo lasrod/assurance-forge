@@ -1,7 +1,6 @@
-#include <gtest/gtest.h>
-
 #include "app/app_events.h"
 
+#include <gtest/gtest.h>
 #include <string>
 #include <vector>
 
@@ -9,12 +8,9 @@ TEST(AppEventsTest, DispatchesOnlyMatchingListeners) {
     app::AppEvents events;
     std::vector<std::string> received;
 
-    events.Subscribe<app::StatusMessageEvent>([&](const app::StatusMessageEvent& event) {
-        received.push_back("status:" + event.message);
-    });
-    events.Subscribe<app::TreeDirtyEvent>([&](const app::TreeDirtyEvent&) {
-        received.push_back("tree");
-    });
+    events.Subscribe<app::StatusMessageEvent>(
+        [&](const app::StatusMessageEvent& event) { received.push_back("status:" + event.message); });
+    events.Subscribe<app::TreeDirtyEvent>([&](const app::TreeDirtyEvent&) { received.push_back("tree"); });
 
     events.Emit(app::StatusMessageEvent{"Ready"});
 
@@ -26,12 +22,8 @@ TEST(AppEventsTest, DispatchesMatchingListenersInSubscriptionOrder) {
     app::AppEvents events;
     std::vector<int> order;
 
-    events.Subscribe<app::DocumentDirtyEvent>([&](const app::DocumentDirtyEvent&) {
-        order.push_back(1);
-    });
-    events.Subscribe<app::DocumentDirtyEvent>([&](const app::DocumentDirtyEvent&) {
-        order.push_back(2);
-    });
+    events.Subscribe<app::DocumentDirtyEvent>([&](const app::DocumentDirtyEvent&) { order.push_back(1); });
+    events.Subscribe<app::DocumentDirtyEvent>([&](const app::DocumentDirtyEvent&) { order.push_back(2); });
 
     events.Emit(app::DocumentDirtyEvent{});
 
@@ -44,10 +36,8 @@ TEST(AppEventsTest, UnsubscribeRemovesListener) {
     app::AppEvents events;
     int count = 0;
 
-    const app::AppEvents::SubscriptionId id = events.Subscribe<app::ReviewItemsDirtyEvent>(
-        [&](const app::ReviewItemsDirtyEvent&) {
-            ++count;
-        });
+    const app::AppEvents::SubscriptionId id =
+        events.Subscribe<app::ReviewItemsDirtyEvent>([&](const app::ReviewItemsDirtyEvent&) { ++count; });
 
     events.Emit(app::ReviewItemsDirtyEvent{});
     events.Unsubscribe(id);

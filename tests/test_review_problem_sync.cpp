@@ -1,7 +1,6 @@
-#include <gtest/gtest.h>
-
 #include "app/review_problem_sync.h"
 
+#include <gtest/gtest.h>
 #include <optional>
 #include <utility>
 
@@ -18,7 +17,7 @@ core::reviews::ReviewItem MakeReviewItem(std::string id = "review-1") {
     return item;
 }
 
-}  // namespace
+} // namespace
 
 TEST(ReviewProblemSyncTest, MakeProblemFromReviewItemUsesStableFields) {
     const core::reviews::ReviewItem item = MakeReviewItem();
@@ -52,18 +51,16 @@ TEST(ReviewProblemSyncTest, SyncReviewProblemsIncludesOnlyOpenItems) {
 
 TEST(ReviewProblemSyncTest, SyncReviewProblemsClearsStaleReviewProblemsOnly) {
     core::ProblemsManager problems;
-    problems.AddProblem(core::ProblemItem{
-        "manual-1",
-        core::ProblemSeverity::Info,
-        core::ProblemSource::Manual,
-        "claim-2",
-        "Claim",
-        "Existing manual problem",
-        {}
-    });
+    problems.AddProblem(core::ProblemItem{"manual-1",
+                                          core::ProblemSeverity::Info,
+                                          core::ProblemSource::Manual,
+                                          "claim-2",
+                                          "Claim",
+                                          "Existing manual problem",
+                                          {}});
     problems.AddProblem(app::MakeProblemFromReviewItem(MakeReviewItem("stale")));
 
-    std::vector<core::reviews::ReviewItem> items = { MakeReviewItem("fresh") };
+    std::vector<core::reviews::ReviewItem> items = {MakeReviewItem("fresh")};
     app::SyncReviewProblems(problems, items);
 
     ASSERT_EQ(problems.GetProblems().size(), 2u);

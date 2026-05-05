@@ -30,9 +30,9 @@ struct ReviewPanelModel {
 };
 
 struct ReviewPanelCallbacks {
-    std::function<void(const std::string& title,
-                       const std::string& message,
-                       const std::vector<std::string>& guideline_ids)> add_review_item;
+    std::function<void(
+        const std::string& title, const std::string& message, const std::vector<std::string>& guideline_ids)>
+        add_review_item;
     std::function<void(const core::reviews::ReviewItem& item)> create_proposed_change;
     std::function<void(const core::reviews::ReviewItem& item)> save_proposal;
     std::function<void(const core::reviews::ReviewItem& item)> edit_proposal;
@@ -45,4 +45,4 @@ struct ReviewPanelCallbacks {
 
 void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& callbacks);
 
-}  // namespace ui::panels
+} // namespace ui::panels

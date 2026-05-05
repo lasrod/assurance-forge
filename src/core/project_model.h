@@ -62,11 +62,7 @@ struct AssuranceProject {
     std::vector<ProjectFileEntry> files;
 };
 
-enum class ProjectLoadStepStatus {
-    Passed,
-    Failed,
-    Warning
-};
+enum class ProjectLoadStepStatus { Passed, Failed, Warning };
 
 struct ProjectLoadStep {
     std::string label;
@@ -89,4 +85,4 @@ ProjectFileRole ProjectFileRoleFromString(const std::string& value);
 const char* ProjectFileStateToString(ProjectFileState state);
 const char* ProjectFileStateToDisplayString(ProjectFileState state);
 
-}  // namespace core
+} // namespace core

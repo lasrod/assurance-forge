@@ -89,7 +89,8 @@ void DrawText(ImDrawList* draw_list, const ImVec2& pos, ImU32 color, std::string
 std::string FormatRecentStats(const RecentProjectEntry& entry) {
     constexpr int kRecentStatsBufferSize = 128;
     char stats[kRecentStatsBufferSize];
-    std::snprintf(stats, sizeof(stats),
+    std::snprintf(stats,
+                  sizeof(stats),
                   "%d claims %s %d strategies %s %d evidence %s %d undeveloped",
                   entry.claims,
                   kUtf8MiddleDot,
@@ -127,18 +128,14 @@ bool ActionLink(std::string_view id, std::string_view title, std::string_view su
     const ItemInteraction interaction = InvisibleButtonInteraction(id, ImVec2(width, height));
 
     if (interaction.hovered) {
-        draw_list->AddRectFilled(
-            pos,
-            ImVec2(pos.x + width, pos.y + height),
-            ui::WithAlpha(theme.surface_3, kWelcomeHoverSurfaceAlpha),
-            theme.rounding_ui);
+        draw_list->AddRectFilled(pos,
+                                 ImVec2(pos.x + width, pos.y + height),
+                                 ui::WithAlpha(theme.surface_3, kWelcomeHoverSurfaceAlpha),
+                                 theme.rounding_ui);
     }
 
     const ImU32 title_color = interaction.hovered ? theme.accent_hover : theme.accent;
-    DrawText(draw_list,
-             ImVec2(pos.x + Px(kLinkTextOffsetX), pos.y + Px(kLinkTitleOffsetY)),
-             title_color,
-             title);
+    DrawText(draw_list, ImVec2(pos.x + Px(kLinkTextOffsetX), pos.y + Px(kLinkTitleOffsetY)), title_color, title);
     if (has_subtitle) {
         DrawText(draw_list,
                  ImVec2(pos.x + Px(kLinkTextOffsetX), pos.y + Px(kLinkSubtitleOffsetY)),
@@ -163,18 +160,14 @@ bool RecentLink(std::string_view id, const RecentProjectEntry& entry) {
     const ItemInteraction interaction = InvisibleButtonInteraction(id, ImVec2(width, height));
 
     if (interaction.hovered) {
-        draw_list->AddRectFilled(
-            pos,
-            ImVec2(pos.x + width, pos.y + height),
-            ui::WithAlpha(theme.surface_3, kWelcomeHoverSurfaceAlpha),
-            theme.rounding_ui);
+        draw_list->AddRectFilled(pos,
+                                 ImVec2(pos.x + width, pos.y + height),
+                                 ui::WithAlpha(theme.surface_3, kWelcomeHoverSurfaceAlpha),
+                                 theme.rounding_ui);
     }
 
     const ImU32 name_color = interaction.hovered ? theme.accent_hover : theme.accent;
-    DrawText(draw_list,
-             ImVec2(pos.x + Px(kRecentTextOffsetX), pos.y + Px(kRecentNameOffsetY)),
-             name_color,
-             entry.name);
+    DrawText(draw_list, ImVec2(pos.x + Px(kRecentTextOffsetX), pos.y + Px(kRecentNameOffsetY)), name_color, entry.name);
 
     const std::string stats = FormatRecentStats(entry);
     DrawText(draw_list,
@@ -206,20 +199,17 @@ bool WalkthroughCard(std::string_view id, std::string_view title, std::string_vi
 
     const ImU32 fill = interaction.hovered ? theme.surface_3 : theme.surface_2;
     draw_list->AddRectFilled(pos, ImVec2(pos.x + width, pos.y + height), fill, theme.rounding_ui);
-    draw_list->AddRect(pos, ImVec2(pos.x + width, pos.y + height), theme.border, theme.rounding_ui, 0, Px(kCardBorderThickness));
+    draw_list->AddRect(
+        pos, ImVec2(pos.x + width, pos.y + height), theme.border, theme.rounding_ui, 0, Px(kCardBorderThickness));
 
     const float stripe_width = width * progress;
-    draw_list->AddRectFilled(
-        ImVec2(pos.x, pos.y + height - Px(kCardStripeHeight)),
-        ImVec2(pos.x + stripe_width, pos.y + height),
-        theme.accent,
-        theme.rounding_ui,
-        ImDrawFlags_RoundCornersBottomLeft);
+    draw_list->AddRectFilled(ImVec2(pos.x, pos.y + height - Px(kCardStripeHeight)),
+                             ImVec2(pos.x + stripe_width, pos.y + height),
+                             theme.accent,
+                             theme.rounding_ui,
+                             ImDrawFlags_RoundCornersBottomLeft);
 
-    DrawText(draw_list,
-             ImVec2(pos.x + Px(kCardTextOffsetX), pos.y + Px(kCardTitleOffsetY)),
-             theme.text_primary,
-             title);
+    DrawText(draw_list, ImVec2(pos.x + Px(kCardTextOffsetX), pos.y + Px(kCardTitleOffsetY)), theme.text_primary, title);
     DrawText(draw_list,
              ImVec2(pos.x + Px(kCardTextOffsetX), pos.y + Px(kCardSubtitleOffsetY)),
              theme.text_secondary,
@@ -228,7 +218,7 @@ bool WalkthroughCard(std::string_view id, std::string_view title, std::string_vi
     return interaction.clicked;
 }
 
-}  // namespace
+} // namespace
 
 void ShowWelcomeModal(bool& is_open,
                       const std::vector<RecentProjectEntry>& recent,
@@ -260,7 +250,10 @@ void ShowWelcomeModal(bool& is_open,
                         ImVec2(PxAtScale(kWelcomeItemSpacingX, welcome_layout_scale),
                                PxAtScale(kWelcomeItemSpacingY, welcome_layout_scale)));
 
-    if (ImGui::BeginPopupModal(kWelcomePopupId, &is_open, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings)) {
+    if (ImGui::BeginPopupModal(kWelcomePopupId,
+                               &is_open,
+                               ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+                                   ImGuiWindowFlags_NoSavedSettings)) {
         const ui::Theme& theme = ui::GetTheme();
         bool show_template_not_implemented = false;
         bool show_import_sacm_not_implemented = false;
@@ -283,9 +276,14 @@ void ShowWelcomeModal(bool& is_open,
         ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeTaglineTopSpacing)));
 
         const float layout_width = std::min(ImGui::GetContentRegionAvail().x, Px(kWelcomeTableMaxWidth));
-        if (ImGui::BeginTable(kWelcomeLayoutTableId, 2, ImGuiTableFlags_SizingStretchProp, ImVec2(layout_width, Px(kWelcomeTableHeight)))) {
-            ImGui::TableSetupColumn(kWelcomeStartColumnId, ImGuiTableColumnFlags_WidthStretch, kWelcomeStartColumnRatio);
-            ImGui::TableSetupColumn(kWelcomeWalkthroughColumnId, ImGuiTableColumnFlags_WidthStretch, kWelcomeWalkthroughColumnRatio);
+        if (ImGui::BeginTable(kWelcomeLayoutTableId,
+                              2,
+                              ImGuiTableFlags_SizingStretchProp,
+                              ImVec2(layout_width, Px(kWelcomeTableHeight)))) {
+            ImGui::TableSetupColumn(
+                kWelcomeStartColumnId, ImGuiTableColumnFlags_WidthStretch, kWelcomeStartColumnRatio);
+            ImGui::TableSetupColumn(
+                kWelcomeWalkthroughColumnId, ImGuiTableColumnFlags_WidthStretch, kWelcomeWalkthroughColumnRatio);
             ImGui::TableNextRow();
 
             ImGui::TableNextColumn();
@@ -294,23 +292,27 @@ void ShowWelcomeModal(bool& is_open,
             if (ActionLink("##create_empty",
                            ui::Tr(ui::MessageId::WelcomeActionCreateEmptyTitle),
                            ui::Tr(ui::MessageId::WelcomeActionCreateEmptySubtitle))) {
-                if (callbacks.create_empty_project) callbacks.create_empty_project();
+                if (callbacks.create_empty_project)
+                    callbacks.create_empty_project();
             }
             if (ActionLink("##create_template",
                            ui::Tr(ui::MessageId::WelcomeActionCreateFromTemplateTitle),
                            ui::Tr(ui::MessageId::WelcomeActionCreateFromTemplateSubtitle))) {
-                if (callbacks.create_project_from_template) callbacks.create_project_from_template();
+                if (callbacks.create_project_from_template)
+                    callbacks.create_project_from_template();
                 show_template_not_implemented = true;
             }
             if (ActionLink("##open_project",
                            ui::Tr(ui::MessageId::WelcomeActionOpenProjectTitle),
                            ui::Tr(ui::MessageId::WelcomeActionOpenProjectSubtitle))) {
-                if (callbacks.open_project) callbacks.open_project();
+                if (callbacks.open_project)
+                    callbacks.open_project();
             }
             if (ActionLink("##import_sacm",
                            ui::Tr(ui::MessageId::WelcomeActionImportSacmTitle),
                            ui::Tr(ui::MessageId::WelcomeActionImportSacmSubtitle))) {
-                if (callbacks.import_sacm) callbacks.import_sacm();
+                if (callbacks.import_sacm)
+                    callbacks.import_sacm();
                 show_import_sacm_not_implemented = true;
             }
 
@@ -326,7 +328,8 @@ void ShowWelcomeModal(bool& is_open,
                     char row_id[32];
                     std::snprintf(row_id, sizeof(row_id), "##recent_%d", i);
                     if (RecentLink(row_id, recent[i])) {
-                        if (callbacks.open_recent_project) callbacks.open_recent_project(recent[i]);
+                        if (callbacks.open_recent_project)
+                            callbacks.open_recent_project(recent[i]);
                         dismiss();
                     }
                 }
@@ -339,7 +342,8 @@ void ShowWelcomeModal(bool& is_open,
                                 ui::Tr(ui::MessageId::WelcomeWalkthroughGetStartedTitle),
                                 ui::Tr(ui::MessageId::WelcomeWalkthroughGetStartedSubtitle),
                                 kGetStartedProgress)) {
-                if (callbacks.walkthrough_get_started) callbacks.walkthrough_get_started();
+                if (callbacks.walkthrough_get_started)
+                    callbacks.walkthrough_get_started();
                 show_walkthrough_not_implemented = true;
             }
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeWalkthroughCardSpacing)));
@@ -347,7 +351,8 @@ void ShowWelcomeModal(bool& is_open,
                                 ui::Tr(ui::MessageId::WelcomeWalkthroughFundamentalsTitle),
                                 ui::Tr(ui::MessageId::WelcomeWalkthroughFundamentalsSubtitle),
                                 kFundamentalsProgress)) {
-                if (callbacks.walkthrough_fundamentals) callbacks.walkthrough_fundamentals();
+                if (callbacks.walkthrough_fundamentals)
+                    callbacks.walkthrough_fundamentals();
                 show_walkthrough_not_implemented = true;
             }
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeWalkthroughCardSpacing)));
@@ -355,7 +360,8 @@ void ShowWelcomeModal(bool& is_open,
                                 ui::Tr(ui::MessageId::WelcomeWalkthroughConformanceTitle),
                                 ui::Tr(ui::MessageId::WelcomeWalkthroughConformanceSubtitle),
                                 kConformanceProgress)) {
-                if (callbacks.walkthrough_conformance) callbacks.walkthrough_conformance();
+                if (callbacks.walkthrough_conformance)
+                    callbacks.walkthrough_conformance();
                 show_walkthrough_not_implemented = true;
             }
 
@@ -421,4 +427,4 @@ void ShowWelcomeModal(bool& is_open,
     ImGui::PopStyleVar(kWelcomeStyleVarCount);
 }
 
-}  // namespace ui::panels
+} // namespace ui::panels

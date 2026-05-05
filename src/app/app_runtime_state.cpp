@@ -10,13 +10,14 @@ namespace app {
 namespace {
 
 void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
-    if (!buffer || buffer_size == 0) return;
+    if (!buffer || buffer_size == 0)
+        return;
     const size_t count = std::min(buffer_size - 1, value.size());
     std::memcpy(buffer, value.data(), count);
     buffer[count] = '\0';
 }
 
-}  // namespace
+} // namespace
 
 bool AppRuntimeState::IsProposalCanvasActive() const {
     return proposal_controller->IsCanvasActive();
@@ -28,12 +29,13 @@ AppRuntimeState::AppRuntimeState()
       ai_http_client(std::make_shared<ai::LibCurlHttpClient>()),
       ai_provider(std::make_shared<ai::OpenAiProvider>(ai_http_client)),
       ai_service(std::make_shared<ai::AiService>(ai_settings_store, ai_secret_store, ai_provider)) {
-        element_edit_controller = std::make_unique<controllers::ElementEditController>(events);
-        modal_coordinator = std::make_unique<controllers::ModalCoordinator>();
-        project_controller = std::make_unique<controllers::ProjectController>();
-        proposal_controller = std::make_unique<controllers::ProposalController>();
-        review_controller = std::make_unique<controllers::ReviewController>(events);
-        ai_review_controller = std::make_unique<controllers::AiReviewController>(events, problems_manager, ai_task_runner, ai_service);
+    element_edit_controller = std::make_unique<controllers::ElementEditController>(events);
+    modal_coordinator = std::make_unique<controllers::ModalCoordinator>();
+    project_controller = std::make_unique<controllers::ProjectController>();
+    proposal_controller = std::make_unique<controllers::ProposalController>();
+    review_controller = std::make_unique<controllers::ReviewController>(events);
+    ai_review_controller =
+        std::make_unique<controllers::AiReviewController>(events, problems_manager, ai_task_runner, ai_service);
     LoadAiSettingsState();
 }
 
@@ -52,4 +54,4 @@ void AppRuntimeState::RefreshStoredAiKeyState() {
     ai_key_stored = ai_service && ai_service->HasStoredApiKey();
 }
 
-}  // namespace app
+} // namespace app

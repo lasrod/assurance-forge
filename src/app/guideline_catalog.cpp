@@ -29,7 +29,7 @@ std::filesystem::path ExecutableDirectory() {
     return std::filesystem::current_path();
 }
 
-}  // namespace
+} // namespace
 
 std::filesystem::path FindSccgCatalogFile() {
     const std::filesystem::path executable_dir = ExecutableDirectory();
@@ -47,7 +47,8 @@ std::filesystem::path FindSccgCatalogFile() {
 
     for (const std::filesystem::path& candidate : candidates) {
         std::error_code error;
-        if (std::filesystem::exists(candidate, error)) return candidate;
+        if (std::filesystem::exists(candidate, error))
+            return candidate;
     }
     return {};
 }
@@ -56,13 +57,13 @@ std::filesystem::path FindGuidelinesFile() {
     return FindSccgCatalogFile();
 }
 
-GuidelineCatalog BuildGuidelineCatalog(parser::GuidelinesDocument document,
-                                       std::filesystem::path source_path) {
+GuidelineCatalog BuildGuidelineCatalog(parser::GuidelinesDocument document, std::filesystem::path source_path) {
     GuidelineCatalog catalog;
     catalog.source_path = std::move(source_path);
     catalog.document = std::move(document);
     for (const parser::Guideline& guideline : catalog.document.guidelines) {
-        if (guideline.id.empty()) continue;
+        if (guideline.id.empty())
+            continue;
         catalog.entries.push_back(GuidelineCatalogEntry{
             guideline.id,
             guideline.category,
@@ -71,7 +72,8 @@ GuidelineCatalog BuildGuidelineCatalog(parser::GuidelinesDocument document,
         catalog.ids.insert(guideline.id);
     }
     for (const parser::ReviewProfile& profile : catalog.document.review_profiles) {
-        if (profile.id.empty()) continue;
+        if (profile.id.empty())
+            continue;
         catalog.review_profile_entries.push_back(ReviewProfileCatalogEntry{
             profile.id,
             profile.display_name,
@@ -107,4 +109,4 @@ bool LoadGuidelineCatalog(GuidelineCatalog& catalog, std::string& error) {
     return true;
 }
 
-}  // namespace app
+} // namespace app

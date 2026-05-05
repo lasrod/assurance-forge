@@ -1,4 +1,5 @@
 #include "core/app_state.h"
+
 #include "core/project_service.h"
 #include "sacm/sacm_parser.h"
 #include "sacm/sacm_serializer.h"
@@ -14,8 +15,8 @@ bool AppState::load_file(const std::string& file_path) {
         loaded_file_path = std::filesystem::path(file_path);
         has_unsaved_changes = false;
         loaded_case = std::move(result.assurance_case);
-        status_message = "Loaded: " + loaded_case->name +
-                         " (" + std::to_string(loaded_case->elements.size()) + " elements)";
+        status_message =
+            "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
 
         // Also populate the SACM domain model for save support
         auto sacm_result = sacm::parse_sacm(file_path);
@@ -67,7 +68,8 @@ bool AppState::save_project() {
 
     if (has_unsaved_changes) {
         std::filesystem::path save_path = active_project_file_path;
-        if (save_path.empty()) save_path = loaded_file_path;
+        if (save_path.empty())
+            save_path = loaded_file_path;
         if (save_path.empty()) {
             status_message = "Error: Could not determine which file to save.";
             return false;
@@ -134,7 +136,8 @@ bool AppState::create_project_sacm_file(const std::string& file_name, ProjectFil
         status_message = "SACM file create failed: " + error;
         return false;
     }
-    if (created_entry) *created_entry = entry;
+    if (created_entry)
+        *created_entry = entry;
     status_message = "Created: " + entry.relativePath.generic_string();
     return true;
 }
@@ -150,7 +153,8 @@ bool AppState::create_project_evidence_register(const std::string& file_name, Pr
         status_message = "Evidence register create failed: " + error;
         return false;
     }
-    if (created_entry) *created_entry = entry;
+    if (created_entry)
+        *created_entry = entry;
     status_message = "Created: " + entry.relativePath.generic_string();
     return true;
 }
@@ -166,7 +170,8 @@ bool AppState::create_project_j3377_cae_register(const std::string& file_name, P
         status_message = "J3377 CAE register create failed: " + error;
         return false;
     }
-    if (created_entry) *created_entry = entry;
+    if (created_entry)
+        *created_entry = entry;
     status_message = "Created: " + entry.relativePath.generic_string();
     return true;
 }
@@ -185,4 +190,4 @@ bool AppState::open_project_file(const ProjectFileEntry& entry) {
     return load_file((current_project->rootPath / entry.relativePath).string());
 }
 
-}  // namespace core
+} // namespace core

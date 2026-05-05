@@ -14,4 +14,4 @@ public:
     static std::string HexDigest(const std::vector<unsigned char>& data);
 };
 
-}  // namespace core
+} // namespace core

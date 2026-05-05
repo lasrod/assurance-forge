@@ -1,8 +1,8 @@
 #pragma once
 
+#include <map>
 #include <string>
 #include <vector>
-#include <map>
 
 // =============================================================================
 // SACM domain model
@@ -47,31 +47,41 @@ namespace sacm {
 // Stores text in multiple languages, keyed by language code (e.g. "en", "ja").
 // Used for SACM MultiLangString (clause 8.5) and for content fields.
 struct MultiLangText {
-    std::map<std::string, std::string> texts;  // lang -> text
+    std::map<std::string, std::string> texts; // lang -> text
 
     // Get text for a given language, falling back to "en", then first available.
     std::string get(const std::string& lang) const {
         auto it = texts.find(lang);
-        if (it != texts.end()) return it->second;
+        if (it != texts.end())
+            return it->second;
         it = texts.find("en");
-        if (it != texts.end()) return it->second;
-        if (!texts.empty()) return texts.begin()->second;
+        if (it != texts.end())
+            return it->second;
+        if (!texts.empty())
+            return texts.begin()->second;
         return {};
     }
 
     // Get text for the default (primary) language.
-    std::string get_primary() const { return get("en"); }
+    std::string get_primary() const {
+        return get("en");
+    }
 
     // Set text for a language.
-    void set(const std::string& lang, const std::string& text) { texts[lang] = text; }
+    void set(const std::string& lang, const std::string& text) {
+        texts[lang] = text;
+    }
 
     // Check if a specific language exists.
-    bool has(const std::string& lang) const { return texts.count(lang) > 0; }
+    bool has(const std::string& lang) const {
+        return texts.count(lang) > 0;
+    }
 
     // Check if any non-primary language exists with non-empty text.
     bool has_secondary() const {
         for (const auto& [lang, text] : texts) {
-            if (lang != "en" && !text.empty()) return true;
+            if (lang != "en" && !text.empty())
+                return true;
         }
         return false;
     }
@@ -81,9 +91,9 @@ struct MultiLangText {
 //
 // All SACM elements ultimately derive from SACMElement.
 struct SacmElement {
-    std::string id;           // XML id (xmi:id in conformant XMI)
-    std::string name;         // Primary-language convenience (also in name_ml)
-    std::string description;  // Primary-language convenience (also in description_ml)
+    std::string id;          // XML id (xmi:id in conformant XMI)
+    std::string name;        // Primary-language convenience (also in name_ml)
+    std::string description; // Primary-language convenience (also in description_ml)
 
     // Multi-language fields (the primary "en" text and any translations).
     MultiLangText name_ml;
@@ -91,11 +101,11 @@ struct SacmElement {
 
     // SACM 2.3 SACMElement attributes (clause 8.2). Optional in XML; defaults
     // match the spec defaults.
-    std::string gid;             // Globally unique identifier
-    bool isCitation = false;     // True if this element cites another
-    bool isAbstract = false;     // True for pattern/template elements
-    std::string citedElement;    // Id of the SACMElement this element cites
-    std::string abstractForm;    // Id of the abstract element this conforms to
+    std::string gid;          // Globally unique identifier
+    bool isCitation = false;  // True if this element cites another
+    bool isAbstract = false;  // True for pattern/template elements
+    std::string citedElement; // Id of the SACMElement this element cites
+    std::string abstractForm; // Id of the abstract element this conforms to
 };
 
 // ===== Terminology (SACM clause 10) =====
@@ -115,8 +125,8 @@ struct TerminologyPackage : SacmElement {
 
 // Artifact (12.7): the distinguishable units of data used in an assurance case.
 struct Artifact : SacmElement {
-    std::string version;  // 12.7 attribute
-    std::string date;     // 12.7 attribute (creation date, ISO 8601)
+    std::string version; // 12.7 attribute
+    std::string date;    // 12.7 attribute (creation date, ISO 8601)
 };
 
 // ArtifactPackage (12.2): container for artifacts.
@@ -148,31 +158,29 @@ struct ArgumentReasoning : SacmElement {
 // Note: SACM 11.9 defines this as a multi-valued reference to ArtifactElement;
 // we currently store a single id for simplicity.
 struct ArtifactReference : SacmElement {
-    std::string referencedArtifact;  // id of the referenced Artifact
+    std::string referencedArtifact; // id of the referenced Artifact
 };
 
 // ===== Relationships (SACM clauses 11.13 - 11.16) =====
 
 // AssertedRelationship (11.13): abstract base for asserted relationships.
 struct AssertedRelationship : SacmElement {
-    std::vector<std::string> sources;     // id references (multi-valued)
-    std::vector<std::string> targets;     // id references (multi-valued)
-    std::string assertionDeclaration;     // see Claim::assertionDeclaration
-    bool isCounter = false;               // 11.13 attribute, default false
+    std::vector<std::string> sources; // id references (multi-valued)
+    std::vector<std::string> targets; // id references (multi-valued)
+    std::string assertionDeclaration; // see Claim::assertionDeclaration
+    bool isCounter = false;           // 11.13 attribute, default false
 };
 
 // AssertedInference (11.14): inference between assertions.
 struct AssertedInference : AssertedRelationship {
-    std::string reasoning;  // id reference to ArgumentReasoning
+    std::string reasoning; // id reference to ArgumentReasoning
 };
 
 // AssertedContext (11.16): contextual scoping of a Claim.
-struct AssertedContext : AssertedRelationship {
-};
+struct AssertedContext : AssertedRelationship {};
 
 // AssertedEvidence (11.15): evidential support for a Claim.
-struct AssertedEvidence : AssertedRelationship {
-};
+struct AssertedEvidence : AssertedRelationship {};
 
 // ===== Argument package (SACM clause 11.4) =====
 
@@ -189,12 +197,12 @@ struct ArgumentPackage : SacmElement {
 
 struct AssuranceCasePackage : SacmElement {
     // XML namespace metadata - preserved on round-trip so output matches input.
-    std::string namespace_prefix;  // e.g. "sacm" or "SACM"
-    std::string namespace_uri;     // e.g. "http://www.omg.org/spec/SACM/2.2/Argumentation"
+    std::string namespace_prefix; // e.g. "sacm" or "SACM"
+    std::string namespace_uri;    // e.g. "http://www.omg.org/spec/SACM/2.2/Argumentation"
 
     std::vector<TerminologyPackage> terminologyPackages;
     std::vector<ArtifactPackage> artifactPackages;
     std::vector<ArgumentPackage> argumentPackages;
 };
 
-}  // namespace sacm
+} // namespace sacm

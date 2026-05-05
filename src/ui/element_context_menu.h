@@ -21,4 +21,4 @@ void RenderRemoveSubmenu(const parser::AssuranceCase* active_case,
                          const std::string& selected_id,
                          const ElementContextActions& actions);
 
-}  // namespace ui
+} // namespace ui

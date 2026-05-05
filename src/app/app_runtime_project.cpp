@@ -1,10 +1,8 @@
 #include "app/app_runtime.h"
 #include "app/app_runtime_state.h"
-
 #include "app/native_file_dialogs.h"
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
-
 #include "core/project_service.h"
 #include "core/reviews/review_item.h"
 #include "imgui.h"
@@ -21,7 +19,8 @@ namespace app {
 namespace {
 
 void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
-    if (!buffer || buffer_size == 0) return;
+    if (!buffer || buffer_size == 0)
+        return;
     const size_t count = std::min(buffer_size - 1, value.size());
     std::memcpy(buffer, value.data(), count);
     buffer[count] = '\0';
@@ -34,7 +33,7 @@ void ClearProposalHighlightState(ui::UiState& ui_state) {
     ui_state.dim_non_proposal_nodes = false;
 }
 
-}  // namespace
+} // namespace
 
 void AppRuntime::BeginCreateProject() {
     std::string selected_path;
@@ -42,9 +41,13 @@ void AppRuntime::BeginCreateProject() {
     const dialogs::DialogResult result = dialogs::BrowseForProjectParentFolder(
         impl_->project_controller->project_parent_buf, selected_path, error_message);
     if (result == dialogs::DialogResult::Selected) {
-        CopyToBuffer(impl_->project_controller->project_parent_buf, sizeof(impl_->project_controller->project_parent_buf), selected_path);
+        CopyToBuffer(impl_->project_controller->project_parent_buf,
+                     sizeof(impl_->project_controller->project_parent_buf),
+                     selected_path);
         if (impl_->project_controller->project_name_buf[0] == '\0') {
-            CopyToBuffer(impl_->project_controller->project_name_buf, sizeof(impl_->project_controller->project_name_buf), "MySafetyCase");
+            CopyToBuffer(impl_->project_controller->project_name_buf,
+                         sizeof(impl_->project_controller->project_name_buf),
+                         "MySafetyCase");
         }
         impl_->project_controller->show_create_project_modal = true;
     } else if (result == dialogs::DialogResult::Failed) {
@@ -60,10 +63,11 @@ void AppRuntime::BeginOpenProject() {
 
     std::string selected_path;
     std::string error_message;
-    const dialogs::DialogResult result = dialogs::BrowseForProjectManifest(
-        default_path, selected_path, error_message);
+    const dialogs::DialogResult result = dialogs::BrowseForProjectManifest(default_path, selected_path, error_message);
     if (result == dialogs::DialogResult::Selected) {
-        CopyToBuffer(impl_->project_controller->open_project_path_buf, sizeof(impl_->project_controller->open_project_path_buf), selected_path);
+        CopyToBuffer(impl_->project_controller->open_project_path_buf,
+                     sizeof(impl_->project_controller->open_project_path_buf),
+                     selected_path);
         TryOpenProjectManifest(selected_path);
     } else if (result == dialogs::DialogResult::Failed) {
         SetStatus("Browse failed: " + error_message);
@@ -87,7 +91,8 @@ void AppRuntime::BeginCreateProjectEvidenceRegister() {
         SetStatus("Create or open a project first.");
         return;
     }
-    impl_->project_controller->BeginProjectFileCreate(ProjectFileCreateKind::EvidenceRegister, "evidence-register.af.json");
+    impl_->project_controller->BeginProjectFileCreate(ProjectFileCreateKind::EvidenceRegister,
+                                                      "evidence-register.af.json");
 }
 
 void AppRuntime::BeginCreateProjectJ3377CaeRegister() {
@@ -95,11 +100,13 @@ void AppRuntime::BeginCreateProjectJ3377CaeRegister() {
         SetStatus("Create or open a project first.");
         return;
     }
-    impl_->project_controller->BeginProjectFileCreate(ProjectFileCreateKind::J3377CaeRegister, "j3377-cae-register.af.json");
+    impl_->project_controller->BeginProjectFileCreate(ProjectFileCreateKind::J3377CaeRegister,
+                                                      "j3377-cae-register.af.json");
 }
 
 void AppRuntime::OpenProjectFile(const core::ProjectFileEntry& entry) {
-    if (!impl_->app_state.open_project_file(entry)) return;
+    if (!impl_->app_state.open_project_file(entry))
+        return;
 
     ui::UiState& ui_state = ui::GetUiState();
     if (entry.role == core::ProjectFileRole::SacmArgument) {
@@ -131,11 +138,14 @@ void AppRuntime::OpenProjectFile(const core::ProjectFileEntry& entry) {
 }
 
 bool AppRuntime::OpenFirstProjectSacmFile() {
-    if (!impl_->app_state.current_project.has_value()) return false;
+    if (!impl_->app_state.current_project.has_value())
+        return false;
 
     for (const auto& entry : impl_->app_state.current_project->files) {
-        if (entry.role != core::ProjectFileRole::SacmArgument) continue;
-        if (entry.state == core::ProjectFileState::Missing) continue;
+        if (entry.role != core::ProjectFileRole::SacmArgument)
+            continue;
+        if (entry.state == core::ProjectFileState::Missing)
+            continue;
         if (impl_->app_state.open_project_file(entry)) {
             impl_->tree_needs_rebuild = true;
             impl_->pending_focus_root = true;
@@ -193,7 +203,9 @@ bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {
     }
     OpenFirstProjectSacmFile();
     TouchCurrentProjectRecent();
-    CopyToBuffer(impl_->project_controller->open_project_path_buf, sizeof(impl_->project_controller->open_project_path_buf), selected_path);
+    CopyToBuffer(impl_->project_controller->open_project_path_buf,
+                 sizeof(impl_->project_controller->open_project_path_buf),
+                 selected_path);
     ImGui::CloseCurrentPopup();
     return true;
 }
@@ -214,7 +226,8 @@ bool AppRuntime::SaveProject() {
     }
 
     if (impl_->document_dirty) {
-        if (!impl_->app_state.save_project()) return false;
+        if (!impl_->app_state.save_project())
+            return false;
         impl_->document_dirty = false;
         impl_->app_state.has_unsaved_changes = impl_->review_controller->IsDirty();
         return true;
@@ -229,4 +242,4 @@ bool AppRuntime::SaveProject() {
     return impl_->app_state.save_project();
 }
 
-}  // namespace app
+} // namespace app

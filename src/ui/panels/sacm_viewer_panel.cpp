@@ -15,10 +15,13 @@ constexpr float kSummaryStripHeight = 88.0f;
 
 ImVec4 ElementTypeColor(const char* type) {
     const ui::Theme& theme = ui::GetTheme();
-    if (!type) return ImGui::ColorConvertU32ToFloat4(theme.text_primary);
+    if (!type)
+        return ImGui::ColorConvertU32ToFloat4(theme.text_primary);
     std::string_view sv(type);
-    if (sv == "claim") return ImGui::ColorConvertU32ToFloat4(theme.node_claim);
-    if (sv == "argumentreasoning") return ImGui::ColorConvertU32ToFloat4(theme.node_strategy);
+    if (sv == "claim")
+        return ImGui::ColorConvertU32ToFloat4(theme.node_claim);
+    if (sv == "argumentreasoning")
+        return ImGui::ColorConvertU32ToFloat4(theme.node_strategy);
     if (sv == "artifact" || sv == "artifactreference") {
         return ImGui::ColorConvertU32ToFloat4(theme.node_solution);
     }
@@ -75,11 +78,13 @@ void ShowFileSelector(SacmViewerPanelModel& model) {
             if (ImGui::Selectable(label, is_selected)) {
                 model.selected_file_idx = i;
                 std::size_t len = path.size();
-                if (len >= model.file_path_buf_size) len = model.file_path_buf_size - 1;
+                if (len >= model.file_path_buf_size)
+                    len = model.file_path_buf_size - 1;
                 std::memcpy(model.file_path_buf, path.c_str(), len);
                 model.file_path_buf[len] = '\0';
             }
-            if (is_selected) ImGui::SetItemDefaultFocus();
+            if (is_selected)
+                ImGui::SetItemDefaultFocus();
         }
         ImGui::EndCombo();
     }
@@ -114,11 +119,18 @@ void ShowProjectSummary(const parser::AssuranceCase& ac) {
         ImGui::Text("Project Summary");
         if (ImGui::BeginTable("ProjectSummaryMetrics", 5, ImGuiTableFlags_SizingStretchSame)) {
             ImGui::TableNextRow();
-            ImGui::TableNextColumn(); SummaryMetric("Claims", CountElementsOfType(ac, "claim"));
-            ImGui::TableNextColumn(); SummaryMetric("Strategies", CountElementsOfType(ac, "argumentreasoning"));
-            ImGui::TableNextColumn(); SummaryMetric("Evidence", CountElementsOfType(ac, "artifact", "artifactreference") + CountElementsOfType(ac, "expression"));
-            ImGui::TableNextColumn(); SummaryMetric("CSE Rows", static_cast<int>(ui::GetCseRegisterRowCount()));
-            ImGui::TableNextColumn(); SummaryMetric("Evidence Rows", static_cast<int>(ui::GetEvidenceRegisterRowCount()));
+            ImGui::TableNextColumn();
+            SummaryMetric("Claims", CountElementsOfType(ac, "claim"));
+            ImGui::TableNextColumn();
+            SummaryMetric("Strategies", CountElementsOfType(ac, "argumentreasoning"));
+            ImGui::TableNextColumn();
+            SummaryMetric("Evidence",
+                          CountElementsOfType(ac, "artifact", "artifactreference") +
+                              CountElementsOfType(ac, "expression"));
+            ImGui::TableNextColumn();
+            SummaryMetric("CSE Rows", static_cast<int>(ui::GetCseRegisterRowCount()));
+            ImGui::TableNextColumn();
+            SummaryMetric("Evidence Rows", static_cast<int>(ui::GetEvidenceRegisterRowCount()));
             ImGui::EndTable();
         }
     }
@@ -148,7 +160,7 @@ void ShowElementList(const parser::AssuranceCase& ac) {
     ImGui::EndChild();
 }
 
-}  // namespace
+} // namespace
 
 void ShowSacmViewerPanel(float width,
                          float height,
@@ -162,23 +174,28 @@ void ShowSacmViewerPanel(float width,
 
     ImGui::Text("Directory:");
     ImGui::SetNextItemWidth(-1);
-    if (ImGui::InputText("##dirpath", model.dir_path_buf, model.dir_path_buf_size, ImGuiInputTextFlags_EnterReturnsTrue)) {
-        if (callbacks.scan_directory) callbacks.scan_directory();
+    if (ImGui::InputText(
+            "##dirpath", model.dir_path_buf, model.dir_path_buf_size, ImGuiInputTextFlags_EnterReturnsTrue)) {
+        if (callbacks.scan_directory)
+            callbacks.scan_directory();
     }
 
     ShowFileSelector(model);
 
     if (ImGui::Button("Load")) {
         if (model.app_state.load_file(model.file_path_buf)) {
-            if (callbacks.on_load_success) callbacks.on_load_success();
+            if (callbacks.on_load_success)
+                callbacks.on_load_success();
         } else {
-            if (callbacks.on_load_failure) callbacks.on_load_failure();
+            if (callbacks.on_load_failure)
+                callbacks.on_load_failure();
         }
     }
 
     ImGui::SameLine();
     bool can_save = model.app_state.sacm_package.has_value();
-    if (!can_save) ImGui::BeginDisabled();
+    if (!can_save)
+        ImGui::BeginDisabled();
     if (ImGui::Button("Save")) {
         FILE* file = std::fopen(model.file_path_buf, "r");
         if (file) {
@@ -188,7 +205,8 @@ void ShowSacmViewerPanel(float width,
             model.app_state.save_file(model.file_path_buf);
         }
     }
-    if (!can_save) ImGui::EndDisabled();
+    if (!can_save)
+        ImGui::EndDisabled();
 
     ShowOverwriteModal(model);
 
@@ -207,4 +225,4 @@ void ShowSacmViewerPanel(float width,
     ImGui::End();
 }
 
-}  // namespace ui::panels
+} // namespace ui::panels

@@ -3,7 +3,6 @@
 #include "hello_imgui/hello_imgui.h"
 #include "hello_imgui/imgui_default_settings.h"
 #include "imgui.h"
-
 #include "ui/gsn/gsn_canvas.h"
 
 namespace app {
@@ -49,4 +48,4 @@ void ConfigureImGuiFonts() {
     }
 }
 
-}  // namespace app
+} // namespace app

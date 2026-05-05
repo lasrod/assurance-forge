@@ -1,7 +1,6 @@
-#include <gtest/gtest.h>
-
 #include "core/sha256.h"
 
+#include <gtest/gtest.h>
 #include <string_view>
 
 TEST(Sha256Test, HexDigestMatchesKnownVectors) {

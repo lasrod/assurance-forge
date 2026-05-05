@@ -25,4 +25,4 @@ private:
     std::vector<ProblemItem> problems_;
 };
 
-}  // namespace core
+} // namespace core

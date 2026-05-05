@@ -1,6 +1,6 @@
-#include <gtest/gtest.h>
-
 #include "app/controllers/element_edit_controller.h"
+
+#include <gtest/gtest.h>
 
 TEST(ElementEditControllerTest, AddTopGoalUpdatesModelAndEmitsEvents) {
     app::AppEvents events;
@@ -13,7 +13,8 @@ TEST(ElementEditControllerTest, AddTopGoalUpdatesModelAndEmitsEvents) {
     std::string status;
     events.Subscribe<app::TreeDirtyEvent>([&](const app::TreeDirtyEvent&) { tree_dirty = true; });
     events.Subscribe<app::DocumentDirtyEvent>([&](const app::DocumentDirtyEvent&) { document_dirty = true; });
-    events.Subscribe<app::SelectionChangedEvent>([&](const app::SelectionChangedEvent& event) { selected_id = event.element_id; });
+    events.Subscribe<app::SelectionChangedEvent>(
+        [&](const app::SelectionChangedEvent& event) { selected_id = event.element_id; });
     events.Subscribe<app::StatusMessageEvent>([&](const app::StatusMessageEvent& event) { status = event.message; });
 
     ASSERT_TRUE(controller.AddTopGoal(model, nullptr));

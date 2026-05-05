@@ -39,4 +39,4 @@ private:
     std::vector<std::string> pending_remove_ids_;
 };
 
-}  // namespace app::controllers
+} // namespace app::controllers

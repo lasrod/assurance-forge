@@ -14,4 +14,4 @@ void ShowTreeViewPanel(const core::AssuranceTree* tree,
                        UiState& state,
                        const ElementContextActions& actions);
 
-}  // namespace ui
+} // namespace ui

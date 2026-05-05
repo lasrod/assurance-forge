@@ -67,7 +67,8 @@ AiConnectionStatus AiService::TestConnection() const {
     }
 
     SecretLoadResult key = LoadApiKey();
-    if (!key.success) return ErrorStatus(key.errorCode, key.errorMessage);
+    if (!key.success)
+        return ErrorStatus(key.errorCode, key.errorMessage);
     if (!key.secret.has_value() || key.secret->empty()) {
         return ErrorStatus(AiErrorCode::MissingApiKey, "Missing API key.");
     }
@@ -104,4 +105,4 @@ AiResponse AiService::Generate(const AiRequest& request) const {
     return provider_->Generate(settings, request, key.secret.value());
 }
 
-}  // namespace ai
+} // namespace ai

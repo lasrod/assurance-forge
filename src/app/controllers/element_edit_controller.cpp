@@ -87,7 +87,8 @@ bool ElementEditController::ConfirmPendingRemoval(parser::AssuranceCase& model, 
     const size_t count = pending_remove_ids_.size();
     CancelPendingRemoval();
 
-    if (id.empty()) return false;
+    if (id.empty())
+        return false;
 
     std::string error;
     if (!core::RemoveElement(model, package, id, mode, error)) {
@@ -124,4 +125,4 @@ const std::vector<std::string>& ElementEditController::PendingRemoveIds() const 
     return pending_remove_ids_;
 }
 
-}  // namespace app::controllers
+} // namespace app::controllers

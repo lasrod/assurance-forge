@@ -1,7 +1,6 @@
-#include <gtest/gtest.h>
-
 #include "app/controllers/ai_review_controller.h"
 
+#include <gtest/gtest.h>
 #include <memory>
 #include <string>
 #include <vector>
@@ -15,11 +14,9 @@ struct ControllerHarness {
     app::controllers::AiReviewController controller;
     std::vector<std::string> statuses;
 
-    ControllerHarness()
-        : controller(events, problems, task_runner, nullptr) {
-        events.Subscribe<app::StatusMessageEvent>([this](const app::StatusMessageEvent& event) {
-            statuses.push_back(event.message);
-        });
+    ControllerHarness() : controller(events, problems, task_runner, nullptr) {
+        events.Subscribe<app::StatusMessageEvent>(
+            [this](const app::StatusMessageEvent& event) { statuses.push_back(event.message); });
     }
 };
 
@@ -47,7 +44,7 @@ app::GuidelineCatalog MakeCatalog(parser::GuidelinesDocument document) {
     return app::BuildGuidelineCatalog(std::move(document), "sccg.full.yaml");
 }
 
-}  // namespace
+} // namespace
 
 TEST(AiReviewControllerTest, NoSelectionAddsInfoProblemAndStatus) {
     ControllerHarness harness;
@@ -122,8 +119,7 @@ TEST(AiReviewControllerTest, SelectClaimReviewGuidelinesUsesProfileWhenAvailable
     document.review_profiles.push_back(profile);
 
     app::GuidelineCatalog catalog = MakeCatalog(std::move(document));
-    app::controllers::AiReviewGuidelineSelection selection =
-        app::controllers::SelectClaimReviewGuidelines(catalog);
+    app::controllers::AiReviewGuidelineSelection selection = app::controllers::SelectClaimReviewGuidelines(catalog);
 
     ASSERT_NE(selection.review_profile, nullptr);
     ASSERT_EQ(selection.guidelines.size(), 1u);
@@ -137,8 +133,7 @@ TEST(AiReviewControllerTest, SelectClaimReviewGuidelinesFallsBackToClWhenProfile
     document.guidelines.push_back(MakeGuideline("RD.4", "RD"));
 
     app::GuidelineCatalog catalog = MakeCatalog(std::move(document));
-    app::controllers::AiReviewGuidelineSelection selection =
-        app::controllers::SelectClaimReviewGuidelines(catalog);
+    app::controllers::AiReviewGuidelineSelection selection = app::controllers::SelectClaimReviewGuidelines(catalog);
 
     EXPECT_EQ(selection.review_profile, nullptr);
     ASSERT_EQ(selection.guidelines.size(), 1u);
@@ -155,8 +150,7 @@ TEST(AiReviewControllerTest, SelectClaimReviewGuidelinesReportsProfileWithNoVali
     document.review_profiles.push_back(profile);
 
     app::GuidelineCatalog catalog = MakeCatalog(std::move(document));
-    app::controllers::AiReviewGuidelineSelection selection =
-        app::controllers::SelectClaimReviewGuidelines(catalog);
+    app::controllers::AiReviewGuidelineSelection selection = app::controllers::SelectClaimReviewGuidelines(catalog);
 
     ASSERT_NE(selection.review_profile, nullptr);
     EXPECT_TRUE(selection.guidelines.empty());

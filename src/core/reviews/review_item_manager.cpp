@@ -45,7 +45,7 @@ bool WriteTextFile(const std::filesystem::path& path, const std::string& content
     return true;
 }
 
-}  // namespace
+} // namespace
 
 void ReviewItemManager::SetFilePath(std::filesystem::path file_path) {
     file_path_ = std::move(file_path);
@@ -81,24 +81,24 @@ void ReviewItemManager::Clear() {
 std::vector<ReviewItem> ReviewItemManager::GetItemsForElement(const std::string& element_id) const {
     std::vector<ReviewItem> matches;
     for (const ReviewItem& item : items_) {
-        if (item.element_id == element_id) matches.push_back(item);
+        if (item.element_id == element_id)
+            matches.push_back(item);
     }
     return matches;
 }
 
 std::optional<ReviewItem> ReviewItemManager::GetItemById(const std::string& id) const {
-    auto found = std::find_if(items_.begin(), items_.end(), [&](const ReviewItem& item) {
-        return item.id == id;
-    });
-    if (found == items_.end()) return std::nullopt;
+    auto found = std::find_if(items_.begin(), items_.end(), [&](const ReviewItem& item) { return item.id == id; });
+    if (found == items_.end())
+        return std::nullopt;
     return *found;
 }
 
 bool ReviewItemManager::AddOrUpdateItem(ReviewItem item) {
-    if (item.id.empty()) return false;
-    auto found = std::find_if(items_.begin(), items_.end(), [&](const ReviewItem& existing) {
-        return existing.id == item.id;
-    });
+    if (item.id.empty())
+        return false;
+    auto found =
+        std::find_if(items_.begin(), items_.end(), [&](const ReviewItem& existing) { return existing.id == item.id; });
     if (found == items_.end()) {
         items_.push_back(std::move(item));
     } else {
@@ -109,15 +109,15 @@ bool ReviewItemManager::AddOrUpdateItem(ReviewItem item) {
 
 bool ReviewItemManager::RemoveItem(const std::string& id) {
     const auto old_size = items_.size();
-    items_.erase(std::remove_if(items_.begin(), items_.end(), [&](const ReviewItem& item) {
-        return item.id == id;
-    }), items_.end());
+    items_.erase(std::remove_if(items_.begin(), items_.end(), [&](const ReviewItem& item) { return item.id == id; }),
+                 items_.end());
     return items_.size() != old_size;
 }
 
 bool ReviewItemManager::SetProposal(const std::string& review_item_id, const std::string& proposal_id) {
     for (ReviewItem& item : items_) {
-        if (item.id != review_item_id) continue;
+        if (item.id != review_item_id)
+            continue;
         item.proposal_id = proposal_id;
         return true;
     }
@@ -126,11 +126,12 @@ bool ReviewItemManager::SetProposal(const std::string& review_item_id, const std
 
 bool ReviewItemManager::ClearProposal(const std::string& review_item_id) {
     for (ReviewItem& item : items_) {
-        if (item.id != review_item_id) continue;
+        if (item.id != review_item_id)
+            continue;
         item.proposal_id.reset();
         return true;
     }
     return false;
 }
 
-}  // namespace core::reviews
+} // namespace core::reviews

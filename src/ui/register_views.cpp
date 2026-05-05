@@ -1,13 +1,13 @@
 #include "ui/register_views.h"
 
+#include "imgui.h"
+
 #include <algorithm>
 #include <cfloat>
 #include <cstring>
 #include <map>
 #include <set>
 #include <unordered_map>
-
-#include "imgui.h"
 
 namespace ui {
 namespace {
@@ -46,10 +46,14 @@ static bool IsEvidenceType(const std::string& t) {
 }
 
 static std::string DisplayTextFor(const parser::SacmElement* e) {
-    if (!e) return "";
-    if (!e->name.empty()) return e->name;
-    if (!e->content.empty()) return e->content;
-    if (!e->description.empty()) return e->description;
+    if (!e)
+        return "";
+    if (!e->name.empty())
+        return e->name;
+    if (!e->content.empty())
+        return e->content;
+    if (!e->description.empty())
+        return e->description;
     return e->id;
 }
 
@@ -60,13 +64,15 @@ static std::string BuildCseId(const std::string& claim_id, const std::string& ev
 static bool EditCellText(const char* id, std::string& value, int max_len = 512) {
     std::vector<char> buf(static_cast<size_t>(max_len));
     size_t n = value.size();
-    if (n >= buf.size()) n = buf.size() - 1;
+    if (n >= buf.size())
+        n = buf.size() - 1;
     memcpy(buf.data(), value.c_str(), n);
     buf[n] = '\0';
 
     ImGui::SetNextItemWidth(-FLT_MIN);
     bool changed = ImGui::InputText(id, buf.data(), buf.size());
-    if (changed) value = buf.data();
+    if (changed)
+        value = buf.data();
     return changed;
 }
 
@@ -92,13 +98,14 @@ static void DrawAssessmentStatusCell(std::string& status) {
             if (ImGui::Selectable(kStatuses[i], selected)) {
                 status = kStatuses[i];
             }
-            if (selected) ImGui::SetItemDefaultFocus();
+            if (selected)
+                ImGui::SetItemDefaultFocus();
         }
         ImGui::EndCombo();
     }
 }
 
-}  // namespace
+} // namespace
 
 void RebuildRegisterViews(const parser::AssuranceCase* ac) {
     g_cse_rows.clear();
@@ -131,7 +138,8 @@ void RebuildRegisterViews(const parser::AssuranceCase* ac) {
 
         auto collect_ref = [&](const std::string& id) {
             auto it = by_id.find(id);
-            if (it == by_id.end() || !it->second) return;
+            if (it == by_id.end() || !it->second)
+                return;
             const auto* ref = it->second;
             if (IsClaimType(ref->type)) {
                 claim_ids.push_back(id);
@@ -140,13 +148,16 @@ void RebuildRegisterViews(const parser::AssuranceCase* ac) {
             }
         };
 
-        for (const auto& id : elem.source_refs) collect_ref(id);
-        for (const auto& id : elem.target_refs) collect_ref(id);
+        for (const auto& id : elem.source_refs)
+            collect_ref(id);
+        for (const auto& id : elem.target_refs)
+            collect_ref(id);
 
         std::sort(claim_ids.begin(), claim_ids.end());
         claim_ids.erase(std::unique(claim_ids.begin(), claim_ids.end()), claim_ids.end());
         std::sort(local_evidence_ids.begin(), local_evidence_ids.end());
-        local_evidence_ids.erase(std::unique(local_evidence_ids.begin(), local_evidence_ids.end()), local_evidence_ids.end());
+        local_evidence_ids.erase(std::unique(local_evidence_ids.begin(), local_evidence_ids.end()),
+                                 local_evidence_ids.end());
 
         for (const auto& claim_id : claim_ids) {
             for (const auto& evidence_id : local_evidence_ids) {
@@ -169,10 +180,12 @@ void RebuildRegisterViews(const parser::AssuranceCase* ac) {
         const parser::SacmElement* evidence_elem = nullptr;
 
         auto claim_it = by_id.find(claim_id);
-        if (claim_it != by_id.end()) claim_elem = claim_it->second;
+        if (claim_it != by_id.end())
+            claim_elem = claim_it->second;
 
         auto evidence_it = by_id.find(evidence_id);
-        if (evidence_it != by_id.end()) evidence_elem = evidence_it->second;
+        if (evidence_it != by_id.end())
+            evidence_elem = evidence_it->second;
 
         CseRegisterRow row;
         row.cse_id = BuildCseId(claim_id, evidence_id);
@@ -198,14 +211,16 @@ void RebuildRegisterViews(const parser::AssuranceCase* ac) {
     }
 
     std::sort(g_cse_rows.begin(), g_cse_rows.end(), [](const CseRegisterRow& a, const CseRegisterRow& b) {
-        if (a.claim_id == b.claim_id) return a.evidence_id < b.evidence_id;
+        if (a.claim_id == b.claim_id)
+            return a.evidence_id < b.evidence_id;
         return a.claim_id < b.claim_id;
     });
 
     for (const auto& evidence_id : evidence_ids) {
         const parser::SacmElement* evidence_elem = nullptr;
         auto it = by_id.find(evidence_id);
-        if (it != by_id.end()) evidence_elem = it->second;
+        if (it != by_id.end())
+            evidence_elem = it->second;
 
         EvidenceRegisterRow row;
         row.evidence_id = evidence_id;
@@ -223,9 +238,9 @@ void RebuildRegisterViews(const parser::AssuranceCase* ac) {
         g_evidence_rows.push_back(std::move(row));
     }
 
-    std::sort(g_evidence_rows.begin(), g_evidence_rows.end(), [](const EvidenceRegisterRow& a, const EvidenceRegisterRow& b) {
-        return a.evidence_id < b.evidence_id;
-    });
+    std::sort(g_evidence_rows.begin(),
+              g_evidence_rows.end(),
+              [](const EvidenceRegisterRow& a, const EvidenceRegisterRow& b) { return a.evidence_id < b.evidence_id; });
 }
 
 size_t GetCseRegisterRowCount() {
@@ -242,11 +257,8 @@ void ShowCseRegisterView() {
         return;
     }
 
-    ImGuiTableFlags flags = ImGuiTableFlags_Borders
-                          | ImGuiTableFlags_RowBg
-                          | ImGuiTableFlags_Resizable
-                          | ImGuiTableFlags_ScrollX
-                          | ImGuiTableFlags_ScrollY;
+    ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
+                            ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
 
     if (!ImGui::BeginTable("cse_register_table", 12, flags)) {
         return;
@@ -329,11 +341,8 @@ void ShowEvidenceRegisterView() {
         return;
     }
 
-    ImGuiTableFlags flags = ImGuiTableFlags_Borders
-                          | ImGuiTableFlags_RowBg
-                          | ImGuiTableFlags_Resizable
-                          | ImGuiTableFlags_ScrollX
-                          | ImGuiTableFlags_ScrollY;
+    ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
+                            ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
 
     if (!ImGui::BeginTable("evidence_register_table", 9, flags)) {
         return;
@@ -397,4 +406,4 @@ void ShowEvidenceRegisterView() {
     ImGui::EndTable();
 }
 
-}  // namespace ui
+} // namespace ui

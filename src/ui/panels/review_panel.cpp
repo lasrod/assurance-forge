@@ -13,7 +13,8 @@ namespace ui::panels {
 namespace {
 
 void CopyToBuffer(char* buffer, size_t size, const std::string& value) {
-    if (size == 0) return;
+    if (size == 0)
+        return;
     const size_t count = std::min(size - 1, value.size());
     std::memcpy(buffer, value.data(), count);
     buffer[count] = '\0';
@@ -39,21 +40,23 @@ bool ContainsGuidelineId(const std::vector<std::string>& guideline_ids, const st
 }
 
 const ReviewGuidelineOption* FindGuidelineOption(const ReviewPanelModel& model, const std::string& guideline_id) {
-    auto found = std::find_if(model.guideline_options.begin(), model.guideline_options.end(), [&](const ReviewGuidelineOption& option) {
-        return option.id == guideline_id;
-    });
+    auto found = std::find_if(model.guideline_options.begin(),
+                              model.guideline_options.end(),
+                              [&](const ReviewGuidelineOption& option) { return option.id == guideline_id; });
     return found == model.guideline_options.end() ? nullptr : &*found;
 }
 
 bool MatchesGuidelineFilter(const ReviewGuidelineOption& option, const std::string& lowered_filter) {
-    if (lowered_filter.empty()) return true;
+    if (lowered_filter.empty())
+        return true;
     return LowerCopy(option.id).find(lowered_filter) != std::string::npos ||
            LowerCopy(option.category).find(lowered_filter) != std::string::npos ||
            LowerCopy(option.title).find(lowered_filter) != std::string::npos;
 }
 
 std::string GuidelineDisplayLabel(const ReviewGuidelineOption& option) {
-    if (option.title.empty()) return option.id;
+    if (option.title.empty())
+        return option.id;
     return option.id + " - " + option.title;
 }
 
@@ -63,7 +66,8 @@ void OpenGuidelineStub(const std::string& guideline_id, std::string& popup_guide
 }
 
 void DrawGuidelineStubPopup(const ReviewPanelModel& model, std::string& popup_guideline_id) {
-    if (!ImGui::BeginPopupModal("SCCG Guideline", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+    if (!ImGui::BeginPopupModal("SCCG Guideline", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+        return;
 
     if (popup_guideline_id == "__browse__") {
         ImGui::TextUnformatted("Browse SCCG Guidelines");
@@ -87,12 +91,14 @@ void DrawGuidelineStubPopup(const ReviewPanelModel& model, std::string& popup_gu
 void DrawGuidelineTags(const ReviewPanelModel& model,
                        const std::vector<std::string>& guideline_ids,
                        std::string& popup_guideline_id) {
-    if (guideline_ids.empty()) return;
+    if (guideline_ids.empty())
+        return;
 
     ImGui::TextDisabled("SCCG");
     ImGui::SameLine();
     for (size_t index = 0; index < guideline_ids.size(); ++index) {
-        if (index > 0) ImGui::SameLine();
+        if (index > 0)
+            ImGui::SameLine();
         const std::string& guideline_id = guideline_ids[index];
         ImGui::PushID(static_cast<int>(index));
         if (ImGui::SmallButton(guideline_id.c_str())) {
@@ -115,7 +121,8 @@ void DrawSelectedGuidelineTags(std::vector<std::string>& selected_guideline_ids)
     ImGui::TextDisabled("Selected");
     ImGui::SameLine();
     for (size_t index = 0; index < selected_guideline_ids.size();) {
-        if (index > 0) ImGui::SameLine();
+        if (index > 0)
+            ImGui::SameLine();
         ImGui::PushID(static_cast<int>(index));
         std::string label = selected_guideline_ids[index] + " x";
         if (ImGui::SmallButton(label.c_str())) {
@@ -142,23 +149,26 @@ void DrawGuidelineSelector(const ReviewPanelModel& model,
     DrawSelectedGuidelineTags(selected_guideline_ids);
 
     const bool has_options = !model.guideline_options.empty();
-    if (!has_options) ImGui::BeginDisabled();
+    if (!has_options)
+        ImGui::BeginDisabled();
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::InputTextWithHint("##guideline_filter", "Filter SCCG IDs or titles", filter_buffer, filter_buffer_size);
 
     const float list_height = ImGui::GetTextLineHeightWithSpacing() * 6.0f;
     if (ImGui::BeginChild("##guideline_options", ImVec2(0.0f, list_height), true)) {
         if (!has_options) {
-            ImGui::TextDisabled("%s", model.guideline_status.empty()
-                ? "SCCG guidelines are not available."
-                : model.guideline_status.c_str());
+            ImGui::TextDisabled("%s",
+                                model.guideline_status.empty() ? "SCCG guidelines are not available."
+                                                               : model.guideline_status.c_str());
         } else {
             const std::string filter(filter_buffer);
             const std::string lowered_filter = LowerCopy(filter);
             int shown = 0;
             for (const ReviewGuidelineOption& option : model.guideline_options) {
-                if (ContainsGuidelineId(selected_guideline_ids, option.id)) continue;
-                if (!MatchesGuidelineFilter(option, lowered_filter)) continue;
+                if (ContainsGuidelineId(selected_guideline_ids, option.id))
+                    continue;
+                if (!MatchesGuidelineFilter(option, lowered_filter))
+                    continue;
 
                 const std::string label = GuidelineDisplayLabel(option);
                 if (ImGui::Selectable(label.c_str())) {
@@ -177,7 +187,8 @@ void DrawGuidelineSelector(const ReviewPanelModel& model,
         }
     }
     ImGui::EndChild();
-    if (!has_options) ImGui::EndDisabled();
+    if (!has_options)
+        ImGui::EndDisabled();
 }
 
 void DrawProposalActions(const core::reviews::ReviewItem& item,
@@ -186,11 +197,13 @@ void DrawProposalActions(const core::reviews::ReviewItem& item,
     const bool is_active_draft = model.active_proposal_review_item_id == item.id;
     if (is_active_draft) {
         ImGui::Text("Proposal draft: %d operation(s)", static_cast<int>(model.active_proposal_operation_count));
-        if (!model.active_proposal_can_save) ImGui::BeginDisabled();
+        if (!model.active_proposal_can_save)
+            ImGui::BeginDisabled();
         if (ImGui::Button("Save Proposal") && callbacks.save_proposal) {
             callbacks.save_proposal(item);
         }
-        if (!model.active_proposal_can_save) ImGui::EndDisabled();
+        if (!model.active_proposal_can_save)
+            ImGui::EndDisabled();
         return;
     }
 
@@ -221,16 +234,20 @@ void DrawProposalActions(const core::reviews::ReviewItem& item,
     }
 
     if (item.status == core::reviews::ReviewItemStatus::Open) {
-        if (ImGui::Button("Edit Proposal") && callbacks.edit_proposal) callbacks.edit_proposal(item);
+        if (ImGui::Button("Edit Proposal") && callbacks.edit_proposal)
+            callbacks.edit_proposal(item);
         ImGui::SameLine();
     }
     if (is_valid) {
-        if (ImGui::Button("View Proposal") && callbacks.preview_proposal) callbacks.preview_proposal(item);
+        if (ImGui::Button("View Proposal") && callbacks.preview_proposal)
+            callbacks.preview_proposal(item);
         ImGui::SameLine();
-        if (ImGui::Button("Apply Proposal") && callbacks.apply_proposal) callbacks.apply_proposal(item);
+        if (ImGui::Button("Apply Proposal") && callbacks.apply_proposal)
+            callbacks.apply_proposal(item);
         ImGui::SameLine();
     }
-    if (ImGui::Button("Delete Proposal") && callbacks.delete_proposal) callbacks.delete_proposal(item);
+    if (ImGui::Button("Delete Proposal") && callbacks.delete_proposal)
+        callbacks.delete_proposal(item);
 }
 
 void DrawReviewItemActions(const core::reviews::ReviewItem& item,
@@ -248,7 +265,7 @@ void DrawReviewItemActions(const core::reviews::ReviewItem& item,
     }
 }
 
-}  // namespace
+} // namespace
 
 void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& callbacks) {
     ImGui::TextUnformatted("Review");
@@ -281,18 +298,21 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
         selected_guideline_ids.clear();
     }
 
-    if (title_buf[0] == '\0') CopyToBuffer(title_buf, sizeof(title_buf), "Review comment");
+    if (title_buf[0] == '\0')
+        CopyToBuffer(title_buf, sizeof(title_buf), "Review comment");
 
     ImGui::TextUnformatted("New Comment");
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::InputText("##review_title", title_buf, sizeof(title_buf));
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::InputTextMultiline("##review_message", message_buf, sizeof(message_buf),
-                              ImVec2(-1.0f, ImGui::GetTextLineHeight() * 4.0f));
-    DrawGuidelineSelector(model, selected_guideline_ids, guideline_filter_buf, sizeof(guideline_filter_buf), popup_guideline_id);
+    ImGui::InputTextMultiline(
+        "##review_message", message_buf, sizeof(message_buf), ImVec2(-1.0f, ImGui::GetTextLineHeight() * 4.0f));
+    DrawGuidelineSelector(
+        model, selected_guideline_ids, guideline_filter_buf, sizeof(guideline_filter_buf), popup_guideline_id);
 
     const bool can_add = title_buf[0] != '\0' && message_buf[0] != '\0';
-    if (!can_add) ImGui::BeginDisabled();
+    if (!can_add)
+        ImGui::BeginDisabled();
     if (ImGui::Button("Add Review Comment") && callbacks.add_review_item) {
         callbacks.add_review_item(title_buf, message_buf, selected_guideline_ids);
         CopyToBuffer(title_buf, sizeof(title_buf), "Review comment");
@@ -300,7 +320,8 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
         guideline_filter_buf[0] = '\0';
         selected_guideline_ids.clear();
     }
-    if (!can_add) ImGui::EndDisabled();
+    if (!can_add)
+        ImGui::EndDisabled();
 
     DrawGuidelineStubPopup(model, popup_guideline_id);
 
@@ -319,7 +340,8 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
             DrawStatusBadge(item);
             ImGui::SameLine();
             ImGui::TextWrapped("%s", item.title.empty() ? "Review comment" : item.title.c_str());
-            ImGui::TextDisabled("Reviewed by %s", item.reviewer_name.empty() ? "not recorded" : item.reviewer_name.c_str());
+            ImGui::TextDisabled("Reviewed by %s",
+                                item.reviewer_name.empty() ? "not recorded" : item.reviewer_name.c_str());
             if (!item.message.empty()) {
                 ImGui::TextWrapped("%s", item.message.c_str());
             }
@@ -331,4 +353,4 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
     ImGui::EndChild();
 }
 
-}  // namespace ui::panels
+} // namespace ui::panels

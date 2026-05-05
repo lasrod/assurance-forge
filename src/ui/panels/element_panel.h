@@ -9,4 +9,4 @@ namespace ui::panels {
 // Returns true if any field was modified (caller should rebuild tree).
 bool ShowElementPanel(parser::AssuranceCase* ac, sacm::AssuranceCasePackage* sacm_pkg);
 
-}  // namespace ui::panels
+} // namespace ui::panels

@@ -95,4 +95,4 @@ std::string ComputeElementSemanticHash(const parser::SacmElement& element);
 ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& proposal,
                                                       const parser::AssuranceCase& current_model);
 
-}  // namespace core::reviews
+} // namespace core::reviews

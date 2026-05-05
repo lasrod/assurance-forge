@@ -15,4 +15,4 @@ void RenderAppSplitters(AppRuntimeState& state,
                         float top_y,
                         ImGuiWindowFlags panel_flags);
 
-}  // namespace app
+} // namespace app

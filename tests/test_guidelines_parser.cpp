@@ -1,8 +1,7 @@
-#include <gtest/gtest.h>
-
 #include "parser/guidelines_parser.h"
 
 #include <filesystem>
+#include <gtest/gtest.h>
 
 namespace {
 
@@ -79,11 +78,11 @@ prechecks:
 )yaml";
 
 std::filesystem::path RepositoryGuidelinesPath() {
-    return std::filesystem::path(__FILE__).parent_path().parent_path() /
-           "external" / "safety-case-core-guidelines" / "dist" / "sccg.full.yaml";
+    return std::filesystem::path(__FILE__).parent_path().parent_path() / "external" / "safety-case-core-guidelines" /
+           "dist" / "sccg.full.yaml";
 }
 
-}  // namespace
+} // namespace
 
 TEST(GuidelinesParserTest, ParsesMinimalYamlAndFetchesGuidelines) {
     parser::GuidelinesParseResult result = parser::GuidelinesParser::ParseString(kMinimalGuidelinesYaml);
@@ -113,7 +112,8 @@ TEST(GuidelinesParserTest, ParsesMinimalYamlAndFetchesGuidelines) {
     ASSERT_EQ(category_matches.size(), 1);
     EXPECT_EQ(category_matches[0]->id, "CL.1");
 
-    std::vector<const parser::Guideline*> element_matches = result.document.FindGuidelinesByApplicableElement("GSN Goal");
+    std::vector<const parser::Guideline*> element_matches =
+        result.document.FindGuidelinesByApplicableElement("GSN Goal");
     ASSERT_EQ(element_matches.size(), 1);
     EXPECT_EQ(element_matches[0]->id, "CL.1");
 
@@ -122,7 +122,7 @@ TEST(GuidelinesParserTest, ParsesMinimalYamlAndFetchesGuidelines) {
     EXPECT_EQ(check->description, "Check whether claim text is a complete proposition.");
 
     std::vector<const parser::Guideline*> check_matches =
-      result.document.FindGuidelinesBySuggestedCheckId("check-claim-is-proposition");
+        result.document.FindGuidelinesBySuggestedCheckId("check-claim-is-proposition");
     ASSERT_EQ(check_matches.size(), 1);
     EXPECT_EQ(check_matches[0]->id, "CL.1");
 
@@ -141,7 +141,7 @@ TEST(GuidelinesParserTest, ParsesMinimalYamlAndFetchesGuidelines) {
     EXPECT_EQ(profile->guideline_ids[0], "CL.1");
 
     std::vector<const parser::Guideline*> profile_matches =
-      result.document.FindGuidelinesByReviewProfile("claim_wording_review");
+        result.document.FindGuidelinesByReviewProfile("claim_wording_review");
     ASSERT_EQ(profile_matches.size(), 1u);
     EXPECT_EQ(profile_matches[0]->id, "CL.1");
 
@@ -252,15 +252,17 @@ TEST(GuidelinesParserTest, ParsesRealGuidelinesFile) {
     EXPECT_FALSE(result.document.data_packages.empty());
     EXPECT_FALSE(result.document.prechecks.empty());
 
-    std::vector<const parser::Guideline*> goal_guidelines = result.document.FindGuidelinesByApplicableElement("GSN Goal");
+    std::vector<const parser::Guideline*> goal_guidelines =
+        result.document.FindGuidelinesByApplicableElement("GSN Goal");
     EXPECT_FALSE(goal_guidelines.empty());
 
-    const parser::SuggestedCheck* proposition_check = result.document.FindSuggestedCheckById("check-claim-is-proposition");
+    const parser::SuggestedCheck* proposition_check =
+        result.document.FindSuggestedCheckById("check-claim-is-proposition");
     ASSERT_NE(proposition_check, nullptr);
     EXPECT_FALSE(proposition_check->description.empty());
 
     std::vector<const parser::Guideline*> proposition_guidelines =
-      result.document.FindGuidelinesBySuggestedCheckId("check-claim-is-proposition");
+        result.document.FindGuidelinesBySuggestedCheckId("check-claim-is-proposition");
     ASSERT_FALSE(proposition_guidelines.empty());
     EXPECT_EQ(proposition_guidelines.front()->id, "CL.1");
 }

@@ -7,11 +7,24 @@ This document captures the current intended shape of the application. It is deli
 - `app`: owns runtime orchestration, layout composition, file workflow state, modal state, and commands that mutate the loaded project.
 - `core`: owns application/domain operations that are independent of ImGui, such as tree building and add/remove behavior.
 - `parser` and `sacm`: own XML parsing, SACM model types, and serialization.
-- `parser::GuidelinesParser`: owns loading and querying Safety Case Core Guidelines from the bundled `data/guidelines.yaml` runtime asset.
+- `parser::GuidelinesParser`: owns loading and querying the generated SCCG catalog from the bundled `data/sccg.full.yaml` runtime asset.
+- `ai`: owns AI settings, provider calls, prompt construction, response parsing, and background AI task execution.
 - `ui`: owns immediate-mode rendering, transient UI state, and small shared UI helpers.
 - `ui/panels`: owns larger panel/modal surfaces.
 - `ui/widgets`: owns reusable low-level widgets.
 - `ui/gsn`: owns GSN canvas model, layout, rendering, and adapter code.
+
+## Ownership Rules
+
+Assurance Forge borrows a simple rule from large readable C++ projects: keep the code that solves a problem close to where the problem originates. Shared abstractions are useful only when they keep more than one real workflow simpler.
+
+- Keep `core` small. Add code there only when it represents reusable assurance-case domain behavior and has no UI, file-dialog, project-workflow, or provider dependency.
+- Keep `app` as orchestration. Controllers may coordinate user workflows, but domain invariants should move into `core`, `parser`, or `sacm` when they are independent of the UI shell.
+- Keep `ui` render-only. Panels should receive state plus small action objects or controller calls rather than reaching into application internals directly.
+- Keep `ai` provider-neutral above the provider boundary. Prompt assembly and response validation should not depend on a specific AI service unless a provider implementation requires it.
+- Keep external data explicit. Bundled runtime assets should have one discovery/copy path and tests for important copies.
+
+When adding a new file, choose the lowest layer that can own the behavior without importing a higher layer. For example, `core` must not include ImGui or `app`, and parser code must not emit UI events.
 
 ## Frame Flow
 
@@ -51,6 +64,8 @@ UI rendering code should avoid depending directly on `app`. If a panel needs to 
 
 This keeps dependencies visible at the call site and preserves the simple immediate-mode style.
 
+Prefer local helpers over widening core APIs for one caller. If a helper is needed by several modules, move it only after the repeated use is real and the new home is obvious.
+
 ## HelloImGui Scope
 
 HelloImGui provides the platform runner, window creation, event loop, DPI scaling, macOS bundling, global ImGui themes, and application settings/user preferences. Assurance Forge keeps its manual `NoDefaultWindow` layout and custom menu flow, but generic widget styling now comes from HelloImGui themes and the selected theme is remembered through HelloImGui settings.
@@ -61,10 +76,14 @@ Application chrome localization is handled by a lightweight Assurance Forge mess
 
 ## Core Data
 
-Safety Case Core Guidelines are tracked as the `external/safety-case-core-guidelines` submodule. The build copies `external/safety-case-core-guidelines/data/guidelines.yaml` into each target runtime directory as `data/guidelines.yaml`, and release packaging overlays that file into the shipped `data` folder.
+Safety Case Core Guidelines are tracked as the `external/safety-case-core-guidelines` submodule. Assurance Forge consumes the generated SCCG distribution artifact rather than the authored SCCG source tree. The build copies `external/safety-case-core-guidelines/dist/sccg.full.yaml` into each target runtime directory as `data/sccg.full.yaml`, and release packaging overlays that file into the shipped `data` folder.
+
+Runtime discovery should prefer `data/sccg.full.yaml` and the SCCG submodule `dist/sccg.full.yaml` path. Temporary compatibility fallback to old `guidelines.yaml` locations can remain where it keeps existing user checkouts usable.
 
 After cloning, initialize data dependencies with:
 
 ```text
 git submodule update --init --recursive
 ```
+
+If the SCCG submodule is present but `dist/sccg.full.yaml` is missing, regenerate the SCCG distribution in the SCCG repository before configuring Assurance Forge.

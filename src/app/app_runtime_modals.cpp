@@ -2,7 +2,6 @@
 #include "app/app_runtime_state.h"
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
-
 #include "core/element_factory.h"
 #include "imgui.h"
 #include "ui/panels/welcome_modal.h"
@@ -17,7 +16,8 @@ namespace app {
 namespace {
 
 void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
-    if (!buffer || buffer_size == 0) return;
+    if (!buffer || buffer_size == 0)
+        return;
     const size_t count = std::min(buffer_size - 1, value.size());
     std::memcpy(buffer, value.data(), count);
     buffer[count] = '\0';
@@ -25,16 +25,19 @@ void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
 
 std::string TrimWhitespace(const std::string& value) {
     auto begin = value.begin();
-    while (begin != value.end() && std::isspace(static_cast<unsigned char>(*begin))) ++begin;
+    while (begin != value.end() && std::isspace(static_cast<unsigned char>(*begin)))
+        ++begin;
     auto end = value.end();
-    while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1)))) --end;
+    while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1))))
+        --end;
     return std::string(begin, end);
 }
 
-}  // namespace
+} // namespace
 
 void AppRuntime::RenderNotImplementedModal() {
-    if (!impl_->modal_coordinator->show_not_implemented_modal) return;
+    if (!impl_->modal_coordinator->show_not_implemented_modal)
+        return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal("##not_implemented_modal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -57,7 +60,8 @@ void AppRuntime::RenderNotImplementedModal() {
 }
 
 void AppRuntime::RenderRemoveConfirmModal() {
-    if (!impl_->element_edit_controller->ShouldShowRemoveConfirm()) return;
+    if (!impl_->element_edit_controller->ShouldShowRemoveConfirm())
+        return;
 
     auto cancel = [&]() {
         impl_->element_edit_controller->CancelPendingRemoval();
@@ -67,13 +71,11 @@ void AppRuntime::RenderRemoveConfirmModal() {
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal("##remove_confirm_modal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         const int n = static_cast<int>(impl_->element_edit_controller->PendingRemoveIds().size());
-        const char* mode_label =
-            impl_->element_edit_controller->PendingRemoveMode() == core::RemoveMode::NodeOnly
-                ? "this node and its attachments"
-                : "this node and its descendants";
+        const char* mode_label = impl_->element_edit_controller->PendingRemoveMode() == core::RemoveMode::NodeOnly
+                                     ? "this node and its attachments"
+                                     : "this node and its descendants";
         ImGui::Text("Remove %s?", mode_label);
-        ImGui::Text("%d element%s will be deleted (highlighted in red).",
-                    n, n == 1 ? "" : "s");
+        ImGui::Text("%d element%s will be deleted (highlighted in red).", n, n == 1 ? "" : "s");
         ImGui::Spacing();
         ImGui::Spacing();
 
@@ -87,9 +89,8 @@ void AppRuntime::RenderRemoveConfirmModal() {
             ImGui::CloseCurrentPopup();
             if (impl_->app_state.loaded_case.has_value()) {
                 parser::AssuranceCase& ac = impl_->app_state.loaded_case.value();
-                sacm::AssuranceCasePackage* pkg = impl_->app_state.sacm_package.has_value()
-                                                      ? &impl_->app_state.sacm_package.value()
-                                                      : nullptr;
+                sacm::AssuranceCasePackage* pkg =
+                    impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
                 impl_->element_edit_controller->ConfirmPendingRemoval(ac, pkg);
             }
             ui::GetUiState().marked_for_removal.clear();
@@ -106,11 +107,10 @@ void AppRuntime::RenderRemoveConfirmModal() {
 }
 
 void AppRuntime::RenderDeleteReviewItemConfirmModal() {
-    if (!impl_->review_controller->ShouldShowDeleteConfirm()) return;
+    if (!impl_->review_controller->ShouldShowDeleteConfirm())
+        return;
 
-    auto cancel = [&]() {
-        impl_->review_controller->CancelDeleteReviewItem();
-    };
+    auto cancel = [&]() { impl_->review_controller->CancelDeleteReviewItem(); };
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal("Delete Review Comment", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -166,19 +166,21 @@ void AppRuntime::RenderStartupProjectWindow() {
             }
         },
     };
-    ui::panels::ShowWelcomeModal(impl_->project_controller->show_startup_project_window,
-                                 impl_->project_controller->recent_projects,
-                                 callbacks);
+    ui::panels::ShowWelcomeModal(
+        impl_->project_controller->show_startup_project_window, impl_->project_controller->recent_projects, callbacks);
 }
 
 void AppRuntime::RenderCreateProjectModal() {
-    if (!impl_->project_controller->show_create_project_modal) return;
+    if (!impl_->project_controller->show_create_project_modal)
+        return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal("Create Empty Assurance Project", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("Project name");
         ImGui::SetNextItemWidth(420.0f);
-        ImGui::InputText("##project_name", impl_->project_controller->project_name_buf, sizeof(impl_->project_controller->project_name_buf));
+        ImGui::InputText("##project_name",
+                         impl_->project_controller->project_name_buf,
+                         sizeof(impl_->project_controller->project_name_buf));
 
         ImGui::TextUnformatted("Parent location");
         ImGui::TextDisabled("%s", impl_->project_controller->project_parent_buf);
@@ -212,24 +214,30 @@ void AppRuntime::RenderCreateProjectModal() {
 }
 
 void AppRuntime::RenderProjectFileNameModal() {
-    if (!impl_->project_controller->show_project_file_name_modal) return;
+    if (!impl_->project_controller->show_project_file_name_modal)
+        return;
 
     const char* title = ProjectFileCreateTitle(impl_->project_controller->pending_project_file_kind);
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("File name");
         ImGui::SetNextItemWidth(420.0f);
-        ImGui::InputText("##project_file_name", impl_->project_controller->project_file_name_buf, sizeof(impl_->project_controller->project_file_name_buf));
+        ImGui::InputText("##project_file_name",
+                         impl_->project_controller->project_file_name_buf,
+                         sizeof(impl_->project_controller->project_file_name_buf));
         ImGui::Spacing();
 
         if (ImGui::Button("Create", ImVec2(110.0f, 0.0f))) {
             bool created = false;
             if (impl_->project_controller->pending_project_file_kind == ProjectFileCreateKind::Sacm) {
                 created = impl_->app_state.create_project_sacm_file(impl_->project_controller->project_file_name_buf);
-            } else if (impl_->project_controller->pending_project_file_kind == ProjectFileCreateKind::EvidenceRegister) {
-                created = impl_->app_state.create_project_evidence_register(impl_->project_controller->project_file_name_buf);
+            } else if (impl_->project_controller->pending_project_file_kind ==
+                       ProjectFileCreateKind::EvidenceRegister) {
+                created =
+                    impl_->app_state.create_project_evidence_register(impl_->project_controller->project_file_name_buf);
             } else {
-                created = impl_->app_state.create_project_j3377_cae_register(impl_->project_controller->project_file_name_buf);
+                created = impl_->app_state.create_project_j3377_cae_register(
+                    impl_->project_controller->project_file_name_buf);
             }
             if (created) {
                 impl_->project_controller->show_project_file_name_modal = false;
@@ -249,14 +257,17 @@ void AppRuntime::RenderProjectFileNameModal() {
 
 void AppRuntime::RenderProjectLoadReportModal() {
     auto& report = impl_->app_state.last_project_load_report;
-    if (!report.showPopup) return;
+    if (!report.showPopup)
+        return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal("Project Loading Status", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         for (const auto& step : report.steps) {
             const char* mark = "[OK]";
-            if (step.status == core::ProjectLoadStepStatus::Failed) mark = "[FAIL]";
-            if (step.status == core::ProjectLoadStepStatus::Warning) mark = "[WARN]";
+            if (step.status == core::ProjectLoadStepStatus::Failed)
+                mark = "[FAIL]";
+            if (step.status == core::ProjectLoadStepStatus::Warning)
+                mark = "[WARN]";
             ImGui::Text("%s %s", mark, step.label.c_str());
             if (!step.message.empty()) {
                 ImGui::SameLine();
@@ -282,7 +293,8 @@ void AppRuntime::RenderProjectLoadReportModal() {
 }
 
 void AppRuntime::RenderSaveBeforeExitModal(bool& done) {
-    if (!impl_->modal_coordinator->show_save_before_exit_modal) return;
+    if (!impl_->modal_coordinator->show_save_before_exit_modal)
+        return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal("Unsaved Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -321,8 +333,10 @@ void AppRuntime::RenderSaveBeforeExitModal(bool& done) {
 }
 
 void AppRuntime::RenderReviewerNamePromptModal() {
-    if (!impl_->modal_coordinator->show_reviewer_name_prompt) return;
-    if (impl_->project_controller->show_startup_project_window) return;
+    if (!impl_->modal_coordinator->show_reviewer_name_prompt)
+        return;
+    if (impl_->project_controller->show_startup_project_window)
+        return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal("Reviewer Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -332,14 +346,16 @@ void AppRuntime::RenderReviewerNamePromptModal() {
         ImGui::Spacing();
 
         const std::string draft = TrimWhitespace(impl_->reviewer_name_buf);
-        if (draft.empty()) ImGui::BeginDisabled();
+        if (draft.empty())
+            ImGui::BeginDisabled();
         if (ImGui::Button("Save", ImVec2(100.0f, 0.0f))) {
             impl_->reviewer_name = draft;
             CopyToBuffer(impl_->reviewer_name_buf, sizeof(impl_->reviewer_name_buf), impl_->reviewer_name);
             impl_->modal_coordinator->show_reviewer_name_prompt = false;
             ImGui::CloseCurrentPopup();
         }
-        if (draft.empty()) ImGui::EndDisabled();
+        if (draft.empty())
+            ImGui::EndDisabled();
         ImGui::SameLine();
         if (ImGui::Button("Later", ImVec2(100.0f, 0.0f))) {
             impl_->modal_coordinator->show_reviewer_name_prompt = false;
@@ -351,4 +367,4 @@ void AppRuntime::RenderReviewerNamePromptModal() {
     }
 }
 
-}  // namespace app
+} // namespace app

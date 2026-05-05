@@ -1,6 +1,6 @@
-#include <gtest/gtest.h>
-
 #include "app/controllers/modal_coordinator.h"
+
+#include <gtest/gtest.h>
 
 TEST(ModalCoordinatorTest, AppliesGenericModalRequests) {
     app::controllers::ModalCoordinator coordinator;

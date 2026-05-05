@@ -32,7 +32,8 @@ std::string GenerateReviewProposalId() {
 }
 
 std::string TruncateForProblemMessage(const std::string& value, size_t limit = 400) {
-    if (value.size() <= limit) return value;
+    if (value.size() <= limit)
+        return value;
     return value.substr(0, limit) + "...";
 }
 
@@ -53,7 +54,7 @@ core::reviews::ReviewProposal BuildDraftReviewProposal(const core::reviews::Revi
     return proposal;
 }
 
-}  // namespace
+} // namespace
 
 bool ProposalController::IsCanvasActive() const {
     return preview_active || creator_active;
@@ -76,14 +77,16 @@ void ProposalController::BeginDraft(const core::reviews::ReviewItem& item,
                                     const parser::SacmElement& anchor,
                                     const std::string& reviewer_name) {
     draft = BuildDraftReviewProposal(item, model, anchor);
-    if (!reviewer_name.empty()) draft.author_name = reviewer_name;
+    if (!reviewer_name.empty())
+        draft.author_name = reviewer_name;
     creator_active = true;
     creator_generated_ids.clear();
 }
 
 void ProposalController::BeginEditDraft(core::reviews::ReviewProposal proposal, const std::string& reviewer_name) {
     draft = std::move(proposal);
-    if (!reviewer_name.empty()) draft.author_name = reviewer_name;
+    if (!reviewer_name.empty())
+        draft.author_name = reviewer_name;
     creator_active = true;
     creator_generated_ids.clear();
 }
@@ -101,7 +104,8 @@ void ProposalController::ClearActiveState() {
 }
 
 bool ProposalController::ClosePreviewIfOpen(const std::string& proposal_id) {
-    if (!preview_active || preview_id != proposal_id) return false;
+    if (!preview_active || preview_id != proposal_id)
+        return false;
 
     preview_active = false;
     preview_id.clear();
@@ -109,4 +113,4 @@ bool ProposalController::ClosePreviewIfOpen(const std::string& proposal_id) {
     return true;
 }
 
-}  // namespace app::controllers
+} // namespace app::controllers

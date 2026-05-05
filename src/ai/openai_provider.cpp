@@ -1,7 +1,6 @@
 #include "ai/openai_provider.h"
 
 #include <nlohmann/json.hpp>
-
 #include <sstream>
 #include <utility>
 
@@ -9,11 +8,16 @@ namespace ai {
 namespace {
 
 AiErrorCode ErrorForHttpStatus(long status_code) {
-    if (status_code == 401 || status_code == 403) return AiErrorCode::AuthenticationFailed;
-    if (status_code == 404) return AiErrorCode::InvalidModel;
-    if (status_code == 408 || status_code == 504) return AiErrorCode::Timeout;
-    if (status_code == 429) return AiErrorCode::RateLimited;
-    if (status_code >= 400) return AiErrorCode::ProviderError;
+    if (status_code == 401 || status_code == 403)
+        return AiErrorCode::AuthenticationFailed;
+    if (status_code == 404)
+        return AiErrorCode::InvalidModel;
+    if (status_code == 408 || status_code == 504)
+        return AiErrorCode::Timeout;
+    if (status_code == 429)
+        return AiErrorCode::RateLimited;
+    if (status_code >= 400)
+        return AiErrorCode::ProviderError;
     return AiErrorCode::None;
 }
 
@@ -25,9 +29,11 @@ std::string ExtractOutputText(const nlohmann::json& root) {
     if (root.contains("output") && root["output"].is_array()) {
         std::ostringstream text;
         for (const auto& item : root["output"]) {
-            if (!item.is_object() || !item.contains("content") || !item["content"].is_array()) continue;
+            if (!item.is_object() || !item.contains("content") || !item["content"].is_array())
+                continue;
             for (const auto& content : item["content"]) {
-                if (!content.is_object()) continue;
+                if (!content.is_object())
+                    continue;
                 if (content.contains("text") && content["text"].is_string()) {
                     text << content["text"].get<std::string>();
                 }
@@ -60,7 +66,8 @@ nlohmann::json BuildRequestBody(const AiProviderSettings& settings, const AiRequ
     return body;
 }
 
-AiResponse ErrorResponse(AiErrorCode code, const std::string& message, std::string raw_json = {}, long http_status = 0) {
+AiResponse
+ErrorResponse(AiErrorCode code, const std::string& message, std::string raw_json = {}, long http_status = 0) {
     AiResponse response;
     response.success = false;
     response.errorCode = code;
@@ -71,29 +78,28 @@ AiResponse ErrorResponse(AiErrorCode code, const std::string& message, std::stri
 }
 
 std::string ErrorMessageWithDetail(const char* fallback, const std::string& detail) {
-    if (detail.empty()) return fallback;
+    if (detail.empty())
+        return fallback;
     return std::string(fallback) + ": " + RedactSensitiveText(detail);
 }
 
-}  // namespace
+} // namespace
 
-OpenAiProvider::OpenAiProvider(std::shared_ptr<IHttpClient> http_client)
-    : http_client_(std::move(http_client)) {}
+OpenAiProvider::OpenAiProvider(std::shared_ptr<IHttpClient> http_client) : http_client_(std::move(http_client)) {}
 
-AiConnectionStatus OpenAiProvider::TestConnection(const AiProviderSettings& settings,
-                                                  const std::string& api_key) {
+AiConnectionStatus OpenAiProvider::TestConnection(const AiProviderSettings& settings, const std::string& api_key) {
     AiRequest request;
     request.userPrompt = kOpenAiConnectionTestPrompt;
     AiResponse response = Generate(settings, request, api_key);
     if (!response.success) {
-        return ErrorStatus(response.errorCode, response.errorMessage.empty() ? ToString(response.errorCode) : response.errorMessage);
+        return ErrorStatus(response.errorCode,
+                           response.errorMessage.empty() ? ToString(response.errorCode) : response.errorMessage);
     }
     return SuccessStatus("Connection successful.");
 }
 
-AiResponse OpenAiProvider::Generate(const AiProviderSettings& settings,
-                                    const AiRequest& request,
-                                    const std::string& api_key) {
+AiResponse
+OpenAiProvider::Generate(const AiProviderSettings& settings, const AiRequest& request, const std::string& api_key) {
     if (!http_client_) {
         return ErrorResponse(AiErrorCode::NetworkError, "HTTP client is unavailable.");
     }
@@ -112,8 +118,7 @@ AiResponse OpenAiProvider::Generate(const AiProviderSettings& settings,
     try {
         http_request.body = BuildRequestBody(settings, request).dump();
     } catch (const nlohmann::json::parse_error& e) {
-        return ErrorResponse(AiErrorCode::SettingsError,
-                             std::string("Invalid JSON schema: ") + e.what());
+        return ErrorResponse(AiErrorCode::SettingsError, std::string("Invalid JSON schema: ") + e.what());
     }
 
     HttpResponse http_response = http_client_->Post(http_request);
@@ -150,4 +155,4 @@ AiResponse OpenAiProvider::Generate(const AiProviderSettings& settings,
     }
 }
 
-}  // namespace ai
+} // namespace ai

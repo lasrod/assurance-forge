@@ -1,9 +1,9 @@
 ﻿#pragma once
 
-#include <string>
-#include <vector>
 #include <map>
 #include <optional>
+#include <string>
+#include <vector>
 
 namespace parser {
 
@@ -11,7 +11,7 @@ namespace parser {
 struct SacmElement {
     std::string id;
     std::string name;
-    std::string type;  // "claim", "argumentreasoning", "artifact", etc. (lowercased local-name)
+    std::string type; // "claim", "argumentreasoning", "artifact", etc. (lowercased local-name)
     std::string content;
     std::string description;
     bool undeveloped = false;
@@ -22,10 +22,10 @@ struct SacmElement {
     std::map<std::string, std::string> content_langs;
 
     // Relationship fields (populated for assertedinference, assertedcontext, assertedevidence)
-    std::vector<std::string> source_refs;  // ids from <source ref="..."/>
-    std::vector<std::string> target_refs;  // ids from <target ref="..."/>
-    std::string reasoning_ref;             // from reasoning attribute (assertedinference)
-    std::string assertion_declaration;     // from assertionDeclaration attribute
+    std::vector<std::string> source_refs; // ids from <source ref="..."/>
+    std::vector<std::string> target_refs; // ids from <target ref="..."/>
+    std::string reasoning_ref;            // from reasoning attribute (assertedinference)
+    std::string assertion_declaration;    // from assertionDeclaration attribute
 };
 
 // Represents a parsed SACM assurance case
@@ -49,4 +49,4 @@ ParseResult parse_sacm_xml(const std::string& file_path);
 // Parses SACM XML from a string buffer
 ParseResult parse_sacm_xml_string(const std::string& xml_content);
 
-}  // namespace parser
+} // namespace parser

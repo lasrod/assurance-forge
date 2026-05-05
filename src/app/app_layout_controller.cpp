@@ -14,7 +14,7 @@ constexpr float kMinLeftSectionHeight = 120.0f;
 constexpr float kMinCenterSectionHeight = 220.0f;
 constexpr float kMinProblemsPanelHeight = 160.0f;
 
-}  // namespace
+} // namespace
 
 void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center_view) {
     if (!state.show_gsn_tab && !state.show_cse_tab && !state.show_evidence_tab) {
@@ -23,9 +23,12 @@ void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center
 
     auto is_tab_visible = [&](ui::CenterView view) {
         switch (view) {
-            case ui::CenterView::GsnCanvas: return state.show_gsn_tab;
-            case ui::CenterView::CseRegister: return state.show_cse_tab;
-            case ui::CenterView::EvidenceRegister: return state.show_evidence_tab;
+        case ui::CenterView::GsnCanvas:
+            return state.show_gsn_tab;
+        case ui::CenterView::CseRegister:
+            return state.show_cse_tab;
+        case ui::CenterView::EvidenceRegister:
+            return state.show_evidence_tab;
         }
         return false;
     };
@@ -75,25 +78,25 @@ void RenderAppSplitters(AppRuntimeState& state,
                                       panel_flags);
 
     const float available_h = content_h - kSplitterThickness;
-    if (available_h <= 0.0f) return;
+    if (available_h <= 0.0f)
+        return;
 
     float min_ratio = kMinLeftSectionHeight / available_h;
-    if (min_ratio > 0.30f) min_ratio = 0.30f;
+    if (min_ratio > 0.30f)
+        min_ratio = 0.30f;
 
     auto clamp_boundaries = [&]() {
-        if (state.project_boundary_ratio < min_ratio) state.project_boundary_ratio = min_ratio;
-        if (state.project_boundary_ratio > 1.0f - min_ratio) state.project_boundary_ratio = 1.0f - min_ratio;
+        if (state.project_boundary_ratio < min_ratio)
+            state.project_boundary_ratio = min_ratio;
+        if (state.project_boundary_ratio > 1.0f - min_ratio)
+            state.project_boundary_ratio = 1.0f - min_ratio;
     };
 
     clamp_boundaries();
 
     const float splitter_y = top_y + available_h * state.project_boundary_ratio;
-    const float delta = ui::widgets::DrawHorizontalSplitter("##left_h_splitter_1",
-                                                            0.0f,
-                                                            splitter_y,
-                                                            left_w,
-                                                            kSplitterThickness,
-                                                            panel_flags);
+    const float delta = ui::widgets::DrawHorizontalSplitter(
+        "##left_h_splitter_1", 0.0f, splitter_y, left_w, kSplitterThickness, panel_flags);
     if (delta != 0.0f) {
         state.project_boundary_ratio += delta / available_h;
         clamp_boundaries();
@@ -109,16 +112,12 @@ void RenderAppSplitters(AppRuntimeState& state,
     clamp_problems_height();
     const float center_panel_h = std::max(0.0f, available_h - state.problems_panel_height);
     const float center_splitter_y = top_y + center_panel_h;
-    const float delta_center = ui::widgets::DrawHorizontalSplitter("##center_problems_splitter",
-                                                                   center_x,
-                                                                   center_splitter_y,
-                                                                   center_w,
-                                                                   kSplitterThickness,
-                                                                   panel_flags);
+    const float delta_center = ui::widgets::DrawHorizontalSplitter(
+        "##center_problems_splitter", center_x, center_splitter_y, center_w, kSplitterThickness, panel_flags);
     if (delta_center != 0.0f) {
         state.problems_panel_height -= delta_center;
         clamp_problems_height();
     }
 }
 
-}  // namespace app
+} // namespace app

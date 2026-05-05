@@ -1,7 +1,6 @@
-#include <gtest/gtest.h>
-
 #include "app/guideline_catalog.h"
 
+#include <gtest/gtest.h>
 #include <string>
 #include <utility>
 

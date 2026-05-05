@@ -1,11 +1,10 @@
-#include <gtest/gtest.h>
-
-#include "core/element_factory.h"
 #include "core/assurance_tree.h"
+#include "core/element_factory.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_model.h"
 
 #include <algorithm>
+#include <gtest/gtest.h>
 
 namespace {
 
@@ -34,17 +33,21 @@ MiniCase MakeRootGoalCase() {
 }
 
 bool ParserHasId(const parser::AssuranceCase& ac, const std::string& id) {
-    for (const auto& e : ac.elements) if (e.id == id) return true;
+    for (const auto& e : ac.elements)
+        if (e.id == id)
+            return true;
     return false;
 }
 
 bool SacmHasClaim(const sacm::AssuranceCasePackage& pkg, const std::string& id) {
     for (const auto& ap : pkg.argumentPackages)
-        for (const auto& c : ap.claims) if (c.id == id) return true;
+        for (const auto& c : ap.claims)
+            if (c.id == id)
+                return true;
     return false;
 }
 
-}  // namespace
+} // namespace
 
 TEST(ElementFactoryAdd, AddTopGoalCreatesClaimInParserAndSacm) {
     parser::AssuranceCase ac;
@@ -64,9 +67,7 @@ TEST(ElementFactoryRemove, RemoveLeafElement) {
 
     // Add a Solution under G1.
     std::string new_id, err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1",
-                                      core::NewElementKind::Solution, new_id, err))
-        << err;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1", core::NewElementKind::Solution, new_id, err)) << err;
     ASSERT_FALSE(new_id.empty());
     ASSERT_TRUE(ParserHasId(mc.ac, new_id));
 
@@ -74,8 +75,7 @@ TEST(ElementFactoryRemove, RemoveLeafElement) {
     EXPECT_EQ(core::CountDescendants(mc.ac, new_id), 0);
 
     // Remove using NodeOnly (single-element plan).
-    ASSERT_TRUE(core::RemoveElement(mc.ac, &mc.pkg, new_id,
-                                    core::RemoveMode::NodeOnly, err)) << err;
+    ASSERT_TRUE(core::RemoveElement(mc.ac, &mc.pkg, new_id, core::RemoveMode::NodeOnly, err)) << err;
 
     // Solution gone from parser model.
     EXPECT_FALSE(ParserHasId(mc.ac, new_id));
@@ -83,8 +83,7 @@ TEST(ElementFactoryRemove, RemoveLeafElement) {
     // The originating AssertedEvidence relationship is also gone (it had the
     // removed element as its only source).
     for (const auto& e : mc.ac.elements) {
-        EXPECT_NE(e.type, "assertedevidence")
-            << "Dangling assertedevidence relationship left behind: " << e.id;
+        EXPECT_NE(e.type, "assertedevidence") << "Dangling assertedevidence relationship left behind: " << e.id;
     }
 
     // SACM model: artifactReferences and assertedEvidences both empty for the package.
@@ -98,23 +97,20 @@ TEST(ElementFactoryRemove, RemoveElementWithChildrenCascade) {
 
     // Add a Strategy under G1, then a Goal under the strategy.
     std::string strategy_id, leaf_id, err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1",
-                                      core::NewElementKind::Strategy, strategy_id, err)) << err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1",
-                                      core::NewElementKind::Goal, leaf_id, err)) << err;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1", core::NewElementKind::Strategy, strategy_id, err)) << err;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1", core::NewElementKind::Goal, leaf_id, err)) << err;
     // leaf_id was added under G1 directly, not under the strategy. Add another
     // goal under the strategy so we have a real subtree to remove.
     std::string sub_goal_id;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, strategy_id,
-                                      core::NewElementKind::Goal, sub_goal_id, err)) << err;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, strategy_id, core::NewElementKind::Goal, sub_goal_id, err))
+        << err;
 
     // The strategy now has at least one descendant.
     EXPECT_GT(core::CountDescendants(mc.ac, strategy_id), 0);
 
     // NodeAndDescendants cleanly removes the strategy and its sub-goal.
     err.clear();
-    ASSERT_TRUE(core::RemoveElement(mc.ac, &mc.pkg, strategy_id,
-                                    core::RemoveMode::NodeAndDescendants, err)) << err;
+    ASSERT_TRUE(core::RemoveElement(mc.ac, &mc.pkg, strategy_id, core::RemoveMode::NodeAndDescendants, err)) << err;
 
     // Strategy and its sub-goal are gone from both models.
     EXPECT_FALSE(ParserHasId(mc.ac, strategy_id));
@@ -132,8 +128,7 @@ TEST(ElementFactoryRemove, RemoveElementWithChildrenCascade) {
 TEST(ElementFactoryRemove, RemoveUnknownIdReturnsError) {
     auto mc = MakeRootGoalCase();
     std::string err;
-    EXPECT_FALSE(core::RemoveElement(mc.ac, &mc.pkg, "DOES_NOT_EXIST",
-                                     core::RemoveMode::NodeOnly, err));
+    EXPECT_FALSE(core::RemoveElement(mc.ac, &mc.pkg, "DOES_NOT_EXIST", core::RemoveMode::NodeOnly, err));
     EXPECT_FALSE(err.empty());
 }
 
@@ -153,9 +148,9 @@ TEST(ElementFactoryRemove, RemoveSourceOfSharedInferencePreservesSiblings) {
         ac.elements.push_back(e);
     };
     add_node("CL_TOP", "claim");
-    add_node("AR_1",   "argumentreasoning");  // strategy
-    add_node("CL_A",   "claim");
-    add_node("CL_B",   "claim");
+    add_node("AR_1", "argumentreasoning"); // strategy
+    add_node("CL_A", "claim");
+    add_node("CL_B", "claim");
 
     parser::SacmElement inference;
     inference.id = "INF_1";
@@ -166,10 +161,18 @@ TEST(ElementFactoryRemove, RemoveSourceOfSharedInferencePreservesSiblings) {
     ac.elements.push_back(inference);
 
     sacm::ArgumentPackage ap;
-    sacm::Claim ct; ct.id = "CL_TOP"; ap.claims.push_back(ct);
-    sacm::Claim ca; ca.id = "CL_A";   ap.claims.push_back(ca);
-    sacm::Claim cb; cb.id = "CL_B";   ap.claims.push_back(cb);
-    sacm::ArgumentReasoning ar; ar.id = "AR_1"; ap.argumentReasonings.push_back(ar);
+    sacm::Claim ct;
+    ct.id = "CL_TOP";
+    ap.claims.push_back(ct);
+    sacm::Claim ca;
+    ca.id = "CL_A";
+    ap.claims.push_back(ca);
+    sacm::Claim cb;
+    cb.id = "CL_B";
+    ap.claims.push_back(cb);
+    sacm::ArgumentReasoning ar;
+    ar.id = "AR_1";
+    ap.argumentReasonings.push_back(ar);
     sacm::AssertedInference inf;
     inf.id = "INF_1";
     inf.targets = {"CL_TOP"};
@@ -182,8 +185,7 @@ TEST(ElementFactoryRemove, RemoveSourceOfSharedInferencePreservesSiblings) {
     EXPECT_EQ(core::CountDescendants(ac, "CL_A"), 0);
 
     std::string err;
-    ASSERT_TRUE(core::RemoveElement(ac, &pkg, "CL_A",
-                                    core::RemoveMode::NodeOnly, err)) << err;
+    ASSERT_TRUE(core::RemoveElement(ac, &pkg, "CL_A", core::RemoveMode::NodeOnly, err)) << err;
 
     // CL_A is gone, but the strategy, sibling, target and inference remain.
     EXPECT_FALSE(ParserHasId(ac, "CL_A"));
@@ -194,7 +196,8 @@ TEST(ElementFactoryRemove, RemoveSourceOfSharedInferencePreservesSiblings) {
 
     // Inference's source list no longer contains CL_A.
     for (const auto& e : ac.elements) {
-        if (e.id != "INF_1") continue;
+        if (e.id != "INF_1")
+            continue;
         EXPECT_EQ(e.source_refs.size(), 1u);
         EXPECT_EQ(e.source_refs[0], "CL_B");
         EXPECT_EQ(e.reasoning_ref, "AR_1");
@@ -217,29 +220,27 @@ TEST(ElementFactoryRemove, RemoveSingleSubGoalUnderStrategyKeepsStrategy) {
     auto mc = MakeRootGoalCase();
 
     std::string strategy_id, sub_goal_id, err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1",
-                                      core::NewElementKind::Strategy, strategy_id, err)) << err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, strategy_id,
-                                      core::NewElementKind::Goal, sub_goal_id, err)) << err;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1", core::NewElementKind::Strategy, strategy_id, err)) << err;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, strategy_id, core::NewElementKind::Goal, sub_goal_id, err))
+        << err;
 
     EXPECT_EQ(core::CountDescendants(mc.ac, sub_goal_id), 0);
 
     err.clear();
-    ASSERT_TRUE(core::RemoveElement(mc.ac, &mc.pkg, sub_goal_id,
-                                    core::RemoveMode::NodeOnly, err)) << err;
+    ASSERT_TRUE(core::RemoveElement(mc.ac, &mc.pkg, sub_goal_id, core::RemoveMode::NodeOnly, err)) << err;
 
     EXPECT_FALSE(ParserHasId(mc.ac, sub_goal_id));
-    EXPECT_TRUE(ParserHasId(mc.ac, strategy_id))
-        << "Strategy must survive removal of its only sub-goal.";
+    EXPECT_TRUE(ParserHasId(mc.ac, strategy_id)) << "Strategy must survive removal of its only sub-goal.";
     EXPECT_TRUE(ParserHasId(mc.ac, "G1"));
 
     // The inference wiring strategy under G1 must still exist (target=G1,
     // reasoning=strategy_id) so the tree continues to render the strategy.
     bool found_wiring = false;
     for (const auto& e : mc.ac.elements) {
-        if (e.type != "assertedinference") continue;
-        bool targets_g1 = std::find(e.target_refs.begin(), e.target_refs.end(),
-                                    std::string("G1")) != e.target_refs.end();
+        if (e.type != "assertedinference")
+            continue;
+        bool targets_g1 =
+            std::find(e.target_refs.begin(), e.target_refs.end(), std::string("G1")) != e.target_refs.end();
         if (targets_g1 && e.reasoning_ref == strategy_id) {
             found_wiring = true;
             break;
@@ -257,8 +258,7 @@ TEST(ElementFactoryRemove, RemoveSingleSubGoalUnderStrategyKeepsStrategy) {
             strategy_in_tree = true;
         }
     }
-    EXPECT_TRUE(strategy_in_tree)
-        << "Tree builder dropped the strategy after sub-goal removal.";
+    EXPECT_TRUE(strategy_in_tree) << "Tree builder dropped the strategy after sub-goal removal.";
 }
 
 // NodeOnly remove of a strategy with structural children must reparent the
@@ -267,10 +267,9 @@ TEST(ElementFactoryRemove, RemoveNodeOnly_ReparentsStructuralChildrenToParent) {
     auto mc = MakeRootGoalCase();
 
     std::string strategy_id, sub_goal_id, err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1",
-                                      core::NewElementKind::Strategy, strategy_id, err)) << err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, strategy_id,
-                                      core::NewElementKind::Goal, sub_goal_id, err)) << err;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1", core::NewElementKind::Strategy, strategy_id, err)) << err;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, strategy_id, core::NewElementKind::Goal, sub_goal_id, err))
+        << err;
 
     // Plan: NodeOnly on a strategy includes only the strategy itself.
     auto plan = core::PlanRemoval(mc.ac, strategy_id, core::RemoveMode::NodeOnly);
@@ -278,22 +277,20 @@ TEST(ElementFactoryRemove, RemoveNodeOnly_ReparentsStructuralChildrenToParent) {
     EXPECT_TRUE(plan.count(strategy_id));
 
     err.clear();
-    ASSERT_TRUE(core::RemoveElement(mc.ac, &mc.pkg, strategy_id,
-                                    core::RemoveMode::NodeOnly, err)) << err;
+    ASSERT_TRUE(core::RemoveElement(mc.ac, &mc.pkg, strategy_id, core::RemoveMode::NodeOnly, err)) << err;
 
     EXPECT_FALSE(ParserHasId(mc.ac, strategy_id));
-    EXPECT_TRUE(ParserHasId(mc.ac, sub_goal_id))
-        << "Sub-goal must survive a NodeOnly remove of its parent strategy.";
+    EXPECT_TRUE(ParserHasId(mc.ac, sub_goal_id)) << "Sub-goal must survive a NodeOnly remove of its parent strategy.";
 
     auto tree = core::AssuranceTree::Build(mc.ac);
     ASSERT_NE(tree.root, nullptr);
     EXPECT_EQ(tree.root->id, "G1");
     bool sub_goal_under_g1 = false;
     for (const auto* c : tree.root->group1_children) {
-        if (c->id == sub_goal_id) sub_goal_under_g1 = true;
+        if (c->id == sub_goal_id)
+            sub_goal_under_g1 = true;
     }
-    EXPECT_TRUE(sub_goal_under_g1)
-        << "Sub-goal must be reparented to G1 after the strategy is removed.";
+    EXPECT_TRUE(sub_goal_under_g1) << "Sub-goal must be reparented to G1 after the strategy is removed.";
 }
 
 // NodeOnly remove of a regular sub-claim that has its own children must promote
@@ -302,14 +299,11 @@ TEST(ElementFactoryRemove, RemoveNodeOnly_PromotesGrandchildrenToGrandparent) {
     auto mc = MakeRootGoalCase();
 
     std::string g2_id, g3_id, err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1",
-                                      core::NewElementKind::Goal, g2_id, err)) << err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, g2_id,
-                                      core::NewElementKind::Goal, g3_id, err)) << err;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1", core::NewElementKind::Goal, g2_id, err)) << err;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, g2_id, core::NewElementKind::Goal, g3_id, err)) << err;
 
     err.clear();
-    ASSERT_TRUE(core::RemoveElement(mc.ac, &mc.pkg, g2_id,
-                                    core::RemoveMode::NodeOnly, err)) << err;
+    ASSERT_TRUE(core::RemoveElement(mc.ac, &mc.pkg, g2_id, core::RemoveMode::NodeOnly, err)) << err;
 
     EXPECT_FALSE(ParserHasId(mc.ac, g2_id));
     EXPECT_TRUE(ParserHasId(mc.ac, g3_id));
@@ -318,7 +312,8 @@ TEST(ElementFactoryRemove, RemoveNodeOnly_PromotesGrandchildrenToGrandparent) {
     ASSERT_NE(tree.root, nullptr);
     bool g3_under_g1 = false;
     for (const auto* c : tree.root->group1_children) {
-        if (c->id == g3_id) g3_under_g1 = true;
+        if (c->id == g3_id)
+            g3_under_g1 = true;
     }
     EXPECT_TRUE(g3_under_g1) << "G3 must be reparented to G1 after G2 is removed.";
 }
@@ -329,10 +324,8 @@ TEST(ElementFactoryRemove, RemoveNodeOnly_AlsoRemovesGroup2Attachments) {
     auto mc = MakeRootGoalCase();
 
     std::string sub_goal_id, ctx_id, err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1",
-                                      core::NewElementKind::Goal, sub_goal_id, err)) << err;
-    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, sub_goal_id,
-                                      core::NewElementKind::Context, ctx_id, err)) << err;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1", core::NewElementKind::Goal, sub_goal_id, err)) << err;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, sub_goal_id, core::NewElementKind::Context, ctx_id, err)) << err;
 
     auto plan = core::PlanRemoval(mc.ac, sub_goal_id, core::RemoveMode::NodeOnly);
     EXPECT_EQ(plan.size(), 2u);
@@ -340,11 +333,9 @@ TEST(ElementFactoryRemove, RemoveNodeOnly_AlsoRemovesGroup2Attachments) {
     EXPECT_TRUE(plan.count(ctx_id));
 
     err.clear();
-    ASSERT_TRUE(core::RemoveElement(mc.ac, &mc.pkg, sub_goal_id,
-                                    core::RemoveMode::NodeOnly, err)) << err;
+    ASSERT_TRUE(core::RemoveElement(mc.ac, &mc.pkg, sub_goal_id, core::RemoveMode::NodeOnly, err)) << err;
     EXPECT_FALSE(ParserHasId(mc.ac, sub_goal_id));
-    EXPECT_FALSE(ParserHasId(mc.ac, ctx_id))
-        << "Context attachment must go away with its target node.";
+    EXPECT_FALSE(ParserHasId(mc.ac, ctx_id)) << "Context attachment must go away with its target node.";
 }
 
 // Comprehensive regression for the canonical shared-inference shape (matches
@@ -358,16 +349,19 @@ TEST(ElementFactoryRemove, StrategyShape_AllRemoveModes) {
 
     auto add_node = [&](const char* id, const char* type) {
         parser::SacmElement e;
-        e.id = id; e.type = type; e.name = id;
+        e.id = id;
+        e.type = type;
+        e.name = id;
         ac.elements.push_back(e);
     };
-    add_node("CL_TOP",   "claim");
-    add_node("AR_1",     "argumentreasoning");
+    add_node("CL_TOP", "claim");
+    add_node("AR_1", "argumentreasoning");
     add_node("CL_SUB_1", "claim");
     add_node("CL_SUB_2", "claim");
 
     parser::SacmElement inf;
-    inf.id = "INF_1"; inf.type = "assertedinference";
+    inf.id = "INF_1";
+    inf.type = "assertedinference";
     inf.target_refs = {"CL_TOP"};
     inf.reasoning_ref = "AR_1";
     inf.source_refs = {"CL_SUB_1", "CL_SUB_2"};
@@ -377,12 +371,22 @@ TEST(ElementFactoryRemove, StrategyShape_AllRemoveModes) {
     pkg.argumentPackages.emplace_back();
     auto& ap = pkg.argumentPackages.back();
     ap.id = "AP1";
-    sacm::Claim c1; c1.id = "CL_TOP";   ap.claims.push_back(c1);
-    sacm::Claim c2; c2.id = "CL_SUB_1"; ap.claims.push_back(c2);
-    sacm::Claim c3; c3.id = "CL_SUB_2"; ap.claims.push_back(c3);
-    sacm::ArgumentReasoning ar; ar.id = "AR_1"; ap.argumentReasonings.push_back(ar);
+    sacm::Claim c1;
+    c1.id = "CL_TOP";
+    ap.claims.push_back(c1);
+    sacm::Claim c2;
+    c2.id = "CL_SUB_1";
+    ap.claims.push_back(c2);
+    sacm::Claim c3;
+    c3.id = "CL_SUB_2";
+    ap.claims.push_back(c3);
+    sacm::ArgumentReasoning ar;
+    ar.id = "AR_1";
+    ap.argumentReasonings.push_back(ar);
     sacm::AssertedInference si;
-    si.id = "INF_1"; si.targets = {"CL_TOP"}; si.reasoning = "AR_1";
+    si.id = "INF_1";
+    si.targets = {"CL_TOP"};
+    si.reasoning = "AR_1";
     si.sources = {"CL_SUB_1", "CL_SUB_2"};
     ap.assertedInferences.push_back(si);
 
@@ -414,9 +418,10 @@ TEST(ElementFactoryRemove, StrategyShape_AllRemoveModes) {
 
     // --- 3. Removing a sub-claim with NodeOnly: AR_1 + CL_TOP survive.
     {
-        auto ac2 = ac; auto pkg2 = pkg; std::string err;
-        ASSERT_TRUE(core::RemoveElement(ac2, &pkg2, "CL_SUB_1",
-                                        core::RemoveMode::NodeOnly, err)) << err;
+        auto ac2 = ac;
+        auto pkg2 = pkg;
+        std::string err;
+        ASSERT_TRUE(core::RemoveElement(ac2, &pkg2, "CL_SUB_1", core::RemoveMode::NodeOnly, err)) << err;
         EXPECT_FALSE(ParserHasId(ac2, "CL_SUB_1"));
         EXPECT_TRUE(ParserHasId(ac2, "CL_SUB_2"));
         EXPECT_TRUE(ParserHasId(ac2, "AR_1"));
@@ -424,9 +429,10 @@ TEST(ElementFactoryRemove, StrategyShape_AllRemoveModes) {
     }
     // --- 4. NodeAndDescendants on the strategy: strategy + sub-claims gone, top stays.
     {
-        auto ac2 = ac; auto pkg2 = pkg; std::string err;
-        ASSERT_TRUE(core::RemoveElement(ac2, &pkg2, "AR_1",
-                                        core::RemoveMode::NodeAndDescendants, err)) << err;
+        auto ac2 = ac;
+        auto pkg2 = pkg;
+        std::string err;
+        ASSERT_TRUE(core::RemoveElement(ac2, &pkg2, "AR_1", core::RemoveMode::NodeAndDescendants, err)) << err;
         EXPECT_FALSE(ParserHasId(ac2, "AR_1"));
         EXPECT_FALSE(ParserHasId(ac2, "CL_SUB_1"));
         EXPECT_FALSE(ParserHasId(ac2, "CL_SUB_2"));

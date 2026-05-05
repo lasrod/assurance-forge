@@ -32,8 +32,7 @@ struct GuidelineCatalog {
 
 std::filesystem::path FindSccgCatalogFile();
 std::filesystem::path FindGuidelinesFile();
-GuidelineCatalog BuildGuidelineCatalog(parser::GuidelinesDocument document,
-                                       std::filesystem::path source_path = {});
+GuidelineCatalog BuildGuidelineCatalog(parser::GuidelinesDocument document, std::filesystem::path source_path = {});
 bool LoadGuidelineCatalog(GuidelineCatalog& catalog, std::string& error);
 
-}  // namespace app
+} // namespace app

@@ -1,15 +1,12 @@
-#include <gtest/gtest.h>
-
 #include "ai/ai_task_runner.h"
 
 #include <chrono>
+#include <gtest/gtest.h>
 #include <stdexcept>
 
 TEST(AiTaskRunnerTest, ReportsRunningThenSuccess) {
     ai::AiTaskRunner runner;
-    auto handle = runner.RunConnectionTest([]() {
-        return ai::SuccessStatus("done");
-    });
+    auto handle = runner.RunConnectionTest([]() { return ai::SuccessStatus("done"); });
 
     ai::AiTaskSnapshot first = handle->Snapshot();
     EXPECT_TRUE(first.state == ai::AiTaskState::Running || first.state == ai::AiTaskState::Success);
@@ -24,9 +21,7 @@ TEST(AiTaskRunnerTest, ReportsRunningThenSuccess) {
 
 TEST(AiTaskRunnerTest, CapturesThrownExceptionAsError) {
     ai::AiTaskRunner runner;
-    auto handle = runner.RunConnectionTest([]() -> ai::AiConnectionStatus {
-        throw std::runtime_error("failure");
-    });
+    auto handle = runner.RunConnectionTest([]() -> ai::AiConnectionStatus { throw std::runtime_error("failure"); });
 
     bool completed = handle->WaitUntilComplete(std::chrono::milliseconds(5000));
     EXPECT_TRUE(completed);
@@ -56,9 +51,7 @@ TEST(AiTaskRunnerTest, RunsGenerateTaskAndCapturesResponse) {
 
 TEST(AiTaskRunnerTest, GenerateExceptionBecomesErrorResponse) {
     ai::AiTaskRunner runner;
-    auto handle = runner.RunGenerate([]() -> ai::AiResponse {
-        throw std::runtime_error("generate failed");
-    });
+    auto handle = runner.RunGenerate([]() -> ai::AiResponse { throw std::runtime_error("generate failed"); });
 
     bool completed = handle->WaitUntilComplete(std::chrono::milliseconds(5000));
     EXPECT_TRUE(completed);
@@ -69,4 +62,3 @@ TEST(AiTaskRunnerTest, GenerateExceptionBecomesErrorResponse) {
     EXPECT_EQ(latest.response.errorCode, ai::AiErrorCode::Unknown);
     EXPECT_EQ(latest.response.errorMessage, "generate failed");
 }
-

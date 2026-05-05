@@ -32,9 +32,7 @@ void RenderFile(const core::ProjectFileEntry& entry,
                 const ProjectFilesPanelCallbacks& callbacks) {
     std::string label = entry.relativePath.filename().generic_string();
     ImGui::PushID(entry.relativePath.generic_string().c_str());
-    ImGui::TreeNodeEx("file",
-                      ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen,
-                      "%s", label.c_str());
+    ImGui::TreeNodeEx("file", ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen, "%s", label.c_str());
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && callbacks.open_file) {
         callbacks.open_file(entry);
     }
@@ -46,7 +44,8 @@ void RenderFile(const core::ProjectFileEntry& entry,
         if (found != model.proposal_validity_by_path.end()) {
             const bool valid = found->second.validity == core::reviews::ProposalValidity::Valid;
             ImGui::SameLine();
-            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(valid ? ui::GetTheme().success : ui::GetTheme().danger));
+            ImGui::PushStyleColor(
+                ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(valid ? ui::GetTheme().success : ui::GetTheme().danger));
             ImGui::TextUnformatted(valid ? "(Valid)" : "(Broken)");
             ImGui::PopStyleColor();
         }
@@ -87,11 +86,13 @@ void ShowProjectFilesTree(const ProjectFilesPanelModel& model, const ProjectFile
     for (const auto& folder : kVisibleFolders) {
         bool open = ImGui::TreeNodeEx(folder.label, ImGuiTreeNodeFlags_DefaultOpen, "%s", folder.label);
         RenderFolderContextMenu(folder.path, callbacks);
-        if (!open) continue;
+        if (!open)
+            continue;
 
         bool has_files = false;
         for (const auto& entry : project.files) {
-            if (!EntryBelongsToFolder(entry, folder.path)) continue;
+            if (!EntryBelongsToFolder(entry, folder.path))
+                continue;
             has_files = true;
             RenderFile(entry, model, callbacks);
         }
@@ -102,7 +103,7 @@ void ShowProjectFilesTree(const ProjectFilesPanelModel& model, const ProjectFile
     }
 }
 
-}  // namespace
+} // namespace
 
 void ShowProjectFilesPanel(float width,
                            float height,
@@ -126,4 +127,4 @@ void ShowProjectFilesPanel(float width,
     ImGui::End();
 }
 
-}  // namespace ui::panels
+} // namespace ui::panels

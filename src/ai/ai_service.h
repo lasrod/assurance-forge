@@ -35,4 +35,4 @@ private:
     std::shared_ptr<IAiProvider> provider_;
 };
 
-}  // namespace ai
+} // namespace ai

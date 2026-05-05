@@ -1,32 +1,48 @@
 #include "ui/tree_view.h"
-#include "ui/theme.h"
+
 #include "imgui.h"
+#include "ui/theme.h"
+
 #include <string>
 
 namespace ui {
 
 static const char* RoleLabel(core::NodeRole role) {
     switch (role) {
-        case core::NodeRole::Claim:         return "[Claim]";
-        case core::NodeRole::Strategy:      return "[Strategy]";
-        case core::NodeRole::Solution:      return "[Solution]";
-        case core::NodeRole::Context:       return "[Context]";
-        case core::NodeRole::Assumption:    return "[Assumption]";
-        case core::NodeRole::Justification: return "[Justification]";
-        default:                            return "[Other]";
+    case core::NodeRole::Claim:
+        return "[Claim]";
+    case core::NodeRole::Strategy:
+        return "[Strategy]";
+    case core::NodeRole::Solution:
+        return "[Solution]";
+    case core::NodeRole::Context:
+        return "[Context]";
+    case core::NodeRole::Assumption:
+        return "[Assumption]";
+    case core::NodeRole::Justification:
+        return "[Justification]";
+    default:
+        return "[Other]";
     }
 }
 
 static ImVec4 RoleColor(core::NodeRole role) {
     const Theme& t = GetTheme();
     switch (role) {
-        case core::NodeRole::Claim:         return ImGui::ColorConvertU32ToFloat4(t.node_claim);
-        case core::NodeRole::Strategy:      return ImGui::ColorConvertU32ToFloat4(t.node_strategy);
-        case core::NodeRole::Solution:      return ImGui::ColorConvertU32ToFloat4(t.node_solution);
-        case core::NodeRole::Context:       return ImGui::ColorConvertU32ToFloat4(t.node_context);
-        case core::NodeRole::Assumption:    return ImGui::ColorConvertU32ToFloat4(t.node_assumption);
-        case core::NodeRole::Justification: return ImGui::ColorConvertU32ToFloat4(t.node_justification);
-        default:                            return ImGui::ColorConvertU32ToFloat4(t.text_secondary);
+    case core::NodeRole::Claim:
+        return ImGui::ColorConvertU32ToFloat4(t.node_claim);
+    case core::NodeRole::Strategy:
+        return ImGui::ColorConvertU32ToFloat4(t.node_strategy);
+    case core::NodeRole::Solution:
+        return ImGui::ColorConvertU32ToFloat4(t.node_solution);
+    case core::NodeRole::Context:
+        return ImGui::ColorConvertU32ToFloat4(t.node_context);
+    case core::NodeRole::Assumption:
+        return ImGui::ColorConvertU32ToFloat4(t.node_assumption);
+    case core::NodeRole::Justification:
+        return ImGui::ColorConvertU32ToFloat4(t.node_justification);
+    default:
+        return ImGui::ColorConvertU32ToFloat4(t.text_secondary);
     }
 }
 
@@ -43,10 +59,8 @@ static void RenderTreeNode(const core::TreeNode* node,
                            const parser::AssuranceCase* active_case,
                            UiState& state,
                            const ElementContextActions& actions) {
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow
-                             | ImGuiTreeNodeFlags_OpenOnDoubleClick
-                             | ImGuiTreeNodeFlags_SpanAvailWidth
-                             | ImGuiTreeNodeFlags_DefaultOpen;
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick |
+                               ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen;
 
     bool has_children = !node->group1_children.empty() || !node->group2_attachments.empty();
     if (!has_children)
@@ -63,7 +77,7 @@ static void RenderTreeNode(const core::TreeNode* node,
     bool clicked = ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen();
 
     // Capture item rect before BeginPopupContextItem advances the last item.
-    ImVec2 item_min  = ImGui::GetItemRectMin();
+    ImVec2 item_min = ImGui::GetItemRectMin();
     ImVec2 item_size = ImGui::GetItemRectSize();
 
     bool popup_open = ImGui::BeginPopupContextItem(node->id.c_str());
@@ -74,21 +88,20 @@ static void RenderTreeNode(const core::TreeNode* node,
         float text_x = item_min.x + ImGui::GetTreeNodeToLabelSpacing();
         float text_y = item_min.y + (item_size.y - ImGui::GetTextLineHeight()) * 0.5f;
 
-        ImDrawList* dl   = ImGui::GetWindowDrawList();
-        ImFont*     font = ImGui::GetFont();
-        float font_size  = ImGui::GetFontSize();
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        ImFont* font = ImGui::GetFont();
+        float font_size = ImGui::GetFontSize();
 
-        const char* tag  = RoleLabel(node->role);
-        ImU32 tag_col    = ImGui::ColorConvertFloat4ToU32(RoleColor(node->role));
+        const char* tag = RoleLabel(node->role);
+        ImU32 tag_col = ImGui::ColorConvertFloat4ToU32(RoleColor(node->role));
         dl->AddText(font, font_size, ImVec2(text_x, text_y), tag_col, tag);
 
-        float tag_w   = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, tag).x;
+        float tag_w = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, tag).x;
         float space_w = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, " ").x;
 
-        std::string name  = ShortName(node);
-        ImU32       name_col = ImGui::GetColorU32(ImGuiCol_Text);
-        dl->AddText(font, font_size, ImVec2(text_x + tag_w + space_w, text_y),
-                    name_col, name.c_str());
+        std::string name = ShortName(node);
+        ImU32 name_col = ImGui::GetColorU32(ImGuiCol_Text);
+        dl->AddText(font, font_size, ImVec2(text_x + tag_w + space_w, text_y), name_col, name.c_str());
     }
 
     if (clicked) {
@@ -143,4 +156,4 @@ void ShowTreeViewPanel(const core::AssuranceTree* tree,
     ImGui::EndChild();
 }
 
-}  // namespace ui
+} // namespace ui

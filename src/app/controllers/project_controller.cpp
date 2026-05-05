@@ -11,13 +11,14 @@ namespace app::controllers {
 namespace {
 
 void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
-    if (!buffer || buffer_size == 0) return;
+    if (!buffer || buffer_size == 0)
+        return;
     const size_t count = std::min(buffer_size - 1, value.size());
     std::memcpy(buffer, value.data(), count);
     buffer[count] = '\0';
 }
 
-}  // namespace
+} // namespace
 
 void ProjectController::ScanDirectory() {
     xml_files.clear();
@@ -29,11 +30,12 @@ void ProjectController::ScanDirectory() {
     }
 
     for (const auto& entry : std::filesystem::directory_iterator(dir_path_buf, ec)) {
-        if (!entry.is_regular_file()) continue;
+        if (!entry.is_regular_file())
+            continue;
 
         auto ext = entry.path().extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(),
-            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        std::transform(
+            ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         if (ext == ".xml") {
             xml_files.push_back(entry.path().string());
         }
@@ -42,13 +44,15 @@ void ProjectController::ScanDirectory() {
     std::sort(xml_files.begin(), xml_files.end());
 
     std::error_code path_ec;
-    std::filesystem::path selected_path = std::filesystem::weakly_canonical(std::filesystem::path(file_path_buf), path_ec);
+    std::filesystem::path selected_path =
+        std::filesystem::weakly_canonical(std::filesystem::path(file_path_buf), path_ec);
     if (path_ec) {
         selected_path = std::filesystem::path(file_path_buf).lexically_normal();
     }
 
     for (int i = 0; i < static_cast<int>(xml_files.size()); ++i) {
-        std::filesystem::path candidate_path = std::filesystem::weakly_canonical(std::filesystem::path(xml_files[i]), path_ec);
+        std::filesystem::path candidate_path =
+            std::filesystem::weakly_canonical(std::filesystem::path(xml_files[i]), path_ec);
         if (path_ec) {
             path_ec.clear();
             candidate_path = std::filesystem::path(xml_files[i]).lexically_normal();
@@ -86,4 +90,4 @@ void ProjectController::RemoveRecentProjectByPath(const std::string& path) {
     app::RemoveRecentProject(recent_projects, path);
 }
 
-}  // namespace app::controllers
+} // namespace app::controllers

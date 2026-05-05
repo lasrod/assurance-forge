@@ -1,9 +1,9 @@
 #pragma once
 
-#include <memory>
-#include <optional>
-#include <string>
-
+#include "ai/ai_service.h"
+#include "ai/ai_task_runner.h"
+#include "ai/http_client.h"
+#include "ai/secret_store.h"
 #include "app/app_events.h"
 #include "app/controllers/ai_review_controller.h"
 #include "app/controllers/element_edit_controller.h"
@@ -12,13 +12,13 @@
 #include "app/controllers/proposal_controller.h"
 #include "app/controllers/review_controller.h"
 #include "app/guideline_catalog.h"
-#include "ai/ai_service.h"
-#include "ai/ai_task_runner.h"
-#include "ai/http_client.h"
-#include "ai/secret_store.h"
 #include "core/app_state.h"
 #include "core/assurance_tree.h"
 #include "core/problems/problems_manager.h"
+
+#include <memory>
+#include <optional>
+#include <string>
 
 namespace app {
 
@@ -75,4 +75,4 @@ struct AppRuntimeState {
     void RefreshStoredAiKeyState();
 };
 
-}  // namespace app
+} // namespace app
