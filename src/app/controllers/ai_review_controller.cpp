@@ -45,7 +45,7 @@ std::string NowUtcString() {
 #if defined(_WIN32)
     gmtime_s(&tm, &now);
 #else
-    gmtime_r(&tm, &now);
+    gmtime_r(&now, &tm);
 #endif
     std::ostringstream out;
     out << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
