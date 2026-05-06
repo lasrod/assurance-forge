@@ -1,10 +1,12 @@
 #pragma once
 
+#include "app/app_events.h"
 #include "core/element_factory.h"
 #include "core/project_model.h"
 #include "core/reviews/review_item.h"
 
 #include <string>
+#include <vector>
 
 namespace app {
 
@@ -97,6 +99,7 @@ private:
     bool BeginEditProposalById(const std::string& proposal_id);
     bool PreviewProposalById(const std::string& proposal_id);
     bool SaveActiveProposal(const core::reviews::ReviewItem& item);
+    void CreateAiGeneratedProposals(const std::vector<AiReviewProposalSuggestion>& suggestions);
     void CancelActiveProposal();
     void MarkReviewItemsDirty();
     bool DeleteProposalPatchFile(const std::string& proposal_id, std::string& error);

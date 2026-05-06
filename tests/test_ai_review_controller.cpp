@@ -21,12 +21,15 @@ struct ControllerHarness {
     app::controllers::AiReviewController controller;
     std::vector<std::string> statuses;
     std::vector<app::ElementReviewVisualEvent> review_visual_events;
+    std::vector<app::AiReviewProposalSuggestionsEvent> proposal_suggestion_events;
 
     ControllerHarness() : reviews(events), controller(events, problems, reviews, task_runner, nullptr) {
         events.Subscribe<app::StatusMessageEvent>(
             [this](const app::StatusMessageEvent& event) { statuses.push_back(event.message); });
         events.Subscribe<app::ElementReviewVisualEvent>(
             [this](const app::ElementReviewVisualEvent& event) { review_visual_events.push_back(event); });
+        events.Subscribe<app::AiReviewProposalSuggestionsEvent>(
+            [this](const app::AiReviewProposalSuggestionsEvent& event) { proposal_suggestion_events.push_back(event); });
         events.Subscribe<app::ReviewItemsDirtyEvent>(
             [this](const app::ReviewItemsDirtyEvent&) { app::SyncReviewProblems(problems, reviews.Items()); });
     }
@@ -91,6 +94,7 @@ struct ServiceControllerHarness {
     app::controllers::AiReviewController controller;
     std::vector<std::string> statuses;
     std::vector<app::ElementReviewVisualEvent> review_visual_events;
+    std::vector<app::AiReviewProposalSuggestionsEvent> proposal_suggestion_events;
 
     ServiceControllerHarness() : reviews(events), controller(events, problems, reviews, task_runner, service) {
         ai::AiProviderSettings settings;
@@ -102,6 +106,8 @@ struct ServiceControllerHarness {
             [this](const app::StatusMessageEvent& event) { statuses.push_back(event.message); });
         events.Subscribe<app::ElementReviewVisualEvent>(
             [this](const app::ElementReviewVisualEvent& event) { review_visual_events.push_back(event); });
+        events.Subscribe<app::AiReviewProposalSuggestionsEvent>(
+            [this](const app::AiReviewProposalSuggestionsEvent& event) { proposal_suggestion_events.push_back(event); });
         events.Subscribe<app::ReviewItemsDirtyEvent>(
             [this](const app::ReviewItemsDirtyEvent&) { app::SyncReviewProblems(problems, reviews.Items()); });
     }
@@ -317,6 +323,12 @@ TEST(AiReviewControllerTest, CompletedAiFindingsAreAddedAsReviewComments) {
     EXPECT_EQ(harness.review_visual_events.front().kind, app::ElementReviewVisualEventKind::AiStarted);
     EXPECT_EQ(harness.review_visual_events.back().kind, app::ElementReviewVisualEventKind::AiFindings);
     EXPECT_EQ(harness.review_visual_events.back().element_id, "claim-1");
+    ASSERT_EQ(harness.proposal_suggestion_events.size(), 1u);
+    ASSERT_EQ(harness.proposal_suggestion_events[0].suggestions.size(), 1u);
+    EXPECT_EQ(harness.proposal_suggestion_events[0].suggestions[0].review_item_id, comments[0].id);
+    EXPECT_EQ(harness.proposal_suggestion_events[0].suggestions[0].element_id, "claim-1");
+    EXPECT_EQ(harness.proposal_suggestion_events[0].suggestions[0].suggested_text,
+              "The braking controller response time meets the defined acceptance criterion.");
     EXPECT_EQ(harness.statuses.back(), "AI review completed with 1 finding(s) added as review comment(s).");
 }
 

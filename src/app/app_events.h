@@ -57,6 +57,16 @@ struct ElementReviewVisualEvent {
     std::unordered_set<std::string> review_scope_element_ids;
 };
 
+struct AiReviewProposalSuggestion {
+    std::string review_item_id;
+    std::string element_id;
+    std::string suggested_text;
+};
+
+struct AiReviewProposalSuggestionsEvent {
+    std::vector<AiReviewProposalSuggestion> suggestions;
+};
+
 enum class CenterViewRequest {
     Preserve,
     GsnCanvas,
@@ -113,6 +123,7 @@ using AppEvent = std::variant<StatusMessageEvent,
                               ActiveModelChangedEvent,
                               SelectionChangedEvent,
                               ElementReviewVisualEvent,
+                              AiReviewProposalSuggestionsEvent,
                               CenterRequestEvent,
                               ProposalModeChangedEvent,
                               ProposalHighlightEvent,

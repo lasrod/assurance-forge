@@ -66,6 +66,7 @@ struct AiReviewParseResult {
     std::string reviewedElementId;
     std::string reviewedElementType;
     std::vector<core::ProblemItem> problems;
+    std::vector<std::string> suggestedClaimWordings;
 };
 
 using ParsedAiReviewResponse = AiReviewParseResult;

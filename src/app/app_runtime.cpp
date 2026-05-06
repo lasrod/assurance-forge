@@ -690,6 +690,8 @@ void AppRuntime::RegisterAppEventListeners() {
             break;
         }
     });
+    impl_->events.Subscribe<AiReviewProposalSuggestionsEvent>(
+        [this](const AiReviewProposalSuggestionsEvent& event) { CreateAiGeneratedProposals(event.suggestions); });
     impl_->events.Subscribe<CenterRequestEvent>([this](const CenterRequestEvent& event) {
         ui::UiState& ui_state = ui::GetUiState();
         switch (event.view) {
@@ -1046,6 +1048,69 @@ bool AppRuntime::SaveActiveProposal(const core::reviews::ReviewItem& item) {
     core::ProjectService::RefreshFileStatus(project);
     SetStatus("Saved proposal " + saved_id + ".");
     return true;
+}
+
+void AppRuntime::CreateAiGeneratedProposals(const std::vector<AiReviewProposalSuggestion>& suggestions) {
+    if (suggestions.empty())
+        return;
+    if (!impl_->app_state.current_project.has_value() || !impl_->app_state.loaded_case.has_value()) {
+        SetStatus("AI found proposed wording, but a project and SACM file must be open to save proposals.");
+        return;
+    }
+
+    core::AssuranceProject& project = impl_->app_state.current_project.value();
+    const parser::AssuranceCase& model = impl_->app_state.loaded_case.value();
+    size_t saved_count = 0;
+    for (const AiReviewProposalSuggestion& suggestion : suggestions) {
+        const std::string suggested_text = TrimWhitespace(suggestion.suggested_text);
+        if (suggested_text.empty())
+            continue;
+
+        std::optional<core::reviews::ReviewItem> item = impl_->review_controller->GetItemById(suggestion.review_item_id);
+        if (!item.has_value() || item->proposal_id.has_value())
+            continue;
+
+        const parser::SacmElement* anchor = FindParserElement(model, item->element_id);
+        if (!anchor || anchor->type != "claim")
+            continue;
+
+        const std::string current_text = anchor->content.empty() ? anchor->description : anchor->content;
+        if (TrimWhitespace(current_text) == suggested_text)
+            continue;
+
+        core::reviews::ReviewProposal proposal = BuildDraftReviewProposal(*item, model, *anchor);
+        proposal.author_name = "AI Review";
+        proposal.summary = "AI suggested replacement wording for " + anchor->id + ".";
+
+        core::reviews::PatchOperation operation;
+        operation.type = core::reviews::PatchOperationType::UpdateElementText;
+        operation.element = core::reviews::ElementRef{anchor->id, std::nullopt};
+        operation.field = "content";
+        operation.old_value = current_text;
+        operation.new_value = suggested_text;
+        proposal.operations.push_back(std::move(operation));
+
+        core::ProjectFileEntry entry;
+        std::string error;
+        if (!core::ProjectService::SaveReviewProposalFile(
+                project, proposal.id, core::reviews::SerializeReviewProposal(proposal), entry, error)) {
+            SetStatus("AI proposal save failed: " + error);
+            continue;
+        }
+
+        if (!impl_->review_controller->SetProposal(item->id, proposal.id)) {
+            std::string cleanup_error;
+            core::ProjectService::RemoveTrackedFile(project, entry.relativePath, true, cleanup_error);
+            SetStatus("AI proposal link update failed.");
+            continue;
+        }
+        ++saved_count;
+    }
+
+    if (saved_count > 0) {
+        core::ProjectService::RefreshFileStatus(project);
+        SetStatus("AI generated " + std::to_string(saved_count) + " proposed change(s). Review before applying.");
+    }
 }
 
 void AppRuntime::CancelActiveProposal() {

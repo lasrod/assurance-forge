@@ -221,10 +221,12 @@ TEST(AiClaimReviewTest, ParsesFencedJsonAndMapsFindingsToProblems) {
 
     ASSERT_TRUE(parsed.success) << parsed.errorMessage;
     ASSERT_EQ(parsed.problems.size(), 1u);
+    ASSERT_EQ(parsed.suggestedClaimWordings.size(), 1u);
     EXPECT_EQ(parsed.problems[0].id, "ai-review:G1:CL.2:1");
     EXPECT_EQ(parsed.problems[0].source, core::ProblemSource::AIReview);
     EXPECT_EQ(parsed.problems[0].severity, core::ProblemSeverity::Warning);
     EXPECT_EQ(parsed.problems[0].guideline_id, "CL.2");
+    EXPECT_EQ(parsed.suggestedClaimWordings[0], "The braking controller safety is acceptable.");
     EXPECT_NE(parsed.problems[0].message.find("Suggested fix: Split the claim."), std::string::npos);
 }
 

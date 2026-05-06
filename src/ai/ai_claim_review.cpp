@@ -734,6 +734,7 @@ AiReviewParseResult ParseAiReviewResponse(const std::string& response_text,
             }
             problem.guideline_id = unknown_guideline_id || guideline_id == "unknown" ? std::string{} : guideline_id;
             result.problems.push_back(std::move(problem));
+            result.suggestedClaimWordings.push_back(JsonStringValue(finding, "suggested_claim_wording"));
         }
 
         result.success = true;

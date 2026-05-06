@@ -526,14 +526,24 @@ void AiReviewController::PollTask() {
 
     const std::string timestamp = NowUtcString();
     size_t review_comment_count = 0;
-    for (const core::ProblemItem& problem : parse_result.problems) {
-        review_controller_.AddOrUpdateItem(MakeAiReviewItem(review_prefix + std::to_string(++review_comment_count),
+    std::vector<AiReviewProposalSuggestion> proposal_suggestions;
+    for (size_t problem_index = 0; problem_index < parse_result.problems.size(); ++problem_index) {
+        const core::ProblemItem& problem = parse_result.problems[problem_index];
+        const std::string review_item_id = review_prefix + std::to_string(++review_comment_count);
+        review_controller_.AddOrUpdateItem(MakeAiReviewItem(review_item_id,
                                                             pending_review_element_id_,
                                                             ReviewTitleForProblem(problem),
                                                             problem.message,
                                                             problem.severity,
                                                             timestamp,
                                                             problem.guideline_id));
+        if (problem_index < parse_result.suggestedClaimWordings.size() &&
+            !parse_result.suggestedClaimWordings[problem_index].empty()) {
+            proposal_suggestions.push_back(
+                AiReviewProposalSuggestion{review_item_id,
+                                           pending_review_element_id_,
+                                           parse_result.suggestedClaimWordings[problem_index]});
+        }
     }
 
     EmitReviewVisualEvent(events_,
@@ -549,6 +559,9 @@ void AiReviewController::PollTask() {
                                         ? "AI review completed with no findings."
                                         : "AI review completed with " + std::to_string(parse_result.problems.size()) +
                                               " finding(s) added as review comment(s)."});
+    if (!proposal_suggestions.empty()) {
+        events_.Emit(AiReviewProposalSuggestionsEvent{std::move(proposal_suggestions)});
+    }
 }
 
 void AiReviewController::CancelPendingRequest() {
