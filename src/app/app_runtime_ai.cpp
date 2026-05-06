@@ -70,10 +70,13 @@ void AppRuntime::RenderAiReviewContextMenuForSelected() {
     if (!ImGui::BeginMenu("AI Review"))
         return;
 
-    const bool manual_ok_enabled = !review_running && loaded_case && selected_element;
+    const bool has_project = impl_->app_state.current_project.has_value();
+    const bool manual_ok_enabled = !review_running && has_project && loaded_case && selected_element;
     std::string manual_ok_tooltip;
     if (review_running)
         manual_ok_tooltip = "AI review is already running.";
+    else if (!has_project)
+        manual_ok_tooltip = "Open or create a project before marking review status.";
     else if (!loaded_case)
         manual_ok_tooltip = "Open an assurance case before marking review status.";
     else if (!selected_element)
@@ -82,9 +85,7 @@ void AppRuntime::RenderAiReviewContextMenuForSelected() {
         manual_ok_tooltip = "Mark this element as manually reviewed OK.";
 
     if (ImGui::MenuItem("Mark review OK manually", nullptr, false, manual_ok_enabled)) {
-        impl_->events.Emit(
-            ElementReviewVisualEvent{ElementReviewVisualEventKind::ManualOk, ui_state.selected_element_id});
-        impl_->events.Emit(StatusMessageEvent{"Element marked OK manually."});
+        SetManualReviewOk(ui_state.selected_element_id, true);
     }
     DrawTooltipIfHovered(manual_ok_tooltip);
     ImGui::Separator();

@@ -90,6 +90,7 @@ private:
     bool TryOpenProjectManifest(const std::string& selected_path);
     bool EnsureReviewItemStorage();
     void SyncReviewProblems();
+    void SyncReviewVisualStatesFromReviews();
     void TouchCurrentProjectRecent();
     bool SaveProject();
     void RequestExit(bool& done);
@@ -100,6 +101,7 @@ private:
     bool PreviewProposalById(const std::string& proposal_id);
     bool SaveActiveProposal(const core::reviews::ReviewItem& item);
     void CreateAiGeneratedProposals(const std::vector<AiReviewProposalSuggestion>& suggestions);
+    bool SetManualReviewOk(const std::string& element_id, bool manual_ok);
     void CancelActiveProposal();
     void MarkReviewItemsDirty();
     bool DeleteProposalPatchFile(const std::string& proposal_id, std::string& error);

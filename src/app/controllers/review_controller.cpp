@@ -51,7 +51,8 @@ bool ReviewController::SaveIfDirty(core::AssuranceProject& project, std::string&
         requested_name = "review-items.af.json";
 
     core::ProjectFileEntry entry;
-    const std::string content = core::reviews::SerializeReviewItems(manager_.GetItems());
+    const std::string content =
+        core::reviews::SerializeReviewItems(manager_.GetItems(), manager_.GetElementReviewStates());
     if (!core::ProjectService::SaveReviewItemsFile(project, requested_name.string(), content, entry, error)) {
         return false;
     }
@@ -90,6 +91,29 @@ std::optional<core::reviews::ReviewItem> ReviewController::GetItemById(const std
     return manager_.GetItemById(item_id);
 }
 
+const core::reviews::ElementReviewStateMap& ReviewController::ElementReviewStates() const {
+    return manager_.GetElementReviewStates();
+}
+
+core::reviews::ElementReviewState ReviewController::ElementReviewStateForElement(const std::string& element_id) const {
+    return manager_.GetElementReviewState(element_id);
+}
+
+ElementReviewStatus ReviewController::StatusForElement(const std::string& element_id, bool has_blocking_problem) const {
+    const core::reviews::ElementReviewState state = manager_.GetElementReviewState(element_id);
+    if (state.failed)
+        return ElementReviewStatus::Failed;
+    for (const core::reviews::ReviewItem& item : manager_.GetItemsForElement(element_id)) {
+        if (item.status == core::reviews::ReviewItemStatus::Open)
+            return ElementReviewStatus::OpenItems;
+    }
+    if (has_blocking_problem)
+        return ElementReviewStatus::OpenItems;
+    if (state.manual_ok || state.ai_ok)
+        return ElementReviewStatus::Passed;
+    return ElementReviewStatus::NotReviewed;
+}
+
 bool ReviewController::AddManualItem(core::reviews::ReviewItem item) {
     if (!AddOrUpdateItem(std::move(item))) {
         events_.Emit(StatusMessageEvent{"Could not add review comment."});
@@ -124,6 +148,43 @@ bool ReviewController::SetProposal(const std::string& item_id, const std::string
 
 bool ReviewController::ClearProposal(const std::string& item_id) {
     if (!manager_.ClearProposal(item_id))
+        return false;
+    MarkDirty();
+    return true;
+}
+
+bool ReviewController::SetManualReviewOk(const std::string& element_id,
+                                         bool manual_ok,
+                                         const std::string& reviewer_name,
+                                         const std::string& updated_utc) {
+    core::reviews::ElementReviewState state = manager_.GetElementReviewState(element_id);
+    if (state.manual_ok == manual_ok && state.reviewed_by == reviewer_name && state.updated_utc == updated_utc)
+        return true;
+    state.manual_ok = manual_ok;
+    state.reviewed_by = reviewer_name;
+    state.updated_utc = updated_utc;
+    if (!manager_.SetElementReviewState(element_id, std::move(state)))
+        return false;
+    MarkDirty();
+    events_.Emit(StatusMessageEvent{manual_ok ? "Element marked OK manually." : "Manual review OK cleared."});
+    return true;
+}
+
+bool ReviewController::SetAiReviewOutcome(const std::string& element_id,
+                                          bool ai_ok,
+                                          bool failed,
+                                          const std::string& review_profile_id,
+                                          const std::string& review_profile_name,
+                                          const std::string& message,
+                                          const std::string& updated_utc) {
+    core::reviews::ElementReviewState state = manager_.GetElementReviewState(element_id);
+    state.ai_ok = ai_ok;
+    state.failed = failed;
+    state.review_profile_id = review_profile_id;
+    state.review_profile_name = review_profile_name;
+    state.last_review_message = message;
+    state.updated_utc = updated_utc;
+    if (!manager_.SetElementReviewState(element_id, std::move(state)))
         return false;
     MarkDirty();
     return true;

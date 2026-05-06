@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace core::reviews {
@@ -32,6 +33,19 @@ struct ReviewItem {
     std::string updated_utc;
 };
 
+struct ElementReviewState {
+    bool manual_ok = false;
+    bool ai_ok = false;
+    bool failed = false;
+    std::string review_profile_id;
+    std::string review_profile_name;
+    std::string last_review_message;
+    std::string reviewed_by;
+    std::string updated_utc;
+};
+
+using ElementReviewStateMap = std::unordered_map<std::string, ElementReviewState>;
+
 const char* ReviewItemStatusToString(ReviewItemStatus status);
 ReviewItemStatus ReviewItemStatusFromString(const std::string& value);
 
@@ -39,6 +53,11 @@ const char* ReviewItemSourceToString(ReviewItemSource source);
 ReviewItemSource ReviewItemSourceFromString(const std::string& value);
 
 std::string SerializeReviewItems(const std::vector<ReviewItem>& items);
+std::string SerializeReviewItems(const std::vector<ReviewItem>& items, const ElementReviewStateMap& element_states);
 bool DeserializeReviewItems(const std::string& content, std::vector<ReviewItem>& items, std::string& error);
+bool DeserializeReviewItems(const std::string& content,
+                            std::vector<ReviewItem>& items,
+                            ElementReviewStateMap& element_states,
+                            std::string& error);
 
 } // namespace core::reviews

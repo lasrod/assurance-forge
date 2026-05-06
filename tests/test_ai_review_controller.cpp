@@ -329,6 +329,10 @@ TEST(AiReviewControllerTest, CompletedAiFindingsAreAddedAsReviewComments) {
     EXPECT_EQ(harness.proposal_suggestion_events[0].suggestions[0].element_id, "claim-1");
     EXPECT_EQ(harness.proposal_suggestion_events[0].suggestions[0].suggested_text,
               "The braking controller response time meets the defined acceptance criterion.");
+    core::reviews::ElementReviewState review_state = harness.reviews.ElementReviewStateForElement("claim-1");
+    EXPECT_FALSE(review_state.ai_ok);
+    EXPECT_FALSE(review_state.failed);
+    EXPECT_EQ(review_state.last_review_message, "AI review completed with findings.");
     EXPECT_EQ(harness.statuses.back(), "AI review completed with 1 finding(s) added as review comment(s).");
 }
 
@@ -347,6 +351,10 @@ TEST(AiReviewControllerTest, StartPendingRequestEmitsRunningVisualEvent) {
     EXPECT_EQ(harness.review_visual_events.back().kind, app::ElementReviewVisualEventKind::AiStarted);
     EXPECT_EQ(harness.review_visual_events.back().element_id, "claim-1");
     EXPECT_TRUE(harness.review_visual_events.back().review_scope_element_ids.count("claim-1") > 0);
+    core::reviews::ElementReviewState review_state = harness.reviews.ElementReviewStateForElement("claim-1");
+    EXPECT_FALSE(review_state.ai_ok);
+    EXPECT_FALSE(review_state.failed);
+    EXPECT_EQ(review_state.last_review_message, "AI review in progress.");
 }
 
 TEST(AiReviewControllerTest, RequestFailureEmitsFailedVisualEvent) {
@@ -369,6 +377,10 @@ TEST(AiReviewControllerTest, RequestFailureEmitsFailedVisualEvent) {
     EXPECT_EQ(comments[0].source, core::reviews::ReviewItemSource::AIReview);
     EXPECT_NE(comments[0].message.find("AI review request failed"), std::string::npos);
     EXPECT_TRUE(harness.problems.GetProblemById(std::string("review-comment:") + comments[0].id).has_value());
+    core::reviews::ElementReviewState review_state = harness.reviews.ElementReviewStateForElement("claim-1");
+    EXPECT_FALSE(review_state.ai_ok);
+    EXPECT_TRUE(review_state.failed);
+    EXPECT_EQ(review_state.last_review_message, "AI review request failed.");
 }
 
 TEST(AiReviewControllerTest, ParseFailureEmitsFailedVisualEvent) {
@@ -416,5 +428,9 @@ TEST(AiReviewControllerTest, NoFindingsEmitsAiOkEventAndPreservesUnrelatedProble
     EXPECT_EQ(harness.review_visual_events.back().kind, app::ElementReviewVisualEventKind::AiNoFindings);
     EXPECT_EQ(harness.review_visual_events.back().element_id, "claim-1");
     EXPECT_TRUE(harness.problems.GetProblemById("manual:claim-1").has_value());
+    core::reviews::ElementReviewState review_state = harness.reviews.ElementReviewStateForElement("claim-1");
+    EXPECT_TRUE(review_state.ai_ok);
+    EXPECT_FALSE(review_state.failed);
+    EXPECT_EQ(review_state.last_review_message, "AI review completed with no findings.");
     EXPECT_EQ(harness.statuses.back(), "AI review completed with no findings.");
 }

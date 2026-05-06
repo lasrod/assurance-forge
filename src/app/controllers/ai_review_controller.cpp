@@ -295,6 +295,13 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
                               review_profile_id,
                               {},
                               "AI review payload could not be created.");
+        review_controller_.SetAiReviewOutcome(selected_element_id,
+                                             false,
+                                             true,
+                                             review_profile_id,
+                                             {},
+                                             "AI review payload could not be created.",
+                                             NowUtcString());
         events_.Emit(StatusMessageEvent{"AI review payload could not be created."});
         return;
     }
@@ -315,6 +322,13 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
                               review_profile_id,
                               {},
                               "SCCG guidelines could not be loaded for AI review.");
+        review_controller_.SetAiReviewOutcome(selected_element_id,
+                                             false,
+                                             true,
+                                             review_profile_id,
+                                             {},
+                                             "SCCG guidelines could not be loaded for AI review.",
+                                             NowUtcString());
         events_.Emit(StatusMessageEvent{"SCCG guidelines could not be loaded for AI review."});
         return;
     }
@@ -338,6 +352,13 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
                               review_profile_id,
                               guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "",
                               guideline_selection.error_message);
+        review_controller_.SetAiReviewOutcome(selected_element_id,
+                                             false,
+                                             true,
+                                             review_profile_id,
+                                             guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "",
+                                             guideline_selection.error_message,
+                                             NowUtcString());
         events_.Emit(StatusMessageEvent{guideline_selection.error_message});
         return;
     }
@@ -382,6 +403,14 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
                                                                  : review_profile_id,
                               guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "",
                               "AI review data packages could not be collected.");
+        review_controller_.SetAiReviewOutcome(selected_element_id,
+                                             false,
+                                             true,
+                                             guideline_selection.review_profile ? guideline_selection.review_profile->id
+                                                                                : review_profile_id,
+                                             guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "",
+                                             "AI review data packages could not be collected.",
+                                             NowUtcString());
         events_.Emit(StatusMessageEvent{"AI review data packages could not be collected."});
         return;
     }
@@ -429,6 +458,13 @@ void AiReviewController::StartPendingRequest() {
                           pending_review_profile_name_,
                           "AI review in progress.",
                           pending_review_scope_element_ids_);
+    review_controller_.SetAiReviewOutcome(pending_review_element_id_,
+                                          false,
+                                          false,
+                                          pending_review_profile_id_,
+                                          pending_review_profile_name_,
+                                          "AI review in progress.",
+                                          NowUtcString());
     events_.Emit(StatusMessageEvent{"AI review request sent."});
 }
 
@@ -458,6 +494,13 @@ void AiReviewController::PollTask() {
                               pending_review_profile_id_,
                               pending_review_profile_name_,
                               "AI review request failed.");
+        review_controller_.SetAiReviewOutcome(pending_review_element_id_,
+                                              false,
+                                              true,
+                                              pending_review_profile_id_,
+                                              pending_review_profile_name_,
+                                              "AI review request failed.",
+                                              NowUtcString());
         events_.Emit(StatusMessageEvent{"AI review request failed."});
         return;
     }
@@ -486,6 +529,13 @@ void AiReviewController::PollTask() {
                               pending_review_profile_id_,
                               pending_review_profile_name_,
                               "AI review response could not be parsed.");
+        review_controller_.SetAiReviewOutcome(pending_review_element_id_,
+                                              false,
+                                              true,
+                                              pending_review_profile_id_,
+                                              pending_review_profile_name_,
+                                              "AI review response could not be parsed.",
+                                              NowUtcString());
         events_.Emit(StatusMessageEvent{"AI review response could not be parsed."});
         return;
     }
@@ -509,6 +559,13 @@ void AiReviewController::PollTask() {
                               pending_review_profile_id_,
                               pending_review_profile_name_,
                               "AI review response could not be validated.");
+        review_controller_.SetAiReviewOutcome(pending_review_element_id_,
+                                              false,
+                                              true,
+                                              pending_review_profile_id_,
+                                              pending_review_profile_name_,
+                                              "AI review response could not be validated.",
+                                              NowUtcString());
         events_.Emit(StatusMessageEvent{"AI review response could not be validated."});
         return;
     }
@@ -554,6 +611,14 @@ void AiReviewController::PollTask() {
                           pending_review_profile_name_,
                           parse_result.problems.empty() ? "AI review completed with no findings."
                                                         : "AI review completed with findings.");
+    review_controller_.SetAiReviewOutcome(pending_review_element_id_,
+                                          parse_result.problems.empty(),
+                                          false,
+                                          pending_review_profile_id_,
+                                          pending_review_profile_name_,
+                                          parse_result.problems.empty() ? "AI review completed with no findings."
+                                                                        : "AI review completed with findings.",
+                                          NowUtcString());
 
     events_.Emit(StatusMessageEvent{parse_result.problems.empty()
                                         ? "AI review completed with no findings."

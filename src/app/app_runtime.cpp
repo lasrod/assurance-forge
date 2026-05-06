@@ -154,6 +154,10 @@ std::string TruncateForProblemMessage(const std::string& value, size_t limit = 4
     return value.substr(0, limit) + "...";
 }
 
+bool IsReviewDerivedProblem(const core::ProblemItem& problem) {
+    return problem.id.rfind("review-comment:", 0) == 0 || problem.id.rfind("guideline-review:", 0) == 0;
+}
+
 const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model, const std::string& element_id) {
     auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
         return element.id == element_id;
@@ -659,6 +663,7 @@ void AppRuntime::RegisterAppEventListeners() {
         if (event.mark_app_dirty)
             impl_->app_state.mark_dirty();
         SyncReviewProblems();
+        SyncReviewVisualStatesFromReviews();
     });
     impl_->events.Subscribe<SelectionChangedEvent>([](const SelectionChangedEvent& event) {
         ui::UiState& ui_state = ui::GetUiState();
@@ -1713,6 +1718,7 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                 ui_state.proposal_canvas_active = impl_->IsProposalCanvasActive();
                 ui_state.attention_element_ids =
                     core::CollectAttentionElementIds(impl_->problems_manager.GetProblems());
+                SyncReviewVisualStatesFromReviews();
                 ui::gsn::ShowGsnCanvasContent(ui_state, visible_case, actions);
                 ImGui::EndTabItem();
             }
@@ -1804,6 +1810,76 @@ void AppRuntime::RenderProblemsPanel(float center_x, float center_w, float probl
 
 void AppRuntime::SyncReviewProblems() {
     app::SyncReviewProblems(impl_->problems_manager, impl_->review_controller->Items());
+}
+
+void AppRuntime::SyncReviewVisualStatesFromReviews() {
+    ui::UiState& ui_state = ui::GetUiState();
+    std::unordered_map<std::string, ui::ElementReviewVisualState> next_states;
+
+    for (const auto& [element_id, stored_state] : impl_->review_controller->ElementReviewStates()) {
+        ui::ElementReviewVisualState visual;
+        visual.manual_ok = stored_state.manual_ok;
+        visual.ai_ok = stored_state.ai_ok;
+        visual.failed = stored_state.failed;
+        visual.review_profile_id = stored_state.review_profile_id;
+        visual.review_profile_name = stored_state.review_profile_name;
+        visual.last_review_message = stored_state.last_review_message;
+        next_states[element_id] = std::move(visual);
+    }
+
+    for (const core::reviews::ReviewItem& item : impl_->review_controller->Items()) {
+        if (item.element_id.empty() || item.status != core::reviews::ReviewItemStatus::Open)
+            continue;
+        ui::ElementReviewVisualState& visual = next_states[item.element_id];
+        visual.failed = true;
+        visual.last_review_message = "Open review items require attention.";
+    }
+
+    for (const core::ProblemItem& problem : impl_->problems_manager.GetProblems()) {
+        if (problem.element_id.empty() || IsReviewDerivedProblem(problem))
+            continue;
+        ui::ElementReviewVisualState& visual = next_states[problem.element_id];
+        visual.failed = true;
+        visual.last_review_message = "Open problems require attention.";
+    }
+
+    for (const auto& [element_id, existing_state] : ui_state.review_visual_states) {
+        if (!existing_state.ai_running)
+            continue;
+        ui::ElementReviewVisualState& visual = next_states[element_id];
+        visual.ai_running = true;
+        if (!existing_state.review_profile_id.empty())
+            visual.review_profile_id = existing_state.review_profile_id;
+        if (!existing_state.review_profile_name.empty())
+            visual.review_profile_name = existing_state.review_profile_name;
+        visual.last_review_message = existing_state.last_review_message;
+    }
+
+    ui_state.review_visual_states = std::move(next_states);
+}
+
+bool AppRuntime::SetManualReviewOk(const std::string& element_id, bool manual_ok) {
+    if (element_id.empty()) {
+        SetStatus("Select an element before changing manual review status.");
+        return false;
+    }
+    if (!impl_->app_state.current_project.has_value()) {
+        SetStatus("Open or create a project before changing review status.");
+        return false;
+    }
+    if (!EnsureReviewItemStorage())
+        return false;
+    if (impl_->reviewer_name.empty()) {
+        impl_->modal_coordinator->show_reviewer_name_prompt = true;
+        SetStatus("Enter a reviewer name before changing review status.");
+        return false;
+    }
+    if (!impl_->review_controller->SetManualReviewOk(element_id, manual_ok, impl_->reviewer_name, NowUtcString())) {
+        SetStatus("Could not update manual review status.");
+        return false;
+    }
+    SyncReviewVisualStatesFromReviews();
+    return true;
 }
 
 void AppRuntime::RenderProposalElementEditor() {
@@ -1960,12 +2036,43 @@ void AppRuntime::RenderReviewPanelContent() {
     }
     if (!model.selected_element_id.empty()) {
         model.review_items = impl_->review_controller->ItemsForElement(model.selected_element_id);
+        bool has_blocking_problem = false;
         for (const core::ProblemItem& problem : impl_->problems_manager.GetProblems()) {
             if (problem.element_id != model.selected_element_id)
                 continue;
-            if (problem.id.rfind("review-comment:", 0) == 0 || problem.id.rfind("guideline-review:", 0) == 0)
+            if (IsReviewDerivedProblem(problem))
                 continue;
             model.problem_items.push_back(problem);
+            has_blocking_problem = true;
+        }
+        const core::reviews::ElementReviewState element_review_state =
+            impl_->review_controller->ElementReviewStateForElement(model.selected_element_id);
+        model.manual_review_ok = element_review_state.manual_ok;
+        model.ai_review_ok = element_review_state.ai_ok;
+        model.ai_review_failed = element_review_state.failed;
+        const app::controllers::ElementReviewStatus review_status =
+            impl_->review_controller->StatusForElement(model.selected_element_id, has_blocking_problem);
+        model.review_status_passed = review_status == app::controllers::ElementReviewStatus::Passed;
+        switch (review_status) {
+        case app::controllers::ElementReviewStatus::Passed:
+            model.review_status_text = "Passed";
+            model.review_status_detail = element_review_state.manual_ok ? "Manual review OK." : "AI review OK.";
+            break;
+        case app::controllers::ElementReviewStatus::Failed:
+            model.review_status_text = "Not OK";
+            model.review_status_detail = element_review_state.last_review_message.empty()
+                                             ? "AI review failed."
+                                             : element_review_state.last_review_message;
+            break;
+        case app::controllers::ElementReviewStatus::OpenItems:
+            model.review_status_text = "Not OK";
+            model.review_status_detail = has_blocking_problem ? "Open problems require attention."
+                                                              : "Open review comments require attention.";
+            break;
+        case app::controllers::ElementReviewStatus::NotReviewed:
+            model.review_status_text = "Not reviewed";
+            model.review_status_detail = "Set Manual review OK or run an AI review with no findings.";
+            break;
         }
         for (const core::reviews::ReviewItem& item : model.review_items) {
             if (!item.proposal_id.has_value())
@@ -2163,7 +2270,11 @@ void AppRuntime::RenderReviewPanelContent() {
     callbacks.delete_review_item = [this](const core::reviews::ReviewItem& item) { BeginDeleteReviewItem(item); };
     callbacks.delete_problem = [this](const core::ProblemItem& problem) {
         impl_->problems_manager.RemoveProblem(problem.id);
+        SyncReviewVisualStatesFromReviews();
         SetStatus("Problem deleted.");
+    };
+    callbacks.set_manual_review_ok = [this, element_id = model.selected_element_id](bool manual_ok) {
+        SetManualReviewOk(element_id, manual_ok);
     };
     ui::panels::ShowReviewPanel(model, callbacks);
 }

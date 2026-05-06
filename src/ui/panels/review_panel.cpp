@@ -310,6 +310,22 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
     }
 
     ImGui::TextDisabled("Element %s", model.selected_element_id.c_str());
+    ImGui::Text("Review status: %s",
+                model.review_status_text.empty() ? "Not reviewed" : model.review_status_text.c_str());
+    if (!model.review_status_detail.empty()) {
+        ImGui::TextDisabled("%s", model.review_status_detail.c_str());
+    }
+    bool manual_ok = model.manual_review_ok;
+    if (ImGui::Checkbox("Manual review OK", &manual_ok) && callbacks.set_manual_review_ok) {
+        callbacks.set_manual_review_ok(manual_ok);
+    }
+    bool ai_ok = model.ai_review_ok;
+    ImGui::BeginDisabled();
+    ImGui::Checkbox("AI review OK", &ai_ok);
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("AI review OK is set by AI review outcomes.");
+    }
     ImGui::Spacing();
 
     static std::string active_element_id;
