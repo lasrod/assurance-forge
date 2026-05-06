@@ -1,10 +1,12 @@
 #pragma once
 
+#include "app/app_events.h"
 #include "core/element_factory.h"
 #include "core/project_model.h"
 #include "core/reviews/review_item.h"
 
 #include <string>
+#include <vector>
 
 namespace app {
 
@@ -44,6 +46,12 @@ public:
     // Show the "not implemented" modal for the given feature name.
     void ShowNotImplementedModal(const std::string& feature);
 
+    // Render AI review actions inside an element context menu.
+    void RenderAiReviewContextMenuForSelected();
+
+    // Build and send an AI review request for the selected element and SCCG profile.
+    void RunAiReviewForSelection(const std::string& review_profile_id);
+
     // Returns the currently loaded assurance case, or nullptr if none.
     const parser::AssuranceCase* GetLoadedCase() const;
 
@@ -58,6 +66,7 @@ private:
     void RenderProblemsPanel(float center_x, float center_w, float problems_h, float top_y);
     void RenderElementPropertiesPanel(float center_x, float center_w, float right_w, float content_h, float top_y);
     void RenderReviewPanelContent();
+    void RenderAiDebugPanelContent();
     void RenderProposalElementEditor();
     void RenderStartupProjectWindow();
     void RenderNotImplementedModal();
@@ -70,7 +79,6 @@ private:
     void RenderSaveBeforeExitModal(bool& done);
     void RenderPreferencesWindow();
     void RenderThemeTweaksWindow();
-    void RenderAiReviewDebugModal();
 
     void BeginCreateProject();
     void BeginOpenProject();
@@ -82,6 +90,7 @@ private:
     bool TryOpenProjectManifest(const std::string& selected_path);
     bool EnsureReviewItemStorage();
     void SyncReviewProblems();
+    void SyncReviewVisualStatesFromReviews();
     void TouchCurrentProjectRecent();
     bool SaveProject();
     void RequestExit(bool& done);
@@ -91,6 +100,8 @@ private:
     bool BeginEditProposalById(const std::string& proposal_id);
     bool PreviewProposalById(const std::string& proposal_id);
     bool SaveActiveProposal(const core::reviews::ReviewItem& item);
+    void CreateAiGeneratedProposals(const std::vector<AiReviewProposalSuggestion>& suggestions);
+    bool SetManualReviewOk(const std::string& element_id, bool manual_ok);
     void CancelActiveProposal();
     void MarkReviewItemsDirty();
     bool DeleteProposalPatchFile(const std::string& proposal_id, std::string& error);

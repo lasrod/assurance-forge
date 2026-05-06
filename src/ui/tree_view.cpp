@@ -113,8 +113,9 @@ static void RenderTreeNode(const core::TreeNode* node,
     if (popup_open) {
         state.selected_element_id = node->id;
         RenderAddElementMenu(actions);
-        ImGui::Separator();
         RenderRemoveSubmenu(active_case, state.selected_element_id, actions);
+        ImGui::Separator();
+        RenderAiReviewMenu(actions);
         ImGui::EndPopup();
     }
 

@@ -106,6 +106,49 @@ TEST(ReviewControllerTest, ResolveReviewItemUpdatesStatusAndMarksDirty) {
     EXPECT_EQ(harness.statuses.back(), "Review comment resolved.");
 }
 
+TEST(ReviewControllerTest, ManualOkPersistsAndStatusRequiresNoOpenItems) {
+    ReviewHarness harness;
+
+    ASSERT_TRUE(harness.controller.SetManualReviewOk("claim-1", true, "Reviewer", "2026-05-06T12:00:00Z"));
+    core::reviews::ElementReviewState state = harness.controller.ElementReviewStateForElement("claim-1");
+    EXPECT_TRUE(state.manual_ok);
+    EXPECT_EQ(state.reviewed_by, "Reviewer");
+    EXPECT_EQ(harness.controller.StatusForElement("claim-1"), app::controllers::ElementReviewStatus::Passed);
+
+    ASSERT_TRUE(harness.controller.AddOrUpdateItem(MakeReviewItem()));
+    EXPECT_EQ(harness.controller.StatusForElement("claim-1"), app::controllers::ElementReviewStatus::OpenItems);
+}
+
+TEST(ReviewControllerTest, AiOutcomesDrivePersistedStatus) {
+    ReviewHarness harness;
+
+    ASSERT_TRUE(harness.controller.SetAiReviewOutcome("claim-1",
+                                                      true,
+                                                      false,
+                                                      "profile-1",
+                                                      "Profile 1",
+                                                      "AI review completed with no findings.",
+                                                      "2026-05-06T12:00:00Z"));
+    core::reviews::ElementReviewState state = harness.controller.ElementReviewStateForElement("claim-1");
+    EXPECT_TRUE(state.ai_ok);
+    EXPECT_FALSE(state.failed);
+    EXPECT_EQ(state.review_profile_id, "profile-1");
+    EXPECT_EQ(harness.controller.StatusForElement("claim-1"), app::controllers::ElementReviewStatus::Passed);
+
+    ASSERT_TRUE(harness.controller.SetAiReviewOutcome("claim-1",
+                                                      false,
+                                                      true,
+                                                      "profile-1",
+                                                      "Profile 1",
+                                                      "AI review request failed.",
+                                                      "2026-05-06T12:01:00Z"));
+    state = harness.controller.ElementReviewStateForElement("claim-1");
+    EXPECT_FALSE(state.ai_ok);
+    EXPECT_TRUE(state.failed);
+    EXPECT_EQ(state.last_review_message, "AI review request failed.");
+    EXPECT_EQ(harness.controller.StatusForElement("claim-1"), app::controllers::ElementReviewStatus::Failed);
+}
+
 TEST(ReviewControllerTest, BeginDeleteReviewItemWithProposalRequestsConfirmation) {
     ReviewHarness harness;
     core::reviews::ReviewItem item = MakeReviewItem();

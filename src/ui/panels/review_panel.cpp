@@ -28,6 +28,17 @@ void DrawStatusBadge(const core::reviews::ReviewItem& item) {
     ImGui::PopStyleColor();
 }
 
+void DrawProblemSeverityBadge(const core::ProblemItem& problem) {
+    ImU32 color = ui::GetTheme().text_secondary;
+    if (problem.severity == core::ProblemSeverity::Error)
+        color = ui::GetTheme().danger;
+    else if (problem.severity == core::ProblemSeverity::Warning)
+        color = ui::GetTheme().warning;
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(color));
+    ImGui::TextUnformatted(core::ToString(problem.severity));
+    ImGui::PopStyleColor();
+}
+
 std::string LowerCopy(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
@@ -265,6 +276,23 @@ void DrawReviewItemActions(const core::reviews::ReviewItem& item,
     }
 }
 
+void DrawProblemItem(const core::ProblemItem& problem, const ReviewPanelCallbacks& callbacks) {
+    DrawProblemSeverityBadge(problem);
+    ImGui::SameLine();
+    ImGui::TextWrapped("%s", problem.type.empty() ? "Problem" : problem.type.c_str());
+    ImGui::TextDisabled("Source: %s", core::ToString(problem.source));
+    if (!problem.message.empty()) {
+        ImGui::TextWrapped("%s", problem.message.c_str());
+    }
+    if (ImGui::Button("Resolve") && callbacks.delete_problem) {
+        callbacks.delete_problem(problem);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Delete") && callbacks.delete_problem) {
+        callbacks.delete_problem(problem);
+    }
+}
+
 } // namespace
 
 void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& callbacks) {
@@ -282,6 +310,22 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
     }
 
     ImGui::TextDisabled("Element %s", model.selected_element_id.c_str());
+    ImGui::Text("Review status: %s",
+                model.review_status_text.empty() ? "Not reviewed" : model.review_status_text.c_str());
+    if (!model.review_status_detail.empty()) {
+        ImGui::TextDisabled("%s", model.review_status_detail.c_str());
+    }
+    bool manual_ok = model.manual_review_ok;
+    if (ImGui::Checkbox("Manual review OK", &manual_ok) && callbacks.set_manual_review_ok) {
+        callbacks.set_manual_review_ok(manual_ok);
+    }
+    bool ai_ok = model.ai_review_ok;
+    ImGui::BeginDisabled();
+    ImGui::Checkbox("AI review OK", &ai_ok);
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("AI review OK is set by AI review outcomes.");
+    }
     ImGui::Spacing();
 
     static std::string active_element_id;
@@ -328,7 +372,7 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
     ImGui::Separator();
     ImGui::Text("Comments (%d)", static_cast<int>(model.review_items.size()));
 
-    if (model.review_items.empty()) {
+    if (model.review_items.empty() && model.problem_items.empty()) {
         ImGui::TextDisabled("No review comments for this element.");
         return;
     }
@@ -348,6 +392,17 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
             DrawGuidelineTags(model, item.guideline_ids, popup_guideline_id);
             DrawReviewItemActions(item, model, callbacks);
             ImGui::PopID();
+        }
+
+        if (!model.problem_items.empty()) {
+            ImGui::Separator();
+            ImGui::Text("Other Problems (%d)", static_cast<int>(model.problem_items.size()));
+            for (const core::ProblemItem& problem : model.problem_items) {
+                ImGui::PushID(problem.id.c_str());
+                ImGui::Separator();
+                DrawProblemItem(problem, callbacks);
+                ImGui::PopID();
+            }
         }
     }
     ImGui::EndChild();

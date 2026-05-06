@@ -1,5 +1,7 @@
 #include "app/guideline_catalog.h"
 
+#include "parser/sccg_dist_parser.h"
+
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -30,6 +32,30 @@ std::filesystem::path ExecutableDirectory() {
 }
 
 } // namespace
+
+std::filesystem::path FindSccgDistDirectory() {
+    const std::filesystem::path executable_dir = ExecutableDirectory();
+    const std::filesystem::path current_dir = std::filesystem::current_path();
+    const std::vector<std::filesystem::path> candidates = {
+        executable_dir / "data" / "sccg" / "dist",
+        current_dir / "data" / "sccg" / "dist",
+        current_dir / "external" / "safety-case-core-guidelines" / "dist",
+        current_dir.parent_path() / "external" / "safety-case-core-guidelines" / "dist",
+    };
+
+    for (const std::filesystem::path& candidate : candidates) {
+        std::error_code error;
+        if (!std::filesystem::exists(candidate, error) || !std::filesystem::is_directory(candidate, error))
+            continue;
+        const bool has_profiles = std::filesystem::exists(candidate / "review_profiles.json", error);
+        const bool has_data_packages = std::filesystem::exists(candidate / "data_packages.json", error);
+        const bool has_rules = std::filesystem::exists(candidate / "ai_rule_export.jsonl", error) ||
+                               std::filesystem::exists(candidate / "sccg.rules.jsonl", error);
+        if (has_profiles && has_data_packages && has_rules)
+            return candidate;
+    }
+    return {};
+}
 
 std::filesystem::path FindSccgCatalogFile() {
     const std::filesystem::path executable_dir = ExecutableDirectory();
@@ -78,6 +104,9 @@ GuidelineCatalog BuildGuidelineCatalog(parser::GuidelinesDocument document, std:
             profile.id,
             profile.display_name,
             profile.description,
+            profile.applies_to,
+            profile.required_data,
+            profile.optional_data,
         });
         catalog.review_profile_ids.insert(profile.id);
     }
@@ -87,6 +116,26 @@ GuidelineCatalog BuildGuidelineCatalog(parser::GuidelinesDocument document, std:
 bool LoadGuidelineCatalog(GuidelineCatalog& catalog, std::string& error) {
     catalog = {};
     error.clear();
+
+    const std::filesystem::path dist_dir = FindSccgDistDirectory();
+    if (!dist_dir.empty()) {
+        parser::GuidelinesParseResult result = parser::SccgDistParser::ParseDirectory(dist_dir);
+        if (!result.success) {
+            error = "SCCG dist artifacts could not be parsed: " + result.error_message;
+            return false;
+        }
+
+        catalog = BuildGuidelineCatalog(std::move(result.document), dist_dir);
+        if (catalog.entries.empty()) {
+            error = "No SCCG rules were found in dist artifacts.";
+            return false;
+        }
+        if (catalog.review_profile_entries.empty()) {
+            error = "No SCCG review profiles were found in dist artifacts.";
+            return false;
+        }
+        return true;
+    }
 
     const std::filesystem::path guidelines_path = FindSccgCatalogFile();
     if (guidelines_path.empty()) {

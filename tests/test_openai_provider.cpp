@@ -32,6 +32,7 @@ TEST(OpenAiProviderTest, GeneratesTextFromOutputTextField) {
 
     ASSERT_TRUE(response.success) << response.errorMessage;
     EXPECT_EQ(response.text, "hello");
+    EXPECT_EQ(http->lastRequest.timeoutSeconds, 120);
     EXPECT_NE(http->lastRequest.body.find("gpt-test"), std::string::npos);
     EXPECT_NE(http->lastRequest.body.find("Say hello"), std::string::npos);
 }

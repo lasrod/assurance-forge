@@ -109,7 +109,7 @@ OpenAiProvider::Generate(const AiProviderSettings& settings, const AiRequest& re
 
     HttpRequest http_request;
     http_request.url = kOpenAiResponsesEndpoint;
-    http_request.timeoutSeconds = 30;
+    http_request.timeoutSeconds = 120;
     http_request.headers = {
         {"Content-Type", "application/json"},
         {"Authorization", "Bearer " + api_key},

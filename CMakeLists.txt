@@ -123,19 +123,56 @@ endif()
 # --- pugixml ---
 add_subdirectory(external/pugixml)
 
-set(AF_SCCG_SOURCE_FILE "${CMAKE_SOURCE_DIR}/external/safety-case-core-guidelines/dist/sccg.full.yaml")
-if(NOT EXISTS "${AF_SCCG_SOURCE_FILE}")
-    message(FATAL_ERROR "Missing SCCG distribution file: external/safety-case-core-guidelines/dist/sccg.full.yaml\n\nRun:\ngit submodule update --init --recursive\n\nIf the SCCG submodule is checked out but dist is missing, run:\ncd external/safety-case-core-guidelines\npython -m pip install -r requirements.txt\npython scripts/build_dist.py")
+set(AF_SCCG_DIST_DIR "${CMAKE_SOURCE_DIR}/external/safety-case-core-guidelines/dist")
+set(AF_SCCG_REQUIRED_DIST_FILES
+    review_profiles.json
+    data_packages.json
+)
+set(AF_SCCG_OPTIONAL_DIST_FILES
+    prechecks.json
+)
+foreach(AF_SCCG_DIST_FILE IN LISTS AF_SCCG_REQUIRED_DIST_FILES)
+    if(NOT EXISTS "${AF_SCCG_DIST_DIR}/${AF_SCCG_DIST_FILE}")
+        message(FATAL_ERROR "Missing SCCG distribution file: external/safety-case-core-guidelines/dist/${AF_SCCG_DIST_FILE}\n\nRun:\ngit submodule update --init --recursive\n\nIf the SCCG submodule is checked out but dist is missing, run:\ncd external/safety-case-core-guidelines\npython -m pip install -r requirements.txt\npython scripts/build_dist.py")
+    endif()
+endforeach()
+if(EXISTS "${AF_SCCG_DIST_DIR}/ai_rule_export.jsonl")
+    set(AF_SCCG_RULES_JSONL "ai_rule_export.jsonl")
+elseif(EXISTS "${AF_SCCG_DIST_DIR}/sccg.rules.jsonl")
+    set(AF_SCCG_RULES_JSONL "sccg.rules.jsonl")
+else()
+    message(FATAL_ERROR "Missing SCCG rules file: external/safety-case-core-guidelines/dist/ must contain ai_rule_export.jsonl or sccg.rules.jsonl\n\nRun:\ngit submodule update --init --recursive\n\nIf the SCCG submodule is checked out but dist is missing, run:\ncd external/safety-case-core-guidelines\npython -m pip install -r requirements.txt\npython scripts/build_dist.py")
 endif()
 
 function(af_copy_sccg_data target_name)
     add_custom_command(TARGET ${target_name} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${target_name}>/data"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${target_name}>/data/sccg/dist"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${AF_SCCG_SOURCE_FILE}"
-            "$<TARGET_FILE_DIR:${target_name}>/data/sccg.full.yaml"
+            ${AF_SCCG_REQUIRED_DIST_FILES}
+            ${AF_SCCG_RULES_JSONL}
+            "$<TARGET_FILE_DIR:${target_name}>/data/sccg/dist"
+        WORKING_DIRECTORY "${AF_SCCG_DIST_DIR}"
         VERBATIM
     )
+    foreach(AF_SCCG_OPT_FILE IN LISTS AF_SCCG_OPTIONAL_DIST_FILES)
+        if(EXISTS "${AF_SCCG_DIST_DIR}/${AF_SCCG_OPT_FILE}")
+            add_custom_command(TARGET ${target_name} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${AF_SCCG_DIST_DIR}/${AF_SCCG_OPT_FILE}"
+                    "$<TARGET_FILE_DIR:${target_name}>/data/sccg/dist/${AF_SCCG_OPT_FILE}"
+                VERBATIM
+            )
+        endif()
+    endforeach()
+    if(EXISTS "${AF_SCCG_DIST_DIR}/sccg.full.yaml")
+        add_custom_command(TARGET ${target_name} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${target_name}>/data"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${AF_SCCG_DIST_DIR}/sccg.full.yaml"
+                "$<TARGET_FILE_DIR:${target_name}>/data/sccg.full.yaml"
+            VERBATIM
+        )
+    endif()
 endfunction()
 
 set(ASSURANCE_FORGE_SHARED_SOURCES
@@ -205,6 +242,7 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/app/recent_projects.cpp
     src/app/controllers/review_controller.cpp
     src/parser/guidelines_parser.cpp
+    src/parser/sccg_dist_parser.cpp
     ${ASSURANCE_FORGE_SHARED_SOURCES}
 )
 
@@ -256,6 +294,7 @@ add_executable(tests
     tests/test_guidelines_parser.cpp
     tests/test_guideline_catalog.cpp
     tests/test_localization.cpp
+    tests/test_ui_state.cpp
     tests/test_recent_projects.cpp
     src/ai/ai_service.cpp
     src/ai/ai_claim_review.cpp
@@ -276,6 +315,7 @@ add_executable(tests
     src/app/review_problem_sync.cpp
     src/app/controllers/review_controller.cpp
     src/parser/guidelines_parser.cpp
+    src/parser/sccg_dist_parser.cpp
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
@@ -292,6 +332,7 @@ add_executable(tests
     src/core/sha256.cpp
     src/ui/gsn/gsn_layout.cpp
     src/ui/localization.cpp
+    src/ui/ui_state.cpp
     src/sacm/sacm_parser.cpp
     src/sacm/sacm_serializer.cpp
 )
@@ -315,6 +356,6 @@ gtest_discover_tests(tests
 add_test(
     NAME SccgDataRuntimeCopy
     COMMAND ${CMAKE_COMMAND} -E compare_files
-        "${AF_SCCG_SOURCE_FILE}"
-        "$<TARGET_FILE_DIR:tests>/data/sccg.full.yaml"
+    "${AF_SCCG_DIST_DIR}/review_profiles.json"
+    "$<TARGET_FILE_DIR:tests>/data/sccg/dist/review_profiles.json"
 )

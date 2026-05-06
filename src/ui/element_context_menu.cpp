@@ -29,6 +29,11 @@ void RenderAddElementMenu(const ElementContextActions& actions) {
     }
 }
 
+void RenderAiReviewMenu(const ElementContextActions& actions) {
+    if (actions.render_ai_review_menu)
+        actions.render_ai_review_menu();
+}
+
 void RenderRemoveSubmenu(const parser::AssuranceCase* active_case,
                          const std::string& selected_id,
                          const ElementContextActions& actions) {

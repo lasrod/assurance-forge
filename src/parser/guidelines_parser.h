@@ -71,14 +71,21 @@ struct GuidelineTool {
 
 struct Guideline {
     std::string id;
+    std::string rule_id;
     std::string category;
+    std::string category_id;
     std::string title;
     std::string statement;
     std::string rationale;
     std::vector<std::string> review_prompts;
     GuidelineExample examples;
     std::vector<GuidelineReference> references;
+    std::vector<std::string> reference_source_ids;
+    std::vector<std::string> review_profile_ids;
+    std::vector<std::string> data_package_ids;
     GuidelineTool tool;
+    std::string schema_version;
+    std::string sccg_version;
 };
 
 struct ReviewProfile {
@@ -89,6 +96,8 @@ struct ReviewProfile {
     std::vector<std::string> guideline_ids;
     std::vector<std::string> required_data;
     std::vector<std::string> optional_data;
+    std::string schema_version;
+    std::string sccg_version;
 };
 
 struct DataPackage {
@@ -97,6 +106,8 @@ struct DataPackage {
     std::string description;
     std::vector<std::string> required_fields;
     std::vector<std::string> optional_fields;
+    std::string schema_version;
+    std::string sccg_version;
 };
 
 struct Precheck {
@@ -107,6 +118,8 @@ struct Precheck {
     std::string result_type;
     std::string description;
     std::string interpretation;
+    std::string schema_version;
+    std::string sccg_version;
 };
 
 struct GuidelinesDocument {

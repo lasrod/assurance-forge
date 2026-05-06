@@ -51,6 +51,6 @@ TEST(GuidelineCatalogTest, LoadsRepositoryGuidelines) {
     ASSERT_TRUE(app::LoadGuidelineCatalog(catalog, error)) << error;
     EXPECT_FALSE(catalog.entries.empty());
     EXPECT_TRUE(catalog.ids.count("CL.1") > 0);
-    EXPECT_EQ(catalog.source_path.filename().string(), "sccg.full.yaml");
+    EXPECT_EQ(catalog.source_path.filename().string(), "dist");
     EXPECT_TRUE(catalog.review_profile_ids.count("claim_wording_review") > 0);
 }

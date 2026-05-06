@@ -40,6 +40,33 @@ struct SelectionChangedEvent {
     bool center_on_selection = false;
 };
 
+enum class ElementReviewVisualEventKind {
+    AiStarted,
+    AiNoFindings,
+    AiFindings,
+    AiFailed,
+    ManualOk,
+};
+
+struct ElementReviewVisualEvent {
+    ElementReviewVisualEventKind kind = ElementReviewVisualEventKind::AiStarted;
+    std::string element_id;
+    std::string review_profile_id;
+    std::string review_profile_name;
+    std::string message;
+    std::unordered_set<std::string> review_scope_element_ids;
+};
+
+struct AiReviewProposalSuggestion {
+    std::string review_item_id;
+    std::string element_id;
+    std::string suggested_text;
+};
+
+struct AiReviewProposalSuggestionsEvent {
+    std::vector<AiReviewProposalSuggestion> suggestions;
+};
+
 enum class CenterViewRequest {
     Preserve,
     GsnCanvas,
@@ -95,6 +122,8 @@ using AppEvent = std::variant<StatusMessageEvent,
                               ProjectFilesChangedEvent,
                               ActiveModelChangedEvent,
                               SelectionChangedEvent,
+                              ElementReviewVisualEvent,
+                              AiReviewProposalSuggestionsEvent,
                               CenterRequestEvent,
                               ProposalModeChangedEvent,
                               ProposalHighlightEvent,

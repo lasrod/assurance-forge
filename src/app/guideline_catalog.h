@@ -19,6 +19,9 @@ struct ReviewProfileCatalogEntry {
     std::string id;
     std::string display_name;
     std::string description;
+    std::vector<std::string> applies_to;
+    std::vector<std::string> required_data;
+    std::vector<std::string> optional_data;
 };
 
 struct GuidelineCatalog {
@@ -31,6 +34,7 @@ struct GuidelineCatalog {
 };
 
 std::filesystem::path FindSccgCatalogFile();
+std::filesystem::path FindSccgDistDirectory();
 std::filesystem::path FindGuidelinesFile();
 GuidelineCatalog BuildGuidelineCatalog(parser::GuidelinesDocument document, std::filesystem::path source_path = {});
 bool LoadGuidelineCatalog(GuidelineCatalog& catalog, std::string& error);

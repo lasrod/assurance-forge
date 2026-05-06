@@ -51,3 +51,23 @@ TEST(AppEventsTest, EmitsSafelyWithoutListeners) {
 
     EXPECT_NO_THROW(events.Emit(app::ModalRequestEvent{app::ModalKind::NotImplemented, true, "Feature"}));
 }
+
+TEST(AppEventsTest, DispatchesElementReviewVisualEvents) {
+    app::AppEvents events;
+    std::vector<app::ElementReviewVisualEvent> received;
+
+    events.Subscribe<app::ElementReviewVisualEvent>(
+        [&](const app::ElementReviewVisualEvent& event) { received.push_back(event); });
+
+    events.Emit(app::ElementReviewVisualEvent{app::ElementReviewVisualEventKind::AiNoFindings,
+                                              "claim-1",
+                                              "profile-1",
+                                              "Profile 1",
+                                              "No findings."});
+
+    ASSERT_EQ(received.size(), 1u);
+    EXPECT_EQ(received[0].kind, app::ElementReviewVisualEventKind::AiNoFindings);
+    EXPECT_EQ(received[0].element_id, "claim-1");
+    EXPECT_EQ(received[0].review_profile_id, "profile-1");
+    EXPECT_EQ(received[0].review_profile_name, "Profile 1");
+}

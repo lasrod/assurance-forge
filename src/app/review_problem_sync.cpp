@@ -62,10 +62,13 @@ core::ProblemItem MakeProblemFromReviewItem(const core::reviews::ReviewItem& ite
     core::ProblemItem problem;
     problem.id = ReviewProblemId(item);
     problem.severity = ReviewProblemSeverity(item.severity);
-    problem.source = core::ProblemSource::ReviewComment;
+    problem.source = item.source == core::reviews::ReviewItemSource::AIReview ? core::ProblemSource::AIReview
+                                                                              : core::ProblemSource::ReviewComment;
     problem.element_id = item.element_id;
     problem.type = "ReviewComment";
     problem.message = BuildProblemMessage(item);
+    if (!item.guideline_ids.empty())
+        problem.guideline_id = item.guideline_ids.front();
     return problem;
 }
 

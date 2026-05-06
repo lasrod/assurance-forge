@@ -28,6 +28,7 @@ static constexpr float kUndGap = 0.50f;
 static constexpr float kAttentionBadgeSize = 18.0f;
 static constexpr float kAttentionBadgeGap = 6.0f;
 static constexpr float kAttentionFontScale = 0.95f;
+static constexpr float kPi = 3.14159265358979323846f;
 
 // Number of stacked offset layers used for soft drop shadows under nodes.
 static constexpr int kShadowLayers = 3;
@@ -273,29 +274,169 @@ DrawUndevelopedMarker(ImDrawList* draw_list, const GsnNode& node, ImVec2 top_lef
     draw_list->AddText(font, font_size, text_pos, und_ink, und);
 }
 
-static void
-DrawAttentionBadge(ImDrawList* draw_list, const GsnNode& node, ImVec2 top_left, ImVec2 bottom_right, float zoom) {
-    const Theme& theme = GetTheme();
+struct BadgeRect {
+    ImVec2 min;
+    ImVec2 max;
+};
+
+static BadgeRect ComputeBadgeRect(ImVec2 top_left, ImVec2 bottom_right, float zoom, int slot, int slot_count) {
     float badge_size = DpiSize(kAttentionBadgeSize) * zoom;
     float badge_gap = DpiSize(kAttentionBadgeGap) * zoom;
-    float rounding = badge_size * 0.32f;
     float center_x = (top_left.x + bottom_right.x) * 0.5f;
     float badge_y = top_left.y - badge_size * 0.45f;
-    float badge_x = center_x - badge_size * 0.5f + badge_gap * 0.35f;
-
+    float row_width = badge_size * (float)slot_count + badge_gap * (float)std::max(0, slot_count - 1);
+    float badge_x = center_x - row_width * 0.5f + (float)slot * (badge_size + badge_gap);
     ImVec2 badge_min(badge_x, badge_y);
-    ImVec2 badge_max(badge_min.x + badge_size, badge_min.y + badge_size);
+    return BadgeRect{badge_min, ImVec2(badge_min.x + badge_size, badge_min.y + badge_size)};
+}
 
-    draw_list->AddRectFilled(badge_min, badge_max, theme.warning, rounding);
-    draw_list->AddRect(badge_min, badge_max, ShadeColor(theme.warning, -0.30f), rounding, 0, DpiSize(1.0f) * zoom);
+static bool IsMouseOverBadge(const BadgeRect& badge) {
+    if (!ImGui::IsWindowHovered())
+        return false;
+    ImVec2 mouse = ImGui::GetIO().MousePos;
+    return mouse.x >= badge.min.x && mouse.x <= badge.max.x && mouse.y >= badge.min.y && mouse.y <= badge.max.y;
+}
+
+static void DrawBadgeShell(ImDrawList* draw_list, const BadgeRect& badge, ImU32 fill, float zoom) {
+    float badge_size = badge.max.x - badge.min.x;
+    float rounding = badge_size * 0.32f;
+    draw_list->AddRectFilled(badge.min, badge.max, fill, rounding);
+    draw_list->AddRect(badge.min, badge.max, ShadeColor(fill, -0.30f), rounding, 0, DpiSize(1.0f) * zoom);
+}
+
+static void DrawAttentionBadge(ImDrawList* draw_list, const BadgeRect& badge, float zoom) {
+    const Theme& theme = GetTheme();
+    DrawBadgeShell(draw_list, badge, theme.warning, zoom);
 
     const char* glyph = "!";
     ImFont* font = g_BoldFont ? g_BoldFont : ImGui::GetFont();
     float font_size = ImGui::GetFontSize() * zoom * kAttentionFontScale;
     ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, glyph);
-    ImVec2 text_pos((badge_min.x + badge_max.x - text_size.x) * 0.5f,
-                    (badge_min.y + badge_max.y - text_size.y) * 0.5f - DpiScale() * zoom * 0.5f);
+    ImVec2 text_pos((badge.min.x + badge.max.x - text_size.x) * 0.5f,
+                    (badge.min.y + badge.max.y - text_size.y) * 0.5f - DpiScale() * zoom * 0.5f);
     draw_list->AddText(font, font_size, text_pos, theme.ink_dark, glyph);
+}
+
+static void DrawCheckGlyph(ImDrawList* draw_list, const BadgeRect& badge, ImU32 color, float zoom) {
+    float size = badge.max.x - badge.min.x;
+    float stroke = std::max(DpiSize(1.8f) * zoom, 1.0f);
+    ImVec2 a(badge.min.x + size * 0.27f, badge.min.y + size * 0.55f);
+    ImVec2 b(badge.min.x + size * 0.43f, badge.min.y + size * 0.70f);
+    ImVec2 c(badge.min.x + size * 0.74f, badge.min.y + size * 0.34f);
+    draw_list->AddLine(a, b, color, stroke);
+    draw_list->AddLine(b, c, color, stroke);
+}
+
+static void DrawCrossGlyph(ImDrawList* draw_list, const BadgeRect& badge, ImU32 color, float zoom) {
+    float size = badge.max.x - badge.min.x;
+    float stroke = std::max(DpiSize(1.8f) * zoom, 1.0f);
+    float pad = size * 0.32f;
+    draw_list->AddLine(ImVec2(badge.min.x + pad, badge.min.y + pad),
+                       ImVec2(badge.max.x - pad, badge.max.y - pad),
+                       color,
+                       stroke);
+    draw_list->AddLine(ImVec2(badge.max.x - pad, badge.min.y + pad),
+                       ImVec2(badge.min.x + pad, badge.max.y - pad),
+                       color,
+                       stroke);
+}
+
+static void DrawSpinnerGlyph(ImDrawList* draw_list, const BadgeRect& badge, ImU32 color, float zoom) {
+    float size = badge.max.x - badge.min.x;
+    float stroke = std::max(DpiSize(1.7f) * zoom, 1.0f);
+    ImVec2 center((badge.min.x + badge.max.x) * 0.5f, (badge.min.y + badge.max.y) * 0.5f);
+    float radius = size * 0.26f;
+    float start = std::fmod((float)ImGui::GetTime() * 5.2f, kPi * 2.0f);
+    float end = start + kPi * 1.45f;
+    draw_list->PathClear();
+    for (int i = 0; i <= 14; ++i) {
+        float t = start + (end - start) * ((float)i / 14.0f);
+        draw_list->PathLineTo(ImVec2(center.x + std::cos(t) * radius, center.y + std::sin(t) * radius));
+    }
+    draw_list->PathStroke(color, false, stroke);
+}
+
+static std::string ReviewBadgeTooltip(ElementReviewVisualStatus status, const ElementReviewVisualState& state) {
+    switch (status) {
+    case ElementReviewVisualStatus::AiRunning:
+        return "AI review in progress.";
+    case ElementReviewVisualStatus::ManualOk:
+        return "Review status: manually marked OK";
+    case ElementReviewVisualStatus::AiOk: {
+        std::string tooltip = "Review status: AI review completed with no findings";
+        if (!state.review_profile_name.empty())
+            tooltip += "\nProfile: " + state.review_profile_name;
+        else if (!state.review_profile_id.empty())
+            tooltip += "\nProfile: " + state.review_profile_id;
+        return tooltip;
+    }
+    case ElementReviewVisualStatus::Failed:
+        return state.last_review_message.empty() ? "Review status: AI review failed\nSee Problems panel for details."
+                                                 : state.last_review_message + "\nSee Problems panel for details.";
+    case ElementReviewVisualStatus::None:
+        break;
+    }
+    return {};
+}
+
+static void DrawReviewBadge(ImDrawList* draw_list,
+                            const BadgeRect& badge,
+                            float zoom,
+                            ElementReviewVisualStatus status,
+                            const ElementReviewVisualState& state) {
+    const Theme& theme = GetTheme();
+    ImU32 fill = theme.surface_3;
+    switch (status) {
+    case ElementReviewVisualStatus::AiRunning:
+        fill = theme.accent;
+        break;
+    case ElementReviewVisualStatus::AiOk:
+        fill = theme.success;
+        break;
+    case ElementReviewVisualStatus::ManualOk:
+        fill = theme.accent;
+        break;
+    case ElementReviewVisualStatus::Failed:
+        fill = theme.danger;
+        break;
+    case ElementReviewVisualStatus::None:
+        return;
+    }
+
+    DrawBadgeShell(draw_list, badge, fill, zoom);
+    ImU32 ink = InkOn(fill);
+    if (status == ElementReviewVisualStatus::Failed) {
+        DrawCrossGlyph(draw_list, badge, ink, zoom);
+    } else if (status == ElementReviewVisualStatus::AiRunning) {
+        DrawSpinnerGlyph(draw_list, badge, ink, zoom);
+    } else {
+        DrawCheckGlyph(draw_list, badge, ink, zoom);
+    }
+
+    if (IsMouseOverBadge(badge)) {
+        std::string tooltip = ReviewBadgeTooltip(status, state);
+        if (!tooltip.empty())
+            ImGui::SetTooltip("%s", tooltip.c_str());
+    }
+}
+
+static void DrawReviewScopeHighlight(ImDrawList* draw_list,
+                                     ImVec2 top_left,
+                                     ImVec2 bottom_right,
+                                     float zoom,
+                                     bool primary) {
+    const Theme& theme = GetTheme();
+    float scale = DpiScale() * zoom;
+    float pulse = 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 4.0f);
+    float alpha = primary ? 0.40f + pulse * 0.20f : 0.22f + pulse * 0.14f;
+    float pad = (primary ? 7.0f : 5.0f) * scale;
+    float thickness = (primary ? 2.2f : 1.6f) * scale;
+    draw_list->AddRect(ImVec2(top_left.x - pad, top_left.y - pad),
+                       ImVec2(bottom_right.x + pad, bottom_right.y + pad),
+                       WithAlpha(theme.accent, alpha),
+                       DpiSize(kClaimRounding) * zoom + pad,
+                       0,
+                       thickness);
 }
 
 // ===== Text layout helper =====
@@ -415,6 +556,12 @@ void DrawGsnNode(const GsnNode& node,
     const bool proposal_highlighted = proposal_dim_active && ui_state.proposal_highlight_ids.count(node.id) > 0;
     const bool proposal_dimmed = proposal_dim_active && !proposal_highlighted;
     const bool has_attention = ui_state.attention_element_ids.count(node.id) > 0;
+    const ElementReviewVisualState* review_state = FindElementReviewVisualState(ui_state, node.id);
+    const ElementReviewVisualStatus review_status =
+        review_state ? ResolveElementReviewVisualStatus(*review_state) : ElementReviewVisualStatus::None;
+    const bool has_review_badge = review_status != ElementReviewVisualStatus::None;
+    const bool in_review_scope = ui_state.ai_review_scope_element_ids.count(node.id) > 0;
+    const bool primary_review_scope_node = in_review_scope && ui_state.ai_review_primary_element_id == node.id;
 
     ImU32 fill_color = ColorForType(node.type);
     if (proposal_dimmed) {
@@ -471,8 +618,9 @@ void DrawGsnNode(const GsnNode& node,
     if (ImGui::BeginPopupContextItem(node.id.c_str())) {
         ui_state.selected_element_id = node.id;
         RenderAddElementMenu(actions);
-        ImGui::Separator();
         RenderRemoveSubmenu(active_case, ui_state.selected_element_id, actions);
+        ImGui::Separator();
+        RenderAiReviewMenu(actions);
         ImGui::EndPopup();
     }
 
@@ -505,6 +653,10 @@ void DrawGsnNode(const GsnNode& node,
                            2.4f * scale);
     }
 
+    if (in_review_scope) {
+        DrawReviewScopeHighlight(draw_list, top_left, bottom_right, zoom, primary_review_scope_node);
+    }
+
     // Marked-for-removal border (drawn after the selection highlight so a
     // selected & marked node still looks unambiguously red).
     if (marked_for_removal) {
@@ -518,9 +670,20 @@ void DrawGsnNode(const GsnNode& node,
                            2.5f * scale);
     }
 
-    // Attention badge drawn last so it always renders above all outlines.
-    if (has_attention) {
-        DrawAttentionBadge(draw_list, node, top_left, bottom_right, zoom);
+    // Status badges drawn last so they always render above all outlines.
+    if (has_attention || has_review_badge) {
+        const int slot_count = (has_attention ? 1 : 0) + (has_review_badge ? 1 : 0);
+        int slot = 0;
+        if (has_attention) {
+            DrawAttentionBadge(draw_list, ComputeBadgeRect(top_left, bottom_right, zoom, slot++, slot_count), zoom);
+        }
+        if (has_review_badge && review_state) {
+            DrawReviewBadge(draw_list,
+                            ComputeBadgeRect(top_left, bottom_right, zoom, slot, slot_count),
+                            zoom,
+                            review_status,
+                            *review_state);
+        }
     }
 }
 

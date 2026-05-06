@@ -53,6 +53,43 @@ ReviewItem FromJson(const nlohmann::json& object) {
     return item;
 }
 
+nlohmann::json ToJson(const ElementReviewState& state) {
+    nlohmann::json object;
+    object["manual_ok"] = state.manual_ok;
+    object["ai_ok"] = state.ai_ok;
+    object["failed"] = state.failed;
+    if (!state.review_profile_id.empty())
+        object["review_profile_id"] = state.review_profile_id;
+    if (!state.review_profile_name.empty())
+        object["review_profile_name"] = state.review_profile_name;
+    if (!state.last_review_message.empty())
+        object["last_review_message"] = state.last_review_message;
+    if (!state.reviewed_by.empty())
+        object["reviewed_by"] = state.reviewed_by;
+    if (!state.updated_utc.empty())
+        object["updated_utc"] = state.updated_utc;
+    return object;
+}
+
+ElementReviewState ElementReviewStateFromJson(const nlohmann::json& object) {
+    ElementReviewState state;
+    state.manual_ok = object.value("manual_ok", false);
+    state.ai_ok = object.value("ai_ok", false);
+    state.failed = object.value("failed", false);
+    state.review_profile_id = object.value("review_profile_id", "");
+    state.review_profile_name = object.value("review_profile_name", "");
+    state.last_review_message = object.value("last_review_message", "");
+    state.reviewed_by = object.value("reviewed_by", "");
+    state.updated_utc = object.value("updated_utc", "");
+    return state;
+}
+
+bool IsEmpty(const ElementReviewState& state) {
+    return !state.manual_ok && !state.ai_ok && !state.failed && state.review_profile_id.empty() &&
+           state.review_profile_name.empty() && state.last_review_message.empty() && state.reviewed_by.empty() &&
+           state.updated_utc.empty();
+}
+
 } // namespace
 
 const char* ReviewItemStatusToString(ReviewItemStatus status) {
@@ -88,6 +125,10 @@ ReviewItemSource ReviewItemSourceFromString(const std::string& value) {
 }
 
 std::string SerializeReviewItems(const std::vector<ReviewItem>& items) {
+    return SerializeReviewItems(items, {});
+}
+
+std::string SerializeReviewItems(const std::vector<ReviewItem>& items, const ElementReviewStateMap& element_states) {
     nlohmann::json root;
     root["format"] = kReviewItemsFormat;
     root["formatVersion"] = kReviewItemsFormatVersion;
@@ -95,11 +136,27 @@ std::string SerializeReviewItems(const std::vector<ReviewItem>& items) {
     for (const ReviewItem& item : items) {
         root["items"].push_back(ToJson(item));
     }
+    if (!element_states.empty()) {
+        root["element_review_states"] = nlohmann::json::object();
+        for (const auto& [element_id, state] : element_states) {
+            if (!element_id.empty() && !IsEmpty(state))
+                root["element_review_states"][element_id] = ToJson(state);
+        }
+    }
     return root.dump(2) + "\n";
 }
 
 bool DeserializeReviewItems(const std::string& content, std::vector<ReviewItem>& items, std::string& error) {
+    ElementReviewStateMap ignored_states;
+    return DeserializeReviewItems(content, items, ignored_states, error);
+}
+
+bool DeserializeReviewItems(const std::string& content,
+                            std::vector<ReviewItem>& items,
+                            ElementReviewStateMap& element_states,
+                            std::string& error) {
     items.clear();
+    element_states.clear();
     error.clear();
     try {
         nlohmann::json root = nlohmann::json::parse(content);
@@ -122,6 +179,19 @@ bool DeserializeReviewItems(const std::string& content, std::vector<ReviewItem>&
             ReviewItem item = FromJson(entry);
             if (!item.id.empty())
                 items.push_back(std::move(item));
+        }
+        if (root.contains("element_review_states")) {
+            if (!root["element_review_states"].is_object()) {
+                error = "Review item file element_review_states field is not an object.";
+                return false;
+            }
+            for (const auto& state_entry : root["element_review_states"].items()) {
+                if (!state_entry.value().is_object())
+                    continue;
+                ElementReviewState state = ElementReviewStateFromJson(state_entry.value());
+                if (!state_entry.key().empty() && !IsEmpty(state))
+                    element_states[state_entry.key()] = std::move(state);
+            }
         }
     } catch (const nlohmann::json::exception& e) {
         error = std::string("Review item JSON parse failed: ") + e.what();

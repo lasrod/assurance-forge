@@ -69,6 +69,38 @@ TEST(ReviewItemTest, RoundTripsReviewItemsJson) {
     EXPECT_EQ(items[0].status, core::reviews::ReviewItemStatus::Resolved);
 }
 
+TEST(ReviewItemTest, RoundTripsElementReviewStatesJson) {
+    core::reviews::ReviewItem item = MakeItem("review-1", "G1");
+    core::reviews::ElementReviewStateMap states;
+    states["G1"].manual_ok = true;
+    states["G1"].ai_ok = true;
+    states["G1"].review_profile_id = "claim_wording_review";
+    states["G1"].review_profile_name = "Claim wording review";
+    states["G1"].last_review_message = "AI review completed with no findings.";
+    states["G1"].reviewed_by = "Reviewer";
+    states["G1"].updated_utc = "2026-05-06T12:00:00Z";
+
+    std::string error;
+    std::vector<core::reviews::ReviewItem> items;
+    core::reviews::ElementReviewStateMap loaded_states;
+    ASSERT_TRUE(core::reviews::DeserializeReviewItems(core::reviews::SerializeReviewItems({item}, states),
+                                                      items,
+                                                      loaded_states,
+                                                      error))
+        << error;
+
+    ASSERT_EQ(items.size(), 1u);
+    ASSERT_EQ(loaded_states.size(), 1u);
+    EXPECT_TRUE(loaded_states["G1"].manual_ok);
+    EXPECT_TRUE(loaded_states["G1"].ai_ok);
+    EXPECT_FALSE(loaded_states["G1"].failed);
+    EXPECT_EQ(loaded_states["G1"].review_profile_id, "claim_wording_review");
+    EXPECT_EQ(loaded_states["G1"].review_profile_name, "Claim wording review");
+    EXPECT_EQ(loaded_states["G1"].last_review_message, "AI review completed with no findings.");
+    EXPECT_EQ(loaded_states["G1"].reviewed_by, "Reviewer");
+    EXPECT_EQ(loaded_states["G1"].updated_utc, "2026-05-06T12:00:00Z");
+}
+
 TEST(ReviewItemTest, DeserializesOldReviewItemsWithoutGuidelineIds) {
     const std::string content = R"json({
     "format": "assurance-forge-review-items",
@@ -92,11 +124,13 @@ TEST(ReviewItemTest, DeserializesOldReviewItemsWithoutGuidelineIds) {
 
     std::string error;
     std::vector<core::reviews::ReviewItem> items;
-    ASSERT_TRUE(core::reviews::DeserializeReviewItems(content, items, error)) << error;
+    core::reviews::ElementReviewStateMap states;
+    ASSERT_TRUE(core::reviews::DeserializeReviewItems(content, items, states, error)) << error;
 
     ASSERT_EQ(items.size(), 1u);
     EXPECT_EQ(items[0].id, "review-legacy");
     EXPECT_TRUE(items[0].guideline_ids.empty());
+    EXPECT_TRUE(states.empty());
 }
 
 TEST(ReviewItemTest, RejectsUnsupportedReviewItemFormat) {
@@ -127,6 +161,31 @@ TEST(ReviewItemManagerTest, SavesLoadsAndFiltersItemsByElement) {
     std::vector<core::reviews::ReviewItem> g1_items = loaded.GetItemsForElement("G1");
     ASSERT_EQ(g1_items.size(), 1u);
     EXPECT_EQ(g1_items[0].id, "review-1");
+}
+
+TEST(ReviewItemManagerTest, SavesLoadsElementReviewStates) {
+    TempDir temp(MakeTempDir());
+    std::filesystem::path review_path = temp.path / "reviews" / "review-items.af.json";
+
+    core::reviews::ReviewItemManager manager;
+    manager.SetFilePath(review_path);
+    ASSERT_TRUE(manager.AddOrUpdateItem(MakeItem("review-1", "G1")));
+    core::reviews::ElementReviewState state;
+    state.manual_ok = true;
+    state.ai_ok = true;
+    state.reviewed_by = "Reviewer";
+    ASSERT_TRUE(manager.SetElementReviewState("G1", state));
+
+    std::string error;
+    ASSERT_TRUE(manager.Save(error)) << error;
+
+    core::reviews::ReviewItemManager loaded;
+    loaded.SetFilePath(review_path);
+    ASSERT_TRUE(loaded.Load(error)) << error;
+
+    EXPECT_TRUE(loaded.GetElementReviewState("G1").manual_ok);
+    EXPECT_TRUE(loaded.GetElementReviewState("G1").ai_ok);
+    EXPECT_EQ(loaded.GetElementReviewState("G1").reviewed_by, "Reviewer");
 }
 
 TEST(ReviewItemManagerTest, UpdatesAndRemovesItems) {

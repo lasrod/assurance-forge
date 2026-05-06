@@ -1,6 +1,7 @@
 ﻿#include "ai/ai_claim_review.h"
 #include "core/assurance_tree.h"
 
+#include <algorithm>
 #include <gtest/gtest.h>
 #include <utility>
 #include <vector>
@@ -56,6 +57,19 @@ parser::ReviewProfile MakeClaimWordingProfile() {
     return profile;
 }
 
+bool HasPackage(const ai::AiReviewDataPackageBundle& packages, const std::string& id) {
+    return std::find_if(packages.available.begin(),
+                        packages.available.end(),
+                        [&](const ai::AiReviewDataPackage& package) { return package.id == id; }) !=
+           packages.available.end();
+}
+
+bool HasUnavailablePackage(const ai::AiReviewDataPackageBundle& packages, const std::string& id) {
+    return std::find_if(packages.unavailable.begin(), packages.unavailable.end(), [&](const auto& package) {
+               return package.id == id;
+           }) != packages.unavailable.end();
+}
+
 } // namespace
 
 TEST(AiClaimReviewTest, BuildsSelectedParentAndDirectChildrenPayload) {
@@ -79,15 +93,55 @@ TEST(AiClaimReviewTest, BuildsSelectedParentAndDirectChildrenPayload) {
     EXPECT_EQ(payload.children[0].role, "child");
 }
 
-TEST(AiClaimReviewTest, RejectsNonClaimElements) {
+TEST(AiClaimReviewTest, CollectsSelectedParentChildrenAndContextDataPackages) {
     parser::AssuranceCase assurance_case;
-    assurance_case.elements.push_back(MakeElement("S1", "argumentreasoning", "Strategy", "By decomposition."));
+    assurance_case.elements.push_back(MakeElement("G1", "claim", "Top goal", "System is safe."));
+    assurance_case.elements.push_back(MakeElement("G2", "claim", "Sub goal", "Braking is safe."));
+    assurance_case.elements.push_back(MakeElement("G3", "claim", "Leaf goal", "Brake timing is safe."));
+    assurance_case.elements.push_back(MakeElement("CTX1", "artifact", "Context", {}, "Operational design domain."));
+    assurance_case.elements.push_back(MakeRelationship("INF1", "assertedinference", {"G2"}, {"G1"}));
+    assurance_case.elements.push_back(MakeRelationship("INF2", "assertedinference", {"G3"}, {"G2"}));
+    assurance_case.elements.push_back(MakeRelationship("CTXREL1", "assertedcontext", {"CTX1"}, {"G2"}));
+
+    core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+    parser::ReviewProfile profile;
+    profile.id = "decomposition_review";
+    profile.required_data = {"SEL", "PARENT", "CHILDREN", "DIRECT_CONTEXT", "EVIDENCE_PATH"};
+    profile.optional_data = {"PROJECT_GLOSSARY"};
+
+    ai::AiReviewDataPackageBundle packages;
+    std::string error;
+    ASSERT_TRUE(ai::CollectAiReviewDataPackages(assurance_case, tree, "G2", &profile, packages, error)) << error;
+
+    EXPECT_TRUE(HasPackage(packages, "SEL"));
+    EXPECT_TRUE(HasPackage(packages, "PARENT"));
+    EXPECT_TRUE(HasPackage(packages, "CHILDREN"));
+    EXPECT_TRUE(HasPackage(packages, "DIRECT_CONTEXT"));
+    EXPECT_TRUE(HasUnavailablePackage(packages, "EVIDENCE_PATH"));
+    EXPECT_TRUE(HasUnavailablePackage(packages, "PROJECT_GLOSSARY"));
+}
+
+TEST(AiClaimReviewTest, RejectsUnsupportedElements) {
+    parser::AssuranceCase assurance_case;
+    assurance_case.elements.push_back(MakeElement("A1", "activity", "Activity", "Work item."));
     core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
     ai::AiReviewPayload payload;
     std::string error;
 
-    EXPECT_FALSE(ai::BuildAiReviewPayload(assurance_case, tree, "S1", payload, error));
-    EXPECT_EQ(error, "AI Review currently supports GSN Goal / SACM Claim elements only.");
+    EXPECT_FALSE(ai::BuildAiReviewPayload(assurance_case, tree, "A1", payload, error));
+    EXPECT_EQ(error, "AI Review does not support the selected element type.");
+}
+
+TEST(AiClaimReviewTest, MapsStrategyAndEvidenceToSccgAppliesToNames) {
+    parser::SacmElement strategy = MakeElement("S1", "argumentreasoning", "Strategy", "By decomposition.");
+    std::vector<std::string> strategy_names = ai::SccgAppliesToNamesForElement(strategy);
+    EXPECT_NE(std::find(strategy_names.begin(), strategy_names.end(), "GSN Strategy"), strategy_names.end());
+    EXPECT_NE(std::find(strategy_names.begin(), strategy_names.end(), "SACM ArgumentReasoning"), strategy_names.end());
+
+    parser::SacmElement evidence = MakeElement("E1", "artifactreference", "Evidence", {}, "Test report.");
+    std::vector<std::string> evidence_names = ai::SccgAppliesToNamesForElement(evidence);
+    EXPECT_NE(std::find(evidence_names.begin(), evidence_names.end(), "GSN Solution"), evidence_names.end());
+    EXPECT_NE(std::find(evidence_names.begin(), evidence_names.end(), "SACM ArtifactReference"), evidence_names.end());
 }
 
 TEST(AiClaimReviewTest, BuildsPromptWithProvidedClaimGuidelinesAndPayload) {
@@ -113,7 +167,7 @@ TEST(AiClaimReviewTest, BuildsPromptWithProvidedClaimGuidelinesAndPayload) {
     EXPECT_NE(parts.expectedResponseSchema.find("findings"), std::string::npos);
 }
 
-TEST(AiClaimReviewTest, RejectsResponseGuidelineIdThatWasNotProvided) {
+TEST(AiClaimReviewTest, PreservesFindingWithResponseGuidelineIdThatWasNotProvided) {
     const std::string response = R"json({
     "reviewed_element_id": "G1",
     "reviewed_element_type": "GSN Goal / SACM Claim",
@@ -135,8 +189,10 @@ TEST(AiClaimReviewTest, RejectsResponseGuidelineIdThatWasNotProvided) {
 
     ai::AiReviewParseResult parsed = ai::ParseAiReviewResponse(response, "G1", std::vector<std::string>{"CL.1"});
 
-    EXPECT_FALSE(parsed.success);
-    EXPECT_NE(parsed.errorMessage.find("CL.9"), std::string::npos);
+    ASSERT_TRUE(parsed.success) << parsed.errorMessage;
+    ASSERT_EQ(parsed.problems.size(), 1u);
+    EXPECT_TRUE(parsed.problems[0].guideline_id.empty());
+    EXPECT_NE(parsed.problems[0].message.find("Unknown SCCG rule reference: CL.9"), std::string::npos);
 }
 
 TEST(AiClaimReviewTest, ParsesFencedJsonAndMapsFindingsToProblems) {
@@ -165,10 +221,12 @@ TEST(AiClaimReviewTest, ParsesFencedJsonAndMapsFindingsToProblems) {
 
     ASSERT_TRUE(parsed.success) << parsed.errorMessage;
     ASSERT_EQ(parsed.problems.size(), 1u);
-    EXPECT_EQ(parsed.problems[0].id, "ai-review:G1:CL.2");
+    ASSERT_EQ(parsed.suggestedClaimWordings.size(), 1u);
+    EXPECT_EQ(parsed.problems[0].id, "ai-review:G1:CL.2:1");
     EXPECT_EQ(parsed.problems[0].source, core::ProblemSource::AIReview);
     EXPECT_EQ(parsed.problems[0].severity, core::ProblemSeverity::Warning);
     EXPECT_EQ(parsed.problems[0].guideline_id, "CL.2");
+    EXPECT_EQ(parsed.suggestedClaimWordings[0], "The braking controller safety is acceptable.");
     EXPECT_NE(parsed.problems[0].message.find("Suggested fix: Split the claim."), std::string::npos);
 }
 

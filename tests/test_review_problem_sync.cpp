@@ -117,6 +117,20 @@ TEST(ReviewProblemSyncTest, GuidelineProblemsOnlyComeFromOpenManualReviewItems) 
     EXPECT_FALSE(problems.GetProblemById("guideline-review:ai-open:CL.3").has_value());
 }
 
+TEST(ReviewProblemSyncTest, AiReviewItemsCreateAiReviewProblems) {
+    core::ProblemsManager problems;
+    core::reviews::ReviewItem item = MakeReviewItem("ai-open");
+    item.source = core::reviews::ReviewItemSource::AIReview;
+    item.guideline_ids = {"CL.3"};
+
+    app::SyncReviewProblems(problems, {item});
+
+    std::optional<core::ProblemItem> problem = problems.GetProblemById("review-comment:ai-open");
+    ASSERT_TRUE(problem.has_value());
+    EXPECT_EQ(problem->source, core::ProblemSource::AIReview);
+    EXPECT_EQ(problem->guideline_id, "CL.3");
+}
+
 TEST(ReviewProblemSyncTest, SyncReviewProblemsClearsStaleGuidelineProblemsByPrefix) {
     core::ProblemsManager problems;
     core::ProblemItem unrelated_guideline_problem;

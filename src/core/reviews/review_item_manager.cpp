@@ -53,6 +53,7 @@ void ReviewItemManager::SetFilePath(std::filesystem::path file_path) {
 
 bool ReviewItemManager::Load(std::string& error) {
     items_.clear();
+    element_states_.clear();
     if (file_path_.empty()) {
         error = "Review item file path is not set.";
         return false;
@@ -62,7 +63,7 @@ bool ReviewItemManager::Load(std::string& error) {
         error = "Review item file does not exist: " + file_path_.string();
         return false;
     }
-    return DeserializeReviewItems(ReadTextFile(file_path_, error), items_, error);
+    return DeserializeReviewItems(ReadTextFile(file_path_, error), items_, element_states_, error);
 }
 
 bool ReviewItemManager::Save(std::string& error) const {
@@ -70,12 +71,13 @@ bool ReviewItemManager::Save(std::string& error) const {
         error = "Review item file path is not set.";
         return false;
     }
-    return WriteTextFile(file_path_, SerializeReviewItems(items_), error);
+    return WriteTextFile(file_path_, SerializeReviewItems(items_, element_states_), error);
 }
 
 void ReviewItemManager::Clear() {
     file_path_.clear();
     items_.clear();
+    element_states_.clear();
 }
 
 std::vector<ReviewItem> ReviewItemManager::GetItemsForElement(const std::string& element_id) const {
@@ -92,6 +94,13 @@ std::optional<ReviewItem> ReviewItemManager::GetItemById(const std::string& id) 
     if (found == items_.end())
         return std::nullopt;
     return *found;
+}
+
+ElementReviewState ReviewItemManager::GetElementReviewState(const std::string& element_id) const {
+    auto found = element_states_.find(element_id);
+    if (found == element_states_.end())
+        return {};
+    return found->second;
 }
 
 bool ReviewItemManager::AddOrUpdateItem(ReviewItem item) {
@@ -114,6 +123,20 @@ bool ReviewItemManager::RemoveItem(const std::string& id) {
     return items_.size() != old_size;
 }
 
+size_t ReviewItemManager::RemoveItemsForElementSourceAndIdPrefix(const std::string& element_id,
+                                                                 ReviewItemSource source,
+                                                                 const std::string& id_prefix) {
+    const auto old_size = items_.size();
+    items_.erase(std::remove_if(items_.begin(),
+                                items_.end(),
+                                [&](const ReviewItem& item) {
+                                    return item.element_id == element_id && item.source == source &&
+                                           item.id.rfind(id_prefix, 0) == 0;
+                                }),
+                 items_.end());
+    return old_size - items_.size();
+}
+
 bool ReviewItemManager::SetProposal(const std::string& review_item_id, const std::string& proposal_id) {
     for (ReviewItem& item : items_) {
         if (item.id != review_item_id)
@@ -132,6 +155,17 @@ bool ReviewItemManager::ClearProposal(const std::string& review_item_id) {
         return true;
     }
     return false;
+}
+
+bool ReviewItemManager::SetElementReviewState(const std::string& element_id, ElementReviewState state) {
+    if (element_id.empty())
+        return false;
+    element_states_[element_id] = std::move(state);
+    return true;
+}
+
+bool ReviewItemManager::ClearElementReviewState(const std::string& element_id) {
+    return element_states_.erase(element_id) > 0;
 }
 
 } // namespace core::reviews

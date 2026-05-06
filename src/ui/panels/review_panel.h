@@ -2,6 +2,7 @@
 
 #include "core/reviews/review_item.h"
 #include "core/reviews/review_proposal.h"
+#include "core/problems/problem_item.h"
 
 #include <cstddef>
 #include <functional>
@@ -20,13 +21,20 @@ struct ReviewGuidelineOption {
 struct ReviewPanelModel {
     std::string selected_element_id;
     std::vector<core::reviews::ReviewItem> review_items;
+    std::vector<core::ProblemItem> problem_items;
     std::vector<ReviewGuidelineOption> guideline_options;
     std::string guideline_status;
     std::map<std::string, core::reviews::ProposalValidityResult> proposal_validity;
+    std::string review_status_text;
+    std::string review_status_detail;
     std::string active_proposal_review_item_id;
     size_t active_proposal_operation_count = 0;
     bool active_proposal_can_save = false;
     bool has_project = false;
+    bool manual_review_ok = false;
+    bool ai_review_ok = false;
+    bool ai_review_failed = false;
+    bool review_status_passed = false;
 };
 
 struct ReviewPanelCallbacks {
@@ -41,6 +49,8 @@ struct ReviewPanelCallbacks {
     std::function<void(const core::reviews::ReviewItem& item)> delete_proposal;
     std::function<void(const core::reviews::ReviewItem& item)> resolve_review_item;
     std::function<void(const core::reviews::ReviewItem& item)> delete_review_item;
+    std::function<void(const core::ProblemItem& problem)> delete_problem;
+    std::function<void(bool manual_ok)> set_manual_review_ok;
 };
 
 void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& callbacks);

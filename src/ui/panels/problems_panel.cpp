@@ -61,24 +61,11 @@ ImVec4 SeverityColor(core::ProblemSeverity severity) {
     return ImGui::ColorConvertU32ToFloat4(theme.text_primary);
 }
 
-void DrawHeader(bool ai_review_running, const ProblemsPanelCallbacks& callbacks, bool show_title) {
+void DrawHeader(bool show_title) {
     if (show_title) {
         ImGui::TextUnformatted("Problems");
-        ImGui::SameLine();
+        ImGui::Separator();
     }
-
-    const char* label = ai_review_running ? "AI Review..." : "AI Review";
-    const float button_width = ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-    const float right_edge = ImGui::GetWindowContentRegionMax().x;
-    ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), right_edge - button_width));
-
-    if (ai_review_running)
-        ImGui::BeginDisabled();
-    if (ImGui::Button(label, ImVec2(button_width, 0.0f)) && callbacks.on_ai_review_requested) {
-        callbacks.on_ai_review_requested();
-    }
-    if (ai_review_running)
-        ImGui::EndDisabled();
 }
 
 void DrawFilterButton(const FilterButtonSpec& spec, int count, ui::ProblemFilter& active_filter) {
@@ -203,8 +190,7 @@ void ShowProblemsPanelContent(ProblemsPanelModel model, const ProblemsPanelCallb
     const std::vector<core::ProblemItem>& problems = model.problems_manager.GetProblems();
     ClearRemovedSelection(problems, model.ui_state);
 
-    DrawHeader(model.ai_review_running, callbacks, show_title);
-    ImGui::Separator();
+    DrawHeader(show_title);
     DrawFilters(problems, model.ui_state.active_problem_filter);
     ImGui::Separator();
 

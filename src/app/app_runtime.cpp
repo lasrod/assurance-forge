@@ -154,6 +154,10 @@ std::string TruncateForProblemMessage(const std::string& value, size_t limit = 4
     return value.substr(0, limit) + "...";
 }
 
+bool IsReviewDerivedProblem(const core::ProblemItem& problem) {
+    return problem.id.rfind("review-comment:", 0) == 0 || problem.id.rfind("guideline-review:", 0) == 0;
+}
+
 const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model, const std::string& element_id) {
     auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
         return element.id == element_id;
@@ -616,6 +620,7 @@ ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
         [&runtime](core::NewElementKind kind) { runtime.AddChildToSelected(kind); },
         [&runtime]() { runtime.AddTopGoal(); },
         [&runtime](core::RemoveMode mode) { runtime.RemoveSelected(mode); },
+        [&runtime]() { runtime.RenderAiReviewContextMenuForSelected(); },
         [&runtime](const char* feature) {
             if (feature)
                 runtime.ShowNotImplementedModal(feature);
@@ -658,12 +663,40 @@ void AppRuntime::RegisterAppEventListeners() {
         if (event.mark_app_dirty)
             impl_->app_state.mark_dirty();
         SyncReviewProblems();
+        SyncReviewVisualStatesFromReviews();
     });
     impl_->events.Subscribe<SelectionChangedEvent>([](const SelectionChangedEvent& event) {
         ui::UiState& ui_state = ui::GetUiState();
         ui_state.selected_element_id = event.element_id;
         ui_state.center_on_selection = event.center_on_selection;
     });
+    impl_->events.Subscribe<ElementReviewVisualEvent>([](const ElementReviewVisualEvent& event) {
+        ui::UiState& ui_state = ui::GetUiState();
+        switch (event.kind) {
+        case ElementReviewVisualEventKind::AiStarted:
+            ui::MarkAiReviewRunning(ui_state,
+                                    event.element_id,
+                                    event.review_profile_id,
+                                    event.review_profile_name,
+                                    event.review_scope_element_ids);
+            break;
+        case ElementReviewVisualEventKind::AiNoFindings:
+            ui::MarkAiReviewNoFindings(ui_state, event.element_id, event.review_profile_id, event.review_profile_name);
+            break;
+        case ElementReviewVisualEventKind::AiFindings:
+            ui::MarkAiReviewFindings(ui_state, event.element_id);
+            break;
+        case ElementReviewVisualEventKind::AiFailed:
+            ui::MarkAiReviewFailed(
+                ui_state, event.element_id, event.message, event.review_profile_id, event.review_profile_name);
+            break;
+        case ElementReviewVisualEventKind::ManualOk:
+            ui::MarkReviewOkManually(ui_state, event.element_id);
+            break;
+        }
+    });
+    impl_->events.Subscribe<AiReviewProposalSuggestionsEvent>(
+        [this](const AiReviewProposalSuggestionsEvent& event) { CreateAiGeneratedProposals(event.suggestions); });
     impl_->events.Subscribe<CenterRequestEvent>([this](const CenterRequestEvent& event) {
         ui::UiState& ui_state = ui::GetUiState();
         switch (event.view) {
@@ -1020,6 +1053,69 @@ bool AppRuntime::SaveActiveProposal(const core::reviews::ReviewItem& item) {
     core::ProjectService::RefreshFileStatus(project);
     SetStatus("Saved proposal " + saved_id + ".");
     return true;
+}
+
+void AppRuntime::CreateAiGeneratedProposals(const std::vector<AiReviewProposalSuggestion>& suggestions) {
+    if (suggestions.empty())
+        return;
+    if (!impl_->app_state.current_project.has_value() || !impl_->app_state.loaded_case.has_value()) {
+        SetStatus("AI found proposed wording, but a project and SACM file must be open to save proposals.");
+        return;
+    }
+
+    core::AssuranceProject& project = impl_->app_state.current_project.value();
+    const parser::AssuranceCase& model = impl_->app_state.loaded_case.value();
+    size_t saved_count = 0;
+    for (const AiReviewProposalSuggestion& suggestion : suggestions) {
+        const std::string suggested_text = TrimWhitespace(suggestion.suggested_text);
+        if (suggested_text.empty())
+            continue;
+
+        std::optional<core::reviews::ReviewItem> item = impl_->review_controller->GetItemById(suggestion.review_item_id);
+        if (!item.has_value() || item->proposal_id.has_value())
+            continue;
+
+        const parser::SacmElement* anchor = FindParserElement(model, item->element_id);
+        if (!anchor || anchor->type != "claim")
+            continue;
+
+        const std::string current_text = anchor->content.empty() ? anchor->description : anchor->content;
+        if (TrimWhitespace(current_text) == suggested_text)
+            continue;
+
+        core::reviews::ReviewProposal proposal = BuildDraftReviewProposal(*item, model, *anchor);
+        proposal.author_name = "AI Review";
+        proposal.summary = "AI suggested replacement wording for " + anchor->id + ".";
+
+        core::reviews::PatchOperation operation;
+        operation.type = core::reviews::PatchOperationType::UpdateElementText;
+        operation.element = core::reviews::ElementRef{anchor->id, std::nullopt};
+        operation.field = "content";
+        operation.old_value = current_text;
+        operation.new_value = suggested_text;
+        proposal.operations.push_back(std::move(operation));
+
+        core::ProjectFileEntry entry;
+        std::string error;
+        if (!core::ProjectService::SaveReviewProposalFile(
+                project, proposal.id, core::reviews::SerializeReviewProposal(proposal), entry, error)) {
+            SetStatus("AI proposal save failed: " + error);
+            continue;
+        }
+
+        if (!impl_->review_controller->SetProposal(item->id, proposal.id)) {
+            std::string cleanup_error;
+            core::ProjectService::RemoveTrackedFile(project, entry.relativePath, true, cleanup_error);
+            SetStatus("AI proposal link update failed.");
+            continue;
+        }
+        ++saved_count;
+    }
+
+    if (saved_count > 0) {
+        core::ProjectService::RefreshFileStatus(project);
+        SetStatus("AI generated " + std::to_string(saved_count) + " proposed change(s). Review before applying.");
+    }
 }
 
 void AppRuntime::CancelActiveProposal() {
@@ -1500,6 +1596,7 @@ void AppRuntime::RenderTreePanel(float left_w, float safety_tree_h, float top_y)
             [this](core::NewElementKind kind) { AddProposalChildToSelected(kind); },
             [this]() { AddProposalTopGoal(); },
             [this](core::RemoveMode mode) { RemoveProposalSelected(mode); },
+            nullptr,
             [this](const char* feature) {
                 if (feature)
                     ShowNotImplementedModal(feature);
@@ -1607,6 +1704,7 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                         [this](core::NewElementKind kind) { AddProposalChildToSelected(kind); },
                         [this]() { AddProposalTopGoal(); },
                         [this](core::RemoveMode mode) { RemoveProposalSelected(mode); },
+                        nullptr,
                         [this](const char* feature) {
                             if (feature)
                                 ShowNotImplementedModal(feature);
@@ -1620,6 +1718,7 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                 ui_state.proposal_canvas_active = impl_->IsProposalCanvasActive();
                 ui_state.attention_element_ids =
                     core::CollectAttentionElementIds(impl_->problems_manager.GetProblems());
+                SyncReviewVisualStatesFromReviews();
                 ui::gsn::ShowGsnCanvasContent(ui_state, visible_case, actions);
                 ImGui::EndTabItem();
             }
@@ -1672,7 +1771,6 @@ void AppRuntime::RenderProblemsPanel(float center_x, float center_w, float probl
     ui::panels::ProblemsPanelModel model{
         impl_->problems_manager,
         ui::GetUiState(),
-        impl_->ai_review_controller->IsReviewRunning(),
     };
     ui::panels::ProblemsPanelCallbacks callbacks{
         [this](const core::ProblemItem& problem) {
@@ -1682,7 +1780,6 @@ void AppRuntime::RenderProblemsPanel(float center_x, float center_w, float probl
             impl_->events.Emit(SelectionChangedEvent{problem.element_id, true});
             impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
         },
-        [this]() { BeginAiReviewForSelection(); },
     };
 
     ImGui::SetNextWindowPos(ImVec2(center_x, top_y));
@@ -1700,6 +1797,11 @@ void AppRuntime::RenderProblemsPanel(float center_x, float center_w, float probl
             ImGui::EndTabItem();
         }
 
+        if (ImGui::BeginTabItem("AI Debug")) {
+            RenderAiDebugPanelContent();
+            ImGui::EndTabItem();
+        }
+
         ImGui::EndTabBar();
     }
 
@@ -1708,6 +1810,76 @@ void AppRuntime::RenderProblemsPanel(float center_x, float center_w, float probl
 
 void AppRuntime::SyncReviewProblems() {
     app::SyncReviewProblems(impl_->problems_manager, impl_->review_controller->Items());
+}
+
+void AppRuntime::SyncReviewVisualStatesFromReviews() {
+    ui::UiState& ui_state = ui::GetUiState();
+    std::unordered_map<std::string, ui::ElementReviewVisualState> next_states;
+
+    for (const auto& [element_id, stored_state] : impl_->review_controller->ElementReviewStates()) {
+        ui::ElementReviewVisualState visual;
+        visual.manual_ok = stored_state.manual_ok;
+        visual.ai_ok = stored_state.ai_ok;
+        visual.failed = stored_state.failed;
+        visual.review_profile_id = stored_state.review_profile_id;
+        visual.review_profile_name = stored_state.review_profile_name;
+        visual.last_review_message = stored_state.last_review_message;
+        next_states[element_id] = std::move(visual);
+    }
+
+    for (const core::reviews::ReviewItem& item : impl_->review_controller->Items()) {
+        if (item.element_id.empty() || item.status != core::reviews::ReviewItemStatus::Open)
+            continue;
+        ui::ElementReviewVisualState& visual = next_states[item.element_id];
+        visual.failed = true;
+        visual.last_review_message = "Open review items require attention.";
+    }
+
+    for (const core::ProblemItem& problem : impl_->problems_manager.GetProblems()) {
+        if (problem.element_id.empty() || IsReviewDerivedProblem(problem))
+            continue;
+        ui::ElementReviewVisualState& visual = next_states[problem.element_id];
+        visual.failed = true;
+        visual.last_review_message = "Open problems require attention.";
+    }
+
+    for (const auto& [element_id, existing_state] : ui_state.review_visual_states) {
+        if (!existing_state.ai_running)
+            continue;
+        ui::ElementReviewVisualState& visual = next_states[element_id];
+        visual.ai_running = true;
+        if (!existing_state.review_profile_id.empty())
+            visual.review_profile_id = existing_state.review_profile_id;
+        if (!existing_state.review_profile_name.empty())
+            visual.review_profile_name = existing_state.review_profile_name;
+        visual.last_review_message = existing_state.last_review_message;
+    }
+
+    ui_state.review_visual_states = std::move(next_states);
+}
+
+bool AppRuntime::SetManualReviewOk(const std::string& element_id, bool manual_ok) {
+    if (element_id.empty()) {
+        SetStatus("Select an element before changing manual review status.");
+        return false;
+    }
+    if (!impl_->app_state.current_project.has_value()) {
+        SetStatus("Open or create a project before changing review status.");
+        return false;
+    }
+    if (!EnsureReviewItemStorage())
+        return false;
+    if (impl_->reviewer_name.empty()) {
+        impl_->modal_coordinator->show_reviewer_name_prompt = true;
+        SetStatus("Enter a reviewer name before changing review status.");
+        return false;
+    }
+    if (!impl_->review_controller->SetManualReviewOk(element_id, manual_ok, impl_->reviewer_name, NowUtcString())) {
+        SetStatus("Could not update manual review status.");
+        return false;
+    }
+    SyncReviewVisualStatesFromReviews();
+    return true;
 }
 
 void AppRuntime::RenderProposalElementEditor() {
@@ -1864,6 +2036,44 @@ void AppRuntime::RenderReviewPanelContent() {
     }
     if (!model.selected_element_id.empty()) {
         model.review_items = impl_->review_controller->ItemsForElement(model.selected_element_id);
+        bool has_blocking_problem = false;
+        for (const core::ProblemItem& problem : impl_->problems_manager.GetProblems()) {
+            if (problem.element_id != model.selected_element_id)
+                continue;
+            if (IsReviewDerivedProblem(problem))
+                continue;
+            model.problem_items.push_back(problem);
+            has_blocking_problem = true;
+        }
+        const core::reviews::ElementReviewState element_review_state =
+            impl_->review_controller->ElementReviewStateForElement(model.selected_element_id);
+        model.manual_review_ok = element_review_state.manual_ok;
+        model.ai_review_ok = element_review_state.ai_ok;
+        model.ai_review_failed = element_review_state.failed;
+        const app::controllers::ElementReviewStatus review_status =
+            impl_->review_controller->StatusForElement(model.selected_element_id, has_blocking_problem);
+        model.review_status_passed = review_status == app::controllers::ElementReviewStatus::Passed;
+        switch (review_status) {
+        case app::controllers::ElementReviewStatus::Passed:
+            model.review_status_text = "Passed";
+            model.review_status_detail = element_review_state.manual_ok ? "Manual review OK." : "AI review OK.";
+            break;
+        case app::controllers::ElementReviewStatus::Failed:
+            model.review_status_text = "Not OK";
+            model.review_status_detail = element_review_state.last_review_message.empty()
+                                             ? "AI review failed."
+                                             : element_review_state.last_review_message;
+            break;
+        case app::controllers::ElementReviewStatus::OpenItems:
+            model.review_status_text = "Not OK";
+            model.review_status_detail = has_blocking_problem ? "Open problems require attention."
+                                                              : "Open review comments require attention.";
+            break;
+        case app::controllers::ElementReviewStatus::NotReviewed:
+            model.review_status_text = "Not reviewed";
+            model.review_status_detail = "Set Manual review OK or run an AI review with no findings.";
+            break;
+        }
         for (const core::reviews::ReviewItem& item : model.review_items) {
             if (!item.proposal_id.has_value())
                 continue;
@@ -2058,6 +2268,14 @@ void AppRuntime::RenderReviewPanelContent() {
     };
     callbacks.resolve_review_item = [this](const core::reviews::ReviewItem& item) { ResolveReviewItem(item); };
     callbacks.delete_review_item = [this](const core::reviews::ReviewItem& item) { BeginDeleteReviewItem(item); };
+    callbacks.delete_problem = [this](const core::ProblemItem& problem) {
+        impl_->problems_manager.RemoveProblem(problem.id);
+        SyncReviewVisualStatesFromReviews();
+        SetStatus("Problem deleted.");
+    };
+    callbacks.set_manual_review_ok = [this, element_id = model.selected_element_id](bool manual_ok) {
+        SetManualReviewOk(element_id, manual_ok);
+    };
     ui::panels::ShowReviewPanel(model, callbacks);
 }
 
@@ -2156,8 +2374,6 @@ void AppRuntime::RenderFrame(bool& done) {
 
     RenderPreferencesWindow();
     RenderThemeTweaksWindow();
-    RenderAiReviewDebugModal();
-
     RenderRemoveConfirmModal();
     RenderDeleteReviewItemConfirmModal();
     RenderCreateProjectModal();
