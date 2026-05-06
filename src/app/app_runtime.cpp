@@ -1684,7 +1684,26 @@ void AppRuntime::RenderProblemsPanel(float center_x, float center_w, float probl
         },
         [this]() { BeginAiReviewForSelection(); },
     };
-    ui::panels::ShowProblemsPanel(center_x, center_w, problems_h, top_y, kPanelFlags, model, callbacks);
+
+    ImGui::SetNextWindowPos(ImVec2(center_x, top_y));
+    ImGui::SetNextWindowSize(ImVec2(center_w, problems_h));
+    ImGui::Begin("Problems and Review", nullptr, kPanelFlags | ImGuiWindowFlags_NoTitleBar);
+
+    if (ImGui::BeginTabBar("##problems_review_tabs")) {
+        if (ImGui::BeginTabItem("Problems")) {
+            ui::panels::ShowProblemsPanelContent(model, callbacks, false);
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem("Review")) {
+            RenderReviewPanelContent();
+            ImGui::EndTabItem();
+        }
+
+        ImGui::EndTabBar();
+    }
+
+    ImGui::End();
 }
 
 void AppRuntime::SyncReviewProblems() {
@@ -1796,23 +1815,9 @@ void AppRuntime::RenderProposalElementEditor() {
 void AppRuntime::RenderElementPropertiesPanel(
     float center_x, float center_w, float right_w, float content_h, float top_y) {
     float right_x = center_x + center_w + kSplitterThickness;
-    const float min_element_h = 150.0f;
-    const float min_review_h = 150.0f;
-    const float split_available_h = std::max(0.0f, content_h - kSplitterThickness);
-    if (split_available_h > min_element_h + min_review_h) {
-        const float min_ratio = min_element_h / split_available_h;
-        const float max_ratio = 1.0f - (min_review_h / split_available_h);
-        impl_->right_panel_split_ratio = std::clamp(impl_->right_panel_split_ratio, min_ratio, max_ratio);
-    } else {
-        impl_->right_panel_split_ratio = 0.5f;
-    }
-    float element_h = split_available_h * impl_->right_panel_split_ratio;
-    element_h = std::max(0.0f, element_h);
-    float review_y = top_y + element_h + kSplitterThickness;
-    float review_h = std::max(0.0f, split_available_h - element_h);
 
     ImGui::SetNextWindowPos(ImVec2(right_x, top_y));
-    ImGui::SetNextWindowSize(ImVec2(right_w, element_h));
+    ImGui::SetNextWindowSize(ImVec2(right_w, content_h));
     ImGui::Begin("Element Properties", nullptr, kPanelFlags);
 
     if (impl_->proposal_controller->creator_active) {
@@ -1831,20 +1836,9 @@ void AppRuntime::RenderElementPropertiesPanel(
     }
 
     ImGui::End();
+}
 
-    float delta = ui::widgets::DrawHorizontalSplitter(
-        "##element_review_splitter", right_x, top_y + element_h, right_w, kSplitterThickness, kPanelFlags);
-    if (delta != 0.0f && split_available_h > min_element_h + min_review_h) {
-        impl_->right_panel_split_ratio += delta / split_available_h;
-        const float min_ratio = min_element_h / split_available_h;
-        const float max_ratio = 1.0f - (min_review_h / split_available_h);
-        impl_->right_panel_split_ratio = std::clamp(impl_->right_panel_split_ratio, min_ratio, max_ratio);
-    }
-
-    ImGui::SetNextWindowPos(ImVec2(right_x, review_y));
-    ImGui::SetNextWindowSize(ImVec2(right_w, review_h));
-    ImGui::Begin("Review", nullptr, kPanelFlags);
-
+void AppRuntime::RenderReviewPanelContent() {
     const ui::UiState& ui_state = ui::GetUiState();
     ui::panels::ReviewPanelModel model;
     auto& proposals = *impl_->proposal_controller;
@@ -2065,8 +2059,6 @@ void AppRuntime::RenderElementPropertiesPanel(
     callbacks.resolve_review_item = [this](const core::reviews::ReviewItem& item) { ResolveReviewItem(item); };
     callbacks.delete_review_item = [this](const core::reviews::ReviewItem& item) { BeginDeleteReviewItem(item); };
     ui::panels::ShowReviewPanel(model, callbacks);
-
-    ImGui::End();
 }
 
 void AppRuntime::RequestExit(bool& done) {

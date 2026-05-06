@@ -65,7 +65,6 @@ struct AppRuntimeState {
 
     float left_ratio = 0.20f;
     float right_ratio = 0.20f;
-    float right_panel_split_ratio = 0.5f;
     float project_boundary_ratio = 0.50f;
     float problems_panel_height = 220.0f;
 

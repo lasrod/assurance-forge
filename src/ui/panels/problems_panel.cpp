@@ -61,13 +61,15 @@ ImVec4 SeverityColor(core::ProblemSeverity severity) {
     return ImGui::ColorConvertU32ToFloat4(theme.text_primary);
 }
 
-void DrawHeader(bool ai_review_running, const ProblemsPanelCallbacks& callbacks) {
-    ImGui::TextUnformatted("Problems");
+void DrawHeader(bool ai_review_running, const ProblemsPanelCallbacks& callbacks, bool show_title) {
+    if (show_title) {
+        ImGui::TextUnformatted("Problems");
+        ImGui::SameLine();
+    }
 
     const char* label = ai_review_running ? "AI Review..." : "AI Review";
     const float button_width = ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
     const float right_edge = ImGui::GetWindowContentRegionMax().x;
-    ImGui::SameLine();
     ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), right_edge - button_width));
 
     if (ai_review_running)
@@ -192,24 +194,28 @@ void ShowProblemsPanel(float x,
     ImGui::SetNextWindowSize(ImVec2(width, height));
     ImGui::Begin("Problems", nullptr, panel_flags);
 
+    ShowProblemsPanelContent(model, callbacks);
+
+    ImGui::End();
+}
+
+void ShowProblemsPanelContent(ProblemsPanelModel model, const ProblemsPanelCallbacks& callbacks, bool show_title) {
     const std::vector<core::ProblemItem>& problems = model.problems_manager.GetProblems();
     ClearRemovedSelection(problems, model.ui_state);
 
-    DrawHeader(model.ai_review_running, callbacks);
+    DrawHeader(model.ai_review_running, callbacks, show_title);
     ImGui::Separator();
     DrawFilters(problems, model.ui_state.active_problem_filter);
     ImGui::Separator();
 
     if (problems.empty()) {
         ImGui::TextDisabled("No problems found.");
-        ImGui::End();
         return;
     }
 
     int visible_count = CountMatches(problems, model.ui_state.active_problem_filter);
     if (visible_count == 0) {
         ImGui::TextDisabled("No problems match the current filter.");
-        ImGui::End();
         return;
     }
 
@@ -234,8 +240,6 @@ void ShowProblemsPanel(float x,
 
         ImGui::EndTable();
     }
-
-    ImGui::End();
 }
 
 } // namespace ui::panels
