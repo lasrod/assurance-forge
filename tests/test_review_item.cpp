@@ -83,10 +83,8 @@ TEST(ReviewItemTest, RoundTripsElementReviewStatesJson) {
     std::string error;
     std::vector<core::reviews::ReviewItem> items;
     core::reviews::ElementReviewStateMap loaded_states;
-    ASSERT_TRUE(core::reviews::DeserializeReviewItems(core::reviews::SerializeReviewItems({item}, states),
-                                                      items,
-                                                      loaded_states,
-                                                      error))
+    ASSERT_TRUE(core::reviews::DeserializeReviewItems(
+        core::reviews::SerializeReviewItems({item}, states), items, loaded_states, error))
         << error;
 
     ASSERT_EQ(items.size(), 1u);

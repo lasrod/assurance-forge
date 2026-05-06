@@ -29,7 +29,9 @@ struct ControllerHarness {
         events.Subscribe<app::ElementReviewVisualEvent>(
             [this](const app::ElementReviewVisualEvent& event) { review_visual_events.push_back(event); });
         events.Subscribe<app::AiReviewProposalSuggestionsEvent>(
-            [this](const app::AiReviewProposalSuggestionsEvent& event) { proposal_suggestion_events.push_back(event); });
+            [this](const app::AiReviewProposalSuggestionsEvent& event) {
+                proposal_suggestion_events.push_back(event);
+            });
         events.Subscribe<app::ReviewItemsDirtyEvent>(
             [this](const app::ReviewItemsDirtyEvent&) { app::SyncReviewProblems(problems, reviews.Items()); });
     }
@@ -107,7 +109,9 @@ struct ServiceControllerHarness {
         events.Subscribe<app::ElementReviewVisualEvent>(
             [this](const app::ElementReviewVisualEvent& event) { review_visual_events.push_back(event); });
         events.Subscribe<app::AiReviewProposalSuggestionsEvent>(
-            [this](const app::AiReviewProposalSuggestionsEvent& event) { proposal_suggestion_events.push_back(event); });
+            [this](const app::AiReviewProposalSuggestionsEvent& event) {
+                proposal_suggestion_events.push_back(event);
+            });
         events.Subscribe<app::ReviewItemsDirtyEvent>(
             [this](const app::ReviewItemsDirtyEvent&) { app::SyncReviewProblems(problems, reviews.Items()); });
     }

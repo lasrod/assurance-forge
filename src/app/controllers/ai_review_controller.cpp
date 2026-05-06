@@ -172,8 +172,8 @@ void ReplaceAiReviewWithSingleItem(ReviewController& review_controller,
                                    const std::string& message,
                                    core::ProblemSeverity severity) {
     review_controller.ClearAiReviewItemsForElementAndPrefix(element_id, review_prefix);
-    review_controller.AddOrUpdateItem(MakeAiReviewItem(
-        review_prefix + suffix, element_id, title, message, severity, NowUtcString()));
+    review_controller.AddOrUpdateItem(
+        MakeAiReviewItem(review_prefix + suffix, element_id, title, message, severity, NowUtcString()));
 }
 
 } // namespace
@@ -296,12 +296,12 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
                               {},
                               "AI review payload could not be created.");
         review_controller_.SetAiReviewOutcome(selected_element_id,
-                                             false,
-                                             true,
-                                             review_profile_id,
-                                             {},
-                                             "AI review payload could not be created.",
-                                             NowUtcString());
+                                              false,
+                                              true,
+                                              review_profile_id,
+                                              {},
+                                              "AI review payload could not be created.",
+                                              NowUtcString());
         events_.Emit(StatusMessageEvent{"AI review payload could not be created."});
         return;
     }
@@ -323,12 +323,12 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
                               {},
                               "SCCG guidelines could not be loaded for AI review.");
         review_controller_.SetAiReviewOutcome(selected_element_id,
-                                             false,
-                                             true,
-                                             review_profile_id,
-                                             {},
-                                             "SCCG guidelines could not be loaded for AI review.",
-                                             NowUtcString());
+                                              false,
+                                              true,
+                                              review_profile_id,
+                                              {},
+                                              "SCCG guidelines could not be loaded for AI review.",
+                                              NowUtcString());
         events_.Emit(StatusMessageEvent{"SCCG guidelines could not be loaded for AI review."});
         return;
     }
@@ -350,15 +350,17 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
                               ElementReviewVisualEventKind::AiFailed,
                               selected_element_id,
                               review_profile_id,
-                              guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "",
+                              guideline_selection.review_profile ? guideline_selection.review_profile->display_name
+                                                                 : "",
                               guideline_selection.error_message);
-        review_controller_.SetAiReviewOutcome(selected_element_id,
-                                             false,
-                                             true,
-                                             review_profile_id,
-                                             guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "",
-                                             guideline_selection.error_message,
-                                             NowUtcString());
+        review_controller_.SetAiReviewOutcome(
+            selected_element_id,
+            false,
+            true,
+            review_profile_id,
+            guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "",
+            guideline_selection.error_message,
+            NowUtcString());
         events_.Emit(StatusMessageEvent{guideline_selection.error_message});
         return;
     }
@@ -396,21 +398,21 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
             "AI review setup failed",
             data_package_error.empty() ? "AI review data packages could not be collected." : data_package_error,
             core::ProblemSeverity::Error);
-        EmitReviewVisualEvent(events_,
-                              ElementReviewVisualEventKind::AiFailed,
-                              selected_element_id,
-                              guideline_selection.review_profile ? guideline_selection.review_profile->id
-                                                                 : review_profile_id,
-                              guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "",
-                              "AI review data packages could not be collected.");
-        review_controller_.SetAiReviewOutcome(selected_element_id,
-                                             false,
-                                             true,
-                                             guideline_selection.review_profile ? guideline_selection.review_profile->id
-                                                                                : review_profile_id,
-                                             guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "",
-                                             "AI review data packages could not be collected.",
-                                             NowUtcString());
+        EmitReviewVisualEvent(
+            events_,
+            ElementReviewVisualEventKind::AiFailed,
+            selected_element_id,
+            guideline_selection.review_profile ? guideline_selection.review_profile->id : review_profile_id,
+            guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "",
+            "AI review data packages could not be collected.");
+        review_controller_.SetAiReviewOutcome(
+            selected_element_id,
+            false,
+            true,
+            guideline_selection.review_profile ? guideline_selection.review_profile->id : review_profile_id,
+            guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "",
+            "AI review data packages could not be collected.",
+            NowUtcString());
         events_.Emit(StatusMessageEvent{"AI review data packages could not be collected."});
         return;
     }
@@ -596,10 +598,8 @@ void AiReviewController::PollTask() {
                                                             problem.guideline_id));
         if (problem_index < parse_result.suggestedClaimWordings.size() &&
             !parse_result.suggestedClaimWordings[problem_index].empty()) {
-            proposal_suggestions.push_back(
-                AiReviewProposalSuggestion{review_item_id,
-                                           pending_review_element_id_,
-                                           parse_result.suggestedClaimWordings[problem_index]});
+            proposal_suggestions.push_back(AiReviewProposalSuggestion{
+                review_item_id, pending_review_element_id_, parse_result.suggestedClaimWordings[problem_index]});
         }
     }
 
