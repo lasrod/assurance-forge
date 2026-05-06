@@ -13,6 +13,7 @@
 #include <chrono>
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace app::controllers {
@@ -70,6 +71,8 @@ private:
     std::string pending_review_element_id_;
     std::string pending_review_element_type_;
     std::string pending_review_profile_id_;
+    std::string pending_review_profile_name_;
+    std::unordered_set<std::string> pending_review_scope_element_ids_;
     std::vector<std::string> pending_guideline_ids_;
     std::string last_raw_response_;
     std::string last_parse_error_;

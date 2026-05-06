@@ -665,6 +665,31 @@ void AppRuntime::RegisterAppEventListeners() {
         ui_state.selected_element_id = event.element_id;
         ui_state.center_on_selection = event.center_on_selection;
     });
+    impl_->events.Subscribe<ElementReviewVisualEvent>([](const ElementReviewVisualEvent& event) {
+        ui::UiState& ui_state = ui::GetUiState();
+        switch (event.kind) {
+        case ElementReviewVisualEventKind::AiStarted:
+            ui::MarkAiReviewRunning(ui_state,
+                                    event.element_id,
+                                    event.review_profile_id,
+                                    event.review_profile_name,
+                                    event.review_scope_element_ids);
+            break;
+        case ElementReviewVisualEventKind::AiNoFindings:
+            ui::MarkAiReviewNoFindings(ui_state, event.element_id, event.review_profile_id, event.review_profile_name);
+            break;
+        case ElementReviewVisualEventKind::AiFindings:
+            ui::MarkAiReviewFindings(ui_state, event.element_id);
+            break;
+        case ElementReviewVisualEventKind::AiFailed:
+            ui::MarkAiReviewFailed(
+                ui_state, event.element_id, event.message, event.review_profile_id, event.review_profile_name);
+            break;
+        case ElementReviewVisualEventKind::ManualOk:
+            ui::MarkReviewOkManually(ui_state, event.element_id);
+            break;
+        }
+    });
     impl_->events.Subscribe<CenterRequestEvent>([this](const CenterRequestEvent& event) {
         ui::UiState& ui_state = ui::GetUiState();
         switch (event.view) {
@@ -1870,6 +1895,13 @@ void AppRuntime::RenderReviewPanelContent() {
     }
     if (!model.selected_element_id.empty()) {
         model.review_items = impl_->review_controller->ItemsForElement(model.selected_element_id);
+        for (const core::ProblemItem& problem : impl_->problems_manager.GetProblems()) {
+            if (problem.element_id != model.selected_element_id)
+                continue;
+            if (problem.id.rfind("review-comment:", 0) == 0 || problem.id.rfind("guideline-review:", 0) == 0)
+                continue;
+            model.problem_items.push_back(problem);
+        }
         for (const core::reviews::ReviewItem& item : model.review_items) {
             if (!item.proposal_id.has_value())
                 continue;
@@ -2064,6 +2096,10 @@ void AppRuntime::RenderReviewPanelContent() {
     };
     callbacks.resolve_review_item = [this](const core::reviews::ReviewItem& item) { ResolveReviewItem(item); };
     callbacks.delete_review_item = [this](const core::reviews::ReviewItem& item) { BeginDeleteReviewItem(item); };
+    callbacks.delete_problem = [this](const core::ProblemItem& problem) {
+        impl_->problems_manager.RemoveProblem(problem.id);
+        SetStatus("Problem deleted.");
+    };
     ui::panels::ShowReviewPanel(model, callbacks);
 }
 

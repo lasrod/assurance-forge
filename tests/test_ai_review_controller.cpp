@@ -2,6 +2,7 @@
 
 #include "ai/ai_provider.h"
 #include "ai/secret_store.h"
+#include "app/review_problem_sync.h"
 
 #include <chrono>
 #include <gtest/gtest.h>
@@ -19,10 +20,15 @@ struct ControllerHarness {
     ai::AiTaskRunner task_runner;
     app::controllers::AiReviewController controller;
     std::vector<std::string> statuses;
+    std::vector<app::ElementReviewVisualEvent> review_visual_events;
 
     ControllerHarness() : reviews(events), controller(events, problems, reviews, task_runner, nullptr) {
         events.Subscribe<app::StatusMessageEvent>(
             [this](const app::StatusMessageEvent& event) { statuses.push_back(event.message); });
+        events.Subscribe<app::ElementReviewVisualEvent>(
+            [this](const app::ElementReviewVisualEvent& event) { review_visual_events.push_back(event); });
+        events.Subscribe<app::ReviewItemsDirtyEvent>(
+            [this](const app::ReviewItemsDirtyEvent&) { app::SyncReviewProblems(problems, reviews.Items()); });
     }
 };
 
@@ -84,6 +90,7 @@ struct ServiceControllerHarness {
     std::shared_ptr<ai::AiService> service = std::make_shared<ai::AiService>(settings_store, secret_store, provider);
     app::controllers::AiReviewController controller;
     std::vector<std::string> statuses;
+    std::vector<app::ElementReviewVisualEvent> review_visual_events;
 
     ServiceControllerHarness() : reviews(events), controller(events, problems, reviews, task_runner, service) {
         ai::AiProviderSettings settings;
@@ -93,6 +100,10 @@ struct ServiceControllerHarness {
         service->SaveApiKey("sk-test");
         events.Subscribe<app::StatusMessageEvent>(
             [this](const app::StatusMessageEvent& event) { statuses.push_back(event.message); });
+        events.Subscribe<app::ElementReviewVisualEvent>(
+            [this](const app::ElementReviewVisualEvent& event) { review_visual_events.push_back(event); });
+        events.Subscribe<app::ReviewItemsDirtyEvent>(
+            [this](const app::ReviewItemsDirtyEvent&) { app::SyncReviewProblems(problems, reviews.Items()); });
     }
 };
 
@@ -118,6 +129,17 @@ parser::Guideline MakeGuideline(std::string id, std::string category) {
 
 app::GuidelineCatalog MakeCatalog(parser::GuidelinesDocument document) {
     return app::BuildGuidelineCatalog(std::move(document), "sccg.full.yaml");
+}
+
+core::ProblemItem MakeManualProblem(const std::string& id, const std::string& element_id) {
+    core::ProblemItem problem;
+    problem.id = id;
+    problem.severity = core::ProblemSeverity::Warning;
+    problem.source = core::ProblemSource::Manual;
+    problem.element_id = element_id;
+    problem.type = "Manual";
+    problem.message = "Manual problem";
+    return problem;
 }
 
 } // namespace
@@ -291,5 +313,96 @@ TEST(AiReviewControllerTest, CompletedAiFindingsAreAddedAsReviewComments) {
     ASSERT_EQ(comments[0].guideline_ids.size(), 1u);
     EXPECT_EQ(comments[0].guideline_ids[0], "CL.1");
     EXPECT_NE(comments[0].message.find("Suggested claim wording"), std::string::npos);
+    ASSERT_GE(harness.review_visual_events.size(), 2u);
+    EXPECT_EQ(harness.review_visual_events.front().kind, app::ElementReviewVisualEventKind::AiStarted);
+    EXPECT_EQ(harness.review_visual_events.back().kind, app::ElementReviewVisualEventKind::AiFindings);
+    EXPECT_EQ(harness.review_visual_events.back().element_id, "claim-1");
     EXPECT_EQ(harness.statuses.back(), "AI review completed with 1 finding(s) added as review comment(s).");
+}
+
+TEST(AiReviewControllerTest, StartPendingRequestEmitsRunningVisualEvent) {
+    ServiceControllerHarness harness;
+    harness.provider->response_text = R"json({"reviewed_element_id":"claim-1","findings":[]})json";
+
+    parser::AssuranceCase assurance_case = MakeCaseWithElement("claim-1", "claim");
+    core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+
+    harness.controller.BeginReviewForSelection(&assurance_case, tree, "claim-1");
+    ASSERT_TRUE(harness.controller.HasPendingRequest());
+    harness.controller.StartPendingRequest();
+
+    ASSERT_FALSE(harness.review_visual_events.empty());
+    EXPECT_EQ(harness.review_visual_events.back().kind, app::ElementReviewVisualEventKind::AiStarted);
+    EXPECT_EQ(harness.review_visual_events.back().element_id, "claim-1");
+    EXPECT_TRUE(harness.review_visual_events.back().review_scope_element_ids.count("claim-1") > 0);
+}
+
+TEST(AiReviewControllerTest, RequestFailureEmitsFailedVisualEvent) {
+    ControllerHarness harness;
+    parser::AssuranceCase assurance_case = MakeCaseWithElement("claim-1", "claim");
+    core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+
+    harness.controller.BeginReviewForSelection(&assurance_case, tree, "claim-1");
+    ASSERT_TRUE(harness.controller.HasPendingRequest());
+    harness.controller.StartPendingRequest();
+    ASSERT_TRUE(harness.controller.WaitForCompletion(std::chrono::seconds(10)));
+    harness.controller.PollTask();
+
+    ASSERT_GE(harness.review_visual_events.size(), 2u);
+    EXPECT_EQ(harness.review_visual_events.front().kind, app::ElementReviewVisualEventKind::AiStarted);
+    EXPECT_EQ(harness.review_visual_events.back().kind, app::ElementReviewVisualEventKind::AiFailed);
+    EXPECT_EQ(harness.review_visual_events.back().element_id, "claim-1");
+    std::vector<core::reviews::ReviewItem> comments = harness.reviews.ItemsForElement("claim-1");
+    ASSERT_EQ(comments.size(), 1u);
+    EXPECT_EQ(comments[0].source, core::reviews::ReviewItemSource::AIReview);
+    EXPECT_NE(comments[0].message.find("AI review request failed"), std::string::npos);
+    EXPECT_TRUE(harness.problems.GetProblemById(std::string("review-comment:") + comments[0].id).has_value());
+}
+
+TEST(AiReviewControllerTest, ParseFailureEmitsFailedVisualEvent) {
+    ServiceControllerHarness harness;
+    harness.provider->response_text = "not json";
+
+    parser::AssuranceCase assurance_case = MakeCaseWithElement("claim-1", "claim");
+    core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+
+    harness.controller.BeginReviewForSelection(&assurance_case, tree, "claim-1");
+    ASSERT_TRUE(harness.controller.HasPendingRequest());
+    harness.controller.StartPendingRequest();
+    ASSERT_TRUE(harness.controller.WaitForCompletion(std::chrono::seconds(10)));
+    harness.controller.PollTask();
+
+    ASSERT_GE(harness.review_visual_events.size(), 2u);
+    EXPECT_EQ(harness.review_visual_events.back().kind, app::ElementReviewVisualEventKind::AiFailed);
+    EXPECT_EQ(harness.review_visual_events.back().message, "AI review response could not be parsed.");
+    std::vector<core::reviews::ReviewItem> comments = harness.reviews.ItemsForElement("claim-1");
+    ASSERT_EQ(comments.size(), 1u);
+    EXPECT_EQ(comments[0].source, core::reviews::ReviewItemSource::AIReview);
+    EXPECT_NE(comments[0].message.find("expected JSON format"), std::string::npos);
+    EXPECT_TRUE(harness.problems.GetProblemById(std::string("review-comment:") + comments[0].id).has_value());
+}
+
+TEST(AiReviewControllerTest, NoFindingsEmitsAiOkEventAndPreservesUnrelatedProblems) {
+    ServiceControllerHarness harness;
+    harness.provider->response_text = R"json({
+        "reviewed_element_id": "claim-1",
+        "reviewed_element_type": "GSN Goal / SACM Claim",
+        "findings": []
+    })json";
+    harness.problems.AddOrUpdateProblem(MakeManualProblem("manual:claim-1", "claim-1"));
+
+    parser::AssuranceCase assurance_case = MakeCaseWithElement("claim-1", "claim");
+    core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+
+    harness.controller.BeginReviewForSelection(&assurance_case, tree, "claim-1");
+    ASSERT_TRUE(harness.controller.HasPendingRequest());
+    harness.controller.StartPendingRequest();
+    ASSERT_TRUE(harness.controller.WaitForCompletion(std::chrono::seconds(10)));
+    harness.controller.PollTask();
+
+    ASSERT_GE(harness.review_visual_events.size(), 2u);
+    EXPECT_EQ(harness.review_visual_events.back().kind, app::ElementReviewVisualEventKind::AiNoFindings);
+    EXPECT_EQ(harness.review_visual_events.back().element_id, "claim-1");
+    EXPECT_TRUE(harness.problems.GetProblemById("manual:claim-1").has_value());
+    EXPECT_EQ(harness.statuses.back(), "AI review completed with no findings.");
 }

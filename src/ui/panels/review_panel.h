@@ -2,6 +2,7 @@
 
 #include "core/reviews/review_item.h"
 #include "core/reviews/review_proposal.h"
+#include "core/problems/problem_item.h"
 
 #include <cstddef>
 #include <functional>
@@ -20,6 +21,7 @@ struct ReviewGuidelineOption {
 struct ReviewPanelModel {
     std::string selected_element_id;
     std::vector<core::reviews::ReviewItem> review_items;
+    std::vector<core::ProblemItem> problem_items;
     std::vector<ReviewGuidelineOption> guideline_options;
     std::string guideline_status;
     std::map<std::string, core::reviews::ProposalValidityResult> proposal_validity;
@@ -41,6 +43,7 @@ struct ReviewPanelCallbacks {
     std::function<void(const core::reviews::ReviewItem& item)> delete_proposal;
     std::function<void(const core::reviews::ReviewItem& item)> resolve_review_item;
     std::function<void(const core::reviews::ReviewItem& item)> delete_review_item;
+    std::function<void(const core::ProblemItem& problem)> delete_problem;
 };
 
 void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& callbacks);

@@ -294,6 +294,7 @@ add_executable(tests
     tests/test_guidelines_parser.cpp
     tests/test_guideline_catalog.cpp
     tests/test_localization.cpp
+    tests/test_ui_state.cpp
     tests/test_recent_projects.cpp
     src/ai/ai_service.cpp
     src/ai/ai_claim_review.cpp
@@ -331,6 +332,7 @@ add_executable(tests
     src/core/sha256.cpp
     src/ui/gsn/gsn_layout.cpp
     src/ui/localization.cpp
+    src/ui/ui_state.cpp
     src/sacm/sacm_parser.cpp
     src/sacm/sacm_serializer.cpp
 )

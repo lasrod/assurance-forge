@@ -3,11 +3,14 @@
 #include "app/guideline_catalog.h"
 #include "parser/guidelines_parser.h"
 
+#include <nlohmann/json.hpp>
+
 #include <chrono>
 #include <ctime>
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace app::controllers {
@@ -89,6 +92,88 @@ const core::TreeNode* FindTreeNode(const core::AssuranceTree& tree, const std::s
             return node.get();
     }
     return nullptr;
+}
+
+void EmitReviewVisualEvent(AppEvents& events,
+                           ElementReviewVisualEventKind kind,
+                           const std::string& element_id,
+                           const std::string& review_profile_id = {},
+                           const std::string& review_profile_name = {},
+                           const std::string& message = {},
+                           std::unordered_set<std::string> review_scope_element_ids = {}) {
+    events.Emit(ElementReviewVisualEvent{
+        kind, element_id, review_profile_id, review_profile_name, message, std::move(review_scope_element_ids)});
+}
+
+void CollectElementIdsFromJson(const nlohmann::json& value, std::unordered_set<std::string>& element_ids) {
+    if (value.is_object()) {
+        for (const auto& item : value.items()) {
+            if ((item.key() == "element_id" || item.key() == "ancestor_id") && item.value().is_string()) {
+                element_ids.insert(item.value().get<std::string>());
+            }
+            CollectElementIdsFromJson(item.value(), element_ids);
+        }
+        return;
+    }
+    if (value.is_array()) {
+        for (const nlohmann::json& child : value) {
+            CollectElementIdsFromJson(child, element_ids);
+        }
+    }
+}
+
+std::unordered_set<std::string> BuildReviewScopeElementIds(const ai::AiReviewPayload& payload,
+                                                           const ai::AiReviewDataPackageBundle& data_packages) {
+    std::unordered_set<std::string> element_ids;
+    if (!payload.selected.id.empty())
+        element_ids.insert(payload.selected.id);
+    if (payload.parent.has_value() && !payload.parent->id.empty())
+        element_ids.insert(payload.parent->id);
+    for (const ai::AiReviewElement& child : payload.children) {
+        if (!child.id.empty())
+            element_ids.insert(child.id);
+    }
+    for (const ai::AiReviewDataPackage& data_package : data_packages.available) {
+        nlohmann::json parsed = nlohmann::json::parse(data_package.json, nullptr, false);
+        if (!parsed.is_discarded())
+            CollectElementIdsFromJson(parsed, element_ids);
+    }
+    return element_ids;
+}
+
+core::reviews::ReviewItem MakeAiReviewItem(const std::string& id,
+                                           const std::string& element_id,
+                                           const std::string& title,
+                                           const std::string& message,
+                                           core::ProblemSeverity severity,
+                                           const std::string& timestamp,
+                                           const std::string& guideline_id = {}) {
+    core::reviews::ReviewItem review_item;
+    review_item.id = id;
+    review_item.element_id = element_id;
+    review_item.title = title;
+    review_item.message = message;
+    review_item.severity = SeverityString(severity);
+    review_item.reviewer_name = "AI Review";
+    if (!guideline_id.empty())
+        review_item.guideline_ids = {guideline_id};
+    review_item.source = core::reviews::ReviewItemSource::AIReview;
+    review_item.status = core::reviews::ReviewItemStatus::Open;
+    review_item.created_utc = timestamp;
+    review_item.updated_utc = timestamp;
+    return review_item;
+}
+
+void ReplaceAiReviewWithSingleItem(ReviewController& review_controller,
+                                   const std::string& element_id,
+                                   const std::string& review_prefix,
+                                   const std::string& suffix,
+                                   const std::string& title,
+                                   const std::string& message,
+                                   core::ProblemSeverity severity) {
+    review_controller.ClearAiReviewItemsForElementAndPrefix(element_id, review_prefix);
+    review_controller.AddOrUpdateItem(MakeAiReviewItem(
+        review_prefix + suffix, element_id, title, message, severity, NowUtcString()));
 }
 
 } // namespace
@@ -197,12 +282,19 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
     ai::AiReviewPayload payload;
     std::string payload_error;
     if (!ai::BuildAiReviewPayload(*assurance_case, current_tree, selected_element_id, payload, payload_error)) {
-        problems_manager_.AddOrUpdateProblem(
-            MakeAiReviewProblem("ai-review:" + selected_element_id + ":payload-error",
-                                core::ProblemSeverity::Error,
-                                selected_element_id,
-                                ai::AiReviewElementType(*selected_element),
-                                payload_error.empty() ? "AI review payload could not be created." : payload_error));
+        ReplaceAiReviewWithSingleItem(review_controller_,
+                                      selected_element_id,
+                                      ReviewCommentPrefix(selected_element_id, review_profile_id),
+                                      "payload-error",
+                                      "AI review setup failed",
+                                      payload_error.empty() ? "AI review payload could not be created." : payload_error,
+                                      core::ProblemSeverity::Error);
+        EmitReviewVisualEvent(events_,
+                              ElementReviewVisualEventKind::AiFailed,
+                              selected_element_id,
+                              review_profile_id,
+                              {},
+                              "AI review payload could not be created.");
         events_.Emit(StatusMessageEvent{"AI review payload could not be created."});
         return;
     }
@@ -210,12 +302,19 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
     GuidelineCatalog guideline_catalog;
     std::string guideline_error;
     if (!LoadGuidelineCatalog(guideline_catalog, guideline_error)) {
-        problems_manager_.AddOrUpdateProblem(
-            MakeAiReviewProblem("ai-review:" + selected_element_id + ":guidelines-missing",
-                                core::ProblemSeverity::Error,
-                                selected_element_id,
-                                payload.selected.type,
-                                "SCCG guidelines could not be loaded for AI review: " + guideline_error));
+        ReplaceAiReviewWithSingleItem(review_controller_,
+                                      selected_element_id,
+                                      ReviewCommentPrefix(selected_element_id, review_profile_id),
+                                      "guidelines-missing",
+                                      "AI review setup failed",
+                                      "SCCG guidelines could not be loaded for AI review: " + guideline_error,
+                                      core::ProblemSeverity::Error);
+        EmitReviewVisualEvent(events_,
+                              ElementReviewVisualEventKind::AiFailed,
+                              selected_element_id,
+                              review_profile_id,
+                              {},
+                              "SCCG guidelines could not be loaded for AI review.");
         events_.Emit(StatusMessageEvent{"SCCG guidelines could not be loaded for AI review."});
         return;
     }
@@ -226,12 +325,19 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
             : SelectReviewProfileGuidelines(guideline_catalog, review_profile_id);
 
     if (!guideline_selection.error_message.empty()) {
-        problems_manager_.AddOrUpdateProblem(
-            MakeAiReviewProblem("ai-review:" + selected_element_id + ":guidelines-empty",
-                                core::ProblemSeverity::Error,
-                                selected_element_id,
-                                payload.selected.type,
-                                guideline_selection.error_message));
+        ReplaceAiReviewWithSingleItem(review_controller_,
+                                      selected_element_id,
+                                      ReviewCommentPrefix(selected_element_id, review_profile_id),
+                                      "guidelines-empty",
+                                      "AI review setup failed",
+                                      guideline_selection.error_message,
+                                      core::ProblemSeverity::Error);
+        EmitReviewVisualEvent(events_,
+                              ElementReviewVisualEventKind::AiFailed,
+                              selected_element_id,
+                              review_profile_id,
+                              guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "",
+                              guideline_selection.error_message);
         events_.Emit(StatusMessageEvent{guideline_selection.error_message});
         return;
     }
@@ -259,12 +365,23 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
                                          guideline_selection.review_profile,
                                          data_packages,
                                          data_package_error)) {
-        problems_manager_.AddOrUpdateProblem(MakeAiReviewProblem(
-            "ai-review:" + selected_element_id + ":data-package-error",
-            core::ProblemSeverity::Error,
+        ReplaceAiReviewWithSingleItem(
+            review_controller_,
             selected_element_id,
-            payload.selected.type,
-            data_package_error.empty() ? "AI review data packages could not be collected." : data_package_error));
+            ReviewCommentPrefix(selected_element_id,
+                                guideline_selection.review_profile ? guideline_selection.review_profile->id
+                                                                   : review_profile_id),
+            "data-package-error",
+            "AI review setup failed",
+            data_package_error.empty() ? "AI review data packages could not be collected." : data_package_error,
+            core::ProblemSeverity::Error);
+        EmitReviewVisualEvent(events_,
+                              ElementReviewVisualEventKind::AiFailed,
+                              selected_element_id,
+                              guideline_selection.review_profile ? guideline_selection.review_profile->id
+                                                                 : review_profile_id,
+                              guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "",
+                              "AI review data packages could not be collected.");
         events_.Emit(StatusMessageEvent{"AI review data packages could not be collected."});
         return;
     }
@@ -275,6 +392,9 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
     pending_review_element_type_ = payload.selected.type;
     pending_review_profile_id_ =
         guideline_selection.review_profile ? guideline_selection.review_profile->id : review_profile_id;
+    pending_review_profile_name_ =
+        guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "";
+    pending_review_scope_element_ids_ = BuildReviewScopeElementIds(payload, data_packages);
     pending_guideline_ids_ = GuidelineIds(guideline_selection.guidelines);
     last_raw_response_.clear();
     last_parse_error_.clear();
@@ -302,6 +422,13 @@ void AiReviewController::StartPendingRequest() {
         response.errorMessage = "AI service is unavailable.";
         return response;
     });
+    EmitReviewVisualEvent(events_,
+                          ElementReviewVisualEventKind::AiStarted,
+                          pending_review_element_id_,
+                          pending_review_profile_id_,
+                          pending_review_profile_name_,
+                          "AI review in progress.",
+                          pending_review_scope_element_ids_);
     events_.Emit(StatusMessageEvent{"AI review request sent."});
 }
 
@@ -318,12 +445,19 @@ void AiReviewController::PollTask() {
     if (!response.success) {
         std::string message = response.errorMessage.empty() ? ai::ToString(response.errorCode) : response.errorMessage;
         last_raw_response_ = response.rawJson;
-        problems_manager_.AddOrUpdateProblem(
-            MakeAiReviewProblem("ai-review:" + pending_review_element_id_ + ":request-error",
-                                core::ProblemSeverity::Error,
-                                pending_review_element_id_,
-                                pending_review_element_type_,
-                                "AI review request failed: " + message));
+        ReplaceAiReviewWithSingleItem(review_controller_,
+                                      pending_review_element_id_,
+                                      ReviewCommentPrefix(pending_review_element_id_, pending_review_profile_id_),
+                                      "request-error",
+                                      "AI review request failed",
+                                      "AI review request failed: " + message,
+                                      core::ProblemSeverity::Error);
+        EmitReviewVisualEvent(events_,
+                              ElementReviewVisualEventKind::AiFailed,
+                              pending_review_element_id_,
+                              pending_review_profile_id_,
+                              pending_review_profile_name_,
+                              "AI review request failed.");
         events_.Emit(StatusMessageEvent{"AI review request failed."});
         return;
     }
@@ -339,12 +473,19 @@ void AiReviewController::PollTask() {
         if (!last_raw_response_.empty()) {
             message += " Raw response: " + TruncateForProblemMessage(last_raw_response_);
         }
-        problems_manager_.AddOrUpdateProblem(
-            MakeAiReviewProblem("ai-review:" + pending_review_element_id_ + ":parse-error",
-                                core::ProblemSeverity::Error,
-                                pending_review_element_id_,
-                                pending_review_element_type_,
-                                message));
+        ReplaceAiReviewWithSingleItem(review_controller_,
+                                      pending_review_element_id_,
+                                      ReviewCommentPrefix(pending_review_element_id_, pending_review_profile_id_),
+                                      "parse-error",
+                                      "AI review response could not be parsed",
+                                      message,
+                                      core::ProblemSeverity::Error);
+        EmitReviewVisualEvent(events_,
+                              ElementReviewVisualEventKind::AiFailed,
+                              pending_review_element_id_,
+                              pending_review_profile_id_,
+                              pending_review_profile_name_,
+                              "AI review response could not be parsed.");
         events_.Emit(StatusMessageEvent{"AI review response could not be parsed."});
         return;
     }
@@ -355,12 +496,19 @@ void AiReviewController::PollTask() {
         if (!last_raw_response_.empty()) {
             message += " Raw response: " + TruncateForProblemMessage(last_raw_response_);
         }
-        problems_manager_.AddOrUpdateProblem(
-            MakeAiReviewProblem("ai-review:" + pending_review_element_id_ + ":parse-error",
-                                core::ProblemSeverity::Error,
-                                pending_review_element_id_,
-                                pending_review_element_type_,
-                                message));
+        ReplaceAiReviewWithSingleItem(review_controller_,
+                                      pending_review_element_id_,
+                                      ReviewCommentPrefix(pending_review_element_id_, pending_review_profile_id_),
+                                      "validation-error",
+                                      "AI review response could not be validated",
+                                      message,
+                                      core::ProblemSeverity::Error);
+        EmitReviewVisualEvent(events_,
+                              ElementReviewVisualEventKind::AiFailed,
+                              pending_review_element_id_,
+                              pending_review_profile_id_,
+                              pending_review_profile_name_,
+                              "AI review response could not be validated.");
         events_.Emit(StatusMessageEvent{"AI review response could not be validated."});
         return;
     }
@@ -379,23 +527,23 @@ void AiReviewController::PollTask() {
     const std::string timestamp = NowUtcString();
     size_t review_comment_count = 0;
     for (const core::ProblemItem& problem : parse_result.problems) {
-        problems_manager_.AddOrUpdateProblem(problem);
-
-        core::reviews::ReviewItem review_item;
-        review_item.id = review_prefix + std::to_string(++review_comment_count);
-        review_item.element_id = pending_review_element_id_;
-        review_item.title = ReviewTitleForProblem(problem);
-        review_item.message = problem.message;
-        review_item.severity = SeverityString(problem.severity);
-        review_item.reviewer_name = "AI Review";
-        if (!problem.guideline_id.empty())
-            review_item.guideline_ids = {problem.guideline_id};
-        review_item.source = core::reviews::ReviewItemSource::AIReview;
-        review_item.status = core::reviews::ReviewItemStatus::Open;
-        review_item.created_utc = timestamp;
-        review_item.updated_utc = timestamp;
-        review_controller_.AddOrUpdateItem(std::move(review_item));
+        review_controller_.AddOrUpdateItem(MakeAiReviewItem(review_prefix + std::to_string(++review_comment_count),
+                                                            pending_review_element_id_,
+                                                            ReviewTitleForProblem(problem),
+                                                            problem.message,
+                                                            problem.severity,
+                                                            timestamp,
+                                                            problem.guideline_id));
     }
+
+    EmitReviewVisualEvent(events_,
+                          parse_result.problems.empty() ? ElementReviewVisualEventKind::AiNoFindings
+                                                        : ElementReviewVisualEventKind::AiFindings,
+                          pending_review_element_id_,
+                          pending_review_profile_id_,
+                          pending_review_profile_name_,
+                          parse_result.problems.empty() ? "AI review completed with no findings."
+                                                        : "AI review completed with findings.");
 
     events_.Emit(StatusMessageEvent{parse_result.problems.empty()
                                         ? "AI review completed with no findings."
@@ -409,6 +557,8 @@ void AiReviewController::CancelPendingRequest() {
     pending_review_element_id_.clear();
     pending_review_element_type_.clear();
     pending_review_profile_id_.clear();
+    pending_review_profile_name_.clear();
+    pending_review_scope_element_ids_.clear();
     pending_guideline_ids_.clear();
 }
 

@@ -14,7 +14,7 @@ struct HttpRequest {
     std::string url;
     std::vector<HttpHeader> headers;
     std::string body;
-    long timeoutSeconds = 30;
+    long timeoutSeconds = 120;
 };
 
 struct HttpResponse {

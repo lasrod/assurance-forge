@@ -3,6 +3,7 @@
 #include "parser/xml_parser.h"
 
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace ui {
@@ -21,6 +22,24 @@ enum class ProblemFilter {
     Info,
 };
 
+enum class ElementReviewVisualStatus {
+    None,
+    AiRunning,
+    AiOk,
+    ManualOk,
+    Failed,
+};
+
+struct ElementReviewVisualState {
+    bool ai_running = false;
+    bool ai_ok = false;
+    bool manual_ok = false;
+    bool failed = false;
+    std::string review_profile_id;
+    std::string review_profile_name;
+    std::string last_review_message;
+};
+
 struct UiState {
     std::string selected_element_id;
 
@@ -37,6 +56,12 @@ struct UiState {
 
     // Nodes with element-scoped problems that need user attention.
     std::unordered_set<std::string> attention_element_ids;
+
+    // Session-only visual review state for GSN nodes. Persistence needs a
+    // dedicated review-result model rather than SACM metadata.
+    std::unordered_map<std::string, ElementReviewVisualState> review_visual_states;
+    std::unordered_set<std::string> ai_review_scope_element_ids;
+    std::string ai_review_primary_element_id;
 
     // Proposal preview/creator highlighting. When enabled, nodes outside this
     // set are rendered subdued so proposed changes stand out.
@@ -64,5 +89,26 @@ UiState& GetUiState();
 
 // Returns true if any element in the assurance case has a non-empty secondary language entry.
 bool ModelHasTranslations(const parser::AssuranceCase& ac, const std::string& secondary_lang = "ja");
+
+ElementReviewVisualStatus ResolveElementReviewVisualStatus(const ElementReviewVisualState& state);
+ElementReviewVisualStatus ResolveElementReviewVisualStatus(const UiState& ui_state, const std::string& element_id);
+const ElementReviewVisualState* FindElementReviewVisualState(const UiState& ui_state, const std::string& element_id);
+
+void MarkAiReviewRunning(UiState& ui_state,
+                         const std::string& element_id,
+                         const std::string& review_profile_id = {},
+                         const std::string& review_profile_name = {},
+                         std::unordered_set<std::string> review_scope_element_ids = {});
+void MarkAiReviewNoFindings(UiState& ui_state,
+                            const std::string& element_id,
+                            const std::string& review_profile_id = {},
+                            const std::string& review_profile_name = {});
+void MarkAiReviewFindings(UiState& ui_state, const std::string& element_id);
+void MarkAiReviewFailed(UiState& ui_state,
+                        const std::string& element_id,
+                        const std::string& message = {},
+                        const std::string& review_profile_id = {},
+                        const std::string& review_profile_name = {});
+void MarkReviewOkManually(UiState& ui_state, const std::string& element_id);
 
 } // namespace ui

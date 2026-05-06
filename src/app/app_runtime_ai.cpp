@@ -70,6 +70,25 @@ void AppRuntime::RenderAiReviewContextMenuForSelected() {
     if (!ImGui::BeginMenu("AI Review"))
         return;
 
+    const bool manual_ok_enabled = !review_running && loaded_case && selected_element;
+    std::string manual_ok_tooltip;
+    if (review_running)
+        manual_ok_tooltip = "AI review is already running.";
+    else if (!loaded_case)
+        manual_ok_tooltip = "Open an assurance case before marking review status.";
+    else if (!selected_element)
+        manual_ok_tooltip = "Select a GSN/SACM element before marking review status.";
+    else
+        manual_ok_tooltip = "Mark this element as manually reviewed OK.";
+
+    if (ImGui::MenuItem("Mark review OK manually", nullptr, false, manual_ok_enabled)) {
+        impl_->events.Emit(
+            ElementReviewVisualEvent{ElementReviewVisualEventKind::ManualOk, ui_state.selected_element_id});
+        impl_->events.Emit(StatusMessageEvent{"Element marked OK manually."});
+    }
+    DrawTooltipIfHovered(manual_ok_tooltip);
+    ImGui::Separator();
+
     if (!impl_->guideline_catalog.has_value()) {
         ImGui::TextDisabled("SCCG profiles unavailable.");
         if (!impl_->guideline_catalog_error.empty() && ImGui::IsItemHovered())
