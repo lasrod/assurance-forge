@@ -471,8 +471,9 @@ void DrawGsnNode(const GsnNode& node,
     if (ImGui::BeginPopupContextItem(node.id.c_str())) {
         ui_state.selected_element_id = node.id;
         RenderAddElementMenu(actions);
-        ImGui::Separator();
         RenderRemoveSubmenu(active_case, ui_state.selected_element_id, actions);
+        ImGui::Separator();
+        RenderAiReviewMenu(actions);
         ImGui::EndPopup();
     }
 

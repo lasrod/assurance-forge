@@ -44,6 +44,12 @@ public:
     // Show the "not implemented" modal for the given feature name.
     void ShowNotImplementedModal(const std::string& feature);
 
+    // Render AI review actions inside an element context menu.
+    void RenderAiReviewContextMenuForSelected();
+
+    // Build and send an AI review request for the selected element and SCCG profile.
+    void RunAiReviewForSelection(const std::string& review_profile_id);
+
     // Returns the currently loaded assurance case, or nullptr if none.
     const parser::AssuranceCase* GetLoadedCase() const;
 

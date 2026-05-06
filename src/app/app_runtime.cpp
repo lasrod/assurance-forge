@@ -616,6 +616,7 @@ ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
         [&runtime](core::NewElementKind kind) { runtime.AddChildToSelected(kind); },
         [&runtime]() { runtime.AddTopGoal(); },
         [&runtime](core::RemoveMode mode) { runtime.RemoveSelected(mode); },
+        [&runtime]() { runtime.RenderAiReviewContextMenuForSelected(); },
         [&runtime](const char* feature) {
             if (feature)
                 runtime.ShowNotImplementedModal(feature);
@@ -1500,6 +1501,7 @@ void AppRuntime::RenderTreePanel(float left_w, float safety_tree_h, float top_y)
             [this](core::NewElementKind kind) { AddProposalChildToSelected(kind); },
             [this]() { AddProposalTopGoal(); },
             [this](core::RemoveMode mode) { RemoveProposalSelected(mode); },
+            nullptr,
             [this](const char* feature) {
                 if (feature)
                     ShowNotImplementedModal(feature);
@@ -1607,6 +1609,7 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                         [this](core::NewElementKind kind) { AddProposalChildToSelected(kind); },
                         [this]() { AddProposalTopGoal(); },
                         [this](core::RemoveMode mode) { RemoveProposalSelected(mode); },
+                        nullptr,
                         [this](const char* feature) {
                             if (feature)
                                 ShowNotImplementedModal(feature);
