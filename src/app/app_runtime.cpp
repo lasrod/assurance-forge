@@ -1672,7 +1672,6 @@ void AppRuntime::RenderProblemsPanel(float center_x, float center_w, float probl
     ui::panels::ProblemsPanelModel model{
         impl_->problems_manager,
         ui::GetUiState(),
-        impl_->ai_review_controller->IsReviewRunning(),
     };
     ui::panels::ProblemsPanelCallbacks callbacks{
         [this](const core::ProblemItem& problem) {
@@ -1682,7 +1681,6 @@ void AppRuntime::RenderProblemsPanel(float center_x, float center_w, float probl
             impl_->events.Emit(SelectionChangedEvent{problem.element_id, true});
             impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
         },
-        [this]() { BeginAiReviewForSelection(); },
     };
 
     ImGui::SetNextWindowPos(ImVec2(center_x, top_y));
@@ -1697,6 +1695,11 @@ void AppRuntime::RenderProblemsPanel(float center_x, float center_w, float probl
 
         if (ImGui::BeginTabItem("Review")) {
             RenderReviewPanelContent();
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem("AI Debug")) {
+            RenderAiDebugPanelContent();
             ImGui::EndTabItem();
         }
 
@@ -2156,8 +2159,6 @@ void AppRuntime::RenderFrame(bool& done) {
 
     RenderPreferencesWindow();
     RenderThemeTweaksWindow();
-    RenderAiReviewDebugModal();
-
     RenderRemoveConfirmModal();
     RenderDeleteReviewItemConfirmModal();
     RenderCreateProjectModal();

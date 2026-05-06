@@ -99,13 +99,16 @@ TEST(AiReviewControllerTest, UnsupportedElementAddsInfoProblemAndStatus) {
     EXPECT_EQ(problem->element_id, "artifact-1");
 }
 
-TEST(AiReviewControllerTest, CancelPendingRequestClearsDebugModal) {
+TEST(AiReviewControllerTest, CancelPendingRequestClearsPendingDebugState) {
     ControllerHarness harness;
 
     harness.controller.SetDebugModalVisible(true);
+    harness.controller.SetPendingPrompt("debug prompt");
     harness.controller.CancelPendingRequest();
 
     EXPECT_FALSE(harness.controller.ShouldShowDebugModal());
+    EXPECT_FALSE(harness.controller.HasPendingRequest());
+    EXPECT_TRUE(harness.controller.PendingPrompt().empty());
     EXPECT_TRUE(harness.controller.PendingDebugText().empty());
 }
 
@@ -164,8 +167,11 @@ TEST(AiReviewControllerTest, BeginReviewForSelectionBuildsProfilePrompt) {
 
     harness.controller.BeginReviewForSelection(&assurance_case, tree, "claim-1");
 
+    ASSERT_TRUE(harness.controller.HasPendingRequest());
+    ASSERT_FALSE(harness.controller.PendingPrompt().empty());
     ASSERT_FALSE(harness.controller.PendingDebugText().empty());
     EXPECT_NE(harness.controller.PendingDebugText().find("claim_wording_review"), std::string::npos);
     EXPECT_EQ(harness.controller.PendingDebugText().find("SCCG CL rules"), std::string::npos);
-    EXPECT_EQ(harness.statuses.back(), "AI review request is ready for inspection.");
+    EXPECT_FALSE(harness.controller.ShouldShowDebugModal());
+    EXPECT_EQ(harness.statuses.back(), "AI review request is ready in the AI Debug panel.");
 }

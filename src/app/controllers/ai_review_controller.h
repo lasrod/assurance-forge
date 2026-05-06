@@ -41,6 +41,9 @@ public:
     bool ShouldShowDebugModal() const;
     void SetDebugModalVisible(bool visible);
 
+    bool HasPendingRequest() const;
+    const std::string& PendingPrompt() const;
+    void SetPendingPrompt(std::string prompt);
     const std::string& PendingDebugText() const;
     const std::string& LastRawResponse() const;
     const std::string& LastParseError() const;

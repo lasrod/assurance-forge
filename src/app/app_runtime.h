@@ -58,6 +58,7 @@ private:
     void RenderProblemsPanel(float center_x, float center_w, float problems_h, float top_y);
     void RenderElementPropertiesPanel(float center_x, float center_w, float right_w, float content_h, float top_y);
     void RenderReviewPanelContent();
+    void RenderAiDebugPanelContent();
     void RenderProposalElementEditor();
     void RenderStartupProjectWindow();
     void RenderNotImplementedModal();
@@ -70,7 +71,6 @@ private:
     void RenderSaveBeforeExitModal(bool& done);
     void RenderPreferencesWindow();
     void RenderThemeTweaksWindow();
-    void RenderAiReviewDebugModal();
 
     void BeginCreateProject();
     void BeginOpenProject();

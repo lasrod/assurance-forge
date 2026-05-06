@@ -167,8 +167,8 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
     pending_guideline_ids_ = GuidelineIds(guideline_selection.guidelines);
     last_raw_response_.clear();
     last_parse_error_.clear();
-    show_debug_modal_ = true;
-    events_.Emit(StatusMessageEvent{"AI review request is ready for inspection."});
+    show_debug_modal_ = false;
+    events_.Emit(StatusMessageEvent{"AI review request is ready in the AI Debug panel."});
 }
 
 void AiReviewController::StartPendingRequest() {
@@ -290,6 +290,18 @@ bool AiReviewController::ShouldShowDebugModal() const {
 
 void AiReviewController::SetDebugModalVisible(bool visible) {
     show_debug_modal_ = visible;
+}
+
+bool AiReviewController::HasPendingRequest() const {
+    return !pending_review_.prompt.empty();
+}
+
+const std::string& AiReviewController::PendingPrompt() const {
+    return pending_review_.prompt;
+}
+
+void AiReviewController::SetPendingPrompt(std::string prompt) {
+    pending_review_.prompt = std::move(prompt);
 }
 
 const std::string& AiReviewController::PendingDebugText() const {
