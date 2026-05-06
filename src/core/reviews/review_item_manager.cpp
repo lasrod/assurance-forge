@@ -114,6 +114,20 @@ bool ReviewItemManager::RemoveItem(const std::string& id) {
     return items_.size() != old_size;
 }
 
+size_t ReviewItemManager::RemoveItemsForElementSourceAndIdPrefix(const std::string& element_id,
+                                                                 ReviewItemSource source,
+                                                                 const std::string& id_prefix) {
+    const auto old_size = items_.size();
+    items_.erase(std::remove_if(items_.begin(),
+                                items_.end(),
+                                [&](const ReviewItem& item) {
+                                    return item.element_id == element_id && item.source == source &&
+                                           item.id.rfind(id_prefix, 0) == 0;
+                                }),
+                 items_.end());
+    return old_size - items_.size();
+}
+
 bool ReviewItemManager::SetProposal(const std::string& review_item_id, const std::string& proposal_id) {
     for (ReviewItem& item : items_) {
         if (item.id != review_item_id)

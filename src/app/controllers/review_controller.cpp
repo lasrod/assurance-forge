@@ -106,6 +106,15 @@ bool ReviewController::AddOrUpdateItem(core::reviews::ReviewItem item) {
     return true;
 }
 
+size_t ReviewController::ClearAiReviewItemsForElementAndPrefix(const std::string& element_id,
+                                                               const std::string& id_prefix) {
+    const size_t removed = manager_.RemoveItemsForElementSourceAndIdPrefix(
+        element_id, core::reviews::ReviewItemSource::AIReview, id_prefix);
+    if (removed > 0)
+        MarkDirty();
+    return removed;
+}
+
 bool ReviewController::SetProposal(const std::string& item_id, const std::string& proposal_id) {
     if (!manager_.SetProposal(item_id, proposal_id))
         return false;

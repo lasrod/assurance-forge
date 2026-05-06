@@ -8,7 +8,8 @@
 namespace ai {
 namespace {
 
-const char* kAiReviewSystemInstruction = "You are reviewing a safety case claim for Assurance Forge. Return JSON only.";
+const char* kAiReviewSystemInstruction =
+    "You are reviewing an assurance case element for Assurance Forge. Return JSON only.";
 
 std::string ToLower(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char character) {
@@ -78,6 +79,34 @@ nlohmann::json StringVectorToJson(const std::vector<std::string>& values) {
     return array;
 }
 
+nlohmann::json ReviewDataPackagesToJson(const AiReviewDataPackageBundle* data_packages) {
+    nlohmann::json packages = nlohmann::json::array();
+    if (!data_packages)
+        return packages;
+    for (const AiReviewDataPackage& data_package : data_packages->available) {
+        try {
+            packages.push_back({{"id", data_package.id}, {"data", nlohmann::json::parse(data_package.json)}});
+        } catch (const nlohmann::json::exception&) {
+            packages.push_back({{"id", data_package.id}, {"data", data_package.json}});
+        }
+    }
+    return packages;
+}
+
+nlohmann::json UnavailableDataPackagesToJson(const AiReviewDataPackageBundle* data_packages) {
+    nlohmann::json packages = nlohmann::json::array();
+    if (!data_packages)
+        return packages;
+    for (const AiReviewUnavailableDataPackage& data_package : data_packages->unavailable) {
+        packages.push_back({
+            {"id", data_package.id},
+            {"required", data_package.required},
+            {"reason", data_package.reason},
+        });
+    }
+    return packages;
+}
+
 nlohmann::json ReviewProfileToJson(const parser::ReviewProfile* review_profile) {
     if (!review_profile)
         return nlohmann::json(nullptr);
@@ -85,7 +114,10 @@ nlohmann::json ReviewProfileToJson(const parser::ReviewProfile* review_profile) 
         {"id", review_profile->id},
         {"display_name", review_profile->display_name},
         {"description", review_profile->description},
+        {"applies_to", StringVectorToJson(review_profile->applies_to)},
         {"guideline_ids", StringVectorToJson(review_profile->guideline_ids)},
+        {"required_data", StringVectorToJson(review_profile->required_data)},
+        {"optional_data", StringVectorToJson(review_profile->optional_data)},
     };
 }
 
@@ -105,11 +137,18 @@ nlohmann::json GuidelinesToJson(const std::vector<const parser::Guideline*>& gui
 
         guidelines.push_back({
             {"id", guideline->id},
+            {"rule_id", guideline->rule_id.empty() ? guideline->id : guideline->rule_id},
             {"category", guideline->category},
+            {"category_id", guideline->category_id.empty() ? guideline->category : guideline->category_id},
             {"title", guideline->title},
             {"statement", guideline->statement},
             {"rationale", guideline->rationale},
             {"review_prompts", StringVectorToJson(guideline->review_prompts)},
+            {"reference_source_ids", StringVectorToJson(guideline->reference_source_ids)},
+            {"review_profile_ids", StringVectorToJson(guideline->review_profile_ids)},
+            {"data_package_ids", StringVectorToJson(guideline->data_package_ids)},
+            {"schema_version", guideline->schema_version},
+            {"sccg_version", guideline->sccg_version},
             {"examples",
              {
                  {"bad", guideline->examples.bad},
@@ -130,6 +169,78 @@ nlohmann::json GuidelinesToJson(const std::vector<const parser::Guideline*>& gui
 bool IsAllowedGuidelineId(const std::string& guideline_id, const std::vector<std::string>& allowed_guideline_ids) {
     return std::find(allowed_guideline_ids.begin(), allowed_guideline_ids.end(), guideline_id) !=
            allowed_guideline_ids.end();
+}
+
+void AddMappedName(std::vector<std::string>& names, const std::string& name) {
+    if (!name.empty() && std::find(names.begin(), names.end(), name) == names.end())
+        names.push_back(name);
+}
+
+std::string NodeRoleName(core::NodeRole role) {
+    switch (role) {
+    case core::NodeRole::Claim:
+        return "claim";
+    case core::NodeRole::Strategy:
+        return "strategy";
+    case core::NodeRole::Solution:
+        return "solution";
+    case core::NodeRole::Context:
+        return "context";
+    case core::NodeRole::Assumption:
+        return "assumption";
+    case core::NodeRole::Justification:
+        return "justification";
+    case core::NodeRole::Other:
+        return "other";
+    }
+    return "other";
+}
+
+std::string ElementText(const parser::SacmElement& element) {
+    if (!element.content.empty())
+        return element.content;
+    if (!element.description.empty())
+        return element.description;
+    return element.name;
+}
+
+nlohmann::json ElementDataToJson(const parser::SacmElement& element,
+                                 const std::string& role,
+                                 const core::TreeNode* node = nullptr) {
+    return {
+        {"role", role},
+        {"element_id", element.id},
+        {"element_type", AiReviewElementType(element)},
+        {"sccg_applies_to", StringVectorToJson(SccgAppliesToNamesForElement(element, node))},
+        {"raw_type", element.type},
+        {"name", element.name},
+        {"text", ElementText(element)},
+        {"description", element.description},
+        {"content", element.content},
+        {"undeveloped", element.undeveloped},
+        {"tree_role", node ? NodeRoleName(node->role) : std::string{}},
+    };
+}
+
+const parser::SacmElement* ElementForNode(const parser::AssuranceCase& assurance_case, const core::TreeNode* node) {
+    return node ? FindSacmElement(assurance_case, node->id) : nullptr;
+}
+
+void AddPackage(AiReviewDataPackageBundle& packages, const std::string& id, const nlohmann::json& data) {
+    packages.available.push_back(AiReviewDataPackage{id, data.dump(2)});
+}
+
+void AddUnavailable(AiReviewDataPackageBundle& packages,
+                    const std::string& id,
+                    const std::string& reason,
+                    bool required) {
+    packages.unavailable.push_back(AiReviewUnavailableDataPackage{id, reason, required});
+}
+
+bool HasPackage(const AiReviewDataPackageBundle& packages, const std::string& id) {
+    return std::find_if(packages.available.begin(), packages.available.end(), [&](const AiReviewDataPackage& package) {
+               return package.id == id;
+           }) != packages.available.end();
 }
 
 core::ProblemSeverity SeverityFromString(const std::string& value) {
@@ -179,13 +290,8 @@ const parser::SacmElement* FindSacmElement(const parser::AssuranceCase& assuranc
 }
 
 bool IsSupportedAiReviewElement(const parser::SacmElement& element) {
-    if (element.type != "claim")
-        return false;
-    if (element.assertion_declaration == "assumed")
-        return false;
-    if (element.assertion_declaration == "justification")
-        return false;
-    return true;
+    return element.type == "claim" || element.type == "argumentreasoning" || element.type == "artifact" ||
+           element.type == "artifactreference" || element.type == "expression";
 }
 
 std::string AiReviewElementType(const parser::SacmElement& element) {
@@ -198,9 +304,61 @@ std::string AiReviewElementType(const parser::SacmElement& element) {
     }
     if (element.type == "argumentreasoning")
         return "GSN Strategy / SACM ArgumentReasoning";
-    if (element.type == "artifact" || element.type == "artifactreference")
-        return "GSN Solution / SACM Artifact";
+    if (element.type == "artifact" || element.type == "artifactreference" || element.type == "expression")
+        return "GSN Solution / SACM ArtifactReference";
     return element.type.empty() ? "SACM Element" : "SACM " + element.type;
+}
+
+std::vector<std::string> SccgAppliesToNamesForElement(const parser::SacmElement& element, const core::TreeNode* node) {
+    std::vector<std::string> names;
+    if (element.type == "claim") {
+        if (element.assertion_declaration == "assumed" || (node && node->role == core::NodeRole::Assumption)) {
+            AddMappedName(names, "GSN Assumption");
+            AddMappedName(names, "SACM Claim");
+            AddMappedName(names, "CAE Assumption");
+            return names;
+        }
+        if (element.assertion_declaration == "justification" || (node && node->role == core::NodeRole::Justification)) {
+            AddMappedName(names, "GSN Justification");
+            AddMappedName(names, "SACM Claim");
+            AddMappedName(names, "CAE Justification");
+            return names;
+        }
+        AddMappedName(names, "GSN Goal");
+        AddMappedName(names, "SACM Claim");
+        AddMappedName(names, "CAE Claim");
+        return names;
+    }
+    if (element.type == "argumentreasoning") {
+        AddMappedName(names, "GSN Strategy");
+        AddMappedName(names, "SACM ArgumentReasoning");
+        AddMappedName(names, "CAE Argument");
+        AddMappedName(names, "CAE Justification");
+        return names;
+    }
+    if (element.type == "artifact" || element.type == "artifactreference" || element.type == "expression" ||
+        (node && node->role == core::NodeRole::Solution)) {
+        if (node && node->group == core::ElementGroup::Group2)
+            AddMappedName(names, "GSN Context");
+        AddMappedName(names, "GSN Solution");
+        AddMappedName(names, "SACM ArtifactReference");
+        AddMappedName(names, "CAE Evidence");
+        return names;
+    }
+    return names;
+}
+
+bool IsReviewProfileCompatibleWithElement(const parser::ReviewProfile& review_profile,
+                                          const parser::SacmElement& element,
+                                          const core::TreeNode* node) {
+    const std::vector<std::string> names = SccgAppliesToNamesForElement(element, node);
+    for (const std::string& name : names) {
+        if (std::find(review_profile.applies_to.begin(), review_profile.applies_to.end(), name) !=
+            review_profile.applies_to.end()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool BuildAiReviewPayload(const parser::AssuranceCase& assurance_case,
@@ -214,7 +372,7 @@ bool BuildAiReviewPayload(const parser::AssuranceCase& assurance_case,
         return false;
     }
     if (!IsSupportedAiReviewElement(*selected)) {
-        out_error = "AI Review currently supports GSN Goal / SACM Claim elements only.";
+        out_error = "AI Review does not support the selected element type.";
         return false;
     }
 
@@ -242,10 +400,145 @@ bool BuildAiReviewPayload(const parser::AssuranceCase& assurance_case,
     return true;
 }
 
+bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
+                                 const core::AssuranceTree& tree,
+                                 const std::string& selected_element_id,
+                                 const parser::ReviewProfile* review_profile,
+                                 AiReviewDataPackageBundle& out_packages,
+                                 std::string& out_error) {
+    out_packages = {};
+    const parser::SacmElement* selected = FindSacmElement(assurance_case, selected_element_id);
+    if (!selected) {
+        out_error = "Selected element was not found.";
+        return false;
+    }
+
+    const core::TreeNode* selected_node = FindTreeNode(tree, selected_element_id);
+    AddPackage(out_packages, "SEL", ElementDataToJson(*selected, "selected", selected_node));
+
+    if (selected_node && selected_node->parent) {
+        if (const parser::SacmElement* parent = ElementForNode(assurance_case, selected_node->parent))
+            AddPackage(out_packages, "PARENT", ElementDataToJson(*parent, "parent", selected_node->parent));
+    }
+
+    if (selected_node && !selected_node->group1_children.empty()) {
+        nlohmann::json children = nlohmann::json::array();
+        for (const core::TreeNode* child_node : selected_node->group1_children) {
+            if (const parser::SacmElement* child = ElementForNode(assurance_case, child_node))
+                children.push_back(ElementDataToJson(*child, "child", child_node));
+        }
+        AddPackage(out_packages, "CHILDREN", {{"child_elements", children}});
+    }
+
+    if (selected_node && !selected_node->group2_attachments.empty()) {
+        nlohmann::json context = nlohmann::json::array();
+        nlohmann::json assumptions = nlohmann::json::array();
+        nlohmann::json justifications = nlohmann::json::array();
+        for (const core::TreeNode* attachment_node : selected_node->group2_attachments) {
+            const parser::SacmElement* attachment = ElementForNode(assurance_case, attachment_node);
+            if (!attachment)
+                continue;
+            nlohmann::json element_json = ElementDataToJson(*attachment, "direct_context", attachment_node);
+            if (attachment_node->role == core::NodeRole::Assumption)
+                assumptions.push_back(element_json);
+            else if (attachment_node->role == core::NodeRole::Justification)
+                justifications.push_back(element_json);
+            else
+                context.push_back(element_json);
+        }
+        AddPackage(out_packages,
+                   "DIRECT_CONTEXT",
+                   {{"context_elements", context}, {"assumptions", assumptions}, {"justifications", justifications}});
+    }
+
+    if (selected_node) {
+        nlohmann::json ancestor_context = nlohmann::json::array();
+        nlohmann::json ancestor_assumptions = nlohmann::json::array();
+        for (const core::TreeNode* ancestor = selected_node->parent; ancestor; ancestor = ancestor->parent) {
+            for (const core::TreeNode* attachment_node : ancestor->group2_attachments) {
+                const parser::SacmElement* attachment = ElementForNode(assurance_case, attachment_node);
+                if (!attachment)
+                    continue;
+                nlohmann::json element_json = ElementDataToJson(*attachment, "inherited_context", attachment_node);
+                element_json["ancestor_id"] = ancestor->id;
+                if (attachment_node->role == core::NodeRole::Assumption)
+                    ancestor_assumptions.push_back(element_json);
+                else
+                    ancestor_context.push_back(element_json);
+            }
+        }
+        if (!ancestor_context.empty() || !ancestor_assumptions.empty()) {
+            AddPackage(out_packages,
+                       "INHERITED_CONTEXT",
+                       {{"ancestor_context", ancestor_context}, {"ancestor_assumptions", ancestor_assumptions}});
+        }
+    }
+
+    const core::TreeNode* strategy_node = nullptr;
+    if (selected_node && selected_node->role == core::NodeRole::Strategy)
+        strategy_node = selected_node;
+    else if (selected_node && selected_node->parent && selected_node->parent->role == core::NodeRole::Strategy)
+        strategy_node = selected_node->parent;
+    else if (selected_node) {
+        for (const core::TreeNode* child_node : selected_node->group1_children) {
+            if (child_node && child_node->role == core::NodeRole::Strategy) {
+                strategy_node = child_node;
+                break;
+            }
+        }
+    }
+    if (const parser::SacmElement* strategy = ElementForNode(assurance_case, strategy_node))
+        AddPackage(out_packages, "STRATEGY", ElementDataToJson(*strategy, "strategy", strategy_node));
+
+    if (selected_node && selected_node->role == core::NodeRole::Solution)
+        AddPackage(out_packages, "EVIDENCE_ITEM", ElementDataToJson(*selected, "evidence_item", selected_node));
+
+    if (selected_node) {
+        nlohmann::json path_elements = nlohmann::json::array();
+        nlohmann::json evidence_items = nlohmann::json::array();
+        std::vector<const core::TreeNode*> stack;
+        for (const core::TreeNode* child_node : selected_node->group1_children)
+            stack.push_back(child_node);
+        while (!stack.empty()) {
+            const core::TreeNode* node = stack.back();
+            stack.pop_back();
+            const parser::SacmElement* element = ElementForNode(assurance_case, node);
+            if (!element)
+                continue;
+            path_elements.push_back(ElementDataToJson(*element, "evidence_path", node));
+            if (node->role == core::NodeRole::Solution)
+                evidence_items.push_back(ElementDataToJson(*element, "evidence_item", node));
+            for (const core::TreeNode* child_node : node->group1_children)
+                stack.push_back(child_node);
+        }
+        if (!evidence_items.empty())
+            AddPackage(out_packages, "EVIDENCE_PATH", {{"path_elements", path_elements}, {"evidence_items", evidence_items}});
+    }
+
+    if (review_profile) {
+        auto mark_missing = [&](const std::vector<std::string>& package_ids, bool required) {
+            for (const std::string& package_id : package_ids) {
+                if (HasPackage(out_packages, package_id))
+                    continue;
+                AddUnavailable(out_packages,
+                               package_id,
+                               "Assurance Forge does not have this data package available yet.",
+                               required);
+            }
+        };
+        mark_missing(review_profile->required_data, true);
+        mark_missing(review_profile->optional_data, false);
+    }
+
+    out_error.clear();
+    return true;
+}
+
 AiReviewRequestArtifacts
 BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
                               const std::vector<const parser::Guideline*>& guidelines_to_review,
-                              const parser::ReviewProfile* review_profile) {
+                              const parser::ReviewProfile* review_profile,
+                              const AiReviewDataPackageBundle* data_packages) {
     nlohmann::json selected = ReviewElementToJson(payload.selected);
     nlohmann::json parent =
         payload.parent.has_value() ? ReviewElementToJson(payload.parent.value()) : nlohmann::json(nullptr);
@@ -255,34 +548,41 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
     }
     nlohmann::json review_profile_json = ReviewProfileToJson(review_profile);
     nlohmann::json guidelines = GuidelinesToJson(guidelines_to_review);
+    nlohmann::json available_data_packages = ReviewDataPackagesToJson(data_packages);
+    nlohmann::json unavailable_data_packages = UnavailableDataPackagesToJson(data_packages);
 
     AiReviewRequestArtifacts artifacts;
     artifacts.systemInstruction = kAiReviewSystemInstruction;
     artifacts.selectedElementJson = selected.dump(2);
     artifacts.parentElementJson = parent.dump(2);
     artifacts.childElementsJson = children.dump(2);
+    artifacts.availableDataPackagesJson = available_data_packages.dump(2);
+    artifacts.unavailableDataPackagesJson = unavailable_data_packages.dump(2);
     artifacts.reviewProfileJson = review_profile_json.dump(2);
     artifacts.guidelinesJson = guidelines.dump(2);
     artifacts.responseSchemaJson = BuildExpectedAiReviewResponseSchemaText();
     artifacts.expectedResponseSchema = artifacts.responseSchemaJson;
 
     std::ostringstream prompt;
-    prompt << "You are reviewing a safety case claim for Assurance Forge.\n\n"
+     prompt << "You are reviewing the selected assurance case element using the SCCG review profile below.\n\n"
            << "Assurance Forge is an assurance case tool using SACM as the domain model and GSN as one graphical view. "
-              "In this review, treat GSN Goals as claims.\n\n"
-           << "Your task is to review the selected claim against the SCCG guidelines provided below for this review "
-              "profile.\n\n"
-           << "Review only the selected claim. Use the parent and child/sub-element information only as context for "
-              "understanding the claim and its decomposition.\n\n"
+                  "Use SCCG applies_to values and the selected element data to interpret the element.\n\n"
+              << "Use only the SCCG rules provided in this request. Return findings that reference the relevant SCCG rule IDs.\n\n"
+              << "Review only the selected element. Use related elements and data packages only as context.\n\n"
            << "Do not invent missing project information.\n"
+              << "Treat unavailable data packages as unavailable; do not assume their contents.\n"
            << "Do not claim that a rule is violated unless the provided data supports that finding.\n"
            << "If there is no clear violation, return an empty findings array.\n"
            << "Return JSON only. Do not include Markdown. Do not include explanations outside the JSON object.\n\n"
            << "## SCCG review profile" << (review_profile ? ": " + review_profile->id : ": CL category fallback")
            << "\n\n"
            << artifacts.reviewProfileJson << "\n\n"
-           << "## SCCG guidelines\n\n"
+           << "## SCCG rules\n\n"
            << artifacts.guidelinesJson << "\n\n"
+           << "## Available data packages\n\n"
+           << artifacts.availableDataPackagesJson << "\n\n"
+           << "## Unavailable data packages\n\n"
+           << artifacts.unavailableDataPackagesJson << "\n\n"
            << "## Selected element\n\n"
            << artifacts.selectedElementJson << "\n\n"
            << "## Parent element\n\n"
@@ -299,6 +599,10 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
           << artifacts.parentElementJson << "\n\n"
           << "Child/sub-element data\n"
           << artifacts.childElementsJson << "\n\n"
+          << "Available data packages\n"
+          << artifacts.availableDataPackagesJson << "\n\n"
+          << "Unavailable data packages\n"
+          << artifacts.unavailableDataPackagesJson << "\n\n"
           << "SCCG review profile data\n"
           << artifacts.reviewProfileJson << "\n\n"
           << "SCCG guideline data\n"
@@ -313,8 +617,9 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
 
 AiReviewPromptParts BuildAiReviewPrompt(const AiReviewPayload& payload,
                                         const std::vector<const parser::Guideline*>& guidelines,
-                                        const parser::ReviewProfile* review_profile) {
-    return BuildAiReviewRequestArtifacts(payload, guidelines, review_profile);
+                                        const parser::ReviewProfile* review_profile,
+                                        const AiReviewDataPackageBundle* data_packages) {
+    return BuildAiReviewRequestArtifacts(payload, guidelines, review_profile, data_packages);
 }
 
 std::string BuildExpectedAiReviewResponseSchemaText() {
@@ -397,29 +702,35 @@ AiReviewParseResult ParseAiReviewResponse(const std::string& response_text,
             result.reviewedElementId = selected_element_id;
         result.reviewedElementType = JsonStringValue(root, "reviewed_element_type");
 
+        size_t finding_index = 0;
         for (const nlohmann::json& finding : root["findings"]) {
+            ++finding_index;
             if (!finding.is_object())
                 continue;
 
             std::string guideline_id = JsonStringValue(finding, "guideline_id");
-            if (!allowed_guideline_ids.empty() &&
-                (guideline_id.empty() || !IsAllowedGuidelineId(guideline_id, allowed_guideline_ids))) {
-                result.errorMessage = "AI response referenced guideline_id '" +
-                                      (guideline_id.empty() ? std::string("<empty>") : guideline_id) +
-                                      "', which was not included in the SCCG guidelines provided to the prompt.";
-                return result;
-            }
+            if (guideline_id.empty())
+                guideline_id = JsonStringValue(finding, "rule_id");
+            const std::string original_guideline_id = guideline_id;
+            const bool unknown_guideline_id = !allowed_guideline_ids.empty() &&
+                                              (guideline_id.empty() ||
+                                               !IsAllowedGuidelineId(guideline_id, allowed_guideline_ids));
             if (guideline_id.empty())
                 guideline_id = "unknown";
 
             core::ProblemItem problem;
-            problem.id = "ai-review:" + result.reviewedElementId + ":" + guideline_id;
+            problem.id = "ai-review:" + result.reviewedElementId + ":" + guideline_id + ":" +
+                         std::to_string(finding_index);
             problem.severity = SeverityFromString(JsonStringValue(finding, "severity"));
             problem.source = core::ProblemSource::AIReview;
             problem.element_id = result.reviewedElementId;
             problem.type = result.reviewedElementType;
             problem.message = BuildProblemMessage(finding);
-            problem.guideline_id = guideline_id == "unknown" ? std::string{} : guideline_id;
+            if (unknown_guideline_id) {
+                const std::string shown_id = original_guideline_id.empty() ? std::string("<empty>") : original_guideline_id;
+                problem.message += " Unknown SCCG rule reference: " + shown_id + ".";
+            }
+            problem.guideline_id = unknown_guideline_id || guideline_id == "unknown" ? std::string{} : guideline_id;
             result.problems.push_back(std::move(problem));
         }
 

@@ -35,6 +35,7 @@ public:
 
     bool AddManualItem(core::reviews::ReviewItem item);
     bool AddOrUpdateItem(core::reviews::ReviewItem item);
+    size_t ClearAiReviewItemsForElementAndPrefix(const std::string& element_id, const std::string& id_prefix);
     bool SetProposal(const std::string& item_id, const std::string& proposal_id);
     bool ClearProposal(const std::string& item_id);
 

@@ -28,6 +28,9 @@ public:
 
     bool AddOrUpdateItem(ReviewItem item);
     bool RemoveItem(const std::string& id);
+    size_t RemoveItemsForElementSourceAndIdPrefix(const std::string& element_id,
+                                                  ReviewItemSource source,
+                                                  const std::string& id_prefix);
     bool SetProposal(const std::string& review_item_id, const std::string& proposal_id);
     bool ClearProposal(const std::string& review_item_id);
 

@@ -1,7 +1,10 @@
 #include "parser/guidelines_parser.h"
+#include "parser/sccg_dist_parser.h"
 
 #include <filesystem>
 #include <gtest/gtest.h>
+#include <fstream>
+#include <nlohmann/json.hpp>
 
 namespace {
 
@@ -81,6 +84,16 @@ std::filesystem::path RepositoryGuidelinesPath() {
     return std::filesystem::path(__FILE__).parent_path().parent_path() / "external" / "safety-case-core-guidelines" /
            "dist" / "sccg.full.yaml";
 }
+
+      std::filesystem::path RepositorySccgDistPath() {
+        return std::filesystem::path(__FILE__).parent_path().parent_path() / "external" / "safety-case-core-guidelines" /
+             "dist";
+      }
+
+        std::filesystem::path RepositorySccgSchemasPath() {
+          return std::filesystem::path(__FILE__).parent_path().parent_path() / "external" / "safety-case-core-guidelines" /
+               "schemas";
+        }
 
 } // namespace
 
@@ -265,4 +278,50 @@ TEST(GuidelinesParserTest, ParsesRealGuidelinesFile) {
         result.document.FindGuidelinesBySuggestedCheckId("check-claim-is-proposition");
     ASSERT_FALSE(proposition_guidelines.empty());
     EXPECT_EQ(proposition_guidelines.front()->id, "CL.1");
+}
+
+TEST(GuidelinesParserTest, ParsesRealSccgDistArtifacts) {
+  parser::GuidelinesParseResult result = parser::SccgDistParser::ParseDirectory(RepositorySccgDistPath());
+
+  ASSERT_TRUE(result.success) << result.error_message;
+  EXPECT_EQ(result.document.schema_version, "1.0.0");
+  EXPECT_EQ(result.document.sccg_version, "0.5.0");
+  EXPECT_GT(result.document.guidelines.size(), 30u);
+  EXPECT_FALSE(result.document.review_profiles.empty());
+  EXPECT_FALSE(result.document.data_packages.empty());
+  EXPECT_FALSE(result.document.prechecks.empty());
+
+  const parser::Guideline* cl1 = result.document.FindGuidelineById("CL.1");
+  ASSERT_NE(cl1, nullptr);
+  EXPECT_EQ(cl1->rule_id, "CL.1");
+  EXPECT_EQ(cl1->category_id, "CL");
+  EXPECT_FALSE(cl1->rationale.empty());
+  EXPECT_FALSE(cl1->review_profile_ids.empty());
+  EXPECT_FALSE(cl1->data_package_ids.empty());
+
+  const parser::ReviewProfile* profile = result.document.FindReviewProfileById("claim_wording_review");
+  ASSERT_NE(profile, nullptr);
+  EXPECT_FALSE(profile->applies_to.empty());
+  EXPECT_FALSE(result.document.FindGuidelinesByReviewProfile(profile->id).empty());
+}
+
+TEST(GuidelinesParserTest, SccgSchemaContractsArePresentAndReadable) {
+  const std::vector<std::string> schema_files = {
+    "review_profiles.schema.json",
+    "data_packages.schema.json",
+    "ai_rule_export.schema.json",
+    "prechecks.schema.json",
+    "sccg.schema.json",
+  };
+
+  for (const std::string& schema_file : schema_files) {
+    const std::filesystem::path path = RepositorySccgSchemasPath() / schema_file;
+    ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
+    std::ifstream input(path);
+    ASSERT_TRUE(input) << path.string();
+    nlohmann::json schema;
+    ASSERT_NO_THROW(input >> schema) << path.string();
+    EXPECT_EQ(schema.value("$schema", ""), "http://json-schema.org/draft-07/schema#");
+    EXPECT_TRUE(schema.contains("required")) << path.string();
+  }
 }

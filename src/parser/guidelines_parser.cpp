@@ -225,11 +225,18 @@ std::vector<Guideline> ParseGuidelines(const YAML::Node& node, std::string& erro
     for (const auto& guideline_node : node) {
         Guideline guideline;
         guideline.id = ReadStringKey(guideline_node, "id");
+        guideline.rule_id = ReadStringKey(guideline_node, "rule_id");
         guideline.category = ReadStringKey(guideline_node, "category");
+        guideline.category_id = ReadStringKey(guideline_node, "category_id");
         guideline.title = ReadStringKey(guideline_node, "title");
         guideline.statement = ReadStringKeyFallback(guideline_node, "statement", "guideline");
         guideline.rationale = ReadStringKeyFallback(guideline_node, "rationale", "why");
         guideline.review_prompts = ReadStringSequence(ReadMapValue(guideline_node, "review_prompts"));
+        guideline.reference_source_ids = ReadStringSequence(ReadMapValue(guideline_node, "reference_source_ids"));
+        guideline.review_profile_ids = ReadStringSequence(ReadMapValue(guideline_node, "review_profile_ids"));
+        guideline.data_package_ids = ReadStringSequence(ReadMapValue(guideline_node, "data_package_ids"));
+        guideline.schema_version = ReadStringKey(guideline_node, "schema_version");
+        guideline.sccg_version = ReadStringKey(guideline_node, "sccg_version");
 
         YAML::Node examples_node = ReadMapValue(guideline_node, "examples");
         if (!IsDefinedNode(examples_node))
@@ -252,6 +259,11 @@ std::vector<Guideline> ParseGuidelines(const YAML::Node& node, std::string& erro
             return {};
         }
 
+        if (guideline.rule_id.empty())
+            guideline.rule_id = guideline.id;
+        if (guideline.category_id.empty())
+            guideline.category_id = guideline.category;
+
         guidelines.push_back(guideline);
         ++index;
     }
@@ -272,6 +284,8 @@ std::vector<ReviewProfile> ParseReviewProfiles(const YAML::Node& node) {
         profile.guideline_ids = ReadStringSequence(ReadMapValue(profile_node, "guideline_ids"));
         profile.required_data = ReadStringSequence(ReadMapValue(profile_node, "required_data"));
         profile.optional_data = ReadStringSequence(ReadMapValue(profile_node, "optional_data"));
+        profile.schema_version = ReadStringKey(profile_node, "schema_version");
+        profile.sccg_version = ReadStringKey(profile_node, "sccg_version");
         if (!profile.id.empty())
             review_profiles.push_back(std::move(profile));
     }
@@ -291,6 +305,8 @@ std::vector<DataPackage> ParseDataPackages(const YAML::Node& node) {
         data_package.description = ReadStringKey(package_node, "description");
         data_package.required_fields = ReadStringSequence(ReadMapValue(package_node, "required_fields"));
         data_package.optional_fields = ReadStringSequence(ReadMapValue(package_node, "optional_fields"));
+        data_package.schema_version = ReadStringKey(package_node, "schema_version");
+        data_package.sccg_version = ReadStringKey(package_node, "sccg_version");
         if (!data_package.id.empty())
             data_packages.push_back(std::move(data_package));
     }
@@ -312,6 +328,8 @@ std::vector<Precheck> ParsePrechecks(const YAML::Node& node) {
         precheck.result_type = ReadStringKey(precheck_node, "result_type");
         precheck.description = ReadStringKey(precheck_node, "description");
         precheck.interpretation = ReadStringKey(precheck_node, "interpretation");
+        precheck.schema_version = ReadStringKey(precheck_node, "schema_version");
+        precheck.sccg_version = ReadStringKey(precheck_node, "sccg_version");
         if (!precheck.id.empty())
             prechecks.push_back(std::move(precheck));
     }

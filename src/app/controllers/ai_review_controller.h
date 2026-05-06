@@ -5,6 +5,7 @@
 #include "ai/ai_task_runner.h"
 #include "app/app_events.h"
 #include "app/guideline_catalog.h"
+#include "app/controllers/review_controller.h"
 #include "core/assurance_tree.h"
 #include "core/problems/problems_manager.h"
 #include "parser/xml_parser.h"
@@ -22,17 +23,24 @@ struct AiReviewGuidelineSelection {
 };
 
 AiReviewGuidelineSelection SelectClaimReviewGuidelines(const GuidelineCatalog& guideline_catalog);
+AiReviewGuidelineSelection SelectReviewProfileGuidelines(const GuidelineCatalog& guideline_catalog,
+                                                         const std::string& review_profile_id);
 
 class AiReviewController {
 public:
     AiReviewController(AppEvents& events,
                        core::ProblemsManager& problems_manager,
+                       ReviewController& review_controller,
                        ai::AiTaskRunner& task_runner,
                        std::shared_ptr<ai::AiService> ai_service);
 
     void BeginReviewForSelection(const parser::AssuranceCase* assurance_case,
                                  const core::AssuranceTree& current_tree,
                                  const std::string& selected_element_id);
+    void BeginReviewForSelection(const parser::AssuranceCase* assurance_case,
+                                 const core::AssuranceTree& current_tree,
+                                 const std::string& selected_element_id,
+                                 const std::string& review_profile_id);
     void StartPendingRequest();
     void PollTask();
     void CancelPendingRequest();
@@ -51,6 +59,7 @@ public:
 private:
     AppEvents& events_;
     core::ProblemsManager& problems_manager_;
+    ReviewController& review_controller_;
     ai::AiTaskRunner& task_runner_;
     std::shared_ptr<ai::AiService> ai_service_;
 
@@ -58,6 +67,7 @@ private:
     ai::AiReviewRequestArtifacts pending_review_;
     std::string pending_review_element_id_;
     std::string pending_review_element_type_;
+    std::string pending_review_profile_id_;
     std::vector<std::string> pending_guideline_ids_;
     std::string last_raw_response_;
     std::string last_parse_error_;
