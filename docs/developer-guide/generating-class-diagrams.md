@@ -49,10 +49,19 @@ python -m mkdocs build --strict
 
 ## Initialize submodules
 
-The top-level CMake configure hard-errors when `external/safety-case-core-guidelines/data/guidelines.yaml` is missing. Initialize all submodules before generating the compile database:
+The top-level CMake configure hard-errors when `external/safety-case-core-guidelines/dist/sccg.full.yaml` is missing. Initialize all submodules before generating the compile database:
 
 ```powershell
 git submodule update --init --recursive
+```
+
+If the SCCG submodule is present but the generated `dist/sccg.full.yaml` file is missing, regenerate the SCCG distribution:
+
+```powershell
+Push-Location external/safety-case-core-guidelines
+python -m pip install -r requirements.txt
+python scripts/build_dist.py
+Pop-Location
 ```
 
 ## Generate compile database

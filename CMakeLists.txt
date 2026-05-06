@@ -125,7 +125,7 @@ add_subdirectory(external/pugixml)
 
 set(AF_SCCG_SOURCE_FILE "${CMAKE_SOURCE_DIR}/external/safety-case-core-guidelines/dist/sccg.full.yaml")
 if(NOT EXISTS "${AF_SCCG_SOURCE_FILE}")
-    message(FATAL_ERROR "Missing SCCG distribution file: external/safety-case-core-guidelines/dist/sccg.full.yaml\n\nRun:\ngit submodule update --init --recursive\n\nIf the SCCG submodule is checked out but dist is missing, run the SCCG repository generation command.")
+    message(FATAL_ERROR "Missing SCCG distribution file: external/safety-case-core-guidelines/dist/sccg.full.yaml\n\nRun:\ngit submodule update --init --recursive\n\nIf the SCCG submodule is checked out but dist is missing, run:\ncd external/safety-case-core-guidelines\npython -m pip install -r requirements.txt\npython scripts/build_dist.py")
 endif()
 
 function(af_copy_sccg_data target_name)
