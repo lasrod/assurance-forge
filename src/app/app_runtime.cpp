@@ -1071,7 +1071,8 @@ void AppRuntime::CreateAiGeneratedProposals(const std::vector<AiReviewProposalSu
         if (suggested_text.empty())
             continue;
 
-        std::optional<core::reviews::ReviewItem> item = impl_->review_controller->GetItemById(suggestion.review_item_id);
+        std::optional<core::reviews::ReviewItem> item =
+            impl_->review_controller->GetItemById(suggestion.review_item_id);
         if (!item.has_value() || item->proposal_id.has_value())
             continue;
 
@@ -2066,8 +2067,8 @@ void AppRuntime::RenderReviewPanelContent() {
             break;
         case app::controllers::ElementReviewStatus::OpenItems:
             model.review_status_text = "Not OK";
-            model.review_status_detail = has_blocking_problem ? "Open problems require attention."
-                                                              : "Open review comments require attention.";
+            model.review_status_detail =
+                has_blocking_problem ? "Open problems require attention." : "Open review comments require attention.";
             break;
         case app::controllers::ElementReviewStatus::NotReviewed:
             model.review_status_text = "Not reviewed";
