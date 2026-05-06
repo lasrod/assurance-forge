@@ -233,8 +233,14 @@ bool ParseDataPackages(const std::filesystem::path& path, GuidelinesDocument& do
 }
 
 bool ParsePrechecks(const std::filesystem::path& path, GuidelinesDocument& document, std::string& error) {
-    if (!std::filesystem::exists(path))
+    std::error_code filesystem_error;
+    if (!std::filesystem::exists(path, filesystem_error)) {
+        if (filesystem_error) {
+            error = "Could not check existence of " + path.filename().string() + ": " + filesystem_error.message();
+            return false;
+        }
         return true;
+    }
 
     json root;
     if (!ReadJsonFile(path, root, error))

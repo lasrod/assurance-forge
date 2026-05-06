@@ -127,12 +127,12 @@ AiReviewGuidelineSelection SelectClaimReviewGuidelines(const GuidelineCatalog& g
 
 AiReviewController::AiReviewController(AppEvents& events,
                                        core::ProblemsManager& problems_manager,
-                                                                             ReviewController& review_controller,
+                                       ReviewController& review_controller,
                                        ai::AiTaskRunner& task_runner,
                                        std::shared_ptr<ai::AiService> ai_service)
     : events_(events),
       problems_manager_(problems_manager),
-            review_controller_(review_controller),
+      review_controller_(review_controller),
       task_runner_(task_runner),
       ai_service_(std::move(ai_service)) {}
 
@@ -413,6 +413,12 @@ void AiReviewController::CancelPendingRequest() {
 
 bool AiReviewController::IsReviewRunning() const {
     return review_task_ && review_task_->IsRunning() && !pending_review_.prompt.empty();
+}
+
+bool AiReviewController::WaitForCompletion(std::chrono::milliseconds timeout) const {
+    if (!review_task_)
+        return true;
+    return review_task_->WaitUntilComplete(timeout);
 }
 
 bool AiReviewController::ShouldShowDebugModal() const {

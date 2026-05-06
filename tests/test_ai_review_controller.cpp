@@ -8,7 +8,6 @@
 #include <map>
 #include <memory>
 #include <string>
-#include <thread>
 #include <vector>
 
 namespace {
@@ -281,10 +280,7 @@ TEST(AiReviewControllerTest, CompletedAiFindingsAreAddedAsReviewComments) {
     harness.controller.BeginReviewForSelection(&assurance_case, tree, "claim-1");
     ASSERT_TRUE(harness.controller.HasPendingRequest());
     harness.controller.StartPendingRequest();
-    for (int attempt = 0; attempt < 100 && harness.controller.IsReviewRunning(); ++attempt) {
-        harness.controller.PollTask();
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    }
+    ASSERT_TRUE(harness.controller.WaitForCompletion(std::chrono::seconds(10)));
     harness.controller.PollTask();
 
     std::vector<core::reviews::ReviewItem> comments = harness.reviews.ItemsForElement("claim-1");

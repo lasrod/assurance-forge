@@ -10,6 +10,7 @@
 #include "core/problems/problems_manager.h"
 #include "parser/xml_parser.h"
 
+#include <chrono>
 #include <memory>
 #include <string>
 #include <vector>
@@ -44,6 +45,7 @@ public:
     void StartPendingRequest();
     void PollTask();
     void CancelPendingRequest();
+    bool WaitForCompletion(std::chrono::milliseconds timeout) const;
 
     bool IsReviewRunning() const;
     bool ShouldShowDebugModal() const;

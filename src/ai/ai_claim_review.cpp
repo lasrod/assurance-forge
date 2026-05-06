@@ -564,7 +564,7 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
     artifacts.expectedResponseSchema = artifacts.responseSchemaJson;
 
     std::ostringstream prompt;
-     prompt << "You are reviewing the selected assurance case element using the SCCG review profile below.\n\n"
+    prompt << "You are reviewing the selected assurance case element using the SCCG review profile below.\n\n"
            << "Assurance Forge is an assurance case tool using SACM as the domain model and GSN as one graphical view. "
                   "Use SCCG applies_to values and the selected element data to interpret the element.\n\n"
               << "Use only the SCCG rules provided in this request. Return findings that reference the relevant SCCG rule IDs.\n\n"

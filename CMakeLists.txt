@@ -127,9 +127,8 @@ set(AF_SCCG_DIST_DIR "${CMAKE_SOURCE_DIR}/external/safety-case-core-guidelines/d
 set(AF_SCCG_REQUIRED_DIST_FILES
     review_profiles.json
     data_packages.json
-    ai_rule_export.jsonl
-    sccg.rules.jsonl
-    sccg.full.json
+)
+set(AF_SCCG_OPTIONAL_DIST_FILES
     prechecks.json
 )
 foreach(AF_SCCG_DIST_FILE IN LISTS AF_SCCG_REQUIRED_DIST_FILES)
@@ -137,16 +136,34 @@ foreach(AF_SCCG_DIST_FILE IN LISTS AF_SCCG_REQUIRED_DIST_FILES)
         message(FATAL_ERROR "Missing SCCG distribution file: external/safety-case-core-guidelines/dist/${AF_SCCG_DIST_FILE}\n\nRun:\ngit submodule update --init --recursive\n\nIf the SCCG submodule is checked out but dist is missing, run:\ncd external/safety-case-core-guidelines\npython -m pip install -r requirements.txt\npython scripts/build_dist.py")
     endif()
 endforeach()
+if(EXISTS "${AF_SCCG_DIST_DIR}/ai_rule_export.jsonl")
+    set(AF_SCCG_RULES_JSONL "ai_rule_export.jsonl")
+elseif(EXISTS "${AF_SCCG_DIST_DIR}/sccg.rules.jsonl")
+    set(AF_SCCG_RULES_JSONL "sccg.rules.jsonl")
+else()
+    message(FATAL_ERROR "Missing SCCG rules file: external/safety-case-core-guidelines/dist/ must contain ai_rule_export.jsonl or sccg.rules.jsonl\n\nRun:\ngit submodule update --init --recursive\n\nIf the SCCG submodule is checked out but dist is missing, run:\ncd external/safety-case-core-guidelines\npython -m pip install -r requirements.txt\npython scripts/build_dist.py")
+endif()
 
 function(af_copy_sccg_data target_name)
     add_custom_command(TARGET ${target_name} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${target_name}>/data/sccg/dist"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             ${AF_SCCG_REQUIRED_DIST_FILES}
+            ${AF_SCCG_RULES_JSONL}
             "$<TARGET_FILE_DIR:${target_name}>/data/sccg/dist"
         WORKING_DIRECTORY "${AF_SCCG_DIST_DIR}"
         VERBATIM
     )
+    foreach(AF_SCCG_OPT_FILE IN LISTS AF_SCCG_OPTIONAL_DIST_FILES)
+        if(EXISTS "${AF_SCCG_DIST_DIR}/${AF_SCCG_OPT_FILE}")
+            add_custom_command(TARGET ${target_name} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${AF_SCCG_DIST_DIR}/${AF_SCCG_OPT_FILE}"
+                    "$<TARGET_FILE_DIR:${target_name}>/data/sccg/dist/${AF_SCCG_OPT_FILE}"
+                VERBATIM
+            )
+        endif()
+    endforeach()
     if(EXISTS "${AF_SCCG_DIST_DIR}/sccg.full.yaml")
         add_custom_command(TARGET ${target_name} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${target_name}>/data"
