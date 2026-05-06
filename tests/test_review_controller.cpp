@@ -135,13 +135,8 @@ TEST(ReviewControllerTest, AiOutcomesDrivePersistedStatus) {
     EXPECT_EQ(state.review_profile_id, "profile-1");
     EXPECT_EQ(harness.controller.StatusForElement("claim-1"), app::controllers::ElementReviewStatus::Passed);
 
-    ASSERT_TRUE(harness.controller.SetAiReviewOutcome("claim-1",
-                                                      false,
-                                                      true,
-                                                      "profile-1",
-                                                      "Profile 1",
-                                                      "AI review request failed.",
-                                                      "2026-05-06T12:01:00Z"));
+    ASSERT_TRUE(harness.controller.SetAiReviewOutcome(
+        "claim-1", false, true, "profile-1", "Profile 1", "AI review request failed.", "2026-05-06T12:01:00Z"));
     state = harness.controller.ElementReviewStateForElement("claim-1");
     EXPECT_FALSE(state.ai_ok);
     EXPECT_TRUE(state.failed);

@@ -331,14 +331,10 @@ static void DrawCrossGlyph(ImDrawList* draw_list, const BadgeRect& badge, ImU32 
     float size = badge.max.x - badge.min.x;
     float stroke = std::max(DpiSize(1.8f) * zoom, 1.0f);
     float pad = size * 0.32f;
-    draw_list->AddLine(ImVec2(badge.min.x + pad, badge.min.y + pad),
-                       ImVec2(badge.max.x - pad, badge.max.y - pad),
-                       color,
-                       stroke);
-    draw_list->AddLine(ImVec2(badge.max.x - pad, badge.min.y + pad),
-                       ImVec2(badge.min.x + pad, badge.max.y - pad),
-                       color,
-                       stroke);
+    draw_list->AddLine(
+        ImVec2(badge.min.x + pad, badge.min.y + pad), ImVec2(badge.max.x - pad, badge.max.y - pad), color, stroke);
+    draw_list->AddLine(
+        ImVec2(badge.max.x - pad, badge.min.y + pad), ImVec2(badge.min.x + pad, badge.max.y - pad), color, stroke);
 }
 
 static void DrawSpinnerGlyph(ImDrawList* draw_list, const BadgeRect& badge, ImU32 color, float zoom) {
@@ -420,11 +416,8 @@ static void DrawReviewBadge(ImDrawList* draw_list,
     }
 }
 
-static void DrawReviewScopeHighlight(ImDrawList* draw_list,
-                                     ImVec2 top_left,
-                                     ImVec2 bottom_right,
-                                     float zoom,
-                                     bool primary) {
+static void
+DrawReviewScopeHighlight(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, float zoom, bool primary) {
     const Theme& theme = GetTheme();
     float scale = DpiScale() * zoom;
     float pulse = 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 4.0f);

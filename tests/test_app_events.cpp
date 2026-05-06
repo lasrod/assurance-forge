@@ -59,11 +59,8 @@ TEST(AppEventsTest, DispatchesElementReviewVisualEvents) {
     events.Subscribe<app::ElementReviewVisualEvent>(
         [&](const app::ElementReviewVisualEvent& event) { received.push_back(event); });
 
-    events.Emit(app::ElementReviewVisualEvent{app::ElementReviewVisualEventKind::AiNoFindings,
-                                              "claim-1",
-                                              "profile-1",
-                                              "Profile 1",
-                                              "No findings."});
+    events.Emit(app::ElementReviewVisualEvent{
+        app::ElementReviewVisualEventKind::AiNoFindings, "claim-1", "profile-1", "Profile 1", "No findings."});
 
     ASSERT_EQ(received.size(), 1u);
     EXPECT_EQ(received[0].kind, app::ElementReviewVisualEventKind::AiNoFindings);
