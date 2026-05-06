@@ -58,9 +58,10 @@ parser::ReviewProfile MakeClaimWordingProfile() {
 }
 
 bool HasPackage(const ai::AiReviewDataPackageBundle& packages, const std::string& id) {
-    return std::find_if(packages.available.begin(), packages.available.end(), [&](const ai::AiReviewDataPackage& package) {
-               return package.id == id;
-           }) != packages.available.end();
+    return std::find_if(packages.available.begin(),
+                        packages.available.end(),
+                        [&](const ai::AiReviewDataPackage& package) { return package.id == id; }) !=
+           packages.available.end();
 }
 
 bool HasUnavailablePackage(const ai::AiReviewDataPackageBundle& packages, const std::string& id) {

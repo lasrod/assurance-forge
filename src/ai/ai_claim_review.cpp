@@ -204,9 +204,8 @@ std::string ElementText(const parser::SacmElement& element) {
     return element.name;
 }
 
-nlohmann::json ElementDataToJson(const parser::SacmElement& element,
-                                 const std::string& role,
-                                 const core::TreeNode* node = nullptr) {
+nlohmann::json
+ElementDataToJson(const parser::SacmElement& element, const std::string& role, const core::TreeNode* node = nullptr) {
     return {
         {"role", role},
         {"element_id", element.id},
@@ -512,7 +511,8 @@ bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
                 stack.push_back(child_node);
         }
         if (!evidence_items.empty())
-            AddPackage(out_packages, "EVIDENCE_PATH", {{"path_elements", path_elements}, {"evidence_items", evidence_items}});
+            AddPackage(
+                out_packages, "EVIDENCE_PATH", {{"path_elements", path_elements}, {"evidence_items", evidence_items}});
     }
 
     if (review_profile) {
@@ -566,11 +566,12 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
     std::ostringstream prompt;
     prompt << "You are reviewing the selected assurance case element using the SCCG review profile below.\n\n"
            << "Assurance Forge is an assurance case tool using SACM as the domain model and GSN as one graphical view. "
-                  "Use SCCG applies_to values and the selected element data to interpret the element.\n\n"
-              << "Use only the SCCG rules provided in this request. Return findings that reference the relevant SCCG rule IDs.\n\n"
-              << "Review only the selected element. Use related elements and data packages only as context.\n\n"
+              "Use SCCG applies_to values and the selected element data to interpret the element.\n\n"
+           << "Use only the SCCG rules provided in this request. Return findings that reference the relevant SCCG rule "
+              "IDs.\n\n"
+           << "Review only the selected element. Use related elements and data packages only as context.\n\n"
            << "Do not invent missing project information.\n"
-              << "Treat unavailable data packages as unavailable; do not assume their contents.\n"
+           << "Treat unavailable data packages as unavailable; do not assume their contents.\n"
            << "Do not claim that a rule is violated unless the provided data supports that finding.\n"
            << "If there is no clear violation, return an empty findings array.\n"
            << "Return JSON only. Do not include Markdown. Do not include explanations outside the JSON object.\n\n"
@@ -712,22 +713,23 @@ AiReviewParseResult ParseAiReviewResponse(const std::string& response_text,
             if (guideline_id.empty())
                 guideline_id = JsonStringValue(finding, "rule_id");
             const std::string original_guideline_id = guideline_id;
-            const bool unknown_guideline_id = !allowed_guideline_ids.empty() &&
-                                              (guideline_id.empty() ||
-                                               !IsAllowedGuidelineId(guideline_id, allowed_guideline_ids));
+            const bool unknown_guideline_id =
+                !allowed_guideline_ids.empty() &&
+                (guideline_id.empty() || !IsAllowedGuidelineId(guideline_id, allowed_guideline_ids));
             if (guideline_id.empty())
                 guideline_id = "unknown";
 
             core::ProblemItem problem;
-            problem.id = "ai-review:" + result.reviewedElementId + ":" + guideline_id + ":" +
-                         std::to_string(finding_index);
+            problem.id =
+                "ai-review:" + result.reviewedElementId + ":" + guideline_id + ":" + std::to_string(finding_index);
             problem.severity = SeverityFromString(JsonStringValue(finding, "severity"));
             problem.source = core::ProblemSource::AIReview;
             problem.element_id = result.reviewedElementId;
             problem.type = result.reviewedElementType;
             problem.message = BuildProblemMessage(finding);
             if (unknown_guideline_id) {
-                const std::string shown_id = original_guideline_id.empty() ? std::string("<empty>") : original_guideline_id;
+                const std::string shown_id =
+                    original_guideline_id.empty() ? std::string("<empty>") : original_guideline_id;
                 problem.message += " Unknown SCCG rule reference: " + shown_id + ".";
             }
             problem.guideline_id = unknown_guideline_id || guideline_id == "unknown" ? std::string{} : guideline_id;

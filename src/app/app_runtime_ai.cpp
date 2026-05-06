@@ -61,10 +61,9 @@ void AppRuntime::RenderAiReviewContextMenuForSelected() {
 
     const ui::UiState& ui_state = ui::GetUiState();
     const parser::AssuranceCase* loaded_case = GetLoadedCase();
-    const parser::SacmElement* selected_element =
-        loaded_case && !ui_state.selected_element_id.empty()
-            ? ai::FindSacmElement(*loaded_case, ui_state.selected_element_id)
-            : nullptr;
+    const parser::SacmElement* selected_element = loaded_case && !ui_state.selected_element_id.empty()
+                                                      ? ai::FindSacmElement(*loaded_case, ui_state.selected_element_id)
+                                                      : nullptr;
     const core::TreeNode* selected_node = FindTreeNode(impl_->current_tree, ui_state.selected_element_id);
     const bool review_running = impl_->ai_review_controller->IsReviewRunning();
 
@@ -119,10 +118,9 @@ void AppRuntime::RenderAiDebugPanelContent() {
 
     const ui::UiState& ui_state = ui::GetUiState();
     const parser::AssuranceCase* loaded_case = GetLoadedCase();
-    const parser::SacmElement* selected_element =
-        loaded_case && !ui_state.selected_element_id.empty()
-            ? ai::FindSacmElement(*loaded_case, ui_state.selected_element_id)
-            : nullptr;
+    const parser::SacmElement* selected_element = loaded_case && !ui_state.selected_element_id.empty()
+                                                      ? ai::FindSacmElement(*loaded_case, ui_state.selected_element_id)
+                                                      : nullptr;
     const core::TreeNode* selected_node = FindTreeNode(impl_->current_tree, ui_state.selected_element_id);
 
     const ImVec2 available = ImGui::GetContentRegionAvail();
@@ -209,8 +207,7 @@ void AppRuntime::RenderAiDebugPanelContent() {
     if (response.empty())
         response = "No response yet.";
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::InputTextMultiline(
-        "##ai_debug_response", &response, ImVec2(-1.0f, -1.0f), ImGuiInputTextFlags_ReadOnly);
+    ImGui::InputTextMultiline("##ai_debug_response", &response, ImVec2(-1.0f, -1.0f), ImGuiInputTextFlags_ReadOnly);
     ImGui::EndChild();
 }
 

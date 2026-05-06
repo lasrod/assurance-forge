@@ -221,8 +221,9 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
     }
 
     AiReviewGuidelineSelection guideline_selection =
-        review_profile_id == kDefaultClaimReviewProfileId ? SelectClaimReviewGuidelines(guideline_catalog)
-                                                          : SelectReviewProfileGuidelines(guideline_catalog, review_profile_id);
+        review_profile_id == kDefaultClaimReviewProfileId
+            ? SelectClaimReviewGuidelines(guideline_catalog)
+            : SelectReviewProfileGuidelines(guideline_catalog, review_profile_id);
 
     if (!guideline_selection.error_message.empty()) {
         problems_manager_.AddOrUpdateProblem(
@@ -258,13 +259,12 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
                                          guideline_selection.review_profile,
                                          data_packages,
                                          data_package_error)) {
-        problems_manager_.AddOrUpdateProblem(
-            MakeAiReviewProblem("ai-review:" + selected_element_id + ":data-package-error",
-                                core::ProblemSeverity::Error,
-                                selected_element_id,
-                                payload.selected.type,
-                                data_package_error.empty() ? "AI review data packages could not be collected."
-                                                           : data_package_error));
+        problems_manager_.AddOrUpdateProblem(MakeAiReviewProblem(
+            "ai-review:" + selected_element_id + ":data-package-error",
+            core::ProblemSeverity::Error,
+            selected_element_id,
+            payload.selected.type,
+            data_package_error.empty() ? "AI review data packages could not be collected." : data_package_error));
         events_.Emit(StatusMessageEvent{"AI review data packages could not be collected."});
         return;
     }
@@ -273,7 +273,8 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
         payload, guideline_selection.guidelines, guideline_selection.review_profile, &data_packages);
     pending_review_element_id_ = payload.selected.id;
     pending_review_element_type_ = payload.selected.type;
-    pending_review_profile_id_ = guideline_selection.review_profile ? guideline_selection.review_profile->id : review_profile_id;
+    pending_review_profile_id_ =
+        guideline_selection.review_profile ? guideline_selection.review_profile->id : review_profile_id;
     pending_guideline_ids_ = GuidelineIds(guideline_selection.guidelines);
     last_raw_response_.clear();
     last_parse_error_.clear();
