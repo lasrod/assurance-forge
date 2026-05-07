@@ -22,7 +22,7 @@ Opening the request only triggers validation. It does not create subtasks or add
 4. Apply the `roadmap-approved` label.
 5. Review the generated epic body, generated task issues, sub-issue links, and Project fields.
 
-Only repository owners, members, and collaborators may trigger generation. If an untrusted actor applies `roadmap-approved`, the automation stops, comments on the issue, removes the approval label where possible, and applies `roadmap-failed`.
+Only actors with `admin`, `maintain`, or `write` repository permission may trigger generation. If an untrusted actor applies `roadmap-approved`, the automation stops, comments on the issue, removes the approval label where possible, and applies `roadmap-failed`.
 
 ## Labels
 
