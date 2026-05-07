@@ -92,7 +92,7 @@ Required Project fields when `ROADMAP_PROJECT_NUMBER` is configured:
 
 Project field names and single-select options must match exactly. If a field is missing or a single-select option does not exist, the automation comments on the issue, applies `roadmap-failed`, and prints the missing Project setup details in the Actions log.
 
-Use the built-in `GITHUB_TOKEN` for issue operations. Add a `ROADMAP_TOKEN` secret only if the default token cannot update the GitHub Project. That token should have the narrowest repository and Project permissions possible.
+Use the built-in `GITHUB_TOKEN` for issue operations. User-level and organization-level GitHub Projects may not be visible to the built-in token, even when `ROADMAP_PROJECT_NUMBER` is correct. If Project lookup or updates fail for a valid Project URL, add a `ROADMAP_TOKEN` secret with access to the repository issues and the target Project. That token should have the narrowest repository and Project permissions possible.
 
 ## Failure Recovery
 
