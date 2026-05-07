@@ -696,7 +696,9 @@ def resolve_project_id(client: GitHubClient, owner: str, project_number: str, to
         f"Project {owner}/{project_number} was not found. {detail} "
         "Check ROADMAP_PROJECT_OWNER and ROADMAP_PROJECT_NUMBER. "
         "ROADMAP_PROJECT_NUMBER must be the number from a user or organization Project URL, "
-        "such as https://github.com/users/OWNER/projects/NUMBER or https://github.com/orgs/OWNER/projects/NUMBER.",
+        "such as https://github.com/users/OWNER/projects/NUMBER or https://github.com/orgs/OWNER/projects/NUMBER. "
+        "If that URL is correct, the token used by the workflow probably cannot access the Project; "
+        "add a ROADMAP_TOKEN secret with access to the repository issues and the target Project.",
     )
 
 

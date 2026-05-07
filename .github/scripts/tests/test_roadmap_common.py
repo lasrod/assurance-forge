@@ -185,6 +185,7 @@ class RoadmapCommonTests(unittest.TestCase):
         self.assertIn("ROADMAP_PROJECT_OWNER", context.exception.message)
         self.assertIn("ROADMAP_PROJECT_NUMBER", context.exception.message)
         self.assertIn("github.com/users/OWNER/projects/NUMBER", context.exception.message)
+        self.assertIn("ROADMAP_TOKEN", context.exception.message)
 
     def test_set_project_fields_warns_about_missing_fields(self):
         client = FakeGraphQLClient([
