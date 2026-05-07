@@ -691,7 +691,13 @@ def resolve_project_id(client: GitHubClient, owner: str, project_number: str, to
             return project["id"]
         errors.append(f"{owner_type} lookup found no ProjectV2 number {project_number}")
     detail = " ".join(errors)
-    raise GitHubApiError(404, f"Project {owner}/{project_number} was not found. {detail}")
+    raise GitHubApiError(
+        404,
+        f"Project {owner}/{project_number} was not found. {detail} "
+        "Check ROADMAP_PROJECT_OWNER and ROADMAP_PROJECT_NUMBER. "
+        "ROADMAP_PROJECT_NUMBER must be the number from a user or organization Project URL, "
+        "such as https://github.com/users/OWNER/projects/NUMBER or https://github.com/orgs/OWNER/projects/NUMBER.",
+    )
 
 
 def project_fields(client: GitHubClient, project_id: str, token: str) -> dict[str, dict[str, Any]]:
