@@ -763,6 +763,12 @@ def project_field_setup_warning(name: str, field: dict[str, Any] | None, value: 
         return f"Project field `{name}` is missing. Create a {expected_type} field named exactly `{name}`{option_text}."
 
     field_type = field.get("__typename")
+    single_select_allowed = expected_type in {"Single select", "Text or single select"}
+    if field_type == "ProjectV2SingleSelectField" and not single_select_allowed:
+        return (
+            f"Project field `{name}` should be a {expected_type} field. "
+            "Current field type is Single select."
+        )
     if expected_type == "Single select" and field_type != "ProjectV2SingleSelectField":
         options = definition.get("options", [])
         return (

@@ -227,6 +227,66 @@ class RoadmapCommonTests(unittest.TestCase):
             warnings,
         )
 
+    def test_set_project_fields_warns_when_text_or_number_field_is_single_select(self):
+        client = FakeGraphQLClient([])
+        fields = {
+            "Discussion URL": {
+                "id": "field_discussion",
+                "name": "Discussion URL",
+                "__typename": "ProjectV2SingleSelectField",
+                "options": [{"id": "discussion", "name": "https://example.com"}],
+            },
+            "Size Points": {
+                "id": "field_size",
+                "name": "Size Points",
+                "__typename": "ProjectV2SingleSelectField",
+                "options": [{"id": "size", "name": "1.0"}],
+            },
+        }
+
+        warnings = set_project_fields(
+            client,
+            "project",
+            "item",
+            fields,
+            {"Discussion URL": "https://example.com", "Size Points": 1.0},
+            "token",
+        )
+
+        self.assertEqual([], client.queries)
+        self.assertEqual(
+            [
+                "Project field `Discussion URL` should be a Text field. Current field type is Single select.",
+                "Project field `Size Points` should be a Number field. Current field type is Single select.",
+            ],
+            warnings,
+        )
+
+    def test_set_project_fields_allows_target_release_single_select(self):
+        client = FakeGraphQLClient([
+            {"updateProjectV2ItemFieldValue": {"projectV2Item": {"id": "item"}}},
+        ])
+        fields = {
+            "Target Release": {
+                "id": "field_release",
+                "name": "Target Release",
+                "__typename": "ProjectV2SingleSelectField",
+                "options": [{"id": "v02", "name": "v0.2"}],
+            },
+        }
+
+        warnings = set_project_fields(
+            client,
+            "project",
+            "item",
+            fields,
+            {"Target Release": "v0.2"},
+            "token",
+        )
+
+        self.assertEqual([], warnings)
+        self.assertEqual(1, len(client.queries))
+
     def test_area_label_mapping(self):
         self.assertEqual("area: build-ci", area_label("Build / CI"))
         self.assertEqual("area: other", area_label("Other"))

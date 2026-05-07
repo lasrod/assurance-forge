@@ -71,7 +71,7 @@ Size Points estimate total effort. Completed Points are calculated from maturity
 
 Create a GitHub Project named **Assurance Forge Roadmap** and store its number in the repository variable `ROADMAP_PROJECT_NUMBER`.
 
-Recommended Project fields:
+Required Project fields when `ROADMAP_PROJECT_NUMBER` is configured:
 
 | Field | Type |
 |---|---|
