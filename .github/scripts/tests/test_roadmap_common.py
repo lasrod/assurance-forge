@@ -173,6 +173,19 @@ class RoadmapCommonTests(unittest.TestCase):
         self.assertEqual(2, len(client.queries))
         self.assertIn("organization(login: $owner)", client.queries[1])
 
+    def test_resolve_project_id_error_explains_project_variables(self):
+        client = FakeGraphQLClient([
+            GitHubApiError(400, "Could not resolve to a ProjectV2 with the number 2."),
+            GitHubApiError(400, "Could not resolve to an Organization with the login of 'lasrod'."),
+        ])
+
+        with self.assertRaises(GitHubApiError) as context:
+            resolve_project_id(client, "lasrod", "2", "token")
+
+        self.assertIn("ROADMAP_PROJECT_OWNER", context.exception.message)
+        self.assertIn("ROADMAP_PROJECT_NUMBER", context.exception.message)
+        self.assertIn("github.com/users/OWNER/projects/NUMBER", context.exception.message)
+
     def test_set_project_fields_warns_about_missing_fields(self):
         client = FakeGraphQLClient([
             {"updateProjectV2ItemFieldValue": {"projectV2Item": {"id": "item"}}},

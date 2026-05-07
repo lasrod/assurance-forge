@@ -86,6 +86,27 @@ class RoadmapCreateEpicTests(unittest.TestCase):
         self.assertEqual("2", project_number)
         self.assertIn("roadmap-automation: generated=true", issue["body"])
 
+    def test_project_owner_defaults_to_repository_owner(self):
+        FakeGitHubClient.issue_labels = [{"name": "roadmap-generated"}, {"name": "roadmap-failed"}]
+        environment = {
+            "GH_TOKEN": "token",
+            "REPO": "repo-owner/repo",
+            "ISSUE_NUMBER": "84",
+            "ACTOR": "maintainer",
+            "EVENT_LABEL": "roadmap-approved",
+            "PROJECT_NUMBER": "2",
+        }
+
+        with mock.patch.dict(os.environ, environment, clear=True), \
+             mock.patch.object(roadmap_create_epic, "GitHubClient", FakeGitHubClient), \
+             mock.patch.object(roadmap_create_epic, "ensure_roadmap_labels"), \
+             mock.patch.object(roadmap_create_epic, "retry_generated_followup", return_value=0) as retry, \
+             mock.patch("sys.stdout", new_callable=io.StringIO):
+            self.assertEqual(0, roadmap_create_epic.main())
+
+        _, _, _, _, project_owner, _ = retry.call_args.args
+        self.assertEqual("repo-owner", project_owner)
+
     def test_roadmap_retry_label_retries_generated_epic_followup(self):
         FakeGitHubClient.issue_labels = [{"name": "roadmap-generated"}, {"name": "roadmap-retry"}]
         environment = {

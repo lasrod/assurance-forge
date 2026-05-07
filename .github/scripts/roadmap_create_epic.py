@@ -154,7 +154,9 @@ def main() -> int:
     issue_number = int(os.environ.get("ISSUE_NUMBER", "0"))
     actor = os.environ.get("ACTOR", "")
     event_label = os.environ.get("EVENT_LABEL", "")
-    project_owner = os.environ.get("PROJECT_OWNER", "lasrod")
+    project_owner = os.environ.get("PROJECT_OWNER", "").strip()
+    if not project_owner and "/" in repo:
+        project_owner = repo.split("/", 1)[0]
     project_number = os.environ.get("PROJECT_NUMBER", "")
 
     if event_label not in {"roadmap-approved", "roadmap-retry"}:

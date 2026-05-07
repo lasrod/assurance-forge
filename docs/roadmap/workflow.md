@@ -71,7 +71,9 @@ Size Points estimate total effort. Completed Points are calculated from maturity
 
 ## Project Setup
 
-Create a GitHub Project named **Assurance Forge Roadmap** and store its number in the repository variable `ROADMAP_PROJECT_NUMBER`.
+Create a GitHub Project named **Assurance Forge Roadmap** and store its number in the repository variable `ROADMAP_PROJECT_NUMBER`. Use the number from the Project URL, for example `https://github.com/users/OWNER/projects/NUMBER` or `https://github.com/orgs/OWNER/projects/NUMBER`.
+
+By default, the automation looks for the Project under the repository owner. If the Project belongs to a different user or organization, store that login in the repository variable `ROADMAP_PROJECT_OWNER`.
 
 Required Project fields when `ROADMAP_PROJECT_NUMBER` is configured:
 

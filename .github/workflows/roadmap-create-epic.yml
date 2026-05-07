@@ -34,6 +34,6 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ACTOR: ${{ github.actor }}
           EVENT_LABEL: ${{ github.event.label.name }}
-          PROJECT_OWNER: ${{ github.repository_owner }}
+          PROJECT_OWNER: ${{ vars.ROADMAP_PROJECT_OWNER }}
           PROJECT_NUMBER: ${{ vars.ROADMAP_PROJECT_NUMBER }}
         run: python .github/scripts/roadmap_create_epic.py
