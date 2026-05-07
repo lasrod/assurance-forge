@@ -56,5 +56,10 @@ docs/diagrams/generated/*
 !docs/diagrams/generated/.gitkeep
 !docs/diagrams/generated/*.mmd
 
+# Python
+__pycache__/
+*.pyc
+
 # ImGui state
 imgui.ini
+

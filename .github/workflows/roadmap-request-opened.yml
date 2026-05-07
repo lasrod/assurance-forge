@@ -1,0 +1,30 @@
+name: Roadmap request opened
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  validate-roadmap-request:
+    if: contains(github.event.issue.labels.*.name, 'roadmap-request') || startsWith(github.event.issue.title, '[EPIC REQUEST]:')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate request and comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: python .github/scripts/roadmap_validate_request.py

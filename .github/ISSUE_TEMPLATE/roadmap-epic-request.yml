@@ -1,0 +1,147 @@
+name: Roadmap Epic Request
+description: Propose a roadmap epic for Assurance Forge.
+title: "[EPIC REQUEST]: "
+labels: ["roadmap-request", "needs-roadmap-review"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form to propose a roadmap epic.
+
+        Submitting this form does not automatically create an epic. A maintainer must review the request and add the `roadmap-approved` label before automation creates the epic and subtasks.
+
+  - type: input
+    id: af_id
+    attributes:
+      label: AF Epic ID
+      description: Example: AF-E-0004. Leave blank if not assigned yet.
+      placeholder: AF-E-0004
+
+  - type: input
+    id: idea_id
+    attributes:
+      label: Related idea ID
+      description: Optional. Example: AF-I-0004.
+      placeholder: AF-I-0004
+
+  - type: input
+    id: discussion_url
+    attributes:
+      label: Related discussion URL
+      description: Optional link to the original GitHub Discussion.
+      placeholder: https://github.com/lasrod/assurance-forge/discussions/123
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Storage
+        - GSN
+        - SACM
+        - Review
+        - AI
+        - UI
+        - Export
+        - Compliance
+        - Documentation
+        - Build / CI
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: maturity
+    attributes:
+      label: Initial maturity
+      options:
+        - Candidate
+        - Planned
+        - Prototype 1
+        - Prototype 2
+        - Ready
+        - Deferred
+    validations:
+      required: true
+
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size Points
+      options:
+        - "1"
+        - "2"
+        - "3"
+        - "5"
+        - "8"
+        - "13"
+        - "21"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - Critical
+        - High
+        - Medium
+        - Low
+        - Later
+    validations:
+      required: true
+
+  - type: input
+    id: target_release
+    attributes:
+      label: Target Release
+      description: Optional. Example: v0.2.
+      placeholder: v0.2
+
+  - type: dropdown
+    id: public_roadmap
+    attributes:
+      label: Public roadmap bucket
+      options:
+        - Now
+        - Next
+        - Later
+        - Not public yet
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the purpose of the epic.
+      placeholder: Explain what should be achieved and why it matters.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Epic acceptance criteria
+      description: What must be true before this epic can be considered Ready?
+      placeholder: |
+        - The feature is persisted correctly.
+        - The feature has tests.
+        - The documentation is updated.
+    validations:
+      required: true
+
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Suggested subtasks
+      description: One task per line. These will become sub-issues after maintainer approval.
+      placeholder: |
+        Define audit event schema
+        Add project user identity model
+        Store audit events in project folder
+        Add audit history UI
+        Add tests and documentation
+    validations:
+      required: true

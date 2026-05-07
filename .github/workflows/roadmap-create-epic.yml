@@ -1,0 +1,40 @@
+name: Create roadmap epic structure
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: roadmap-epic-${{ github.event.issue.node_id }}
+  cancel-in-progress: false
+
+jobs:
+  create-roadmap-epic:
+    if: github.event.label.name == 'roadmap-approved'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Create epic and subtasks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ROADMAP_TOKEN: ${{ secrets.ROADMAP_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ACTOR: ${{ github.actor }}
+          ACTOR_ASSOCIATION: ${{ github.event.sender.association }}
+          EVENT_LABEL: ${{ github.event.label.name }}
+          PROJECT_OWNER: ${{ github.repository_owner }}
+          PROJECT_NUMBER: ${{ vars.ROADMAP_PROJECT_NUMBER }}
+        run: python .github/scripts/roadmap_create_epic.py
