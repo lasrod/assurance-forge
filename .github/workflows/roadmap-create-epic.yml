@@ -33,7 +33,6 @@ jobs:
           REPO: ${{ github.repository }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ACTOR: ${{ github.actor }}
-          ACTOR_ASSOCIATION: ${{ github.event.sender.association }}
           EVENT_LABEL: ${{ github.event.label.name }}
           PROJECT_OWNER: ${{ github.repository_owner }}
           PROJECT_NUMBER: ${{ vars.ROADMAP_PROJECT_NUMBER }}

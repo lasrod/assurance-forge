@@ -16,7 +16,7 @@ from roadmap_common import (
     generate_tasks,
     generated_tasks_from_epic_body,
     has_generated_marker,
-    is_trusted_actor_association,
+    is_trusted_actor_permission,
     issue_labels,
     project_fields,
     project_values_for_request,
@@ -28,17 +28,16 @@ from roadmap_common import (
 )
 
 
-def fail_for_untrusted_actor(client: GitHubClient, issue_number: int, actor: str, association: str) -> int:
+def fail_for_untrusted_actor(client: GitHubClient, issue_number: int, actor: str, permission: str) -> int:
+    message = (
+        "Roadmap generation did not run because `roadmap-approved` was applied by "
+        f"`{actor}` with repository permission `{permission or 'none'}`. "
+        "A repository owner, maintainer, or collaborator with write access must approve roadmap generation."
+    )
+    print(message)
     client.add_labels(issue_number, ["roadmap-failed"])
     client.remove_label(issue_number, "roadmap-approved")
-    client.create_comment(
-        issue_number,
-        (
-            "Roadmap generation did not run because `roadmap-approved` was applied by "
-            f"`{actor}` with association `{association or 'UNKNOWN'}`. "
-            "A repository owner, member, or collaborator must approve roadmap generation."
-        ),
-    )
+    client.create_comment(issue_number, message)
     return 1
 
 
@@ -129,7 +128,6 @@ def main() -> int:
     repo = os.environ.get("REPO", "")
     issue_number = int(os.environ.get("ISSUE_NUMBER", "0"))
     actor = os.environ.get("ACTOR", "")
-    association = os.environ.get("ACTOR_ASSOCIATION", "")
     event_label = os.environ.get("EVENT_LABEL", "")
     project_owner = os.environ.get("PROJECT_OWNER", "lasrod")
     project_number = os.environ.get("PROJECT_NUMBER", "")
@@ -145,8 +143,10 @@ def main() -> int:
     issue = client.get_issue(issue_number)
     ensure_roadmap_labels(client)
 
-    if not is_trusted_actor_association(association):
-        return fail_for_untrusted_actor(client, issue_number, actor, association)
+    actor_permission = client.get_actor_permission(actor)
+    if not is_trusted_actor_permission(actor_permission):
+        return fail_for_untrusted_actor(client, issue_number, actor, actor_permission)
+    print(f"Roadmap approval actor `{actor}` has repository permission `{actor_permission}`.")
 
     if has_generated_marker(issue.get("body") or ""):
         if "roadmap-failed" in issue_labels(issue):
