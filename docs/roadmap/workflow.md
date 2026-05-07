@@ -33,6 +33,8 @@ The request form applies these labels when they already exist:
 
 The automation also ensures the roadmap labels exist before it uses them. The issue form never applies `roadmap-approved`; that label is reserved for maintainer approval.
 
+Maintainers may apply `roadmap-retry` to an existing generated epic when follow-up Project or sub-issue work should be retried deliberately.
+
 Generated epics receive:
 
 - `type: epic`
@@ -94,6 +96,9 @@ Use the built-in `GITHUB_TOKEN` for issue operations. Add a `ROADMAP_TOKEN` secr
 
 The generation workflow is idempotent. It checks for the generated epic marker and existing generated task titles before creating issues.
 
-If sub-issue linking or Project updates fail, the automation keeps created issues, adds `roadmap-failed`, and comments with the failure. Fix the configuration or permissions, then rerun by removing and reapplying `roadmap-approved`.
+If sub-issue linking or Project updates fail, the automation keeps created issues, adds `roadmap-failed`, and comments with the failure. Fix the configuration or permissions, then rerun by removing and reapplying `roadmap-approved`, or by applying `roadmap-retry` to the generated epic.
+
+If an already-generated epic is approved again while it is not marked `roadmap-failed` and does not have `roadmap-retry`, the automation leaves the epic and tasks unchanged and does not retry Project updates. This prevents a successful epic from being downgraded to `roadmap-failed` because of a transient follow-up API error during a harmless reapproval.
+
 
 The old roadmap document was intentionally removed because new roadmap content will be created separately.

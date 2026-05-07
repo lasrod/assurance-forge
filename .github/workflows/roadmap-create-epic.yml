@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   create-roadmap-epic:
-    if: github.event.label.name == 'roadmap-approved'
+    if: github.event.label.name == 'roadmap-approved' || github.event.label.name == 'roadmap-retry'
     runs-on: ubuntu-latest
 
     steps:

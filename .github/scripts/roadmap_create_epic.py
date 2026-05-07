@@ -129,6 +129,7 @@ def retry_generated_followup(client: GitHubClient, issue: dict, issue_number: in
         print_warnings("Roadmap follow-up retry failed:", warnings)
         client.add_labels(issue_number, ["roadmap-failed"])
         client.remove_label(issue_number, "roadmap-approved")
+        client.remove_label(issue_number, "roadmap-retry")
         warning_text = "\n".join(f"- {warning}" for warning in warnings)
         client.create_comment(
             issue_number,
@@ -138,6 +139,7 @@ def retry_generated_followup(client: GitHubClient, issue: dict, issue_number: in
         return 1
 
     client.remove_label(issue_number, "roadmap-failed")
+    client.remove_label(issue_number, "roadmap-retry")
     client.create_comment(
         issue_number,
         "Roadmap automation found an existing generated epic. No duplicate tasks were created, and follow-up Project/sub-issue work completed successfully.",
@@ -155,8 +157,8 @@ def main() -> int:
     project_owner = os.environ.get("PROJECT_OWNER", "lasrod")
     project_number = os.environ.get("PROJECT_NUMBER", "")
 
-    if event_label != "roadmap-approved":
-        print("Event label was not roadmap-approved; no action taken.")
+    if event_label not in {"roadmap-approved", "roadmap-retry"}:
+        print("Event label was not roadmap-approved or roadmap-retry; no action taken.")
         return 0
     if not token or not repo or not issue_number:
         print("GH_TOKEN, REPO, and ISSUE_NUMBER are required", file=sys.stderr)
@@ -171,8 +173,19 @@ def main() -> int:
         return fail_for_untrusted_actor(client, issue_number, actor, actor_permission)
     print(f"Roadmap approval actor `{actor}` has repository permission `{actor_permission}`.")
 
+    labels = issue_labels(issue)
     if has_generated_marker(issue.get("body") or ""):
-        return retry_generated_followup(client, issue, issue_number, roadmap_token, project_owner, project_number)
+        if "roadmap-failed" in labels or "roadmap-retry" in labels or event_label == "roadmap-retry":
+            return retry_generated_followup(client, issue, issue_number, roadmap_token, project_owner, project_number)
+        client.create_comment(
+            issue_number,
+            "Roadmap automation has already generated this epic structure. No duplicate tasks were created.",
+        )
+        return 0
+
+    if event_label == "roadmap-retry":
+        print("roadmap-retry only retries existing generated epics; no action taken.")
+        return 0
 
     request = build_request_from_issue(issue)
     validation = validate_request(request, require_af_id=True)
@@ -205,7 +218,7 @@ def main() -> int:
     warnings = link_missing_sub_issues(client, issue_number, resolved_tasks)
 
     epic_title = f"[{request.af_id}] {request.title}"
-    epic_labels = sorted(set(issue_labels(issue) + ["type: epic", "roadmap-generated", area_label(request.area)]))
+    epic_labels = sorted(set(labels + ["type: epic", "roadmap-generated", area_label(request.area)]))
     epic_issue = client.update_issue(issue_number, title=epic_title, body=render_epic_body(request, resolved_tasks), labels=epic_labels)
     client.remove_label(issue_number, "needs-roadmap-review")
 
