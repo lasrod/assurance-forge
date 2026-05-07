@@ -28,6 +28,7 @@ from roadmap_common import (
 )
 
 
+<<<<<<< HEAD
 def print_failure(message: str) -> None:
     print(message, file=sys.stderr)
 
@@ -38,6 +39,8 @@ def print_warnings(prefix: str, warnings: list[str]) -> None:
         print_failure(f"- {warning}")
 
 
+=======
+>>>>>>> a1112ec7ad941b1dc6b42e057955891f4d541378
 def fail_for_untrusted_actor(client: GitHubClient, issue_number: int, actor: str, permission: str) -> int:
     message = (
         "Roadmap generation did not run because `roadmap-approved` was applied by "

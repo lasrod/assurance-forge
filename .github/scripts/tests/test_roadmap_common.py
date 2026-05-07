@@ -154,6 +154,7 @@ class RoadmapCommonTests(unittest.TestCase):
         self.assertTrue(is_trusted_actor_permission("write"))
         self.assertFalse(is_trusted_actor_permission("triage"))
         self.assertFalse(is_trusted_actor_permission("read"))
+<<<<<<< HEAD
 
     def test_resolve_project_id_uses_user_project_without_org_lookup(self):
         client = FakeGraphQLClient([{"user": {"projectV2": {"id": "PVT_user"}}}])
@@ -171,6 +172,8 @@ class RoadmapCommonTests(unittest.TestCase):
         self.assertEqual("PVT_org", resolve_project_id(client, "example-org", "2", "token"))
         self.assertEqual(2, len(client.queries))
         self.assertIn("organization(login: $owner)", client.queries[1])
+=======
+>>>>>>> a1112ec7ad941b1dc6b42e057955891f4d541378
 
     def test_area_label_mapping(self):
         self.assertEqual("area: build-ci", area_label("Build / CI"))
