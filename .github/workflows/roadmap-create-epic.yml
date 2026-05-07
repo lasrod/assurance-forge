@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   create-roadmap-epic:
-    if: github.event.label.name == 'roadmap-approved'
+    if: github.event.label.name == 'roadmap-approved' || github.event.label.name == 'roadmap-retry'
     runs-on: ubuntu-latest
 
     steps:
@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
