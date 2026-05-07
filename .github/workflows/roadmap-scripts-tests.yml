@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - '.github/scripts/**'
+      - '.github/workflows/roadmap-*.yml'
+      - '.github/ISSUE_TEMPLATE/roadmap-epic-request.yml'
 
 permissions:
   contents: read
@@ -21,8 +23,5 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install test dependencies
-        run: pip install pytest
-
       - name: Run roadmap script tests
-        run: python -m pytest .github/scripts/tests/ -v
+        run: python -m unittest discover .github/scripts/tests

@@ -60,3 +60,6 @@ docs/diagrams/generated/*
 __pycache__/
 *.pyc
 
+# ImGui state
+imgui.ini
+
