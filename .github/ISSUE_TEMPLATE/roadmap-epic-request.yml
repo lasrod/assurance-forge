@@ -14,14 +14,14 @@ body:
     id: af_id
     attributes:
       label: AF Epic ID
-      description: Example: AF-E-0004. Leave blank if not assigned yet.
+      description: "Example: AF-E-0004. Leave blank if not assigned yet."
       placeholder: AF-E-0004
 
   - type: input
     id: idea_id
     attributes:
       label: Related idea ID
-      description: Optional. Example: AF-I-0004.
+      description: "Optional. Example: AF-I-0004."
       placeholder: AF-I-0004
 
   - type: input
@@ -29,7 +29,7 @@ body:
     attributes:
       label: Related discussion URL
       description: Optional link to the original GitHub Discussion.
-      placeholder: https://github.com/lasrod/assurance-forge/discussions/123
+      placeholder: "https://github.com/lasrod/assurance-forge/discussions/123"
 
   - type: dropdown
     id: area
@@ -96,7 +96,7 @@ body:
     id: target_release
     attributes:
       label: Target Release
-      description: Optional. Example: v0.2.
+      description: "Optional. Example: v0.2."
       placeholder: v0.2
 
   - type: dropdown
