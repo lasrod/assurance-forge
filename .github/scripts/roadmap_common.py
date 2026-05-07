@@ -659,19 +659,25 @@ def apply_issue_data_to_task(task: GeneratedTask, issue: dict[str, Any]) -> Gene
 
 def resolve_project_id(client: GitHubClient, owner: str, project_number: str, token: str) -> str:
     number = int(project_number)
-    query = """
-    query($owner: String!, $number: Int!) {
-      user(login: $owner) { projectV2(number: $number) { id } }
-      organization(login: $owner) { projectV2(number: $number) { id } }
-    }
-    """
-    data = client.graphql(query, {"owner": owner, "number": number}, token=token)
-    user_project = data.get("user") and data["user"].get("projectV2")
-    org_project = data.get("organization") and data["organization"].get("projectV2")
-    project = user_project or org_project
-    if not project:
-        raise GitHubApiError(404, f"Project {owner}/{project_number} was not found")
-    return project["id"]
+    errors: list[str] = []
+    for owner_type in ("user", "organization"):
+        query = f"""
+        query($owner: String!, $number: Int!) {{
+          {owner_type}(login: $owner) {{ projectV2(number: $number) {{ id }} }}
+        }}
+        """
+        try:
+            data = client.graphql(query, {"owner": owner, "number": number}, token=token)
+        except GitHubApiError as error:
+            errors.append(f"{owner_type} lookup failed: {error.message}")
+            continue
+        project_owner = data.get(owner_type)
+        project = project_owner and project_owner.get("projectV2")
+        if project:
+            return project["id"]
+        errors.append(f"{owner_type} lookup found no ProjectV2 number {project_number}")
+    detail = " ".join(errors)
+    raise GitHubApiError(404, f"Project {owner}/{project_number} was not found. {detail}")
 
 
 def project_fields(client: GitHubClient, project_id: str, token: str) -> dict[str, dict[str, Any]]:
