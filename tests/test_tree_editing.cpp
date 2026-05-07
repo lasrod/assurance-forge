@@ -178,12 +178,28 @@ MiniCase MakeMoveCase() {
 TEST(TreeEditingValidation, AllowsSameParentSiblingReorder) {
     MiniCase mini_case = MakeSiblingCase();
     core::AssuranceTree tree = core::AssuranceTree::Build(mini_case.model);
+    const core::TreeEditIndex index = core::BuildTreeEditIndex(mini_case.model);
 
     core::TreeDropValidationResult result =
-        core::ValidateTreeDrop(mini_case.model, tree, "G4", "G2", core::TreeDropMode::Before);
+        core::ValidateTreeDrop(index, tree, "G4", "G2", core::TreeDropMode::Before);
 
     EXPECT_TRUE(result.allowed) << result.reason;
     EXPECT_FALSE(result.changes_semantic_relationship);
+}
+
+TEST(TreeEditingValidation, ReusesBuiltIndexAcrossDropValidations) {
+    MiniCase mini_case = MakeMoveCase();
+    core::AssuranceTree tree = core::AssuranceTree::Build(mini_case.model);
+    const core::TreeEditIndex index = core::BuildTreeEditIndex(mini_case.model);
+
+    core::TreeDropValidationResult reorder_result =
+        core::ValidateTreeDrop(index, tree, "G4", "G3", core::TreeDropMode::Before);
+    core::TreeDropValidationResult child_result =
+        core::ValidateTreeDrop(index, tree, "G4", "G3", core::TreeDropMode::AsChild);
+
+    EXPECT_FALSE(reorder_result.allowed);
+    EXPECT_TRUE(child_result.allowed) << child_result.reason;
+    EXPECT_TRUE(child_result.changes_semantic_relationship);
 }
 
 TEST(TreeEditingValidation, RejectsCrossParentBeforeDrop) {

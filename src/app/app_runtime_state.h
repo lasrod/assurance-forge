@@ -59,6 +59,8 @@ struct AppRuntimeState {
     bool tree_needs_rebuild = false;
     core::AssuranceTree current_tree;
     core::TreeDisplayOrder tree_display_order;
+    core::TreeEditIndex tree_edit_index;
+    bool tree_edit_index_valid = false;
     bool force_center_tab_selection = false;
     bool pending_focus_root = false;
     bool show_gsn_tab = true;

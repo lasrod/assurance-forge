@@ -651,6 +651,7 @@ void AppRuntime::RegisterAppEventListeners() {
         [this](const StatusMessageEvent& event) { impl_->app_state.status_message = event.message; });
     impl_->events.Subscribe<TreeDirtyEvent>([this](const TreeDirtyEvent& event) {
         impl_->tree_needs_rebuild = event.dirty;
+        impl_->tree_edit_index_valid = false;
         if (event.focus_root)
             impl_->pending_focus_root = true;
     });
@@ -795,8 +796,11 @@ core::TreeDropValidationResult AppRuntime::ValidateTreeDrop(const std::string& d
         return result;
     }
 
-    return core::ValidateTreeDrop(
-        impl_->app_state.loaded_case.value(), impl_->current_tree, dragged_id, target_id, drop_mode);
+    if (!impl_->tree_edit_index_valid) {
+        impl_->tree_edit_index = core::BuildTreeEditIndex(impl_->app_state.loaded_case.value());
+        impl_->tree_edit_index_valid = true;
+    }
+    return core::ValidateTreeDrop(impl_->tree_edit_index, impl_->current_tree, dragged_id, target_id, drop_mode);
 }
 
 bool AppRuntime::PerformTreeDrop(const std::string& dragged_id,
@@ -1387,6 +1391,8 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
 
     if (impl_->tree_needs_rebuild && !impl_->app_state.loaded_case.has_value()) {
         ui::RebuildRegisterViews(nullptr);
+        impl_->tree_edit_index = core::TreeEditIndex();
+        impl_->tree_edit_index_valid = false;
         impl_->tree_needs_rebuild = false;
         return;
     }
@@ -1398,6 +1404,8 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     const auto& ac = impl_->app_state.loaded_case.value();
     impl_->current_tree = ui::gsn::BuildAssuranceTree(ac);
     core::ApplyTreeDisplayOrder(impl_->current_tree, impl_->tree_display_order);
+    impl_->tree_edit_index = core::BuildTreeEditIndex(ac);
+    impl_->tree_edit_index_valid = true;
     ui::gsn::SetCanvasTree(impl_->current_tree);
     ui::RebuildRegisterViews(&ac);
     ui::GetUiState().model_has_translations = ui::ModelHasTranslations(ac);

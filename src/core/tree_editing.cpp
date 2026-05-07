@@ -20,14 +20,6 @@ const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const
     return nullptr;
 }
 
-parser::SacmElement* FindElement(parser::AssuranceCase& model, const std::string& id) {
-    for (parser::SacmElement& element : model.elements) {
-        if (element.id == id)
-            return &element;
-    }
-    return nullptr;
-}
-
 const TreeNode* FindTreeNode(const TreeNode* node, const std::string& id) {
     if (!node)
         return nullptr;
@@ -92,54 +84,11 @@ TreeRelationshipKind DetermineRelationshipKind(NodeRole parent_role, NodeRole ch
     return TreeRelationshipKind::None;
 }
 
-struct TreeEditIndex {
-    std::unordered_map<std::string, int> parent_counts;
-    std::unordered_map<std::string, std::vector<std::string>> graph_children;
-};
-
 void AddIndexedEdge(TreeEditIndex& index, const std::string& parent, const std::string& child) {
     if (parent.empty() || child.empty() || parent == child)
         return;
     ++index.parent_counts[child];
     index.graph_children[parent].push_back(child);
-}
-
-TreeEditIndex BuildTreeEditIndex(const parser::AssuranceCase& model) {
-    std::unordered_set<std::string> node_ids;
-    for (const parser::SacmElement& element : model.elements) {
-        if (!IsRelationshipType(element.type) && !element.id.empty())
-            node_ids.insert(element.id);
-    }
-
-    TreeEditIndex index;
-    for (const parser::SacmElement& relationship : model.elements) {
-        if (!IsRelationshipType(relationship.type))
-            continue;
-
-        for (const std::string& target : relationship.target_refs) {
-            if (node_ids.find(target) == node_ids.end())
-                continue;
-
-            if (relationship.type == "assertedinference") {
-                std::string attach_parent = target;
-                if (!relationship.reasoning_ref.empty() &&
-                    node_ids.find(relationship.reasoning_ref) != node_ids.end()) {
-                    AddIndexedEdge(index, target, relationship.reasoning_ref);
-                    attach_parent = relationship.reasoning_ref;
-                }
-                for (const std::string& source : relationship.source_refs) {
-                    if (node_ids.find(source) != node_ids.end())
-                        AddIndexedEdge(index, attach_parent, source);
-                }
-            } else {
-                for (const std::string& source : relationship.source_refs) {
-                    if (node_ids.find(source) != node_ids.end())
-                        AddIndexedEdge(index, target, source);
-                }
-            }
-        }
-    }
-    return index;
 }
 
 bool HasGraphPath(const TreeEditIndex& index, const std::string& from, const std::string& to) {
@@ -576,7 +525,44 @@ void ApplyDisplayOrderToChildren(TreeNode* node, const TreeDisplayOrder& display
 
 } // namespace
 
-TreeDropValidationResult ValidateTreeDrop(const parser::AssuranceCase& model,
+TreeEditIndex BuildTreeEditIndex(const parser::AssuranceCase& model) {
+    TreeEditIndex index;
+    for (const parser::SacmElement& element : model.elements) {
+        if (!IsRelationshipType(element.type) && !element.id.empty())
+            index.element_ids.insert(element.id);
+    }
+
+    for (const parser::SacmElement& relationship : model.elements) {
+        if (!IsRelationshipType(relationship.type))
+            continue;
+
+        for (const std::string& target : relationship.target_refs) {
+            if (index.element_ids.find(target) == index.element_ids.end())
+                continue;
+
+            if (relationship.type == "assertedinference") {
+                std::string attach_parent = target;
+                if (!relationship.reasoning_ref.empty() &&
+                    index.element_ids.find(relationship.reasoning_ref) != index.element_ids.end()) {
+                    AddIndexedEdge(index, target, relationship.reasoning_ref);
+                    attach_parent = relationship.reasoning_ref;
+                }
+                for (const std::string& source : relationship.source_refs) {
+                    if (index.element_ids.find(source) != index.element_ids.end())
+                        AddIndexedEdge(index, attach_parent, source);
+                }
+            } else {
+                for (const std::string& source : relationship.source_refs) {
+                    if (index.element_ids.find(source) != index.element_ids.end())
+                        AddIndexedEdge(index, target, source);
+                }
+            }
+        }
+    }
+    return index;
+}
+
+TreeDropValidationResult ValidateTreeDrop(const TreeEditIndex& index,
                                           const AssuranceTree& tree,
                                           const std::string& dragged_element_id,
                                           const std::string& target_element_id,
@@ -591,7 +577,8 @@ TreeDropValidationResult ValidateTreeDrop(const parser::AssuranceCase& model,
         result.reason = "Cannot move an element under itself.";
         return result;
     }
-    if (!FindElement(model, dragged_element_id) || !FindElement(model, target_element_id)) {
+    if (index.element_ids.find(dragged_element_id) == index.element_ids.end() ||
+        index.element_ids.find(target_element_id) == index.element_ids.end()) {
         result.reason = "Drop references an element that is not in the model.";
         return result;
     }
@@ -603,7 +590,6 @@ TreeDropValidationResult ValidateTreeDrop(const parser::AssuranceCase& model,
         return result;
     }
 
-    const TreeEditIndex index = BuildTreeEditIndex(model);
     if (index.parent_counts.count(dragged_element_id) == 0) {
         result.reason = "Root or orphan elements cannot be moved in the tree yet.";
         return result;
@@ -652,6 +638,14 @@ TreeDropValidationResult ValidateTreeDrop(const parser::AssuranceCase& model,
     result.relationship_kind = kind;
     result.changes_semantic_relationship = true;
     return result;
+}
+
+TreeDropValidationResult ValidateTreeDrop(const parser::AssuranceCase& model,
+                                          const AssuranceTree& tree,
+                                          const std::string& dragged_element_id,
+                                          const std::string& target_element_id,
+                                          TreeDropMode drop_mode) {
+    return ValidateTreeDrop(BuildTreeEditIndex(model), tree, dragged_element_id, target_element_id, drop_mode);
 }
 
 bool ReorderSiblings(parser::AssuranceCase& model,
