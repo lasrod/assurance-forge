@@ -50,7 +50,7 @@ Users work with assurance content, not diagram layout.
 
 ## 🗺️ Roadmap
 
-See docs/ROADMAP.md
+See the [Roadmap Workflow](docs/roadmap/workflow.md) documentation.
 
 ---
 

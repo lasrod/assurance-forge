@@ -337,7 +337,7 @@ def normalize_task_title(line: str) -> str:
 
 
 def parse_tasks(tasks_text: str) -> list[str]:
-    return [normalize_task_title(line) for line in tasks_text.splitlines() if normalize_task_title(line)]
+    return [t for t in (normalize_task_title(line) for line in tasks_text.splitlines()) if t]
 
 
 def extract_epic_title(issue_title: str, af_id: str = "") -> str:

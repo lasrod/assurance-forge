@@ -1,0 +1,28 @@
+name: Roadmap scripts tests
+
+on:
+  pull_request:
+    paths:
+      - '.github/scripts/**'
+
+permissions:
+  contents: read
+
+jobs:
+  test-roadmap-scripts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test dependencies
+        run: pip install pytest
+
+      - name: Run roadmap script tests
+        run: python -m pytest .github/scripts/tests/ -v
