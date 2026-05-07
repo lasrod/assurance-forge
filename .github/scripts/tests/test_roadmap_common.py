@@ -14,7 +14,7 @@ from roadmap_common import (  # noqa: E402
     completed_points,
     generate_tasks,
     has_generated_marker,
-    is_trusted_actor_association,
+    is_trusted_actor_permission,
     parse_issue_form,
     render_epic_body,
     validate_request,
@@ -133,10 +133,12 @@ class RoadmapCommonTests(unittest.TestCase):
         self.assertTrue(has_generated_marker("<!-- roadmap-automation: generated=true af_id=AF-E-0004 -->"))
         self.assertFalse(has_generated_marker("plain text"))
 
-    def test_trusted_actor_associations(self):
-        self.assertTrue(is_trusted_actor_association("OWNER"))
-        self.assertTrue(is_trusted_actor_association("collaborator"))
-        self.assertFalse(is_trusted_actor_association("CONTRIBUTOR"))
+    def test_trusted_actor_permissions(self):
+        self.assertTrue(is_trusted_actor_permission("admin"))
+        self.assertTrue(is_trusted_actor_permission("MAINTAIN"))
+        self.assertTrue(is_trusted_actor_permission("write"))
+        self.assertFalse(is_trusted_actor_permission("triage"))
+        self.assertFalse(is_trusted_actor_permission("read"))
 
     def test_area_label_mapping(self):
         self.assertEqual("area: build-ci", area_label("Build / CI"))

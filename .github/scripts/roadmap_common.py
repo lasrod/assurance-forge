@@ -54,7 +54,7 @@ ALLOWED_MATURITY = {"Candidate", "Planned", "Prototype 1", "Prototype 2", "Ready
 ALLOWED_SIZE_POINTS = {"1", "2", "3", "5", "8", "13", "21"}
 ALLOWED_PRIORITY = {"Critical", "High", "Medium", "Low", "Later"}
 ALLOWED_PUBLIC_ROADMAP = {"Now", "Next", "Later", "Not public yet"}
-TRUSTED_ACTOR_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
+TRUSTED_ACTOR_PERMISSIONS = {"admin", "maintain", "write"}
 
 AREA_LABELS = {
     "Storage": "area: storage",
@@ -221,6 +221,18 @@ class GitHubClient:
 
     def get_issue(self, issue_number: int) -> dict[str, Any]:
         return self.request("GET", f"/repos/{self.repo}/issues/{issue_number}")
+
+    def get_actor_permission(self, username: str) -> str:
+        if not username:
+            return "none"
+        encoded = urllib.parse.quote(username, safe="")
+        try:
+            data = self.request("GET", f"/repos/{self.repo}/collaborators/{encoded}/permission")
+        except GitHubApiError as error:
+            if error.status == 404:
+                return "none"
+            raise
+        return str(data.get("permission") or "none").lower()
 
     def update_issue(self, issue_number: int, title: str | None = None, body: str | None = None,
                      labels: list[str] | None = None) -> dict[str, Any]:
@@ -424,8 +436,8 @@ def validate_request(request: RoadmapRequest, require_af_id: bool) -> Validation
     return ValidationResult(errors)
 
 
-def is_trusted_actor_association(association: str) -> bool:
-    return association.upper() in TRUSTED_ACTOR_ASSOCIATIONS
+def is_trusted_actor_permission(permission: str) -> bool:
+    return permission.lower() in TRUSTED_ACTOR_PERMISSIONS
 
 
 def generated_marker_for(af_id: str) -> str:
