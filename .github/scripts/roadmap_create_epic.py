@@ -27,6 +27,15 @@ from roadmap_common import (
     validate_request,
 )
 
+def print_failure(message: str) -> None:
+    print(message, file=sys.stderr)
+
+
+def print_warnings(prefix: str, warnings: list[str]) -> None:
+    print_failure(prefix)
+    for warning in warnings:
+        print_failure(f"- {warning}")
+
 
 def fail_for_untrusted_actor(client: GitHubClient, issue_number: int, actor: str, permission: str) -> int:
     message = (
@@ -104,6 +113,7 @@ def retry_generated_followup(client: GitHubClient, issue: dict, issue_number: in
     warnings = link_missing_sub_issues(client, issue_number, resolved_tasks)
     warnings.extend(update_project_items(client, roadmap_token, project_owner, project_number, request, issue, resolved_tasks))
     if warnings:
+        print_warnings("Roadmap follow-up retry failed:", warnings)
         client.add_labels(issue_number, ["roadmap-failed"])
         client.remove_label(issue_number, "roadmap-approved")
         warning_text = "\n".join(f"- {warning}" for warning in warnings)
@@ -163,6 +173,7 @@ def main() -> int:
         client.add_labels(issue_number, ["roadmap-failed", "needs-roadmap-review"])
         client.remove_label(issue_number, "roadmap-approved")
         errors = "\n".join(f"- {error}" for error in validation.errors)
+        print_failure("Roadmap generation failed validation:\n" + errors)
         client.create_comment(issue_number, f"Roadmap generation failed validation:\n\n{errors}")
         return 1
 
@@ -193,6 +204,7 @@ def main() -> int:
 
     warnings.extend(update_project_items(client, roadmap_token, project_owner, project_number, request, epic_issue, resolved_tasks))
     if warnings:
+        print_warnings("Roadmap follow-up automation failed:", warnings)
         client.add_labels(issue_number, ["roadmap-failed"])
         client.remove_label(issue_number, "roadmap-approved")
         warning_text = "\n".join(f"- {warning}" for warning in warnings)

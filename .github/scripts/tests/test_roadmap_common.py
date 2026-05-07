@@ -7,6 +7,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 
 from roadmap_common import (  # noqa: E402
     GeneratedTask,
+    GitHubApiError,
     RoadmapRequest,
     area_label,
     build_request_from_issue,
@@ -17,6 +18,7 @@ from roadmap_common import (  # noqa: E402
     is_trusted_actor_permission,
     parse_issue_form,
     render_epic_body,
+    resolve_project_id,
     validate_request,
 )
 
@@ -81,6 +83,19 @@ def request(**overrides):
     return RoadmapRequest(**values)
 
 
+class FakeGraphQLClient:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.queries = []
+
+    def graphql(self, query, variables, token=None):
+        self.queries.append(query)
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+
 class RoadmapCommonTests(unittest.TestCase):
     def test_parse_issue_form(self):
         fields = parse_issue_form(ISSUE_BODY.replace("\n", "\r\n"))
@@ -139,6 +154,23 @@ class RoadmapCommonTests(unittest.TestCase):
         self.assertTrue(is_trusted_actor_permission("write"))
         self.assertFalse(is_trusted_actor_permission("triage"))
         self.assertFalse(is_trusted_actor_permission("read"))
+
+    def test_resolve_project_id_uses_user_project_without_org_lookup(self):
+        client = FakeGraphQLClient([{"user": {"projectV2": {"id": "PVT_user"}}}])
+
+        self.assertEqual("PVT_user", resolve_project_id(client, "lasrod", "2", "token"))
+        self.assertEqual(1, len(client.queries))
+        self.assertIn("user(login: $owner)", client.queries[0])
+
+    def test_resolve_project_id_falls_back_to_org_project(self):
+        client = FakeGraphQLClient([
+            GitHubApiError(400, "Could not resolve to a User with the login of 'example-org'."),
+            {"organization": {"projectV2": {"id": "PVT_org"}}},
+        ])
+
+        self.assertEqual("PVT_org", resolve_project_id(client, "example-org", "2", "token"))
+        self.assertEqual(2, len(client.queries))
+        self.assertIn("organization(login: $owner)", client.queries[1])
 
     def test_area_label_mapping(self):
         self.assertEqual("area: build-ci", area_label("Build / CI"))
