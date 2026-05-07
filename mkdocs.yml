@@ -49,6 +49,8 @@ extra_javascript:
 
 nav:
   - Home: index.md
+  - Roadmap:
+      - Workflow: roadmap/workflow.md
   - Architecture:
       - Overview: architecture/index.md
       - Runtime and State: architecture/runtime-state.md

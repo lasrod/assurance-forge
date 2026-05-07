@@ -1,0 +1,97 @@
+# Roadmap Workflow
+
+Assurance Forge uses GitHub Discussions for early ideas, GitHub Issues for roadmap epics and implementation tasks, GitHub Projects for planning fields, and MkDocs for public documentation.
+
+Anyone may submit a roadmap request. A maintainer must approve the request before automation creates an epic, subtasks, sub-issue links, or Project entries.
+
+## Contributor Flow
+
+1. Open a new issue.
+2. Select **Roadmap Epic Request**.
+3. Fill in the roadmap form.
+4. Submit the issue.
+5. Wait for maintainer review.
+
+Opening the request only triggers validation. It does not create subtasks or add anything to the roadmap Project.
+
+## Maintainer Flow
+
+1. Review the roadmap request.
+2. Edit the request if scope, tasks, or metadata need adjustment.
+3. Confirm the `AF-E-xxxx` epic ID.
+4. Apply the `roadmap-approved` label.
+5. Review the generated epic body, generated task issues, sub-issue links, and Project fields.
+
+Only repository owners, members, and collaborators may trigger generation. If an untrusted actor applies `roadmap-approved`, the automation stops, comments on the issue, removes the approval label where possible, and applies `roadmap-failed`.
+
+## Labels
+
+The request form applies these labels when they already exist:
+
+- `roadmap-request`
+- `needs-roadmap-review`
+
+The automation also ensures the roadmap labels exist before it uses them. The issue form never applies `roadmap-approved`; that label is reserved for maintainer approval.
+
+Generated epics receive:
+
+- `type: epic`
+- `roadmap-generated`
+- the matching `area:*` label
+
+Generated tasks receive:
+
+- `type: task`
+- `roadmap-generated`
+- the matching `area:*` label
+
+## Maturity And Points
+
+Roadmap requests use these maturity stages:
+
+| Maturity | Meaning |
+|---|---|
+| Candidate | Worth considering; needs scope, risks, and estimate. |
+| Planned | Accepted into the roadmap. |
+| Prototype 1 | Minimal working version that proves the concept. |
+| Prototype 2 | Integrated version using real architecture, persistence, and UI patterns. |
+| Ready | Documented, tested, stable, and suitable for normal use. |
+| Deferred | Valid idea, but not planned now. |
+
+Size Points estimate total effort. Completed Points are calculated from maturity:
+
+| Maturity | Completion |
+|---|---:|
+| Candidate / Planned / Deferred | 0% |
+| Prototype 1 | 30% |
+| Prototype 2 | 70% |
+| Ready | 100% |
+
+## Project Setup
+
+Create a GitHub Project named **Assurance Forge Roadmap** and store its number in the repository variable `ROADMAP_PROJECT_NUMBER`.
+
+Recommended Project fields:
+
+| Field | Type |
+|---|---|
+| AF ID | Text |
+| Area | Single select |
+| Maturity | Single select |
+| Size Points | Number |
+| Completed Points | Number |
+| Priority | Single select |
+| Target Release | Text or single select |
+| Public Roadmap | Single select |
+| Discussion URL | Text |
+| Automation Status | Single select |
+
+Use the built-in `GITHUB_TOKEN` for issue operations. Add a `ROADMAP_TOKEN` secret only if the default token cannot update the GitHub Project. That token should have the narrowest repository and Project permissions possible.
+
+## Failure Recovery
+
+The generation workflow is idempotent. It checks for the generated epic marker and existing generated task titles before creating issues.
+
+If sub-issue linking or Project updates fail, the automation keeps created issues, adds `roadmap-failed`, and comments with the failure. Fix the configuration or permissions, then rerun by removing and reapplying `roadmap-approved`.
+
+The old roadmap document was intentionally removed because new roadmap content will be created separately.
