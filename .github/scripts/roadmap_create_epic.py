@@ -172,13 +172,7 @@ def main() -> int:
     print(f"Roadmap approval actor `{actor}` has repository permission `{actor_permission}`.")
 
     if has_generated_marker(issue.get("body") or ""):
-        if "roadmap-failed" in issue_labels(issue):
-            return retry_generated_followup(client, issue, issue_number, roadmap_token, project_owner, project_number)
-        client.create_comment(
-            issue_number,
-            "Roadmap automation has already generated this epic structure. No duplicate tasks were created.",
-        )
-        return 0
+        return retry_generated_followup(client, issue, issue_number, roadmap_token, project_owner, project_number)
 
     request = build_request_from_issue(issue)
     validation = validate_request(request, require_af_id=True)
