@@ -94,6 +94,19 @@ LABEL_DEFINITIONS = {
     "area: other": {"color": "bfdadc", "description": "Other roadmap area"},
 }
 
+PROJECT_FIELD_DEFINITIONS = {
+    "AF ID": {"type": "Text", "data_type": "TEXT"},
+    "Area": {"type": "Single select", "options": sorted(ALLOWED_AREAS)},
+    "Maturity": {"type": "Single select", "options": sorted(ALLOWED_MATURITY)},
+    "Size Points": {"type": "Number", "data_type": "NUMBER"},
+    "Completed Points": {"type": "Number", "data_type": "NUMBER"},
+    "Priority": {"type": "Single select", "options": sorted(ALLOWED_PRIORITY)},
+    "Target Release": {"type": "Text or single select"},
+    "Public Roadmap": {"type": "Single select", "options": sorted(ALLOWED_PUBLIC_ROADMAP)},
+    "Discussion URL": {"type": "Text", "data_type": "TEXT"},
+    "Automation Status": {"type": "Single select", "options": ["Generated"]},
+}
+
 
 @dataclasses.dataclass(frozen=True)
 class RoadmapRequest:
@@ -689,6 +702,7 @@ def project_fields(client: GitHubClient, project_id: str, token: str) -> dict[st
             nodes {
               __typename
               ... on ProjectV2FieldCommon { id name }
+              ... on ProjectV2Field { id name dataType }
               ... on ProjectV2SingleSelectField { id name options { id name } }
             }
           }
@@ -740,12 +754,48 @@ def update_project_field(client: GitHubClient, project_id: str, item_id: str, fi
     )
 
 
+def project_field_setup_warning(name: str, field: dict[str, Any] | None, value: Any) -> str:
+    definition = PROJECT_FIELD_DEFINITIONS.get(name, {"type": "Text"})
+    expected_type = definition["type"]
+    if not field:
+        options = definition.get("options")
+        option_text = f" with options: {', '.join(options)}" if options else ""
+        return f"Project field `{name}` is missing. Create a {expected_type} field named exactly `{name}`{option_text}."
+
+    field_type = field.get("__typename")
+    if expected_type == "Single select" and field_type != "ProjectV2SingleSelectField":
+        options = definition.get("options", [])
+        return (
+            f"Project field `{name}` should be a Single select field with options: {', '.join(options)}. "
+            f"Current field type is {field_type or 'unknown'}."
+        )
+    expected_data_type = definition.get("data_type")
+    actual_data_type = field.get("dataType")
+    if expected_data_type and actual_data_type and actual_data_type != expected_data_type:
+        return (
+            f"Project field `{name}` should be a {expected_type} field. "
+            f"Current Project data type is {actual_data_type}."
+        )
+    if field_type == "ProjectV2SingleSelectField" and value not in {None, ""}:
+        option = next((option for option in field.get("options", []) if option.get("name") == value), None)
+        if not option:
+            return f"Project field `{name}` has no option named `{value}`. Add that option to the single-select field."
+    return ""
+
+
 def set_project_fields(client: GitHubClient, project_id: str, item_id: str, fields: dict[str, dict[str, Any]],
-                       values: dict[str, Any], token: str) -> None:
+                       values: dict[str, Any], token: str) -> list[str]:
+    warnings: list[str] = []
     for name, value in values.items():
         field = fields.get(name)
-        if field:
-            update_project_field(client, project_id, item_id, field, value, token)
+        warning = project_field_setup_warning(name, field, value)
+        if warning:
+            warnings.append(warning)
+            continue
+        if value in {None, ""}:
+            continue
+        update_project_field(client, project_id, item_id, field, value, token)
+    return warnings
 
 
 def project_values_for_request(request: RoadmapRequest, af_id: str, include_points: bool) -> dict[str, Any]:
