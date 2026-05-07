@@ -4,6 +4,7 @@
 #include "core/element_factory.h"
 #include "core/project_model.h"
 #include "core/reviews/review_item.h"
+#include "core/tree_editing.h"
 
 #include <string>
 #include <vector>
@@ -39,6 +40,9 @@ public:
     // planned removal targets more than one element, opens the confirmation
     // modal (with canvas highlight + fit-to-view) instead of removing.
     void RemoveSelected(core::RemoveMode mode);
+    core::TreeDropValidationResult
+    ValidateTreeDrop(const std::string& dragged_id, const std::string& target_id, core::TreeDropMode drop_mode) const;
+    bool PerformTreeDrop(const std::string& dragged_id, const std::string& target_id, core::TreeDropMode drop_mode);
 
     // Set a transient status message (shown next frame in the SACM viewer panel).
     void SetStatus(const std::string& message);
