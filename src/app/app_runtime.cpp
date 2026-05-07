@@ -651,6 +651,7 @@ void AppRuntime::RegisterAppEventListeners() {
         [this](const StatusMessageEvent& event) { impl_->app_state.status_message = event.message; });
     impl_->events.Subscribe<TreeDirtyEvent>([this](const TreeDirtyEvent& event) {
         impl_->tree_needs_rebuild = event.dirty;
+        impl_->tree_edit_index_valid = false;
         if (event.focus_root)
             impl_->pending_focus_root = true;
     });
@@ -784,6 +785,60 @@ void AppRuntime::RemoveSelected(core::RemoveMode mode) {
         s.marked_for_removal = {pending_ids.begin(), pending_ids.end()};
         s.center_on_marked = true;
     }
+}
+
+core::TreeDropValidationResult AppRuntime::ValidateTreeDrop(const std::string& dragged_id,
+                                                            const std::string& target_id,
+                                                            core::TreeDropMode drop_mode) const {
+    if (!impl_->app_state.loaded_case.has_value()) {
+        core::TreeDropValidationResult result;
+        result.reason = "No assurance case loaded.";
+        return result;
+    }
+
+    if (!impl_->tree_edit_index_valid) {
+        impl_->tree_edit_index = core::BuildTreeEditIndex(impl_->app_state.loaded_case.value());
+        impl_->tree_edit_index_valid = true;
+    }
+    return core::ValidateTreeDrop(impl_->tree_edit_index, impl_->current_tree, dragged_id, target_id, drop_mode);
+}
+
+bool AppRuntime::PerformTreeDrop(const std::string& dragged_id,
+                                 const std::string& target_id,
+                                 core::TreeDropMode drop_mode) {
+    if (!impl_->app_state.loaded_case.has_value()) {
+        SetStatus("No assurance case loaded.");
+        return false;
+    }
+
+    parser::AssuranceCase& model = impl_->app_state.loaded_case.value();
+    sacm::AssuranceCasePackage* package =
+        impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
+
+    std::string error;
+    bool changed = false;
+    if (drop_mode == core::TreeDropMode::Before || drop_mode == core::TreeDropMode::After) {
+        changed = core::ReorderSiblings(model,
+                                        package,
+                                        impl_->current_tree,
+                                        impl_->tree_display_order,
+                                        core::ReorderSiblingsCommand{dragged_id, target_id, drop_mode},
+                                        error);
+    } else {
+        changed = core::MoveSubtree(
+            model, package, impl_->current_tree, core::MoveSubtreeCommand{dragged_id, target_id}, error);
+    }
+
+    if (!changed) {
+        SetStatus("Tree move failed: " + error);
+        return false;
+    }
+
+    impl_->events.Emit(TreeDirtyEvent{});
+    impl_->events.Emit(SelectionChangedEvent{dragged_id, true});
+    impl_->events.Emit(DocumentDirtyEvent{});
+    SetStatus(drop_mode == core::TreeDropMode::AsChild ? "Moved " + dragged_id : "Reordered " + dragged_id);
+    return true;
 }
 
 void AppRuntime::SetStatus(const std::string& message) {
@@ -1336,6 +1391,8 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
 
     if (impl_->tree_needs_rebuild && !impl_->app_state.loaded_case.has_value()) {
         ui::RebuildRegisterViews(nullptr);
+        impl_->tree_edit_index = core::TreeEditIndex();
+        impl_->tree_edit_index_valid = false;
         impl_->tree_needs_rebuild = false;
         return;
     }
@@ -1346,6 +1403,9 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
 
     const auto& ac = impl_->app_state.loaded_case.value();
     impl_->current_tree = ui::gsn::BuildAssuranceTree(ac);
+    core::ApplyTreeDisplayOrder(impl_->current_tree, impl_->tree_display_order);
+    impl_->tree_edit_index = core::BuildTreeEditIndex(ac);
+    impl_->tree_edit_index_valid = true;
     ui::gsn::SetCanvasTree(impl_->current_tree);
     ui::RebuildRegisterViews(&ac);
     ui::GetUiState().model_has_translations = ui::ModelHasTranslations(ac);
@@ -1606,9 +1666,19 @@ void AppRuntime::RenderTreePanel(float left_w, float safety_tree_h, float top_y)
     } else {
         actions = MakeElementContextActions(*this);
     }
+    ui::TreeEditActions tree_edit_actions{
+        [this](const std::string& dragged_id, const std::string& target_id, core::TreeDropMode drop_mode) {
+            return ValidateTreeDrop(dragged_id, target_id, drop_mode);
+        },
+        [this](const std::string& dragged_id, const std::string& target_id, core::TreeDropMode drop_mode) {
+            return PerformTreeDrop(dragged_id, target_id, drop_mode);
+        },
+    };
     const parser::AssuranceCase* visible_case =
         impl_->IsProposalCanvasActive() ? &impl_->proposal_controller->preview_model : GetLoadedCase();
-    ui::ShowTreeViewPanel(impl_->current_tree.root ? &impl_->current_tree : nullptr, visible_case, ui_state, actions);
+    const ui::TreeEditActions* edit_actions = impl_->IsProposalCanvasActive() ? nullptr : &tree_edit_actions;
+    ui::ShowTreeViewPanel(
+        impl_->current_tree.root ? &impl_->current_tree : nullptr, visible_case, ui_state, actions, edit_actions);
     ImGui::End();
 }
 

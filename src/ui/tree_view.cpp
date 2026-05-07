@@ -4,6 +4,8 @@
 
 #include "imgui.h"
 
+#include <algorithm>
+#include <cstring>
 #include <string>
 
 namespace ui {
@@ -56,10 +58,44 @@ static std::string ShortName(const core::TreeNode* node) {
     return label;
 }
 
+static core::TreeDropMode DetectDropMode(const ImVec2& item_min, const ImVec2& item_size) {
+    const float mouse_y = ImGui::GetMousePos().y;
+    const float relative_y = item_size.y > 0.0f ? (mouse_y - item_min.y) / item_size.y : 0.5f;
+    if (relative_y < 0.25f)
+        return core::TreeDropMode::Before;
+    if (relative_y > 0.75f)
+        return core::TreeDropMode::After;
+    return core::TreeDropMode::AsChild;
+}
+
+static void
+DrawDropFeedback(const ImVec2& item_min, const ImVec2& item_max, core::TreeDropMode drop_mode, const ImU32 color) {
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    if (drop_mode == core::TreeDropMode::AsChild) {
+        draw_list->AddRectFilled(item_min, item_max, ImGui::ColorConvertFloat4ToU32(ImVec4(0.35f, 0.55f, 1.0f, 0.18f)));
+        draw_list->AddRect(item_min, item_max, color, 0.0f, 0, 1.5f);
+        return;
+    }
+
+    const float y = drop_mode == core::TreeDropMode::Before ? item_min.y : item_max.y;
+    draw_list->AddLine(ImVec2(item_min.x, y), ImVec2(item_max.x, y), color, 2.0f);
+}
+
+static std::string PayloadElementId(const ImGuiPayload* payload) {
+    if (!payload || !payload->Data || payload->DataSize <= 0)
+        return {};
+    const char* begin = static_cast<const char*>(payload->Data);
+    const char* end = static_cast<const char*>(std::memchr(begin, '\0', static_cast<size_t>(payload->DataSize)));
+    if (!end)
+        end = begin + payload->DataSize;
+    return std::string(begin, end);
+}
+
 static void RenderTreeNode(const core::TreeNode* node,
                            const parser::AssuranceCase* active_case,
                            UiState& state,
-                           const ElementContextActions& actions) {
+                           const ElementContextActions& actions,
+                           const TreeEditActions* tree_edit_actions) {
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick |
                                ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen;
 
@@ -79,7 +115,37 @@ static void RenderTreeNode(const core::TreeNode* node,
 
     // Capture item rect before BeginPopupContextItem advances the last item.
     ImVec2 item_min = ImGui::GetItemRectMin();
+    ImVec2 item_max = ImGui::GetItemRectMax();
     ImVec2 item_size = ImGui::GetItemRectSize();
+
+    if (tree_edit_actions && tree_edit_actions->enabled()) {
+        if (ImGui::BeginDragDropSource()) {
+            ImGui::SetDragDropPayload(core::AF_TREE_NODE_PAYLOAD, node->id.c_str(), node->id.size() + 1);
+            ImGui::TextUnformatted(ShortName(node).c_str());
+            ImGui::EndDragDropSource();
+        }
+
+        if (ImGui::BeginDragDropTarget()) {
+            const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(core::AF_TREE_NODE_PAYLOAD,
+                                                                       ImGuiDragDropFlags_AcceptBeforeDelivery |
+                                                                           ImGuiDragDropFlags_AcceptNoDrawDefaultRect);
+            const std::string dragged_id = PayloadElementId(payload);
+            if (!dragged_id.empty()) {
+                const core::TreeDropMode drop_mode = DetectDropMode(item_min, item_size);
+                core::TreeDropValidationResult validation =
+                    tree_edit_actions->validate_drop(dragged_id, node->id, drop_mode);
+                if (validation.allowed) {
+                    DrawDropFeedback(item_min, item_max, drop_mode, ImGui::GetColorU32(ImGuiCol_DragDropTarget));
+                    if (payload->IsDelivery()) {
+                        tree_edit_actions->perform_drop(dragged_id, node->id, drop_mode);
+                    }
+                } else if (!validation.reason.empty()) {
+                    ImGui::SetTooltip("%s", validation.reason.c_str());
+                }
+            }
+            ImGui::EndDragDropTarget();
+        }
+    }
 
     bool popup_open = ImGui::BeginPopupContextItem(node->id.c_str());
 
@@ -122,11 +188,11 @@ static void RenderTreeNode(const core::TreeNode* node,
     if (has_children && open) {
         // Group1 children (structural)
         for (const auto* child : node->group1_children) {
-            RenderTreeNode(child, active_case, state, actions);
+            RenderTreeNode(child, active_case, state, actions, tree_edit_actions);
         }
         // Group2 attachments (contextual)
         for (const auto* attachment : node->group2_attachments) {
-            RenderTreeNode(attachment, active_case, state, actions);
+            RenderTreeNode(attachment, active_case, state, actions, tree_edit_actions);
         }
         ImGui::TreePop();
     }
@@ -135,21 +201,22 @@ static void RenderTreeNode(const core::TreeNode* node,
 void ShowTreeViewPanel(const core::AssuranceTree* tree,
                        const parser::AssuranceCase* active_case,
                        UiState& state,
-                       const ElementContextActions& actions) {
+                       const ElementContextActions& actions,
+                       const TreeEditActions* tree_edit_actions) {
     if (!tree || !tree->root) {
         ImGui::TextDisabled("No safety case loaded.");
         return;
     }
 
     if (ImGui::BeginChild("TreeViewScroll", ImVec2(0, 0), false)) {
-        RenderTreeNode(tree->root, active_case, state, actions);
+        RenderTreeNode(tree->root, active_case, state, actions, tree_edit_actions);
 
         // Show orphan nodes if any
         if (!tree->orphans.empty()) {
             ImGui::Separator();
             if (ImGui::TreeNodeEx("##orphans", ImGuiTreeNodeFlags_None, "Orphans (%d)", (int)tree->orphans.size())) {
                 for (const auto* orphan : tree->orphans) {
-                    RenderTreeNode(orphan, active_case, state, actions);
+                    RenderTreeNode(orphan, active_case, state, actions, tree_edit_actions);
                 }
                 ImGui::TreePop();
             }

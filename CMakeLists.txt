@@ -198,6 +198,7 @@ set(ASSURANCE_FORGE_SHARED_SOURCES
     src/core/app_state.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
+    src/core/tree_editing.cpp
     src/core/problems/problem_attention.cpp
     src/core/problems/problem_item.cpp
     src/core/problems/problems_manager.cpp
@@ -276,6 +277,7 @@ add_executable(tests
     tests/test_review_proposal_patch_service.cpp
     tests/test_sacm_roundtrip.cpp
     tests/test_element_factory.cpp
+    tests/test_tree_editing.cpp
     tests/test_project_service.cpp
     tests/test_project_controller.cpp
     tests/test_proposal_controller.cpp
@@ -319,6 +321,7 @@ add_executable(tests
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
+    src/core/tree_editing.cpp
     src/core/problems/problem_attention.cpp
     src/core/problems/problem_item.cpp
     src/core/problems/problems_manager.cpp
