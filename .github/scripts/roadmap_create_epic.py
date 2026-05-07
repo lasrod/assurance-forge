@@ -27,6 +27,7 @@ from roadmap_common import (
     validate_request,
 )
 
+
 def print_failure(message: str) -> None:
     print(message, file=sys.stderr)
 
@@ -35,6 +36,12 @@ def print_warnings(prefix: str, warnings: list[str]) -> None:
     print_failure(prefix)
     for warning in warnings:
         print_failure(f"- {warning}")
+
+
+def append_unique_warnings(warnings: list[str], new_warnings: list[str]) -> None:
+    for warning in new_warnings:
+        if warning not in warnings:
+            warnings.append(warning)
 
 
 def fail_for_untrusted_actor(client: GitHubClient, issue_number: int, actor: str, permission: str) -> int:
@@ -59,25 +66,31 @@ def update_project_items(client: GitHubClient, token: str, owner: str, number: s
         project_id = resolve_project_id(client, owner, number, token)
         fields = project_fields(client, project_id, token)
         epic_item_id = add_project_item(client, project_id, epic_issue["node_id"], token)
-        set_project_fields(
-            client,
-            project_id,
-            epic_item_id,
-            fields,
-            project_values_for_request(request, request.af_id, include_points=True),
-            token,
+        append_unique_warnings(
+            warnings,
+            set_project_fields(
+                client,
+                project_id,
+                epic_item_id,
+                fields,
+                project_values_for_request(request, request.af_id, include_points=True),
+                token,
+            ),
         )
         for task in task_issues:
             if not task.node_id:
                 continue
             item_id = add_project_item(client, project_id, task.node_id, token)
-            set_project_fields(
-                client,
-                project_id,
-                item_id,
-                fields,
-                project_values_for_request(request, task.task_id, include_points=False),
-                token,
+            append_unique_warnings(
+                warnings,
+                set_project_fields(
+                    client,
+                    project_id,
+                    item_id,
+                    fields,
+                    project_values_for_request(request, task.task_id, include_points=False),
+                    token,
+                ),
             )
     except (GitHubApiError, ValueError) as error:
         warnings.append(f"Project update failed: {error}")

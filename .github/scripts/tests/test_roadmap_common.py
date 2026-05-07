@@ -19,6 +19,7 @@ from roadmap_common import (  # noqa: E402
     parse_issue_form,
     render_epic_body,
     resolve_project_id,
+    set_project_fields,
     validate_request,
 )
 
@@ -171,6 +172,120 @@ class RoadmapCommonTests(unittest.TestCase):
         self.assertEqual("PVT_org", resolve_project_id(client, "example-org", "2", "token"))
         self.assertEqual(2, len(client.queries))
         self.assertIn("organization(login: $owner)", client.queries[1])
+
+    def test_set_project_fields_warns_about_missing_fields(self):
+        client = FakeGraphQLClient([
+            {"updateProjectV2ItemFieldValue": {"projectV2Item": {"id": "item"}}},
+            {"updateProjectV2ItemFieldValue": {"projectV2Item": {"id": "item"}}},
+        ])
+        fields = {
+            "AF ID": {"id": "field_af", "name": "AF ID", "__typename": "ProjectV2Field", "dataType": "TEXT"},
+            "Automation Status": {
+                "id": "field_status",
+                "name": "Automation Status",
+                "__typename": "ProjectV2SingleSelectField",
+                "options": [{"id": "generated", "name": "Generated"}],
+            },
+        }
+
+        warnings = set_project_fields(
+            client,
+            "project",
+            "item",
+            fields,
+            {"AF ID": "AF-E-0004", "Discussion URL": "https://example.com", "Automation Status": "Generated"},
+            "token",
+        )
+
+        self.assertEqual(2, len(client.queries))
+        self.assertEqual(1, len(warnings))
+        self.assertIn("Project field `Discussion URL` is missing", warnings[0])
+
+    def test_set_project_fields_warns_about_missing_single_select_option(self):
+        client = FakeGraphQLClient([])
+        fields = {
+            "Automation Status": {
+                "id": "field_status",
+                "name": "Automation Status",
+                "__typename": "ProjectV2SingleSelectField",
+                "options": [],
+            },
+        }
+
+        warnings = set_project_fields(
+            client,
+            "project",
+            "item",
+            fields,
+            {"Automation Status": "Generated"},
+            "token",
+        )
+
+        self.assertEqual([], client.queries)
+        self.assertEqual(
+            ["Project field `Automation Status` has no option named `Generated`. Add that option to the single-select field."],
+            warnings,
+        )
+
+    def test_set_project_fields_warns_when_text_or_number_field_is_single_select(self):
+        client = FakeGraphQLClient([])
+        fields = {
+            "Discussion URL": {
+                "id": "field_discussion",
+                "name": "Discussion URL",
+                "__typename": "ProjectV2SingleSelectField",
+                "options": [{"id": "discussion", "name": "https://example.com"}],
+            },
+            "Size Points": {
+                "id": "field_size",
+                "name": "Size Points",
+                "__typename": "ProjectV2SingleSelectField",
+                "options": [{"id": "size", "name": "1.0"}],
+            },
+        }
+
+        warnings = set_project_fields(
+            client,
+            "project",
+            "item",
+            fields,
+            {"Discussion URL": "https://example.com", "Size Points": 1.0},
+            "token",
+        )
+
+        self.assertEqual([], client.queries)
+        self.assertEqual(
+            [
+                "Project field `Discussion URL` should be a Text field. Current field type is Single select.",
+                "Project field `Size Points` should be a Number field. Current field type is Single select.",
+            ],
+            warnings,
+        )
+
+    def test_set_project_fields_allows_target_release_single_select(self):
+        client = FakeGraphQLClient([
+            {"updateProjectV2ItemFieldValue": {"projectV2Item": {"id": "item"}}},
+        ])
+        fields = {
+            "Target Release": {
+                "id": "field_release",
+                "name": "Target Release",
+                "__typename": "ProjectV2SingleSelectField",
+                "options": [{"id": "v02", "name": "v0.2"}],
+            },
+        }
+
+        warnings = set_project_fields(
+            client,
+            "project",
+            "item",
+            fields,
+            {"Target Release": "v0.2"},
+            "token",
+        )
+
+        self.assertEqual([], warnings)
+        self.assertEqual(1, len(client.queries))
 
     def test_area_label_mapping(self):
         self.assertEqual("area: build-ci", area_label("Build / CI"))

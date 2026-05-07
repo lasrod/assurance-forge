@@ -71,7 +71,7 @@ Size Points estimate total effort. Completed Points are calculated from maturity
 
 Create a GitHub Project named **Assurance Forge Roadmap** and store its number in the repository variable `ROADMAP_PROJECT_NUMBER`.
 
-Recommended Project fields:
+Required Project fields when `ROADMAP_PROJECT_NUMBER` is configured:
 
 | Field | Type |
 |---|---|
@@ -85,6 +85,8 @@ Recommended Project fields:
 | Public Roadmap | Single select |
 | Discussion URL | Text |
 | Automation Status | Single select |
+
+Project field names and single-select options must match exactly. If a field is missing or a single-select option does not exist, the automation comments on the issue, applies `roadmap-failed`, and prints the missing Project setup details in the Actions log.
 
 Use the built-in `GITHUB_TOKEN` for issue operations. Add a `ROADMAP_TOKEN` secret only if the default token cannot update the GitHub Project. That token should have the narrowest repository and Project permissions possible.
 
