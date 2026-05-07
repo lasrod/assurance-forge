@@ -815,6 +815,7 @@ bool AppRuntime::PerformTreeDrop(const std::string& dragged_id,
     bool changed = false;
     if (drop_mode == core::TreeDropMode::Before || drop_mode == core::TreeDropMode::After) {
         changed = core::ReorderSiblings(model,
+                                        package,
                                         impl_->current_tree,
                                         impl_->tree_display_order,
                                         core::ReorderSiblingsCommand{dragged_id, target_id, drop_mode},

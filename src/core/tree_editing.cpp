@@ -212,6 +212,11 @@ struct IncomingRelationship {
     bool child_is_reasoning = false;
 };
 
+struct ConstIncomingRelationship {
+    const parser::SacmElement* relationship = nullptr;
+    bool child_is_reasoning = false;
+};
+
 IncomingRelationship
 FindIncomingRelationship(parser::AssuranceCase& model, const std::string& parent_id, const std::string& child_id) {
     for (parser::SacmElement& relationship : model.elements) {
@@ -233,6 +238,169 @@ FindIncomingRelationship(parser::AssuranceCase& model, const std::string& parent
         }
     }
     return {};
+}
+
+ConstIncomingRelationship FindIncomingRelationship(const parser::AssuranceCase& model,
+                                                   const std::string& parent_id,
+                                                   const std::string& child_id) {
+    for (const parser::SacmElement& relationship : model.elements) {
+        if (!IsRelationshipType(relationship.type))
+            continue;
+
+        if (relationship.type == "assertedinference") {
+            if (relationship.reasoning_ref == child_id && ContainsValue(relationship.target_refs, parent_id))
+                return ConstIncomingRelationship{&relationship, true};
+            if (relationship.reasoning_ref == parent_id && ContainsValue(relationship.source_refs, child_id))
+                return ConstIncomingRelationship{&relationship, false};
+            if (relationship.reasoning_ref.empty() && ContainsValue(relationship.target_refs, parent_id) &&
+                ContainsValue(relationship.source_refs, child_id)) {
+                return ConstIncomingRelationship{&relationship, false};
+            }
+        } else if (ContainsValue(relationship.target_refs, parent_id) &&
+                   ContainsValue(relationship.source_refs, child_id)) {
+            return ConstIncomingRelationship{&relationship, false};
+        }
+    }
+    return {};
+}
+
+int RelationshipTypePriority(const std::string& type) {
+    if (type == "assertedinference")
+        return 0;
+    if (type == "assertedcontext")
+        return 1;
+    if (type == "assertedevidence")
+        return 2;
+    return 3;
+}
+
+std::vector<std::string> ReorderIds(std::vector<std::string> order,
+                                    const std::string& dragged_id,
+                                    const std::string& target_id,
+                                    TreeDropMode drop_mode) {
+    RemoveValue(order, dragged_id);
+    auto target = std::find(order.begin(), order.end(), target_id);
+    if (target == order.end())
+        return {};
+    if (drop_mode == TreeDropMode::After)
+        ++target;
+    order.insert(target, dragged_id);
+    return order;
+}
+
+void ApplySourceOrder(std::vector<std::string>& sources, const std::vector<std::string>& sibling_order) {
+    std::unordered_map<std::string, size_t> position_by_id;
+    for (size_t index = 0; index < sibling_order.size(); ++index)
+        position_by_id.emplace(sibling_order[index], index);
+
+    std::stable_sort(sources.begin(), sources.end(), [&](const std::string& lhs, const std::string& rhs) {
+        const auto lhs_position = position_by_id.find(lhs);
+        const auto rhs_position = position_by_id.find(rhs);
+        const bool lhs_known = lhs_position != position_by_id.end();
+        const bool rhs_known = rhs_position != position_by_id.end();
+        if (lhs_known && rhs_known)
+            return lhs_position->second < rhs_position->second;
+        if (lhs_known != rhs_known)
+            return lhs_known;
+        return false;
+    });
+}
+
+std::unordered_map<std::string, size_t> RelationshipPositionById(const parser::AssuranceCase& model,
+                                                                 const std::string& parent_id,
+                                                                 const std::vector<std::string>& sibling_order) {
+    std::unordered_map<std::string, size_t> child_position;
+    for (size_t index = 0; index < sibling_order.size(); ++index)
+        child_position.emplace(sibling_order[index], index);
+
+    std::unordered_map<std::string, size_t> relationship_position;
+    for (const std::string& child_id : sibling_order) {
+        ConstIncomingRelationship incoming = FindIncomingRelationship(model, parent_id, child_id);
+        if (!incoming.relationship)
+            continue;
+        auto child_found = child_position.find(child_id);
+        if (child_found == child_position.end())
+            continue;
+        auto inserted = relationship_position.emplace(incoming.relationship->id, child_found->second);
+        if (!inserted.second && child_found->second < inserted.first->second)
+            inserted.first->second = child_found->second;
+    }
+    return relationship_position;
+}
+
+void ApplyParserSiblingOrder(parser::AssuranceCase& model,
+                             const std::string& parent_id,
+                             const std::vector<std::string>& sibling_order) {
+    const std::unordered_map<std::string, size_t> relationship_position =
+        RelationshipPositionById(model, parent_id, sibling_order);
+
+    for (parser::SacmElement& element : model.elements) {
+        if (IsRelationshipType(element.type))
+            ApplySourceOrder(element.source_refs, sibling_order);
+    }
+
+    std::stable_sort(model.elements.begin(),
+                     model.elements.end(),
+                     [&](const parser::SacmElement& lhs, const parser::SacmElement& rhs) {
+                         const bool lhs_relationship = IsRelationshipType(lhs.type);
+                         const bool rhs_relationship = IsRelationshipType(rhs.type);
+                         if (lhs_relationship != rhs_relationship)
+                             return false;
+                         if (!lhs_relationship)
+                             return false;
+
+                         const int lhs_priority = RelationshipTypePriority(lhs.type);
+                         const int rhs_priority = RelationshipTypePriority(rhs.type);
+                         if (lhs_priority != rhs_priority)
+                             return lhs_priority < rhs_priority;
+
+                         const auto lhs_position = relationship_position.find(lhs.id);
+                         const auto rhs_position = relationship_position.find(rhs.id);
+                         const bool lhs_known = lhs_position != relationship_position.end();
+                         const bool rhs_known = rhs_position != relationship_position.end();
+                         if (lhs_known && rhs_known)
+                             return lhs_position->second < rhs_position->second;
+                         if (lhs_known != rhs_known)
+                             return lhs_known;
+                         return false;
+                     });
+}
+
+template <typename RelationshipT>
+void ApplySacmRelationshipOrder(std::vector<RelationshipT>& relationships,
+                                const std::unordered_map<std::string, size_t>& relationship_position,
+                                const std::vector<std::string>& sibling_order) {
+    for (RelationshipT& relationship : relationships)
+        ApplySourceOrder(relationship.sources, sibling_order);
+
+    std::stable_sort(
+        relationships.begin(), relationships.end(), [&](const RelationshipT& lhs, const RelationshipT& rhs) {
+            const auto lhs_position = relationship_position.find(lhs.id);
+            const auto rhs_position = relationship_position.find(rhs.id);
+            const bool lhs_known = lhs_position != relationship_position.end();
+            const bool rhs_known = rhs_position != relationship_position.end();
+            if (lhs_known && rhs_known)
+                return lhs_position->second < rhs_position->second;
+            if (lhs_known != rhs_known)
+                return lhs_known;
+            return false;
+        });
+}
+
+void ApplySacmSiblingOrder(sacm::AssuranceCasePackage* package,
+                           const parser::AssuranceCase& model,
+                           const std::string& parent_id,
+                           const std::vector<std::string>& sibling_order) {
+    if (!package)
+        return;
+
+    const std::unordered_map<std::string, size_t> relationship_position =
+        RelationshipPositionById(model, parent_id, sibling_order);
+    for (sacm::ArgumentPackage& argument_package : package->argumentPackages) {
+        ApplySacmRelationshipOrder(argument_package.assertedInferences, relationship_position, sibling_order);
+        ApplySacmRelationshipOrder(argument_package.assertedContexts, relationship_position, sibling_order);
+        ApplySacmRelationshipOrder(argument_package.assertedEvidences, relationship_position, sibling_order);
+    }
 }
 
 sacm::ArgumentPackage* FindOwningArgumentPackage(sacm::AssuranceCasePackage* package, const std::string& element_id) {
@@ -486,7 +654,8 @@ TreeDropValidationResult ValidateTreeDrop(const parser::AssuranceCase& model,
     return result;
 }
 
-bool ReorderSiblings(const parser::AssuranceCase& model,
+bool ReorderSiblings(parser::AssuranceCase& model,
+                     sacm::AssuranceCasePackage* package,
                      const AssuranceTree& tree,
                      TreeDisplayOrder& display_order,
                      const ReorderSiblingsCommand& command,
@@ -506,17 +675,17 @@ bool ReorderSiblings(const parser::AssuranceCase& model,
         return false;
     }
 
-    std::vector<std::string> order = CurrentSiblingOrder(parent, dragged_node->group);
-    RemoveValue(order, command.dragged_element_id);
-    auto target = std::find(order.begin(), order.end(), command.target_element_id);
-    if (target == order.end()) {
+    std::vector<std::string> order = ReorderIds(CurrentSiblingOrder(parent, dragged_node->group),
+                                                command.dragged_element_id,
+                                                command.target_element_id,
+                                                command.drop_mode);
+    if (order.empty()) {
         out_error = "Target sibling was not found in the current order.";
         return false;
     }
-    if (command.drop_mode == TreeDropMode::After)
-        ++target;
-    order.insert(target, command.dragged_element_id);
-    display_order.children_by_parent[parent->id] = std::move(order);
+    ApplyParserSiblingOrder(model, parent->id, order);
+    ApplySacmSiblingOrder(package, model, parent->id, order);
+    display_order.children_by_parent[parent->id] = order;
     return true;
 }
 

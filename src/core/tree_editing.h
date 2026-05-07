@@ -57,7 +57,8 @@ TreeDropValidationResult ValidateTreeDrop(const parser::AssuranceCase& model,
                                           const std::string& target_element_id,
                                           TreeDropMode drop_mode);
 
-bool ReorderSiblings(const parser::AssuranceCase& model,
+bool ReorderSiblings(parser::AssuranceCase& model,
+                     sacm::AssuranceCasePackage* package,
                      const AssuranceTree& tree,
                      TreeDisplayOrder& display_order,
                      const ReorderSiblingsCommand& command,

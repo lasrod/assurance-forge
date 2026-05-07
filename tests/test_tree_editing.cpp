@@ -237,23 +237,30 @@ TEST(TreeEditingValidation, AllowsContextUnderStrategy) {
     EXPECT_EQ(result.relationship_kind, core::TreeRelationshipKind::InContextOf);
 }
 
-TEST(TreeEditingCommand, ReorderSiblingsStoresDisplayOrderWithoutChangingModel) {
+TEST(TreeEditingCommand, ReorderSiblingsPersistsSourceOrderAndDisplayOrder) {
     MiniCase mini_case = MakeSiblingCase();
-    const parser::AssuranceCase before = mini_case.model;
     core::AssuranceTree tree = core::AssuranceTree::Build(mini_case.model);
     core::TreeDisplayOrder order;
     std::string error;
 
-    ASSERT_TRUE(core::ReorderSiblings(
-        mini_case.model, tree, order, core::ReorderSiblingsCommand{"G4", "G2", core::TreeDropMode::Before}, error))
+    ASSERT_TRUE(core::ReorderSiblings(mini_case.model,
+                                      &mini_case.package,
+                                      tree,
+                                      order,
+                                      core::ReorderSiblingsCommand{"G4", "G2", core::TreeDropMode::Before},
+                                      error))
         << error;
 
     ASSERT_EQ(order.children_by_parent.count("G1"), 1u);
     EXPECT_EQ(order.children_by_parent["G1"], std::vector<std::string>({"G4", "G2", "G3"}));
-    ASSERT_EQ(before.elements.size(), mini_case.model.elements.size());
+    ASSERT_EQ(mini_case.model.elements.size(), 5u);
     const parser::SacmElement* relationship = FindElement(mini_case.model, "R1");
     ASSERT_NE(relationship, nullptr);
-    EXPECT_EQ(relationship->source_refs, std::vector<std::string>({"G2", "G3", "G4"}));
+    EXPECT_EQ(relationship->source_refs, std::vector<std::string>({"G4", "G2", "G3"}));
+    ASSERT_EQ(mini_case.package.argumentPackages.size(), 1u);
+    ASSERT_EQ(mini_case.package.argumentPackages.front().assertedInferences.size(), 1u);
+    EXPECT_EQ(mini_case.package.argumentPackages.front().assertedInferences.front().sources,
+              std::vector<std::string>({"G4", "G2", "G3"}));
 }
 
 TEST(TreeEditingCommand, ApplyDisplayOrderReordersBuiltTreeProjection) {
@@ -262,8 +269,12 @@ TEST(TreeEditingCommand, ApplyDisplayOrderReordersBuiltTreeProjection) {
     core::TreeDisplayOrder order;
     std::string error;
 
-    ASSERT_TRUE(core::ReorderSiblings(
-        mini_case.model, tree, order, core::ReorderSiblingsCommand{"G4", "G2", core::TreeDropMode::Before}, error))
+    ASSERT_TRUE(core::ReorderSiblings(mini_case.model,
+                                      &mini_case.package,
+                                      tree,
+                                      order,
+                                      core::ReorderSiblingsCommand{"G4", "G2", core::TreeDropMode::Before},
+                                      error))
         << error;
 
     core::AssuranceTree rebuilt_tree = core::AssuranceTree::Build(mini_case.model);
@@ -274,6 +285,42 @@ TEST(TreeEditingCommand, ApplyDisplayOrderReordersBuiltTreeProjection) {
     EXPECT_EQ(rebuilt_tree.root->group1_children[0]->id, "G4");
     EXPECT_EQ(rebuilt_tree.root->group1_children[1]->id, "G2");
     EXPECT_EQ(rebuilt_tree.root->group1_children[2]->id, "G3");
+}
+
+TEST(TreeEditingCommand, ReorderSolutionsPersistsByReorderingEvidenceRelationships) {
+    MiniCase mini_case;
+    AddClaim(mini_case, "G1");
+    AddArtifactReference(mini_case, "Sn1");
+    AddArtifactReference(mini_case, "Sn2");
+    AddArtifactReference(mini_case, "Sn3");
+    AddEvidence(mini_case, "R1", "G1", "Sn1");
+    AddEvidence(mini_case, "R2", "G1", "Sn2");
+    AddEvidence(mini_case, "R3", "G1", "Sn3");
+    core::AssuranceTree tree = core::AssuranceTree::Build(mini_case.model);
+    core::TreeDisplayOrder order;
+    std::string error;
+
+    ASSERT_TRUE(core::ReorderSiblings(mini_case.model,
+                                      &mini_case.package,
+                                      tree,
+                                      order,
+                                      core::ReorderSiblingsCommand{"Sn3", "Sn1", core::TreeDropMode::Before},
+                                      error))
+        << error;
+
+    core::AssuranceTree rebuilt_tree = core::AssuranceTree::Build(mini_case.model);
+    ASSERT_NE(rebuilt_tree.root, nullptr);
+    ASSERT_EQ(rebuilt_tree.root->group1_children.size(), 3u);
+    EXPECT_EQ(rebuilt_tree.root->group1_children[0]->id, "Sn3");
+    EXPECT_EQ(rebuilt_tree.root->group1_children[1]->id, "Sn1");
+    EXPECT_EQ(rebuilt_tree.root->group1_children[2]->id, "Sn2");
+
+    ASSERT_EQ(mini_case.package.argumentPackages.size(), 1u);
+    const auto& evidences = mini_case.package.argumentPackages.front().assertedEvidences;
+    ASSERT_EQ(evidences.size(), 3u);
+    EXPECT_EQ(evidences[0].id, "R3");
+    EXPECT_EQ(evidences[1].id, "R1");
+    EXPECT_EQ(evidences[2].id, "R2");
 }
 
 TEST(TreeEditingCommand, MoveGoalUnderGoalRewritesOnlyIncomingRelationship) {
