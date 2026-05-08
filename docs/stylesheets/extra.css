@@ -1,0 +1,5 @@
+/* Status icon colors used on the roadmap page */
+.status-stable   { color: #4CAF50; }
+.status-prototype { color: #FF9800; }
+.status-planned  { color: #42A5F5; }
+.status-candidate { color: #9E9E9E; }

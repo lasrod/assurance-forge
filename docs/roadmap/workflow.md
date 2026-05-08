@@ -2,6 +2,8 @@
 
 Assurance Forge uses GitHub Discussions for early ideas, GitHub Issues for roadmap epics and implementation tasks, GitHub Projects for planning fields, and MkDocs for public documentation.
 
+For the public-facing status and direction view, see [Product Roadmap](public.md).
+
 Anyone may submit a roadmap request. A maintainer must approve the request before automation creates an epic, subtasks, sub-issue links, or Project entries.
 
 ## Contributor Flow
@@ -101,6 +103,3 @@ The generation workflow is idempotent. It checks for the generated epic marker a
 If sub-issue linking or Project updates fail, the automation keeps created issues, adds `roadmap-failed`, and comments with the failure. Fix the configuration or permissions, then rerun by removing and reapplying `roadmap-approved`, or by applying `roadmap-retry` to the generated epic.
 
 If an already-generated epic is approved again while it is not marked `roadmap-failed` and does not have `roadmap-retry`, the automation leaves the epic and tasks unchanged and does not retry Project updates. This prevents a successful epic from being downgraded to `roadmap-failed` because of a transient follow-up API error during a harmless reapproval.
-
-
-The old roadmap document was intentionally removed because new roadmap content will be created separately.

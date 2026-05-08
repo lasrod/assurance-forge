@@ -1,7 +1,6 @@
-# Assurance Forge - Safety Case Engineering Tool
+# Assurance Forge — Safety Case Engineering Tool
 
-Assurance Forge is an application that assists Safety Engineers with Safety Case development.
-The tool uses SACM (Structured Assurance Case Metamodel).
+Assurance Forge is an open-source tool for safety case development, review, and navigation. It is built around the SACM (Structured Assurance Case Metamodel) standard and designed for safety engineers who need a rigorous, efficient workflow for constructing and maintaining assurance arguments.
 
 ![Early Screenshot](docs/screenshot/early-screenshot.png)
 
@@ -9,48 +8,33 @@ The tool uses SACM (Structured Assurance Case Metamodel).
 
 ## ✨ Vision
 
-Assurance Forge aims to modernize safety case development by:
+Safety cases are critical artifacts in safety-critical systems engineering, yet the tooling available today is often heavyweight, expensive, or disconnected from the engineering lifecycle. Assurance Forge aims to change that.
 
-- Making safety cases easier to understand and navigate
-- Ensuring credibility through SACM compliance
-- Enabling AI-assisted improvement of assurance arguments using the SCCG (Safety Case Core Guidelines)
-- Removing the burden of diagram maintenance through automatic layout
-- Fully open source
+The vision is to make safety cases **easier to develop, review, and navigate** — and to connect them to the broader engineering context through open standards.
 
----
+### What Assurance Forge delivers today
 
-## 🧭 Core Principles
+- **Automatic layout** — Assurance arguments are visualized automatically. Engineers focus on content, not diagram maintenance. No manual positioning of nodes.
+- **GSN visualization** — Safety arguments are rendered using Goal Structuring Notation (GSN), providing a clear, standardized view of the assurance case.
+- **Manual and AI-assisted reviews** — Integrated AI assistance evaluates arguments against the Safety Case Core Guidelines (SCCG), helping teams identify weaknesses and improve argument quality.
+- **SACM-first** — The tool consumes and produces SACM 2.3 XML. Internal structures closely follow SACM concepts, ensuring standards conformance.
+- **Fully open source** — MIT licensed with no vendor lock-in for AI providers.
 
-### Model-driven, not drawing-driven
-Users work with assurance content, not diagram layout.
+### Future direction
 
-- SACM XML is the source of truth
-- Layout is automatically generated
-- No manual positioning of nodes
+Assurance Forge is designed to grow alongside the evolving safety engineering landscape. Planned integrations include:
 
-### SACM-first approach
-- The tool consumes and produces SACM 2.3 XML
-- Internal structures closely follow SACM concepts
+- **RAAML** — Hazard and risk model integration to connect hazard analysis directly to safety arguments
+- **ReqIF** — Requirements interchange for traceability between requirements and assurance claims
+- **OSLC RM/QM** — Live lifecycle links to requirements management and quality management tools, and SPI (Safety Performance Indicators) support
+- **GSN extensions** — Dialectic Extensions/Challenges (defeater resolution), Modular Extensions (contracts and away elements), Confidence Arguments Extension (ACP), and patterns
+- **CAE** — Claim Argument Evidence notation
+- **Safety Case Report** — Produce your own safety case report as LaTeX and PDF
+- **Standard Conformance** — Conduct conformance assessment for UL 4600, ISO 26262 or other standards
+- **J3377 Assessment process** — Conduct assessment in accordance with J3377 or ASCV CSE.
+- And much more, driven by community needs and safety engineering standards
 
-### AI as optional assistance
-- Users provide their own AI provider
-- No vendor lock-in
-
----
-
-## 🚀 Current Scope (MVP)
-
-- Load SACM XML files
-- Visualize assurance cases in a GSN-like structure
-- Automatic layout of assurance elements
-- Inspect nodes and relationships
-- AI-based suggestions (planned)
-
----
-
-## 🗺️ Roadmap
-
-See the [Roadmap Workflow](docs/roadmap/workflow.md) documentation.
+Feel free to drop an idea in the [Discussion forum](https://github.com/lasrod/assurance-forge/discussions/categories/ideas) if there is anything you would like to see in the tool.
 
 ---
 
