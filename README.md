@@ -29,7 +29,7 @@ Assurance Forge is designed to grow alongside the evolving safety engineering la
 - **OSLC RM/QM** — Live lifecycle links to requirements management and quality management tools, and SPI (Safety Performance Indicators) support
 - **GSN extensions** — Dialectic Extensions/Challenges (defeater resolution), Modular Extensions (contracts and away elements), Confidence Arguments Extension (ACP), and patterns
 - **CAE** — Claim Argument Evidence notation
-- **Safety Case Report** — Produce your own safety case report as LaTex and PDF
+- **Safety Case Report** — Produce your own safety case report as LaTeX and PDF
 - **Standard Conformance** — Conduct conformance assessment for UL 4600, ISO 26262 or other standards
 - **J3377 Assessment process** — Conduct assessment in accordance with J3377 or ASCV CSE.
 - And much more, driven by community needs and safety engineering standards
