@@ -18,6 +18,37 @@ sacm::AssuranceCasePackage MakePackage() {
     return package;
 }
 
+sacm::AssuranceCasePackage MakePackageWithTerminologyContextTargets() {
+    sacm::AssuranceCasePackage package = MakePackage();
+
+    sacm::TerminologyPackage terminology_package;
+    terminology_package.id = "TP1";
+    terminology_package.gid = "gid-TP1";
+    terminology_package.name = "Glossary";
+    sacm::Term term;
+    term.id = "T_ODD";
+    term.gid = "gid-T_ODD";
+    term.value = "ODD";
+    term.name = "Operational Design Domain";
+    terminology_package.terms.push_back(term);
+    package.terminologyPackages.push_back(terminology_package);
+
+    sacm::ArgumentPackage argument_package;
+    argument_package.id = "AP1";
+    argument_package.gid = "gid-AP1";
+    sacm::Claim first_goal;
+    first_goal.id = "G1";
+    first_goal.gid = "gid-G1";
+    argument_package.claims.push_back(first_goal);
+    sacm::Claim second_goal;
+    second_goal.id = "G2";
+    second_goal.gid = "gid-G2";
+    argument_package.claims.push_back(second_goal);
+    package.argumentPackages.push_back(argument_package);
+
+    return package;
+}
+
 } // namespace
 
 TEST(TerminologyPackageService, CreateAssignsUniqueIdGidAndEditableText) {
@@ -562,4 +593,108 @@ TEST(TerminologyPackageService, CreatedCategoriesSerializeAndParseWithTermAssign
     ASSERT_EQ(reparsed->terms.size(), 1u);
     ASSERT_EQ(reparsed->terms.front().category_refs.size(), 1u);
     EXPECT_EQ(reparsed->terms.front().category_refs.front(), category.category_ref.id);
+}
+
+TEST(TerminologyPackageService, VisibleTermContextCreatesArtifactReferenceAndAssertedContext) {
+    sacm::AssuranceCasePackage package = MakePackageWithTerminologyContextTargets();
+
+    core::TerminologyContextAssociationResult result = core::AddTerminologyTermAsVisibleContext(
+        package, "G1", core::TerminologyPackageRef{"TP1", "gid-TP1"}, core::TerminologyTermRef{"T_ODD", "gid-T_ODD"});
+
+    ASSERT_TRUE(result.success) << result.error;
+    EXPECT_TRUE(result.created_artifact_reference);
+    EXPECT_TRUE(result.created_asserted_context);
+    ASSERT_EQ(package.argumentPackages.size(), 1u);
+    const sacm::ArgumentPackage& argument_package = package.argumentPackages.front();
+    ASSERT_EQ(argument_package.artifactReferences.size(), 1u);
+    EXPECT_EQ(argument_package.artifactReferences.front().referencedArtifact, "T_ODD");
+    EXPECT_TRUE(core::IsVisibleTerminologyArtifactReference(package,
+                                                           argument_package,
+                                                           argument_package.artifactReferences.front()));
+    ASSERT_EQ(argument_package.assertedContexts.size(), 1u);
+    EXPECT_TRUE(core::IsVisibleTerminologyContext(argument_package.assertedContexts.front()));
+    EXPECT_EQ(argument_package.assertedContexts.front().sources, std::vector<std::string>{result.artifact_reference_id});
+    EXPECT_EQ(argument_package.assertedContexts.front().targets, std::vector<std::string>{"G1"});
+}
+
+TEST(TerminologyPackageService, VisibleTermContextIsIdempotentPerTarget) {
+    sacm::AssuranceCasePackage package = MakePackageWithTerminologyContextTargets();
+
+    core::TerminologyPackageRef package_ref{"TP1", "gid-TP1"};
+    core::TerminologyTermRef term_ref{"T_ODD", "gid-T_ODD"};
+    core::TerminologyContextAssociationResult first =
+        core::AddTerminologyTermAsVisibleContext(package, "G1", package_ref, term_ref);
+    ASSERT_TRUE(first.success) << first.error;
+
+    core::TerminologyContextAssociationResult second =
+        core::AddTerminologyTermAsVisibleContext(package, "G1", package_ref, term_ref);
+
+    ASSERT_TRUE(second.success) << second.error;
+    EXPECT_TRUE(second.already_associated);
+    EXPECT_EQ(second.artifact_reference_id, first.artifact_reference_id);
+    EXPECT_EQ(second.asserted_context_id, first.asserted_context_id);
+    EXPECT_EQ(package.argumentPackages.front().artifactReferences.size(), 1u);
+    EXPECT_EQ(package.argumentPackages.front().assertedContexts.size(), 1u);
+}
+
+TEST(TerminologyPackageService, VisibleTermContextUsesTargetScopedReferences) {
+    sacm::AssuranceCasePackage package = MakePackageWithTerminologyContextTargets();
+
+    core::TerminologyPackageRef package_ref{"TP1", "gid-TP1"};
+    core::TerminologyTermRef term_ref{"T_ODD", "gid-T_ODD"};
+    core::TerminologyContextAssociationResult first =
+        core::AddTerminologyTermAsVisibleContext(package, "G1", package_ref, term_ref);
+    core::TerminologyContextAssociationResult second =
+        core::AddTerminologyTermAsVisibleContext(package, "G2", package_ref, term_ref);
+
+    ASSERT_TRUE(first.success) << first.error;
+    ASSERT_TRUE(second.success) << second.error;
+    EXPECT_NE(first.artifact_reference_id, second.artifact_reference_id);
+    EXPECT_EQ(package.argumentPackages.front().artifactReferences.size(), 2u);
+    EXPECT_EQ(package.argumentPackages.front().assertedContexts.size(), 2u);
+}
+
+TEST(TerminologyPackageService, VisibleTermContextPromotesSingleHiddenAssociation) {
+    sacm::AssuranceCasePackage package = MakePackageWithTerminologyContextTargets();
+
+    core::TerminologyPackageRef package_ref{"TP1", "gid-TP1"};
+    core::TerminologyTermRef term_ref{"T_ODD", "gid-T_ODD"};
+    core::TerminologyContextAssociationResult hidden =
+        core::AssociateTerminologyTermWithElement(package, "G1", package_ref, term_ref);
+    ASSERT_TRUE(hidden.success) << hidden.error;
+    ASSERT_EQ(package.argumentPackages.front().artifactReferences.size(), 1u);
+    ASSERT_EQ(package.argumentPackages.front().assertedContexts.size(), 1u);
+    EXPECT_FALSE(core::IsVisibleTerminologyContext(package.argumentPackages.front().assertedContexts.front()));
+
+    core::TerminologyContextAssociationResult visible =
+        core::AddTerminologyTermAsVisibleContext(package, "G1", package_ref, term_ref);
+
+    ASSERT_TRUE(visible.success) << visible.error;
+    EXPECT_EQ(visible.artifact_reference_id, hidden.artifact_reference_id);
+    EXPECT_EQ(visible.asserted_context_id, hidden.asserted_context_id);
+    EXPECT_EQ(package.argumentPackages.front().artifactReferences.size(), 1u);
+    ASSERT_EQ(package.argumentPackages.front().assertedContexts.size(), 1u);
+    EXPECT_TRUE(core::IsVisibleTerminologyContext(package.argumentPackages.front().assertedContexts.front()));
+}
+
+TEST(TerminologyPackageService, VisibleTermContextDoesNotPromoteSharedHiddenReference) {
+    sacm::AssuranceCasePackage package = MakePackageWithTerminologyContextTargets();
+
+    core::TerminologyPackageRef package_ref{"TP1", "gid-TP1"};
+    core::TerminologyTermRef term_ref{"T_ODD", "gid-T_ODD"};
+    ASSERT_TRUE(core::AssociateTerminologyTermWithElement(package, "G1", package_ref, term_ref).success);
+    ASSERT_TRUE(core::AssociateTerminologyTermWithElement(package, "G2", package_ref, term_ref).success);
+    ASSERT_EQ(package.argumentPackages.front().artifactReferences.size(), 1u);
+    ASSERT_EQ(package.argumentPackages.front().assertedContexts.size(), 2u);
+
+    core::TerminologyContextAssociationResult visible =
+        core::AddTerminologyTermAsVisibleContext(package, "G1", package_ref, term_ref);
+
+    ASSERT_TRUE(visible.success) << visible.error;
+    EXPECT_EQ(package.argumentPackages.front().artifactReferences.size(), 2u);
+    ASSERT_EQ(package.argumentPackages.front().assertedContexts.size(), 2u);
+    const auto visible_contexts = std::count_if(package.argumentPackages.front().assertedContexts.begin(),
+                                               package.argumentPackages.front().assertedContexts.end(),
+                                               core::IsVisibleTerminologyContext);
+    EXPECT_EQ(visible_contexts, 1);
 }

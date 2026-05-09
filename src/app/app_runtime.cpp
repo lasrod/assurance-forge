@@ -672,7 +672,8 @@ void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sa
                 artifact_reference_targets[artifact_reference.id] = artifact_reference.referencedArtifact;
             if (!artifact_reference.gid.empty())
                 artifact_reference_targets[artifact_reference.gid] = artifact_reference.referencedArtifact;
-            if (ArtifactReferenceTargetsTerm(artifact_reference, term_refs)) {
+            if (ArtifactReferenceTargetsTerm(artifact_reference, term_refs) &&
+                !core::IsVisibleTerminologyArtifactReference(package, argument_package, artifact_reference)) {
                 preserved_term_references.push_back(artifact_reference);
                 if (!artifact_reference.id.empty())
                     term_artifact_refs.insert(artifact_reference.id);
@@ -1957,6 +1958,12 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                                                                      const core::TerminologyTermRef& term_ref) {
                         AddTerminologyTermAsContextFromCanvas(element_id, package_ref, term_ref);
                     };
+                    actions.add_visible_terminology_term_context =
+                        [this](const std::string& element_id,
+                               const core::TerminologyPackageRef& package_ref,
+                               const core::TerminologyTermRef& term_ref) {
+                            AddVisibleTerminologyTermContextFromCanvas(element_id, package_ref, term_ref);
+                        };
                     actions.find_terminology_usages = [this](const core::TerminologyPackageRef& package_ref,
                                                              const core::TerminologyTermRef& term_ref) {
                         FindTerminologyUsagesFromCanvas(package_ref, term_ref);

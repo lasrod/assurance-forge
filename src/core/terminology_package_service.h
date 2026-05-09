@@ -8,6 +8,8 @@
 
 namespace core {
 
+inline constexpr const char* kVisibleTerminologyContextMarker = "assurance-forge:visible-term-context";
+
 struct TerminologyPackageRef {
     std::string id;
     std::string gid;
@@ -160,6 +162,17 @@ TerminologyContextAssociationResult AssociateTerminologyTermWithElement(sacm::As
                                                                         const std::string& target_element_id,
                                                                         const TerminologyPackageRef& package_ref,
                                                                         const TerminologyTermRef& term_ref);
+TerminologyContextAssociationResult AddTerminologyTermAsVisibleContext(sacm::AssuranceCasePackage& package,
+                                                                       const std::string& target_element_id,
+                                                                       const TerminologyPackageRef& package_ref,
+                                                                       const TerminologyTermRef& term_ref);
+
+bool IsVisibleTerminologyContext(const sacm::AssertedContext& context);
+bool IsTerminologyArtifactReference(const sacm::AssuranceCasePackage& package,
+                                    const sacm::ArtifactReference& artifact_reference);
+bool IsVisibleTerminologyArtifactReference(const sacm::AssuranceCasePackage& package,
+                                           const sacm::ArgumentPackage& argument_package,
+                                           const sacm::ArtifactReference& artifact_reference);
 
 sacm::Category* FindTerminologyCategory(sacm::TerminologyPackage& package, const TerminologyCategoryRef& category_ref);
 const sacm::Category* FindTerminologyCategory(const sacm::TerminologyPackage& package,

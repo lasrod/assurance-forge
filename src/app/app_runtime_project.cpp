@@ -268,6 +268,89 @@ std::string FirstElementIdForArgumentPackage(const sacm::AssuranceCasePackage& p
     return {};
 }
 
+const sacm::ArtifactReference* FindArtifactReferenceById(const sacm::AssuranceCasePackage& package,
+                                                         const std::string& artifact_reference_id) {
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
+            if (artifact_reference.id == artifact_reference_id || artifact_reference.gid == artifact_reference_id)
+                return &artifact_reference;
+        }
+    }
+    return nullptr;
+}
+
+const sacm::AssertedContext* FindAssertedContextById(const sacm::AssuranceCasePackage& package,
+                                                     const std::string& asserted_context_id) {
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::AssertedContext& context : argument_package.assertedContexts) {
+            if (context.id == asserted_context_id || context.gid == asserted_context_id)
+                return &context;
+        }
+    }
+    return nullptr;
+}
+
+bool ParserModelHasElement(const parser::AssuranceCase& model, const std::string& element_id) {
+    return std::any_of(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
+        return element.id == element_id || element.name == element_id;
+    });
+}
+
+bool SyncVisibleTerminologyContextToParser(core::AppState& app_state,
+                                           const core::TerminologyContextAssociationResult& result) {
+    if (!app_state.loaded_case.has_value() || !app_state.sacm_package.has_value())
+        return false;
+
+    const sacm::ArtifactReference* artifact_reference =
+        FindArtifactReferenceById(app_state.sacm_package.value(), result.artifact_reference_id);
+    const sacm::AssertedContext* context =
+        FindAssertedContextById(app_state.sacm_package.value(), result.asserted_context_id);
+    if (!artifact_reference || !context || !core::IsVisibleTerminologyContext(*context))
+        return false;
+
+    parser::AssuranceCase& model = app_state.loaded_case.value();
+    bool changed = false;
+    if (!ParserModelHasElement(model, artifact_reference->id)) {
+        parser::SacmElement element;
+        element.id = artifact_reference->id;
+        element.name = artifact_reference->name;
+        element.type = "artifactreference";
+        element.description = artifact_reference->description;
+        element.name_langs = artifact_reference->name_ml.texts;
+        element.description_langs = artifact_reference->description_ml.texts;
+        model.elements.push_back(std::move(element));
+        changed = true;
+    }
+    if (!ParserModelHasElement(model, context->id)) {
+        parser::SacmElement element;
+        element.id = context->id;
+        element.name = context->name;
+        element.type = "assertedcontext";
+        element.description = context->description;
+        element.name_langs = context->name_ml.texts;
+        element.description_langs = context->description_ml.texts;
+        element.source_refs = context->sources;
+        element.target_refs = context->targets;
+        element.assertion_declaration = context->assertionDeclaration;
+        model.elements.push_back(std::move(element));
+        changed = true;
+    }
+    return changed;
+}
+
+std::string TermStatusLabel(const sacm::AssuranceCasePackage& package,
+                            const core::TerminologyPackageRef& package_ref,
+                            const core::TerminologyTermRef& term_ref) {
+    const sacm::Term* term = core::FindTerminologyTerm(package, package_ref, term_ref);
+    if (!term)
+        return "Term";
+    if (!term->value.empty())
+        return term->value;
+    if (!term->name.empty())
+        return term->name;
+    return term->id.empty() ? "Term" : term->id;
+}
+
 } // namespace
 
 void AppRuntime::BeginCreateProject() {
@@ -695,6 +778,39 @@ void AppRuntime::AddTerminologyTermAsContextFromCanvas(const std::string& elemen
                                         : "Associated term with this element.");
 }
 
+void AppRuntime::AddVisibleTerminologyTermContextFromCanvas(const std::string& element_id,
+                                                            const core::TerminologyPackageRef& package_ref,
+                                                            const core::TerminologyTermRef& term_ref) {
+    if (!impl_->app_state.sacm_package.has_value()) {
+        SetStatus("Open a SACM model before adding terminology context.");
+        return;
+    }
+
+    const std::string term_label = TermStatusLabel(impl_->app_state.sacm_package.value(), package_ref, term_ref);
+    core::TerminologyContextAssociationResult result = core::AddTerminologyTermAsVisibleContext(
+        impl_->app_state.sacm_package.value(), element_id, package_ref, term_ref);
+    if (!result.success) {
+        SetStatus("Could not add term as context: " + result.error);
+        return;
+    }
+
+    const bool parser_changed = SyncVisibleTerminologyContextToParser(impl_->app_state, result);
+    if (!result.already_associated) {
+        MarkTerminologyDocumentDirty(*impl_);
+        impl_->events.Emit(DocumentDirtyEvent{});
+        if (impl_->app_state.current_project.has_value() && !impl_->app_state.active_project_file_path.empty()) {
+            const std::filesystem::path relative = std::filesystem::relative(
+                impl_->app_state.active_project_file_path, impl_->app_state.current_project->rootPath);
+            InvalidateSacmPackageTreeCache(*impl_, relative);
+        }
+    }
+    if (!result.already_associated || parser_changed)
+        impl_->events.Emit(TreeDirtyEvent{});
+    SyncTerminologyProblems();
+    SetStatus(result.already_associated ? term_label + " is already attached as context to this element."
+                                        : "Added " + term_label + " as context.");
+}
+
 void AppRuntime::FindTerminologyUsagesFromCanvas(const core::TerminologyPackageRef& package_ref,
                                                  const core::TerminologyTermRef& term_ref) {
     BeginFindTerminologyUsages(package_ref, term_ref);
@@ -840,7 +956,7 @@ void AppRuntime::ConfirmQuickDefineTerminologyTerm(bool add_as_context) {
     }
     const std::string context_element_id = impl_->quick_define_element_id;
     if (add_as_context)
-        AddTerminologyTermAsContextFromCanvas(
+        AddVisibleTerminologyTermContextFromCanvas(
             context_element_id, impl_->quick_define_target_package_ref, result.term_ref);
 
     impl_->show_quick_define_term_modal = false;

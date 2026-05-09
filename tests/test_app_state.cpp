@@ -1,4 +1,6 @@
 #include "core/app_state.h"
+#include "core/assurance_tree.h"
+#include "core/terminology_package_service.h"
 
 #include <chrono>
 #include <filesystem>
@@ -69,4 +71,45 @@ TEST(AppStateTest, LoadFileHidesTerminologyArtifactReferencesButKeepsEvidenceSol
     ASSERT_EQ(state.sacm_package->argumentPackages.size(), 1u);
     EXPECT_EQ(state.sacm_package->argumentPackages.front().artifactReferences.size(), 2u);
     EXPECT_EQ(state.sacm_package->argumentPackages.front().assertedContexts.size(), 1u);
+}
+
+TEST(AppStateTest, LoadFileKeepsVisibleTerminologyContextOnCanvas) {
+    TempDir temp(MakeTempDir());
+    const std::filesystem::path sacm_path = temp.path / "case.sacm";
+    std::ofstream(sacm_path) << R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="urn:test" id="T" name="T">
+  <terminologyPackage id="TP" name="Glossary">
+    <term id="TERM_ODD" name="Operational Design Domain" value="ODD"/>
+  </terminologyPackage>
+  <argumentPackage id="AP" name="AP">
+    <claim id="G1" name="Goal" assertionDeclaration="asserted"/>
+    <artifactReference id="TERM_HIDDEN" name="Hidden ODD" referencedArtifact="TERM_ODD"/>
+    <artifactReference id="TERM_VISIBLE" name="ODD" referencedArtifact="TERM_ODD"/>
+    <assertedContext id="AC_HIDDEN" name="Hidden terminology relation">
+      <source ref="TERM_HIDDEN"/>
+      <target ref="G1"/>
+    </assertedContext>
+    <assertedContext id="AC_VISIBLE" name="Visible terminology relation">
+      <description><content lang="en">assurance-forge:visible-term-context</content></description>
+      <source ref="TERM_VISIBLE"/>
+      <target ref="G1"/>
+    </assertedContext>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(sacm_path.string())) << state.status_message;
+    ASSERT_TRUE(state.loaded_case.has_value());
+    ASSERT_TRUE(state.sacm_package.has_value());
+
+    EXPECT_EQ(FindElement(state.loaded_case.value(), "TERM_HIDDEN"), nullptr);
+    EXPECT_EQ(FindElement(state.loaded_case.value(), "AC_HIDDEN"), nullptr);
+    EXPECT_NE(FindElement(state.loaded_case.value(), "TERM_VISIBLE"), nullptr);
+    EXPECT_NE(FindElement(state.loaded_case.value(), "AC_VISIBLE"), nullptr);
+
+    core::AssuranceTree tree = core::AssuranceTree::Build(state.loaded_case.value());
+    ASSERT_NE(tree.root, nullptr);
+    ASSERT_EQ(tree.root->group2_attachments.size(), 1u);
+    EXPECT_EQ(tree.root->group2_attachments.front()->id, "TERM_VISIBLE");
+    EXPECT_EQ(tree.root->group2_attachments.front()->role, core::NodeRole::Context);
 }

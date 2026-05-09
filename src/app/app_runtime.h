@@ -117,6 +117,9 @@ private:
     void AddTerminologyTermAsContextFromCanvas(const std::string& element_id,
                                                const core::TerminologyPackageRef& package_ref,
                                                const core::TerminologyTermRef& term_ref);
+    void AddVisibleTerminologyTermContextFromCanvas(const std::string& element_id,
+                                                    const core::TerminologyPackageRef& package_ref,
+                                                    const core::TerminologyTermRef& term_ref);
     void BeginFindTerminologyUsages(const core::TerminologyPackageRef& package_ref,
                                     const core::TerminologyTermRef& term_ref);
     void FindTerminologyUsagesFromCanvas(const core::TerminologyPackageRef& package_ref,

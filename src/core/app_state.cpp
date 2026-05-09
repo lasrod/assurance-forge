@@ -1,6 +1,7 @@
 #include "core/app_state.h"
 
 #include "core/project_service.h"
+#include "core/terminology_package_service.h"
 #include "sacm/sacm_parser.h"
 #include "sacm/sacm_serializer.h"
 
@@ -17,62 +18,72 @@ std::string NormalizeSacmRef(std::string ref) {
     return ref;
 }
 
-void CollectTermRefs(const sacm::TerminologyPackage& terminology_package, std::unordered_set<std::string>& refs) {
-    for (const sacm::Term& term : terminology_package.terms) {
-        if (!term.id.empty())
-            refs.insert(term.id);
-        if (!term.gid.empty())
-            refs.insert(term.gid);
-    }
-}
-
-std::unordered_set<std::string> CollectTermRefs(const sacm::AssuranceCasePackage& package) {
-    std::unordered_set<std::string> refs;
-    for (const sacm::TerminologyPackage& terminology_package : package.terminologyPackages)
-        CollectTermRefs(terminology_package, refs);
-    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
-        for (const sacm::TerminologyPackage& terminology_package : argument_package.terminologyPackages)
-            CollectTermRefs(terminology_package, refs);
-    }
-    return refs;
-}
-
-std::unordered_set<std::string> CollectTerminologyArtifactReferenceRefs(const sacm::AssuranceCasePackage& package) {
-    const std::unordered_set<std::string> term_refs = CollectTermRefs(package);
-    std::unordered_set<std::string> artifact_reference_refs;
-    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
-        for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
-            if (term_refs.find(NormalizeSacmRef(artifact_reference.referencedArtifact)) == term_refs.end())
-                continue;
-            if (!artifact_reference.id.empty())
-                artifact_reference_refs.insert(artifact_reference.id);
-            if (!artifact_reference.gid.empty())
-                artifact_reference_refs.insert(artifact_reference.gid);
-        }
-    }
-    return artifact_reference_refs;
-}
-
 bool ReferencesAny(const std::vector<std::string>& refs, const std::unordered_set<std::string>& candidates) {
     return std::any_of(refs.begin(), refs.end(), [&](const std::string& ref) {
         return candidates.find(NormalizeSacmRef(ref)) != candidates.end();
     });
 }
 
+void AddRef(std::unordered_set<std::string>& refs, const std::string& ref) {
+    if (!ref.empty())
+        refs.insert(ref);
+}
+
+struct HiddenTerminologyRefs {
+    std::unordered_set<std::string> artifact_reference_refs;
+    std::unordered_set<std::string> asserted_context_refs;
+};
+
+bool ContextSourcesArtifactReference(const sacm::AssertedContext& context,
+                                     const sacm::ArtifactReference& artifact_reference) {
+    std::unordered_set<std::string> artifact_refs;
+    AddRef(artifact_refs, artifact_reference.id);
+    AddRef(artifact_refs, artifact_reference.gid);
+    return ReferencesAny(context.sources, artifact_refs);
+}
+
+HiddenTerminologyRefs CollectHiddenTerminologyRefs(const sacm::AssuranceCasePackage& package) {
+    HiddenTerminologyRefs refs;
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
+            if (!IsTerminologyArtifactReference(package, artifact_reference))
+                continue;
+            if (!IsVisibleTerminologyArtifactReference(package, argument_package, artifact_reference)) {
+                AddRef(refs.artifact_reference_refs, artifact_reference.id);
+                AddRef(refs.artifact_reference_refs, artifact_reference.gid);
+            }
+            for (const sacm::AssertedContext& context : argument_package.assertedContexts) {
+                if (!ContextSourcesArtifactReference(context, artifact_reference) || IsVisibleTerminologyContext(context))
+                    continue;
+                AddRef(refs.asserted_context_refs, context.id);
+                AddRef(refs.asserted_context_refs, context.gid);
+            }
+        }
+    }
+    return refs;
+}
+
 void HideTerminologyArtifactReferences(parser::AssuranceCase& model, const sacm::AssuranceCasePackage& package) {
-    const std::unordered_set<std::string> hidden_refs = CollectTerminologyArtifactReferenceRefs(package);
-    if (hidden_refs.empty())
+    const HiddenTerminologyRefs hidden_refs = CollectHiddenTerminologyRefs(package);
+    if (hidden_refs.artifact_reference_refs.empty() && hidden_refs.asserted_context_refs.empty())
         return;
 
     model.elements.erase(std::remove_if(model.elements.begin(),
                                         model.elements.end(),
                                         [&](const parser::SacmElement& element) {
                                             if (element.type == "artifactreference") {
-                                                return hidden_refs.find(element.id) != hidden_refs.end() ||
-                                                       hidden_refs.find(element.name) != hidden_refs.end();
+                                                return hidden_refs.artifact_reference_refs.find(element.id) !=
+                                                           hidden_refs.artifact_reference_refs.end() ||
+                                                       hidden_refs.artifact_reference_refs.find(element.name) !=
+                                                           hidden_refs.artifact_reference_refs.end();
                                             }
                                             return element.type == "assertedcontext" &&
-                                                   ReferencesAny(element.source_refs, hidden_refs);
+                                                   (hidden_refs.asserted_context_refs.find(element.id) !=
+                                                        hidden_refs.asserted_context_refs.end() ||
+                                                    hidden_refs.asserted_context_refs.find(element.name) !=
+                                                        hidden_refs.asserted_context_refs.end() ||
+                                                    ReferencesAny(element.source_refs,
+                                                                  hidden_refs.artifact_reference_refs));
                                         }),
                          model.elements.end());
 }
