@@ -124,9 +124,13 @@ struct Term : Expression {
     std::vector<std::string> category_refs;
 };
 
+// Category (10.8): classifies terminology elements such as terms.
+struct Category : SacmElement {};
+
 // TerminologyPackage (10.4): container of terminology elements.
 // Legacy Expression rows are preserved for import/round-trip compatibility.
 struct TerminologyPackage : SacmElement {
+    std::vector<Category> categories;
     std::vector<Expression> expressions;
     std::vector<Term> terms;
 };

@@ -38,6 +38,27 @@ struct TerminologyTermCreateResult {
     std::string error;
 };
 
+struct TerminologyCategoryRef {
+    std::string id;
+    std::string gid;
+};
+
+struct TerminologyCategoryDraft {
+    std::string name;
+    std::string description;
+};
+
+struct TerminologyCategoryCreateResult {
+    bool success = false;
+    TerminologyCategoryRef category_ref;
+    std::string error;
+};
+
+struct TerminologyCategoryUsageSummary {
+    TerminologyCategoryRef category_ref;
+    int term_count = 0;
+};
+
 enum class TerminologyTermIssueSeverity { Error, Warning, Info };
 
 struct TerminologyTermIssue {
@@ -95,9 +116,41 @@ bool DeleteTerminologyTerm(sacm::AssuranceCasePackage& package,
                            const TerminologyTermRef& term_ref,
                            std::string& out_error);
 
+sacm::Category* FindTerminologyCategory(sacm::TerminologyPackage& package,
+                                        const TerminologyCategoryRef& category_ref);
+const sacm::Category* FindTerminologyCategory(const sacm::TerminologyPackage& package,
+                                              const TerminologyCategoryRef& category_ref);
+sacm::Category* FindTerminologyCategory(sacm::AssuranceCasePackage& package,
+                                        const TerminologyPackageRef& package_ref,
+                                        const TerminologyCategoryRef& category_ref);
+const sacm::Category* FindTerminologyCategory(const sacm::AssuranceCasePackage& package,
+                                              const TerminologyPackageRef& package_ref,
+                                              const TerminologyCategoryRef& category_ref);
+
+TerminologyCategoryCreateResult CreateTerminologyCategory(sacm::AssuranceCasePackage& package,
+                                                          const TerminologyPackageRef& package_ref,
+                                                          const TerminologyCategoryDraft& draft);
+
+bool UpdateTerminologyCategory(sacm::AssuranceCasePackage& package,
+                               const TerminologyPackageRef& package_ref,
+                               const TerminologyCategoryRef& category_ref,
+                               const TerminologyCategoryDraft& draft,
+                               std::string& out_error);
+
+bool DeleteTerminologyCategory(sacm::AssuranceCasePackage& package,
+                               const TerminologyPackageRef& package_ref,
+                               const TerminologyCategoryRef& category_ref,
+                               std::string& out_error);
+
+int CountTermsUsingCategory(const sacm::TerminologyPackage& package, const TerminologyCategoryRef& category_ref);
+std::vector<TerminologyCategoryUsageSummary> BuildTerminologyCategoryUsageSummaries(
+    const sacm::TerminologyPackage& package);
+std::string CategoryDisplayName(const sacm::TerminologyPackage& package, const std::string& category_ref);
+
 std::vector<TerminologyTermIssue> ValidateTerminologyTerms(const sacm::TerminologyPackage& package);
 int CountTerminologyTermUsage(const sacm::AssuranceCasePackage& package, const sacm::Term& term);
-std::vector<TerminologyTermUsageSummary> BuildTerminologyTermUsageSummaries(
-    const sacm::AssuranceCasePackage& package, const sacm::TerminologyPackage& terminology_package);
+std::vector<TerminologyTermUsageSummary>
+BuildTerminologyTermUsageSummaries(const sacm::AssuranceCasePackage& package,
+                                   const sacm::TerminologyPackage& terminology_package);
 
 } // namespace core

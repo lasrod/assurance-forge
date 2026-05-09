@@ -146,10 +146,19 @@ static void serialize_term(pugi::xml_node parent, const Term& term) {
     }
 }
 
+static void serialize_category(pugi::xml_node parent, const Category& category) {
+    auto node = parent.append_child("category");
+    set_base(node, category);
+    add_description(node, category.description, category.description_ml);
+}
+
 static void serialize_terminology_package(pugi::xml_node parent, const TerminologyPackage& tp) {
     auto node = parent.append_child("terminologyPackage");
     set_base(node, tp);
     add_description(node, tp.description, tp.description_ml);
+    for (const auto& category : tp.categories) {
+        serialize_category(node, category);
+    }
     for (const auto& term : tp.terms) {
         serialize_term(node, term);
     }

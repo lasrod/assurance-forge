@@ -125,6 +125,16 @@ void CopyTermToEditor(AppRuntimeState& state, const sacm::Term& term) {
     CopyToBuffer(state.term_origin_buf, sizeof(state.term_origin_buf), term.origin);
 }
 
+void ClearCategoryEditorBuffers(AppRuntimeState& state) {
+    CopyToBuffer(state.category_name_buf, sizeof(state.category_name_buf), "");
+    CopyToBuffer(state.category_description_buf, sizeof(state.category_description_buf), "");
+}
+
+void CopyCategoryToEditor(AppRuntimeState& state, const sacm::Category& category) {
+    CopyToBuffer(state.category_name_buf, sizeof(state.category_name_buf), category.name);
+    CopyToBuffer(state.category_description_buf, sizeof(state.category_description_buf), category.description);
+}
+
 core::TerminologyTermDraft TermDraftFromEditor(const AppRuntimeState& state) {
     core::TerminologyTermDraft draft;
     draft.value = TrimWhitespace(state.term_value_buf);
@@ -134,6 +144,19 @@ core::TerminologyTermDraft TermDraftFromEditor(const AppRuntimeState& state) {
     draft.externalReference = TrimWhitespace(state.term_external_reference_buf);
     draft.origin = TrimWhitespace(state.term_origin_buf);
     return draft;
+}
+
+core::TerminologyCategoryDraft CategoryDraftFromEditor(const AppRuntimeState& state) {
+    core::TerminologyCategoryDraft draft;
+    draft.name = TrimWhitespace(state.category_name_buf);
+    draft.description = TrimWhitespace(state.category_description_buf);
+    return draft;
+}
+
+bool CategoryNameExists(const sacm::TerminologyPackage& package, const std::string& name) {
+    return std::any_of(package.categories.begin(), package.categories.end(), [&](const sacm::Category& category) {
+        return category.name == name;
+    });
 }
 
 void MarkTerminologyDocumentDirty(AppRuntimeState& state) {
@@ -321,6 +344,8 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
         impl_->selected_terminology_package_ref = package_ref;
         impl_->selected_terminology_package_file_path = impl_->selected_package_file_path;
         impl_->selected_terminology_term_ref = core::TerminologyTermRef{};
+        impl_->selected_terminology_category_ref = core::TerminologyCategoryRef{};
+        CopyToBuffer(impl_->terminology_category_filter_buf, sizeof(impl_->terminology_category_filter_buf), "");
         CopyTerminologyPackageToEditor(*impl_, *terminology_package);
         impl_->show_terminology_package_tab = true;
         ui_state.center_view = ui::CenterView::TerminologyPackage;
@@ -380,6 +405,8 @@ void AppRuntime::ConfirmAddTerminologyPackage() {
 
     impl_->selected_terminology_package_ref = result.package_ref;
     impl_->selected_terminology_term_ref = core::TerminologyTermRef{};
+    impl_->selected_terminology_category_ref = core::TerminologyCategoryRef{};
+    CopyToBuffer(impl_->terminology_category_filter_buf, sizeof(impl_->terminology_category_filter_buf), "");
     impl_->selected_terminology_package_file_path = impl_->app_state.active_project_file_path;
     if (const sacm::TerminologyPackage* package =
             core::FindTerminologyPackage(impl_->app_state.sacm_package.value(), result.package_ref)) {
@@ -538,6 +565,147 @@ void AppRuntime::ConfirmDeleteTerminologyTerm() {
     impl_->show_delete_terminology_term_modal = false;
     MarkTerminologyDocumentDirty(*impl_);
     SetStatus("Deleted term.");
+}
+
+void AppRuntime::SelectTerminologyCategory(const core::TerminologyCategoryRef& category_ref) {
+    impl_->selected_terminology_category_ref = category_ref;
+}
+
+void AppRuntime::SetTerminologyCategoryFilter(const std::string& category_filter) {
+    CopyToBuffer(impl_->terminology_category_filter_buf,
+                 sizeof(impl_->terminology_category_filter_buf),
+                 category_filter);
+}
+
+void AppRuntime::BeginAddTerminologyCategory() {
+    if (!impl_->app_state.sacm_package.has_value()) {
+        SetStatus("Open a terminology package before adding categories.");
+        return;
+    }
+    ClearCategoryEditorBuffers(*impl_);
+    impl_->editing_existing_terminology_category = false;
+    impl_->show_terminology_category_editor_modal = true;
+}
+
+void AppRuntime::BeginEditTerminologyCategory(const core::TerminologyCategoryRef& category_ref) {
+    if (!impl_->app_state.sacm_package.has_value())
+        return;
+    const sacm::Category* category = core::FindTerminologyCategory(
+        impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref, category_ref);
+    if (!category) {
+        SetStatus("Category not found.");
+        return;
+    }
+
+    impl_->selected_terminology_category_ref = category_ref;
+    CopyCategoryToEditor(*impl_, *category);
+    impl_->editing_existing_terminology_category = true;
+    impl_->show_terminology_category_editor_modal = true;
+}
+
+void AppRuntime::ConfirmTerminologyCategoryEdit() {
+    if (!impl_->app_state.sacm_package.has_value())
+        return;
+
+    const core::TerminologyCategoryDraft draft = CategoryDraftFromEditor(*impl_);
+    std::string error;
+    if (impl_->editing_existing_terminology_category) {
+        if (!core::UpdateTerminologyCategory(impl_->app_state.sacm_package.value(),
+                                             impl_->selected_terminology_package_ref,
+                                             impl_->selected_terminology_category_ref,
+                                             draft,
+                                             error)) {
+            SetStatus("Category update failed: " + error);
+            return;
+        }
+        SetStatus("Updated category " + draft.name + ".");
+    } else {
+        core::TerminologyCategoryCreateResult result = core::CreateTerminologyCategory(
+            impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref, draft);
+        if (!result.success) {
+            SetStatus("Category create failed: " + result.error);
+            return;
+        }
+        impl_->selected_terminology_category_ref = result.category_ref;
+        SetStatus("Added category " + draft.name + ".");
+    }
+
+    MarkTerminologyDocumentDirty(*impl_);
+    impl_->show_terminology_category_editor_modal = false;
+}
+
+void AppRuntime::BeginDeleteTerminologyCategory(const core::TerminologyCategoryRef& category_ref) {
+    if (!impl_->app_state.sacm_package.has_value())
+        return;
+    const sacm::TerminologyPackage* terminology_package = core::FindTerminologyPackage(
+        impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref);
+    if (!terminology_package) {
+        SetStatus("Terminology package not found.");
+        return;
+    }
+    const sacm::Category* category = core::FindTerminologyCategory(*terminology_package, category_ref);
+    if (!category) {
+        SetStatus("Category not found.");
+        return;
+    }
+
+    impl_->selected_terminology_category_ref = category_ref;
+    impl_->pending_delete_terminology_category_term_count =
+        core::CountTermsUsingCategory(*terminology_package, category_ref);
+    impl_->show_delete_terminology_category_modal = true;
+}
+
+void AppRuntime::ConfirmDeleteTerminologyCategory() {
+    if (!impl_->app_state.sacm_package.has_value())
+        return;
+
+    std::string error;
+    if (!core::DeleteTerminologyCategory(impl_->app_state.sacm_package.value(),
+                                         impl_->selected_terminology_package_ref,
+                                         impl_->selected_terminology_category_ref,
+                                         error)) {
+        SetStatus("Category delete failed: " + error);
+        return;
+    }
+
+    impl_->selected_terminology_category_ref = core::TerminologyCategoryRef{};
+    CopyToBuffer(impl_->terminology_category_filter_buf, sizeof(impl_->terminology_category_filter_buf), "");
+    impl_->show_delete_terminology_category_modal = false;
+    MarkTerminologyDocumentDirty(*impl_);
+    SetStatus("Deleted category.");
+}
+
+void AppRuntime::SeedRecommendedTerminologyCategories() {
+    if (!impl_->app_state.sacm_package.has_value())
+        return;
+
+    sacm::TerminologyPackage* terminology_package = core::FindTerminologyPackage(
+        impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref);
+    if (!terminology_package) {
+        SetStatus("Terminology package not found.");
+        return;
+    }
+
+    const char* recommended[] = {"Operational Context", "System",       "Hazard / Risk",  "Evidence",
+                                 "Requirement",          "Standard",     "Project Specific", "Deprecated"};
+    int added = 0;
+    for (const char* name : recommended) {
+        if (CategoryNameExists(*terminology_package, name))
+            continue;
+        core::TerminologyCategoryDraft draft;
+        draft.name = name;
+        core::TerminologyCategoryCreateResult result = core::CreateTerminologyCategory(
+            impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref, draft);
+        if (result.success)
+            ++added;
+    }
+
+    if (added > 0) {
+        MarkTerminologyDocumentDirty(*impl_);
+        SetStatus("Added recommended terminology categories.");
+    } else {
+        SetStatus("Recommended terminology categories already exist.");
+    }
 }
 
 void AppRuntime::RefreshSacmPackageTreeCache() {

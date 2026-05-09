@@ -1874,12 +1874,16 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                 model.can_delete = can_delete;
                 model.delete_block_reason = delete_block_reason;
                 model.selected_term_ref = impl_->selected_terminology_term_ref;
+                model.selected_category_ref = impl_->selected_terminology_category_ref;
                 model.search_buffer = impl_->terminology_filter_buf;
                 model.search_buffer_size = sizeof(impl_->terminology_filter_buf);
+                model.category_filter_buffer = impl_->terminology_category_filter_buf;
+                model.category_filter_buffer_size = sizeof(impl_->terminology_category_filter_buf);
                 if (terminology_package) {
                     model.term_issues = core::ValidateTerminologyTerms(*terminology_package);
                     model.term_usage_summaries = core::BuildTerminologyTermUsageSummaries(
                         impl_->app_state.sacm_package.value(), *terminology_package);
+                    model.category_usage_summaries = core::BuildTerminologyCategoryUsageSummaries(*terminology_package);
                 }
                 ui::panels::TerminologyPackagePanelCallbacks callbacks;
                 callbacks.apply_changes = [this]() { ApplyTerminologyPackageEdits(); };
@@ -1894,6 +1898,20 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                 callbacks.delete_term = [this](const core::TerminologyTermRef& term_ref) {
                     BeginDeleteTerminologyTerm(term_ref);
                 };
+                callbacks.set_category_filter = [this](const std::string& category_filter) {
+                    SetTerminologyCategoryFilter(category_filter);
+                };
+                callbacks.add_category = [this]() { BeginAddTerminologyCategory(); };
+                callbacks.select_category = [this](const core::TerminologyCategoryRef& category_ref) {
+                    SelectTerminologyCategory(category_ref);
+                };
+                callbacks.edit_category = [this](const core::TerminologyCategoryRef& category_ref) {
+                    BeginEditTerminologyCategory(category_ref);
+                };
+                callbacks.delete_category = [this](const core::TerminologyCategoryRef& category_ref) {
+                    BeginDeleteTerminologyCategory(category_ref);
+                };
+                callbacks.seed_recommended_categories = [this]() { SeedRecommendedTerminologyCategories(); };
                 ui::panels::ShowTerminologyPackagePanel(model, callbacks);
                 ImGui::EndTabItem();
             }
@@ -2530,6 +2548,8 @@ void AppRuntime::RenderFrame(bool& done) {
     RenderDeleteTerminologyPackageModal();
     RenderTerminologyTermEditorModal();
     RenderDeleteTerminologyTermModal();
+    RenderTerminologyCategoryEditorModal();
+    RenderDeleteTerminologyCategoryModal();
     RenderSaveBeforeExitModal(done);
     RenderStartupProjectWindow();
     RenderNotImplementedModal();

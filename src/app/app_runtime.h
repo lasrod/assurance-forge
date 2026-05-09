@@ -87,6 +87,8 @@ private:
     void RenderDeleteTerminologyPackageModal();
     void RenderTerminologyTermEditorModal();
     void RenderDeleteTerminologyTermModal();
+    void RenderTerminologyCategoryEditorModal();
+    void RenderDeleteTerminologyCategoryModal();
     void RenderPreferencesWindow();
     void RenderThemeTweaksWindow();
 
@@ -108,6 +110,14 @@ private:
     void ConfirmTerminologyTermEdit();
     void BeginDeleteTerminologyTerm(const core::TerminologyTermRef& term_ref);
     void ConfirmDeleteTerminologyTerm();
+    void SelectTerminologyCategory(const core::TerminologyCategoryRef& category_ref);
+    void SetTerminologyCategoryFilter(const std::string& category_filter);
+    void BeginAddTerminologyCategory();
+    void BeginEditTerminologyCategory(const core::TerminologyCategoryRef& category_ref);
+    void ConfirmTerminologyCategoryEdit();
+    void BeginDeleteTerminologyCategory(const core::TerminologyCategoryRef& category_ref);
+    void ConfirmDeleteTerminologyCategory();
+    void SeedRecommendedTerminologyCategories();
     bool OpenFirstProjectSacmFile();
     bool TryOpenProjectManifest(const std::string& selected_path);
     bool EnsureReviewItemStorage();

@@ -287,12 +287,20 @@ static Term parse_term(pugi::xml_node node) {
     return term;
 }
 
+static Category parse_category(pugi::xml_node node) {
+    Category category;
+    parse_element_base(node, category);
+    return category;
+}
+
 static TerminologyPackage parse_terminology_package(pugi::xml_node node) {
     TerminologyPackage pkg;
     parse_element_base(node, pkg);
     for (auto child : node.children()) {
         const std::string child_name = local_name(child.name());
-        if (child_name == "term") {
+        if (child_name == "category") {
+            pkg.categories.push_back(parse_category(child));
+        } else if (child_name == "term") {
             pkg.terms.push_back(parse_term(child));
         } else if (child_name == "expression") {
             pkg.expressions.push_back(parse_expression(child));

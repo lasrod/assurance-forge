@@ -21,10 +21,14 @@ struct TerminologyPackagePanelModel {
     bool can_delete = false;
     std::string delete_block_reason;
     core::TerminologyTermRef selected_term_ref;
+    core::TerminologyCategoryRef selected_category_ref;
     char* search_buffer = nullptr;
     std::size_t search_buffer_size = 0;
+    char* category_filter_buffer = nullptr;
+    std::size_t category_filter_buffer_size = 0;
     std::vector<core::TerminologyTermIssue> term_issues;
     std::vector<core::TerminologyTermUsageSummary> term_usage_summaries;
+    std::vector<core::TerminologyCategoryUsageSummary> category_usage_summaries;
 };
 
 struct TerminologyPackagePanelCallbacks {
@@ -34,6 +38,12 @@ struct TerminologyPackagePanelCallbacks {
     std::function<void(const core::TerminologyTermRef&)> select_term;
     std::function<void(const core::TerminologyTermRef&)> edit_term;
     std::function<void(const core::TerminologyTermRef&)> delete_term;
+    std::function<void(const std::string&)> set_category_filter;
+    std::function<void()> add_category;
+    std::function<void(const core::TerminologyCategoryRef&)> select_category;
+    std::function<void(const core::TerminologyCategoryRef&)> edit_category;
+    std::function<void(const core::TerminologyCategoryRef&)> delete_category;
+    std::function<void()> seed_recommended_categories;
 };
 
 void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model, const TerminologyPackagePanelCallbacks& callbacks);

@@ -85,17 +85,25 @@ struct AppRuntimeState {
     char new_terminology_package_description_buf[2048] = {};
     bool show_delete_terminology_package_modal = false;
     core::TerminologyTermRef selected_terminology_term_ref;
+    core::TerminologyCategoryRef selected_terminology_category_ref;
     char terminology_filter_buf[256] = {};
+    char terminology_category_filter_buf[128] = {};
     bool show_terminology_term_editor_modal = false;
     bool editing_existing_terminology_term = false;
     bool show_delete_terminology_term_modal = false;
     int pending_delete_terminology_term_usage_count = 0;
+    bool show_terminology_category_editor_modal = false;
+    bool editing_existing_terminology_category = false;
+    bool show_delete_terminology_category_modal = false;
+    int pending_delete_terminology_category_term_count = 0;
     char term_value_buf[256] = {};
     char term_name_buf[256] = {};
     char term_definition_buf[2048] = {};
     char term_categories_buf[512] = {};
     char term_external_reference_buf[512] = {};
     char term_origin_buf[512] = {};
+    char category_name_buf[256] = {};
+    char category_description_buf[2048] = {};
 
     float left_ratio = 0.20f;
     float right_ratio = 0.20f;

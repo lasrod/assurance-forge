@@ -20,6 +20,8 @@ std::unordered_set<std::string> CollectElementIds(const sacm::AssuranceCasePacka
     add_base(package);
     for (const auto& terminology_package : package.terminologyPackages) {
         add_base(terminology_package);
+        for (const auto& category : terminology_package.categories)
+            add_base(category);
         for (const auto& term : terminology_package.terms)
             add_base(term);
         for (const auto& expression : terminology_package.expressions)
@@ -58,6 +60,8 @@ std::unordered_set<std::string> CollectGids(const sacm::AssuranceCasePackage& pa
     add_base(package);
     for (const auto& terminology_package : package.terminologyPackages) {
         add_base(terminology_package);
+        for (const auto& category : terminology_package.categories)
+            add_base(category);
         for (const auto& term : terminology_package.terms)
             add_base(term);
         for (const auto& expression : terminology_package.expressions)
@@ -125,8 +129,20 @@ bool MatchesRef(const sacm::Term& term, const TerminologyTermRef& term_ref) {
     return false;
 }
 
+bool MatchesRef(const sacm::Category& category, const TerminologyCategoryRef& category_ref) {
+    if (!category_ref.id.empty() && category.id == category_ref.id)
+        return true;
+    if (!category_ref.gid.empty() && category.gid == category_ref.gid)
+        return true;
+    return false;
+}
+
 TerminologyTermRef RefFor(const sacm::Term& term) {
     return TerminologyTermRef{term.id, term.gid};
+}
+
+TerminologyCategoryRef RefFor(const sacm::Category& category) {
+    return TerminologyCategoryRef{category.id, category.gid};
 }
 
 std::string TrimWhitespace(const std::string& value) {
@@ -163,6 +179,29 @@ void ApplyTermDraft(sacm::Term& term, const TerminologyTermDraft& draft) {
     term.category_refs = NormalizeCategoryRefs(draft.category_refs);
     term.externalReference = TrimWhitespace(draft.externalReference);
     term.origin = TrimWhitespace(draft.origin);
+}
+
+void ApplyCategoryDraft(sacm::Category& category, const TerminologyCategoryDraft& draft) {
+    category.name = TrimWhitespace(draft.name);
+    category.name_ml.set("en", category.name);
+    category.description = TrimWhitespace(draft.description);
+    category.description_ml.texts.erase("en");
+    if (!category.description.empty())
+        category.description_ml.set("en", category.description);
+}
+
+std::string NormalizeRef(std::string ref) {
+    ref = TrimWhitespace(ref);
+    if (!ref.empty() && ref.front() == '#')
+        ref.erase(ref.begin());
+    return ref;
+}
+
+bool MatchesCategoryRefString(const sacm::Category& category, const std::string& raw_ref) {
+    const std::string ref = NormalizeRef(raw_ref);
+    if (ref.empty())
+        return false;
+    return (!category.id.empty() && category.id == ref) || (!category.gid.empty() && category.gid == ref);
 }
 
 bool IsWordChar(char c) {
@@ -302,6 +341,10 @@ bool UpdateTerminologyPackage(sacm::AssuranceCasePackage& package,
 
 bool CanDeleteTerminologyPackage(const sacm::TerminologyPackage& package, std::string& out_reason) {
     out_reason.clear();
+    if (!package.categories.empty()) {
+        out_reason = "Terminology package contains categories.";
+        return false;
+    }
     if (!package.terms.empty()) {
         out_reason = "Terminology package contains terms.";
         return false;
@@ -433,6 +476,152 @@ bool DeleteTerminologyTerm(sacm::AssuranceCasePackage& package,
     return true;
 }
 
+sacm::Category* FindTerminologyCategory(sacm::TerminologyPackage& package,
+                                        const TerminologyCategoryRef& category_ref) {
+    for (auto& category : package.categories) {
+        if (MatchesRef(category, category_ref))
+            return &category;
+    }
+    return nullptr;
+}
+
+const sacm::Category* FindTerminologyCategory(const sacm::TerminologyPackage& package,
+                                              const TerminologyCategoryRef& category_ref) {
+    for (const auto& category : package.categories) {
+        if (MatchesRef(category, category_ref))
+            return &category;
+    }
+    return nullptr;
+}
+
+sacm::Category* FindTerminologyCategory(sacm::AssuranceCasePackage& package,
+                                        const TerminologyPackageRef& package_ref,
+                                        const TerminologyCategoryRef& category_ref) {
+    sacm::TerminologyPackage* terminology_package = FindTerminologyPackage(package, package_ref);
+    return terminology_package ? FindTerminologyCategory(*terminology_package, category_ref) : nullptr;
+}
+
+const sacm::Category* FindTerminologyCategory(const sacm::AssuranceCasePackage& package,
+                                              const TerminologyPackageRef& package_ref,
+                                              const TerminologyCategoryRef& category_ref) {
+    const sacm::TerminologyPackage* terminology_package = FindTerminologyPackage(package, package_ref);
+    return terminology_package ? FindTerminologyCategory(*terminology_package, category_ref) : nullptr;
+}
+
+TerminologyCategoryCreateResult CreateTerminologyCategory(sacm::AssuranceCasePackage& package,
+                                                          const TerminologyPackageRef& package_ref,
+                                                          const TerminologyCategoryDraft& draft) {
+    TerminologyCategoryCreateResult result;
+    if (TrimWhitespace(draft.name).empty()) {
+        result.error = "Category name is required.";
+        return result;
+    }
+
+    sacm::TerminologyPackage* terminology_package = FindTerminologyPackage(package, package_ref);
+    if (!terminology_package) {
+        result.error = "Terminology package not found.";
+        return result;
+    }
+
+    sacm::Category category;
+    category.id = GenerateUniqueId(package, "CAT");
+    category.gid = GenerateUniqueGid(package, category.id);
+    ApplyCategoryDraft(category, draft);
+    result.category_ref = RefFor(category);
+    terminology_package->categories.push_back(std::move(category));
+    result.success = true;
+    return result;
+}
+
+bool UpdateTerminologyCategory(sacm::AssuranceCasePackage& package,
+                               const TerminologyPackageRef& package_ref,
+                               const TerminologyCategoryRef& category_ref,
+                               const TerminologyCategoryDraft& draft,
+                               std::string& out_error) {
+    out_error.clear();
+    if (TrimWhitespace(draft.name).empty()) {
+        out_error = "Category name is required.";
+        return false;
+    }
+
+    sacm::Category* category = FindTerminologyCategory(package, package_ref, category_ref);
+    if (!category) {
+        out_error = "Category not found.";
+        return false;
+    }
+
+    ApplyCategoryDraft(*category, draft);
+    return true;
+}
+
+int CountTermsUsingCategory(const sacm::TerminologyPackage& package, const TerminologyCategoryRef& category_ref) {
+    const sacm::Category* category = FindTerminologyCategory(package, category_ref);
+    if (!category)
+        return 0;
+
+    int count = 0;
+    for (const auto& term : package.terms) {
+        const bool assigned = std::any_of(term.category_refs.begin(), term.category_refs.end(), [&](const std::string& ref) {
+            return MatchesCategoryRefString(*category, ref);
+        });
+        if (assigned)
+            ++count;
+    }
+    return count;
+}
+
+bool DeleteTerminologyCategory(sacm::AssuranceCasePackage& package,
+                               const TerminologyPackageRef& package_ref,
+                               const TerminologyCategoryRef& category_ref,
+                               std::string& out_error) {
+    out_error.clear();
+    sacm::TerminologyPackage* terminology_package = FindTerminologyPackage(package, package_ref);
+    if (!terminology_package) {
+        out_error = "Terminology package not found.";
+        return false;
+    }
+
+    if (CountTermsUsingCategory(*terminology_package, category_ref) > 0) {
+        out_error = "Category is assigned to one or more terms.";
+        return false;
+    }
+
+    auto it = std::find_if(terminology_package->categories.begin(),
+                           terminology_package->categories.end(),
+                           [&](const sacm::Category& category) { return MatchesRef(category, category_ref); });
+    if (it == terminology_package->categories.end()) {
+        out_error = "Category not found.";
+        return false;
+    }
+
+    terminology_package->categories.erase(it);
+    return true;
+}
+
+std::vector<TerminologyCategoryUsageSummary> BuildTerminologyCategoryUsageSummaries(
+    const sacm::TerminologyPackage& package) {
+    std::vector<TerminologyCategoryUsageSummary> summaries;
+    for (const auto& category : package.categories) {
+        const TerminologyCategoryRef ref = RefFor(category);
+        summaries.push_back({ref, CountTermsUsingCategory(package, ref)});
+    }
+    return summaries;
+}
+
+std::string CategoryDisplayName(const sacm::TerminologyPackage& package, const std::string& category_ref) {
+    const std::string ref = NormalizeRef(category_ref);
+    for (const auto& category : package.categories) {
+        if (MatchesCategoryRefString(category, ref)) {
+            if (!category.name.empty())
+                return category.name;
+            if (!category.id.empty())
+                return category.id;
+            return category.gid;
+        }
+    }
+    return ref;
+}
+
 std::vector<TerminologyTermIssue> ValidateTerminologyTerms(const sacm::TerminologyPackage& package) {
     std::vector<TerminologyTermIssue> issues;
     std::map<std::string, int> value_counts;
@@ -448,7 +637,8 @@ std::vector<TerminologyTermIssue> ValidateTerminologyTerms(const sacm::Terminolo
         if (value.empty()) {
             issues.push_back({ref, TerminologyTermIssueSeverity::Error, "Term has no value."});
         } else if (value_counts[value] > 1) {
-            issues.push_back({ref, TerminologyTermIssueSeverity::Warning,
+            issues.push_back({ref,
+                              TerminologyTermIssueSeverity::Warning,
                               "Duplicate term value exists in this terminology package."});
         }
         if (TrimWhitespace(term.description).empty()) {
@@ -470,8 +660,9 @@ int CountTerminologyTermUsage(const sacm::AssuranceCasePackage& package, const s
     return count;
 }
 
-std::vector<TerminologyTermUsageSummary> BuildTerminologyTermUsageSummaries(
-    const sacm::AssuranceCasePackage& package, const sacm::TerminologyPackage& terminology_package) {
+std::vector<TerminologyTermUsageSummary>
+BuildTerminologyTermUsageSummaries(const sacm::AssuranceCasePackage& package,
+                                   const sacm::TerminologyPackage& terminology_package) {
     std::vector<TerminologyTermUsageSummary> summaries;
     for (const auto& term : terminology_package.terms) {
         summaries.push_back({RefFor(term), CountTerminologyTermUsage(package, term)});

@@ -8,14 +8,14 @@
 namespace ui::panels {
 namespace {
 
-void RenderDisabledAction(const char* label) {
-    ImGui::BeginDisabled();
-    ImGui::Button(label);
-    ImGui::EndDisabled();
-}
+constexpr const char* kUncategorizedFilter = "__uncategorized";
 
 core::TerminologyTermRef RefFor(const sacm::Term& term) {
     return core::TerminologyTermRef{term.id, term.gid};
+}
+
+core::TerminologyCategoryRef RefFor(const sacm::Category& category) {
+    return core::TerminologyCategoryRef{category.id, category.gid};
 }
 
 bool SameRef(const core::TerminologyTermRef& left, const core::TerminologyTermRef& right) {
@@ -23,6 +23,34 @@ bool SameRef(const core::TerminologyTermRef& left, const core::TerminologyTermRe
         return true;
     if (!left.gid.empty() && !right.gid.empty() && left.gid == right.gid)
         return true;
+    return false;
+}
+
+bool SameRef(const core::TerminologyCategoryRef& left, const core::TerminologyCategoryRef& right) {
+    if (!left.id.empty() && !right.id.empty() && left.id == right.id)
+        return true;
+    if (!left.gid.empty() && !right.gid.empty() && left.gid == right.gid)
+        return true;
+    return false;
+}
+
+std::string RefValue(const core::TerminologyCategoryRef& ref) {
+    return !ref.id.empty() ? ref.id : ref.gid;
+}
+
+bool CategoryMatchesRef(const sacm::Category& category, const std::string& ref) {
+    return (!category.id.empty() && category.id == ref) || (!category.gid.empty() && category.gid == ref);
+}
+
+bool TermHasCategoryRef(const sacm::TerminologyPackage& package, const sacm::Term& term, const std::string& category_ref) {
+    for (const auto& ref : term.category_refs) {
+        if (ref == category_ref)
+            return true;
+        for (const auto& category : package.categories) {
+            if (CategoryMatchesRef(category, category_ref) && CategoryMatchesRef(category, ref))
+                return true;
+        }
+    }
     return false;
 }
 
@@ -38,6 +66,18 @@ std::string JoinCategoryRefs(const std::vector<std::string>& refs) {
     return result;
 }
 
+std::string JoinCategoryNames(const sacm::TerminologyPackage& package, const std::vector<std::string>& refs) {
+    std::string result;
+    for (const auto& ref : refs) {
+        if (ref.empty())
+            continue;
+        if (!result.empty())
+            result += ", ";
+        result += core::CategoryDisplayName(package, ref);
+    }
+    return result;
+}
+
 std::string ToLower(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) { return std::tolower(c); });
     return value;
@@ -49,12 +89,24 @@ bool ContainsInsensitive(const std::string& haystack, const std::string& needle)
     return ToLower(haystack).find(ToLower(needle)) != std::string::npos;
 }
 
-bool MatchesFilter(const sacm::Term& term, const std::string& filter) {
+bool MatchesFilter(const sacm::TerminologyPackage& package, const sacm::Term& term, const std::string& filter) {
     if (filter.empty())
         return true;
     return ContainsInsensitive(term.value, filter) || ContainsInsensitive(term.name, filter) ||
-           ContainsInsensitive(term.description, filter) || ContainsInsensitive(JoinCategoryRefs(term.category_refs), filter) ||
+           ContainsInsensitive(term.description, filter) ||
+           ContainsInsensitive(JoinCategoryNames(package, term.category_refs), filter) ||
+           ContainsInsensitive(JoinCategoryRefs(term.category_refs), filter) ||
            ContainsInsensitive(term.externalReference, filter) || ContainsInsensitive(term.origin, filter);
+}
+
+bool MatchesCategoryFilter(const sacm::TerminologyPackage& package,
+                           const sacm::Term& term,
+                           const std::string& category_filter) {
+    if (category_filter.empty())
+        return true;
+    if (category_filter == kUncategorizedFilter)
+        return term.category_refs.empty();
+    return TermHasCategoryRef(package, term, category_filter);
 }
 
 int UsageCountFor(const core::TerminologyTermRef& ref,
@@ -66,8 +118,17 @@ int UsageCountFor(const core::TerminologyTermRef& ref,
     return 0;
 }
 
-std::vector<core::TerminologyTermIssue> IssuesFor(
-    const core::TerminologyTermRef& ref, const std::vector<core::TerminologyTermIssue>& issues) {
+int UsageCountFor(const core::TerminologyCategoryRef& ref,
+                  const std::vector<core::TerminologyCategoryUsageSummary>& summaries) {
+    for (const auto& summary : summaries) {
+        if (SameRef(summary.category_ref, ref))
+            return summary.term_count;
+    }
+    return 0;
+}
+
+std::vector<core::TerminologyTermIssue> IssuesFor(const core::TerminologyTermRef& ref,
+                                                  const std::vector<core::TerminologyTermIssue>& issues) {
     std::vector<core::TerminologyTermIssue> result;
     for (const auto& issue : issues) {
         if (SameRef(issue.term_ref, ref))
@@ -128,8 +189,9 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
 
     int visible_rows = 0;
     const std::string filter = model.search_buffer ? model.search_buffer : "";
+    const std::string category_filter = model.category_filter_buffer ? model.category_filter_buffer : "";
     for (const auto& term : model.package->terms) {
-        if (!MatchesFilter(term, filter))
+        if (!MatchesFilter(*model.package, term, filter) || !MatchesCategoryFilter(*model.package, term, category_filter))
             continue;
 
         ++visible_rows;
@@ -140,7 +202,8 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
         ImGui::PushID(term.id.empty() ? term.gid.c_str() : term.id.c_str());
-        if (ImGui::Selectable(term.value.empty() ? "<empty>" : term.value.c_str(), selected, ImGuiSelectableFlags_SpanAllColumns) &&
+        if (ImGui::Selectable(
+                term.value.empty() ? "<empty>" : term.value.c_str(), selected, ImGuiSelectableFlags_SpanAllColumns) &&
             callbacks.select_term) {
             callbacks.select_term(ref);
         }
@@ -154,7 +217,7 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
         ImGui::TableSetColumnIndex(2);
         ImGui::TextUnformatted(term.description.c_str());
         ImGui::TableSetColumnIndex(3);
-        const std::string categories = JoinCategoryRefs(term.category_refs);
+        const std::string categories = JoinCategoryNames(*model.package, term.category_refs);
         ImGui::TextUnformatted(categories.c_str());
         ImGui::TableSetColumnIndex(4);
         ImGui::TextUnformatted(term.externalReference.c_str());
@@ -168,6 +231,81 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
         ImGui::TextDisabled("No terms");
+    }
+
+    ImGui::EndTable();
+}
+
+std::string CategoryPreview(const TerminologyPackagePanelModel& model) {
+    const std::string filter = model.category_filter_buffer ? model.category_filter_buffer : "";
+    if (filter.empty())
+        return "All categories";
+    if (filter == kUncategorizedFilter)
+        return "Uncategorized";
+    return core::CategoryDisplayName(*model.package, filter);
+}
+
+void RenderCategoryFilter(const TerminologyPackagePanelModel& model,
+                          const TerminologyPackagePanelCallbacks& callbacks) {
+    const std::string active_filter = model.category_filter_buffer ? model.category_filter_buffer : "";
+    const std::string preview = CategoryPreview(model);
+    ImGui::SetNextItemWidth(220.0f);
+    if (ImGui::BeginCombo("Category filter", preview.c_str())) {
+        if (ImGui::Selectable("All categories", active_filter.empty()) && callbacks.set_category_filter)
+            callbacks.set_category_filter("");
+        if (ImGui::Selectable("Uncategorized", active_filter == kUncategorizedFilter) && callbacks.set_category_filter)
+            callbacks.set_category_filter(kUncategorizedFilter);
+        for (const auto& category : model.package->categories) {
+            const core::TerminologyCategoryRef ref = RefFor(category);
+            const std::string value = RefValue(ref);
+            const bool selected = active_filter == value;
+            const std::string label = category.name.empty() ? value : category.name;
+            if (ImGui::Selectable(label.c_str(), selected) && callbacks.set_category_filter)
+                callbacks.set_category_filter(value);
+            if (selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+}
+
+void RenderCategoriesTable(const TerminologyPackagePanelModel& model,
+                           const TerminologyPackagePanelCallbacks& callbacks) {
+    if (!ImGui::BeginTable(
+            "##categories_table", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
+        return;
+
+    ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+    ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 180.0f);
+    ImGui::TableSetupColumn("Description", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+    ImGui::TableSetupColumn("Used By", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+    ImGui::TableHeadersRow();
+
+    for (const auto& category : model.package->categories) {
+        const core::TerminologyCategoryRef ref = RefFor(category);
+        const std::string id = RefValue(ref);
+        const bool selected = SameRef(ref, model.selected_category_ref);
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::PushID(id.c_str());
+        if (ImGui::Selectable(id.c_str(), selected, ImGuiSelectableFlags_SpanAllColumns) && callbacks.select_category)
+            callbacks.select_category(ref);
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && callbacks.edit_category)
+            callbacks.edit_category(ref);
+        ImGui::PopID();
+        ImGui::TableSetColumnIndex(1);
+        ImGui::TextUnformatted(category.name.c_str());
+        ImGui::TableSetColumnIndex(2);
+        ImGui::TextUnformatted(category.description.c_str());
+        ImGui::TableSetColumnIndex(3);
+        ImGui::Text("%d", UsageCountFor(ref, model.category_usage_summaries));
+    }
+
+    if (model.package->categories.empty()) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::TextDisabled("No categories");
     }
 
     ImGui::EndTable();
@@ -237,7 +375,10 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     if (callbacks.delete_term && (model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty()))
         ImGui::EndDisabled();
     ImGui::SameLine();
-    RenderDisabledAction("Add Category##terms_add_category");
+    if (ImGui::Button("Add Category##terms_add_category") && callbacks.add_category)
+        callbacks.add_category();
+    ImGui::SameLine();
+    RenderCategoryFilter(model, callbacks);
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::InputText("Search", model.search_buffer, model.search_buffer_size);
     ImGui::Spacing();
@@ -251,20 +392,30 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
 
     ImGui::Spacing();
     ImGui::SeparatorText("Categories");
-    RenderDisabledAction("Add Category##categories_add_category");
-    ImGui::Spacing();
-    if (ImGui::BeginTable(
-            "##categories_table", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable)) {
-        ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 120.0f);
-        ImGui::TableSetupColumn("Name");
-        ImGui::TableHeadersRow();
-        ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0);
-        ImGui::TextDisabled("No categories");
-        ImGui::TableSetColumnIndex(1);
-        ImGui::TextDisabled("-");
-        ImGui::EndTable();
+    if (ImGui::Button("Add Category##categories_add_category") && callbacks.add_category)
+        callbacks.add_category();
+    ImGui::SameLine();
+    const bool has_selected_category = !model.selected_category_ref.id.empty() || !model.selected_category_ref.gid.empty();
+    if (!has_selected_category)
+        ImGui::BeginDisabled();
+    if (ImGui::Button("Edit Category") && callbacks.edit_category)
+        callbacks.edit_category(model.selected_category_ref);
+    if (!has_selected_category)
+        ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (!has_selected_category)
+        ImGui::BeginDisabled();
+    if (ImGui::Button("Delete Category") && callbacks.delete_category)
+        callbacks.delete_category(model.selected_category_ref);
+    if (!has_selected_category)
+        ImGui::EndDisabled();
+    if (model.package->categories.empty() && callbacks.seed_recommended_categories) {
+        ImGui::SameLine();
+        if (ImGui::Button("Add Recommended"))
+            callbacks.seed_recommended_categories();
     }
+    ImGui::Spacing();
+    RenderCategoriesTable(model, callbacks);
 
     ImGui::EndChild();
 }

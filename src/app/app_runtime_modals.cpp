@@ -10,7 +10,9 @@
 #include <algorithm>
 #include <cctype>
 #include <cstring>
+#include <sstream>
 #include <string>
+#include <vector>
 
 namespace app {
 namespace {
@@ -55,6 +57,80 @@ bool CurrentTermValueHasDuplicate(const AppRuntimeState& state, const std::strin
             return true;
     }
     return false;
+}
+
+std::vector<std::string> SplitCategoryRefs(const std::string& raw) {
+    std::string normalized = raw;
+    std::replace(normalized.begin(), normalized.end(), ',', ' ');
+    std::stringstream stream(normalized);
+    std::vector<std::string> refs;
+    std::string item;
+    while (stream >> item) {
+        item = TrimWhitespace(item);
+        if (!item.empty() && item.front() == '#')
+            item.erase(item.begin());
+        if (!item.empty() && std::find(refs.begin(), refs.end(), item) == refs.end())
+            refs.push_back(item);
+    }
+    return refs;
+}
+
+std::string JoinCategoryRefs(const std::vector<std::string>& refs) {
+    std::string result;
+    for (const auto& ref : refs) {
+        if (ref.empty())
+            continue;
+        if (!result.empty())
+            result += ", ";
+        result += ref;
+    }
+    return result;
+}
+
+bool ContainsCategoryRef(const std::vector<std::string>& refs, const std::string& ref) {
+    return std::find(refs.begin(), refs.end(), ref) != refs.end();
+}
+
+void SetCategoryChecked(AppRuntimeState& state, const sacm::Category& category, bool checked) {
+    std::vector<std::string> refs = SplitCategoryRefs(state.term_categories_buf);
+    const std::string ref = !category.id.empty() ? category.id : category.gid;
+    if (checked) {
+        if (!ContainsCategoryRef(refs, ref))
+            refs.push_back(ref);
+    } else {
+        refs.erase(std::remove(refs.begin(), refs.end(), ref), refs.end());
+        if (!category.id.empty())
+            refs.erase(std::remove(refs.begin(), refs.end(), category.id), refs.end());
+        if (!category.gid.empty())
+            refs.erase(std::remove(refs.begin(), refs.end(), category.gid), refs.end());
+    }
+    CopyToBuffer(state.term_categories_buf, sizeof(state.term_categories_buf), JoinCategoryRefs(refs));
+}
+
+void RenderTermCategoryPicker(AppRuntimeState& state) {
+    const sacm::TerminologyPackage* package = nullptr;
+    if (state.app_state.sacm_package.has_value()) {
+        package = core::FindTerminologyPackage(state.app_state.sacm_package.value(), state.selected_terminology_package_ref);
+    }
+
+    ImGui::TextUnformatted("Categories");
+    if (!package || package->categories.empty()) {
+        ImGui::TextDisabled("No categories are available in this terminology package.");
+        return;
+    }
+
+    std::vector<std::string> refs = SplitCategoryRefs(state.term_categories_buf);
+    const float list_height = ImGui::GetTextLineHeightWithSpacing() * 5.0f;
+    if (ImGui::BeginChild("##term_category_picker", ImVec2(460.0f, list_height), true)) {
+        for (const auto& category : package->categories) {
+            const std::string ref = !category.id.empty() ? category.id : category.gid;
+            bool selected = ContainsCategoryRef(refs, ref) || ContainsCategoryRef(refs, category.gid);
+            const std::string label = (category.name.empty() ? ref : category.name) + "##" + ref;
+            if (ImGui::Checkbox(label.c_str(), &selected))
+                SetCategoryChecked(state, category, selected);
+        }
+    }
+    ImGui::EndChild();
 }
 
 } // namespace
@@ -432,12 +508,10 @@ void AppRuntime::RenderTerminologyTermEditorModal() {
         ImGui::SetNextItemWidth(460.0f);
         ImGui::InputTextMultiline(
             "Definition", impl_->term_definition_buf, sizeof(impl_->term_definition_buf), ImVec2(460.0f, 110.0f));
+        RenderTermCategoryPicker(*impl_);
         ImGui::SetNextItemWidth(460.0f);
-        ImGui::InputText("Categories", impl_->term_categories_buf, sizeof(impl_->term_categories_buf));
-        ImGui::SetNextItemWidth(460.0f);
-        ImGui::InputText("External Reference",
-                         impl_->term_external_reference_buf,
-                         sizeof(impl_->term_external_reference_buf));
+        ImGui::InputText(
+            "External Reference", impl_->term_external_reference_buf, sizeof(impl_->term_external_reference_buf));
         ImGui::SetNextItemWidth(460.0f);
         ImGui::InputText("Origin", impl_->term_origin_buf, sizeof(impl_->term_origin_buf));
 
@@ -498,6 +572,78 @@ void AppRuntime::RenderDeleteTerminologyTermModal() {
         ImGui::EndPopup();
     } else if (impl_->show_delete_terminology_term_modal) {
         ImGui::OpenPopup("Delete Term");
+    }
+}
+
+void AppRuntime::RenderTerminologyCategoryEditorModal() {
+    if (!impl_->show_terminology_category_editor_modal)
+        return;
+
+    const char* title = impl_->editing_existing_terminology_category ? "Edit Category" : "Create Category";
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::SetNextItemWidth(420.0f);
+        ImGui::InputText("Category name", impl_->category_name_buf, sizeof(impl_->category_name_buf));
+        ImGui::SetNextItemWidth(420.0f);
+        ImGui::InputTextMultiline("Category description",
+                                  impl_->category_description_buf,
+                                  sizeof(impl_->category_description_buf),
+                                  ImVec2(420.0f, 96.0f));
+
+        const bool can_save = !TrimWhitespace(impl_->category_name_buf).empty();
+        if (!can_save)
+            ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.2f, 1.0f), "Category name is required.");
+
+        ImGui::Spacing();
+        if (!can_save)
+            ImGui::BeginDisabled();
+        if (ImGui::Button(impl_->editing_existing_terminology_category ? "Save" : "Create", ImVec2(100.0f, 0.0f))) {
+            ConfirmTerminologyCategoryEdit();
+            if (!impl_->show_terminology_category_editor_modal)
+                ImGui::CloseCurrentPopup();
+        }
+        if (!can_save)
+            ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(100.0f, 0.0f))) {
+            impl_->show_terminology_category_editor_modal = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    } else if (impl_->show_terminology_category_editor_modal) {
+        ImGui::OpenPopup(title);
+    }
+}
+
+void AppRuntime::RenderDeleteTerminologyCategoryModal() {
+    if (!impl_->show_delete_terminology_category_modal)
+        return;
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal("Delete Category", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped("Delete this category?");
+        if (impl_->pending_delete_terminology_category_term_count > 0) {
+            ImGui::TextWrapped("This category is assigned to %d term(s). Remove those assignments before deleting it.",
+                               impl_->pending_delete_terminology_category_term_count);
+        }
+        ImGui::Spacing();
+        if (impl_->pending_delete_terminology_category_term_count > 0)
+            ImGui::BeginDisabled();
+        if (ImGui::Button("Delete", ImVec2(100.0f, 0.0f))) {
+            ConfirmDeleteTerminologyCategory();
+            if (!impl_->show_delete_terminology_category_modal)
+                ImGui::CloseCurrentPopup();
+        }
+        if (impl_->pending_delete_terminology_category_term_count > 0)
+            ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(100.0f, 0.0f))) {
+            impl_->show_delete_terminology_category_modal = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    } else if (impl_->show_delete_terminology_category_modal) {
+        ImGui::OpenPopup("Delete Category");
     }
 }
 

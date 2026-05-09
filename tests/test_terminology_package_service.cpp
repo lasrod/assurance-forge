@@ -77,8 +77,86 @@ TEST(TerminologyPackageService, DeleteOnlyAllowsEmptyPackages) {
     EXPECT_FALSE(error.empty());
 
     package.terminologyPackages.front().terms.clear();
+    package.terminologyPackages.front().categories.push_back(sacm::Category{});
+    EXPECT_FALSE(core::DeleteTerminologyPackage(package, created.package_ref, error));
+    EXPECT_EQ(package.terminologyPackages.size(), 1u);
+    EXPECT_FALSE(error.empty());
+
+    package.terminologyPackages.front().categories.clear();
     ASSERT_TRUE(core::DeleteTerminologyPackage(package, created.package_ref, error)) << error;
     EXPECT_TRUE(package.terminologyPackages.empty());
+}
+
+TEST(TerminologyPackageService, CreateUpdateAndDeleteCategory) {
+    sacm::AssuranceCasePackage package = MakePackage();
+    core::TerminologyPackageCreateResult terminology_package = core::CreateTerminologyPackage(package, "Terms", "");
+    ASSERT_TRUE(terminology_package.success);
+
+    core::TerminologyCategoryDraft draft;
+    draft.name = "Operational Context";
+    draft.description = "Terms describing the intended operating context.";
+    core::TerminologyCategoryCreateResult created =
+        core::CreateTerminologyCategory(package, terminology_package.package_ref, draft);
+    ASSERT_TRUE(created.success) << created.error;
+    EXPECT_EQ(created.category_ref.id, "CAT1");
+    EXPECT_EQ(created.category_ref.gid, "gid-CAT1");
+
+    const sacm::Category* category =
+        core::FindTerminologyCategory(package, terminology_package.package_ref, created.category_ref);
+    ASSERT_NE(category, nullptr);
+    EXPECT_EQ(category->name, "Operational Context");
+    EXPECT_EQ(category->description, "Terms describing the intended operating context.");
+
+    core::TerminologyCategoryDraft update;
+    update.name = "Operational Domain";
+    update.description = "Updated category description.";
+    std::string error;
+    ASSERT_TRUE(core::UpdateTerminologyCategory(
+        package, terminology_package.package_ref, created.category_ref, update, error))
+        << error;
+
+    category = core::FindTerminologyCategory(package, terminology_package.package_ref, created.category_ref);
+    ASSERT_NE(category, nullptr);
+    EXPECT_EQ(category->name, "Operational Domain");
+    EXPECT_EQ(category->description, "Updated category description.");
+
+    ASSERT_TRUE(core::DeleteTerminologyCategory(package, terminology_package.package_ref, created.category_ref, error))
+        << error;
+    const sacm::TerminologyPackage* terms = core::FindTerminologyPackage(package, terminology_package.package_ref);
+    ASSERT_NE(terms, nullptr);
+    EXPECT_TRUE(terms->categories.empty());
+}
+
+TEST(TerminologyPackageService, CategoryDeletionIsBlockedWhenAssignedToTerm) {
+    sacm::AssuranceCasePackage package = MakePackage();
+    core::TerminologyPackageCreateResult terminology_package = core::CreateTerminologyPackage(package, "Terms", "");
+    ASSERT_TRUE(terminology_package.success);
+
+    core::TerminologyCategoryDraft category_draft;
+    category_draft.name = "Hazard / Risk";
+    core::TerminologyCategoryCreateResult category =
+        core::CreateTerminologyCategory(package, terminology_package.package_ref, category_draft);
+    ASSERT_TRUE(category.success);
+
+    core::TerminologyTermDraft term_draft;
+    term_draft.value = "hazard";
+    term_draft.description = "A potential source of harm.";
+    term_draft.category_refs = {category.category_ref.id};
+    ASSERT_TRUE(core::CreateTerminologyTerm(package, terminology_package.package_ref, term_draft).success);
+
+    const sacm::TerminologyPackage* terms = core::FindTerminologyPackage(package, terminology_package.package_ref);
+    ASSERT_NE(terms, nullptr);
+    EXPECT_EQ(core::CountTermsUsingCategory(*terms, category.category_ref), 1);
+
+    std::vector<core::TerminologyCategoryUsageSummary> summaries =
+        core::BuildTerminologyCategoryUsageSummaries(*terms);
+    ASSERT_EQ(summaries.size(), 1u);
+    EXPECT_EQ(summaries.front().term_count, 1);
+    EXPECT_EQ(core::CategoryDisplayName(*terms, category.category_ref.id), "Hazard / Risk");
+
+    std::string error;
+    EXPECT_FALSE(core::DeleteTerminologyCategory(package, terminology_package.package_ref, category.category_ref, error));
+    EXPECT_FALSE(error.empty());
 }
 
 TEST(TerminologyPackageService, CreateUpdateAndDeleteTerm) {
@@ -126,7 +204,8 @@ TEST(TerminologyPackageService, CreateUpdateAndDeleteTerm) {
     ASSERT_EQ(term->category_refs.size(), 1u);
     EXPECT_EQ(term->category_refs.front(), "cat-risk");
 
-    ASSERT_TRUE(core::DeleteTerminologyTerm(package, terminology_package.package_ref, created.term_ref, error)) << error;
+    ASSERT_TRUE(core::DeleteTerminologyTerm(package, terminology_package.package_ref, created.term_ref, error))
+        << error;
     const sacm::TerminologyPackage* terms = core::FindTerminologyPackage(package, terminology_package.package_ref);
     ASSERT_NE(terms, nullptr);
     EXPECT_TRUE(terms->terms.empty());
@@ -164,20 +243,26 @@ TEST(TerminologyPackageService, ValidatesDuplicateMissingDescriptionAndNoCategor
     ASSERT_NE(terms, nullptr);
     std::vector<core::TerminologyTermIssue> issues = core::ValidateTerminologyTerms(*terms);
 
-    EXPECT_NE(std::find_if(issues.begin(), issues.end(), [](const core::TerminologyTermIssue& issue) {
-                  return issue.severity == core::TerminologyTermIssueSeverity::Warning &&
-                         issue.message.find("Duplicate") != std::string::npos;
-              }),
+    EXPECT_NE(std::find_if(issues.begin(),
+                           issues.end(),
+                           [](const core::TerminologyTermIssue& issue) {
+                               return issue.severity == core::TerminologyTermIssueSeverity::Warning &&
+                                      issue.message.find("Duplicate") != std::string::npos;
+                           }),
               issues.end());
-    EXPECT_NE(std::find_if(issues.begin(), issues.end(), [](const core::TerminologyTermIssue& issue) {
-                  return issue.severity == core::TerminologyTermIssueSeverity::Warning &&
-                         issue.message.find("description") != std::string::npos;
-              }),
+    EXPECT_NE(std::find_if(issues.begin(),
+                           issues.end(),
+                           [](const core::TerminologyTermIssue& issue) {
+                               return issue.severity == core::TerminologyTermIssueSeverity::Warning &&
+                                      issue.message.find("description") != std::string::npos;
+                           }),
               issues.end());
-    EXPECT_NE(std::find_if(issues.begin(), issues.end(), [](const core::TerminologyTermIssue& issue) {
-                  return issue.severity == core::TerminologyTermIssueSeverity::Info &&
-                         issue.message.find("category") != std::string::npos;
-              }),
+    EXPECT_NE(std::find_if(issues.begin(),
+                           issues.end(),
+                           [](const core::TerminologyTermIssue& issue) {
+                               return issue.severity == core::TerminologyTermIssueSeverity::Info &&
+                                      issue.message.find("category") != std::string::npos;
+                           }),
               issues.end());
 }
 
@@ -230,7 +315,8 @@ TEST(TerminologyPackageService, CreatedPackageSerializesAndParses) {
 
 TEST(TerminologyPackageService, CreatedTermsSerializeAndParse) {
     sacm::AssuranceCasePackage package = MakePackage();
-    core::TerminologyPackageCreateResult terminology_package = core::CreateTerminologyPackage(package, "Vocabulary", "");
+    core::TerminologyPackageCreateResult terminology_package =
+        core::CreateTerminologyPackage(package, "Vocabulary", "");
     ASSERT_TRUE(terminology_package.success);
 
     core::TerminologyTermDraft first;
@@ -253,7 +339,8 @@ TEST(TerminologyPackageService, CreatedTermsSerializeAndParse) {
     sacm::SacmParseResult parsed = sacm::parse_sacm_string(xml);
     ASSERT_TRUE(parsed.success) << parsed.error_message;
 
-    const sacm::TerminologyPackage* reparsed = core::FindTerminologyPackage(parsed.package, terminology_package.package_ref);
+    const sacm::TerminologyPackage* reparsed =
+        core::FindTerminologyPackage(parsed.package, terminology_package.package_ref);
     ASSERT_NE(reparsed, nullptr);
     ASSERT_EQ(reparsed->terms.size(), 2u);
     EXPECT_EQ(reparsed->terms[0].value, "hazard");
@@ -264,4 +351,42 @@ TEST(TerminologyPackageService, CreatedTermsSerializeAndParse) {
     EXPECT_EQ(reparsed->terms[0].externalReference, "ISO 26262");
     EXPECT_EQ(reparsed->terms[0].origin, "Imported");
     EXPECT_EQ(reparsed->terms[1].value, "hazard");
+}
+
+TEST(TerminologyPackageService, CreatedCategoriesSerializeAndParseWithTermAssignments) {
+    sacm::AssuranceCasePackage package = MakePackage();
+    core::TerminologyPackageCreateResult terminology_package =
+        core::CreateTerminologyPackage(package, "Vocabulary", "");
+    ASSERT_TRUE(terminology_package.success);
+
+    core::TerminologyCategoryDraft category_draft;
+    category_draft.name = "Operational Context";
+    category_draft.description = "Operating conditions and boundaries.";
+    core::TerminologyCategoryCreateResult category =
+        core::CreateTerminologyCategory(package, terminology_package.package_ref, category_draft);
+    ASSERT_TRUE(category.success);
+
+    core::TerminologyTermDraft term;
+    term.value = "ODD";
+    term.name = "Operational Design Domain";
+    term.description = "The operating conditions under which the system is intended to function.";
+    term.category_refs = {category.category_ref.id};
+    ASSERT_TRUE(core::CreateTerminologyTerm(package, terminology_package.package_ref, term).success);
+
+    std::string xml = sacm::serialize_sacm(package);
+    ASSERT_FALSE(xml.empty());
+
+    sacm::SacmParseResult parsed = sacm::parse_sacm_string(xml);
+    ASSERT_TRUE(parsed.success) << parsed.error_message;
+
+    const sacm::TerminologyPackage* reparsed =
+        core::FindTerminologyPackage(parsed.package, terminology_package.package_ref);
+    ASSERT_NE(reparsed, nullptr);
+    ASSERT_EQ(reparsed->categories.size(), 1u);
+    EXPECT_EQ(reparsed->categories.front().id, category.category_ref.id);
+    EXPECT_EQ(reparsed->categories.front().name, "Operational Context");
+    EXPECT_EQ(reparsed->categories.front().description, "Operating conditions and boundaries.");
+    ASSERT_EQ(reparsed->terms.size(), 1u);
+    ASSERT_EQ(reparsed->terms.front().category_refs.size(), 1u);
+    EXPECT_EQ(reparsed->terms.front().category_refs.front(), category.category_ref.id);
 }
