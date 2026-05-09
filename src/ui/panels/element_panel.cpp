@@ -195,11 +195,10 @@ struct TerminologySuggestion {
     std::vector<core::TerminologyScopedTermRef> candidates;
 };
 
-std::vector<TerminologySuggestion>
-BuildTerminologySuggestions(const sacm::AssuranceCasePackage* sacm_pkg,
-                            const std::string& element_id,
-                            const std::string& text,
-                            const ElementTerminologyAssistCallbacks* callbacks) {
+std::vector<TerminologySuggestion> BuildTerminologySuggestions(const sacm::AssuranceCasePackage* sacm_pkg,
+                                                               const std::string& element_id,
+                                                               const std::string& text,
+                                                               const ElementTerminologyAssistCallbacks* callbacks) {
     std::vector<TerminologySuggestion> suggestions;
     if (!sacm_pkg || !callbacks || text.empty())
         return suggestions;
@@ -254,12 +253,12 @@ void RenderTerminologySuggestions(const sacm::AssuranceCasePackage* sacm_pkg,
     for (const TerminologySuggestion& suggestion : suggestions) {
         ImGui::PushID(suggestion.text.c_str());
         if (suggestion.kind == TerminologySuggestion::Kind::AmbiguousTerm) {
-            ImGui::TextColored(
-                ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "%s has multiple meanings.", suggestion.text.c_str());
+            ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "%s has multiple meanings.", suggestion.text.c_str());
             int candidate_index = 0;
             for (const auto& candidate : suggestion.candidates) {
                 ImGui::PushID(candidate_index++);
-                const std::string term_name = candidate.term && !candidate.term->name.empty() ? candidate.term->name : "Unnamed term";
+                const std::string term_name =
+                    candidate.term && !candidate.term->name.empty() ? candidate.term->name : "Unnamed term";
                 ImGui::BulletText("%s", term_name.c_str());
                 if (callbacks && callbacks->use_term_for_element) {
                     ImGui::SameLine();

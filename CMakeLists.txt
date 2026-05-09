@@ -186,6 +186,7 @@ set(ASSURANCE_FORGE_SHARED_SOURCES
     src/ui/panels/review_panel.cpp
     src/ui/panels/sacm_viewer_panel.cpp
     src/ui/panels/terminology_package_panel.cpp
+    src/ui/panels/terminology_usages_panel.cpp
     src/ui/widgets/splitter.cpp
     src/ui/gsn/gsn_canvas.cpp
     src/ui/gsn/gsn_layout.cpp

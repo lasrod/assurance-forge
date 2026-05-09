@@ -38,6 +38,7 @@ struct TerminologyPackagePanelCallbacks {
     std::function<void(const core::TerminologyTermRef&)> select_term;
     std::function<void(const core::TerminologyTermRef&)> edit_term;
     std::function<void(const core::TerminologyTermRef&)> delete_term;
+    std::function<void(const core::TerminologyTermRef&)> find_term_usages;
     std::function<void(const std::string&)> set_category_filter;
     std::function<void()> add_category;
     std::function<void(const core::TerminologyCategoryRef&)> select_category;

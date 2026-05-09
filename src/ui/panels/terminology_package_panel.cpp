@@ -227,7 +227,16 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
         ImGui::TableSetColumnIndex(5);
         ImGui::TextUnformatted(term.origin.c_str());
         ImGui::TableSetColumnIndex(6);
-        ImGui::Text("%d", UsageCountFor(ref, model.term_usage_summaries));
+        const int usage_count = UsageCountFor(ref, model.term_usage_summaries);
+        if (callbacks.find_term_usages) {
+            const std::string label = std::to_string(usage_count) + "##find_usages";
+            if (ImGui::SmallButton(label.c_str()))
+                callbacks.find_term_usages(ref);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Find usages");
+        } else {
+            ImGui::Text("%d", usage_count);
+        }
     }
 
     if (visible_rows == 0) {
@@ -376,6 +385,13 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     if (ImGui::Button("Delete Term") && callbacks.delete_term)
         callbacks.delete_term(model.selected_term_ref);
     if (callbacks.delete_term && (model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty()))
+        ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (callbacks.find_term_usages && (model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty()))
+        ImGui::BeginDisabled();
+    if (ImGui::Button("Find Usages") && callbacks.find_term_usages)
+        callbacks.find_term_usages(model.selected_term_ref);
+    if (callbacks.find_term_usages && (model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty()))
         ImGui::EndDisabled();
     ImGui::SameLine();
     if (ImGui::Button("Add Category##terms_add_category") && callbacks.add_category)

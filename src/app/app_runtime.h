@@ -8,6 +8,7 @@
 #include "core/tree_editing.h"
 #include "sacm/sacm_package_tree.h"
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -116,8 +117,11 @@ private:
     void AddTerminologyTermAsContextFromCanvas(const std::string& element_id,
                                                const core::TerminologyPackageRef& package_ref,
                                                const core::TerminologyTermRef& term_ref);
+    void BeginFindTerminologyUsages(const core::TerminologyPackageRef& package_ref,
+                                    const core::TerminologyTermRef& term_ref);
     void FindTerminologyUsagesFromCanvas(const core::TerminologyPackageRef& package_ref,
                                          const core::TerminologyTermRef& term_ref);
+    void NavigateToTerminologyUsage(std::size_t usage_index);
     void ChangeTerminologyMeaningFromCanvas(const std::string& element_id, const std::string& term_value);
     void BeginQuickDefineTerminologyTerm(const std::string& element_id, const std::string& term_value);
     void BeginLinkExistingTerminologyTerm(const std::string& element_id, const std::string& term_value);

@@ -33,6 +33,7 @@
 #include "ui/panels/review_panel.h"
 #include "ui/panels/sacm_viewer_panel.h"
 #include "ui/panels/terminology_package_panel.h"
+#include "ui/panels/terminology_usages_panel.h"
 #include "ui/register_views.h"
 #include "ui/theme.h"
 #include "ui/tree_view.h"
@@ -647,13 +648,12 @@ bool HasArtifactReference(const sacm::ArgumentPackage& argument_package, const s
 }
 
 bool HasAssertedContext(const sacm::ArgumentPackage& argument_package, const sacm::AssertedContext& candidate) {
-    return std::any_of(argument_package.assertedContexts.begin(),
-                       argument_package.assertedContexts.end(),
-                       [&](const auto& existing) {
-                           return (!candidate.id.empty() && existing.id == candidate.id) ||
-                                  (!candidate.gid.empty() && existing.gid == candidate.gid) ||
-                                  (existing.sources == candidate.sources && existing.targets == candidate.targets);
-                       });
+    return std::any_of(
+        argument_package.assertedContexts.begin(), argument_package.assertedContexts.end(), [&](const auto& existing) {
+            return (!candidate.id.empty() && existing.id == candidate.id) ||
+                   (!candidate.gid.empty() && existing.gid == candidate.gid) ||
+                   (existing.sources == candidate.sources && existing.targets == candidate.targets);
+        });
 }
 
 void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sacm::AssuranceCasePackage& package) {
@@ -2079,6 +2079,9 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                 callbacks.delete_term = [this](const core::TerminologyTermRef& term_ref) {
                     BeginDeleteTerminologyTerm(term_ref);
                 };
+                callbacks.find_term_usages = [this](const core::TerminologyTermRef& term_ref) {
+                    BeginFindTerminologyUsages(impl_->selected_terminology_package_ref, term_ref);
+                };
                 callbacks.set_category_filter = [this](const std::string& category_filter) {
                     SetTerminologyCategoryFilter(category_filter);
                 };
@@ -2129,6 +2132,31 @@ void AppRuntime::RenderProblemsPanel(float center_x, float center_w, float probl
             ui::panels::ShowProblemsPanelContent(model, callbacks, false);
             ImGui::EndTabItem();
         }
+
+        ImGuiTabItemFlags terminology_usage_flags =
+            impl_->focus_terminology_usages_tab ? ImGuiTabItemFlags_SetSelected : 0;
+        if (ImGui::BeginTabItem("Term Usages", nullptr, terminology_usage_flags)) {
+            ui::panels::TerminologyUsagesPanelModel usage_model;
+            usage_model.has_search = impl_->terminology_usages_active;
+            usage_model.term_value = impl_->usage_search_term_value;
+            usage_model.term_name = impl_->usage_search_term_name;
+            usage_model.message = impl_->usage_search_message;
+            usage_model.error = impl_->usage_search_error;
+            usage_model.usages = &impl_->terminology_usage_results;
+            usage_model.selected_usage_index = impl_->selected_terminology_usage_index;
+
+            ui::panels::TerminologyUsagesPanelCallbacks usage_callbacks;
+            usage_callbacks.select_usage = [this](std::size_t usage_index) {
+                if (usage_index < impl_->terminology_usage_results.size())
+                    impl_->selected_terminology_usage_index = static_cast<int>(usage_index);
+            };
+            usage_callbacks.activate_usage = [this](std::size_t usage_index) {
+                NavigateToTerminologyUsage(usage_index);
+            };
+            ui::panels::ShowTerminologyUsagesPanelContent(usage_model, usage_callbacks);
+            ImGui::EndTabItem();
+        }
+        impl_->focus_terminology_usages_tab = false;
 
         if (ImGui::BeginTabItem("Review")) {
             RenderReviewPanelContent();

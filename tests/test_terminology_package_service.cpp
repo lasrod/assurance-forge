@@ -295,6 +295,179 @@ TEST(TerminologyPackageService, CountsTermUsageInSacmText) {
     EXPECT_EQ(summaries.front().count, 2);
 }
 
+TEST(TerminologyPackageService, FindUsagesReportsNavigableArgumentElements) {
+    sacm::AssuranceCasePackage package = MakePackage();
+    core::TerminologyPackageCreateResult terminology_package = core::CreateTerminologyPackage(package, "Terms", "");
+    ASSERT_TRUE(terminology_package.success);
+
+    core::TerminologyTermDraft draft;
+    draft.value = "ODD";
+    draft.name = "Operational Design Domain";
+    core::TerminologyTermCreateResult term =
+        core::CreateTerminologyTerm(package, terminology_package.package_ref, draft);
+    ASSERT_TRUE(term.success);
+
+    sacm::ArgumentPackage argument_package;
+    argument_package.id = "AP1";
+    argument_package.gid = "gid-AP1";
+    argument_package.name = "Main Argument";
+
+    sacm::Claim goal;
+    goal.id = "G1";
+    goal.gid = "gid-G1";
+    goal.name = "Top goal";
+    goal.content = "The ODD is well defined.";
+    argument_package.claims.push_back(goal);
+
+    sacm::Claim assumption;
+    assumption.id = "A1";
+    assumption.assertionDeclaration = "assumed";
+    assumption.content = "The ODD remains stable.";
+    argument_package.claims.push_back(assumption);
+
+    sacm::Claim justification;
+    justification.id = "J1";
+    justification.assertionDeclaration = "justification";
+    justification.content = "The ODD definition is justified.";
+    argument_package.claims.push_back(justification);
+
+    sacm::ArgumentReasoning reasoning;
+    reasoning.id = "S1";
+    reasoning.content = "Argument over ODD completeness.";
+    argument_package.argumentReasonings.push_back(reasoning);
+
+    sacm::ArtifactReference context;
+    context.id = "C1";
+    context.description = "ODD definition from ISO 34503.";
+    argument_package.artifactReferences.push_back(context);
+
+    sacm::ArtifactReference solution;
+    solution.id = "Sn1";
+    solution.description = "ODD review evidence.";
+    argument_package.artifactReferences.push_back(solution);
+
+    sacm::ArtifactReference hidden_term_reference;
+    hidden_term_reference.id = "AR1";
+    hidden_term_reference.name = "ODD: Operational Design Domain";
+    hidden_term_reference.referencedArtifact = term.term_ref.id;
+    argument_package.artifactReferences.push_back(hidden_term_reference);
+
+    sacm::AssertedContext asserted_context;
+    asserted_context.sources = {"C1", "AR1"};
+    asserted_context.targets = {"G1"};
+    argument_package.assertedContexts.push_back(asserted_context);
+
+    sacm::AssertedEvidence asserted_evidence;
+    asserted_evidence.sources = {"Sn1"};
+    asserted_evidence.targets = {"G1"};
+    argument_package.assertedEvidences.push_back(asserted_evidence);
+
+    package.argumentPackages.push_back(argument_package);
+
+    core::TerminologyTermUsageSearchResult usages =
+        core::FindTerminologyTermUsages(package, terminology_package.package_ref, term.term_ref);
+
+    ASSERT_TRUE(usages.success) << usages.error;
+    ASSERT_EQ(usages.usages.size(), 6u);
+    std::vector<std::string> element_types;
+    std::vector<std::string> element_ids;
+    for (const auto& usage : usages.usages) {
+        element_ids.push_back(usage.element_id);
+        element_types.push_back(usage.element_type);
+        EXPECT_EQ(usage.argument_package_name, "Main Argument");
+        EXPECT_TRUE(usage.resolution_status == core::TerminologyUsageResolutionStatus::Resolved ||
+                    usage.resolution_status == core::TerminologyUsageResolutionStatus::ExplicitContext);
+        EXPECT_FALSE(usage.snippet.empty());
+    }
+
+    EXPECT_NE(std::find(element_types.begin(), element_types.end(), "Goal"), element_types.end());
+    EXPECT_NE(std::find(element_types.begin(), element_types.end(), "Assumption"), element_types.end());
+    EXPECT_NE(std::find(element_types.begin(), element_types.end(), "Justification"), element_types.end());
+    EXPECT_NE(std::find(element_types.begin(), element_types.end(), "Strategy"), element_types.end());
+    EXPECT_NE(std::find(element_types.begin(), element_types.end(), "Context"), element_types.end());
+    EXPECT_NE(std::find(element_types.begin(), element_types.end(), "Solution"), element_types.end());
+    EXPECT_EQ(std::find(element_ids.begin(), element_ids.end(), "AR1"), element_ids.end());
+}
+
+TEST(TerminologyPackageService, FindUsagesShowsAmbiguousAndExplicitStatuses) {
+    sacm::AssuranceCasePackage package = MakePackage();
+    core::TerminologyPackageCreateResult terminology_package = core::CreateTerminologyPackage(package, "Terms", "");
+    ASSERT_TRUE(terminology_package.success);
+
+    core::TerminologyTermDraft context_term;
+    context_term.value = "ODD";
+    context_term.name = "Operational Design Domain";
+    core::TerminologyTermCreateResult context =
+        core::CreateTerminologyTerm(package, terminology_package.package_ref, context_term);
+    ASSERT_TRUE(context.success);
+
+    core::TerminologyTermDraft dataset_term;
+    dataset_term.value = "ODD";
+    dataset_term.name = "Object Detection Dataset";
+    core::TerminologyTermCreateResult dataset =
+        core::CreateTerminologyTerm(package, terminology_package.package_ref, dataset_term);
+    ASSERT_TRUE(dataset.success);
+
+    sacm::ArgumentPackage argument_package;
+    argument_package.id = "AP1";
+    sacm::Claim claim;
+    claim.id = "G1";
+    claim.content = "The ODD is well defined.";
+    argument_package.claims.push_back(claim);
+    package.argumentPackages.push_back(argument_package);
+
+    core::TerminologyTermUsageSearchResult ambiguous =
+        core::FindTerminologyTermUsages(package, terminology_package.package_ref, context.term_ref);
+    ASSERT_TRUE(ambiguous.success) << ambiguous.error;
+    ASSERT_EQ(ambiguous.usages.size(), 1u);
+    EXPECT_EQ(ambiguous.usages.front().resolution_status, core::TerminologyUsageResolutionStatus::Ambiguous);
+
+    core::TerminologyContextAssociationResult association =
+        core::AssociateTerminologyTermWithElement(package, "G1", terminology_package.package_ref, context.term_ref);
+    ASSERT_TRUE(association.success) << association.error;
+
+    core::TerminologyTermUsageSearchResult explicit_context =
+        core::FindTerminologyTermUsages(package, terminology_package.package_ref, context.term_ref);
+    ASSERT_TRUE(explicit_context.success) << explicit_context.error;
+    ASSERT_EQ(explicit_context.usages.size(), 1u);
+    EXPECT_EQ(explicit_context.usages.front().resolution_status,
+              core::TerminologyUsageResolutionStatus::ExplicitContext);
+
+    core::TerminologyTermUsageSearchResult other_meaning =
+        core::FindTerminologyTermUsages(package, terminology_package.package_ref, dataset.term_ref);
+    ASSERT_TRUE(other_meaning.success) << other_meaning.error;
+    ASSERT_EQ(other_meaning.usages.size(), 1u);
+    EXPECT_EQ(other_meaning.usages.front().resolution_status, core::TerminologyUsageResolutionStatus::OtherMeaning);
+}
+
+TEST(TerminologyPackageService, FindUsagesUsesWholeWordMatches) {
+    sacm::AssuranceCasePackage package = MakePackage();
+    core::TerminologyPackageCreateResult terminology_package = core::CreateTerminologyPackage(package, "Terms", "");
+    ASSERT_TRUE(terminology_package.success);
+
+    core::TerminologyTermDraft draft;
+    draft.value = "ODD";
+    core::TerminologyTermCreateResult term =
+        core::CreateTerminologyTerm(package, terminology_package.package_ref, draft);
+    ASSERT_TRUE(term.success);
+
+    sacm::ArgumentPackage argument_package;
+    argument_package.id = "AP1";
+    sacm::Claim claim;
+    claim.id = "G1";
+    claim.content = "ODDity is not ODD.";
+    argument_package.claims.push_back(claim);
+    package.argumentPackages.push_back(argument_package);
+
+    core::TerminologyTermUsageSearchResult usages =
+        core::FindTerminologyTermUsages(package, terminology_package.package_ref, term.term_ref);
+
+    ASSERT_TRUE(usages.success) << usages.error;
+    ASSERT_EQ(usages.usages.size(), 1u);
+    EXPECT_EQ(usages.usages.front().start_offset, 14u);
+    EXPECT_EQ(usages.usages.front().matched_text, "ODD");
+}
+
 TEST(TerminologyPackageService, CreatedPackageSerializesAndParses) {
     sacm::AssuranceCasePackage package = MakePackage();
     core::TerminologyPackageCreateResult created =

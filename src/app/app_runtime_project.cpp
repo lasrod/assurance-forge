@@ -19,6 +19,7 @@
 #include <sstream>
 #include <string>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 namespace app {
@@ -684,8 +685,8 @@ void AppRuntime::AddTerminologyTermAsContextFromCanvas(const std::string& elemen
         MarkTerminologyDocumentDirty(*impl_);
         impl_->events.Emit(DocumentDirtyEvent{});
         if (impl_->app_state.current_project.has_value() && !impl_->app_state.active_project_file_path.empty()) {
-            const std::filesystem::path relative = std::filesystem::relative(impl_->app_state.active_project_file_path,
-                                                                             impl_->app_state.current_project->rootPath);
+            const std::filesystem::path relative = std::filesystem::relative(
+                impl_->app_state.active_project_file_path, impl_->app_state.current_project->rootPath);
             InvalidateSacmPackageTreeCache(*impl_, relative);
         }
     }
@@ -696,9 +697,58 @@ void AppRuntime::AddTerminologyTermAsContextFromCanvas(const std::string& elemen
 
 void AppRuntime::FindTerminologyUsagesFromCanvas(const core::TerminologyPackageRef& package_ref,
                                                  const core::TerminologyTermRef& term_ref) {
-    (void)package_ref;
-    (void)term_ref;
-    ShowNotImplementedModal("Find terminology usages");
+    BeginFindTerminologyUsages(package_ref, term_ref);
+}
+
+void AppRuntime::BeginFindTerminologyUsages(const core::TerminologyPackageRef& package_ref,
+                                            const core::TerminologyTermRef& term_ref) {
+    impl_->terminology_usages_active = true;
+    impl_->focus_terminology_usages_tab = true;
+    impl_->usage_search_package_ref = package_ref;
+    impl_->usage_search_term_ref = term_ref;
+    impl_->usage_search_term_value.clear();
+    impl_->usage_search_term_name.clear();
+    impl_->usage_search_message.clear();
+    impl_->usage_search_error.clear();
+    impl_->terminology_usage_results.clear();
+    impl_->selected_terminology_usage_index = -1;
+
+    if (!impl_->app_state.sacm_package.has_value()) {
+        impl_->usage_search_error = "Open a SACM model before finding terminology usages.";
+        SetStatus(impl_->usage_search_error);
+        return;
+    }
+
+    core::TerminologyTermUsageSearchResult result =
+        core::FindTerminologyTermUsages(impl_->app_state.sacm_package.value(), package_ref, term_ref);
+    impl_->usage_search_term_value = result.term_value;
+    impl_->usage_search_term_name = result.term_name;
+    if (!result.success) {
+        impl_->usage_search_error = result.error;
+        SetStatus("Find usages failed: " + result.error);
+        return;
+    }
+
+    impl_->terminology_usage_results = std::move(result.usages);
+    if (!impl_->terminology_usage_results.empty())
+        impl_->selected_terminology_usage_index = 0;
+    const int usage_count = static_cast<int>(impl_->terminology_usage_results.size());
+    const std::string label = impl_->usage_search_term_value.empty() ? "term" : impl_->usage_search_term_value;
+    impl_->usage_search_message = std::to_string(usage_count) + " usage" + (usage_count == 1 ? "" : "s") + " found.";
+    SetStatus("Found " + std::to_string(usage_count) + " usage" + (usage_count == 1 ? "" : "s") + " of " + label + ".");
+}
+
+void AppRuntime::NavigateToTerminologyUsage(std::size_t usage_index) {
+    if (usage_index >= impl_->terminology_usage_results.size())
+        return;
+    impl_->selected_terminology_usage_index = static_cast<int>(usage_index);
+    const core::TerminologyTermUsage& usage = impl_->terminology_usage_results[usage_index];
+    if (usage.element_id.empty()) {
+        SetStatus("The selected usage has no navigable element id.");
+        return;
+    }
+    impl_->events.Emit(SelectionChangedEvent{usage.element_id, true});
+    impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
 }
 
 void AppRuntime::ChangeTerminologyMeaningFromCanvas(const std::string& element_id, const std::string& term_value) {
@@ -790,7 +840,8 @@ void AppRuntime::ConfirmQuickDefineTerminologyTerm(bool add_as_context) {
     }
     const std::string context_element_id = impl_->quick_define_element_id;
     if (add_as_context)
-        AddTerminologyTermAsContextFromCanvas(context_element_id, impl_->quick_define_target_package_ref, result.term_ref);
+        AddTerminologyTermAsContextFromCanvas(
+            context_element_id, impl_->quick_define_target_package_ref, result.term_ref);
 
     impl_->show_quick_define_term_modal = false;
     impl_->quick_define_element_id.clear();

@@ -1022,15 +1022,8 @@ void DrawGsnNode(const GsnNode& node,
     if (proposal_dimmed)
         ink = WithAlpha(GetTheme().text_secondary, 0.62f);
     DrawNodeLabel(draw_list, node, top_left, bottom_right, text_left, text_wrap, zoom, ink, ui_state);
-    const std::vector<TerminologySpanHitRegion> terminology_regions =
-        BuildAndDrawTerminologySpans(draw_list,
-                                     node,
-                                     top_left,
-                                     text_left,
-                                     text_wrap,
-                                     zoom,
-                                     ui_state,
-                                     terminology_service);
+    const std::vector<TerminologySpanHitRegion> terminology_regions = BuildAndDrawTerminologySpans(
+        draw_list, node, top_left, text_left, text_wrap, zoom, ui_state, terminology_service);
     HandleTerminologySpanInteractions(terminology_regions, terminology_card_state, terminology_package, actions);
     DrawUndevelopedMarker(draw_list, node, top_left, bottom_right, zoom);
 

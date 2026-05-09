@@ -2,6 +2,7 @@
 
 #include "sacm/sacm_model.h"
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -80,6 +81,35 @@ struct TerminologyTermIssue {
 struct TerminologyTermUsageSummary {
     TerminologyTermRef term_ref;
     int count = 0;
+};
+
+enum class TerminologyUsageResolutionStatus { Resolved, Ambiguous, Undefined, ExplicitContext, OtherMeaning };
+
+struct TerminologyTermUsage {
+    TerminologyPackageRef package_ref;
+    TerminologyTermRef term_ref;
+    std::string argument_package_id;
+    std::string argument_package_gid;
+    std::string argument_package_name;
+    std::string element_id;
+    std::string element_gid;
+    std::string element_name;
+    std::string element_type;
+    std::size_t start_offset = 0;
+    std::size_t end_offset = 0;
+    std::string matched_text;
+    std::string snippet;
+    TerminologyUsageResolutionStatus resolution_status = TerminologyUsageResolutionStatus::Undefined;
+};
+
+struct TerminologyTermUsageSearchResult {
+    bool success = false;
+    TerminologyPackageRef package_ref;
+    TerminologyTermRef term_ref;
+    std::string term_value;
+    std::string term_name;
+    std::string error;
+    std::vector<TerminologyTermUsage> usages;
 };
 
 sacm::TerminologyPackage* FindTerminologyPackage(sacm::AssuranceCasePackage& package,
@@ -166,5 +196,9 @@ int CountTerminologyTermUsage(const sacm::AssuranceCasePackage& package, const s
 std::vector<TerminologyTermUsageSummary>
 BuildTerminologyTermUsageSummaries(const sacm::AssuranceCasePackage& package,
                                    const sacm::TerminologyPackage& terminology_package);
+TerminologyTermUsageSearchResult FindTerminologyTermUsages(const sacm::AssuranceCasePackage& package,
+                                                           const TerminologyPackageRef& package_ref,
+                                                           const TerminologyTermRef& term_ref);
+const char* ToString(TerminologyUsageResolutionStatus status);
 
 } // namespace core

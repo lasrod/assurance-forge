@@ -247,13 +247,16 @@ TEST(TerminologyScopeService, DetectionMarksDuplicateTermValuesAmbiguous) {
 
 TEST(TerminologyScopeService, ExplicitTermContextResolvesDuplicateTermValueForElement) {
     sacm::AssuranceCasePackage package = MakePackageWithArgument();
-    package.terminologyPackages.push_back(MakeTerminologyPackage(
-        "TP_CASE",
-        {MakeTerm("T_CONTEXT", "ODD", "Operational Design Domain"),
-         MakeTerm("T_DATASET", "ODD", "Object Detection Dataset")}));
+    package.terminologyPackages.push_back(
+        MakeTerminologyPackage("TP_CASE",
+                               {MakeTerm("T_CONTEXT", "ODD", "Operational Design Domain"),
+                                MakeTerm("T_DATASET", "ODD", "Object Detection Dataset")}));
 
-    core::TerminologyContextAssociationResult association = core::AssociateTerminologyTermWithElement(
-        package, "G1", core::TerminologyPackageRef{"TP_CASE", "gid-TP_CASE"}, core::TerminologyTermRef{"T_DATASET", "gid-T_DATASET"});
+    core::TerminologyContextAssociationResult association =
+        core::AssociateTerminologyTermWithElement(package,
+                                                  "G1",
+                                                  core::TerminologyPackageRef{"TP_CASE", "gid-TP_CASE"},
+                                                  core::TerminologyTermRef{"T_DATASET", "gid-T_DATASET"});
     ASSERT_TRUE(association.success) << association.error;
 
     core::TerminologyService service(package);
@@ -272,16 +275,16 @@ TEST(TerminologyScopeService, ExplicitTermContextResolvesDuplicateTermValueForSo
     solution.gid = "gid-Sn1";
     solution.description = "The ODD evidence is reviewed.";
     package.argumentPackages.front().artifactReferences.push_back(solution);
-    package.terminologyPackages.push_back(MakeTerminologyPackage(
-        "TP_CASE",
-        {MakeTerm("T_CONTEXT", "ODD", "Operational Design Domain"),
-         MakeTerm("T_DATASET", "ODD", "Object Detection Dataset")}));
+    package.terminologyPackages.push_back(
+        MakeTerminologyPackage("TP_CASE",
+                               {MakeTerm("T_CONTEXT", "ODD", "Operational Design Domain"),
+                                MakeTerm("T_DATASET", "ODD", "Object Detection Dataset")}));
 
-    core::TerminologyContextAssociationResult association = core::AssociateTerminologyTermWithElement(
-        package,
-        "Sn1",
-        core::TerminologyPackageRef{"TP_CASE", "gid-TP_CASE"},
-        core::TerminologyTermRef{"T_CONTEXT", "gid-T_CONTEXT"});
+    core::TerminologyContextAssociationResult association =
+        core::AssociateTerminologyTermWithElement(package,
+                                                  "Sn1",
+                                                  core::TerminologyPackageRef{"TP_CASE", "gid-TP_CASE"},
+                                                  core::TerminologyTermRef{"T_CONTEXT", "gid-T_CONTEXT"});
     ASSERT_TRUE(association.success) << association.error;
 
     core::TerminologyService service(package);
@@ -295,8 +298,8 @@ TEST(TerminologyScopeService, ExplicitTermContextResolvesDuplicateTermValueForSo
 
 TEST(TerminologyScopeService, TermContextAssociationIsIdempotent) {
     sacm::AssuranceCasePackage package = MakePackageWithArgument();
-    package.terminologyPackages.push_back(MakeTerminologyPackage(
-        "TP_CASE", {MakeTerm("T_CONTEXT", "ODD", "Operational Design Domain")}));
+    package.terminologyPackages.push_back(
+        MakeTerminologyPackage("TP_CASE", {MakeTerm("T_CONTEXT", "ODD", "Operational Design Domain")}));
 
     core::TerminologyPackageRef package_ref{"TP_CASE", "gid-TP_CASE"};
     core::TerminologyTermRef term_ref{"T_CONTEXT", "gid-T_CONTEXT"};
@@ -316,14 +319,14 @@ TEST(TerminologyScopeService, TermContextAssociationIsIdempotent) {
 
 TEST(TerminologyScopeService, TermContextAssociationSurvivesRoundTripAndResolvesAmbiguity) {
     sacm::AssuranceCasePackage package = MakePackageWithArgument();
-    package.terminologyPackages.push_back(MakeTerminologyPackage(
-        "TP_CASE",
-        {MakeTerm("T_CONTEXT", "ODD", "Operational Design Domain"),
-         MakeTerm("T_DATASET", "ODD", "Object Detection Dataset")}));
+    package.terminologyPackages.push_back(
+        MakeTerminologyPackage("TP_CASE",
+                               {MakeTerm("T_CONTEXT", "ODD", "Operational Design Domain"),
+                                MakeTerm("T_DATASET", "ODD", "Object Detection Dataset")}));
     ASSERT_TRUE(core::AssociateTerminologyTermWithElement(package,
-                                                         "G1",
-                                                         core::TerminologyPackageRef{"TP_CASE", "gid-TP_CASE"},
-                                                         core::TerminologyTermRef{"T_CONTEXT", "gid-T_CONTEXT"})
+                                                          "G1",
+                                                          core::TerminologyPackageRef{"TP_CASE", "gid-TP_CASE"},
+                                                          core::TerminologyTermRef{"T_CONTEXT", "gid-T_CONTEXT"})
                     .success);
 
     std::string xml = sacm::serialize_sacm(package);

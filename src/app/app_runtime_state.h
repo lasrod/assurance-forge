@@ -25,6 +25,7 @@
 #include <optional>
 #include <string>
 #include <unordered_set>
+#include <vector>
 
 namespace app {
 
@@ -87,6 +88,16 @@ struct AppRuntimeState {
     bool show_delete_terminology_package_modal = false;
     core::TerminologyTermRef selected_terminology_term_ref;
     core::TerminologyCategoryRef selected_terminology_category_ref;
+    bool terminology_usages_active = false;
+    bool focus_terminology_usages_tab = false;
+    core::TerminologyPackageRef usage_search_package_ref;
+    core::TerminologyTermRef usage_search_term_ref;
+    std::string usage_search_term_value;
+    std::string usage_search_term_name;
+    std::string usage_search_message;
+    std::string usage_search_error;
+    std::vector<core::TerminologyTermUsage> terminology_usage_results;
+    int selected_terminology_usage_index = -1;
     char terminology_filter_buf[256] = {};
     char terminology_category_filter_buf[128] = {};
     bool show_terminology_term_editor_modal = false;
