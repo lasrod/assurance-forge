@@ -242,11 +242,19 @@ void extract_elements_recursive(pugi::xml_node node, std::vector<SacmElement>& e
 ParseResult parse_document(pugi::xml_document& doc) {
     ParseResult result;
 
-    // Find the root AssuranceCasePackage element (namespace- and case-agnostic)
-    pugi::xml_node root = find_child_by_local_name(doc, "assurancecasepackage");
+    pugi::xml_node root;
+    for (pugi::xml_node child : doc.children()) {
+        const std::string local_name = get_local_name(child.name());
+        if (local_name == "assurancecasepackage" || local_name == "argumentpackage" ||
+            local_name == "artifactpackage" || local_name == "terminologypackage") {
+            root = child;
+            break;
+        }
+    }
     if (!root) {
         result.success = false;
-        result.error_message = "Root element 'AssuranceCasePackage' not found";
+        result.error_message =
+            "Root element 'AssuranceCasePackage', 'ArgumentPackage', 'ArtifactPackage', or 'TerminologyPackage' not found";
         return result;
     }
 

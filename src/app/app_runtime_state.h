@@ -16,7 +16,10 @@
 #include "core/assurance_tree.h"
 #include "core/problems/problems_manager.h"
 #include "core/tree_editing.h"
+#include "sacm/sacm_package_tree.h"
 
+#include <filesystem>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -66,6 +69,10 @@ struct AppRuntimeState {
     bool show_gsn_tab = true;
     bool show_cse_tab = false;
     bool show_evidence_tab = false;
+    bool show_package_details_tab = false;
+    std::map<std::string, sacm::SacmPackageTreeResult> sacm_package_tree_cache;
+    std::optional<sacm::SacmPackageTreeNode> selected_package_node;
+    std::filesystem::path selected_package_file_path;
 
     float left_ratio = 0.20f;
     float right_ratio = 0.20f;

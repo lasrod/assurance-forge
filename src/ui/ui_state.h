@@ -12,6 +12,7 @@ enum class CenterView {
     GsnCanvas,
     CseRegister,
     EvidenceRegister,
+    PackageDetails,
 };
 
 enum class ProblemFilter {

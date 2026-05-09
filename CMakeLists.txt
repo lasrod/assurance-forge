@@ -179,6 +179,7 @@ set(ASSURANCE_FORGE_SHARED_SOURCES
     src/parser/xml_parser.cpp
     src/ui/panels/welcome_modal.cpp
     src/ui/panels/element_panel.cpp
+    src/ui/panels/package_details_panel.cpp
     src/ui/panels/preferences_panel.cpp
     src/ui/panels/problems_panel.cpp
     src/ui/panels/project_files_panel.cpp
@@ -211,6 +212,7 @@ set(ASSURANCE_FORGE_SHARED_SOURCES
     src/core/reviews/review_proposal_patch_service.cpp
     src/core/sha256.cpp
     src/sacm/sacm_parser.cpp
+    src/sacm/sacm_package_tree.cpp
     src/sacm/sacm_serializer.cpp
 )
 set(ASSURANCE_FORGE_APP_SOURCES
@@ -276,6 +278,7 @@ add_executable(tests
     tests/test_review_proposal.cpp
     tests/test_review_proposal_patch_service.cpp
     tests/test_sacm_roundtrip.cpp
+    tests/test_sacm_package_tree.cpp
     tests/test_element_factory.cpp
     tests/test_tree_editing.cpp
     tests/test_project_service.cpp
@@ -337,6 +340,7 @@ add_executable(tests
     src/ui/localization.cpp
     src/ui/ui_state.cpp
     src/sacm/sacm_parser.cpp
+    src/sacm/sacm_package_tree.cpp
     src/sacm/sacm_serializer.cpp
 )
 target_include_directories(tests PRIVATE src ${ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS})

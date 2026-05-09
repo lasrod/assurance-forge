@@ -389,10 +389,11 @@ static void detect_sacm_namespace(pugi::xml_node root, std::string& out_prefix, 
 static SacmParseResult parse_document(pugi::xml_document& doc) {
     SacmParseResult result;
 
-    // Find the root AssuranceCasePackage element; namespace prefix may vary.
     pugi::xml_node root;
     for (auto child : doc.children()) {
-        if (local_name(child.name()) == "assurancecasepackage") {
+        const std::string ln = local_name(child.name());
+        if (ln == "assurancecasepackage" || ln == "argumentpackage" || ln == "artifactpackage" ||
+            ln == "terminologypackage") {
             root = child;
             break;
         }
@@ -405,6 +406,23 @@ static SacmParseResult parse_document(pugi::xml_document& doc) {
     AssuranceCasePackage& pkg = result.package;
     parse_element_base(root, pkg);
     detect_sacm_namespace(root, pkg.namespace_prefix, pkg.namespace_uri);
+
+    const std::string root_ln = local_name(root.name());
+    if (root_ln == "argumentpackage") {
+        pkg.argumentPackages.push_back(parse_argument_package(root));
+        result.success = true;
+        return result;
+    }
+    if (root_ln == "artifactpackage") {
+        pkg.artifactPackages.push_back(parse_artifact_package(root));
+        result.success = true;
+        return result;
+    }
+    if (root_ln == "terminologypackage") {
+        pkg.terminologyPackages.push_back(parse_terminology_package(root));
+        result.success = true;
+        return result;
+    }
 
     for (auto child : root.children()) {
         const std::string ln = local_name(child.name());

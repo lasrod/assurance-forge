@@ -24,6 +24,7 @@
 #include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/localization.h"
 #include "ui/panels/element_panel.h"
+#include "ui/panels/package_details_panel.h"
 #include "ui/panels/preferences_panel.h"
 #include "ui/panels/problems_panel.h"
 #include "ui/panels/project_files_panel.h"
@@ -1831,6 +1832,20 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
             }
         }
 
+        if (impl_->show_package_details_tab) {
+            ImGuiTabItemFlags package_flags =
+                (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::PackageDetails)
+                    ? ImGuiTabItemFlags_SetSelected
+                    : 0;
+            if (ImGui::BeginTabItem("Package Details", nullptr, package_flags)) {
+                ui_state.center_view = ui::CenterView::PackageDetails;
+                ui::panels::ShowPackageDetailsPanel(impl_->selected_package_node ? &impl_->selected_package_node.value()
+                                                                                  : nullptr,
+                                                    impl_->selected_package_file_path);
+                ImGui::EndTabItem();
+            }
+        }
+
         ImGui::EndTabBar();
         impl_->force_center_tab_selection = false;
     }
@@ -2417,6 +2432,8 @@ void AppRuntime::RenderFrame(bool& done) {
     project_model.project =
         impl_->app_state.current_project.has_value() ? &impl_->app_state.current_project.value() : nullptr;
     if (project_model.project) {
+        RefreshSacmPackageTreeCache();
+        project_model.sacm_package_trees_by_path = impl_->sacm_package_tree_cache;
         const parser::AssuranceCase* loaded_case =
             impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
         for (const core::reviews::ReviewProposalSummary& summary :
@@ -2429,6 +2446,9 @@ void AppRuntime::RenderFrame(bool& done) {
         [this]() { BeginCreateProjectEvidenceRegister(); },
         [this]() { BeginCreateProjectJ3377CaeRegister(); },
         [this](const core::ProjectFileEntry& entry) { OpenProjectFile(entry); },
+        [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
+            OpenProjectPackageNode(entry, node);
+        },
     };
     ui::panels::ShowProjectFilesPanel(left_w, project_h, project_y, kPanelFlags, project_model, project_callbacks);
     RenderTreePanel(left_w, safety_tree_h, safety_y);

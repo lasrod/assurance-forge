@@ -29,6 +29,8 @@ void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center
             return state.show_cse_tab;
         case ui::CenterView::EvidenceRegister:
             return state.show_evidence_tab;
+        case ui::CenterView::PackageDetails:
+            return state.show_package_details_tab;
         }
         return false;
     };
@@ -38,6 +40,8 @@ void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center
             center_view = ui::CenterView::GsnCanvas;
         } else if (state.show_cse_tab) {
             center_view = ui::CenterView::CseRegister;
+        } else if (state.show_package_details_tab) {
+            center_view = ui::CenterView::PackageDetails;
         } else {
             center_view = ui::CenterView::EvidenceRegister;
         }

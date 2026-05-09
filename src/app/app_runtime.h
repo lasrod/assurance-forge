@@ -5,6 +5,7 @@
 #include "core/project_model.h"
 #include "core/reviews/review_item.h"
 #include "core/tree_editing.h"
+#include "sacm/sacm_package_tree.h"
 
 #include <string>
 #include <vector>
@@ -90,9 +91,11 @@ private:
     void BeginCreateProjectEvidenceRegister();
     void BeginCreateProjectJ3377CaeRegister();
     void OpenProjectFile(const core::ProjectFileEntry& entry);
+    void OpenProjectPackageNode(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node);
     bool OpenFirstProjectSacmFile();
     bool TryOpenProjectManifest(const std::string& selected_path);
     bool EnsureReviewItemStorage();
+    void RefreshSacmPackageTreeCache();
     void SyncReviewProblems();
     void SyncReviewVisualStatesFromReviews();
     void TouchCurrentProjectRecent();
