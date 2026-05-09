@@ -111,8 +111,8 @@ TEST(TerminologyPackageService, CreateUpdateAndDeleteCategory) {
     update.name = "Operational Domain";
     update.description = "Updated category description.";
     std::string error;
-    ASSERT_TRUE(core::UpdateTerminologyCategory(
-        package, terminology_package.package_ref, created.category_ref, update, error))
+    ASSERT_TRUE(
+        core::UpdateTerminologyCategory(package, terminology_package.package_ref, created.category_ref, update, error))
         << error;
 
     category = core::FindTerminologyCategory(package, terminology_package.package_ref, created.category_ref);
@@ -148,14 +148,14 @@ TEST(TerminologyPackageService, CategoryDeletionIsBlockedWhenAssignedToTerm) {
     ASSERT_NE(terms, nullptr);
     EXPECT_EQ(core::CountTermsUsingCategory(*terms, category.category_ref), 1);
 
-    std::vector<core::TerminologyCategoryUsageSummary> summaries =
-        core::BuildTerminologyCategoryUsageSummaries(*terms);
+    std::vector<core::TerminologyCategoryUsageSummary> summaries = core::BuildTerminologyCategoryUsageSummaries(*terms);
     ASSERT_EQ(summaries.size(), 1u);
     EXPECT_EQ(summaries.front().term_count, 1);
     EXPECT_EQ(core::CategoryDisplayName(*terms, category.category_ref.id), "Hazard / Risk");
 
     std::string error;
-    EXPECT_FALSE(core::DeleteTerminologyCategory(package, terminology_package.package_ref, category.category_ref, error));
+    EXPECT_FALSE(
+        core::DeleteTerminologyCategory(package, terminology_package.package_ref, category.category_ref, error));
     EXPECT_FALSE(error.empty());
 }
 

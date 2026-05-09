@@ -572,9 +572,8 @@ void AppRuntime::SelectTerminologyCategory(const core::TerminologyCategoryRef& c
 }
 
 void AppRuntime::SetTerminologyCategoryFilter(const std::string& category_filter) {
-    CopyToBuffer(impl_->terminology_category_filter_buf,
-                 sizeof(impl_->terminology_category_filter_buf),
-                 category_filter);
+    CopyToBuffer(
+        impl_->terminology_category_filter_buf, sizeof(impl_->terminology_category_filter_buf), category_filter);
 }
 
 void AppRuntime::BeginAddTerminologyCategory() {
@@ -637,8 +636,8 @@ void AppRuntime::ConfirmTerminologyCategoryEdit() {
 void AppRuntime::BeginDeleteTerminologyCategory(const core::TerminologyCategoryRef& category_ref) {
     if (!impl_->app_state.sacm_package.has_value())
         return;
-    const sacm::TerminologyPackage* terminology_package = core::FindTerminologyPackage(
-        impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref);
+    const sacm::TerminologyPackage* terminology_package =
+        core::FindTerminologyPackage(impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref);
     if (!terminology_package) {
         SetStatus("Terminology package not found.");
         return;
@@ -679,15 +678,21 @@ void AppRuntime::SeedRecommendedTerminologyCategories() {
     if (!impl_->app_state.sacm_package.has_value())
         return;
 
-    sacm::TerminologyPackage* terminology_package = core::FindTerminologyPackage(
-        impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref);
+    sacm::TerminologyPackage* terminology_package =
+        core::FindTerminologyPackage(impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref);
     if (!terminology_package) {
         SetStatus("Terminology package not found.");
         return;
     }
 
-    const char* recommended[] = {"Operational Context", "System",       "Hazard / Risk",  "Evidence",
-                                 "Requirement",          "Standard",     "Project Specific", "Deprecated"};
+    const char* recommended[] = {"Operational Context",
+                                 "System",
+                                 "Hazard / Risk",
+                                 "Evidence",
+                                 "Requirement",
+                                 "Standard",
+                                 "Project Specific",
+                                 "Deprecated"};
     int added = 0;
     for (const char* name : recommended) {
         if (CategoryNameExists(*terminology_package, name))

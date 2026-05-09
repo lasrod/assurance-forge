@@ -116,8 +116,7 @@ bool DeleteTerminologyTerm(sacm::AssuranceCasePackage& package,
                            const TerminologyTermRef& term_ref,
                            std::string& out_error);
 
-sacm::Category* FindTerminologyCategory(sacm::TerminologyPackage& package,
-                                        const TerminologyCategoryRef& category_ref);
+sacm::Category* FindTerminologyCategory(sacm::TerminologyPackage& package, const TerminologyCategoryRef& category_ref);
 const sacm::Category* FindTerminologyCategory(const sacm::TerminologyPackage& package,
                                               const TerminologyCategoryRef& category_ref);
 sacm::Category* FindTerminologyCategory(sacm::AssuranceCasePackage& package,
@@ -143,8 +142,8 @@ bool DeleteTerminologyCategory(sacm::AssuranceCasePackage& package,
                                std::string& out_error);
 
 int CountTermsUsingCategory(const sacm::TerminologyPackage& package, const TerminologyCategoryRef& category_ref);
-std::vector<TerminologyCategoryUsageSummary> BuildTerminologyCategoryUsageSummaries(
-    const sacm::TerminologyPackage& package);
+std::vector<TerminologyCategoryUsageSummary>
+BuildTerminologyCategoryUsageSummaries(const sacm::TerminologyPackage& package);
 std::string CategoryDisplayName(const sacm::TerminologyPackage& package, const std::string& category_ref);
 
 std::vector<TerminologyTermIssue> ValidateTerminologyTerms(const sacm::TerminologyPackage& package);

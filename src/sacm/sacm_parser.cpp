@@ -405,6 +405,8 @@ static ArgumentPackage parse_argument_package(pugi::xml_node node) {
             pkg.claims.push_back(parse_claim(child));
         } else if (ln == "argumentreasoning") {
             pkg.argumentReasonings.push_back(parse_argument_reasoning(child));
+        } else if (ln == "terminologypackage") {
+            pkg.terminologyPackages.push_back(parse_terminology_package(child));
         } else if (ln == "artifactreference") {
             pkg.artifactReferences.push_back(parse_artifact_reference(child));
         } else if (ln == "assertedinference") {

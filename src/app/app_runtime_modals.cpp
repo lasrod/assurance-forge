@@ -110,7 +110,8 @@ void SetCategoryChecked(AppRuntimeState& state, const sacm::Category& category, 
 void RenderTermCategoryPicker(AppRuntimeState& state) {
     const sacm::TerminologyPackage* package = nullptr;
     if (state.app_state.sacm_package.has_value()) {
-        package = core::FindTerminologyPackage(state.app_state.sacm_package.value(), state.selected_terminology_package_ref);
+        package =
+            core::FindTerminologyPackage(state.app_state.sacm_package.value(), state.selected_terminology_package_ref);
     }
 
     ImGui::TextUnformatted("Categories");

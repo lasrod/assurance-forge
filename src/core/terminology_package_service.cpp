@@ -16,9 +16,7 @@ std::unordered_set<std::string> CollectElementIds(const sacm::AssuranceCasePacka
         if (!element.id.empty())
             ids.insert(element.id);
     };
-
-    add_base(package);
-    for (const auto& terminology_package : package.terminologyPackages) {
+    auto add_terminology_package = [&](const sacm::TerminologyPackage& terminology_package) {
         add_base(terminology_package);
         for (const auto& category : terminology_package.categories)
             add_base(category);
@@ -26,6 +24,11 @@ std::unordered_set<std::string> CollectElementIds(const sacm::AssuranceCasePacka
             add_base(term);
         for (const auto& expression : terminology_package.expressions)
             add_base(expression);
+    };
+
+    add_base(package);
+    for (const auto& terminology_package : package.terminologyPackages) {
+        add_terminology_package(terminology_package);
     }
     for (const auto& artifact_package : package.artifactPackages) {
         add_base(artifact_package);
@@ -34,6 +37,8 @@ std::unordered_set<std::string> CollectElementIds(const sacm::AssuranceCasePacka
     }
     for (const auto& argument_package : package.argumentPackages) {
         add_base(argument_package);
+        for (const auto& terminology_package : argument_package.terminologyPackages)
+            add_terminology_package(terminology_package);
         for (const auto& claim : argument_package.claims)
             add_base(claim);
         for (const auto& reasoning : argument_package.argumentReasonings)
@@ -56,9 +61,7 @@ std::unordered_set<std::string> CollectGids(const sacm::AssuranceCasePackage& pa
         if (!element.gid.empty())
             gids.insert(element.gid);
     };
-
-    add_base(package);
-    for (const auto& terminology_package : package.terminologyPackages) {
+    auto add_terminology_package = [&](const sacm::TerminologyPackage& terminology_package) {
         add_base(terminology_package);
         for (const auto& category : terminology_package.categories)
             add_base(category);
@@ -66,6 +69,11 @@ std::unordered_set<std::string> CollectGids(const sacm::AssuranceCasePackage& pa
             add_base(term);
         for (const auto& expression : terminology_package.expressions)
             add_base(expression);
+    };
+
+    add_base(package);
+    for (const auto& terminology_package : package.terminologyPackages) {
+        add_terminology_package(terminology_package);
     }
     for (const auto& artifact_package : package.artifactPackages) {
         add_base(artifact_package);
@@ -74,6 +82,8 @@ std::unordered_set<std::string> CollectGids(const sacm::AssuranceCasePackage& pa
     }
     for (const auto& argument_package : package.argumentPackages) {
         add_base(argument_package);
+        for (const auto& terminology_package : argument_package.terminologyPackages)
+            add_terminology_package(terminology_package);
         for (const auto& claim : argument_package.claims)
             add_base(claim);
         for (const auto& reasoning : argument_package.argumentReasonings)
@@ -277,6 +287,12 @@ sacm::TerminologyPackage* FindTerminologyPackage(sacm::AssuranceCasePackage& pac
         if (MatchesRef(terminology_package, package_ref))
             return &terminology_package;
     }
+    for (auto& argument_package : package.argumentPackages) {
+        for (auto& terminology_package : argument_package.terminologyPackages) {
+            if (MatchesRef(terminology_package, package_ref))
+                return &terminology_package;
+        }
+    }
     return nullptr;
 }
 
@@ -285,6 +301,12 @@ const sacm::TerminologyPackage* FindTerminologyPackage(const sacm::AssuranceCase
     for (const auto& terminology_package : package.terminologyPackages) {
         if (MatchesRef(terminology_package, package_ref))
             return &terminology_package;
+    }
+    for (const auto& argument_package : package.argumentPackages) {
+        for (const auto& terminology_package : argument_package.terminologyPackages) {
+            if (MatchesRef(terminology_package, package_ref))
+                return &terminology_package;
+        }
     }
     return nullptr;
 }
@@ -476,8 +498,7 @@ bool DeleteTerminologyTerm(sacm::AssuranceCasePackage& package,
     return true;
 }
 
-sacm::Category* FindTerminologyCategory(sacm::TerminologyPackage& package,
-                                        const TerminologyCategoryRef& category_ref) {
+sacm::Category* FindTerminologyCategory(sacm::TerminologyPackage& package, const TerminologyCategoryRef& category_ref) {
     for (auto& category : package.categories) {
         if (MatchesRef(category, category_ref))
             return &category;
@@ -561,9 +582,10 @@ int CountTermsUsingCategory(const sacm::TerminologyPackage& package, const Termi
 
     int count = 0;
     for (const auto& term : package.terms) {
-        const bool assigned = std::any_of(term.category_refs.begin(), term.category_refs.end(), [&](const std::string& ref) {
-            return MatchesCategoryRefString(*category, ref);
-        });
+        const bool assigned =
+            std::any_of(term.category_refs.begin(), term.category_refs.end(), [&](const std::string& ref) {
+                return MatchesCategoryRefString(*category, ref);
+            });
         if (assigned)
             ++count;
     }
@@ -598,8 +620,8 @@ bool DeleteTerminologyCategory(sacm::AssuranceCasePackage& package,
     return true;
 }
 
-std::vector<TerminologyCategoryUsageSummary> BuildTerminologyCategoryUsageSummaries(
-    const sacm::TerminologyPackage& package) {
+std::vector<TerminologyCategoryUsageSummary>
+BuildTerminologyCategoryUsageSummaries(const sacm::TerminologyPackage& package) {
     std::vector<TerminologyCategoryUsageSummary> summaries;
     for (const auto& category : package.categories) {
         const TerminologyCategoryRef ref = RefFor(category);

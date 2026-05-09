@@ -251,6 +251,8 @@ static void serialize_argument_package(pugi::xml_node parent, const ArgumentPack
     set_base(node, pkg);
     add_description(node, pkg.description, pkg.description_ml);
 
+    for (const auto& tp : pkg.terminologyPackages)
+        serialize_terminology_package(node, tp);
     for (const auto& c : pkg.claims)
         serialize_claim(node, c);
     for (const auto& ar : pkg.argumentReasonings)

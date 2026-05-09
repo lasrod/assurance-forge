@@ -213,6 +213,7 @@ set(ASSURANCE_FORGE_SHARED_SOURCES
     src/core/reviews/review_proposal_patch_service.cpp
     src/core/sha256.cpp
     src/core/terminology_package_service.cpp
+    src/core/terminology_scope_service.cpp
     src/sacm/sacm_parser.cpp
     src/sacm/sacm_package_tree.cpp
     src/sacm/sacm_serializer.cpp
@@ -282,6 +283,7 @@ add_executable(tests
     tests/test_sacm_roundtrip.cpp
     tests/test_sacm_package_tree.cpp
     tests/test_terminology_package_service.cpp
+    tests/test_terminology_scope_service.cpp
     tests/test_element_factory.cpp
     tests/test_tree_editing.cpp
     tests/test_project_service.cpp
@@ -340,6 +342,7 @@ add_executable(tests
     src/core/reviews/review_proposal_patch_service.cpp
     src/core/sha256.cpp
     src/core/terminology_package_service.cpp
+    src/core/terminology_scope_service.cpp
     src/ui/gsn/gsn_layout.cpp
     src/ui/localization.cpp
     src/ui/ui_state.cpp

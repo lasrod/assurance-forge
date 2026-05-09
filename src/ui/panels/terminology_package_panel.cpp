@@ -42,7 +42,9 @@ bool CategoryMatchesRef(const sacm::Category& category, const std::string& ref) 
     return (!category.id.empty() && category.id == ref) || (!category.gid.empty() && category.gid == ref);
 }
 
-bool TermHasCategoryRef(const sacm::TerminologyPackage& package, const sacm::Term& term, const std::string& category_ref) {
+bool TermHasCategoryRef(const sacm::TerminologyPackage& package,
+                        const sacm::Term& term,
+                        const std::string& category_ref) {
     for (const auto& ref : term.category_refs) {
         if (ref == category_ref)
             return true;
@@ -191,7 +193,8 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
     const std::string filter = model.search_buffer ? model.search_buffer : "";
     const std::string category_filter = model.category_filter_buffer ? model.category_filter_buffer : "";
     for (const auto& term : model.package->terms) {
-        if (!MatchesFilter(*model.package, term, filter) || !MatchesCategoryFilter(*model.package, term, category_filter))
+        if (!MatchesFilter(*model.package, term, filter) ||
+            !MatchesCategoryFilter(*model.package, term, category_filter))
             continue;
 
         ++visible_rows;
@@ -395,7 +398,8 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     if (ImGui::Button("Add Category##categories_add_category") && callbacks.add_category)
         callbacks.add_category();
     ImGui::SameLine();
-    const bool has_selected_category = !model.selected_category_ref.id.empty() || !model.selected_category_ref.gid.empty();
+    const bool has_selected_category =
+        !model.selected_category_ref.id.empty() || !model.selected_category_ref.gid.empty();
     if (!has_selected_category)
         ImGui::BeginDisabled();
     if (ImGui::Button("Edit Category") && callbacks.edit_category)
