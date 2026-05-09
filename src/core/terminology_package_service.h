@@ -74,8 +74,17 @@ struct TerminologyCategoryUsageSummary {
 
 enum class TerminologyTermIssueSeverity { Error, Warning, Info };
 
+enum class TerminologyTermIssueKind {
+    MissingValue,
+    DuplicateDefinition,
+    MissingDescription,
+    MissingCategory,
+    MissingExternalReference,
+};
+
 struct TerminologyTermIssue {
     TerminologyTermRef term_ref;
+    TerminologyTermIssueKind kind = TerminologyTermIssueKind::MissingValue;
     TerminologyTermIssueSeverity severity = TerminologyTermIssueSeverity::Info;
     std::string message;
 };
@@ -195,7 +204,7 @@ TerminologyContextAssociationResult AddTerminologyTermAsVisibleContext(sacm::Ass
                                                                        const TerminologyTermRef& term_ref);
 
 TerminologyTermReferenceResolution ResolveTerminologyTermReference(const sacm::AssuranceCasePackage& package,
-                                                                  const std::string& raw_ref);
+                                                                   const std::string& raw_ref);
 std::vector<TerminologyContextReferenceIssue>
 ValidateTerminologyContextReferences(const sacm::AssuranceCasePackage& package);
 

@@ -53,7 +53,8 @@ HiddenTerminologyRefs CollectHiddenTerminologyRefs(const sacm::AssuranceCasePack
                 AddRef(refs.artifact_reference_refs, artifact_reference.gid);
             }
             for (const sacm::AssertedContext& context : argument_package.assertedContexts) {
-                if (!ContextSourcesArtifactReference(context, artifact_reference) || IsVisibleTerminologyContext(context))
+                if (!ContextSourcesArtifactReference(context, artifact_reference) ||
+                    IsVisibleTerminologyContext(context))
                     continue;
                 AddRef(refs.asserted_context_refs, context.id);
                 AddRef(refs.asserted_context_refs, context.gid);
@@ -68,24 +69,24 @@ void HideTerminologyArtifactReferences(parser::AssuranceCase& model, const sacm:
     if (hidden_refs.artifact_reference_refs.empty() && hidden_refs.asserted_context_refs.empty())
         return;
 
-    model.elements.erase(std::remove_if(model.elements.begin(),
-                                        model.elements.end(),
-                                        [&](const parser::SacmElement& element) {
-                                            if (element.type == "artifactreference") {
-                                                return hidden_refs.artifact_reference_refs.find(element.id) !=
-                                                           hidden_refs.artifact_reference_refs.end() ||
-                                                       hidden_refs.artifact_reference_refs.find(element.name) !=
-                                                           hidden_refs.artifact_reference_refs.end();
-                                            }
-                                            return element.type == "assertedcontext" &&
-                                                   (hidden_refs.asserted_context_refs.find(element.id) !=
-                                                        hidden_refs.asserted_context_refs.end() ||
-                                                    hidden_refs.asserted_context_refs.find(element.name) !=
-                                                        hidden_refs.asserted_context_refs.end() ||
-                                                    ReferencesAny(element.source_refs,
-                                                                  hidden_refs.artifact_reference_refs));
-                                        }),
-                         model.elements.end());
+    model.elements.erase(
+        std::remove_if(model.elements.begin(),
+                       model.elements.end(),
+                       [&](const parser::SacmElement& element) {
+                           if (element.type == "artifactreference") {
+                               return hidden_refs.artifact_reference_refs.find(element.id) !=
+                                          hidden_refs.artifact_reference_refs.end() ||
+                                      hidden_refs.artifact_reference_refs.find(element.name) !=
+                                          hidden_refs.artifact_reference_refs.end();
+                           }
+                           return element.type == "assertedcontext" &&
+                                  (hidden_refs.asserted_context_refs.find(element.id) !=
+                                       hidden_refs.asserted_context_refs.end() ||
+                                   hidden_refs.asserted_context_refs.find(element.name) !=
+                                       hidden_refs.asserted_context_refs.end() ||
+                                   ReferencesAny(element.source_refs, hidden_refs.artifact_reference_refs));
+                       }),
+        model.elements.end());
 }
 
 std::string TermContextDisplayLabel(const sacm::Term& term) {
@@ -104,8 +105,7 @@ parser::SacmElement* FindParserElement(parser::AssuranceCase& model, const std::
     return nullptr;
 }
 
-void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model,
-                                             const sacm::AssuranceCasePackage& package) {
+void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model, const sacm::AssuranceCasePackage& package) {
     for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
         for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
             if (!IsVisibleTerminologyArtifactReference(package, argument_package, artifact_reference))

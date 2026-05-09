@@ -55,12 +55,13 @@ bool SameTerminologyPackageRef(const core::TerminologyPackageRef& left, const co
     return false;
 }
 
-bool TermValueHasDuplicate(const AppRuntimeState& state,
-                           const core::TerminologyPackageRef& package_ref,
-                           const std::string& value,
-                           bool editing_existing_term,
-                           const core::TerminologyTermRef& selected_term_ref) {
-    if (value.empty() || !state.app_state.sacm_package.has_value())
+bool TermDefinitionHasDuplicate(const AppRuntimeState& state,
+                                const core::TerminologyPackageRef& package_ref,
+                                const std::string& value,
+                                const std::string& description,
+                                bool editing_existing_term,
+                                const core::TerminologyTermRef& selected_term_ref) {
+    if (value.empty() || description.empty() || !state.app_state.sacm_package.has_value())
         return false;
     const sacm::TerminologyPackage* package =
         core::FindTerminologyPackage(state.app_state.sacm_package.value(), package_ref);
@@ -69,18 +70,21 @@ bool TermValueHasDuplicate(const AppRuntimeState& state,
     for (const auto& term : package->terms) {
         if (editing_existing_term && SameTermRef(term, selected_term_ref))
             continue;
-        if (term.value == value)
+        if (TrimWhitespace(term.value) == value && TrimWhitespace(term.description) == description)
             return true;
     }
     return false;
 }
 
-bool CurrentTermValueHasDuplicate(const AppRuntimeState& state, const std::string& value) {
-    return TermValueHasDuplicate(state,
-                                 state.selected_terminology_package_ref,
-                                 value,
-                                 state.editing_existing_terminology_term,
-                                 state.selected_terminology_term_ref);
+bool CurrentTermDefinitionHasDuplicate(const AppRuntimeState& state,
+                                       const std::string& value,
+                                       const std::string& description) {
+    return TermDefinitionHasDuplicate(state,
+                                      state.selected_terminology_package_ref,
+                                      value,
+                                      description,
+                                      state.editing_existing_terminology_term,
+                                      state.selected_terminology_term_ref);
 }
 
 std::vector<std::string> SplitCategoryRefs(const std::string& raw) {
@@ -595,12 +599,14 @@ void AppRuntime::RenderTerminologyTermEditorModal() {
         ImGui::InputText("Origin", impl_->term_origin_buf, sizeof(impl_->term_origin_buf));
 
         const std::string value = TrimWhitespace(impl_->term_value_buf);
+        const std::string description = TrimWhitespace(impl_->term_definition_buf);
         const bool can_save = !value.empty();
         if (!can_save)
             ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.2f, 1.0f), "Term value is required.");
-        if (CurrentTermValueHasDuplicate(*impl_, value))
-            ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "Duplicate term value exists in this package.");
-        if (TrimWhitespace(impl_->term_definition_buf).empty())
+        if (CurrentTermDefinitionHasDuplicate(*impl_, value, description))
+            ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f),
+                               "Duplicate term value and definition exist in this package.");
+        if (description.empty())
             ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "Concrete term has no description.");
         if (TrimWhitespace(impl_->term_categories_buf).empty())
             ImGui::TextDisabled("Term has no category.");
@@ -676,6 +682,7 @@ void AppRuntime::RenderQuickDefineTermModal() {
             "External Reference", impl_->term_external_reference_buf, sizeof(impl_->term_external_reference_buf));
 
         const std::string value = TrimWhitespace(impl_->term_value_buf);
+        const std::string description = TrimWhitespace(impl_->term_definition_buf);
         const bool has_target_package =
             HasTerminologyPackageRef(impl_->quick_define_target_package_ref) &&
             impl_->app_state.sacm_package.has_value() &&
@@ -685,9 +692,10 @@ void AppRuntime::RenderQuickDefineTermModal() {
             ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.2f, 1.0f), "Term value is required.");
         if (!has_target_package)
             ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.2f, 1.0f), "Choose a target TerminologyPackage.");
-        if (TermValueHasDuplicate(*impl_, impl_->quick_define_target_package_ref, value, false, {}))
-            ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "Duplicate term value exists in this package.");
-        if (TrimWhitespace(impl_->term_definition_buf).empty())
+        if (TermDefinitionHasDuplicate(*impl_, impl_->quick_define_target_package_ref, value, description, false, {}))
+            ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f),
+                               "Duplicate term value and definition exist in this package.");
+        if (description.empty())
             ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "Concrete term has no description.");
         if (TrimWhitespace(impl_->term_categories_buf).empty())
             ImGui::TextDisabled("Term has no category.");

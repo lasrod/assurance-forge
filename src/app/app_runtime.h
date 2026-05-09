@@ -2,6 +2,7 @@
 
 #include "app/app_events.h"
 #include "core/element_factory.h"
+#include "core/problems/problem_item.h"
 #include "core/project_model.h"
 #include "core/reviews/review_item.h"
 #include "core/terminology_package_service.h"
@@ -147,6 +148,7 @@ private:
     void RefreshSacmPackageTreeCache();
     void SyncReviewProblems();
     void SyncTerminologyProblems();
+    void HandleProblemQuickFix(const core::ProblemItem& problem);
     void SyncReviewVisualStatesFromReviews();
     void TouchCurrentProjectRecent();
     bool SaveProject();

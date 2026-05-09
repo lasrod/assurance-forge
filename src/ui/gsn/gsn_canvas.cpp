@@ -892,11 +892,9 @@ static void RenderTerminologyCardContents(const TerminologyCardState& card_state
         ImGui::SameLine();
         if (actions.edit_terminology_term && ImGui::Button("Edit term", ImVec2(95.0f, 0.0f)))
             actions.edit_terminology_term(card_state.package_ref, card_state.term_ref);
-        if (actions.add_visible_terminology_term_context &&
-            ImGui::Button("Add as context", ImVec2(130.0f, 0.0f))) {
-            actions.add_visible_terminology_term_context(card_state.element_id,
-                                                         card_state.package_ref,
-                                                         card_state.term_ref);
+        if (actions.add_visible_terminology_term_context && ImGui::Button("Add as context", ImVec2(130.0f, 0.0f))) {
+            actions.add_visible_terminology_term_context(
+                card_state.element_id, card_state.package_ref, card_state.term_ref);
         }
         ImGui::SameLine();
         if (actions.find_terminology_usages && ImGui::Button("Find usages", ImVec2(120.0f, 0.0f)))

@@ -251,6 +251,54 @@ std::string TerminologySuggestionKey(const std::string& element_id, const std::s
     return element_id + "\n" + term_value;
 }
 
+bool StartsWith(const std::string& value, const std::string& prefix) {
+    return value.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), value.begin());
+}
+
+struct TerminologyTermQuickFixPayload {
+    core::TerminologyPackageRef package_ref;
+    core::TerminologyTermRef term_ref;
+    std::string term_value;
+};
+
+bool DecodeTerminologyTermQuickFixPayload(const std::string& payload,
+                                          TerminologyTermQuickFixPayload& decoded) {
+    std::stringstream stream(payload);
+    std::vector<std::string> parts;
+    std::string part;
+    while (std::getline(stream, part)) {
+        parts.push_back(part);
+    }
+    if (parts.size() < 5)
+        return false;
+    decoded.package_ref = core::TerminologyPackageRef{parts[0], parts[1]};
+    decoded.term_ref = core::TerminologyTermRef{parts[2], parts[3]};
+    decoded.term_value = parts[4];
+    return HasTerminologyPackageRef(decoded.package_ref) && (!decoded.term_ref.id.empty() || !decoded.term_ref.gid.empty());
+}
+
+bool OpenTerminologyProblemTerm(AppRuntimeState& state,
+                                const core::TerminologyPackageRef& package_ref,
+                                const core::TerminologyTermRef& term_ref,
+                                const std::string& filter_value) {
+    if (!state.app_state.sacm_package.has_value())
+        return false;
+    const sacm::TerminologyPackage* package = core::FindTerminologyPackage(state.app_state.sacm_package.value(), package_ref);
+    if (!package)
+        return false;
+    state.selected_terminology_package_ref = package_ref;
+    state.selected_terminology_package_file_path = state.app_state.active_project_file_path;
+    state.selected_terminology_term_ref = term_ref;
+    state.selected_terminology_category_ref = core::TerminologyCategoryRef{};
+    CopyToBuffer(state.terminology_filter_buf, sizeof(state.terminology_filter_buf), filter_value);
+    CopyToBuffer(state.terminology_category_filter_buf, sizeof(state.terminology_category_filter_buf), "");
+    CopyTerminologyPackageToEditor(state, *package);
+    state.show_terminology_package_tab = true;
+    ui::GetUiState().center_view = ui::CenterView::TerminologyPackage;
+    state.force_center_tab_selection = true;
+    return true;
+}
+
 std::string FirstElementIdForArgumentPackage(const sacm::AssuranceCasePackage& package,
                                              const sacm::SacmPackageTreeNode& selected_package) {
     for (const auto& argument_package : package.argumentPackages) {
@@ -905,7 +953,6 @@ void AppRuntime::BeginFindTerminologyUsages(const core::TerminologyPackageRef& p
         impl_->selected_terminology_usage_index = 0;
     const int usage_count = static_cast<int>(impl_->terminology_usage_results.size());
     const std::string label = impl_->usage_search_term_value.empty() ? "term" : impl_->usage_search_term_value;
-    impl_->usage_search_message = std::to_string(usage_count) + " usage" + (usage_count == 1 ? "" : "s") + " found.";
     SetStatus("Found " + std::to_string(usage_count) + " usage" + (usage_count == 1 ? "" : "s") + " of " + label + ".");
 }
 
@@ -975,6 +1022,39 @@ void AppRuntime::IgnoreTerminologySuggestion(const std::string& element_id, cons
 bool AppRuntime::IsTerminologySuggestionIgnored(const std::string& element_id, const std::string& term_value) const {
     const std::string key = TerminologySuggestionKey(element_id, TrimWhitespace(term_value));
     return impl_->ignored_terminology_suggestion_keys.count(key) > 0;
+}
+
+void AppRuntime::HandleProblemQuickFix(const core::ProblemItem& problem) {
+    if (problem.type == "TerminologyUndefinedAcronym") {
+        BeginQuickDefineTerminologyTerm(problem.element_id, problem.quick_fix_payload);
+        return;
+    }
+    if (problem.type == "TerminologyAmbiguity") {
+        BeginLinkExistingTerminologyTerm(problem.element_id, problem.quick_fix_payload);
+        return;
+    }
+    if (StartsWith(problem.type, "TerminologyTerm")) {
+        TerminologyTermQuickFixPayload payload;
+        if (!DecodeTerminologyTermQuickFixPayload(problem.quick_fix_payload, payload)) {
+            SetStatus("Could not decode terminology quick fix target.");
+            return;
+        }
+        if (!OpenTerminologyProblemTerm(*impl_, payload.package_ref, payload.term_ref, payload.term_value)) {
+            SetStatus("Terminology quick fix target was not found.");
+            return;
+        }
+        if (problem.type == "TerminologyTermDuplicateDefinition") {
+            SetStatus("Filtered glossary to duplicated term definition " + payload.term_value + ".");
+            return;
+        }
+        BeginEditTerminologyTerm(payload.term_ref);
+        SetStatus("Opened terminology term editor.");
+        return;
+    }
+    if (!problem.element_id.empty()) {
+        impl_->events.Emit(SelectionChangedEvent{problem.element_id, true});
+        impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
+    }
 }
 
 void AppRuntime::ConfirmQuickDefineTerminologyTerm(bool add_as_context) {

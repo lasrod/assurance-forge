@@ -262,7 +262,7 @@ TEST(TerminologyPackageService, RejectsEmptyTermValue) {
     EXPECT_FALSE(created.error.empty());
 }
 
-TEST(TerminologyPackageService, ValidatesDuplicateMissingDescriptionAndNoCategory) {
+TEST(TerminologyPackageService, ValidatesMissingDescriptionCategoryAndExternalReference) {
     sacm::AssuranceCasePackage package = MakePackage();
     core::TerminologyPackageCreateResult terminology_package = core::CreateTerminologyPackage(package, "Terms", "");
     ASSERT_TRUE(terminology_package.success);
@@ -280,25 +280,83 @@ TEST(TerminologyPackageService, ValidatesDuplicateMissingDescriptionAndNoCategor
     ASSERT_NE(terms, nullptr);
     std::vector<core::TerminologyTermIssue> issues = core::ValidateTerminologyTerms(*terms);
 
-    EXPECT_NE(std::find_if(issues.begin(),
+    EXPECT_EQ(std::find_if(issues.begin(),
                            issues.end(),
                            [](const core::TerminologyTermIssue& issue) {
-                               return issue.severity == core::TerminologyTermIssueSeverity::Warning &&
-                                      issue.message.find("Duplicate") != std::string::npos;
+                               return issue.kind == core::TerminologyTermIssueKind::DuplicateDefinition;
                            }),
               issues.end());
     EXPECT_NE(std::find_if(issues.begin(),
                            issues.end(),
                            [](const core::TerminologyTermIssue& issue) {
-                               return issue.severity == core::TerminologyTermIssueSeverity::Warning &&
+                               return issue.kind == core::TerminologyTermIssueKind::MissingDescription &&
+                                      issue.severity == core::TerminologyTermIssueSeverity::Warning &&
                                       issue.message.find("description") != std::string::npos;
                            }),
               issues.end());
     EXPECT_NE(std::find_if(issues.begin(),
                            issues.end(),
                            [](const core::TerminologyTermIssue& issue) {
-                               return issue.severity == core::TerminologyTermIssueSeverity::Info &&
+                               return issue.kind == core::TerminologyTermIssueKind::MissingCategory &&
+                                      issue.severity == core::TerminologyTermIssueSeverity::Info &&
                                       issue.message.find("category") != std::string::npos;
+                           }),
+              issues.end());
+    EXPECT_NE(std::find_if(issues.begin(),
+                           issues.end(),
+                           [](const core::TerminologyTermIssue& issue) {
+                               return issue.kind == core::TerminologyTermIssueKind::MissingExternalReference &&
+                                      issue.severity == core::TerminologyTermIssueSeverity::Info &&
+                                      issue.message.find("external reference") != std::string::npos;
+                           }),
+              issues.end());
+}
+
+TEST(TerminologyPackageService, WarnsOnlyWhenDuplicateValueHasSameDefinition) {
+    sacm::AssuranceCasePackage package = MakePackage();
+    core::TerminologyPackageCreateResult terminology_package = core::CreateTerminologyPackage(package, "Terms", "");
+    ASSERT_TRUE(terminology_package.success);
+
+    core::TerminologyTermDraft operational_domain;
+    operational_domain.value = "ODD";
+    operational_domain.name = "Operational Design Domain";
+    operational_domain.description = "Operating conditions for the system.";
+    operational_domain.externalReference = "ISO 34503";
+    ASSERT_TRUE(core::CreateTerminologyTerm(package, terminology_package.package_ref, operational_domain).success);
+
+    core::TerminologyTermDraft dataset;
+    dataset.value = "ODD";
+    dataset.name = "Object Detection Dataset";
+    dataset.description = "Dataset used for object detection validation.";
+    dataset.externalReference = "Project dataset catalog";
+    ASSERT_TRUE(core::CreateTerminologyTerm(package, terminology_package.package_ref, dataset).success);
+
+    const sacm::TerminologyPackage* terms = core::FindTerminologyPackage(package, terminology_package.package_ref);
+    ASSERT_NE(terms, nullptr);
+    std::vector<core::TerminologyTermIssue> issues = core::ValidateTerminologyTerms(*terms);
+    EXPECT_EQ(std::find_if(issues.begin(),
+                           issues.end(),
+                           [](const core::TerminologyTermIssue& issue) {
+                               return issue.kind == core::TerminologyTermIssueKind::DuplicateDefinition;
+                           }),
+              issues.end());
+
+    core::TerminologyTermDraft repeated_definition;
+    repeated_definition.value = "ODD";
+    repeated_definition.name = "Repeated Operational Design Domain";
+    repeated_definition.description = operational_domain.description;
+    repeated_definition.externalReference = "ISO 34503";
+    ASSERT_TRUE(core::CreateTerminologyTerm(package, terminology_package.package_ref, repeated_definition).success);
+
+    terms = core::FindTerminologyPackage(package, terminology_package.package_ref);
+    ASSERT_NE(terms, nullptr);
+    issues = core::ValidateTerminologyTerms(*terms);
+    EXPECT_NE(std::find_if(issues.begin(),
+                           issues.end(),
+                           [](const core::TerminologyTermIssue& issue) {
+                               return issue.kind == core::TerminologyTermIssueKind::DuplicateDefinition &&
+                                      issue.severity == core::TerminologyTermIssueSeverity::Warning &&
+                                      issue.message.find("definition") != std::string::npos;
                            }),
               issues.end());
 }
@@ -507,12 +565,12 @@ TEST(TerminologyPackageService, FindUsagesSplitsDuplicateAbbreviationsByExplicit
     argument_package.claims.push_back(dataset_claim);
     package.argumentPackages.push_back(argument_package);
 
-    ASSERT_TRUE(core::AssociateTerminologyTermWithElement(
-                    package, "G1", terminology_package.package_ref, context.term_ref)
-                    .success);
-    ASSERT_TRUE(core::AssociateTerminologyTermWithElement(
-                    package, "G2", terminology_package.package_ref, dataset.term_ref)
-                    .success);
+    ASSERT_TRUE(
+        core::AssociateTerminologyTermWithElement(package, "G1", terminology_package.package_ref, context.term_ref)
+            .success);
+    ASSERT_TRUE(
+        core::AssociateTerminologyTermWithElement(package, "G2", terminology_package.package_ref, dataset.term_ref)
+            .success);
 
     core::TerminologyTermUsageSearchResult context_usages =
         core::FindTerminologyTermUsages(package, terminology_package.package_ref, context.term_ref);
@@ -666,12 +724,12 @@ TEST(TerminologyPackageService, VisibleTermContextCreatesArtifactReferenceAndAss
     const sacm::ArgumentPackage& argument_package = package.argumentPackages.front();
     ASSERT_EQ(argument_package.artifactReferences.size(), 1u);
     EXPECT_EQ(argument_package.artifactReferences.front().referencedArtifact, "T_ODD");
-    EXPECT_TRUE(core::IsVisibleTerminologyArtifactReference(package,
-                                                           argument_package,
-                                                           argument_package.artifactReferences.front()));
+    EXPECT_TRUE(core::IsVisibleTerminologyArtifactReference(
+        package, argument_package, argument_package.artifactReferences.front()));
     ASSERT_EQ(argument_package.assertedContexts.size(), 1u);
     EXPECT_TRUE(core::IsVisibleTerminologyContext(argument_package.assertedContexts.front()));
-    EXPECT_EQ(argument_package.assertedContexts.front().sources, std::vector<std::string>{result.artifact_reference_id});
+    EXPECT_EQ(argument_package.assertedContexts.front().sources,
+              std::vector<std::string>{result.artifact_reference_id});
     EXPECT_EQ(argument_package.assertedContexts.front().targets, std::vector<std::string>{"G1"});
 }
 
@@ -752,8 +810,8 @@ TEST(TerminologyPackageService, VisibleTermContextDoesNotPromoteSharedHiddenRefe
     EXPECT_EQ(package.argumentPackages.front().artifactReferences.size(), 2u);
     ASSERT_EQ(package.argumentPackages.front().assertedContexts.size(), 2u);
     const auto visible_contexts = std::count_if(package.argumentPackages.front().assertedContexts.begin(),
-                                               package.argumentPackages.front().assertedContexts.end(),
-                                               core::IsVisibleTerminologyContext);
+                                                package.argumentPackages.front().assertedContexts.end(),
+                                                core::IsVisibleTerminologyContext);
     EXPECT_EQ(visible_contexts, 1);
 }
 
@@ -848,7 +906,8 @@ TEST(TerminologyPackageService, VisibleTermContextValidationReportsMissingSource
     EXPECT_NE(std::find_if(issues.begin(),
                            issues.end(),
                            [](const core::TerminologyContextReferenceIssue& issue) {
-                               return issue.kind == core::TerminologyContextReferenceIssueKind::MissingArtifactReference;
+                               return issue.kind ==
+                                      core::TerminologyContextReferenceIssueKind::MissingArtifactReference;
                            }),
               issues.end());
     EXPECT_NE(std::find_if(issues.begin(),

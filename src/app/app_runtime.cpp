@@ -194,6 +194,80 @@ std::string TerminologyAmbiguityProblemId(const core::TermOccurrence& occurrence
            std::to_string(occurrence.start_offset) + ":" + std::to_string(occurrence.end_offset);
 }
 
+std::string TerminologyUndefinedProblemId(const core::TermOccurrence& occurrence) {
+    return "terminology-undefined:" + occurrence.element_id + ":" + occurrence.text + ":" +
+           std::to_string(occurrence.start_offset) + ":" + std::to_string(occurrence.end_offset);
+}
+
+core::TerminologyPackageRef TerminologyPackageRefFor(const sacm::TerminologyPackage& package) {
+    return core::TerminologyPackageRef{package.id, package.gid};
+}
+
+std::string RefValue(const core::TerminologyPackageRef& ref) {
+    return ref.id.empty() ? ref.gid : ref.id;
+}
+
+std::string RefValue(const core::TerminologyTermRef& ref) {
+    return ref.id.empty() ? ref.gid : ref.id;
+}
+
+const char* TermIssueKindCode(core::TerminologyTermIssueKind kind) {
+    switch (kind) {
+    case core::TerminologyTermIssueKind::MissingValue:
+        return "missing-value";
+    case core::TerminologyTermIssueKind::DuplicateDefinition:
+        return "duplicate-definition";
+    case core::TerminologyTermIssueKind::MissingDescription:
+        return "missing-description";
+    case core::TerminologyTermIssueKind::MissingCategory:
+        return "missing-category";
+    case core::TerminologyTermIssueKind::MissingExternalReference:
+        return "missing-external-reference";
+    }
+    return "unknown";
+}
+
+const char* TermIssueProblemType(core::TerminologyTermIssueKind kind) {
+    switch (kind) {
+    case core::TerminologyTermIssueKind::MissingValue:
+        return "TerminologyTermMissingValue";
+    case core::TerminologyTermIssueKind::DuplicateDefinition:
+        return "TerminologyTermDuplicateDefinition";
+    case core::TerminologyTermIssueKind::MissingDescription:
+        return "TerminologyTermMissingDescription";
+    case core::TerminologyTermIssueKind::MissingCategory:
+        return "TerminologyTermMissingCategory";
+    case core::TerminologyTermIssueKind::MissingExternalReference:
+        return "TerminologyTermMissingExternalReference";
+    }
+    return "TerminologyTermIssue";
+}
+
+const char* TermIssueQuickFixLabel(core::TerminologyTermIssueKind kind) {
+    switch (kind) {
+    case core::TerminologyTermIssueKind::DuplicateDefinition:
+        return "Open duplicates";
+    case core::TerminologyTermIssueKind::MissingValue:
+    case core::TerminologyTermIssueKind::MissingDescription:
+    case core::TerminologyTermIssueKind::MissingCategory:
+    case core::TerminologyTermIssueKind::MissingExternalReference:
+        return "Edit term";
+    }
+    return "";
+}
+
+std::string TerminologyTermProblemId(const core::TerminologyPackageRef& package_ref,
+                                     const core::TerminologyTermIssue& issue) {
+    return "terminology-term:" + RefValue(package_ref) + ":" + RefValue(issue.term_ref) + ":" +
+           TermIssueKindCode(issue.kind);
+}
+
+std::string EncodeTerminologyTermQuickFixPayload(const core::TerminologyPackageRef& package_ref,
+                                                 const core::TerminologyTermRef& term_ref,
+                                                 const std::string& term_value) {
+    return package_ref.id + "\n" + package_ref.gid + "\n" + term_ref.id + "\n" + term_ref.gid + "\n" + term_value;
+}
+
 std::string TerminologyContextReferenceProblemId(const core::TerminologyContextReferenceIssue& issue) {
     if (!issue.artifact_reference_id.empty())
         return "terminology-context-reference:" + issue.artifact_reference_id + ":" + issue.target_ref;
@@ -2148,12 +2222,17 @@ void AppRuntime::RenderProblemsPanel(float center_x, float center_w, float probl
     };
     ui::panels::ProblemsPanelCallbacks callbacks{
         [this](const core::ProblemItem& problem) {
+            if (problem.type.rfind("TerminologyTerm", 0) == 0) {
+                HandleProblemQuickFix(problem);
+                return;
+            }
             if (problem.element_id.empty())
                 return;
             ui::GetUiState().selected_problem_element_id = problem.element_id;
             impl_->events.Emit(SelectionChangedEvent{problem.element_id, true});
             impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
         },
+        [this](const core::ProblemItem& problem) { HandleProblemQuickFix(problem); },
     };
 
     ImGui::SetNextWindowPos(ImVec2(center_x, top_y));
@@ -2212,9 +2291,13 @@ void AppRuntime::SyncReviewProblems() {
 }
 
 void AppRuntime::SyncTerminologyProblems() {
+    constexpr const char* kTerminologyTermProblemPrefix = "terminology-term:";
     constexpr const char* kTerminologyAmbiguityProblemPrefix = "terminology-ambiguity:";
+    constexpr const char* kTerminologyUndefinedProblemPrefix = "terminology-undefined:";
     constexpr const char* kTerminologyContextReferenceProblemPrefix = "terminology-context-reference:";
+    ClearProblemsByIdPrefix(impl_->problems_manager, kTerminologyTermProblemPrefix);
     ClearProblemsByIdPrefix(impl_->problems_manager, kTerminologyAmbiguityProblemPrefix);
+    ClearProblemsByIdPrefix(impl_->problems_manager, kTerminologyUndefinedProblemPrefix);
     ClearProblemsByIdPrefix(impl_->problems_manager, kTerminologyContextReferenceProblemPrefix);
 
     if (!impl_->app_state.loaded_case.has_value() || !impl_->app_state.sacm_package.has_value())
@@ -2222,6 +2305,32 @@ void AppRuntime::SyncTerminologyProblems() {
 
     const parser::AssuranceCase& model = impl_->app_state.loaded_case.value();
     const sacm::AssuranceCasePackage& package = impl_->app_state.sacm_package.value();
+
+    auto add_term_problems = [&](const sacm::TerminologyPackage& terminology_package) {
+        const core::TerminologyPackageRef package_ref = TerminologyPackageRefFor(terminology_package);
+        for (const core::TerminologyTermIssue& issue : core::ValidateTerminologyTerms(terminology_package)) {
+            const sacm::Term* term = core::FindTerminologyTerm(terminology_package, issue.term_ref);
+            const std::string term_value = term ? term->value : std::string{};
+            core::ProblemItem problem;
+            problem.id = TerminologyTermProblemId(package_ref, issue);
+            problem.severity = ProblemSeverityFor(issue.severity);
+            problem.source = core::ProblemSource::ModelValidation;
+            problem.element_id = RefValue(issue.term_ref);
+            problem.type = TermIssueProblemType(issue.kind);
+            problem.message = issue.message;
+            problem.quick_fix_label = TermIssueQuickFixLabel(issue.kind);
+            problem.quick_fix_payload = EncodeTerminologyTermQuickFixPayload(package_ref, issue.term_ref, term_value);
+            impl_->problems_manager.AddOrUpdateProblem(problem);
+        }
+    };
+
+    for (const sacm::TerminologyPackage& terminology_package : package.terminologyPackages)
+        add_term_problems(terminology_package);
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::TerminologyPackage& terminology_package : argument_package.terminologyPackages)
+            add_term_problems(terminology_package);
+    }
+
     for (const core::TerminologyContextReferenceIssue& issue : core::ValidateTerminologyContextReferences(package)) {
         core::ProblemItem problem;
         problem.id = TerminologyContextReferenceProblemId(issue);
@@ -2244,17 +2353,33 @@ void AppRuntime::SyncTerminologyProblems() {
 
         std::vector<core::TermOccurrence> occurrences = terminology_service.DetectTermsInText(element.id, text);
         for (const core::TermOccurrence& occurrence : occurrences) {
-            if (occurrence.resolution.status != core::TermResolutionStatus::Ambiguous)
+            if (IsTerminologySuggestionIgnored(occurrence.element_id, occurrence.text))
                 continue;
-            core::ProblemItem problem;
-            problem.id = TerminologyAmbiguityProblemId(occurrence);
-            problem.severity = core::ProblemSeverity::Warning;
-            problem.source = core::ProblemSource::ModelValidation;
-            problem.element_id = occurrence.element_id;
-            problem.type = "TerminologyAmbiguity";
-            problem.message = occurrence.text + " has " + std::to_string(occurrence.resolution.candidates.size()) +
-                              " visible meanings. Choose the intended terminology entry.";
-            impl_->problems_manager.AddOrUpdateProblem(problem);
+            if (occurrence.resolution.status == core::TermResolutionStatus::Ambiguous) {
+                core::ProblemItem problem;
+                problem.id = TerminologyAmbiguityProblemId(occurrence);
+                problem.severity = core::ProblemSeverity::Warning;
+                problem.source = core::ProblemSource::ModelValidation;
+                problem.element_id = occurrence.element_id;
+                problem.type = "TerminologyAmbiguity";
+                problem.message = occurrence.text + " has " + std::to_string(occurrence.resolution.candidates.size()) +
+                                  " visible meanings. Choose the intended terminology entry.";
+                problem.quick_fix_label = "Open glossary";
+                problem.quick_fix_payload = occurrence.text;
+                impl_->problems_manager.AddOrUpdateProblem(problem);
+            } else if (occurrence.kind == core::TermOccurrenceKind::UndefinedAcronym &&
+                       occurrence.resolution.important_undefined) {
+                core::ProblemItem problem;
+                problem.id = TerminologyUndefinedProblemId(occurrence);
+                problem.severity = core::ProblemSeverity::Warning;
+                problem.source = core::ProblemSource::ModelValidation;
+                problem.element_id = occurrence.element_id;
+                problem.type = "TerminologyUndefinedAcronym";
+                problem.message = occurrence.text + " looks like an undefined terminology entry.";
+                problem.quick_fix_label = "Define term";
+                problem.quick_fix_payload = occurrence.text;
+                impl_->problems_manager.AddOrUpdateProblem(problem);
+            }
         }
     }
 }
