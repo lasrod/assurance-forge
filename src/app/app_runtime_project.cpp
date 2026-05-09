@@ -619,6 +619,70 @@ void AppRuntime::ConfirmTerminologyTermEdit() {
     impl_->show_terminology_term_editor_modal = false;
 }
 
+void AppRuntime::OpenTerminologyTermFromCanvas(const core::TerminologyPackageRef& package_ref,
+                                               const core::TerminologyTermRef& term_ref) {
+    if (!impl_->app_state.sacm_package.has_value()) {
+        SetStatus("Open a SACM model before opening terminology terms.");
+        return;
+    }
+
+    const sacm::TerminologyPackage* terminology_package =
+        core::FindTerminologyPackage(impl_->app_state.sacm_package.value(), package_ref);
+    if (!terminology_package) {
+        SetStatus("Terminology package not found.");
+        return;
+    }
+    const sacm::Term* term = core::FindTerminologyTerm(*terminology_package, term_ref);
+    if (!term) {
+        SetStatus("Term not found.");
+        return;
+    }
+
+    impl_->selected_terminology_package_ref = package_ref;
+    impl_->selected_terminology_term_ref = term_ref;
+    impl_->selected_terminology_category_ref = core::TerminologyCategoryRef{};
+    impl_->selected_terminology_package_file_path = impl_->app_state.active_project_file_path;
+    CopyTerminologyPackageToEditor(*impl_, *terminology_package);
+    CopyToBuffer(impl_->terminology_filter_buf, sizeof(impl_->terminology_filter_buf), term->value);
+    CopyToBuffer(impl_->terminology_category_filter_buf, sizeof(impl_->terminology_category_filter_buf), "");
+    impl_->show_terminology_package_tab = true;
+    ui::GetUiState().center_view = ui::CenterView::TerminologyPackage;
+    impl_->force_center_tab_selection = true;
+    SetStatus("Opened term " + term->value + ".");
+}
+
+void AppRuntime::EditTerminologyTermFromCanvas(const core::TerminologyPackageRef& package_ref,
+                                               const core::TerminologyTermRef& term_ref) {
+    OpenTerminologyTermFromCanvas(package_ref, term_ref);
+    if (!impl_->app_state.sacm_package.has_value())
+        return;
+    if (!core::FindTerminologyTerm(impl_->app_state.sacm_package.value(), package_ref, term_ref))
+        return;
+    BeginEditTerminologyTerm(term_ref);
+}
+
+void AppRuntime::AddTerminologyTermAsContextFromCanvas(const std::string& element_id,
+                                                       const core::TerminologyPackageRef& package_ref,
+                                                       const core::TerminologyTermRef& term_ref) {
+    (void)element_id;
+    (void)package_ref;
+    (void)term_ref;
+    ShowNotImplementedModal("Add term as context");
+}
+
+void AppRuntime::FindTerminologyUsagesFromCanvas(const core::TerminologyPackageRef& package_ref,
+                                                 const core::TerminologyTermRef& term_ref) {
+    (void)package_ref;
+    (void)term_ref;
+    ShowNotImplementedModal("Find terminology usages");
+}
+
+void AppRuntime::ChangeTerminologyMeaningFromCanvas(const std::string& element_id, const std::string& term_value) {
+    (void)element_id;
+    (void)term_value;
+    ShowNotImplementedModal("Change linked terminology meaning");
+}
+
 void AppRuntime::BeginQuickDefineTerminologyTerm(const std::string& element_id, const std::string& term_value) {
     if (!impl_->app_state.sacm_package.has_value()) {
         SetStatus("Open a SACM model before defining terms.");

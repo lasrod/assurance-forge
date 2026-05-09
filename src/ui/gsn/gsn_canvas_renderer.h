@@ -3,6 +3,7 @@
 #include "core/assurance_tree.h"
 #include "parser/xml_parser.h"
 #include "ui/element_context_menu.h"
+#include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_model.h"
 #include "ui/ui_state.h"
 
@@ -81,6 +82,7 @@ private:
     std::unordered_map<std::string, const LayoutNode*> node_by_id_;
     float zoom_level_ = 1.0f;
     ImVec2 view_offset_ = ImVec2(0.0f, 0.0f); // pixel-space pan offset
+    TerminologyCardState terminology_card_state_;
     CanvasRenderStats last_render_stats_{};
 };
 

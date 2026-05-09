@@ -427,6 +427,8 @@ void GsnCanvas::Render(UiState& ui_state,
     }
     const core::TerminologyService* terminology_service_ptr =
         terminology_service.has_value() ? &terminology_service.value() : nullptr;
+    terminology_card_state_.clicked_term_this_frame = false;
+    terminology_card_state_.card_hovered_this_frame = false;
 
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
@@ -521,8 +523,23 @@ void GsnCanvas::Render(UiState& ui_state,
         gsn_node.label = node.label;
         gsn_node.label_secondary = node.label_secondary;
         gsn_node.undeveloped = node.undeveloped;
-        DrawGsnNode(gsn_node, origin, ui_state, active_case, actions, terminology_service_ptr, zoom);
+        DrawGsnNode(gsn_node,
+                    origin,
+                    ui_state,
+                    active_case,
+                    actions,
+                    terminology_service_ptr,
+                    terminology_package,
+                    &terminology_card_state_,
+                    zoom);
         ++frame_stats.nodes_drawn;
+    }
+
+    RenderPinnedTerminologyCard(terminology_card_state_, terminology_package, actions);
+    if (terminology_card_state_.pinned && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+        !terminology_card_state_.clicked_term_this_frame && !terminology_card_state_.card_hovered_this_frame &&
+        !ImGui::IsAnyItemHovered()) {
+        terminology_card_state_.pinned = false;
     }
 
     last_render_stats_ = frame_stats;

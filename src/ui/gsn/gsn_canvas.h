@@ -1,12 +1,14 @@
 ﻿#pragma once
 
 #include "core/assurance_tree.h"
+#include "core/terminology_package_service.h"
 #include "imgui.h"
 #include "parser/xml_parser.h"
 #include "ui/element_context_menu.h"
 #include "ui/gsn/gsn_model.h"
 #include "ui/ui_state.h"
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -30,6 +32,28 @@ struct GsnNode {
     bool undeveloped = false;
 };
 
+enum class TerminologyCardKind { Resolved, Ambiguous, Undefined };
+
+struct TerminologyCardCandidate {
+    core::TerminologyPackageRef package_ref;
+    core::TerminologyTermRef term_ref;
+};
+
+struct TerminologyCardState {
+    bool pinned = false;
+    bool clicked_term_this_frame = false;
+    bool card_hovered_this_frame = false;
+    TerminologyCardKind kind = TerminologyCardKind::Undefined;
+    std::string element_id;
+    std::string text;
+    std::size_t start_offset = 0;
+    std::size_t end_offset = 0;
+    core::TerminologyPackageRef package_ref;
+    core::TerminologyTermRef term_ref;
+    std::vector<TerminologyCardCandidate> candidates;
+    ImVec2 anchor = ImVec2(0.0f, 0.0f);
+};
+
 // Bold font used for the ID/name line in nodes (set by main.cpp at startup).
 extern ImFont* g_BoldFont;
 
@@ -42,7 +66,13 @@ void DrawGsnNode(const GsnNode& node,
                  const parser::AssuranceCase* active_case,
                  const ElementContextActions& actions,
                  const core::TerminologyService* terminology_service = nullptr,
+                 const sacm::AssuranceCasePackage* terminology_package = nullptr,
+                 TerminologyCardState* terminology_card_state = nullptr,
                  float zoom = 1.0f);
+
+void RenderPinnedTerminologyCard(TerminologyCardState& card_state,
+                                 const sacm::AssuranceCasePackage* terminology_package,
+                                 const ElementContextActions& actions);
 
 // Backwards-compatible function used by `main.cpp`.
 // Internally uses the new `GsnCanvas` renderer.

@@ -109,6 +109,16 @@ private:
     void BeginAddTerminologyTerm();
     void BeginEditTerminologyTerm(const core::TerminologyTermRef& term_ref);
     void ConfirmTerminologyTermEdit();
+    void OpenTerminologyTermFromCanvas(const core::TerminologyPackageRef& package_ref,
+                                       const core::TerminologyTermRef& term_ref);
+    void EditTerminologyTermFromCanvas(const core::TerminologyPackageRef& package_ref,
+                                       const core::TerminologyTermRef& term_ref);
+    void AddTerminologyTermAsContextFromCanvas(const std::string& element_id,
+                                               const core::TerminologyPackageRef& package_ref,
+                                               const core::TerminologyTermRef& term_ref);
+    void FindTerminologyUsagesFromCanvas(const core::TerminologyPackageRef& package_ref,
+                                         const core::TerminologyTermRef& term_ref);
+    void ChangeTerminologyMeaningFromCanvas(const std::string& element_id, const std::string& term_value);
     void BeginQuickDefineTerminologyTerm(const std::string& element_id, const std::string& term_value);
     void BeginLinkExistingTerminologyTerm(const std::string& element_id, const std::string& term_value);
     void IgnoreTerminologySuggestion(const std::string& element_id, const std::string& term_value);

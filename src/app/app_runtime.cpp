@@ -1786,6 +1786,31 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                     };
                 } else {
                     actions = MakeElementContextActions(*this);
+                    actions.open_terminology_term = [this](const core::TerminologyPackageRef& package_ref,
+                                                           const core::TerminologyTermRef& term_ref) {
+                        OpenTerminologyTermFromCanvas(package_ref, term_ref);
+                    };
+                    actions.edit_terminology_term = [this](const core::TerminologyPackageRef& package_ref,
+                                                           const core::TerminologyTermRef& term_ref) {
+                        EditTerminologyTermFromCanvas(package_ref, term_ref);
+                    };
+                    actions.define_terminology_term =
+                        [this](const std::string& element_id, const std::string& term_value) {
+                            BeginQuickDefineTerminologyTerm(element_id, term_value);
+                        };
+                    actions.add_terminology_term_as_context = [this](const std::string& element_id,
+                                                                     const core::TerminologyPackageRef& package_ref,
+                                                                     const core::TerminologyTermRef& term_ref) {
+                        AddTerminologyTermAsContextFromCanvas(element_id, package_ref, term_ref);
+                    };
+                    actions.find_terminology_usages = [this](const core::TerminologyPackageRef& package_ref,
+                                                             const core::TerminologyTermRef& term_ref) {
+                        FindTerminologyUsagesFromCanvas(package_ref, term_ref);
+                    };
+                    actions.change_terminology_meaning =
+                        [this](const std::string& element_id, const std::string& term_value) {
+                            ChangeTerminologyMeaningFromCanvas(element_id, term_value);
+                        };
                 }
                 const parser::AssuranceCase* visible_case =
                     impl_->IsProposalCanvasActive() ? &impl_->proposal_controller->preview_model : GetLoadedCase();
