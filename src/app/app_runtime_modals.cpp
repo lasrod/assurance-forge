@@ -187,9 +187,9 @@ std::vector<TerminologyPackageChoice> BuildTerminologyPackageChoices(const AppRu
                            PackageDisplayLabel(terminology_package, "Assurance case")});
     }
     for (const auto& argument_package : package.argumentPackages) {
-        const std::string argument_label = argument_package.name.empty()
-                                       ? (!argument_package.id.empty() ? argument_package.id : argument_package.gid)
-                                       : argument_package.name;
+        const std::string argument_label =
+            argument_package.name.empty() ? (!argument_package.id.empty() ? argument_package.id : argument_package.gid)
+                                          : argument_package.name;
         for (const auto& terminology_package : argument_package.terminologyPackages) {
             choices.push_back({TerminologyPackageRefFor(terminology_package),
                                PackageDisplayLabel(terminology_package, argument_label)});
@@ -631,7 +631,8 @@ void AppRuntime::RenderQuickDefineTermModal() {
         return;
 
     std::vector<TerminologyPackageChoice> package_choices = BuildTerminologyPackageChoices(*impl_);
-    int selected_package_index = FindTerminologyPackageChoiceIndex(package_choices, impl_->quick_define_target_package_ref);
+    int selected_package_index =
+        FindTerminologyPackageChoiceIndex(package_choices, impl_->quick_define_target_package_ref);
     if (selected_package_index < 0 && !package_choices.empty()) {
         selected_package_index = 0;
         impl_->quick_define_target_package_ref = package_choices.front().ref;
@@ -675,10 +676,10 @@ void AppRuntime::RenderQuickDefineTermModal() {
             "External Reference", impl_->term_external_reference_buf, sizeof(impl_->term_external_reference_buf));
 
         const std::string value = TrimWhitespace(impl_->term_value_buf);
-        const bool has_target_package = HasTerminologyPackageRef(impl_->quick_define_target_package_ref) &&
-                                        impl_->app_state.sacm_package.has_value() &&
-                                        core::FindTerminologyPackage(impl_->app_state.sacm_package.value(),
-                                                                     impl_->quick_define_target_package_ref);
+        const bool has_target_package =
+            HasTerminologyPackageRef(impl_->quick_define_target_package_ref) &&
+            impl_->app_state.sacm_package.has_value() &&
+            core::FindTerminologyPackage(impl_->app_state.sacm_package.value(), impl_->quick_define_target_package_ref);
         const bool can_create = !value.empty() && has_target_package;
         if (value.empty())
             ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.2f, 1.0f), "Term value is required.");

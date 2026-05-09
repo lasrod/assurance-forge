@@ -214,6 +214,57 @@ bool MatchesCategoryRefString(const sacm::Category& category, const std::string&
     return (!category.id.empty() && category.id == ref) || (!category.gid.empty() && category.gid == ref);
 }
 
+bool MatchesRawRef(const std::string& raw_ref, const std::string& id, const std::string& gid) {
+    const std::string ref = NormalizeRef(raw_ref);
+    if (ref.empty())
+        return false;
+    return (!id.empty() && ref == id) || (!gid.empty() && ref == gid);
+}
+
+bool ArtifactReferenceTargetsTerm(const sacm::ArtifactReference& artifact_reference, const sacm::Term& term) {
+    return MatchesRawRef(artifact_reference.referencedArtifact, term.id, term.gid);
+}
+
+bool RelationshipReferencesElement(const std::vector<std::string>& refs,
+                                   const std::string& id,
+                                   const std::string& gid = {}) {
+    return std::any_of(refs.begin(), refs.end(), [&](const std::string& ref) { return MatchesRawRef(ref, id, gid); });
+}
+
+bool ArgumentPackageContainsTargetElement(const sacm::ArgumentPackage& argument_package,
+                                          const std::string& target_element_id) {
+    for (const auto& claim : argument_package.claims) {
+        if (MatchesRawRef(target_element_id, claim.id, claim.gid))
+            return true;
+    }
+    for (const auto& reasoning : argument_package.argumentReasonings) {
+        if (MatchesRawRef(target_element_id, reasoning.id, reasoning.gid))
+            return true;
+    }
+    for (const auto& artifact_reference : argument_package.artifactReferences) {
+        if (MatchesRawRef(target_element_id, artifact_reference.id, artifact_reference.gid))
+            return true;
+    }
+    return false;
+}
+
+sacm::ArgumentPackage* FindOwningArgumentPackageForContext(sacm::AssuranceCasePackage& package,
+                                                           const std::string& target_element_id) {
+    for (auto& argument_package : package.argumentPackages) {
+        if (ArgumentPackageContainsTargetElement(argument_package, target_element_id))
+            return &argument_package;
+    }
+    return nullptr;
+}
+
+std::string TermContextLabel(const sacm::Term& term) {
+    if (term.value.empty())
+        return term.name.empty() ? term.id : term.name;
+    if (term.name.empty() || term.name == term.value)
+        return term.value;
+    return term.value + ": " + term.name;
+}
+
 bool IsWordChar(char c) {
     return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
 }
@@ -496,6 +547,74 @@ bool DeleteTerminologyTerm(sacm::AssuranceCasePackage& package,
 
     terminology_package->terms.erase(it);
     return true;
+}
+
+TerminologyContextAssociationResult AssociateTerminologyTermWithElement(sacm::AssuranceCasePackage& package,
+                                                                        const std::string& target_element_id,
+                                                                        const TerminologyPackageRef& package_ref,
+                                                                        const TerminologyTermRef& term_ref) {
+    TerminologyContextAssociationResult result;
+    if (NormalizeRef(target_element_id).empty()) {
+        result.error = "Target element is required.";
+        return result;
+    }
+
+    const sacm::Term* term = FindTerminologyTerm(package, package_ref, term_ref);
+    if (!term) {
+        result.error = "Term not found.";
+        return result;
+    }
+
+    sacm::ArgumentPackage* argument_package = FindOwningArgumentPackageForContext(package, target_element_id);
+    if (!argument_package) {
+        result.error = "Selected element is not a claim, strategy, or solution in an argument package.";
+        return result;
+    }
+
+    sacm::ArtifactReference* reusable_reference = nullptr;
+    for (auto& artifact_reference : argument_package->artifactReferences) {
+        if (!ArtifactReferenceTargetsTerm(artifact_reference, *term))
+            continue;
+        if (!reusable_reference)
+            reusable_reference = &artifact_reference;
+        for (const auto& context : argument_package->assertedContexts) {
+            if (RelationshipReferencesElement(context.sources, artifact_reference.id, artifact_reference.gid) &&
+                RelationshipReferencesElement(context.targets, target_element_id)) {
+                result.success = true;
+                result.already_associated = true;
+                result.artifact_reference_id = artifact_reference.id;
+                result.asserted_context_id = context.id;
+                return result;
+            }
+        }
+    }
+
+    if (!reusable_reference) {
+        sacm::ArtifactReference artifact_reference;
+        artifact_reference.id = GenerateUniqueId(package, "AR");
+        artifact_reference.gid = GenerateUniqueGid(package, artifact_reference.id);
+        artifact_reference.name = TermContextLabel(*term);
+        artifact_reference.name_ml.set("en", artifact_reference.name);
+        artifact_reference.referencedArtifact = !term->id.empty() ? term->id : term->gid;
+        argument_package->artifactReferences.push_back(std::move(artifact_reference));
+        reusable_reference = &argument_package->artifactReferences.back();
+        result.created_artifact_reference = true;
+    }
+
+    sacm::AssertedContext context;
+    context.id = GenerateUniqueId(package, "AC");
+    context.gid = GenerateUniqueGid(package, context.id);
+    context.name = "Context: " + TermContextLabel(*term);
+    context.name_ml.set("en", context.name);
+    context.sources.push_back(reusable_reference->id);
+    context.targets.push_back(NormalizeRef(target_element_id));
+    argument_package->assertedContexts.push_back(std::move(context));
+
+    result.success = true;
+    result.created_asserted_context = true;
+    result.artifact_reference_id = reusable_reference->id;
+    result.asserted_context_id = argument_package->assertedContexts.back().id;
+    return result;
 }
 
 sacm::Category* FindTerminologyCategory(sacm::TerminologyPackage& package, const TerminologyCategoryRef& category_ref) {

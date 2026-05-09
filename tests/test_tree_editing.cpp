@@ -180,8 +180,7 @@ TEST(TreeEditingValidation, AllowsSameParentSiblingReorder) {
     core::AssuranceTree tree = core::AssuranceTree::Build(mini_case.model);
     const core::TreeEditIndex index = core::BuildTreeEditIndex(mini_case.model);
 
-    core::TreeDropValidationResult result =
-        core::ValidateTreeDrop(index, tree, "G4", "G2", core::TreeDropMode::Before);
+    core::TreeDropValidationResult result = core::ValidateTreeDrop(index, tree, "G4", "G2", core::TreeDropMode::Before);
 
     EXPECT_TRUE(result.allowed) << result.reason;
     EXPECT_FALSE(result.changes_semantic_relationship);

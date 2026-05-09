@@ -186,16 +186,20 @@ static const char* const kLangLabels[] = {"Japanese",
 static const int kLangCount = 15;
 
 struct TerminologySuggestion {
+    enum class Kind { UndefinedAcronym, AmbiguousTerm };
+
+    Kind kind = Kind::UndefinedAcronym;
     std::string text;
     std::size_t start_offset = 0;
     std::size_t end_offset = 0;
+    std::vector<core::TerminologyScopedTermRef> candidates;
 };
 
-std::vector<TerminologySuggestion> BuildUndefinedAcronymSuggestions(
-    const sacm::AssuranceCasePackage* sacm_pkg,
-    const std::string& element_id,
-    const std::string& text,
-    const ElementTerminologyAssistCallbacks* callbacks) {
+std::vector<TerminologySuggestion>
+BuildTerminologySuggestions(const sacm::AssuranceCasePackage* sacm_pkg,
+                            const std::string& element_id,
+                            const std::string& text,
+                            const ElementTerminologyAssistCallbacks* callbacks) {
     std::vector<TerminologySuggestion> suggestions;
     if (!sacm_pkg || !callbacks || text.empty())
         return suggestions;
@@ -204,24 +208,35 @@ std::vector<TerminologySuggestion> BuildUndefinedAcronymSuggestions(
     const std::vector<core::TermOccurrence> occurrences = terminology_service.DetectTermsInText(element_id, text);
     std::unordered_set<std::string> seen_terms;
     for (const core::TermOccurrence& occurrence : occurrences) {
-        if (occurrence.kind != core::TermOccurrenceKind::UndefinedAcronym)
-            continue;
-        if (occurrence.resolution.status != core::TermResolutionStatus::None ||
-            !occurrence.resolution.important_undefined) {
-            continue;
-        }
-        if (callbacks->is_ignored && callbacks->is_ignored(element_id, occurrence.text))
-            continue;
         if (!seen_terms.insert(occurrence.text).second)
             continue;
-        suggestions.push_back({occurrence.text, occurrence.start_offset, occurrence.end_offset});
+        if (occurrence.kind == core::TermOccurrenceKind::UndefinedAcronym) {
+            if (occurrence.resolution.status != core::TermResolutionStatus::None ||
+                !occurrence.resolution.important_undefined) {
+                continue;
+            }
+            if (callbacks->is_ignored && callbacks->is_ignored(element_id, occurrence.text))
+                continue;
+            suggestions.push_back({TerminologySuggestion::Kind::UndefinedAcronym,
+                                   occurrence.text,
+                                   occurrence.start_offset,
+                                   occurrence.end_offset,
+                                   {}});
+        } else if (occurrence.resolution.status == core::TermResolutionStatus::Ambiguous) {
+            suggestions.push_back({TerminologySuggestion::Kind::AmbiguousTerm,
+                                   occurrence.text,
+                                   occurrence.start_offset,
+                                   occurrence.end_offset,
+                                   occurrence.resolution.candidates});
+        }
     }
-    std::sort(suggestions.begin(), suggestions.end(), [](const TerminologySuggestion& left,
-                                                         const TerminologySuggestion& right) {
-        if (left.start_offset != right.start_offset)
-            return left.start_offset < right.start_offset;
-        return left.text < right.text;
-    });
+    std::sort(suggestions.begin(),
+              suggestions.end(),
+              [](const TerminologySuggestion& left, const TerminologySuggestion& right) {
+                  if (left.start_offset != right.start_offset)
+                      return left.start_offset < right.start_offset;
+                  return left.text < right.text;
+              });
     return suggestions;
 }
 
@@ -229,8 +244,7 @@ void RenderTerminologySuggestions(const sacm::AssuranceCasePackage* sacm_pkg,
                                   const std::string& element_id,
                                   const std::string& text,
                                   const ElementTerminologyAssistCallbacks* callbacks) {
-    std::vector<TerminologySuggestion> suggestions =
-        BuildUndefinedAcronymSuggestions(sacm_pkg, element_id, text, callbacks);
+    std::vector<TerminologySuggestion> suggestions = BuildTerminologySuggestions(sacm_pkg, element_id, text, callbacks);
     if (suggestions.empty())
         return;
 
@@ -239,6 +253,30 @@ void RenderTerminologySuggestions(const sacm::AssuranceCasePackage* sacm_pkg,
     ImGui::Separator();
     for (const TerminologySuggestion& suggestion : suggestions) {
         ImGui::PushID(suggestion.text.c_str());
+        if (suggestion.kind == TerminologySuggestion::Kind::AmbiguousTerm) {
+            ImGui::TextColored(
+                ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "%s has multiple meanings.", suggestion.text.c_str());
+            int candidate_index = 0;
+            for (const auto& candidate : suggestion.candidates) {
+                ImGui::PushID(candidate_index++);
+                const std::string term_name = candidate.term && !candidate.term->name.empty() ? candidate.term->name : "Unnamed term";
+                ImGui::BulletText("%s", term_name.c_str());
+                if (callbacks && callbacks->use_term_for_element) {
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Use for this element")) {
+                        callbacks->use_term_for_element(element_id, candidate.package_ref, candidate.term_ref);
+                    }
+                }
+                ImGui::PopID();
+            }
+            if (callbacks && callbacks->define_term) {
+                if (ImGui::Button("Create new meaning"))
+                    callbacks->define_term(element_id, suggestion.text);
+            }
+            ImGui::PopID();
+            continue;
+        }
+
         ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "%s is not defined.", suggestion.text.c_str());
         if (callbacks && callbacks->define_term) {
             if (ImGui::Button("Define"))

@@ -1,4 +1,5 @@
 #include "core/terminology_scope_service.h"
+#include "core/terminology_package_service.h"
 #include "sacm/sacm_parser.h"
 #include "sacm/sacm_serializer.h"
 
@@ -242,6 +243,103 @@ TEST(TerminologyScopeService, DetectionMarksDuplicateTermValuesAmbiguous) {
     EXPECT_EQ(occurrences.front().resolution.status, core::TermResolutionStatus::Ambiguous);
     EXPECT_FALSE(occurrences.front().resolution.selected.has_value());
     EXPECT_EQ(occurrences.front().resolution.candidates.size(), 2u);
+}
+
+TEST(TerminologyScopeService, ExplicitTermContextResolvesDuplicateTermValueForElement) {
+    sacm::AssuranceCasePackage package = MakePackageWithArgument();
+    package.terminologyPackages.push_back(MakeTerminologyPackage(
+        "TP_CASE",
+        {MakeTerm("T_CONTEXT", "ODD", "Operational Design Domain"),
+         MakeTerm("T_DATASET", "ODD", "Object Detection Dataset")}));
+
+    core::TerminologyContextAssociationResult association = core::AssociateTerminologyTermWithElement(
+        package, "G1", core::TerminologyPackageRef{"TP_CASE", "gid-TP_CASE"}, core::TerminologyTermRef{"T_DATASET", "gid-T_DATASET"});
+    ASSERT_TRUE(association.success) << association.error;
+
+    core::TerminologyService service(package);
+    std::vector<core::TermOccurrence> occurrences = service.DetectTermsInText("G1", "The ODD is well defined.");
+
+    ASSERT_EQ(occurrences.size(), 1u);
+    EXPECT_EQ(occurrences.front().resolution.status, core::TermResolutionStatus::Explicit);
+    ASSERT_TRUE(occurrences.front().resolution.selected.has_value());
+    EXPECT_EQ(occurrences.front().resolution.selected->term_ref.id, "T_DATASET");
+}
+
+TEST(TerminologyScopeService, ExplicitTermContextResolvesDuplicateTermValueForSolution) {
+    sacm::AssuranceCasePackage package = MakePackageWithArgument();
+    sacm::ArtifactReference solution;
+    solution.id = "Sn1";
+    solution.gid = "gid-Sn1";
+    solution.description = "The ODD evidence is reviewed.";
+    package.argumentPackages.front().artifactReferences.push_back(solution);
+    package.terminologyPackages.push_back(MakeTerminologyPackage(
+        "TP_CASE",
+        {MakeTerm("T_CONTEXT", "ODD", "Operational Design Domain"),
+         MakeTerm("T_DATASET", "ODD", "Object Detection Dataset")}));
+
+    core::TerminologyContextAssociationResult association = core::AssociateTerminologyTermWithElement(
+        package,
+        "Sn1",
+        core::TerminologyPackageRef{"TP_CASE", "gid-TP_CASE"},
+        core::TerminologyTermRef{"T_CONTEXT", "gid-T_CONTEXT"});
+    ASSERT_TRUE(association.success) << association.error;
+
+    core::TerminologyService service(package);
+    std::vector<core::TermOccurrence> occurrences = service.DetectTermsInText("Sn1", "The ODD evidence is reviewed.");
+
+    ASSERT_EQ(occurrences.size(), 1u);
+    EXPECT_EQ(occurrences.front().resolution.status, core::TermResolutionStatus::Explicit);
+    ASSERT_TRUE(occurrences.front().resolution.selected.has_value());
+    EXPECT_EQ(occurrences.front().resolution.selected->term_ref.id, "T_CONTEXT");
+}
+
+TEST(TerminologyScopeService, TermContextAssociationIsIdempotent) {
+    sacm::AssuranceCasePackage package = MakePackageWithArgument();
+    package.terminologyPackages.push_back(MakeTerminologyPackage(
+        "TP_CASE", {MakeTerm("T_CONTEXT", "ODD", "Operational Design Domain")}));
+
+    core::TerminologyPackageRef package_ref{"TP_CASE", "gid-TP_CASE"};
+    core::TerminologyTermRef term_ref{"T_CONTEXT", "gid-T_CONTEXT"};
+    core::TerminologyContextAssociationResult first =
+        core::AssociateTerminologyTermWithElement(package, "G1", package_ref, term_ref);
+    core::TerminologyContextAssociationResult second =
+        core::AssociateTerminologyTermWithElement(package, "G1", package_ref, term_ref);
+
+    ASSERT_TRUE(first.success) << first.error;
+    ASSERT_TRUE(second.success) << second.error;
+    EXPECT_FALSE(first.already_associated);
+    EXPECT_TRUE(second.already_associated);
+    ASSERT_EQ(package.argumentPackages.size(), 1u);
+    EXPECT_EQ(package.argumentPackages.front().artifactReferences.size(), 1u);
+    EXPECT_EQ(package.argumentPackages.front().assertedContexts.size(), 1u);
+}
+
+TEST(TerminologyScopeService, TermContextAssociationSurvivesRoundTripAndResolvesAmbiguity) {
+    sacm::AssuranceCasePackage package = MakePackageWithArgument();
+    package.terminologyPackages.push_back(MakeTerminologyPackage(
+        "TP_CASE",
+        {MakeTerm("T_CONTEXT", "ODD", "Operational Design Domain"),
+         MakeTerm("T_DATASET", "ODD", "Object Detection Dataset")}));
+    ASSERT_TRUE(core::AssociateTerminologyTermWithElement(package,
+                                                         "G1",
+                                                         core::TerminologyPackageRef{"TP_CASE", "gid-TP_CASE"},
+                                                         core::TerminologyTermRef{"T_CONTEXT", "gid-T_CONTEXT"})
+                    .success);
+
+    std::string xml = sacm::serialize_sacm(package);
+    sacm::SacmParseResult parsed = sacm::parse_sacm_string(xml);
+    ASSERT_TRUE(parsed.success) << parsed.error_message;
+    ASSERT_EQ(parsed.package.argumentPackages.size(), 1u);
+    EXPECT_EQ(parsed.package.argumentPackages.front().artifactReferences.size(), 1u);
+    EXPECT_EQ(parsed.package.argumentPackages.front().assertedContexts.size(), 1u);
+
+    core::TerminologyService service(parsed.package);
+    std::vector<core::TermOccurrence> occurrences = service.DetectTermsInText("G1", "The ODD is well defined.");
+
+    ASSERT_EQ(occurrences.size(), 1u);
+    EXPECT_EQ(occurrences.front().resolution.status, core::TermResolutionStatus::Explicit);
+    ASSERT_TRUE(occurrences.front().resolution.selected.has_value());
+    EXPECT_EQ(occurrences.front().resolution.selected->term_ref.id, "T_CONTEXT");
 }
 
 TEST(TerminologyScopeService, DetectionReportsUndefinedAcronyms) {

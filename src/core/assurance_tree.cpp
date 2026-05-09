@@ -173,7 +173,7 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac) {
     std::unordered_map<std::string, TreeNode*> node_by_id;
     std::unordered_set<std::string> wired_ids;
 
-    // Step 1: Create a TreeNode for every non-relationship element
+    // Step 1: Create a TreeNode for every non-relationship element.
     for (const auto& element : ac.elements) {
         if (is_relationship(element.type))
             continue;

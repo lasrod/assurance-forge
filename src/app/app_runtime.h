@@ -139,6 +139,7 @@ private:
     bool EnsureReviewItemStorage();
     void RefreshSacmPackageTreeCache();
     void SyncReviewProblems();
+    void SyncTerminologyProblems();
     void SyncReviewVisualStatesFromReviews();
     void TouchCurrentProjectRecent();
     bool SaveProject();

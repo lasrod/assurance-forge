@@ -18,9 +18,8 @@ struct ElementContextActions {
     std::function<void(const core::TerminologyPackageRef&, const core::TerminologyTermRef&)> open_terminology_term;
     std::function<void(const core::TerminologyPackageRef&, const core::TerminologyTermRef&)> edit_terminology_term;
     std::function<void(const std::string& element_id, const std::string& term_value)> define_terminology_term;
-    std::function<void(const std::string& element_id,
-                       const core::TerminologyPackageRef&,
-                       const core::TerminologyTermRef&)>
+    std::function<void(
+        const std::string& element_id, const core::TerminologyPackageRef&, const core::TerminologyTermRef&)>
         add_terminology_term_as_context;
     std::function<void(const core::TerminologyPackageRef&, const core::TerminologyTermRef&)> find_terminology_usages;
     std::function<void(const std::string& element_id, const std::string& term_value)> change_terminology_meaning;

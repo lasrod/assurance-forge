@@ -562,9 +562,8 @@ static bool HasPackageRef(const core::TerminologyPackageRef& package_ref) {
     return !package_ref.id.empty() || !package_ref.gid.empty();
 }
 
-static TerminologyCardState CardStateFromOccurrence(const std::string& element_id,
-                                                    const core::TermOccurrence& occurrence,
-                                                    ImVec2 anchor) {
+static TerminologyCardState
+CardStateFromOccurrence(const std::string& element_id, const core::TermOccurrence& occurrence, ImVec2 anchor) {
     TerminologyCardState card;
     card.element_id = element_id;
     card.text = occurrence.text;
@@ -596,12 +595,8 @@ static TerminologyCardState CardStateFromOccurrence(const std::string& element_i
     return card;
 }
 
-static void DrawDottedUnderline(ImDrawList* draw_list,
-                                ImVec2 start,
-                                ImVec2 end,
-                                ImU32 color,
-                                float thickness,
-                                float zoom) {
+static void
+DrawDottedUnderline(ImDrawList* draw_list, ImVec2 start, ImVec2 end, ImU32 color, float thickness, float zoom) {
     const float length = end.x - start.x;
     if (length <= 0.5f)
         return;
@@ -617,17 +612,17 @@ static void DrawDottedUnderline(ImDrawList* draw_list,
     }
 }
 
-static std::vector<TerminologySpanHitRegion> BuildAndDrawTerminologySpansForText(
-    ImDrawList* draw_list,
-    const std::string& element_id,
-    const char* text_start,
-    const char* text_end,
-    ImFont* font,
-    float font_size,
-    float text_wrap,
-    ImVec2 text_pos,
-    float zoom,
-    const std::vector<core::TermOccurrence>& occurrences) {
+static std::vector<TerminologySpanHitRegion>
+BuildAndDrawTerminologySpansForText(ImDrawList* draw_list,
+                                    const std::string& element_id,
+                                    const char* text_start,
+                                    const char* text_end,
+                                    ImFont* font,
+                                    float font_size,
+                                    float text_wrap,
+                                    ImVec2 text_pos,
+                                    float zoom,
+                                    const std::vector<core::TermOccurrence>& occurrences) {
     std::vector<TerminologySpanHitRegion> regions;
     if (!text_start || !text_end || text_start >= text_end)
         return regions;
@@ -696,15 +691,15 @@ static std::vector<TerminologySpanHitRegion> BuildAndDrawTerminologySpansForText
     return regions;
 }
 
-static std::vector<TerminologySpanHitRegion> BuildAndDrawTerminologySpans(
-    ImDrawList* draw_list,
-    const GsnNode& node,
-    ImVec2 top_left,
-    float text_left,
-    float text_wrap,
-    float zoom,
-    const UiState& ui_state,
-    const core::TerminologyService* terminology_service) {
+static std::vector<TerminologySpanHitRegion>
+BuildAndDrawTerminologySpans(ImDrawList* draw_list,
+                             const GsnNode& node,
+                             ImVec2 top_left,
+                             float text_left,
+                             float text_wrap,
+                             float zoom,
+                             const UiState& ui_state,
+                             const core::TerminologyService* terminology_service) {
     if (!terminology_service || zoom < kFullLabelZoom)
         return {};
 
@@ -754,9 +749,8 @@ static bool RegionContains(const TerminologySpanHitRegion& region, ImVec2 point)
     return point.x >= region.min.x && point.x <= region.max.x && point.y >= region.min.y && point.y <= region.max.y;
 }
 
-static const TerminologySpanHitRegion* FindHoveredTerminologyRegion(
-    const std::vector<TerminologySpanHitRegion>& regions,
-    ImVec2 mouse_pos) {
+static const TerminologySpanHitRegion*
+FindHoveredTerminologyRegion(const std::vector<TerminologySpanHitRegion>& regions, ImVec2 mouse_pos) {
     const TerminologySpanHitRegion* hovered = nullptr;
     float hovered_area = 0.0f;
     for (const auto& region : regions) {
@@ -862,25 +856,34 @@ static void RenderTerminologyCardContents(const TerminologyCardState& card_state
         ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "%s has multiple meanings.", card_state.text.c_str());
         int shown = 0;
         for (const auto& candidate : card_state.candidates) {
+            ImGui::PushID(shown);
             const sacm::TerminologyPackage* candidate_package = nullptr;
             const sacm::Term* candidate_term =
                 ResolveCardTerm(package, candidate.package_ref, candidate.term_ref, &candidate_package);
             ImGui::BulletText("%s", CandidateSummary(candidate_package, candidate_term).c_str());
+            if (interactive && actions.add_terminology_term_as_context && candidate_term) {
+                if (ImGui::SmallButton("Use for this element")) {
+                    actions.add_terminology_term_as_context(
+                        card_state.element_id, candidate.package_ref, candidate.term_ref);
+                }
+            }
+            ImGui::PopID();
             if (++shown >= 4 && static_cast<int>(card_state.candidates.size()) > shown) {
                 ImGui::TextDisabled("%d more candidate(s).", static_cast<int>(card_state.candidates.size()) - shown);
                 break;
             }
         }
-        if (interactive && actions.change_terminology_meaning) {
-            if (ImGui::Button("Change linked meaning", ImVec2(175.0f, 0.0f)))
-                actions.change_terminology_meaning(card_state.element_id, card_state.text);
+        if (interactive) {
+            if (actions.define_terminology_term && ImGui::Button("Create new meaning", ImVec2(165.0f, 0.0f)))
+                actions.define_terminology_term(card_state.element_id, card_state.text);
         }
         ImGui::PopTextWrapPos();
         return;
     }
 
     const sacm::TerminologyPackage* terminology_package = nullptr;
-    const sacm::Term* term = ResolveCardTerm(package, card_state.package_ref, card_state.term_ref, &terminology_package);
+    const sacm::Term* term =
+        ResolveCardTerm(package, card_state.package_ref, card_state.term_ref, &terminology_package);
     RenderTermDetails(package, terminology_package, term, card_state);
     if (interactive && term) {
         ImGui::Spacing();
@@ -889,8 +892,7 @@ static void RenderTerminologyCardContents(const TerminologyCardState& card_state
         ImGui::SameLine();
         if (actions.edit_terminology_term && ImGui::Button("Edit term", ImVec2(95.0f, 0.0f)))
             actions.edit_terminology_term(card_state.package_ref, card_state.term_ref);
-        if (actions.add_terminology_term_as_context &&
-            ImGui::Button("Add as context", ImVec2(130.0f, 0.0f))) {
+        if (actions.add_terminology_term_as_context && ImGui::Button("Add as context", ImVec2(130.0f, 0.0f))) {
             actions.add_terminology_term_as_context(card_state.element_id, card_state.package_ref, card_state.term_ref);
         }
         ImGui::SameLine();
@@ -917,11 +919,11 @@ void RenderPinnedTerminologyCard(TerminologyCardState& card_state,
     ImGui::SetNextWindowPos(card_state.anchor, ImGuiCond_Appearing);
     ImGui::SetNextWindowSizeConstraints(ImVec2(DpiSize(280.0f), 0.0f), ImVec2(DpiSize(420.0f), FLT_MAX));
     bool open = true;
-    const ImGuiWindowFlags flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
-                                   ImGuiWindowFlags_NoDocking;
+    const ImGuiWindowFlags flags =
+        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking;
     if (ImGui::Begin("Term Card##gsn_term_card", &open, flags)) {
-        card_state.card_hovered_this_frame = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup |
-                                                                    ImGuiHoveredFlags_ChildWindows);
+        card_state.card_hovered_this_frame =
+            ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup | ImGuiHoveredFlags_ChildWindows);
         RenderTerminologyCardContents(card_state, terminology_package, actions, true);
     }
     ImGui::End();
@@ -941,8 +943,8 @@ static void HandleTerminologySpanInteractions(const std::vector<TerminologySpanH
         return;
 
     RenderTerminologyHoverCard(hovered_region->card, terminology_package, actions);
-    if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && hovered_region->card.kind == TerminologyCardKind::Resolved &&
-        actions.open_terminology_term) {
+    if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
+        hovered_region->card.kind == TerminologyCardKind::Resolved && actions.open_terminology_term) {
         card_state->clicked_term_this_frame = true;
         actions.open_terminology_term(hovered_region->card.package_ref, hovered_region->card.term_ref);
         return;
@@ -1021,7 +1023,14 @@ void DrawGsnNode(const GsnNode& node,
         ink = WithAlpha(GetTheme().text_secondary, 0.62f);
     DrawNodeLabel(draw_list, node, top_left, bottom_right, text_left, text_wrap, zoom, ink, ui_state);
     const std::vector<TerminologySpanHitRegion> terminology_regions =
-        BuildAndDrawTerminologySpans(draw_list, node, top_left, text_left, text_wrap, zoom, ui_state, terminology_service);
+        BuildAndDrawTerminologySpans(draw_list,
+                                     node,
+                                     top_left,
+                                     text_left,
+                                     text_wrap,
+                                     zoom,
+                                     ui_state,
+                                     terminology_service);
     HandleTerminologySpanInteractions(terminology_regions, terminology_card_state, terminology_package, actions);
     DrawUndevelopedMarker(draw_list, node, top_left, bottom_right, zoom);
 

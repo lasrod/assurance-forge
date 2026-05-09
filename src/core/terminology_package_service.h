@@ -38,6 +38,16 @@ struct TerminologyTermCreateResult {
     std::string error;
 };
 
+struct TerminologyContextAssociationResult {
+    bool success = false;
+    bool already_associated = false;
+    bool created_artifact_reference = false;
+    bool created_asserted_context = false;
+    std::string artifact_reference_id;
+    std::string asserted_context_id;
+    std::string error;
+};
+
 struct TerminologyCategoryRef {
     std::string id;
     std::string gid;
@@ -115,6 +125,11 @@ bool DeleteTerminologyTerm(sacm::AssuranceCasePackage& package,
                            const TerminologyPackageRef& package_ref,
                            const TerminologyTermRef& term_ref,
                            std::string& out_error);
+
+TerminologyContextAssociationResult AssociateTerminologyTermWithElement(sacm::AssuranceCasePackage& package,
+                                                                        const std::string& target_element_id,
+                                                                        const TerminologyPackageRef& package_ref,
+                                                                        const TerminologyTermRef& term_ref);
 
 sacm::Category* FindTerminologyCategory(sacm::TerminologyPackage& package, const TerminologyCategoryRef& category_ref);
 const sacm::Category* FindTerminologyCategory(const sacm::TerminologyPackage& package,

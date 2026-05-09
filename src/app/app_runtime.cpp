@@ -17,6 +17,7 @@
 #include "core/reviews/review_proposal_manager.h"
 #include "core/reviews/review_proposal_patch_service.h"
 #include "core/terminology_package_service.h"
+#include "core/terminology_scope_service.h"
 #include "hello_imgui/hello_imgui.h"
 #include "hello_imgui/hello_imgui_theme.h"
 #include "imgui.h"
@@ -159,6 +160,37 @@ std::string TruncateForProblemMessage(const std::string& value, size_t limit = 4
 
 bool IsReviewDerivedProblem(const core::ProblemItem& problem) {
     return problem.id.rfind("review-comment:", 0) == 0 || problem.id.rfind("guideline-review:", 0) == 0;
+}
+
+bool StartsWith(const std::string& value, const std::string& prefix) {
+    return value.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), value.begin());
+}
+
+void ClearProblemsByIdPrefix(core::ProblemsManager& problems_manager, const std::string& prefix) {
+    std::vector<std::string> problem_ids;
+    for (const core::ProblemItem& problem : problems_manager.GetProblems()) {
+        if (StartsWith(problem.id, prefix))
+            problem_ids.push_back(problem.id);
+    }
+    for (const std::string& problem_id : problem_ids) {
+        problems_manager.RemoveProblem(problem_id);
+    }
+}
+
+bool IsRelationshipElement(const parser::SacmElement& element) {
+    return element.type == "assertedinference" || element.type == "assertedcontext" ||
+           element.type == "assertedevidence";
+}
+
+std::string ElementTerminologyText(const parser::SacmElement& element) {
+    if (element.type == "claim" || element.type == "argumentreasoning")
+        return element.content;
+    return element.description;
+}
+
+std::string TerminologyAmbiguityProblemId(const core::TermOccurrence& occurrence) {
+    return "terminology-ambiguity:" + occurrence.element_id + ":" + occurrence.text + ":" +
+           std::to_string(occurrence.start_offset) + ":" + std::to_string(occurrence.end_offset);
 }
 
 const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model, const std::string& element_id) {
@@ -553,10 +585,105 @@ void CopyCommonSacmFields(sacm::SacmElement& target, const parser::SacmElement& 
         target.description_ml.set("en", source.description);
 }
 
+std::string NormalizeSacmRef(std::string ref) {
+    if (!ref.empty() && ref.front() == '#')
+        ref.erase(ref.begin());
+    return ref;
+}
+
+void CollectTermRefs(const sacm::TerminologyPackage& terminology_package, std::unordered_set<std::string>& refs) {
+    for (const sacm::Term& term : terminology_package.terms) {
+        if (!term.id.empty())
+            refs.insert(term.id);
+        if (!term.gid.empty())
+            refs.insert(term.gid);
+    }
+}
+
+std::unordered_set<std::string> CollectTermRefs(const sacm::AssuranceCasePackage& package) {
+    std::unordered_set<std::string> refs;
+    for (const sacm::TerminologyPackage& terminology_package : package.terminologyPackages)
+        CollectTermRefs(terminology_package, refs);
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::TerminologyPackage& terminology_package : argument_package.terminologyPackages)
+            CollectTermRefs(terminology_package, refs);
+    }
+    return refs;
+}
+
+bool ReferencesAny(const std::vector<std::string>& refs, const std::unordered_set<std::string>& candidates) {
+    return std::any_of(refs.begin(), refs.end(), [&](const std::string& ref) {
+        return candidates.find(NormalizeSacmRef(ref)) != candidates.end();
+    });
+}
+
+bool ArtifactReferenceTargetsTerm(const sacm::ArtifactReference& artifact_reference,
+                                  const std::unordered_set<std::string>& term_refs) {
+    return term_refs.find(NormalizeSacmRef(artifact_reference.referencedArtifact)) != term_refs.end();
+}
+
+void AddElementRefs(const parser::AssuranceCase& model, std::unordered_set<std::string>& refs) {
+    for (const parser::SacmElement& element : model.elements) {
+        if (IsPreviewRelationshipType(element.type))
+            continue;
+        if (!element.id.empty())
+            refs.insert(element.id);
+        if (!element.name.empty())
+            refs.insert(element.name);
+    }
+}
+
+bool ContainsSacmElementRef(const std::vector<std::string>& refs, const std::unordered_set<std::string>& candidates) {
+    return ReferencesAny(refs, candidates);
+}
+
+bool HasArtifactReference(const sacm::ArgumentPackage& argument_package, const sacm::ArtifactReference& candidate) {
+    return std::any_of(argument_package.artifactReferences.begin(),
+                       argument_package.artifactReferences.end(),
+                       [&](const auto& existing) {
+                           return (!candidate.id.empty() && existing.id == candidate.id) ||
+                                  (!candidate.gid.empty() && existing.gid == candidate.gid);
+                       });
+}
+
+bool HasAssertedContext(const sacm::ArgumentPackage& argument_package, const sacm::AssertedContext& candidate) {
+    return std::any_of(argument_package.assertedContexts.begin(),
+                       argument_package.assertedContexts.end(),
+                       [&](const auto& existing) {
+                           return (!candidate.id.empty() && existing.id == candidate.id) ||
+                                  (!candidate.gid.empty() && existing.gid == candidate.gid) ||
+                                  (existing.sources == candidate.sources && existing.targets == candidate.targets);
+                       });
+}
+
 void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sacm::AssuranceCasePackage& package) {
     if (package.argumentPackages.empty())
         package.argumentPackages.emplace_back();
+    std::map<std::string, std::string> artifact_reference_targets;
+    const std::unordered_set<std::string> term_refs = CollectTermRefs(package);
+    std::vector<sacm::ArtifactReference> preserved_term_references;
+    std::vector<sacm::AssertedContext> preserved_term_contexts;
     for (sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        std::unordered_set<std::string> term_artifact_refs;
+        for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
+            if (artifact_reference.referencedArtifact.empty())
+                continue;
+            if (!artifact_reference.id.empty())
+                artifact_reference_targets[artifact_reference.id] = artifact_reference.referencedArtifact;
+            if (!artifact_reference.gid.empty())
+                artifact_reference_targets[artifact_reference.gid] = artifact_reference.referencedArtifact;
+            if (ArtifactReferenceTargetsTerm(artifact_reference, term_refs)) {
+                preserved_term_references.push_back(artifact_reference);
+                if (!artifact_reference.id.empty())
+                    term_artifact_refs.insert(artifact_reference.id);
+                if (!artifact_reference.gid.empty())
+                    term_artifact_refs.insert(artifact_reference.gid);
+            }
+        }
+        for (const sacm::AssertedContext& context : argument_package.assertedContexts) {
+            if (ReferencesAny(context.sources, term_artifact_refs))
+                preserved_term_contexts.push_back(context);
+        }
         argument_package.claims.clear();
         argument_package.argumentReasonings.clear();
         argument_package.artifactReferences.clear();
@@ -589,6 +716,11 @@ void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sa
         } else if (element.type == "artifactreference" || element.type == "artifact") {
             sacm::ArtifactReference artifact_reference;
             CopyCommonSacmFields(artifact_reference, element);
+            auto target = artifact_reference_targets.find(element.id);
+            if (target == artifact_reference_targets.end())
+                target = artifact_reference_targets.find(element.name);
+            if (target != artifact_reference_targets.end())
+                artifact_reference.referencedArtifact = target->second;
             argument_package.artifactReferences.push_back(std::move(artifact_reference));
         } else if (element.type == "assertedinference") {
             sacm::AssertedInference inference;
@@ -613,6 +745,27 @@ void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sa
             evidence.assertionDeclaration = element.assertion_declaration;
             argument_package.assertedEvidences.push_back(std::move(evidence));
         }
+    }
+
+    std::unordered_set<std::string> model_element_refs;
+    AddElementRefs(model, model_element_refs);
+    std::unordered_set<std::string> kept_artifact_refs;
+    for (const sacm::ArtifactReference& artifact_reference : preserved_term_references) {
+        if (HasArtifactReference(argument_package, artifact_reference))
+            continue;
+        argument_package.artifactReferences.push_back(artifact_reference);
+        if (!artifact_reference.id.empty())
+            kept_artifact_refs.insert(artifact_reference.id);
+        if (!artifact_reference.gid.empty())
+            kept_artifact_refs.insert(artifact_reference.gid);
+    }
+    for (const sacm::AssertedContext& context : preserved_term_contexts) {
+        if (!ReferencesAny(context.sources, kept_artifact_refs) ||
+            !ContainsSacmElementRef(context.targets, model_element_refs)) {
+            continue;
+        }
+        if (!HasAssertedContext(argument_package, context))
+            argument_package.assertedContexts.push_back(context);
     }
 }
 
@@ -1412,6 +1565,7 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     ui::gsn::SetCanvasTree(impl_->current_tree);
     ui::RebuildRegisterViews(&ac);
     ui::GetUiState().model_has_translations = ui::ModelHasTranslations(ac);
+    SyncTerminologyProblems();
 
     if (impl_->pending_focus_root && impl_->current_tree.root) {
         ui::UiState& ui_state = ui::GetUiState();
@@ -1794,10 +1948,10 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                                                            const core::TerminologyTermRef& term_ref) {
                         EditTerminologyTermFromCanvas(package_ref, term_ref);
                     };
-                    actions.define_terminology_term =
-                        [this](const std::string& element_id, const std::string& term_value) {
-                            BeginQuickDefineTerminologyTerm(element_id, term_value);
-                        };
+                    actions.define_terminology_term = [this](const std::string& element_id,
+                                                             const std::string& term_value) {
+                        BeginQuickDefineTerminologyTerm(element_id, term_value);
+                    };
                     actions.add_terminology_term_as_context = [this](const std::string& element_id,
                                                                      const core::TerminologyPackageRef& package_ref,
                                                                      const core::TerminologyTermRef& term_ref) {
@@ -1807,10 +1961,10 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                                                              const core::TerminologyTermRef& term_ref) {
                         FindTerminologyUsagesFromCanvas(package_ref, term_ref);
                     };
-                    actions.change_terminology_meaning =
-                        [this](const std::string& element_id, const std::string& term_value) {
-                            ChangeTerminologyMeaningFromCanvas(element_id, term_value);
-                        };
+                    actions.change_terminology_meaning = [this](const std::string& element_id,
+                                                                const std::string& term_value) {
+                        ChangeTerminologyMeaningFromCanvas(element_id, term_value);
+                    };
                 }
                 const parser::AssuranceCase* visible_case =
                     impl_->IsProposalCanvasActive() ? &impl_->proposal_controller->preview_model : GetLoadedCase();
@@ -1994,6 +2148,40 @@ void AppRuntime::RenderProblemsPanel(float center_x, float center_w, float probl
 
 void AppRuntime::SyncReviewProblems() {
     app::SyncReviewProblems(impl_->problems_manager, impl_->review_controller->Items());
+}
+
+void AppRuntime::SyncTerminologyProblems() {
+    constexpr const char* kTerminologyProblemPrefix = "terminology-ambiguity:";
+    ClearProblemsByIdPrefix(impl_->problems_manager, kTerminologyProblemPrefix);
+
+    if (!impl_->app_state.loaded_case.has_value() || !impl_->app_state.sacm_package.has_value())
+        return;
+
+    const parser::AssuranceCase& model = impl_->app_state.loaded_case.value();
+    core::TerminologyService terminology_service(impl_->app_state.sacm_package.value());
+
+    for (const parser::SacmElement& element : model.elements) {
+        if (IsRelationshipElement(element))
+            continue;
+        const std::string text = ElementTerminologyText(element);
+        if (text.empty())
+            continue;
+
+        std::vector<core::TermOccurrence> occurrences = terminology_service.DetectTermsInText(element.id, text);
+        for (const core::TermOccurrence& occurrence : occurrences) {
+            if (occurrence.resolution.status != core::TermResolutionStatus::Ambiguous)
+                continue;
+            core::ProblemItem problem;
+            problem.id = TerminologyAmbiguityProblemId(occurrence);
+            problem.severity = core::ProblemSeverity::Warning;
+            problem.source = core::ProblemSource::ModelValidation;
+            problem.element_id = occurrence.element_id;
+            problem.type = "TerminologyAmbiguity";
+            problem.message = occurrence.text + " has " + std::to_string(occurrence.resolution.candidates.size()) +
+                              " visible meanings. Choose the intended terminology entry.";
+            impl_->problems_manager.AddOrUpdateProblem(problem);
+        }
+    }
 }
 
 void AppRuntime::SyncReviewVisualStatesFromReviews() {
@@ -2189,10 +2377,15 @@ void AppRuntime::RenderElementPropertiesPanel(
         terminology_callbacks.define_term = [this](const std::string& element_id, const std::string& term_value) {
             BeginQuickDefineTerminologyTerm(element_id, term_value);
         };
-        terminology_callbacks.link_existing_term =
-            [this](const std::string& element_id, const std::string& term_value) {
-                BeginLinkExistingTerminologyTerm(element_id, term_value);
-            };
+        terminology_callbacks.link_existing_term = [this](const std::string& element_id,
+                                                          const std::string& term_value) {
+            BeginLinkExistingTerminologyTerm(element_id, term_value);
+        };
+        terminology_callbacks.use_term_for_element = [this](const std::string& element_id,
+                                                            const core::TerminologyPackageRef& package_ref,
+                                                            const core::TerminologyTermRef& term_ref) {
+            AddTerminologyTermAsContextFromCanvas(element_id, package_ref, term_ref);
+        };
         terminology_callbacks.ignore_term = [this](const std::string& element_id, const std::string& term_value) {
             IgnoreTerminologySuggestion(element_id, term_value);
         };

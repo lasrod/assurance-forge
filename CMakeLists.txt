@@ -286,6 +286,7 @@ add_executable(tests
     tests/test_terminology_scope_service.cpp
     tests/test_element_factory.cpp
     tests/test_tree_editing.cpp
+    tests/test_app_state.cpp
     tests/test_project_service.cpp
     tests/test_project_controller.cpp
     tests/test_proposal_controller.cpp
@@ -335,6 +336,7 @@ add_executable(tests
     src/core/problems/problems_manager.cpp
     src/core/project_model.cpp
     src/core/project_service.cpp
+    src/core/app_state.cpp
     src/core/reviews/review_item.cpp
     src/core/reviews/review_item_manager.cpp
     src/core/reviews/review_proposal.cpp

@@ -471,6 +471,25 @@ TermResolution TerminologyService::ResolveOccurrence(const TextOccurrence& occur
         }
     }
 
+    std::vector<TerminologyScopedTermRef> explicit_context_matches;
+    for (const auto& candidate : GetActiveTermsForElement(scope)) {
+        if (candidate.layer != TerminologyLookupLayer::ExplicitElementContext || !candidate.term)
+            continue;
+        if (candidate.term->value == occurrence.text)
+            explicit_context_matches.push_back(candidate);
+    }
+    if (explicit_context_matches.size() == 1) {
+        resolution.status = TermResolutionStatus::Explicit;
+        resolution.selected = explicit_context_matches.front();
+        resolution.candidates = std::move(explicit_context_matches);
+        return resolution;
+    }
+    if (explicit_context_matches.size() > 1) {
+        resolution.status = TermResolutionStatus::Ambiguous;
+        resolution.candidates = std::move(explicit_context_matches);
+        return resolution;
+    }
+
     resolution.candidates = FindTermsByValue(occurrence.text, scope);
     if (resolution.candidates.size() == 1) {
         resolution.status = TermResolutionStatus::Unique;

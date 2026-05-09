@@ -15,8 +15,8 @@
 #include <cctype>
 #include <cstring>
 #include <filesystem>
-#include <sstream>
 #include <set>
+#include <sstream>
 #include <string>
 #include <system_error>
 #include <vector>
@@ -499,6 +499,7 @@ void AppRuntime::ConfirmAddTerminologyPackage() {
         CopyTerminologyPackageToEditor(*impl_, *package);
     }
     MarkTerminologyDocumentDirty(*impl_);
+    SyncTerminologyProblems();
     InvalidateSacmPackageTreeCache(*impl_, entry.relativePath);
     impl_->show_create_terminology_package_modal = false;
     impl_->pending_terminology_package_parent_entry.reset();
@@ -523,6 +524,7 @@ void AppRuntime::ApplyTerminologyPackageEdits() {
     }
 
     MarkTerminologyDocumentDirty(*impl_);
+    SyncTerminologyProblems();
     if (impl_->app_state.current_project.has_value() && !impl_->app_state.active_project_file_path.empty()) {
         const std::filesystem::path relative = std::filesystem::relative(impl_->app_state.active_project_file_path,
                                                                          impl_->app_state.current_project->rootPath);
@@ -546,6 +548,7 @@ void AppRuntime::ConfirmDeleteTerminologyPackage() {
     }
 
     MarkTerminologyDocumentDirty(*impl_);
+    SyncTerminologyProblems();
     if (impl_->app_state.current_project.has_value() && !impl_->app_state.active_project_file_path.empty()) {
         const std::filesystem::path relative = std::filesystem::relative(impl_->app_state.active_project_file_path,
                                                                          impl_->app_state.current_project->rootPath);
@@ -616,6 +619,7 @@ void AppRuntime::ConfirmTerminologyTermEdit() {
     }
 
     MarkTerminologyDocumentDirty(*impl_);
+    SyncTerminologyProblems();
     impl_->show_terminology_term_editor_modal = false;
 }
 
@@ -664,10 +668,30 @@ void AppRuntime::EditTerminologyTermFromCanvas(const core::TerminologyPackageRef
 void AppRuntime::AddTerminologyTermAsContextFromCanvas(const std::string& element_id,
                                                        const core::TerminologyPackageRef& package_ref,
                                                        const core::TerminologyTermRef& term_ref) {
-    (void)element_id;
-    (void)package_ref;
-    (void)term_ref;
-    ShowNotImplementedModal("Add term as context");
+    if (!impl_->app_state.sacm_package.has_value()) {
+        SetStatus("Open a SACM model before associating terminology.");
+        return;
+    }
+
+    core::TerminologyContextAssociationResult result = core::AssociateTerminologyTermWithElement(
+        impl_->app_state.sacm_package.value(), element_id, package_ref, term_ref);
+    if (!result.success) {
+        SetStatus("Could not associate term with element: " + result.error);
+        return;
+    }
+
+    if (!result.already_associated) {
+        MarkTerminologyDocumentDirty(*impl_);
+        impl_->events.Emit(DocumentDirtyEvent{});
+        if (impl_->app_state.current_project.has_value() && !impl_->app_state.active_project_file_path.empty()) {
+            const std::filesystem::path relative = std::filesystem::relative(impl_->app_state.active_project_file_path,
+                                                                             impl_->app_state.current_project->rootPath);
+            InvalidateSacmPackageTreeCache(*impl_, relative);
+        }
+    }
+    SyncTerminologyProblems();
+    SetStatus(result.already_associated ? "Term is already associated with this element."
+                                        : "Associated term with this element.");
 }
 
 void AppRuntime::FindTerminologyUsagesFromCanvas(const core::TerminologyPackageRef& package_ref,
@@ -750,12 +774,13 @@ void AppRuntime::ConfirmQuickDefineTerminologyTerm(bool add_as_context) {
     CopyToBuffer(impl_->terminology_filter_buf, sizeof(impl_->terminology_filter_buf), draft.value);
     CopyToBuffer(impl_->terminology_category_filter_buf, sizeof(impl_->terminology_category_filter_buf), "");
     impl_->selected_terminology_package_file_path = impl_->app_state.active_project_file_path;
-    if (const sacm::TerminologyPackage* package =
-            core::FindTerminologyPackage(impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref)) {
+    if (const sacm::TerminologyPackage* package = core::FindTerminologyPackage(
+            impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref)) {
         CopyTerminologyPackageToEditor(*impl_, *package);
     }
 
     MarkTerminologyDocumentDirty(*impl_);
+    SyncTerminologyProblems();
     impl_->events.Emit(TreeDirtyEvent{});
     impl_->events.Emit(DocumentDirtyEvent{});
     if (impl_->app_state.current_project.has_value() && !impl_->app_state.active_project_file_path.empty()) {
@@ -763,13 +788,15 @@ void AppRuntime::ConfirmQuickDefineTerminologyTerm(bool add_as_context) {
                                                                          impl_->app_state.current_project->rootPath);
         InvalidateSacmPackageTreeCache(*impl_, relative);
     }
+    const std::string context_element_id = impl_->quick_define_element_id;
+    if (add_as_context)
+        AddTerminologyTermAsContextFromCanvas(context_element_id, impl_->quick_define_target_package_ref, result.term_ref);
+
     impl_->show_quick_define_term_modal = false;
     impl_->quick_define_element_id.clear();
     impl_->quick_define_source_text.clear();
-    SetStatus("Added term " + draft.value + ".");
-
-    if (add_as_context)
-        ShowNotImplementedModal("Add term as context");
+    if (!add_as_context)
+        SetStatus("Added term " + draft.value + ".");
 }
 
 void AppRuntime::BeginDeleteTerminologyTerm(const core::TerminologyTermRef& term_ref) {
@@ -803,6 +830,7 @@ void AppRuntime::ConfirmDeleteTerminologyTerm() {
     impl_->selected_terminology_term_ref = core::TerminologyTermRef{};
     impl_->show_delete_terminology_term_modal = false;
     MarkTerminologyDocumentDirty(*impl_);
+    SyncTerminologyProblems();
     SetStatus("Deleted term.");
 }
 

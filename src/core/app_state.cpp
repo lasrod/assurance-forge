@@ -4,7 +4,80 @@
 #include "sacm/sacm_parser.h"
 #include "sacm/sacm_serializer.h"
 
+#include <algorithm>
+#include <unordered_set>
+
 namespace core {
+
+namespace {
+
+std::string NormalizeSacmRef(std::string ref) {
+    if (!ref.empty() && ref.front() == '#')
+        ref.erase(ref.begin());
+    return ref;
+}
+
+void CollectTermRefs(const sacm::TerminologyPackage& terminology_package, std::unordered_set<std::string>& refs) {
+    for (const sacm::Term& term : terminology_package.terms) {
+        if (!term.id.empty())
+            refs.insert(term.id);
+        if (!term.gid.empty())
+            refs.insert(term.gid);
+    }
+}
+
+std::unordered_set<std::string> CollectTermRefs(const sacm::AssuranceCasePackage& package) {
+    std::unordered_set<std::string> refs;
+    for (const sacm::TerminologyPackage& terminology_package : package.terminologyPackages)
+        CollectTermRefs(terminology_package, refs);
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::TerminologyPackage& terminology_package : argument_package.terminologyPackages)
+            CollectTermRefs(terminology_package, refs);
+    }
+    return refs;
+}
+
+std::unordered_set<std::string> CollectTerminologyArtifactReferenceRefs(const sacm::AssuranceCasePackage& package) {
+    const std::unordered_set<std::string> term_refs = CollectTermRefs(package);
+    std::unordered_set<std::string> artifact_reference_refs;
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
+            if (term_refs.find(NormalizeSacmRef(artifact_reference.referencedArtifact)) == term_refs.end())
+                continue;
+            if (!artifact_reference.id.empty())
+                artifact_reference_refs.insert(artifact_reference.id);
+            if (!artifact_reference.gid.empty())
+                artifact_reference_refs.insert(artifact_reference.gid);
+        }
+    }
+    return artifact_reference_refs;
+}
+
+bool ReferencesAny(const std::vector<std::string>& refs, const std::unordered_set<std::string>& candidates) {
+    return std::any_of(refs.begin(), refs.end(), [&](const std::string& ref) {
+        return candidates.find(NormalizeSacmRef(ref)) != candidates.end();
+    });
+}
+
+void HideTerminologyArtifactReferences(parser::AssuranceCase& model, const sacm::AssuranceCasePackage& package) {
+    const std::unordered_set<std::string> hidden_refs = CollectTerminologyArtifactReferenceRefs(package);
+    if (hidden_refs.empty())
+        return;
+
+    model.elements.erase(std::remove_if(model.elements.begin(),
+                                        model.elements.end(),
+                                        [&](const parser::SacmElement& element) {
+                                            if (element.type == "artifactreference") {
+                                                return hidden_refs.find(element.id) != hidden_refs.end() ||
+                                                       hidden_refs.find(element.name) != hidden_refs.end();
+                                            }
+                                            return element.type == "assertedcontext" &&
+                                                   ReferencesAny(element.source_refs, hidden_refs);
+                                        }),
+                         model.elements.end());
+}
+
+} // namespace
 
 bool AppState::load_file(const std::string& file_path) {
     parser::ParseResult result = parser::parse_sacm_xml(file_path);
@@ -22,6 +95,9 @@ bool AppState::load_file(const std::string& file_path) {
         auto sacm_result = sacm::parse_sacm(file_path);
         if (sacm_result.success) {
             sacm_package = std::move(sacm_result.package);
+            HideTerminologyArtifactReferences(loaded_case.value(), sacm_package.value());
+            status_message =
+                "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
         }
 
         return true;
