@@ -2160,7 +2160,21 @@ void AppRuntime::RenderElementPropertiesPanel(
             impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
         sacm::AssuranceCasePackage* sacm_ptr =
             impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
-        if (ui::panels::ShowElementPanel(ac_ptr, sacm_ptr)) {
+        ui::panels::ElementTerminologyAssistCallbacks terminology_callbacks;
+        terminology_callbacks.define_term = [this](const std::string& element_id, const std::string& term_value) {
+            BeginQuickDefineTerminologyTerm(element_id, term_value);
+        };
+        terminology_callbacks.link_existing_term =
+            [this](const std::string& element_id, const std::string& term_value) {
+                BeginLinkExistingTerminologyTerm(element_id, term_value);
+            };
+        terminology_callbacks.ignore_term = [this](const std::string& element_id, const std::string& term_value) {
+            IgnoreTerminologySuggestion(element_id, term_value);
+        };
+        terminology_callbacks.is_ignored = [this](const std::string& element_id, const std::string& term_value) {
+            return IsTerminologySuggestionIgnored(element_id, term_value);
+        };
+        if (ui::panels::ShowElementPanel(ac_ptr, sacm_ptr, &terminology_callbacks)) {
             impl_->events.Emit(TreeDirtyEvent{});
             impl_->events.Emit(DocumentDirtyEvent{});
         }
@@ -2549,6 +2563,7 @@ void AppRuntime::RenderFrame(bool& done) {
     RenderCreateTerminologyPackageModal();
     RenderDeleteTerminologyPackageModal();
     RenderTerminologyTermEditorModal();
+    RenderQuickDefineTermModal();
     RenderDeleteTerminologyTermModal();
     RenderTerminologyCategoryEditorModal();
     RenderDeleteTerminologyCategoryModal();

@@ -86,6 +86,7 @@ private:
     void RenderCreateTerminologyPackageModal();
     void RenderDeleteTerminologyPackageModal();
     void RenderTerminologyTermEditorModal();
+    void RenderQuickDefineTermModal();
     void RenderDeleteTerminologyTermModal();
     void RenderTerminologyCategoryEditorModal();
     void RenderDeleteTerminologyCategoryModal();
@@ -108,6 +109,11 @@ private:
     void BeginAddTerminologyTerm();
     void BeginEditTerminologyTerm(const core::TerminologyTermRef& term_ref);
     void ConfirmTerminologyTermEdit();
+    void BeginQuickDefineTerminologyTerm(const std::string& element_id, const std::string& term_value);
+    void BeginLinkExistingTerminologyTerm(const std::string& element_id, const std::string& term_value);
+    void IgnoreTerminologySuggestion(const std::string& element_id, const std::string& term_value);
+    bool IsTerminologySuggestionIgnored(const std::string& element_id, const std::string& term_value) const;
+    void ConfirmQuickDefineTerminologyTerm(bool add_as_context);
     void BeginDeleteTerminologyTerm(const core::TerminologyTermRef& term_ref);
     void ConfirmDeleteTerminologyTerm();
     void SelectTerminologyCategory(const core::TerminologyCategoryRef& category_ref);

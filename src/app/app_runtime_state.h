@@ -24,6 +24,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <unordered_set>
 
 namespace app {
 
@@ -90,6 +91,11 @@ struct AppRuntimeState {
     char terminology_category_filter_buf[128] = {};
     bool show_terminology_term_editor_modal = false;
     bool editing_existing_terminology_term = false;
+    bool show_quick_define_term_modal = false;
+    std::string quick_define_element_id;
+    std::string quick_define_source_text;
+    core::TerminologyPackageRef quick_define_target_package_ref;
+    std::unordered_set<std::string> ignored_terminology_suggestion_keys;
     bool show_delete_terminology_term_modal = false;
     int pending_delete_terminology_term_usage_count = 0;
     bool show_terminology_category_editor_modal = false;

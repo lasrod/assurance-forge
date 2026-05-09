@@ -164,6 +164,92 @@ void MarkTerminologyDocumentDirty(AppRuntimeState& state) {
     state.document_dirty = true;
 }
 
+bool HasTerminologyPackageRef(const core::TerminologyPackageRef& package_ref) {
+    return !package_ref.id.empty() || !package_ref.gid.empty();
+}
+
+bool TerminologyPackageMatchesRef(const sacm::TerminologyPackage& package,
+                                  const core::TerminologyPackageRef& package_ref) {
+    return (!package_ref.id.empty() && package.id == package_ref.id) ||
+           (!package_ref.gid.empty() && package.gid == package_ref.gid);
+}
+
+core::TerminologyPackageRef TerminologyPackageRefFor(const sacm::TerminologyPackage& package) {
+    return core::TerminologyPackageRef{package.id, package.gid};
+}
+
+bool ArgumentPackageContainsElement(const sacm::ArgumentPackage& argument_package, const std::string& element_id) {
+    if (element_id.empty())
+        return false;
+    for (const auto& claim : argument_package.claims) {
+        if (claim.id == element_id || claim.gid == element_id)
+            return true;
+    }
+    for (const auto& reasoning : argument_package.argumentReasonings) {
+        if (reasoning.id == element_id || reasoning.gid == element_id)
+            return true;
+    }
+    for (const auto& artifact_reference : argument_package.artifactReferences) {
+        if (artifact_reference.id == element_id || artifact_reference.gid == element_id)
+            return true;
+    }
+    return false;
+}
+
+const sacm::ArgumentPackage* FindContainingArgumentPackage(const sacm::AssuranceCasePackage& package,
+                                                           const std::string& element_id) {
+    for (const auto& argument_package : package.argumentPackages) {
+        if (ArgumentPackageContainsElement(argument_package, element_id))
+            return &argument_package;
+    }
+    return nullptr;
+}
+
+bool IsAssuranceCaseTerminologyPackage(const sacm::AssuranceCasePackage& package,
+                                       const core::TerminologyPackageRef& package_ref) {
+    for (const auto& terminology_package : package.terminologyPackages) {
+        if (TerminologyPackageMatchesRef(terminology_package, package_ref))
+            return true;
+    }
+    return false;
+}
+
+bool IsArgumentTerminologyPackage(const sacm::ArgumentPackage& argument_package,
+                                  const core::TerminologyPackageRef& package_ref) {
+    for (const auto& terminology_package : argument_package.terminologyPackages) {
+        if (TerminologyPackageMatchesRef(terminology_package, package_ref))
+            return true;
+    }
+    return false;
+}
+
+core::TerminologyPackageRef ResolveQuickDefineTargetPackage(const AppRuntimeState& state,
+                                                            const std::string& element_id) {
+    if (!state.app_state.sacm_package.has_value())
+        return {};
+
+    const sacm::AssuranceCasePackage& package = state.app_state.sacm_package.value();
+    const sacm::ArgumentPackage* containing_argument_package = FindContainingArgumentPackage(package, element_id);
+    if (HasTerminologyPackageRef(state.selected_terminology_package_ref) &&
+        core::FindTerminologyPackage(package, state.selected_terminology_package_ref)) {
+        if (IsAssuranceCaseTerminologyPackage(package, state.selected_terminology_package_ref) ||
+            (containing_argument_package &&
+             IsArgumentTerminologyPackage(*containing_argument_package, state.selected_terminology_package_ref))) {
+            return state.selected_terminology_package_ref;
+        }
+    }
+
+    if (containing_argument_package && !containing_argument_package->terminologyPackages.empty())
+        return TerminologyPackageRefFor(containing_argument_package->terminologyPackages.front());
+    if (!package.terminologyPackages.empty())
+        return TerminologyPackageRefFor(package.terminologyPackages.front());
+    return {};
+}
+
+std::string TerminologySuggestionKey(const std::string& element_id, const std::string& term_value) {
+    return element_id + "\n" + term_value;
+}
+
 std::string FirstElementIdForArgumentPackage(const sacm::AssuranceCasePackage& package,
                                              const sacm::SacmPackageTreeNode& selected_package) {
     for (const auto& argument_package : package.argumentPackages) {
@@ -531,6 +617,95 @@ void AppRuntime::ConfirmTerminologyTermEdit() {
 
     MarkTerminologyDocumentDirty(*impl_);
     impl_->show_terminology_term_editor_modal = false;
+}
+
+void AppRuntime::BeginQuickDefineTerminologyTerm(const std::string& element_id, const std::string& term_value) {
+    if (!impl_->app_state.sacm_package.has_value()) {
+        SetStatus("Open a SACM model before defining terms.");
+        return;
+    }
+
+    const core::TerminologyPackageRef target_package_ref = ResolveQuickDefineTargetPackage(*impl_, element_id);
+    if (!HasTerminologyPackageRef(target_package_ref)) {
+        SetStatus("Create a TerminologyPackage before defining terms from text.");
+        return;
+    }
+
+    ClearTermEditorBuffers(*impl_);
+    CopyToBuffer(impl_->term_value_buf, sizeof(impl_->term_value_buf), TrimWhitespace(term_value));
+    impl_->quick_define_element_id = element_id;
+    impl_->quick_define_source_text = TrimWhitespace(term_value);
+    impl_->quick_define_target_package_ref = target_package_ref;
+    impl_->show_quick_define_term_modal = true;
+}
+
+void AppRuntime::BeginLinkExistingTerminologyTerm(const std::string& element_id, const std::string& term_value) {
+    if (impl_->app_state.sacm_package.has_value()) {
+        const core::TerminologyPackageRef target_package_ref = ResolveQuickDefineTargetPackage(*impl_, element_id);
+        if (HasTerminologyPackageRef(target_package_ref)) {
+            impl_->selected_terminology_package_ref = target_package_ref;
+            if (const sacm::TerminologyPackage* package =
+                    core::FindTerminologyPackage(impl_->app_state.sacm_package.value(), target_package_ref)) {
+                CopyTerminologyPackageToEditor(*impl_, *package);
+            }
+        }
+    }
+    CopyToBuffer(impl_->terminology_filter_buf, sizeof(impl_->terminology_filter_buf), TrimWhitespace(term_value));
+    impl_->show_terminology_package_tab = true;
+    ui::GetUiState().center_view = ui::CenterView::TerminologyPackage;
+    impl_->force_center_tab_selection = true;
+    SetStatus("Filtered the glossary for " + TrimWhitespace(term_value) +
+              ". Select a term to link when occurrence binding is available.");
+}
+
+void AppRuntime::IgnoreTerminologySuggestion(const std::string& element_id, const std::string& term_value) {
+    impl_->ignored_terminology_suggestion_keys.insert(TerminologySuggestionKey(element_id, TrimWhitespace(term_value)));
+    SetStatus("Ignored terminology suggestion " + TrimWhitespace(term_value) + " for this session.");
+}
+
+bool AppRuntime::IsTerminologySuggestionIgnored(const std::string& element_id, const std::string& term_value) const {
+    const std::string key = TerminologySuggestionKey(element_id, TrimWhitespace(term_value));
+    return impl_->ignored_terminology_suggestion_keys.count(key) > 0;
+}
+
+void AppRuntime::ConfirmQuickDefineTerminologyTerm(bool add_as_context) {
+    if (!impl_->app_state.sacm_package.has_value())
+        return;
+
+    const core::TerminologyTermDraft draft = TermDraftFromEditor(*impl_);
+    core::TerminologyTermCreateResult result = core::CreateTerminologyTerm(
+        impl_->app_state.sacm_package.value(), impl_->quick_define_target_package_ref, draft);
+    if (!result.success) {
+        SetStatus("Term create failed: " + result.error);
+        return;
+    }
+
+    impl_->selected_terminology_package_ref = impl_->quick_define_target_package_ref;
+    impl_->selected_terminology_term_ref = result.term_ref;
+    impl_->selected_terminology_category_ref = core::TerminologyCategoryRef{};
+    CopyToBuffer(impl_->terminology_filter_buf, sizeof(impl_->terminology_filter_buf), draft.value);
+    CopyToBuffer(impl_->terminology_category_filter_buf, sizeof(impl_->terminology_category_filter_buf), "");
+    impl_->selected_terminology_package_file_path = impl_->app_state.active_project_file_path;
+    if (const sacm::TerminologyPackage* package =
+            core::FindTerminologyPackage(impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref)) {
+        CopyTerminologyPackageToEditor(*impl_, *package);
+    }
+
+    MarkTerminologyDocumentDirty(*impl_);
+    impl_->events.Emit(TreeDirtyEvent{});
+    impl_->events.Emit(DocumentDirtyEvent{});
+    if (impl_->app_state.current_project.has_value() && !impl_->app_state.active_project_file_path.empty()) {
+        const std::filesystem::path relative = std::filesystem::relative(impl_->app_state.active_project_file_path,
+                                                                         impl_->app_state.current_project->rootPath);
+        InvalidateSacmPackageTreeCache(*impl_, relative);
+    }
+    impl_->show_quick_define_term_modal = false;
+    impl_->quick_define_element_id.clear();
+    impl_->quick_define_source_text.clear();
+    SetStatus("Added term " + draft.value + ".");
+
+    if (add_as_context)
+        ShowNotImplementedModal("Add term as context");
 }
 
 void AppRuntime::BeginDeleteTerminologyTerm(const core::TerminologyTermRef& term_ref) {

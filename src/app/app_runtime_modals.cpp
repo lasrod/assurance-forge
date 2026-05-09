@@ -43,20 +43,44 @@ bool SameTermRef(const sacm::Term& term, const core::TerminologyTermRef& term_re
     return false;
 }
 
-bool CurrentTermValueHasDuplicate(const AppRuntimeState& state, const std::string& value) {
+bool HasTerminologyPackageRef(const core::TerminologyPackageRef& package_ref) {
+    return !package_ref.id.empty() || !package_ref.gid.empty();
+}
+
+bool SameTerminologyPackageRef(const core::TerminologyPackageRef& left, const core::TerminologyPackageRef& right) {
+    if (!left.id.empty() && !right.id.empty() && left.id == right.id)
+        return true;
+    if (!left.gid.empty() && !right.gid.empty() && left.gid == right.gid)
+        return true;
+    return false;
+}
+
+bool TermValueHasDuplicate(const AppRuntimeState& state,
+                           const core::TerminologyPackageRef& package_ref,
+                           const std::string& value,
+                           bool editing_existing_term,
+                           const core::TerminologyTermRef& selected_term_ref) {
     if (value.empty() || !state.app_state.sacm_package.has_value())
         return false;
     const sacm::TerminologyPackage* package =
-        core::FindTerminologyPackage(state.app_state.sacm_package.value(), state.selected_terminology_package_ref);
+        core::FindTerminologyPackage(state.app_state.sacm_package.value(), package_ref);
     if (!package)
         return false;
     for (const auto& term : package->terms) {
-        if (state.editing_existing_terminology_term && SameTermRef(term, state.selected_terminology_term_ref))
+        if (editing_existing_term && SameTermRef(term, selected_term_ref))
             continue;
         if (term.value == value)
             return true;
     }
     return false;
+}
+
+bool CurrentTermValueHasDuplicate(const AppRuntimeState& state, const std::string& value) {
+    return TermValueHasDuplicate(state,
+                                 state.selected_terminology_package_ref,
+                                 value,
+                                 state.editing_existing_terminology_term,
+                                 state.selected_terminology_term_ref);
 }
 
 std::vector<std::string> SplitCategoryRefs(const std::string& raw) {
@@ -107,11 +131,10 @@ void SetCategoryChecked(AppRuntimeState& state, const sacm::Category& category, 
     CopyToBuffer(state.term_categories_buf, sizeof(state.term_categories_buf), JoinCategoryRefs(refs));
 }
 
-void RenderTermCategoryPicker(AppRuntimeState& state) {
+void RenderTermCategoryPickerForPackage(AppRuntimeState& state, const core::TerminologyPackageRef& package_ref) {
     const sacm::TerminologyPackage* package = nullptr;
     if (state.app_state.sacm_package.has_value()) {
-        package =
-            core::FindTerminologyPackage(state.app_state.sacm_package.value(), state.selected_terminology_package_ref);
+        package = core::FindTerminologyPackage(state.app_state.sacm_package.value(), package_ref);
     }
 
     ImGui::TextUnformatted("Categories");
@@ -132,6 +155,61 @@ void RenderTermCategoryPicker(AppRuntimeState& state) {
         }
     }
     ImGui::EndChild();
+}
+
+void RenderTermCategoryPicker(AppRuntimeState& state) {
+    RenderTermCategoryPickerForPackage(state, state.selected_terminology_package_ref);
+}
+
+struct TerminologyPackageChoice {
+    core::TerminologyPackageRef ref;
+    std::string label;
+};
+
+core::TerminologyPackageRef TerminologyPackageRefFor(const sacm::TerminologyPackage& package) {
+    return core::TerminologyPackageRef{package.id, package.gid};
+}
+
+std::string PackageDisplayLabel(const sacm::TerminologyPackage& package, const std::string& scope_label) {
+    const std::string fallback = !package.id.empty() ? package.id : package.gid;
+    const std::string name = package.name.empty() ? fallback : package.name;
+    return scope_label.empty() ? name : scope_label + ": " + name;
+}
+
+std::vector<TerminologyPackageChoice> BuildTerminologyPackageChoices(const AppRuntimeState& state) {
+    std::vector<TerminologyPackageChoice> choices;
+    if (!state.app_state.sacm_package.has_value())
+        return choices;
+
+    const sacm::AssuranceCasePackage& package = state.app_state.sacm_package.value();
+    for (const auto& terminology_package : package.terminologyPackages) {
+        choices.push_back({TerminologyPackageRefFor(terminology_package),
+                           PackageDisplayLabel(terminology_package, "Assurance case")});
+    }
+    for (const auto& argument_package : package.argumentPackages) {
+        const std::string argument_label = argument_package.name.empty()
+                                       ? (!argument_package.id.empty() ? argument_package.id : argument_package.gid)
+                                       : argument_package.name;
+        for (const auto& terminology_package : argument_package.terminologyPackages) {
+            choices.push_back({TerminologyPackageRefFor(terminology_package),
+                               PackageDisplayLabel(terminology_package, argument_label)});
+        }
+    }
+    return choices;
+}
+
+int FindTerminologyPackageChoiceIndex(const std::vector<TerminologyPackageChoice>& choices,
+                                      const core::TerminologyPackageRef& package_ref) {
+    for (std::size_t index = 0; index < choices.size(); ++index) {
+        if (SameTerminologyPackageRef(choices[index].ref, package_ref))
+            return static_cast<int>(index);
+    }
+    return -1;
+}
+
+std::string PackageChoiceWidgetLabel(const TerminologyPackageChoice& choice, std::size_t index) {
+    const std::string ref = !choice.ref.id.empty() ? choice.ref.id : choice.ref.gid;
+    return choice.label + "##quick_define_target_package_" + ref + "_" + std::to_string(index);
 }
 
 } // namespace
@@ -545,6 +623,100 @@ void AppRuntime::RenderTerminologyTermEditorModal() {
         ImGui::EndPopup();
     } else if (impl_->show_terminology_term_editor_modal) {
         ImGui::OpenPopup(title);
+    }
+}
+
+void AppRuntime::RenderQuickDefineTermModal() {
+    if (!impl_->show_quick_define_term_modal)
+        return;
+
+    std::vector<TerminologyPackageChoice> package_choices = BuildTerminologyPackageChoices(*impl_);
+    int selected_package_index = FindTerminologyPackageChoiceIndex(package_choices, impl_->quick_define_target_package_ref);
+    if (selected_package_index < 0 && !package_choices.empty()) {
+        selected_package_index = 0;
+        impl_->quick_define_target_package_ref = package_choices.front().ref;
+    }
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal("Create Term##quick_define_term", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::SetNextItemWidth(460.0f);
+        ImGui::InputText("Term", impl_->term_value_buf, sizeof(impl_->term_value_buf));
+        ImGui::SetNextItemWidth(460.0f);
+        ImGui::InputText("Full Name / Display Name", impl_->term_name_buf, sizeof(impl_->term_name_buf));
+        ImGui::SetNextItemWidth(460.0f);
+        ImGui::InputTextMultiline(
+            "Definition", impl_->term_definition_buf, sizeof(impl_->term_definition_buf), ImVec2(460.0f, 110.0f));
+
+        ImGui::TextUnformatted("Store in");
+        if (package_choices.empty()) {
+            ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.2f, 1.0f), "No TerminologyPackage is available.");
+        } else {
+            const char* preview = package_choices[static_cast<std::size_t>(selected_package_index)].label.c_str();
+            ImGui::SetNextItemWidth(460.0f);
+            if (ImGui::BeginCombo("##quick_define_target_package", preview)) {
+                for (std::size_t index = 0; index < package_choices.size(); ++index) {
+                    const bool selected = static_cast<int>(index) == selected_package_index;
+                    const std::string selectable_label = PackageChoiceWidgetLabel(package_choices[index], index);
+                    if (ImGui::Selectable(selectable_label.c_str(), selected)) {
+                        selected_package_index = static_cast<int>(index);
+                        impl_->quick_define_target_package_ref = package_choices[index].ref;
+                        CopyToBuffer(impl_->term_categories_buf, sizeof(impl_->term_categories_buf), "");
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+        }
+
+        RenderTermCategoryPickerForPackage(*impl_, impl_->quick_define_target_package_ref);
+        ImGui::SetNextItemWidth(460.0f);
+        ImGui::InputText(
+            "External Reference", impl_->term_external_reference_buf, sizeof(impl_->term_external_reference_buf));
+
+        const std::string value = TrimWhitespace(impl_->term_value_buf);
+        const bool has_target_package = HasTerminologyPackageRef(impl_->quick_define_target_package_ref) &&
+                                        impl_->app_state.sacm_package.has_value() &&
+                                        core::FindTerminologyPackage(impl_->app_state.sacm_package.value(),
+                                                                     impl_->quick_define_target_package_ref);
+        const bool can_create = !value.empty() && has_target_package;
+        if (value.empty())
+            ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.2f, 1.0f), "Term value is required.");
+        if (!has_target_package)
+            ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.2f, 1.0f), "Choose a target TerminologyPackage.");
+        if (TermValueHasDuplicate(*impl_, impl_->quick_define_target_package_ref, value, false, {}))
+            ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "Duplicate term value exists in this package.");
+        if (TrimWhitespace(impl_->term_definition_buf).empty())
+            ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "Concrete term has no description.");
+        if (TrimWhitespace(impl_->term_categories_buf).empty())
+            ImGui::TextDisabled("Term has no category.");
+
+        ImGui::Spacing();
+        if (!can_create)
+            ImGui::BeginDisabled();
+        if (ImGui::Button("Create", ImVec2(100.0f, 0.0f))) {
+            ConfirmQuickDefineTerminologyTerm(false);
+            if (!impl_->show_quick_define_term_modal)
+                ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Create + Add as Context", ImVec2(185.0f, 0.0f))) {
+            ConfirmQuickDefineTerminologyTerm(true);
+            if (!impl_->show_quick_define_term_modal)
+                ImGui::CloseCurrentPopup();
+        }
+        if (!can_create)
+            ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(100.0f, 0.0f))) {
+            impl_->show_quick_define_term_modal = false;
+            impl_->quick_define_element_id.clear();
+            impl_->quick_define_source_text.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    } else if (impl_->show_quick_define_term_modal) {
+        ImGui::OpenPopup("Create Term##quick_define_term");
     }
 }
 
