@@ -15,9 +15,11 @@
 #include <cctype>
 #include <cstring>
 #include <filesystem>
+#include <sstream>
 #include <set>
 #include <string>
 #include <system_error>
+#include <vector>
 
 namespace app {
 namespace {
@@ -77,6 +79,66 @@ void CopyTerminologyPackageToEditor(AppRuntimeState& state, const sacm::Terminol
     CopyToBuffer(state.terminology_package_description_buf,
                  sizeof(state.terminology_package_description_buf),
                  package.description);
+}
+
+std::string JoinCategoryRefs(const std::vector<std::string>& refs) {
+    std::string result;
+    for (const auto& ref : refs) {
+        if (ref.empty())
+            continue;
+        if (!result.empty())
+            result += ", ";
+        result += ref;
+    }
+    return result;
+}
+
+std::vector<std::string> SplitCategoryRefs(const std::string& raw) {
+    std::string normalized = raw;
+    std::replace(normalized.begin(), normalized.end(), ',', ' ');
+    std::stringstream stream(normalized);
+    std::vector<std::string> refs;
+    std::string item;
+    while (stream >> item) {
+        item = TrimWhitespace(item);
+        if (!item.empty() && std::find(refs.begin(), refs.end(), item) == refs.end())
+            refs.push_back(item);
+    }
+    return refs;
+}
+
+void ClearTermEditorBuffers(AppRuntimeState& state) {
+    CopyToBuffer(state.term_value_buf, sizeof(state.term_value_buf), "");
+    CopyToBuffer(state.term_name_buf, sizeof(state.term_name_buf), "");
+    CopyToBuffer(state.term_definition_buf, sizeof(state.term_definition_buf), "");
+    CopyToBuffer(state.term_categories_buf, sizeof(state.term_categories_buf), "");
+    CopyToBuffer(state.term_external_reference_buf, sizeof(state.term_external_reference_buf), "");
+    CopyToBuffer(state.term_origin_buf, sizeof(state.term_origin_buf), "");
+}
+
+void CopyTermToEditor(AppRuntimeState& state, const sacm::Term& term) {
+    CopyToBuffer(state.term_value_buf, sizeof(state.term_value_buf), term.value);
+    CopyToBuffer(state.term_name_buf, sizeof(state.term_name_buf), term.name);
+    CopyToBuffer(state.term_definition_buf, sizeof(state.term_definition_buf), term.description);
+    CopyToBuffer(state.term_categories_buf, sizeof(state.term_categories_buf), JoinCategoryRefs(term.category_refs));
+    CopyToBuffer(state.term_external_reference_buf, sizeof(state.term_external_reference_buf), term.externalReference);
+    CopyToBuffer(state.term_origin_buf, sizeof(state.term_origin_buf), term.origin);
+}
+
+core::TerminologyTermDraft TermDraftFromEditor(const AppRuntimeState& state) {
+    core::TerminologyTermDraft draft;
+    draft.value = TrimWhitespace(state.term_value_buf);
+    draft.name = TrimWhitespace(state.term_name_buf);
+    draft.description = TrimWhitespace(state.term_definition_buf);
+    draft.category_refs = SplitCategoryRefs(state.term_categories_buf);
+    draft.externalReference = TrimWhitespace(state.term_external_reference_buf);
+    draft.origin = TrimWhitespace(state.term_origin_buf);
+    return draft;
+}
+
+void MarkTerminologyDocumentDirty(AppRuntimeState& state) {
+    state.app_state.mark_dirty();
+    state.document_dirty = true;
 }
 
 std::string FirstElementIdForArgumentPackage(const sacm::AssuranceCasePackage& package,
@@ -258,6 +320,7 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
 
         impl_->selected_terminology_package_ref = package_ref;
         impl_->selected_terminology_package_file_path = impl_->selected_package_file_path;
+        impl_->selected_terminology_term_ref = core::TerminologyTermRef{};
         CopyTerminologyPackageToEditor(*impl_, *terminology_package);
         impl_->show_terminology_package_tab = true;
         ui_state.center_view = ui::CenterView::TerminologyPackage;
@@ -283,9 +346,8 @@ void AppRuntime::BeginAddTerminologyPackage(const core::ProjectFileEntry& entry,
     CopyToBuffer(impl_->new_terminology_package_name_buf,
                  sizeof(impl_->new_terminology_package_name_buf),
                  "Terminology Package");
-    CopyToBuffer(impl_->new_terminology_package_description_buf,
-                 sizeof(impl_->new_terminology_package_description_buf),
-                 "");
+    CopyToBuffer(
+        impl_->new_terminology_package_description_buf, sizeof(impl_->new_terminology_package_description_buf), "");
     impl_->show_create_terminology_package_modal = true;
 }
 
@@ -307,23 +369,23 @@ void AppRuntime::ConfirmAddTerminologyPackage() {
         return;
     }
 
-    core::TerminologyPackageCreateResult result = core::CreateTerminologyPackage(
-        impl_->app_state.sacm_package.value(),
-        TrimWhitespace(impl_->new_terminology_package_name_buf),
-        TrimWhitespace(impl_->new_terminology_package_description_buf));
+    core::TerminologyPackageCreateResult result =
+        core::CreateTerminologyPackage(impl_->app_state.sacm_package.value(),
+                                       TrimWhitespace(impl_->new_terminology_package_name_buf),
+                                       TrimWhitespace(impl_->new_terminology_package_description_buf));
     if (!result.success) {
         SetStatus("Terminology package create failed: " + result.error);
         return;
     }
 
     impl_->selected_terminology_package_ref = result.package_ref;
+    impl_->selected_terminology_term_ref = core::TerminologyTermRef{};
     impl_->selected_terminology_package_file_path = impl_->app_state.active_project_file_path;
     if (const sacm::TerminologyPackage* package =
             core::FindTerminologyPackage(impl_->app_state.sacm_package.value(), result.package_ref)) {
         CopyTerminologyPackageToEditor(*impl_, *package);
     }
-    impl_->app_state.mark_dirty();
-    impl_->document_dirty = true;
+    MarkTerminologyDocumentDirty(*impl_);
     InvalidateSacmPackageTreeCache(*impl_, entry.relativePath);
     impl_->show_create_terminology_package_modal = false;
     impl_->pending_terminology_package_parent_entry.reset();
@@ -347,11 +409,10 @@ void AppRuntime::ApplyTerminologyPackageEdits() {
         return;
     }
 
-    impl_->app_state.mark_dirty();
-    impl_->document_dirty = true;
+    MarkTerminologyDocumentDirty(*impl_);
     if (impl_->app_state.current_project.has_value() && !impl_->app_state.active_project_file_path.empty()) {
-        const std::filesystem::path relative =
-            std::filesystem::relative(impl_->app_state.active_project_file_path, impl_->app_state.current_project->rootPath);
+        const std::filesystem::path relative = std::filesystem::relative(impl_->app_state.active_project_file_path,
+                                                                         impl_->app_state.current_project->rootPath);
         InvalidateSacmPackageTreeCache(*impl_, relative);
     }
 }
@@ -371,11 +432,10 @@ void AppRuntime::ConfirmDeleteTerminologyPackage() {
         return;
     }
 
-    impl_->app_state.mark_dirty();
-    impl_->document_dirty = true;
+    MarkTerminologyDocumentDirty(*impl_);
     if (impl_->app_state.current_project.has_value() && !impl_->app_state.active_project_file_path.empty()) {
-        const std::filesystem::path relative =
-            std::filesystem::relative(impl_->app_state.active_project_file_path, impl_->app_state.current_project->rootPath);
+        const std::filesystem::path relative = std::filesystem::relative(impl_->app_state.active_project_file_path,
+                                                                         impl_->app_state.current_project->rootPath);
         InvalidateSacmPackageTreeCache(*impl_, relative);
     }
     impl_->selected_terminology_package_ref = core::TerminologyPackageRef{};
@@ -384,6 +444,100 @@ void AppRuntime::ConfirmDeleteTerminologyPackage() {
     ui::GetUiState().center_view = ui::CenterView::PackageDetails;
     impl_->force_center_tab_selection = true;
     SetStatus("Deleted terminology package.");
+}
+
+void AppRuntime::SelectTerminologyTerm(const core::TerminologyTermRef& term_ref) {
+    impl_->selected_terminology_term_ref = term_ref;
+}
+
+void AppRuntime::BeginAddTerminologyTerm() {
+    if (!impl_->app_state.sacm_package.has_value()) {
+        SetStatus("Open a terminology package before adding terms.");
+        return;
+    }
+    ClearTermEditorBuffers(*impl_);
+    impl_->editing_existing_terminology_term = false;
+    impl_->show_terminology_term_editor_modal = true;
+}
+
+void AppRuntime::BeginEditTerminologyTerm(const core::TerminologyTermRef& term_ref) {
+    if (!impl_->app_state.sacm_package.has_value())
+        return;
+    const sacm::Term* term = core::FindTerminologyTerm(
+        impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref, term_ref);
+    if (!term) {
+        SetStatus("Term not found.");
+        return;
+    }
+    impl_->selected_terminology_term_ref = term_ref;
+    CopyTermToEditor(*impl_, *term);
+    impl_->editing_existing_terminology_term = true;
+    impl_->show_terminology_term_editor_modal = true;
+}
+
+void AppRuntime::ConfirmTerminologyTermEdit() {
+    if (!impl_->app_state.sacm_package.has_value())
+        return;
+
+    const core::TerminologyTermDraft draft = TermDraftFromEditor(*impl_);
+    std::string error;
+    if (impl_->editing_existing_terminology_term) {
+        if (!core::UpdateTerminologyTerm(impl_->app_state.sacm_package.value(),
+                                         impl_->selected_terminology_package_ref,
+                                         impl_->selected_terminology_term_ref,
+                                         draft,
+                                         error)) {
+            SetStatus("Term update failed: " + error);
+            return;
+        }
+        SetStatus("Updated term " + draft.value + ".");
+    } else {
+        core::TerminologyTermCreateResult result = core::CreateTerminologyTerm(
+            impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref, draft);
+        if (!result.success) {
+            SetStatus("Term create failed: " + result.error);
+            return;
+        }
+        impl_->selected_terminology_term_ref = result.term_ref;
+        SetStatus("Added term " + draft.value + ".");
+    }
+
+    MarkTerminologyDocumentDirty(*impl_);
+    impl_->show_terminology_term_editor_modal = false;
+}
+
+void AppRuntime::BeginDeleteTerminologyTerm(const core::TerminologyTermRef& term_ref) {
+    if (!impl_->app_state.sacm_package.has_value())
+        return;
+    const sacm::Term* term = core::FindTerminologyTerm(
+        impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref, term_ref);
+    if (!term) {
+        SetStatus("Term not found.");
+        return;
+    }
+    impl_->selected_terminology_term_ref = term_ref;
+    impl_->pending_delete_terminology_term_usage_count =
+        core::CountTerminologyTermUsage(impl_->app_state.sacm_package.value(), *term);
+    impl_->show_delete_terminology_term_modal = true;
+}
+
+void AppRuntime::ConfirmDeleteTerminologyTerm() {
+    if (!impl_->app_state.sacm_package.has_value())
+        return;
+
+    std::string error;
+    if (!core::DeleteTerminologyTerm(impl_->app_state.sacm_package.value(),
+                                     impl_->selected_terminology_package_ref,
+                                     impl_->selected_terminology_term_ref,
+                                     error)) {
+        SetStatus("Term delete failed: " + error);
+        return;
+    }
+
+    impl_->selected_terminology_term_ref = core::TerminologyTermRef{};
+    impl_->show_delete_terminology_term_modal = false;
+    MarkTerminologyDocumentDirty(*impl_);
+    SetStatus("Deleted term.");
 }
 
 void AppRuntime::RefreshSacmPackageTreeCache() {

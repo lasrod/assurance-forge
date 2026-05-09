@@ -128,10 +128,31 @@ static void serialize_expression(pugi::xml_node parent, const Expression& e) {
         node.append_attribute("value") = e.value.c_str();
 }
 
+static void serialize_term(pugi::xml_node parent, const Term& term) {
+    auto node = parent.append_child("term");
+    set_base(node, term);
+    if (!term.value.empty())
+        node.append_attribute("value") = term.value.c_str();
+    if (!term.externalReference.empty())
+        node.append_attribute("externalReference") = term.externalReference.c_str();
+    if (!term.origin.empty())
+        node.append_attribute("origin") = term.origin.c_str();
+    add_description(node, term.description, term.description_ml);
+    for (const auto& category_ref : term.category_refs) {
+        if (category_ref.empty())
+            continue;
+        auto category_node = node.append_child("category");
+        category_node.append_attribute("href") = ("#" + category_ref).c_str();
+    }
+}
+
 static void serialize_terminology_package(pugi::xml_node parent, const TerminologyPackage& tp) {
     auto node = parent.append_child("terminologyPackage");
     set_base(node, tp);
     add_description(node, tp.description, tp.description_ml);
+    for (const auto& term : tp.terms) {
+        serialize_term(node, term);
+    }
     for (const auto& e : tp.expressions) {
         serialize_expression(node, e);
     }

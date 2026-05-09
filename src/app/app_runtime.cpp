@@ -1861,9 +1861,9 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                                                                        impl_->selected_terminology_package_ref);
                 }
                 std::string delete_block_reason;
-                const bool can_delete = terminology_package
-                                            ? core::CanDeleteTerminologyPackage(*terminology_package, delete_block_reason)
-                                            : false;
+                const bool can_delete =
+                    terminology_package ? core::CanDeleteTerminologyPackage(*terminology_package, delete_block_reason)
+                                        : false;
                 ui::panels::TerminologyPackagePanelModel model;
                 model.package = terminology_package;
                 model.source_file_path = impl_->selected_terminology_package_file_path;
@@ -1873,9 +1873,27 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                 model.description_buffer_size = sizeof(impl_->terminology_package_description_buf);
                 model.can_delete = can_delete;
                 model.delete_block_reason = delete_block_reason;
+                model.selected_term_ref = impl_->selected_terminology_term_ref;
+                model.search_buffer = impl_->terminology_filter_buf;
+                model.search_buffer_size = sizeof(impl_->terminology_filter_buf);
+                if (terminology_package) {
+                    model.term_issues = core::ValidateTerminologyTerms(*terminology_package);
+                    model.term_usage_summaries = core::BuildTerminologyTermUsageSummaries(
+                        impl_->app_state.sacm_package.value(), *terminology_package);
+                }
                 ui::panels::TerminologyPackagePanelCallbacks callbacks;
                 callbacks.apply_changes = [this]() { ApplyTerminologyPackageEdits(); };
                 callbacks.delete_package = [this]() { BeginDeleteTerminologyPackage(); };
+                callbacks.add_term = [this]() { BeginAddTerminologyTerm(); };
+                callbacks.select_term = [this](const core::TerminologyTermRef& term_ref) {
+                    SelectTerminologyTerm(term_ref);
+                };
+                callbacks.edit_term = [this](const core::TerminologyTermRef& term_ref) {
+                    BeginEditTerminologyTerm(term_ref);
+                };
+                callbacks.delete_term = [this](const core::TerminologyTermRef& term_ref) {
+                    BeginDeleteTerminologyTerm(term_ref);
+                };
                 ui::panels::ShowTerminologyPackagePanel(model, callbacks);
                 ImGui::EndTabItem();
             }
@@ -2510,6 +2528,8 @@ void AppRuntime::RenderFrame(bool& done) {
     RenderProjectLoadReportModal();
     RenderCreateTerminologyPackageModal();
     RenderDeleteTerminologyPackageModal();
+    RenderTerminologyTermEditorModal();
+    RenderDeleteTerminologyTermModal();
     RenderSaveBeforeExitModal(done);
     RenderStartupProjectWindow();
     RenderNotImplementedModal();

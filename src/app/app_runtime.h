@@ -4,6 +4,7 @@
 #include "core/element_factory.h"
 #include "core/project_model.h"
 #include "core/reviews/review_item.h"
+#include "core/terminology_package_service.h"
 #include "core/tree_editing.h"
 #include "sacm/sacm_package_tree.h"
 
@@ -84,6 +85,8 @@ private:
     void RenderSaveBeforeExitModal(bool& done);
     void RenderCreateTerminologyPackageModal();
     void RenderDeleteTerminologyPackageModal();
+    void RenderTerminologyTermEditorModal();
+    void RenderDeleteTerminologyTermModal();
     void RenderPreferencesWindow();
     void RenderThemeTweaksWindow();
 
@@ -99,6 +102,12 @@ private:
     void ApplyTerminologyPackageEdits();
     void BeginDeleteTerminologyPackage();
     void ConfirmDeleteTerminologyPackage();
+    void SelectTerminologyTerm(const core::TerminologyTermRef& term_ref);
+    void BeginAddTerminologyTerm();
+    void BeginEditTerminologyTerm(const core::TerminologyTermRef& term_ref);
+    void ConfirmTerminologyTermEdit();
+    void BeginDeleteTerminologyTerm(const core::TerminologyTermRef& term_ref);
+    void ConfirmDeleteTerminologyTerm();
     bool OpenFirstProjectSacmFile();
     bool TryOpenProjectManifest(const std::string& selected_path);
     bool EnsureReviewItemStorage();
