@@ -422,7 +422,7 @@ VisibleContextSearchResult FindVisibleContextCandidates(sacm::ArgumentPackage& a
 }
 
 sacm::ArtifactReference CreateTerminologyArtifactReference(const sacm::AssuranceCasePackage& package,
-                                                          const sacm::Term& term) {
+                                                           const sacm::Term& term) {
     sacm::ArtifactReference artifact_reference;
     artifact_reference.id = GenerateUniqueId(package, "TC");
     artifact_reference.gid = GenerateUniqueGid(package, artifact_reference.id);
@@ -433,9 +433,9 @@ sacm::ArtifactReference CreateTerminologyArtifactReference(const sacm::Assurance
 }
 
 sacm::AssertedContext CreateVisibleTerminologyContext(const sacm::AssuranceCasePackage& package,
-                                                     const sacm::Term& term,
-                                                     const std::string& source_ref,
-                                                     const std::string& target_ref) {
+                                                      const sacm::Term& term,
+                                                      const std::string& source_ref,
+                                                      const std::string& target_ref) {
     sacm::AssertedContext context;
     context.id = GenerateUniqueId(package, "AC");
     context.gid = GenerateUniqueGid(package, context.id);
@@ -458,8 +458,8 @@ void RemoveContextsById(sacm::ArgumentPackage& argument_package, const std::vect
 }
 
 void RemoveUnreferencedTerminologyArtifacts(sacm::ArgumentPackage& argument_package,
-                                           const sacm::Term& term,
-                                           const std::string& artifact_reference_id_to_keep) {
+                                            const sacm::Term& term,
+                                            const std::string& artifact_reference_id_to_keep) {
     argument_package.artifactReferences.erase(
         std::remove_if(argument_package.artifactReferences.begin(),
                        argument_package.artifactReferences.end(),

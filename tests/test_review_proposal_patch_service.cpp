@@ -287,6 +287,10 @@ TEST(ReviewProposalPatchServiceTest, AddsAndRemovesRelationships) {
     ASSERT_TRUE(result.success) << result.error;
     EXPECT_FALSE(HasInferenceSourceTarget(model, "G2", "G1"));
     const std::string context_id = result.generated_ids.at("$new_context_1");
+    const parser::SacmElement* context = FindElement(model, context_id);
+    ASSERT_NE(context, nullptr);
+    EXPECT_EQ(context->type, "artifactreference");
+    EXPECT_EQ(context->description, "Operational context");
     bool has_context = false;
     for (const parser::SacmElement& element : model.elements) {
         if (element.type != "assertedcontext")

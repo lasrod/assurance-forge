@@ -48,6 +48,38 @@ bool SacmHasClaim(const sacm::AssuranceCasePackage& pkg, const std::string& id) 
     return false;
 }
 
+const parser::SacmElement* FindParserElement(const parser::AssuranceCase& ac, const std::string& id) {
+    for (const auto& element : ac.elements) {
+        if (element.id == id)
+            return &element;
+    }
+    return nullptr;
+}
+
+bool SacmHasArtifactReference(const sacm::AssuranceCasePackage& pkg, const std::string& id) {
+    for (const auto& ap : pkg.argumentPackages)
+        for (const auto& artifact_reference : ap.artifactReferences)
+            if (artifact_reference.id == id)
+                return true;
+    return false;
+}
+
+bool SacmHasContextRelation(const sacm::AssuranceCasePackage& pkg,
+                            const std::string& source_id,
+                            const std::string& target_id) {
+    for (const auto& ap : pkg.argumentPackages) {
+        for (const auto& context : ap.assertedContexts) {
+            const bool has_source =
+                std::find(context.sources.begin(), context.sources.end(), source_id) != context.sources.end();
+            const bool has_target =
+                std::find(context.targets.begin(), context.targets.end(), target_id) != context.targets.end();
+            if (has_source && has_target)
+                return true;
+        }
+    }
+    return false;
+}
+
 } // namespace
 
 TEST(ElementFactoryAdd, AddTopGoalCreatesClaimInParserAndSacm) {
@@ -61,6 +93,27 @@ TEST(ElementFactoryAdd, AddTopGoalCreatesClaimInParserAndSacm) {
 
     EXPECT_TRUE(ParserHasId(ac, new_id));
     EXPECT_TRUE(SacmHasClaim(pkg, new_id));
+}
+
+TEST(ElementFactoryAdd, AddContextCreatesArtifactReferenceAndAssertedContext) {
+    auto mc = MakeRootGoalCase();
+
+    std::string context_id;
+    std::string err;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1", core::NewElementKind::Context, context_id, err)) << err;
+
+    const parser::SacmElement* context = FindParserElement(mc.ac, context_id);
+    ASSERT_NE(context, nullptr);
+    EXPECT_EQ(context->type, "artifactreference");
+    EXPECT_FALSE(SacmHasClaim(mc.pkg, context_id));
+    EXPECT_TRUE(SacmHasArtifactReference(mc.pkg, context_id));
+    EXPECT_TRUE(SacmHasContextRelation(mc.pkg, context_id, "G1"));
+
+    core::AssuranceTree tree = core::AssuranceTree::Build(mc.ac);
+    ASSERT_NE(tree.root, nullptr);
+    ASSERT_EQ(tree.root->group2_attachments.size(), 1u);
+    EXPECT_EQ(tree.root->group2_attachments.front()->id, context_id);
+    EXPECT_EQ(tree.root->group2_attachments.front()->role, core::NodeRole::Context);
 }
 
 TEST(ElementFactoryRemove, RemoveLeafElement) {

@@ -48,9 +48,9 @@ The parser model is intentionally flat. A claim, strategy, evidence item, assert
 
 | Collection | Meaning |
 | --- | --- |
-| `claims` | Assertions and GSN goals/contexts/assumptions/justifications. |
+| `claims` | Assertions and GSN goals/assumptions/justifications. |
 | `argumentReasonings` | Strategies. |
-| `artifactReferences` | Evidence references. |
+| `artifactReferences` | Context and evidence references. |
 | `assertedInferences` | Support relationships. |
 | `assertedContexts` | Context relationships. |
 | `assertedEvidences` | Evidence relationships. |

@@ -177,7 +177,8 @@ void RenderTermTextFields(AppRuntimeState& state) {
 
 void RenderTermExternalReferenceField(AppRuntimeState& state) {
     ImGui::SetNextItemWidth(460.0f);
-    ImGui::InputText("External Reference", state.term_external_reference_buf, sizeof(state.term_external_reference_buf));
+    ImGui::InputText(
+        "External Reference", state.term_external_reference_buf, sizeof(state.term_external_reference_buf));
 }
 
 void RenderTerminologyTermValidationMessages(bool missing_value,

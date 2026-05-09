@@ -72,13 +72,13 @@ const char* DefaultNameFor(PatchOperationType type) {
 std::string ElementTypeFor(PatchOperationType type) {
     switch (type) {
     case PatchOperationType::CreateClaim:
-    case PatchOperationType::CreateContext:
     case PatchOperationType::CreateAssumption:
     case PatchOperationType::CreateJustification:
         return "claim";
     case PatchOperationType::CreateStrategy:
         return "argumentreasoning";
     case PatchOperationType::CreateSolution:
+    case PatchOperationType::CreateContext:
         return "artifactreference";
     default:
         return {};
