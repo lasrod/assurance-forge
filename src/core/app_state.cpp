@@ -88,6 +88,51 @@ void HideTerminologyArtifactReferences(parser::AssuranceCase& model, const sacm:
                          model.elements.end());
 }
 
+std::string TermContextDisplayLabel(const sacm::Term& term) {
+    if (term.value.empty())
+        return term.name.empty() ? term.id : term.name;
+    if (term.name.empty() || term.name == term.value)
+        return term.value;
+    return term.value + ": " + term.name;
+}
+
+parser::SacmElement* FindParserElement(parser::AssuranceCase& model, const std::string& id, const std::string& gid) {
+    for (parser::SacmElement& element : model.elements) {
+        if ((!id.empty() && element.id == id) || (!gid.empty() && element.id == gid))
+            return &element;
+    }
+    return nullptr;
+}
+
+void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model,
+                                             const sacm::AssuranceCasePackage& package) {
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
+            if (!IsVisibleTerminologyArtifactReference(package, argument_package, artifact_reference))
+                continue;
+            parser::SacmElement* element = FindParserElement(model, artifact_reference.id, artifact_reference.gid);
+            if (!element)
+                continue;
+            const TerminologyTermReferenceResolution resolution =
+                ResolveTerminologyTermReference(package, artifact_reference.referencedArtifact);
+            if (!resolution.resolved || !resolution.term) {
+                element->description.clear();
+                element->description_langs.clear();
+                continue;
+            }
+
+            element->name = TermContextDisplayLabel(*resolution.term);
+            element->name_langs = resolution.term->name_ml.texts;
+            if (element->name_langs.empty() && !element->name.empty())
+                element->name_langs["en"] = element->name;
+            element->description = resolution.term->description;
+            element->description_langs = resolution.term->description_ml.texts;
+            if (element->description_langs.empty() && !element->description.empty())
+                element->description_langs["en"] = element->description;
+        }
+    }
+}
+
 } // namespace
 
 bool AppState::load_file(const std::string& file_path) {
@@ -107,6 +152,7 @@ bool AppState::load_file(const std::string& file_path) {
         if (sacm_result.success) {
             sacm_package = std::move(sacm_result.package);
             HideTerminologyArtifactReferences(loaded_case.value(), sacm_package.value());
+            RefreshVisibleTerminologyContextDisplay(loaded_case.value(), sacm_package.value());
             status_message =
                 "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
         }

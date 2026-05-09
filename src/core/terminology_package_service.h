@@ -114,6 +114,33 @@ struct TerminologyTermUsageSearchResult {
     std::vector<TerminologyTermUsage> usages;
 };
 
+struct TerminologyTermReferenceResolution {
+    bool resolved = false;
+    TerminologyPackageRef package_ref;
+    TerminologyTermRef term_ref;
+    const sacm::TerminologyPackage* package = nullptr;
+    const sacm::Term* term = nullptr;
+};
+
+enum class TerminologyContextReferenceIssueKind {
+    MissingArtifactReference,
+    MissingTerm,
+    InvalidTarget,
+    DuplicateContext,
+};
+
+struct TerminologyContextReferenceIssue {
+    TerminologyContextReferenceIssueKind kind = TerminologyContextReferenceIssueKind::MissingTerm;
+    TerminologyTermIssueSeverity severity = TerminologyTermIssueSeverity::Error;
+    std::string argument_package_id;
+    std::string argument_package_gid;
+    std::string asserted_context_id;
+    std::string artifact_reference_id;
+    std::string target_ref;
+    std::string referenced_artifact;
+    std::string message;
+};
+
 sacm::TerminologyPackage* FindTerminologyPackage(sacm::AssuranceCasePackage& package,
                                                  const TerminologyPackageRef& package_ref);
 const sacm::TerminologyPackage* FindTerminologyPackage(const sacm::AssuranceCasePackage& package,
@@ -166,6 +193,11 @@ TerminologyContextAssociationResult AddTerminologyTermAsVisibleContext(sacm::Ass
                                                                        const std::string& target_element_id,
                                                                        const TerminologyPackageRef& package_ref,
                                                                        const TerminologyTermRef& term_ref);
+
+TerminologyTermReferenceResolution ResolveTerminologyTermReference(const sacm::AssuranceCasePackage& package,
+                                                                  const std::string& raw_ref);
+std::vector<TerminologyContextReferenceIssue>
+ValidateTerminologyContextReferences(const sacm::AssuranceCasePackage& package);
 
 bool IsVisibleTerminologyContext(const sacm::AssertedContext& context);
 bool IsTerminologyArtifactReference(const sacm::AssuranceCasePackage& package,

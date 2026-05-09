@@ -296,6 +296,59 @@ bool ParserModelHasElement(const parser::AssuranceCase& model, const std::string
     });
 }
 
+parser::SacmElement* FindParserElement(parser::AssuranceCase& model, const std::string& id, const std::string& gid) {
+    for (parser::SacmElement& element : model.elements) {
+        if ((!id.empty() && element.id == id) || (!gid.empty() && element.id == gid))
+            return &element;
+    }
+    return nullptr;
+}
+
+std::string TermContextDisplayLabel(const sacm::Term& term) {
+    if (term.value.empty())
+        return term.name.empty() ? term.id : term.name;
+    if (term.name.empty() || term.name == term.value)
+        return term.value;
+    return term.value + ": " + term.name;
+}
+
+bool RefreshVisibleTerminologyContextProjection(core::AppState& app_state) {
+    if (!app_state.loaded_case.has_value() || !app_state.sacm_package.has_value())
+        return false;
+
+    bool changed = false;
+    parser::AssuranceCase& model = app_state.loaded_case.value();
+    const sacm::AssuranceCasePackage& package = app_state.sacm_package.value();
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
+            if (!core::IsVisibleTerminologyArtifactReference(package, argument_package, artifact_reference))
+                continue;
+            parser::SacmElement* element = FindParserElement(model, artifact_reference.id, artifact_reference.gid);
+            if (!element)
+                continue;
+            const core::TerminologyTermReferenceResolution resolution =
+                core::ResolveTerminologyTermReference(package, artifact_reference.referencedArtifact);
+            const std::string previous_name = element->name;
+            const std::string previous_description = element->description;
+            if (!resolution.resolved || !resolution.term) {
+                element->description.clear();
+                element->description_langs.clear();
+            } else {
+                element->name = TermContextDisplayLabel(*resolution.term);
+                element->name_langs = resolution.term->name_ml.texts;
+                if (element->name_langs.empty() && !element->name.empty())
+                    element->name_langs["en"] = element->name;
+                element->description = resolution.term->description;
+                element->description_langs = resolution.term->description_ml.texts;
+                if (element->description_langs.empty() && !element->description.empty())
+                    element->description_langs["en"] = element->description;
+            }
+            changed = changed || element->name != previous_name || element->description != previous_description;
+        }
+    }
+    return changed;
+}
+
 bool SyncVisibleTerminologyContextToParser(core::AppState& app_state,
                                            const core::TerminologyContextAssociationResult& result) {
     if (!app_state.loaded_case.has_value() || !app_state.sacm_package.has_value())
@@ -335,7 +388,7 @@ bool SyncVisibleTerminologyContextToParser(core::AppState& app_state,
         model.elements.push_back(std::move(element));
         changed = true;
     }
-    return changed;
+    return RefreshVisibleTerminologyContextProjection(app_state) || changed;
 }
 
 std::string TermStatusLabel(const sacm::AssuranceCasePackage& package,
@@ -703,6 +756,8 @@ void AppRuntime::ConfirmTerminologyTermEdit() {
     }
 
     MarkTerminologyDocumentDirty(*impl_);
+    if (RefreshVisibleTerminologyContextProjection(impl_->app_state))
+        impl_->events.Emit(TreeDirtyEvent{});
     SyncTerminologyProblems();
     impl_->show_terminology_term_editor_modal = false;
 }
@@ -997,6 +1052,8 @@ void AppRuntime::ConfirmDeleteTerminologyTerm() {
     impl_->selected_terminology_term_ref = core::TerminologyTermRef{};
     impl_->show_delete_terminology_term_modal = false;
     MarkTerminologyDocumentDirty(*impl_);
+    if (RefreshVisibleTerminologyContextProjection(impl_->app_state))
+        impl_->events.Emit(TreeDirtyEvent{});
     SyncTerminologyProblems();
     SetStatus("Deleted term.");
 }

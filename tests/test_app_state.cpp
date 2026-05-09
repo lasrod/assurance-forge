@@ -79,7 +79,9 @@ TEST(AppStateTest, LoadFileKeepsVisibleTerminologyContextOnCanvas) {
     std::ofstream(sacm_path) << R"(<?xml version="1.0" encoding="UTF-8"?>
 <sacm:AssuranceCasePackage xmlns:sacm="urn:test" id="T" name="T">
   <terminologyPackage id="TP" name="Glossary">
-    <term id="TERM_ODD" name="Operational Design Domain" value="ODD"/>
+    <term id="TERM_ODD" name="Operational Design Domain" value="ODD">
+      <description><content lang="en">The intended operating conditions.</content></description>
+    </term>
   </terminologyPackage>
   <argumentPackage id="AP" name="AP">
     <claim id="G1" name="Goal" assertionDeclaration="asserted"/>
@@ -104,7 +106,10 @@ TEST(AppStateTest, LoadFileKeepsVisibleTerminologyContextOnCanvas) {
 
     EXPECT_EQ(FindElement(state.loaded_case.value(), "TERM_HIDDEN"), nullptr);
     EXPECT_EQ(FindElement(state.loaded_case.value(), "AC_HIDDEN"), nullptr);
-    EXPECT_NE(FindElement(state.loaded_case.value(), "TERM_VISIBLE"), nullptr);
+    const parser::SacmElement* visible_context = FindElement(state.loaded_case.value(), "TERM_VISIBLE");
+    ASSERT_NE(visible_context, nullptr);
+    EXPECT_EQ(visible_context->name, "ODD: Operational Design Domain");
+    EXPECT_EQ(visible_context->description, "The intended operating conditions.");
     EXPECT_NE(FindElement(state.loaded_case.value(), "AC_VISIBLE"), nullptr);
 
     core::AssuranceTree tree = core::AssuranceTree::Build(state.loaded_case.value());
@@ -112,4 +117,38 @@ TEST(AppStateTest, LoadFileKeepsVisibleTerminologyContextOnCanvas) {
     ASSERT_EQ(tree.root->group2_attachments.size(), 1u);
     EXPECT_EQ(tree.root->group2_attachments.front()->id, "TERM_VISIBLE");
     EXPECT_EQ(tree.root->group2_attachments.front()->role, core::NodeRole::Context);
+}
+
+TEST(AppStateTest, LoadFileKeepsBrokenVisibleTerminologyContextRepairable) {
+    TempDir temp(MakeTempDir());
+    const std::filesystem::path sacm_path = temp.path / "case.sacm";
+    std::ofstream(sacm_path) << R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="urn:test" id="T" name="T">
+  <argumentPackage id="AP" name="AP">
+    <claim id="G1" name="Goal" assertionDeclaration="asserted"/>
+    <artifactReference id="TERM_BROKEN" name="Missing term" referencedArtifact="TERM_MISSING"/>
+    <assertedContext id="AC_BROKEN" name="Broken terminology relation">
+      <description><content lang="en">assurance-forge:visible-term-context</content></description>
+      <source ref="TERM_BROKEN"/>
+      <target ref="G1"/>
+    </assertedContext>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(sacm_path.string())) << state.status_message;
+    ASSERT_TRUE(state.loaded_case.has_value());
+    ASSERT_TRUE(state.sacm_package.has_value());
+
+    EXPECT_NE(FindElement(state.loaded_case.value(), "TERM_BROKEN"), nullptr);
+    EXPECT_NE(FindElement(state.loaded_case.value(), "AC_BROKEN"), nullptr);
+    std::vector<core::TerminologyContextReferenceIssue> issues =
+        core::ValidateTerminologyContextReferences(state.sacm_package.value());
+    ASSERT_EQ(issues.size(), 1u);
+    EXPECT_EQ(issues.front().kind, core::TerminologyContextReferenceIssueKind::MissingTerm);
+
+    core::AssuranceTree tree = core::AssuranceTree::Build(state.loaded_case.value());
+    ASSERT_NE(tree.root, nullptr);
+    ASSERT_EQ(tree.root->group2_attachments.size(), 1u);
+    EXPECT_EQ(tree.root->group2_attachments.front()->id, "TERM_BROKEN");
 }

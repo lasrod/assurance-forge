@@ -194,6 +194,26 @@ std::string TerminologyAmbiguityProblemId(const core::TermOccurrence& occurrence
            std::to_string(occurrence.start_offset) + ":" + std::to_string(occurrence.end_offset);
 }
 
+std::string TerminologyContextReferenceProblemId(const core::TerminologyContextReferenceIssue& issue) {
+    if (!issue.artifact_reference_id.empty())
+        return "terminology-context-reference:" + issue.artifact_reference_id + ":" + issue.target_ref;
+    if (!issue.asserted_context_id.empty())
+        return "terminology-context-reference:" + issue.asserted_context_id + ":" + issue.target_ref;
+    return "terminology-context-reference:" + issue.referenced_artifact + ":" + issue.target_ref;
+}
+
+core::ProblemSeverity ProblemSeverityFor(core::TerminologyTermIssueSeverity severity) {
+    switch (severity) {
+    case core::TerminologyTermIssueSeverity::Error:
+        return core::ProblemSeverity::Error;
+    case core::TerminologyTermIssueSeverity::Warning:
+        return core::ProblemSeverity::Warning;
+    case core::TerminologyTermIssueSeverity::Info:
+        return core::ProblemSeverity::Info;
+    }
+    return core::ProblemSeverity::Info;
+}
+
 const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model, const std::string& element_id) {
     auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
         return element.id == element_id;
@@ -767,6 +787,12 @@ void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sa
         }
         if (!HasAssertedContext(argument_package, context))
             argument_package.assertedContexts.push_back(context);
+    }
+    for (sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
+        if (!core::IsVisibleTerminologyArtifactReference(package, argument_package, artifact_reference))
+            continue;
+        artifact_reference.description.clear();
+        artifact_reference.description_ml.texts.clear();
     }
 }
 
@@ -2186,14 +2212,28 @@ void AppRuntime::SyncReviewProblems() {
 }
 
 void AppRuntime::SyncTerminologyProblems() {
-    constexpr const char* kTerminologyProblemPrefix = "terminology-ambiguity:";
-    ClearProblemsByIdPrefix(impl_->problems_manager, kTerminologyProblemPrefix);
+    constexpr const char* kTerminologyAmbiguityProblemPrefix = "terminology-ambiguity:";
+    constexpr const char* kTerminologyContextReferenceProblemPrefix = "terminology-context-reference:";
+    ClearProblemsByIdPrefix(impl_->problems_manager, kTerminologyAmbiguityProblemPrefix);
+    ClearProblemsByIdPrefix(impl_->problems_manager, kTerminologyContextReferenceProblemPrefix);
 
     if (!impl_->app_state.loaded_case.has_value() || !impl_->app_state.sacm_package.has_value())
         return;
 
     const parser::AssuranceCase& model = impl_->app_state.loaded_case.value();
-    core::TerminologyService terminology_service(impl_->app_state.sacm_package.value());
+    const sacm::AssuranceCasePackage& package = impl_->app_state.sacm_package.value();
+    for (const core::TerminologyContextReferenceIssue& issue : core::ValidateTerminologyContextReferences(package)) {
+        core::ProblemItem problem;
+        problem.id = TerminologyContextReferenceProblemId(issue);
+        problem.severity = ProblemSeverityFor(issue.severity);
+        problem.source = core::ProblemSource::ModelValidation;
+        problem.element_id = issue.artifact_reference_id.empty() ? issue.target_ref : issue.artifact_reference_id;
+        problem.type = "TerminologyBrokenContextReference";
+        problem.message = issue.message;
+        impl_->problems_manager.AddOrUpdateProblem(problem);
+    }
+
+    core::TerminologyService terminology_service(package);
 
     for (const parser::SacmElement& element : model.elements) {
         if (IsRelationshipElement(element))

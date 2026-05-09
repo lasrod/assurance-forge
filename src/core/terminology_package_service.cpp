@@ -230,27 +230,7 @@ bool ArtifactReferenceTargetsTerm(const sacm::ArtifactReference& artifact_refere
 
 bool ArtifactReferenceTargetsAnyTerm(const sacm::AssuranceCasePackage& package,
                                      const sacm::ArtifactReference& artifact_reference) {
-    const std::string ref = NormalizeRef(artifact_reference.referencedArtifact);
-    if (ref.empty())
-        return false;
-
-    auto package_has_term_ref = [&](const sacm::TerminologyPackage& terminology_package) {
-        return std::any_of(terminology_package.terms.begin(),
-                           terminology_package.terms.end(),
-                           [&](const sacm::Term& term) { return MatchesRawRef(ref, term.id, term.gid); });
-    };
-
-    for (const auto& terminology_package : package.terminologyPackages) {
-        if (package_has_term_ref(terminology_package))
-            return true;
-    }
-    for (const auto& argument_package : package.argumentPackages) {
-        for (const auto& terminology_package : argument_package.terminologyPackages) {
-            if (package_has_term_ref(terminology_package))
-                return true;
-        }
-    }
-    return false;
+    return ResolveTerminologyTermReference(package, artifact_reference.referencedArtifact).resolved;
 }
 
 bool RelationshipReferencesElement(const std::vector<std::string>& refs,
@@ -314,6 +294,72 @@ bool ContextReferencesArtifact(const sacm::AssertedContext& context,
 
 bool ContextTargetsElement(const sacm::AssertedContext& context, const std::string& target_element_id) {
     return RelationshipReferencesElement(context.targets, target_element_id);
+}
+
+const sacm::ArtifactReference* FindArtifactReferenceByRef(const sacm::ArgumentPackage& argument_package,
+                                                          const std::string& raw_ref) {
+    for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
+        if (MatchesRawRef(raw_ref, artifact_reference.id, artifact_reference.gid))
+            return &artifact_reference;
+    }
+    return nullptr;
+}
+
+bool IsClaimOrReasoningTarget(const sacm::ArgumentPackage& argument_package, const std::string& raw_ref) {
+    for (const sacm::Claim& claim : argument_package.claims) {
+        if (MatchesRawRef(raw_ref, claim.id, claim.gid))
+            return true;
+    }
+    for (const sacm::ArgumentReasoning& reasoning : argument_package.argumentReasonings) {
+        if (MatchesRawRef(raw_ref, reasoning.id, reasoning.gid))
+            return true;
+    }
+    return false;
+}
+
+std::string CanonicalTargetRef(const sacm::ArgumentPackage& argument_package, const std::string& raw_ref) {
+    for (const sacm::Claim& claim : argument_package.claims) {
+        if (MatchesRawRef(raw_ref, claim.id, claim.gid))
+            return claim.id.empty() ? claim.gid : claim.id;
+    }
+    for (const sacm::ArgumentReasoning& reasoning : argument_package.argumentReasonings) {
+        if (MatchesRawRef(raw_ref, reasoning.id, reasoning.gid))
+            return reasoning.id.empty() ? reasoning.gid : reasoning.id;
+    }
+    return NormalizeRef(raw_ref);
+}
+
+std::string CanonicalTermRef(const TerminologyTermReferenceResolution& resolution) {
+    if (!resolution.term_ref.id.empty())
+        return resolution.term_ref.id;
+    return resolution.term_ref.gid;
+}
+
+std::string DisplayRef(const std::string& ref, const char* fallback) {
+    const std::string normalized = NormalizeRef(ref);
+    return normalized.empty() ? fallback : normalized;
+}
+
+TerminologyContextReferenceIssue MakeContextIssue(TerminologyContextReferenceIssueKind kind,
+                                                  const sacm::ArgumentPackage& argument_package,
+                                                  const sacm::AssertedContext& context,
+                                                  const sacm::ArtifactReference* artifact_reference,
+                                                  const std::string& source_ref,
+                                                  const std::string& target_ref,
+                                                  const std::string& message) {
+    TerminologyContextReferenceIssue issue;
+    issue.kind = kind;
+    issue.severity = kind == TerminologyContextReferenceIssueKind::DuplicateContext
+                         ? TerminologyTermIssueSeverity::Warning
+                         : TerminologyTermIssueSeverity::Error;
+    issue.argument_package_id = argument_package.id;
+    issue.argument_package_gid = argument_package.gid;
+    issue.asserted_context_id = context.id;
+    issue.artifact_reference_id = artifact_reference ? artifact_reference->id : NormalizeRef(source_ref);
+    issue.target_ref = NormalizeRef(target_ref);
+    issue.referenced_artifact = artifact_reference ? NormalizeRef(artifact_reference->referencedArtifact) : NormalizeRef(source_ref);
+    issue.message = message;
+    return issue;
 }
 
 bool ArtifactReferenceUsedByOtherContexts(const sacm::ArgumentPackage& argument_package,
@@ -440,6 +486,12 @@ TerminologyUsageResolutionStatus UsageStatusForOccurrence(const TermOccurrence* 
         return TerminologyUsageResolutionStatus::Undefined;
     }
     return TerminologyUsageResolutionStatus::Undefined;
+}
+
+bool IsSelectedTermUsageStatus(TerminologyUsageResolutionStatus status) {
+    return status == TerminologyUsageResolutionStatus::Resolved ||
+           status == TerminologyUsageResolutionStatus::Ambiguous ||
+           status == TerminologyUsageResolutionStatus::ExplicitContext;
 }
 
 const TermOccurrence* FindDetectedOccurrenceAt(const std::vector<TermOccurrence>& occurrences,
@@ -851,6 +903,40 @@ bool IsVisibleTerminologyContext(const sacm::AssertedContext& context) {
     return TrimWhitespace(context.description) == kVisibleTerminologyContextMarker;
 }
 
+TerminologyTermReferenceResolution ResolveTerminologyTermReference(const sacm::AssuranceCasePackage& package,
+                                                                  const std::string& raw_ref) {
+    TerminologyTermReferenceResolution resolution;
+    const std::string ref = NormalizeRef(raw_ref);
+    if (ref.empty())
+        return resolution;
+
+    auto resolve_from_package = [&](const sacm::TerminologyPackage& terminology_package) {
+        for (const sacm::Term& term : terminology_package.terms) {
+            if (!MatchesRawRef(ref, term.id, term.gid))
+                continue;
+            resolution.resolved = true;
+            resolution.package_ref = TerminologyPackageRef{terminology_package.id, terminology_package.gid};
+            resolution.term_ref = RefFor(term);
+            resolution.package = &terminology_package;
+            resolution.term = &term;
+            return true;
+        }
+        return false;
+    };
+
+    for (const sacm::TerminologyPackage& terminology_package : package.terminologyPackages) {
+        if (resolve_from_package(terminology_package))
+            return resolution;
+    }
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::TerminologyPackage& terminology_package : argument_package.terminologyPackages) {
+            if (resolve_from_package(terminology_package))
+                return resolution;
+        }
+    }
+    return resolution;
+}
+
 bool IsTerminologyArtifactReference(const sacm::AssuranceCasePackage& package,
                                     const sacm::ArtifactReference& artifact_reference) {
     return ArtifactReferenceTargetsAnyTerm(package, artifact_reference);
@@ -859,14 +945,96 @@ bool IsTerminologyArtifactReference(const sacm::AssuranceCasePackage& package,
 bool IsVisibleTerminologyArtifactReference(const sacm::AssuranceCasePackage& package,
                                            const sacm::ArgumentPackage& argument_package,
                                            const sacm::ArtifactReference& artifact_reference) {
-    if (!IsTerminologyArtifactReference(package, artifact_reference))
-        return false;
+    (void)package;
     return std::any_of(argument_package.assertedContexts.begin(),
                        argument_package.assertedContexts.end(),
                        [&](const sacm::AssertedContext& context) {
                            return IsVisibleTerminologyContext(context) &&
                                   ContextReferencesArtifact(context, artifact_reference);
                        });
+}
+
+std::vector<TerminologyContextReferenceIssue>
+ValidateTerminologyContextReferences(const sacm::AssuranceCasePackage& package) {
+    std::vector<TerminologyContextReferenceIssue> issues;
+    std::map<std::string, const sacm::AssertedContext*> seen_visible_contexts;
+
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::AssertedContext& context : argument_package.assertedContexts) {
+            if (!IsVisibleTerminologyContext(context))
+                continue;
+
+            for (const std::string& target_ref : context.targets) {
+                if (!IsClaimOrReasoningTarget(argument_package, target_ref)) {
+                    issues.push_back(MakeContextIssue(
+                        TerminologyContextReferenceIssueKind::InvalidTarget,
+                        argument_package,
+                        context,
+                        nullptr,
+                        {},
+                        target_ref,
+                        "Visible terminology context targets missing claim or strategy " +
+                            DisplayRef(target_ref, "<empty>") + "."));
+                }
+            }
+
+            for (const std::string& source_ref : context.sources) {
+                const sacm::ArtifactReference* artifact_reference = FindArtifactReferenceByRef(argument_package, source_ref);
+                if (!artifact_reference) {
+                    issues.push_back(MakeContextIssue(
+                        TerminologyContextReferenceIssueKind::MissingArtifactReference,
+                        argument_package,
+                        context,
+                        nullptr,
+                        source_ref,
+                        context.targets.empty() ? std::string{} : context.targets.front(),
+                        "Visible terminology context references missing artifact source " +
+                            DisplayRef(source_ref, "<empty>") + "."));
+                    continue;
+                }
+
+                const TerminologyTermReferenceResolution resolution =
+                    ResolveTerminologyTermReference(package, artifact_reference->referencedArtifact);
+                if (!resolution.resolved) {
+                    issues.push_back(MakeContextIssue(
+                        TerminologyContextReferenceIssueKind::MissingTerm,
+                        argument_package,
+                        context,
+                        artifact_reference,
+                        source_ref,
+                        context.targets.empty() ? std::string{} : context.targets.front(),
+                        "Visible terminology context references missing term " +
+                            DisplayRef(artifact_reference->referencedArtifact, "<empty>") + "."));
+                    continue;
+                }
+
+                for (const std::string& target_ref : context.targets) {
+                    if (!IsClaimOrReasoningTarget(argument_package, target_ref))
+                        continue;
+                    const std::string argument_package_ref = argument_package.id.empty() ? argument_package.gid
+                                                                                         : argument_package.id;
+                    const std::string duplicate_key = argument_package_ref + "\n" +
+                                                      CanonicalTargetRef(argument_package, target_ref) + "\n" +
+                                                      CanonicalTermRef(resolution);
+                    const auto [it, inserted] = seen_visible_contexts.emplace(duplicate_key, &context);
+                    if (inserted)
+                        continue;
+                    const std::string existing_id = it->second && !it->second->id.empty() ? it->second->id : "another";
+                    issues.push_back(MakeContextIssue(
+                        TerminologyContextReferenceIssueKind::DuplicateContext,
+                        argument_package,
+                        context,
+                        artifact_reference,
+                        source_ref,
+                        target_ref,
+                        "Visible terminology context duplicates " + existing_id + " for target " +
+                            DisplayRef(target_ref, "<empty>") + " and term " + CanonicalTermRef(resolution) + "."));
+                }
+            }
+        }
+    }
+
+    return issues;
 }
 
 TerminologyContextAssociationResult AddTerminologyTermAsVisibleContext(sacm::AssuranceCasePackage& package,
@@ -1237,6 +1405,8 @@ TerminologyTermUsageSearchResult FindTerminologyTermUsages(const sacm::Assurance
             usage.matched_text = matched_text;
             usage.snippet = BuildSnippet(text, start, end);
             usage.resolution_status = UsageStatusForOccurrence(occurrence, package_ref, term_ref);
+            if (!IsSelectedTermUsageStatus(usage.resolution_status))
+                continue;
             result.usages.push_back(std::move(usage));
         }
     };

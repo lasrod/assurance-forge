@@ -30,6 +30,8 @@ sacm::AssuranceCasePackage MakePackageWithTerminologyContextTargets() {
     term.gid = "gid-T_ODD";
     term.value = "ODD";
     term.name = "Operational Design Domain";
+    term.description = "The conditions under which the system is intended to operate.";
+    term.description_ml.set("en", term.description);
     terminology_package.terms.push_back(term);
     package.terminologyPackages.push_back(terminology_package);
 
@@ -44,6 +46,10 @@ sacm::AssuranceCasePackage MakePackageWithTerminologyContextTargets() {
     second_goal.id = "G2";
     second_goal.gid = "gid-G2";
     argument_package.claims.push_back(second_goal);
+    sacm::ArgumentReasoning strategy;
+    strategy.id = "S1";
+    strategy.gid = "gid-S1";
+    argument_package.argumentReasonings.push_back(strategy);
     package.argumentPackages.push_back(argument_package);
 
     return package;
@@ -467,8 +473,60 @@ TEST(TerminologyPackageService, FindUsagesShowsAmbiguousAndExplicitStatuses) {
     core::TerminologyTermUsageSearchResult other_meaning =
         core::FindTerminologyTermUsages(package, terminology_package.package_ref, dataset.term_ref);
     ASSERT_TRUE(other_meaning.success) << other_meaning.error;
-    ASSERT_EQ(other_meaning.usages.size(), 1u);
-    EXPECT_EQ(other_meaning.usages.front().resolution_status, core::TerminologyUsageResolutionStatus::OtherMeaning);
+    EXPECT_TRUE(other_meaning.usages.empty());
+}
+
+TEST(TerminologyPackageService, FindUsagesSplitsDuplicateAbbreviationsByExplicitMeaning) {
+    sacm::AssuranceCasePackage package = MakePackage();
+    core::TerminologyPackageCreateResult terminology_package = core::CreateTerminologyPackage(package, "Terms", "");
+    ASSERT_TRUE(terminology_package.success);
+
+    core::TerminologyTermDraft context_term;
+    context_term.value = "ODD";
+    context_term.name = "Operational Design Domain";
+    core::TerminologyTermCreateResult context =
+        core::CreateTerminologyTerm(package, terminology_package.package_ref, context_term);
+    ASSERT_TRUE(context.success);
+
+    core::TerminologyTermDraft dataset_term;
+    dataset_term.value = "ODD";
+    dataset_term.name = "Object Detection Dataset";
+    core::TerminologyTermCreateResult dataset =
+        core::CreateTerminologyTerm(package, terminology_package.package_ref, dataset_term);
+    ASSERT_TRUE(dataset.success);
+
+    sacm::ArgumentPackage argument_package;
+    argument_package.id = "AP1";
+    sacm::Claim operational_claim;
+    operational_claim.id = "G1";
+    operational_claim.content = "The ODD is well defined.";
+    argument_package.claims.push_back(operational_claim);
+    sacm::Claim dataset_claim;
+    dataset_claim.id = "G2";
+    dataset_claim.content = "The ODD is curated for perception review.";
+    argument_package.claims.push_back(dataset_claim);
+    package.argumentPackages.push_back(argument_package);
+
+    ASSERT_TRUE(core::AssociateTerminologyTermWithElement(
+                    package, "G1", terminology_package.package_ref, context.term_ref)
+                    .success);
+    ASSERT_TRUE(core::AssociateTerminologyTermWithElement(
+                    package, "G2", terminology_package.package_ref, dataset.term_ref)
+                    .success);
+
+    core::TerminologyTermUsageSearchResult context_usages =
+        core::FindTerminologyTermUsages(package, terminology_package.package_ref, context.term_ref);
+    ASSERT_TRUE(context_usages.success) << context_usages.error;
+    ASSERT_EQ(context_usages.usages.size(), 1u);
+    EXPECT_EQ(context_usages.usages.front().element_id, "G1");
+    EXPECT_EQ(context_usages.usages.front().resolution_status, core::TerminologyUsageResolutionStatus::ExplicitContext);
+
+    core::TerminologyTermUsageSearchResult dataset_usages =
+        core::FindTerminologyTermUsages(package, terminology_package.package_ref, dataset.term_ref);
+    ASSERT_TRUE(dataset_usages.success) << dataset_usages.error;
+    ASSERT_EQ(dataset_usages.usages.size(), 1u);
+    EXPECT_EQ(dataset_usages.usages.front().element_id, "G2");
+    EXPECT_EQ(dataset_usages.usages.front().resolution_status, core::TerminologyUsageResolutionStatus::ExplicitContext);
 }
 
 TEST(TerminologyPackageService, FindUsagesUsesWholeWordMatches) {
@@ -697,4 +755,126 @@ TEST(TerminologyPackageService, VisibleTermContextDoesNotPromoteSharedHiddenRefe
                                                package.argumentPackages.front().assertedContexts.end(),
                                                core::IsVisibleTerminologyContext);
     EXPECT_EQ(visible_contexts, 1);
+}
+
+TEST(TerminologyPackageService, VisibleTermContextSurvivesSaveReloadForClaimAndStrategy) {
+    sacm::AssuranceCasePackage package = MakePackageWithTerminologyContextTargets();
+    core::TerminologyPackageRef package_ref{"TP1", "gid-TP1"};
+    core::TerminologyTermRef term_ref{"T_ODD", "gid-T_ODD"};
+    ASSERT_TRUE(core::AddTerminologyTermAsVisibleContext(package, "G1", package_ref, term_ref).success);
+    ASSERT_TRUE(core::AddTerminologyTermAsVisibleContext(package, "S1", package_ref, term_ref).success);
+
+    std::string xml = sacm::serialize_sacm(package);
+    ASSERT_FALSE(xml.empty());
+
+    sacm::SacmParseResult parsed = sacm::parse_sacm_string(xml);
+    ASSERT_TRUE(parsed.success) << parsed.error_message;
+    ASSERT_EQ(parsed.package.terminologyPackages.size(), 1u);
+    ASSERT_EQ(parsed.package.terminologyPackages.front().terms.size(), 1u);
+    ASSERT_EQ(parsed.package.argumentPackages.size(), 1u);
+    const sacm::ArgumentPackage& argument_package = parsed.package.argumentPackages.front();
+    ASSERT_EQ(argument_package.artifactReferences.size(), 2u);
+    ASSERT_EQ(argument_package.assertedContexts.size(), 2u);
+    EXPECT_EQ(std::count_if(argument_package.assertedContexts.begin(),
+                            argument_package.assertedContexts.end(),
+                            core::IsVisibleTerminologyContext),
+              2);
+    EXPECT_TRUE(std::all_of(argument_package.artifactReferences.begin(),
+                            argument_package.artifactReferences.end(),
+                            [](const sacm::ArtifactReference& artifact_reference) {
+                                return artifact_reference.referencedArtifact == "T_ODD";
+                            }));
+}
+
+TEST(TerminologyPackageService, VisibleTermContextResolverFollowsMovedTermByStableId) {
+    sacm::AssuranceCasePackage package = MakePackageWithTerminologyContextTargets();
+    core::TerminologyPackageRef package_ref{"TP1", "gid-TP1"};
+    core::TerminologyTermRef term_ref{"T_ODD", "gid-T_ODD"};
+    ASSERT_TRUE(core::AddTerminologyTermAsVisibleContext(package, "G1", package_ref, term_ref).success);
+
+    sacm::TerminologyPackage moved_package;
+    moved_package.id = "TP2";
+    moved_package.gid = "gid-TP2";
+    moved_package.name = "Moved Glossary";
+    moved_package.terms.push_back(package.terminologyPackages.front().terms.front());
+    package.terminologyPackages.front().terms.clear();
+    package.terminologyPackages.push_back(moved_package);
+
+    core::TerminologyTermReferenceResolution resolution = core::ResolveTerminologyTermReference(package, "T_ODD");
+    ASSERT_TRUE(resolution.resolved);
+    EXPECT_EQ(resolution.package_ref.id, "TP2");
+    EXPECT_EQ(resolution.term_ref.id, "T_ODD");
+    EXPECT_TRUE(core::ValidateTerminologyContextReferences(package).empty());
+}
+
+TEST(TerminologyPackageService, VisibleTermContextValidationReportsMissingTerm) {
+    sacm::AssuranceCasePackage package = MakePackageWithTerminologyContextTargets();
+    core::TerminologyPackageRef package_ref{"TP1", "gid-TP1"};
+    core::TerminologyTermRef term_ref{"T_ODD", "gid-T_ODD"};
+    ASSERT_TRUE(core::AddTerminologyTermAsVisibleContext(package, "G1", package_ref, term_ref).success);
+    package.terminologyPackages.front().terms.clear();
+
+    std::vector<core::TerminologyContextReferenceIssue> issues = core::ValidateTerminologyContextReferences(package);
+    ASSERT_EQ(issues.size(), 1u);
+    EXPECT_EQ(issues.front().kind, core::TerminologyContextReferenceIssueKind::MissingTerm);
+    EXPECT_EQ(issues.front().severity, core::TerminologyTermIssueSeverity::Error);
+    EXPECT_EQ(issues.front().referenced_artifact, "T_ODD");
+}
+
+TEST(TerminologyPackageService, VisibleTermContextValidationReportsMissingSourceInvalidTargetAndDuplicate) {
+    sacm::AssuranceCasePackage package = MakePackageWithTerminologyContextTargets();
+    core::TerminologyPackageRef package_ref{"TP1", "gid-TP1"};
+    core::TerminologyTermRef term_ref{"T_ODD", "gid-T_ODD"};
+    ASSERT_TRUE(core::AddTerminologyTermAsVisibleContext(package, "G1", package_ref, term_ref).success);
+    ASSERT_TRUE(core::AddTerminologyTermAsVisibleContext(package, "G2", package_ref, term_ref).success);
+
+    sacm::AssertedContext missing_source;
+    missing_source.id = "AC_MISSING_SOURCE";
+    missing_source.description = core::kVisibleTerminologyContextMarker;
+    missing_source.sources = {"NO_SUCH_REF"};
+    missing_source.targets = {"G1"};
+    package.argumentPackages.front().assertedContexts.push_back(missing_source);
+
+    sacm::AssertedContext invalid_target = package.argumentPackages.front().assertedContexts.front();
+    invalid_target.id = "AC_INVALID_TARGET";
+    invalid_target.targets = {"NO_SUCH_TARGET"};
+    package.argumentPackages.front().assertedContexts.push_back(invalid_target);
+
+    sacm::AssertedContext duplicate = package.argumentPackages.front().assertedContexts.front();
+    duplicate.id = "AC_DUPLICATE";
+    package.argumentPackages.front().assertedContexts.push_back(duplicate);
+
+    std::vector<core::TerminologyContextReferenceIssue> issues = core::ValidateTerminologyContextReferences(package);
+    EXPECT_NE(std::find_if(issues.begin(),
+                           issues.end(),
+                           [](const core::TerminologyContextReferenceIssue& issue) {
+                               return issue.kind == core::TerminologyContextReferenceIssueKind::MissingArtifactReference;
+                           }),
+              issues.end());
+    EXPECT_NE(std::find_if(issues.begin(),
+                           issues.end(),
+                           [](const core::TerminologyContextReferenceIssue& issue) {
+                               return issue.kind == core::TerminologyContextReferenceIssueKind::InvalidTarget;
+                           }),
+              issues.end());
+    EXPECT_NE(std::find_if(issues.begin(),
+                           issues.end(),
+                           [](const core::TerminologyContextReferenceIssue& issue) {
+                               return issue.kind == core::TerminologyContextReferenceIssueKind::DuplicateContext;
+                           }),
+              issues.end());
+}
+
+TEST(TerminologyPackageService, VisibleTermContextExporterDoesNotDuplicateTermDefinition) {
+    sacm::AssuranceCasePackage package = MakePackageWithTerminologyContextTargets();
+    core::TerminologyPackageRef package_ref{"TP1", "gid-TP1"};
+    core::TerminologyTermRef term_ref{"T_ODD", "gid-T_ODD"};
+    ASSERT_TRUE(core::AddTerminologyTermAsVisibleContext(package, "G1", package_ref, term_ref).success);
+
+    const std::string definition = package.terminologyPackages.front().terms.front().description;
+    std::string xml = sacm::serialize_sacm(package);
+    ASSERT_FALSE(xml.empty());
+    const std::size_t first = xml.find(definition);
+    ASSERT_NE(first, std::string::npos);
+    EXPECT_EQ(xml.find(definition, first + definition.size()), std::string::npos);
 }
