@@ -288,6 +288,72 @@ core::ProblemSeverity ProblemSeverityFor(core::TerminologyTermIssueSeverity seve
     return core::ProblemSeverity::Info;
 }
 
+std::vector<core::ProblemItem> BuildTerminologyTermProblems(const sacm::TerminologyPackage& terminology_package) {
+    std::vector<core::ProblemItem> problems;
+    const core::TerminologyPackageRef package_ref = TerminologyPackageRefFor(terminology_package);
+    for (const core::TerminologyTermIssue& issue : core::ValidateTerminologyTerms(terminology_package)) {
+        const sacm::Term* term = core::FindTerminologyTerm(terminology_package, issue.term_ref);
+        const std::string term_value = term ? term->value : std::string{};
+        core::ProblemItem problem;
+        problem.id = TerminologyTermProblemId(package_ref, issue);
+        problem.severity = ProblemSeverityFor(issue.severity);
+        problem.source = core::ProblemSource::ModelValidation;
+        problem.element_id = RefValue(issue.term_ref);
+        problem.type = TermIssueProblemType(issue.kind);
+        problem.message = issue.message;
+        problem.quick_fix_label = TermIssueQuickFixLabel(issue.kind);
+        problem.quick_fix_payload = EncodeTerminologyTermQuickFixPayload(package_ref, issue.term_ref, term_value);
+        problems.push_back(std::move(problem));
+    }
+    return problems;
+}
+
+core::ProblemItem BuildTerminologyContextReferenceProblem(const core::TerminologyContextReferenceIssue& issue) {
+    core::ProblemItem problem;
+    problem.id = TerminologyContextReferenceProblemId(issue);
+    problem.severity = ProblemSeverityFor(issue.severity);
+    problem.source = core::ProblemSource::ModelValidation;
+    problem.element_id = issue.artifact_reference_id.empty() ? issue.target_ref : issue.artifact_reference_id;
+    problem.type = "TerminologyBrokenContextReference";
+    problem.message = issue.message;
+    return problem;
+}
+
+std::optional<core::ProblemItem> BuildTerminologyOccurrenceProblem(const core::TermOccurrence& occurrence,
+                                                                   bool ignored) {
+    if (ignored)
+        return std::nullopt;
+
+    if (occurrence.resolution.status == core::TermResolutionStatus::Ambiguous) {
+        core::ProblemItem problem;
+        problem.id = TerminologyAmbiguityProblemId(occurrence);
+        problem.severity = core::ProblemSeverity::Warning;
+        problem.source = core::ProblemSource::ModelValidation;
+        problem.element_id = occurrence.element_id;
+        problem.type = "TerminologyAmbiguity";
+        problem.message = occurrence.text + " has " + std::to_string(occurrence.resolution.candidates.size()) +
+                          " visible meanings. Choose the intended terminology entry.";
+        problem.quick_fix_label = "Open glossary";
+        problem.quick_fix_payload = occurrence.text;
+        return problem;
+    }
+
+    if (occurrence.kind == core::TermOccurrenceKind::UndefinedAcronym && occurrence.resolution.important_undefined) {
+        core::ProblemItem problem;
+        problem.id = TerminologyUndefinedProblemId(occurrence);
+        problem.severity = core::ProblemSeverity::Warning;
+        problem.source = core::ProblemSource::ModelValidation;
+        problem.element_id = occurrence.element_id;
+        problem.type = "TerminologyUndefinedAcronym";
+        problem.message = occurrence.text + " looks like an undefined terminology entry.";
+        problem.quick_fix_label = "Define term";
+        problem.quick_fix_payload = occurrence.text;
+        return problem;
+    }
+
+    return std::nullopt;
+}
+
 const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model, const std::string& element_id) {
     auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
         return element.id == element_id;
@@ -2307,19 +2373,7 @@ void AppRuntime::SyncTerminologyProblems() {
     const sacm::AssuranceCasePackage& package = impl_->app_state.sacm_package.value();
 
     auto add_term_problems = [&](const sacm::TerminologyPackage& terminology_package) {
-        const core::TerminologyPackageRef package_ref = TerminologyPackageRefFor(terminology_package);
-        for (const core::TerminologyTermIssue& issue : core::ValidateTerminologyTerms(terminology_package)) {
-            const sacm::Term* term = core::FindTerminologyTerm(terminology_package, issue.term_ref);
-            const std::string term_value = term ? term->value : std::string{};
-            core::ProblemItem problem;
-            problem.id = TerminologyTermProblemId(package_ref, issue);
-            problem.severity = ProblemSeverityFor(issue.severity);
-            problem.source = core::ProblemSource::ModelValidation;
-            problem.element_id = RefValue(issue.term_ref);
-            problem.type = TermIssueProblemType(issue.kind);
-            problem.message = issue.message;
-            problem.quick_fix_label = TermIssueQuickFixLabel(issue.kind);
-            problem.quick_fix_payload = EncodeTerminologyTermQuickFixPayload(package_ref, issue.term_ref, term_value);
+        for (core::ProblemItem& problem : BuildTerminologyTermProblems(terminology_package)) {
             impl_->problems_manager.AddOrUpdateProblem(problem);
         }
     };
@@ -2332,13 +2386,7 @@ void AppRuntime::SyncTerminologyProblems() {
     }
 
     for (const core::TerminologyContextReferenceIssue& issue : core::ValidateTerminologyContextReferences(package)) {
-        core::ProblemItem problem;
-        problem.id = TerminologyContextReferenceProblemId(issue);
-        problem.severity = ProblemSeverityFor(issue.severity);
-        problem.source = core::ProblemSource::ModelValidation;
-        problem.element_id = issue.artifact_reference_id.empty() ? issue.target_ref : issue.artifact_reference_id;
-        problem.type = "TerminologyBrokenContextReference";
-        problem.message = issue.message;
+        core::ProblemItem problem = BuildTerminologyContextReferenceProblem(issue);
         impl_->problems_manager.AddOrUpdateProblem(problem);
     }
 
@@ -2353,33 +2401,10 @@ void AppRuntime::SyncTerminologyProblems() {
 
         std::vector<core::TermOccurrence> occurrences = terminology_service.DetectTermsInText(element.id, text);
         for (const core::TermOccurrence& occurrence : occurrences) {
-            if (IsTerminologySuggestionIgnored(occurrence.element_id, occurrence.text))
-                continue;
-            if (occurrence.resolution.status == core::TermResolutionStatus::Ambiguous) {
-                core::ProblemItem problem;
-                problem.id = TerminologyAmbiguityProblemId(occurrence);
-                problem.severity = core::ProblemSeverity::Warning;
-                problem.source = core::ProblemSource::ModelValidation;
-                problem.element_id = occurrence.element_id;
-                problem.type = "TerminologyAmbiguity";
-                problem.message = occurrence.text + " has " + std::to_string(occurrence.resolution.candidates.size()) +
-                                  " visible meanings. Choose the intended terminology entry.";
-                problem.quick_fix_label = "Open glossary";
-                problem.quick_fix_payload = occurrence.text;
-                impl_->problems_manager.AddOrUpdateProblem(problem);
-            } else if (occurrence.kind == core::TermOccurrenceKind::UndefinedAcronym &&
-                       occurrence.resolution.important_undefined) {
-                core::ProblemItem problem;
-                problem.id = TerminologyUndefinedProblemId(occurrence);
-                problem.severity = core::ProblemSeverity::Warning;
-                problem.source = core::ProblemSource::ModelValidation;
-                problem.element_id = occurrence.element_id;
-                problem.type = "TerminologyUndefinedAcronym";
-                problem.message = occurrence.text + " looks like an undefined terminology entry.";
-                problem.quick_fix_label = "Define term";
-                problem.quick_fix_payload = occurrence.text;
-                impl_->problems_manager.AddOrUpdateProblem(problem);
-            }
+            std::optional<core::ProblemItem> problem = BuildTerminologyOccurrenceProblem(
+                occurrence, IsTerminologySuggestionIgnored(occurrence.element_id, occurrence.text));
+            if (problem.has_value())
+                impl_->problems_manager.AddOrUpdateProblem(*problem);
         }
     }
 }

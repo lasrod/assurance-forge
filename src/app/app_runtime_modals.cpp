@@ -165,6 +165,39 @@ void RenderTermCategoryPicker(AppRuntimeState& state) {
     RenderTermCategoryPickerForPackage(state, state.selected_terminology_package_ref);
 }
 
+void RenderTermTextFields(AppRuntimeState& state) {
+    ImGui::SetNextItemWidth(460.0f);
+    ImGui::InputText("Term", state.term_value_buf, sizeof(state.term_value_buf));
+    ImGui::SetNextItemWidth(460.0f);
+    ImGui::InputText("Full Name / Display Name", state.term_name_buf, sizeof(state.term_name_buf));
+    ImGui::SetNextItemWidth(460.0f);
+    ImGui::InputTextMultiline(
+        "Definition", state.term_definition_buf, sizeof(state.term_definition_buf), ImVec2(460.0f, 110.0f));
+}
+
+void RenderTermExternalReferenceField(AppRuntimeState& state) {
+    ImGui::SetNextItemWidth(460.0f);
+    ImGui::InputText("External Reference", state.term_external_reference_buf, sizeof(state.term_external_reference_buf));
+}
+
+void RenderTerminologyTermValidationMessages(bool missing_value,
+                                             bool missing_target_package,
+                                             bool duplicate_definition,
+                                             bool missing_definition,
+                                             bool missing_category) {
+    if (missing_value)
+        ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.2f, 1.0f), "Term value is required.");
+    if (missing_target_package)
+        ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.2f, 1.0f), "Choose a target TerminologyPackage.");
+    if (duplicate_definition)
+        ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f),
+                           "Duplicate term value and definition exist in this package.");
+    if (missing_definition)
+        ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "Concrete term has no description.");
+    if (missing_category)
+        ImGui::TextDisabled("Term has no category.");
+}
+
 struct TerminologyPackageChoice {
     core::TerminologyPackageRef ref;
     std::string label;
@@ -584,32 +617,20 @@ void AppRuntime::RenderTerminologyTermEditorModal() {
     const char* title = impl_->editing_existing_terminology_term ? "Edit Term" : "Create Term";
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::SetNextItemWidth(460.0f);
-        ImGui::InputText("Term", impl_->term_value_buf, sizeof(impl_->term_value_buf));
-        ImGui::SetNextItemWidth(460.0f);
-        ImGui::InputText("Full Name / Display Name", impl_->term_name_buf, sizeof(impl_->term_name_buf));
-        ImGui::SetNextItemWidth(460.0f);
-        ImGui::InputTextMultiline(
-            "Definition", impl_->term_definition_buf, sizeof(impl_->term_definition_buf), ImVec2(460.0f, 110.0f));
+        RenderTermTextFields(*impl_);
         RenderTermCategoryPicker(*impl_);
-        ImGui::SetNextItemWidth(460.0f);
-        ImGui::InputText(
-            "External Reference", impl_->term_external_reference_buf, sizeof(impl_->term_external_reference_buf));
+        RenderTermExternalReferenceField(*impl_);
         ImGui::SetNextItemWidth(460.0f);
         ImGui::InputText("Origin", impl_->term_origin_buf, sizeof(impl_->term_origin_buf));
 
         const std::string value = TrimWhitespace(impl_->term_value_buf);
         const std::string description = TrimWhitespace(impl_->term_definition_buf);
         const bool can_save = !value.empty();
-        if (!can_save)
-            ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.2f, 1.0f), "Term value is required.");
-        if (CurrentTermDefinitionHasDuplicate(*impl_, value, description))
-            ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f),
-                               "Duplicate term value and definition exist in this package.");
-        if (description.empty())
-            ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "Concrete term has no description.");
-        if (TrimWhitespace(impl_->term_categories_buf).empty())
-            ImGui::TextDisabled("Term has no category.");
+        RenderTerminologyTermValidationMessages(!can_save,
+                                                false,
+                                                CurrentTermDefinitionHasDuplicate(*impl_, value, description),
+                                                description.empty(),
+                                                TrimWhitespace(impl_->term_categories_buf).empty());
 
         ImGui::Spacing();
         if (!can_save)
@@ -646,13 +667,7 @@ void AppRuntime::RenderQuickDefineTermModal() {
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal("Create Term##quick_define_term", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::SetNextItemWidth(460.0f);
-        ImGui::InputText("Term", impl_->term_value_buf, sizeof(impl_->term_value_buf));
-        ImGui::SetNextItemWidth(460.0f);
-        ImGui::InputText("Full Name / Display Name", impl_->term_name_buf, sizeof(impl_->term_name_buf));
-        ImGui::SetNextItemWidth(460.0f);
-        ImGui::InputTextMultiline(
-            "Definition", impl_->term_definition_buf, sizeof(impl_->term_definition_buf), ImVec2(460.0f, 110.0f));
+        RenderTermTextFields(*impl_);
 
         ImGui::TextUnformatted("Store in");
         if (package_choices.empty()) {
@@ -677,9 +692,7 @@ void AppRuntime::RenderQuickDefineTermModal() {
         }
 
         RenderTermCategoryPickerForPackage(*impl_, impl_->quick_define_target_package_ref);
-        ImGui::SetNextItemWidth(460.0f);
-        ImGui::InputText(
-            "External Reference", impl_->term_external_reference_buf, sizeof(impl_->term_external_reference_buf));
+        RenderTermExternalReferenceField(*impl_);
 
         const std::string value = TrimWhitespace(impl_->term_value_buf);
         const std::string description = TrimWhitespace(impl_->term_definition_buf);
@@ -688,17 +701,12 @@ void AppRuntime::RenderQuickDefineTermModal() {
             impl_->app_state.sacm_package.has_value() &&
             core::FindTerminologyPackage(impl_->app_state.sacm_package.value(), impl_->quick_define_target_package_ref);
         const bool can_create = !value.empty() && has_target_package;
-        if (value.empty())
-            ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.2f, 1.0f), "Term value is required.");
-        if (!has_target_package)
-            ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.2f, 1.0f), "Choose a target TerminologyPackage.");
-        if (TermDefinitionHasDuplicate(*impl_, impl_->quick_define_target_package_ref, value, description, false, {}))
-            ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f),
-                               "Duplicate term value and definition exist in this package.");
-        if (description.empty())
-            ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "Concrete term has no description.");
-        if (TrimWhitespace(impl_->term_categories_buf).empty())
-            ImGui::TextDisabled("Term has no category.");
+        RenderTerminologyTermValidationMessages(
+            value.empty(),
+            !has_target_package,
+            TermDefinitionHasDuplicate(*impl_, impl_->quick_define_target_package_ref, value, description, false, {}),
+            description.empty(),
+            TrimWhitespace(impl_->term_categories_buf).empty());
 
         ImGui::Spacing();
         if (!can_create)

@@ -386,6 +386,97 @@ std::string TermContextLabel(const sacm::Term& term) {
     return term.value + ": " + term.name;
 }
 
+struct VisibleContextSearchResult {
+    sacm::ArtifactReference* existing_visible_reference = nullptr;
+    sacm::AssertedContext* existing_visible_context = nullptr;
+    sacm::ArtifactReference* promotable_reference = nullptr;
+    sacm::AssertedContext* promotable_context = nullptr;
+    std::vector<std::string> hidden_contexts_to_remove;
+};
+
+VisibleContextSearchResult FindVisibleContextCandidates(sacm::ArgumentPackage& argument_package,
+                                                        const sacm::Term& term,
+                                                        const std::string& target_ref) {
+    VisibleContextSearchResult result;
+    for (auto& artifact_reference : argument_package.artifactReferences) {
+        if (!ArtifactReferenceTargetsTerm(artifact_reference, term))
+            continue;
+        for (auto& context : argument_package.assertedContexts) {
+            if (!ContextReferencesArtifact(context, artifact_reference) || !ContextTargetsElement(context, target_ref))
+                continue;
+            if (IsVisibleTerminologyContext(context)) {
+                result.existing_visible_reference = &artifact_reference;
+                result.existing_visible_context = &context;
+                return result;
+            }
+            if (!ArtifactReferenceUsedByOtherContexts(argument_package, artifact_reference, target_ref, context.id) &&
+                !result.promotable_reference && !result.promotable_context) {
+                result.promotable_reference = &artifact_reference;
+                result.promotable_context = &context;
+            } else if (!context.id.empty()) {
+                result.hidden_contexts_to_remove.push_back(context.id);
+            }
+        }
+    }
+    return result;
+}
+
+sacm::ArtifactReference CreateTerminologyArtifactReference(const sacm::AssuranceCasePackage& package,
+                                                          const sacm::Term& term) {
+    sacm::ArtifactReference artifact_reference;
+    artifact_reference.id = GenerateUniqueId(package, "TC");
+    artifact_reference.gid = GenerateUniqueGid(package, artifact_reference.id);
+    artifact_reference.name = TermContextLabel(term);
+    artifact_reference.name_ml.set("en", artifact_reference.name);
+    artifact_reference.referencedArtifact = !term.id.empty() ? term.id : term.gid;
+    return artifact_reference;
+}
+
+sacm::AssertedContext CreateVisibleTerminologyContext(const sacm::AssuranceCasePackage& package,
+                                                     const sacm::Term& term,
+                                                     const std::string& source_ref,
+                                                     const std::string& target_ref) {
+    sacm::AssertedContext context;
+    context.id = GenerateUniqueId(package, "AC");
+    context.gid = GenerateUniqueGid(package, context.id);
+    context.name = "Context: " + TermContextLabel(term);
+    context.name_ml.set("en", context.name);
+    context.description = kVisibleTerminologyContextMarker;
+    context.sources.push_back(source_ref);
+    context.targets.push_back(target_ref);
+    return context;
+}
+
+void RemoveContextsById(sacm::ArgumentPackage& argument_package, const std::vector<std::string>& context_ids) {
+    for (const std::string& hidden_context_id : context_ids) {
+        argument_package.assertedContexts.erase(
+            std::remove_if(argument_package.assertedContexts.begin(),
+                           argument_package.assertedContexts.end(),
+                           [&](const sacm::AssertedContext& existing) { return existing.id == hidden_context_id; }),
+            argument_package.assertedContexts.end());
+    }
+}
+
+void RemoveUnreferencedTerminologyArtifacts(sacm::ArgumentPackage& argument_package,
+                                           const sacm::Term& term,
+                                           const std::string& artifact_reference_id_to_keep) {
+    argument_package.artifactReferences.erase(
+        std::remove_if(argument_package.artifactReferences.begin(),
+                       argument_package.artifactReferences.end(),
+                       [&](const sacm::ArtifactReference& existing) {
+                           if (!ArtifactReferenceTargetsTerm(existing, term))
+                               return false;
+                           if (existing.id == artifact_reference_id_to_keep)
+                               return false;
+                           return !std::any_of(argument_package.assertedContexts.begin(),
+                                               argument_package.assertedContexts.end(),
+                                               [&](const sacm::AssertedContext& existing_context) {
+                                                   return ContextReferencesArtifact(existing_context, existing);
+                                               });
+                       }),
+        argument_package.artifactReferences.end());
+}
+
 bool IsWordChar(char c) {
     return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
 }
@@ -1061,84 +1152,33 @@ TerminologyContextAssociationResult AddTerminologyTermAsVisibleContext(sacm::Ass
         return result;
     }
 
-    sacm::ArtifactReference* promotable_reference = nullptr;
-    sacm::AssertedContext* promotable_context = nullptr;
-    std::vector<std::string> hidden_contexts_to_remove;
-    for (auto& artifact_reference : argument_package->artifactReferences) {
-        if (!ArtifactReferenceTargetsTerm(artifact_reference, *term))
-            continue;
-        for (auto& context : argument_package->assertedContexts) {
-            if (!ContextReferencesArtifact(context, artifact_reference) || !ContextTargetsElement(context, target_ref))
-                continue;
-            if (IsVisibleTerminologyContext(context)) {
-                result.success = true;
-                result.already_associated = true;
-                result.artifact_reference_id = artifact_reference.id;
-                result.asserted_context_id = context.id;
-                return result;
-            }
-            if (!ArtifactReferenceUsedByOtherContexts(*argument_package, artifact_reference, target_ref, context.id) &&
-                !promotable_reference && !promotable_context) {
-                promotable_reference = &artifact_reference;
-                promotable_context = &context;
-            } else if (!context.id.empty()) {
-                hidden_contexts_to_remove.push_back(context.id);
-            }
-        }
-    }
-
-    if (promotable_reference && promotable_context) {
-        promotable_context->description = kVisibleTerminologyContextMarker;
-        promotable_context->description_ml.texts.clear();
+    const VisibleContextSearchResult candidates = FindVisibleContextCandidates(*argument_package, *term, target_ref);
+    if (candidates.existing_visible_reference && candidates.existing_visible_context) {
         result.success = true;
-        result.artifact_reference_id = promotable_reference->id;
-        result.asserted_context_id = promotable_context->id;
+        result.already_associated = true;
+        result.artifact_reference_id = candidates.existing_visible_reference->id;
+        result.asserted_context_id = candidates.existing_visible_context->id;
         return result;
     }
 
-    sacm::ArtifactReference artifact_reference;
-    artifact_reference.id = GenerateUniqueId(package, "TC");
-    artifact_reference.gid = GenerateUniqueGid(package, artifact_reference.id);
-    artifact_reference.name = TermContextLabel(*term);
-    artifact_reference.name_ml.set("en", artifact_reference.name);
-    artifact_reference.referencedArtifact = !term->id.empty() ? term->id : term->gid;
-    argument_package->artifactReferences.push_back(std::move(artifact_reference));
+    if (candidates.promotable_reference && candidates.promotable_context) {
+        candidates.promotable_context->description = kVisibleTerminologyContextMarker;
+        candidates.promotable_context->description_ml.texts.clear();
+        result.success = true;
+        result.artifact_reference_id = candidates.promotable_reference->id;
+        result.asserted_context_id = candidates.promotable_context->id;
+        return result;
+    }
+
+    argument_package->artifactReferences.push_back(CreateTerminologyArtifactReference(package, *term));
     sacm::ArtifactReference& visible_reference = argument_package->artifactReferences.back();
     const std::string visible_reference_id = visible_reference.id;
 
-    sacm::AssertedContext context;
-    context.id = GenerateUniqueId(package, "AC");
-    context.gid = GenerateUniqueGid(package, context.id);
-    context.name = "Context: " + TermContextLabel(*term);
-    context.name_ml.set("en", context.name);
-    context.description = kVisibleTerminologyContextMarker;
-    context.sources.push_back(visible_reference.id);
-    context.targets.push_back(target_ref);
-    argument_package->assertedContexts.push_back(std::move(context));
+    argument_package->assertedContexts.push_back(
+        CreateVisibleTerminologyContext(package, *term, visible_reference.id, target_ref));
 
-    for (const std::string& hidden_context_id : hidden_contexts_to_remove) {
-        argument_package->assertedContexts.erase(
-            std::remove_if(argument_package->assertedContexts.begin(),
-                           argument_package->assertedContexts.end(),
-                           [&](const sacm::AssertedContext& existing) { return existing.id == hidden_context_id; }),
-            argument_package->assertedContexts.end());
-    }
-
-    argument_package->artifactReferences.erase(
-        std::remove_if(argument_package->artifactReferences.begin(),
-                       argument_package->artifactReferences.end(),
-                       [&](const sacm::ArtifactReference& existing) {
-                           if (!ArtifactReferenceTargetsTerm(existing, *term))
-                               return false;
-                           if (existing.id == visible_reference_id)
-                               return false;
-                           return !std::any_of(argument_package->assertedContexts.begin(),
-                                               argument_package->assertedContexts.end(),
-                                               [&](const sacm::AssertedContext& existing_context) {
-                                                   return ContextReferencesArtifact(existing_context, existing);
-                                               });
-                       }),
-        argument_package->artifactReferences.end());
+    RemoveContextsById(*argument_package, candidates.hidden_contexts_to_remove);
+    RemoveUnreferencedTerminologyArtifacts(*argument_package, *term, visible_reference_id);
 
     result.success = true;
     result.created_artifact_reference = true;

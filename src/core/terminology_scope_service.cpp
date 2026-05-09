@@ -503,17 +503,13 @@ TermResolution TerminologyService::ResolveOccurrence(const TextOccurrence& occur
     return resolution;
 }
 
-std::vector<TermOccurrence> TerminologyService::DetectTermsInText(const std::string& element_ref,
-                                                                  const std::string& text,
-                                                                  const TerminologyDetectionOptions& options) const {
-    return DetectTermsInText(BuildScopeContextForElement(element_ref), text, options);
-}
-
-std::vector<TermOccurrence> TerminologyService::DetectTermsInText(const TerminologyScopeContext& scope,
-                                                                  const std::string& text,
-                                                                  const TerminologyDetectionOptions& options) const {
+std::vector<TermOccurrence> DetectKnownTermOccurrences(const TerminologyService& terminology_service,
+                                                       const TerminologyScopeContext& scope,
+                                                       const std::string& text,
+                                                       const TerminologyDetectionOptions& options) {
     std::vector<TermOccurrence> occurrences;
-    const std::vector<IndexedTermValue> term_values = BuildTermValueIndex(GetActiveTermsForElement(scope), options);
+    const std::vector<IndexedTermValue> term_values =
+        BuildTermValueIndex(terminology_service.GetActiveTermsForElement(scope), options);
 
     std::size_t offset = 0;
     while (offset < text.size()) {
@@ -538,7 +534,7 @@ std::vector<TermOccurrence> TerminologyService::DetectTermsInText(const Terminol
             occurrence.end_offset = text_occurrence.end_offset;
             occurrence.text = text.substr(occurrence.start_offset, occurrence.end_offset - occurrence.start_offset);
             occurrence.kind = TermOccurrenceKind::KnownTerm;
-            occurrence.resolution = ResolveOccurrence(text_occurrence, scope);
+            occurrence.resolution = terminology_service.ResolveOccurrence(text_occurrence, scope);
             occurrences.push_back(occurrence);
 
             offset = occurrence.end_offset;
@@ -549,11 +545,15 @@ std::vector<TermOccurrence> TerminologyService::DetectTermsInText(const Terminol
         if (!matched)
             ++offset;
     }
+    return occurrences;
+}
 
-    if (!options.detect_unknown_acronyms)
-        return occurrences;
-
-    offset = 0;
+void AppendUndefinedAcronymOccurrences(const TerminologyService& terminology_service,
+                                       const TerminologyScopeContext& scope,
+                                       const std::string& text,
+                                       const TerminologyDetectionOptions& options,
+                                       std::vector<TermOccurrence>& occurrences) {
+    std::size_t offset = 0;
     while (offset < text.size()) {
         if (!IsAcronymStartChar(text[offset])) {
             ++offset;
@@ -587,7 +587,7 @@ std::vector<TermOccurrence> TerminologyService::DetectTermsInText(const Terminol
         text_occurrence.end_offset = end;
         text_occurrence.text = token;
 
-        TermResolution resolution = ResolveOccurrence(text_occurrence, scope);
+        TermResolution resolution = terminology_service.ResolveOccurrence(text_occurrence, scope);
         if (resolution.status != TermResolutionStatus::None || !resolution.important_undefined) {
             offset = end;
             continue;
@@ -605,6 +605,20 @@ std::vector<TermOccurrence> TerminologyService::DetectTermsInText(const Terminol
 
         offset = end;
     }
+}
+
+std::vector<TermOccurrence> TerminologyService::DetectTermsInText(const std::string& element_ref,
+                                                                  const std::string& text,
+                                                                  const TerminologyDetectionOptions& options) const {
+    return DetectTermsInText(BuildScopeContextForElement(element_ref), text, options);
+}
+
+std::vector<TermOccurrence> TerminologyService::DetectTermsInText(const TerminologyScopeContext& scope,
+                                                                  const std::string& text,
+                                                                  const TerminologyDetectionOptions& options) const {
+    std::vector<TermOccurrence> occurrences = DetectKnownTermOccurrences(*this, scope, text, options);
+    if (options.detect_unknown_acronyms)
+        AppendUndefinedAcronymOccurrences(*this, scope, text, options, occurrences);
 
     std::sort(occurrences.begin(), occurrences.end(), [](const TermOccurrence& left, const TermOccurrence& right) {
         if (left.start_offset != right.start_offset)
