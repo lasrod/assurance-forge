@@ -261,8 +261,7 @@ struct TerminologyTermQuickFixPayload {
     std::string term_value;
 };
 
-bool DecodeTerminologyTermQuickFixPayload(const std::string& payload,
-                                          TerminologyTermQuickFixPayload& decoded) {
+bool DecodeTerminologyTermQuickFixPayload(const std::string& payload, TerminologyTermQuickFixPayload& decoded) {
     std::stringstream stream(payload);
     std::vector<std::string> parts;
     std::string part;
@@ -274,7 +273,8 @@ bool DecodeTerminologyTermQuickFixPayload(const std::string& payload,
     decoded.package_ref = core::TerminologyPackageRef{parts[0], parts[1]};
     decoded.term_ref = core::TerminologyTermRef{parts[2], parts[3]};
     decoded.term_value = parts[4];
-    return HasTerminologyPackageRef(decoded.package_ref) && (!decoded.term_ref.id.empty() || !decoded.term_ref.gid.empty());
+    return HasTerminologyPackageRef(decoded.package_ref) &&
+           (!decoded.term_ref.id.empty() || !decoded.term_ref.gid.empty());
 }
 
 bool OpenTerminologyProblemTerm(AppRuntimeState& state,
@@ -283,7 +283,8 @@ bool OpenTerminologyProblemTerm(AppRuntimeState& state,
                                 const std::string& filter_value) {
     if (!state.app_state.sacm_package.has_value())
         return false;
-    const sacm::TerminologyPackage* package = core::FindTerminologyPackage(state.app_state.sacm_package.value(), package_ref);
+    const sacm::TerminologyPackage* package =
+        core::FindTerminologyPackage(state.app_state.sacm_package.value(), package_ref);
     if (!package)
         return false;
     state.selected_terminology_package_ref = package_ref;

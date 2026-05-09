@@ -26,6 +26,8 @@ void ShowProblemsPanel(float x,
                        ProblemsPanelModel model,
                        const ProblemsPanelCallbacks& callbacks);
 
-void ShowProblemsPanelContent(ProblemsPanelModel model, const ProblemsPanelCallbacks& callbacks, bool show_title = true);
+void ShowProblemsPanelContent(ProblemsPanelModel model,
+                              const ProblemsPanelCallbacks& callbacks,
+                              bool show_title = true);
 
 } // namespace ui::panels

@@ -1308,8 +1308,10 @@ std::vector<TerminologyTermIssue> ValidateTerminologyTerms(const sacm::Terminolo
         const TerminologyTermRef ref = RefFor(term);
         const std::string value = TrimWhitespace(term.value);
         if (value.empty()) {
-            issues.push_back(
-                {ref, TerminologyTermIssueKind::MissingValue, TerminologyTermIssueSeverity::Error, "Term has no value."});
+            issues.push_back({ref,
+                              TerminologyTermIssueKind::MissingValue,
+                              TerminologyTermIssueSeverity::Error,
+                              "Term has no value."});
         } else if (const std::string description = TrimWhitespace(term.description);
                    !description.empty() && definition_counts[{value, description}] > 1) {
             issues.push_back({ref,
@@ -1324,8 +1326,10 @@ std::vector<TerminologyTermIssue> ValidateTerminologyTerms(const sacm::Terminolo
                               "Concrete term has no description."});
         }
         if (term.category_refs.empty()) {
-            issues.push_back(
-                {ref, TerminologyTermIssueKind::MissingCategory, TerminologyTermIssueSeverity::Info, "Term has no category."});
+            issues.push_back({ref,
+                              TerminologyTermIssueKind::MissingCategory,
+                              TerminologyTermIssueSeverity::Info,
+                              "Term has no category."});
         }
         if (TrimWhitespace(term.externalReference).empty() && TrimWhitespace(term.origin).empty()) {
             issues.push_back({ref,

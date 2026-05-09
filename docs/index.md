@@ -46,7 +46,13 @@ The application is built in C++ using Dear ImGui and is designed around structur
 
 ## Documentation
 
-Start with the architecture section for the current component layout and data flow:
+Start with the features section for user-facing workflows:
+
+- Terminology Assist
+- SACM terminology packages and glossary editing
+- GSN term lookup, ambiguity handling, and explicit context
+
+Use the architecture section for the current component layout and data flow:
 
 - Architecture
 - Generated class diagrams
