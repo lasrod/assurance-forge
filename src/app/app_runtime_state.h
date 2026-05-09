@@ -15,6 +15,7 @@
 #include "core/app_state.h"
 #include "core/assurance_tree.h"
 #include "core/problems/problems_manager.h"
+#include "core/terminology_package_service.h"
 #include "core/tree_editing.h"
 #include "sacm/sacm_package_tree.h"
 
@@ -70,9 +71,19 @@ struct AppRuntimeState {
     bool show_cse_tab = false;
     bool show_evidence_tab = false;
     bool show_package_details_tab = false;
+    bool show_terminology_package_tab = false;
     std::map<std::string, sacm::SacmPackageTreeResult> sacm_package_tree_cache;
     std::optional<sacm::SacmPackageTreeNode> selected_package_node;
     std::filesystem::path selected_package_file_path;
+    core::TerminologyPackageRef selected_terminology_package_ref;
+    std::filesystem::path selected_terminology_package_file_path;
+    char terminology_package_name_buf[256] = {};
+    char terminology_package_description_buf[2048] = {};
+    bool show_create_terminology_package_modal = false;
+    std::optional<core::ProjectFileEntry> pending_terminology_package_parent_entry;
+    char new_terminology_package_name_buf[256] = {};
+    char new_terminology_package_description_buf[2048] = {};
+    bool show_delete_terminology_package_modal = false;
 
     float left_ratio = 0.20f;
     float right_ratio = 0.20f;

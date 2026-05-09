@@ -23,6 +23,7 @@ struct ProjectFilesPanelCallbacks {
     std::function<void()> add_j3377_cae_register;
     std::function<void(const core::ProjectFileEntry&)> open_file;
     std::function<void(const core::ProjectFileEntry&, const sacm::SacmPackageTreeNode&)> open_package_node;
+    std::function<void(const core::ProjectFileEntry&, const sacm::SacmPackageTreeNode&)> add_terminology_package;
 };
 
 void ShowProjectFilesPanel(float width,

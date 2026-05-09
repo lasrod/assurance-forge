@@ -13,6 +13,7 @@ enum class CenterView {
     CseRegister,
     EvidenceRegister,
     PackageDetails,
+    TerminologyPackage
 };
 
 enum class ProblemFilter {

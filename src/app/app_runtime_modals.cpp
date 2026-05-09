@@ -332,6 +332,69 @@ void AppRuntime::RenderSaveBeforeExitModal(bool& done) {
     }
 }
 
+void AppRuntime::RenderCreateTerminologyPackageModal() {
+    if (!impl_->show_create_terminology_package_modal)
+        return;
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal("Create Terminology Package", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::SetNextItemWidth(420.0f);
+        ImGui::InputText("Package name",
+                         impl_->new_terminology_package_name_buf,
+                         sizeof(impl_->new_terminology_package_name_buf));
+        ImGui::SetNextItemWidth(420.0f);
+        ImGui::InputTextMultiline("Package description",
+                                  impl_->new_terminology_package_description_buf,
+                                  sizeof(impl_->new_terminology_package_description_buf),
+                                  ImVec2(420.0f, 96.0f));
+        ImGui::Spacing();
+
+        const bool can_create = !TrimWhitespace(impl_->new_terminology_package_name_buf).empty();
+        if (!can_create)
+            ImGui::BeginDisabled();
+        if (ImGui::Button("Create", ImVec2(100.0f, 0.0f))) {
+            ConfirmAddTerminologyPackage();
+            if (!impl_->show_create_terminology_package_modal)
+                ImGui::CloseCurrentPopup();
+        }
+        if (!can_create)
+            ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(100.0f, 0.0f))) {
+            impl_->show_create_terminology_package_modal = false;
+            impl_->pending_terminology_package_parent_entry.reset();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    } else if (impl_->show_create_terminology_package_modal) {
+        ImGui::OpenPopup("Create Terminology Package");
+    }
+}
+
+void AppRuntime::RenderDeleteTerminologyPackageModal() {
+    if (!impl_->show_delete_terminology_package_modal)
+        return;
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal("Delete Terminology Package", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped("Delete this terminology package?");
+        ImGui::Spacing();
+        if (ImGui::Button("Delete", ImVec2(100.0f, 0.0f))) {
+            ConfirmDeleteTerminologyPackage();
+            if (!impl_->show_delete_terminology_package_modal)
+                ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(100.0f, 0.0f))) {
+            impl_->show_delete_terminology_package_modal = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    } else if (impl_->show_delete_terminology_package_modal) {
+        ImGui::OpenPopup("Delete Terminology Package");
+    }
+}
+
 void AppRuntime::RenderReviewerNamePromptModal() {
     if (!impl_->modal_coordinator->show_reviewer_name_prompt)
         return;

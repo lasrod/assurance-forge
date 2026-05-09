@@ -16,6 +16,7 @@
 #include "core/project_service.h"
 #include "core/reviews/review_proposal_manager.h"
 #include "core/reviews/review_proposal_patch_service.h"
+#include "core/terminology_package_service.h"
 #include "hello_imgui/hello_imgui.h"
 #include "hello_imgui/hello_imgui_theme.h"
 #include "imgui.h"
@@ -30,6 +31,7 @@
 #include "ui/panels/project_files_panel.h"
 #include "ui/panels/review_panel.h"
 #include "ui/panels/sacm_viewer_panel.h"
+#include "ui/panels/terminology_package_panel.h"
 #include "ui/register_views.h"
 #include "ui/theme.h"
 #include "ui/tree_view.h"
@@ -1840,8 +1842,41 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
             if (ImGui::BeginTabItem("Package Details", nullptr, package_flags)) {
                 ui_state.center_view = ui::CenterView::PackageDetails;
                 ui::panels::ShowPackageDetailsPanel(impl_->selected_package_node ? &impl_->selected_package_node.value()
-                                                                                  : nullptr,
+                                                                                 : nullptr,
                                                     impl_->selected_package_file_path);
+                ImGui::EndTabItem();
+            }
+        }
+
+        if (impl_->show_terminology_package_tab) {
+            ImGuiTabItemFlags terminology_flags =
+                (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::TerminologyPackage)
+                    ? ImGuiTabItemFlags_SetSelected
+                    : 0;
+            if (ImGui::BeginTabItem("Terminology Package", nullptr, terminology_flags)) {
+                ui_state.center_view = ui::CenterView::TerminologyPackage;
+                const sacm::TerminologyPackage* terminology_package = nullptr;
+                if (impl_->app_state.sacm_package.has_value()) {
+                    terminology_package = core::FindTerminologyPackage(impl_->app_state.sacm_package.value(),
+                                                                       impl_->selected_terminology_package_ref);
+                }
+                std::string delete_block_reason;
+                const bool can_delete = terminology_package
+                                            ? core::CanDeleteTerminologyPackage(*terminology_package, delete_block_reason)
+                                            : false;
+                ui::panels::TerminologyPackagePanelModel model;
+                model.package = terminology_package;
+                model.source_file_path = impl_->selected_terminology_package_file_path;
+                model.name_buffer = impl_->terminology_package_name_buf;
+                model.name_buffer_size = sizeof(impl_->terminology_package_name_buf);
+                model.description_buffer = impl_->terminology_package_description_buf;
+                model.description_buffer_size = sizeof(impl_->terminology_package_description_buf);
+                model.can_delete = can_delete;
+                model.delete_block_reason = delete_block_reason;
+                ui::panels::TerminologyPackagePanelCallbacks callbacks;
+                callbacks.apply_changes = [this]() { ApplyTerminologyPackageEdits(); };
+                callbacks.delete_package = [this]() { BeginDeleteTerminologyPackage(); };
+                ui::panels::ShowTerminologyPackagePanel(model, callbacks);
                 ImGui::EndTabItem();
             }
         }
@@ -2449,6 +2484,9 @@ void AppRuntime::RenderFrame(bool& done) {
         [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
             OpenProjectPackageNode(entry, node);
         },
+        [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
+            BeginAddTerminologyPackage(entry, node);
+        },
     };
     ui::panels::ShowProjectFilesPanel(left_w, project_h, project_y, kPanelFlags, project_model, project_callbacks);
     RenderTreePanel(left_w, safety_tree_h, safety_y);
@@ -2470,6 +2508,8 @@ void AppRuntime::RenderFrame(bool& done) {
     RenderCreateProjectModal();
     RenderProjectFileNameModal();
     RenderProjectLoadReportModal();
+    RenderCreateTerminologyPackageModal();
+    RenderDeleteTerminologyPackageModal();
     RenderSaveBeforeExitModal(done);
     RenderStartupProjectWindow();
     RenderNotImplementedModal();

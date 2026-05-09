@@ -82,6 +82,8 @@ private:
     void RenderProjectFileNameModal();
     void RenderProjectLoadReportModal();
     void RenderSaveBeforeExitModal(bool& done);
+    void RenderCreateTerminologyPackageModal();
+    void RenderDeleteTerminologyPackageModal();
     void RenderPreferencesWindow();
     void RenderThemeTweaksWindow();
 
@@ -92,6 +94,11 @@ private:
     void BeginCreateProjectJ3377CaeRegister();
     void OpenProjectFile(const core::ProjectFileEntry& entry);
     void OpenProjectPackageNode(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node);
+    void BeginAddTerminologyPackage(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& parent_node);
+    void ConfirmAddTerminologyPackage();
+    void ApplyTerminologyPackageEdits();
+    void BeginDeleteTerminologyPackage();
+    void ConfirmDeleteTerminologyPackage();
     bool OpenFirstProjectSacmFile();
     bool TryOpenProjectManifest(const std::string& selected_path);
     bool EnsureReviewItemStorage();

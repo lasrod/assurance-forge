@@ -253,8 +253,8 @@ ParseResult parse_document(pugi::xml_document& doc) {
     }
     if (!root) {
         result.success = false;
-        result.error_message =
-            "Root element 'AssuranceCasePackage', 'ArgumentPackage', 'ArtifactPackage', or 'TerminologyPackage' not found";
+        result.error_message = "Root element 'AssuranceCasePackage', 'ArgumentPackage', 'ArtifactPackage', or "
+                               "'TerminologyPackage' not found";
         return result;
     }
 

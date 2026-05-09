@@ -5,12 +5,14 @@
 #include "app/recent_projects.h"
 #include "core/project_service.h"
 #include "core/reviews/review_item.h"
+#include "core/terminology_package_service.h"
 #include "imgui.h"
 #include "sacm/sacm_package_tree.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <filesystem>
 #include <set>
@@ -28,11 +30,53 @@ void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
     buffer[count] = '\0';
 }
 
+std::string TrimWhitespace(const std::string& value) {
+    auto begin = value.begin();
+    while (begin != value.end() && std::isspace(static_cast<unsigned char>(*begin)))
+        ++begin;
+    auto end = value.end();
+    while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1))))
+        --end;
+    return std::string(begin, end);
+}
+
 void ClearProposalHighlightState(ui::UiState& ui_state) {
     ui_state.proposal_highlight_ids.clear();
     ui_state.marked_for_removal.clear();
     ui_state.center_on_marked = false;
     ui_state.dim_non_proposal_nodes = false;
+}
+
+bool CanSwitchProjectSacmFile(const core::AppState& app_state, const core::ProjectFileEntry& entry) {
+    if (!app_state.current_project.has_value() || !app_state.has_unsaved_changes)
+        return true;
+    const std::filesystem::path target_path = app_state.current_project->rootPath / entry.relativePath;
+    return app_state.active_project_file_path.empty() || app_state.active_project_file_path == target_path;
+}
+
+bool IsActiveProjectSacmFile(const core::AppState& app_state, const core::ProjectFileEntry& entry) {
+    if (!app_state.current_project.has_value() || app_state.active_project_file_path.empty())
+        return false;
+    return app_state.active_project_file_path == app_state.current_project->rootPath / entry.relativePath;
+}
+
+bool EnsureProjectSacmFileOpen(AppRuntimeState& state, const core::ProjectFileEntry& entry, bool require_loaded_case) {
+    if (IsActiveProjectSacmFile(state.app_state, entry) && state.app_state.sacm_package.has_value() &&
+        (!require_loaded_case || state.app_state.loaded_case.has_value())) {
+        return true;
+    }
+    return state.app_state.open_project_file(entry);
+}
+
+void InvalidateSacmPackageTreeCache(AppRuntimeState& state, const std::filesystem::path& relative_path) {
+    state.sacm_package_tree_cache.erase(relative_path.generic_string());
+}
+
+void CopyTerminologyPackageToEditor(AppRuntimeState& state, const sacm::TerminologyPackage& package) {
+    CopyToBuffer(state.terminology_package_name_buf, sizeof(state.terminology_package_name_buf), package.name);
+    CopyToBuffer(state.terminology_package_description_buf,
+                 sizeof(state.terminology_package_description_buf),
+                 package.description);
 }
 
 std::string FirstElementIdForArgumentPackage(const sacm::AssuranceCasePackage& package,
@@ -160,11 +204,15 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
     ui::UiState& ui_state = ui::GetUiState();
     impl_->selected_package_node = node;
     impl_->selected_package_file_path = impl_->app_state.current_project.has_value()
-                                           ? impl_->app_state.current_project->rootPath / entry.relativePath
-                                           : entry.relativePath;
+                                            ? impl_->app_state.current_project->rootPath / entry.relativePath
+                                            : entry.relativePath;
 
     if (node.type == sacm::SacmPackageNodeType::ArgumentPackage) {
-        if (!impl_->app_state.open_project_file(entry))
+        if (!CanSwitchProjectSacmFile(impl_->app_state, entry)) {
+            SetStatus("Save the current SACM file before opening another package.");
+            return;
+        }
+        if (!EnsureProjectSacmFileOpen(*impl_, entry, true))
             return;
 
         impl_->proposal_controller->ClearActiveState();
@@ -188,9 +236,154 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
         return;
     }
 
+    if (node.type == sacm::SacmPackageNodeType::TerminologyPackage) {
+        if (!CanSwitchProjectSacmFile(impl_->app_state, entry)) {
+            SetStatus("Save the current SACM file before opening another package.");
+            return;
+        }
+        if (!EnsureProjectSacmFileOpen(*impl_, entry, false))
+            return;
+        if (!impl_->app_state.sacm_package.has_value()) {
+            SetStatus("Opened SACM file, but no editable package model was available.");
+            return;
+        }
+
+        core::TerminologyPackageRef package_ref{node.id, node.gid};
+        const sacm::TerminologyPackage* terminology_package =
+            core::FindTerminologyPackage(impl_->app_state.sacm_package.value(), package_ref);
+        if (!terminology_package) {
+            SetStatus("Terminology package was not found in the editable model.");
+            return;
+        }
+
+        impl_->selected_terminology_package_ref = package_ref;
+        impl_->selected_terminology_package_file_path = impl_->selected_package_file_path;
+        CopyTerminologyPackageToEditor(*impl_, *terminology_package);
+        impl_->show_terminology_package_tab = true;
+        ui_state.center_view = ui::CenterView::TerminologyPackage;
+        impl_->force_center_tab_selection = true;
+        return;
+    }
+
     impl_->show_package_details_tab = true;
     ui_state.center_view = ui::CenterView::PackageDetails;
     impl_->force_center_tab_selection = true;
+}
+
+void AppRuntime::BeginAddTerminologyPackage(const core::ProjectFileEntry& entry,
+                                            const sacm::SacmPackageTreeNode& parent_node) {
+    if (parent_node.type != sacm::SacmPackageNodeType::AssuranceCasePackage)
+        return;
+    if (!CanSwitchProjectSacmFile(impl_->app_state, entry)) {
+        SetStatus("Save the current SACM file before adding a terminology package.");
+        return;
+    }
+
+    impl_->pending_terminology_package_parent_entry = entry;
+    CopyToBuffer(impl_->new_terminology_package_name_buf,
+                 sizeof(impl_->new_terminology_package_name_buf),
+                 "Terminology Package");
+    CopyToBuffer(impl_->new_terminology_package_description_buf,
+                 sizeof(impl_->new_terminology_package_description_buf),
+                 "");
+    impl_->show_create_terminology_package_modal = true;
+}
+
+void AppRuntime::ConfirmAddTerminologyPackage() {
+    if (!impl_->pending_terminology_package_parent_entry.has_value()) {
+        impl_->show_create_terminology_package_modal = false;
+        return;
+    }
+
+    const core::ProjectFileEntry entry = impl_->pending_terminology_package_parent_entry.value();
+    if (!CanSwitchProjectSacmFile(impl_->app_state, entry)) {
+        SetStatus("Save the current SACM file before adding a terminology package.");
+        return;
+    }
+    if (!EnsureProjectSacmFileOpen(*impl_, entry, false))
+        return;
+    if (!impl_->app_state.sacm_package.has_value()) {
+        SetStatus("Could not load an editable SACM package model.");
+        return;
+    }
+
+    core::TerminologyPackageCreateResult result = core::CreateTerminologyPackage(
+        impl_->app_state.sacm_package.value(),
+        TrimWhitespace(impl_->new_terminology_package_name_buf),
+        TrimWhitespace(impl_->new_terminology_package_description_buf));
+    if (!result.success) {
+        SetStatus("Terminology package create failed: " + result.error);
+        return;
+    }
+
+    impl_->selected_terminology_package_ref = result.package_ref;
+    impl_->selected_terminology_package_file_path = impl_->app_state.active_project_file_path;
+    if (const sacm::TerminologyPackage* package =
+            core::FindTerminologyPackage(impl_->app_state.sacm_package.value(), result.package_ref)) {
+        CopyTerminologyPackageToEditor(*impl_, *package);
+    }
+    impl_->app_state.mark_dirty();
+    impl_->document_dirty = true;
+    InvalidateSacmPackageTreeCache(*impl_, entry.relativePath);
+    impl_->show_create_terminology_package_modal = false;
+    impl_->pending_terminology_package_parent_entry.reset();
+    impl_->show_terminology_package_tab = true;
+    ui::GetUiState().center_view = ui::CenterView::TerminologyPackage;
+    impl_->force_center_tab_selection = true;
+    SetStatus("Added terminology package " + result.package_ref.id + ".");
+}
+
+void AppRuntime::ApplyTerminologyPackageEdits() {
+    if (!impl_->app_state.sacm_package.has_value())
+        return;
+
+    std::string error;
+    if (!core::UpdateTerminologyPackage(impl_->app_state.sacm_package.value(),
+                                        impl_->selected_terminology_package_ref,
+                                        TrimWhitespace(impl_->terminology_package_name_buf),
+                                        TrimWhitespace(impl_->terminology_package_description_buf),
+                                        error)) {
+        SetStatus("Terminology package update failed: " + error);
+        return;
+    }
+
+    impl_->app_state.mark_dirty();
+    impl_->document_dirty = true;
+    if (impl_->app_state.current_project.has_value() && !impl_->app_state.active_project_file_path.empty()) {
+        const std::filesystem::path relative =
+            std::filesystem::relative(impl_->app_state.active_project_file_path, impl_->app_state.current_project->rootPath);
+        InvalidateSacmPackageTreeCache(*impl_, relative);
+    }
+}
+
+void AppRuntime::BeginDeleteTerminologyPackage() {
+    impl_->show_delete_terminology_package_modal = true;
+}
+
+void AppRuntime::ConfirmDeleteTerminologyPackage() {
+    if (!impl_->app_state.sacm_package.has_value())
+        return;
+
+    std::string error;
+    if (!core::DeleteTerminologyPackage(
+            impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref, error)) {
+        SetStatus("Terminology package delete failed: " + error);
+        return;
+    }
+
+    impl_->app_state.mark_dirty();
+    impl_->document_dirty = true;
+    if (impl_->app_state.current_project.has_value() && !impl_->app_state.active_project_file_path.empty()) {
+        const std::filesystem::path relative =
+            std::filesystem::relative(impl_->app_state.active_project_file_path, impl_->app_state.current_project->rootPath);
+        InvalidateSacmPackageTreeCache(*impl_, relative);
+    }
+    impl_->selected_terminology_package_ref = core::TerminologyPackageRef{};
+    impl_->show_delete_terminology_package_modal = false;
+    impl_->show_terminology_package_tab = false;
+    ui::GetUiState().center_view = ui::CenterView::PackageDetails;
+    impl_->force_center_tab_selection = true;
+    SetStatus("Deleted terminology package.");
 }
 
 void AppRuntime::RefreshSacmPackageTreeCache() {

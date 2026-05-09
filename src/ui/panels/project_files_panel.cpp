@@ -120,6 +120,14 @@ void RenderPackageNode(const core::ProjectFileEntry& entry,
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen() && callbacks.open_package_node) {
         callbacks.open_package_node(entry, node);
     }
+    if (node.type == sacm::SacmPackageNodeType::AssuranceCasePackage && callbacks.add_terminology_package) {
+        if (ImGui::BeginPopupContextItem("##package_context")) {
+            if (ImGui::MenuItem("Add Terminology Package")) {
+                callbacks.add_terminology_package(entry, node);
+            }
+            ImGui::EndPopup();
+        }
+    }
     if (has_children && open) {
         RenderPackageChildren(entry, node, callbacks);
         ImGui::TreePop();
@@ -133,12 +141,13 @@ void RenderFile(const core::ProjectFileEntry& entry,
     std::string label = entry.relativePath.filename().generic_string();
     ImGui::PushID(entry.relativePath.generic_string().c_str());
     const auto tree_it = model.sacm_package_trees_by_path.find(entry.relativePath.generic_string());
-    const bool has_package_tree = entry.role == core::ProjectFileRole::SacmArgument &&
-                                  tree_it != model.sacm_package_trees_by_path.end();
-    const bool has_package_children = has_package_tree && tree_it->second.success && !tree_it->second.root.children.empty();
+    const bool has_package_tree =
+        entry.role == core::ProjectFileRole::SacmArgument && tree_it != model.sacm_package_trees_by_path.end();
+    const bool has_package_children =
+        has_package_tree && tree_it->second.success && !tree_it->second.root.children.empty();
 
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick |
-                               ImGuiTreeNodeFlags_SpanAvailWidth;
+    ImGuiTreeNodeFlags flags =
+        ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
     if (!has_package_children)
         flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 
