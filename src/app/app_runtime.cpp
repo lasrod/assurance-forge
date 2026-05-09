@@ -1793,7 +1793,9 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                 ui_state.attention_element_ids =
                     core::CollectAttentionElementIds(impl_->problems_manager.GetProblems());
                 SyncReviewVisualStatesFromReviews();
-                ui::gsn::ShowGsnCanvasContent(ui_state, visible_case, actions);
+                const sacm::AssuranceCasePackage* terminology_package =
+                    impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
+                ui::gsn::ShowGsnCanvasContent(ui_state, visible_case, actions, terminology_package);
                 ImGui::EndTabItem();
             }
         }

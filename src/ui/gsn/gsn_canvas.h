@@ -10,6 +10,14 @@
 #include <string>
 #include <vector>
 
+namespace core {
+class TerminologyService;
+}
+
+namespace sacm {
+struct AssuranceCasePackage;
+}
+
 namespace ui::gsn {
 
 struct GsnNode {
@@ -33,6 +41,7 @@ void DrawGsnNode(const GsnNode& node,
                  UiState& ui_state,
                  const parser::AssuranceCase* active_case,
                  const ElementContextActions& actions,
+                 const core::TerminologyService* terminology_service = nullptr,
                  float zoom = 1.0f);
 
 // Backwards-compatible function used by `main.cpp`.
@@ -43,7 +52,8 @@ void ShowGsnCanvasWindow();
 // This enables embedding the canvas under tab views.
 void ShowGsnCanvasContent(UiState& ui_state,
                           const parser::AssuranceCase* active_case,
-                          const ElementContextActions& actions);
+                          const ElementContextActions& actions,
+                          const sacm::AssuranceCasePackage* terminology_package = nullptr);
 
 // High-level renderer class (in implementation file)
 class GsnCanvas;

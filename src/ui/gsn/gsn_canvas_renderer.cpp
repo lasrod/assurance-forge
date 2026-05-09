@@ -1,5 +1,6 @@
 ﻿#include "ui/gsn/gsn_canvas_renderer.h"
 
+#include "core/terminology_scope_service.h"
 #include "ui/gsn/gsn_canvas.h" // for DrawGsnNode
 #include "ui/gsn/gsn_dpi.h"
 #include "ui/gsn/gsn_layout.h"
@@ -8,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <imgui.h>
+#include <optional>
 
 namespace ui::gsn {
 
@@ -415,8 +417,16 @@ static void ComputeGroup2EdgeBounds(
 
 void GsnCanvas::Render(UiState& ui_state,
                        const parser::AssuranceCase* active_case,
-                       const ElementContextActions& actions) {
+                       const ElementContextActions& actions,
+                       const sacm::AssuranceCasePackage* terminology_package) {
     CanvasRenderStats frame_stats{};
+
+    std::optional<core::TerminologyService> terminology_service;
+    if (terminology_package) {
+        terminology_service.emplace(*terminology_package);
+    }
+    const core::TerminologyService* terminology_service_ptr =
+        terminology_service.has_value() ? &terminology_service.value() : nullptr;
 
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
@@ -511,7 +521,7 @@ void GsnCanvas::Render(UiState& ui_state,
         gsn_node.label = node.label;
         gsn_node.label_secondary = node.label_secondary;
         gsn_node.undeveloped = node.undeveloped;
-        DrawGsnNode(gsn_node, origin, ui_state, active_case, actions, zoom);
+        DrawGsnNode(gsn_node, origin, ui_state, active_case, actions, terminology_service_ptr, zoom);
         ++frame_stats.nodes_drawn;
     }
 

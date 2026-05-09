@@ -26,6 +26,94 @@ std::string NormalizeRef(std::string ref) {
     return ref;
 }
 
+std::string ToLower(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    return value;
+}
+
+bool IsWordChar(char c) {
+    const unsigned char ch = static_cast<unsigned char>(c);
+    return std::isalnum(ch) || c == '_';
+}
+
+bool HasWholeWordBoundaries(const std::string& text, std::size_t start, std::size_t length) {
+    if (start > text.size() || length > text.size() - start)
+        return false;
+    const std::size_t end = start + length;
+    if (start > 0 && IsWordChar(text[start - 1]))
+        return false;
+    if (end < text.size() && IsWordChar(text[end]))
+        return false;
+    return true;
+}
+
+bool TextMatchesAt(const std::string& text, std::size_t start, const std::string& value, bool case_sensitive) {
+    if (start > text.size() || value.size() > text.size() - start)
+        return false;
+    for (std::size_t index = 0; index < value.size(); ++index) {
+        unsigned char text_char = static_cast<unsigned char>(text[start + index]);
+        unsigned char value_char = static_cast<unsigned char>(value[index]);
+        if (case_sensitive) {
+            if (text_char != value_char)
+                return false;
+        } else if (std::tolower(text_char) != std::tolower(value_char)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool RangesOverlap(std::size_t left_start, std::size_t left_end, std::size_t right_start, std::size_t right_end) {
+    return left_start < right_end && right_start < left_end;
+}
+
+bool OverlapsAnyRange(const std::vector<TermOccurrence>& occurrences, std::size_t start, std::size_t end) {
+    return std::any_of(occurrences.begin(), occurrences.end(), [&](const TermOccurrence& occurrence) {
+        return RangesOverlap(start, end, occurrence.start_offset, occurrence.end_offset);
+    });
+}
+
+bool IsAcronymStartChar(char c) {
+    return std::isupper(static_cast<unsigned char>(c));
+}
+
+bool IsAcronymBodyChar(char c) {
+    const unsigned char ch = static_cast<unsigned char>(c);
+    return std::isupper(ch) || std::isdigit(ch) || c == '_' || c == '-';
+}
+
+struct IndexedTermValue {
+    std::string value;
+    std::string comparison_value;
+};
+
+std::vector<IndexedTermValue> BuildTermValueIndex(const std::vector<TerminologyScopedTermRef>& active_terms,
+                                                  const TerminologyDetectionOptions& options) {
+    std::vector<IndexedTermValue> term_values;
+    std::unordered_set<std::string> seen_values;
+    for (const auto& active_term : active_terms) {
+        if (!active_term.term)
+            continue;
+        const std::string value = TrimWhitespace(active_term.term->value);
+        if (value.empty() || value.size() < options.min_known_term_length)
+            continue;
+
+        const std::string comparison_value = options.case_sensitive_terms ? value : ToLower(value);
+        if (!seen_values.insert(comparison_value).second)
+            continue;
+        term_values.push_back({value, comparison_value});
+    }
+
+    std::sort(term_values.begin(), term_values.end(), [](const IndexedTermValue& left, const IndexedTermValue& right) {
+        if (left.value.size() != right.value.size())
+            return left.value.size() > right.value.size();
+        return left.comparison_value < right.comparison_value;
+    });
+    return term_values;
+}
+
 bool RefMatches(const std::string& raw_ref, const std::string& id, const std::string& gid) {
     const std::string ref = NormalizeRef(raw_ref);
     if (ref.empty())
@@ -122,7 +210,8 @@ const sacm::ArgumentPackage* FindContainingArgumentPackage(const sacm::Assurance
                 return &argument_package;
         }
         for (const auto& reasoning : argument_package.argumentReasonings) {
-            if (RefMatches(element_id, reasoning.id, reasoning.gid) || RefMatches(element_gid, reasoning.id, reasoning.gid))
+            if (RefMatches(element_id, reasoning.id, reasoning.gid) ||
+                RefMatches(element_gid, reasoning.id, reasoning.gid))
                 return &argument_package;
         }
         for (const auto& artifact_reference : argument_package.artifactReferences) {
@@ -225,8 +314,8 @@ void AddExplicitTerm(std::vector<TerminologyScopedTermRef>& terms,
     const sacm::Term* term = nullptr;
     int package_order = 0;
     int term_order = 0;
-    if (!FindTermByRef(package, term_ref, terminology_package, term, package_order, term_order) || !terminology_package ||
-        !term)
+    if (!FindTermByRef(package, term_ref, terminology_package, term, package_order, term_order) ||
+        !terminology_package || !term)
         return;
     AddTerm(terms, seen, *terminology_package, *term, layer, package_order, term_order);
 }
@@ -281,18 +370,19 @@ TerminologyScopeContext TerminologyService::BuildScopeContextForElement(const st
     return scope;
 }
 
-std::vector<TerminologyScopedTermRef> TerminologyService::GetActiveTermsForElement(
-    const std::string& element_gid) const {
+std::vector<TerminologyScopedTermRef>
+TerminologyService::GetActiveTermsForElement(const std::string& element_gid) const {
     return GetActiveTermsForElement(BuildScopeContextForElement(element_gid));
 }
 
-std::vector<TerminologyScopedTermRef> TerminologyService::GetActiveTermsForElement(
-    const TerminologyScopeContext& scope) const {
+std::vector<TerminologyScopedTermRef>
+TerminologyService::GetActiveTermsForElement(const TerminologyScopeContext& scope) const {
     std::vector<TerminologyScopedTermRef> terms;
     std::unordered_set<std::string> seen;
 
     if (scope.has_explicit_term_ref)
-        AddExplicitTerm(terms, seen, package_, scope.explicit_term_ref, TerminologyLookupLayer::ExplicitOccurrenceBinding);
+        AddExplicitTerm(
+            terms, seen, package_, scope.explicit_term_ref, TerminologyLookupLayer::ExplicitOccurrenceBinding);
 
     const sacm::ArgumentPackage* argument_package = ResolveArgumentPackage(package_, scope);
     if (argument_package) {
@@ -322,11 +412,8 @@ std::vector<TerminologyScopedTermRef> TerminologyService::GetActiveTermsForEleme
             const sacm::TerminologyPackage& terminology_package = package_.terminologyPackages[index];
             if (!MatchesRef(terminology_package, scope.project_glossary_ref))
                 continue;
-            AddPackageTerms(terms,
-                            seen,
-                            terminology_package,
-                            TerminologyLookupLayer::ProjectGlossary,
-                            static_cast<int>(index));
+            AddPackageTerms(
+                terms, seen, terminology_package, TerminologyLookupLayer::ProjectGlossary, static_cast<int>(index));
             break;
         }
     }
@@ -334,8 +421,8 @@ std::vector<TerminologyScopedTermRef> TerminologyService::GetActiveTermsForEleme
     return terms;
 }
 
-std::vector<TerminologyScopedTermRef> TerminologyService::FindTermsByValue(
-    const std::string& text, const TerminologyScopeContext& scope) const {
+std::vector<TerminologyScopedTermRef> TerminologyService::FindTermsByValue(const std::string& text,
+                                                                           const TerminologyScopeContext& scope) const {
     std::vector<TerminologyScopedTermRef> matches;
     const std::string value = TrimWhitespace(text);
     if (value.empty())
@@ -371,10 +458,11 @@ TermResolution TerminologyService::ResolveOccurrence(const TextOccurrence& occur
         explicit_scope.has_explicit_term_ref = true;
         explicit_scope.explicit_term_ref = explicit_ref;
         std::vector<TerminologyScopedTermRef> active_terms = GetActiveTermsForElement(explicit_scope);
-        auto selected = std::find_if(active_terms.begin(), active_terms.end(), [&](const TerminologyScopedTermRef& term) {
-            return (!explicit_ref.id.empty() && term.term_ref.id == explicit_ref.id) ||
-                   (!explicit_ref.gid.empty() && term.term_ref.gid == explicit_ref.gid);
-        });
+        auto selected =
+            std::find_if(active_terms.begin(), active_terms.end(), [&](const TerminologyScopedTermRef& term) {
+                return (!explicit_ref.id.empty() && term.term_ref.id == explicit_ref.id) ||
+                       (!explicit_ref.gid.empty() && term.term_ref.gid == explicit_ref.gid);
+            });
         if (selected != active_terms.end()) {
             resolution.status = TermResolutionStatus::Explicit;
             resolution.selected = *selected;
@@ -394,6 +482,117 @@ TermResolution TerminologyService::ResolveOccurrence(const TextOccurrence& occur
         resolution.important_undefined = LooksImportantUndefinedTerm(occurrence.text);
     }
     return resolution;
+}
+
+std::vector<TermOccurrence> TerminologyService::DetectTermsInText(const std::string& element_ref,
+                                                                  const std::string& text,
+                                                                  const TerminologyDetectionOptions& options) const {
+    return DetectTermsInText(BuildScopeContextForElement(element_ref), text, options);
+}
+
+std::vector<TermOccurrence> TerminologyService::DetectTermsInText(const TerminologyScopeContext& scope,
+                                                                  const std::string& text,
+                                                                  const TerminologyDetectionOptions& options) const {
+    std::vector<TermOccurrence> occurrences;
+    const std::vector<IndexedTermValue> term_values = BuildTermValueIndex(GetActiveTermsForElement(scope), options);
+
+    std::size_t offset = 0;
+    while (offset < text.size()) {
+        bool matched = false;
+        for (const auto& term_value : term_values) {
+            if (!HasWholeWordBoundaries(text, offset, term_value.value.size()) ||
+                !TextMatchesAt(text, offset, term_value.value, options.case_sensitive_terms)) {
+                continue;
+            }
+
+            TextOccurrence text_occurrence;
+            text_occurrence.element_id = scope.element_id;
+            text_occurrence.element_gid = scope.element_gid;
+            text_occurrence.start_offset = offset;
+            text_occurrence.end_offset = offset + term_value.value.size();
+            text_occurrence.text = term_value.value;
+
+            TermOccurrence occurrence;
+            occurrence.element_id = scope.element_id;
+            occurrence.element_gid = scope.element_gid;
+            occurrence.start_offset = text_occurrence.start_offset;
+            occurrence.end_offset = text_occurrence.end_offset;
+            occurrence.text = text.substr(occurrence.start_offset, occurrence.end_offset - occurrence.start_offset);
+            occurrence.kind = TermOccurrenceKind::KnownTerm;
+            occurrence.resolution = ResolveOccurrence(text_occurrence, scope);
+            occurrences.push_back(occurrence);
+
+            offset = occurrence.end_offset;
+            matched = true;
+            break;
+        }
+
+        if (!matched)
+            ++offset;
+    }
+
+    if (!options.detect_unknown_acronyms)
+        return occurrences;
+
+    offset = 0;
+    while (offset < text.size()) {
+        if (!IsAcronymStartChar(text[offset])) {
+            ++offset;
+            continue;
+        }
+
+        if (offset > 0 && IsWordChar(text[offset - 1])) {
+            ++offset;
+            continue;
+        }
+
+        std::size_t end = offset;
+        while (end < text.size() && IsAcronymBodyChar(text[end]))
+            ++end;
+
+        if (!HasWholeWordBoundaries(text, offset, end - offset) || OverlapsAnyRange(occurrences, offset, end)) {
+            offset = end;
+            continue;
+        }
+
+        const std::string token = text.substr(offset, end - offset);
+        if (token.size() < options.min_acronym_length || !LooksImportantUndefinedTerm(token)) {
+            offset = end;
+            continue;
+        }
+
+        TextOccurrence text_occurrence;
+        text_occurrence.element_id = scope.element_id;
+        text_occurrence.element_gid = scope.element_gid;
+        text_occurrence.start_offset = offset;
+        text_occurrence.end_offset = end;
+        text_occurrence.text = token;
+
+        TermResolution resolution = ResolveOccurrence(text_occurrence, scope);
+        if (resolution.status != TermResolutionStatus::None || !resolution.important_undefined) {
+            offset = end;
+            continue;
+        }
+
+        TermOccurrence occurrence;
+        occurrence.element_id = scope.element_id;
+        occurrence.element_gid = scope.element_gid;
+        occurrence.start_offset = offset;
+        occurrence.end_offset = end;
+        occurrence.text = token;
+        occurrence.kind = TermOccurrenceKind::UndefinedAcronym;
+        occurrence.resolution = resolution;
+        occurrences.push_back(occurrence);
+
+        offset = end;
+    }
+
+    std::sort(occurrences.begin(), occurrences.end(), [](const TermOccurrence& left, const TermOccurrence& right) {
+        if (left.start_offset != right.start_offset)
+            return left.start_offset < right.start_offset;
+        return left.end_offset < right.end_offset;
+    });
+    return occurrences;
 }
 
 bool LooksImportantUndefinedTerm(const std::string& text) {

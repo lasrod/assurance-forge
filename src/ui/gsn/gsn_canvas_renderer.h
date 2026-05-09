@@ -11,6 +11,10 @@
 #include <unordered_set>
 #include <vector>
 
+namespace sacm {
+struct AssuranceCasePackage;
+}
+
 namespace ui::gsn {
 
 struct CanvasRenderStats {
@@ -31,7 +35,10 @@ public:
     // Set elements (legacy flat list)
     void SetElements(const std::vector<CanvasElement>& elements);
     // Render into the current ImGui window/child
-    void Render(UiState& ui_state, const parser::AssuranceCase* active_case, const ElementContextActions& actions);
+    void Render(UiState& ui_state,
+                const parser::AssuranceCase* active_case,
+                const ElementContextActions& actions,
+                const sacm::AssuranceCasePackage* terminology_package = nullptr);
 
     // Zoom controls
     void ZoomIn();

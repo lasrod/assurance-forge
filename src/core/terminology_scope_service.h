@@ -65,6 +65,25 @@ struct TermResolution {
     bool important_undefined = false;
 };
 
+enum class TermOccurrenceKind { KnownTerm, UndefinedAcronym };
+
+struct TermOccurrence {
+    std::string element_id;
+    std::string element_gid;
+    std::size_t start_offset = 0;
+    std::size_t end_offset = 0;
+    std::string text;
+    TermOccurrenceKind kind = TermOccurrenceKind::KnownTerm;
+    TermResolution resolution;
+};
+
+struct TerminologyDetectionOptions {
+    std::size_t min_known_term_length = 1;
+    std::size_t min_acronym_length = 2;
+    bool detect_unknown_acronyms = true;
+    bool case_sensitive_terms = true;
+};
+
 class TerminologyService {
 public:
     explicit TerminologyService(const sacm::AssuranceCasePackage& package);
@@ -73,8 +92,14 @@ public:
     std::vector<TerminologyScopedTermRef> GetActiveTermsForElement(const std::string& element_gid) const;
     std::vector<TerminologyScopedTermRef> GetActiveTermsForElement(const TerminologyScopeContext& scope) const;
     std::vector<TerminologyScopedTermRef> FindTermsByValue(const std::string& text,
-                                                          const TerminologyScopeContext& scope) const;
+                                                           const TerminologyScopeContext& scope) const;
     TermResolution ResolveOccurrence(const TextOccurrence& occurrence, const TerminologyScopeContext& scope) const;
+    std::vector<TermOccurrence> DetectTermsInText(const std::string& element_ref,
+                                                  const std::string& text,
+                                                  const TerminologyDetectionOptions& options = {}) const;
+    std::vector<TermOccurrence> DetectTermsInText(const TerminologyScopeContext& scope,
+                                                  const std::string& text,
+                                                  const TerminologyDetectionOptions& options = {}) const;
 
 private:
     const sacm::AssuranceCasePackage& package_;

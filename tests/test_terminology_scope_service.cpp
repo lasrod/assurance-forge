@@ -5,6 +5,8 @@
 #include <gtest/gtest.h>
 
 #include <initializer_list>
+#include <string>
+#include <vector>
 
 namespace {
 
@@ -182,4 +184,121 @@ TEST(TerminologyScopeService, ArgumentPackageTerminologyRoundTrips) {
     ASSERT_EQ(terminology_package.terms.size(), 1u);
     EXPECT_EQ(terminology_package.terms.front().id, "T_ARG");
     EXPECT_EQ(terminology_package.terms.front().value, "ODD");
+}
+
+TEST(TerminologyScopeService, DetectsKnownTermsInVisibleText) {
+    sacm::AssuranceCasePackage package = MakePackageWithArgument();
+    package.terminologyPackages.push_back(MakeTerminologyPackage("TP_CASE", {MakeTerm("T_ODD", "ODD")}));
+
+    core::TerminologyService service(package);
+    std::vector<core::TermOccurrence> occurrences = service.DetectTermsInText("G1", "The ODD is well defined.");
+
+    ASSERT_EQ(occurrences.size(), 1u);
+    EXPECT_EQ(occurrences.front().kind, core::TermOccurrenceKind::KnownTerm);
+    EXPECT_EQ(occurrences.front().start_offset, 4u);
+    EXPECT_EQ(occurrences.front().end_offset, 7u);
+    EXPECT_EQ(occurrences.front().text, "ODD");
+    ASSERT_EQ(occurrences.front().resolution.status, core::TermResolutionStatus::Unique);
+    ASSERT_TRUE(occurrences.front().resolution.selected.has_value());
+    EXPECT_EQ(occurrences.front().resolution.selected->term_ref.id, "T_ODD");
+}
+
+TEST(TerminologyScopeService, DetectionUsesWholeWordBoundaries) {
+    sacm::AssuranceCasePackage package = MakePackageWithArgument();
+    package.terminologyPackages.push_back(MakeTerminologyPackage("TP_CASE", {MakeTerm("T_ODD", "ODD")}));
+
+    core::TerminologyService service(package);
+    std::vector<core::TermOccurrence> occurrences = service.DetectTermsInText("G1", "The ODDity is not relevant.");
+
+    EXPECT_TRUE(occurrences.empty());
+}
+
+TEST(TerminologyScopeService, DetectionSupportsMultiWordTermsAndLongestMatch) {
+    sacm::AssuranceCasePackage package = MakePackageWithArgument();
+    package.terminologyPackages.push_back(MakeTerminologyPackage(
+        "TP_CASE", {MakeTerm("T_SHORT", "Operational Design"), MakeTerm("T_LONG", "Operational Design Domain")}));
+
+    core::TerminologyService service(package);
+    std::vector<core::TermOccurrence> occurrences =
+        service.DetectTermsInText("G1", "Operational Design Domain is defined.");
+
+    ASSERT_EQ(occurrences.size(), 1u);
+    EXPECT_EQ(occurrences.front().text, "Operational Design Domain");
+    ASSERT_EQ(occurrences.front().resolution.status, core::TermResolutionStatus::Unique);
+    ASSERT_TRUE(occurrences.front().resolution.selected.has_value());
+    EXPECT_EQ(occurrences.front().resolution.selected->term_ref.id, "T_LONG");
+}
+
+TEST(TerminologyScopeService, DetectionMarksDuplicateTermValuesAmbiguous) {
+    sacm::AssuranceCasePackage package = MakePackageWithArgument();
+    package.terminologyPackages.push_back(
+        MakeTerminologyPackage("TP_CASE", {MakeTerm("T_CONTEXT", "ODD"), MakeTerm("T_DATASET", "ODD")}));
+
+    core::TerminologyService service(package);
+    std::vector<core::TermOccurrence> occurrences = service.DetectTermsInText("G1", "The ODD is well defined.");
+
+    ASSERT_EQ(occurrences.size(), 1u);
+    EXPECT_EQ(occurrences.front().kind, core::TermOccurrenceKind::KnownTerm);
+    EXPECT_EQ(occurrences.front().resolution.status, core::TermResolutionStatus::Ambiguous);
+    EXPECT_FALSE(occurrences.front().resolution.selected.has_value());
+    EXPECT_EQ(occurrences.front().resolution.candidates.size(), 2u);
+}
+
+TEST(TerminologyScopeService, DetectionReportsUndefinedAcronyms) {
+    sacm::AssuranceCasePackage package = MakePackageWithArgument();
+    core::TerminologyService service(package);
+
+    std::vector<core::TermOccurrence> occurrences =
+        service.DetectTermsInText("G1", "ODD, HARA, FMEA and ASIL are assessed.");
+
+    ASSERT_EQ(occurrences.size(), 4u);
+    EXPECT_EQ(occurrences[0].text, "ODD");
+    EXPECT_EQ(occurrences[1].text, "HARA");
+    EXPECT_EQ(occurrences[2].text, "FMEA");
+    EXPECT_EQ(occurrences[3].text, "ASIL");
+    for (const auto& occurrence : occurrences) {
+        EXPECT_EQ(occurrence.kind, core::TermOccurrenceKind::UndefinedAcronym);
+        EXPECT_EQ(occurrence.resolution.status, core::TermResolutionStatus::None);
+        EXPECT_TRUE(occurrence.resolution.important_undefined);
+    }
+}
+
+TEST(TerminologyScopeService, DetectionIgnoresLowercaseAndMixedCaseUnknownWords) {
+    sacm::AssuranceCasePackage package = MakePackageWithArgument();
+    core::TerminologyService service(package);
+
+    std::vector<core::TermOccurrence> occurrences = service.DetectTermsInText("G1", "odd Hara ASIL");
+
+    ASSERT_EQ(occurrences.size(), 1u);
+    EXPECT_EQ(occurrences.front().text, "ASIL");
+    EXPECT_EQ(occurrences.front().kind, core::TermOccurrenceKind::UndefinedAcronym);
+}
+
+TEST(TerminologyScopeService, DetectionDoesNotDuplicateKnownAcronymAsUndefined) {
+    sacm::AssuranceCasePackage package = MakePackageWithArgument();
+    package.terminologyPackages.push_back(MakeTerminologyPackage("TP_CASE", {MakeTerm("T_ODD", "ODD")}));
+
+    core::TerminologyService service(package);
+    std::vector<core::TermOccurrence> occurrences = service.DetectTermsInText("G1", "ODD and HARA are assessed.");
+
+    ASSERT_EQ(occurrences.size(), 2u);
+    EXPECT_EQ(occurrences[0].text, "ODD");
+    EXPECT_EQ(occurrences[0].kind, core::TermOccurrenceKind::KnownTerm);
+    EXPECT_EQ(occurrences[1].text, "HARA");
+    EXPECT_EQ(occurrences[1].kind, core::TermOccurrenceKind::UndefinedAcronym);
+}
+
+TEST(TerminologyScopeService, DetectionUsesArgumentPackageScope) {
+    sacm::AssuranceCasePackage package = MakePackageWithArgument();
+    package.argumentPackages.front().terminologyPackages.push_back(
+        MakeTerminologyPackage("TP_ARG", {MakeTerm("T_ARG", "ODD")}));
+
+    core::TerminologyService service(package);
+    std::vector<core::TermOccurrence> occurrences = service.DetectTermsInText("G1", "The ODD is well defined.");
+
+    ASSERT_EQ(occurrences.size(), 1u);
+    ASSERT_EQ(occurrences.front().resolution.status, core::TermResolutionStatus::Unique);
+    ASSERT_TRUE(occurrences.front().resolution.selected.has_value());
+    EXPECT_EQ(occurrences.front().resolution.selected->term_ref.id, "T_ARG");
+    EXPECT_EQ(occurrences.front().resolution.selected->layer, core::TerminologyLookupLayer::ArgumentPackageTerminology);
 }

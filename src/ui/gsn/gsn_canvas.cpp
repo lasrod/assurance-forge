@@ -1,13 +1,16 @@
 #include "ui/gsn/gsn_canvas.h"
 
+#include "core/terminology_scope_service.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/gsn/gsn_dpi.h"
 #include "ui/theme.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cfloat>
 #include <cmath>
+#include <cstring>
 #include <iostream>
 
 namespace ui::gsn {
@@ -532,6 +535,118 @@ static void DrawNodeLabel(ImDrawList* draw_list,
     }
 }
 
+static ImU32 TerminologyUnderlineColor(const core::TermOccurrence& occurrence) {
+    const Theme& theme = GetTheme();
+    if (occurrence.kind == core::TermOccurrenceKind::UndefinedAcronym)
+        return theme.warning;
+    if (occurrence.resolution.status == core::TermResolutionStatus::Ambiguous)
+        return theme.warning;
+    if (occurrence.resolution.status == core::TermResolutionStatus::Unique ||
+        occurrence.resolution.status == core::TermResolutionStatus::Explicit)
+        return theme.success;
+    return theme.accent;
+}
+
+static void DrawTerminologyUnderlinesForText(ImDrawList* draw_list,
+                                             const char* text_start,
+                                             const char* text_end,
+                                             ImFont* font,
+                                             float font_size,
+                                             ImVec2 text_pos,
+                                             float zoom,
+                                             const std::vector<core::TermOccurrence>& occurrences) {
+    if (!text_start || !text_end || text_start >= text_end)
+        return;
+
+    const char* line_start = text_start;
+    float line_y = text_pos.y;
+    const float underline_offset = std::max(1.0f, DpiSize(1.0f) * zoom);
+    const float underline_thickness = std::max(1.0f, DpiSize(1.4f) * zoom);
+
+    while (line_start < text_end) {
+        const char* hard_break = static_cast<const char*>(memchr(line_start, '\n', text_end - line_start));
+        const char* line_end = hard_break ? hard_break : text_end;
+        const char* visible_end = line_end;
+
+        while (visible_end > line_start && std::isspace(static_cast<unsigned char>(*(visible_end - 1))))
+            --visible_end;
+
+        const std::size_t line_start_offset = static_cast<std::size_t>(line_start - text_start);
+        const std::size_t line_end_offset = static_cast<std::size_t>(visible_end - text_start);
+        for (const auto& occurrence : occurrences) {
+            if (occurrence.end_offset <= line_start_offset || occurrence.start_offset >= line_end_offset)
+                continue;
+
+            const std::size_t range_start_offset = std::max(occurrence.start_offset, line_start_offset);
+            const std::size_t range_end_offset = std::min(occurrence.end_offset, line_end_offset);
+            if (range_start_offset >= range_end_offset)
+                continue;
+
+            const char* range_start = text_start + range_start_offset;
+            const char* range_end = text_start + range_end_offset;
+            float x1 = text_pos.x + font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, line_start, range_start).x;
+            float x2 = text_pos.x + font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, line_start, range_end).x;
+            float y = line_y + font_size - underline_offset;
+            draw_list->AddLine(
+                ImVec2(x1, y), ImVec2(x2, y), TerminologyUnderlineColor(occurrence), underline_thickness);
+        }
+
+        line_y += font_size;
+        line_start = hard_break ? hard_break + 1 : text_end;
+    }
+}
+
+static void DrawTerminologyUnderlines(ImDrawList* draw_list,
+                                      const GsnNode& node,
+                                      ImVec2 top_left,
+                                      float text_left,
+                                      float text_wrap,
+                                      float zoom,
+                                      const UiState& ui_state,
+                                      const core::TerminologyService* terminology_service) {
+    if (!terminology_service || zoom < kFullLabelZoom)
+        return;
+
+    const std::string& active_label =
+        (ui_state.show_secondary_language && !node.label_secondary.empty()) ? node.label_secondary : node.label;
+    if (active_label.empty())
+        return;
+
+    ImFont* bold_font = g_BoldFont ? g_BoldFont : ImGui::GetFont();
+    ImFont* normal_font = ImGui::GetFont();
+    float font_size = ImGui::GetFontSize() * zoom;
+    float scaled_padding = DpiSize(kTextPadding) * zoom;
+    const char* label_start = active_label.c_str();
+    const char* label_end = label_start + active_label.size();
+    const char* first_newline = strchr(label_start, '\n');
+    if (!first_newline || first_newline + 1 >= label_end)
+        return;
+
+    const char* detail_start = first_newline + 1;
+    const std::string detail_text(detail_start, label_end);
+    const std::vector<core::TermOccurrence> occurrences = terminology_service->DetectTermsInText(node.id, detail_text);
+    if (occurrences.empty())
+        return;
+
+    ImVec2 bold_text_size = bold_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, label_start, first_newline);
+    ImVec2 rest_text_size = normal_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, detail_start, nullptr);
+
+    float scaled_node_height = node.size.y * zoom;
+    float total_text_height = bold_text_size.y + rest_text_size.y;
+    float text_y = top_left.y + (scaled_node_height - total_text_height) * 0.5f;
+    if (text_y < top_left.y + scaled_padding)
+        text_y = top_left.y + scaled_padding;
+
+    DrawTerminologyUnderlinesForText(draw_list,
+                                     detail_start,
+                                     label_end,
+                                     normal_font,
+                                     font_size,
+                                     ImVec2(text_left, text_y + bold_text_size.y),
+                                     zoom,
+                                     occurrences);
+}
+
 // ===== Main node drawing function =====
 
 void DrawGsnNode(const GsnNode& node,
@@ -539,6 +654,7 @@ void DrawGsnNode(const GsnNode& node,
                  UiState& ui_state,
                  const parser::AssuranceCase* active_case,
                  const ElementContextActions& actions,
+                 const core::TerminologyService* terminology_service,
                  float zoom) {
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     ImVec2 top_left = ImVec2(canvas_origin.x + node.position.x * zoom, canvas_origin.y + node.position.y * zoom);
@@ -595,6 +711,7 @@ void DrawGsnNode(const GsnNode& node,
     if (proposal_dimmed)
         ink = WithAlpha(GetTheme().text_secondary, 0.62f);
     DrawNodeLabel(draw_list, node, top_left, bottom_right, text_left, text_wrap, zoom, ink, ui_state);
+    DrawTerminologyUnderlines(draw_list, node, top_left, text_left, text_wrap, zoom, ui_state, terminology_service);
     DrawUndevelopedMarker(draw_list, node, top_left, bottom_right, zoom);
 
     // Invisible button for hit-testing.
@@ -682,7 +799,8 @@ void DrawGsnNode(const GsnNode& node,
 
 void ShowGsnCanvasContent(UiState& ui_state,
                           const parser::AssuranceCase* active_case,
-                          const ElementContextActions& actions) {
+                          const ElementContextActions& actions,
+                          const sacm::AssuranceCasePackage* terminology_package) {
     // Child region with clipping; we manage our own pan/zoom offset
     // so no ImGui scrollbars are needed.
     ImU32 canvas_bg = GetTheme().canvas_bg;
@@ -834,7 +952,7 @@ void ShowGsnCanvasContent(UiState& ui_state,
     }
 
     // Render the canvas content
-    renderer.Render(ui_state, active_case, actions);
+    renderer.Render(ui_state, active_case, actions, terminology_package);
 
     if (ImGui::BeginPopupContextWindow("##gsn_canvas_background_context",
                                        ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems)) {
@@ -1062,7 +1180,7 @@ void ShowGsnCanvasWindow() {
 
     if (ImGui::Begin("GSN Canvas", nullptr, window_flags)) {
         ElementContextActions actions{};
-        ShowGsnCanvasContent(GetUiState(), nullptr, actions);
+        ShowGsnCanvasContent(GetUiState(), nullptr, actions, nullptr);
     }
     ImGui::End();
 }
