@@ -3,16 +3,17 @@
 #include "app/actions/element_actions.h"
 #include "app/actions/proposal_actions.h"
 #include "app/actions/review_actions.h"
+#include "app/areas/ai_debug_area.h"
 #include "app/areas/argument_navigator_area.h"
 #include "app/areas/feedback_dock_area.h"
 #include "app/areas/inspector_area.h"
 #include "app/areas/modal_host.h"
 #include "app/areas/project_explorer_area.h"
+#include "app/areas/review_panel_area.h"
 #include "app/areas/workbench_area.h"
 #include "app/app_runtime_state.h"
 #include "app/frame/app_menu_bar.h"
 #include "app/frame/app_shell.h"
-#include "app/guideline_catalog.h"
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
 #include "app/review_problem_sync.h"
@@ -28,7 +29,6 @@
 #include "imgui.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas.h"
-#include "ui/panels/review_panel.h"
 #include "ui/panels/sacm_viewer_panel.h"
 #include "ui/register_views.h"
 #include "ui/ui_state.h"
@@ -87,14 +87,6 @@ std::string NowUtcString() {
 #endif
     std::ostringstream out;
     out << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
-    return out.str();
-}
-
-std::string GenerateReviewItemId() {
-    static unsigned long long counter = 0;
-    auto ticks = std::chrono::system_clock::now().time_since_epoch().count();
-    std::ostringstream out;
-    out << "review-" << std::hex << ticks << "-" << ++counter;
     return out.str();
 }
 
@@ -329,22 +321,6 @@ core::reviews::ReviewProposal BuildDraftReviewProposal(const core::reviews::Revi
     proposal.base_model_hash = core::reviews::ComputeModelSemanticHash(model);
     proposal.base_element_hashes[anchor.id] = core::reviews::ComputeElementSemanticHash(anchor);
     return proposal;
-}
-
-void EnsureGuidelineCatalogLoaded(AppRuntimeState& state) {
-    if (state.guideline_catalog_load_attempted)
-        return;
-
-    GuidelineCatalog catalog;
-    std::string error;
-    if (LoadGuidelineCatalog(catalog, error)) {
-        state.guideline_catalog = std::move(catalog);
-        state.guideline_catalog_error.clear();
-    } else {
-        state.guideline_catalog.reset();
-        state.guideline_catalog_error = error;
-    }
-    state.guideline_catalog_load_attempted = true;
 }
 
 core::reviews::ElementRef ExistingElementRef(const std::string& id) {
@@ -1029,8 +1005,8 @@ void AppRuntime::RenderSacmViewerPanel(float left_w, float sacm_h, float top_y) 
     ui::panels::ShowSacmViewerPanel(left_w, sacm_h, top_y, kPanelFlags, model, callbacks);
 }
 
-void AppRuntime::RenderWorkbenchArea(const frame::AppLayoutRegion& region) {
-    areas::WorkbenchAreaCallbacks callbacks{
+areas::WorkbenchAreaCallbacks AppRuntime::MakeWorkbenchAreaCallbacks() {
+    return areas::WorkbenchAreaCallbacks{
         [this]() { return MakeElementContextActions(*this); },
         [this](core::NewElementKind kind) { AddProposalChildToSelected(kind); },
         [this]() { AddProposalTopGoal(); },
@@ -1094,7 +1070,6 @@ void AppRuntime::RenderWorkbenchArea(const frame::AppLayoutRegion& region) {
         [this](const core::TerminologyCategoryRef& category_ref) { BeginDeleteTerminologyCategory(category_ref); },
         [this]() { SeedRecommendedTerminologyCategories(); },
     };
-    areas::RenderWorkbenchArea(*impl_, region, kPanelFlags, callbacks);
 }
 
 void AppRuntime::SyncReviewProblems() {
@@ -1326,246 +1301,75 @@ void AppRuntime::RenderProposalElementEditor() {
     }
 }
 
-void AppRuntime::RenderReviewPanelContent() {
-    const ui::UiState& ui_state = ui::GetUiState();
-    ui::panels::ReviewPanelModel model;
-    auto& proposals = *impl_->proposal_controller;
-    model.selected_element_id =
-        proposals.creator_active ? proposals.draft.anchor_element_id : ui_state.selected_element_id;
-    model.has_project = impl_->app_state.current_project.has_value();
-    EnsureGuidelineCatalogLoaded(*impl_);
-    if (impl_->guideline_catalog.has_value()) {
-        for (const GuidelineCatalogEntry& entry : impl_->guideline_catalog->entries) {
-            model.guideline_options.push_back(ui::panels::ReviewGuidelineOption{
-                entry.id,
-                entry.category,
-                entry.title,
-            });
-        }
-    } else {
-        model.guideline_status = impl_->guideline_catalog_error;
+void AppRuntime::ApplyReviewProposal(const core::reviews::ReviewItem& item) {
+    if (impl_->proposal_controller->creator_active) {
+        SetStatus("Save or discard the active proposal before applying another proposal.");
+        return;
     }
-    if (proposals.creator_active) {
-        model.active_proposal_review_item_id = proposals.draft.review_item_id;
-        model.active_proposal_operation_count = proposals.ActiveOperationCount();
-        model.active_proposal_can_save = proposals.CanSaveActiveDraft();
+    if (!item.proposal_id.has_value()) {
+        SetStatus("This review comment has no proposed change to apply.");
+        return;
     }
-    if (!model.selected_element_id.empty()) {
-        model.review_items = impl_->review_controller->ItemsForElement(model.selected_element_id);
-        bool has_blocking_problem = false;
-        for (const core::ProblemItem& problem : impl_->problems_manager.GetProblems()) {
-            if (problem.element_id != model.selected_element_id)
-                continue;
-            if (IsReviewDerivedProblem(problem))
-                continue;
-            model.problem_items.push_back(problem);
-            has_blocking_problem = true;
-        }
-        const core::reviews::ElementReviewState element_review_state =
-            impl_->review_controller->ElementReviewStateForElement(model.selected_element_id);
-        model.manual_review_ok = element_review_state.manual_ok;
-        model.ai_review_ok = element_review_state.ai_ok;
-        model.ai_review_failed = element_review_state.failed;
-        const app::controllers::ElementReviewStatus review_status =
-            impl_->review_controller->StatusForElement(model.selected_element_id, has_blocking_problem);
-        model.review_status_passed = review_status == app::controllers::ElementReviewStatus::Passed;
-        switch (review_status) {
-        case app::controllers::ElementReviewStatus::Passed:
-            model.review_status_text = "Passed";
-            model.review_status_detail = element_review_state.manual_ok ? "Manual review OK." : "AI review OK.";
-            break;
-        case app::controllers::ElementReviewStatus::Failed:
-            model.review_status_text = "Not OK";
-            model.review_status_detail = element_review_state.last_review_message.empty()
-                                             ? "AI review failed."
-                                             : element_review_state.last_review_message;
-            break;
-        case app::controllers::ElementReviewStatus::OpenItems:
-            model.review_status_text = "Not OK";
-            model.review_status_detail =
-                has_blocking_problem ? "Open problems require attention." : "Open review comments require attention.";
-            break;
-        case app::controllers::ElementReviewStatus::NotReviewed:
-            model.review_status_text = "Not reviewed";
-            model.review_status_detail = "Set Manual review OK or run an AI review with no findings.";
-            break;
-        }
-        for (const core::reviews::ReviewItem& item : model.review_items) {
-            if (!item.proposal_id.has_value())
-                continue;
-            std::string error;
-            std::optional<core::reviews::ReviewProposal> proposal =
-                proposals.manager.LoadProposal(item.proposal_id.value(), error);
-            if (!proposal.has_value()) {
-                model.proposal_validity[item.proposal_id.value()] = {core::reviews::ProposalValidity::Broken, error};
-            } else if (impl_->app_state.loaded_case.has_value()) {
-                model.proposal_validity[item.proposal_id.value()] = core::reviews::EvaluateReviewProposalValidity(
-                    proposal.value(), impl_->app_state.loaded_case.value());
-            } else {
-                model.proposal_validity[item.proposal_id.value()] = {core::reviews::ProposalValidity::Broken,
-                                                                     "No SACM model is loaded."};
-            }
-        }
+    if (!impl_->app_state.current_project.has_value() || !impl_->app_state.loaded_case.has_value()) {
+        SetStatus("Open a project and SACM file before applying proposed changes.");
+        return;
     }
 
-    ui::panels::ReviewPanelCallbacks callbacks;
-    callbacks.add_review_item =
-        [this](const std::string& title, const std::string& message, const std::vector<std::string>& guideline_ids) {
-            if (impl_->proposal_controller->creator_active) {
-                SetStatus("Save or discard the active proposal before adding more review comments.");
-                return;
-            }
-            if (!impl_->app_state.current_project.has_value()) {
-                SetStatus("Open or create a project before adding review comments.");
-                return;
-            }
-            if (!EnsureReviewItemStorage()) {
-                return;
-            }
-            if (impl_->reviewer_name.empty()) {
-                impl_->modal_coordinator->show_reviewer_name_prompt = true;
-                SetStatus("Enter a reviewer name before adding review comments.");
-                return;
-            }
-            const std::string element_id = ui::GetUiState().selected_element_id;
-            if (element_id.empty()) {
-                SetStatus("Select an element before adding a review comment.");
-                return;
-            }
+    std::string error;
+    std::optional<core::reviews::ReviewProposal> proposal =
+        impl_->proposal_controller->manager.LoadProposal(item.proposal_id.value(), error);
+    if (!proposal.has_value()) {
+        SetStatus("Proposal apply failed: " + error);
+        return;
+    }
 
-            std::vector<std::string> validated_guideline_ids;
-            if (!guideline_ids.empty()) {
-                EnsureGuidelineCatalogLoaded(*impl_);
-                if (!impl_->guideline_catalog.has_value()) {
-                    SetStatus("SCCG guidelines are not available: " + impl_->guideline_catalog_error);
-                    return;
-                }
+    core::reviews::ProposalValidityResult validity =
+        core::reviews::EvaluateReviewProposalValidity(*proposal, impl_->app_state.loaded_case.value());
+    if (validity.validity != core::reviews::ProposalValidity::Valid) {
+        SetStatus("Proposal is broken: " + validity.reason);
+        return;
+    }
 
-                std::unordered_set<std::string> seen_guideline_ids;
-                for (const std::string& guideline_id : guideline_ids) {
-                    if (guideline_id.empty() || seen_guideline_ids.count(guideline_id) > 0)
-                        continue;
-                    if (impl_->guideline_catalog->ids.count(guideline_id) == 0) {
-                        SetStatus("Unknown SCCG guideline id: " + guideline_id);
-                        return;
-                    }
-                    validated_guideline_ids.push_back(guideline_id);
-                    seen_guideline_ids.insert(guideline_id);
-                }
-            }
+    core::reviews::ReviewProposalPatchService patch_service;
+    core::reviews::ApplyProposalResult apply_result =
+        patch_service.ApplyProposal(*proposal, impl_->app_state.loaded_case.value());
+    if (!apply_result.success) {
+        SetStatus("Proposal apply failed: " + apply_result.error);
+        return;
+    }
 
-            core::reviews::ReviewItem item;
-            item.id = GenerateReviewItemId();
-            item.element_id = element_id;
-            item.title = title;
-            item.message = message;
-            item.severity = "warning";
-            item.reviewer_name = impl_->reviewer_name;
-            item.guideline_ids = std::move(validated_guideline_ids);
-            item.source = core::reviews::ReviewItemSource::Manual;
-            item.status = core::reviews::ReviewItemStatus::Open;
-            item.created_utc = NowUtcString();
-            item.updated_utc = item.created_utc;
+    impl_->proposal_controller->ClosePreviewIfOpen(item.proposal_id.value());
+    ClearProposalHighlightState(ui::GetUiState());
+    if (!impl_->app_state.sacm_package.has_value())
+        impl_->app_state.sacm_package.emplace();
+    RebuildSacmArgumentPackageFromParser(impl_->app_state.loaded_case.value(), impl_->app_state.sacm_package.value());
+    impl_->document_dirty = true;
+    impl_->app_state.mark_dirty();
 
-            impl_->review_controller->AddManualItem(std::move(item));
-        };
-    callbacks.create_proposed_change = [this](const core::reviews::ReviewItem& item) {
-        BeginProposalForReviewItem(item);
-    };
-    callbacks.save_proposal = [this](const core::reviews::ReviewItem& item) { SaveActiveProposal(item); };
-    callbacks.edit_proposal = [this](const core::reviews::ReviewItem& item) { BeginEditProposalForReviewItem(item); };
-    callbacks.preview_proposal = [this](const core::reviews::ReviewItem& item) {
-        if (!item.proposal_id.has_value()) {
-            SetStatus("This review comment has no proposed change to preview.");
-            return;
-        }
-        PreviewProposalById(item.proposal_id.value());
-    };
-    callbacks.apply_proposal = [this](const core::reviews::ReviewItem& item) {
-        if (impl_->proposal_controller->creator_active) {
-            SetStatus("Save or discard the active proposal before applying another proposal.");
-            return;
-        }
-        if (!item.proposal_id.has_value()) {
-            SetStatus("This review comment has no proposed change to apply.");
-            return;
-        }
-        if (!impl_->app_state.current_project.has_value() || !impl_->app_state.loaded_case.has_value()) {
-            SetStatus("Open a project and SACM file before applying proposed changes.");
-            return;
-        }
+    core::AssuranceProject& project = impl_->app_state.current_project.value();
+    if (!DeleteProposalPatchFile(item.proposal_id.value(), error)) {
+        SetStatus("Proposal applied in memory, but proposal file removal failed: " + error);
+        return;
+    }
 
-        std::string error;
-        std::optional<core::reviews::ReviewProposal> proposal =
-            impl_->proposal_controller->manager.LoadProposal(item.proposal_id.value(), error);
-        if (!proposal.has_value()) {
-            SetStatus("Proposal apply failed: " + error);
-            return;
-        }
+    core::reviews::ReviewItem updated = item;
+    updated.proposal_id.reset();
+    updated.status = core::reviews::ReviewItemStatus::Resolved;
+    updated.applied_note = "Proposal applied at " + NowUtcString() + ".";
+    updated.updated_utc = NowUtcString();
+    if (!impl_->review_controller->AddOrUpdateItem(std::move(updated))) {
+        SetStatus("Proposal applied, but review item update failed.");
+        return;
+    }
 
-        core::reviews::ProposalValidityResult validity =
-            core::reviews::EvaluateReviewProposalValidity(*proposal, impl_->app_state.loaded_case.value());
-        if (validity.validity != core::reviews::ProposalValidity::Valid) {
-            SetStatus("Proposal is broken: " + validity.reason);
-            return;
-        }
+    if (!SaveProject()) {
+        SetStatus("Proposal applied, but project save failed: " + impl_->app_state.status_message);
+        return;
+    }
 
-        core::reviews::ReviewProposalPatchService patch_service;
-        core::reviews::ApplyProposalResult apply_result =
-            patch_service.ApplyProposal(*proposal, impl_->app_state.loaded_case.value());
-        if (!apply_result.success) {
-            SetStatus("Proposal apply failed: " + apply_result.error);
-            return;
-        }
-
-        impl_->proposal_controller->ClosePreviewIfOpen(item.proposal_id.value());
-        ClearProposalHighlightState(ui::GetUiState());
-        if (!impl_->app_state.sacm_package.has_value())
-            impl_->app_state.sacm_package.emplace();
-        RebuildSacmArgumentPackageFromParser(impl_->app_state.loaded_case.value(),
-                                             impl_->app_state.sacm_package.value());
-        impl_->document_dirty = true;
-        impl_->app_state.mark_dirty();
-
-        core::AssuranceProject& project = impl_->app_state.current_project.value();
-        if (!DeleteProposalPatchFile(item.proposal_id.value(), error)) {
-            SetStatus("Proposal applied in memory, but proposal file removal failed: " + error);
-            return;
-        }
-
-        core::reviews::ReviewItem updated = item;
-        updated.proposal_id.reset();
-        updated.status = core::reviews::ReviewItemStatus::Resolved;
-        updated.applied_note = "Proposal applied at " + NowUtcString() + ".";
-        updated.updated_utc = NowUtcString();
-        if (!impl_->review_controller->AddOrUpdateItem(std::move(updated))) {
-            SetStatus("Proposal applied, but review item update failed.");
-            return;
-        }
-
-        if (!SaveProject()) {
-            SetStatus("Proposal applied, but project save failed: " + impl_->app_state.status_message);
-            return;
-        }
-
-        core::ProjectService::RefreshFileStatus(project);
-        impl_->tree_needs_rebuild = true;
-        SetStatus("Applied proposal " + proposal->id + ".");
-    };
-    callbacks.delete_proposal = [this](const core::reviews::ReviewItem& item) {
-        actions::ReviewActions(*impl_).DeleteProposalForReviewItem(item);
-    };
-    callbacks.resolve_review_item = [this](const core::reviews::ReviewItem& item) { ResolveReviewItem(item); };
-    callbacks.delete_review_item = [this](const core::reviews::ReviewItem& item) { BeginDeleteReviewItem(item); };
-    callbacks.delete_problem = [this](const core::ProblemItem& problem) {
-        impl_->problems_manager.RemoveProblem(problem.id);
-        SyncReviewVisualStatesFromReviews();
-        SetStatus("Problem deleted.");
-    };
-    callbacks.set_manual_review_ok = [this, element_id = model.selected_element_id](bool manual_ok) {
-        SetManualReviewOk(element_id, manual_ok);
-    };
-    ui::panels::ShowReviewPanel(model, callbacks);
+    core::ProjectService::RefreshFileStatus(project);
+    impl_->tree_needs_rebuild = true;
+    SetStatus("Applied proposal " + proposal->id + ".");
 }
 
 void AppRuntime::RequestExit(bool& done) {
@@ -1656,7 +1460,39 @@ void AppRuntime::RenderFrame(bool& done) {
 
     areas::RenderProjectExplorerArea(*impl_, regions.project_explorer, kPanelFlags, project_explorer_callbacks);
     areas::RenderArgumentNavigatorArea(*impl_, regions.argument_navigator, kPanelFlags, argument_navigator_callbacks);
-    RenderWorkbenchArea(regions.workbench);
+    areas::RenderWorkbenchArea(*impl_, regions.workbench, kPanelFlags, MakeWorkbenchAreaCallbacks());
+
+    areas::ReviewPanelAreaCallbacks review_panel_callbacks;
+    review_panel_callbacks.ensure_review_item_storage = [this]() { return EnsureReviewItemStorage(); };
+    review_panel_callbacks.set_status = [this](const std::string& message) { SetStatus(message); };
+    review_panel_callbacks.create_proposed_change = [this](const core::reviews::ReviewItem& item) {
+        return BeginProposalForReviewItem(item);
+    };
+    review_panel_callbacks.save_proposal = [this](const core::reviews::ReviewItem& item) {
+        return SaveActiveProposal(item);
+    };
+    review_panel_callbacks.edit_proposal = [this](const core::reviews::ReviewItem& item) {
+        return BeginEditProposalForReviewItem(item);
+    };
+    review_panel_callbacks.preview_proposal_by_id = [this](const std::string& proposal_id) {
+        return PreviewProposalById(proposal_id);
+    };
+    review_panel_callbacks.apply_proposal = [this](const core::reviews::ReviewItem& item) {
+        ApplyReviewProposal(item);
+    };
+    review_panel_callbacks.delete_proposal = [this](const core::reviews::ReviewItem& item) {
+        actions::ReviewActions(*impl_).DeleteProposalForReviewItem(item);
+    };
+    review_panel_callbacks.resolve_review_item = [this](const core::reviews::ReviewItem& item) {
+        return ResolveReviewItem(item);
+    };
+    review_panel_callbacks.delete_review_item = [this](const core::reviews::ReviewItem& item) {
+        BeginDeleteReviewItem(item);
+    };
+    review_panel_callbacks.sync_review_visual_states = [this]() { SyncReviewVisualStatesFromReviews(); };
+    review_panel_callbacks.set_manual_review_ok = [this](const std::string& element_id, bool manual_ok) {
+        return SetManualReviewOk(element_id, manual_ok);
+    };
 
     areas::FeedbackDockAreaCallbacks feedback_dock_callbacks{
         [this](const core::ProblemItem& problem) {
@@ -1672,8 +1508,8 @@ void AppRuntime::RenderFrame(bool& done) {
         },
         [this](const core::ProblemItem& problem) { HandleProblemQuickFix(problem); },
         [this](std::size_t usage_index) { NavigateToTerminologyUsage(usage_index); },
-        [this]() { RenderReviewPanelContent(); },
-        [this]() { RenderAiDebugPanelContent(); },
+        [this, &review_panel_callbacks]() { areas::RenderReviewPanelContent(*impl_, review_panel_callbacks); },
+        [this]() { areas::RenderAiDebugPanelContent(*impl_); },
     };
     areas::RenderFeedbackDockArea(*impl_, regions.feedback_dock, kPanelFlags, feedback_dock_callbacks);
 
