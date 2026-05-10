@@ -3,6 +3,7 @@
 #include "ai/ai_service.h"
 #include "ai/ai_task_runner.h"
 #include "ai/secret_store.h"
+#include "app/areas/argument_navigator_area.h"
 #include "app/areas/project_explorer_area.h"
 #include "app/app_runtime_state.h"
 #include "app/frame/app_shell.h"
@@ -36,7 +37,6 @@
 #include "ui/panels/terminology_usages_panel.h"
 #include "ui/register_views.h"
 #include "ui/theme.h"
-#include "ui/tree_view.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
@@ -1966,44 +1966,6 @@ void AppRuntime::RenderThemeTweaksWindow() {
     HelloImGui::ShowThemeTweakGuiWindow(&impl_->modal_coordinator->show_theme_tweak_window);
 }
 
-void AppRuntime::RenderArgumentNavigatorArea(const AppLayoutRegion& region) {
-    ImGui::SetNextWindowPos(region.pos);
-    ImGui::SetNextWindowSize(region.size);
-    ImGui::Begin("Safety Case Tree", nullptr, kPanelFlags);
-    ui::UiState& ui_state = ui::GetUiState();
-    ui::ElementContextActions actions;
-    if (impl_->proposal_controller->preview_active) {
-        actions = ui::ElementContextActions{};
-    } else if (impl_->proposal_controller->creator_active) {
-        actions = ui::ElementContextActions{
-            [this](core::NewElementKind kind) { AddProposalChildToSelected(kind); },
-            [this]() { AddProposalTopGoal(); },
-            [this](core::RemoveMode mode) { RemoveProposalSelected(mode); },
-            nullptr,
-            [this](const char* feature) {
-                if (feature)
-                    ShowNotImplementedModal(feature);
-            },
-        };
-    } else {
-        actions = MakeElementContextActions(*this);
-    }
-    ui::TreeEditActions tree_edit_actions{
-        [this](const std::string& dragged_id, const std::string& target_id, core::TreeDropMode drop_mode) {
-            return ValidateTreeDrop(dragged_id, target_id, drop_mode);
-        },
-        [this](const std::string& dragged_id, const std::string& target_id, core::TreeDropMode drop_mode) {
-            return PerformTreeDrop(dragged_id, target_id, drop_mode);
-        },
-    };
-    const parser::AssuranceCase* visible_case =
-        impl_->IsProposalCanvasActive() ? &impl_->proposal_controller->preview_model : GetLoadedCase();
-    const ui::TreeEditActions* edit_actions = impl_->IsProposalCanvasActive() ? nullptr : &tree_edit_actions;
-    ui::ShowTreeViewPanel(
-        impl_->current_tree.root ? &impl_->current_tree : nullptr, visible_case, ui_state, actions, edit_actions);
-    ImGui::End();
-}
-
 void AppRuntime::RenderSacmViewerPanel(float left_w, float sacm_h, float top_y) {
     ui::panels::SacmViewerPanelModel model{
         impl_->app_state,
@@ -2949,8 +2911,27 @@ void AppRuntime::RenderFrame(bool& done) {
         },
     };
 
+    ArgumentNavigatorAreaCallbacks argument_navigator_callbacks{
+        [this]() { return MakeElementContextActions(*this); },
+        [this](core::NewElementKind kind) { AddProposalChildToSelected(kind); },
+        [this]() { AddProposalTopGoal(); },
+        [this](core::RemoveMode mode) { RemoveProposalSelected(mode); },
+        [this](const char* feature) {
+            if (feature)
+                ShowNotImplementedModal(feature);
+        },
+        ui::TreeEditActions{
+            [this](const std::string& dragged_id, const std::string& target_id, core::TreeDropMode drop_mode) {
+                return ValidateTreeDrop(dragged_id, target_id, drop_mode);
+            },
+            [this](const std::string& dragged_id, const std::string& target_id, core::TreeDropMode drop_mode) {
+                return PerformTreeDrop(dragged_id, target_id, drop_mode);
+            },
+        },
+    };
+
     app::RenderProjectExplorerArea(*impl_, regions.project_explorer, kPanelFlags, project_explorer_callbacks);
-    RenderArgumentNavigatorArea(regions.argument_navigator);
+    app::RenderArgumentNavigatorArea(*impl_, regions.argument_navigator, kPanelFlags, argument_navigator_callbacks);
     RenderWorkbenchArea(regions.workbench);
     RenderFeedbackDockArea(regions.feedback_dock);
     RenderInspectorArea(regions.inspector);

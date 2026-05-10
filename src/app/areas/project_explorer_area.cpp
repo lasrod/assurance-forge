@@ -11,8 +11,8 @@ void RenderProjectExplorerArea(AppRuntimeState& state,
                                ImGuiWindowFlags panel_flags,
                                const ProjectExplorerAreaCallbacks& callbacks) {
     ui::panels::ProjectFilesPanelModel project_model;
-    project_model.project = state.app_state.current_project.has_value() ? &state.app_state.current_project.value()
-                                                                       : nullptr;
+    project_model.project =
+        state.app_state.current_project.has_value() ? &state.app_state.current_project.value() : nullptr;
     if (project_model.project) {
         if (callbacks.refresh_sacm_package_tree_cache)
             callbacks.refresh_sacm_package_tree_cache();

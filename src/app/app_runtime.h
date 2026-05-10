@@ -69,7 +69,6 @@ private:
 
     float RenderMainMenuBar(bool& done);
     void ScanDirectory();
-    void RenderArgumentNavigatorArea(const AppLayoutRegion& region);
     void RenderSacmViewerPanel(float left_w, float sacm_h, float top_y);
     void RenderWorkbenchArea(const AppLayoutRegion& region);
     void RenderFeedbackDockArea(const AppLayoutRegion& region);
