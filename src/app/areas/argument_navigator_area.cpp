@@ -4,10 +4,10 @@
 #include "app/frame/app_layout_regions.h"
 #include "imgui.h"
 
-namespace app {
+namespace app::areas {
 
 void RenderArgumentNavigatorArea(AppRuntimeState& state,
-                                 const AppLayoutRegion& region,
+                                 const frame::AppLayoutRegion& region,
                                  ImGuiWindowFlags panel_flags,
                                  const ArgumentNavigatorAreaCallbacks& callbacks) {
     ImGui::SetNextWindowPos(region.pos);
@@ -39,4 +39,4 @@ void RenderArgumentNavigatorArea(AppRuntimeState& state,
     ImGui::End();
 }
 
-} // namespace app
+} // namespace app::areas

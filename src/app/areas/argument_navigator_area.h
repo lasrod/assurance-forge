@@ -8,9 +8,11 @@
 #include <functional>
 
 namespace app {
-
-struct AppLayoutRegion;
 struct AppRuntimeState;
+namespace frame { struct AppLayoutRegion; }
+}
+
+namespace app::areas {
 
 struct ArgumentNavigatorAreaCallbacks {
     std::function<ui::ElementContextActions()> make_element_context_actions;
@@ -22,8 +24,8 @@ struct ArgumentNavigatorAreaCallbacks {
 };
 
 void RenderArgumentNavigatorArea(AppRuntimeState& state,
-                                 const AppLayoutRegion& region,
+                                 const frame::AppLayoutRegion& region,
                                  ImGuiWindowFlags panel_flags,
                                  const ArgumentNavigatorAreaCallbacks& callbacks);
 
-} // namespace app
+} // namespace app::areas

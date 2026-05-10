@@ -7,9 +7,11 @@
 #include <functional>
 
 namespace app {
-
-struct AppLayoutRegion;
 struct AppRuntimeState;
+namespace frame { struct AppLayoutRegion; }
+}
+
+namespace app::areas {
 
 struct FeedbackDockAreaCallbacks {
     std::function<void(const core::ProblemItem&)> activate_problem;
@@ -20,8 +22,8 @@ struct FeedbackDockAreaCallbacks {
 };
 
 void RenderFeedbackDockArea(AppRuntimeState& state,
-                            const AppLayoutRegion& region,
+                            const frame::AppLayoutRegion& region,
                             ImGuiWindowFlags panel_flags,
                             const FeedbackDockAreaCallbacks& callbacks);
 
-} // namespace app
+} // namespace app::areas

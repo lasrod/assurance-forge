@@ -6,10 +6,10 @@
 #include "ui/panels/terminology_usages_panel.h"
 #include "ui/ui_state.h"
 
-namespace app {
+namespace app::areas {
 
 void RenderFeedbackDockArea(AppRuntimeState& state,
-                            const AppLayoutRegion& region,
+                            const frame::AppLayoutRegion& region,
                             ImGuiWindowFlags panel_flags,
                             const FeedbackDockAreaCallbacks& callbacks) {
     ui::panels::ProblemsPanelModel model{
@@ -72,4 +72,4 @@ void RenderFeedbackDockArea(AppRuntimeState& state,
     ImGui::End();
 }
 
-} // namespace app
+} // namespace app::areas

@@ -5,9 +5,9 @@
 
 #include <string>
 
-namespace app {
+namespace app { struct AppRuntimeState; }
 
-struct AppRuntimeState;
+namespace app::actions {
 
 class ElementActions {
 public:
@@ -24,4 +24,4 @@ private:
     AppRuntimeState& state_;
 };
 
-} // namespace app
+} // namespace app::actions

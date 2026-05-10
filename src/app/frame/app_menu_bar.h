@@ -2,9 +2,9 @@
 
 #include <functional>
 
-namespace app {
+namespace app { struct AppRuntimeState; }
 
-struct AppRuntimeState;
+namespace app::frame {
 
 struct AppMenuBarCallbacks {
     std::function<void()> begin_create_project;
@@ -18,4 +18,4 @@ struct AppMenuBarCallbacks {
 
 float RenderAppMenuBar(AppRuntimeState& state, bool& done, const AppMenuBarCallbacks& callbacks);
 
-} // namespace app
+} // namespace app::frame

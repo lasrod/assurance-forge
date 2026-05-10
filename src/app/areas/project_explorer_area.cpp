@@ -4,10 +4,10 @@
 #include "app/frame/app_layout_regions.h"
 #include "ui/panels/project_files_panel.h"
 
-namespace app {
+namespace app::areas {
 
 void RenderProjectExplorerArea(AppRuntimeState& state,
-                               const AppLayoutRegion& region,
+                               const frame::AppLayoutRegion& region,
                                ImGuiWindowFlags panel_flags,
                                const ProjectExplorerAreaCallbacks& callbacks) {
     ui::panels::ProjectFilesPanelModel project_model;
@@ -37,4 +37,4 @@ void RenderProjectExplorerArea(AppRuntimeState& state,
         region.size.x, region.size.y, region.pos.y, panel_flags, project_model, project_callbacks);
 }
 
-} // namespace app
+} // namespace app::areas

@@ -4,7 +4,7 @@
 #include "app/app_runtime_state.h"
 #include "ui/ui_state.h"
 
-namespace app {
+namespace app::actions {
 namespace {
 
 void SetStatus(AppRuntimeState& state, const std::string& message) {
@@ -115,4 +115,4 @@ bool ElementActions::PerformTreeDrop(const std::string& dragged_id,
     return true;
 }
 
-} // namespace app
+} // namespace app::actions

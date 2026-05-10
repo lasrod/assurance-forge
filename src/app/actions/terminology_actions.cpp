@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-namespace app {
+namespace app::actions {
 namespace {
 
 void SetStatus(AppRuntimeState& state, const std::string& message) {
@@ -1107,4 +1107,4 @@ bool TerminologyActions::IsSuggestionIgnored(const std::string& element_id, cons
     return state_.terminology.ignored_suggestion_keys.count(key) > 0;
 }
 
-} // namespace app
+} // namespace app::actions

@@ -4,10 +4,10 @@
 #include "app/frame/app_layout_regions.h"
 #include "ui/panels/element_panel.h"
 
-namespace app {
+namespace app::areas {
 
 void RenderInspectorArea(AppRuntimeState& state,
-                         const AppLayoutRegion& region,
+                         const frame::AppLayoutRegion& region,
                          ImGuiWindowFlags panel_flags,
                          const InspectorAreaCallbacks& callbacks) {
     ImGui::SetNextWindowPos(region.pos);
@@ -39,4 +39,4 @@ void RenderInspectorArea(AppRuntimeState& state,
     ImGui::End();
 }
 
-} // namespace app
+} // namespace app::areas

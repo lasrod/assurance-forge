@@ -8,9 +8,9 @@
 #include <cstddef>
 #include <string>
 
-namespace app {
+namespace app { struct AppRuntimeState; }
 
-struct AppRuntimeState;
+namespace app::actions {
 
 class TerminologyActions {
 public:
@@ -57,4 +57,4 @@ private:
     AppRuntimeState& state_;
 };
 
-} // namespace app
+} // namespace app::actions

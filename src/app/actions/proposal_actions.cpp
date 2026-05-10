@@ -18,7 +18,7 @@
 #include <utility>
 #include <vector>
 
-namespace app {
+namespace app::actions {
 namespace {
 
 void SetStatus(AppRuntimeState& state, const std::string& message) {
@@ -718,4 +718,4 @@ void ProposalActions::RemoveSelected(core::RemoveMode mode) {
     SetStatus(state_, "Recorded proposal remove operation.");
 }
 
-} // namespace app
+} // namespace app::actions

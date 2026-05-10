@@ -7,9 +7,11 @@
 #include <string>
 
 namespace app {
-
-struct AppLayoutRegion;
 struct AppRuntimeState;
+namespace frame { struct AppLayoutRegion; }
+}
+
+namespace app::areas {
 
 struct InspectorAreaCallbacks {
     std::function<void()> render_proposal_element_editor;
@@ -23,8 +25,8 @@ struct InspectorAreaCallbacks {
 };
 
 void RenderInspectorArea(AppRuntimeState& state,
-                         const AppLayoutRegion& region,
+                         const frame::AppLayoutRegion& region,
                          ImGuiWindowFlags panel_flags,
                          const InspectorAreaCallbacks& callbacks);
 
-} // namespace app
+} // namespace app::areas

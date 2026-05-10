@@ -3,7 +3,7 @@
 #include "app/app_runtime_state.h"
 #include "ui/ui_state.h"
 
-namespace app {
+namespace app::actions {
 namespace {
 
 const parser::AssuranceCase* GetLoadedCase(const AppRuntimeState& state) {
@@ -38,4 +38,4 @@ void AiReviewActions::PollTask() {
     state_.ai.review_controller->PollTask();
 }
 
-} // namespace app
+} // namespace app::actions

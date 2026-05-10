@@ -313,151 +313,151 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
 
 void AppRuntime::BeginAddTerminologyPackage(const core::ProjectFileEntry& entry,
                                             const sacm::SacmPackageTreeNode& parent_node) {
-    TerminologyActions(*impl_).BeginAddPackage(entry, parent_node);
+    actions::TerminologyActions(*impl_).BeginAddPackage(entry, parent_node);
 }
 
 void AppRuntime::ConfirmAddTerminologyPackage() {
-    if (TerminologyActions(*impl_).ConfirmAddPackage())
+    if (actions::TerminologyActions(*impl_).ConfirmAddPackage())
         SyncTerminologyProblems();
 }
 
 void AppRuntime::ApplyTerminologyPackageEdits() {
-    if (TerminologyActions(*impl_).ApplyPackageEdits())
+    if (actions::TerminologyActions(*impl_).ApplyPackageEdits())
         SyncTerminologyProblems();
 }
 
 void AppRuntime::BeginDeleteTerminologyPackage() {
-    TerminologyActions(*impl_).BeginDeletePackage();
+    actions::TerminologyActions(*impl_).BeginDeletePackage();
 }
 
 void AppRuntime::ConfirmDeleteTerminologyPackage() {
-    if (TerminologyActions(*impl_).ConfirmDeletePackage())
+    if (actions::TerminologyActions(*impl_).ConfirmDeletePackage())
         SyncTerminologyProblems();
 }
 
 void AppRuntime::SelectTerminologyTerm(const core::TerminologyTermRef& term_ref) {
-    TerminologyActions(*impl_).SelectTerm(term_ref);
+    actions::TerminologyActions(*impl_).SelectTerm(term_ref);
 }
 
 void AppRuntime::BeginAddTerminologyTerm() {
-    TerminologyActions(*impl_).BeginAddTerm();
+    actions::TerminologyActions(*impl_).BeginAddTerm();
 }
 
 void AppRuntime::BeginEditTerminologyTerm(const core::TerminologyTermRef& term_ref) {
-    TerminologyActions(*impl_).BeginEditTerm(term_ref);
+    actions::TerminologyActions(*impl_).BeginEditTerm(term_ref);
 }
 
 void AppRuntime::ConfirmTerminologyTermEdit() {
-    if (TerminologyActions(*impl_).ConfirmTermEdit())
+    if (actions::TerminologyActions(*impl_).ConfirmTermEdit())
         SyncTerminologyProblems();
 }
 
 void AppRuntime::OpenTerminologyTermFromCanvas(const core::TerminologyPackageRef& package_ref,
                                                const core::TerminologyTermRef& term_ref) {
-    TerminologyActions(*impl_).OpenTermFromCanvas(package_ref, term_ref);
+    actions::TerminologyActions(*impl_).OpenTermFromCanvas(package_ref, term_ref);
 }
 
 void AppRuntime::EditTerminologyTermFromCanvas(const core::TerminologyPackageRef& package_ref,
                                                const core::TerminologyTermRef& term_ref) {
-    TerminologyActions(*impl_).EditTermFromCanvas(package_ref, term_ref);
+    actions::TerminologyActions(*impl_).EditTermFromCanvas(package_ref, term_ref);
 }
 
 void AppRuntime::AddTerminologyTermAsContextFromCanvas(const std::string& element_id,
                                                        const core::TerminologyPackageRef& package_ref,
                                                        const core::TerminologyTermRef& term_ref) {
-    if (TerminologyActions(*impl_).AddTermAsContextFromCanvas(element_id, package_ref, term_ref))
+    if (actions::TerminologyActions(*impl_).AddTermAsContextFromCanvas(element_id, package_ref, term_ref))
         SyncTerminologyProblems();
 }
 
 void AppRuntime::AddVisibleTerminologyTermContextFromCanvas(const std::string& element_id,
                                                             const core::TerminologyPackageRef& package_ref,
                                                             const core::TerminologyTermRef& term_ref) {
-    if (TerminologyActions(*impl_).AddVisibleTermContextFromCanvas(element_id, package_ref, term_ref))
+    if (actions::TerminologyActions(*impl_).AddVisibleTermContextFromCanvas(element_id, package_ref, term_ref))
         SyncTerminologyProblems();
 }
 
 void AppRuntime::FindTerminologyUsagesFromCanvas(const core::TerminologyPackageRef& package_ref,
                                                  const core::TerminologyTermRef& term_ref) {
-    TerminologyActions(*impl_).BeginFindUsages(package_ref, term_ref);
+    actions::TerminologyActions(*impl_).BeginFindUsages(package_ref, term_ref);
 }
 
 void AppRuntime::BeginFindTerminologyUsages(const core::TerminologyPackageRef& package_ref,
                                             const core::TerminologyTermRef& term_ref) {
-    TerminologyActions(*impl_).BeginFindUsages(package_ref, term_ref);
+    actions::TerminologyActions(*impl_).BeginFindUsages(package_ref, term_ref);
 }
 
 void AppRuntime::NavigateToTerminologyUsage(std::size_t usage_index) {
-    TerminologyActions(*impl_).NavigateToUsage(usage_index);
+    actions::TerminologyActions(*impl_).NavigateToUsage(usage_index);
 }
 
 void AppRuntime::ChangeTerminologyMeaningFromCanvas(const std::string& element_id, const std::string& term_value) {
-    TerminologyActions(*impl_).ChangeMeaningFromCanvas(element_id, term_value);
+    actions::TerminologyActions(*impl_).ChangeMeaningFromCanvas(element_id, term_value);
 }
 
 void AppRuntime::BeginQuickDefineTerminologyTerm(const std::string& element_id, const std::string& term_value) {
-    TerminologyActions(*impl_).BeginQuickDefineTerm(element_id, term_value);
+    actions::TerminologyActions(*impl_).BeginQuickDefineTerm(element_id, term_value);
 }
 
 void AppRuntime::BeginLinkExistingTerminologyTerm(const std::string& element_id, const std::string& term_value) {
-    TerminologyActions(*impl_).BeginLinkExistingTerm(element_id, term_value);
+    actions::TerminologyActions(*impl_).BeginLinkExistingTerm(element_id, term_value);
 }
 
 void AppRuntime::IgnoreTerminologySuggestion(const std::string& element_id, const std::string& term_value) {
-    TerminologyActions(*impl_).IgnoreSuggestion(element_id, term_value);
+    actions::TerminologyActions(*impl_).IgnoreSuggestion(element_id, term_value);
 }
 
 bool AppRuntime::IsTerminologySuggestionIgnored(const std::string& element_id, const std::string& term_value) const {
-    return TerminologyActions(*impl_).IsSuggestionIgnored(element_id, term_value);
+    return actions::TerminologyActions(*impl_).IsSuggestionIgnored(element_id, term_value);
 }
 
 void AppRuntime::HandleProblemQuickFix(const core::ProblemItem& problem) {
-    TerminologyActions(*impl_).HandleProblemQuickFix(problem);
+    actions::TerminologyActions(*impl_).HandleProblemQuickFix(problem);
 }
 
 void AppRuntime::ConfirmQuickDefineTerminologyTerm(bool add_as_context) {
-    if (TerminologyActions(*impl_).ConfirmQuickDefineTerm(add_as_context))
+    if (actions::TerminologyActions(*impl_).ConfirmQuickDefineTerm(add_as_context))
         SyncTerminologyProblems();
 }
 
 void AppRuntime::BeginDeleteTerminologyTerm(const core::TerminologyTermRef& term_ref) {
-    TerminologyActions(*impl_).BeginDeleteTerm(term_ref);
+    actions::TerminologyActions(*impl_).BeginDeleteTerm(term_ref);
 }
 
 void AppRuntime::ConfirmDeleteTerminologyTerm() {
-    if (TerminologyActions(*impl_).ConfirmDeleteTerm())
+    if (actions::TerminologyActions(*impl_).ConfirmDeleteTerm())
         SyncTerminologyProblems();
 }
 
 void AppRuntime::SelectTerminologyCategory(const core::TerminologyCategoryRef& category_ref) {
-    TerminologyActions(*impl_).SelectCategory(category_ref);
+    actions::TerminologyActions(*impl_).SelectCategory(category_ref);
 }
 
 void AppRuntime::SetTerminologyCategoryFilter(const std::string& category_filter) {
-    TerminologyActions(*impl_).SetCategoryFilter(category_filter);
+    actions::TerminologyActions(*impl_).SetCategoryFilter(category_filter);
 }
 
 void AppRuntime::BeginAddTerminologyCategory() {
-    TerminologyActions(*impl_).BeginAddCategory();
+    actions::TerminologyActions(*impl_).BeginAddCategory();
 }
 
 void AppRuntime::BeginEditTerminologyCategory(const core::TerminologyCategoryRef& category_ref) {
-    TerminologyActions(*impl_).BeginEditCategory(category_ref);
+    actions::TerminologyActions(*impl_).BeginEditCategory(category_ref);
 }
 
 void AppRuntime::ConfirmTerminologyCategoryEdit() {
-    TerminologyActions(*impl_).ConfirmCategoryEdit();
+    actions::TerminologyActions(*impl_).ConfirmCategoryEdit();
 }
 
 void AppRuntime::BeginDeleteTerminologyCategory(const core::TerminologyCategoryRef& category_ref) {
-    TerminologyActions(*impl_).BeginDeleteCategory(category_ref);
+    actions::TerminologyActions(*impl_).BeginDeleteCategory(category_ref);
 }
 
 void AppRuntime::ConfirmDeleteTerminologyCategory() {
-    TerminologyActions(*impl_).ConfirmDeleteCategory();
+    actions::TerminologyActions(*impl_).ConfirmDeleteCategory();
 }
 
 void AppRuntime::SeedRecommendedTerminologyCategories() {
-    TerminologyActions(*impl_).SeedRecommendedCategories();
+    actions::TerminologyActions(*impl_).SeedRecommendedCategories();
 }
 
 void AppRuntime::RefreshSacmPackageTreeCache() {

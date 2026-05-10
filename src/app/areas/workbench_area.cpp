@@ -11,7 +11,7 @@
 #include "ui/register_views.h"
 #include "ui/ui_state.h"
 
-namespace app {
+namespace app::areas {
 namespace {
 
 ui::ElementContextActions MakeProposalContextActions(const WorkbenchAreaCallbacks& callbacks) {
@@ -147,7 +147,7 @@ void RenderTerminologyPackageTab(AppRuntimeState& state, const WorkbenchAreaCall
 } // namespace
 
 void RenderWorkbenchArea(AppRuntimeState& state,
-                         const AppLayoutRegion& region,
+                         const frame::AppLayoutRegion& region,
                          ImGuiWindowFlags panel_flags,
                          const WorkbenchAreaCallbacks& callbacks) {
     ImGui::SetNextWindowPos(region.pos);
@@ -155,7 +155,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
     ImGui::Begin("Center View", nullptr, panel_flags | ImGuiWindowFlags_NoTitleBar);
 
     ui::UiState& ui_state = ui::GetUiState();
-    NormalizeCenterViewSelection(state, ui_state.center_view);
+    frame::NormalizeCenterViewSelection(state, ui_state.center_view);
 
     if (ImGui::BeginTabBar("##center_tabs")) {
         if (state.workbench.show_gsn_tab) {
@@ -238,4 +238,4 @@ void RenderWorkbenchArea(AppRuntimeState& state,
     ImGui::End();
 }
 
-} // namespace app
+} // namespace app::areas

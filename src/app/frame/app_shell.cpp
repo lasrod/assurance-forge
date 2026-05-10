@@ -5,7 +5,7 @@
 
 #include <algorithm>
 
-namespace app {
+namespace app::frame {
 namespace {
 
 constexpr float kSplitterThickness = 4.0f;
@@ -166,4 +166,4 @@ AppLayoutRegions RenderAppShell(AppRuntimeState& state, float menu_height, ImGui
     return regions;
 }
 
-} // namespace app
+} // namespace app::frame

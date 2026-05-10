@@ -5,9 +5,9 @@
 #include <functional>
 #include <string>
 
-namespace app {
+namespace app { struct AppRuntimeState; }
 
-struct AppRuntimeState;
+namespace app::areas {
 
 struct ModalHostCallbacks {
     std::function<void()> begin_create_project;
@@ -30,4 +30,4 @@ struct ModalHostCallbacks {
 
 void RenderModalHost(AppRuntimeState& state, bool& done, const ModalHostCallbacks& callbacks);
 
-} // namespace app
+} // namespace app::areas

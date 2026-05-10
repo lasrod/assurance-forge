@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-namespace app {
+namespace app::areas {
 namespace {
 
 void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
@@ -1045,4 +1045,4 @@ void RenderModalHost(AppRuntimeState& state, bool& done, const ModalHostCallback
     ModalHost(state, done, callbacks).Render();
 }
 
-} // namespace app
+} // namespace app::areas

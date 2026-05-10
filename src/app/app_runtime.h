@@ -15,7 +15,7 @@
 
 namespace app {
 
-struct AppLayoutRegion;
+namespace frame { struct AppLayoutRegion; }
 struct AppRuntimeState;
 
 class AppRuntime {
@@ -69,7 +69,7 @@ private:
 
     void ScanDirectory();
     void RenderSacmViewerPanel(float left_w, float sacm_h, float top_y);
-    void RenderWorkbenchArea(const AppLayoutRegion& region);
+    void RenderWorkbenchArea(const frame::AppLayoutRegion& region);
     void RenderReviewPanelContent();
     void RenderAiDebugPanelContent();
     void RenderProposalElementEditor();

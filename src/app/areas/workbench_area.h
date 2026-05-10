@@ -9,9 +9,11 @@
 #include <string>
 
 namespace app {
-
-struct AppLayoutRegion;
 struct AppRuntimeState;
+namespace frame { struct AppLayoutRegion; }
+}
+
+namespace app::areas {
 
 struct WorkbenchAreaCallbacks {
     std::function<ui::ElementContextActions()> make_element_context_actions;
@@ -47,8 +49,8 @@ struct WorkbenchAreaCallbacks {
 };
 
 void RenderWorkbenchArea(AppRuntimeState& state,
-                         const AppLayoutRegion& region,
+                         const frame::AppLayoutRegion& region,
                          ImGuiWindowFlags panel_flags,
                          const WorkbenchAreaCallbacks& callbacks);
 
-} // namespace app
+} // namespace app::areas

@@ -11,7 +11,7 @@
 #include <filesystem>
 #include <string>
 
-namespace app {
+namespace app::actions {
 namespace {
 
 void ClearProposalHighlightState(ui::UiState& ui_state) {
@@ -118,4 +118,4 @@ bool ReviewActions::ResolveReviewItem(const core::reviews::ReviewItem& item, con
         item, state_.proposal_controller->creator_active, state_.app_state.current_project.has_value(), updated_utc);
 }
 
-} // namespace app
+} // namespace app::actions

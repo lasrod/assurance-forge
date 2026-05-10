@@ -13,7 +13,7 @@
 #include <algorithm>
 #include <cstdio>
 
-namespace app {
+namespace app::frame {
 namespace {
 
 void RenderLanguageMenu() {
@@ -181,4 +181,4 @@ float RenderAppMenuBar(AppRuntimeState& state, bool& done, const AppMenuBarCallb
     return ImGui::GetFrameHeight();
 }
 
-} // namespace app
+} // namespace app::frame

@@ -2,7 +2,7 @@
 
 #include "imgui.h"
 
-namespace app {
+namespace app::frame {
 
 struct AppLayoutRegion {
     ImVec2 pos{};
@@ -18,4 +18,4 @@ struct AppLayoutRegions {
     float menu_height = 0.0f;
 };
 
-} // namespace app
+} // namespace app::frame

@@ -4,11 +4,11 @@
 #include "imgui.h"
 #include "ui/ui_state.h"
 
-namespace app {
+namespace app { struct AppRuntimeState; }
 
-struct AppRuntimeState;
+namespace app::frame {
 
 void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center_view);
 AppLayoutRegions RenderAppShell(AppRuntimeState& state, float menu_height, ImGuiWindowFlags panel_flags);
 
-} // namespace app
+} // namespace app::frame

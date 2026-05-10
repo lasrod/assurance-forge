@@ -46,11 +46,11 @@ void DrawTooltipIfHovered(const std::string& text) {
 } // namespace
 
 void AppRuntime::BeginAiReviewForSelection() {
-    AiReviewActions(*impl_).BeginForSelection();
+    actions::AiReviewActions(*impl_).BeginForSelection();
 }
 
 void AppRuntime::RunAiReviewForSelection(const std::string& review_profile_id) {
-    AiReviewActions(*impl_).RunForSelection(review_profile_id);
+    actions::AiReviewActions(*impl_).RunForSelection(review_profile_id);
 }
 
 void AppRuntime::RenderAiReviewContextMenuForSelected() {
@@ -121,11 +121,11 @@ void AppRuntime::RenderAiReviewContextMenuForSelected() {
 }
 
 void AppRuntime::StartPendingAiReviewRequest() {
-    AiReviewActions(*impl_).StartPendingRequest();
+    actions::AiReviewActions(*impl_).StartPendingRequest();
 }
 
 void AppRuntime::PollAiReviewTask() {
-    AiReviewActions(*impl_).PollTask();
+    actions::AiReviewActions(*impl_).PollTask();
 }
 
 void AppRuntime::RenderAiDebugPanelContent() {
@@ -174,7 +174,7 @@ void AppRuntime::RenderAiDebugPanelContent() {
             if (!enabled)
                 ImGui::BeginDisabled();
             if (ImGui::Button(profile.display_name.c_str(), ImVec2(-1.0f, 0.0f))) {
-                AiReviewActions(*impl_).BeginForSelection(profile.id);
+                actions::AiReviewActions(*impl_).BeginForSelection(profile.id);
             }
             DrawTooltipIfHovered(tooltip);
             if (!enabled)

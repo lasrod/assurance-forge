@@ -7,9 +7,11 @@
 #include <functional>
 
 namespace app {
-
-struct AppLayoutRegion;
 struct AppRuntimeState;
+namespace frame { struct AppLayoutRegion; }
+}
+
+namespace app::areas {
 
 struct ProjectExplorerAreaCallbacks {
     std::function<void()> refresh_sacm_package_tree_cache;
@@ -22,8 +24,8 @@ struct ProjectExplorerAreaCallbacks {
 };
 
 void RenderProjectExplorerArea(AppRuntimeState& state,
-                               const AppLayoutRegion& region,
+                               const frame::AppLayoutRegion& region,
                                ImGuiWindowFlags panel_flags,
                                const ProjectExplorerAreaCallbacks& callbacks);
 
-} // namespace app
+} // namespace app::areas

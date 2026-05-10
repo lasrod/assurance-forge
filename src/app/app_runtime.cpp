@@ -800,27 +800,27 @@ void AppRuntime::RequestClose() {
 }
 
 bool AppRuntime::AddChildToSelected(core::NewElementKind kind) {
-    return ElementActions(*impl_).AddChildToSelected(kind);
+    return actions::ElementActions(*impl_).AddChildToSelected(kind);
 }
 
 bool AppRuntime::AddTopGoal() {
-    return ElementActions(*impl_).AddTopGoal();
+    return actions::ElementActions(*impl_).AddTopGoal();
 }
 
 void AppRuntime::RemoveSelected(core::RemoveMode mode) {
-    ElementActions(*impl_).RemoveSelected(mode);
+    actions::ElementActions(*impl_).RemoveSelected(mode);
 }
 
 core::TreeDropValidationResult AppRuntime::ValidateTreeDrop(const std::string& dragged_id,
                                                             const std::string& target_id,
                                                             core::TreeDropMode drop_mode) const {
-    return ElementActions(*impl_).ValidateTreeDrop(dragged_id, target_id, drop_mode);
+    return actions::ElementActions(*impl_).ValidateTreeDrop(dragged_id, target_id, drop_mode);
 }
 
 bool AppRuntime::PerformTreeDrop(const std::string& dragged_id,
                                  const std::string& target_id,
                                  core::TreeDropMode drop_mode) {
-    return ElementActions(*impl_).PerformTreeDrop(dragged_id, target_id, drop_mode);
+    return actions::ElementActions(*impl_).PerformTreeDrop(dragged_id, target_id, drop_mode);
 }
 
 void AppRuntime::SetStatus(const std::string& message) {
@@ -832,31 +832,31 @@ void AppRuntime::ShowNotImplementedModal(const std::string& feature) {
 }
 
 bool AppRuntime::RefreshProposalCreatorPreview() {
-    return ProposalActions(*impl_).RefreshCreatorPreview();
+    return actions::ProposalActions(*impl_).RefreshCreatorPreview();
 }
 
 void AppRuntime::ProcessPendingProposalCreatorPreviewRefresh() {
-    ProposalActions(*impl_).ProcessPendingCreatorPreviewRefresh();
+    actions::ProposalActions(*impl_).ProcessPendingCreatorPreviewRefresh();
 }
 
 bool AppRuntime::BeginProposalForReviewItem(const core::reviews::ReviewItem& item) {
-    return ProposalActions(*impl_).BeginForReviewItem(item);
+    return actions::ProposalActions(*impl_).BeginForReviewItem(item);
 }
 
 bool AppRuntime::BeginEditProposalForReviewItem(const core::reviews::ReviewItem& item) {
-    return ProposalActions(*impl_).BeginEditForReviewItem(item);
+    return actions::ProposalActions(*impl_).BeginEditForReviewItem(item);
 }
 
 bool AppRuntime::BeginEditProposalById(const std::string& proposal_id) {
-    return ProposalActions(*impl_).BeginEditById(proposal_id);
+    return actions::ProposalActions(*impl_).BeginEditById(proposal_id);
 }
 
 bool AppRuntime::PreviewProposalById(const std::string& proposal_id) {
-    return ProposalActions(*impl_).PreviewById(proposal_id);
+    return actions::ProposalActions(*impl_).PreviewById(proposal_id);
 }
 
 bool AppRuntime::SaveActiveProposal(const core::reviews::ReviewItem& item) {
-    return ProposalActions(*impl_).SaveActive(item);
+    return actions::ProposalActions(*impl_).SaveActive(item);
 }
 
 void AppRuntime::CreateAiGeneratedProposals(const std::vector<AiReviewProposalSuggestion>& suggestions) {
@@ -924,39 +924,39 @@ void AppRuntime::CreateAiGeneratedProposals(const std::vector<AiReviewProposalSu
 }
 
 void AppRuntime::CancelActiveProposal() {
-    ProposalActions(*impl_).CancelActive();
+    actions::ProposalActions(*impl_).CancelActive();
 }
 
 bool AppRuntime::DeleteProposalPatchFile(const std::string& proposal_id, std::string& error) {
-    return ReviewActions(*impl_).DeleteProposalPatchFile(proposal_id, error);
+    return actions::ReviewActions(*impl_).DeleteProposalPatchFile(proposal_id, error);
 }
 
 void AppRuntime::CloseProposalPreviewIfOpen(const std::string& proposal_id) {
-    ReviewActions(*impl_).CloseProposalPreviewIfOpen(proposal_id);
+    actions::ReviewActions(*impl_).CloseProposalPreviewIfOpen(proposal_id);
 }
 
 void AppRuntime::BeginDeleteReviewItem(const core::reviews::ReviewItem& item) {
-    ReviewActions(*impl_).BeginDeleteReviewItem(item);
+    actions::ReviewActions(*impl_).BeginDeleteReviewItem(item);
 }
 
 bool AppRuntime::DeleteReviewItem(const core::reviews::ReviewItem& item) {
-    return ReviewActions(*impl_).DeleteReviewItem(item);
+    return actions::ReviewActions(*impl_).DeleteReviewItem(item);
 }
 
 bool AppRuntime::ResolveReviewItem(const core::reviews::ReviewItem& item) {
-    return ReviewActions(*impl_).ResolveReviewItem(item, NowUtcString());
+    return actions::ReviewActions(*impl_).ResolveReviewItem(item, NowUtcString());
 }
 
 bool AppRuntime::AddProposalChildToSelected(core::NewElementKind kind) {
-    return ProposalActions(*impl_).AddChildToSelected(kind);
+    return actions::ProposalActions(*impl_).AddChildToSelected(kind);
 }
 
 bool AppRuntime::AddProposalTopGoal() {
-    return ProposalActions(*impl_).AddTopGoal();
+    return actions::ProposalActions(*impl_).AddTopGoal();
 }
 
 void AppRuntime::RemoveProposalSelected(core::RemoveMode mode) {
-    ProposalActions(*impl_).RemoveSelected(mode);
+    actions::ProposalActions(*impl_).RemoveSelected(mode);
 }
 
 void AppRuntime::ScanDirectory() {
@@ -1029,8 +1029,8 @@ void AppRuntime::RenderSacmViewerPanel(float left_w, float sacm_h, float top_y) 
     ui::panels::ShowSacmViewerPanel(left_w, sacm_h, top_y, kPanelFlags, model, callbacks);
 }
 
-void AppRuntime::RenderWorkbenchArea(const AppLayoutRegion& region) {
-    WorkbenchAreaCallbacks callbacks{
+void AppRuntime::RenderWorkbenchArea(const frame::AppLayoutRegion& region) {
+    areas::WorkbenchAreaCallbacks callbacks{
         [this]() { return MakeElementContextActions(*this); },
         [this](core::NewElementKind kind) { AddProposalChildToSelected(kind); },
         [this]() { AddProposalTopGoal(); },
@@ -1094,7 +1094,7 @@ void AppRuntime::RenderWorkbenchArea(const AppLayoutRegion& region) {
         [this](const core::TerminologyCategoryRef& category_ref) { BeginDeleteTerminologyCategory(category_ref); },
         [this]() { SeedRecommendedTerminologyCategories(); },
     };
-    app::RenderWorkbenchArea(*impl_, region, kPanelFlags, callbacks);
+    areas::RenderWorkbenchArea(*impl_, region, kPanelFlags, callbacks);
 }
 
 void AppRuntime::SyncReviewProblems() {
@@ -1553,7 +1553,7 @@ void AppRuntime::RenderReviewPanelContent() {
         SetStatus("Applied proposal " + proposal->id + ".");
     };
     callbacks.delete_proposal = [this](const core::reviews::ReviewItem& item) {
-        ReviewActions(*impl_).DeleteProposalForReviewItem(item);
+        actions::ReviewActions(*impl_).DeleteProposalForReviewItem(item);
     };
     callbacks.resolve_review_item = [this](const core::reviews::ReviewItem& item) { ResolveReviewItem(item); };
     callbacks.delete_review_item = [this](const core::reviews::ReviewItem& item) { BeginDeleteReviewItem(item); };
@@ -1605,7 +1605,7 @@ void AppRuntime::RenderFrame(bool& done) {
         RequestExit(done);
     }
 
-    AppMenuBarCallbacks menu_callbacks;
+    frame::AppMenuBarCallbacks menu_callbacks;
     menu_callbacks.begin_create_project = [this]() { BeginCreateProject(); };
     menu_callbacks.begin_open_project = [this]() { BeginOpenProject(); };
     menu_callbacks.save_project = [this]() { return SaveProject(); };
@@ -1613,15 +1613,15 @@ void AppRuntime::RenderFrame(bool& done) {
     menu_callbacks.begin_create_project_sacm_file = [this]() { BeginCreateProjectSacmFile(); };
     menu_callbacks.begin_create_project_evidence_register = [this]() { BeginCreateProjectEvidenceRegister(); };
     menu_callbacks.begin_create_project_j3377_cae_register = [this]() { BeginCreateProjectJ3377CaeRegister(); };
-    const float menu_height = RenderAppMenuBar(*impl_, done, menu_callbacks);
+    const float menu_height = frame::RenderAppMenuBar(*impl_, done, menu_callbacks);
 
     RebuildDerivedViewsIfNeeded();
     ProcessPendingProposalCreatorPreviewRefresh();
     PollAiReviewTask();
 
-    const AppLayoutRegions regions = RenderAppShell(*impl_, menu_height, kPanelFlags);
+    const frame::AppLayoutRegions regions = frame::RenderAppShell(*impl_, menu_height, kPanelFlags);
 
-    ProjectExplorerAreaCallbacks project_explorer_callbacks{
+    areas::ProjectExplorerAreaCallbacks project_explorer_callbacks{
         [this]() { RefreshSacmPackageTreeCache(); },
         [this]() { BeginCreateProjectSacmFile(); },
         [this]() { BeginCreateProjectEvidenceRegister(); },
@@ -1635,7 +1635,7 @@ void AppRuntime::RenderFrame(bool& done) {
         },
     };
 
-    ArgumentNavigatorAreaCallbacks argument_navigator_callbacks{
+    areas::ArgumentNavigatorAreaCallbacks argument_navigator_callbacks{
         [this]() { return MakeElementContextActions(*this); },
         [this](core::NewElementKind kind) { AddProposalChildToSelected(kind); },
         [this]() { AddProposalTopGoal(); },
@@ -1654,11 +1654,11 @@ void AppRuntime::RenderFrame(bool& done) {
         },
     };
 
-    app::RenderProjectExplorerArea(*impl_, regions.project_explorer, kPanelFlags, project_explorer_callbacks);
-    app::RenderArgumentNavigatorArea(*impl_, regions.argument_navigator, kPanelFlags, argument_navigator_callbacks);
+    areas::RenderProjectExplorerArea(*impl_, regions.project_explorer, kPanelFlags, project_explorer_callbacks);
+    areas::RenderArgumentNavigatorArea(*impl_, regions.argument_navigator, kPanelFlags, argument_navigator_callbacks);
     RenderWorkbenchArea(regions.workbench);
 
-    FeedbackDockAreaCallbacks feedback_dock_callbacks{
+    areas::FeedbackDockAreaCallbacks feedback_dock_callbacks{
         [this](const core::ProblemItem& problem) {
             if (problem.type.rfind("TerminologyTerm", 0) == 0) {
                 HandleProblemQuickFix(problem);
@@ -1675,9 +1675,9 @@ void AppRuntime::RenderFrame(bool& done) {
         [this]() { RenderReviewPanelContent(); },
         [this]() { RenderAiDebugPanelContent(); },
     };
-    app::RenderFeedbackDockArea(*impl_, regions.feedback_dock, kPanelFlags, feedback_dock_callbacks);
+    areas::RenderFeedbackDockArea(*impl_, regions.feedback_dock, kPanelFlags, feedback_dock_callbacks);
 
-    InspectorAreaCallbacks inspector_callbacks{
+    areas::InspectorAreaCallbacks inspector_callbacks{
         [this]() { RenderProposalElementEditor(); },
         [this](const std::string& element_id, const std::string& term_value) {
             BeginQuickDefineTerminologyTerm(element_id, term_value);
@@ -1701,9 +1701,9 @@ void AppRuntime::RenderFrame(bool& done) {
             impl_->events.Emit(DocumentDirtyEvent{});
         },
     };
-    app::RenderInspectorArea(*impl_, regions.inspector, kPanelFlags, inspector_callbacks);
+    areas::RenderInspectorArea(*impl_, regions.inspector, kPanelFlags, inspector_callbacks);
 
-    ModalHostCallbacks modal_callbacks;
+    areas::ModalHostCallbacks modal_callbacks;
     modal_callbacks.begin_create_project = [this]() { BeginCreateProject(); };
     modal_callbacks.begin_open_project = [this]() { BeginOpenProject(); };
     modal_callbacks.try_open_project_manifest = [this](const std::string& selected_path) {
@@ -1726,7 +1726,7 @@ void AppRuntime::RenderFrame(bool& done) {
     modal_callbacks.confirm_delete_terminology_term = [this]() { ConfirmDeleteTerminologyTerm(); };
     modal_callbacks.confirm_terminology_category_edit = [this]() { ConfirmTerminologyCategoryEdit(); };
     modal_callbacks.confirm_delete_terminology_category = [this]() { ConfirmDeleteTerminologyCategory(); };
-    RenderModalHost(*impl_, done, modal_callbacks);
+    areas::RenderModalHost(*impl_, done, modal_callbacks);
 }
 
 } // namespace app
