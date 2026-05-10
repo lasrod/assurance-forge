@@ -31,6 +31,8 @@ flowchart TD
 
 `AppRuntime` remains responsible for lifecycle coordination, event registration, derived view rebuilds, proposal preview refresh, AI task polling, and close/save-before-exit flow. Area renderers should focus on building panel models, wiring callbacks, and invoking lower-level UI panels.
 
+`AppRuntimeState` keeps shared runtime data in responsibility-oriented groups where the ownership is stable: `layout` for splitter ratios and dock sizing, `workbench` for center-tab visibility and focus requests, `terminology` for terminology package/editor/usage UI state, and `ai` for AI service handles, settings, connection test state, and AI review coordination.
+
 ## Dependency Direction
 
 ```mermaid

@@ -399,7 +399,7 @@ bool ProposalActions::BeginForReviewItem(const core::reviews::ReviewItem& item) 
     ui_state.center_view = ui::CenterView::GsnCanvas;
     ui_state.selected_element_id = anchor->id;
     ui_state.center_on_selection = true;
-    state_.force_center_tab_selection = true;
+    state_.workbench.force_center_tab_selection = true;
     SetStatus(state_, "Building proposal " + proposals.draft.id + ". Use the GSN canvas and Save Proposal when ready.");
     return true;
 }
@@ -445,7 +445,7 @@ bool ProposalActions::BeginEditForReviewItem(const core::reviews::ReviewItem& it
     ui_state.center_view = ui::CenterView::GsnCanvas;
     ui_state.selected_element_id = proposals.draft.anchor_element_id;
     ui_state.center_on_selection = !ui_state.selected_element_id.empty();
-    state_.force_center_tab_selection = true;
+    state_.workbench.force_center_tab_selection = true;
     SetStatus(state_, "Editing proposal " + proposals.draft.id + ". Use Save Proposal to update it.");
     return true;
 }
@@ -521,8 +521,8 @@ bool ProposalActions::PreviewById(const std::string& proposal_id) {
     preview_ui_state.center_view = ui::CenterView::GsnCanvas;
     preview_ui_state.selected_element_id = proposal->anchor_element_id;
     preview_ui_state.center_on_selection = true;
-    state_.show_gsn_tab = true;
-    state_.force_center_tab_selection = true;
+    state_.workbench.show_gsn_tab = true;
+    state_.workbench.force_center_tab_selection = true;
 
     std::ostringstream status;
     status << "Previewing proposal " << proposal->id << " with " << proposal->operations.size() << " operation(s). ";

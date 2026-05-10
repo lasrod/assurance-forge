@@ -32,27 +32,27 @@ void RenderFeedbackDockArea(AppRuntimeState& state,
         }
 
         ImGuiTabItemFlags terminology_usage_flags =
-            state.focus_terminology_usages_tab ? ImGuiTabItemFlags_SetSelected : 0;
+            state.terminology.focus_usages_tab ? ImGuiTabItemFlags_SetSelected : 0;
         if (ImGui::BeginTabItem("Term Usages", nullptr, terminology_usage_flags)) {
             ui::panels::TerminologyUsagesPanelModel usage_model;
-            usage_model.has_search = state.terminology_usages_active;
-            usage_model.term_value = state.usage_search_term_value;
-            usage_model.term_name = state.usage_search_term_name;
-            usage_model.message = state.usage_search_message;
-            usage_model.error = state.usage_search_error;
-            usage_model.usages = &state.terminology_usage_results;
-            usage_model.selected_usage_index = state.selected_terminology_usage_index;
+            usage_model.has_search = state.terminology.usages_active;
+            usage_model.term_value = state.terminology.usage_search_term_value;
+            usage_model.term_name = state.terminology.usage_search_term_name;
+            usage_model.message = state.terminology.usage_search_message;
+            usage_model.error = state.terminology.usage_search_error;
+            usage_model.usages = &state.terminology.usage_results;
+            usage_model.selected_usage_index = state.terminology.selected_usage_index;
 
             ui::panels::TerminologyUsagesPanelCallbacks usage_callbacks;
             usage_callbacks.select_usage = [&state](std::size_t usage_index) {
-                if (usage_index < state.terminology_usage_results.size())
-                    state.selected_terminology_usage_index = static_cast<int>(usage_index);
+                if (usage_index < state.terminology.usage_results.size())
+                    state.terminology.selected_usage_index = static_cast<int>(usage_index);
             };
             usage_callbacks.activate_usage = callbacks.activate_terminology_usage;
             ui::panels::ShowTerminologyUsagesPanelContent(usage_model, usage_callbacks);
             ImGui::EndTabItem();
         }
-        state.focus_terminology_usages_tab = false;
+        state.terminology.focus_usages_tab = false;
 
         if (ImGui::BeginTabItem("Review")) {
             if (callbacks.render_review_content)

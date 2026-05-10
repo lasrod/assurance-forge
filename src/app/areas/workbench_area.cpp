@@ -99,7 +99,7 @@ void RenderTerminologyPackageTab(AppRuntimeState& state, const WorkbenchAreaCall
     const sacm::TerminologyPackage* terminology_package = nullptr;
     if (state.app_state.sacm_package.has_value()) {
         terminology_package =
-            core::FindTerminologyPackage(state.app_state.sacm_package.value(), state.selected_terminology_package_ref);
+            core::FindTerminologyPackage(state.app_state.sacm_package.value(), state.terminology.selected_package_ref);
     }
     std::string delete_block_reason;
     const bool can_delete =
@@ -107,19 +107,19 @@ void RenderTerminologyPackageTab(AppRuntimeState& state, const WorkbenchAreaCall
 
     ui::panels::TerminologyPackagePanelModel model;
     model.package = terminology_package;
-    model.source_file_path = state.selected_terminology_package_file_path;
-    model.name_buffer = state.terminology_package_name_buf;
-    model.name_buffer_size = sizeof(state.terminology_package_name_buf);
-    model.description_buffer = state.terminology_package_description_buf;
-    model.description_buffer_size = sizeof(state.terminology_package_description_buf);
+    model.source_file_path = state.terminology.selected_package_file_path;
+    model.name_buffer = state.terminology.package_name_buf;
+    model.name_buffer_size = sizeof(state.terminology.package_name_buf);
+    model.description_buffer = state.terminology.package_description_buf;
+    model.description_buffer_size = sizeof(state.terminology.package_description_buf);
     model.can_delete = can_delete;
     model.delete_block_reason = delete_block_reason;
-    model.selected_term_ref = state.selected_terminology_term_ref;
-    model.selected_category_ref = state.selected_terminology_category_ref;
-    model.search_buffer = state.terminology_filter_buf;
-    model.search_buffer_size = sizeof(state.terminology_filter_buf);
-    model.category_filter_buffer = state.terminology_category_filter_buf;
-    model.category_filter_buffer_size = sizeof(state.terminology_category_filter_buf);
+    model.selected_term_ref = state.terminology.selected_term_ref;
+    model.selected_category_ref = state.terminology.selected_category_ref;
+    model.search_buffer = state.terminology.filter_buf;
+    model.search_buffer_size = sizeof(state.terminology.filter_buf);
+    model.category_filter_buffer = state.terminology.category_filter_buf;
+    model.category_filter_buffer_size = sizeof(state.terminology.category_filter_buf);
     if (terminology_package) {
         model.term_issues = core::ValidateTerminologyTerms(*terminology_package);
         model.term_usage_summaries =
@@ -158,9 +158,9 @@ void RenderWorkbenchArea(AppRuntimeState& state,
     NormalizeCenterViewSelection(state, ui_state.center_view);
 
     if (ImGui::BeginTabBar("##center_tabs")) {
-        if (state.show_gsn_tab) {
+        if (state.workbench.show_gsn_tab) {
             ImGuiTabItemFlags gsn_flags =
-                (state.force_center_tab_selection && ui_state.center_view == ui::CenterView::GsnCanvas)
+                (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::GsnCanvas)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
             if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::GsnCanvas), nullptr, gsn_flags)) {
@@ -169,9 +169,9 @@ void RenderWorkbenchArea(AppRuntimeState& state,
             }
         }
 
-        if (state.show_cse_tab) {
+        if (state.workbench.show_cse_tab) {
             ImGuiTabItemFlags cse_flags =
-                (state.force_center_tab_selection && ui_state.center_view == ui::CenterView::CseRegister)
+                (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::CseRegister)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
             if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::CseRegister), nullptr, cse_flags)) {
@@ -187,9 +187,9 @@ void RenderWorkbenchArea(AppRuntimeState& state,
             }
         }
 
-        if (state.show_evidence_tab) {
+        if (state.workbench.show_evidence_tab) {
             ImGuiTabItemFlags evidence_flags =
-                (state.force_center_tab_selection && ui_state.center_view == ui::CenterView::EvidenceRegister)
+                (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::EvidenceRegister)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
             if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::EvidenceRegister), nullptr, evidence_flags)) {
@@ -205,9 +205,9 @@ void RenderWorkbenchArea(AppRuntimeState& state,
             }
         }
 
-        if (state.show_package_details_tab) {
+        if (state.workbench.show_package_details_tab) {
             ImGuiTabItemFlags package_flags =
-                (state.force_center_tab_selection && ui_state.center_view == ui::CenterView::PackageDetails)
+                (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::PackageDetails)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
             if (ImGui::BeginTabItem("Package Details", nullptr, package_flags)) {
@@ -219,9 +219,9 @@ void RenderWorkbenchArea(AppRuntimeState& state,
             }
         }
 
-        if (state.show_terminology_package_tab) {
+        if (state.workbench.show_terminology_package_tab) {
             ImGuiTabItemFlags terminology_flags =
-                (state.force_center_tab_selection && ui_state.center_view == ui::CenterView::TerminologyPackage)
+                (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::TerminologyPackage)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
             if (ImGui::BeginTabItem("Terminology Package", nullptr, terminology_flags)) {
@@ -232,7 +232,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
         }
 
         ImGui::EndTabBar();
-        state.force_center_tab_selection = false;
+        state.workbench.force_center_tab_selection = false;
     }
 
     ImGui::End();

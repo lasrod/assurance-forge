@@ -45,15 +45,15 @@ void DrawTooltipIfHovered(const std::string& text) {
 } // namespace
 
 void AppRuntime::BeginAiReviewForSelection() {
-    impl_->ai_review_controller->BeginReviewForSelection(
+    impl_->ai.review_controller->BeginReviewForSelection(
         GetLoadedCase(), impl_->current_tree, ui::GetUiState().selected_element_id);
 }
 
 void AppRuntime::RunAiReviewForSelection(const std::string& review_profile_id) {
-    impl_->ai_review_controller->CancelPendingRequest();
-    impl_->ai_review_controller->BeginReviewForSelection(
+    impl_->ai.review_controller->CancelPendingRequest();
+    impl_->ai.review_controller->BeginReviewForSelection(
         GetLoadedCase(), impl_->current_tree, ui::GetUiState().selected_element_id, review_profile_id);
-    impl_->ai_review_controller->StartPendingRequest();
+    impl_->ai.review_controller->StartPendingRequest();
 }
 
 void AppRuntime::RenderAiReviewContextMenuForSelected() {
@@ -65,7 +65,7 @@ void AppRuntime::RenderAiReviewContextMenuForSelected() {
                                                       ? ai::FindSacmElement(*loaded_case, ui_state.selected_element_id)
                                                       : nullptr;
     const core::TreeNode* selected_node = FindTreeNode(impl_->current_tree, ui_state.selected_element_id);
-    const bool review_running = impl_->ai_review_controller->IsReviewRunning();
+    const bool review_running = impl_->ai.review_controller->IsReviewRunning();
 
     if (!ImGui::BeginMenu("AI Review"))
         return;
@@ -124,15 +124,15 @@ void AppRuntime::RenderAiReviewContextMenuForSelected() {
 }
 
 void AppRuntime::StartPendingAiReviewRequest() {
-    impl_->ai_review_controller->StartPendingRequest();
+    impl_->ai.review_controller->StartPendingRequest();
 }
 
 void AppRuntime::PollAiReviewTask() {
-    impl_->ai_review_controller->PollTask();
+    impl_->ai.review_controller->PollTask();
 }
 
 void AppRuntime::RenderAiDebugPanelContent() {
-    auto& ai_review = *impl_->ai_review_controller;
+    auto& ai_review = *impl_->ai.review_controller;
     const bool review_running = ai_review.IsReviewRunning();
     EnsureAiGuidelineCatalogLoaded(*impl_);
 
@@ -177,7 +177,7 @@ void AppRuntime::RenderAiDebugPanelContent() {
             if (!enabled)
                 ImGui::BeginDisabled();
             if (ImGui::Button(profile.display_name.c_str(), ImVec2(-1.0f, 0.0f))) {
-                impl_->ai_review_controller->BeginReviewForSelection(
+                impl_->ai.review_controller->BeginReviewForSelection(
                     loaded_case, impl_->current_tree, ui_state.selected_element_id, profile.id);
             }
             DrawTooltipIfHovered(tooltip);

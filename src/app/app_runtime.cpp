@@ -1,8 +1,5 @@
 #include "app/app_runtime.h"
 
-#include "ai/ai_service.h"
-#include "ai/ai_task_runner.h"
-#include "ai/secret_store.h"
 #include "app/actions/proposal_actions.h"
 #include "app/actions/review_actions.h"
 #include "app/areas/argument_navigator_area.h"
@@ -27,13 +24,11 @@
 #include "core/terminology_package_service.h"
 #include "core/terminology_scope_service.h"
 #include "hello_imgui/hello_imgui.h"
-#include "hello_imgui/hello_imgui_theme.h"
 #include "imgui.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/localization.h"
-#include "ui/panels/preferences_panel.h"
 #include "ui/panels/review_panel.h"
 #include "ui/panels/sacm_viewer_panel.h"
 #include "ui/register_views.h"
@@ -756,7 +751,7 @@ void AppRuntime::RegisterAppEventListeners() {
         impl_->tree_needs_rebuild = event.dirty;
         impl_->tree_edit_index_valid = false;
         if (event.focus_root)
-            impl_->pending_focus_root = true;
+            impl_->workbench.pending_focus_root = true;
     });
     impl_->events.Subscribe<DocumentDirtyEvent>([this](const DocumentDirtyEvent& event) {
         impl_->document_dirty = event.dirty;
@@ -819,7 +814,7 @@ void AppRuntime::RegisterAppEventListeners() {
         ui_state.center_on_selection = event.center_on_selection;
         ui_state.center_on_marked = event.center_on_marked;
         if (event.force_tab_selection)
-            impl_->force_center_tab_selection = true;
+            impl_->workbench.force_center_tab_selection = true;
     });
     impl_->events.Subscribe<ProposalHighlightEvent>([](const ProposalHighlightEvent& event) {
         ui::UiState& ui_state = ui::GetUiState();
@@ -1111,13 +1106,13 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     ui::GetUiState().model_has_translations = ui::ModelHasTranslations(ac);
     SyncTerminologyProblems();
 
-    if (impl_->pending_focus_root && impl_->current_tree.root) {
+    if (impl_->workbench.pending_focus_root && impl_->current_tree.root) {
         ui::UiState& ui_state = ui::GetUiState();
         ui_state.selected_element_id = impl_->current_tree.root->id;
         ui_state.center_on_selection = true;
         ui_state.center_view = ui::CenterView::GsnCanvas;
-        impl_->force_center_tab_selection = true;
-        impl_->pending_focus_root = false;
+        impl_->workbench.force_center_tab_selection = true;
+        impl_->workbench.pending_focus_root = false;
     }
 
     impl_->tree_needs_rebuild = false;
@@ -1178,9 +1173,9 @@ float AppRuntime::RenderMainMenuBar(bool& done) {
 
     if (ImGui::BeginMenu(ui::Tr(ui::MessageId::ViewMenu))) {
         ui::UiState& ui_state = ui::GetUiState();
-        ImGui::MenuItem(ui::Tr(ui::MessageId::GsnCanvas), nullptr, &impl_->show_gsn_tab);
-        ImGui::MenuItem(ui::Tr(ui::MessageId::CseRegister), nullptr, &impl_->show_cse_tab);
-        ImGui::MenuItem(ui::Tr(ui::MessageId::EvidenceRegister), nullptr, &impl_->show_evidence_tab);
+        ImGui::MenuItem(ui::Tr(ui::MessageId::GsnCanvas), nullptr, &impl_->workbench.show_gsn_tab);
+        ImGui::MenuItem(ui::Tr(ui::MessageId::CseRegister), nullptr, &impl_->workbench.show_cse_tab);
+        ImGui::MenuItem(ui::Tr(ui::MessageId::EvidenceRegister), nullptr, &impl_->workbench.show_evidence_tab);
         NormalizeCenterViewSelection(*impl_, ui_state.center_view);
 
         ImGui::Separator();
@@ -1257,7 +1252,7 @@ void AppRuntime::RenderSacmViewerPanel(float left_w, float sacm_h, float top_y) 
         [this]() { ScanDirectory(); },
         [this]() {
             impl_->tree_needs_rebuild = true;
-            impl_->pending_focus_root = true;
+            impl_->workbench.pending_focus_root = true;
         },
         [this]() {
             impl_->current_tree = core::AssuranceTree();
@@ -1325,7 +1320,7 @@ void AppRuntime::RenderWorkbenchArea(const AppLayoutRegion& region) {
         [this](const core::TerminologyTermRef& term_ref) { BeginEditTerminologyTerm(term_ref); },
         [this](const core::TerminologyTermRef& term_ref) { BeginDeleteTerminologyTerm(term_ref); },
         [this](const core::TerminologyTermRef& term_ref) {
-            BeginFindTerminologyUsages(impl_->selected_terminology_package_ref, term_ref);
+            BeginFindTerminologyUsages(impl_->terminology.selected_package_ref, term_ref);
         },
         [this](const std::string& category_filter) { SetTerminologyCategoryFilter(category_filter); },
         [this]() { BeginAddTerminologyCategory(); },

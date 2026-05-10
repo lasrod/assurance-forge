@@ -58,9 +58,9 @@ bool EnsureProjectSacmFileOpen(AppRuntimeState& state, const core::ProjectFileEn
 }
 
 void CopyTerminologyPackageToEditor(AppRuntimeState& state, const sacm::TerminologyPackage& package) {
-    CopyToBuffer(state.terminology_package_name_buf, sizeof(state.terminology_package_name_buf), package.name);
-    CopyToBuffer(state.terminology_package_description_buf,
-                 sizeof(state.terminology_package_description_buf),
+    CopyToBuffer(state.terminology.package_name_buf, sizeof(state.terminology.package_name_buf), package.name);
+    CopyToBuffer(state.terminology.package_description_buf,
+                 sizeof(state.terminology.package_description_buf),
                  package.description);
 }
 
@@ -215,18 +215,18 @@ void AppRuntime::OpenProjectFile(const core::ProjectFileEntry& entry) {
         ClearProposalHighlightState(ui_state);
         impl_->document_dirty = false;
         impl_->tree_needs_rebuild = true;
-        impl_->pending_focus_root = true;
-        impl_->show_gsn_tab = true;
+        impl_->workbench.pending_focus_root = true;
+        impl_->workbench.show_gsn_tab = true;
         ui_state.center_view = ui::CenterView::GsnCanvas;
-        impl_->force_center_tab_selection = true;
+        impl_->workbench.force_center_tab_selection = true;
     } else if (entry.role == core::ProjectFileRole::EvidenceRegister) {
-        impl_->show_evidence_tab = true;
+        impl_->workbench.show_evidence_tab = true;
         ui_state.center_view = ui::CenterView::EvidenceRegister;
-        impl_->force_center_tab_selection = true;
+        impl_->workbench.force_center_tab_selection = true;
     } else if (entry.role == core::ProjectFileRole::J3377CaeRegister) {
-        impl_->show_cse_tab = true;
+        impl_->workbench.show_cse_tab = true;
         ui_state.center_view = ui::CenterView::CseRegister;
-        impl_->force_center_tab_selection = true;
+        impl_->workbench.force_center_tab_selection = true;
     } else if (entry.role == core::ProjectFileRole::ReviewProposal) {
         std::string proposal_id = entry.relativePath.filename().generic_string();
         const std::string suffix = ".afpatch.json";
@@ -257,10 +257,10 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
         ClearProposalHighlightState(ui_state);
         impl_->document_dirty = false;
         impl_->tree_needs_rebuild = true;
-        impl_->pending_focus_root = false;
-        impl_->show_gsn_tab = true;
+        impl_->workbench.pending_focus_root = false;
+        impl_->workbench.show_gsn_tab = true;
         ui_state.center_view = ui::CenterView::GsnCanvas;
-        impl_->force_center_tab_selection = true;
+        impl_->workbench.force_center_tab_selection = true;
 
         if (impl_->app_state.sacm_package.has_value()) {
             std::string first_id = FirstElementIdForArgumentPackage(impl_->app_state.sacm_package.value(), node);
@@ -294,21 +294,21 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
             return;
         }
 
-        impl_->selected_terminology_package_ref = package_ref;
-        impl_->selected_terminology_package_file_path = impl_->selected_package_file_path;
-        impl_->selected_terminology_term_ref = core::TerminologyTermRef{};
-        impl_->selected_terminology_category_ref = core::TerminologyCategoryRef{};
-        CopyToBuffer(impl_->terminology_category_filter_buf, sizeof(impl_->terminology_category_filter_buf), "");
+        impl_->terminology.selected_package_ref = package_ref;
+        impl_->terminology.selected_package_file_path = impl_->selected_package_file_path;
+        impl_->terminology.selected_term_ref = core::TerminologyTermRef{};
+        impl_->terminology.selected_category_ref = core::TerminologyCategoryRef{};
+        CopyToBuffer(impl_->terminology.category_filter_buf, sizeof(impl_->terminology.category_filter_buf), "");
         CopyTerminologyPackageToEditor(*impl_, *terminology_package);
-        impl_->show_terminology_package_tab = true;
+        impl_->workbench.show_terminology_package_tab = true;
         ui_state.center_view = ui::CenterView::TerminologyPackage;
-        impl_->force_center_tab_selection = true;
+        impl_->workbench.force_center_tab_selection = true;
         return;
     }
 
-    impl_->show_package_details_tab = true;
+    impl_->workbench.show_package_details_tab = true;
     ui_state.center_view = ui::CenterView::PackageDetails;
-    impl_->force_center_tab_selection = true;
+    impl_->workbench.force_center_tab_selection = true;
 }
 
 void AppRuntime::BeginAddTerminologyPackage(const core::ProjectFileEntry& entry,
@@ -498,11 +498,11 @@ bool AppRuntime::OpenFirstProjectSacmFile() {
             continue;
         if (impl_->app_state.open_project_file(entry)) {
             impl_->tree_needs_rebuild = true;
-            impl_->pending_focus_root = true;
-            impl_->show_gsn_tab = true;
+            impl_->workbench.pending_focus_root = true;
+            impl_->workbench.show_gsn_tab = true;
             ui::UiState& ui_state = ui::GetUiState();
             ui_state.center_view = ui::CenterView::GsnCanvas;
-            impl_->force_center_tab_selection = true;
+            impl_->workbench.force_center_tab_selection = true;
             return true;
         }
     }

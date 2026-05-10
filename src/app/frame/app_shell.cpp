@@ -28,7 +28,7 @@ void RenderAppSplitters(AppRuntimeState& state,
                                       content_h,
                                       top_y,
                                       display_w,
-                                      state.left_ratio,
+                                      state.layout.left_ratio,
                                       false,
                                       kMinPanelRatio,
                                       kMaxPanelRatio,
@@ -41,7 +41,7 @@ void RenderAppSplitters(AppRuntimeState& state,
                                       content_h,
                                       top_y,
                                       display_w,
-                                      state.right_ratio,
+                                      state.layout.right_ratio,
                                       true,
                                       kMinPanelRatio,
                                       kMaxPanelRatio,
@@ -56,19 +56,19 @@ void RenderAppSplitters(AppRuntimeState& state,
         min_ratio = 0.30f;
 
     auto clamp_boundaries = [&]() {
-        if (state.project_boundary_ratio < min_ratio)
-            state.project_boundary_ratio = min_ratio;
-        if (state.project_boundary_ratio > 1.0f - min_ratio)
-            state.project_boundary_ratio = 1.0f - min_ratio;
+        if (state.layout.project_boundary_ratio < min_ratio)
+            state.layout.project_boundary_ratio = min_ratio;
+        if (state.layout.project_boundary_ratio > 1.0f - min_ratio)
+            state.layout.project_boundary_ratio = 1.0f - min_ratio;
     };
 
     clamp_boundaries();
 
-    const float splitter_y = top_y + available_h * state.project_boundary_ratio;
+    const float splitter_y = top_y + available_h * state.layout.project_boundary_ratio;
     const float delta = ui::widgets::DrawHorizontalSplitter(
         "##left_h_splitter_1", 0.0f, splitter_y, left_w, kSplitterThickness, panel_flags);
     if (delta != 0.0f) {
-        state.project_boundary_ratio += delta / available_h;
+        state.layout.project_boundary_ratio += delta / available_h;
         clamp_boundaries();
     }
 
@@ -76,16 +76,16 @@ void RenderAppSplitters(AppRuntimeState& state,
         const float min_problems_h = std::min(kMinProblemsPanelHeight, available_h * 0.5f);
         const float min_center_h = std::min(kMinCenterSectionHeight, available_h - min_problems_h);
         const float max_problems_h = std::max(min_problems_h, available_h - min_center_h);
-        state.problems_panel_height = std::clamp(state.problems_panel_height, min_problems_h, max_problems_h);
+        state.layout.problems_panel_height = std::clamp(state.layout.problems_panel_height, min_problems_h, max_problems_h);
     };
 
     clamp_problems_height();
-    const float center_panel_h = std::max(0.0f, available_h - state.problems_panel_height);
+    const float center_panel_h = std::max(0.0f, available_h - state.layout.problems_panel_height);
     const float center_splitter_y = top_y + center_panel_h;
     const float delta_center = ui::widgets::DrawHorizontalSplitter(
         "##center_problems_splitter", center_x, center_splitter_y, center_w, kSplitterThickness, panel_flags);
     if (delta_center != 0.0f) {
-        state.problems_panel_height -= delta_center;
+        state.layout.problems_panel_height -= delta_center;
         clamp_problems_height();
     }
 }
@@ -93,40 +93,40 @@ void RenderAppSplitters(AppRuntimeState& state,
 } // namespace
 
 void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center_view) {
-    if (!state.show_gsn_tab && !state.show_cse_tab && !state.show_evidence_tab && !state.show_package_details_tab &&
-        !state.show_terminology_package_tab) {
-        state.show_gsn_tab = true;
+    if (!state.workbench.show_gsn_tab && !state.workbench.show_cse_tab && !state.workbench.show_evidence_tab && !state.workbench.show_package_details_tab &&
+        !state.workbench.show_terminology_package_tab) {
+        state.workbench.show_gsn_tab = true;
     }
 
     auto is_tab_visible = [&](ui::CenterView view) {
         switch (view) {
         case ui::CenterView::GsnCanvas:
-            return state.show_gsn_tab;
+            return state.workbench.show_gsn_tab;
         case ui::CenterView::CseRegister:
-            return state.show_cse_tab;
+            return state.workbench.show_cse_tab;
         case ui::CenterView::EvidenceRegister:
-            return state.show_evidence_tab;
+            return state.workbench.show_evidence_tab;
         case ui::CenterView::PackageDetails:
-            return state.show_package_details_tab;
+            return state.workbench.show_package_details_tab;
         case ui::CenterView::TerminologyPackage:
-            return state.show_terminology_package_tab;
+            return state.workbench.show_terminology_package_tab;
         }
         return false;
     };
 
     if (!is_tab_visible(center_view)) {
-        if (state.show_gsn_tab) {
+        if (state.workbench.show_gsn_tab) {
             center_view = ui::CenterView::GsnCanvas;
-        } else if (state.show_cse_tab) {
+        } else if (state.workbench.show_cse_tab) {
             center_view = ui::CenterView::CseRegister;
-        } else if (state.show_terminology_package_tab) {
+        } else if (state.workbench.show_terminology_package_tab) {
             center_view = ui::CenterView::TerminologyPackage;
-        } else if (state.show_package_details_tab) {
+        } else if (state.workbench.show_package_details_tab) {
             center_view = ui::CenterView::PackageDetails;
         } else {
             center_view = ui::CenterView::EvidenceRegister;
         }
-        state.force_center_tab_selection = true;
+        state.workbench.force_center_tab_selection = true;
     }
 }
 
@@ -134,24 +134,24 @@ AppLayoutRegions RenderAppShell(AppRuntimeState& state, float menu_height, ImGui
     const ImVec2 display = ImGui::GetIO().DisplaySize;
     const float content_h = std::max(0.0f, display.y - menu_height);
 
-    float left_w = display.x * state.left_ratio;
-    float right_w = display.x * state.right_ratio;
+    float left_w = display.x * state.layout.left_ratio;
+    float right_w = display.x * state.layout.right_ratio;
     float center_w = display.x - left_w - right_w - kSplitterThickness * 2.0f;
 
     RenderAppSplitters(state, display.x, content_h, left_w, center_w, menu_height, panel_flags);
 
-    left_w = display.x * state.left_ratio;
-    right_w = display.x * state.right_ratio;
+    left_w = display.x * state.layout.left_ratio;
+    right_w = display.x * state.layout.right_ratio;
     center_w = display.x - left_w - right_w - kSplitterThickness * 2.0f;
 
     const float available_h = std::max(0.0f, content_h - kSplitterThickness);
-    const float project_h = available_h * state.project_boundary_ratio;
+    const float project_h = available_h * state.layout.project_boundary_ratio;
     const float argument_navigator_h = std::max(0.0f, available_h - project_h);
     const float argument_navigator_y = menu_height + project_h + kSplitterThickness;
 
     const float center_x = left_w + kSplitterThickness;
     const float center_available_h = std::max(0.0f, content_h - kSplitterThickness);
-    const float feedback_h = std::min(state.problems_panel_height, center_available_h);
+    const float feedback_h = std::min(state.layout.problems_panel_height, center_available_h);
     const float workbench_h = std::max(0.0f, center_available_h - feedback_h);
     const float feedback_y = menu_height + workbench_h + kSplitterThickness;
     const float inspector_x = center_x + center_w + kSplitterThickness;
