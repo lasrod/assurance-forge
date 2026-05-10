@@ -134,7 +134,8 @@ void SetCategoryChecked(AppRuntimeState& state, const sacm::Category& category, 
         if (!category.gid.empty())
             refs.erase(std::remove(refs.begin(), refs.end(), category.gid), refs.end());
     }
-    CopyToBuffer(state.terminology.term_categories_buf, sizeof(state.terminology.term_categories_buf), JoinCategoryRefs(refs));
+    CopyToBuffer(
+        state.terminology.term_categories_buf, sizeof(state.terminology.term_categories_buf), JoinCategoryRefs(refs));
 }
 
 void RenderTermCategoryPickerForPackage(AppRuntimeState& state, const core::TerminologyPackageRef& package_ref) {
@@ -171,16 +172,20 @@ void RenderTermTextFields(AppRuntimeState& state) {
     ImGui::SetNextItemWidth(460.0f);
     ImGui::InputText("Term", state.terminology.term_value_buf, sizeof(state.terminology.term_value_buf));
     ImGui::SetNextItemWidth(460.0f);
-    ImGui::InputText("Full Name / Display Name", state.terminology.term_name_buf, sizeof(state.terminology.term_name_buf));
+    ImGui::InputText(
+        "Full Name / Display Name", state.terminology.term_name_buf, sizeof(state.terminology.term_name_buf));
     ImGui::SetNextItemWidth(460.0f);
-    ImGui::InputTextMultiline(
-        "Definition", state.terminology.term_definition_buf, sizeof(state.terminology.term_definition_buf), ImVec2(460.0f, 110.0f));
+    ImGui::InputTextMultiline("Definition",
+                              state.terminology.term_definition_buf,
+                              sizeof(state.terminology.term_definition_buf),
+                              ImVec2(460.0f, 110.0f));
 }
 
 void RenderTermExternalReferenceField(AppRuntimeState& state) {
     ImGui::SetNextItemWidth(460.0f);
-    ImGui::InputText(
-        "External Reference", state.terminology.term_external_reference_buf, sizeof(state.terminology.term_external_reference_buf));
+    ImGui::InputText("External Reference",
+                     state.terminology.term_external_reference_buf,
+                     sizeof(state.terminology.term_external_reference_buf));
 }
 
 void RenderTerminologyTermValidationMessages(bool missing_value,
@@ -385,7 +390,8 @@ void ModalHost::RenderPreferencesWindow() {
             return;
         }
         std::shared_ptr<ai::AiService> service = state_.ai.service;
-        state_.ai.test_task = state_.ai.task_runner.RunConnectionTest([service]() { return service->TestConnection(); });
+        state_.ai.test_task =
+            state_.ai.task_runner.RunConnectionTest([service]() { return service->TestConnection(); });
     };
     callbacks.set_language = [](ui::Language language) { ui::SetCurrentLanguage(language); };
     callbacks.set_show_fps = [](bool show_fps) {
@@ -841,7 +847,8 @@ void ModalHost::RenderQuickDefineTermModal() {
                     if (ImGui::Selectable(selectable_label.c_str(), selected)) {
                         selected_package_index = static_cast<int>(index);
                         state_.terminology.quick_define_target_package_ref = package_choices[index].ref;
-                        CopyToBuffer(state_.terminology.term_categories_buf, sizeof(state_.terminology.term_categories_buf), "");
+                        CopyToBuffer(
+                            state_.terminology.term_categories_buf, sizeof(state_.terminology.term_categories_buf), "");
                     }
                     if (selected)
                         ImGui::SetItemDefaultFocus();
@@ -858,12 +865,14 @@ void ModalHost::RenderQuickDefineTermModal() {
         const bool has_target_package =
             HasTerminologyPackageRef(state_.terminology.quick_define_target_package_ref) &&
             state_.app_state.sacm_package.has_value() &&
-            core::FindTerminologyPackage(state_.app_state.sacm_package.value(), state_.terminology.quick_define_target_package_ref);
+            core::FindTerminologyPackage(state_.app_state.sacm_package.value(),
+                                         state_.terminology.quick_define_target_package_ref);
         const bool can_create = !value.empty() && has_target_package;
         RenderTerminologyTermValidationMessages(
             value.empty(),
             !has_target_package,
-            TermDefinitionHasDuplicate(state_, state_.terminology.quick_define_target_package_ref, value, description, false, {}),
+            TermDefinitionHasDuplicate(
+                state_, state_.terminology.quick_define_target_package_ref, value, description, false, {}),
             description.empty(),
             TrimWhitespace(state_.terminology.term_categories_buf).empty());
 
@@ -932,7 +941,8 @@ void ModalHost::RenderTerminologyCategoryEditorModal() {
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::SetNextItemWidth(420.0f);
-        ImGui::InputText("Category name", state_.terminology.category_name_buf, sizeof(state_.terminology.category_name_buf));
+        ImGui::InputText(
+            "Category name", state_.terminology.category_name_buf, sizeof(state_.terminology.category_name_buf));
         ImGui::SetNextItemWidth(420.0f);
         ImGui::InputTextMultiline("Category description",
                                   state_.terminology.category_description_buf,

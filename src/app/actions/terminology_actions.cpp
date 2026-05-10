@@ -66,16 +66,22 @@ void ClearTermEditorBuffers(AppRuntimeState& state) {
     CopyToBuffer(state.terminology.term_name_buf, sizeof(state.terminology.term_name_buf), "");
     CopyToBuffer(state.terminology.term_definition_buf, sizeof(state.terminology.term_definition_buf), "");
     CopyToBuffer(state.terminology.term_categories_buf, sizeof(state.terminology.term_categories_buf), "");
-    CopyToBuffer(state.terminology.term_external_reference_buf, sizeof(state.terminology.term_external_reference_buf), "");
+    CopyToBuffer(
+        state.terminology.term_external_reference_buf, sizeof(state.terminology.term_external_reference_buf), "");
     CopyToBuffer(state.terminology.term_origin_buf, sizeof(state.terminology.term_origin_buf), "");
 }
 
 void CopyTermToEditor(AppRuntimeState& state, const sacm::Term& term) {
     CopyToBuffer(state.terminology.term_value_buf, sizeof(state.terminology.term_value_buf), term.value);
     CopyToBuffer(state.terminology.term_name_buf, sizeof(state.terminology.term_name_buf), term.name);
-    CopyToBuffer(state.terminology.term_definition_buf, sizeof(state.terminology.term_definition_buf), term.description);
-    CopyToBuffer(state.terminology.term_categories_buf, sizeof(state.terminology.term_categories_buf), JoinCategoryRefs(term.category_refs));
-    CopyToBuffer(state.terminology.term_external_reference_buf, sizeof(state.terminology.term_external_reference_buf), term.externalReference);
+    CopyToBuffer(
+        state.terminology.term_definition_buf, sizeof(state.terminology.term_definition_buf), term.description);
+    CopyToBuffer(state.terminology.term_categories_buf,
+                 sizeof(state.terminology.term_categories_buf),
+                 JoinCategoryRefs(term.category_refs));
+    CopyToBuffer(state.terminology.term_external_reference_buf,
+                 sizeof(state.terminology.term_external_reference_buf),
+                 term.externalReference);
     CopyToBuffer(state.terminology.term_origin_buf, sizeof(state.terminology.term_origin_buf), term.origin);
 }
 
@@ -111,7 +117,9 @@ void ClearCategoryEditorBuffers(AppRuntimeState& state) {
 
 void CopyCategoryToEditor(AppRuntimeState& state, const sacm::Category& category) {
     CopyToBuffer(state.terminology.category_name_buf, sizeof(state.terminology.category_name_buf), category.name);
-    CopyToBuffer(state.terminology.category_description_buf, sizeof(state.terminology.category_description_buf), category.description);
+    CopyToBuffer(state.terminology.category_description_buf,
+                 sizeof(state.terminology.category_description_buf),
+                 category.description);
 }
 
 core::TerminologyCategoryDraft CategoryDraftFromEditor(const AppRuntimeState& state) {
@@ -443,9 +451,8 @@ void TerminologyActions::BeginAddPackage(const core::ProjectFileEntry& entry,
     CopyToBuffer(state_.terminology.new_package_name_buf,
                  sizeof(state_.terminology.new_package_name_buf),
                  "Terminology Package");
-    CopyToBuffer(state_.terminology.new_package_description_buf,
-                 sizeof(state_.terminology.new_package_description_buf),
-                 "");
+    CopyToBuffer(
+        state_.terminology.new_package_description_buf, sizeof(state_.terminology.new_package_description_buf), "");
     state_.terminology.show_create_package_modal = true;
 }
 
@@ -768,7 +775,8 @@ void TerminologyActions::SelectCategory(const core::TerminologyCategoryRef& cate
 }
 
 void TerminologyActions::SetCategoryFilter(const std::string& category_filter) {
-    CopyToBuffer(state_.terminology.category_filter_buf, sizeof(state_.terminology.category_filter_buf), category_filter);
+    CopyToBuffer(
+        state_.terminology.category_filter_buf, sizeof(state_.terminology.category_filter_buf), category_filter);
 }
 
 void TerminologyActions::BeginAddCategory() {
@@ -942,7 +950,8 @@ void TerminologyActions::BeginFindUsages(const core::TerminologyPackageRef& pack
     if (!state_.terminology.usage_results.empty())
         state_.terminology.selected_usage_index = 0;
     const int usage_count = static_cast<int>(state_.terminology.usage_results.size());
-    const std::string label = state_.terminology.usage_search_term_value.empty() ? "term" : state_.terminology.usage_search_term_value;
+    const std::string label =
+        state_.terminology.usage_search_term_value.empty() ? "term" : state_.terminology.usage_search_term_value;
     SetStatus(state_,
               "Found " + std::to_string(usage_count) + " usage" + (usage_count == 1 ? "" : "s") + " of " + label + ".");
 }
@@ -1043,7 +1052,8 @@ bool TerminologyActions::ConfirmQuickDefineTerm(bool add_as_context) {
     }
     const std::string context_element_id = state_.terminology.quick_define_element_id;
     if (add_as_context)
-        AddVisibleTermContextFromCanvas(context_element_id, state_.terminology.quick_define_target_package_ref, result.term_ref);
+        AddVisibleTermContextFromCanvas(
+            context_element_id, state_.terminology.quick_define_target_package_ref, result.term_ref);
 
     state_.terminology.show_quick_define_term_modal = false;
     state_.terminology.quick_define_element_id.clear();

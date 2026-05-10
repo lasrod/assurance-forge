@@ -67,7 +67,6 @@ public:
 private:
     void RegisterAppEventListeners();
 
-    float RenderMainMenuBar(bool& done);
     void ScanDirectory();
     void RenderSacmViewerPanel(float left_w, float sacm_h, float top_y);
     void RenderWorkbenchArea(const AppLayoutRegion& region);

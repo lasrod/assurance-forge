@@ -236,6 +236,8 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/app/app_runtime_project.cpp
     src/app/app_runtime.cpp
     src/app/app_runtime_state.cpp
+    src/app/actions/ai_review_actions.cpp
+    src/app/actions/element_actions.cpp
     src/app/actions/proposal_actions.cpp
     src/app/actions/review_actions.cpp
     src/app/actions/terminology_actions.cpp
@@ -246,6 +248,7 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/app/areas/project_explorer_area.cpp
     src/app/areas/workbench_area.cpp
     src/app/frame/app_layout_regions.cpp
+    src/app/frame/app_menu_bar.cpp
     src/app/frame/app_shell.cpp
     src/app/guideline_catalog.cpp
     src/app/review_problem_sync.cpp

@@ -1,5 +1,6 @@
 #include "app/app_runtime.h"
 
+#include "app/actions/ai_review_actions.h"
 #include "app/app_runtime_state.h"
 #include "app/guideline_catalog.h"
 #include "ui/ui_state.h"
@@ -45,15 +46,11 @@ void DrawTooltipIfHovered(const std::string& text) {
 } // namespace
 
 void AppRuntime::BeginAiReviewForSelection() {
-    impl_->ai.review_controller->BeginReviewForSelection(
-        GetLoadedCase(), impl_->current_tree, ui::GetUiState().selected_element_id);
+    AiReviewActions(*impl_).BeginForSelection();
 }
 
 void AppRuntime::RunAiReviewForSelection(const std::string& review_profile_id) {
-    impl_->ai.review_controller->CancelPendingRequest();
-    impl_->ai.review_controller->BeginReviewForSelection(
-        GetLoadedCase(), impl_->current_tree, ui::GetUiState().selected_element_id, review_profile_id);
-    impl_->ai.review_controller->StartPendingRequest();
+    AiReviewActions(*impl_).RunForSelection(review_profile_id);
 }
 
 void AppRuntime::RenderAiReviewContextMenuForSelected() {
@@ -124,11 +121,11 @@ void AppRuntime::RenderAiReviewContextMenuForSelected() {
 }
 
 void AppRuntime::StartPendingAiReviewRequest() {
-    impl_->ai.review_controller->StartPendingRequest();
+    AiReviewActions(*impl_).StartPendingRequest();
 }
 
 void AppRuntime::PollAiReviewTask() {
-    impl_->ai.review_controller->PollTask();
+    AiReviewActions(*impl_).PollTask();
 }
 
 void AppRuntime::RenderAiDebugPanelContent() {
@@ -177,8 +174,7 @@ void AppRuntime::RenderAiDebugPanelContent() {
             if (!enabled)
                 ImGui::BeginDisabled();
             if (ImGui::Button(profile.display_name.c_str(), ImVec2(-1.0f, 0.0f))) {
-                impl_->ai.review_controller->BeginReviewForSelection(
-                    loaded_case, impl_->current_tree, ui_state.selected_element_id, profile.id);
+                AiReviewActions(*impl_).BeginForSelection(profile.id);
             }
             DrawTooltipIfHovered(tooltip);
             if (!enabled)

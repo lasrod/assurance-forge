@@ -1,6 +1,6 @@
 # App Shell and UI Areas
 
-Assurance Forge uses a named application shell to keep the frame layout separate from feature-specific UI rendering. `RenderAppShell()` owns splitter handling and returns layout regions for the major application areas. The current implementation still routes area rendering through `AppRuntime`, but new code should use the names in this document when discussing or extracting the main application areas.
+Assurance Forge uses a named application shell to keep the frame layout separate from feature-specific UI rendering. `RenderAppMenuBar()` owns the main menu bar, while `RenderAppShell()` owns splitter handling and returns layout regions for the major application areas. `AppRuntime` wires callbacks and invokes the named area renderers.
 
 ## Named Areas
 
@@ -20,7 +20,8 @@ Position-based names such as left panel, right panel, and bottom panel should be
 
 ```mermaid
 flowchart TD
-    Runtime[AppRuntime::RenderFrame] --> Shell[AppShell layout and menu]
+    Runtime[AppRuntime::RenderFrame] --> MenuBar[AppMenuBar]
+    Runtime --> Shell[AppShell layout]
     Shell --> ProjectExplorer[ProjectExplorerArea]
     Shell --> ArgumentNavigator[ArgumentNavigatorArea]
     Shell --> Workbench[WorkbenchArea]

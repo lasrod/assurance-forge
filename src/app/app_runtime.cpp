@@ -1,5 +1,6 @@
 #include "app/app_runtime.h"
 
+#include "app/actions/element_actions.h"
 #include "app/actions/proposal_actions.h"
 #include "app/actions/review_actions.h"
 #include "app/areas/argument_navigator_area.h"
@@ -9,6 +10,7 @@
 #include "app/areas/project_explorer_area.h"
 #include "app/areas/workbench_area.h"
 #include "app/app_runtime_state.h"
+#include "app/frame/app_menu_bar.h"
 #include "app/frame/app_shell.h"
 #include "app/guideline_catalog.h"
 #include "app/project_workflow.h"
@@ -23,22 +25,17 @@
 #include "core/reviews/review_proposal_patch_service.h"
 #include "core/terminology_package_service.h"
 #include "core/terminology_scope_service.h"
-#include "hello_imgui/hello_imgui.h"
 #include "imgui.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas.h"
-#include "ui/gsn/gsn_canvas_renderer.h"
-#include "ui/localization.h"
 #include "ui/panels/review_panel.h"
 #include "ui/panels/sacm_viewer_panel.h"
 #include "ui/register_views.h"
-#include "ui/theme.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
 #include <cctype>
 #include <chrono>
-#include <cstdio>
 #include <cstring>
 #include <ctime>
 #include <filesystem>
@@ -75,43 +72,6 @@ std::string TrimWhitespace(const std::string& value) {
     while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1))))
         --end;
     return std::string(begin, end);
-}
-
-void RenderLanguageMenu() {
-    if (!ImGui::BeginMenu(ui::Tr(ui::MessageId::Language)))
-        return;
-
-    const ui::Language current = ui::CurrentLanguage();
-    if (ImGui::MenuItem(ui::Tr(ui::MessageId::English), nullptr, current == ui::Language::English)) {
-        ui::SetCurrentLanguage(ui::Language::English);
-    }
-    if (ImGui::MenuItem(ui::Tr(ui::MessageId::Japanese), nullptr, current == ui::Language::Japanese)) {
-        ui::SetCurrentLanguage(ui::Language::Japanese);
-    }
-
-    ImGui::EndMenu();
-}
-
-void RenderThemeMenu() {
-    if (!ImGui::BeginMenu(ui::Tr(ui::MessageId::Theme)))
-        return;
-
-    HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
-    if (!runner_params) {
-        ImGui::EndMenu();
-        return;
-    }
-
-    for (int i = 0; i < ImGuiTheme::ImGuiTheme_Count; ++i) {
-        auto theme = static_cast<ImGuiTheme::ImGuiTheme_>(i);
-        bool selected = runner_params->imGuiWindowParams.tweakedTheme.Theme == theme;
-        if (ImGui::MenuItem(ImGuiTheme::ImGuiTheme_Name(theme), nullptr, selected)) {
-            runner_params->imGuiWindowParams.tweakedTheme.Theme = theme;
-            ImGuiTheme::ApplyTweakedTheme(runner_params->imGuiWindowParams.tweakedTheme);
-        }
-    }
-
-    ImGui::EndMenu();
 }
 
 std::string NowUtcString() {
@@ -840,103 +800,27 @@ void AppRuntime::RequestClose() {
 }
 
 bool AppRuntime::AddChildToSelected(core::NewElementKind kind) {
-    if (!impl_->app_state.loaded_case.has_value()) {
-        SetStatus("No assurance case loaded.");
-        return false;
-    }
-    const std::string& selected_id = ui::GetUiState().selected_element_id;
-
-    parser::AssuranceCase& ac = impl_->app_state.loaded_case.value();
-    sacm::AssuranceCasePackage* pkg =
-        impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
-    return impl_->element_edit_controller->AddChildToSelected(ac, pkg, selected_id, kind);
+    return ElementActions(*impl_).AddChildToSelected(kind);
 }
 
 bool AppRuntime::AddTopGoal() {
-    if (!impl_->app_state.loaded_case.has_value()) {
-        SetStatus("No assurance case loaded.");
-        return false;
-    }
-
-    parser::AssuranceCase& ac = impl_->app_state.loaded_case.value();
-    sacm::AssuranceCasePackage* pkg =
-        impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
-    return impl_->element_edit_controller->AddTopGoal(ac, pkg);
+    return ElementActions(*impl_).AddTopGoal();
 }
 
 void AppRuntime::RemoveSelected(core::RemoveMode mode) {
-    if (!impl_->app_state.loaded_case.has_value()) {
-        SetStatus("No assurance case loaded.");
-        return;
-    }
-    const std::string& selected_id = ui::GetUiState().selected_element_id;
-
-    parser::AssuranceCase& ac = impl_->app_state.loaded_case.value();
-    sacm::AssuranceCasePackage* pkg =
-        impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
-    if (!impl_->element_edit_controller->RemoveSelected(ac, pkg, selected_id, mode))
-        return;
-
-    if (impl_->element_edit_controller->ShouldShowRemoveConfirm()) {
-        auto& s = ui::GetUiState();
-        const auto& pending_ids = impl_->element_edit_controller->PendingRemoveIds();
-        s.marked_for_removal = {pending_ids.begin(), pending_ids.end()};
-        s.center_on_marked = true;
-    }
+    ElementActions(*impl_).RemoveSelected(mode);
 }
 
 core::TreeDropValidationResult AppRuntime::ValidateTreeDrop(const std::string& dragged_id,
                                                             const std::string& target_id,
                                                             core::TreeDropMode drop_mode) const {
-    if (!impl_->app_state.loaded_case.has_value()) {
-        core::TreeDropValidationResult result;
-        result.reason = "No assurance case loaded.";
-        return result;
-    }
-
-    if (!impl_->tree_edit_index_valid) {
-        impl_->tree_edit_index = core::BuildTreeEditIndex(impl_->app_state.loaded_case.value());
-        impl_->tree_edit_index_valid = true;
-    }
-    return core::ValidateTreeDrop(impl_->tree_edit_index, impl_->current_tree, dragged_id, target_id, drop_mode);
+    return ElementActions(*impl_).ValidateTreeDrop(dragged_id, target_id, drop_mode);
 }
 
 bool AppRuntime::PerformTreeDrop(const std::string& dragged_id,
                                  const std::string& target_id,
                                  core::TreeDropMode drop_mode) {
-    if (!impl_->app_state.loaded_case.has_value()) {
-        SetStatus("No assurance case loaded.");
-        return false;
-    }
-
-    parser::AssuranceCase& model = impl_->app_state.loaded_case.value();
-    sacm::AssuranceCasePackage* package =
-        impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
-
-    std::string error;
-    bool changed = false;
-    if (drop_mode == core::TreeDropMode::Before || drop_mode == core::TreeDropMode::After) {
-        changed = core::ReorderSiblings(model,
-                                        package,
-                                        impl_->current_tree,
-                                        impl_->tree_display_order,
-                                        core::ReorderSiblingsCommand{dragged_id, target_id, drop_mode},
-                                        error);
-    } else {
-        changed = core::MoveSubtree(
-            model, package, impl_->current_tree, core::MoveSubtreeCommand{dragged_id, target_id}, error);
-    }
-
-    if (!changed) {
-        SetStatus("Tree move failed: " + error);
-        return false;
-    }
-
-    impl_->events.Emit(TreeDirtyEvent{});
-    impl_->events.Emit(SelectionChangedEvent{dragged_id, true});
-    impl_->events.Emit(DocumentDirtyEvent{});
-    SetStatus(drop_mode == core::TreeDropMode::AsChild ? "Moved " + dragged_id : "Reordered " + dragged_id);
-    return true;
+    return ElementActions(*impl_).PerformTreeDrop(dragged_id, target_id, drop_mode);
 }
 
 void AppRuntime::SetStatus(const std::string& message) {
@@ -1116,125 +1000,6 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     }
 
     impl_->tree_needs_rebuild = false;
-}
-
-float AppRuntime::RenderMainMenuBar(bool& done) {
-    if (!ImGui::BeginMainMenuBar()) {
-        return 0.0f;
-    }
-
-    if (ImGui::BeginMenu(ui::Tr(ui::MessageId::FileMenu))) {
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::CreateEmptyProject))) {
-            BeginCreateProject();
-        }
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::OpenProject))) {
-            BeginOpenProject();
-        }
-        ImGui::Separator();
-        bool has_project = impl_->app_state.current_project.has_value();
-        if (!has_project)
-            ImGui::BeginDisabled();
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::SaveProject))) {
-            SaveProject();
-        }
-        if (!has_project)
-            ImGui::EndDisabled();
-        ImGui::Separator();
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::Exit))) {
-            RequestExit(done);
-        }
-        ImGui::EndMenu();
-    }
-
-    if (ImGui::BeginMenu(ui::Tr(ui::MessageId::AddMenu))) {
-        bool has_project = impl_->app_state.current_project.has_value();
-        if (!has_project)
-            ImGui::BeginDisabled();
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::NewGsnSacmFile))) {
-            BeginCreateProjectSacmFile();
-        }
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::NewEvidenceRegister))) {
-            BeginCreateProjectEvidenceRegister();
-        }
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::NewJ3377CaeRegister))) {
-            BeginCreateProjectJ3377CaeRegister();
-        }
-        if (!has_project)
-            ImGui::EndDisabled();
-        ImGui::EndMenu();
-    }
-
-    if (ImGui::BeginMenu(ui::Tr(ui::MessageId::EditMenu))) {
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::Preferences))) {
-            impl_->modal_coordinator->show_preferences_window = true;
-        }
-        ImGui::EndMenu();
-    }
-
-    if (ImGui::BeginMenu(ui::Tr(ui::MessageId::ViewMenu))) {
-        ui::UiState& ui_state = ui::GetUiState();
-        ImGui::MenuItem(ui::Tr(ui::MessageId::GsnCanvas), nullptr, &impl_->workbench.show_gsn_tab);
-        ImGui::MenuItem(ui::Tr(ui::MessageId::CseRegister), nullptr, &impl_->workbench.show_cse_tab);
-        ImGui::MenuItem(ui::Tr(ui::MessageId::EvidenceRegister), nullptr, &impl_->workbench.show_evidence_tab);
-        NormalizeCenterViewSelection(*impl_, ui_state.center_view);
-
-        ImGui::Separator();
-        if (ImGui::BeginMenu(ui::Tr(ui::MessageId::Appearance))) {
-            if (ImGui::MenuItem(ui::Tr(ui::MessageId::ThemeTweaks))) {
-                impl_->modal_coordinator->show_theme_tweak_window = true;
-            }
-            RenderThemeMenu();
-            RenderLanguageMenu();
-            ImGui::EndMenu();
-        }
-
-        ImGui::Separator();
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::WelcomeScreen))) {
-            impl_->project_controller->show_startup_project_window = true;
-        }
-
-        ImGui::EndMenu();
-    }
-
-    HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
-    if (runner_params && runner_params->imGuiWindowParams.showStatus_Fps) {
-        ui::gsn::CanvasRenderStats stats = ui::gsn::GetLastCanvasRenderStats();
-        const int node_total = stats.nodes_drawn + stats.nodes_culled;
-        const int edge_total = stats.edges_drawn + stats.edges_culled;
-        const float node_ratio =
-            node_total > 0 ? static_cast<float>(stats.nodes_culled) / static_cast<float>(node_total) : 0.0f;
-        const float edge_ratio =
-            edge_total > 0 ? static_cast<float>(stats.edges_culled) / static_cast<float>(edge_total) : 0.0f;
-
-        char fps_text[32];
-        char nodes_text[32];
-        char edges_text[32];
-        std::snprintf(fps_text, sizeof(fps_text), "FPS: %.1f", ImGui::GetIO().Framerate);
-        std::snprintf(nodes_text, sizeof(nodes_text), "N %d/%d", stats.nodes_drawn, node_total);
-        std::snprintf(edges_text, sizeof(edges_text), "E %d/%d", stats.edges_drawn, edge_total);
-
-        const char* sep = "  ";
-        const float total_width = ImGui::CalcTextSize(fps_text).x + ImGui::CalcTextSize(sep).x +
-                                  ImGui::CalcTextSize(nodes_text).x + ImGui::CalcTextSize(sep).x +
-                                  ImGui::CalcTextSize(edges_text).x;
-
-        const float right_x = ImGui::GetWindowContentRegionMax().x - total_width;
-        ImGui::SameLine();
-        ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), right_x));
-
-        ImGui::TextUnformatted(fps_text);
-        ImGui::SameLine(0.0f, 0.0f);
-        ImGui::TextUnformatted(sep);
-        ImGui::SameLine(0.0f, 0.0f);
-        ImGui::TextColored(ui::CullRatioColor(node_ratio), "%s", nodes_text);
-        ImGui::SameLine(0.0f, 0.0f);
-        ImGui::TextUnformatted(sep);
-        ImGui::SameLine(0.0f, 0.0f);
-        ImGui::TextColored(ui::CullRatioColor(edge_ratio), "%s", edges_text);
-    }
-
-    ImGui::EndMainMenuBar();
-    return ImGui::GetFrameHeight();
 }
 
 void AppRuntime::RenderSacmViewerPanel(float left_w, float sacm_h, float top_y) {
@@ -1840,7 +1605,15 @@ void AppRuntime::RenderFrame(bool& done) {
         RequestExit(done);
     }
 
-    const float menu_height = RenderMainMenuBar(done);
+    AppMenuBarCallbacks menu_callbacks;
+    menu_callbacks.begin_create_project = [this]() { BeginCreateProject(); };
+    menu_callbacks.begin_open_project = [this]() { BeginOpenProject(); };
+    menu_callbacks.save_project = [this]() { return SaveProject(); };
+    menu_callbacks.request_exit = [this](bool& done_ref) { RequestExit(done_ref); };
+    menu_callbacks.begin_create_project_sacm_file = [this]() { BeginCreateProjectSacmFile(); };
+    menu_callbacks.begin_create_project_evidence_register = [this]() { BeginCreateProjectEvidenceRegister(); };
+    menu_callbacks.begin_create_project_j3377_cae_register = [this]() { BeginCreateProjectJ3377CaeRegister(); };
+    const float menu_height = RenderAppMenuBar(*impl_, done, menu_callbacks);
 
     RebuildDerivedViewsIfNeeded();
     ProcessPendingProposalCreatorPreviewRefresh();
@@ -1941,7 +1714,9 @@ void AppRuntime::RenderFrame(bool& done) {
     modal_callbacks.touch_current_project_recent = [this]() { TouchCurrentProjectRecent(); };
     modal_callbacks.save_project = [this]() { return SaveProject(); };
     modal_callbacks.set_status = [this](const std::string& message) { SetStatus(message); };
-    modal_callbacks.delete_review_item = [this](const core::reviews::ReviewItem& item) { return DeleteReviewItem(item); };
+    modal_callbacks.delete_review_item = [this](const core::reviews::ReviewItem& item) {
+        return DeleteReviewItem(item);
+    };
     modal_callbacks.confirm_add_terminology_package = [this]() { ConfirmAddTerminologyPackage(); };
     modal_callbacks.confirm_delete_terminology_package = [this]() { ConfirmDeleteTerminologyPackage(); };
     modal_callbacks.confirm_terminology_term_edit = [this]() { ConfirmTerminologyTermEdit(); };
