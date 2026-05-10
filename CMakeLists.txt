@@ -246,8 +246,10 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/app/areas/feedback_dock_area.cpp
     src/app/areas/inspector_area.cpp
     src/app/areas/modal_host.cpp
+    src/app/areas/problems_area.cpp
     src/app/areas/project_explorer_area.cpp
     src/app/areas/review_panel_area.cpp
+    src/app/areas/term_usages_area.cpp
     src/app/areas/workbench_area.cpp
     src/app/frame/app_layout_regions.cpp
     src/app/frame/app_menu_bar.cpp

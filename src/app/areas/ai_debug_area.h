@@ -1,6 +1,8 @@
 #pragma once
 
-namespace app { struct AppRuntimeState; }
+namespace app {
+struct AppRuntimeState;
+}
 
 namespace app::areas {
 

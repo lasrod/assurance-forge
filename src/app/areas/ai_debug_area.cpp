@@ -52,9 +52,8 @@ void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
     EnsureGuidelineCatalogLoaded(state);
 
     const ui::UiState& ui_state = ui::GetUiState();
-    const parser::AssuranceCase* loaded_case = state.app_state.loaded_case.has_value()
-                                                  ? &state.app_state.loaded_case.value()
-                                                  : nullptr;
+    const parser::AssuranceCase* loaded_case =
+        state.app_state.loaded_case.has_value() ? &state.app_state.loaded_case.value() : nullptr;
     const parser::SacmElement* selected_element = loaded_case && !ui_state.selected_element_id.empty()
                                                       ? ai::FindSacmElement(*loaded_case, ui_state.selected_element_id)
                                                       : nullptr;

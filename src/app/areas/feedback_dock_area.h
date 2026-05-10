@@ -1,22 +1,23 @@
 #pragma once
 
-#include "core/problems/problem_item.h"
+#include "app/areas/problems_area.h"
+#include "app/areas/term_usages_area.h"
 #include "imgui.h"
 
-#include <cstddef>
 #include <functional>
 
 namespace app {
 struct AppRuntimeState;
-namespace frame { struct AppLayoutRegion; }
+namespace frame {
+struct AppLayoutRegion;
 }
+} // namespace app
 
 namespace app::areas {
 
 struct FeedbackDockAreaCallbacks {
-    std::function<void(const core::ProblemItem&)> activate_problem;
-    std::function<void(const core::ProblemItem&)> quick_fix_problem;
-    std::function<void(std::size_t)> activate_terminology_usage;
+    ProblemsAreaCallbacks problems;
+    TermUsagesAreaCallbacks term_usages;
     std::function<void()> render_review_content;
     std::function<void()> render_ai_debug_content;
 };

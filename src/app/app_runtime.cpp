@@ -1494,23 +1494,28 @@ void AppRuntime::RenderFrame(bool& done) {
         return SetManualReviewOk(element_id, manual_ok);
     };
 
-    areas::FeedbackDockAreaCallbacks feedback_dock_callbacks{
-        [this](const core::ProblemItem& problem) {
-            if (problem.type.rfind("TerminologyTerm", 0) == 0) {
-                HandleProblemQuickFix(problem);
-                return;
-            }
-            if (problem.element_id.empty())
-                return;
-            ui::GetUiState().selected_problem_element_id = problem.element_id;
-            impl_->events.Emit(SelectionChangedEvent{problem.element_id, true});
-            impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
-        },
-        [this](const core::ProblemItem& problem) { HandleProblemQuickFix(problem); },
-        [this](std::size_t usage_index) { NavigateToTerminologyUsage(usage_index); },
-        [this, &review_panel_callbacks]() { areas::RenderReviewPanelContent(*impl_, review_panel_callbacks); },
-        [this]() { areas::RenderAiDebugPanelContent(*impl_); },
+    areas::FeedbackDockAreaCallbacks feedback_dock_callbacks;
+    feedback_dock_callbacks.problems.activate_problem = [this](const core::ProblemItem& problem) {
+        if (problem.type.rfind("TerminologyTerm", 0) == 0) {
+            HandleProblemQuickFix(problem);
+            return;
+        }
+        if (problem.element_id.empty())
+            return;
+        ui::GetUiState().selected_problem_element_id = problem.element_id;
+        impl_->events.Emit(SelectionChangedEvent{problem.element_id, true});
+        impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
     };
+    feedback_dock_callbacks.problems.quick_fix_problem = [this](const core::ProblemItem& problem) {
+        HandleProblemQuickFix(problem);
+    };
+    feedback_dock_callbacks.term_usages.activate_usage = [this](std::size_t usage_index) {
+        NavigateToTerminologyUsage(usage_index);
+    };
+    feedback_dock_callbacks.render_review_content = [this, &review_panel_callbacks]() {
+        areas::RenderReviewPanelContent(*impl_, review_panel_callbacks);
+    };
+    feedback_dock_callbacks.render_ai_debug_content = [this]() { areas::RenderAiDebugPanelContent(*impl_); };
     areas::RenderFeedbackDockArea(*impl_, regions.feedback_dock, kPanelFlags, feedback_dock_callbacks);
 
     areas::InspectorAreaCallbacks inspector_callbacks{

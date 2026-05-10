@@ -15,8 +15,12 @@
 
 namespace app {
 
-namespace areas { struct WorkbenchAreaCallbacks; }
-namespace frame { struct AppLayoutRegion; }
+namespace areas {
+struct WorkbenchAreaCallbacks;
+}
+namespace frame {
+struct AppLayoutRegion;
+}
 struct AppRuntimeState;
 
 class AppRuntime {

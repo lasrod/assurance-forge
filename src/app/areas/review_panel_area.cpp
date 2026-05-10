@@ -185,8 +185,8 @@ ui::panels::ReviewPanelModel BuildReviewPanelModel(AppRuntimeState& state) {
     case controllers::ElementReviewStatus::Failed:
         model.review_status_text = "Not OK";
         model.review_status_detail = element_review_state.last_review_message.empty()
-                                      ? "AI review failed."
-                                      : element_review_state.last_review_message;
+                                         ? "AI review failed."
+                                         : element_review_state.last_review_message;
         break;
     case controllers::ElementReviewStatus::OpenItems:
         model.review_status_text = "Not OK";
@@ -225,8 +225,8 @@ void RenderReviewPanelContent(AppRuntimeState& state, const ReviewPanelAreaCallb
 
     ui::panels::ReviewPanelCallbacks panel_callbacks;
     panel_callbacks.add_review_item = [&state, &callbacks](const std::string& title,
-                                                            const std::string& message,
-                                                            const std::vector<std::string>& guideline_ids) {
+                                                           const std::string& message,
+                                                           const std::vector<std::string>& guideline_ids) {
         AddManualReviewItem(state, callbacks, title, message, guideline_ids);
     };
     panel_callbacks.create_proposed_change = [&callbacks](const core::reviews::ReviewItem& item) {
