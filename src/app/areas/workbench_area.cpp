@@ -25,8 +25,8 @@ ui::ElementContextActions MakeProposalContextActions(const WorkbenchAreaCallback
 }
 
 ui::ElementContextActions MakeCanvasContextActions(const WorkbenchAreaCallbacks& callbacks) {
-    ui::ElementContextActions actions = callbacks.make_element_context_actions ? callbacks.make_element_context_actions()
-                                                                               : ui::ElementContextActions{};
+    ui::ElementContextActions actions =
+        callbacks.make_element_context_actions ? callbacks.make_element_context_actions() : ui::ElementContextActions{};
     actions.open_terminology_term = callbacks.open_terminology_term;
     actions.edit_terminology_term = callbacks.edit_terminology_term;
     actions.define_terminology_term = callbacks.define_terminology_term;
@@ -82,11 +82,10 @@ void RenderGsnCanvasTab(AppRuntimeState& state, ui::UiState& ui_state, const Wor
     } else {
         actions = MakeCanvasContextActions(callbacks);
     }
-    const parser::AssuranceCase* visible_case = state.IsProposalCanvasActive()
-                                                    ? &state.proposal_controller->preview_model
-                                                    : (state.app_state.loaded_case.has_value()
-                                                           ? &state.app_state.loaded_case.value()
-                                                           : nullptr);
+    const parser::AssuranceCase* visible_case =
+        state.IsProposalCanvasActive()
+            ? &state.proposal_controller->preview_model
+            : (state.app_state.loaded_case.has_value() ? &state.app_state.loaded_case.value() : nullptr);
     ui_state.proposal_canvas_active = state.IsProposalCanvasActive();
     ui_state.attention_element_ids = core::CollectAttentionElementIds(state.problems_manager.GetProblems());
     if (callbacks.sync_review_visual_states)

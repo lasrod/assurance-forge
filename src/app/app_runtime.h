@@ -160,7 +160,6 @@ private:
     void CreateAiGeneratedProposals(const std::vector<AiReviewProposalSuggestion>& suggestions);
     bool SetManualReviewOk(const std::string& element_id, bool manual_ok);
     void CancelActiveProposal();
-    void MarkReviewItemsDirty();
     bool DeleteProposalPatchFile(const std::string& proposal_id, std::string& error);
     void CloseProposalPreviewIfOpen(const std::string& proposal_id);
     void BeginDeleteReviewItem(const core::reviews::ReviewItem& item);

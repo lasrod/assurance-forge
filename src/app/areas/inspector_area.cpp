@@ -22,9 +22,8 @@ void RenderInspectorArea(AppRuntimeState& state,
     } else {
         parser::AssuranceCase* loaded_case =
             state.app_state.loaded_case.has_value() ? &state.app_state.loaded_case.value() : nullptr;
-        sacm::AssuranceCasePackage* sacm_package = state.app_state.sacm_package.has_value()
-                                                       ? &state.app_state.sacm_package.value()
-                                                       : nullptr;
+        sacm::AssuranceCasePackage* sacm_package =
+            state.app_state.sacm_package.has_value() ? &state.app_state.sacm_package.value() : nullptr;
         ui::panels::ElementTerminologyAssistCallbacks terminology_callbacks;
         terminology_callbacks.define_term = callbacks.define_terminology_term;
         terminology_callbacks.link_existing_term = callbacks.link_existing_terminology_term;

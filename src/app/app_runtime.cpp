@@ -3,6 +3,7 @@
 #include "ai/ai_service.h"
 #include "ai/ai_task_runner.h"
 #include "ai/secret_store.h"
+#include "app/actions/review_actions.h"
 #include "app/areas/argument_navigator_area.h"
 #include "app/areas/feedback_dock_area.h"
 #include "app/areas/inspector_area.h"
@@ -1505,61 +1506,24 @@ void AppRuntime::CancelActiveProposal() {
     }
 }
 
-void AppRuntime::MarkReviewItemsDirty() {
-    impl_->review_controller->MarkDirty();
-}
-
 bool AppRuntime::DeleteProposalPatchFile(const std::string& proposal_id, std::string& error) {
-    if (!impl_->app_state.current_project.has_value()) {
-        error = "Open a project before deleting proposed changes.";
-        return false;
-    }
-
-    core::AssuranceProject& project = impl_->app_state.current_project.value();
-    const std::filesystem::path relative_path = ReviewProposalRelativePath(proposal_id);
-    if (ProjectTracksFile(project, relative_path)) {
-        return core::ProjectService::RemoveTrackedFile(project, relative_path, true, error);
-    }
-    return impl_->proposal_controller->manager.DeleteProposal(proposal_id, error);
+    return ReviewActions(*impl_).DeleteProposalPatchFile(proposal_id, error);
 }
 
 void AppRuntime::CloseProposalPreviewIfOpen(const std::string& proposal_id) {
-    if (!impl_->proposal_controller->ClosePreviewIfOpen(proposal_id))
-        return;
-    ClearProposalHighlightState(ui::GetUiState());
-    if (impl_->app_state.loaded_case.has_value()) {
-        impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->app_state.loaded_case.value());
-        ui::gsn::SetCanvasTree(impl_->current_tree);
-    } else {
-        impl_->tree_needs_rebuild = true;
-    }
+    ReviewActions(*impl_).CloseProposalPreviewIfOpen(proposal_id);
 }
 
 void AppRuntime::BeginDeleteReviewItem(const core::reviews::ReviewItem& item) {
-    const bool creator_active = impl_->proposal_controller->creator_active;
-    impl_->review_controller->BeginDeleteReviewItem(item, creator_active);
-    if (!item.proposal_id.has_value() && !creator_active)
-        DeleteReviewItem(item);
+    ReviewActions(*impl_).BeginDeleteReviewItem(item);
 }
 
 bool AppRuntime::DeleteReviewItem(const core::reviews::ReviewItem& item) {
-    const bool deleted = impl_->review_controller->DeleteReviewItem(
-        item,
-        impl_->proposal_controller->creator_active,
-        impl_->app_state.current_project.has_value(),
-        [this](const std::string& proposal_id, std::string& error) {
-            return DeleteProposalPatchFile(proposal_id, error);
-        },
-        [this](const std::string& proposal_id) { CloseProposalPreviewIfOpen(proposal_id); });
-    if (deleted && impl_->app_state.current_project.has_value()) {
-        core::ProjectService::RefreshFileStatus(impl_->app_state.current_project.value());
-    }
-    return deleted;
+    return ReviewActions(*impl_).DeleteReviewItem(item);
 }
 
 bool AppRuntime::ResolveReviewItem(const core::reviews::ReviewItem& item) {
-    return impl_->review_controller->ResolveReviewItem(
-        item, impl_->proposal_controller->creator_active, impl_->app_state.current_project.has_value(), NowUtcString());
+    return ReviewActions(*impl_).ResolveReviewItem(item, NowUtcString());
 }
 
 bool AppRuntime::AddProposalChildToSelected(core::NewElementKind kind) {
@@ -2515,34 +2479,7 @@ void AppRuntime::RenderReviewPanelContent() {
         SetStatus("Applied proposal " + proposal->id + ".");
     };
     callbacks.delete_proposal = [this](const core::reviews::ReviewItem& item) {
-        if (impl_->proposal_controller->creator_active) {
-            SetStatus("Save or discard the active proposal before deleting another proposal.");
-            return;
-        }
-        if (!item.proposal_id.has_value()) {
-            SetStatus("This review comment has no proposed change to delete.");
-            return;
-        }
-        if (!impl_->app_state.current_project.has_value()) {
-            SetStatus("Open a project before deleting proposed changes.");
-            return;
-        }
-
-        core::AssuranceProject& project = impl_->app_state.current_project.value();
-        std::string error;
-        if (!DeleteProposalPatchFile(item.proposal_id.value(), error)) {
-            SetStatus("Proposal delete failed: " + error);
-            return;
-        }
-
-        if (!impl_->review_controller->ClearProposal(item.id)) {
-            SetStatus("Proposal deleted, but review link update failed.");
-            return;
-        }
-        CloseProposalPreviewIfOpen(item.proposal_id.value());
-
-        core::ProjectService::RefreshFileStatus(project);
-        SetStatus("Deleted proposed change " + item.proposal_id.value() + ".");
+        ReviewActions(*impl_).DeleteProposalForReviewItem(item);
     };
     callbacks.resolve_review_item = [this](const core::reviews::ReviewItem& item) { ResolveReviewItem(item); };
     callbacks.delete_review_item = [this](const core::reviews::ReviewItem& item) { BeginDeleteReviewItem(item); };

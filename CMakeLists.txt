@@ -237,6 +237,7 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/app/app_runtime_project.cpp
     src/app/app_runtime.cpp
     src/app/app_runtime_state.cpp
+    src/app/actions/review_actions.cpp
     src/app/areas/argument_navigator_area.cpp
     src/app/areas/feedback_dock_area.cpp
     src/app/areas/inspector_area.cpp
