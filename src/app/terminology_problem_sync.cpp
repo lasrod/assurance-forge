@@ -4,6 +4,7 @@
 #include "core/problems/problem_utils.h"
 #include "core/terminology_package_service.h"
 #include "core/terminology_scope_service.h"
+#include "parser/model_utils.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_model.h"
 
@@ -15,17 +16,6 @@
 
 namespace app {
 namespace {
-
-bool IsRelationshipElement(const parser::SacmElement& element) {
-    return element.type == "assertedinference" || element.type == "assertedcontext" ||
-           element.type == "assertedevidence";
-}
-
-std::string ElementTerminologyText(const parser::SacmElement& element) {
-    if (element.type == "claim" || element.type == "argumentreasoning")
-        return element.content;
-    return element.description;
-}
 
 std::string TerminologyAmbiguityProblemId(const core::TermOccurrence& occurrence) {
     return "terminology-ambiguity:" + occurrence.element_id + ":" + occurrence.text + ":" +
@@ -231,9 +221,9 @@ void SyncTerminologyProblems(core::ProblemsManager& problems_manager,
     core::TerminologyService terminology_service(*package);
 
     for (const parser::SacmElement& element : model->elements) {
-        if (IsRelationshipElement(element))
+        if (parser::IsRelationshipElement(element))
             continue;
-        const std::string text = ElementTerminologyText(element);
+        const std::string text = parser::ElementTerminologyText(element);
         if (text.empty())
             continue;
 

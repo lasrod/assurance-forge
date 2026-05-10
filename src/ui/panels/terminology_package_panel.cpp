@@ -1,6 +1,7 @@
 #include "ui/panels/terminology_package_panel.h"
 
 #include "core/string_utils.h"
+#include "core/terminology_text_utils.h"
 #include "imgui.h"
 
 #include <algorithm>
@@ -56,18 +57,6 @@ bool TermHasCategoryRef(const sacm::TerminologyPackage& package,
     return false;
 }
 
-std::string JoinCategoryRefs(const std::vector<std::string>& refs) {
-    std::string result;
-    for (const auto& ref : refs) {
-        if (ref.empty())
-            continue;
-        if (!result.empty())
-            result += ", ";
-        result += ref;
-    }
-    return result;
-}
-
 std::string JoinCategoryNames(const sacm::TerminologyPackage& package, const std::vector<std::string>& refs) {
     std::string result;
     for (const auto& ref : refs) {
@@ -92,7 +81,7 @@ bool MatchesFilter(const sacm::TerminologyPackage& package, const sacm::Term& te
     return ContainsInsensitive(term.value, filter) || ContainsInsensitive(term.name, filter) ||
            ContainsInsensitive(term.description, filter) ||
            ContainsInsensitive(JoinCategoryNames(package, term.category_refs), filter) ||
-           ContainsInsensitive(JoinCategoryRefs(term.category_refs), filter) ||
+           ContainsInsensitive(core::JoinCategoryRefs(term.category_refs), filter) ||
            ContainsInsensitive(term.externalReference, filter) || ContainsInsensitive(term.origin, filter);
 }
 

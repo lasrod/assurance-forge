@@ -39,4 +39,15 @@ const SacmElement* FindElementByIdOrGid(const AssuranceCase& model, const std::s
     return found == model.elements.end() ? nullptr : &*found;
 }
 
+bool IsRelationshipElement(const SacmElement& element) {
+    return element.type == "assertedinference" || element.type == "assertedcontext" ||
+           element.type == "assertedevidence";
+}
+
+std::string ElementTerminologyText(const SacmElement& element) {
+    if (element.type == "claim" || element.type == "argumentreasoning")
+        return element.content;
+    return element.description;
+}
+
 } // namespace parser

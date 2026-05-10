@@ -3,6 +3,7 @@
 #include "core/project_service.h"
 #include "core/string_utils.h"
 #include "core/terminology_package_service.h"
+#include "core/terminology_text_utils.h"
 #include "parser/model_utils.h"
 #include "sacm/sacm_parser.h"
 #include "sacm/sacm_serializer.h"
@@ -83,14 +84,6 @@ void HideTerminologyArtifactReferences(parser::AssuranceCase& model, const sacm:
                                    ReferencesAny(element.source_refs, hidden_refs.artifact_reference_refs));
                        }),
         model.elements.end());
-}
-
-std::string TermContextDisplayLabel(const sacm::Term& term) {
-    if (term.value.empty())
-        return term.name.empty() ? term.id : term.name;
-    if (term.name.empty() || term.name == term.value)
-        return term.value;
-    return term.value + ": " + term.name;
 }
 
 void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model, const sacm::AssuranceCasePackage& package) {

@@ -4,6 +4,7 @@
 #include "app/recent_projects.h"
 #include "core/element_factory.h"
 #include "core/string_utils.h"
+#include "core/terminology_text_utils.h"
 #include "hello_imgui/hello_imgui.h"
 #include "imgui.h"
 #include "ui/imgui_buffer_utils.h"
@@ -12,7 +13,6 @@
 #include "ui/ui_state.h"
 
 #include <algorithm>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -74,40 +74,12 @@ bool CurrentTermDefinitionHasDuplicate(const AppRuntimeState& state,
                                       state.terminology.selected_term_ref);
 }
 
-std::vector<std::string> SplitCategoryRefs(const std::string& raw) {
-    std::string normalized = raw;
-    std::replace(normalized.begin(), normalized.end(), ',', ' ');
-    std::stringstream stream(normalized);
-    std::vector<std::string> refs;
-    std::string item;
-    while (stream >> item) {
-        item = TrimWhitespace(item);
-        if (!item.empty() && item.front() == '#')
-            item.erase(item.begin());
-        if (!item.empty() && std::find(refs.begin(), refs.end(), item) == refs.end())
-            refs.push_back(item);
-    }
-    return refs;
-}
-
-std::string JoinCategoryRefs(const std::vector<std::string>& refs) {
-    std::string result;
-    for (const auto& ref : refs) {
-        if (ref.empty())
-            continue;
-        if (!result.empty())
-            result += ", ";
-        result += ref;
-    }
-    return result;
-}
-
 bool ContainsCategoryRef(const std::vector<std::string>& refs, const std::string& ref) {
     return std::find(refs.begin(), refs.end(), ref) != refs.end();
 }
 
 void SetCategoryChecked(AppRuntimeState& state, const sacm::Category& category, bool checked) {
-    std::vector<std::string> refs = SplitCategoryRefs(state.terminology.term_categories_buf);
+    std::vector<std::string> refs = core::SplitNormalizedCategoryRefs(state.terminology.term_categories_buf);
     const std::string ref = !category.id.empty() ? category.id : category.gid;
     if (checked) {
         if (!ContainsCategoryRef(refs, ref))
@@ -120,7 +92,7 @@ void SetCategoryChecked(AppRuntimeState& state, const sacm::Category& category, 
             refs.erase(std::remove(refs.begin(), refs.end(), category.gid), refs.end());
     }
     CopyToBuffer(
-        state.terminology.term_categories_buf, sizeof(state.terminology.term_categories_buf), JoinCategoryRefs(refs));
+        state.terminology.term_categories_buf, sizeof(state.terminology.term_categories_buf), core::JoinCategoryRefs(refs));
 }
 
 void RenderTermCategoryPickerForPackage(AppRuntimeState& state, const core::TerminologyPackageRef& package_ref) {
@@ -135,7 +107,7 @@ void RenderTermCategoryPickerForPackage(AppRuntimeState& state, const core::Term
         return;
     }
 
-    std::vector<std::string> refs = SplitCategoryRefs(state.terminology.term_categories_buf);
+    std::vector<std::string> refs = core::SplitNormalizedCategoryRefs(state.terminology.term_categories_buf);
     const float list_height = ImGui::GetTextLineHeightWithSpacing() * 5.0f;
     if (ImGui::BeginChild("##term_category_picker", ImVec2(460.0f, list_height), true)) {
         for (const auto& category : package->categories) {

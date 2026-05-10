@@ -1,6 +1,8 @@
 #include "app/sacm_argument_sync.h"
 
+#include "core/string_utils.h"
 #include "core/terminology_package_service.h"
+#include "parser/model_utils.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_model.h"
 
@@ -14,11 +16,6 @@
 namespace app {
 namespace {
 
-bool IsRelationshipElement(const parser::SacmElement& element) {
-    return element.type == "assertedinference" || element.type == "assertedcontext" ||
-           element.type == "assertedevidence";
-}
-
 void CopyCommonSacmFields(sacm::SacmElement& target, const parser::SacmElement& source) {
     target.id = source.id;
     target.gid = source.gid;
@@ -30,12 +27,6 @@ void CopyCommonSacmFields(sacm::SacmElement& target, const parser::SacmElement& 
         target.name_ml.set("en", source.name);
     if (target.description_ml.texts.empty() && !source.description.empty())
         target.description_ml.set("en", source.description);
-}
-
-std::string NormalizeSacmRef(std::string ref) {
-    if (!ref.empty() && ref.front() == '#')
-        ref.erase(ref.begin());
-    return ref;
 }
 
 void CollectTermRefs(const sacm::TerminologyPackage& terminology_package, std::unordered_set<std::string>& refs) {
@@ -60,18 +51,18 @@ std::unordered_set<std::string> CollectTermRefs(const sacm::AssuranceCasePackage
 
 bool ReferencesAny(const std::vector<std::string>& refs, const std::unordered_set<std::string>& candidates) {
     return std::any_of(refs.begin(), refs.end(), [&](const std::string& ref) {
-        return candidates.find(NormalizeSacmRef(ref)) != candidates.end();
+        return candidates.find(core::StripLeadingHash(ref)) != candidates.end();
     });
 }
 
 bool ArtifactReferenceTargetsTerm(const sacm::ArtifactReference& artifact_reference,
                                   const std::unordered_set<std::string>& term_refs) {
-    return term_refs.find(NormalizeSacmRef(artifact_reference.referencedArtifact)) != term_refs.end();
+    return term_refs.find(core::StripLeadingHash(artifact_reference.referencedArtifact)) != term_refs.end();
 }
 
 void AddElementRefs(const parser::AssuranceCase& model, std::unordered_set<std::string>& refs) {
     for (const parser::SacmElement& element : model.elements) {
-        if (IsRelationshipElement(element))
+        if (parser::IsRelationshipElement(element))
             continue;
         if (!element.id.empty())
             refs.insert(element.id);

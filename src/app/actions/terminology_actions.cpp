@@ -3,6 +3,7 @@
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
 #include "core/string_utils.h"
+#include "core/terminology_text_utils.h"
 #include "parser/model_utils.h"
 #include "parser/xml_parser.h"
 #include "ui/imgui_buffer_utils.h"
@@ -26,18 +27,6 @@ void SetStatus(AppRuntimeState& state, const std::string& message) {
 
 std::string TerminologySuggestionKey(const std::string& element_id, const std::string& term_value) {
     return element_id + "\n" + term_value;
-}
-
-std::string JoinCategoryRefs(const std::vector<std::string>& refs) {
-    std::string result;
-    for (const auto& ref : refs) {
-        if (ref.empty())
-            continue;
-        if (!result.empty())
-            result += ", ";
-        result += ref;
-    }
-    return result;
 }
 
 void CopyTerminologyPackageToEditor(AppRuntimeState& state, const sacm::TerminologyPackage& package) {
@@ -64,25 +53,11 @@ void CopyTermToEditor(AppRuntimeState& state, const sacm::Term& term) {
         state.terminology.term_definition_buf, sizeof(state.terminology.term_definition_buf), term.description);
     CopyToBuffer(state.terminology.term_categories_buf,
                  sizeof(state.terminology.term_categories_buf),
-                 JoinCategoryRefs(term.category_refs));
+                 core::JoinCategoryRefs(term.category_refs));
     CopyToBuffer(state.terminology.term_external_reference_buf,
                  sizeof(state.terminology.term_external_reference_buf),
                  term.externalReference);
     CopyToBuffer(state.terminology.term_origin_buf, sizeof(state.terminology.term_origin_buf), term.origin);
-}
-
-std::vector<std::string> SplitCategoryRefs(const std::string& raw) {
-    std::string normalized = raw;
-    std::replace(normalized.begin(), normalized.end(), ',', ' ');
-    std::stringstream stream(normalized);
-    std::vector<std::string> refs;
-    std::string item;
-    while (stream >> item) {
-        item = TrimWhitespace(item);
-        if (!item.empty() && std::find(refs.begin(), refs.end(), item) == refs.end())
-            refs.push_back(item);
-    }
-    return refs;
 }
 
 core::TerminologyTermDraft TermDraftFromEditor(const AppRuntimeState& state) {
@@ -90,7 +65,7 @@ core::TerminologyTermDraft TermDraftFromEditor(const AppRuntimeState& state) {
     draft.value = TrimWhitespace(state.terminology.term_value_buf);
     draft.name = TrimWhitespace(state.terminology.term_name_buf);
     draft.description = TrimWhitespace(state.terminology.term_definition_buf);
-    draft.category_refs = SplitCategoryRefs(state.terminology.term_categories_buf);
+    draft.category_refs = core::SplitCategoryRefs(state.terminology.term_categories_buf);
     draft.externalReference = TrimWhitespace(state.terminology.term_external_reference_buf);
     draft.origin = TrimWhitespace(state.terminology.term_origin_buf);
     return draft;
@@ -255,14 +230,6 @@ const sacm::AssertedContext* FindAssertedContextById(const sacm::AssuranceCasePa
     return nullptr;
 }
 
-std::string TermContextDisplayLabel(const sacm::Term& term) {
-    if (term.value.empty())
-        return term.name.empty() ? term.id : term.name;
-    if (term.name.empty() || term.name == term.value)
-        return term.value;
-    return term.value + ": " + term.name;
-}
-
 bool RefreshVisibleTerminologyContextProjection(core::AppState& app_state) {
     if (!app_state.loaded_case.has_value() || !app_state.sacm_package.has_value())
         return false;
@@ -286,7 +253,7 @@ bool RefreshVisibleTerminologyContextProjection(core::AppState& app_state) {
                 element->description.clear();
                 element->description_langs.clear();
             } else {
-                element->name = TermContextDisplayLabel(*resolution.term);
+                element->name = core::TermContextDisplayLabel(*resolution.term);
                 element->name_langs = resolution.term->name_ml.texts;
                 if (element->name_langs.empty() && !element->name.empty())
                     element->name_langs["en"] = element->name;

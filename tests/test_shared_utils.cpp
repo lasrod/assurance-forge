@@ -6,8 +6,10 @@
 #include "core/reviews/review_text_utils.h"
 #include "core/string_utils.h"
 #include "core/time_utils.h"
+#include "core/terminology_text_utils.h"
 #include "parser/model_utils.h"
 #include "parser/xml_parser.h"
+#include "sacm/sacm_model.h"
 #include "ui/imgui_buffer_utils.h"
 
 #include <gtest/gtest.h>
@@ -118,4 +120,38 @@ TEST(ReviewProposalFactoryTest, BuildsDraftProposalWithAnchorHashes) {
     EXPECT_FALSE(proposal.created_utc.empty());
     EXPECT_FALSE(proposal.base_model_hash.empty());
     EXPECT_FALSE(proposal.base_element_hashes["G1"].empty());
+}
+
+TEST(TerminologyTextUtilsTest, JoinsAndSplitsCategoryRefs) {
+    EXPECT_EQ(core::JoinCategoryRefs({"cat-a", "", "cat-b"}), "cat-a, cat-b");
+    EXPECT_EQ(core::SplitCategoryRefs(" cat-a, cat-b cat-a "), (std::vector<std::string>{"cat-a", "cat-b"}));
+    EXPECT_EQ(core::SplitNormalizedCategoryRefs(" #cat-a, cat-b #cat-a "),
+              (std::vector<std::string>{"cat-a", "cat-b"}));
+}
+
+TEST(TerminologyTextUtilsTest, BuildsTermContextDisplayLabel) {
+    sacm::Term term;
+    term.id = "term-id";
+    EXPECT_EQ(core::TermContextDisplayLabel(term), "term-id");
+    term.name = "Display Name";
+    EXPECT_EQ(core::TermContextDisplayLabel(term), "Display Name");
+    term.value = "ABS";
+    EXPECT_EQ(core::TermContextDisplayLabel(term), "ABS: Display Name");
+    term.name = "ABS";
+    EXPECT_EQ(core::TermContextDisplayLabel(term), "ABS");
+}
+
+TEST(ParserModelUtilsTest, IdentifiesRelationshipElementsAndTerminologyText) {
+    parser::SacmElement claim;
+    claim.type = "claim";
+    claim.content = "Claim content";
+    claim.description = "Claim description";
+    EXPECT_FALSE(parser::IsRelationshipElement(claim));
+    EXPECT_EQ(parser::ElementTerminologyText(claim), "Claim content");
+
+    parser::SacmElement context;
+    context.type = "assertedcontext";
+    context.description = "Relationship description";
+    EXPECT_TRUE(parser::IsRelationshipElement(context));
+    EXPECT_EQ(parser::ElementTerminologyText(context), "Relationship description");
 }

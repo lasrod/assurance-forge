@@ -8,6 +8,7 @@
 #include "core/project_service.h"
 #include "core/reviews/review_item.h"
 #include "core/terminology_package_service.h"
+#include "core/terminology_text_utils.h"
 #include "imgui.h"
 #include "parser/model_utils.h"
 #include "sacm/sacm_package_tree.h"
@@ -70,14 +71,6 @@ std::string FirstElementIdForArgumentPackage(const sacm::AssuranceCasePackage& p
     return {};
 }
 
-std::string TermContextDisplayLabel(const sacm::Term& term) {
-    if (term.value.empty())
-        return term.name.empty() ? term.id : term.name;
-    if (term.name.empty() || term.name == term.value)
-        return term.value;
-    return term.value + ": " + term.name;
-}
-
 bool RefreshVisibleTerminologyContextProjection(core::AppState& app_state) {
     if (!app_state.loaded_case.has_value() || !app_state.sacm_package.has_value())
         return false;
@@ -101,7 +94,7 @@ bool RefreshVisibleTerminologyContextProjection(core::AppState& app_state) {
                 element->description.clear();
                 element->description_langs.clear();
             } else {
-                element->name = TermContextDisplayLabel(*resolution.term);
+                element->name = core::TermContextDisplayLabel(*resolution.term);
                 element->name_langs = resolution.term->name_ml.texts;
                 if (element->name_langs.empty() && !element->name.empty())
                     element->name_langs["en"] = element->name;
