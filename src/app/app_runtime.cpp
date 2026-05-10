@@ -497,7 +497,8 @@ bool AppRuntime::SetManualReviewOk(const std::string& element_id, bool manual_ok
         SetStatus("Enter a reviewer name before changing review status.");
         return false;
     }
-    if (!impl_->review_controller->SetManualReviewOk(element_id, manual_ok, impl_->reviewer_name, core::NowUtcString())) {
+    if (!impl_->review_controller->SetManualReviewOk(
+            element_id, manual_ok, impl_->reviewer_name, core::NowUtcString())) {
         SetStatus("Could not update manual review status.");
         return false;
     }

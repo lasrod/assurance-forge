@@ -3,6 +3,7 @@
 #include "core/project_service.h"
 #include "core/string_utils.h"
 #include "core/terminology_package_service.h"
+#include "parser/model_utils.h"
 #include "sacm/sacm_parser.h"
 #include "sacm/sacm_serializer.h"
 
@@ -92,20 +93,13 @@ std::string TermContextDisplayLabel(const sacm::Term& term) {
     return term.value + ": " + term.name;
 }
 
-parser::SacmElement* FindParserElement(parser::AssuranceCase& model, const std::string& id, const std::string& gid) {
-    for (parser::SacmElement& element : model.elements) {
-        if ((!id.empty() && element.id == id) || (!gid.empty() && element.gid == gid))
-            return &element;
-    }
-    return nullptr;
-}
-
 void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model, const sacm::AssuranceCasePackage& package) {
     for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
         for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
             if (!IsVisibleTerminologyArtifactReference(package, argument_package, artifact_reference))
                 continue;
-            parser::SacmElement* element = FindParserElement(model, artifact_reference.id, artifact_reference.gid);
+            parser::SacmElement* element =
+                parser::FindElementByIdOrGid(model, artifact_reference.id, artifact_reference.gid);
             if (!element)
                 continue;
             const TerminologyTermReferenceResolution resolution =

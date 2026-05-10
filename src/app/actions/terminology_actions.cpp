@@ -3,6 +3,7 @@
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
 #include "core/string_utils.h"
+#include "parser/model_utils.h"
 #include "parser/xml_parser.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/ui_state.h"
@@ -254,20 +255,6 @@ const sacm::AssertedContext* FindAssertedContextById(const sacm::AssuranceCasePa
     return nullptr;
 }
 
-bool ParserModelHasElement(const parser::AssuranceCase& model, const std::string& id, const std::string& gid) {
-    return std::any_of(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
-        return (!id.empty() && element.id == id) || (!gid.empty() && element.gid == gid);
-    });
-}
-
-parser::SacmElement* FindParserElement(parser::AssuranceCase& model, const std::string& id, const std::string& gid) {
-    for (parser::SacmElement& element : model.elements) {
-        if ((!id.empty() && element.id == id) || (!gid.empty() && element.gid == gid))
-            return &element;
-    }
-    return nullptr;
-}
-
 std::string TermContextDisplayLabel(const sacm::Term& term) {
     if (term.value.empty())
         return term.name.empty() ? term.id : term.name;
@@ -287,7 +274,8 @@ bool RefreshVisibleTerminologyContextProjection(core::AppState& app_state) {
         for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
             if (!core::IsVisibleTerminologyArtifactReference(package, argument_package, artifact_reference))
                 continue;
-            parser::SacmElement* element = FindParserElement(model, artifact_reference.id, artifact_reference.gid);
+            parser::SacmElement* element =
+                parser::FindElementByIdOrGid(model, artifact_reference.id, artifact_reference.gid);
             if (!element)
                 continue;
             const core::TerminologyTermReferenceResolution resolution =
@@ -327,7 +315,7 @@ bool SyncVisibleTerminologyContextToParser(core::AppState& app_state,
 
     parser::AssuranceCase& model = app_state.loaded_case.value();
     bool changed = false;
-    if (!ParserModelHasElement(model, artifact_reference->id, artifact_reference->gid)) {
+    if (!parser::FindElementByIdOrGid(model, artifact_reference->id, artifact_reference->gid)) {
         parser::SacmElement element;
         element.id = artifact_reference->id;
         element.gid = artifact_reference->gid;
@@ -339,7 +327,7 @@ bool SyncVisibleTerminologyContextToParser(core::AppState& app_state,
         model.elements.push_back(std::move(element));
         changed = true;
     }
-    if (!ParserModelHasElement(model, context->id, context->gid)) {
+    if (!parser::FindElementByIdOrGid(model, context->id, context->gid)) {
         parser::SacmElement element;
         element.id = context->id;
         element.gid = context->gid;

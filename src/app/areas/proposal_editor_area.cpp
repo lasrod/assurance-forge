@@ -3,6 +3,7 @@
 #include "app/app_runtime_state.h"
 #include "core/reviews/review_proposal.h"
 #include "imgui.h"
+#include "parser/model_utils.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/ui_state.h"
 
@@ -16,13 +17,6 @@ namespace app::areas {
 namespace {
 
 using ui::CopyToBuffer;
-
-const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model, const std::string& element_id) {
-    auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
-        return element.id == element_id;
-    });
-    return found == model.elements.end() ? nullptr : &*found;
-}
 
 core::reviews::ElementRef ExistingElementRef(const std::string& id) {
     return core::reviews::ElementRef{id, std::nullopt};
@@ -58,7 +52,7 @@ void TrackAffectedExistingElement(core::reviews::ReviewProposal& proposal,
         proposal.affected_existing_element_ids.push_back(element_id);
     }
     if (proposal.base_element_hashes.count(element_id) == 0) {
-        if (const parser::SacmElement* element = FindParserElement(base_model, element_id)) {
+        if (const parser::SacmElement* element = parser::FindElementById(base_model, element_id)) {
             proposal.base_element_hashes[element_id] = core::reviews::ComputeElementSemanticHash(*element);
         }
     }
@@ -160,7 +154,7 @@ void RenderProposalElementEditor(AppRuntimeState& state, const ProposalEditorAre
         return;
     }
 
-    const parser::SacmElement* element = FindParserElement(proposals.preview_model, selected_id);
+    const parser::SacmElement* element = parser::FindElementById(proposals.preview_model, selected_id);
     if (!element) {
         ImGui::TextWrapped("The selected proposal preview element no longer exists.");
         return;
@@ -189,7 +183,7 @@ void RenderProposalElementEditor(AppRuntimeState& state, const ProposalEditorAre
     bool old_undeveloped = element_snapshot.undeveloped;
     if (ref->existing_id.has_value() && state.app_state.loaded_case.has_value()) {
         if (const parser::SacmElement* base =
-                FindParserElement(state.app_state.loaded_case.value(), ref->existing_id.value())) {
+                parser::FindElementById(state.app_state.loaded_case.value(), ref->existing_id.value())) {
             old_name = base->name;
             old_text = EditableTextFor(*base);
             old_undeveloped = base->undeveloped;

@@ -176,6 +176,7 @@ function(af_copy_sccg_data target_name)
 endfunction()
 
 set(ASSURANCE_FORGE_SHARED_SOURCES
+    src/parser/model_utils.cpp
     src/parser/xml_parser.cpp
     src/ui/panels/welcome_modal.cpp
     src/ui/panels/element_panel.cpp
@@ -213,6 +214,7 @@ set(ASSURANCE_FORGE_SHARED_SOURCES
     src/core/reviews/review_item.cpp
     src/core/reviews/review_item_manager.cpp
     src/core/reviews/review_proposal.cpp
+    src/core/reviews/review_proposal_factory.cpp
     src/core/reviews/review_proposal_manager.cpp
     src/core/reviews/review_proposal_patch_service.cpp
     src/core/reviews/review_text_utils.cpp
@@ -353,6 +355,7 @@ add_executable(tests
     src/app/controllers/review_controller.cpp
     src/parser/guidelines_parser.cpp
     src/parser/sccg_dist_parser.cpp
+    src/parser/model_utils.cpp
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
@@ -369,6 +372,7 @@ add_executable(tests
     src/core/reviews/review_item.cpp
     src/core/reviews/review_item_manager.cpp
     src/core/reviews/review_proposal.cpp
+    src/core/reviews/review_proposal_factory.cpp
     src/core/reviews/review_proposal_manager.cpp
     src/core/reviews/review_proposal_patch_service.cpp
     src/core/reviews/review_text_utils.cpp

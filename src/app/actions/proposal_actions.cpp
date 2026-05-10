@@ -6,17 +6,17 @@
 #include "app/project_workflow.h"
 #include "app/sacm_argument_sync.h"
 #include "core/project_service.h"
+#include "core/reviews/review_proposal_factory.h"
 #include "core/reviews/review_proposal_patch_service.h"
-#include "core/reviews/review_text_utils.h"
 #include "core/string_utils.h"
 #include "core/time_utils.h"
+#include "parser/model_utils.h"
 #include "parser/xml_parser.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
-#include <chrono>
 #include <filesystem>
 #include <map>
 #include <optional>
@@ -31,42 +31,10 @@ namespace {
 
 using core::NowUtcString;
 using core::TrimWhitespace;
-using core::reviews::TruncateForProblemMessage;
+using core::reviews::BuildDraftReviewProposal;
 
 void SetStatus(AppRuntimeState& state, const std::string& message) {
     state.events.Emit(StatusMessageEvent{message});
-}
-
-std::string GenerateReviewProposalId() {
-    static unsigned long long counter = 0;
-    auto ticks = std::chrono::system_clock::now().time_since_epoch().count();
-    std::ostringstream out;
-    out << "proposal-" << std::hex << ticks << "-" << ++counter;
-    return out.str();
-}
-
-const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model, const std::string& element_id) {
-    auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
-        return element.id == element_id || element.gid == element_id;
-    });
-    return found == model.elements.end() ? nullptr : &*found;
-}
-
-core::reviews::ReviewProposal BuildDraftReviewProposal(const core::reviews::ReviewItem& item,
-                                                       const parser::AssuranceCase& model,
-                                                       const parser::SacmElement& anchor) {
-    core::reviews::ReviewProposal proposal;
-    proposal.id = GenerateReviewProposalId();
-    proposal.review_item_id = item.id;
-    proposal.title = item.title.empty() ? "Proposed change" : item.title;
-    proposal.summary = item.message.empty() ? "Draft proposed change." : TruncateForProblemMessage(item.message, 180);
-    proposal.author_name = "Manual reviewer";
-    proposal.created_utc = NowUtcString();
-    proposal.anchor_element_id = anchor.id;
-    proposal.affected_existing_element_ids = {anchor.id};
-    proposal.base_model_hash = core::reviews::ComputeModelSemanticHash(model);
-    proposal.base_element_hashes[anchor.id] = core::reviews::ComputeElementSemanticHash(anchor);
-    return proposal;
 }
 
 core::reviews::PatchOperationType CreateOperationFor(core::NewElementKind kind) {
@@ -176,7 +144,7 @@ void TrackAffectedExistingElement(core::reviews::ReviewProposal& proposal,
         proposal.affected_existing_element_ids.push_back(element_id);
     }
     if (proposal.base_element_hashes.count(element_id) == 0) {
-        if (const parser::SacmElement* element = FindParserElement(base_model, element_id)) {
+        if (const parser::SacmElement* element = parser::FindElementByIdOrGidValue(base_model, element_id)) {
             proposal.base_element_hashes[element_id] = core::reviews::ComputeElementSemanticHash(*element);
         }
     }
@@ -256,7 +224,7 @@ CollectProposalRemovedExistingIds(const core::reviews::ReviewProposal& proposal,
         if (operation.type != core::reviews::PatchOperationType::RemoveElement || !operation.element.has_value())
             continue;
         const std::string element_id = PreviewIdForProposalRef(operation.element.value(), generated_ids);
-        if (element_id.empty() || !FindParserElement(base_model, element_id))
+        if (element_id.empty() || !parser::FindElementByIdOrGidValue(base_model, element_id))
             continue;
 
         std::optional<core::RemoveMode> mode = ProposalRemoveModeFromField(operation.field);
@@ -281,7 +249,7 @@ void RestoreRemovedExistingElementsForProposalPreview(parser::AssuranceCase& pre
             continue;
         if (removed_ids.count(element.id) == 0)
             continue;
-        if (FindParserElement(preview_model, element.id))
+        if (parser::FindElementByIdOrGidValue(preview_model, element.id))
             continue;
         preview_model.elements.push_back(element);
     }
@@ -459,7 +427,8 @@ bool ProposalActions::BeginForReviewItem(const core::reviews::ReviewItem& item) 
         return false;
     }
 
-    const parser::SacmElement* anchor = FindParserElement(state_.app_state.loaded_case.value(), item.element_id);
+    const parser::SacmElement* anchor =
+        parser::FindElementByIdOrGidValue(state_.app_state.loaded_case.value(), item.element_id);
     if (!anchor) {
         SetStatus(state_, "The reviewed element no longer exists in the loaded model.");
         return false;
@@ -739,7 +708,7 @@ void ProposalActions::CreateAiGenerated(const std::vector<AiReviewProposalSugges
         if (!item.has_value() || item->proposal_id.has_value())
             continue;
 
-        const parser::SacmElement* anchor = FindParserElement(model, item->element_id);
+        const parser::SacmElement* anchor = parser::FindElementByIdOrGidValue(model, item->element_id);
         if (!anchor || anchor->type != "claim")
             continue;
 
@@ -808,7 +777,7 @@ bool ProposalActions::AddChildToSelected(core::NewElementKind kind) {
         return false;
     }
 
-    const parser::SacmElement* parent = FindParserElement(proposals.preview_model, selected_id);
+    const parser::SacmElement* parent = parser::FindElementByIdOrGidValue(proposals.preview_model, selected_id);
     if (!parent) {
         SetStatus(state_, "The selected proposal preview element no longer exists.");
         return false;
