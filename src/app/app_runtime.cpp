@@ -3,6 +3,7 @@
 #include "ai/ai_service.h"
 #include "ai/ai_task_runner.h"
 #include "ai/secret_store.h"
+#include "app/actions/proposal_actions.h"
 #include "app/actions/review_actions.h"
 #include "app/areas/argument_navigator_area.h"
 #include "app/areas/feedback_dock_area.h"
@@ -374,24 +375,6 @@ core::reviews::ReviewProposal BuildDraftReviewProposal(const core::reviews::Revi
     return proposal;
 }
 
-core::reviews::PatchOperationType CreateOperationFor(core::NewElementKind kind) {
-    switch (kind) {
-    case core::NewElementKind::Goal:
-        return core::reviews::PatchOperationType::CreateClaim;
-    case core::NewElementKind::Strategy:
-        return core::reviews::PatchOperationType::CreateStrategy;
-    case core::NewElementKind::Solution:
-        return core::reviews::PatchOperationType::CreateSolution;
-    case core::NewElementKind::Context:
-        return core::reviews::PatchOperationType::CreateContext;
-    case core::NewElementKind::Assumption:
-        return core::reviews::PatchOperationType::CreateAssumption;
-    case core::NewElementKind::Justification:
-        return core::reviews::PatchOperationType::CreateJustification;
-    }
-    return core::reviews::PatchOperationType::CreateClaim;
-}
-
 void EnsureGuidelineCatalogLoaded(AppRuntimeState& state) {
     if (state.guideline_catalog_load_attempted)
         return;
@@ -406,49 +389,6 @@ void EnsureGuidelineCatalogLoaded(AppRuntimeState& state) {
         state.guideline_catalog_error = error;
     }
     state.guideline_catalog_load_attempted = true;
-}
-
-const char* CreateRefPrefixFor(core::NewElementKind kind) {
-    switch (kind) {
-    case core::NewElementKind::Goal:
-        return "$new_claim_";
-    case core::NewElementKind::Strategy:
-        return "$new_strategy_";
-    case core::NewElementKind::Solution:
-        return "$new_solution_";
-    case core::NewElementKind::Context:
-        return "$new_context_";
-    case core::NewElementKind::Assumption:
-        return "$new_assumption_";
-    case core::NewElementKind::Justification:
-        return "$new_justification_";
-    }
-    return "$new_element_";
-}
-
-bool IsContextLike(core::NewElementKind kind) {
-    return kind == core::NewElementKind::Context || kind == core::NewElementKind::Assumption ||
-           kind == core::NewElementKind::Justification;
-}
-
-const char* RemoveModeField(core::RemoveMode mode) {
-    return mode == core::RemoveMode::NodeAndDescendants ? core::reviews::kReviewProposalRemoveModeNodeAndDescendants
-                                                        : core::reviews::kReviewProposalRemoveModeNodeOnly;
-}
-
-std::string GenerateCreateRef(const core::reviews::ReviewProposal& proposal, core::NewElementKind kind) {
-    std::unordered_set<std::string> used;
-    for (const core::reviews::PatchOperation& operation : proposal.operations) {
-        if (operation.create_ref.has_value())
-            used.insert(operation.create_ref.value());
-    }
-    const std::string prefix = CreateRefPrefixFor(kind);
-    for (int i = 1; i < 100000; ++i) {
-        std::string candidate = prefix + std::to_string(i);
-        if (used.count(candidate) == 0)
-            return candidate;
-    }
-    return prefix + std::to_string(used.size() + 1);
 }
 
 core::reviews::ElementRef ExistingElementRef(const std::string& id) {
@@ -472,18 +412,6 @@ ProposalRefForPreviewId(const std::string& preview_id, const std::map<std::strin
     if (!preview_id.empty())
         return ExistingElementRef(preview_id);
     return std::nullopt;
-}
-
-std::string PreviewIdForProposalRef(const core::reviews::ElementRef& ref,
-                                    const std::map<std::string, std::string>& generated_ids) {
-    if (ref.existing_id.has_value())
-        return ref.existing_id.value();
-    if (ref.create_ref.has_value()) {
-        auto found = generated_ids.find(ref.create_ref.value());
-        if (found != generated_ids.end())
-            return found->second;
-    }
-    return {};
 }
 
 void TrackAffectedExistingElement(core::reviews::ReviewProposal& proposal,
@@ -510,157 +438,11 @@ void TrackAffectedRef(core::reviews::ReviewProposal& proposal,
         TrackAffectedExistingElement(proposal, base_model, ref.existing_id.value());
 }
 
-void AddHighlightRef(std::unordered_set<std::string>& ids,
-                     const core::reviews::ElementRef& ref,
-                     const std::map<std::string, std::string>& generated_ids) {
-    if (ref.existing_id.has_value() && !ref.existing_id->empty()) {
-        ids.insert(ref.existing_id.value());
-    }
-    if (ref.create_ref.has_value()) {
-        auto found = generated_ids.find(ref.create_ref.value());
-        if (found != generated_ids.end() && !found->second.empty())
-            ids.insert(found->second);
-    }
-}
-
-bool IsPreviewRelationshipType(const std::string& type) {
-    return type == "assertedinference" || type == "assertedcontext" || type == "assertedevidence";
-}
-
-bool RelationshipTouchesAny(const parser::SacmElement& relationship, const std::unordered_set<std::string>& ids) {
-    if (!IsPreviewRelationshipType(relationship.type))
-        return false;
-    if (ids.count(relationship.reasoning_ref) > 0)
-        return true;
-    for (const std::string& source : relationship.source_refs) {
-        if (ids.count(source) > 0)
-            return true;
-    }
-    for (const std::string& target : relationship.target_refs) {
-        if (ids.count(target) > 0)
-            return true;
-    }
-    return false;
-}
-
-bool SameRelationship(const parser::SacmElement& lhs, const parser::SacmElement& rhs) {
-    return lhs.type == rhs.type && lhs.reasoning_ref == rhs.reasoning_ref && lhs.source_refs == rhs.source_refs &&
-           lhs.target_refs == rhs.target_refs;
-}
-
-bool RelationshipExists(const parser::AssuranceCase& model, const parser::SacmElement& relationship) {
-    for (const parser::SacmElement& element : model.elements) {
-        if (!IsPreviewRelationshipType(element.type))
-            continue;
-        if (!relationship.id.empty() && element.id == relationship.id)
-            return true;
-        if (SameRelationship(element, relationship))
-            return true;
-    }
-    return false;
-}
-
-std::optional<core::RemoveMode> ProposalRemoveModeFromField(const std::string& field) {
-    if (field == core::reviews::kReviewProposalRemoveModeNodeOnly)
-        return core::RemoveMode::NodeOnly;
-    if (field == core::reviews::kReviewProposalRemoveModeNodeAndDescendants)
-        return core::RemoveMode::NodeAndDescendants;
-    return std::nullopt;
-}
-
-std::unordered_set<std::string>
-CollectProposalRemovedExistingIds(const core::reviews::ReviewProposal& proposal,
-                                  const parser::AssuranceCase& base_model,
-                                  const std::map<std::string, std::string>& generated_ids) {
-    std::unordered_set<std::string> ids;
-    for (const core::reviews::PatchOperation& operation : proposal.operations) {
-        if (operation.type != core::reviews::PatchOperationType::RemoveElement || !operation.element.has_value())
-            continue;
-        const std::string element_id = PreviewIdForProposalRef(operation.element.value(), generated_ids);
-        if (element_id.empty() || !FindParserElement(base_model, element_id))
-            continue;
-
-        std::optional<core::RemoveMode> mode = ProposalRemoveModeFromField(operation.field);
-        if (mode.has_value()) {
-            std::unordered_set<std::string> planned = core::PlanRemoval(base_model, element_id, mode.value());
-            ids.insert(planned.begin(), planned.end());
-        } else {
-            ids.insert(element_id);
-        }
-    }
-    return ids;
-}
-
-void RestoreRemovedExistingElementsForProposalPreview(parser::AssuranceCase& preview_model,
-                                                      const parser::AssuranceCase& base_model,
-                                                      const std::unordered_set<std::string>& removed_ids) {
-    if (removed_ids.empty())
-        return;
-
-    for (const parser::SacmElement& element : base_model.elements) {
-        if (IsPreviewRelationshipType(element.type))
-            continue;
-        if (removed_ids.count(element.id) == 0)
-            continue;
-        if (FindParserElement(preview_model, element.id))
-            continue;
-        preview_model.elements.push_back(element);
-    }
-
-    for (const parser::SacmElement& relationship : base_model.elements) {
-        if (!RelationshipTouchesAny(relationship, removed_ids))
-            continue;
-        if (RelationshipExists(preview_model, relationship))
-            continue;
-        preview_model.elements.push_back(relationship);
-    }
-}
-
-std::unordered_set<std::string> CollectProposalHighlightIds(const core::reviews::ReviewProposal& proposal,
-                                                            const std::map<std::string, std::string>& generated_ids) {
-    std::unordered_set<std::string> ids;
-    if (!proposal.anchor_element_id.empty())
-        ids.insert(proposal.anchor_element_id);
-    for (const std::string& id : proposal.affected_existing_element_ids) {
-        if (!id.empty())
-            ids.insert(id);
-    }
-    for (const auto& generated : generated_ids) {
-        if (!generated.second.empty())
-            ids.insert(generated.second);
-    }
-    for (const core::reviews::PatchOperation& operation : proposal.operations) {
-        if (operation.element.has_value())
-            AddHighlightRef(ids, operation.element.value(), generated_ids);
-        if (operation.source.has_value())
-            AddHighlightRef(ids, operation.source.value(), generated_ids);
-        if (operation.target.has_value())
-            AddHighlightRef(ids, operation.target.value(), generated_ids);
-    }
-    return ids;
-}
-
 void ClearProposalHighlightState(ui::UiState& ui_state) {
     ui_state.proposal_highlight_ids.clear();
     ui_state.marked_for_removal.clear();
     ui_state.center_on_marked = false;
     ui_state.dim_non_proposal_nodes = false;
-}
-
-void ApplyProposalPreviewVisualState(ui::UiState& ui_state,
-                                     parser::AssuranceCase& preview_model,
-                                     const parser::AssuranceCase& base_model,
-                                     const core::reviews::ReviewProposal& proposal,
-                                     const std::map<std::string, std::string>& generated_ids) {
-    std::unordered_set<std::string> removed_ids =
-        CollectProposalRemovedExistingIds(proposal, base_model, generated_ids);
-    // The patch service removes nodes from the preview model; restore them so the canvas can mark removals explicitly.
-    RestoreRemovedExistingElementsForProposalPreview(preview_model, base_model, removed_ids);
-
-    ui_state.proposal_highlight_ids = CollectProposalHighlightIds(proposal, generated_ids);
-    ui_state.proposal_highlight_ids.insert(removed_ids.begin(), removed_ids.end());
-    ui_state.marked_for_removal = std::move(removed_ids);
-    ui_state.dim_non_proposal_nodes = !ui_state.proposal_highlight_ids.empty();
 }
 
 bool IsUpdateForElement(const core::reviews::PatchOperation& operation,
@@ -782,7 +564,7 @@ bool ArtifactReferenceTargetsTerm(const sacm::ArtifactReference& artifact_refere
 
 void AddElementRefs(const parser::AssuranceCase& model, std::unordered_set<std::string>& refs) {
     for (const parser::SacmElement& element : model.elements) {
-        if (IsPreviewRelationshipType(element.type))
+        if (IsRelationshipElement(element))
             continue;
         if (!element.id.empty())
             refs.insert(element.id);
@@ -1170,264 +952,31 @@ void AppRuntime::ShowNotImplementedModal(const std::string& feature) {
 }
 
 bool AppRuntime::RefreshProposalCreatorPreview() {
-    auto& proposals = *impl_->proposal_controller;
-    if (!proposals.creator_active)
-        return false;
-    if (!impl_->app_state.loaded_case.has_value()) {
-        SetStatus("Load a SACM model before editing proposal drafts.");
-        return false;
-    }
-
-    core::reviews::ReviewProposalPatchService patch_service;
-    core::reviews::ProposalPreviewResult preview =
-        patch_service.BuildPreviewModel(proposals.draft, impl_->app_state.loaded_case.value());
-    if (!preview.success) {
-        SetStatus("Proposal draft preview failed: " + preview.error);
-        return false;
-    }
-
-    proposals.preview_active = false;
-    proposals.preview_id = proposals.draft.id;
-    proposals.preview_model = std::move(preview.preview_model);
-    proposals.creator_generated_ids = std::move(preview.generated_ids);
-    ui::UiState& ui_state = ui::GetUiState();
-    ApplyProposalPreviewVisualState(ui_state,
-                                    proposals.preview_model,
-                                    impl_->app_state.loaded_case.value(),
-                                    proposals.draft,
-                                    proposals.creator_generated_ids);
-    impl_->current_tree = ui::gsn::BuildAssuranceTree(proposals.preview_model);
-    ui::gsn::SetCanvasTree(impl_->current_tree);
-    return true;
+    return ProposalActions(*impl_).RefreshCreatorPreview();
 }
 
 void AppRuntime::ProcessPendingProposalCreatorPreviewRefresh() {
-    auto& proposals = *impl_->proposal_controller;
-    if (!proposals.creator_preview_refresh_pending)
-        return;
-
-    proposals.creator_preview_refresh_pending = false;
-    const std::optional<std::string> select_create_ref = proposals.creator_pending_select_create_ref;
-    const bool clear_selection = proposals.creator_pending_clear_selection;
-    proposals.creator_pending_select_create_ref.reset();
-    proposals.creator_pending_clear_selection = false;
-
-    if (!RefreshProposalCreatorPreview())
-        return;
-
-    ui::UiState& ui_state = ui::GetUiState();
-    if (select_create_ref.has_value()) {
-        ui_state.selected_element_id =
-            PreviewIdForProposalRef(CreatedElementRef(select_create_ref.value()), proposals.creator_generated_ids);
-        ui_state.center_on_selection = !ui_state.selected_element_id.empty();
-    } else if (clear_selection) {
-        ui_state.selected_element_id.clear();
-    }
+    ProposalActions(*impl_).ProcessPendingCreatorPreviewRefresh();
 }
 
 bool AppRuntime::BeginProposalForReviewItem(const core::reviews::ReviewItem& item) {
-    auto& proposals = *impl_->proposal_controller;
-    if (proposals.creator_active) {
-        SetStatus("Save or discard the active proposal before creating another one.");
-        return false;
-    }
-    if (item.status != core::reviews::ReviewItemStatus::Open) {
-        SetStatus("Resolved review comments cannot create proposed changes.");
-        return false;
-    }
-    if (item.proposal_id.has_value()) {
-        SetStatus("This review comment already has a proposed change.");
-        return false;
-    }
-    if (!impl_->app_state.current_project.has_value() || !impl_->app_state.loaded_case.has_value()) {
-        SetStatus("Open a project and SACM file before creating proposed changes.");
-        return false;
-    }
-
-    const parser::SacmElement* anchor = FindParserElement(impl_->app_state.loaded_case.value(), item.element_id);
-    if (!anchor) {
-        SetStatus("The reviewed element no longer exists in the loaded model.");
-        return false;
-    }
-
-    proposals.BeginDraft(item, impl_->app_state.loaded_case.value(), *anchor, impl_->reviewer_name);
-    if (!RefreshProposalCreatorPreview()) {
-        CancelActiveProposal();
-        return false;
-    }
-
-    ui::UiState& ui_state = ui::GetUiState();
-    ui_state.center_view = ui::CenterView::GsnCanvas;
-    ui_state.selected_element_id = anchor->id;
-    ui_state.center_on_selection = true;
-    impl_->force_center_tab_selection = true;
-    SetStatus("Building proposal " + proposals.draft.id + ". Use the GSN canvas and Save Proposal when ready.");
-    return true;
+    return ProposalActions(*impl_).BeginForReviewItem(item);
 }
 
 bool AppRuntime::BeginEditProposalForReviewItem(const core::reviews::ReviewItem& item) {
-    auto& proposals = *impl_->proposal_controller;
-    if (proposals.creator_active) {
-        SetStatus("Save or discard the active proposal before editing another one.");
-        return false;
-    }
-    if (item.status != core::reviews::ReviewItemStatus::Open) {
-        SetStatus("Resolved review comments cannot edit proposed changes.");
-        return false;
-    }
-    if (!item.proposal_id.has_value()) {
-        SetStatus("This review comment has no proposed change to edit.");
-        return false;
-    }
-    if (!impl_->app_state.current_project.has_value() || !impl_->app_state.loaded_case.has_value()) {
-        SetStatus("Open a project and SACM file before editing proposed changes.");
-        return false;
-    }
-
-    std::string error;
-    std::optional<core::reviews::ReviewProposal> proposal =
-        proposals.manager.LoadProposal(item.proposal_id.value(), error);
-    if (!proposal.has_value()) {
-        SetStatus("Proposal edit failed: " + error);
-        return false;
-    }
-    if (proposal->review_item_id != item.id) {
-        SetStatus("Proposal edit failed: the proposal belongs to a different review comment.");
-        return false;
-    }
-
-    proposals.BeginEditDraft(std::move(proposal.value()), impl_->reviewer_name);
-    if (!RefreshProposalCreatorPreview()) {
-        CancelActiveProposal();
-        return false;
-    }
-
-    ui::UiState& ui_state = ui::GetUiState();
-    ui_state.center_view = ui::CenterView::GsnCanvas;
-    ui_state.selected_element_id = proposals.draft.anchor_element_id;
-    ui_state.center_on_selection = !ui_state.selected_element_id.empty();
-    impl_->force_center_tab_selection = true;
-    SetStatus("Editing proposal " + proposals.draft.id + ". Use Save Proposal to update it.");
-    return true;
+    return ProposalActions(*impl_).BeginEditForReviewItem(item);
 }
 
 bool AppRuntime::BeginEditProposalById(const std::string& proposal_id) {
-    if (proposal_id.empty()) {
-        SetStatus("No proposal id was provided.");
-        return false;
-    }
-
-    std::string error;
-    std::optional<core::reviews::ReviewProposal> proposal =
-        impl_->proposal_controller->manager.LoadProposal(proposal_id, error);
-    if (!proposal.has_value()) {
-        SetStatus("Proposal edit failed: " + error);
-        return false;
-    }
-
-    std::optional<core::reviews::ReviewItem> item = impl_->review_controller->GetItemById(proposal->review_item_id);
-    if (!item.has_value()) {
-        SetStatus("Proposal edit failed: the owning review comment was not found.");
-        return false;
-    }
-    if (!item->proposal_id.has_value() || item->proposal_id.value() != proposal_id) {
-        SetStatus("Proposal edit failed: the owning review comment no longer points to this proposal.");
-        return false;
-    }
-
-    return BeginEditProposalForReviewItem(item.value());
+    return ProposalActions(*impl_).BeginEditById(proposal_id);
 }
 
 bool AppRuntime::PreviewProposalById(const std::string& proposal_id) {
-    auto& proposals = *impl_->proposal_controller;
-    if (proposals.creator_active) {
-        SetStatus("Save or discard the active proposal before viewing another proposal.");
-        return false;
-    }
-    if (proposal_id.empty()) {
-        SetStatus("No proposal id was provided.");
-        return false;
-    }
-
-    std::string error;
-    std::optional<core::reviews::ReviewProposal> proposal = proposals.manager.LoadProposal(proposal_id, error);
-    if (!proposal.has_value()) {
-        SetStatus("Proposal preview failed: " + error);
-        return false;
-    }
-
-    if (!impl_->app_state.loaded_case.has_value()) {
-        SetStatus("Load a SACM model before previewing proposals.");
-        return false;
-    }
-
-    core::reviews::ReviewProposalPatchService patch_service;
-    core::reviews::ProposalPreviewResult preview =
-        patch_service.BuildPreviewModel(*proposal, impl_->app_state.loaded_case.value());
-    if (!preview.success) {
-        SetStatus("Proposal preview failed: " + preview.error);
-        return false;
-    }
-
-    const std::map<std::string, std::string> generated_ids = preview.generated_ids;
-    proposals.preview_active = true;
-    proposals.preview_id = proposal->id;
-    proposals.preview_model = std::move(preview.preview_model);
-
-    ui::UiState& preview_ui_state = ui::GetUiState();
-    ApplyProposalPreviewVisualState(
-        preview_ui_state, proposals.preview_model, impl_->app_state.loaded_case.value(), *proposal, generated_ids);
-    impl_->current_tree = ui::gsn::BuildAssuranceTree(proposals.preview_model);
-    ui::gsn::SetCanvasTree(impl_->current_tree);
-    preview_ui_state.center_view = ui::CenterView::GsnCanvas;
-    preview_ui_state.selected_element_id = proposal->anchor_element_id;
-    preview_ui_state.center_on_selection = true;
-    impl_->show_gsn_tab = true;
-    impl_->force_center_tab_selection = true;
-
-    std::ostringstream status;
-    status << "Previewing proposal " << proposal->id << " with " << proposal->operations.size() << " operation(s). ";
-    status << "The project model has not been changed.";
-    SetStatus(status.str());
-    return true;
+    return ProposalActions(*impl_).PreviewById(proposal_id);
 }
 
 bool AppRuntime::SaveActiveProposal(const core::reviews::ReviewItem& item) {
-    auto& proposals = *impl_->proposal_controller;
-    if (!proposals.HasActiveDraftForItem(item.id)) {
-        SetStatus("No active proposal draft for this review comment.");
-        return false;
-    }
-    if (!proposals.CanSaveActiveDraft()) {
-        SetStatus("Add at least one proposal operation before saving.");
-        return false;
-    }
-    if (!impl_->app_state.current_project.has_value()) {
-        SetStatus("Open a project before saving proposals.");
-        return false;
-    }
-
-    core::AssuranceProject& project = impl_->app_state.current_project.value();
-    core::ProjectFileEntry entry;
-    std::string error;
-    if (!core::ProjectService::SaveReviewProposalFile(
-            project, proposals.draft.id, core::reviews::SerializeReviewProposal(proposals.draft), entry, error)) {
-        SetStatus("Proposal save failed: " + error);
-        return false;
-    }
-
-    if (!impl_->review_controller->SetProposal(item.id, proposals.draft.id)) {
-        std::string cleanup_error;
-        core::ProjectService::RemoveTrackedFile(project, entry.relativePath, true, cleanup_error);
-        SetStatus("Proposal link update failed.");
-        return false;
-    }
-
-    const std::string saved_id = proposals.draft.id;
-    CancelActiveProposal();
-    core::ProjectService::RefreshFileStatus(project);
-    SetStatus("Saved proposal " + saved_id + ".");
-    return true;
+    return ProposalActions(*impl_).SaveActive(item);
 }
 
 void AppRuntime::CreateAiGeneratedProposals(const std::vector<AiReviewProposalSuggestion>& suggestions) {
@@ -1495,15 +1044,7 @@ void AppRuntime::CreateAiGeneratedProposals(const std::vector<AiReviewProposalSu
 }
 
 void AppRuntime::CancelActiveProposal() {
-    impl_->proposal_controller->ClearActiveState();
-    ClearProposalHighlightState(ui::GetUiState());
-
-    if (impl_->app_state.loaded_case.has_value()) {
-        impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->app_state.loaded_case.value());
-        ui::gsn::SetCanvasTree(impl_->current_tree);
-    } else {
-        impl_->tree_needs_rebuild = true;
-    }
+    ProposalActions(*impl_).CancelActive();
 }
 
 bool AppRuntime::DeleteProposalPatchFile(const std::string& proposal_id, std::string& error) {
@@ -1527,140 +1068,15 @@ bool AppRuntime::ResolveReviewItem(const core::reviews::ReviewItem& item) {
 }
 
 bool AppRuntime::AddProposalChildToSelected(core::NewElementKind kind) {
-    auto& proposals = *impl_->proposal_controller;
-    if (!proposals.creator_active || !impl_->app_state.loaded_case.has_value()) {
-        SetStatus("Start a proposal draft before editing proposal changes.");
-        return false;
-    }
-
-    const std::string selected_id = ui::GetUiState().selected_element_id;
-    if (selected_id.empty()) {
-        SetStatus("Select an element before adding proposal nodes.");
-        return false;
-    }
-
-    const parser::SacmElement* parent = FindParserElement(proposals.preview_model, selected_id);
-    if (!parent) {
-        SetStatus("The selected proposal preview element no longer exists.");
-        return false;
-    }
-    const bool parent_is_container = parent->type == "claim" || parent->type == "argumentreasoning";
-    if (!parent_is_container) {
-        SetStatus("Cannot add a child to a leaf element (" + parent->type + ").");
-        return false;
-    }
-    if (kind == core::NewElementKind::Strategy && parent->type != "claim") {
-        SetStatus("Strategy can only be added under a Claim.");
-        return false;
-    }
-
-    std::optional<core::reviews::ElementRef> parent_ref =
-        ProposalRefForPreviewId(selected_id, proposals.creator_generated_ids);
-    if (!parent_ref.has_value()) {
-        SetStatus("Could not resolve selected element for proposal operation.");
-        return false;
-    }
-
-    const std::string create_ref = GenerateCreateRef(proposals.draft, kind);
-
-    core::reviews::PatchOperation create;
-    create.type = CreateOperationFor(kind);
-    create.create_ref = create_ref;
-    proposals.draft.operations.push_back(std::move(create));
-
-    core::reviews::PatchOperation relationship;
-    relationship.type = IsContextLike(kind) ? core::reviews::PatchOperationType::AddInContextOf
-                                            : core::reviews::PatchOperationType::AddSupportedBy;
-    relationship.source = CreatedElementRef(create_ref);
-    relationship.target = parent_ref.value();
-    proposals.draft.operations.push_back(std::move(relationship));
-
-    TrackAffectedRef(proposals.draft, impl_->app_state.loaded_case.value(), parent_ref.value());
-
-    proposals.creator_preview_refresh_pending = true;
-    proposals.creator_pending_select_create_ref = create_ref;
-    proposals.creator_pending_clear_selection = false;
-    SetStatus("Recorded proposal add operation.");
-    return true;
+    return ProposalActions(*impl_).AddChildToSelected(kind);
 }
 
 bool AppRuntime::AddProposalTopGoal() {
-    auto& proposals = *impl_->proposal_controller;
-    if (!proposals.creator_active || !impl_->app_state.loaded_case.has_value()) {
-        SetStatus("Start a proposal draft before editing proposal changes.");
-        return false;
-    }
-
-    const std::string create_ref = GenerateCreateRef(proposals.draft, core::NewElementKind::Goal);
-
-    core::reviews::PatchOperation create;
-    create.type = core::reviews::PatchOperationType::CreateClaim;
-    create.create_ref = create_ref;
-    proposals.draft.operations.push_back(std::move(create));
-
-    proposals.creator_preview_refresh_pending = true;
-    proposals.creator_pending_select_create_ref = create_ref;
-    proposals.creator_pending_clear_selection = false;
-    SetStatus("Recorded proposal top goal operation.");
-    return true;
+    return ProposalActions(*impl_).AddTopGoal();
 }
 
 void AppRuntime::RemoveProposalSelected(core::RemoveMode mode) {
-    auto& proposals = *impl_->proposal_controller;
-    if (!proposals.creator_active || !impl_->app_state.loaded_case.has_value()) {
-        SetStatus("Start a proposal draft before editing proposal changes.");
-        return;
-    }
-
-    const std::string selected_id = ui::GetUiState().selected_element_id;
-    if (selected_id.empty()) {
-        SetStatus("Select an element before removing proposal nodes.");
-        return;
-    }
-
-    std::vector<std::string> planned_ids;
-    auto planned = core::PlanRemoval(proposals.preview_model, selected_id, mode);
-    planned_ids.assign(planned.begin(), planned.end());
-    std::sort(planned_ids.begin(), planned_ids.end());
-    if (planned_ids.empty()) {
-        SetStatus("Nothing to remove for this selection.");
-        return;
-    }
-
-    for (const std::string& id : planned_ids) {
-        std::optional<core::reviews::ElementRef> ref = ProposalRefForPreviewId(id, proposals.creator_generated_ids);
-        if (!ref.has_value())
-            continue;
-        TrackAffectedRef(proposals.draft, impl_->app_state.loaded_case.value(), ref.value());
-    }
-
-    std::optional<core::reviews::ElementRef> selected_ref =
-        ProposalRefForPreviewId(selected_id, proposals.creator_generated_ids);
-    if (!selected_ref.has_value()) {
-        SetStatus("Could not resolve selected element for proposal removal.");
-        return;
-    }
-
-    proposals.draft.operations.erase(
-        std::remove_if(proposals.draft.operations.begin(),
-                       proposals.draft.operations.end(),
-                       [&](const core::reviews::PatchOperation& operation) {
-                           return operation.type == core::reviews::PatchOperationType::RemoveElement &&
-                                  operation.element.has_value() &&
-                                  SameElementRef(operation.element.value(), selected_ref.value());
-                       }),
-        proposals.draft.operations.end());
-
-    core::reviews::PatchOperation remove;
-    remove.type = core::reviews::PatchOperationType::RemoveElement;
-    remove.element = selected_ref.value();
-    remove.field = RemoveModeField(mode);
-    proposals.draft.operations.push_back(std::move(remove));
-
-    proposals.creator_preview_refresh_pending = true;
-    proposals.creator_pending_select_create_ref.reset();
-    proposals.creator_pending_clear_selection = true;
-    SetStatus("Recorded proposal remove operation.");
+    ProposalActions(*impl_).RemoveSelected(mode);
 }
 
 void AppRuntime::ScanDirectory() {

@@ -1,4 +1,5 @@
 #include "app/app_runtime.h"
+#include "app/actions/terminology_actions.h"
 #include "app/app_runtime_state.h"
 #include "app/native_file_dialogs.h"
 #include "app/project_workflow.h"
@@ -245,10 +246,6 @@ core::TerminologyPackageRef ResolveQuickDefineTargetPackage(const AppRuntimeStat
     if (!package.terminologyPackages.empty())
         return TerminologyPackageRefFor(package.terminologyPackages.front());
     return {};
-}
-
-std::string TerminologySuggestionKey(const std::string& element_id, const std::string& term_value) {
-    return element_id + "\n" + term_value;
 }
 
 bool StartsWith(const std::string& value, const std::string& prefix) {
@@ -919,64 +916,20 @@ void AppRuntime::AddVisibleTerminologyTermContextFromCanvas(const std::string& e
 
 void AppRuntime::FindTerminologyUsagesFromCanvas(const core::TerminologyPackageRef& package_ref,
                                                  const core::TerminologyTermRef& term_ref) {
-    BeginFindTerminologyUsages(package_ref, term_ref);
+    TerminologyActions(*impl_).BeginFindUsages(package_ref, term_ref);
 }
 
 void AppRuntime::BeginFindTerminologyUsages(const core::TerminologyPackageRef& package_ref,
                                             const core::TerminologyTermRef& term_ref) {
-    impl_->terminology_usages_active = true;
-    impl_->focus_terminology_usages_tab = true;
-    impl_->usage_search_package_ref = package_ref;
-    impl_->usage_search_term_ref = term_ref;
-    impl_->usage_search_term_value.clear();
-    impl_->usage_search_term_name.clear();
-    impl_->usage_search_message.clear();
-    impl_->usage_search_error.clear();
-    impl_->terminology_usage_results.clear();
-    impl_->selected_terminology_usage_index = -1;
-
-    if (!impl_->app_state.sacm_package.has_value()) {
-        impl_->usage_search_error = "Open a SACM model before finding terminology usages.";
-        SetStatus(impl_->usage_search_error);
-        return;
-    }
-
-    core::TerminologyTermUsageSearchResult result =
-        core::FindTerminologyTermUsages(impl_->app_state.sacm_package.value(), package_ref, term_ref);
-    impl_->usage_search_term_value = result.term_value;
-    impl_->usage_search_term_name = result.term_name;
-    if (!result.success) {
-        impl_->usage_search_error = result.error;
-        SetStatus("Find usages failed: " + result.error);
-        return;
-    }
-
-    impl_->terminology_usage_results = std::move(result.usages);
-    if (!impl_->terminology_usage_results.empty())
-        impl_->selected_terminology_usage_index = 0;
-    const int usage_count = static_cast<int>(impl_->terminology_usage_results.size());
-    const std::string label = impl_->usage_search_term_value.empty() ? "term" : impl_->usage_search_term_value;
-    SetStatus("Found " + std::to_string(usage_count) + " usage" + (usage_count == 1 ? "" : "s") + " of " + label + ".");
+    TerminologyActions(*impl_).BeginFindUsages(package_ref, term_ref);
 }
 
 void AppRuntime::NavigateToTerminologyUsage(std::size_t usage_index) {
-    if (usage_index >= impl_->terminology_usage_results.size())
-        return;
-    impl_->selected_terminology_usage_index = static_cast<int>(usage_index);
-    const core::TerminologyTermUsage& usage = impl_->terminology_usage_results[usage_index];
-    if (usage.element_id.empty()) {
-        SetStatus("The selected usage has no navigable element id.");
-        return;
-    }
-    impl_->show_gsn_tab = true;
-    impl_->events.Emit(SelectionChangedEvent{usage.element_id, true});
-    impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
+    TerminologyActions(*impl_).NavigateToUsage(usage_index);
 }
 
 void AppRuntime::ChangeTerminologyMeaningFromCanvas(const std::string& element_id, const std::string& term_value) {
-    (void)element_id;
-    (void)term_value;
-    ShowNotImplementedModal("Change linked terminology meaning");
+    TerminologyActions(*impl_).ChangeMeaningFromCanvas(element_id, term_value);
 }
 
 void AppRuntime::BeginQuickDefineTerminologyTerm(const std::string& element_id, const std::string& term_value) {
@@ -1019,13 +972,11 @@ void AppRuntime::BeginLinkExistingTerminologyTerm(const std::string& element_id,
 }
 
 void AppRuntime::IgnoreTerminologySuggestion(const std::string& element_id, const std::string& term_value) {
-    impl_->ignored_terminology_suggestion_keys.insert(TerminologySuggestionKey(element_id, TrimWhitespace(term_value)));
-    SetStatus("Ignored terminology suggestion " + TrimWhitespace(term_value) + " for this session.");
+    TerminologyActions(*impl_).IgnoreSuggestion(element_id, term_value);
 }
 
 bool AppRuntime::IsTerminologySuggestionIgnored(const std::string& element_id, const std::string& term_value) const {
-    const std::string key = TerminologySuggestionKey(element_id, TrimWhitespace(term_value));
-    return impl_->ignored_terminology_suggestion_keys.count(key) > 0;
+    return TerminologyActions(*impl_).IsSuggestionIgnored(element_id, term_value);
 }
 
 void AppRuntime::HandleProblemQuickFix(const core::ProblemItem& problem) {
