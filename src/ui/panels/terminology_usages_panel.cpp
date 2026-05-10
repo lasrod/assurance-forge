@@ -53,8 +53,10 @@ void DrawUsageRow(std::size_t index,
 
     ImGui::TableSetColumnIndex(0);
     const std::string element_label = ElementLabel(usage);
-    ImGui::Selectable(
-        element_label.c_str(), selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick);
+    ImGui::Selectable(element_label.c_str(),
+                      selected,
+                      ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick |
+                          ImGuiSelectableFlags_AllowOverlap);
     if (ImGui::IsItemClicked() && callbacks.select_usage)
         callbacks.select_usage(index);
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && callbacks.activate_usage)

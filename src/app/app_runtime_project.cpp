@@ -968,6 +968,7 @@ void AppRuntime::NavigateToTerminologyUsage(std::size_t usage_index) {
         SetStatus("The selected usage has no navigable element id.");
         return;
     }
+    impl_->show_gsn_tab = true;
     impl_->events.Emit(SelectionChangedEvent{usage.element_id, true});
     impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
 }
