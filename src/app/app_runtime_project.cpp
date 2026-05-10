@@ -13,15 +13,10 @@
 #include "ui/ui_state.h"
 
 #include <algorithm>
-#include <cctype>
 #include <cstring>
 #include <filesystem>
 #include <set>
-#include <sstream>
 #include <string>
-#include <system_error>
-#include <utility>
-#include <vector>
 
 namespace app {
 namespace {
@@ -32,16 +27,6 @@ void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
     const size_t count = std::min(buffer_size - 1, value.size());
     std::memcpy(buffer, value.data(), count);
     buffer[count] = '\0';
-}
-
-std::string TrimWhitespace(const std::string& value) {
-    auto begin = value.begin();
-    while (begin != value.end() && std::isspace(static_cast<unsigned char>(*begin)))
-        ++begin;
-    auto end = value.end();
-    while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1))))
-        --end;
-    return std::string(begin, end);
 }
 
 void ClearProposalHighlightState(ui::UiState& ui_state) {
@@ -72,151 +57,11 @@ bool EnsureProjectSacmFileOpen(AppRuntimeState& state, const core::ProjectFileEn
     return state.app_state.open_project_file(entry);
 }
 
-void InvalidateSacmPackageTreeCache(AppRuntimeState& state, const std::filesystem::path& relative_path) {
-    state.sacm_package_tree_cache.erase(relative_path.generic_string());
-}
-
 void CopyTerminologyPackageToEditor(AppRuntimeState& state, const sacm::TerminologyPackage& package) {
     CopyToBuffer(state.terminology_package_name_buf, sizeof(state.terminology_package_name_buf), package.name);
     CopyToBuffer(state.terminology_package_description_buf,
                  sizeof(state.terminology_package_description_buf),
                  package.description);
-}
-
-std::string JoinCategoryRefs(const std::vector<std::string>& refs) {
-    std::string result;
-    for (const auto& ref : refs) {
-        if (ref.empty())
-            continue;
-        if (!result.empty())
-            result += ", ";
-        result += ref;
-    }
-    return result;
-}
-
-std::vector<std::string> SplitCategoryRefs(const std::string& raw) {
-    std::string normalized = raw;
-    std::replace(normalized.begin(), normalized.end(), ',', ' ');
-    std::stringstream stream(normalized);
-    std::vector<std::string> refs;
-    std::string item;
-    while (stream >> item) {
-        item = TrimWhitespace(item);
-        if (!item.empty() && std::find(refs.begin(), refs.end(), item) == refs.end())
-            refs.push_back(item);
-    }
-    return refs;
-}
-
-void ClearTermEditorBuffers(AppRuntimeState& state) {
-    CopyToBuffer(state.term_value_buf, sizeof(state.term_value_buf), "");
-    CopyToBuffer(state.term_name_buf, sizeof(state.term_name_buf), "");
-    CopyToBuffer(state.term_definition_buf, sizeof(state.term_definition_buf), "");
-    CopyToBuffer(state.term_categories_buf, sizeof(state.term_categories_buf), "");
-    CopyToBuffer(state.term_external_reference_buf, sizeof(state.term_external_reference_buf), "");
-    CopyToBuffer(state.term_origin_buf, sizeof(state.term_origin_buf), "");
-}
-
-void CopyTermToEditor(AppRuntimeState& state, const sacm::Term& term) {
-    CopyToBuffer(state.term_value_buf, sizeof(state.term_value_buf), term.value);
-    CopyToBuffer(state.term_name_buf, sizeof(state.term_name_buf), term.name);
-    CopyToBuffer(state.term_definition_buf, sizeof(state.term_definition_buf), term.description);
-    CopyToBuffer(state.term_categories_buf, sizeof(state.term_categories_buf), JoinCategoryRefs(term.category_refs));
-    CopyToBuffer(state.term_external_reference_buf, sizeof(state.term_external_reference_buf), term.externalReference);
-    CopyToBuffer(state.term_origin_buf, sizeof(state.term_origin_buf), term.origin);
-}
-
-void ClearCategoryEditorBuffers(AppRuntimeState& state) {
-    CopyToBuffer(state.category_name_buf, sizeof(state.category_name_buf), "");
-    CopyToBuffer(state.category_description_buf, sizeof(state.category_description_buf), "");
-}
-
-void CopyCategoryToEditor(AppRuntimeState& state, const sacm::Category& category) {
-    CopyToBuffer(state.category_name_buf, sizeof(state.category_name_buf), category.name);
-    CopyToBuffer(state.category_description_buf, sizeof(state.category_description_buf), category.description);
-}
-
-core::TerminologyTermDraft TermDraftFromEditor(const AppRuntimeState& state) {
-    core::TerminologyTermDraft draft;
-    draft.value = TrimWhitespace(state.term_value_buf);
-    draft.name = TrimWhitespace(state.term_name_buf);
-    draft.description = TrimWhitespace(state.term_definition_buf);
-    draft.category_refs = SplitCategoryRefs(state.term_categories_buf);
-    draft.externalReference = TrimWhitespace(state.term_external_reference_buf);
-    draft.origin = TrimWhitespace(state.term_origin_buf);
-    return draft;
-}
-
-core::TerminologyCategoryDraft CategoryDraftFromEditor(const AppRuntimeState& state) {
-    core::TerminologyCategoryDraft draft;
-    draft.name = TrimWhitespace(state.category_name_buf);
-    draft.description = TrimWhitespace(state.category_description_buf);
-    return draft;
-}
-
-bool CategoryNameExists(const sacm::TerminologyPackage& package, const std::string& name) {
-    return std::any_of(package.categories.begin(), package.categories.end(), [&](const sacm::Category& category) {
-        return category.name == name;
-    });
-}
-
-void MarkTerminologyDocumentDirty(AppRuntimeState& state) {
-    state.app_state.mark_dirty();
-    state.document_dirty = true;
-}
-
-bool HasTerminologyPackageRef(const core::TerminologyPackageRef& package_ref) {
-    return !package_ref.id.empty() || !package_ref.gid.empty();
-}
-
-bool StartsWith(const std::string& value, const std::string& prefix) {
-    return value.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), value.begin());
-}
-
-struct TerminologyTermQuickFixPayload {
-    core::TerminologyPackageRef package_ref;
-    core::TerminologyTermRef term_ref;
-    std::string term_value;
-};
-
-bool DecodeTerminologyTermQuickFixPayload(const std::string& payload, TerminologyTermQuickFixPayload& decoded) {
-    std::stringstream stream(payload);
-    std::vector<std::string> parts;
-    std::string part;
-    while (std::getline(stream, part)) {
-        parts.push_back(part);
-    }
-    if (parts.size() < 5)
-        return false;
-    decoded.package_ref = core::TerminologyPackageRef{parts[0], parts[1]};
-    decoded.term_ref = core::TerminologyTermRef{parts[2], parts[3]};
-    decoded.term_value = parts[4];
-    return HasTerminologyPackageRef(decoded.package_ref) &&
-           (!decoded.term_ref.id.empty() || !decoded.term_ref.gid.empty());
-}
-
-bool OpenTerminologyProblemTerm(AppRuntimeState& state,
-                                const core::TerminologyPackageRef& package_ref,
-                                const core::TerminologyTermRef& term_ref,
-                                const std::string& filter_value) {
-    if (!state.app_state.sacm_package.has_value())
-        return false;
-    const sacm::TerminologyPackage* package =
-        core::FindTerminologyPackage(state.app_state.sacm_package.value(), package_ref);
-    if (!package)
-        return false;
-    state.selected_terminology_package_ref = package_ref;
-    state.selected_terminology_package_file_path = state.app_state.active_project_file_path;
-    state.selected_terminology_term_ref = term_ref;
-    state.selected_terminology_category_ref = core::TerminologyCategoryRef{};
-    CopyToBuffer(state.terminology_filter_buf, sizeof(state.terminology_filter_buf), filter_value);
-    CopyToBuffer(state.terminology_category_filter_buf, sizeof(state.terminology_category_filter_buf), "");
-    CopyTerminologyPackageToEditor(state, *package);
-    state.show_terminology_package_tab = true;
-    ui::GetUiState().center_view = ui::CenterView::TerminologyPackage;
-    state.force_center_tab_selection = true;
-    return true;
 }
 
 std::string FirstElementIdForArgumentPackage(const sacm::AssuranceCasePackage& package,
@@ -468,183 +313,43 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
 
 void AppRuntime::BeginAddTerminologyPackage(const core::ProjectFileEntry& entry,
                                             const sacm::SacmPackageTreeNode& parent_node) {
-    if (parent_node.type != sacm::SacmPackageNodeType::AssuranceCasePackage)
-        return;
-    if (!CanSwitchProjectSacmFile(impl_->app_state, entry)) {
-        SetStatus("Save the current SACM file before adding a terminology package.");
-        return;
-    }
-
-    impl_->pending_terminology_package_parent_entry = entry;
-    CopyToBuffer(impl_->new_terminology_package_name_buf,
-                 sizeof(impl_->new_terminology_package_name_buf),
-                 "Terminology Package");
-    CopyToBuffer(
-        impl_->new_terminology_package_description_buf, sizeof(impl_->new_terminology_package_description_buf), "");
-    impl_->show_create_terminology_package_modal = true;
+    TerminologyActions(*impl_).BeginAddPackage(entry, parent_node);
 }
 
 void AppRuntime::ConfirmAddTerminologyPackage() {
-    if (!impl_->pending_terminology_package_parent_entry.has_value()) {
-        impl_->show_create_terminology_package_modal = false;
-        return;
-    }
-
-    const core::ProjectFileEntry entry = impl_->pending_terminology_package_parent_entry.value();
-    if (!CanSwitchProjectSacmFile(impl_->app_state, entry)) {
-        SetStatus("Save the current SACM file before adding a terminology package.");
-        return;
-    }
-    if (!EnsureProjectSacmFileOpen(*impl_, entry, false))
-        return;
-    if (!impl_->app_state.sacm_package.has_value()) {
-        SetStatus("Could not load an editable SACM package model.");
-        return;
-    }
-
-    core::TerminologyPackageCreateResult result =
-        core::CreateTerminologyPackage(impl_->app_state.sacm_package.value(),
-                                       TrimWhitespace(impl_->new_terminology_package_name_buf),
-                                       TrimWhitespace(impl_->new_terminology_package_description_buf));
-    if (!result.success) {
-        SetStatus("Terminology package create failed: " + result.error);
-        return;
-    }
-
-    impl_->selected_terminology_package_ref = result.package_ref;
-    impl_->selected_terminology_term_ref = core::TerminologyTermRef{};
-    impl_->selected_terminology_category_ref = core::TerminologyCategoryRef{};
-    CopyToBuffer(impl_->terminology_category_filter_buf, sizeof(impl_->terminology_category_filter_buf), "");
-    impl_->selected_terminology_package_file_path = impl_->app_state.active_project_file_path;
-    if (const sacm::TerminologyPackage* package =
-            core::FindTerminologyPackage(impl_->app_state.sacm_package.value(), result.package_ref)) {
-        CopyTerminologyPackageToEditor(*impl_, *package);
-    }
-    MarkTerminologyDocumentDirty(*impl_);
-    SyncTerminologyProblems();
-    InvalidateSacmPackageTreeCache(*impl_, entry.relativePath);
-    impl_->show_create_terminology_package_modal = false;
-    impl_->pending_terminology_package_parent_entry.reset();
-    impl_->show_terminology_package_tab = true;
-    ui::GetUiState().center_view = ui::CenterView::TerminologyPackage;
-    impl_->force_center_tab_selection = true;
-    SetStatus("Added terminology package " + result.package_ref.id + ".");
+    if (TerminologyActions(*impl_).ConfirmAddPackage())
+        SyncTerminologyProblems();
 }
 
 void AppRuntime::ApplyTerminologyPackageEdits() {
-    if (!impl_->app_state.sacm_package.has_value())
-        return;
-
-    std::string error;
-    if (!core::UpdateTerminologyPackage(impl_->app_state.sacm_package.value(),
-                                        impl_->selected_terminology_package_ref,
-                                        TrimWhitespace(impl_->terminology_package_name_buf),
-                                        TrimWhitespace(impl_->terminology_package_description_buf),
-                                        error)) {
-        SetStatus("Terminology package update failed: " + error);
-        return;
-    }
-
-    MarkTerminologyDocumentDirty(*impl_);
-    SyncTerminologyProblems();
-    if (impl_->app_state.current_project.has_value() && !impl_->app_state.active_project_file_path.empty()) {
-        const std::filesystem::path relative = std::filesystem::relative(impl_->app_state.active_project_file_path,
-                                                                         impl_->app_state.current_project->rootPath);
-        InvalidateSacmPackageTreeCache(*impl_, relative);
-    }
+    if (TerminologyActions(*impl_).ApplyPackageEdits())
+        SyncTerminologyProblems();
 }
 
 void AppRuntime::BeginDeleteTerminologyPackage() {
-    impl_->show_delete_terminology_package_modal = true;
+    TerminologyActions(*impl_).BeginDeletePackage();
 }
 
 void AppRuntime::ConfirmDeleteTerminologyPackage() {
-    if (!impl_->app_state.sacm_package.has_value())
-        return;
-
-    std::string error;
-    if (!core::DeleteTerminologyPackage(
-            impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref, error)) {
-        SetStatus("Terminology package delete failed: " + error);
-        return;
-    }
-
-    MarkTerminologyDocumentDirty(*impl_);
-    SyncTerminologyProblems();
-    if (impl_->app_state.current_project.has_value() && !impl_->app_state.active_project_file_path.empty()) {
-        const std::filesystem::path relative = std::filesystem::relative(impl_->app_state.active_project_file_path,
-                                                                         impl_->app_state.current_project->rootPath);
-        InvalidateSacmPackageTreeCache(*impl_, relative);
-    }
-    impl_->selected_terminology_package_ref = core::TerminologyPackageRef{};
-    impl_->show_delete_terminology_package_modal = false;
-    impl_->show_terminology_package_tab = false;
-    ui::GetUiState().center_view = ui::CenterView::PackageDetails;
-    impl_->force_center_tab_selection = true;
-    SetStatus("Deleted terminology package.");
+    if (TerminologyActions(*impl_).ConfirmDeletePackage())
+        SyncTerminologyProblems();
 }
 
 void AppRuntime::SelectTerminologyTerm(const core::TerminologyTermRef& term_ref) {
-    impl_->selected_terminology_term_ref = term_ref;
+    TerminologyActions(*impl_).SelectTerm(term_ref);
 }
 
 void AppRuntime::BeginAddTerminologyTerm() {
-    if (!impl_->app_state.sacm_package.has_value()) {
-        SetStatus("Open a terminology package before adding terms.");
-        return;
-    }
-    ClearTermEditorBuffers(*impl_);
-    impl_->editing_existing_terminology_term = false;
-    impl_->show_terminology_term_editor_modal = true;
+    TerminologyActions(*impl_).BeginAddTerm();
 }
 
 void AppRuntime::BeginEditTerminologyTerm(const core::TerminologyTermRef& term_ref) {
-    if (!impl_->app_state.sacm_package.has_value())
-        return;
-    const sacm::Term* term = core::FindTerminologyTerm(
-        impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref, term_ref);
-    if (!term) {
-        SetStatus("Term not found.");
-        return;
-    }
-    impl_->selected_terminology_term_ref = term_ref;
-    CopyTermToEditor(*impl_, *term);
-    impl_->editing_existing_terminology_term = true;
-    impl_->show_terminology_term_editor_modal = true;
+    TerminologyActions(*impl_).BeginEditTerm(term_ref);
 }
 
 void AppRuntime::ConfirmTerminologyTermEdit() {
-    if (!impl_->app_state.sacm_package.has_value())
-        return;
-
-    const core::TerminologyTermDraft draft = TermDraftFromEditor(*impl_);
-    std::string error;
-    if (impl_->editing_existing_terminology_term) {
-        if (!core::UpdateTerminologyTerm(impl_->app_state.sacm_package.value(),
-                                         impl_->selected_terminology_package_ref,
-                                         impl_->selected_terminology_term_ref,
-                                         draft,
-                                         error)) {
-            SetStatus("Term update failed: " + error);
-            return;
-        }
-        SetStatus("Updated term " + draft.value + ".");
-    } else {
-        core::TerminologyTermCreateResult result = core::CreateTerminologyTerm(
-            impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref, draft);
-        if (!result.success) {
-            SetStatus("Term create failed: " + result.error);
-            return;
-        }
-        impl_->selected_terminology_term_ref = result.term_ref;
-        SetStatus("Added term " + draft.value + ".");
-    }
-
-    MarkTerminologyDocumentDirty(*impl_);
-    if (RefreshVisibleTerminologyContextProjection(impl_->app_state))
-        impl_->events.Emit(TreeDirtyEvent{});
-    SyncTerminologyProblems();
-    impl_->show_terminology_term_editor_modal = false;
+    if (TerminologyActions(*impl_).ConfirmTermEdit())
+        SyncTerminologyProblems();
 }
 
 void AppRuntime::OpenTerminologyTermFromCanvas(const core::TerminologyPackageRef& package_ref,
@@ -706,36 +411,7 @@ bool AppRuntime::IsTerminologySuggestionIgnored(const std::string& element_id, c
 }
 
 void AppRuntime::HandleProblemQuickFix(const core::ProblemItem& problem) {
-    if (problem.type == "TerminologyUndefinedAcronym") {
-        BeginQuickDefineTerminologyTerm(problem.element_id, problem.quick_fix_payload);
-        return;
-    }
-    if (problem.type == "TerminologyAmbiguity") {
-        BeginLinkExistingTerminologyTerm(problem.element_id, problem.quick_fix_payload);
-        return;
-    }
-    if (StartsWith(problem.type, "TerminologyTerm")) {
-        TerminologyTermQuickFixPayload payload;
-        if (!DecodeTerminologyTermQuickFixPayload(problem.quick_fix_payload, payload)) {
-            SetStatus("Could not decode terminology quick fix target.");
-            return;
-        }
-        if (!OpenTerminologyProblemTerm(*impl_, payload.package_ref, payload.term_ref, payload.term_value)) {
-            SetStatus("Terminology quick fix target was not found.");
-            return;
-        }
-        if (problem.type == "TerminologyTermDuplicateDefinition") {
-            SetStatus("Filtered glossary to duplicated term definition " + payload.term_value + ".");
-            return;
-        }
-        BeginEditTerminologyTerm(payload.term_ref);
-        SetStatus("Opened terminology term editor.");
-        return;
-    }
-    if (!problem.element_id.empty()) {
-        impl_->events.Emit(SelectionChangedEvent{problem.element_id, true});
-        impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
-    }
+    TerminologyActions(*impl_).HandleProblemQuickFix(problem);
 }
 
 void AppRuntime::ConfirmQuickDefineTerminologyTerm(bool add_as_context) {
@@ -744,186 +420,44 @@ void AppRuntime::ConfirmQuickDefineTerminologyTerm(bool add_as_context) {
 }
 
 void AppRuntime::BeginDeleteTerminologyTerm(const core::TerminologyTermRef& term_ref) {
-    if (!impl_->app_state.sacm_package.has_value())
-        return;
-    const sacm::Term* term = core::FindTerminologyTerm(
-        impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref, term_ref);
-    if (!term) {
-        SetStatus("Term not found.");
-        return;
-    }
-    impl_->selected_terminology_term_ref = term_ref;
-    impl_->pending_delete_terminology_term_usage_count =
-        core::CountTerminologyTermUsage(impl_->app_state.sacm_package.value(), *term);
-    impl_->show_delete_terminology_term_modal = true;
+    TerminologyActions(*impl_).BeginDeleteTerm(term_ref);
 }
 
 void AppRuntime::ConfirmDeleteTerminologyTerm() {
-    if (!impl_->app_state.sacm_package.has_value())
-        return;
-
-    std::string error;
-    if (!core::DeleteTerminologyTerm(impl_->app_state.sacm_package.value(),
-                                     impl_->selected_terminology_package_ref,
-                                     impl_->selected_terminology_term_ref,
-                                     error)) {
-        SetStatus("Term delete failed: " + error);
-        return;
-    }
-
-    impl_->selected_terminology_term_ref = core::TerminologyTermRef{};
-    impl_->show_delete_terminology_term_modal = false;
-    MarkTerminologyDocumentDirty(*impl_);
-    if (RefreshVisibleTerminologyContextProjection(impl_->app_state))
-        impl_->events.Emit(TreeDirtyEvent{});
-    SyncTerminologyProblems();
-    SetStatus("Deleted term.");
+    if (TerminologyActions(*impl_).ConfirmDeleteTerm())
+        SyncTerminologyProblems();
 }
 
 void AppRuntime::SelectTerminologyCategory(const core::TerminologyCategoryRef& category_ref) {
-    impl_->selected_terminology_category_ref = category_ref;
+    TerminologyActions(*impl_).SelectCategory(category_ref);
 }
 
 void AppRuntime::SetTerminologyCategoryFilter(const std::string& category_filter) {
-    CopyToBuffer(
-        impl_->terminology_category_filter_buf, sizeof(impl_->terminology_category_filter_buf), category_filter);
+    TerminologyActions(*impl_).SetCategoryFilter(category_filter);
 }
 
 void AppRuntime::BeginAddTerminologyCategory() {
-    if (!impl_->app_state.sacm_package.has_value()) {
-        SetStatus("Open a terminology package before adding categories.");
-        return;
-    }
-    ClearCategoryEditorBuffers(*impl_);
-    impl_->editing_existing_terminology_category = false;
-    impl_->show_terminology_category_editor_modal = true;
+    TerminologyActions(*impl_).BeginAddCategory();
 }
 
 void AppRuntime::BeginEditTerminologyCategory(const core::TerminologyCategoryRef& category_ref) {
-    if (!impl_->app_state.sacm_package.has_value())
-        return;
-    const sacm::Category* category = core::FindTerminologyCategory(
-        impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref, category_ref);
-    if (!category) {
-        SetStatus("Category not found.");
-        return;
-    }
-
-    impl_->selected_terminology_category_ref = category_ref;
-    CopyCategoryToEditor(*impl_, *category);
-    impl_->editing_existing_terminology_category = true;
-    impl_->show_terminology_category_editor_modal = true;
+    TerminologyActions(*impl_).BeginEditCategory(category_ref);
 }
 
 void AppRuntime::ConfirmTerminologyCategoryEdit() {
-    if (!impl_->app_state.sacm_package.has_value())
-        return;
-
-    const core::TerminologyCategoryDraft draft = CategoryDraftFromEditor(*impl_);
-    std::string error;
-    if (impl_->editing_existing_terminology_category) {
-        if (!core::UpdateTerminologyCategory(impl_->app_state.sacm_package.value(),
-                                             impl_->selected_terminology_package_ref,
-                                             impl_->selected_terminology_category_ref,
-                                             draft,
-                                             error)) {
-            SetStatus("Category update failed: " + error);
-            return;
-        }
-        SetStatus("Updated category " + draft.name + ".");
-    } else {
-        core::TerminologyCategoryCreateResult result = core::CreateTerminologyCategory(
-            impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref, draft);
-        if (!result.success) {
-            SetStatus("Category create failed: " + result.error);
-            return;
-        }
-        impl_->selected_terminology_category_ref = result.category_ref;
-        SetStatus("Added category " + draft.name + ".");
-    }
-
-    MarkTerminologyDocumentDirty(*impl_);
-    impl_->show_terminology_category_editor_modal = false;
+    TerminologyActions(*impl_).ConfirmCategoryEdit();
 }
 
 void AppRuntime::BeginDeleteTerminologyCategory(const core::TerminologyCategoryRef& category_ref) {
-    if (!impl_->app_state.sacm_package.has_value())
-        return;
-    const sacm::TerminologyPackage* terminology_package =
-        core::FindTerminologyPackage(impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref);
-    if (!terminology_package) {
-        SetStatus("Terminology package not found.");
-        return;
-    }
-    const sacm::Category* category = core::FindTerminologyCategory(*terminology_package, category_ref);
-    if (!category) {
-        SetStatus("Category not found.");
-        return;
-    }
-
-    impl_->selected_terminology_category_ref = category_ref;
-    impl_->pending_delete_terminology_category_term_count =
-        core::CountTermsUsingCategory(*terminology_package, category_ref);
-    impl_->show_delete_terminology_category_modal = true;
+    TerminologyActions(*impl_).BeginDeleteCategory(category_ref);
 }
 
 void AppRuntime::ConfirmDeleteTerminologyCategory() {
-    if (!impl_->app_state.sacm_package.has_value())
-        return;
-
-    std::string error;
-    if (!core::DeleteTerminologyCategory(impl_->app_state.sacm_package.value(),
-                                         impl_->selected_terminology_package_ref,
-                                         impl_->selected_terminology_category_ref,
-                                         error)) {
-        SetStatus("Category delete failed: " + error);
-        return;
-    }
-
-    impl_->selected_terminology_category_ref = core::TerminologyCategoryRef{};
-    CopyToBuffer(impl_->terminology_category_filter_buf, sizeof(impl_->terminology_category_filter_buf), "");
-    impl_->show_delete_terminology_category_modal = false;
-    MarkTerminologyDocumentDirty(*impl_);
-    SetStatus("Deleted category.");
+    TerminologyActions(*impl_).ConfirmDeleteCategory();
 }
 
 void AppRuntime::SeedRecommendedTerminologyCategories() {
-    if (!impl_->app_state.sacm_package.has_value())
-        return;
-
-    sacm::TerminologyPackage* terminology_package =
-        core::FindTerminologyPackage(impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref);
-    if (!terminology_package) {
-        SetStatus("Terminology package not found.");
-        return;
-    }
-
-    const char* recommended[] = {"Operational Context",
-                                 "System",
-                                 "Hazard / Risk",
-                                 "Evidence",
-                                 "Requirement",
-                                 "Standard",
-                                 "Project Specific",
-                                 "Deprecated"};
-    int added = 0;
-    for (const char* name : recommended) {
-        if (CategoryNameExists(*terminology_package, name))
-            continue;
-        core::TerminologyCategoryDraft draft;
-        draft.name = name;
-        core::TerminologyCategoryCreateResult result = core::CreateTerminologyCategory(
-            impl_->app_state.sacm_package.value(), impl_->selected_terminology_package_ref, draft);
-        if (result.success)
-            ++added;
-    }
-
-    if (added > 0) {
-        MarkTerminologyDocumentDirty(*impl_);
-        SetStatus("Added recommended terminology categories.");
-    } else {
-        SetStatus("Recommended terminology categories already exist.");
-    }
+    TerminologyActions(*impl_).SeedRecommendedCategories();
 }
 
 void AppRuntime::RefreshSacmPackageTreeCache() {
