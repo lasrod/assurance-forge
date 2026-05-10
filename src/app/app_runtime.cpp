@@ -3,8 +3,8 @@
 #include "ai/ai_service.h"
 #include "ai/ai_task_runner.h"
 #include "ai/secret_store.h"
-#include "app/app_layout_controller.h"
 #include "app/app_runtime_state.h"
+#include "app/frame/app_shell.h"
 #include "app/guideline_catalog.h"
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
@@ -60,8 +60,6 @@
 
 namespace app {
 namespace {
-
-constexpr float kSplitterThickness = 4.0f;
 
 const ImGuiWindowFlags kPanelFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
                                      ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoSavedSettings;
@@ -1969,7 +1967,7 @@ void AppRuntime::RenderThemeTweaksWindow() {
     HelloImGui::ShowThemeTweakGuiWindow(&impl_->modal_coordinator->show_theme_tweak_window);
 }
 
-void AppRuntime::RenderProjectExplorerArea(float left_w, float project_h, float top_y) {
+void AppRuntime::RenderProjectExplorerArea(const AppLayoutRegion& region) {
     ui::panels::ProjectFilesPanelModel project_model;
     project_model.project =
         impl_->app_state.current_project.has_value() ? &impl_->app_state.current_project.value() : nullptr;
@@ -1995,12 +1993,13 @@ void AppRuntime::RenderProjectExplorerArea(float left_w, float project_h, float 
             BeginAddTerminologyPackage(entry, node);
         },
     };
-    ui::panels::ShowProjectFilesPanel(left_w, project_h, top_y, kPanelFlags, project_model, project_callbacks);
+    ui::panels::ShowProjectFilesPanel(
+        region.size.x, region.size.y, region.pos.y, kPanelFlags, project_model, project_callbacks);
 }
 
-void AppRuntime::RenderArgumentNavigatorArea(float left_w, float safety_tree_h, float top_y) {
-    ImGui::SetNextWindowPos(ImVec2(0, top_y));
-    ImGui::SetNextWindowSize(ImVec2(left_w, safety_tree_h));
+void AppRuntime::RenderArgumentNavigatorArea(const AppLayoutRegion& region) {
+    ImGui::SetNextWindowPos(region.pos);
+    ImGui::SetNextWindowSize(region.size);
     ImGui::Begin("Safety Case Tree", nullptr, kPanelFlags);
     ui::UiState& ui_state = ui::GetUiState();
     ui::ElementContextActions actions;
@@ -2063,9 +2062,9 @@ void AppRuntime::RenderSacmViewerPanel(float left_w, float sacm_h, float top_y) 
     ui::panels::ShowSacmViewerPanel(left_w, sacm_h, top_y, kPanelFlags, model, callbacks);
 }
 
-void AppRuntime::RenderWorkbenchArea(float center_x, float center_w, float content_h, float top_y) {
-    ImGui::SetNextWindowPos(ImVec2(center_x, top_y));
-    ImGui::SetNextWindowSize(ImVec2(center_w, content_h));
+void AppRuntime::RenderWorkbenchArea(const AppLayoutRegion& region) {
+    ImGui::SetNextWindowPos(region.pos);
+    ImGui::SetNextWindowSize(region.size);
     ImGui::Begin("Center View", nullptr, kPanelFlags | ImGuiWindowFlags_NoTitleBar);
 
     ui::UiState& ui_state = ui::GetUiState();
@@ -2311,7 +2310,7 @@ void AppRuntime::RenderWorkbenchArea(float center_x, float center_w, float conte
     ImGui::End();
 }
 
-void AppRuntime::RenderFeedbackDockArea(float center_x, float center_w, float problems_h, float top_y) {
+void AppRuntime::RenderFeedbackDockArea(const AppLayoutRegion& region) {
     ui::panels::ProblemsPanelModel model{
         impl_->problems_manager,
         ui::GetUiState(),
@@ -2331,8 +2330,8 @@ void AppRuntime::RenderFeedbackDockArea(float center_x, float center_w, float pr
         [this](const core::ProblemItem& problem) { HandleProblemQuickFix(problem); },
     };
 
-    ImGui::SetNextWindowPos(ImVec2(center_x, top_y));
-    ImGui::SetNextWindowSize(ImVec2(center_w, problems_h));
+    ImGui::SetNextWindowPos(region.pos);
+    ImGui::SetNextWindowSize(region.size);
     ImGui::Begin("Problems and Review", nullptr, kPanelFlags | ImGuiWindowFlags_NoTitleBar);
 
     if (ImGui::BeginTabBar("##problems_review_tabs")) {
@@ -2611,12 +2610,9 @@ void AppRuntime::RenderProposalElementEditor() {
     }
 }
 
-void AppRuntime::RenderInspectorArea(
-    float center_x, float center_w, float right_w, float content_h, float top_y) {
-    float right_x = center_x + center_w + kSplitterThickness;
-
-    ImGui::SetNextWindowPos(ImVec2(right_x, top_y));
-    ImGui::SetNextWindowSize(ImVec2(right_w, content_h));
+void AppRuntime::RenderInspectorArea(const AppLayoutRegion& region) {
+    ImGui::SetNextWindowPos(region.pos);
+    ImGui::SetNextWindowSize(region.size);
     ImGui::Begin("Element Properties", nullptr, kPanelFlags);
 
     if (impl_->proposal_controller->creator_active) {
@@ -2962,44 +2958,19 @@ void AppRuntime::RenderFrame(bool& done) {
         RequestExit(done);
     }
 
-    ImVec2 display = ImGui::GetIO().DisplaySize;
-    float top_y = RenderMainMenuBar(done);
-
-    float content_h = std::max(0.0f, display.y - top_y);
-
-    float left_w = display.x * impl_->left_ratio;
-    float right_w = display.x * impl_->right_ratio;
-    float center_w = display.x - left_w - right_w - kSplitterThickness * 2.0f;
+    const float menu_height = RenderMainMenuBar(done);
 
     RebuildDerivedViewsIfNeeded();
     ProcessPendingProposalCreatorPreviewRefresh();
     PollAiReviewTask();
 
-    RenderAppSplitters(*impl_, display.x, content_h, left_w, center_w, top_y, kPanelFlags);
+    const AppLayoutRegions regions = RenderAppShell(*impl_, menu_height, kPanelFlags);
 
-    left_w = display.x * impl_->left_ratio;
-    right_w = display.x * impl_->right_ratio;
-    center_w = display.x - left_w - right_w - kSplitterThickness * 2.0f;
-
-    float available_h = std::max(0.0f, content_h - kSplitterThickness);
-    float project_h = available_h * impl_->project_boundary_ratio;
-    float safety_tree_h = std::max(0.0f, available_h - project_h);
-
-    float project_y = top_y;
-    float safety_y = project_y + project_h + kSplitterThickness;
-
-    RenderProjectExplorerArea(left_w, project_h, project_y);
-    RenderArgumentNavigatorArea(left_w, safety_tree_h, safety_y);
-
-    float center_x = left_w + kSplitterThickness;
-    float center_available_h = std::max(0.0f, content_h - kSplitterThickness);
-    float problems_h = std::min(impl_->problems_panel_height, center_available_h);
-    float center_panel_h = std::max(0.0f, center_available_h - problems_h);
-    float problems_y = top_y + center_panel_h + kSplitterThickness;
-
-    RenderWorkbenchArea(center_x, center_w, center_panel_h, top_y);
-    RenderFeedbackDockArea(center_x, center_w, problems_h, problems_y);
-    RenderInspectorArea(center_x, center_w, right_w, content_h, top_y);
+    RenderProjectExplorerArea(regions.project_explorer);
+    RenderArgumentNavigatorArea(regions.argument_navigator);
+    RenderWorkbenchArea(regions.workbench);
+    RenderFeedbackDockArea(regions.feedback_dock);
+    RenderInspectorArea(regions.inspector);
 
     RenderPreferencesWindow();
     RenderThemeTweaksWindow();

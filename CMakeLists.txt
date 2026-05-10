@@ -233,11 +233,12 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/app/controllers/ai_review_controller.cpp
     src/app/app_runtime_ai.cpp
     src/app/app_ui_bootstrap.cpp
-    src/app/app_layout_controller.cpp
     src/app/app_runtime_modals.cpp
     src/app/app_runtime_project.cpp
     src/app/app_runtime.cpp
     src/app/app_runtime_state.cpp
+    src/app/frame/app_layout_regions.cpp
+    src/app/frame/app_shell.cpp
     src/app/guideline_catalog.cpp
     src/app/review_problem_sync.cpp
     src/app/controllers/element_edit_controller.cpp

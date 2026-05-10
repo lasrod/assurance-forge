@@ -15,6 +15,7 @@
 
 namespace app {
 
+struct AppLayoutRegion;
 struct AppRuntimeState;
 
 class AppRuntime {
@@ -68,12 +69,12 @@ private:
 
     float RenderMainMenuBar(bool& done);
     void ScanDirectory();
-    void RenderProjectExplorerArea(float left_w, float project_h, float top_y);
-    void RenderArgumentNavigatorArea(float left_w, float safety_tree_h, float top_y);
+    void RenderProjectExplorerArea(const AppLayoutRegion& region);
+    void RenderArgumentNavigatorArea(const AppLayoutRegion& region);
     void RenderSacmViewerPanel(float left_w, float sacm_h, float top_y);
-    void RenderWorkbenchArea(float center_x, float center_w, float content_h, float top_y);
-    void RenderFeedbackDockArea(float center_x, float center_w, float problems_h, float top_y);
-    void RenderInspectorArea(float center_x, float center_w, float right_w, float content_h, float top_y);
+    void RenderWorkbenchArea(const AppLayoutRegion& region);
+    void RenderFeedbackDockArea(const AppLayoutRegion& region);
+    void RenderInspectorArea(const AppLayoutRegion& region);
     void RenderReviewPanelContent();
     void RenderAiDebugPanelContent();
     void RenderProposalElementEditor();

@@ -1,6 +1,6 @@
 # App Shell and UI Areas
 
-Assurance Forge uses a named application shell to keep the frame layout separate from feature-specific UI rendering. The current implementation still routes most rendering through `AppRuntime`, but new code should use the names in this document when discussing or extracting the main application areas.
+Assurance Forge uses a named application shell to keep the frame layout separate from feature-specific UI rendering. `RenderAppShell()` owns splitter handling and returns layout regions for the major application areas. The current implementation still routes area rendering through `AppRuntime`, but new code should use the names in this document when discussing or extracting the main application areas.
 
 ## Named Areas
 

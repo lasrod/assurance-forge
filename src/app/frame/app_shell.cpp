@@ -1,5 +1,6 @@
-#include "app/app_layout_controller.h"
+#include "app/frame/app_shell.h"
 
+#include "app/app_runtime_state.h"
 #include "ui/widgets/splitter.h"
 
 #include <algorithm>
@@ -13,46 +14,6 @@ constexpr float kMaxPanelRatio = 0.40f;
 constexpr float kMinLeftSectionHeight = 120.0f;
 constexpr float kMinCenterSectionHeight = 220.0f;
 constexpr float kMinProblemsPanelHeight = 320.0f;
-
-} // namespace
-
-void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center_view) {
-    if (!state.show_gsn_tab && !state.show_cse_tab && !state.show_evidence_tab && !state.show_package_details_tab &&
-        !state.show_terminology_package_tab) {
-        state.show_gsn_tab = true;
-    }
-
-    auto is_tab_visible = [&](ui::CenterView view) {
-        switch (view) {
-        case ui::CenterView::GsnCanvas:
-            return state.show_gsn_tab;
-        case ui::CenterView::CseRegister:
-            return state.show_cse_tab;
-        case ui::CenterView::EvidenceRegister:
-            return state.show_evidence_tab;
-        case ui::CenterView::PackageDetails:
-            return state.show_package_details_tab;
-        case ui::CenterView::TerminologyPackage:
-            return state.show_terminology_package_tab;
-        }
-        return false;
-    };
-
-    if (!is_tab_visible(center_view)) {
-        if (state.show_gsn_tab) {
-            center_view = ui::CenterView::GsnCanvas;
-        } else if (state.show_cse_tab) {
-            center_view = ui::CenterView::CseRegister;
-        } else if (state.show_terminology_package_tab) {
-            center_view = ui::CenterView::TerminologyPackage;
-        } else if (state.show_package_details_tab) {
-            center_view = ui::CenterView::PackageDetails;
-        } else {
-            center_view = ui::CenterView::EvidenceRegister;
-        }
-        state.force_center_tab_selection = true;
-    }
-}
 
 void RenderAppSplitters(AppRuntimeState& state,
                         float display_w,
@@ -127,6 +88,82 @@ void RenderAppSplitters(AppRuntimeState& state,
         state.problems_panel_height -= delta_center;
         clamp_problems_height();
     }
+}
+
+} // namespace
+
+void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center_view) {
+    if (!state.show_gsn_tab && !state.show_cse_tab && !state.show_evidence_tab && !state.show_package_details_tab &&
+        !state.show_terminology_package_tab) {
+        state.show_gsn_tab = true;
+    }
+
+    auto is_tab_visible = [&](ui::CenterView view) {
+        switch (view) {
+        case ui::CenterView::GsnCanvas:
+            return state.show_gsn_tab;
+        case ui::CenterView::CseRegister:
+            return state.show_cse_tab;
+        case ui::CenterView::EvidenceRegister:
+            return state.show_evidence_tab;
+        case ui::CenterView::PackageDetails:
+            return state.show_package_details_tab;
+        case ui::CenterView::TerminologyPackage:
+            return state.show_terminology_package_tab;
+        }
+        return false;
+    };
+
+    if (!is_tab_visible(center_view)) {
+        if (state.show_gsn_tab) {
+            center_view = ui::CenterView::GsnCanvas;
+        } else if (state.show_cse_tab) {
+            center_view = ui::CenterView::CseRegister;
+        } else if (state.show_terminology_package_tab) {
+            center_view = ui::CenterView::TerminologyPackage;
+        } else if (state.show_package_details_tab) {
+            center_view = ui::CenterView::PackageDetails;
+        } else {
+            center_view = ui::CenterView::EvidenceRegister;
+        }
+        state.force_center_tab_selection = true;
+    }
+}
+
+AppLayoutRegions RenderAppShell(AppRuntimeState& state, float menu_height, ImGuiWindowFlags panel_flags) {
+    const ImVec2 display = ImGui::GetIO().DisplaySize;
+    const float content_h = std::max(0.0f, display.y - menu_height);
+
+    float left_w = display.x * state.left_ratio;
+    float right_w = display.x * state.right_ratio;
+    float center_w = display.x - left_w - right_w - kSplitterThickness * 2.0f;
+
+    RenderAppSplitters(state, display.x, content_h, left_w, center_w, menu_height, panel_flags);
+
+    left_w = display.x * state.left_ratio;
+    right_w = display.x * state.right_ratio;
+    center_w = display.x - left_w - right_w - kSplitterThickness * 2.0f;
+
+    const float available_h = std::max(0.0f, content_h - kSplitterThickness);
+    const float project_h = available_h * state.project_boundary_ratio;
+    const float argument_navigator_h = std::max(0.0f, available_h - project_h);
+    const float argument_navigator_y = menu_height + project_h + kSplitterThickness;
+
+    const float center_x = left_w + kSplitterThickness;
+    const float center_available_h = std::max(0.0f, content_h - kSplitterThickness);
+    const float feedback_h = std::min(state.problems_panel_height, center_available_h);
+    const float workbench_h = std::max(0.0f, center_available_h - feedback_h);
+    const float feedback_y = menu_height + workbench_h + kSplitterThickness;
+    const float inspector_x = center_x + center_w + kSplitterThickness;
+
+    AppLayoutRegions regions;
+    regions.menu_height = menu_height;
+    regions.project_explorer = {{0.0f, menu_height}, {left_w, project_h}};
+    regions.argument_navigator = {{0.0f, argument_navigator_y}, {left_w, argument_navigator_h}};
+    regions.workbench = {{center_x, menu_height}, {center_w, workbench_h}};
+    regions.feedback_dock = {{center_x, feedback_y}, {center_w, feedback_h}};
+    regions.inspector = {{inspector_x, menu_height}, {right_w, content_h}};
+    return regions;
 }
 
 } // namespace app
