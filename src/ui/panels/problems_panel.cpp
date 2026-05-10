@@ -165,6 +165,14 @@ void DrawProblemRow(const core::ProblemItem& problem, ui::UiState& ui_state, con
     ImGui::TableSetColumnIndex(5);
     ImGui::TextUnformatted(problem.guideline_id.empty() ? "-" : problem.guideline_id.c_str());
 
+    ImGui::TableSetColumnIndex(6);
+    if (!problem.quick_fix_label.empty() && callbacks.on_quick_fix) {
+        if (ImGui::SmallButton(problem.quick_fix_label.c_str()))
+            callbacks.on_quick_fix(problem);
+    } else {
+        ImGui::TextUnformatted("-");
+    }
+
     ImGui::PopID();
 }
 
@@ -208,7 +216,7 @@ void ShowProblemsPanelContent(ProblemsPanelModel model, const ProblemsPanelCallb
     ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
                             ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
 
-    if (ImGui::BeginTable("problems_table", 6, flags, ImVec2(0.0f, 0.0f))) {
+    if (ImGui::BeginTable("problems_table", 7, flags, ImVec2(0.0f, 0.0f))) {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("Severity", ImGuiTableColumnFlags_WidthFixed, 86.0f);
         ImGui::TableSetupColumn("Source", ImGuiTableColumnFlags_WidthFixed, 128.0f);
@@ -216,6 +224,7 @@ void ShowProblemsPanelContent(ProblemsPanelModel model, const ProblemsPanelCallb
         ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 96.0f);
         ImGui::TableSetupColumn("Message", ImGuiTableColumnFlags_WidthStretch, 1.0f);
         ImGui::TableSetupColumn("Guideline", ImGuiTableColumnFlags_WidthFixed, 116.0f);
+        ImGui::TableSetupColumn("Fix", ImGuiTableColumnFlags_WidthFixed, 120.0f);
         ImGui::TableHeadersRow();
 
         for (const auto& problem : problems) {

@@ -8,11 +8,7 @@
 
 namespace ui {
 
-enum class CenterView {
-    GsnCanvas,
-    CseRegister,
-    EvidenceRegister,
-};
+enum class CenterView { GsnCanvas, CseRegister, EvidenceRegister, PackageDetails, TerminologyPackage };
 
 enum class ProblemFilter {
     All,

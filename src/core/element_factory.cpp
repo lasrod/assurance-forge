@@ -232,7 +232,7 @@ bool AddChildElement(parser::AssuranceCase& ac,
         rel.source_refs.push_back(new_elem.id);
         break;
     case NewElementKind::Context:
-        new_elem.type = "claim";
+        new_elem.type = "artifactreference";
         rel.type = "assertedcontext";
         rel.source_refs.push_back(new_elem.id);
         break;
@@ -268,6 +268,9 @@ bool AddChildElement(parser::AssuranceCase& ac,
             MirrorEvidence(ap, rel);
             break;
         case NewElementKind::Context:
+            MirrorArtifactReference(ap, new_elem);
+            MirrorContext(ap, rel);
+            break;
         case NewElementKind::Assumption:
         case NewElementKind::Justification:
             MirrorClaim(ap, new_elem);

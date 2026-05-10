@@ -11,7 +11,7 @@ TEST(XmlParserTest, ParseMinimalValidXml) {
     xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation"
     id="TEST" name="Test Case" description="A test assurance case">
     <argumentPackage id="AP1" name="Main Argument">
-        <claim id="G1" name="Goal 1" content="The system is safe.">
+        <claim id="G1" gid="gid-g1" name="Goal 1" content="The system is safe.">
             <description>Top-level safety claim</description>
         </claim>
     </argumentPackage>
@@ -27,6 +27,7 @@ TEST(XmlParserTest, ParseMinimalValidXml) {
 
     const auto& claim = result.assurance_case.elements[0];
     EXPECT_EQ(claim.id, "G1");
+    EXPECT_EQ(claim.gid, "gid-g1");
     EXPECT_EQ(claim.name, "Goal 1");
     EXPECT_EQ(claim.type, "claim");
     EXPECT_EQ(claim.content, "The system is safe.");
@@ -74,6 +75,25 @@ TEST(XmlParserTest, ParseTerminologyExpressions) {
     EXPECT_EQ(result.assurance_case.elements.size(), 1);
     EXPECT_EQ(result.assurance_case.elements[0].type, "expression");
     EXPECT_EQ(result.assurance_case.elements[0].content, "ISO 26262 - Functional Safety");
+}
+
+TEST(XmlParserTest, ParseStandaloneArgumentPackageRoot) {
+    const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<argumentPackage id="AP1" name="Main Argument">
+    <claim id="G1" name="Goal" content="The system is safe."/>
+    <argumentReasoning id="S1" name="Strategy" content="By decomposition."/>
+</argumentPackage>)";
+
+    ParseResult result = parse_sacm_xml_string(xml);
+
+    ASSERT_TRUE(result.success) << result.error_message;
+    EXPECT_EQ(result.assurance_case.id, "AP1");
+    EXPECT_EQ(result.assurance_case.name, "Main Argument");
+    ASSERT_EQ(result.assurance_case.elements.size(), 2u);
+    EXPECT_EQ(result.assurance_case.elements[0].type, "claim");
+    EXPECT_EQ(result.assurance_case.elements[0].id, "G1");
+    EXPECT_EQ(result.assurance_case.elements[1].type, "argumentreasoning");
+    EXPECT_EQ(result.assurance_case.elements[1].id, "S1");
 }
 
 // Test parsing invalid XML

@@ -15,6 +15,7 @@ struct ProblemsPanelModel {
 
 struct ProblemsPanelCallbacks {
     std::function<void(const core::ProblemItem&)> on_problem_activated;
+    std::function<void(const core::ProblemItem&)> on_quick_fix;
 };
 
 void ShowProblemsPanel(float x,
@@ -25,6 +26,8 @@ void ShowProblemsPanel(float x,
                        ProblemsPanelModel model,
                        const ProblemsPanelCallbacks& callbacks);
 
-void ShowProblemsPanelContent(ProblemsPanelModel model, const ProblemsPanelCallbacks& callbacks, bool show_title = true);
+void ShowProblemsPanelContent(ProblemsPanelModel model,
+                              const ProblemsPanelCallbacks& callbacks,
+                              bool show_title = true);
 
 } // namespace ui::panels

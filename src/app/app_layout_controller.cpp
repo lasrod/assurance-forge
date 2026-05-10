@@ -12,12 +12,13 @@ constexpr float kMinPanelRatio = 0.10f;
 constexpr float kMaxPanelRatio = 0.40f;
 constexpr float kMinLeftSectionHeight = 120.0f;
 constexpr float kMinCenterSectionHeight = 220.0f;
-constexpr float kMinProblemsPanelHeight = 160.0f;
+constexpr float kMinProblemsPanelHeight = 320.0f;
 
 } // namespace
 
 void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center_view) {
-    if (!state.show_gsn_tab && !state.show_cse_tab && !state.show_evidence_tab) {
+    if (!state.show_gsn_tab && !state.show_cse_tab && !state.show_evidence_tab && !state.show_package_details_tab &&
+        !state.show_terminology_package_tab) {
         state.show_gsn_tab = true;
     }
 
@@ -29,6 +30,10 @@ void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center
             return state.show_cse_tab;
         case ui::CenterView::EvidenceRegister:
             return state.show_evidence_tab;
+        case ui::CenterView::PackageDetails:
+            return state.show_package_details_tab;
+        case ui::CenterView::TerminologyPackage:
+            return state.show_terminology_package_tab;
         }
         return false;
     };
@@ -38,6 +43,10 @@ void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center
             center_view = ui::CenterView::GsnCanvas;
         } else if (state.show_cse_tab) {
             center_view = ui::CenterView::CseRegister;
+        } else if (state.show_terminology_package_tab) {
+            center_view = ui::CenterView::TerminologyPackage;
+        } else if (state.show_package_details_tab) {
+            center_view = ui::CenterView::PackageDetails;
         } else {
             center_view = ui::CenterView::EvidenceRegister;
         }

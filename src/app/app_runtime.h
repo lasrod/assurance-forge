@@ -2,10 +2,14 @@
 
 #include "app/app_events.h"
 #include "core/element_factory.h"
+#include "core/problems/problem_item.h"
 #include "core/project_model.h"
 #include "core/reviews/review_item.h"
+#include "core/terminology_package_service.h"
 #include "core/tree_editing.h"
+#include "sacm/sacm_package_tree.h"
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -81,6 +85,13 @@ private:
     void RenderProjectFileNameModal();
     void RenderProjectLoadReportModal();
     void RenderSaveBeforeExitModal(bool& done);
+    void RenderCreateTerminologyPackageModal();
+    void RenderDeleteTerminologyPackageModal();
+    void RenderTerminologyTermEditorModal();
+    void RenderQuickDefineTermModal();
+    void RenderDeleteTerminologyTermModal();
+    void RenderTerminologyCategoryEditorModal();
+    void RenderDeleteTerminologyCategoryModal();
     void RenderPreferencesWindow();
     void RenderThemeTweaksWindow();
 
@@ -90,10 +101,54 @@ private:
     void BeginCreateProjectEvidenceRegister();
     void BeginCreateProjectJ3377CaeRegister();
     void OpenProjectFile(const core::ProjectFileEntry& entry);
+    void OpenProjectPackageNode(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node);
+    void BeginAddTerminologyPackage(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& parent_node);
+    void ConfirmAddTerminologyPackage();
+    void ApplyTerminologyPackageEdits();
+    void BeginDeleteTerminologyPackage();
+    void ConfirmDeleteTerminologyPackage();
+    void SelectTerminologyTerm(const core::TerminologyTermRef& term_ref);
+    void BeginAddTerminologyTerm();
+    void BeginEditTerminologyTerm(const core::TerminologyTermRef& term_ref);
+    void ConfirmTerminologyTermEdit();
+    void OpenTerminologyTermFromCanvas(const core::TerminologyPackageRef& package_ref,
+                                       const core::TerminologyTermRef& term_ref);
+    void EditTerminologyTermFromCanvas(const core::TerminologyPackageRef& package_ref,
+                                       const core::TerminologyTermRef& term_ref);
+    void AddTerminologyTermAsContextFromCanvas(const std::string& element_id,
+                                               const core::TerminologyPackageRef& package_ref,
+                                               const core::TerminologyTermRef& term_ref);
+    void AddVisibleTerminologyTermContextFromCanvas(const std::string& element_id,
+                                                    const core::TerminologyPackageRef& package_ref,
+                                                    const core::TerminologyTermRef& term_ref);
+    void BeginFindTerminologyUsages(const core::TerminologyPackageRef& package_ref,
+                                    const core::TerminologyTermRef& term_ref);
+    void FindTerminologyUsagesFromCanvas(const core::TerminologyPackageRef& package_ref,
+                                         const core::TerminologyTermRef& term_ref);
+    void NavigateToTerminologyUsage(std::size_t usage_index);
+    void ChangeTerminologyMeaningFromCanvas(const std::string& element_id, const std::string& term_value);
+    void BeginQuickDefineTerminologyTerm(const std::string& element_id, const std::string& term_value);
+    void BeginLinkExistingTerminologyTerm(const std::string& element_id, const std::string& term_value);
+    void IgnoreTerminologySuggestion(const std::string& element_id, const std::string& term_value);
+    bool IsTerminologySuggestionIgnored(const std::string& element_id, const std::string& term_value) const;
+    void ConfirmQuickDefineTerminologyTerm(bool add_as_context);
+    void BeginDeleteTerminologyTerm(const core::TerminologyTermRef& term_ref);
+    void ConfirmDeleteTerminologyTerm();
+    void SelectTerminologyCategory(const core::TerminologyCategoryRef& category_ref);
+    void SetTerminologyCategoryFilter(const std::string& category_filter);
+    void BeginAddTerminologyCategory();
+    void BeginEditTerminologyCategory(const core::TerminologyCategoryRef& category_ref);
+    void ConfirmTerminologyCategoryEdit();
+    void BeginDeleteTerminologyCategory(const core::TerminologyCategoryRef& category_ref);
+    void ConfirmDeleteTerminologyCategory();
+    void SeedRecommendedTerminologyCategories();
     bool OpenFirstProjectSacmFile();
     bool TryOpenProjectManifest(const std::string& selected_path);
     bool EnsureReviewItemStorage();
+    void RefreshSacmPackageTreeCache();
     void SyncReviewProblems();
+    void SyncTerminologyProblems();
+    void HandleProblemQuickFix(const core::ProblemItem& problem);
     void SyncReviewVisualStatesFromReviews();
     void TouchCurrentProjectRecent();
     bool SaveProject();

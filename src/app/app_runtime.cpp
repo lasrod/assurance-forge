@@ -16,6 +16,8 @@
 #include "core/project_service.h"
 #include "core/reviews/review_proposal_manager.h"
 #include "core/reviews/review_proposal_patch_service.h"
+#include "core/terminology_package_service.h"
+#include "core/terminology_scope_service.h"
 #include "hello_imgui/hello_imgui.h"
 #include "hello_imgui/hello_imgui_theme.h"
 #include "imgui.h"
@@ -24,11 +26,14 @@
 #include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/localization.h"
 #include "ui/panels/element_panel.h"
+#include "ui/panels/package_details_panel.h"
 #include "ui/panels/preferences_panel.h"
 #include "ui/panels/problems_panel.h"
 #include "ui/panels/project_files_panel.h"
 #include "ui/panels/review_panel.h"
 #include "ui/panels/sacm_viewer_panel.h"
+#include "ui/panels/terminology_package_panel.h"
+#include "ui/panels/terminology_usages_panel.h"
 #include "ui/register_views.h"
 #include "ui/theme.h"
 #include "ui/tree_view.h"
@@ -156,6 +161,197 @@ std::string TruncateForProblemMessage(const std::string& value, size_t limit = 4
 
 bool IsReviewDerivedProblem(const core::ProblemItem& problem) {
     return problem.id.rfind("review-comment:", 0) == 0 || problem.id.rfind("guideline-review:", 0) == 0;
+}
+
+bool StartsWith(const std::string& value, const std::string& prefix) {
+    return value.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), value.begin());
+}
+
+void ClearProblemsByIdPrefix(core::ProblemsManager& problems_manager, const std::string& prefix) {
+    std::vector<std::string> problem_ids;
+    for (const core::ProblemItem& problem : problems_manager.GetProblems()) {
+        if (StartsWith(problem.id, prefix))
+            problem_ids.push_back(problem.id);
+    }
+    for (const std::string& problem_id : problem_ids) {
+        problems_manager.RemoveProblem(problem_id);
+    }
+}
+
+bool IsRelationshipElement(const parser::SacmElement& element) {
+    return element.type == "assertedinference" || element.type == "assertedcontext" ||
+           element.type == "assertedevidence";
+}
+
+std::string ElementTerminologyText(const parser::SacmElement& element) {
+    if (element.type == "claim" || element.type == "argumentreasoning")
+        return element.content;
+    return element.description;
+}
+
+std::string TerminologyAmbiguityProblemId(const core::TermOccurrence& occurrence) {
+    return "terminology-ambiguity:" + occurrence.element_id + ":" + occurrence.text + ":" +
+           std::to_string(occurrence.start_offset) + ":" + std::to_string(occurrence.end_offset);
+}
+
+std::string TerminologyUndefinedProblemId(const core::TermOccurrence& occurrence) {
+    return "terminology-undefined:" + occurrence.element_id + ":" + occurrence.text + ":" +
+           std::to_string(occurrence.start_offset) + ":" + std::to_string(occurrence.end_offset);
+}
+
+core::TerminologyPackageRef TerminologyPackageRefFor(const sacm::TerminologyPackage& package) {
+    return core::TerminologyPackageRef{package.id, package.gid};
+}
+
+std::string RefValue(const core::TerminologyPackageRef& ref) {
+    return ref.id.empty() ? ref.gid : ref.id;
+}
+
+std::string RefValue(const core::TerminologyTermRef& ref) {
+    return ref.id.empty() ? ref.gid : ref.id;
+}
+
+const char* TermIssueKindCode(core::TerminologyTermIssueKind kind) {
+    switch (kind) {
+    case core::TerminologyTermIssueKind::MissingValue:
+        return "missing-value";
+    case core::TerminologyTermIssueKind::DuplicateDefinition:
+        return "duplicate-definition";
+    case core::TerminologyTermIssueKind::MissingDescription:
+        return "missing-description";
+    case core::TerminologyTermIssueKind::MissingCategory:
+        return "missing-category";
+    case core::TerminologyTermIssueKind::MissingExternalReference:
+        return "missing-external-reference";
+    }
+    return "unknown";
+}
+
+const char* TermIssueProblemType(core::TerminologyTermIssueKind kind) {
+    switch (kind) {
+    case core::TerminologyTermIssueKind::MissingValue:
+        return "TerminologyTermMissingValue";
+    case core::TerminologyTermIssueKind::DuplicateDefinition:
+        return "TerminologyTermDuplicateDefinition";
+    case core::TerminologyTermIssueKind::MissingDescription:
+        return "TerminologyTermMissingDescription";
+    case core::TerminologyTermIssueKind::MissingCategory:
+        return "TerminologyTermMissingCategory";
+    case core::TerminologyTermIssueKind::MissingExternalReference:
+        return "TerminologyTermMissingExternalReference";
+    }
+    return "TerminologyTermIssue";
+}
+
+const char* TermIssueQuickFixLabel(core::TerminologyTermIssueKind kind) {
+    switch (kind) {
+    case core::TerminologyTermIssueKind::DuplicateDefinition:
+        return "Open duplicates";
+    case core::TerminologyTermIssueKind::MissingValue:
+    case core::TerminologyTermIssueKind::MissingDescription:
+    case core::TerminologyTermIssueKind::MissingCategory:
+    case core::TerminologyTermIssueKind::MissingExternalReference:
+        return "Edit term";
+    }
+    return "";
+}
+
+std::string TerminologyTermProblemId(const core::TerminologyPackageRef& package_ref,
+                                     const core::TerminologyTermIssue& issue) {
+    return "terminology-term:" + RefValue(package_ref) + ":" + RefValue(issue.term_ref) + ":" +
+           TermIssueKindCode(issue.kind);
+}
+
+std::string EncodeTerminologyTermQuickFixPayload(const core::TerminologyPackageRef& package_ref,
+                                                 const core::TerminologyTermRef& term_ref,
+                                                 const std::string& term_value) {
+    return package_ref.id + "\n" + package_ref.gid + "\n" + term_ref.id + "\n" + term_ref.gid + "\n" + term_value;
+}
+
+std::string TerminologyContextReferenceProblemId(const core::TerminologyContextReferenceIssue& issue) {
+    if (!issue.artifact_reference_id.empty())
+        return "terminology-context-reference:" + issue.artifact_reference_id + ":" + issue.target_ref;
+    if (!issue.asserted_context_id.empty())
+        return "terminology-context-reference:" + issue.asserted_context_id + ":" + issue.target_ref;
+    return "terminology-context-reference:" + issue.referenced_artifact + ":" + issue.target_ref;
+}
+
+core::ProblemSeverity ProblemSeverityFor(core::TerminologyTermIssueSeverity severity) {
+    switch (severity) {
+    case core::TerminologyTermIssueSeverity::Error:
+        return core::ProblemSeverity::Error;
+    case core::TerminologyTermIssueSeverity::Warning:
+        return core::ProblemSeverity::Warning;
+    case core::TerminologyTermIssueSeverity::Info:
+        return core::ProblemSeverity::Info;
+    }
+    return core::ProblemSeverity::Info;
+}
+
+std::vector<core::ProblemItem> BuildTerminologyTermProblems(const sacm::TerminologyPackage& terminology_package) {
+    std::vector<core::ProblemItem> problems;
+    const core::TerminologyPackageRef package_ref = TerminologyPackageRefFor(terminology_package);
+    for (const core::TerminologyTermIssue& issue : core::ValidateTerminologyTerms(terminology_package)) {
+        const sacm::Term* term = core::FindTerminologyTerm(terminology_package, issue.term_ref);
+        const std::string term_value = term ? term->value : std::string{};
+        core::ProblemItem problem;
+        problem.id = TerminologyTermProblemId(package_ref, issue);
+        problem.severity = ProblemSeverityFor(issue.severity);
+        problem.source = core::ProblemSource::ModelValidation;
+        problem.element_id = RefValue(issue.term_ref);
+        problem.type = TermIssueProblemType(issue.kind);
+        problem.message = issue.message;
+        problem.quick_fix_label = TermIssueQuickFixLabel(issue.kind);
+        problem.quick_fix_payload = EncodeTerminologyTermQuickFixPayload(package_ref, issue.term_ref, term_value);
+        problems.push_back(std::move(problem));
+    }
+    return problems;
+}
+
+core::ProblemItem BuildTerminologyContextReferenceProblem(const core::TerminologyContextReferenceIssue& issue) {
+    core::ProblemItem problem;
+    problem.id = TerminologyContextReferenceProblemId(issue);
+    problem.severity = ProblemSeverityFor(issue.severity);
+    problem.source = core::ProblemSource::ModelValidation;
+    problem.element_id = issue.artifact_reference_id.empty() ? issue.target_ref : issue.artifact_reference_id;
+    problem.type = "TerminologyBrokenContextReference";
+    problem.message = issue.message;
+    return problem;
+}
+
+std::optional<core::ProblemItem> BuildTerminologyOccurrenceProblem(const core::TermOccurrence& occurrence,
+                                                                   bool ignored) {
+    if (ignored)
+        return std::nullopt;
+
+    if (occurrence.resolution.status == core::TermResolutionStatus::Ambiguous) {
+        core::ProblemItem problem;
+        problem.id = TerminologyAmbiguityProblemId(occurrence);
+        problem.severity = core::ProblemSeverity::Warning;
+        problem.source = core::ProblemSource::ModelValidation;
+        problem.element_id = occurrence.element_id;
+        problem.type = "TerminologyAmbiguity";
+        problem.message = occurrence.text + " has " + std::to_string(occurrence.resolution.candidates.size()) +
+                          " visible meanings. Choose the intended terminology entry.";
+        problem.quick_fix_label = "Open glossary";
+        problem.quick_fix_payload = occurrence.text;
+        return problem;
+    }
+
+    if (occurrence.kind == core::TermOccurrenceKind::UndefinedAcronym && occurrence.resolution.important_undefined) {
+        core::ProblemItem problem;
+        problem.id = TerminologyUndefinedProblemId(occurrence);
+        problem.severity = core::ProblemSeverity::Warning;
+        problem.source = core::ProblemSource::ModelValidation;
+        problem.element_id = occurrence.element_id;
+        problem.type = "TerminologyUndefinedAcronym";
+        problem.message = occurrence.text + " looks like an undefined terminology entry.";
+        problem.quick_fix_label = "Define term";
+        problem.quick_fix_payload = occurrence.text;
+        return problem;
+    }
+
+    return std::nullopt;
 }
 
 const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model, const std::string& element_id) {
@@ -540,6 +736,7 @@ const char* EditableTextFieldFor(const parser::SacmElement& element) {
 
 void CopyCommonSacmFields(sacm::SacmElement& target, const parser::SacmElement& source) {
     target.id = source.id;
+    target.gid = source.gid;
     target.name = source.name;
     target.description = source.description;
     target.name_ml.texts = source.name_langs;
@@ -550,10 +747,105 @@ void CopyCommonSacmFields(sacm::SacmElement& target, const parser::SacmElement& 
         target.description_ml.set("en", source.description);
 }
 
+std::string NormalizeSacmRef(std::string ref) {
+    if (!ref.empty() && ref.front() == '#')
+        ref.erase(ref.begin());
+    return ref;
+}
+
+void CollectTermRefs(const sacm::TerminologyPackage& terminology_package, std::unordered_set<std::string>& refs) {
+    for (const sacm::Term& term : terminology_package.terms) {
+        if (!term.id.empty())
+            refs.insert(term.id);
+        if (!term.gid.empty())
+            refs.insert(term.gid);
+    }
+}
+
+std::unordered_set<std::string> CollectTermRefs(const sacm::AssuranceCasePackage& package) {
+    std::unordered_set<std::string> refs;
+    for (const sacm::TerminologyPackage& terminology_package : package.terminologyPackages)
+        CollectTermRefs(terminology_package, refs);
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::TerminologyPackage& terminology_package : argument_package.terminologyPackages)
+            CollectTermRefs(terminology_package, refs);
+    }
+    return refs;
+}
+
+bool ReferencesAny(const std::vector<std::string>& refs, const std::unordered_set<std::string>& candidates) {
+    return std::any_of(refs.begin(), refs.end(), [&](const std::string& ref) {
+        return candidates.find(NormalizeSacmRef(ref)) != candidates.end();
+    });
+}
+
+bool ArtifactReferenceTargetsTerm(const sacm::ArtifactReference& artifact_reference,
+                                  const std::unordered_set<std::string>& term_refs) {
+    return term_refs.find(NormalizeSacmRef(artifact_reference.referencedArtifact)) != term_refs.end();
+}
+
+void AddElementRefs(const parser::AssuranceCase& model, std::unordered_set<std::string>& refs) {
+    for (const parser::SacmElement& element : model.elements) {
+        if (IsPreviewRelationshipType(element.type))
+            continue;
+        if (!element.id.empty())
+            refs.insert(element.id);
+        if (!element.gid.empty())
+            refs.insert(element.gid);
+    }
+}
+
+bool ContainsSacmElementRef(const std::vector<std::string>& refs, const std::unordered_set<std::string>& candidates) {
+    return ReferencesAny(refs, candidates);
+}
+
+bool HasArtifactReference(const sacm::ArgumentPackage& argument_package, const sacm::ArtifactReference& candidate) {
+    return std::any_of(argument_package.artifactReferences.begin(),
+                       argument_package.artifactReferences.end(),
+                       [&](const auto& existing) {
+                           return (!candidate.id.empty() && existing.id == candidate.id) ||
+                                  (!candidate.gid.empty() && existing.gid == candidate.gid);
+                       });
+}
+
+bool HasAssertedContext(const sacm::ArgumentPackage& argument_package, const sacm::AssertedContext& candidate) {
+    return std::any_of(
+        argument_package.assertedContexts.begin(), argument_package.assertedContexts.end(), [&](const auto& existing) {
+            return (!candidate.id.empty() && existing.id == candidate.id) ||
+                   (!candidate.gid.empty() && existing.gid == candidate.gid) ||
+                   (existing.sources == candidate.sources && existing.targets == candidate.targets);
+        });
+}
+
 void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sacm::AssuranceCasePackage& package) {
     if (package.argumentPackages.empty())
         package.argumentPackages.emplace_back();
+    std::map<std::string, std::string> artifact_reference_targets;
+    const std::unordered_set<std::string> term_refs = CollectTermRefs(package);
+    std::vector<sacm::ArtifactReference> preserved_term_references;
+    std::vector<sacm::AssertedContext> preserved_term_contexts;
     for (sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        std::unordered_set<std::string> term_artifact_refs;
+        for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
+            if (artifact_reference.referencedArtifact.empty())
+                continue;
+            if (!artifact_reference.id.empty())
+                artifact_reference_targets[artifact_reference.id] = artifact_reference.referencedArtifact;
+            if (!artifact_reference.gid.empty())
+                artifact_reference_targets[artifact_reference.gid] = artifact_reference.referencedArtifact;
+            if (ArtifactReferenceTargetsTerm(artifact_reference, term_refs) &&
+                !core::IsVisibleTerminologyArtifactReference(package, argument_package, artifact_reference)) {
+                preserved_term_references.push_back(artifact_reference);
+                if (!artifact_reference.id.empty())
+                    term_artifact_refs.insert(artifact_reference.id);
+                if (!artifact_reference.gid.empty())
+                    term_artifact_refs.insert(artifact_reference.gid);
+            }
+        }
+        for (const sacm::AssertedContext& context : argument_package.assertedContexts) {
+            if (ReferencesAny(context.sources, term_artifact_refs))
+                preserved_term_contexts.push_back(context);
+        }
         argument_package.claims.clear();
         argument_package.argumentReasonings.clear();
         argument_package.artifactReferences.clear();
@@ -586,6 +878,11 @@ void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sa
         } else if (element.type == "artifactreference" || element.type == "artifact") {
             sacm::ArtifactReference artifact_reference;
             CopyCommonSacmFields(artifact_reference, element);
+            auto target = artifact_reference_targets.find(element.id);
+            if (target == artifact_reference_targets.end())
+                target = artifact_reference_targets.find(element.gid);
+            if (target != artifact_reference_targets.end())
+                artifact_reference.referencedArtifact = target->second;
             argument_package.artifactReferences.push_back(std::move(artifact_reference));
         } else if (element.type == "assertedinference") {
             sacm::AssertedInference inference;
@@ -610,6 +907,33 @@ void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sa
             evidence.assertionDeclaration = element.assertion_declaration;
             argument_package.assertedEvidences.push_back(std::move(evidence));
         }
+    }
+
+    std::unordered_set<std::string> model_element_refs;
+    AddElementRefs(model, model_element_refs);
+    std::unordered_set<std::string> kept_artifact_refs;
+    for (const sacm::ArtifactReference& artifact_reference : preserved_term_references) {
+        if (HasArtifactReference(argument_package, artifact_reference))
+            continue;
+        argument_package.artifactReferences.push_back(artifact_reference);
+        if (!artifact_reference.id.empty())
+            kept_artifact_refs.insert(artifact_reference.id);
+        if (!artifact_reference.gid.empty())
+            kept_artifact_refs.insert(artifact_reference.gid);
+    }
+    for (const sacm::AssertedContext& context : preserved_term_contexts) {
+        if (!ReferencesAny(context.sources, kept_artifact_refs) ||
+            !ContainsSacmElementRef(context.targets, model_element_refs)) {
+            continue;
+        }
+        if (!HasAssertedContext(argument_package, context))
+            argument_package.assertedContexts.push_back(context);
+    }
+    for (sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
+        if (!core::IsVisibleTerminologyArtifactReference(package, argument_package, artifact_reference))
+            continue;
+        artifact_reference.description.clear();
+        artifact_reference.description_ml.texts.clear();
     }
 }
 
@@ -1409,6 +1733,7 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     ui::gsn::SetCanvasTree(impl_->current_tree);
     ui::RebuildRegisterViews(&ac);
     ui::GetUiState().model_has_translations = ui::ModelHasTranslations(ac);
+    SyncTerminologyProblems();
 
     if (impl_->pending_focus_root && impl_->current_tree.root) {
         ui::UiState& ui_state = ui::GetUiState();
@@ -1783,6 +2108,37 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                     };
                 } else {
                     actions = MakeElementContextActions(*this);
+                    actions.open_terminology_term = [this](const core::TerminologyPackageRef& package_ref,
+                                                           const core::TerminologyTermRef& term_ref) {
+                        OpenTerminologyTermFromCanvas(package_ref, term_ref);
+                    };
+                    actions.edit_terminology_term = [this](const core::TerminologyPackageRef& package_ref,
+                                                           const core::TerminologyTermRef& term_ref) {
+                        EditTerminologyTermFromCanvas(package_ref, term_ref);
+                    };
+                    actions.define_terminology_term = [this](const std::string& element_id,
+                                                             const std::string& term_value) {
+                        BeginQuickDefineTerminologyTerm(element_id, term_value);
+                    };
+                    actions.add_terminology_term_as_context = [this](const std::string& element_id,
+                                                                     const core::TerminologyPackageRef& package_ref,
+                                                                     const core::TerminologyTermRef& term_ref) {
+                        AddTerminologyTermAsContextFromCanvas(element_id, package_ref, term_ref);
+                    };
+                    actions.add_visible_terminology_term_context =
+                        [this](const std::string& element_id,
+                               const core::TerminologyPackageRef& package_ref,
+                               const core::TerminologyTermRef& term_ref) {
+                            AddVisibleTerminologyTermContextFromCanvas(element_id, package_ref, term_ref);
+                        };
+                    actions.find_terminology_usages = [this](const core::TerminologyPackageRef& package_ref,
+                                                             const core::TerminologyTermRef& term_ref) {
+                        FindTerminologyUsagesFromCanvas(package_ref, term_ref);
+                    };
+                    actions.change_terminology_meaning = [this](const std::string& element_id,
+                                                                const std::string& term_value) {
+                        ChangeTerminologyMeaningFromCanvas(element_id, term_value);
+                    };
                 }
                 const parser::AssuranceCase* visible_case =
                     impl_->IsProposalCanvasActive() ? &impl_->proposal_controller->preview_model : GetLoadedCase();
@@ -1790,7 +2146,9 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
                 ui_state.attention_element_ids =
                     core::CollectAttentionElementIds(impl_->problems_manager.GetProblems());
                 SyncReviewVisualStatesFromReviews();
-                ui::gsn::ShowGsnCanvasContent(ui_state, visible_case, actions);
+                const sacm::AssuranceCasePackage* terminology_package =
+                    impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
+                ui::gsn::ShowGsnCanvasContent(ui_state, visible_case, actions, terminology_package);
                 ImGui::EndTabItem();
             }
         }
@@ -1831,6 +2189,92 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
             }
         }
 
+        if (impl_->show_package_details_tab) {
+            ImGuiTabItemFlags package_flags =
+                (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::PackageDetails)
+                    ? ImGuiTabItemFlags_SetSelected
+                    : 0;
+            if (ImGui::BeginTabItem("Package Details", nullptr, package_flags)) {
+                ui_state.center_view = ui::CenterView::PackageDetails;
+                ui::panels::ShowPackageDetailsPanel(impl_->selected_package_node ? &impl_->selected_package_node.value()
+                                                                                 : nullptr,
+                                                    impl_->selected_package_file_path);
+                ImGui::EndTabItem();
+            }
+        }
+
+        if (impl_->show_terminology_package_tab) {
+            ImGuiTabItemFlags terminology_flags =
+                (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::TerminologyPackage)
+                    ? ImGuiTabItemFlags_SetSelected
+                    : 0;
+            if (ImGui::BeginTabItem("Terminology Package", nullptr, terminology_flags)) {
+                ui_state.center_view = ui::CenterView::TerminologyPackage;
+                const sacm::TerminologyPackage* terminology_package = nullptr;
+                if (impl_->app_state.sacm_package.has_value()) {
+                    terminology_package = core::FindTerminologyPackage(impl_->app_state.sacm_package.value(),
+                                                                       impl_->selected_terminology_package_ref);
+                }
+                std::string delete_block_reason;
+                const bool can_delete =
+                    terminology_package ? core::CanDeleteTerminologyPackage(*terminology_package, delete_block_reason)
+                                        : false;
+                ui::panels::TerminologyPackagePanelModel model;
+                model.package = terminology_package;
+                model.source_file_path = impl_->selected_terminology_package_file_path;
+                model.name_buffer = impl_->terminology_package_name_buf;
+                model.name_buffer_size = sizeof(impl_->terminology_package_name_buf);
+                model.description_buffer = impl_->terminology_package_description_buf;
+                model.description_buffer_size = sizeof(impl_->terminology_package_description_buf);
+                model.can_delete = can_delete;
+                model.delete_block_reason = delete_block_reason;
+                model.selected_term_ref = impl_->selected_terminology_term_ref;
+                model.selected_category_ref = impl_->selected_terminology_category_ref;
+                model.search_buffer = impl_->terminology_filter_buf;
+                model.search_buffer_size = sizeof(impl_->terminology_filter_buf);
+                model.category_filter_buffer = impl_->terminology_category_filter_buf;
+                model.category_filter_buffer_size = sizeof(impl_->terminology_category_filter_buf);
+                if (terminology_package) {
+                    model.term_issues = core::ValidateTerminologyTerms(*terminology_package);
+                    model.term_usage_summaries = core::BuildTerminologyTermUsageSummaries(
+                        impl_->app_state.sacm_package.value(), *terminology_package);
+                    model.category_usage_summaries = core::BuildTerminologyCategoryUsageSummaries(*terminology_package);
+                }
+                ui::panels::TerminologyPackagePanelCallbacks callbacks;
+                callbacks.apply_changes = [this]() { ApplyTerminologyPackageEdits(); };
+                callbacks.delete_package = [this]() { BeginDeleteTerminologyPackage(); };
+                callbacks.add_term = [this]() { BeginAddTerminologyTerm(); };
+                callbacks.select_term = [this](const core::TerminologyTermRef& term_ref) {
+                    SelectTerminologyTerm(term_ref);
+                };
+                callbacks.edit_term = [this](const core::TerminologyTermRef& term_ref) {
+                    BeginEditTerminologyTerm(term_ref);
+                };
+                callbacks.delete_term = [this](const core::TerminologyTermRef& term_ref) {
+                    BeginDeleteTerminologyTerm(term_ref);
+                };
+                callbacks.find_term_usages = [this](const core::TerminologyTermRef& term_ref) {
+                    BeginFindTerminologyUsages(impl_->selected_terminology_package_ref, term_ref);
+                };
+                callbacks.set_category_filter = [this](const std::string& category_filter) {
+                    SetTerminologyCategoryFilter(category_filter);
+                };
+                callbacks.add_category = [this]() { BeginAddTerminologyCategory(); };
+                callbacks.select_category = [this](const core::TerminologyCategoryRef& category_ref) {
+                    SelectTerminologyCategory(category_ref);
+                };
+                callbacks.edit_category = [this](const core::TerminologyCategoryRef& category_ref) {
+                    BeginEditTerminologyCategory(category_ref);
+                };
+                callbacks.delete_category = [this](const core::TerminologyCategoryRef& category_ref) {
+                    BeginDeleteTerminologyCategory(category_ref);
+                };
+                callbacks.seed_recommended_categories = [this]() { SeedRecommendedTerminologyCategories(); };
+                ui::panels::ShowTerminologyPackagePanel(model, callbacks);
+                ImGui::EndTabItem();
+            }
+        }
+
         ImGui::EndTabBar();
         impl_->force_center_tab_selection = false;
     }
@@ -1845,12 +2289,17 @@ void AppRuntime::RenderProblemsPanel(float center_x, float center_w, float probl
     };
     ui::panels::ProblemsPanelCallbacks callbacks{
         [this](const core::ProblemItem& problem) {
+            if (problem.type.rfind("TerminologyTerm", 0) == 0) {
+                HandleProblemQuickFix(problem);
+                return;
+            }
             if (problem.element_id.empty())
                 return;
             ui::GetUiState().selected_problem_element_id = problem.element_id;
             impl_->events.Emit(SelectionChangedEvent{problem.element_id, true});
             impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
         },
+        [this](const core::ProblemItem& problem) { HandleProblemQuickFix(problem); },
     };
 
     ImGui::SetNextWindowPos(ImVec2(center_x, top_y));
@@ -1862,6 +2311,31 @@ void AppRuntime::RenderProblemsPanel(float center_x, float center_w, float probl
             ui::panels::ShowProblemsPanelContent(model, callbacks, false);
             ImGui::EndTabItem();
         }
+
+        ImGuiTabItemFlags terminology_usage_flags =
+            impl_->focus_terminology_usages_tab ? ImGuiTabItemFlags_SetSelected : 0;
+        if (ImGui::BeginTabItem("Term Usages", nullptr, terminology_usage_flags)) {
+            ui::panels::TerminologyUsagesPanelModel usage_model;
+            usage_model.has_search = impl_->terminology_usages_active;
+            usage_model.term_value = impl_->usage_search_term_value;
+            usage_model.term_name = impl_->usage_search_term_name;
+            usage_model.message = impl_->usage_search_message;
+            usage_model.error = impl_->usage_search_error;
+            usage_model.usages = &impl_->terminology_usage_results;
+            usage_model.selected_usage_index = impl_->selected_terminology_usage_index;
+
+            ui::panels::TerminologyUsagesPanelCallbacks usage_callbacks;
+            usage_callbacks.select_usage = [this](std::size_t usage_index) {
+                if (usage_index < impl_->terminology_usage_results.size())
+                    impl_->selected_terminology_usage_index = static_cast<int>(usage_index);
+            };
+            usage_callbacks.activate_usage = [this](std::size_t usage_index) {
+                NavigateToTerminologyUsage(usage_index);
+            };
+            ui::panels::ShowTerminologyUsagesPanelContent(usage_model, usage_callbacks);
+            ImGui::EndTabItem();
+        }
+        impl_->focus_terminology_usages_tab = false;
 
         if (ImGui::BeginTabItem("Review")) {
             RenderReviewPanelContent();
@@ -1881,6 +2355,59 @@ void AppRuntime::RenderProblemsPanel(float center_x, float center_w, float probl
 
 void AppRuntime::SyncReviewProblems() {
     app::SyncReviewProblems(impl_->problems_manager, impl_->review_controller->Items());
+}
+
+void AppRuntime::SyncTerminologyProblems() {
+    constexpr const char* kTerminologyTermProblemPrefix = "terminology-term:";
+    constexpr const char* kTerminologyAmbiguityProblemPrefix = "terminology-ambiguity:";
+    constexpr const char* kTerminologyUndefinedProblemPrefix = "terminology-undefined:";
+    constexpr const char* kTerminologyContextReferenceProblemPrefix = "terminology-context-reference:";
+    ClearProblemsByIdPrefix(impl_->problems_manager, kTerminologyTermProblemPrefix);
+    ClearProblemsByIdPrefix(impl_->problems_manager, kTerminologyAmbiguityProblemPrefix);
+    ClearProblemsByIdPrefix(impl_->problems_manager, kTerminologyUndefinedProblemPrefix);
+    ClearProblemsByIdPrefix(impl_->problems_manager, kTerminologyContextReferenceProblemPrefix);
+
+    if (!impl_->app_state.loaded_case.has_value() || !impl_->app_state.sacm_package.has_value())
+        return;
+
+    const parser::AssuranceCase& model = impl_->app_state.loaded_case.value();
+    const sacm::AssuranceCasePackage& package = impl_->app_state.sacm_package.value();
+
+    auto add_term_problems = [&](const sacm::TerminologyPackage& terminology_package) {
+        for (core::ProblemItem& problem : BuildTerminologyTermProblems(terminology_package)) {
+            impl_->problems_manager.AddOrUpdateProblem(problem);
+        }
+    };
+
+    for (const sacm::TerminologyPackage& terminology_package : package.terminologyPackages)
+        add_term_problems(terminology_package);
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::TerminologyPackage& terminology_package : argument_package.terminologyPackages)
+            add_term_problems(terminology_package);
+    }
+
+    for (const core::TerminologyContextReferenceIssue& issue : core::ValidateTerminologyContextReferences(package)) {
+        core::ProblemItem problem = BuildTerminologyContextReferenceProblem(issue);
+        impl_->problems_manager.AddOrUpdateProblem(problem);
+    }
+
+    core::TerminologyService terminology_service(package);
+
+    for (const parser::SacmElement& element : model.elements) {
+        if (IsRelationshipElement(element))
+            continue;
+        const std::string text = ElementTerminologyText(element);
+        if (text.empty())
+            continue;
+
+        std::vector<core::TermOccurrence> occurrences = terminology_service.DetectTermsInText(element.id, text);
+        for (const core::TermOccurrence& occurrence : occurrences) {
+            std::optional<core::ProblemItem> problem = BuildTerminologyOccurrenceProblem(
+                occurrence, IsTerminologySuggestionIgnored(occurrence.element_id, occurrence.text));
+            if (problem.has_value())
+                impl_->problems_manager.AddOrUpdateProblem(*problem);
+        }
+    }
 }
 
 void AppRuntime::SyncReviewVisualStatesFromReviews() {
@@ -2072,7 +2599,26 @@ void AppRuntime::RenderElementPropertiesPanel(
             impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
         sacm::AssuranceCasePackage* sacm_ptr =
             impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
-        if (ui::panels::ShowElementPanel(ac_ptr, sacm_ptr)) {
+        ui::panels::ElementTerminologyAssistCallbacks terminology_callbacks;
+        terminology_callbacks.define_term = [this](const std::string& element_id, const std::string& term_value) {
+            BeginQuickDefineTerminologyTerm(element_id, term_value);
+        };
+        terminology_callbacks.link_existing_term = [this](const std::string& element_id,
+                                                          const std::string& term_value) {
+            BeginLinkExistingTerminologyTerm(element_id, term_value);
+        };
+        terminology_callbacks.use_term_for_element = [this](const std::string& element_id,
+                                                            const core::TerminologyPackageRef& package_ref,
+                                                            const core::TerminologyTermRef& term_ref) {
+            AddTerminologyTermAsContextFromCanvas(element_id, package_ref, term_ref);
+        };
+        terminology_callbacks.ignore_term = [this](const std::string& element_id, const std::string& term_value) {
+            IgnoreTerminologySuggestion(element_id, term_value);
+        };
+        terminology_callbacks.is_ignored = [this](const std::string& element_id, const std::string& term_value) {
+            return IsTerminologySuggestionIgnored(element_id, term_value);
+        };
+        if (ui::panels::ShowElementPanel(ac_ptr, sacm_ptr, &terminology_callbacks)) {
             impl_->events.Emit(TreeDirtyEvent{});
             impl_->events.Emit(DocumentDirtyEvent{});
         }
@@ -2417,6 +2963,8 @@ void AppRuntime::RenderFrame(bool& done) {
     project_model.project =
         impl_->app_state.current_project.has_value() ? &impl_->app_state.current_project.value() : nullptr;
     if (project_model.project) {
+        RefreshSacmPackageTreeCache();
+        project_model.sacm_package_trees_by_path = impl_->sacm_package_tree_cache;
         const parser::AssuranceCase* loaded_case =
             impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
         for (const core::reviews::ReviewProposalSummary& summary :
@@ -2429,6 +2977,12 @@ void AppRuntime::RenderFrame(bool& done) {
         [this]() { BeginCreateProjectEvidenceRegister(); },
         [this]() { BeginCreateProjectJ3377CaeRegister(); },
         [this](const core::ProjectFileEntry& entry) { OpenProjectFile(entry); },
+        [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
+            OpenProjectPackageNode(entry, node);
+        },
+        [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
+            BeginAddTerminologyPackage(entry, node);
+        },
     };
     ui::panels::ShowProjectFilesPanel(left_w, project_h, project_y, kPanelFlags, project_model, project_callbacks);
     RenderTreePanel(left_w, safety_tree_h, safety_y);
@@ -2450,6 +3004,13 @@ void AppRuntime::RenderFrame(bool& done) {
     RenderCreateProjectModal();
     RenderProjectFileNameModal();
     RenderProjectLoadReportModal();
+    RenderCreateTerminologyPackageModal();
+    RenderDeleteTerminologyPackageModal();
+    RenderTerminologyTermEditorModal();
+    RenderQuickDefineTermModal();
+    RenderDeleteTerminologyTermModal();
+    RenderTerminologyCategoryEditorModal();
+    RenderDeleteTerminologyCategoryModal();
     RenderSaveBeforeExitModal(done);
     RenderStartupProjectWindow();
     RenderNotImplementedModal();

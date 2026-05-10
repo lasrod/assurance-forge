@@ -3,6 +3,7 @@
 #include "core/assurance_tree.h"
 #include "parser/xml_parser.h"
 #include "ui/element_context_menu.h"
+#include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_model.h"
 #include "ui/ui_state.h"
 
@@ -10,6 +11,10 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+
+namespace sacm {
+struct AssuranceCasePackage;
+}
 
 namespace ui::gsn {
 
@@ -31,7 +36,10 @@ public:
     // Set elements (legacy flat list)
     void SetElements(const std::vector<CanvasElement>& elements);
     // Render into the current ImGui window/child
-    void Render(UiState& ui_state, const parser::AssuranceCase* active_case, const ElementContextActions& actions);
+    void Render(UiState& ui_state,
+                const parser::AssuranceCase* active_case,
+                const ElementContextActions& actions,
+                const sacm::AssuranceCasePackage* terminology_package = nullptr);
 
     // Zoom controls
     void ZoomIn();
@@ -74,6 +82,7 @@ private:
     std::unordered_map<std::string, const LayoutNode*> node_by_id_;
     float zoom_level_ = 1.0f;
     ImVec2 view_offset_ = ImVec2(0.0f, 0.0f); // pixel-space pan offset
+    TerminologyCardState terminology_card_state_;
     CanvasRenderStats last_render_stats_{};
 };
 

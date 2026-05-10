@@ -27,6 +27,8 @@ struct ProblemItem {
     std::string type;
     std::string message;
     std::string guideline_id;
+    std::string quick_fix_label;
+    std::string quick_fix_payload;
 };
 
 const char* ToString(ProblemSeverity severity);

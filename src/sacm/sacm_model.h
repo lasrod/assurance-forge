@@ -19,7 +19,9 @@
 //                                AssertedEvidence (11.15), AssertedContext
 //                                (11.16). Counter-relationships via the
 //                                inherited isCounter flag (11.13).
-//   - Terminology (minimal):     TerminologyPackage (10.4), Expression (10.10).
+//   - Terminology (minimal):     TerminologyPackage (10.4), Term (10.7),
+//                                ExpressionElement.value (10.11), Expression (10.10),
+//                                Category (10.8).
 //   - Artifacts (minimal):       ArtifactPackage (12.2), Artifact (12.7).
 //   - Common base attributes:    gid, isCitation, isAbstract, citedElement,
 //                                abstractForm (SACMElement, clause 8.2).
@@ -33,8 +35,8 @@
 //   - AssertedArtifactSupport (11.17), AssertedArtifactContext (11.18).
 //   - Full Artifact metamodel: Property, Event, Resource, Activity, Technique,
 //     Participant, ArtifactAssetRelationship (12.8 - 12.14).
-//   - Full Terminology metamodel: Term, Category, ExpressionElement,
-//     TerminologyAsset, externalReference, origin (10.7 - 10.11).
+//   - Full Terminology metamodel: TerminologyAsset and full
+//     externalReference/origin typing (10.7 - 10.11).
 //   - UtilityElement attachments: Note, TaggedValue, ImplementationConstraint
 //     (8.7 - 8.12).
 //   - SACM UML Profile (Annex F).
@@ -115,10 +117,23 @@ struct Expression : SacmElement {
     std::string value;
 };
 
+// Term (10.7): a terminology asset with a concrete expression value.
+// Definitions are stored using the inherited SacmElement::description fields.
+struct Term : Expression {
+    std::string externalReference;
+    std::string origin;
+    std::vector<std::string> category_refs;
+};
+
+// Category (10.8): classifies terminology elements such as terms.
+struct Category : SacmElement {};
+
 // TerminologyPackage (10.4): container of terminology elements.
-// Only Expression is currently modeled; Term/Category/Group are TODO.
+// Legacy Expression rows are preserved for import/round-trip compatibility.
 struct TerminologyPackage : SacmElement {
+    std::vector<Category> categories;
     std::vector<Expression> expressions;
+    std::vector<Term> terms;
 };
 
 // ===== Artifacts (SACM clause 12) =====
@@ -185,6 +200,7 @@ struct AssertedEvidence : AssertedRelationship {};
 // ===== Argument package (SACM clause 11.4) =====
 
 struct ArgumentPackage : SacmElement {
+    std::vector<TerminologyPackage> terminologyPackages;
     std::vector<Claim> claims;
     std::vector<ArgumentReasoning> argumentReasonings;
     std::vector<ArtifactReference> artifactReferences;

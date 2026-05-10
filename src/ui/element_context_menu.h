@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/element_factory.h"
+#include "core/terminology_package_service.h"
 #include "parser/xml_parser.h"
 
 #include <functional>
@@ -14,6 +15,17 @@ struct ElementContextActions {
     std::function<void(core::RemoveMode)> remove_selected;
     std::function<void()> render_ai_review_menu;
     std::function<void(const char*)> not_implemented;
+    std::function<void(const core::TerminologyPackageRef&, const core::TerminologyTermRef&)> open_terminology_term;
+    std::function<void(const core::TerminologyPackageRef&, const core::TerminologyTermRef&)> edit_terminology_term;
+    std::function<void(const std::string& element_id, const std::string& term_value)> define_terminology_term;
+    std::function<void(
+        const std::string& element_id, const core::TerminologyPackageRef&, const core::TerminologyTermRef&)>
+        add_terminology_term_as_context;
+    std::function<void(
+        const std::string& element_id, const core::TerminologyPackageRef&, const core::TerminologyTermRef&)>
+        add_visible_terminology_term_context;
+    std::function<void(const core::TerminologyPackageRef&, const core::TerminologyTermRef&)> find_terminology_usages;
+    std::function<void(const std::string& element_id, const std::string& term_value)> change_terminology_meaning;
 };
 
 void RenderAddElementMenu(const ElementContextActions& actions);

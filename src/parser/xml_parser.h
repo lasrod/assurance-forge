@@ -10,6 +10,7 @@ namespace parser {
 // Represents a SACM element (claim, strategy, evidence, etc.)
 struct SacmElement {
     std::string id;
+    std::string gid;
     std::string name;
     std::string type; // "claim", "argumentreasoning", "artifact", etc. (lowercased local-name)
     std::string content;

@@ -1,0 +1,52 @@
+#pragma once
+
+#include "core/terminology_package_service.h"
+#include "sacm/sacm_model.h"
+
+#include <cstddef>
+#include <filesystem>
+#include <functional>
+#include <string>
+#include <vector>
+
+namespace ui::panels {
+
+struct TerminologyPackagePanelModel {
+    const sacm::TerminologyPackage* package = nullptr;
+    std::filesystem::path source_file_path;
+    char* name_buffer = nullptr;
+    std::size_t name_buffer_size = 0;
+    char* description_buffer = nullptr;
+    std::size_t description_buffer_size = 0;
+    bool can_delete = false;
+    std::string delete_block_reason;
+    core::TerminologyTermRef selected_term_ref;
+    core::TerminologyCategoryRef selected_category_ref;
+    char* search_buffer = nullptr;
+    std::size_t search_buffer_size = 0;
+    char* category_filter_buffer = nullptr;
+    std::size_t category_filter_buffer_size = 0;
+    std::vector<core::TerminologyTermIssue> term_issues;
+    std::vector<core::TerminologyTermUsageSummary> term_usage_summaries;
+    std::vector<core::TerminologyCategoryUsageSummary> category_usage_summaries;
+};
+
+struct TerminologyPackagePanelCallbacks {
+    std::function<void()> apply_changes;
+    std::function<void()> delete_package;
+    std::function<void()> add_term;
+    std::function<void(const core::TerminologyTermRef&)> select_term;
+    std::function<void(const core::TerminologyTermRef&)> edit_term;
+    std::function<void(const core::TerminologyTermRef&)> delete_term;
+    std::function<void(const core::TerminologyTermRef&)> find_term_usages;
+    std::function<void(const std::string&)> set_category_filter;
+    std::function<void()> add_category;
+    std::function<void(const core::TerminologyCategoryRef&)> select_category;
+    std::function<void(const core::TerminologyCategoryRef&)> edit_category;
+    std::function<void(const core::TerminologyCategoryRef&)> delete_category;
+    std::function<void()> seed_recommended_categories;
+};
+
+void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model, const TerminologyPackagePanelCallbacks& callbacks);
+
+} // namespace ui::panels

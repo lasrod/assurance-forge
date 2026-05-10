@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cctype>
 #include <pugixml.hpp>
+#include <sstream>
+#include <utility>
 
 // =============================================================================
 // SACM XML parser
@@ -29,6 +31,8 @@
 //   Claim                 (11.11)  content + assertionDeclaration
 //   ArgumentReasoning     (11.12)  content
 //   ArtifactReference     (11.9)   referencedArtifact (id)
+//   Term                  (10.7)   name, description, value,
+//                                  externalReference, origin, category refs
 //   AssertedRelationship  (11.13)  source*, target*, isCounter,
 //                                   assertionDeclaration
 //   AssertedInference     (11.14)  + reasoning (id of ArgumentReasoning)
@@ -77,6 +81,23 @@ static std::string read_id_ref(pugi::xml_node node) {
     if (!ref.empty() && ref[0] == '#')
         ref = ref.substr(1);
     return ref;
+}
+
+static void append_ref_if_present(std::vector<std::string>& refs, std::string ref) {
+    if (!ref.empty() && ref[0] == '#')
+        ref = ref.substr(1);
+    if (!ref.empty() && std::find(refs.begin(), refs.end(), ref) == refs.end())
+        refs.push_back(std::move(ref));
+}
+
+static void append_ref_list(std::vector<std::string>& refs, const std::string& raw) {
+    std::string normalized = raw;
+    std::replace(normalized.begin(), normalized.end(), ',', ' ');
+    std::stringstream stream(normalized);
+    std::string item;
+    while (stream >> item) {
+        append_ref_if_present(refs, item);
+    }
 }
 
 // Read an XML attribute as a boolean. SACM uses "true" / "false" strings; any
@@ -235,11 +256,53 @@ static Expression parse_expression(pugi::xml_node node) {
     return expr;
 }
 
+static Term parse_term(pugi::xml_node node) {
+    Term term;
+    parse_element_base(node, term);
+    term.value = node.attribute("value").as_string();
+    term.externalReference = node.attribute("externalReference").as_string();
+    term.origin = node.attribute("origin").as_string();
+
+    append_ref_list(term.category_refs, node.attribute("category").as_string());
+    append_ref_list(term.category_refs, node.attribute("categories").as_string());
+
+    for (auto child : node.children()) {
+        const std::string ln = local_name(child.name());
+        if (ln == "externalreference" && term.externalReference.empty()) {
+            term.externalReference = read_id_ref(child);
+            if (term.externalReference.empty())
+                term.externalReference = child.text().as_string();
+        } else if (ln == "origin" && term.origin.empty()) {
+            term.origin = read_id_ref(child);
+            if (term.origin.empty())
+                term.origin = child.text().as_string();
+        } else if (ln == "category" || ln == "categoryref") {
+            std::string ref = read_id_ref(child);
+            if (ref.empty())
+                ref = child.text().as_string();
+            append_ref_if_present(term.category_refs, ref);
+        }
+    }
+
+    return term;
+}
+
+static Category parse_category(pugi::xml_node node) {
+    Category category;
+    parse_element_base(node, category);
+    return category;
+}
+
 static TerminologyPackage parse_terminology_package(pugi::xml_node node) {
     TerminologyPackage pkg;
     parse_element_base(node, pkg);
     for (auto child : node.children()) {
-        if (local_name(child.name()) == "expression") {
+        const std::string child_name = local_name(child.name());
+        if (child_name == "category") {
+            pkg.categories.push_back(parse_category(child));
+        } else if (child_name == "term") {
+            pkg.terms.push_back(parse_term(child));
+        } else if (child_name == "expression") {
             pkg.expressions.push_back(parse_expression(child));
         }
     }
@@ -342,6 +405,8 @@ static ArgumentPackage parse_argument_package(pugi::xml_node node) {
             pkg.claims.push_back(parse_claim(child));
         } else if (ln == "argumentreasoning") {
             pkg.argumentReasonings.push_back(parse_argument_reasoning(child));
+        } else if (ln == "terminologypackage") {
+            pkg.terminologyPackages.push_back(parse_terminology_package(child));
         } else if (ln == "artifactreference") {
             pkg.artifactReferences.push_back(parse_artifact_reference(child));
         } else if (ln == "assertedinference") {
@@ -389,10 +454,11 @@ static void detect_sacm_namespace(pugi::xml_node root, std::string& out_prefix, 
 static SacmParseResult parse_document(pugi::xml_document& doc) {
     SacmParseResult result;
 
-    // Find the root AssuranceCasePackage element; namespace prefix may vary.
     pugi::xml_node root;
     for (auto child : doc.children()) {
-        if (local_name(child.name()) == "assurancecasepackage") {
+        const std::string ln = local_name(child.name());
+        if (ln == "assurancecasepackage" || ln == "argumentpackage" || ln == "artifactpackage" ||
+            ln == "terminologypackage") {
             root = child;
             break;
         }
@@ -405,6 +471,23 @@ static SacmParseResult parse_document(pugi::xml_document& doc) {
     AssuranceCasePackage& pkg = result.package;
     parse_element_base(root, pkg);
     detect_sacm_namespace(root, pkg.namespace_prefix, pkg.namespace_uri);
+
+    const std::string root_ln = local_name(root.name());
+    if (root_ln == "argumentpackage") {
+        pkg.argumentPackages.push_back(parse_argument_package(root));
+        result.success = true;
+        return result;
+    }
+    if (root_ln == "artifactpackage") {
+        pkg.artifactPackages.push_back(parse_artifact_package(root));
+        result.success = true;
+        return result;
+    }
+    if (root_ln == "terminologypackage") {
+        pkg.terminologyPackages.push_back(parse_terminology_package(root));
+        result.success = true;
+        return result;
+    }
 
     for (auto child : root.children()) {
         const std::string ln = local_name(child.name());

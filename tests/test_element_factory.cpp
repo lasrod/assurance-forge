@@ -1,5 +1,6 @@
 #include "core/assurance_tree.h"
 #include "core/element_factory.h"
+#include "core/terminology_package_service.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_model.h"
 
@@ -47,6 +48,38 @@ bool SacmHasClaim(const sacm::AssuranceCasePackage& pkg, const std::string& id) 
     return false;
 }
 
+const parser::SacmElement* FindParserElement(const parser::AssuranceCase& ac, const std::string& id) {
+    for (const auto& element : ac.elements) {
+        if (element.id == id)
+            return &element;
+    }
+    return nullptr;
+}
+
+bool SacmHasArtifactReference(const sacm::AssuranceCasePackage& pkg, const std::string& id) {
+    for (const auto& ap : pkg.argumentPackages)
+        for (const auto& artifact_reference : ap.artifactReferences)
+            if (artifact_reference.id == id)
+                return true;
+    return false;
+}
+
+bool SacmHasContextRelation(const sacm::AssuranceCasePackage& pkg,
+                            const std::string& source_id,
+                            const std::string& target_id) {
+    for (const auto& ap : pkg.argumentPackages) {
+        for (const auto& context : ap.assertedContexts) {
+            const bool has_source =
+                std::find(context.sources.begin(), context.sources.end(), source_id) != context.sources.end();
+            const bool has_target =
+                std::find(context.targets.begin(), context.targets.end(), target_id) != context.targets.end();
+            if (has_source && has_target)
+                return true;
+        }
+    }
+    return false;
+}
+
 } // namespace
 
 TEST(ElementFactoryAdd, AddTopGoalCreatesClaimInParserAndSacm) {
@@ -60,6 +93,27 @@ TEST(ElementFactoryAdd, AddTopGoalCreatesClaimInParserAndSacm) {
 
     EXPECT_TRUE(ParserHasId(ac, new_id));
     EXPECT_TRUE(SacmHasClaim(pkg, new_id));
+}
+
+TEST(ElementFactoryAdd, AddContextCreatesArtifactReferenceAndAssertedContext) {
+    auto mc = MakeRootGoalCase();
+
+    std::string context_id;
+    std::string err;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1", core::NewElementKind::Context, context_id, err)) << err;
+
+    const parser::SacmElement* context = FindParserElement(mc.ac, context_id);
+    ASSERT_NE(context, nullptr);
+    EXPECT_EQ(context->type, "artifactreference");
+    EXPECT_FALSE(SacmHasClaim(mc.pkg, context_id));
+    EXPECT_TRUE(SacmHasArtifactReference(mc.pkg, context_id));
+    EXPECT_TRUE(SacmHasContextRelation(mc.pkg, context_id, "G1"));
+
+    core::AssuranceTree tree = core::AssuranceTree::Build(mc.ac);
+    ASSERT_NE(tree.root, nullptr);
+    ASSERT_EQ(tree.root->group2_attachments.size(), 1u);
+    EXPECT_EQ(tree.root->group2_attachments.front()->id, context_id);
+    EXPECT_EQ(tree.root->group2_attachments.front()->role, core::NodeRole::Context);
 }
 
 TEST(ElementFactoryRemove, RemoveLeafElement) {
@@ -472,6 +526,63 @@ TEST(ElementFactoryRemove, RemovalPlannerUsesFirstExistingTargetRef) {
     EXPECT_TRUE(plan.count("CL_TOP"));
     EXPECT_TRUE(plan.count("AR_1"));
     EXPECT_TRUE(plan.count("CL_SUB"));
+}
+
+TEST(ElementFactoryRemove, RemovingVisibleTerminologyContextKeepsGlossaryTerm) {
+    parser::AssuranceCase ac;
+    parser::SacmElement goal;
+    goal.id = "G1";
+    goal.type = "claim";
+    ac.elements.push_back(goal);
+    parser::SacmElement term_context;
+    term_context.id = "TERM_VISIBLE";
+    term_context.name = "ODD";
+    term_context.type = "artifactreference";
+    ac.elements.push_back(term_context);
+    parser::SacmElement relation;
+    relation.id = "AC_VISIBLE";
+    relation.type = "assertedcontext";
+    relation.description = core::kVisibleTerminologyContextMarker;
+    relation.source_refs = {"TERM_VISIBLE"};
+    relation.target_refs = {"G1"};
+    ac.elements.push_back(relation);
+
+    sacm::AssuranceCasePackage package;
+    sacm::TerminologyPackage terminology_package;
+    terminology_package.id = "TP1";
+    sacm::Term term;
+    term.id = "TERM_ODD";
+    term.value = "ODD";
+    terminology_package.terms.push_back(term);
+    package.terminologyPackages.push_back(terminology_package);
+    sacm::ArgumentPackage argument_package;
+    sacm::Claim claim;
+    claim.id = "G1";
+    argument_package.claims.push_back(claim);
+    sacm::ArtifactReference artifact_reference;
+    artifact_reference.id = "TERM_VISIBLE";
+    artifact_reference.name = "ODD";
+    artifact_reference.referencedArtifact = "TERM_ODD";
+    argument_package.artifactReferences.push_back(artifact_reference);
+    sacm::AssertedContext context;
+    context.id = "AC_VISIBLE";
+    context.description = core::kVisibleTerminologyContextMarker;
+    context.sources = {"TERM_VISIBLE"};
+    context.targets = {"G1"};
+    argument_package.assertedContexts.push_back(context);
+    package.argumentPackages.push_back(argument_package);
+
+    std::string error;
+    ASSERT_TRUE(core::RemoveElement(ac, &package, "TERM_VISIBLE", core::RemoveMode::NodeOnly, error)) << error;
+
+    EXPECT_FALSE(ParserHasId(ac, "TERM_VISIBLE"));
+    EXPECT_FALSE(ParserHasId(ac, "AC_VISIBLE"));
+    ASSERT_EQ(package.terminologyPackages.size(), 1u);
+    ASSERT_EQ(package.terminologyPackages.front().terms.size(), 1u);
+    EXPECT_EQ(package.terminologyPackages.front().terms.front().id, "TERM_ODD");
+    ASSERT_EQ(package.argumentPackages.size(), 1u);
+    EXPECT_TRUE(package.argumentPackages.front().artifactReferences.empty());
+    EXPECT_TRUE(package.argumentPackages.front().assertedContexts.empty());
 }
 
 TEST(ElementFactoryRemove, RemovalPlannerIgnoresDanglingReasoningAndSourceRefs) {

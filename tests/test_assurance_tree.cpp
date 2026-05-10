@@ -127,7 +127,6 @@ TEST(AssuranceTreeTest, EvidenceIsSolutionGroup1Leaf) {
 
     auto tree = build_tree_from_xml(xml);
     ASSERT_NE(tree.root, nullptr);
-    // Evidence should be Group 1 child (Solution)
     ASSERT_EQ(tree.root->group1_children.size(), 1);
     EXPECT_EQ(tree.root->group1_children[0]->id, "ev_1");
     EXPECT_EQ(tree.root->group1_children[0]->role, NodeRole::Solution);
@@ -174,7 +173,6 @@ TEST(AssuranceTreeTest, OrphanedElementsAtRootLevel) {
     auto tree = build_tree_from_xml(xml);
     ASSERT_NE(tree.root, nullptr);
     EXPECT_EQ(tree.root->id, "cl_top");
-    // orphan_1 should be in orphans list
     ASSERT_EQ(tree.orphans.size(), 1);
     EXPECT_EQ(tree.orphans[0]->id, "orphan_1");
 }

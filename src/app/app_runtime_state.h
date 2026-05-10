@@ -15,11 +15,17 @@
 #include "core/app_state.h"
 #include "core/assurance_tree.h"
 #include "core/problems/problems_manager.h"
+#include "core/terminology_package_service.h"
 #include "core/tree_editing.h"
+#include "sacm/sacm_package_tree.h"
 
+#include <filesystem>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
+#include <unordered_set>
+#include <vector>
 
 namespace app {
 
@@ -66,6 +72,55 @@ struct AppRuntimeState {
     bool show_gsn_tab = true;
     bool show_cse_tab = false;
     bool show_evidence_tab = false;
+    bool show_package_details_tab = false;
+    bool show_terminology_package_tab = false;
+    std::map<std::string, sacm::SacmPackageTreeResult> sacm_package_tree_cache;
+    std::optional<sacm::SacmPackageTreeNode> selected_package_node;
+    std::filesystem::path selected_package_file_path;
+    core::TerminologyPackageRef selected_terminology_package_ref;
+    std::filesystem::path selected_terminology_package_file_path;
+    char terminology_package_name_buf[256] = {};
+    char terminology_package_description_buf[2048] = {};
+    bool show_create_terminology_package_modal = false;
+    std::optional<core::ProjectFileEntry> pending_terminology_package_parent_entry;
+    char new_terminology_package_name_buf[256] = {};
+    char new_terminology_package_description_buf[2048] = {};
+    bool show_delete_terminology_package_modal = false;
+    core::TerminologyTermRef selected_terminology_term_ref;
+    core::TerminologyCategoryRef selected_terminology_category_ref;
+    bool terminology_usages_active = false;
+    bool focus_terminology_usages_tab = false;
+    core::TerminologyPackageRef usage_search_package_ref;
+    core::TerminologyTermRef usage_search_term_ref;
+    std::string usage_search_term_value;
+    std::string usage_search_term_name;
+    std::string usage_search_message;
+    std::string usage_search_error;
+    std::vector<core::TerminologyTermUsage> terminology_usage_results;
+    int selected_terminology_usage_index = -1;
+    char terminology_filter_buf[256] = {};
+    char terminology_category_filter_buf[128] = {};
+    bool show_terminology_term_editor_modal = false;
+    bool editing_existing_terminology_term = false;
+    bool show_quick_define_term_modal = false;
+    std::string quick_define_element_id;
+    std::string quick_define_source_text;
+    core::TerminologyPackageRef quick_define_target_package_ref;
+    std::unordered_set<std::string> ignored_terminology_suggestion_keys;
+    bool show_delete_terminology_term_modal = false;
+    int pending_delete_terminology_term_usage_count = 0;
+    bool show_terminology_category_editor_modal = false;
+    bool editing_existing_terminology_category = false;
+    bool show_delete_terminology_category_modal = false;
+    int pending_delete_terminology_category_term_count = 0;
+    char term_value_buf[256] = {};
+    char term_name_buf[256] = {};
+    char term_definition_buf[2048] = {};
+    char term_categories_buf[512] = {};
+    char term_external_reference_buf[512] = {};
+    char term_origin_buf[512] = {};
+    char category_name_buf[256] = {};
+    char category_description_buf[2048] = {};
 
     float left_ratio = 0.20f;
     float right_ratio = 0.20f;

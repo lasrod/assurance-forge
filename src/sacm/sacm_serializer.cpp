@@ -128,10 +128,40 @@ static void serialize_expression(pugi::xml_node parent, const Expression& e) {
         node.append_attribute("value") = e.value.c_str();
 }
 
+static void serialize_term(pugi::xml_node parent, const Term& term) {
+    auto node = parent.append_child("term");
+    set_base(node, term);
+    if (!term.value.empty())
+        node.append_attribute("value") = term.value.c_str();
+    if (!term.externalReference.empty())
+        node.append_attribute("externalReference") = term.externalReference.c_str();
+    if (!term.origin.empty())
+        node.append_attribute("origin") = term.origin.c_str();
+    add_description(node, term.description, term.description_ml);
+    for (const auto& category_ref : term.category_refs) {
+        if (category_ref.empty())
+            continue;
+        auto category_node = node.append_child("category");
+        category_node.append_attribute("href") = ("#" + category_ref).c_str();
+    }
+}
+
+static void serialize_category(pugi::xml_node parent, const Category& category) {
+    auto node = parent.append_child("category");
+    set_base(node, category);
+    add_description(node, category.description, category.description_ml);
+}
+
 static void serialize_terminology_package(pugi::xml_node parent, const TerminologyPackage& tp) {
     auto node = parent.append_child("terminologyPackage");
     set_base(node, tp);
     add_description(node, tp.description, tp.description_ml);
+    for (const auto& category : tp.categories) {
+        serialize_category(node, category);
+    }
+    for (const auto& term : tp.terms) {
+        serialize_term(node, term);
+    }
     for (const auto& e : tp.expressions) {
         serialize_expression(node, e);
     }
@@ -221,6 +251,8 @@ static void serialize_argument_package(pugi::xml_node parent, const ArgumentPack
     set_base(node, pkg);
     add_description(node, pkg.description, pkg.description_ml);
 
+    for (const auto& tp : pkg.terminologyPackages)
+        serialize_terminology_package(node, tp);
     for (const auto& c : pkg.claims)
         serialize_claim(node, c);
     for (const auto& ar : pkg.argumentReasonings)
