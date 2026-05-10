@@ -247,6 +247,7 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/app/areas/inspector_area.cpp
     src/app/areas/modal_host.cpp
     src/app/areas/problems_area.cpp
+    src/app/areas/proposal_editor_area.cpp
     src/app/areas/project_explorer_area.cpp
     src/app/areas/review_panel_area.cpp
     src/app/areas/term_usages_area.cpp
@@ -264,6 +265,8 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/app/project_workflow.cpp
     src/app/recent_projects.cpp
     src/app/controllers/review_controller.cpp
+    src/app/sacm_argument_sync.cpp
+    src/app/terminology_problem_sync.cpp
     src/parser/guidelines_parser.cpp
     src/parser/sccg_dist_parser.cpp
     ${ASSURANCE_FORGE_SHARED_SOURCES}

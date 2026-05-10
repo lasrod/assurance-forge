@@ -1,10 +1,12 @@
 #pragma once
 
+#include "app/app_events.h"
 #include "core/element_factory.h"
 #include "core/reviews/review_item.h"
 #include "core/tree_editing.h"
 
 #include <string>
+#include <vector>
 
 namespace app { struct AppRuntimeState; }
 
@@ -21,6 +23,8 @@ public:
     bool BeginEditById(const std::string& proposal_id);
     bool PreviewById(const std::string& proposal_id);
     bool SaveActive(const core::reviews::ReviewItem& item);
+    bool ApplyReviewProposal(const core::reviews::ReviewItem& item);
+    void CreateAiGenerated(const std::vector<AiReviewProposalSuggestion>& suggestions);
     void CancelActive();
     bool AddChildToSelected(core::NewElementKind kind);
     bool AddTopGoal();

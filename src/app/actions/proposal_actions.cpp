@@ -2,6 +2,8 @@
 
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
+#include "app/project_workflow.h"
+#include "app/sacm_argument_sync.h"
 #include "core/project_service.h"
 #include "core/reviews/review_proposal_patch_service.h"
 #include "parser/xml_parser.h"
@@ -10,6 +12,11 @@
 #include "ui/ui_state.h"
 
 #include <algorithm>
+#include <chrono>
+#include <cctype>
+#include <ctime>
+#include <filesystem>
+#include <iomanip>
 #include <map>
 #include <optional>
 #include <sstream>
@@ -25,11 +32,68 @@ void SetStatus(AppRuntimeState& state, const std::string& message) {
     state.events.Emit(StatusMessageEvent{message});
 }
 
+std::string TrimWhitespace(const std::string& value) {
+    auto begin = value.begin();
+    while (begin != value.end() && std::isspace(static_cast<unsigned char>(*begin)))
+        ++begin;
+    auto end = value.end();
+    while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1))))
+        --end;
+    return std::string(begin, end);
+}
+
+std::string NowUtcString() {
+    auto now = std::chrono::system_clock::now();
+    std::time_t time = std::chrono::system_clock::to_time_t(now);
+    std::tm utc{};
+#if defined(_WIN32)
+    if (gmtime_s(&utc, &time) != 0)
+        return "1970-01-01T00:00:00Z";
+#else
+    if (!gmtime_r(&time, &utc))
+        return "1970-01-01T00:00:00Z";
+#endif
+    std::ostringstream out;
+    out << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
+    return out.str();
+}
+
+std::string GenerateReviewProposalId() {
+    static unsigned long long counter = 0;
+    auto ticks = std::chrono::system_clock::now().time_since_epoch().count();
+    std::ostringstream out;
+    out << "proposal-" << std::hex << ticks << "-" << ++counter;
+    return out.str();
+}
+
+std::string TruncateForProblemMessage(const std::string& value, size_t limit = 400) {
+    if (value.size() <= limit)
+        return value;
+    return value.substr(0, limit) + "...";
+}
+
 const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model, const std::string& element_id) {
     auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
         return element.id == element_id || element.gid == element_id;
     });
     return found == model.elements.end() ? nullptr : &*found;
+}
+
+core::reviews::ReviewProposal BuildDraftReviewProposal(const core::reviews::ReviewItem& item,
+                                                       const parser::AssuranceCase& model,
+                                                       const parser::SacmElement& anchor) {
+    core::reviews::ReviewProposal proposal;
+    proposal.id = GenerateReviewProposalId();
+    proposal.review_item_id = item.id;
+    proposal.title = item.title.empty() ? "Proposed change" : item.title;
+    proposal.summary = item.message.empty() ? "Draft proposed change." : TruncateForProblemMessage(item.message, 180);
+    proposal.author_name = "Manual reviewer";
+    proposal.created_utc = NowUtcString();
+    proposal.anchor_element_id = anchor.id;
+    proposal.affected_existing_element_ids = {anchor.id};
+    proposal.base_model_hash = core::reviews::ComputeModelSemanticHash(model);
+    proposal.base_element_hashes[anchor.id] = core::reviews::ComputeElementSemanticHash(anchor);
+    return proposal;
 }
 
 core::reviews::PatchOperationType CreateOperationFor(core::NewElementKind kind) {
@@ -287,6 +351,52 @@ void ClearProposalHighlightState(ui::UiState& ui_state) {
     ui_state.marked_for_removal.clear();
     ui_state.center_on_marked = false;
     ui_state.dim_non_proposal_nodes = false;
+}
+
+bool DeleteProposalPatchFile(AppRuntimeState& state, const std::string& proposal_id, std::string& error) {
+    if (!state.app_state.current_project.has_value()) {
+        error = "Open a project before deleting proposed changes.";
+        return false;
+    }
+
+    core::AssuranceProject& project = state.app_state.current_project.value();
+    const std::filesystem::path relative_path = ReviewProposalRelativePath(proposal_id);
+    if (ProjectTracksFile(project, relative_path)) {
+        return core::ProjectService::RemoveTrackedFile(project, relative_path, true, error);
+    }
+    return state.proposal_controller->manager.DeleteProposal(proposal_id, error);
+}
+
+bool SaveProject(AppRuntimeState& state) {
+    if (!state.app_state.current_project.has_value()) {
+        state.app_state.status_message = "Create or open a project first.";
+        return false;
+    }
+
+    if (state.review_controller->IsDirty()) {
+        core::AssuranceProject& project = state.app_state.current_project.value();
+        std::string error;
+        if (!state.review_controller->SaveIfDirty(project, error)) {
+            state.app_state.status_message = "Review item save failed: " + error;
+            return false;
+        }
+    }
+
+    if (state.document_dirty) {
+        if (!state.app_state.save_project())
+            return false;
+        state.document_dirty = false;
+        state.app_state.has_unsaved_changes = state.review_controller->IsDirty();
+        return true;
+    }
+
+    if (state.app_state.has_unsaved_changes) {
+        state.app_state.has_unsaved_changes = false;
+        state.app_state.status_message = "Project saved: " + state.app_state.current_project->name;
+        return true;
+    }
+
+    return state.app_state.save_project();
 }
 
 void ApplyProposalPreviewVisualState(ui::UiState& ui_state,
@@ -567,6 +677,142 @@ bool ProposalActions::SaveActive(const core::reviews::ReviewItem& item) {
     core::ProjectService::RefreshFileStatus(project);
     SetStatus(state_, "Saved proposal " + saved_id + ".");
     return true;
+}
+
+bool ProposalActions::ApplyReviewProposal(const core::reviews::ReviewItem& item) {
+    if (state_.proposal_controller->creator_active) {
+        SetStatus(state_, "Save or discard the active proposal before applying another proposal.");
+        return false;
+    }
+    if (!item.proposal_id.has_value()) {
+        SetStatus(state_, "This review comment has no proposed change to apply.");
+        return false;
+    }
+    if (!state_.app_state.current_project.has_value() || !state_.app_state.loaded_case.has_value()) {
+        SetStatus(state_, "Open a project and SACM file before applying proposed changes.");
+        return false;
+    }
+
+    std::string error;
+    std::optional<core::reviews::ReviewProposal> proposal =
+        state_.proposal_controller->manager.LoadProposal(item.proposal_id.value(), error);
+    if (!proposal.has_value()) {
+        SetStatus(state_, "Proposal apply failed: " + error);
+        return false;
+    }
+
+    core::reviews::ProposalValidityResult validity =
+        core::reviews::EvaluateReviewProposalValidity(*proposal, state_.app_state.loaded_case.value());
+    if (validity.validity != core::reviews::ProposalValidity::Valid) {
+        SetStatus(state_, "Proposal is broken: " + validity.reason);
+        return false;
+    }
+
+    core::reviews::ReviewProposalPatchService patch_service;
+    core::reviews::ApplyProposalResult apply_result =
+        patch_service.ApplyProposal(*proposal, state_.app_state.loaded_case.value());
+    if (!apply_result.success) {
+        SetStatus(state_, "Proposal apply failed: " + apply_result.error);
+        return false;
+    }
+
+    state_.proposal_controller->ClosePreviewIfOpen(item.proposal_id.value());
+    ClearProposalHighlightState(ui::GetUiState());
+    if (!state_.app_state.sacm_package.has_value())
+        state_.app_state.sacm_package.emplace();
+    RebuildSacmArgumentPackageFromParser(state_.app_state.loaded_case.value(), state_.app_state.sacm_package.value());
+    state_.document_dirty = true;
+    state_.app_state.mark_dirty();
+
+    core::AssuranceProject& project = state_.app_state.current_project.value();
+    if (!DeleteProposalPatchFile(state_, item.proposal_id.value(), error)) {
+        SetStatus(state_, "Proposal applied in memory, but proposal file removal failed: " + error);
+        return false;
+    }
+
+    const std::string applied_utc = NowUtcString();
+    core::reviews::ReviewItem updated = item;
+    updated.proposal_id.reset();
+    updated.status = core::reviews::ReviewItemStatus::Resolved;
+    updated.applied_note = "Proposal applied at " + applied_utc + ".";
+    updated.updated_utc = applied_utc;
+    if (!state_.review_controller->AddOrUpdateItem(std::move(updated))) {
+        SetStatus(state_, "Proposal applied, but review item update failed.");
+        return false;
+    }
+
+    if (!SaveProject(state_)) {
+        SetStatus(state_, "Proposal applied, but project save failed: " + state_.app_state.status_message);
+        return false;
+    }
+
+    core::ProjectService::RefreshFileStatus(project);
+    state_.tree_needs_rebuild = true;
+    SetStatus(state_, "Applied proposal " + proposal->id + ".");
+    return true;
+}
+
+void ProposalActions::CreateAiGenerated(const std::vector<AiReviewProposalSuggestion>& suggestions) {
+    if (suggestions.empty())
+        return;
+    if (!state_.app_state.current_project.has_value() || !state_.app_state.loaded_case.has_value()) {
+        SetStatus(state_, "AI found proposed wording, but a project and SACM file must be open to save proposals.");
+        return;
+    }
+
+    core::AssuranceProject& project = state_.app_state.current_project.value();
+    const parser::AssuranceCase& model = state_.app_state.loaded_case.value();
+    size_t saved_count = 0;
+    for (const AiReviewProposalSuggestion& suggestion : suggestions) {
+        const std::string suggested_text = TrimWhitespace(suggestion.suggested_text);
+        if (suggested_text.empty())
+            continue;
+
+        std::optional<core::reviews::ReviewItem> item = state_.review_controller->GetItemById(suggestion.review_item_id);
+        if (!item.has_value() || item->proposal_id.has_value())
+            continue;
+
+        const parser::SacmElement* anchor = FindParserElement(model, item->element_id);
+        if (!anchor || anchor->type != "claim")
+            continue;
+
+        const std::string current_text = anchor->content.empty() ? anchor->description : anchor->content;
+        if (TrimWhitespace(current_text) == suggested_text)
+            continue;
+
+        core::reviews::ReviewProposal proposal = BuildDraftReviewProposal(*item, model, *anchor);
+        proposal.author_name = "AI Review";
+        proposal.summary = "AI suggested replacement wording for " + anchor->id + ".";
+
+        core::reviews::PatchOperation operation;
+        operation.type = core::reviews::PatchOperationType::UpdateElementText;
+        operation.element = core::reviews::ElementRef{anchor->id, std::nullopt};
+        operation.field = "content";
+        operation.old_value = current_text;
+        operation.new_value = suggested_text;
+        proposal.operations.push_back(std::move(operation));
+
+        core::ProjectFileEntry entry;
+        std::string error;
+        if (!core::ProjectService::SaveReviewProposalFile(
+                project, proposal.id, core::reviews::SerializeReviewProposal(proposal), entry, error)) {
+            SetStatus(state_, "AI proposal save failed: " + error);
+            continue;
+        }
+
+        if (!state_.review_controller->SetProposal(item->id, proposal.id)) {
+            std::string cleanup_error;
+            core::ProjectService::RemoveTrackedFile(project, entry.relativePath, true, cleanup_error);
+            SetStatus(state_, "AI proposal link update failed.");
+            continue;
+        }
+        ++saved_count;
+    }
+
+    if (saved_count > 0) {
+        core::ProjectService::RefreshFileStatus(project);
+        SetStatus(state_, "AI generated " + std::to_string(saved_count) + " proposed change(s). Review before applying.");
+    }
 }
 
 void ProposalActions::CancelActive() {

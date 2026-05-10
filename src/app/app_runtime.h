@@ -75,7 +75,6 @@ private:
     void ScanDirectory();
     void RenderSacmViewerPanel(float left_w, float sacm_h, float top_y);
     areas::WorkbenchAreaCallbacks MakeWorkbenchAreaCallbacks();
-    void RenderProposalElementEditor();
 
     void BeginCreateProject();
     void BeginOpenProject();
@@ -141,8 +140,6 @@ private:
     bool BeginEditProposalById(const std::string& proposal_id);
     bool PreviewProposalById(const std::string& proposal_id);
     bool SaveActiveProposal(const core::reviews::ReviewItem& item);
-    void ApplyReviewProposal(const core::reviews::ReviewItem& item);
-    void CreateAiGeneratedProposals(const std::vector<AiReviewProposalSuggestion>& suggestions);
     bool SetManualReviewOk(const std::string& element_id, bool manual_ok);
     void CancelActiveProposal();
     bool DeleteProposalPatchFile(const std::string& proposal_id, std::string& error);
