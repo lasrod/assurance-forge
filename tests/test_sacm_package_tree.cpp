@@ -6,7 +6,11 @@
 namespace {
 
 const sacm::SacmPackageTreeNode& OnlyChild(const sacm::SacmPackageTreeNode& node) {
-    EXPECT_EQ(node.children.size(), 1u);
+    if (node.children.size() != 1u) {
+        ADD_FAILURE() << "Expected exactly one child, found " << node.children.size();
+        static const sacm::SacmPackageTreeNode empty_node;
+        return node.children.empty() ? empty_node : node.children.front();
+    }
     return node.children.front();
 }
 

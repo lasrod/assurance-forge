@@ -736,6 +736,7 @@ const char* EditableTextFieldFor(const parser::SacmElement& element) {
 
 void CopyCommonSacmFields(sacm::SacmElement& target, const parser::SacmElement& source) {
     target.id = source.id;
+    target.gid = source.gid;
     target.name = source.name;
     target.description = source.description;
     target.name_ml.texts = source.name_langs;

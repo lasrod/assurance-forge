@@ -47,13 +47,18 @@ TEST(AppStateTest, LoadFileHidesTerminologyArtifactReferencesButKeepsEvidenceSol
   <argumentPackage id="AP" name="AP">
     <claim id="G1" name="Goal" assertionDeclaration="asserted"/>
     <artifactReference id="EV1" name="Evidence"/>
-    <artifactReference id="TERM_CTX" name="ODD Context" referencedArtifact="TERM_ODD"/>
+    <artifactReference id="EV_GID_NAME_COLLISION" name="gid-term-ctx"/>
+    <artifactReference id="TERM_CTX" gid="gid-term-ctx" name="ODD Context" referencedArtifact="TERM_ODD"/>
     <assertedEvidence id="AE1" name="Evidence relation">
       <source ref="EV1"/>
       <target ref="G1"/>
     </assertedEvidence>
+    <assertedEvidence id="AE2" name="Evidence relation with colliding display name">
+      <source ref="EV_GID_NAME_COLLISION"/>
+      <target ref="G1"/>
+    </assertedEvidence>
     <assertedContext id="AC_TERM" name="Terminology relation">
-      <source ref="TERM_CTX"/>
+      <source ref="gid-term-ctx"/>
       <target ref="G1"/>
     </assertedContext>
   </argumentPackage>
@@ -65,11 +70,13 @@ TEST(AppStateTest, LoadFileHidesTerminologyArtifactReferencesButKeepsEvidenceSol
     ASSERT_TRUE(state.sacm_package.has_value());
 
     EXPECT_NE(FindElement(state.loaded_case.value(), "EV1"), nullptr);
+    EXPECT_NE(FindElement(state.loaded_case.value(), "EV_GID_NAME_COLLISION"), nullptr);
     EXPECT_NE(FindElement(state.loaded_case.value(), "AE1"), nullptr);
+    EXPECT_NE(FindElement(state.loaded_case.value(), "AE2"), nullptr);
     EXPECT_EQ(FindElement(state.loaded_case.value(), "TERM_CTX"), nullptr);
     EXPECT_EQ(FindElement(state.loaded_case.value(), "AC_TERM"), nullptr);
     ASSERT_EQ(state.sacm_package->argumentPackages.size(), 1u);
-    EXPECT_EQ(state.sacm_package->argumentPackages.front().artifactReferences.size(), 2u);
+    EXPECT_EQ(state.sacm_package->argumentPackages.front().artifactReferences.size(), 3u);
     EXPECT_EQ(state.sacm_package->argumentPackages.front().assertedContexts.size(), 1u);
 }
 

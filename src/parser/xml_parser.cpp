@@ -174,6 +174,7 @@ void extract_elements_recursive(pugi::xml_node node, std::vector<SacmElement>& e
         if (is_relevant) {
             SacmElement element;
             element.id = child.attribute("id").as_string();
+            element.gid = child.attribute("gid").as_string();
             element.name = child.attribute("name").as_string();
             element.type = local_name;
             element.content = child.attribute("content").as_string();

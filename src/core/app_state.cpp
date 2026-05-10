@@ -76,13 +76,13 @@ void HideTerminologyArtifactReferences(parser::AssuranceCase& model, const sacm:
                            if (element.type == "artifactreference") {
                                return hidden_refs.artifact_reference_refs.find(element.id) !=
                                           hidden_refs.artifact_reference_refs.end() ||
-                                      hidden_refs.artifact_reference_refs.find(element.name) !=
+                                      hidden_refs.artifact_reference_refs.find(element.gid) !=
                                           hidden_refs.artifact_reference_refs.end();
                            }
                            return element.type == "assertedcontext" &&
                                   (hidden_refs.asserted_context_refs.find(element.id) !=
                                        hidden_refs.asserted_context_refs.end() ||
-                                   hidden_refs.asserted_context_refs.find(element.name) !=
+                                   hidden_refs.asserted_context_refs.find(element.gid) !=
                                        hidden_refs.asserted_context_refs.end() ||
                                    ReferencesAny(element.source_refs, hidden_refs.artifact_reference_refs));
                        }),
@@ -99,7 +99,7 @@ std::string TermContextDisplayLabel(const sacm::Term& term) {
 
 parser::SacmElement* FindParserElement(parser::AssuranceCase& model, const std::string& id, const std::string& gid) {
     for (parser::SacmElement& element : model.elements) {
-        if ((!id.empty() && element.id == id) || (!gid.empty() && element.id == gid))
+        if ((!id.empty() && element.id == id) || (!gid.empty() && element.gid == gid))
             return &element;
     }
     return nullptr;

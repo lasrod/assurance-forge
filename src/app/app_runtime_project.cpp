@@ -339,15 +339,15 @@ const sacm::AssertedContext* FindAssertedContextById(const sacm::AssuranceCasePa
     return nullptr;
 }
 
-bool ParserModelHasElement(const parser::AssuranceCase& model, const std::string& element_id) {
+bool ParserModelHasElement(const parser::AssuranceCase& model, const std::string& id, const std::string& gid) {
     return std::any_of(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
-        return element.id == element_id || element.name == element_id;
+        return (!id.empty() && element.id == id) || (!gid.empty() && element.gid == gid);
     });
 }
 
 parser::SacmElement* FindParserElement(parser::AssuranceCase& model, const std::string& id, const std::string& gid) {
     for (parser::SacmElement& element : model.elements) {
-        if ((!id.empty() && element.id == id) || (!gid.empty() && element.id == gid))
+        if ((!id.empty() && element.id == id) || (!gid.empty() && element.gid == gid))
             return &element;
     }
     return nullptr;
@@ -412,9 +412,10 @@ bool SyncVisibleTerminologyContextToParser(core::AppState& app_state,
 
     parser::AssuranceCase& model = app_state.loaded_case.value();
     bool changed = false;
-    if (!ParserModelHasElement(model, artifact_reference->id)) {
+    if (!ParserModelHasElement(model, artifact_reference->id, artifact_reference->gid)) {
         parser::SacmElement element;
         element.id = artifact_reference->id;
+        element.gid = artifact_reference->gid;
         element.name = artifact_reference->name;
         element.type = "artifactreference";
         element.description = artifact_reference->description;
@@ -423,9 +424,10 @@ bool SyncVisibleTerminologyContextToParser(core::AppState& app_state,
         model.elements.push_back(std::move(element));
         changed = true;
     }
-    if (!ParserModelHasElement(model, context->id)) {
+    if (!ParserModelHasElement(model, context->id, context->gid)) {
         parser::SacmElement element;
         element.id = context->id;
+        element.gid = context->gid;
         element.name = context->name;
         element.type = "assertedcontext";
         element.description = context->description;

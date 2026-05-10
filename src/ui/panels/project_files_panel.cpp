@@ -14,6 +14,11 @@ struct FolderSpec {
     const char* label;
 };
 
+struct PackageNodeRenderEntry {
+    const sacm::SacmPackageTreeNode* node = nullptr;
+    std::size_t child_index = 0;
+};
+
 constexpr std::array<FolderSpec, 5> kVisibleFolders = {{
     {"arguments", "arguments/"},
     {"registers", "registers/"},
@@ -52,19 +57,24 @@ std::string PackageNodeLabel(const sacm::SacmPackageTreeNode& node) {
 
 void RenderPackageNode(const core::ProjectFileEntry& entry,
                        const sacm::SacmPackageTreeNode& node,
-                       const ProjectFilesPanelCallbacks& callbacks);
+                       const ProjectFilesPanelCallbacks& callbacks,
+                       const std::string& tree_path);
 
 void RenderPackageGroup(const char* label,
-                        const std::vector<const sacm::SacmPackageTreeNode*>& nodes,
+                        const std::vector<PackageNodeRenderEntry>& nodes,
                         const core::ProjectFileEntry& entry,
-                        const ProjectFilesPanelCallbacks& callbacks) {
+                        const ProjectFilesPanelCallbacks& callbacks,
+                        const std::string& parent_path) {
     if (nodes.empty())
         return;
 
     const bool open = ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen, "%s", label);
     if (open) {
-        for (const auto* node : nodes) {
-            RenderPackageNode(entry, *node, callbacks);
+        for (const PackageNodeRenderEntry& entry_ref : nodes) {
+            if (!entry_ref.node)
+                continue;
+            RenderPackageNode(
+                entry, *entry_ref.node, callbacks, parent_path + "/" + std::to_string(entry_ref.child_index));
         }
         ImGui::TreePop();
     }
@@ -72,41 +82,45 @@ void RenderPackageGroup(const char* label,
 
 void RenderPackageChildren(const core::ProjectFileEntry& entry,
                            const sacm::SacmPackageTreeNode& node,
-                           const ProjectFilesPanelCallbacks& callbacks) {
-    std::vector<const sacm::SacmPackageTreeNode*> argument_packages;
-    std::vector<const sacm::SacmPackageTreeNode*> artifact_packages;
-    std::vector<const sacm::SacmPackageTreeNode*> terminology_packages;
-    std::vector<const sacm::SacmPackageTreeNode*> interfaces;
-    std::vector<const sacm::SacmPackageTreeNode*> bindings;
-    std::vector<const sacm::SacmPackageTreeNode*> other_packages;
+                           const ProjectFilesPanelCallbacks& callbacks,
+                           const std::string& parent_path) {
+    std::vector<PackageNodeRenderEntry> argument_packages;
+    std::vector<PackageNodeRenderEntry> artifact_packages;
+    std::vector<PackageNodeRenderEntry> terminology_packages;
+    std::vector<PackageNodeRenderEntry> interfaces;
+    std::vector<PackageNodeRenderEntry> bindings;
+    std::vector<PackageNodeRenderEntry> other_packages;
 
-    for (const auto& child : node.children) {
+    for (std::size_t child_index = 0; child_index < node.children.size(); ++child_index) {
+        const auto& child = node.children[child_index];
+        PackageNodeRenderEntry child_entry{&child, child_index};
         if (child.type == sacm::SacmPackageNodeType::ArgumentPackage) {
-            argument_packages.push_back(&child);
+            argument_packages.push_back(child_entry);
         } else if (child.type == sacm::SacmPackageNodeType::ArtifactPackage) {
-            artifact_packages.push_back(&child);
+            artifact_packages.push_back(child_entry);
         } else if (child.type == sacm::SacmPackageNodeType::TerminologyPackage) {
-            terminology_packages.push_back(&child);
+            terminology_packages.push_back(child_entry);
         } else if (IsInterfaceNode(child.type)) {
-            interfaces.push_back(&child);
+            interfaces.push_back(child_entry);
         } else if (IsBindingNode(child.type)) {
-            bindings.push_back(&child);
+            bindings.push_back(child_entry);
         } else {
-            other_packages.push_back(&child);
+            other_packages.push_back(child_entry);
         }
     }
 
-    RenderPackageGroup("Argument Packages", argument_packages, entry, callbacks);
-    RenderPackageGroup("Artifact Packages", artifact_packages, entry, callbacks);
-    RenderPackageGroup("Terminology Packages", terminology_packages, entry, callbacks);
-    RenderPackageGroup("Interfaces", interfaces, entry, callbacks);
-    RenderPackageGroup("Bindings", bindings, entry, callbacks);
-    RenderPackageGroup("Other Packages", other_packages, entry, callbacks);
+    RenderPackageGroup("Argument Packages", argument_packages, entry, callbacks, parent_path);
+    RenderPackageGroup("Artifact Packages", artifact_packages, entry, callbacks, parent_path);
+    RenderPackageGroup("Terminology Packages", terminology_packages, entry, callbacks, parent_path);
+    RenderPackageGroup("Interfaces", interfaces, entry, callbacks, parent_path);
+    RenderPackageGroup("Bindings", bindings, entry, callbacks, parent_path);
+    RenderPackageGroup("Other Packages", other_packages, entry, callbacks, parent_path);
 }
 
 void RenderPackageNode(const core::ProjectFileEntry& entry,
                        const sacm::SacmPackageTreeNode& node,
-                       const ProjectFilesPanelCallbacks& callbacks) {
+                       const ProjectFilesPanelCallbacks& callbacks,
+                       const std::string& tree_path) {
     const bool has_children = !node.children.empty();
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick |
                                ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen;
@@ -114,7 +128,8 @@ void RenderPackageNode(const core::ProjectFileEntry& entry,
         flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 
     const std::string label = PackageNodeLabel(node);
-    const std::string id = node.id.empty() ? node.gid + node.xmlLocalName + label : node.id;
+    const std::string id = entry.relativePath.generic_string() + ":" + tree_path + ":" + node.id + ":" + node.gid +
+                           ":" + node.xmlLocalName + ":" + label;
     ImGui::PushID(id.c_str());
     const bool open = ImGui::TreeNodeEx("package", flags, "%s", label.c_str());
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen() && callbacks.open_package_node) {
@@ -129,7 +144,7 @@ void RenderPackageNode(const core::ProjectFileEntry& entry,
         }
     }
     if (has_children && open) {
-        RenderPackageChildren(entry, node, callbacks);
+        RenderPackageChildren(entry, node, callbacks, tree_path);
         ImGui::TreePop();
     }
     ImGui::PopID();
@@ -175,8 +190,9 @@ void RenderFile(const core::ProjectFileEntry& entry,
     }
 
     if (has_package_children && open) {
-        for (const auto& child : tree_it->second.root.children) {
-            RenderPackageNode(entry, child, callbacks);
+        for (std::size_t child_index = 0; child_index < tree_it->second.root.children.size(); ++child_index) {
+            const auto& child = tree_it->second.root.children[child_index];
+            RenderPackageNode(entry, child, callbacks, std::to_string(child_index));
         }
         ImGui::TreePop();
     }
