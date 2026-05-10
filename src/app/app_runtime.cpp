@@ -3,6 +3,7 @@
 #include "ai/ai_service.h"
 #include "ai/ai_task_runner.h"
 #include "ai/secret_store.h"
+#include "app/areas/project_explorer_area.h"
 #include "app/app_runtime_state.h"
 #include "app/frame/app_shell.h"
 #include "app/guideline_catalog.h"
@@ -29,7 +30,6 @@
 #include "ui/panels/package_details_panel.h"
 #include "ui/panels/preferences_panel.h"
 #include "ui/panels/problems_panel.h"
-#include "ui/panels/project_files_panel.h"
 #include "ui/panels/review_panel.h"
 #include "ui/panels/sacm_viewer_panel.h"
 #include "ui/panels/terminology_package_panel.h"
@@ -38,7 +38,6 @@
 #include "ui/theme.h"
 #include "ui/tree_view.h"
 #include "ui/ui_state.h"
-#include "ui/widgets/splitter.h"
 
 #include <algorithm>
 #include <cctype>
@@ -1967,36 +1966,6 @@ void AppRuntime::RenderThemeTweaksWindow() {
     HelloImGui::ShowThemeTweakGuiWindow(&impl_->modal_coordinator->show_theme_tweak_window);
 }
 
-void AppRuntime::RenderProjectExplorerArea(const AppLayoutRegion& region) {
-    ui::panels::ProjectFilesPanelModel project_model;
-    project_model.project =
-        impl_->app_state.current_project.has_value() ? &impl_->app_state.current_project.value() : nullptr;
-    if (project_model.project) {
-        RefreshSacmPackageTreeCache();
-        project_model.sacm_package_trees_by_path = impl_->sacm_package_tree_cache;
-        const parser::AssuranceCase* loaded_case =
-            impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
-        for (const core::reviews::ReviewProposalSummary& summary :
-             impl_->proposal_controller->manager.ListProposals(loaded_case)) {
-            project_model.proposal_validity_by_path[summary.relative_path.generic_string()] = summary.validity;
-        }
-    }
-    ui::panels::ProjectFilesPanelCallbacks project_callbacks{
-        [this]() { BeginCreateProjectSacmFile(); },
-        [this]() { BeginCreateProjectEvidenceRegister(); },
-        [this]() { BeginCreateProjectJ3377CaeRegister(); },
-        [this](const core::ProjectFileEntry& entry) { OpenProjectFile(entry); },
-        [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
-            OpenProjectPackageNode(entry, node);
-        },
-        [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
-            BeginAddTerminologyPackage(entry, node);
-        },
-    };
-    ui::panels::ShowProjectFilesPanel(
-        region.size.x, region.size.y, region.pos.y, kPanelFlags, project_model, project_callbacks);
-}
-
 void AppRuntime::RenderArgumentNavigatorArea(const AppLayoutRegion& region) {
     ImGui::SetNextWindowPos(region.pos);
     ImGui::SetNextWindowSize(region.size);
@@ -2966,7 +2935,21 @@ void AppRuntime::RenderFrame(bool& done) {
 
     const AppLayoutRegions regions = RenderAppShell(*impl_, menu_height, kPanelFlags);
 
-    RenderProjectExplorerArea(regions.project_explorer);
+    ProjectExplorerAreaCallbacks project_explorer_callbacks{
+        [this]() { RefreshSacmPackageTreeCache(); },
+        [this]() { BeginCreateProjectSacmFile(); },
+        [this]() { BeginCreateProjectEvidenceRegister(); },
+        [this]() { BeginCreateProjectJ3377CaeRegister(); },
+        [this](const core::ProjectFileEntry& entry) { OpenProjectFile(entry); },
+        [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
+            OpenProjectPackageNode(entry, node);
+        },
+        [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
+            BeginAddTerminologyPackage(entry, node);
+        },
+    };
+
+    app::RenderProjectExplorerArea(*impl_, regions.project_explorer, kPanelFlags, project_explorer_callbacks);
     RenderArgumentNavigatorArea(regions.argument_navigator);
     RenderWorkbenchArea(regions.workbench);
     RenderFeedbackDockArea(regions.feedback_dock);
