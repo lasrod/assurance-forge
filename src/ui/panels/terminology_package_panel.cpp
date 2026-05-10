@@ -192,7 +192,8 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
     int visible_rows = 0;
     const std::string filter = model.search_buffer ? model.search_buffer : "";
     const std::string category_filter = model.category_filter_buffer ? model.category_filter_buffer : "";
-    for (const auto& term : model.package->terms) {
+    for (std::size_t term_index = 0; term_index < model.package->terms.size(); ++term_index) {
+        const auto& term = model.package->terms[term_index];
         if (!MatchesFilter(*model.package, term, filter) ||
             !MatchesCategoryFilter(*model.package, term, category_filter))
             continue;
@@ -204,9 +205,10 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
 
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
-        ImGui::PushID(term.id.empty() ? term.gid.c_str() : term.id.c_str());
-        if (ImGui::Selectable(
-                term.value.empty() ? "<empty>" : term.value.c_str(), selected, ImGuiSelectableFlags_SpanAllColumns) &&
+        ImGui::PushID(static_cast<int>(term_index));
+        const ImGuiSelectableFlags selectable_flags =
+            ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
+        if (ImGui::Selectable(term.value.empty() ? "<empty>" : term.value.c_str(), selected, selectable_flags) &&
             callbacks.select_term) {
             callbacks.select_term(ref);
         }
@@ -214,7 +216,6 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
             callbacks.edit_term(ref);
         }
         RenderIssueMarker(issues);
-        ImGui::PopID();
         ImGui::TableSetColumnIndex(1);
         ImGui::TextUnformatted(term.name.c_str());
         ImGui::TableSetColumnIndex(2);
@@ -237,6 +238,7 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
         } else {
             ImGui::Text("%d", usage_count);
         }
+        ImGui::PopID();
     }
 
     if (visible_rows == 0) {
