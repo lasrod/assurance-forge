@@ -31,8 +31,8 @@ void RenderFeedbackDockArea(AppRuntimeState& state,
             ImGui::EndTabItem();
         }
 
-        ImGuiTabItemFlags terminology_usage_flags = state.focus_terminology_usages_tab ? ImGuiTabItemFlags_SetSelected
-                                                                                       : 0;
+        ImGuiTabItemFlags terminology_usage_flags =
+            state.focus_terminology_usages_tab ? ImGuiTabItemFlags_SetSelected : 0;
         if (ImGui::BeginTabItem("Term Usages", nullptr, terminology_usage_flags)) {
             ui::panels::TerminologyUsagesPanelModel usage_model;
             usage_model.has_search = state.terminology_usages_active;

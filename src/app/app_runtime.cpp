@@ -5,7 +5,9 @@
 #include "ai/secret_store.h"
 #include "app/areas/argument_navigator_area.h"
 #include "app/areas/feedback_dock_area.h"
+#include "app/areas/inspector_area.h"
 #include "app/areas/project_explorer_area.h"
+#include "app/areas/workbench_area.h"
 #include "app/app_runtime_state.h"
 #include "app/frame/app_shell.h"
 #include "app/guideline_catalog.h"
@@ -28,12 +30,9 @@
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/localization.h"
-#include "ui/panels/element_panel.h"
-#include "ui/panels/package_details_panel.h"
 #include "ui/panels/preferences_panel.h"
 #include "ui/panels/review_panel.h"
 #include "ui/panels/sacm_viewer_panel.h"
-#include "ui/panels/terminology_package_panel.h"
 #include "ui/register_views.h"
 #include "ui/theme.h"
 #include "ui/ui_state.h"
@@ -1993,251 +1992,71 @@ void AppRuntime::RenderSacmViewerPanel(float left_w, float sacm_h, float top_y) 
 }
 
 void AppRuntime::RenderWorkbenchArea(const AppLayoutRegion& region) {
-    ImGui::SetNextWindowPos(region.pos);
-    ImGui::SetNextWindowSize(region.size);
-    ImGui::Begin("Center View", nullptr, kPanelFlags | ImGuiWindowFlags_NoTitleBar);
-
-    ui::UiState& ui_state = ui::GetUiState();
-    NormalizeCenterViewSelection(*impl_, ui_state.center_view);
-
-    if (ImGui::BeginTabBar("##center_tabs")) {
-        if (impl_->show_gsn_tab) {
-            ImGuiTabItemFlags gsn_flags =
-                (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::GsnCanvas)
-                    ? ImGuiTabItemFlags_SetSelected
-                    : 0;
-            if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::GsnCanvas), nullptr, gsn_flags)) {
-                ui_state.center_view = ui::CenterView::GsnCanvas;
-                if (impl_->IsProposalCanvasActive()) {
-                    const float banner_h = ImGui::GetStyle().WindowPadding.y * 2.0f + ImGui::GetTextLineHeight() +
-                                           ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeight() +
-                                           2.0f; // border pixels
-                    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(IM_COL32(42, 45, 30, 255)));
-                    ImGui::BeginChild(
-                        "##proposal_preview_banner", ImVec2(0.0f, banner_h), true, ImGuiWindowFlags_NoScrollbar);
-                    auto& proposals = *impl_->proposal_controller;
-                    ImGui::TextUnformatted(proposals.creator_active ? "PROPOSAL CREATOR" : "PROPOSAL PREVIEW");
-                    if (proposals.creator_active) {
-                        ImGui::TextDisabled(
-                            "Changes are recorded in the proposal draft. Save it from the review panel.");
-                    } else {
-                        ImGui::TextDisabled("This is a preview. The project model has not been changed.");
-                    }
-                    ImGui::SameLine();
-                    if (proposals.creator_active) {
-                        ImGui::TextDisabled("%d operation(s)", static_cast<int>(proposals.ActiveOperationCount()));
-                        ImGui::SameLine();
-                    } else if (!proposals.preview_id.empty()) {
-                        if (ImGui::Button("Edit Proposal")) {
-                            BeginEditProposalById(proposals.preview_id);
-                        }
-                        ImGui::SameLine();
-                    }
-                    const char* exit_label = proposals.creator_active ? "Discard Draft" : "Exit Preview";
-                    if (ImGui::Button(exit_label)) {
-                        const bool was_creator = proposals.creator_active;
-                        proposals.ClearActiveState();
-                        ClearProposalHighlightState(ui::GetUiState());
-                        if (impl_->app_state.loaded_case.has_value()) {
-                            impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->app_state.loaded_case.value());
-                            ui::gsn::SetCanvasTree(impl_->current_tree);
-                        } else {
-                            impl_->tree_needs_rebuild = true;
-                        }
-                        if (was_creator)
-                            SetStatus("Discarded proposal draft.");
-                    }
-                    ImGui::EndChild();
-                    ImGui::PopStyleColor();
-                }
-                ui::ElementContextActions actions;
-                if (impl_->proposal_controller->preview_active) {
-                    actions = ui::ElementContextActions{};
-                } else if (impl_->proposal_controller->creator_active) {
-                    actions = ui::ElementContextActions{
-                        [this](core::NewElementKind kind) { AddProposalChildToSelected(kind); },
-                        [this]() { AddProposalTopGoal(); },
-                        [this](core::RemoveMode mode) { RemoveProposalSelected(mode); },
-                        nullptr,
-                        [this](const char* feature) {
-                            if (feature)
-                                ShowNotImplementedModal(feature);
-                        },
-                    };
-                } else {
-                    actions = MakeElementContextActions(*this);
-                    actions.open_terminology_term = [this](const core::TerminologyPackageRef& package_ref,
-                                                           const core::TerminologyTermRef& term_ref) {
-                        OpenTerminologyTermFromCanvas(package_ref, term_ref);
-                    };
-                    actions.edit_terminology_term = [this](const core::TerminologyPackageRef& package_ref,
-                                                           const core::TerminologyTermRef& term_ref) {
-                        EditTerminologyTermFromCanvas(package_ref, term_ref);
-                    };
-                    actions.define_terminology_term = [this](const std::string& element_id,
-                                                             const std::string& term_value) {
-                        BeginQuickDefineTerminologyTerm(element_id, term_value);
-                    };
-                    actions.add_terminology_term_as_context = [this](const std::string& element_id,
-                                                                     const core::TerminologyPackageRef& package_ref,
-                                                                     const core::TerminologyTermRef& term_ref) {
-                        AddTerminologyTermAsContextFromCanvas(element_id, package_ref, term_ref);
-                    };
-                    actions.add_visible_terminology_term_context =
-                        [this](const std::string& element_id,
-                               const core::TerminologyPackageRef& package_ref,
-                               const core::TerminologyTermRef& term_ref) {
-                            AddVisibleTerminologyTermContextFromCanvas(element_id, package_ref, term_ref);
-                        };
-                    actions.find_terminology_usages = [this](const core::TerminologyPackageRef& package_ref,
-                                                             const core::TerminologyTermRef& term_ref) {
-                        FindTerminologyUsagesFromCanvas(package_ref, term_ref);
-                    };
-                    actions.change_terminology_meaning = [this](const std::string& element_id,
-                                                                const std::string& term_value) {
-                        ChangeTerminologyMeaningFromCanvas(element_id, term_value);
-                    };
-                }
-                const parser::AssuranceCase* visible_case =
-                    impl_->IsProposalCanvasActive() ? &impl_->proposal_controller->preview_model : GetLoadedCase();
-                ui_state.proposal_canvas_active = impl_->IsProposalCanvasActive();
-                ui_state.attention_element_ids =
-                    core::CollectAttentionElementIds(impl_->problems_manager.GetProblems());
-                SyncReviewVisualStatesFromReviews();
-                const sacm::AssuranceCasePackage* terminology_package =
-                    impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
-                ui::gsn::ShowGsnCanvasContent(ui_state, visible_case, actions, terminology_package);
-                ImGui::EndTabItem();
+    WorkbenchAreaCallbacks callbacks{
+        [this]() { return MakeElementContextActions(*this); },
+        [this](core::NewElementKind kind) { AddProposalChildToSelected(kind); },
+        [this]() { AddProposalTopGoal(); },
+        [this](core::RemoveMode mode) { RemoveProposalSelected(mode); },
+        [this](const char* feature) {
+            if (feature)
+                ShowNotImplementedModal(feature);
+        },
+        [this](const std::string& proposal_id) { return BeginEditProposalById(proposal_id); },
+        [this](bool was_creator) {
+            impl_->proposal_controller->ClearActiveState();
+            ClearProposalHighlightState(ui::GetUiState());
+            if (impl_->app_state.loaded_case.has_value()) {
+                impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->app_state.loaded_case.value());
+                ui::gsn::SetCanvasTree(impl_->current_tree);
+            } else {
+                impl_->tree_needs_rebuild = true;
             }
-        }
-
-        if (impl_->show_cse_tab) {
-            ImGuiTabItemFlags cse_flags =
-                (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::CseRegister)
-                    ? ImGuiTabItemFlags_SetSelected
-                    : 0;
-            if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::CseRegister), nullptr, cse_flags)) {
-                ui_state.center_view = ui::CenterView::CseRegister;
-                if (impl_->app_state.active_project_file_role == core::ProjectFileRole::J3377CaeRegister) {
-                    ImGui::TextWrapped("J3377 CAE register file: %s",
-                                       impl_->app_state.active_project_file_path.string().c_str());
-                    ImGui::TextDisabled("Editable CAE register content will be implemented in a later workflow.");
-                    ImGui::Separator();
-                }
-                ui::ShowCseRegisterView();
-                ImGui::EndTabItem();
-            }
-        }
-
-        if (impl_->show_evidence_tab) {
-            ImGuiTabItemFlags evidence_flags =
-                (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::EvidenceRegister)
-                    ? ImGuiTabItemFlags_SetSelected
-                    : 0;
-            if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::EvidenceRegister), nullptr, evidence_flags)) {
-                ui_state.center_view = ui::CenterView::EvidenceRegister;
-                if (impl_->app_state.active_project_file_role == core::ProjectFileRole::EvidenceRegister) {
-                    ImGui::TextWrapped("Evidence register file: %s",
-                                       impl_->app_state.active_project_file_path.string().c_str());
-                    ImGui::TextDisabled("Editable evidence register content will be implemented in a later workflow.");
-                    ImGui::Separator();
-                }
-                ui::ShowEvidenceRegisterView();
-                ImGui::EndTabItem();
-            }
-        }
-
-        if (impl_->show_package_details_tab) {
-            ImGuiTabItemFlags package_flags =
-                (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::PackageDetails)
-                    ? ImGuiTabItemFlags_SetSelected
-                    : 0;
-            if (ImGui::BeginTabItem("Package Details", nullptr, package_flags)) {
-                ui_state.center_view = ui::CenterView::PackageDetails;
-                ui::panels::ShowPackageDetailsPanel(impl_->selected_package_node ? &impl_->selected_package_node.value()
-                                                                                 : nullptr,
-                                                    impl_->selected_package_file_path);
-                ImGui::EndTabItem();
-            }
-        }
-
-        if (impl_->show_terminology_package_tab) {
-            ImGuiTabItemFlags terminology_flags =
-                (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::TerminologyPackage)
-                    ? ImGuiTabItemFlags_SetSelected
-                    : 0;
-            if (ImGui::BeginTabItem("Terminology Package", nullptr, terminology_flags)) {
-                ui_state.center_view = ui::CenterView::TerminologyPackage;
-                const sacm::TerminologyPackage* terminology_package = nullptr;
-                if (impl_->app_state.sacm_package.has_value()) {
-                    terminology_package = core::FindTerminologyPackage(impl_->app_state.sacm_package.value(),
-                                                                       impl_->selected_terminology_package_ref);
-                }
-                std::string delete_block_reason;
-                const bool can_delete =
-                    terminology_package ? core::CanDeleteTerminologyPackage(*terminology_package, delete_block_reason)
-                                        : false;
-                ui::panels::TerminologyPackagePanelModel model;
-                model.package = terminology_package;
-                model.source_file_path = impl_->selected_terminology_package_file_path;
-                model.name_buffer = impl_->terminology_package_name_buf;
-                model.name_buffer_size = sizeof(impl_->terminology_package_name_buf);
-                model.description_buffer = impl_->terminology_package_description_buf;
-                model.description_buffer_size = sizeof(impl_->terminology_package_description_buf);
-                model.can_delete = can_delete;
-                model.delete_block_reason = delete_block_reason;
-                model.selected_term_ref = impl_->selected_terminology_term_ref;
-                model.selected_category_ref = impl_->selected_terminology_category_ref;
-                model.search_buffer = impl_->terminology_filter_buf;
-                model.search_buffer_size = sizeof(impl_->terminology_filter_buf);
-                model.category_filter_buffer = impl_->terminology_category_filter_buf;
-                model.category_filter_buffer_size = sizeof(impl_->terminology_category_filter_buf);
-                if (terminology_package) {
-                    model.term_issues = core::ValidateTerminologyTerms(*terminology_package);
-                    model.term_usage_summaries = core::BuildTerminologyTermUsageSummaries(
-                        impl_->app_state.sacm_package.value(), *terminology_package);
-                    model.category_usage_summaries = core::BuildTerminologyCategoryUsageSummaries(*terminology_package);
-                }
-                ui::panels::TerminologyPackagePanelCallbacks callbacks;
-                callbacks.apply_changes = [this]() { ApplyTerminologyPackageEdits(); };
-                callbacks.delete_package = [this]() { BeginDeleteTerminologyPackage(); };
-                callbacks.add_term = [this]() { BeginAddTerminologyTerm(); };
-                callbacks.select_term = [this](const core::TerminologyTermRef& term_ref) {
-                    SelectTerminologyTerm(term_ref);
-                };
-                callbacks.edit_term = [this](const core::TerminologyTermRef& term_ref) {
-                    BeginEditTerminologyTerm(term_ref);
-                };
-                callbacks.delete_term = [this](const core::TerminologyTermRef& term_ref) {
-                    BeginDeleteTerminologyTerm(term_ref);
-                };
-                callbacks.find_term_usages = [this](const core::TerminologyTermRef& term_ref) {
-                    BeginFindTerminologyUsages(impl_->selected_terminology_package_ref, term_ref);
-                };
-                callbacks.set_category_filter = [this](const std::string& category_filter) {
-                    SetTerminologyCategoryFilter(category_filter);
-                };
-                callbacks.add_category = [this]() { BeginAddTerminologyCategory(); };
-                callbacks.select_category = [this](const core::TerminologyCategoryRef& category_ref) {
-                    SelectTerminologyCategory(category_ref);
-                };
-                callbacks.edit_category = [this](const core::TerminologyCategoryRef& category_ref) {
-                    BeginEditTerminologyCategory(category_ref);
-                };
-                callbacks.delete_category = [this](const core::TerminologyCategoryRef& category_ref) {
-                    BeginDeleteTerminologyCategory(category_ref);
-                };
-                callbacks.seed_recommended_categories = [this]() { SeedRecommendedTerminologyCategories(); };
-                ui::panels::ShowTerminologyPackagePanel(model, callbacks);
-                ImGui::EndTabItem();
-            }
-        }
-
-        ImGui::EndTabBar();
-        impl_->force_center_tab_selection = false;
-    }
-
-    ImGui::End();
+            if (was_creator)
+                SetStatus("Discarded proposal draft.");
+        },
+        [this](const core::TerminologyPackageRef& package_ref, const core::TerminologyTermRef& term_ref) {
+            OpenTerminologyTermFromCanvas(package_ref, term_ref);
+        },
+        [this](const core::TerminologyPackageRef& package_ref, const core::TerminologyTermRef& term_ref) {
+            EditTerminologyTermFromCanvas(package_ref, term_ref);
+        },
+        [this](const std::string& element_id, const std::string& term_value) {
+            BeginQuickDefineTerminologyTerm(element_id, term_value);
+        },
+        [this](const std::string& element_id,
+               const core::TerminologyPackageRef& package_ref,
+               const core::TerminologyTermRef& term_ref) {
+            AddTerminologyTermAsContextFromCanvas(element_id, package_ref, term_ref);
+        },
+        [this](const std::string& element_id,
+               const core::TerminologyPackageRef& package_ref,
+               const core::TerminologyTermRef& term_ref) {
+            AddVisibleTerminologyTermContextFromCanvas(element_id, package_ref, term_ref);
+        },
+        [this](const core::TerminologyPackageRef& package_ref, const core::TerminologyTermRef& term_ref) {
+            FindTerminologyUsagesFromCanvas(package_ref, term_ref);
+        },
+        [this](const std::string& element_id, const std::string& term_value) {
+            ChangeTerminologyMeaningFromCanvas(element_id, term_value);
+        },
+        [this]() { SyncReviewVisualStatesFromReviews(); },
+        [this]() { ApplyTerminologyPackageEdits(); },
+        [this]() { BeginDeleteTerminologyPackage(); },
+        [this]() { BeginAddTerminologyTerm(); },
+        [this](const core::TerminologyTermRef& term_ref) { SelectTerminologyTerm(term_ref); },
+        [this](const core::TerminologyTermRef& term_ref) { BeginEditTerminologyTerm(term_ref); },
+        [this](const core::TerminologyTermRef& term_ref) { BeginDeleteTerminologyTerm(term_ref); },
+        [this](const core::TerminologyTermRef& term_ref) {
+            BeginFindTerminologyUsages(impl_->selected_terminology_package_ref, term_ref);
+        },
+        [this](const std::string& category_filter) { SetTerminologyCategoryFilter(category_filter); },
+        [this]() { BeginAddTerminologyCategory(); },
+        [this](const core::TerminologyCategoryRef& category_ref) { SelectTerminologyCategory(category_ref); },
+        [this](const core::TerminologyCategoryRef& category_ref) { BeginEditTerminologyCategory(category_ref); },
+        [this](const core::TerminologyCategoryRef& category_ref) { BeginDeleteTerminologyCategory(category_ref); },
+        [this]() { SeedRecommendedTerminologyCategories(); },
+    };
+    app::RenderWorkbenchArea(*impl_, region, kPanelFlags, callbacks);
 }
 
 void AppRuntime::SyncReviewProblems() {
@@ -2467,48 +2286,6 @@ void AppRuntime::RenderProposalElementEditor() {
     if (RefreshProposalCreatorPreview()) {
         SetStatus("Recorded proposal property change.");
     }
-}
-
-void AppRuntime::RenderInspectorArea(const AppLayoutRegion& region) {
-    ImGui::SetNextWindowPos(region.pos);
-    ImGui::SetNextWindowSize(region.size);
-    ImGui::Begin("Element Properties", nullptr, kPanelFlags);
-
-    if (impl_->proposal_controller->creator_active) {
-        RenderProposalElementEditor();
-    } else if (impl_->proposal_controller->preview_active) {
-        ImGui::TextWrapped("Proposal preview is active. Exit preview before editing element properties.");
-    } else {
-        parser::AssuranceCase* ac_ptr =
-            impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
-        sacm::AssuranceCasePackage* sacm_ptr =
-            impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
-        ui::panels::ElementTerminologyAssistCallbacks terminology_callbacks;
-        terminology_callbacks.define_term = [this](const std::string& element_id, const std::string& term_value) {
-            BeginQuickDefineTerminologyTerm(element_id, term_value);
-        };
-        terminology_callbacks.link_existing_term = [this](const std::string& element_id,
-                                                          const std::string& term_value) {
-            BeginLinkExistingTerminologyTerm(element_id, term_value);
-        };
-        terminology_callbacks.use_term_for_element = [this](const std::string& element_id,
-                                                            const core::TerminologyPackageRef& package_ref,
-                                                            const core::TerminologyTermRef& term_ref) {
-            AddTerminologyTermAsContextFromCanvas(element_id, package_ref, term_ref);
-        };
-        terminology_callbacks.ignore_term = [this](const std::string& element_id, const std::string& term_value) {
-            IgnoreTerminologySuggestion(element_id, term_value);
-        };
-        terminology_callbacks.is_ignored = [this](const std::string& element_id, const std::string& term_value) {
-            return IsTerminologySuggestionIgnored(element_id, term_value);
-        };
-        if (ui::panels::ShowElementPanel(ac_ptr, sacm_ptr, &terminology_callbacks)) {
-            impl_->events.Emit(TreeDirtyEvent{});
-            impl_->events.Emit(DocumentDirtyEvent{});
-        }
-    }
-
-    ImGui::End();
 }
 
 void AppRuntime::RenderReviewPanelContent() {
@@ -2881,7 +2658,31 @@ void AppRuntime::RenderFrame(bool& done) {
     };
     app::RenderFeedbackDockArea(*impl_, regions.feedback_dock, kPanelFlags, feedback_dock_callbacks);
 
-    RenderInspectorArea(regions.inspector);
+    InspectorAreaCallbacks inspector_callbacks{
+        [this]() { RenderProposalElementEditor(); },
+        [this](const std::string& element_id, const std::string& term_value) {
+            BeginQuickDefineTerminologyTerm(element_id, term_value);
+        },
+        [this](const std::string& element_id, const std::string& term_value) {
+            BeginLinkExistingTerminologyTerm(element_id, term_value);
+        },
+        [this](const std::string& element_id,
+               const core::TerminologyPackageRef& package_ref,
+               const core::TerminologyTermRef& term_ref) {
+            AddTerminologyTermAsContextFromCanvas(element_id, package_ref, term_ref);
+        },
+        [this](const std::string& element_id, const std::string& term_value) {
+            IgnoreTerminologySuggestion(element_id, term_value);
+        },
+        [this](const std::string& element_id, const std::string& term_value) {
+            return IsTerminologySuggestionIgnored(element_id, term_value);
+        },
+        [this]() {
+            impl_->events.Emit(TreeDirtyEvent{});
+            impl_->events.Emit(DocumentDirtyEvent{});
+        },
+    };
+    app::RenderInspectorArea(*impl_, regions.inspector, kPanelFlags, inspector_callbacks);
 
     RenderPreferencesWindow();
     RenderThemeTweaksWindow();
