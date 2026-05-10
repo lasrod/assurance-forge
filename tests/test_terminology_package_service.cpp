@@ -387,7 +387,7 @@ TEST(TerminologyPackageService, CountsTermUsageInSacmText) {
     std::vector<core::TerminologyTermUsageSummary> summaries = core::BuildTerminologyTermUsageSummaries(
         package, *core::FindTerminologyPackage(package, terminology_package.package_ref));
     ASSERT_EQ(summaries.size(), 1u);
-    EXPECT_EQ(summaries.front().count, 2);
+    EXPECT_EQ(summaries.front().count, 1);
 }
 
 TEST(TerminologyPackageService, FindUsagesReportsNavigableArgumentElements) {
@@ -532,6 +532,14 @@ TEST(TerminologyPackageService, FindUsagesShowsAmbiguousAndExplicitStatuses) {
         core::FindTerminologyTermUsages(package, terminology_package.package_ref, dataset.term_ref);
     ASSERT_TRUE(other_meaning.success) << other_meaning.error;
     EXPECT_TRUE(other_meaning.usages.empty());
+
+    const sacm::TerminologyPackage* terms = core::FindTerminologyPackage(package, terminology_package.package_ref);
+    ASSERT_NE(terms, nullptr);
+    std::vector<core::TerminologyTermUsageSummary> summaries =
+        core::BuildTerminologyTermUsageSummaries(package, *terms);
+    ASSERT_EQ(summaries.size(), 2u);
+    EXPECT_EQ(summaries[0].count, 1);
+    EXPECT_EQ(summaries[1].count, 0);
 }
 
 TEST(TerminologyPackageService, FindUsagesSplitsDuplicateAbbreviationsByExplicitMeaning) {

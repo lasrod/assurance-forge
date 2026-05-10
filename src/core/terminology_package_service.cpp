@@ -154,6 +154,10 @@ TerminologyTermRef RefFor(const sacm::Term& term) {
     return TerminologyTermRef{term.id, term.gid};
 }
 
+TerminologyPackageRef RefFor(const sacm::TerminologyPackage& package) {
+    return TerminologyPackageRef{package.id, package.gid};
+}
+
 TerminologyCategoryRef RefFor(const sacm::Category& category) {
     return TerminologyCategoryRef{category.id, category.gid};
 }
@@ -1394,8 +1398,11 @@ std::vector<TerminologyTermUsageSummary>
 BuildTerminologyTermUsageSummaries(const sacm::AssuranceCasePackage& package,
                                    const sacm::TerminologyPackage& terminology_package) {
     std::vector<TerminologyTermUsageSummary> summaries;
+    const TerminologyPackageRef package_ref = RefFor(terminology_package);
     for (const auto& term : terminology_package.terms) {
-        summaries.push_back({RefFor(term), CountTerminologyTermUsage(package, term)});
+        const TerminologyTermRef term_ref = RefFor(term);
+        const TerminologyTermUsageSearchResult result = FindTerminologyTermUsages(package, package_ref, term_ref);
+        summaries.push_back({term_ref, result.success ? static_cast<int>(result.usages.size()) : 0});
     }
     return summaries;
 }

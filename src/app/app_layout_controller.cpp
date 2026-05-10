@@ -12,7 +12,7 @@ constexpr float kMinPanelRatio = 0.10f;
 constexpr float kMaxPanelRatio = 0.40f;
 constexpr float kMinLeftSectionHeight = 120.0f;
 constexpr float kMinCenterSectionHeight = 220.0f;
-constexpr float kMinProblemsPanelHeight = 160.0f;
+constexpr float kMinProblemsPanelHeight = 320.0f;
 
 } // namespace
 
