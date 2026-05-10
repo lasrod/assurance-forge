@@ -9,11 +9,11 @@
 #include "ui/imgui_buffer_utils.h"
 #include "ui/ui_state.h"
 
+#include <nlohmann/json.hpp>
+
 #include <algorithm>
 #include <filesystem>
-#include <sstream>
 #include <utility>
-#include <vector>
 
 namespace app::actions {
 namespace {
@@ -325,28 +325,39 @@ std::string TermStatusLabel(const sacm::AssuranceCasePackage& package,
     return term->id.empty() ? "Term" : term->id;
 }
 
-bool StartsWith(const std::string& value, const std::string& prefix) {
-    return value.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), value.begin());
-}
-
 struct TerminologyTermQuickFixPayload {
     core::TerminologyPackageRef package_ref;
     core::TerminologyTermRef term_ref;
     std::string term_value;
 };
 
-bool DecodeTerminologyTermQuickFixPayload(const std::string& payload, TerminologyTermQuickFixPayload& decoded) {
-    std::stringstream stream(payload);
-    std::vector<std::string> parts;
-    std::string part;
-    while (std::getline(stream, part)) {
-        parts.push_back(part);
-    }
-    if (parts.size() < 5)
+bool ReadStringField(const nlohmann::json& object, const char* key, std::string& value) {
+    const auto field = object.find(key);
+    if (field == object.end() || !field->is_string())
         return false;
-    decoded.package_ref = core::TerminologyPackageRef{parts[0], parts[1]};
-    decoded.term_ref = core::TerminologyTermRef{parts[2], parts[3]};
-    decoded.term_value = parts[4];
+    value = field->get<std::string>();
+    return true;
+}
+
+bool DecodeTerminologyTermQuickFixPayload(const std::string& payload, TerminologyTermQuickFixPayload& decoded) {
+    const nlohmann::json root = nlohmann::json::parse(payload, nullptr, false);
+    if (!root.is_object() || root.size() != 5)
+        return false;
+
+    std::string package_id;
+    std::string package_gid;
+    std::string term_id;
+    std::string term_gid;
+    std::string term_value;
+    if (!ReadStringField(root, "packageId", package_id) || !ReadStringField(root, "packageGid", package_gid) ||
+        !ReadStringField(root, "termId", term_id) || !ReadStringField(root, "termGid", term_gid) ||
+        !ReadStringField(root, "termValue", term_value)) {
+        return false;
+    }
+
+    decoded.package_ref = core::TerminologyPackageRef{package_id, package_gid};
+    decoded.term_ref = core::TerminologyTermRef{term_id, term_gid};
+    decoded.term_value = term_value;
     return HasTerminologyPackageRef(decoded.package_ref) &&
            (!decoded.term_ref.id.empty() || !decoded.term_ref.gid.empty());
 }
@@ -1012,7 +1023,7 @@ void TerminologyActions::HandleProblemQuickFix(const core::ProblemItem& problem)
         BeginLinkExistingTerm(problem.element_id, problem.quick_fix_payload);
         return;
     }
-    if (StartsWith(problem.type, "TerminologyTerm")) {
+    if (core::StartsWith(problem.type, "TerminologyTerm")) {
         TerminologyTermQuickFixPayload payload;
         if (!DecodeTerminologyTermQuickFixPayload(problem.quick_fix_payload, payload)) {
             SetStatus(state_, "Could not decode terminology quick fix target.");

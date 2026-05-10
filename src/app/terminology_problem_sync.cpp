@@ -8,6 +8,8 @@
 #include "parser/xml_parser.h"
 #include "sacm/sacm_model.h"
 
+#include <nlohmann/json.hpp>
+
 #include <algorithm>
 #include <optional>
 #include <string>
@@ -93,7 +95,14 @@ std::string TerminologyTermProblemId(const core::TerminologyPackageRef& package_
 std::string EncodeTerminologyTermQuickFixPayload(const core::TerminologyPackageRef& package_ref,
                                                  const core::TerminologyTermRef& term_ref,
                                                  const std::string& term_value) {
-    return package_ref.id + "\n" + package_ref.gid + "\n" + term_ref.id + "\n" + term_ref.gid + "\n" + term_value;
+    const nlohmann::json payload{
+        {"packageId", package_ref.id},
+        {"packageGid", package_ref.gid},
+        {"termId", term_ref.id},
+        {"termGid", term_ref.gid},
+        {"termValue", term_value},
+    };
+    return payload.dump();
 }
 
 std::string TerminologyContextReferenceProblemId(const core::TerminologyContextReferenceIssue& issue) {
