@@ -1969,7 +1969,36 @@ void AppRuntime::RenderThemeTweaksWindow() {
     HelloImGui::ShowThemeTweakGuiWindow(&impl_->modal_coordinator->show_theme_tweak_window);
 }
 
-void AppRuntime::RenderTreePanel(float left_w, float safety_tree_h, float top_y) {
+void AppRuntime::RenderProjectExplorerArea(float left_w, float project_h, float top_y) {
+    ui::panels::ProjectFilesPanelModel project_model;
+    project_model.project =
+        impl_->app_state.current_project.has_value() ? &impl_->app_state.current_project.value() : nullptr;
+    if (project_model.project) {
+        RefreshSacmPackageTreeCache();
+        project_model.sacm_package_trees_by_path = impl_->sacm_package_tree_cache;
+        const parser::AssuranceCase* loaded_case =
+            impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
+        for (const core::reviews::ReviewProposalSummary& summary :
+             impl_->proposal_controller->manager.ListProposals(loaded_case)) {
+            project_model.proposal_validity_by_path[summary.relative_path.generic_string()] = summary.validity;
+        }
+    }
+    ui::panels::ProjectFilesPanelCallbacks project_callbacks{
+        [this]() { BeginCreateProjectSacmFile(); },
+        [this]() { BeginCreateProjectEvidenceRegister(); },
+        [this]() { BeginCreateProjectJ3377CaeRegister(); },
+        [this](const core::ProjectFileEntry& entry) { OpenProjectFile(entry); },
+        [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
+            OpenProjectPackageNode(entry, node);
+        },
+        [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
+            BeginAddTerminologyPackage(entry, node);
+        },
+    };
+    ui::panels::ShowProjectFilesPanel(left_w, project_h, top_y, kPanelFlags, project_model, project_callbacks);
+}
+
+void AppRuntime::RenderArgumentNavigatorArea(float left_w, float safety_tree_h, float top_y) {
     ImGui::SetNextWindowPos(ImVec2(0, top_y));
     ImGui::SetNextWindowSize(ImVec2(left_w, safety_tree_h));
     ImGui::Begin("Safety Case Tree", nullptr, kPanelFlags);
@@ -2034,7 +2063,7 @@ void AppRuntime::RenderSacmViewerPanel(float left_w, float sacm_h, float top_y) 
     ui::panels::ShowSacmViewerPanel(left_w, sacm_h, top_y, kPanelFlags, model, callbacks);
 }
 
-void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content_h, float top_y) {
+void AppRuntime::RenderWorkbenchArea(float center_x, float center_w, float content_h, float top_y) {
     ImGui::SetNextWindowPos(ImVec2(center_x, top_y));
     ImGui::SetNextWindowSize(ImVec2(center_w, content_h));
     ImGui::Begin("Center View", nullptr, kPanelFlags | ImGuiWindowFlags_NoTitleBar);
@@ -2282,7 +2311,7 @@ void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content
     ImGui::End();
 }
 
-void AppRuntime::RenderProblemsPanel(float center_x, float center_w, float problems_h, float top_y) {
+void AppRuntime::RenderFeedbackDockArea(float center_x, float center_w, float problems_h, float top_y) {
     ui::panels::ProblemsPanelModel model{
         impl_->problems_manager,
         ui::GetUiState(),
@@ -2582,7 +2611,7 @@ void AppRuntime::RenderProposalElementEditor() {
     }
 }
 
-void AppRuntime::RenderElementPropertiesPanel(
+void AppRuntime::RenderInspectorArea(
     float center_x, float center_w, float right_w, float content_h, float top_y) {
     float right_x = center_x + center_w + kSplitterThickness;
 
@@ -2959,33 +2988,8 @@ void AppRuntime::RenderFrame(bool& done) {
     float project_y = top_y;
     float safety_y = project_y + project_h + kSplitterThickness;
 
-    ui::panels::ProjectFilesPanelModel project_model;
-    project_model.project =
-        impl_->app_state.current_project.has_value() ? &impl_->app_state.current_project.value() : nullptr;
-    if (project_model.project) {
-        RefreshSacmPackageTreeCache();
-        project_model.sacm_package_trees_by_path = impl_->sacm_package_tree_cache;
-        const parser::AssuranceCase* loaded_case =
-            impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
-        for (const core::reviews::ReviewProposalSummary& summary :
-             impl_->proposal_controller->manager.ListProposals(loaded_case)) {
-            project_model.proposal_validity_by_path[summary.relative_path.generic_string()] = summary.validity;
-        }
-    }
-    ui::panels::ProjectFilesPanelCallbacks project_callbacks{
-        [this]() { BeginCreateProjectSacmFile(); },
-        [this]() { BeginCreateProjectEvidenceRegister(); },
-        [this]() { BeginCreateProjectJ3377CaeRegister(); },
-        [this](const core::ProjectFileEntry& entry) { OpenProjectFile(entry); },
-        [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
-            OpenProjectPackageNode(entry, node);
-        },
-        [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
-            BeginAddTerminologyPackage(entry, node);
-        },
-    };
-    ui::panels::ShowProjectFilesPanel(left_w, project_h, project_y, kPanelFlags, project_model, project_callbacks);
-    RenderTreePanel(left_w, safety_tree_h, safety_y);
+    RenderProjectExplorerArea(left_w, project_h, project_y);
+    RenderArgumentNavigatorArea(left_w, safety_tree_h, safety_y);
 
     float center_x = left_w + kSplitterThickness;
     float center_available_h = std::max(0.0f, content_h - kSplitterThickness);
@@ -2993,9 +2997,9 @@ void AppRuntime::RenderFrame(bool& done) {
     float center_panel_h = std::max(0.0f, center_available_h - problems_h);
     float problems_y = top_y + center_panel_h + kSplitterThickness;
 
-    RenderCenterPanel(center_x, center_w, center_panel_h, top_y);
-    RenderProblemsPanel(center_x, center_w, problems_h, problems_y);
-    RenderElementPropertiesPanel(center_x, center_w, right_w, content_h, top_y);
+    RenderWorkbenchArea(center_x, center_w, center_panel_h, top_y);
+    RenderFeedbackDockArea(center_x, center_w, problems_h, problems_y);
+    RenderInspectorArea(center_x, center_w, right_w, content_h, top_y);
 
     RenderPreferencesWindow();
     RenderThemeTweaksWindow();

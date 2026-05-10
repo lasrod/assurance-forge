@@ -2,6 +2,8 @@
 
 The UI layer renders Dear ImGui views. Most panels receive data models and callbacks from `AppRuntime`, and controllers perform the business work. The main exception is the element properties panel, which edits the active parser element directly and syncs those field changes back into the SACM package.
 
+The application frame is organized around named UI areas documented in [App Shell and UI Areas](app-shell.md): `ProjectExplorerArea`, `ArgumentNavigatorArea`, `WorkbenchArea`, `InspectorArea`, and `FeedbackDockArea`. These names describe responsibility instead of current screen position.
+
 ```mermaid
 flowchart TD
     Runtime[AppRuntime::RenderFrame]
@@ -30,6 +32,17 @@ flowchart TD
 | Welcome modal | `ui::panels::ShowWelcomeModal` | Recent project list | Create/open/import callbacks. |
 | CSE register | `ui::ShowCseRegisterView` | Register rows derived from parser model | None. |
 | Evidence register | `ui::ShowEvidenceRegisterView` | Register rows derived from parser model | None. |
+
+## Area Mapping
+
+| Area | Current panels and views |
+| --- | --- |
+| `ProjectExplorerArea` | Project files panel and SACM package tree entries. |
+| `ArgumentNavigatorArea` | Safety case tree view. |
+| `WorkbenchArea` | GSN canvas, CSE register, evidence register, package details, and terminology package tabs. |
+| `InspectorArea` | Element properties panel and proposal element editor. |
+| `FeedbackDockArea` | Problems, term usages, review, and AI debug tabs. |
+| `ModalHost` | Welcome, project, terminology, review confirmation, preferences, theme tweaks, and save-before-exit modals. |
 
 ## Shared UI State
 
@@ -119,9 +132,8 @@ Panels do not own project or document state. They render current state, collect 
 
 The current main-frame layout is:
 
-- Left top: project files panel
-- Left bottom: safety case tree
-- Center: GSN canvas or register tabs
-- Bottom center: problems panel
-- Right top: element properties
-- Right bottom: review panel
+- Project explorer: project files panel
+- Argument navigator: safety case tree
+- Workbench: GSN canvas, register tabs, package details, or terminology package tabs
+- Inspector: element properties
+- Feedback dock: problems, term usages, review, and AI debug tabs

@@ -65,6 +65,7 @@ nav:
       - Overview: architecture/index.md
       - Runtime and State: architecture/runtime-state.md
       - Parser and SACM: architecture/parser-sacm.md
+      - App Shell and UI Areas: architecture/app-shell.md
       - UI Panels: architecture/ui-panels.md
       - Controllers: architecture/controllers.md
       - Project Storage: architecture/project-storage.md
