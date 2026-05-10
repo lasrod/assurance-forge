@@ -382,7 +382,7 @@ TEST(TerminologyPackageService, CountsTermUsageInSacmText) {
 
     const sacm::Term* term = core::FindTerminologyTerm(package, terminology_package.package_ref, created.term_ref);
     ASSERT_NE(term, nullptr);
-    EXPECT_EQ(core::CountTerminologyTermUsage(package, *term), 2);
+    EXPECT_EQ(core::CountTerminologyTermUsage(package, *term), 1);
 
     std::vector<core::TerminologyTermUsageSummary> summaries = core::BuildTerminologyTermUsageSummaries(
         package, *core::FindTerminologyPackage(package, terminology_package.package_ref));
@@ -464,6 +464,9 @@ TEST(TerminologyPackageService, FindUsagesReportsNavigableArgumentElements) {
 
     ASSERT_TRUE(usages.success) << usages.error;
     ASSERT_EQ(usages.usages.size(), 6u);
+    const sacm::Term* found_term = core::FindTerminologyTerm(package, terminology_package.package_ref, term.term_ref);
+    ASSERT_NE(found_term, nullptr);
+    EXPECT_EQ(core::CountTerminologyTermUsage(package, *found_term), 6);
     std::vector<std::string> element_types;
     std::vector<std::string> element_ids;
     for (const auto& usage : usages.usages) {
@@ -532,6 +535,15 @@ TEST(TerminologyPackageService, FindUsagesShowsAmbiguousAndExplicitStatuses) {
         core::FindTerminologyTermUsages(package, terminology_package.package_ref, dataset.term_ref);
     ASSERT_TRUE(other_meaning.success) << other_meaning.error;
     EXPECT_TRUE(other_meaning.usages.empty());
+
+    const sacm::Term* context_term_ptr =
+        core::FindTerminologyTerm(package, terminology_package.package_ref, context.term_ref);
+    const sacm::Term* dataset_term_ptr =
+        core::FindTerminologyTerm(package, terminology_package.package_ref, dataset.term_ref);
+    ASSERT_NE(context_term_ptr, nullptr);
+    ASSERT_NE(dataset_term_ptr, nullptr);
+    EXPECT_EQ(core::CountTerminologyTermUsage(package, *context_term_ptr), 1);
+    EXPECT_EQ(core::CountTerminologyTermUsage(package, *dataset_term_ptr), 0);
 
     const sacm::TerminologyPackage* terms = core::FindTerminologyPackage(package, terminology_package.package_ref);
     ASSERT_NE(terms, nullptr);

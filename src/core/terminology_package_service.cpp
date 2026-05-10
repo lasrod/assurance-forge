@@ -6,6 +6,7 @@
 #include <cctype>
 #include <initializer_list>
 #include <map>
+#include <optional>
 #include <sstream>
 #include <unordered_set>
 #include <utility>
@@ -160,6 +161,46 @@ TerminologyPackageRef RefFor(const sacm::TerminologyPackage& package) {
 
 TerminologyCategoryRef RefFor(const sacm::Category& category) {
     return TerminologyCategoryRef{category.id, category.gid};
+}
+
+struct ScopedTermRef {
+    TerminologyPackageRef package_ref;
+    TerminologyTermRef term_ref;
+};
+
+std::optional<ScopedTermRef> FindScopedTermRef(const sacm::AssuranceCasePackage& package, const sacm::Term& term) {
+    const sacm::Term* term_ptr = &term;
+    for (const auto& terminology_package : package.terminologyPackages) {
+        for (const auto& candidate : terminology_package.terms) {
+            if (&candidate == term_ptr)
+                return ScopedTermRef{RefFor(terminology_package), RefFor(candidate)};
+        }
+    }
+    for (const auto& argument_package : package.argumentPackages) {
+        for (const auto& terminology_package : argument_package.terminologyPackages) {
+            for (const auto& candidate : terminology_package.terms) {
+                if (&candidate == term_ptr)
+                    return ScopedTermRef{RefFor(terminology_package), RefFor(candidate)};
+            }
+        }
+    }
+
+    const TerminologyTermRef term_ref = RefFor(term);
+    for (const auto& terminology_package : package.terminologyPackages) {
+        for (const auto& candidate : terminology_package.terms) {
+            if (MatchesRef(candidate, term_ref))
+                return ScopedTermRef{RefFor(terminology_package), RefFor(candidate)};
+        }
+    }
+    for (const auto& argument_package : package.argumentPackages) {
+        for (const auto& terminology_package : argument_package.terminologyPackages) {
+            for (const auto& candidate : terminology_package.terms) {
+                if (MatchesRef(candidate, term_ref))
+                    return ScopedTermRef{RefFor(terminology_package), RefFor(candidate)};
+            }
+        }
+    }
+    return std::nullopt;
 }
 
 std::string TrimWhitespace(const std::string& value) {
@@ -490,24 +531,6 @@ std::string ToLower(std::string value) {
     return value;
 }
 
-int CountWholeWordOccurrences(const std::string& text, const std::string& needle) {
-    if (text.empty() || needle.empty())
-        return 0;
-    const std::string searchable_text = ToLower(text);
-    const std::string searchable_needle = ToLower(needle);
-    int count = 0;
-    std::size_t pos = searchable_text.find(searchable_needle);
-    while (pos != std::string::npos) {
-        const bool left_ok = pos == 0 || !IsWordChar(searchable_text[pos - 1]);
-        const std::size_t end = pos + searchable_needle.size();
-        const bool right_ok = end >= searchable_text.size() || !IsWordChar(searchable_text[end]);
-        if (left_ok && right_ok)
-            ++count;
-        pos = searchable_text.find(searchable_needle, pos + 1);
-    }
-    return count;
-}
-
 std::vector<std::size_t> FindWholeWordMatches(const std::string& text, const std::string& needle, bool case_sensitive) {
     std::vector<std::size_t> matches;
     if (text.empty() || needle.empty() || needle.size() > text.size())
@@ -668,44 +691,6 @@ std::string ArtifactReferenceTypeLabel(const sacm::ArtifactReference& artifact_r
     if (SourceSetContainsElement(evidence_sources, artifact_reference))
         return "Solution";
     return "ArtifactReference";
-}
-
-void AddText(std::vector<std::string>& texts, const std::string& text) {
-    if (!text.empty())
-        texts.push_back(text);
-}
-
-std::vector<std::string> CollectUsageTexts(const sacm::AssuranceCasePackage& package) {
-    std::vector<std::string> texts;
-    AddText(texts, package.name);
-    AddText(texts, package.description);
-    for (const auto& artifact_package : package.artifactPackages) {
-        AddText(texts, artifact_package.name);
-        AddText(texts, artifact_package.description);
-        for (const auto& artifact : artifact_package.artifacts) {
-            AddText(texts, artifact.name);
-            AddText(texts, artifact.description);
-        }
-    }
-    for (const auto& argument_package : package.argumentPackages) {
-        AddText(texts, argument_package.name);
-        AddText(texts, argument_package.description);
-        for (const auto& claim : argument_package.claims) {
-            AddText(texts, claim.name);
-            AddText(texts, claim.description);
-            AddText(texts, claim.content);
-        }
-        for (const auto& reasoning : argument_package.argumentReasonings) {
-            AddText(texts, reasoning.name);
-            AddText(texts, reasoning.description);
-            AddText(texts, reasoning.content);
-        }
-        for (const auto& artifact_reference : argument_package.artifactReferences) {
-            AddText(texts, artifact_reference.name);
-            AddText(texts, artifact_reference.description);
-        }
-    }
-    return texts;
 }
 
 } // namespace
@@ -1386,12 +1371,12 @@ std::vector<TerminologyTermIssue> ValidateTerminologyTerms(const sacm::Terminolo
 }
 
 int CountTerminologyTermUsage(const sacm::AssuranceCasePackage& package, const sacm::Term& term) {
-    int count = 0;
-    const std::vector<std::string> texts = CollectUsageTexts(package);
-    for (const auto& text : texts) {
-        count += CountWholeWordOccurrences(text, term.value);
-    }
-    return count;
+    const std::optional<ScopedTermRef> scoped_ref = FindScopedTermRef(package, term);
+    if (!scoped_ref.has_value())
+        return 0;
+    const TerminologyTermUsageSearchResult result =
+        FindTerminologyTermUsages(package, scoped_ref->package_ref, scoped_ref->term_ref);
+    return result.success ? static_cast<int>(result.usages.size()) : 0;
 }
 
 std::vector<TerminologyTermUsageSummary>

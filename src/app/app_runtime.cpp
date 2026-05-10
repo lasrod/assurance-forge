@@ -790,8 +790,8 @@ void AddElementRefs(const parser::AssuranceCase& model, std::unordered_set<std::
             continue;
         if (!element.id.empty())
             refs.insert(element.id);
-        if (!element.name.empty())
-            refs.insert(element.name);
+        if (!element.gid.empty())
+            refs.insert(element.gid);
     }
 }
 
@@ -880,7 +880,7 @@ void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sa
             CopyCommonSacmFields(artifact_reference, element);
             auto target = artifact_reference_targets.find(element.id);
             if (target == artifact_reference_targets.end())
-                target = artifact_reference_targets.find(element.name);
+                target = artifact_reference_targets.find(element.gid);
             if (target != artifact_reference_targets.end())
                 artifact_reference.referencedArtifact = target->second;
             argument_package.artifactReferences.push_back(std::move(artifact_reference));
