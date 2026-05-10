@@ -4,6 +4,7 @@
 #include "ai/ai_task_runner.h"
 #include "ai/secret_store.h"
 #include "app/areas/argument_navigator_area.h"
+#include "app/areas/feedback_dock_area.h"
 #include "app/areas/project_explorer_area.h"
 #include "app/app_runtime_state.h"
 #include "app/frame/app_shell.h"
@@ -30,11 +31,9 @@
 #include "ui/panels/element_panel.h"
 #include "ui/panels/package_details_panel.h"
 #include "ui/panels/preferences_panel.h"
-#include "ui/panels/problems_panel.h"
 #include "ui/panels/review_panel.h"
 #include "ui/panels/sacm_viewer_panel.h"
 #include "ui/panels/terminology_package_panel.h"
-#include "ui/panels/terminology_usages_panel.h"
 #include "ui/register_views.h"
 #include "ui/theme.h"
 #include "ui/ui_state.h"
@@ -2241,77 +2240,6 @@ void AppRuntime::RenderWorkbenchArea(const AppLayoutRegion& region) {
     ImGui::End();
 }
 
-void AppRuntime::RenderFeedbackDockArea(const AppLayoutRegion& region) {
-    ui::panels::ProblemsPanelModel model{
-        impl_->problems_manager,
-        ui::GetUiState(),
-    };
-    ui::panels::ProblemsPanelCallbacks callbacks{
-        [this](const core::ProblemItem& problem) {
-            if (problem.type.rfind("TerminologyTerm", 0) == 0) {
-                HandleProblemQuickFix(problem);
-                return;
-            }
-            if (problem.element_id.empty())
-                return;
-            ui::GetUiState().selected_problem_element_id = problem.element_id;
-            impl_->events.Emit(SelectionChangedEvent{problem.element_id, true});
-            impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
-        },
-        [this](const core::ProblemItem& problem) { HandleProblemQuickFix(problem); },
-    };
-
-    ImGui::SetNextWindowPos(region.pos);
-    ImGui::SetNextWindowSize(region.size);
-    ImGui::Begin("Problems and Review", nullptr, kPanelFlags | ImGuiWindowFlags_NoTitleBar);
-
-    if (ImGui::BeginTabBar("##problems_review_tabs")) {
-        if (ImGui::BeginTabItem("Problems")) {
-            ui::panels::ShowProblemsPanelContent(model, callbacks, false);
-            ImGui::EndTabItem();
-        }
-
-        ImGuiTabItemFlags terminology_usage_flags =
-            impl_->focus_terminology_usages_tab ? ImGuiTabItemFlags_SetSelected : 0;
-        if (ImGui::BeginTabItem("Term Usages", nullptr, terminology_usage_flags)) {
-            ui::panels::TerminologyUsagesPanelModel usage_model;
-            usage_model.has_search = impl_->terminology_usages_active;
-            usage_model.term_value = impl_->usage_search_term_value;
-            usage_model.term_name = impl_->usage_search_term_name;
-            usage_model.message = impl_->usage_search_message;
-            usage_model.error = impl_->usage_search_error;
-            usage_model.usages = &impl_->terminology_usage_results;
-            usage_model.selected_usage_index = impl_->selected_terminology_usage_index;
-
-            ui::panels::TerminologyUsagesPanelCallbacks usage_callbacks;
-            usage_callbacks.select_usage = [this](std::size_t usage_index) {
-                if (usage_index < impl_->terminology_usage_results.size())
-                    impl_->selected_terminology_usage_index = static_cast<int>(usage_index);
-            };
-            usage_callbacks.activate_usage = [this](std::size_t usage_index) {
-                NavigateToTerminologyUsage(usage_index);
-            };
-            ui::panels::ShowTerminologyUsagesPanelContent(usage_model, usage_callbacks);
-            ImGui::EndTabItem();
-        }
-        impl_->focus_terminology_usages_tab = false;
-
-        if (ImGui::BeginTabItem("Review")) {
-            RenderReviewPanelContent();
-            ImGui::EndTabItem();
-        }
-
-        if (ImGui::BeginTabItem("AI Debug")) {
-            RenderAiDebugPanelContent();
-            ImGui::EndTabItem();
-        }
-
-        ImGui::EndTabBar();
-    }
-
-    ImGui::End();
-}
-
 void AppRuntime::SyncReviewProblems() {
     app::SyncReviewProblems(impl_->problems_manager, impl_->review_controller->Items());
 }
@@ -2933,7 +2861,26 @@ void AppRuntime::RenderFrame(bool& done) {
     app::RenderProjectExplorerArea(*impl_, regions.project_explorer, kPanelFlags, project_explorer_callbacks);
     app::RenderArgumentNavigatorArea(*impl_, regions.argument_navigator, kPanelFlags, argument_navigator_callbacks);
     RenderWorkbenchArea(regions.workbench);
-    RenderFeedbackDockArea(regions.feedback_dock);
+
+    FeedbackDockAreaCallbacks feedback_dock_callbacks{
+        [this](const core::ProblemItem& problem) {
+            if (problem.type.rfind("TerminologyTerm", 0) == 0) {
+                HandleProblemQuickFix(problem);
+                return;
+            }
+            if (problem.element_id.empty())
+                return;
+            ui::GetUiState().selected_problem_element_id = problem.element_id;
+            impl_->events.Emit(SelectionChangedEvent{problem.element_id, true});
+            impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
+        },
+        [this](const core::ProblemItem& problem) { HandleProblemQuickFix(problem); },
+        [this](std::size_t usage_index) { NavigateToTerminologyUsage(usage_index); },
+        [this]() { RenderReviewPanelContent(); },
+        [this]() { RenderAiDebugPanelContent(); },
+    };
+    app::RenderFeedbackDockArea(*impl_, regions.feedback_dock, kPanelFlags, feedback_dock_callbacks);
+
     RenderInspectorArea(regions.inspector);
 
     RenderPreferencesWindow();

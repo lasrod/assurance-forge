@@ -34,11 +34,8 @@ void RenderArgumentNavigatorArea(AppRuntimeState& state,
             ? &state.proposal_controller->preview_model
             : (state.app_state.loaded_case.has_value() ? &state.app_state.loaded_case.value() : nullptr);
     const ui::TreeEditActions* edit_actions = state.IsProposalCanvasActive() ? nullptr : &callbacks.tree_edit_actions;
-    ui::ShowTreeViewPanel(state.current_tree.root ? &state.current_tree : nullptr,
-                          visible_case,
-                          ui::GetUiState(),
-                          actions,
-                          edit_actions);
+    ui::ShowTreeViewPanel(
+        state.current_tree.root ? &state.current_tree : nullptr, visible_case, ui::GetUiState(), actions, edit_actions);
     ImGui::End();
 }
 

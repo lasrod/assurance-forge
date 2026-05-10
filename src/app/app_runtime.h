@@ -71,7 +71,6 @@ private:
     void ScanDirectory();
     void RenderSacmViewerPanel(float left_w, float sacm_h, float top_y);
     void RenderWorkbenchArea(const AppLayoutRegion& region);
-    void RenderFeedbackDockArea(const AppLayoutRegion& region);
     void RenderInspectorArea(const AppLayoutRegion& region);
     void RenderReviewPanelContent();
     void RenderAiDebugPanelContent();
