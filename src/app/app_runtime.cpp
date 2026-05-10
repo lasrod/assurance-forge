@@ -8,6 +8,7 @@
 #include "app/areas/argument_navigator_area.h"
 #include "app/areas/feedback_dock_area.h"
 #include "app/areas/inspector_area.h"
+#include "app/areas/modal_host.h"
 #include "app/areas/project_explorer_area.h"
 #include "app/areas/workbench_area.h"
 #include "app/app_runtime_state.h"
@@ -1241,109 +1242,6 @@ float AppRuntime::RenderMainMenuBar(bool& done) {
     return ImGui::GetFrameHeight();
 }
 
-void AppRuntime::RenderPreferencesWindow() {
-    if (!impl_->modal_coordinator->show_preferences_window)
-        return;
-
-    bool test_running = false;
-    if (impl_->ai_test_task) {
-        ai::AiTaskSnapshot snapshot = impl_->ai_test_task->Snapshot();
-        test_running = snapshot.state == ai::AiTaskState::Running;
-        impl_->ai_connection_status = snapshot.status;
-        if (!test_running) {
-            impl_->ai_test_task.reset();
-            impl_->RefreshStoredAiKeyState();
-        }
-    }
-
-    ui::panels::PreferencesPanelModel model;
-    model.settings = &impl_->ai_settings;
-    model.keyStored = impl_->ai_key_stored;
-    model.secureStoreAvailable = impl_->ai_secure_store_available;
-    model.testRunning = test_running;
-    model.connectionStatus = impl_->ai_connection_status;
-    model.apiKeyBuffer = impl_->ai_api_key_buf;
-    model.apiKeyBufferSize = sizeof(impl_->ai_api_key_buf);
-    model.modelBuffer = impl_->ai_model_buf;
-    model.modelBufferSize = sizeof(impl_->ai_model_buf);
-    model.reviewerNameBuffer = impl_->reviewer_name_buf;
-    model.reviewerNameBufferSize = sizeof(impl_->reviewer_name_buf);
-    model.language = ui::CurrentLanguage();
-    if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams()) {
-        model.showFps = runner_params->imGuiWindowParams.showStatus_Fps;
-    }
-
-    ui::panels::PreferencesPanelCallbacks callbacks;
-    callbacks.save_settings = [this](const ai::AiProviderSettings& settings) {
-        impl_->ai_settings = settings;
-        if (impl_->ai_settings.model.empty())
-            impl_->ai_settings.model = ai::kDefaultOpenAiModel;
-        std::string error;
-        if (!impl_->ai_service->SaveSettings(impl_->ai_settings, error)) {
-            impl_->ai_connection_status = ai::ErrorStatus(ai::AiErrorCode::SettingsError, error);
-            return;
-        }
-        CopyToBuffer(impl_->ai_model_buf, sizeof(impl_->ai_model_buf), impl_->ai_settings.model);
-        impl_->ai_connection_status = ai::SuccessStatus("AI settings saved.");
-    };
-    callbacks.save_api_key = [this](const char* api_key) {
-        if (!api_key || api_key[0] == '\0') {
-            impl_->ai_connection_status =
-                ai::ErrorStatus(ai::AiErrorCode::MissingApiKey, "Enter an API key before saving.");
-            return;
-        }
-        ai::SecretStoreResult result = impl_->ai_service->SaveApiKey(api_key);
-        std::memset(impl_->ai_api_key_buf, 0, sizeof(impl_->ai_api_key_buf));
-        impl_->RefreshStoredAiKeyState();
-        impl_->ai_connection_status = result.success ? ai::SuccessStatus("API key saved securely.")
-                                                     : ai::ErrorStatus(result.errorCode, result.errorMessage);
-    };
-    callbacks.remove_api_key = [this]() {
-        ai::SecretStoreResult result = impl_->ai_service->DeleteApiKey();
-        std::memset(impl_->ai_api_key_buf, 0, sizeof(impl_->ai_api_key_buf));
-        impl_->RefreshStoredAiKeyState();
-        impl_->ai_connection_status = result.success ? ai::SuccessStatus("API key removed.")
-                                                     : ai::ErrorStatus(result.errorCode, result.errorMessage);
-    };
-    callbacks.test_connection = [this]() {
-        if (impl_->ai_test_task && impl_->ai_test_task->IsRunning())
-            return;
-        impl_->ai_connection_status =
-            ai::MakeStatus(ai::AiTaskState::Running, ai::AiErrorCode::None, "Testing connection...");
-        impl_->ai_settings.model = impl_->ai_model_buf;
-        if (impl_->ai_settings.model.empty())
-            impl_->ai_settings.model = ai::kDefaultOpenAiModel;
-        std::string error;
-        if (!impl_->ai_service->SaveSettings(impl_->ai_settings, error)) {
-            impl_->ai_connection_status = ai::ErrorStatus(ai::AiErrorCode::SettingsError, error);
-            return;
-        }
-        std::shared_ptr<ai::AiService> service = impl_->ai_service;
-        impl_->ai_test_task =
-            impl_->ai_task_runner.RunConnectionTest([service]() { return service->TestConnection(); });
-    };
-    callbacks.set_language = [](ui::Language language) { ui::SetCurrentLanguage(language); };
-    callbacks.set_show_fps = [](bool show_fps) {
-        if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams()) {
-            runner_params->imGuiWindowParams.showStatus_Fps = show_fps;
-        }
-    };
-    callbacks.save_reviewer_name = [this](const char* reviewer_name) {
-        impl_->reviewer_name = TrimWhitespace(reviewer_name ? reviewer_name : "");
-        CopyToBuffer(impl_->reviewer_name_buf, sizeof(impl_->reviewer_name_buf), impl_->reviewer_name);
-        impl_->modal_coordinator->show_reviewer_name_prompt = impl_->reviewer_name.empty();
-        SetStatus(impl_->reviewer_name.empty() ? "Reviewer name is required for new reviews." : "Reviewer name saved.");
-    };
-
-    ui::panels::ShowPreferencesWindow(impl_->modal_coordinator->show_preferences_window, model, callbacks);
-}
-
-void AppRuntime::RenderThemeTweaksWindow() {
-    if (!impl_->modal_coordinator->show_theme_tweak_window)
-        return;
-    HelloImGui::ShowThemeTweakGuiWindow(&impl_->modal_coordinator->show_theme_tweak_window);
-}
-
 void AppRuntime::RenderSacmViewerPanel(float left_w, float sacm_h, float top_y) {
     ui::panels::SacmViewerPanelModel model{
         impl_->app_state,
@@ -2037,24 +1935,28 @@ void AppRuntime::RenderFrame(bool& done) {
     };
     app::RenderInspectorArea(*impl_, regions.inspector, kPanelFlags, inspector_callbacks);
 
-    RenderPreferencesWindow();
-    RenderThemeTweaksWindow();
-    RenderRemoveConfirmModal();
-    RenderDeleteReviewItemConfirmModal();
-    RenderCreateProjectModal();
-    RenderProjectFileNameModal();
-    RenderProjectLoadReportModal();
-    RenderCreateTerminologyPackageModal();
-    RenderDeleteTerminologyPackageModal();
-    RenderTerminologyTermEditorModal();
-    RenderQuickDefineTermModal();
-    RenderDeleteTerminologyTermModal();
-    RenderTerminologyCategoryEditorModal();
-    RenderDeleteTerminologyCategoryModal();
-    RenderSaveBeforeExitModal(done);
-    RenderStartupProjectWindow();
-    RenderNotImplementedModal();
-    RenderReviewerNamePromptModal();
+    ModalHostCallbacks modal_callbacks;
+    modal_callbacks.begin_create_project = [this]() { BeginCreateProject(); };
+    modal_callbacks.begin_open_project = [this]() { BeginOpenProject(); };
+    modal_callbacks.try_open_project_manifest = [this](const std::string& selected_path) {
+        return TryOpenProjectManifest(selected_path);
+    };
+    modal_callbacks.open_first_project_sacm_file = [this]() { return OpenFirstProjectSacmFile(); };
+    modal_callbacks.ensure_review_item_storage = [this]() { return EnsureReviewItemStorage(); };
+    modal_callbacks.touch_current_project_recent = [this]() { TouchCurrentProjectRecent(); };
+    modal_callbacks.save_project = [this]() { return SaveProject(); };
+    modal_callbacks.set_status = [this](const std::string& message) { SetStatus(message); };
+    modal_callbacks.delete_review_item = [this](const core::reviews::ReviewItem& item) { return DeleteReviewItem(item); };
+    modal_callbacks.confirm_add_terminology_package = [this]() { ConfirmAddTerminologyPackage(); };
+    modal_callbacks.confirm_delete_terminology_package = [this]() { ConfirmDeleteTerminologyPackage(); };
+    modal_callbacks.confirm_terminology_term_edit = [this]() { ConfirmTerminologyTermEdit(); };
+    modal_callbacks.confirm_quick_define_terminology_term = [this](bool add_as_context) {
+        ConfirmQuickDefineTerminologyTerm(add_as_context);
+    };
+    modal_callbacks.confirm_delete_terminology_term = [this]() { ConfirmDeleteTerminologyTerm(); };
+    modal_callbacks.confirm_terminology_category_edit = [this]() { ConfirmTerminologyCategoryEdit(); };
+    modal_callbacks.confirm_delete_terminology_category = [this]() { ConfirmDeleteTerminologyCategory(); };
+    RenderModalHost(*impl_, done, modal_callbacks);
 }
 
 } // namespace app

@@ -233,7 +233,6 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/app/controllers/ai_review_controller.cpp
     src/app/app_runtime_ai.cpp
     src/app/app_ui_bootstrap.cpp
-    src/app/app_runtime_modals.cpp
     src/app/app_runtime_project.cpp
     src/app/app_runtime.cpp
     src/app/app_runtime_state.cpp
@@ -243,6 +242,7 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/app/areas/argument_navigator_area.cpp
     src/app/areas/feedback_dock_area.cpp
     src/app/areas/inspector_area.cpp
+    src/app/areas/modal_host.cpp
     src/app/areas/project_explorer_area.cpp
     src/app/areas/workbench_area.cpp
     src/app/frame/app_layout_regions.cpp

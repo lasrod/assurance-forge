@@ -74,24 +74,6 @@ private:
     void RenderReviewPanelContent();
     void RenderAiDebugPanelContent();
     void RenderProposalElementEditor();
-    void RenderStartupProjectWindow();
-    void RenderNotImplementedModal();
-    void RenderRemoveConfirmModal();
-    void RenderDeleteReviewItemConfirmModal();
-    void RenderReviewerNamePromptModal();
-    void RenderCreateProjectModal();
-    void RenderProjectFileNameModal();
-    void RenderProjectLoadReportModal();
-    void RenderSaveBeforeExitModal(bool& done);
-    void RenderCreateTerminologyPackageModal();
-    void RenderDeleteTerminologyPackageModal();
-    void RenderTerminologyTermEditorModal();
-    void RenderQuickDefineTermModal();
-    void RenderDeleteTerminologyTermModal();
-    void RenderTerminologyCategoryEditorModal();
-    void RenderDeleteTerminologyCategoryModal();
-    void RenderPreferencesWindow();
-    void RenderThemeTweaksWindow();
 
     void BeginCreateProject();
     void BeginOpenProject();
