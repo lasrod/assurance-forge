@@ -1,7 +1,10 @@
 #include "core/app_state.h"
 
 #include "core/project_service.h"
+#include "core/string_utils.h"
 #include "core/terminology_package_service.h"
+#include "core/terminology_text_utils.h"
+#include "parser/model_utils.h"
 #include "sacm/sacm_parser.h"
 #include "sacm/sacm_serializer.h"
 
@@ -12,15 +15,9 @@ namespace core {
 
 namespace {
 
-std::string NormalizeSacmRef(std::string ref) {
-    if (!ref.empty() && ref.front() == '#')
-        ref.erase(ref.begin());
-    return ref;
-}
-
 bool ReferencesAny(const std::vector<std::string>& refs, const std::unordered_set<std::string>& candidates) {
     return std::any_of(refs.begin(), refs.end(), [&](const std::string& ref) {
-        return candidates.find(NormalizeSacmRef(ref)) != candidates.end();
+        return candidates.find(StripLeadingHash(ref)) != candidates.end();
     });
 }
 
@@ -89,28 +86,13 @@ void HideTerminologyArtifactReferences(parser::AssuranceCase& model, const sacm:
         model.elements.end());
 }
 
-std::string TermContextDisplayLabel(const sacm::Term& term) {
-    if (term.value.empty())
-        return term.name.empty() ? term.id : term.name;
-    if (term.name.empty() || term.name == term.value)
-        return term.value;
-    return term.value + ": " + term.name;
-}
-
-parser::SacmElement* FindParserElement(parser::AssuranceCase& model, const std::string& id, const std::string& gid) {
-    for (parser::SacmElement& element : model.elements) {
-        if ((!id.empty() && element.id == id) || (!gid.empty() && element.gid == gid))
-            return &element;
-    }
-    return nullptr;
-}
-
 void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model, const sacm::AssuranceCasePackage& package) {
     for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
         for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
             if (!IsVisibleTerminologyArtifactReference(package, argument_package, artifact_reference))
                 continue;
-            parser::SacmElement* element = FindParserElement(model, artifact_reference.id, artifact_reference.gid);
+            parser::SacmElement* element =
+                parser::FindElementByIdOrGid(model, artifact_reference.id, artifact_reference.gid);
             if (!element)
                 continue;
             const TerminologyTermReferenceResolution resolution =

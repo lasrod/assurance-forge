@@ -1,7 +1,8 @@
 #include "ai/ai_claim_review.h"
 
+#include "core/string_utils.h"
+
 #include <algorithm>
-#include <cctype>
 #include <nlohmann/json.hpp>
 #include <sstream>
 
@@ -10,25 +11,6 @@ namespace {
 
 const char* kAiReviewSystemInstruction =
     "You are reviewing an assurance case element for Assurance Forge. Return JSON only.";
-
-std::string ToLower(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char character) {
-        return static_cast<char>(std::tolower(character));
-    });
-    return value;
-}
-
-std::string Trim(const std::string& value) {
-    size_t start = 0;
-    while (start < value.size() && std::isspace(static_cast<unsigned char>(value[start])))
-        ++start;
-
-    size_t end = value.size();
-    while (end > start && std::isspace(static_cast<unsigned char>(value[end - 1])))
-        --end;
-
-    return value.substr(start, end - start);
-}
 
 nlohmann::json ReviewElementToJson(const AiReviewElement& element) {
     return {
@@ -243,7 +225,7 @@ bool HasPackage(const AiReviewDataPackageBundle& packages, const std::string& id
 }
 
 core::ProblemSeverity SeverityFromString(const std::string& value) {
-    std::string severity = ToLower(value);
+    std::string severity = core::ToLower(value);
     if (severity == "info")
         return core::ProblemSeverity::Info;
     if (severity == "error")
@@ -662,7 +644,7 @@ Return JSON only.)json";
 }
 
 std::string StripJsonCodeFence(const std::string& response_text) {
-    std::string trimmed = Trim(response_text);
+    std::string trimmed = core::TrimWhitespace(response_text);
     if (trimmed.rfind("```", 0) != 0)
         return trimmed;
 
@@ -674,7 +656,7 @@ std::string StripJsonCodeFence(const std::string& response_text) {
     if (fence_start == 0 || fence_start == std::string::npos)
         return trimmed;
 
-    return Trim(trimmed.substr(first_line_end + 1, fence_start - first_line_end - 1));
+    return core::TrimWhitespace(trimmed.substr(first_line_end + 1, fence_start - first_line_end - 1));
 }
 
 AiReviewParseResult ParseAiReviewResponse(const std::string& response_text, const std::string& selected_element_id) {

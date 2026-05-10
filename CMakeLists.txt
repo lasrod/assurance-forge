@@ -176,13 +176,14 @@ function(af_copy_sccg_data target_name)
 endfunction()
 
 set(ASSURANCE_FORGE_SHARED_SOURCES
+    src/parser/model_utils.cpp
     src/parser/xml_parser.cpp
     src/ui/panels/welcome_modal.cpp
     src/ui/panels/element_panel.cpp
     src/ui/panels/package_details_panel.cpp
     src/ui/panels/preferences_panel.cpp
     src/ui/panels/problems_panel.cpp
-    src/ui/panels/project_files_panel.cpp
+    src/ui/panels/project_explorer_panel.cpp
     src/ui/panels/review_panel.cpp
     src/ui/panels/sacm_viewer_panel.cpp
     src/ui/panels/terminology_package_panel.cpp
@@ -201,20 +202,26 @@ set(ASSURANCE_FORGE_SHARED_SOURCES
     src/core/app_state.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
+    src/core/string_utils.cpp
+    src/core/time_utils.cpp
     src/core/tree_editing.cpp
     src/core/problems/problem_attention.cpp
     src/core/problems/problem_item.cpp
     src/core/problems/problems_manager.cpp
+    src/core/problems/problem_utils.cpp
     src/core/project_model.cpp
     src/core/project_service.cpp
     src/core/reviews/review_item.cpp
     src/core/reviews/review_item_manager.cpp
     src/core/reviews/review_proposal.cpp
+    src/core/reviews/review_proposal_factory.cpp
     src/core/reviews/review_proposal_manager.cpp
     src/core/reviews/review_proposal_patch_service.cpp
+    src/core/reviews/review_text_utils.cpp
     src/core/sha256.cpp
     src/core/terminology_package_service.cpp
     src/core/terminology_scope_service.cpp
+    src/core/terminology_text_utils.cpp
     src/sacm/sacm_parser.cpp
     src/sacm/sacm_package_tree.cpp
     src/sacm/sacm_serializer.cpp
@@ -233,11 +240,28 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/app/controllers/ai_review_controller.cpp
     src/app/app_runtime_ai.cpp
     src/app/app_ui_bootstrap.cpp
-    src/app/app_layout_controller.cpp
-    src/app/app_runtime_modals.cpp
     src/app/app_runtime_project.cpp
     src/app/app_runtime.cpp
     src/app/app_runtime_state.cpp
+    src/app/actions/ai_review_actions.cpp
+    src/app/actions/element_actions.cpp
+    src/app/actions/proposal_actions.cpp
+    src/app/actions/review_actions.cpp
+    src/app/actions/terminology_actions.cpp
+    src/app/areas/ai_debug_area.cpp
+    src/app/areas/argument_navigator_area.cpp
+    src/app/areas/feedback_dock_area.cpp
+    src/app/areas/inspector_area.cpp
+    src/app/areas/modal_host.cpp
+    src/app/areas/problems_area.cpp
+    src/app/areas/proposal_editor_area.cpp
+    src/app/areas/project_explorer_area.cpp
+    src/app/areas/review_panel_area.cpp
+    src/app/areas/term_usages_area.cpp
+    src/app/areas/workbench_area.cpp
+    src/app/frame/app_layout_regions.cpp
+    src/app/frame/app_menu_bar.cpp
+    src/app/frame/app_shell.cpp
     src/app/guideline_catalog.cpp
     src/app/review_problem_sync.cpp
     src/app/controllers/element_edit_controller.cpp
@@ -246,8 +270,11 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/app/controllers/project_controller.cpp
     src/app/controllers/proposal_controller.cpp
     src/app/project_workflow.cpp
+    src/app/proposal_ui_state.cpp
     src/app/recent_projects.cpp
     src/app/controllers/review_controller.cpp
+    src/app/sacm_argument_sync.cpp
+    src/app/terminology_problem_sync.cpp
     src/parser/guidelines_parser.cpp
     src/parser/sccg_dist_parser.cpp
     ${ASSURANCE_FORGE_SHARED_SOURCES}
@@ -308,6 +335,7 @@ add_executable(tests
     tests/test_localization.cpp
     tests/test_ui_state.cpp
     tests/test_recent_projects.cpp
+    tests/test_shared_utils.cpp
     src/ai/ai_service.cpp
     src/ai/ai_claim_review.cpp
     src/ai/ai_settings.cpp
@@ -328,24 +356,31 @@ add_executable(tests
     src/app/controllers/review_controller.cpp
     src/parser/guidelines_parser.cpp
     src/parser/sccg_dist_parser.cpp
+    src/parser/model_utils.cpp
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
+    src/core/string_utils.cpp
+    src/core/time_utils.cpp
     src/core/tree_editing.cpp
     src/core/problems/problem_attention.cpp
     src/core/problems/problem_item.cpp
     src/core/problems/problems_manager.cpp
+    src/core/problems/problem_utils.cpp
     src/core/project_model.cpp
     src/core/project_service.cpp
     src/core/app_state.cpp
     src/core/reviews/review_item.cpp
     src/core/reviews/review_item_manager.cpp
     src/core/reviews/review_proposal.cpp
+    src/core/reviews/review_proposal_factory.cpp
     src/core/reviews/review_proposal_manager.cpp
     src/core/reviews/review_proposal_patch_service.cpp
+    src/core/reviews/review_text_utils.cpp
     src/core/sha256.cpp
     src/core/terminology_package_service.cpp
     src/core/terminology_scope_service.cpp
+    src/core/terminology_text_utils.cpp
     src/ui/gsn/gsn_layout.cpp
     src/ui/localization.cpp
     src/ui/ui_state.cpp

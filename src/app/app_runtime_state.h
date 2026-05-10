@@ -29,6 +29,87 @@
 
 namespace app {
 
+struct AiUiState {
+    std::shared_ptr<ai::AiSettingsStore> settings_store;
+    std::shared_ptr<ai::ISecretStore> secret_store;
+    std::shared_ptr<ai::IHttpClient> http_client;
+    std::shared_ptr<ai::IAiProvider> provider;
+    std::shared_ptr<ai::AiService> service;
+    ai::AiTaskRunner task_runner;
+    std::shared_ptr<ai::AiTaskHandle> test_task;
+    std::unique_ptr<controllers::AiReviewController> review_controller;
+    ai::AiProviderSettings settings;
+    ai::AiConnectionStatus connection_status;
+    bool key_stored = false;
+    bool secure_store_available = false;
+    char api_key_buf[256] = {};
+    char model_buf[128] = {};
+};
+
+struct WorkbenchState {
+    bool force_center_tab_selection = false;
+    bool pending_focus_root = false;
+    bool show_gsn_tab = true;
+    bool show_cse_tab = false;
+    bool show_evidence_tab = false;
+    bool show_package_details_tab = false;
+    bool show_terminology_package_tab = false;
+};
+
+struct TerminologyUiState {
+    core::TerminologyPackageRef selected_package_ref;
+    std::filesystem::path selected_package_file_path;
+    char package_name_buf[256] = {};
+    char package_description_buf[2048] = {};
+    bool show_create_package_modal = false;
+    std::optional<core::ProjectFileEntry> pending_package_parent_entry;
+    char new_package_name_buf[256] = {};
+    char new_package_description_buf[2048] = {};
+    bool show_delete_package_modal = false;
+    core::TerminologyTermRef selected_term_ref;
+    core::TerminologyCategoryRef selected_category_ref;
+    bool usages_active = false;
+    bool focus_usages_tab = false;
+    core::TerminologyPackageRef usage_search_package_ref;
+    core::TerminologyTermRef usage_search_term_ref;
+    std::string usage_search_term_value;
+    std::string usage_search_term_name;
+    std::string usage_search_message;
+    std::string usage_search_error;
+    std::vector<core::TerminologyTermUsage> usage_results;
+    int selected_usage_index = -1;
+    char filter_buf[256] = {};
+    char category_filter_buf[128] = {};
+    bool show_term_editor_modal = false;
+    bool editing_existing_term = false;
+    bool show_quick_define_term_modal = false;
+    std::string quick_define_element_id;
+    std::string quick_define_source_text;
+    core::TerminologyPackageRef quick_define_target_package_ref;
+    std::unordered_set<std::string> ignored_suggestion_keys;
+    bool show_delete_term_modal = false;
+    int pending_delete_term_usage_count = 0;
+    bool show_category_editor_modal = false;
+    bool editing_existing_category = false;
+    bool show_delete_category_modal = false;
+    int pending_delete_category_term_count = 0;
+    char term_value_buf[256] = {};
+    char term_name_buf[256] = {};
+    char term_definition_buf[2048] = {};
+    char term_categories_buf[512] = {};
+    char term_external_reference_buf[512] = {};
+    char term_origin_buf[512] = {};
+    char category_name_buf[256] = {};
+    char category_description_buf[2048] = {};
+};
+
+struct LayoutState {
+    float left_ratio = 0.20f;
+    float right_ratio = 0.20f;
+    float project_boundary_ratio = 0.50f;
+    float problems_panel_height = 220.0f;
+};
+
 struct AppRuntimeState {
     AppRuntimeState();
 
@@ -47,85 +128,19 @@ struct AppRuntimeState {
     std::string reviewer_name;
     char reviewer_name_buf[128] = {};
 
-    std::shared_ptr<ai::AiSettingsStore> ai_settings_store;
-    std::shared_ptr<ai::ISecretStore> ai_secret_store;
-    std::shared_ptr<ai::IHttpClient> ai_http_client;
-    std::shared_ptr<ai::IAiProvider> ai_provider;
-    std::shared_ptr<ai::AiService> ai_service;
-    ai::AiTaskRunner ai_task_runner;
-    std::shared_ptr<ai::AiTaskHandle> ai_test_task;
-    std::unique_ptr<controllers::AiReviewController> ai_review_controller;
-    ai::AiProviderSettings ai_settings;
-    ai::AiConnectionStatus ai_connection_status;
-    bool ai_key_stored = false;
-    bool ai_secure_store_available = false;
-    char ai_api_key_buf[256] = {};
-    char ai_model_buf[128] = {};
+    AiUiState ai;
 
     bool tree_needs_rebuild = false;
     core::AssuranceTree current_tree;
     core::TreeDisplayOrder tree_display_order;
     core::TreeEditIndex tree_edit_index;
     bool tree_edit_index_valid = false;
-    bool force_center_tab_selection = false;
-    bool pending_focus_root = false;
-    bool show_gsn_tab = true;
-    bool show_cse_tab = false;
-    bool show_evidence_tab = false;
-    bool show_package_details_tab = false;
-    bool show_terminology_package_tab = false;
+    WorkbenchState workbench;
     std::map<std::string, sacm::SacmPackageTreeResult> sacm_package_tree_cache;
     std::optional<sacm::SacmPackageTreeNode> selected_package_node;
     std::filesystem::path selected_package_file_path;
-    core::TerminologyPackageRef selected_terminology_package_ref;
-    std::filesystem::path selected_terminology_package_file_path;
-    char terminology_package_name_buf[256] = {};
-    char terminology_package_description_buf[2048] = {};
-    bool show_create_terminology_package_modal = false;
-    std::optional<core::ProjectFileEntry> pending_terminology_package_parent_entry;
-    char new_terminology_package_name_buf[256] = {};
-    char new_terminology_package_description_buf[2048] = {};
-    bool show_delete_terminology_package_modal = false;
-    core::TerminologyTermRef selected_terminology_term_ref;
-    core::TerminologyCategoryRef selected_terminology_category_ref;
-    bool terminology_usages_active = false;
-    bool focus_terminology_usages_tab = false;
-    core::TerminologyPackageRef usage_search_package_ref;
-    core::TerminologyTermRef usage_search_term_ref;
-    std::string usage_search_term_value;
-    std::string usage_search_term_name;
-    std::string usage_search_message;
-    std::string usage_search_error;
-    std::vector<core::TerminologyTermUsage> terminology_usage_results;
-    int selected_terminology_usage_index = -1;
-    char terminology_filter_buf[256] = {};
-    char terminology_category_filter_buf[128] = {};
-    bool show_terminology_term_editor_modal = false;
-    bool editing_existing_terminology_term = false;
-    bool show_quick_define_term_modal = false;
-    std::string quick_define_element_id;
-    std::string quick_define_source_text;
-    core::TerminologyPackageRef quick_define_target_package_ref;
-    std::unordered_set<std::string> ignored_terminology_suggestion_keys;
-    bool show_delete_terminology_term_modal = false;
-    int pending_delete_terminology_term_usage_count = 0;
-    bool show_terminology_category_editor_modal = false;
-    bool editing_existing_terminology_category = false;
-    bool show_delete_terminology_category_modal = false;
-    int pending_delete_terminology_category_term_count = 0;
-    char term_value_buf[256] = {};
-    char term_name_buf[256] = {};
-    char term_definition_buf[2048] = {};
-    char term_categories_buf[512] = {};
-    char term_external_reference_buf[512] = {};
-    char term_origin_buf[512] = {};
-    char category_name_buf[256] = {};
-    char category_description_buf[2048] = {};
-
-    float left_ratio = 0.20f;
-    float right_ratio = 0.20f;
-    float project_boundary_ratio = 0.50f;
-    float problems_panel_height = 220.0f;
+    TerminologyUiState terminology;
+    LayoutState layout;
 
     bool IsProposalCanvasActive() const;
 

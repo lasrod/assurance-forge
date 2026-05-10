@@ -1,24 +1,18 @@
 #include "ui/panels/review_panel.h"
 
+#include "core/string_utils.h"
 #include "imgui.h"
+#include "ui/imgui_buffer_utils.h"
 #include "ui/theme.h"
 
 #include <algorithm>
-#include <cctype>
-#include <cstring>
 #include <string>
 #include <vector>
 
 namespace ui::panels {
 namespace {
 
-void CopyToBuffer(char* buffer, size_t size, const std::string& value) {
-    if (size == 0)
-        return;
-    const size_t count = std::min(size - 1, value.size());
-    std::memcpy(buffer, value.data(), count);
-    buffer[count] = '\0';
-}
+using ui::CopyToBuffer;
 
 void DrawStatusBadge(const core::reviews::ReviewItem& item) {
     const bool resolved = item.status == core::reviews::ReviewItemStatus::Resolved;
@@ -39,13 +33,6 @@ void DrawProblemSeverityBadge(const core::ProblemItem& problem) {
     ImGui::PopStyleColor();
 }
 
-std::string LowerCopy(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
-        return static_cast<char>(std::tolower(ch));
-    });
-    return value;
-}
-
 bool ContainsGuidelineId(const std::vector<std::string>& guideline_ids, const std::string& guideline_id) {
     return std::find(guideline_ids.begin(), guideline_ids.end(), guideline_id) != guideline_ids.end();
 }
@@ -60,9 +47,9 @@ const ReviewGuidelineOption* FindGuidelineOption(const ReviewPanelModel& model, 
 bool MatchesGuidelineFilter(const ReviewGuidelineOption& option, const std::string& lowered_filter) {
     if (lowered_filter.empty())
         return true;
-    return LowerCopy(option.id).find(lowered_filter) != std::string::npos ||
-           LowerCopy(option.category).find(lowered_filter) != std::string::npos ||
-           LowerCopy(option.title).find(lowered_filter) != std::string::npos;
+    return core::ToLower(option.id).find(lowered_filter) != std::string::npos ||
+           core::ToLower(option.category).find(lowered_filter) != std::string::npos ||
+           core::ToLower(option.title).find(lowered_filter) != std::string::npos;
 }
 
 std::string GuidelineDisplayLabel(const ReviewGuidelineOption& option) {
@@ -173,7 +160,7 @@ void DrawGuidelineSelector(const ReviewPanelModel& model,
                                                                : model.guideline_status.c_str());
         } else {
             const std::string filter(filter_buffer);
-            const std::string lowered_filter = LowerCopy(filter);
+            const std::string lowered_filter = core::ToLower(filter);
             int shown = 0;
             for (const ReviewGuidelineOption& option : model.guideline_options) {
                 if (ContainsGuidelineId(selected_guideline_ids, option.id))

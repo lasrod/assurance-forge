@@ -15,6 +15,12 @@
 
 namespace app {
 
+namespace areas {
+struct WorkbenchAreaCallbacks;
+}
+namespace frame {
+struct AppLayoutRegion;
+}
 struct AppRuntimeState;
 
 class AppRuntime {
@@ -66,34 +72,9 @@ public:
 private:
     void RegisterAppEventListeners();
 
-    float RenderMainMenuBar(bool& done);
     void ScanDirectory();
-    void RenderTreePanel(float left_w, float safety_tree_h, float top_y);
     void RenderSacmViewerPanel(float left_w, float sacm_h, float top_y);
-    void RenderCenterPanel(float center_x, float center_w, float content_h, float top_y);
-    void RenderProblemsPanel(float center_x, float center_w, float problems_h, float top_y);
-    void RenderElementPropertiesPanel(float center_x, float center_w, float right_w, float content_h, float top_y);
-    void RenderReviewPanelContent();
-    void RenderAiDebugPanelContent();
-    void RenderProposalElementEditor();
-    void RenderStartupProjectWindow();
-    void RenderNotImplementedModal();
-    void RenderRemoveConfirmModal();
-    void RenderDeleteReviewItemConfirmModal();
-    void RenderReviewerNamePromptModal();
-    void RenderCreateProjectModal();
-    void RenderProjectFileNameModal();
-    void RenderProjectLoadReportModal();
-    void RenderSaveBeforeExitModal(bool& done);
-    void RenderCreateTerminologyPackageModal();
-    void RenderDeleteTerminologyPackageModal();
-    void RenderTerminologyTermEditorModal();
-    void RenderQuickDefineTermModal();
-    void RenderDeleteTerminologyTermModal();
-    void RenderTerminologyCategoryEditorModal();
-    void RenderDeleteTerminologyCategoryModal();
-    void RenderPreferencesWindow();
-    void RenderThemeTweaksWindow();
+    areas::WorkbenchAreaCallbacks MakeWorkbenchAreaCallbacks();
 
     void BeginCreateProject();
     void BeginOpenProject();
@@ -159,10 +140,8 @@ private:
     bool BeginEditProposalById(const std::string& proposal_id);
     bool PreviewProposalById(const std::string& proposal_id);
     bool SaveActiveProposal(const core::reviews::ReviewItem& item);
-    void CreateAiGeneratedProposals(const std::vector<AiReviewProposalSuggestion>& suggestions);
     bool SetManualReviewOk(const std::string& element_id, bool manual_ok);
     void CancelActiveProposal();
-    void MarkReviewItemsDirty();
     bool DeleteProposalPatchFile(const std::string& proposal_id, std::string& error);
     void CloseProposalPreviewIfOpen(const std::string& proposal_id);
     void BeginDeleteReviewItem(const core::reviews::ReviewItem& item);

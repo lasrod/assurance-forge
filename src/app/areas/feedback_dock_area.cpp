@@ -1,0 +1,48 @@
+#include "app/areas/feedback_dock_area.h"
+
+#include "app/app_runtime_state.h"
+#include "app/frame/app_layout_regions.h"
+
+namespace app::areas {
+
+void RenderFeedbackDockArea(AppRuntimeState& state,
+                            const frame::AppLayoutRegion& region,
+                            ImGuiWindowFlags panel_flags,
+                            const FeedbackDockAreaCallbacks& callbacks) {
+    ImGui::SetNextWindowPos(region.pos);
+    ImGui::SetNextWindowSize(region.size);
+    ImGui::Begin("Problems and Review", nullptr, panel_flags | ImGuiWindowFlags_NoTitleBar);
+
+    if (ImGui::BeginTabBar("##problems_review_tabs")) {
+        if (ImGui::BeginTabItem("Problems")) {
+            RenderProblemsAreaContent(state, callbacks.problems);
+            ImGui::EndTabItem();
+        }
+
+        ImGuiTabItemFlags terminology_usage_flags =
+            state.terminology.focus_usages_tab ? ImGuiTabItemFlags_SetSelected : 0;
+        if (ImGui::BeginTabItem("Term Usages", nullptr, terminology_usage_flags)) {
+            RenderTermUsagesAreaContent(state, callbacks.term_usages);
+            ImGui::EndTabItem();
+        }
+        state.terminology.focus_usages_tab = false;
+
+        if (ImGui::BeginTabItem("Review")) {
+            if (callbacks.render_review_content)
+                callbacks.render_review_content();
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem("AI Debug")) {
+            if (callbacks.render_ai_debug_content)
+                callbacks.render_ai_debug_content();
+            ImGui::EndTabItem();
+        }
+
+        ImGui::EndTabBar();
+    }
+
+    ImGui::End();
+}
+
+} // namespace app::areas

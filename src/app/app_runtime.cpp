@@ -1,57 +1,47 @@
 #include "app/app_runtime.h"
 
-#include "ai/ai_service.h"
-#include "ai/ai_task_runner.h"
-#include "ai/secret_store.h"
-#include "app/app_layout_controller.h"
+#include "app/actions/element_actions.h"
+#include "app/actions/proposal_actions.h"
+#include "app/actions/review_actions.h"
+#include "app/areas/ai_debug_area.h"
+#include "app/areas/argument_navigator_area.h"
+#include "app/areas/feedback_dock_area.h"
+#include "app/areas/inspector_area.h"
+#include "app/areas/modal_host.h"
+#include "app/areas/proposal_editor_area.h"
+#include "app/areas/project_explorer_area.h"
+#include "app/areas/review_panel_area.h"
+#include "app/areas/workbench_area.h"
 #include "app/app_runtime_state.h"
-#include "app/guideline_catalog.h"
+#include "app/frame/app_menu_bar.h"
+#include "app/frame/app_shell.h"
+#include "app/proposal_ui_state.h"
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
 #include "app/review_problem_sync.h"
+#include "app/terminology_problem_sync.h"
 #include "core/app_state.h"
 #include "core/element_factory.h"
 #include "core/problems/problem_attention.h"
 #include "core/problems/problems_manager.h"
-#include "core/project_service.h"
 #include "core/reviews/review_proposal_manager.h"
-#include "core/reviews/review_proposal_patch_service.h"
+#include "core/string_utils.h"
 #include "core/terminology_package_service.h"
 #include "core/terminology_scope_service.h"
-#include "hello_imgui/hello_imgui.h"
-#include "hello_imgui/hello_imgui_theme.h"
+#include "core/time_utils.h"
 #include "imgui.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas.h"
-#include "ui/gsn/gsn_canvas_renderer.h"
-#include "ui/localization.h"
-#include "ui/panels/element_panel.h"
-#include "ui/panels/package_details_panel.h"
-#include "ui/panels/preferences_panel.h"
-#include "ui/panels/problems_panel.h"
-#include "ui/panels/project_files_panel.h"
-#include "ui/panels/review_panel.h"
+#include "ui/imgui_buffer_utils.h"
 #include "ui/panels/sacm_viewer_panel.h"
-#include "ui/panels/terminology_package_panel.h"
-#include "ui/panels/terminology_usages_panel.h"
 #include "ui/register_views.h"
-#include "ui/theme.h"
-#include "ui/tree_view.h"
 #include "ui/ui_state.h"
-#include "ui/widgets/splitter.h"
 
 #include <algorithm>
-#include <cctype>
-#include <chrono>
-#include <cstdio>
-#include <cstring>
-#include <ctime>
 #include <filesystem>
-#include <iomanip>
 #include <map>
 #include <memory>
 #include <optional>
-#include <sstream>
 #include <string>
 #include <system_error>
 #include <unordered_set>
@@ -61,880 +51,11 @@
 namespace app {
 namespace {
 
-constexpr float kSplitterThickness = 4.0f;
-
 const ImGuiWindowFlags kPanelFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
                                      ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoSavedSettings;
 
-void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
-    if (!buffer || buffer_size == 0)
-        return;
-    size_t count = std::min(buffer_size - 1, value.size());
-    std::memcpy(buffer, value.data(), count);
-    buffer[count] = '\0';
-}
-
-std::string TrimWhitespace(const std::string& value) {
-    auto begin = value.begin();
-    while (begin != value.end() && std::isspace(static_cast<unsigned char>(*begin)))
-        ++begin;
-    auto end = value.end();
-    while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1))))
-        --end;
-    return std::string(begin, end);
-}
-
-void RenderLanguageMenu() {
-    if (!ImGui::BeginMenu(ui::Tr(ui::MessageId::Language)))
-        return;
-
-    const ui::Language current = ui::CurrentLanguage();
-    if (ImGui::MenuItem(ui::Tr(ui::MessageId::English), nullptr, current == ui::Language::English)) {
-        ui::SetCurrentLanguage(ui::Language::English);
-    }
-    if (ImGui::MenuItem(ui::Tr(ui::MessageId::Japanese), nullptr, current == ui::Language::Japanese)) {
-        ui::SetCurrentLanguage(ui::Language::Japanese);
-    }
-
-    ImGui::EndMenu();
-}
-
-void RenderThemeMenu() {
-    if (!ImGui::BeginMenu(ui::Tr(ui::MessageId::Theme)))
-        return;
-
-    HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
-    if (!runner_params) {
-        ImGui::EndMenu();
-        return;
-    }
-
-    for (int i = 0; i < ImGuiTheme::ImGuiTheme_Count; ++i) {
-        auto theme = static_cast<ImGuiTheme::ImGuiTheme_>(i);
-        bool selected = runner_params->imGuiWindowParams.tweakedTheme.Theme == theme;
-        if (ImGui::MenuItem(ImGuiTheme::ImGuiTheme_Name(theme), nullptr, selected)) {
-            runner_params->imGuiWindowParams.tweakedTheme.Theme = theme;
-            ImGuiTheme::ApplyTweakedTheme(runner_params->imGuiWindowParams.tweakedTheme);
-        }
-    }
-
-    ImGui::EndMenu();
-}
-
-std::string NowUtcString() {
-    auto now = std::chrono::system_clock::now();
-    std::time_t time = std::chrono::system_clock::to_time_t(now);
-    std::tm utc{};
-#if defined(_WIN32)
-    if (gmtime_s(&utc, &time) != 0)
-        return "1970-01-01T00:00:00Z";
-#else
-    if (!gmtime_r(&time, &utc))
-        return "1970-01-01T00:00:00Z";
-#endif
-    std::ostringstream out;
-    out << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
-    return out.str();
-}
-
-std::string GenerateReviewItemId() {
-    static unsigned long long counter = 0;
-    auto ticks = std::chrono::system_clock::now().time_since_epoch().count();
-    std::ostringstream out;
-    out << "review-" << std::hex << ticks << "-" << ++counter;
-    return out.str();
-}
-
-std::string GenerateReviewProposalId() {
-    static unsigned long long counter = 0;
-    auto ticks = std::chrono::system_clock::now().time_since_epoch().count();
-    std::ostringstream out;
-    out << "proposal-" << std::hex << ticks << "-" << ++counter;
-    return out.str();
-}
-
-std::string TruncateForProblemMessage(const std::string& value, size_t limit = 400) {
-    if (value.size() <= limit)
-        return value;
-    return value.substr(0, limit) + "...";
-}
-
 bool IsReviewDerivedProblem(const core::ProblemItem& problem) {
     return problem.id.rfind("review-comment:", 0) == 0 || problem.id.rfind("guideline-review:", 0) == 0;
-}
-
-bool StartsWith(const std::string& value, const std::string& prefix) {
-    return value.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), value.begin());
-}
-
-void ClearProblemsByIdPrefix(core::ProblemsManager& problems_manager, const std::string& prefix) {
-    std::vector<std::string> problem_ids;
-    for (const core::ProblemItem& problem : problems_manager.GetProblems()) {
-        if (StartsWith(problem.id, prefix))
-            problem_ids.push_back(problem.id);
-    }
-    for (const std::string& problem_id : problem_ids) {
-        problems_manager.RemoveProblem(problem_id);
-    }
-}
-
-bool IsRelationshipElement(const parser::SacmElement& element) {
-    return element.type == "assertedinference" || element.type == "assertedcontext" ||
-           element.type == "assertedevidence";
-}
-
-std::string ElementTerminologyText(const parser::SacmElement& element) {
-    if (element.type == "claim" || element.type == "argumentreasoning")
-        return element.content;
-    return element.description;
-}
-
-std::string TerminologyAmbiguityProblemId(const core::TermOccurrence& occurrence) {
-    return "terminology-ambiguity:" + occurrence.element_id + ":" + occurrence.text + ":" +
-           std::to_string(occurrence.start_offset) + ":" + std::to_string(occurrence.end_offset);
-}
-
-std::string TerminologyUndefinedProblemId(const core::TermOccurrence& occurrence) {
-    return "terminology-undefined:" + occurrence.element_id + ":" + occurrence.text + ":" +
-           std::to_string(occurrence.start_offset) + ":" + std::to_string(occurrence.end_offset);
-}
-
-core::TerminologyPackageRef TerminologyPackageRefFor(const sacm::TerminologyPackage& package) {
-    return core::TerminologyPackageRef{package.id, package.gid};
-}
-
-std::string RefValue(const core::TerminologyPackageRef& ref) {
-    return ref.id.empty() ? ref.gid : ref.id;
-}
-
-std::string RefValue(const core::TerminologyTermRef& ref) {
-    return ref.id.empty() ? ref.gid : ref.id;
-}
-
-const char* TermIssueKindCode(core::TerminologyTermIssueKind kind) {
-    switch (kind) {
-    case core::TerminologyTermIssueKind::MissingValue:
-        return "missing-value";
-    case core::TerminologyTermIssueKind::DuplicateDefinition:
-        return "duplicate-definition";
-    case core::TerminologyTermIssueKind::MissingDescription:
-        return "missing-description";
-    case core::TerminologyTermIssueKind::MissingCategory:
-        return "missing-category";
-    case core::TerminologyTermIssueKind::MissingExternalReference:
-        return "missing-external-reference";
-    }
-    return "unknown";
-}
-
-const char* TermIssueProblemType(core::TerminologyTermIssueKind kind) {
-    switch (kind) {
-    case core::TerminologyTermIssueKind::MissingValue:
-        return "TerminologyTermMissingValue";
-    case core::TerminologyTermIssueKind::DuplicateDefinition:
-        return "TerminologyTermDuplicateDefinition";
-    case core::TerminologyTermIssueKind::MissingDescription:
-        return "TerminologyTermMissingDescription";
-    case core::TerminologyTermIssueKind::MissingCategory:
-        return "TerminologyTermMissingCategory";
-    case core::TerminologyTermIssueKind::MissingExternalReference:
-        return "TerminologyTermMissingExternalReference";
-    }
-    return "TerminologyTermIssue";
-}
-
-const char* TermIssueQuickFixLabel(core::TerminologyTermIssueKind kind) {
-    switch (kind) {
-    case core::TerminologyTermIssueKind::DuplicateDefinition:
-        return "Open duplicates";
-    case core::TerminologyTermIssueKind::MissingValue:
-    case core::TerminologyTermIssueKind::MissingDescription:
-    case core::TerminologyTermIssueKind::MissingCategory:
-    case core::TerminologyTermIssueKind::MissingExternalReference:
-        return "Edit term";
-    }
-    return "";
-}
-
-std::string TerminologyTermProblemId(const core::TerminologyPackageRef& package_ref,
-                                     const core::TerminologyTermIssue& issue) {
-    return "terminology-term:" + RefValue(package_ref) + ":" + RefValue(issue.term_ref) + ":" +
-           TermIssueKindCode(issue.kind);
-}
-
-std::string EncodeTerminologyTermQuickFixPayload(const core::TerminologyPackageRef& package_ref,
-                                                 const core::TerminologyTermRef& term_ref,
-                                                 const std::string& term_value) {
-    return package_ref.id + "\n" + package_ref.gid + "\n" + term_ref.id + "\n" + term_ref.gid + "\n" + term_value;
-}
-
-std::string TerminologyContextReferenceProblemId(const core::TerminologyContextReferenceIssue& issue) {
-    if (!issue.artifact_reference_id.empty())
-        return "terminology-context-reference:" + issue.artifact_reference_id + ":" + issue.target_ref;
-    if (!issue.asserted_context_id.empty())
-        return "terminology-context-reference:" + issue.asserted_context_id + ":" + issue.target_ref;
-    return "terminology-context-reference:" + issue.referenced_artifact + ":" + issue.target_ref;
-}
-
-core::ProblemSeverity ProblemSeverityFor(core::TerminologyTermIssueSeverity severity) {
-    switch (severity) {
-    case core::TerminologyTermIssueSeverity::Error:
-        return core::ProblemSeverity::Error;
-    case core::TerminologyTermIssueSeverity::Warning:
-        return core::ProblemSeverity::Warning;
-    case core::TerminologyTermIssueSeverity::Info:
-        return core::ProblemSeverity::Info;
-    }
-    return core::ProblemSeverity::Info;
-}
-
-std::vector<core::ProblemItem> BuildTerminologyTermProblems(const sacm::TerminologyPackage& terminology_package) {
-    std::vector<core::ProblemItem> problems;
-    const core::TerminologyPackageRef package_ref = TerminologyPackageRefFor(terminology_package);
-    for (const core::TerminologyTermIssue& issue : core::ValidateTerminologyTerms(terminology_package)) {
-        const sacm::Term* term = core::FindTerminologyTerm(terminology_package, issue.term_ref);
-        const std::string term_value = term ? term->value : std::string{};
-        core::ProblemItem problem;
-        problem.id = TerminologyTermProblemId(package_ref, issue);
-        problem.severity = ProblemSeverityFor(issue.severity);
-        problem.source = core::ProblemSource::ModelValidation;
-        problem.element_id = RefValue(issue.term_ref);
-        problem.type = TermIssueProblemType(issue.kind);
-        problem.message = issue.message;
-        problem.quick_fix_label = TermIssueQuickFixLabel(issue.kind);
-        problem.quick_fix_payload = EncodeTerminologyTermQuickFixPayload(package_ref, issue.term_ref, term_value);
-        problems.push_back(std::move(problem));
-    }
-    return problems;
-}
-
-core::ProblemItem BuildTerminologyContextReferenceProblem(const core::TerminologyContextReferenceIssue& issue) {
-    core::ProblemItem problem;
-    problem.id = TerminologyContextReferenceProblemId(issue);
-    problem.severity = ProblemSeverityFor(issue.severity);
-    problem.source = core::ProblemSource::ModelValidation;
-    problem.element_id = issue.artifact_reference_id.empty() ? issue.target_ref : issue.artifact_reference_id;
-    problem.type = "TerminologyBrokenContextReference";
-    problem.message = issue.message;
-    return problem;
-}
-
-std::optional<core::ProblemItem> BuildTerminologyOccurrenceProblem(const core::TermOccurrence& occurrence,
-                                                                   bool ignored) {
-    if (ignored)
-        return std::nullopt;
-
-    if (occurrence.resolution.status == core::TermResolutionStatus::Ambiguous) {
-        core::ProblemItem problem;
-        problem.id = TerminologyAmbiguityProblemId(occurrence);
-        problem.severity = core::ProblemSeverity::Warning;
-        problem.source = core::ProblemSource::ModelValidation;
-        problem.element_id = occurrence.element_id;
-        problem.type = "TerminologyAmbiguity";
-        problem.message = occurrence.text + " has " + std::to_string(occurrence.resolution.candidates.size()) +
-                          " visible meanings. Choose the intended terminology entry.";
-        problem.quick_fix_label = "Open glossary";
-        problem.quick_fix_payload = occurrence.text;
-        return problem;
-    }
-
-    if (occurrence.kind == core::TermOccurrenceKind::UndefinedAcronym && occurrence.resolution.important_undefined) {
-        core::ProblemItem problem;
-        problem.id = TerminologyUndefinedProblemId(occurrence);
-        problem.severity = core::ProblemSeverity::Warning;
-        problem.source = core::ProblemSource::ModelValidation;
-        problem.element_id = occurrence.element_id;
-        problem.type = "TerminologyUndefinedAcronym";
-        problem.message = occurrence.text + " looks like an undefined terminology entry.";
-        problem.quick_fix_label = "Define term";
-        problem.quick_fix_payload = occurrence.text;
-        return problem;
-    }
-
-    return std::nullopt;
-}
-
-const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model, const std::string& element_id) {
-    auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
-        return element.id == element_id;
-    });
-    return found == model.elements.end() ? nullptr : &*found;
-}
-
-core::reviews::ReviewProposal BuildDraftReviewProposal(const core::reviews::ReviewItem& item,
-                                                       const parser::AssuranceCase& model,
-                                                       const parser::SacmElement& anchor) {
-    core::reviews::ReviewProposal proposal;
-    proposal.id = GenerateReviewProposalId();
-    proposal.review_item_id = item.id;
-    proposal.title = item.title.empty() ? "Proposed change" : item.title;
-    proposal.summary = item.message.empty() ? "Draft proposed change." : TruncateForProblemMessage(item.message, 180);
-    proposal.author_name = "Manual reviewer";
-    proposal.created_utc = NowUtcString();
-    proposal.anchor_element_id = anchor.id;
-    proposal.affected_existing_element_ids = {anchor.id};
-    proposal.base_model_hash = core::reviews::ComputeModelSemanticHash(model);
-    proposal.base_element_hashes[anchor.id] = core::reviews::ComputeElementSemanticHash(anchor);
-    return proposal;
-}
-
-core::reviews::PatchOperationType CreateOperationFor(core::NewElementKind kind) {
-    switch (kind) {
-    case core::NewElementKind::Goal:
-        return core::reviews::PatchOperationType::CreateClaim;
-    case core::NewElementKind::Strategy:
-        return core::reviews::PatchOperationType::CreateStrategy;
-    case core::NewElementKind::Solution:
-        return core::reviews::PatchOperationType::CreateSolution;
-    case core::NewElementKind::Context:
-        return core::reviews::PatchOperationType::CreateContext;
-    case core::NewElementKind::Assumption:
-        return core::reviews::PatchOperationType::CreateAssumption;
-    case core::NewElementKind::Justification:
-        return core::reviews::PatchOperationType::CreateJustification;
-    }
-    return core::reviews::PatchOperationType::CreateClaim;
-}
-
-void EnsureGuidelineCatalogLoaded(AppRuntimeState& state) {
-    if (state.guideline_catalog_load_attempted)
-        return;
-
-    GuidelineCatalog catalog;
-    std::string error;
-    if (LoadGuidelineCatalog(catalog, error)) {
-        state.guideline_catalog = std::move(catalog);
-        state.guideline_catalog_error.clear();
-    } else {
-        state.guideline_catalog.reset();
-        state.guideline_catalog_error = error;
-    }
-    state.guideline_catalog_load_attempted = true;
-}
-
-const char* CreateRefPrefixFor(core::NewElementKind kind) {
-    switch (kind) {
-    case core::NewElementKind::Goal:
-        return "$new_claim_";
-    case core::NewElementKind::Strategy:
-        return "$new_strategy_";
-    case core::NewElementKind::Solution:
-        return "$new_solution_";
-    case core::NewElementKind::Context:
-        return "$new_context_";
-    case core::NewElementKind::Assumption:
-        return "$new_assumption_";
-    case core::NewElementKind::Justification:
-        return "$new_justification_";
-    }
-    return "$new_element_";
-}
-
-bool IsContextLike(core::NewElementKind kind) {
-    return kind == core::NewElementKind::Context || kind == core::NewElementKind::Assumption ||
-           kind == core::NewElementKind::Justification;
-}
-
-const char* RemoveModeField(core::RemoveMode mode) {
-    return mode == core::RemoveMode::NodeAndDescendants ? core::reviews::kReviewProposalRemoveModeNodeAndDescendants
-                                                        : core::reviews::kReviewProposalRemoveModeNodeOnly;
-}
-
-std::string GenerateCreateRef(const core::reviews::ReviewProposal& proposal, core::NewElementKind kind) {
-    std::unordered_set<std::string> used;
-    for (const core::reviews::PatchOperation& operation : proposal.operations) {
-        if (operation.create_ref.has_value())
-            used.insert(operation.create_ref.value());
-    }
-    const std::string prefix = CreateRefPrefixFor(kind);
-    for (int i = 1; i < 100000; ++i) {
-        std::string candidate = prefix + std::to_string(i);
-        if (used.count(candidate) == 0)
-            return candidate;
-    }
-    return prefix + std::to_string(used.size() + 1);
-}
-
-core::reviews::ElementRef ExistingElementRef(const std::string& id) {
-    return core::reviews::ElementRef{id, std::nullopt};
-}
-
-core::reviews::ElementRef CreatedElementRef(const std::string& create_ref) {
-    return core::reviews::ElementRef{std::nullopt, create_ref};
-}
-
-bool SameElementRef(const core::reviews::ElementRef& lhs, const core::reviews::ElementRef& rhs) {
-    return lhs.existing_id == rhs.existing_id && lhs.create_ref == rhs.create_ref;
-}
-
-std::optional<core::reviews::ElementRef>
-ProposalRefForPreviewId(const std::string& preview_id, const std::map<std::string, std::string>& generated_ids) {
-    for (const auto& generated : generated_ids) {
-        if (generated.second == preview_id)
-            return CreatedElementRef(generated.first);
-    }
-    if (!preview_id.empty())
-        return ExistingElementRef(preview_id);
-    return std::nullopt;
-}
-
-std::string PreviewIdForProposalRef(const core::reviews::ElementRef& ref,
-                                    const std::map<std::string, std::string>& generated_ids) {
-    if (ref.existing_id.has_value())
-        return ref.existing_id.value();
-    if (ref.create_ref.has_value()) {
-        auto found = generated_ids.find(ref.create_ref.value());
-        if (found != generated_ids.end())
-            return found->second;
-    }
-    return {};
-}
-
-void TrackAffectedExistingElement(core::reviews::ReviewProposal& proposal,
-                                  const parser::AssuranceCase& base_model,
-                                  const std::string& element_id) {
-    if (element_id.empty())
-        return;
-    if (std::find(proposal.affected_existing_element_ids.begin(),
-                  proposal.affected_existing_element_ids.end(),
-                  element_id) == proposal.affected_existing_element_ids.end()) {
-        proposal.affected_existing_element_ids.push_back(element_id);
-    }
-    if (proposal.base_element_hashes.count(element_id) == 0) {
-        if (const parser::SacmElement* element = FindParserElement(base_model, element_id)) {
-            proposal.base_element_hashes[element_id] = core::reviews::ComputeElementSemanticHash(*element);
-        }
-    }
-}
-
-void TrackAffectedRef(core::reviews::ReviewProposal& proposal,
-                      const parser::AssuranceCase& base_model,
-                      const core::reviews::ElementRef& ref) {
-    if (ref.existing_id.has_value())
-        TrackAffectedExistingElement(proposal, base_model, ref.existing_id.value());
-}
-
-void AddHighlightRef(std::unordered_set<std::string>& ids,
-                     const core::reviews::ElementRef& ref,
-                     const std::map<std::string, std::string>& generated_ids) {
-    if (ref.existing_id.has_value() && !ref.existing_id->empty()) {
-        ids.insert(ref.existing_id.value());
-    }
-    if (ref.create_ref.has_value()) {
-        auto found = generated_ids.find(ref.create_ref.value());
-        if (found != generated_ids.end() && !found->second.empty())
-            ids.insert(found->second);
-    }
-}
-
-bool IsPreviewRelationshipType(const std::string& type) {
-    return type == "assertedinference" || type == "assertedcontext" || type == "assertedevidence";
-}
-
-bool RelationshipTouchesAny(const parser::SacmElement& relationship, const std::unordered_set<std::string>& ids) {
-    if (!IsPreviewRelationshipType(relationship.type))
-        return false;
-    if (ids.count(relationship.reasoning_ref) > 0)
-        return true;
-    for (const std::string& source : relationship.source_refs) {
-        if (ids.count(source) > 0)
-            return true;
-    }
-    for (const std::string& target : relationship.target_refs) {
-        if (ids.count(target) > 0)
-            return true;
-    }
-    return false;
-}
-
-bool SameRelationship(const parser::SacmElement& lhs, const parser::SacmElement& rhs) {
-    return lhs.type == rhs.type && lhs.reasoning_ref == rhs.reasoning_ref && lhs.source_refs == rhs.source_refs &&
-           lhs.target_refs == rhs.target_refs;
-}
-
-bool RelationshipExists(const parser::AssuranceCase& model, const parser::SacmElement& relationship) {
-    for (const parser::SacmElement& element : model.elements) {
-        if (!IsPreviewRelationshipType(element.type))
-            continue;
-        if (!relationship.id.empty() && element.id == relationship.id)
-            return true;
-        if (SameRelationship(element, relationship))
-            return true;
-    }
-    return false;
-}
-
-std::optional<core::RemoveMode> ProposalRemoveModeFromField(const std::string& field) {
-    if (field == core::reviews::kReviewProposalRemoveModeNodeOnly)
-        return core::RemoveMode::NodeOnly;
-    if (field == core::reviews::kReviewProposalRemoveModeNodeAndDescendants)
-        return core::RemoveMode::NodeAndDescendants;
-    return std::nullopt;
-}
-
-std::unordered_set<std::string>
-CollectProposalRemovedExistingIds(const core::reviews::ReviewProposal& proposal,
-                                  const parser::AssuranceCase& base_model,
-                                  const std::map<std::string, std::string>& generated_ids) {
-    std::unordered_set<std::string> ids;
-    for (const core::reviews::PatchOperation& operation : proposal.operations) {
-        if (operation.type != core::reviews::PatchOperationType::RemoveElement || !operation.element.has_value())
-            continue;
-        const std::string element_id = PreviewIdForProposalRef(operation.element.value(), generated_ids);
-        if (element_id.empty() || !FindParserElement(base_model, element_id))
-            continue;
-
-        std::optional<core::RemoveMode> mode = ProposalRemoveModeFromField(operation.field);
-        if (mode.has_value()) {
-            std::unordered_set<std::string> planned = core::PlanRemoval(base_model, element_id, mode.value());
-            ids.insert(planned.begin(), planned.end());
-        } else {
-            ids.insert(element_id);
-        }
-    }
-    return ids;
-}
-
-void RestoreRemovedExistingElementsForProposalPreview(parser::AssuranceCase& preview_model,
-                                                      const parser::AssuranceCase& base_model,
-                                                      const std::unordered_set<std::string>& removed_ids) {
-    if (removed_ids.empty())
-        return;
-
-    for (const parser::SacmElement& element : base_model.elements) {
-        if (IsPreviewRelationshipType(element.type))
-            continue;
-        if (removed_ids.count(element.id) == 0)
-            continue;
-        if (FindParserElement(preview_model, element.id))
-            continue;
-        preview_model.elements.push_back(element);
-    }
-
-    for (const parser::SacmElement& relationship : base_model.elements) {
-        if (!RelationshipTouchesAny(relationship, removed_ids))
-            continue;
-        if (RelationshipExists(preview_model, relationship))
-            continue;
-        preview_model.elements.push_back(relationship);
-    }
-}
-
-std::unordered_set<std::string> CollectProposalHighlightIds(const core::reviews::ReviewProposal& proposal,
-                                                            const std::map<std::string, std::string>& generated_ids) {
-    std::unordered_set<std::string> ids;
-    if (!proposal.anchor_element_id.empty())
-        ids.insert(proposal.anchor_element_id);
-    for (const std::string& id : proposal.affected_existing_element_ids) {
-        if (!id.empty())
-            ids.insert(id);
-    }
-    for (const auto& generated : generated_ids) {
-        if (!generated.second.empty())
-            ids.insert(generated.second);
-    }
-    for (const core::reviews::PatchOperation& operation : proposal.operations) {
-        if (operation.element.has_value())
-            AddHighlightRef(ids, operation.element.value(), generated_ids);
-        if (operation.source.has_value())
-            AddHighlightRef(ids, operation.source.value(), generated_ids);
-        if (operation.target.has_value())
-            AddHighlightRef(ids, operation.target.value(), generated_ids);
-    }
-    return ids;
-}
-
-void ClearProposalHighlightState(ui::UiState& ui_state) {
-    ui_state.proposal_highlight_ids.clear();
-    ui_state.marked_for_removal.clear();
-    ui_state.center_on_marked = false;
-    ui_state.dim_non_proposal_nodes = false;
-}
-
-void ApplyProposalPreviewVisualState(ui::UiState& ui_state,
-                                     parser::AssuranceCase& preview_model,
-                                     const parser::AssuranceCase& base_model,
-                                     const core::reviews::ReviewProposal& proposal,
-                                     const std::map<std::string, std::string>& generated_ids) {
-    std::unordered_set<std::string> removed_ids =
-        CollectProposalRemovedExistingIds(proposal, base_model, generated_ids);
-    // The patch service removes nodes from the preview model; restore them so the canvas can mark removals explicitly.
-    RestoreRemovedExistingElementsForProposalPreview(preview_model, base_model, removed_ids);
-
-    ui_state.proposal_highlight_ids = CollectProposalHighlightIds(proposal, generated_ids);
-    ui_state.proposal_highlight_ids.insert(removed_ids.begin(), removed_ids.end());
-    ui_state.marked_for_removal = std::move(removed_ids);
-    ui_state.dim_non_proposal_nodes = !ui_state.proposal_highlight_ids.empty();
-}
-
-bool IsUpdateForElement(const core::reviews::PatchOperation& operation,
-                        core::reviews::PatchOperationType type,
-                        const core::reviews::ElementRef& ref,
-                        const std::string& field) {
-    return operation.type == type && operation.element.has_value() && SameElementRef(operation.element.value(), ref) &&
-           operation.field == field;
-}
-
-void UpsertElementUpdate(core::reviews::ReviewProposal& proposal,
-                         core::reviews::PatchOperationType type,
-                         const core::reviews::ElementRef& ref,
-                         const std::string& field,
-                         const std::string& old_value,
-                         const std::string& new_value) {
-    proposal.operations.erase(std::remove_if(proposal.operations.begin(),
-                                             proposal.operations.end(),
-                                             [&](const core::reviews::PatchOperation& operation) {
-                                                 return IsUpdateForElement(operation, type, ref, field);
-                                             }),
-                              proposal.operations.end());
-
-    if (old_value == new_value)
-        return;
-
-    core::reviews::PatchOperation operation;
-    operation.type = type;
-    operation.element = ref;
-    operation.field = field;
-    operation.old_value = old_value;
-    operation.new_value = new_value;
-    proposal.operations.push_back(std::move(operation));
-}
-
-void UpsertUndevelopedUpdate(core::reviews::ReviewProposal& proposal,
-                             const core::reviews::ElementRef& ref,
-                             bool old_value,
-                             bool new_value) {
-    proposal.operations.erase(
-        std::remove_if(proposal.operations.begin(),
-                       proposal.operations.end(),
-                       [&](const core::reviews::PatchOperation& operation) {
-                           if (operation.type != core::reviews::PatchOperationType::SetUndeveloped &&
-                               operation.type != core::reviews::PatchOperationType::ClearUndeveloped) {
-                               return false;
-                           }
-                           return operation.element.has_value() && SameElementRef(operation.element.value(), ref);
-                       }),
-        proposal.operations.end());
-
-    if (old_value == new_value)
-        return;
-
-    core::reviews::PatchOperation operation;
-    operation.type = new_value ? core::reviews::PatchOperationType::SetUndeveloped
-                               : core::reviews::PatchOperationType::ClearUndeveloped;
-    operation.element = ref;
-    proposal.operations.push_back(std::move(operation));
-}
-
-std::string EditableTextFor(const parser::SacmElement& element) {
-    return (element.type == "claim" || element.type == "argumentreasoning") ? element.content : element.description;
-}
-
-const char* EditableTextFieldFor(const parser::SacmElement& element) {
-    return (element.type == "claim" || element.type == "argumentreasoning") ? "content" : "description";
-}
-
-void CopyCommonSacmFields(sacm::SacmElement& target, const parser::SacmElement& source) {
-    target.id = source.id;
-    target.gid = source.gid;
-    target.name = source.name;
-    target.description = source.description;
-    target.name_ml.texts = source.name_langs;
-    target.description_ml.texts = source.description_langs;
-    if (target.name_ml.texts.empty() && !source.name.empty())
-        target.name_ml.set("en", source.name);
-    if (target.description_ml.texts.empty() && !source.description.empty())
-        target.description_ml.set("en", source.description);
-}
-
-std::string NormalizeSacmRef(std::string ref) {
-    if (!ref.empty() && ref.front() == '#')
-        ref.erase(ref.begin());
-    return ref;
-}
-
-void CollectTermRefs(const sacm::TerminologyPackage& terminology_package, std::unordered_set<std::string>& refs) {
-    for (const sacm::Term& term : terminology_package.terms) {
-        if (!term.id.empty())
-            refs.insert(term.id);
-        if (!term.gid.empty())
-            refs.insert(term.gid);
-    }
-}
-
-std::unordered_set<std::string> CollectTermRefs(const sacm::AssuranceCasePackage& package) {
-    std::unordered_set<std::string> refs;
-    for (const sacm::TerminologyPackage& terminology_package : package.terminologyPackages)
-        CollectTermRefs(terminology_package, refs);
-    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
-        for (const sacm::TerminologyPackage& terminology_package : argument_package.terminologyPackages)
-            CollectTermRefs(terminology_package, refs);
-    }
-    return refs;
-}
-
-bool ReferencesAny(const std::vector<std::string>& refs, const std::unordered_set<std::string>& candidates) {
-    return std::any_of(refs.begin(), refs.end(), [&](const std::string& ref) {
-        return candidates.find(NormalizeSacmRef(ref)) != candidates.end();
-    });
-}
-
-bool ArtifactReferenceTargetsTerm(const sacm::ArtifactReference& artifact_reference,
-                                  const std::unordered_set<std::string>& term_refs) {
-    return term_refs.find(NormalizeSacmRef(artifact_reference.referencedArtifact)) != term_refs.end();
-}
-
-void AddElementRefs(const parser::AssuranceCase& model, std::unordered_set<std::string>& refs) {
-    for (const parser::SacmElement& element : model.elements) {
-        if (IsPreviewRelationshipType(element.type))
-            continue;
-        if (!element.id.empty())
-            refs.insert(element.id);
-        if (!element.gid.empty())
-            refs.insert(element.gid);
-    }
-}
-
-bool ContainsSacmElementRef(const std::vector<std::string>& refs, const std::unordered_set<std::string>& candidates) {
-    return ReferencesAny(refs, candidates);
-}
-
-bool HasArtifactReference(const sacm::ArgumentPackage& argument_package, const sacm::ArtifactReference& candidate) {
-    return std::any_of(argument_package.artifactReferences.begin(),
-                       argument_package.artifactReferences.end(),
-                       [&](const auto& existing) {
-                           return (!candidate.id.empty() && existing.id == candidate.id) ||
-                                  (!candidate.gid.empty() && existing.gid == candidate.gid);
-                       });
-}
-
-bool HasAssertedContext(const sacm::ArgumentPackage& argument_package, const sacm::AssertedContext& candidate) {
-    return std::any_of(
-        argument_package.assertedContexts.begin(), argument_package.assertedContexts.end(), [&](const auto& existing) {
-            return (!candidate.id.empty() && existing.id == candidate.id) ||
-                   (!candidate.gid.empty() && existing.gid == candidate.gid) ||
-                   (existing.sources == candidate.sources && existing.targets == candidate.targets);
-        });
-}
-
-void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sacm::AssuranceCasePackage& package) {
-    if (package.argumentPackages.empty())
-        package.argumentPackages.emplace_back();
-    std::map<std::string, std::string> artifact_reference_targets;
-    const std::unordered_set<std::string> term_refs = CollectTermRefs(package);
-    std::vector<sacm::ArtifactReference> preserved_term_references;
-    std::vector<sacm::AssertedContext> preserved_term_contexts;
-    for (sacm::ArgumentPackage& argument_package : package.argumentPackages) {
-        std::unordered_set<std::string> term_artifact_refs;
-        for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
-            if (artifact_reference.referencedArtifact.empty())
-                continue;
-            if (!artifact_reference.id.empty())
-                artifact_reference_targets[artifact_reference.id] = artifact_reference.referencedArtifact;
-            if (!artifact_reference.gid.empty())
-                artifact_reference_targets[artifact_reference.gid] = artifact_reference.referencedArtifact;
-            if (ArtifactReferenceTargetsTerm(artifact_reference, term_refs) &&
-                !core::IsVisibleTerminologyArtifactReference(package, argument_package, artifact_reference)) {
-                preserved_term_references.push_back(artifact_reference);
-                if (!artifact_reference.id.empty())
-                    term_artifact_refs.insert(artifact_reference.id);
-                if (!artifact_reference.gid.empty())
-                    term_artifact_refs.insert(artifact_reference.gid);
-            }
-        }
-        for (const sacm::AssertedContext& context : argument_package.assertedContexts) {
-            if (ReferencesAny(context.sources, term_artifact_refs))
-                preserved_term_contexts.push_back(context);
-        }
-        argument_package.claims.clear();
-        argument_package.argumentReasonings.clear();
-        argument_package.artifactReferences.clear();
-        argument_package.assertedInferences.clear();
-        argument_package.assertedContexts.clear();
-        argument_package.assertedEvidences.clear();
-    }
-
-    sacm::ArgumentPackage& argument_package = package.argumentPackages.front();
-    for (const parser::SacmElement& element : model.elements) {
-        if (element.type == "claim") {
-            sacm::Claim claim;
-            CopyCommonSacmFields(claim, element);
-            claim.content = element.content;
-            claim.content_ml.texts = element.content_langs;
-            if (claim.content_ml.texts.empty() && !element.content.empty())
-                claim.content_ml.set("en", element.content);
-            claim.assertionDeclaration = element.assertion_declaration;
-            claim.undeveloped = element.undeveloped;
-            argument_package.claims.push_back(std::move(claim));
-        } else if (element.type == "argumentreasoning") {
-            sacm::ArgumentReasoning reasoning;
-            CopyCommonSacmFields(reasoning, element);
-            reasoning.content = element.content;
-            reasoning.content_ml.texts = element.content_langs;
-            if (reasoning.content_ml.texts.empty() && !element.content.empty())
-                reasoning.content_ml.set("en", element.content);
-            reasoning.undeveloped = element.undeveloped;
-            argument_package.argumentReasonings.push_back(std::move(reasoning));
-        } else if (element.type == "artifactreference" || element.type == "artifact") {
-            sacm::ArtifactReference artifact_reference;
-            CopyCommonSacmFields(artifact_reference, element);
-            auto target = artifact_reference_targets.find(element.id);
-            if (target == artifact_reference_targets.end())
-                target = artifact_reference_targets.find(element.gid);
-            if (target != artifact_reference_targets.end())
-                artifact_reference.referencedArtifact = target->second;
-            argument_package.artifactReferences.push_back(std::move(artifact_reference));
-        } else if (element.type == "assertedinference") {
-            sacm::AssertedInference inference;
-            CopyCommonSacmFields(inference, element);
-            inference.sources = element.source_refs;
-            inference.targets = element.target_refs;
-            inference.reasoning = element.reasoning_ref;
-            inference.assertionDeclaration = element.assertion_declaration;
-            argument_package.assertedInferences.push_back(std::move(inference));
-        } else if (element.type == "assertedcontext") {
-            sacm::AssertedContext context;
-            CopyCommonSacmFields(context, element);
-            context.sources = element.source_refs;
-            context.targets = element.target_refs;
-            context.assertionDeclaration = element.assertion_declaration;
-            argument_package.assertedContexts.push_back(std::move(context));
-        } else if (element.type == "assertedevidence") {
-            sacm::AssertedEvidence evidence;
-            CopyCommonSacmFields(evidence, element);
-            evidence.sources = element.source_refs;
-            evidence.targets = element.target_refs;
-            evidence.assertionDeclaration = element.assertion_declaration;
-            argument_package.assertedEvidences.push_back(std::move(evidence));
-        }
-    }
-
-    std::unordered_set<std::string> model_element_refs;
-    AddElementRefs(model, model_element_refs);
-    std::unordered_set<std::string> kept_artifact_refs;
-    for (const sacm::ArtifactReference& artifact_reference : preserved_term_references) {
-        if (HasArtifactReference(argument_package, artifact_reference))
-            continue;
-        argument_package.artifactReferences.push_back(artifact_reference);
-        if (!artifact_reference.id.empty())
-            kept_artifact_refs.insert(artifact_reference.id);
-        if (!artifact_reference.gid.empty())
-            kept_artifact_refs.insert(artifact_reference.gid);
-    }
-    for (const sacm::AssertedContext& context : preserved_term_contexts) {
-        if (!ReferencesAny(context.sources, kept_artifact_refs) ||
-            !ContainsSacmElementRef(context.targets, model_element_refs)) {
-            continue;
-        }
-        if (!HasAssertedContext(argument_package, context))
-            argument_package.assertedContexts.push_back(context);
-    }
-    for (sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
-        if (!core::IsVisibleTerminologyArtifactReference(package, argument_package, artifact_reference))
-            continue;
-        artifact_reference.description.clear();
-        artifact_reference.description_ml.texts.clear();
-    }
 }
 
 } // namespace
@@ -977,7 +98,7 @@ void AppRuntime::RegisterAppEventListeners() {
         impl_->tree_needs_rebuild = event.dirty;
         impl_->tree_edit_index_valid = false;
         if (event.focus_root)
-            impl_->pending_focus_root = true;
+            impl_->workbench.pending_focus_root = true;
     });
     impl_->events.Subscribe<DocumentDirtyEvent>([this](const DocumentDirtyEvent& event) {
         impl_->document_dirty = event.dirty;
@@ -1020,8 +141,9 @@ void AppRuntime::RegisterAppEventListeners() {
             break;
         }
     });
-    impl_->events.Subscribe<AiReviewProposalSuggestionsEvent>(
-        [this](const AiReviewProposalSuggestionsEvent& event) { CreateAiGeneratedProposals(event.suggestions); });
+    impl_->events.Subscribe<AiReviewProposalSuggestionsEvent>([this](const AiReviewProposalSuggestionsEvent& event) {
+        actions::ProposalActions(*impl_).CreateAiGenerated(event.suggestions);
+    });
     impl_->events.Subscribe<CenterRequestEvent>([this](const CenterRequestEvent& event) {
         ui::UiState& ui_state = ui::GetUiState();
         switch (event.view) {
@@ -1040,7 +162,7 @@ void AppRuntime::RegisterAppEventListeners() {
         ui_state.center_on_selection = event.center_on_selection;
         ui_state.center_on_marked = event.center_on_marked;
         if (event.force_tab_selection)
-            impl_->force_center_tab_selection = true;
+            impl_->workbench.force_center_tab_selection = true;
     });
     impl_->events.Subscribe<ProposalHighlightEvent>([](const ProposalHighlightEvent& event) {
         ui::UiState& ui_state = ui::GetUiState();
@@ -1066,103 +188,27 @@ void AppRuntime::RequestClose() {
 }
 
 bool AppRuntime::AddChildToSelected(core::NewElementKind kind) {
-    if (!impl_->app_state.loaded_case.has_value()) {
-        SetStatus("No assurance case loaded.");
-        return false;
-    }
-    const std::string& selected_id = ui::GetUiState().selected_element_id;
-
-    parser::AssuranceCase& ac = impl_->app_state.loaded_case.value();
-    sacm::AssuranceCasePackage* pkg =
-        impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
-    return impl_->element_edit_controller->AddChildToSelected(ac, pkg, selected_id, kind);
+    return actions::ElementActions(*impl_).AddChildToSelected(kind);
 }
 
 bool AppRuntime::AddTopGoal() {
-    if (!impl_->app_state.loaded_case.has_value()) {
-        SetStatus("No assurance case loaded.");
-        return false;
-    }
-
-    parser::AssuranceCase& ac = impl_->app_state.loaded_case.value();
-    sacm::AssuranceCasePackage* pkg =
-        impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
-    return impl_->element_edit_controller->AddTopGoal(ac, pkg);
+    return actions::ElementActions(*impl_).AddTopGoal();
 }
 
 void AppRuntime::RemoveSelected(core::RemoveMode mode) {
-    if (!impl_->app_state.loaded_case.has_value()) {
-        SetStatus("No assurance case loaded.");
-        return;
-    }
-    const std::string& selected_id = ui::GetUiState().selected_element_id;
-
-    parser::AssuranceCase& ac = impl_->app_state.loaded_case.value();
-    sacm::AssuranceCasePackage* pkg =
-        impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
-    if (!impl_->element_edit_controller->RemoveSelected(ac, pkg, selected_id, mode))
-        return;
-
-    if (impl_->element_edit_controller->ShouldShowRemoveConfirm()) {
-        auto& s = ui::GetUiState();
-        const auto& pending_ids = impl_->element_edit_controller->PendingRemoveIds();
-        s.marked_for_removal = {pending_ids.begin(), pending_ids.end()};
-        s.center_on_marked = true;
-    }
+    actions::ElementActions(*impl_).RemoveSelected(mode);
 }
 
 core::TreeDropValidationResult AppRuntime::ValidateTreeDrop(const std::string& dragged_id,
                                                             const std::string& target_id,
                                                             core::TreeDropMode drop_mode) const {
-    if (!impl_->app_state.loaded_case.has_value()) {
-        core::TreeDropValidationResult result;
-        result.reason = "No assurance case loaded.";
-        return result;
-    }
-
-    if (!impl_->tree_edit_index_valid) {
-        impl_->tree_edit_index = core::BuildTreeEditIndex(impl_->app_state.loaded_case.value());
-        impl_->tree_edit_index_valid = true;
-    }
-    return core::ValidateTreeDrop(impl_->tree_edit_index, impl_->current_tree, dragged_id, target_id, drop_mode);
+    return actions::ElementActions(*impl_).ValidateTreeDrop(dragged_id, target_id, drop_mode);
 }
 
 bool AppRuntime::PerformTreeDrop(const std::string& dragged_id,
                                  const std::string& target_id,
                                  core::TreeDropMode drop_mode) {
-    if (!impl_->app_state.loaded_case.has_value()) {
-        SetStatus("No assurance case loaded.");
-        return false;
-    }
-
-    parser::AssuranceCase& model = impl_->app_state.loaded_case.value();
-    sacm::AssuranceCasePackage* package =
-        impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
-
-    std::string error;
-    bool changed = false;
-    if (drop_mode == core::TreeDropMode::Before || drop_mode == core::TreeDropMode::After) {
-        changed = core::ReorderSiblings(model,
-                                        package,
-                                        impl_->current_tree,
-                                        impl_->tree_display_order,
-                                        core::ReorderSiblingsCommand{dragged_id, target_id, drop_mode},
-                                        error);
-    } else {
-        changed = core::MoveSubtree(
-            model, package, impl_->current_tree, core::MoveSubtreeCommand{dragged_id, target_id}, error);
-    }
-
-    if (!changed) {
-        SetStatus("Tree move failed: " + error);
-        return false;
-    }
-
-    impl_->events.Emit(TreeDirtyEvent{});
-    impl_->events.Emit(SelectionChangedEvent{dragged_id, true});
-    impl_->events.Emit(DocumentDirtyEvent{});
-    SetStatus(drop_mode == core::TreeDropMode::AsChild ? "Moved " + dragged_id : "Reordered " + dragged_id);
-    return true;
+    return actions::ElementActions(*impl_).PerformTreeDrop(dragged_id, target_id, drop_mode);
 }
 
 void AppRuntime::SetStatus(const std::string& message) {
@@ -1174,534 +220,67 @@ void AppRuntime::ShowNotImplementedModal(const std::string& feature) {
 }
 
 bool AppRuntime::RefreshProposalCreatorPreview() {
-    auto& proposals = *impl_->proposal_controller;
-    if (!proposals.creator_active)
-        return false;
-    if (!impl_->app_state.loaded_case.has_value()) {
-        SetStatus("Load a SACM model before editing proposal drafts.");
-        return false;
-    }
-
-    core::reviews::ReviewProposalPatchService patch_service;
-    core::reviews::ProposalPreviewResult preview =
-        patch_service.BuildPreviewModel(proposals.draft, impl_->app_state.loaded_case.value());
-    if (!preview.success) {
-        SetStatus("Proposal draft preview failed: " + preview.error);
-        return false;
-    }
-
-    proposals.preview_active = false;
-    proposals.preview_id = proposals.draft.id;
-    proposals.preview_model = std::move(preview.preview_model);
-    proposals.creator_generated_ids = std::move(preview.generated_ids);
-    ui::UiState& ui_state = ui::GetUiState();
-    ApplyProposalPreviewVisualState(ui_state,
-                                    proposals.preview_model,
-                                    impl_->app_state.loaded_case.value(),
-                                    proposals.draft,
-                                    proposals.creator_generated_ids);
-    impl_->current_tree = ui::gsn::BuildAssuranceTree(proposals.preview_model);
-    ui::gsn::SetCanvasTree(impl_->current_tree);
-    return true;
+    return actions::ProposalActions(*impl_).RefreshCreatorPreview();
 }
 
 void AppRuntime::ProcessPendingProposalCreatorPreviewRefresh() {
-    auto& proposals = *impl_->proposal_controller;
-    if (!proposals.creator_preview_refresh_pending)
-        return;
-
-    proposals.creator_preview_refresh_pending = false;
-    const std::optional<std::string> select_create_ref = proposals.creator_pending_select_create_ref;
-    const bool clear_selection = proposals.creator_pending_clear_selection;
-    proposals.creator_pending_select_create_ref.reset();
-    proposals.creator_pending_clear_selection = false;
-
-    if (!RefreshProposalCreatorPreview())
-        return;
-
-    ui::UiState& ui_state = ui::GetUiState();
-    if (select_create_ref.has_value()) {
-        ui_state.selected_element_id =
-            PreviewIdForProposalRef(CreatedElementRef(select_create_ref.value()), proposals.creator_generated_ids);
-        ui_state.center_on_selection = !ui_state.selected_element_id.empty();
-    } else if (clear_selection) {
-        ui_state.selected_element_id.clear();
-    }
+    actions::ProposalActions(*impl_).ProcessPendingCreatorPreviewRefresh();
 }
 
 bool AppRuntime::BeginProposalForReviewItem(const core::reviews::ReviewItem& item) {
-    auto& proposals = *impl_->proposal_controller;
-    if (proposals.creator_active) {
-        SetStatus("Save or discard the active proposal before creating another one.");
-        return false;
-    }
-    if (item.status != core::reviews::ReviewItemStatus::Open) {
-        SetStatus("Resolved review comments cannot create proposed changes.");
-        return false;
-    }
-    if (item.proposal_id.has_value()) {
-        SetStatus("This review comment already has a proposed change.");
-        return false;
-    }
-    if (!impl_->app_state.current_project.has_value() || !impl_->app_state.loaded_case.has_value()) {
-        SetStatus("Open a project and SACM file before creating proposed changes.");
-        return false;
-    }
-
-    const parser::SacmElement* anchor = FindParserElement(impl_->app_state.loaded_case.value(), item.element_id);
-    if (!anchor) {
-        SetStatus("The reviewed element no longer exists in the loaded model.");
-        return false;
-    }
-
-    proposals.BeginDraft(item, impl_->app_state.loaded_case.value(), *anchor, impl_->reviewer_name);
-    if (!RefreshProposalCreatorPreview()) {
-        CancelActiveProposal();
-        return false;
-    }
-
-    ui::UiState& ui_state = ui::GetUiState();
-    ui_state.center_view = ui::CenterView::GsnCanvas;
-    ui_state.selected_element_id = anchor->id;
-    ui_state.center_on_selection = true;
-    impl_->force_center_tab_selection = true;
-    SetStatus("Building proposal " + proposals.draft.id + ". Use the GSN canvas and Save Proposal when ready.");
-    return true;
+    return actions::ProposalActions(*impl_).BeginForReviewItem(item);
 }
 
 bool AppRuntime::BeginEditProposalForReviewItem(const core::reviews::ReviewItem& item) {
-    auto& proposals = *impl_->proposal_controller;
-    if (proposals.creator_active) {
-        SetStatus("Save or discard the active proposal before editing another one.");
-        return false;
-    }
-    if (item.status != core::reviews::ReviewItemStatus::Open) {
-        SetStatus("Resolved review comments cannot edit proposed changes.");
-        return false;
-    }
-    if (!item.proposal_id.has_value()) {
-        SetStatus("This review comment has no proposed change to edit.");
-        return false;
-    }
-    if (!impl_->app_state.current_project.has_value() || !impl_->app_state.loaded_case.has_value()) {
-        SetStatus("Open a project and SACM file before editing proposed changes.");
-        return false;
-    }
-
-    std::string error;
-    std::optional<core::reviews::ReviewProposal> proposal =
-        proposals.manager.LoadProposal(item.proposal_id.value(), error);
-    if (!proposal.has_value()) {
-        SetStatus("Proposal edit failed: " + error);
-        return false;
-    }
-    if (proposal->review_item_id != item.id) {
-        SetStatus("Proposal edit failed: the proposal belongs to a different review comment.");
-        return false;
-    }
-
-    proposals.BeginEditDraft(std::move(proposal.value()), impl_->reviewer_name);
-    if (!RefreshProposalCreatorPreview()) {
-        CancelActiveProposal();
-        return false;
-    }
-
-    ui::UiState& ui_state = ui::GetUiState();
-    ui_state.center_view = ui::CenterView::GsnCanvas;
-    ui_state.selected_element_id = proposals.draft.anchor_element_id;
-    ui_state.center_on_selection = !ui_state.selected_element_id.empty();
-    impl_->force_center_tab_selection = true;
-    SetStatus("Editing proposal " + proposals.draft.id + ". Use Save Proposal to update it.");
-    return true;
+    return actions::ProposalActions(*impl_).BeginEditForReviewItem(item);
 }
 
 bool AppRuntime::BeginEditProposalById(const std::string& proposal_id) {
-    if (proposal_id.empty()) {
-        SetStatus("No proposal id was provided.");
-        return false;
-    }
-
-    std::string error;
-    std::optional<core::reviews::ReviewProposal> proposal =
-        impl_->proposal_controller->manager.LoadProposal(proposal_id, error);
-    if (!proposal.has_value()) {
-        SetStatus("Proposal edit failed: " + error);
-        return false;
-    }
-
-    std::optional<core::reviews::ReviewItem> item = impl_->review_controller->GetItemById(proposal->review_item_id);
-    if (!item.has_value()) {
-        SetStatus("Proposal edit failed: the owning review comment was not found.");
-        return false;
-    }
-    if (!item->proposal_id.has_value() || item->proposal_id.value() != proposal_id) {
-        SetStatus("Proposal edit failed: the owning review comment no longer points to this proposal.");
-        return false;
-    }
-
-    return BeginEditProposalForReviewItem(item.value());
+    return actions::ProposalActions(*impl_).BeginEditById(proposal_id);
 }
 
 bool AppRuntime::PreviewProposalById(const std::string& proposal_id) {
-    auto& proposals = *impl_->proposal_controller;
-    if (proposals.creator_active) {
-        SetStatus("Save or discard the active proposal before viewing another proposal.");
-        return false;
-    }
-    if (proposal_id.empty()) {
-        SetStatus("No proposal id was provided.");
-        return false;
-    }
-
-    std::string error;
-    std::optional<core::reviews::ReviewProposal> proposal = proposals.manager.LoadProposal(proposal_id, error);
-    if (!proposal.has_value()) {
-        SetStatus("Proposal preview failed: " + error);
-        return false;
-    }
-
-    if (!impl_->app_state.loaded_case.has_value()) {
-        SetStatus("Load a SACM model before previewing proposals.");
-        return false;
-    }
-
-    core::reviews::ReviewProposalPatchService patch_service;
-    core::reviews::ProposalPreviewResult preview =
-        patch_service.BuildPreviewModel(*proposal, impl_->app_state.loaded_case.value());
-    if (!preview.success) {
-        SetStatus("Proposal preview failed: " + preview.error);
-        return false;
-    }
-
-    const std::map<std::string, std::string> generated_ids = preview.generated_ids;
-    proposals.preview_active = true;
-    proposals.preview_id = proposal->id;
-    proposals.preview_model = std::move(preview.preview_model);
-
-    ui::UiState& preview_ui_state = ui::GetUiState();
-    ApplyProposalPreviewVisualState(
-        preview_ui_state, proposals.preview_model, impl_->app_state.loaded_case.value(), *proposal, generated_ids);
-    impl_->current_tree = ui::gsn::BuildAssuranceTree(proposals.preview_model);
-    ui::gsn::SetCanvasTree(impl_->current_tree);
-    preview_ui_state.center_view = ui::CenterView::GsnCanvas;
-    preview_ui_state.selected_element_id = proposal->anchor_element_id;
-    preview_ui_state.center_on_selection = true;
-    impl_->show_gsn_tab = true;
-    impl_->force_center_tab_selection = true;
-
-    std::ostringstream status;
-    status << "Previewing proposal " << proposal->id << " with " << proposal->operations.size() << " operation(s). ";
-    status << "The project model has not been changed.";
-    SetStatus(status.str());
-    return true;
+    return actions::ProposalActions(*impl_).PreviewById(proposal_id);
 }
 
 bool AppRuntime::SaveActiveProposal(const core::reviews::ReviewItem& item) {
-    auto& proposals = *impl_->proposal_controller;
-    if (!proposals.HasActiveDraftForItem(item.id)) {
-        SetStatus("No active proposal draft for this review comment.");
-        return false;
-    }
-    if (!proposals.CanSaveActiveDraft()) {
-        SetStatus("Add at least one proposal operation before saving.");
-        return false;
-    }
-    if (!impl_->app_state.current_project.has_value()) {
-        SetStatus("Open a project before saving proposals.");
-        return false;
-    }
-
-    core::AssuranceProject& project = impl_->app_state.current_project.value();
-    core::ProjectFileEntry entry;
-    std::string error;
-    if (!core::ProjectService::SaveReviewProposalFile(
-            project, proposals.draft.id, core::reviews::SerializeReviewProposal(proposals.draft), entry, error)) {
-        SetStatus("Proposal save failed: " + error);
-        return false;
-    }
-
-    if (!impl_->review_controller->SetProposal(item.id, proposals.draft.id)) {
-        std::string cleanup_error;
-        core::ProjectService::RemoveTrackedFile(project, entry.relativePath, true, cleanup_error);
-        SetStatus("Proposal link update failed.");
-        return false;
-    }
-
-    const std::string saved_id = proposals.draft.id;
-    CancelActiveProposal();
-    core::ProjectService::RefreshFileStatus(project);
-    SetStatus("Saved proposal " + saved_id + ".");
-    return true;
-}
-
-void AppRuntime::CreateAiGeneratedProposals(const std::vector<AiReviewProposalSuggestion>& suggestions) {
-    if (suggestions.empty())
-        return;
-    if (!impl_->app_state.current_project.has_value() || !impl_->app_state.loaded_case.has_value()) {
-        SetStatus("AI found proposed wording, but a project and SACM file must be open to save proposals.");
-        return;
-    }
-
-    core::AssuranceProject& project = impl_->app_state.current_project.value();
-    const parser::AssuranceCase& model = impl_->app_state.loaded_case.value();
-    size_t saved_count = 0;
-    for (const AiReviewProposalSuggestion& suggestion : suggestions) {
-        const std::string suggested_text = TrimWhitespace(suggestion.suggested_text);
-        if (suggested_text.empty())
-            continue;
-
-        std::optional<core::reviews::ReviewItem> item =
-            impl_->review_controller->GetItemById(suggestion.review_item_id);
-        if (!item.has_value() || item->proposal_id.has_value())
-            continue;
-
-        const parser::SacmElement* anchor = FindParserElement(model, item->element_id);
-        if (!anchor || anchor->type != "claim")
-            continue;
-
-        const std::string current_text = anchor->content.empty() ? anchor->description : anchor->content;
-        if (TrimWhitespace(current_text) == suggested_text)
-            continue;
-
-        core::reviews::ReviewProposal proposal = BuildDraftReviewProposal(*item, model, *anchor);
-        proposal.author_name = "AI Review";
-        proposal.summary = "AI suggested replacement wording for " + anchor->id + ".";
-
-        core::reviews::PatchOperation operation;
-        operation.type = core::reviews::PatchOperationType::UpdateElementText;
-        operation.element = core::reviews::ElementRef{anchor->id, std::nullopt};
-        operation.field = "content";
-        operation.old_value = current_text;
-        operation.new_value = suggested_text;
-        proposal.operations.push_back(std::move(operation));
-
-        core::ProjectFileEntry entry;
-        std::string error;
-        if (!core::ProjectService::SaveReviewProposalFile(
-                project, proposal.id, core::reviews::SerializeReviewProposal(proposal), entry, error)) {
-            SetStatus("AI proposal save failed: " + error);
-            continue;
-        }
-
-        if (!impl_->review_controller->SetProposal(item->id, proposal.id)) {
-            std::string cleanup_error;
-            core::ProjectService::RemoveTrackedFile(project, entry.relativePath, true, cleanup_error);
-            SetStatus("AI proposal link update failed.");
-            continue;
-        }
-        ++saved_count;
-    }
-
-    if (saved_count > 0) {
-        core::ProjectService::RefreshFileStatus(project);
-        SetStatus("AI generated " + std::to_string(saved_count) + " proposed change(s). Review before applying.");
-    }
+    return actions::ProposalActions(*impl_).SaveActive(item);
 }
 
 void AppRuntime::CancelActiveProposal() {
-    impl_->proposal_controller->ClearActiveState();
-    ClearProposalHighlightState(ui::GetUiState());
-
-    if (impl_->app_state.loaded_case.has_value()) {
-        impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->app_state.loaded_case.value());
-        ui::gsn::SetCanvasTree(impl_->current_tree);
-    } else {
-        impl_->tree_needs_rebuild = true;
-    }
-}
-
-void AppRuntime::MarkReviewItemsDirty() {
-    impl_->review_controller->MarkDirty();
+    actions::ProposalActions(*impl_).CancelActive();
 }
 
 bool AppRuntime::DeleteProposalPatchFile(const std::string& proposal_id, std::string& error) {
-    if (!impl_->app_state.current_project.has_value()) {
-        error = "Open a project before deleting proposed changes.";
-        return false;
-    }
-
-    core::AssuranceProject& project = impl_->app_state.current_project.value();
-    const std::filesystem::path relative_path = ReviewProposalRelativePath(proposal_id);
-    if (ProjectTracksFile(project, relative_path)) {
-        return core::ProjectService::RemoveTrackedFile(project, relative_path, true, error);
-    }
-    return impl_->proposal_controller->manager.DeleteProposal(proposal_id, error);
+    return actions::ReviewActions(*impl_).DeleteProposalPatchFile(proposal_id, error);
 }
 
 void AppRuntime::CloseProposalPreviewIfOpen(const std::string& proposal_id) {
-    if (!impl_->proposal_controller->ClosePreviewIfOpen(proposal_id))
-        return;
-    ClearProposalHighlightState(ui::GetUiState());
-    if (impl_->app_state.loaded_case.has_value()) {
-        impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->app_state.loaded_case.value());
-        ui::gsn::SetCanvasTree(impl_->current_tree);
-    } else {
-        impl_->tree_needs_rebuild = true;
-    }
+    actions::ReviewActions(*impl_).CloseProposalPreviewIfOpen(proposal_id);
 }
 
 void AppRuntime::BeginDeleteReviewItem(const core::reviews::ReviewItem& item) {
-    const bool creator_active = impl_->proposal_controller->creator_active;
-    impl_->review_controller->BeginDeleteReviewItem(item, creator_active);
-    if (!item.proposal_id.has_value() && !creator_active)
-        DeleteReviewItem(item);
+    actions::ReviewActions(*impl_).BeginDeleteReviewItem(item);
 }
 
 bool AppRuntime::DeleteReviewItem(const core::reviews::ReviewItem& item) {
-    const bool deleted = impl_->review_controller->DeleteReviewItem(
-        item,
-        impl_->proposal_controller->creator_active,
-        impl_->app_state.current_project.has_value(),
-        [this](const std::string& proposal_id, std::string& error) {
-            return DeleteProposalPatchFile(proposal_id, error);
-        },
-        [this](const std::string& proposal_id) { CloseProposalPreviewIfOpen(proposal_id); });
-    if (deleted && impl_->app_state.current_project.has_value()) {
-        core::ProjectService::RefreshFileStatus(impl_->app_state.current_project.value());
-    }
-    return deleted;
+    return actions::ReviewActions(*impl_).DeleteReviewItem(item);
 }
 
 bool AppRuntime::ResolveReviewItem(const core::reviews::ReviewItem& item) {
-    return impl_->review_controller->ResolveReviewItem(
-        item, impl_->proposal_controller->creator_active, impl_->app_state.current_project.has_value(), NowUtcString());
+    return actions::ReviewActions(*impl_).ResolveReviewItem(item, core::NowUtcString());
 }
 
 bool AppRuntime::AddProposalChildToSelected(core::NewElementKind kind) {
-    auto& proposals = *impl_->proposal_controller;
-    if (!proposals.creator_active || !impl_->app_state.loaded_case.has_value()) {
-        SetStatus("Start a proposal draft before editing proposal changes.");
-        return false;
-    }
-
-    const std::string selected_id = ui::GetUiState().selected_element_id;
-    if (selected_id.empty()) {
-        SetStatus("Select an element before adding proposal nodes.");
-        return false;
-    }
-
-    const parser::SacmElement* parent = FindParserElement(proposals.preview_model, selected_id);
-    if (!parent) {
-        SetStatus("The selected proposal preview element no longer exists.");
-        return false;
-    }
-    const bool parent_is_container = parent->type == "claim" || parent->type == "argumentreasoning";
-    if (!parent_is_container) {
-        SetStatus("Cannot add a child to a leaf element (" + parent->type + ").");
-        return false;
-    }
-    if (kind == core::NewElementKind::Strategy && parent->type != "claim") {
-        SetStatus("Strategy can only be added under a Claim.");
-        return false;
-    }
-
-    std::optional<core::reviews::ElementRef> parent_ref =
-        ProposalRefForPreviewId(selected_id, proposals.creator_generated_ids);
-    if (!parent_ref.has_value()) {
-        SetStatus("Could not resolve selected element for proposal operation.");
-        return false;
-    }
-
-    const std::string create_ref = GenerateCreateRef(proposals.draft, kind);
-
-    core::reviews::PatchOperation create;
-    create.type = CreateOperationFor(kind);
-    create.create_ref = create_ref;
-    proposals.draft.operations.push_back(std::move(create));
-
-    core::reviews::PatchOperation relationship;
-    relationship.type = IsContextLike(kind) ? core::reviews::PatchOperationType::AddInContextOf
-                                            : core::reviews::PatchOperationType::AddSupportedBy;
-    relationship.source = CreatedElementRef(create_ref);
-    relationship.target = parent_ref.value();
-    proposals.draft.operations.push_back(std::move(relationship));
-
-    TrackAffectedRef(proposals.draft, impl_->app_state.loaded_case.value(), parent_ref.value());
-
-    proposals.creator_preview_refresh_pending = true;
-    proposals.creator_pending_select_create_ref = create_ref;
-    proposals.creator_pending_clear_selection = false;
-    SetStatus("Recorded proposal add operation.");
-    return true;
+    return actions::ProposalActions(*impl_).AddChildToSelected(kind);
 }
 
 bool AppRuntime::AddProposalTopGoal() {
-    auto& proposals = *impl_->proposal_controller;
-    if (!proposals.creator_active || !impl_->app_state.loaded_case.has_value()) {
-        SetStatus("Start a proposal draft before editing proposal changes.");
-        return false;
-    }
-
-    const std::string create_ref = GenerateCreateRef(proposals.draft, core::NewElementKind::Goal);
-
-    core::reviews::PatchOperation create;
-    create.type = core::reviews::PatchOperationType::CreateClaim;
-    create.create_ref = create_ref;
-    proposals.draft.operations.push_back(std::move(create));
-
-    proposals.creator_preview_refresh_pending = true;
-    proposals.creator_pending_select_create_ref = create_ref;
-    proposals.creator_pending_clear_selection = false;
-    SetStatus("Recorded proposal top goal operation.");
-    return true;
+    return actions::ProposalActions(*impl_).AddTopGoal();
 }
 
 void AppRuntime::RemoveProposalSelected(core::RemoveMode mode) {
-    auto& proposals = *impl_->proposal_controller;
-    if (!proposals.creator_active || !impl_->app_state.loaded_case.has_value()) {
-        SetStatus("Start a proposal draft before editing proposal changes.");
-        return;
-    }
-
-    const std::string selected_id = ui::GetUiState().selected_element_id;
-    if (selected_id.empty()) {
-        SetStatus("Select an element before removing proposal nodes.");
-        return;
-    }
-
-    std::vector<std::string> planned_ids;
-    auto planned = core::PlanRemoval(proposals.preview_model, selected_id, mode);
-    planned_ids.assign(planned.begin(), planned.end());
-    std::sort(planned_ids.begin(), planned_ids.end());
-    if (planned_ids.empty()) {
-        SetStatus("Nothing to remove for this selection.");
-        return;
-    }
-
-    for (const std::string& id : planned_ids) {
-        std::optional<core::reviews::ElementRef> ref = ProposalRefForPreviewId(id, proposals.creator_generated_ids);
-        if (!ref.has_value())
-            continue;
-        TrackAffectedRef(proposals.draft, impl_->app_state.loaded_case.value(), ref.value());
-    }
-
-    std::optional<core::reviews::ElementRef> selected_ref =
-        ProposalRefForPreviewId(selected_id, proposals.creator_generated_ids);
-    if (!selected_ref.has_value()) {
-        SetStatus("Could not resolve selected element for proposal removal.");
-        return;
-    }
-
-    proposals.draft.operations.erase(
-        std::remove_if(proposals.draft.operations.begin(),
-                       proposals.draft.operations.end(),
-                       [&](const core::reviews::PatchOperation& operation) {
-                           return operation.type == core::reviews::PatchOperationType::RemoveElement &&
-                                  operation.element.has_value() &&
-                                  SameElementRef(operation.element.value(), selected_ref.value());
-                       }),
-        proposals.draft.operations.end());
-
-    core::reviews::PatchOperation remove;
-    remove.type = core::reviews::PatchOperationType::RemoveElement;
-    remove.element = selected_ref.value();
-    remove.field = RemoveModeField(mode);
-    proposals.draft.operations.push_back(std::move(remove));
-
-    proposals.creator_preview_refresh_pending = true;
-    proposals.creator_pending_select_create_ref.reset();
-    proposals.creator_pending_clear_selection = true;
-    SetStatus("Recorded proposal remove operation.");
+    actions::ProposalActions(*impl_).RemoveSelected(mode);
 }
 
 void AppRuntime::ScanDirectory() {
@@ -1735,276 +314,16 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     ui::GetUiState().model_has_translations = ui::ModelHasTranslations(ac);
     SyncTerminologyProblems();
 
-    if (impl_->pending_focus_root && impl_->current_tree.root) {
+    if (impl_->workbench.pending_focus_root && impl_->current_tree.root) {
         ui::UiState& ui_state = ui::GetUiState();
         ui_state.selected_element_id = impl_->current_tree.root->id;
         ui_state.center_on_selection = true;
         ui_state.center_view = ui::CenterView::GsnCanvas;
-        impl_->force_center_tab_selection = true;
-        impl_->pending_focus_root = false;
+        impl_->workbench.force_center_tab_selection = true;
+        impl_->workbench.pending_focus_root = false;
     }
 
     impl_->tree_needs_rebuild = false;
-}
-
-float AppRuntime::RenderMainMenuBar(bool& done) {
-    if (!ImGui::BeginMainMenuBar()) {
-        return 0.0f;
-    }
-
-    if (ImGui::BeginMenu(ui::Tr(ui::MessageId::FileMenu))) {
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::CreateEmptyProject))) {
-            BeginCreateProject();
-        }
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::OpenProject))) {
-            BeginOpenProject();
-        }
-        ImGui::Separator();
-        bool has_project = impl_->app_state.current_project.has_value();
-        if (!has_project)
-            ImGui::BeginDisabled();
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::SaveProject))) {
-            SaveProject();
-        }
-        if (!has_project)
-            ImGui::EndDisabled();
-        ImGui::Separator();
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::Exit))) {
-            RequestExit(done);
-        }
-        ImGui::EndMenu();
-    }
-
-    if (ImGui::BeginMenu(ui::Tr(ui::MessageId::AddMenu))) {
-        bool has_project = impl_->app_state.current_project.has_value();
-        if (!has_project)
-            ImGui::BeginDisabled();
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::NewGsnSacmFile))) {
-            BeginCreateProjectSacmFile();
-        }
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::NewEvidenceRegister))) {
-            BeginCreateProjectEvidenceRegister();
-        }
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::NewJ3377CaeRegister))) {
-            BeginCreateProjectJ3377CaeRegister();
-        }
-        if (!has_project)
-            ImGui::EndDisabled();
-        ImGui::EndMenu();
-    }
-
-    if (ImGui::BeginMenu(ui::Tr(ui::MessageId::EditMenu))) {
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::Preferences))) {
-            impl_->modal_coordinator->show_preferences_window = true;
-        }
-        ImGui::EndMenu();
-    }
-
-    if (ImGui::BeginMenu(ui::Tr(ui::MessageId::ViewMenu))) {
-        ui::UiState& ui_state = ui::GetUiState();
-        ImGui::MenuItem(ui::Tr(ui::MessageId::GsnCanvas), nullptr, &impl_->show_gsn_tab);
-        ImGui::MenuItem(ui::Tr(ui::MessageId::CseRegister), nullptr, &impl_->show_cse_tab);
-        ImGui::MenuItem(ui::Tr(ui::MessageId::EvidenceRegister), nullptr, &impl_->show_evidence_tab);
-        NormalizeCenterViewSelection(*impl_, ui_state.center_view);
-
-        ImGui::Separator();
-        if (ImGui::BeginMenu(ui::Tr(ui::MessageId::Appearance))) {
-            if (ImGui::MenuItem(ui::Tr(ui::MessageId::ThemeTweaks))) {
-                impl_->modal_coordinator->show_theme_tweak_window = true;
-            }
-            RenderThemeMenu();
-            RenderLanguageMenu();
-            ImGui::EndMenu();
-        }
-
-        ImGui::Separator();
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::WelcomeScreen))) {
-            impl_->project_controller->show_startup_project_window = true;
-        }
-
-        ImGui::EndMenu();
-    }
-
-    HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
-    if (runner_params && runner_params->imGuiWindowParams.showStatus_Fps) {
-        ui::gsn::CanvasRenderStats stats = ui::gsn::GetLastCanvasRenderStats();
-        const int node_total = stats.nodes_drawn + stats.nodes_culled;
-        const int edge_total = stats.edges_drawn + stats.edges_culled;
-        const float node_ratio =
-            node_total > 0 ? static_cast<float>(stats.nodes_culled) / static_cast<float>(node_total) : 0.0f;
-        const float edge_ratio =
-            edge_total > 0 ? static_cast<float>(stats.edges_culled) / static_cast<float>(edge_total) : 0.0f;
-
-        char fps_text[32];
-        char nodes_text[32];
-        char edges_text[32];
-        std::snprintf(fps_text, sizeof(fps_text), "FPS: %.1f", ImGui::GetIO().Framerate);
-        std::snprintf(nodes_text, sizeof(nodes_text), "N %d/%d", stats.nodes_drawn, node_total);
-        std::snprintf(edges_text, sizeof(edges_text), "E %d/%d", stats.edges_drawn, edge_total);
-
-        const char* sep = "  ";
-        const float total_width = ImGui::CalcTextSize(fps_text).x + ImGui::CalcTextSize(sep).x +
-                                  ImGui::CalcTextSize(nodes_text).x + ImGui::CalcTextSize(sep).x +
-                                  ImGui::CalcTextSize(edges_text).x;
-
-        const float right_x = ImGui::GetWindowContentRegionMax().x - total_width;
-        ImGui::SameLine();
-        ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), right_x));
-
-        ImGui::TextUnformatted(fps_text);
-        ImGui::SameLine(0.0f, 0.0f);
-        ImGui::TextUnformatted(sep);
-        ImGui::SameLine(0.0f, 0.0f);
-        ImGui::TextColored(ui::CullRatioColor(node_ratio), "%s", nodes_text);
-        ImGui::SameLine(0.0f, 0.0f);
-        ImGui::TextUnformatted(sep);
-        ImGui::SameLine(0.0f, 0.0f);
-        ImGui::TextColored(ui::CullRatioColor(edge_ratio), "%s", edges_text);
-    }
-
-    ImGui::EndMainMenuBar();
-    return ImGui::GetFrameHeight();
-}
-
-void AppRuntime::RenderPreferencesWindow() {
-    if (!impl_->modal_coordinator->show_preferences_window)
-        return;
-
-    bool test_running = false;
-    if (impl_->ai_test_task) {
-        ai::AiTaskSnapshot snapshot = impl_->ai_test_task->Snapshot();
-        test_running = snapshot.state == ai::AiTaskState::Running;
-        impl_->ai_connection_status = snapshot.status;
-        if (!test_running) {
-            impl_->ai_test_task.reset();
-            impl_->RefreshStoredAiKeyState();
-        }
-    }
-
-    ui::panels::PreferencesPanelModel model;
-    model.settings = &impl_->ai_settings;
-    model.keyStored = impl_->ai_key_stored;
-    model.secureStoreAvailable = impl_->ai_secure_store_available;
-    model.testRunning = test_running;
-    model.connectionStatus = impl_->ai_connection_status;
-    model.apiKeyBuffer = impl_->ai_api_key_buf;
-    model.apiKeyBufferSize = sizeof(impl_->ai_api_key_buf);
-    model.modelBuffer = impl_->ai_model_buf;
-    model.modelBufferSize = sizeof(impl_->ai_model_buf);
-    model.reviewerNameBuffer = impl_->reviewer_name_buf;
-    model.reviewerNameBufferSize = sizeof(impl_->reviewer_name_buf);
-    model.language = ui::CurrentLanguage();
-    if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams()) {
-        model.showFps = runner_params->imGuiWindowParams.showStatus_Fps;
-    }
-
-    ui::panels::PreferencesPanelCallbacks callbacks;
-    callbacks.save_settings = [this](const ai::AiProviderSettings& settings) {
-        impl_->ai_settings = settings;
-        if (impl_->ai_settings.model.empty())
-            impl_->ai_settings.model = ai::kDefaultOpenAiModel;
-        std::string error;
-        if (!impl_->ai_service->SaveSettings(impl_->ai_settings, error)) {
-            impl_->ai_connection_status = ai::ErrorStatus(ai::AiErrorCode::SettingsError, error);
-            return;
-        }
-        CopyToBuffer(impl_->ai_model_buf, sizeof(impl_->ai_model_buf), impl_->ai_settings.model);
-        impl_->ai_connection_status = ai::SuccessStatus("AI settings saved.");
-    };
-    callbacks.save_api_key = [this](const char* api_key) {
-        if (!api_key || api_key[0] == '\0') {
-            impl_->ai_connection_status =
-                ai::ErrorStatus(ai::AiErrorCode::MissingApiKey, "Enter an API key before saving.");
-            return;
-        }
-        ai::SecretStoreResult result = impl_->ai_service->SaveApiKey(api_key);
-        std::memset(impl_->ai_api_key_buf, 0, sizeof(impl_->ai_api_key_buf));
-        impl_->RefreshStoredAiKeyState();
-        impl_->ai_connection_status = result.success ? ai::SuccessStatus("API key saved securely.")
-                                                     : ai::ErrorStatus(result.errorCode, result.errorMessage);
-    };
-    callbacks.remove_api_key = [this]() {
-        ai::SecretStoreResult result = impl_->ai_service->DeleteApiKey();
-        std::memset(impl_->ai_api_key_buf, 0, sizeof(impl_->ai_api_key_buf));
-        impl_->RefreshStoredAiKeyState();
-        impl_->ai_connection_status = result.success ? ai::SuccessStatus("API key removed.")
-                                                     : ai::ErrorStatus(result.errorCode, result.errorMessage);
-    };
-    callbacks.test_connection = [this]() {
-        if (impl_->ai_test_task && impl_->ai_test_task->IsRunning())
-            return;
-        impl_->ai_connection_status =
-            ai::MakeStatus(ai::AiTaskState::Running, ai::AiErrorCode::None, "Testing connection...");
-        impl_->ai_settings.model = impl_->ai_model_buf;
-        if (impl_->ai_settings.model.empty())
-            impl_->ai_settings.model = ai::kDefaultOpenAiModel;
-        std::string error;
-        if (!impl_->ai_service->SaveSettings(impl_->ai_settings, error)) {
-            impl_->ai_connection_status = ai::ErrorStatus(ai::AiErrorCode::SettingsError, error);
-            return;
-        }
-        std::shared_ptr<ai::AiService> service = impl_->ai_service;
-        impl_->ai_test_task =
-            impl_->ai_task_runner.RunConnectionTest([service]() { return service->TestConnection(); });
-    };
-    callbacks.set_language = [](ui::Language language) { ui::SetCurrentLanguage(language); };
-    callbacks.set_show_fps = [](bool show_fps) {
-        if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams()) {
-            runner_params->imGuiWindowParams.showStatus_Fps = show_fps;
-        }
-    };
-    callbacks.save_reviewer_name = [this](const char* reviewer_name) {
-        impl_->reviewer_name = TrimWhitespace(reviewer_name ? reviewer_name : "");
-        CopyToBuffer(impl_->reviewer_name_buf, sizeof(impl_->reviewer_name_buf), impl_->reviewer_name);
-        impl_->modal_coordinator->show_reviewer_name_prompt = impl_->reviewer_name.empty();
-        SetStatus(impl_->reviewer_name.empty() ? "Reviewer name is required for new reviews." : "Reviewer name saved.");
-    };
-
-    ui::panels::ShowPreferencesWindow(impl_->modal_coordinator->show_preferences_window, model, callbacks);
-}
-
-void AppRuntime::RenderThemeTweaksWindow() {
-    if (!impl_->modal_coordinator->show_theme_tweak_window)
-        return;
-    HelloImGui::ShowThemeTweakGuiWindow(&impl_->modal_coordinator->show_theme_tweak_window);
-}
-
-void AppRuntime::RenderTreePanel(float left_w, float safety_tree_h, float top_y) {
-    ImGui::SetNextWindowPos(ImVec2(0, top_y));
-    ImGui::SetNextWindowSize(ImVec2(left_w, safety_tree_h));
-    ImGui::Begin("Safety Case Tree", nullptr, kPanelFlags);
-    ui::UiState& ui_state = ui::GetUiState();
-    ui::ElementContextActions actions;
-    if (impl_->proposal_controller->preview_active) {
-        actions = ui::ElementContextActions{};
-    } else if (impl_->proposal_controller->creator_active) {
-        actions = ui::ElementContextActions{
-            [this](core::NewElementKind kind) { AddProposalChildToSelected(kind); },
-            [this]() { AddProposalTopGoal(); },
-            [this](core::RemoveMode mode) { RemoveProposalSelected(mode); },
-            nullptr,
-            [this](const char* feature) {
-                if (feature)
-                    ShowNotImplementedModal(feature);
-            },
-        };
-    } else {
-        actions = MakeElementContextActions(*this);
-    }
-    ui::TreeEditActions tree_edit_actions{
-        [this](const std::string& dragged_id, const std::string& target_id, core::TreeDropMode drop_mode) {
-            return ValidateTreeDrop(dragged_id, target_id, drop_mode);
-        },
-        [this](const std::string& dragged_id, const std::string& target_id, core::TreeDropMode drop_mode) {
-            return PerformTreeDrop(dragged_id, target_id, drop_mode);
-        },
-    };
-    const parser::AssuranceCase* visible_case =
-        impl_->IsProposalCanvasActive() ? &impl_->proposal_controller->preview_model : GetLoadedCase();
-    const ui::TreeEditActions* edit_actions = impl_->IsProposalCanvasActive() ? nullptr : &tree_edit_actions;
-    ui::ShowTreeViewPanel(
-        impl_->current_tree.root ? &impl_->current_tree : nullptr, visible_case, ui_state, actions, edit_actions);
-    ImGui::End();
 }
 
 void AppRuntime::RenderSacmViewerPanel(float left_w, float sacm_h, float top_y) {
@@ -2022,7 +341,7 @@ void AppRuntime::RenderSacmViewerPanel(float left_w, float sacm_h, float top_y) 
         [this]() { ScanDirectory(); },
         [this]() {
             impl_->tree_needs_rebuild = true;
-            impl_->pending_focus_root = true;
+            impl_->workbench.pending_focus_root = true;
         },
         [this]() {
             impl_->current_tree = core::AssuranceTree();
@@ -2034,323 +353,71 @@ void AppRuntime::RenderSacmViewerPanel(float left_w, float sacm_h, float top_y) 
     ui::panels::ShowSacmViewerPanel(left_w, sacm_h, top_y, kPanelFlags, model, callbacks);
 }
 
-void AppRuntime::RenderCenterPanel(float center_x, float center_w, float content_h, float top_y) {
-    ImGui::SetNextWindowPos(ImVec2(center_x, top_y));
-    ImGui::SetNextWindowSize(ImVec2(center_w, content_h));
-    ImGui::Begin("Center View", nullptr, kPanelFlags | ImGuiWindowFlags_NoTitleBar);
-
-    ui::UiState& ui_state = ui::GetUiState();
-    NormalizeCenterViewSelection(*impl_, ui_state.center_view);
-
-    if (ImGui::BeginTabBar("##center_tabs")) {
-        if (impl_->show_gsn_tab) {
-            ImGuiTabItemFlags gsn_flags =
-                (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::GsnCanvas)
-                    ? ImGuiTabItemFlags_SetSelected
-                    : 0;
-            if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::GsnCanvas), nullptr, gsn_flags)) {
-                ui_state.center_view = ui::CenterView::GsnCanvas;
-                if (impl_->IsProposalCanvasActive()) {
-                    const float banner_h = ImGui::GetStyle().WindowPadding.y * 2.0f + ImGui::GetTextLineHeight() +
-                                           ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeight() +
-                                           2.0f; // border pixels
-                    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(IM_COL32(42, 45, 30, 255)));
-                    ImGui::BeginChild(
-                        "##proposal_preview_banner", ImVec2(0.0f, banner_h), true, ImGuiWindowFlags_NoScrollbar);
-                    auto& proposals = *impl_->proposal_controller;
-                    ImGui::TextUnformatted(proposals.creator_active ? "PROPOSAL CREATOR" : "PROPOSAL PREVIEW");
-                    if (proposals.creator_active) {
-                        ImGui::TextDisabled(
-                            "Changes are recorded in the proposal draft. Save it from the review panel.");
-                    } else {
-                        ImGui::TextDisabled("This is a preview. The project model has not been changed.");
-                    }
-                    ImGui::SameLine();
-                    if (proposals.creator_active) {
-                        ImGui::TextDisabled("%d operation(s)", static_cast<int>(proposals.ActiveOperationCount()));
-                        ImGui::SameLine();
-                    } else if (!proposals.preview_id.empty()) {
-                        if (ImGui::Button("Edit Proposal")) {
-                            BeginEditProposalById(proposals.preview_id);
-                        }
-                        ImGui::SameLine();
-                    }
-                    const char* exit_label = proposals.creator_active ? "Discard Draft" : "Exit Preview";
-                    if (ImGui::Button(exit_label)) {
-                        const bool was_creator = proposals.creator_active;
-                        proposals.ClearActiveState();
-                        ClearProposalHighlightState(ui::GetUiState());
-                        if (impl_->app_state.loaded_case.has_value()) {
-                            impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->app_state.loaded_case.value());
-                            ui::gsn::SetCanvasTree(impl_->current_tree);
-                        } else {
-                            impl_->tree_needs_rebuild = true;
-                        }
-                        if (was_creator)
-                            SetStatus("Discarded proposal draft.");
-                    }
-                    ImGui::EndChild();
-                    ImGui::PopStyleColor();
-                }
-                ui::ElementContextActions actions;
-                if (impl_->proposal_controller->preview_active) {
-                    actions = ui::ElementContextActions{};
-                } else if (impl_->proposal_controller->creator_active) {
-                    actions = ui::ElementContextActions{
-                        [this](core::NewElementKind kind) { AddProposalChildToSelected(kind); },
-                        [this]() { AddProposalTopGoal(); },
-                        [this](core::RemoveMode mode) { RemoveProposalSelected(mode); },
-                        nullptr,
-                        [this](const char* feature) {
-                            if (feature)
-                                ShowNotImplementedModal(feature);
-                        },
-                    };
-                } else {
-                    actions = MakeElementContextActions(*this);
-                    actions.open_terminology_term = [this](const core::TerminologyPackageRef& package_ref,
-                                                           const core::TerminologyTermRef& term_ref) {
-                        OpenTerminologyTermFromCanvas(package_ref, term_ref);
-                    };
-                    actions.edit_terminology_term = [this](const core::TerminologyPackageRef& package_ref,
-                                                           const core::TerminologyTermRef& term_ref) {
-                        EditTerminologyTermFromCanvas(package_ref, term_ref);
-                    };
-                    actions.define_terminology_term = [this](const std::string& element_id,
-                                                             const std::string& term_value) {
-                        BeginQuickDefineTerminologyTerm(element_id, term_value);
-                    };
-                    actions.add_terminology_term_as_context = [this](const std::string& element_id,
-                                                                     const core::TerminologyPackageRef& package_ref,
-                                                                     const core::TerminologyTermRef& term_ref) {
-                        AddTerminologyTermAsContextFromCanvas(element_id, package_ref, term_ref);
-                    };
-                    actions.add_visible_terminology_term_context =
-                        [this](const std::string& element_id,
-                               const core::TerminologyPackageRef& package_ref,
-                               const core::TerminologyTermRef& term_ref) {
-                            AddVisibleTerminologyTermContextFromCanvas(element_id, package_ref, term_ref);
-                        };
-                    actions.find_terminology_usages = [this](const core::TerminologyPackageRef& package_ref,
-                                                             const core::TerminologyTermRef& term_ref) {
-                        FindTerminologyUsagesFromCanvas(package_ref, term_ref);
-                    };
-                    actions.change_terminology_meaning = [this](const std::string& element_id,
-                                                                const std::string& term_value) {
-                        ChangeTerminologyMeaningFromCanvas(element_id, term_value);
-                    };
-                }
-                const parser::AssuranceCase* visible_case =
-                    impl_->IsProposalCanvasActive() ? &impl_->proposal_controller->preview_model : GetLoadedCase();
-                ui_state.proposal_canvas_active = impl_->IsProposalCanvasActive();
-                ui_state.attention_element_ids =
-                    core::CollectAttentionElementIds(impl_->problems_manager.GetProblems());
-                SyncReviewVisualStatesFromReviews();
-                const sacm::AssuranceCasePackage* terminology_package =
-                    impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
-                ui::gsn::ShowGsnCanvasContent(ui_state, visible_case, actions, terminology_package);
-                ImGui::EndTabItem();
-            }
-        }
-
-        if (impl_->show_cse_tab) {
-            ImGuiTabItemFlags cse_flags =
-                (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::CseRegister)
-                    ? ImGuiTabItemFlags_SetSelected
-                    : 0;
-            if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::CseRegister), nullptr, cse_flags)) {
-                ui_state.center_view = ui::CenterView::CseRegister;
-                if (impl_->app_state.active_project_file_role == core::ProjectFileRole::J3377CaeRegister) {
-                    ImGui::TextWrapped("J3377 CAE register file: %s",
-                                       impl_->app_state.active_project_file_path.string().c_str());
-                    ImGui::TextDisabled("Editable CAE register content will be implemented in a later workflow.");
-                    ImGui::Separator();
-                }
-                ui::ShowCseRegisterView();
-                ImGui::EndTabItem();
-            }
-        }
-
-        if (impl_->show_evidence_tab) {
-            ImGuiTabItemFlags evidence_flags =
-                (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::EvidenceRegister)
-                    ? ImGuiTabItemFlags_SetSelected
-                    : 0;
-            if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::EvidenceRegister), nullptr, evidence_flags)) {
-                ui_state.center_view = ui::CenterView::EvidenceRegister;
-                if (impl_->app_state.active_project_file_role == core::ProjectFileRole::EvidenceRegister) {
-                    ImGui::TextWrapped("Evidence register file: %s",
-                                       impl_->app_state.active_project_file_path.string().c_str());
-                    ImGui::TextDisabled("Editable evidence register content will be implemented in a later workflow.");
-                    ImGui::Separator();
-                }
-                ui::ShowEvidenceRegisterView();
-                ImGui::EndTabItem();
-            }
-        }
-
-        if (impl_->show_package_details_tab) {
-            ImGuiTabItemFlags package_flags =
-                (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::PackageDetails)
-                    ? ImGuiTabItemFlags_SetSelected
-                    : 0;
-            if (ImGui::BeginTabItem("Package Details", nullptr, package_flags)) {
-                ui_state.center_view = ui::CenterView::PackageDetails;
-                ui::panels::ShowPackageDetailsPanel(impl_->selected_package_node ? &impl_->selected_package_node.value()
-                                                                                 : nullptr,
-                                                    impl_->selected_package_file_path);
-                ImGui::EndTabItem();
-            }
-        }
-
-        if (impl_->show_terminology_package_tab) {
-            ImGuiTabItemFlags terminology_flags =
-                (impl_->force_center_tab_selection && ui_state.center_view == ui::CenterView::TerminologyPackage)
-                    ? ImGuiTabItemFlags_SetSelected
-                    : 0;
-            if (ImGui::BeginTabItem("Terminology Package", nullptr, terminology_flags)) {
-                ui_state.center_view = ui::CenterView::TerminologyPackage;
-                const sacm::TerminologyPackage* terminology_package = nullptr;
-                if (impl_->app_state.sacm_package.has_value()) {
-                    terminology_package = core::FindTerminologyPackage(impl_->app_state.sacm_package.value(),
-                                                                       impl_->selected_terminology_package_ref);
-                }
-                std::string delete_block_reason;
-                const bool can_delete =
-                    terminology_package ? core::CanDeleteTerminologyPackage(*terminology_package, delete_block_reason)
-                                        : false;
-                ui::panels::TerminologyPackagePanelModel model;
-                model.package = terminology_package;
-                model.source_file_path = impl_->selected_terminology_package_file_path;
-                model.name_buffer = impl_->terminology_package_name_buf;
-                model.name_buffer_size = sizeof(impl_->terminology_package_name_buf);
-                model.description_buffer = impl_->terminology_package_description_buf;
-                model.description_buffer_size = sizeof(impl_->terminology_package_description_buf);
-                model.can_delete = can_delete;
-                model.delete_block_reason = delete_block_reason;
-                model.selected_term_ref = impl_->selected_terminology_term_ref;
-                model.selected_category_ref = impl_->selected_terminology_category_ref;
-                model.search_buffer = impl_->terminology_filter_buf;
-                model.search_buffer_size = sizeof(impl_->terminology_filter_buf);
-                model.category_filter_buffer = impl_->terminology_category_filter_buf;
-                model.category_filter_buffer_size = sizeof(impl_->terminology_category_filter_buf);
-                if (terminology_package) {
-                    model.term_issues = core::ValidateTerminologyTerms(*terminology_package);
-                    model.term_usage_summaries = core::BuildTerminologyTermUsageSummaries(
-                        impl_->app_state.sacm_package.value(), *terminology_package);
-                    model.category_usage_summaries = core::BuildTerminologyCategoryUsageSummaries(*terminology_package);
-                }
-                ui::panels::TerminologyPackagePanelCallbacks callbacks;
-                callbacks.apply_changes = [this]() { ApplyTerminologyPackageEdits(); };
-                callbacks.delete_package = [this]() { BeginDeleteTerminologyPackage(); };
-                callbacks.add_term = [this]() { BeginAddTerminologyTerm(); };
-                callbacks.select_term = [this](const core::TerminologyTermRef& term_ref) {
-                    SelectTerminologyTerm(term_ref);
-                };
-                callbacks.edit_term = [this](const core::TerminologyTermRef& term_ref) {
-                    BeginEditTerminologyTerm(term_ref);
-                };
-                callbacks.delete_term = [this](const core::TerminologyTermRef& term_ref) {
-                    BeginDeleteTerminologyTerm(term_ref);
-                };
-                callbacks.find_term_usages = [this](const core::TerminologyTermRef& term_ref) {
-                    BeginFindTerminologyUsages(impl_->selected_terminology_package_ref, term_ref);
-                };
-                callbacks.set_category_filter = [this](const std::string& category_filter) {
-                    SetTerminologyCategoryFilter(category_filter);
-                };
-                callbacks.add_category = [this]() { BeginAddTerminologyCategory(); };
-                callbacks.select_category = [this](const core::TerminologyCategoryRef& category_ref) {
-                    SelectTerminologyCategory(category_ref);
-                };
-                callbacks.edit_category = [this](const core::TerminologyCategoryRef& category_ref) {
-                    BeginEditTerminologyCategory(category_ref);
-                };
-                callbacks.delete_category = [this](const core::TerminologyCategoryRef& category_ref) {
-                    BeginDeleteTerminologyCategory(category_ref);
-                };
-                callbacks.seed_recommended_categories = [this]() { SeedRecommendedTerminologyCategories(); };
-                ui::panels::ShowTerminologyPackagePanel(model, callbacks);
-                ImGui::EndTabItem();
-            }
-        }
-
-        ImGui::EndTabBar();
-        impl_->force_center_tab_selection = false;
-    }
-
-    ImGui::End();
-}
-
-void AppRuntime::RenderProblemsPanel(float center_x, float center_w, float problems_h, float top_y) {
-    ui::panels::ProblemsPanelModel model{
-        impl_->problems_manager,
-        ui::GetUiState(),
-    };
-    ui::panels::ProblemsPanelCallbacks callbacks{
-        [this](const core::ProblemItem& problem) {
-            if (problem.type.rfind("TerminologyTerm", 0) == 0) {
-                HandleProblemQuickFix(problem);
-                return;
-            }
-            if (problem.element_id.empty())
-                return;
-            ui::GetUiState().selected_problem_element_id = problem.element_id;
-            impl_->events.Emit(SelectionChangedEvent{problem.element_id, true});
-            impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
+areas::WorkbenchAreaCallbacks AppRuntime::MakeWorkbenchAreaCallbacks() {
+    return areas::WorkbenchAreaCallbacks{
+        [this]() { return MakeElementContextActions(*this); },
+        [this](core::NewElementKind kind) { AddProposalChildToSelected(kind); },
+        [this]() { AddProposalTopGoal(); },
+        [this](core::RemoveMode mode) { RemoveProposalSelected(mode); },
+        [this](const char* feature) {
+            if (feature)
+                ShowNotImplementedModal(feature);
         },
-        [this](const core::ProblemItem& problem) { HandleProblemQuickFix(problem); },
+        [this](const std::string& proposal_id) { return BeginEditProposalById(proposal_id); },
+        [this](bool was_creator) {
+            impl_->proposal_controller->ClearActiveState();
+            ClearProposalHighlightState(ui::GetUiState());
+            if (impl_->app_state.loaded_case.has_value()) {
+                impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->app_state.loaded_case.value());
+                ui::gsn::SetCanvasTree(impl_->current_tree);
+            } else {
+                impl_->tree_needs_rebuild = true;
+            }
+            if (was_creator)
+                SetStatus("Discarded proposal draft.");
+        },
+        [this](const core::TerminologyPackageRef& package_ref, const core::TerminologyTermRef& term_ref) {
+            OpenTerminologyTermFromCanvas(package_ref, term_ref);
+        },
+        [this](const core::TerminologyPackageRef& package_ref, const core::TerminologyTermRef& term_ref) {
+            EditTerminologyTermFromCanvas(package_ref, term_ref);
+        },
+        [this](const std::string& element_id, const std::string& term_value) {
+            BeginQuickDefineTerminologyTerm(element_id, term_value);
+        },
+        [this](const std::string& element_id,
+               const core::TerminologyPackageRef& package_ref,
+               const core::TerminologyTermRef& term_ref) {
+            AddTerminologyTermAsContextFromCanvas(element_id, package_ref, term_ref);
+        },
+        [this](const std::string& element_id,
+               const core::TerminologyPackageRef& package_ref,
+               const core::TerminologyTermRef& term_ref) {
+            AddVisibleTerminologyTermContextFromCanvas(element_id, package_ref, term_ref);
+        },
+        [this](const core::TerminologyPackageRef& package_ref, const core::TerminologyTermRef& term_ref) {
+            FindTerminologyUsagesFromCanvas(package_ref, term_ref);
+        },
+        [this](const std::string& element_id, const std::string& term_value) {
+            ChangeTerminologyMeaningFromCanvas(element_id, term_value);
+        },
+        [this]() { SyncReviewVisualStatesFromReviews(); },
+        [this]() { ApplyTerminologyPackageEdits(); },
+        [this]() { BeginDeleteTerminologyPackage(); },
+        [this]() { BeginAddTerminologyTerm(); },
+        [this](const core::TerminologyTermRef& term_ref) { SelectTerminologyTerm(term_ref); },
+        [this](const core::TerminologyTermRef& term_ref) { BeginEditTerminologyTerm(term_ref); },
+        [this](const core::TerminologyTermRef& term_ref) { BeginDeleteTerminologyTerm(term_ref); },
+        [this](const core::TerminologyTermRef& term_ref) {
+            BeginFindTerminologyUsages(impl_->terminology.selected_package_ref, term_ref);
+        },
+        [this](const std::string& category_filter) { SetTerminologyCategoryFilter(category_filter); },
+        [this]() { BeginAddTerminologyCategory(); },
+        [this](const core::TerminologyCategoryRef& category_ref) { SelectTerminologyCategory(category_ref); },
+        [this](const core::TerminologyCategoryRef& category_ref) { BeginEditTerminologyCategory(category_ref); },
+        [this](const core::TerminologyCategoryRef& category_ref) { BeginDeleteTerminologyCategory(category_ref); },
+        [this]() { SeedRecommendedTerminologyCategories(); },
     };
-
-    ImGui::SetNextWindowPos(ImVec2(center_x, top_y));
-    ImGui::SetNextWindowSize(ImVec2(center_w, problems_h));
-    ImGui::Begin("Problems and Review", nullptr, kPanelFlags | ImGuiWindowFlags_NoTitleBar);
-
-    if (ImGui::BeginTabBar("##problems_review_tabs")) {
-        if (ImGui::BeginTabItem("Problems")) {
-            ui::panels::ShowProblemsPanelContent(model, callbacks, false);
-            ImGui::EndTabItem();
-        }
-
-        ImGuiTabItemFlags terminology_usage_flags =
-            impl_->focus_terminology_usages_tab ? ImGuiTabItemFlags_SetSelected : 0;
-        if (ImGui::BeginTabItem("Term Usages", nullptr, terminology_usage_flags)) {
-            ui::panels::TerminologyUsagesPanelModel usage_model;
-            usage_model.has_search = impl_->terminology_usages_active;
-            usage_model.term_value = impl_->usage_search_term_value;
-            usage_model.term_name = impl_->usage_search_term_name;
-            usage_model.message = impl_->usage_search_message;
-            usage_model.error = impl_->usage_search_error;
-            usage_model.usages = &impl_->terminology_usage_results;
-            usage_model.selected_usage_index = impl_->selected_terminology_usage_index;
-
-            ui::panels::TerminologyUsagesPanelCallbacks usage_callbacks;
-            usage_callbacks.select_usage = [this](std::size_t usage_index) {
-                if (usage_index < impl_->terminology_usage_results.size())
-                    impl_->selected_terminology_usage_index = static_cast<int>(usage_index);
-            };
-            usage_callbacks.activate_usage = [this](std::size_t usage_index) {
-                NavigateToTerminologyUsage(usage_index);
-            };
-            ui::panels::ShowTerminologyUsagesPanelContent(usage_model, usage_callbacks);
-            ImGui::EndTabItem();
-        }
-        impl_->focus_terminology_usages_tab = false;
-
-        if (ImGui::BeginTabItem("Review")) {
-            RenderReviewPanelContent();
-            ImGui::EndTabItem();
-        }
-
-        if (ImGui::BeginTabItem("AI Debug")) {
-            RenderAiDebugPanelContent();
-            ImGui::EndTabItem();
-        }
-
-        ImGui::EndTabBar();
-    }
-
-    ImGui::End();
 }
 
 void AppRuntime::SyncReviewProblems() {
@@ -2358,56 +425,14 @@ void AppRuntime::SyncReviewProblems() {
 }
 
 void AppRuntime::SyncTerminologyProblems() {
-    constexpr const char* kTerminologyTermProblemPrefix = "terminology-term:";
-    constexpr const char* kTerminologyAmbiguityProblemPrefix = "terminology-ambiguity:";
-    constexpr const char* kTerminologyUndefinedProblemPrefix = "terminology-undefined:";
-    constexpr const char* kTerminologyContextReferenceProblemPrefix = "terminology-context-reference:";
-    ClearProblemsByIdPrefix(impl_->problems_manager, kTerminologyTermProblemPrefix);
-    ClearProblemsByIdPrefix(impl_->problems_manager, kTerminologyAmbiguityProblemPrefix);
-    ClearProblemsByIdPrefix(impl_->problems_manager, kTerminologyUndefinedProblemPrefix);
-    ClearProblemsByIdPrefix(impl_->problems_manager, kTerminologyContextReferenceProblemPrefix);
-
-    if (!impl_->app_state.loaded_case.has_value() || !impl_->app_state.sacm_package.has_value())
-        return;
-
-    const parser::AssuranceCase& model = impl_->app_state.loaded_case.value();
-    const sacm::AssuranceCasePackage& package = impl_->app_state.sacm_package.value();
-
-    auto add_term_problems = [&](const sacm::TerminologyPackage& terminology_package) {
-        for (core::ProblemItem& problem : BuildTerminologyTermProblems(terminology_package)) {
-            impl_->problems_manager.AddOrUpdateProblem(problem);
-        }
-    };
-
-    for (const sacm::TerminologyPackage& terminology_package : package.terminologyPackages)
-        add_term_problems(terminology_package);
-    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
-        for (const sacm::TerminologyPackage& terminology_package : argument_package.terminologyPackages)
-            add_term_problems(terminology_package);
-    }
-
-    for (const core::TerminologyContextReferenceIssue& issue : core::ValidateTerminologyContextReferences(package)) {
-        core::ProblemItem problem = BuildTerminologyContextReferenceProblem(issue);
-        impl_->problems_manager.AddOrUpdateProblem(problem);
-    }
-
-    core::TerminologyService terminology_service(package);
-
-    for (const parser::SacmElement& element : model.elements) {
-        if (IsRelationshipElement(element))
-            continue;
-        const std::string text = ElementTerminologyText(element);
-        if (text.empty())
-            continue;
-
-        std::vector<core::TermOccurrence> occurrences = terminology_service.DetectTermsInText(element.id, text);
-        for (const core::TermOccurrence& occurrence : occurrences) {
-            std::optional<core::ProblemItem> problem = BuildTerminologyOccurrenceProblem(
-                occurrence, IsTerminologySuggestionIgnored(occurrence.element_id, occurrence.text));
-            if (problem.has_value())
-                impl_->problems_manager.AddOrUpdateProblem(*problem);
-        }
-    }
+    const parser::AssuranceCase* model =
+        impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
+    const sacm::AssuranceCasePackage* package =
+        impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
+    app::SyncTerminologyProblems(
+        impl_->problems_manager, model, package, [this](const std::string& element_id, const std::string& term_value) {
+            return IsTerminologySuggestionIgnored(element_id, term_value);
+        });
 }
 
 void AppRuntime::SyncReviewVisualStatesFromReviews() {
@@ -2472,428 +497,13 @@ bool AppRuntime::SetManualReviewOk(const std::string& element_id, bool manual_ok
         SetStatus("Enter a reviewer name before changing review status.");
         return false;
     }
-    if (!impl_->review_controller->SetManualReviewOk(element_id, manual_ok, impl_->reviewer_name, NowUtcString())) {
+    if (!impl_->review_controller->SetManualReviewOk(
+            element_id, manual_ok, impl_->reviewer_name, core::NowUtcString())) {
         SetStatus("Could not update manual review status.");
         return false;
     }
     SyncReviewVisualStatesFromReviews();
     return true;
-}
-
-void AppRuntime::RenderProposalElementEditor() {
-    auto& proposals = *impl_->proposal_controller;
-    if (!proposals.creator_active)
-        return;
-
-    ImGui::TextUnformatted("Proposal Creator");
-    ImGui::TextDisabled("Edits are recorded in the proposal draft only.");
-    ImGui::Separator();
-
-    const std::string selected_id = ui::GetUiState().selected_element_id;
-    if (selected_id.empty()) {
-        ImGui::TextWrapped("Select a proposal preview element to edit its proposed properties.");
-        return;
-    }
-
-    const parser::SacmElement* element = FindParserElement(proposals.preview_model, selected_id);
-    if (!element) {
-        ImGui::TextWrapped("The selected proposal preview element no longer exists.");
-        return;
-    }
-
-    static std::string active_editor_key;
-    static char name_buf[256] = "";
-    static char text_buf[2048] = "";
-    const std::string editor_key = proposals.draft.id + ":" + selected_id;
-    if (active_editor_key != editor_key) {
-        active_editor_key = editor_key;
-        CopyToBuffer(name_buf, sizeof(name_buf), element->name);
-        CopyToBuffer(text_buf, sizeof(text_buf), EditableTextFor(*element));
-    }
-
-    const parser::SacmElement element_snapshot = *element;
-    std::optional<core::reviews::ElementRef> ref =
-        ProposalRefForPreviewId(selected_id, proposals.creator_generated_ids);
-    if (!ref.has_value()) {
-        ImGui::TextWrapped("Could not resolve this preview element for proposal edits.");
-        return;
-    }
-
-    std::string old_name = element_snapshot.name;
-    std::string old_text = EditableTextFor(element_snapshot);
-    bool old_undeveloped = element_snapshot.undeveloped;
-    if (ref->existing_id.has_value() && impl_->app_state.loaded_case.has_value()) {
-        if (const parser::SacmElement* base =
-                FindParserElement(impl_->app_state.loaded_case.value(), ref->existing_id.value())) {
-            old_name = base->name;
-            old_text = EditableTextFor(*base);
-            old_undeveloped = base->undeveloped;
-        }
-    }
-
-    ImGui::TextDisabled("%s  %s", ref->existing_id.has_value() ? "Existing" : "New", selected_id.c_str());
-    if (ImGui::Button("Remove")) {
-        RemoveProposalSelected(core::RemoveMode::NodeOnly);
-        return;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Remove Subtree")) {
-        RemoveProposalSelected(core::RemoveMode::NodeAndDescendants);
-        return;
-    }
-    ImGui::Separator();
-
-    ImGui::PushID(editor_key.c_str());
-    ImGui::SetNextItemWidth(-1.0f);
-    const bool name_changed = ImGui::InputText("Name", name_buf, sizeof(name_buf));
-    ImGui::SetNextItemWidth(-1.0f);
-    const bool text_changed =
-        ImGui::InputTextMultiline("Text", text_buf, sizeof(text_buf), ImVec2(-1.0f, ImGui::GetTextLineHeight() * 5.0f));
-    bool undeveloped_value = element_snapshot.undeveloped;
-    const bool undeveloped_changed = ImGui::Checkbox("Undeveloped", &undeveloped_value);
-    ImGui::PopID();
-
-    if (!name_changed && !text_changed && !undeveloped_changed)
-        return;
-
-    TrackAffectedRef(proposals.draft, impl_->app_state.loaded_case.value(), ref.value());
-    if (name_changed) {
-        UpsertElementUpdate(proposals.draft,
-                            core::reviews::PatchOperationType::UpdateElementName,
-                            ref.value(),
-                            "name",
-                            old_name,
-                            name_buf);
-    }
-    if (text_changed) {
-        UpsertElementUpdate(proposals.draft,
-                            core::reviews::PatchOperationType::UpdateElementText,
-                            ref.value(),
-                            EditableTextFieldFor(element_snapshot),
-                            old_text,
-                            text_buf);
-    }
-    if (undeveloped_changed) {
-        UpsertUndevelopedUpdate(proposals.draft, ref.value(), old_undeveloped, undeveloped_value);
-    }
-
-    if (RefreshProposalCreatorPreview()) {
-        SetStatus("Recorded proposal property change.");
-    }
-}
-
-void AppRuntime::RenderElementPropertiesPanel(
-    float center_x, float center_w, float right_w, float content_h, float top_y) {
-    float right_x = center_x + center_w + kSplitterThickness;
-
-    ImGui::SetNextWindowPos(ImVec2(right_x, top_y));
-    ImGui::SetNextWindowSize(ImVec2(right_w, content_h));
-    ImGui::Begin("Element Properties", nullptr, kPanelFlags);
-
-    if (impl_->proposal_controller->creator_active) {
-        RenderProposalElementEditor();
-    } else if (impl_->proposal_controller->preview_active) {
-        ImGui::TextWrapped("Proposal preview is active. Exit preview before editing element properties.");
-    } else {
-        parser::AssuranceCase* ac_ptr =
-            impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
-        sacm::AssuranceCasePackage* sacm_ptr =
-            impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
-        ui::panels::ElementTerminologyAssistCallbacks terminology_callbacks;
-        terminology_callbacks.define_term = [this](const std::string& element_id, const std::string& term_value) {
-            BeginQuickDefineTerminologyTerm(element_id, term_value);
-        };
-        terminology_callbacks.link_existing_term = [this](const std::string& element_id,
-                                                          const std::string& term_value) {
-            BeginLinkExistingTerminologyTerm(element_id, term_value);
-        };
-        terminology_callbacks.use_term_for_element = [this](const std::string& element_id,
-                                                            const core::TerminologyPackageRef& package_ref,
-                                                            const core::TerminologyTermRef& term_ref) {
-            AddTerminologyTermAsContextFromCanvas(element_id, package_ref, term_ref);
-        };
-        terminology_callbacks.ignore_term = [this](const std::string& element_id, const std::string& term_value) {
-            IgnoreTerminologySuggestion(element_id, term_value);
-        };
-        terminology_callbacks.is_ignored = [this](const std::string& element_id, const std::string& term_value) {
-            return IsTerminologySuggestionIgnored(element_id, term_value);
-        };
-        if (ui::panels::ShowElementPanel(ac_ptr, sacm_ptr, &terminology_callbacks)) {
-            impl_->events.Emit(TreeDirtyEvent{});
-            impl_->events.Emit(DocumentDirtyEvent{});
-        }
-    }
-
-    ImGui::End();
-}
-
-void AppRuntime::RenderReviewPanelContent() {
-    const ui::UiState& ui_state = ui::GetUiState();
-    ui::panels::ReviewPanelModel model;
-    auto& proposals = *impl_->proposal_controller;
-    model.selected_element_id =
-        proposals.creator_active ? proposals.draft.anchor_element_id : ui_state.selected_element_id;
-    model.has_project = impl_->app_state.current_project.has_value();
-    EnsureGuidelineCatalogLoaded(*impl_);
-    if (impl_->guideline_catalog.has_value()) {
-        for (const GuidelineCatalogEntry& entry : impl_->guideline_catalog->entries) {
-            model.guideline_options.push_back(ui::panels::ReviewGuidelineOption{
-                entry.id,
-                entry.category,
-                entry.title,
-            });
-        }
-    } else {
-        model.guideline_status = impl_->guideline_catalog_error;
-    }
-    if (proposals.creator_active) {
-        model.active_proposal_review_item_id = proposals.draft.review_item_id;
-        model.active_proposal_operation_count = proposals.ActiveOperationCount();
-        model.active_proposal_can_save = proposals.CanSaveActiveDraft();
-    }
-    if (!model.selected_element_id.empty()) {
-        model.review_items = impl_->review_controller->ItemsForElement(model.selected_element_id);
-        bool has_blocking_problem = false;
-        for (const core::ProblemItem& problem : impl_->problems_manager.GetProblems()) {
-            if (problem.element_id != model.selected_element_id)
-                continue;
-            if (IsReviewDerivedProblem(problem))
-                continue;
-            model.problem_items.push_back(problem);
-            has_blocking_problem = true;
-        }
-        const core::reviews::ElementReviewState element_review_state =
-            impl_->review_controller->ElementReviewStateForElement(model.selected_element_id);
-        model.manual_review_ok = element_review_state.manual_ok;
-        model.ai_review_ok = element_review_state.ai_ok;
-        model.ai_review_failed = element_review_state.failed;
-        const app::controllers::ElementReviewStatus review_status =
-            impl_->review_controller->StatusForElement(model.selected_element_id, has_blocking_problem);
-        model.review_status_passed = review_status == app::controllers::ElementReviewStatus::Passed;
-        switch (review_status) {
-        case app::controllers::ElementReviewStatus::Passed:
-            model.review_status_text = "Passed";
-            model.review_status_detail = element_review_state.manual_ok ? "Manual review OK." : "AI review OK.";
-            break;
-        case app::controllers::ElementReviewStatus::Failed:
-            model.review_status_text = "Not OK";
-            model.review_status_detail = element_review_state.last_review_message.empty()
-                                             ? "AI review failed."
-                                             : element_review_state.last_review_message;
-            break;
-        case app::controllers::ElementReviewStatus::OpenItems:
-            model.review_status_text = "Not OK";
-            model.review_status_detail =
-                has_blocking_problem ? "Open problems require attention." : "Open review comments require attention.";
-            break;
-        case app::controllers::ElementReviewStatus::NotReviewed:
-            model.review_status_text = "Not reviewed";
-            model.review_status_detail = "Set Manual review OK or run an AI review with no findings.";
-            break;
-        }
-        for (const core::reviews::ReviewItem& item : model.review_items) {
-            if (!item.proposal_id.has_value())
-                continue;
-            std::string error;
-            std::optional<core::reviews::ReviewProposal> proposal =
-                proposals.manager.LoadProposal(item.proposal_id.value(), error);
-            if (!proposal.has_value()) {
-                model.proposal_validity[item.proposal_id.value()] = {core::reviews::ProposalValidity::Broken, error};
-            } else if (impl_->app_state.loaded_case.has_value()) {
-                model.proposal_validity[item.proposal_id.value()] = core::reviews::EvaluateReviewProposalValidity(
-                    proposal.value(), impl_->app_state.loaded_case.value());
-            } else {
-                model.proposal_validity[item.proposal_id.value()] = {core::reviews::ProposalValidity::Broken,
-                                                                     "No SACM model is loaded."};
-            }
-        }
-    }
-
-    ui::panels::ReviewPanelCallbacks callbacks;
-    callbacks.add_review_item =
-        [this](const std::string& title, const std::string& message, const std::vector<std::string>& guideline_ids) {
-            if (impl_->proposal_controller->creator_active) {
-                SetStatus("Save or discard the active proposal before adding more review comments.");
-                return;
-            }
-            if (!impl_->app_state.current_project.has_value()) {
-                SetStatus("Open or create a project before adding review comments.");
-                return;
-            }
-            if (!EnsureReviewItemStorage()) {
-                return;
-            }
-            if (impl_->reviewer_name.empty()) {
-                impl_->modal_coordinator->show_reviewer_name_prompt = true;
-                SetStatus("Enter a reviewer name before adding review comments.");
-                return;
-            }
-            const std::string element_id = ui::GetUiState().selected_element_id;
-            if (element_id.empty()) {
-                SetStatus("Select an element before adding a review comment.");
-                return;
-            }
-
-            std::vector<std::string> validated_guideline_ids;
-            if (!guideline_ids.empty()) {
-                EnsureGuidelineCatalogLoaded(*impl_);
-                if (!impl_->guideline_catalog.has_value()) {
-                    SetStatus("SCCG guidelines are not available: " + impl_->guideline_catalog_error);
-                    return;
-                }
-
-                std::unordered_set<std::string> seen_guideline_ids;
-                for (const std::string& guideline_id : guideline_ids) {
-                    if (guideline_id.empty() || seen_guideline_ids.count(guideline_id) > 0)
-                        continue;
-                    if (impl_->guideline_catalog->ids.count(guideline_id) == 0) {
-                        SetStatus("Unknown SCCG guideline id: " + guideline_id);
-                        return;
-                    }
-                    validated_guideline_ids.push_back(guideline_id);
-                    seen_guideline_ids.insert(guideline_id);
-                }
-            }
-
-            core::reviews::ReviewItem item;
-            item.id = GenerateReviewItemId();
-            item.element_id = element_id;
-            item.title = title;
-            item.message = message;
-            item.severity = "warning";
-            item.reviewer_name = impl_->reviewer_name;
-            item.guideline_ids = std::move(validated_guideline_ids);
-            item.source = core::reviews::ReviewItemSource::Manual;
-            item.status = core::reviews::ReviewItemStatus::Open;
-            item.created_utc = NowUtcString();
-            item.updated_utc = item.created_utc;
-
-            impl_->review_controller->AddManualItem(std::move(item));
-        };
-    callbacks.create_proposed_change = [this](const core::reviews::ReviewItem& item) {
-        BeginProposalForReviewItem(item);
-    };
-    callbacks.save_proposal = [this](const core::reviews::ReviewItem& item) { SaveActiveProposal(item); };
-    callbacks.edit_proposal = [this](const core::reviews::ReviewItem& item) { BeginEditProposalForReviewItem(item); };
-    callbacks.preview_proposal = [this](const core::reviews::ReviewItem& item) {
-        if (!item.proposal_id.has_value()) {
-            SetStatus("This review comment has no proposed change to preview.");
-            return;
-        }
-        PreviewProposalById(item.proposal_id.value());
-    };
-    callbacks.apply_proposal = [this](const core::reviews::ReviewItem& item) {
-        if (impl_->proposal_controller->creator_active) {
-            SetStatus("Save or discard the active proposal before applying another proposal.");
-            return;
-        }
-        if (!item.proposal_id.has_value()) {
-            SetStatus("This review comment has no proposed change to apply.");
-            return;
-        }
-        if (!impl_->app_state.current_project.has_value() || !impl_->app_state.loaded_case.has_value()) {
-            SetStatus("Open a project and SACM file before applying proposed changes.");
-            return;
-        }
-
-        std::string error;
-        std::optional<core::reviews::ReviewProposal> proposal =
-            impl_->proposal_controller->manager.LoadProposal(item.proposal_id.value(), error);
-        if (!proposal.has_value()) {
-            SetStatus("Proposal apply failed: " + error);
-            return;
-        }
-
-        core::reviews::ProposalValidityResult validity =
-            core::reviews::EvaluateReviewProposalValidity(*proposal, impl_->app_state.loaded_case.value());
-        if (validity.validity != core::reviews::ProposalValidity::Valid) {
-            SetStatus("Proposal is broken: " + validity.reason);
-            return;
-        }
-
-        core::reviews::ReviewProposalPatchService patch_service;
-        core::reviews::ApplyProposalResult apply_result =
-            patch_service.ApplyProposal(*proposal, impl_->app_state.loaded_case.value());
-        if (!apply_result.success) {
-            SetStatus("Proposal apply failed: " + apply_result.error);
-            return;
-        }
-
-        impl_->proposal_controller->ClosePreviewIfOpen(item.proposal_id.value());
-        ClearProposalHighlightState(ui::GetUiState());
-        if (!impl_->app_state.sacm_package.has_value())
-            impl_->app_state.sacm_package.emplace();
-        RebuildSacmArgumentPackageFromParser(impl_->app_state.loaded_case.value(),
-                                             impl_->app_state.sacm_package.value());
-        impl_->document_dirty = true;
-        impl_->app_state.mark_dirty();
-
-        core::AssuranceProject& project = impl_->app_state.current_project.value();
-        if (!DeleteProposalPatchFile(item.proposal_id.value(), error)) {
-            SetStatus("Proposal applied in memory, but proposal file removal failed: " + error);
-            return;
-        }
-
-        core::reviews::ReviewItem updated = item;
-        updated.proposal_id.reset();
-        updated.status = core::reviews::ReviewItemStatus::Resolved;
-        updated.applied_note = "Proposal applied at " + NowUtcString() + ".";
-        updated.updated_utc = NowUtcString();
-        if (!impl_->review_controller->AddOrUpdateItem(std::move(updated))) {
-            SetStatus("Proposal applied, but review item update failed.");
-            return;
-        }
-
-        if (!SaveProject()) {
-            SetStatus("Proposal applied, but project save failed: " + impl_->app_state.status_message);
-            return;
-        }
-
-        core::ProjectService::RefreshFileStatus(project);
-        impl_->tree_needs_rebuild = true;
-        SetStatus("Applied proposal " + proposal->id + ".");
-    };
-    callbacks.delete_proposal = [this](const core::reviews::ReviewItem& item) {
-        if (impl_->proposal_controller->creator_active) {
-            SetStatus("Save or discard the active proposal before deleting another proposal.");
-            return;
-        }
-        if (!item.proposal_id.has_value()) {
-            SetStatus("This review comment has no proposed change to delete.");
-            return;
-        }
-        if (!impl_->app_state.current_project.has_value()) {
-            SetStatus("Open a project before deleting proposed changes.");
-            return;
-        }
-
-        core::AssuranceProject& project = impl_->app_state.current_project.value();
-        std::string error;
-        if (!DeleteProposalPatchFile(item.proposal_id.value(), error)) {
-            SetStatus("Proposal delete failed: " + error);
-            return;
-        }
-
-        if (!impl_->review_controller->ClearProposal(item.id)) {
-            SetStatus("Proposal deleted, but review link update failed.");
-            return;
-        }
-        CloseProposalPreviewIfOpen(item.proposal_id.value());
-
-        core::ProjectService::RefreshFileStatus(project);
-        SetStatus("Deleted proposed change " + item.proposal_id.value() + ".");
-    };
-    callbacks.resolve_review_item = [this](const core::reviews::ReviewItem& item) { ResolveReviewItem(item); };
-    callbacks.delete_review_item = [this](const core::reviews::ReviewItem& item) { BeginDeleteReviewItem(item); };
-    callbacks.delete_problem = [this](const core::ProblemItem& problem) {
-        impl_->problems_manager.RemoveProblem(problem.id);
-        SyncReviewVisualStatesFromReviews();
-        SetStatus("Problem deleted.");
-    };
-    callbacks.set_manual_review_ok = [this, element_id = model.selected_element_id](bool manual_ok) {
-        SetManualReviewOk(element_id, manual_ok);
-    };
-    ui::panels::ShowReviewPanel(model, callbacks);
 }
 
 void AppRuntime::RequestExit(bool& done) {
@@ -2919,8 +529,8 @@ std::string AppRuntime::RecentProjectsPreferenceJson() const {
 }
 
 void AppRuntime::LoadReviewerNamePreference(const std::string& content) {
-    impl_->reviewer_name = TrimWhitespace(content);
-    CopyToBuffer(impl_->reviewer_name_buf, sizeof(impl_->reviewer_name_buf), impl_->reviewer_name);
+    impl_->reviewer_name = core::TrimWhitespace(content);
+    ui::CopyToBuffer(impl_->reviewer_name_buf, sizeof(impl_->reviewer_name_buf), impl_->reviewer_name);
     impl_->modal_coordinator->show_reviewer_name_prompt = impl_->reviewer_name.empty();
 }
 
@@ -2933,46 +543,24 @@ void AppRuntime::RenderFrame(bool& done) {
         RequestExit(done);
     }
 
-    ImVec2 display = ImGui::GetIO().DisplaySize;
-    float top_y = RenderMainMenuBar(done);
-
-    float content_h = std::max(0.0f, display.y - top_y);
-
-    float left_w = display.x * impl_->left_ratio;
-    float right_w = display.x * impl_->right_ratio;
-    float center_w = display.x - left_w - right_w - kSplitterThickness * 2.0f;
+    frame::AppMenuBarCallbacks menu_callbacks;
+    menu_callbacks.begin_create_project = [this]() { BeginCreateProject(); };
+    menu_callbacks.begin_open_project = [this]() { BeginOpenProject(); };
+    menu_callbacks.save_project = [this]() { return SaveProject(); };
+    menu_callbacks.request_exit = [this](bool& done_ref) { RequestExit(done_ref); };
+    menu_callbacks.begin_create_project_sacm_file = [this]() { BeginCreateProjectSacmFile(); };
+    menu_callbacks.begin_create_project_evidence_register = [this]() { BeginCreateProjectEvidenceRegister(); };
+    menu_callbacks.begin_create_project_j3377_cae_register = [this]() { BeginCreateProjectJ3377CaeRegister(); };
+    const float menu_height = frame::RenderAppMenuBar(*impl_, done, menu_callbacks);
 
     RebuildDerivedViewsIfNeeded();
     ProcessPendingProposalCreatorPreviewRefresh();
     PollAiReviewTask();
 
-    RenderAppSplitters(*impl_, display.x, content_h, left_w, center_w, top_y, kPanelFlags);
+    const frame::AppLayoutRegions regions = frame::RenderAppShell(*impl_, menu_height, kPanelFlags);
 
-    left_w = display.x * impl_->left_ratio;
-    right_w = display.x * impl_->right_ratio;
-    center_w = display.x - left_w - right_w - kSplitterThickness * 2.0f;
-
-    float available_h = std::max(0.0f, content_h - kSplitterThickness);
-    float project_h = available_h * impl_->project_boundary_ratio;
-    float safety_tree_h = std::max(0.0f, available_h - project_h);
-
-    float project_y = top_y;
-    float safety_y = project_y + project_h + kSplitterThickness;
-
-    ui::panels::ProjectFilesPanelModel project_model;
-    project_model.project =
-        impl_->app_state.current_project.has_value() ? &impl_->app_state.current_project.value() : nullptr;
-    if (project_model.project) {
-        RefreshSacmPackageTreeCache();
-        project_model.sacm_package_trees_by_path = impl_->sacm_package_tree_cache;
-        const parser::AssuranceCase* loaded_case =
-            impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
-        for (const core::reviews::ReviewProposalSummary& summary :
-             impl_->proposal_controller->manager.ListProposals(loaded_case)) {
-            project_model.proposal_validity_by_path[summary.relative_path.generic_string()] = summary.validity;
-        }
-    }
-    ui::panels::ProjectFilesPanelCallbacks project_callbacks{
+    areas::ProjectExplorerAreaCallbacks project_explorer_callbacks{
+        [this]() { RefreshSacmPackageTreeCache(); },
         [this]() { BeginCreateProjectSacmFile(); },
         [this]() { BeginCreateProjectEvidenceRegister(); },
         [this]() { BeginCreateProjectJ3377CaeRegister(); },
@@ -2984,37 +572,142 @@ void AppRuntime::RenderFrame(bool& done) {
             BeginAddTerminologyPackage(entry, node);
         },
     };
-    ui::panels::ShowProjectFilesPanel(left_w, project_h, project_y, kPanelFlags, project_model, project_callbacks);
-    RenderTreePanel(left_w, safety_tree_h, safety_y);
 
-    float center_x = left_w + kSplitterThickness;
-    float center_available_h = std::max(0.0f, content_h - kSplitterThickness);
-    float problems_h = std::min(impl_->problems_panel_height, center_available_h);
-    float center_panel_h = std::max(0.0f, center_available_h - problems_h);
-    float problems_y = top_y + center_panel_h + kSplitterThickness;
+    areas::ArgumentNavigatorAreaCallbacks argument_navigator_callbacks{
+        [this]() { return MakeElementContextActions(*this); },
+        [this](core::NewElementKind kind) { AddProposalChildToSelected(kind); },
+        [this]() { AddProposalTopGoal(); },
+        [this](core::RemoveMode mode) { RemoveProposalSelected(mode); },
+        [this](const char* feature) {
+            if (feature)
+                ShowNotImplementedModal(feature);
+        },
+        ui::TreeEditActions{
+            [this](const std::string& dragged_id, const std::string& target_id, core::TreeDropMode drop_mode) {
+                return ValidateTreeDrop(dragged_id, target_id, drop_mode);
+            },
+            [this](const std::string& dragged_id, const std::string& target_id, core::TreeDropMode drop_mode) {
+                return PerformTreeDrop(dragged_id, target_id, drop_mode);
+            },
+        },
+    };
 
-    RenderCenterPanel(center_x, center_w, center_panel_h, top_y);
-    RenderProblemsPanel(center_x, center_w, problems_h, problems_y);
-    RenderElementPropertiesPanel(center_x, center_w, right_w, content_h, top_y);
+    areas::RenderProjectExplorerArea(*impl_, regions.project_explorer, kPanelFlags, project_explorer_callbacks);
+    areas::RenderArgumentNavigatorArea(*impl_, regions.argument_navigator, kPanelFlags, argument_navigator_callbacks);
+    areas::RenderWorkbenchArea(*impl_, regions.workbench, kPanelFlags, MakeWorkbenchAreaCallbacks());
 
-    RenderPreferencesWindow();
-    RenderThemeTweaksWindow();
-    RenderRemoveConfirmModal();
-    RenderDeleteReviewItemConfirmModal();
-    RenderCreateProjectModal();
-    RenderProjectFileNameModal();
-    RenderProjectLoadReportModal();
-    RenderCreateTerminologyPackageModal();
-    RenderDeleteTerminologyPackageModal();
-    RenderTerminologyTermEditorModal();
-    RenderQuickDefineTermModal();
-    RenderDeleteTerminologyTermModal();
-    RenderTerminologyCategoryEditorModal();
-    RenderDeleteTerminologyCategoryModal();
-    RenderSaveBeforeExitModal(done);
-    RenderStartupProjectWindow();
-    RenderNotImplementedModal();
-    RenderReviewerNamePromptModal();
+    areas::ReviewPanelAreaCallbacks review_panel_callbacks;
+    review_panel_callbacks.ensure_review_item_storage = [this]() { return EnsureReviewItemStorage(); };
+    review_panel_callbacks.set_status = [this](const std::string& message) { SetStatus(message); };
+    review_panel_callbacks.create_proposed_change = [this](const core::reviews::ReviewItem& item) {
+        return BeginProposalForReviewItem(item);
+    };
+    review_panel_callbacks.save_proposal = [this](const core::reviews::ReviewItem& item) {
+        return SaveActiveProposal(item);
+    };
+    review_panel_callbacks.edit_proposal = [this](const core::reviews::ReviewItem& item) {
+        return BeginEditProposalForReviewItem(item);
+    };
+    review_panel_callbacks.preview_proposal_by_id = [this](const std::string& proposal_id) {
+        return PreviewProposalById(proposal_id);
+    };
+    review_panel_callbacks.apply_proposal = [this](const core::reviews::ReviewItem& item) {
+        actions::ProposalActions(*impl_).ApplyReviewProposal(item);
+    };
+    review_panel_callbacks.delete_proposal = [this](const core::reviews::ReviewItem& item) {
+        actions::ReviewActions(*impl_).DeleteProposalForReviewItem(item);
+    };
+    review_panel_callbacks.resolve_review_item = [this](const core::reviews::ReviewItem& item) {
+        return ResolveReviewItem(item);
+    };
+    review_panel_callbacks.delete_review_item = [this](const core::reviews::ReviewItem& item) {
+        BeginDeleteReviewItem(item);
+    };
+    review_panel_callbacks.sync_review_visual_states = [this]() { SyncReviewVisualStatesFromReviews(); };
+    review_panel_callbacks.set_manual_review_ok = [this](const std::string& element_id, bool manual_ok) {
+        return SetManualReviewOk(element_id, manual_ok);
+    };
+
+    areas::FeedbackDockAreaCallbacks feedback_dock_callbacks;
+    feedback_dock_callbacks.problems.activate_problem = [this](const core::ProblemItem& problem) {
+        if (problem.type.rfind("TerminologyTerm", 0) == 0) {
+            HandleProblemQuickFix(problem);
+            return;
+        }
+        if (problem.element_id.empty())
+            return;
+        ui::GetUiState().selected_problem_element_id = problem.element_id;
+        impl_->events.Emit(SelectionChangedEvent{problem.element_id, true});
+        impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
+    };
+    feedback_dock_callbacks.problems.quick_fix_problem = [this](const core::ProblemItem& problem) {
+        HandleProblemQuickFix(problem);
+    };
+    feedback_dock_callbacks.term_usages.activate_usage = [this](std::size_t usage_index) {
+        NavigateToTerminologyUsage(usage_index);
+    };
+    feedback_dock_callbacks.render_review_content = [this, &review_panel_callbacks]() {
+        areas::RenderReviewPanelContent(*impl_, review_panel_callbacks);
+    };
+    feedback_dock_callbacks.render_ai_debug_content = [this]() { areas::RenderAiDebugPanelContent(*impl_); };
+    areas::RenderFeedbackDockArea(*impl_, regions.feedback_dock, kPanelFlags, feedback_dock_callbacks);
+
+    areas::ProposalEditorAreaCallbacks proposal_editor_callbacks{
+        [this](core::RemoveMode mode) { RemoveProposalSelected(mode); },
+        [this]() { return RefreshProposalCreatorPreview(); },
+        [this](const std::string& message) { SetStatus(message); },
+    };
+
+    areas::InspectorAreaCallbacks inspector_callbacks{
+        [this, &proposal_editor_callbacks]() { areas::RenderProposalElementEditor(*impl_, proposal_editor_callbacks); },
+        [this](const std::string& element_id, const std::string& term_value) {
+            BeginQuickDefineTerminologyTerm(element_id, term_value);
+        },
+        [this](const std::string& element_id, const std::string& term_value) {
+            BeginLinkExistingTerminologyTerm(element_id, term_value);
+        },
+        [this](const std::string& element_id,
+               const core::TerminologyPackageRef& package_ref,
+               const core::TerminologyTermRef& term_ref) {
+            AddTerminologyTermAsContextFromCanvas(element_id, package_ref, term_ref);
+        },
+        [this](const std::string& element_id, const std::string& term_value) {
+            IgnoreTerminologySuggestion(element_id, term_value);
+        },
+        [this](const std::string& element_id, const std::string& term_value) {
+            return IsTerminologySuggestionIgnored(element_id, term_value);
+        },
+        [this]() {
+            impl_->events.Emit(TreeDirtyEvent{});
+            impl_->events.Emit(DocumentDirtyEvent{});
+        },
+    };
+    areas::RenderInspectorArea(*impl_, regions.inspector, kPanelFlags, inspector_callbacks);
+
+    areas::ModalHostCallbacks modal_callbacks;
+    modal_callbacks.begin_create_project = [this]() { BeginCreateProject(); };
+    modal_callbacks.begin_open_project = [this]() { BeginOpenProject(); };
+    modal_callbacks.try_open_project_manifest = [this](const std::string& selected_path) {
+        return TryOpenProjectManifest(selected_path);
+    };
+    modal_callbacks.open_first_project_sacm_file = [this]() { return OpenFirstProjectSacmFile(); };
+    modal_callbacks.ensure_review_item_storage = [this]() { return EnsureReviewItemStorage(); };
+    modal_callbacks.touch_current_project_recent = [this]() { TouchCurrentProjectRecent(); };
+    modal_callbacks.save_project = [this]() { return SaveProject(); };
+    modal_callbacks.set_status = [this](const std::string& message) { SetStatus(message); };
+    modal_callbacks.delete_review_item = [this](const core::reviews::ReviewItem& item) {
+        return DeleteReviewItem(item);
+    };
+    modal_callbacks.confirm_add_terminology_package = [this]() { ConfirmAddTerminologyPackage(); };
+    modal_callbacks.confirm_delete_terminology_package = [this]() { ConfirmDeleteTerminologyPackage(); };
+    modal_callbacks.confirm_terminology_term_edit = [this]() { ConfirmTerminologyTermEdit(); };
+    modal_callbacks.confirm_quick_define_terminology_term = [this](bool add_as_context) {
+        ConfirmQuickDefineTerminologyTerm(add_as_context);
+    };
+    modal_callbacks.confirm_delete_terminology_term = [this]() { ConfirmDeleteTerminologyTerm(); };
+    modal_callbacks.confirm_terminology_category_edit = [this]() { ConfirmTerminologyCategoryEdit(); };
+    modal_callbacks.confirm_delete_terminology_category = [this]() { ConfirmDeleteTerminologyCategory(); };
+    areas::RenderModalHost(*impl_, done, modal_callbacks);
 }
 
 } // namespace app

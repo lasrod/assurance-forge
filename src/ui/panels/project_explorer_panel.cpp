@@ -1,4 +1,4 @@
-#include "ui/panels/project_files_panel.h"
+#include "ui/panels/project_explorer_panel.h"
 
 #include "ui/theme.h"
 
@@ -8,6 +8,8 @@
 
 namespace ui::panels {
 namespace {
+
+constexpr const char* kProjectExplorerTitle = "Project Explorer";
 
 struct FolderSpec {
     const char* path;
@@ -57,13 +59,13 @@ std::string PackageNodeLabel(const sacm::SacmPackageTreeNode& node) {
 
 void RenderPackageNode(const core::ProjectFileEntry& entry,
                        const sacm::SacmPackageTreeNode& node,
-                       const ProjectFilesPanelCallbacks& callbacks,
+                       const ProjectExplorerPanelCallbacks& callbacks,
                        const std::string& tree_path);
 
 void RenderPackageGroup(const char* label,
                         const std::vector<PackageNodeRenderEntry>& nodes,
                         const core::ProjectFileEntry& entry,
-                        const ProjectFilesPanelCallbacks& callbacks,
+                        const ProjectExplorerPanelCallbacks& callbacks,
                         const std::string& parent_path) {
     if (nodes.empty())
         return;
@@ -82,7 +84,7 @@ void RenderPackageGroup(const char* label,
 
 void RenderPackageChildren(const core::ProjectFileEntry& entry,
                            const sacm::SacmPackageTreeNode& node,
-                           const ProjectFilesPanelCallbacks& callbacks,
+                           const ProjectExplorerPanelCallbacks& callbacks,
                            const std::string& parent_path) {
     std::vector<PackageNodeRenderEntry> argument_packages;
     std::vector<PackageNodeRenderEntry> artifact_packages;
@@ -119,7 +121,7 @@ void RenderPackageChildren(const core::ProjectFileEntry& entry,
 
 void RenderPackageNode(const core::ProjectFileEntry& entry,
                        const sacm::SacmPackageTreeNode& node,
-                       const ProjectFilesPanelCallbacks& callbacks,
+                       const ProjectExplorerPanelCallbacks& callbacks,
                        const std::string& tree_path) {
     const bool has_children = !node.children.empty();
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick |
@@ -151,8 +153,8 @@ void RenderPackageNode(const core::ProjectFileEntry& entry,
 }
 
 void RenderFile(const core::ProjectFileEntry& entry,
-                const ProjectFilesPanelModel& model,
-                const ProjectFilesPanelCallbacks& callbacks) {
+                const ProjectExplorerPanelModel& model,
+                const ProjectExplorerPanelCallbacks& callbacks) {
     std::string label = entry.relativePath.filename().generic_string();
     ImGui::PushID(entry.relativePath.generic_string().c_str());
     const auto tree_it = model.sacm_package_trees_by_path.find(entry.relativePath.generic_string());
@@ -199,7 +201,7 @@ void RenderFile(const core::ProjectFileEntry& entry,
     ImGui::PopID();
 }
 
-void RenderFolderContextMenu(std::string_view folder, const ProjectFilesPanelCallbacks& callbacks) {
+void RenderFolderContextMenu(std::string_view folder, const ProjectExplorerPanelCallbacks& callbacks) {
     if (folder == "arguments") {
         if (ImGui::BeginPopupContextItem("##arguments_context")) {
             if (ImGui::MenuItem("Add New GSN / SACM File") && callbacks.add_sacm_file) {
@@ -223,7 +225,7 @@ void RenderFolderContextMenu(std::string_view folder, const ProjectFilesPanelCal
     }
 }
 
-void ShowProjectFilesTree(const ProjectFilesPanelModel& model, const ProjectFilesPanelCallbacks& callbacks) {
+void ShowProjectExplorerTree(const ProjectExplorerPanelModel& model, const ProjectExplorerPanelCallbacks& callbacks) {
     const core::AssuranceProject& project = *model.project;
     ImGui::TextWrapped("%s", project.name.c_str());
     ImGui::TextDisabled("%s", project.rootPath.string().c_str());
@@ -251,19 +253,19 @@ void ShowProjectFilesTree(const ProjectFilesPanelModel& model, const ProjectFile
 
 } // namespace
 
-void ShowProjectFilesPanel(float width,
-                           float height,
-                           float top_y,
-                           ImGuiWindowFlags panel_flags,
-                           ProjectFilesPanelModel model,
-                           const ProjectFilesPanelCallbacks& callbacks) {
+void ShowProjectExplorerPanel(float width,
+                              float height,
+                              float top_y,
+                              ImGuiWindowFlags panel_flags,
+                              ProjectExplorerPanelModel model,
+                              const ProjectExplorerPanelCallbacks& callbacks) {
     ImGui::SetNextWindowPos(ImVec2(0.0f, top_y));
     ImGui::SetNextWindowSize(ImVec2(width, height));
-    ImGui::Begin("Project Files", nullptr, panel_flags);
+    ImGui::Begin(kProjectExplorerTitle, nullptr, panel_flags);
 
-    if (ImGui::BeginChild("ProjectFilesTree", ImVec2(0, 0), false)) {
+    if (ImGui::BeginChild("ProjectExplorerTree", ImVec2(0, 0), false)) {
         if (model.project) {
-            ShowProjectFilesTree(model, callbacks);
+            ShowProjectExplorerTree(model, callbacks);
         } else {
             ImGui::TextDisabled("No project open.");
         }

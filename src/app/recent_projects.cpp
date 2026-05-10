@@ -1,7 +1,8 @@
 #include "app/recent_projects.h"
 
+#include "core/string_utils.h"
+
 #include <algorithm>
-#include <cctype>
 #include <exception>
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -14,8 +15,7 @@ namespace {
 std::string RecentProjectKey(const std::string& path) {
     std::string key = NormalizeRecentProjectPath(path);
 #ifdef _WIN32
-    std::transform(
-        key.begin(), key.end(), key.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    key = core::ToLower(std::move(key));
 #endif
     return key;
 }
