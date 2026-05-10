@@ -1,14 +1,12 @@
 #include "app/controllers/ai_review_controller.h"
 
 #include "app/guideline_catalog.h"
+#include "core/reviews/review_text_utils.h"
+#include "core/time_utils.h"
 #include "parser/guidelines_parser.h"
 
 #include <nlohmann/json.hpp>
 
-#include <chrono>
-#include <ctime>
-#include <iomanip>
-#include <sstream>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -17,6 +15,9 @@ namespace app::controllers {
 namespace {
 
 constexpr const char* kDefaultClaimReviewProfileId = "claim_wording_review";
+
+using core::NowUtcString;
+using core::reviews::TruncateForProblemMessage;
 
 core::ProblemItem MakeAiReviewProblem(const std::string& id,
                                       core::ProblemSeverity severity,
@@ -33,26 +34,6 @@ core::ProblemItem MakeAiReviewProblem(const std::string& id,
     problem.message = message;
     problem.guideline_id = guideline_id;
     return problem;
-}
-
-std::string TruncateForProblemMessage(const std::string& value, size_t limit = 400) {
-    if (value.size() <= limit)
-        return value;
-    return value.substr(0, limit) + "...";
-}
-
-std::string NowUtcString() {
-    using clock = std::chrono::system_clock;
-    std::time_t now = clock::to_time_t(clock::now());
-    std::tm tm{};
-#if defined(_WIN32)
-    gmtime_s(&tm, &now);
-#else
-    gmtime_r(&now, &tm);
-#endif
-    std::ostringstream out;
-    out << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
-    return out.str();
 }
 
 std::string ReviewCommentPrefix(const std::string& element_id, const std::string& profile_id) {

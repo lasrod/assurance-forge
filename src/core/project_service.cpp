@@ -2,11 +2,11 @@
 
 #include "core/reviews/review_item.h"
 #include "core/sha256.h"
+#include "core/string_utils.h"
 #include "parser/xml_parser.h"
 
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <chrono>
 #include <ctime>
 #include <filesystem>
@@ -15,6 +15,7 @@
 #include <random>
 #include <sstream>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace core {
@@ -36,16 +37,6 @@ const std::array<const char*, 10> kProjectDirectories = {
     ".af/snapshots",
     ".af/history",
 };
-
-std::string Trim(const std::string& value) {
-    auto begin = value.begin();
-    while (begin != value.end() && std::isspace(static_cast<unsigned char>(*begin)))
-        ++begin;
-    auto end = value.end();
-    while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1))))
-        --end;
-    return std::string(begin, end);
-}
 
 bool MakeUtcTime(std::time_t time, std::tm& utc) {
 #if defined(_WIN32)
@@ -485,19 +476,14 @@ bool IsSafeRelativePath(const std::filesystem::path& path) {
 
 std::filesystem::path
 NormalizeFileName(const std::string& requested_file_name, const char* default_name, const char* extension) {
-    std::string trimmed = Trim(requested_file_name);
+    std::string trimmed = TrimWhitespace(requested_file_name);
     if (trimmed.empty())
         trimmed = default_name;
     std::filesystem::path name(trimmed);
     std::string actual_extension = name.extension().string();
     std::string expected_extension = extension;
-    std::transform(actual_extension.begin(), actual_extension.end(), actual_extension.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
-    std::transform(expected_extension.begin(),
-                   expected_extension.end(),
-                   expected_extension.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    actual_extension = ToLower(std::move(actual_extension));
+    expected_extension = ToLower(std::move(expected_extension));
     if (actual_extension != expected_extension) {
         name += extension;
     }
@@ -505,16 +491,13 @@ NormalizeFileName(const std::string& requested_file_name, const char* default_na
 }
 
 std::filesystem::path NormalizeProposalPatchName(const std::string& requested_file_name) {
-    std::string trimmed = Trim(requested_file_name);
+    std::string trimmed = TrimWhitespace(requested_file_name);
     if (trimmed.empty())
         trimmed = "proposal-0001.afpatch.json";
     const std::string suffix = ".afpatch.json";
     bool has_suffix = false;
     if (trimmed.size() >= suffix.size()) {
-        std::string actual_tail = trimmed.substr(trimmed.size() - suffix.size());
-        std::transform(actual_tail.begin(), actual_tail.end(), actual_tail.begin(), [](unsigned char c) {
-            return static_cast<char>(std::tolower(c));
-        });
+        std::string actual_tail = ToLower(trimmed.substr(trimmed.size() - suffix.size()));
         has_suffix = (actual_tail == suffix);
     }
     if (!has_suffix) {
@@ -718,7 +701,7 @@ bool ProjectService::CreateEmptyProject(const std::string& project_name,
                                         AssuranceProject& project,
                                         ProjectLoadReport& report,
                                         std::string& error) {
-    std::string clean_name = Trim(project_name);
+    std::string clean_name = TrimWhitespace(project_name);
     if (clean_name.empty()) {
         error = "Project name is required.";
         return false;

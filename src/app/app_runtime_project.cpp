@@ -2,6 +2,7 @@
 #include "app/actions/terminology_actions.h"
 #include "app/app_runtime_state.h"
 #include "app/native_file_dialogs.h"
+#include "app/proposal_ui_state.h"
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
 #include "core/project_service.h"
@@ -10,10 +11,10 @@
 #include "imgui.h"
 #include "sacm/sacm_package_tree.h"
 #include "ui/gsn/gsn_adapter.h"
+#include "ui/imgui_buffer_utils.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
-#include <cstring>
 #include <filesystem>
 #include <set>
 #include <string>
@@ -21,20 +22,7 @@
 namespace app {
 namespace {
 
-void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
-    if (!buffer || buffer_size == 0)
-        return;
-    const size_t count = std::min(buffer_size - 1, value.size());
-    std::memcpy(buffer, value.data(), count);
-    buffer[count] = '\0';
-}
-
-void ClearProposalHighlightState(ui::UiState& ui_state) {
-    ui_state.proposal_highlight_ids.clear();
-    ui_state.marked_for_removal.clear();
-    ui_state.center_on_marked = false;
-    ui_state.dim_non_proposal_nodes = false;
-}
+using ui::CopyToBuffer;
 
 bool CanSwitchProjectSacmFile(const core::AppState& app_state, const core::ProjectFileEntry& entry) {
     if (!app_state.current_project.has_value() || !app_state.has_unsaved_changes)
@@ -58,10 +46,10 @@ bool EnsureProjectSacmFileOpen(AppRuntimeState& state, const core::ProjectFileEn
 }
 
 void CopyTerminologyPackageToEditor(AppRuntimeState& state, const sacm::TerminologyPackage& package) {
-    CopyToBuffer(state.terminology.package_name_buf, sizeof(state.terminology.package_name_buf), package.name);
-    CopyToBuffer(state.terminology.package_description_buf,
-                 sizeof(state.terminology.package_description_buf),
-                 package.description);
+    ui::CopyToBuffer(state.terminology.package_name_buf, sizeof(state.terminology.package_name_buf), package.name);
+    ui::CopyToBuffer(state.terminology.package_description_buf,
+                     sizeof(state.terminology.package_description_buf),
+                     package.description);
 }
 
 std::string FirstElementIdForArgumentPackage(const sacm::AssuranceCasePackage& package,

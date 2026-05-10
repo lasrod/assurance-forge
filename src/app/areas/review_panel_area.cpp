@@ -3,12 +3,10 @@
 #include "app/app_runtime_state.h"
 #include "app/controllers/review_controller.h"
 #include "app/guideline_catalog.h"
+#include "core/time_utils.h"
 #include "ui/panels/review_panel.h"
 #include "ui/ui_state.h"
 
-#include <chrono>
-#include <ctime>
-#include <iomanip>
 #include <optional>
 #include <sstream>
 #include <unordered_set>
@@ -18,21 +16,7 @@
 namespace app::areas {
 namespace {
 
-std::string NowUtcString() {
-    auto now = std::chrono::system_clock::now();
-    std::time_t time = std::chrono::system_clock::to_time_t(now);
-    std::tm utc{};
-#if defined(_WIN32)
-    if (gmtime_s(&utc, &time) != 0)
-        return "1970-01-01T00:00:00Z";
-#else
-    if (!gmtime_r(&time, &utc))
-        return "1970-01-01T00:00:00Z";
-#endif
-    std::ostringstream out;
-    out << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
-    return out.str();
-}
+using core::NowUtcString;
 
 std::string GenerateReviewItemId() {
     static unsigned long long counter = 0;

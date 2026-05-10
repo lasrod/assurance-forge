@@ -2,10 +2,14 @@
 
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
+#include "app/proposal_ui_state.h"
 #include "app/project_workflow.h"
 #include "app/sacm_argument_sync.h"
 #include "core/project_service.h"
 #include "core/reviews/review_proposal_patch_service.h"
+#include "core/reviews/review_text_utils.h"
+#include "core/string_utils.h"
+#include "core/time_utils.h"
 #include "parser/xml_parser.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas.h"
@@ -13,10 +17,7 @@
 
 #include <algorithm>
 #include <chrono>
-#include <cctype>
-#include <ctime>
 #include <filesystem>
-#include <iomanip>
 #include <map>
 #include <optional>
 #include <sstream>
@@ -28,34 +29,12 @@
 namespace app::actions {
 namespace {
 
+using core::NowUtcString;
+using core::TrimWhitespace;
+using core::reviews::TruncateForProblemMessage;
+
 void SetStatus(AppRuntimeState& state, const std::string& message) {
     state.events.Emit(StatusMessageEvent{message});
-}
-
-std::string TrimWhitespace(const std::string& value) {
-    auto begin = value.begin();
-    while (begin != value.end() && std::isspace(static_cast<unsigned char>(*begin)))
-        ++begin;
-    auto end = value.end();
-    while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1))))
-        --end;
-    return std::string(begin, end);
-}
-
-std::string NowUtcString() {
-    auto now = std::chrono::system_clock::now();
-    std::time_t time = std::chrono::system_clock::to_time_t(now);
-    std::tm utc{};
-#if defined(_WIN32)
-    if (gmtime_s(&utc, &time) != 0)
-        return "1970-01-01T00:00:00Z";
-#else
-    if (!gmtime_r(&time, &utc))
-        return "1970-01-01T00:00:00Z";
-#endif
-    std::ostringstream out;
-    out << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
-    return out.str();
 }
 
 std::string GenerateReviewProposalId() {
@@ -64,12 +43,6 @@ std::string GenerateReviewProposalId() {
     std::ostringstream out;
     out << "proposal-" << std::hex << ticks << "-" << ++counter;
     return out.str();
-}
-
-std::string TruncateForProblemMessage(const std::string& value, size_t limit = 400) {
-    if (value.size() <= limit)
-        return value;
-    return value.substr(0, limit) + "...";
 }
 
 const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model, const std::string& element_id) {
@@ -344,13 +317,6 @@ std::unordered_set<std::string> CollectProposalHighlightIds(const core::reviews:
             AddHighlightRef(ids, operation.target.value(), generated_ids);
     }
     return ids;
-}
-
-void ClearProposalHighlightState(ui::UiState& ui_state) {
-    ui_state.proposal_highlight_ids.clear();
-    ui_state.marked_for_removal.clear();
-    ui_state.center_on_marked = false;
-    ui_state.dim_non_proposal_nodes = false;
 }
 
 bool DeleteProposalPatchFile(AppRuntimeState& state, const std::string& proposal_id, std::string& error) {
@@ -768,7 +734,8 @@ void ProposalActions::CreateAiGenerated(const std::vector<AiReviewProposalSugges
         if (suggested_text.empty())
             continue;
 
-        std::optional<core::reviews::ReviewItem> item = state_.review_controller->GetItemById(suggestion.review_item_id);
+        std::optional<core::reviews::ReviewItem> item =
+            state_.review_controller->GetItemById(suggestion.review_item_id);
         if (!item.has_value() || item->proposal_id.has_value())
             continue;
 
@@ -811,7 +778,8 @@ void ProposalActions::CreateAiGenerated(const std::vector<AiReviewProposalSugges
 
     if (saved_count > 0) {
         core::ProjectService::RefreshFileStatus(project);
-        SetStatus(state_, "AI generated " + std::to_string(saved_count) + " proposed change(s). Review before applying.");
+        SetStatus(state_,
+                  "AI generated " + std::to_string(saved_count) + " proposed change(s). Review before applying.");
     }
 }
 

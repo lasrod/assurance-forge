@@ -1,6 +1,7 @@
 #include "app/terminology_problem_sync.h"
 
 #include "core/problems/problem_item.h"
+#include "core/problems/problem_utils.h"
 #include "core/terminology_package_service.h"
 #include "core/terminology_scope_service.h"
 #include "parser/xml_parser.h"
@@ -14,21 +15,6 @@
 
 namespace app {
 namespace {
-
-bool StartsWith(const std::string& value, const std::string& prefix) {
-    return value.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), value.begin());
-}
-
-void ClearProblemsByIdPrefix(core::ProblemsManager& problems_manager, const std::string& prefix) {
-    std::vector<std::string> problem_ids;
-    for (const core::ProblemItem& problem : problems_manager.GetProblems()) {
-        if (StartsWith(problem.id, prefix))
-            problem_ids.push_back(problem.id);
-    }
-    for (const std::string& problem_id : problem_ids) {
-        problems_manager.RemoveProblem(problem_id);
-    }
-}
 
 bool IsRelationshipElement(const parser::SacmElement& element) {
     return element.type == "assertedinference" || element.type == "assertedcontext" ||
@@ -216,10 +202,10 @@ void SyncTerminologyProblems(core::ProblemsManager& problems_manager,
     constexpr const char* kTerminologyAmbiguityProblemPrefix = "terminology-ambiguity:";
     constexpr const char* kTerminologyUndefinedProblemPrefix = "terminology-undefined:";
     constexpr const char* kTerminologyContextReferenceProblemPrefix = "terminology-context-reference:";
-    ClearProblemsByIdPrefix(problems_manager, kTerminologyTermProblemPrefix);
-    ClearProblemsByIdPrefix(problems_manager, kTerminologyAmbiguityProblemPrefix);
-    ClearProblemsByIdPrefix(problems_manager, kTerminologyUndefinedProblemPrefix);
-    ClearProblemsByIdPrefix(problems_manager, kTerminologyContextReferenceProblemPrefix);
+    core::ClearProblemsByIdPrefix(problems_manager, kTerminologyTermProblemPrefix);
+    core::ClearProblemsByIdPrefix(problems_manager, kTerminologyAmbiguityProblemPrefix);
+    core::ClearProblemsByIdPrefix(problems_manager, kTerminologyUndefinedProblemPrefix);
+    core::ClearProblemsByIdPrefix(problems_manager, kTerminologyContextReferenceProblemPrefix);
 
     if (!model || !package)
         return;

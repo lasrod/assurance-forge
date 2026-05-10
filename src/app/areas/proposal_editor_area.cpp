@@ -3,10 +3,10 @@
 #include "app/app_runtime_state.h"
 #include "core/reviews/review_proposal.h"
 #include "imgui.h"
+#include "ui/imgui_buffer_utils.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
-#include <cstring>
 #include <map>
 #include <optional>
 #include <string>
@@ -15,13 +15,7 @@
 namespace app::areas {
 namespace {
 
-void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
-    if (!buffer || buffer_size == 0)
-        return;
-    size_t count = std::min(buffer_size - 1, value.size());
-    std::memcpy(buffer, value.data(), count);
-    buffer[count] = '\0';
-}
+using ui::CopyToBuffer;
 
 const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model, const std::string& element_id) {
     auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
@@ -194,7 +188,8 @@ void RenderProposalElementEditor(AppRuntimeState& state, const ProposalEditorAre
     std::string old_text = EditableTextFor(element_snapshot);
     bool old_undeveloped = element_snapshot.undeveloped;
     if (ref->existing_id.has_value() && state.app_state.loaded_case.has_value()) {
-        if (const parser::SacmElement* base = FindParserElement(state.app_state.loaded_case.value(), ref->existing_id.value())) {
+        if (const parser::SacmElement* base =
+                FindParserElement(state.app_state.loaded_case.value(), ref->existing_id.value())) {
             old_name = base->name;
             old_text = EditableTextFor(*base);
             old_undeveloped = base->undeveloped;

@@ -1,5 +1,6 @@
 #include "core/terminology_package_service.h"
 
+#include "core/string_utils.h"
 #include "core/terminology_scope_service.h"
 
 #include <algorithm>
@@ -203,16 +204,6 @@ std::optional<ScopedTermRef> FindScopedTermRef(const sacm::AssuranceCasePackage&
     return std::nullopt;
 }
 
-std::string TrimWhitespace(const std::string& value) {
-    auto begin = value.begin();
-    while (begin != value.end() && std::isspace(static_cast<unsigned char>(*begin)))
-        ++begin;
-    auto end = value.end();
-    while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1))))
-        --end;
-    return std::string(begin, end);
-}
-
 std::vector<std::string> NormalizeCategoryRefs(const std::vector<std::string>& refs) {
     std::vector<std::string> normalized;
     for (std::string ref : refs) {
@@ -246,13 +237,6 @@ void ApplyCategoryDraft(sacm::Category& category, const TerminologyCategoryDraft
     category.description_ml.texts.erase("en");
     if (!category.description.empty())
         category.description_ml.set("en", category.description);
-}
-
-std::string NormalizeRef(std::string ref) {
-    ref = TrimWhitespace(ref);
-    if (!ref.empty() && ref.front() == '#')
-        ref.erase(ref.begin());
-    return ref;
 }
 
 bool MatchesCategoryRefString(const sacm::Category& category, const std::string& raw_ref) {
@@ -524,11 +508,6 @@ void RemoveUnreferencedTerminologyArtifacts(sacm::ArgumentPackage& argument_pack
 
 bool IsWordChar(char c) {
     return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
-}
-
-std::string ToLower(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) { return std::tolower(c); });
-    return value;
 }
 
 std::vector<std::size_t> FindWholeWordMatches(const std::string& text, const std::string& needle, bool case_sensitive) {

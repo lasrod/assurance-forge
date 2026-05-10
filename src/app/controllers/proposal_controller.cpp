@@ -1,27 +1,17 @@
 #include "app/controllers/proposal_controller.h"
 
+#include "core/reviews/review_text_utils.h"
+#include "core/time_utils.h"
+
 #include <chrono>
-#include <ctime>
-#include <iomanip>
 #include <sstream>
 #include <utility>
 
 namespace app::controllers {
 namespace {
 
-std::string NowUtcString() {
-    using clock = std::chrono::system_clock;
-    std::time_t now = clock::to_time_t(clock::now());
-    std::tm tm{};
-#if defined(_WIN32)
-    gmtime_s(&tm, &now);
-#else
-    gmtime_r(&now, &tm);
-#endif
-    std::ostringstream out;
-    out << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
-    return out.str();
-}
+using core::NowUtcString;
+using core::reviews::TruncateForProblemMessage;
 
 std::string GenerateReviewProposalId() {
     static unsigned long long counter = 0;
@@ -29,12 +19,6 @@ std::string GenerateReviewProposalId() {
     std::ostringstream out;
     out << "proposal-" << std::hex << ticks << "-" << ++counter;
     return out.str();
-}
-
-std::string TruncateForProblemMessage(const std::string& value, size_t limit = 400) {
-    if (value.size() <= limit)
-        return value;
-    return value.substr(0, limit) + "...";
 }
 
 core::reviews::ReviewProposal BuildDraftReviewProposal(const core::reviews::ReviewItem& item,

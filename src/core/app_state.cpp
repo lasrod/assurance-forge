@@ -1,6 +1,7 @@
 #include "core/app_state.h"
 
 #include "core/project_service.h"
+#include "core/string_utils.h"
 #include "core/terminology_package_service.h"
 #include "sacm/sacm_parser.h"
 #include "sacm/sacm_serializer.h"
@@ -12,15 +13,9 @@ namespace core {
 
 namespace {
 
-std::string NormalizeSacmRef(std::string ref) {
-    if (!ref.empty() && ref.front() == '#')
-        ref.erase(ref.begin());
-    return ref;
-}
-
 bool ReferencesAny(const std::vector<std::string>& refs, const std::unordered_set<std::string>& candidates) {
     return std::any_of(refs.begin(), refs.end(), [&](const std::string& ref) {
-        return candidates.find(NormalizeSacmRef(ref)) != candidates.end();
+        return candidates.find(StripLeadingHash(ref)) != candidates.end();
     });
 }
 

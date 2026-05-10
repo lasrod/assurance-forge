@@ -8,7 +8,9 @@
 #include <string>
 #include <vector>
 
-namespace app { struct AppRuntimeState; }
+namespace app {
+struct AppRuntimeState;
+}
 
 namespace app::actions {
 

@@ -2,6 +2,7 @@
 
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
+#include "app/proposal_ui_state.h"
 #include "app/project_workflow.h"
 #include "core/project_service.h"
 #include "ui/gsn/gsn_adapter.h"
@@ -13,13 +14,6 @@
 
 namespace app::actions {
 namespace {
-
-void ClearProposalHighlightState(ui::UiState& ui_state) {
-    ui_state.proposal_highlight_ids.clear();
-    ui_state.marked_for_removal.clear();
-    ui_state.center_on_marked = false;
-    ui_state.dim_non_proposal_nodes = false;
-}
 
 void RestoreBaseCanvas(AppRuntimeState& state) {
     ClearProposalHighlightState(ui::GetUiState());

@@ -1,5 +1,7 @@
 #include "core/terminology_scope_service.h"
 
+#include "core/string_utils.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
@@ -8,30 +10,6 @@
 
 namespace core {
 namespace {
-
-std::string TrimWhitespace(const std::string& value) {
-    auto begin = value.begin();
-    while (begin != value.end() && std::isspace(static_cast<unsigned char>(*begin)))
-        ++begin;
-    auto end = value.end();
-    while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1))))
-        --end;
-    return std::string(begin, end);
-}
-
-std::string NormalizeRef(std::string ref) {
-    ref = TrimWhitespace(ref);
-    if (!ref.empty() && ref.front() == '#')
-        ref.erase(ref.begin());
-    return ref;
-}
-
-std::string ToLower(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
-        return static_cast<char>(std::tolower(ch));
-    });
-    return value;
-}
 
 bool IsWordChar(char c) {
     const unsigned char ch = static_cast<unsigned char>(c);

@@ -1,9 +1,9 @@
 #include "ui/panels/terminology_package_panel.h"
 
+#include "core/string_utils.h"
 #include "imgui.h"
 
 #include <algorithm>
-#include <cctype>
 
 namespace ui::panels {
 namespace {
@@ -80,15 +80,10 @@ std::string JoinCategoryNames(const sacm::TerminologyPackage& package, const std
     return result;
 }
 
-std::string ToLower(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) { return std::tolower(c); });
-    return value;
-}
-
 bool ContainsInsensitive(const std::string& haystack, const std::string& needle) {
     if (needle.empty())
         return true;
-    return ToLower(haystack).find(ToLower(needle)) != std::string::npos;
+    return core::ToLower(haystack).find(core::ToLower(needle)) != std::string::npos;
 }
 
 bool MatchesFilter(const sacm::TerminologyPackage& package, const sacm::Term& term, const std::string& filter) {

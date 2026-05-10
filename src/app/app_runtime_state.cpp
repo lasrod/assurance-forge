@@ -2,22 +2,9 @@
 
 #include "ai/libcurl_http_client.h"
 #include "ai/openai_provider.h"
-
-#include <algorithm>
-#include <cstring>
+#include "ui/imgui_buffer_utils.h"
 
 namespace app {
-namespace {
-
-void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
-    if (!buffer || buffer_size == 0)
-        return;
-    const size_t count = std::min(buffer_size - 1, value.size());
-    std::memcpy(buffer, value.data(), count);
-    buffer[count] = '\0';
-}
-
-} // namespace
 
 bool AppRuntimeState::IsProposalCanvasActive() const {
     return proposal_controller->IsCanvasActive();
@@ -43,7 +30,7 @@ AppRuntimeState::AppRuntimeState() {
 void AppRuntimeState::LoadAiSettingsState() {
     std::string warning;
     ai.settings = ai.service->LoadSettings(&warning);
-    CopyToBuffer(ai.model_buf, sizeof(ai.model_buf), ai.settings.model);
+    ui::CopyToBuffer(ai.model_buf, sizeof(ai.model_buf), ai.settings.model);
     ai.secure_store_available = ai.secret_store && ai.secret_store->IsAvailable();
     RefreshStoredAiKeyState();
     if (!warning.empty()) {

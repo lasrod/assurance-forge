@@ -2,12 +2,12 @@
 
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
+#include "core/string_utils.h"
 #include "parser/xml_parser.h"
+#include "ui/imgui_buffer_utils.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
-#include <cctype>
-#include <cstring>
 #include <filesystem>
 #include <sstream>
 #include <utility>
@@ -16,26 +16,11 @@
 namespace app::actions {
 namespace {
 
+using core::TrimWhitespace;
+using ui::CopyToBuffer;
+
 void SetStatus(AppRuntimeState& state, const std::string& message) {
     state.events.Emit(StatusMessageEvent{message});
-}
-
-void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
-    if (!buffer || buffer_size == 0)
-        return;
-    const size_t count = std::min(buffer_size - 1, value.size());
-    std::memcpy(buffer, value.data(), count);
-    buffer[count] = '\0';
-}
-
-std::string TrimWhitespace(const std::string& value) {
-    auto begin = value.begin();
-    while (begin != value.end() && std::isspace(static_cast<unsigned char>(*begin)))
-        ++begin;
-    auto end = value.end();
-    while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1))))
-        --end;
-    return std::string(begin, end);
 }
 
 std::string TerminologySuggestionKey(const std::string& element_id, const std::string& term_value) {

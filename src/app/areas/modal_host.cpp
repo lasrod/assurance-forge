@@ -3,15 +3,15 @@
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
 #include "core/element_factory.h"
+#include "core/string_utils.h"
 #include "hello_imgui/hello_imgui.h"
 #include "imgui.h"
+#include "ui/imgui_buffer_utils.h"
 #include "ui/panels/preferences_panel.h"
 #include "ui/panels/welcome_modal.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
-#include <cctype>
-#include <cstring>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -19,23 +19,8 @@
 namespace app::areas {
 namespace {
 
-void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
-    if (!buffer || buffer_size == 0)
-        return;
-    const size_t count = std::min(buffer_size - 1, value.size());
-    std::memcpy(buffer, value.data(), count);
-    buffer[count] = '\0';
-}
-
-std::string TrimWhitespace(const std::string& value) {
-    auto begin = value.begin();
-    while (begin != value.end() && std::isspace(static_cast<unsigned char>(*begin)))
-        ++begin;
-    auto end = value.end();
-    while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1))))
-        --end;
-    return std::string(begin, end);
-}
+using core::TrimWhitespace;
+using ui::CopyToBuffer;
 
 bool SameTermRef(const sacm::Term& term, const core::TerminologyTermRef& term_ref) {
     if (!term_ref.id.empty() && term.id == term_ref.id)

@@ -1,21 +1,12 @@
 #include "app/project_workflow.h"
 
 #include "core/project_service.h"
+#include "core/string_utils.h"
 
 #include <algorithm>
-#include <cctype>
 #include <system_error>
 
 namespace app {
-namespace {
-
-std::string LowercaseAscii(std::string value) {
-    std::transform(
-        value.begin(), value.end(), value.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return value;
-}
-
-} // namespace
 
 const char* ProjectFileCreateTitle(ProjectFileCreateKind kind) {
     switch (kind) {
@@ -49,7 +40,7 @@ bool ProjectTracksFile(const core::AssuranceProject& project, const std::filesys
 }
 
 bool IsProjectManifestPath(const std::filesystem::path& path) {
-    if (LowercaseAscii(path.filename().string()) == "af.proj")
+    if (core::ToLower(path.filename().string()) == "af.proj")
         return true;
 
     std::error_code error;
@@ -68,7 +59,7 @@ RecentProjectEntry MakeRecentProjectEntry(const core::AppState& app_state) {
     if (!app_state.loaded_case.has_value())
         return entry;
     for (const parser::SacmElement& element : app_state.loaded_case->elements) {
-        const std::string type = LowercaseAscii(element.type);
+        const std::string type = core::ToLower(element.type);
         if (type == "claim") {
             ++entry.claims;
         } else if (type == "argumentreasoning") {

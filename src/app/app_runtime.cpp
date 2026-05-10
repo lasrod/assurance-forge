@@ -15,6 +15,7 @@
 #include "app/app_runtime_state.h"
 #include "app/frame/app_menu_bar.h"
 #include "app/frame/app_shell.h"
+#include "app/proposal_ui_state.h"
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
 #include "app/review_problem_sync.h"
@@ -24,26 +25,23 @@
 #include "core/problems/problem_attention.h"
 #include "core/problems/problems_manager.h"
 #include "core/reviews/review_proposal_manager.h"
+#include "core/string_utils.h"
 #include "core/terminology_package_service.h"
 #include "core/terminology_scope_service.h"
+#include "core/time_utils.h"
 #include "imgui.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas.h"
+#include "ui/imgui_buffer_utils.h"
 #include "ui/panels/sacm_viewer_panel.h"
 #include "ui/register_views.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
-#include <cctype>
-#include <chrono>
-#include <cstring>
-#include <ctime>
 #include <filesystem>
-#include <iomanip>
 #include <map>
 #include <memory>
 #include <optional>
-#include <sstream>
 #include <string>
 #include <system_error>
 #include <unordered_set>
@@ -56,49 +54,8 @@ namespace {
 const ImGuiWindowFlags kPanelFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
                                      ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoSavedSettings;
 
-void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
-    if (!buffer || buffer_size == 0)
-        return;
-    size_t count = std::min(buffer_size - 1, value.size());
-    std::memcpy(buffer, value.data(), count);
-    buffer[count] = '\0';
-}
-
-std::string TrimWhitespace(const std::string& value) {
-    auto begin = value.begin();
-    while (begin != value.end() && std::isspace(static_cast<unsigned char>(*begin)))
-        ++begin;
-    auto end = value.end();
-    while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1))))
-        --end;
-    return std::string(begin, end);
-}
-
-std::string NowUtcString() {
-    auto now = std::chrono::system_clock::now();
-    std::time_t time = std::chrono::system_clock::to_time_t(now);
-    std::tm utc{};
-#if defined(_WIN32)
-    if (gmtime_s(&utc, &time) != 0)
-        return "1970-01-01T00:00:00Z";
-#else
-    if (!gmtime_r(&time, &utc))
-        return "1970-01-01T00:00:00Z";
-#endif
-    std::ostringstream out;
-    out << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
-    return out.str();
-}
-
 bool IsReviewDerivedProblem(const core::ProblemItem& problem) {
     return problem.id.rfind("review-comment:", 0) == 0 || problem.id.rfind("guideline-review:", 0) == 0;
-}
-
-void ClearProposalHighlightState(ui::UiState& ui_state) {
-    ui_state.proposal_highlight_ids.clear();
-    ui_state.marked_for_removal.clear();
-    ui_state.center_on_marked = false;
-    ui_state.dim_non_proposal_nodes = false;
 }
 
 } // namespace
@@ -184,10 +141,9 @@ void AppRuntime::RegisterAppEventListeners() {
             break;
         }
     });
-    impl_->events.Subscribe<AiReviewProposalSuggestionsEvent>(
-        [this](const AiReviewProposalSuggestionsEvent& event) {
-            actions::ProposalActions(*impl_).CreateAiGenerated(event.suggestions);
-        });
+    impl_->events.Subscribe<AiReviewProposalSuggestionsEvent>([this](const AiReviewProposalSuggestionsEvent& event) {
+        actions::ProposalActions(*impl_).CreateAiGenerated(event.suggestions);
+    });
     impl_->events.Subscribe<CenterRequestEvent>([this](const CenterRequestEvent& event) {
         ui::UiState& ui_state = ui::GetUiState();
         switch (event.view) {
@@ -312,7 +268,7 @@ bool AppRuntime::DeleteReviewItem(const core::reviews::ReviewItem& item) {
 }
 
 bool AppRuntime::ResolveReviewItem(const core::reviews::ReviewItem& item) {
-    return actions::ReviewActions(*impl_).ResolveReviewItem(item, NowUtcString());
+    return actions::ReviewActions(*impl_).ResolveReviewItem(item, core::NowUtcString());
 }
 
 bool AppRuntime::AddProposalChildToSelected(core::NewElementKind kind) {
@@ -473,10 +429,10 @@ void AppRuntime::SyncTerminologyProblems() {
         impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
     const sacm::AssuranceCasePackage* package =
         impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
-    app::SyncTerminologyProblems(impl_->problems_manager, model, package, [this](const std::string& element_id,
-                                                                                 const std::string& term_value) {
-        return IsTerminologySuggestionIgnored(element_id, term_value);
-    });
+    app::SyncTerminologyProblems(
+        impl_->problems_manager, model, package, [this](const std::string& element_id, const std::string& term_value) {
+            return IsTerminologySuggestionIgnored(element_id, term_value);
+        });
 }
 
 void AppRuntime::SyncReviewVisualStatesFromReviews() {
@@ -541,7 +497,7 @@ bool AppRuntime::SetManualReviewOk(const std::string& element_id, bool manual_ok
         SetStatus("Enter a reviewer name before changing review status.");
         return false;
     }
-    if (!impl_->review_controller->SetManualReviewOk(element_id, manual_ok, impl_->reviewer_name, NowUtcString())) {
+    if (!impl_->review_controller->SetManualReviewOk(element_id, manual_ok, impl_->reviewer_name, core::NowUtcString())) {
         SetStatus("Could not update manual review status.");
         return false;
     }
@@ -572,8 +528,8 @@ std::string AppRuntime::RecentProjectsPreferenceJson() const {
 }
 
 void AppRuntime::LoadReviewerNamePreference(const std::string& content) {
-    impl_->reviewer_name = TrimWhitespace(content);
-    CopyToBuffer(impl_->reviewer_name_buf, sizeof(impl_->reviewer_name_buf), impl_->reviewer_name);
+    impl_->reviewer_name = core::TrimWhitespace(content);
+    ui::CopyToBuffer(impl_->reviewer_name_buf, sizeof(impl_->reviewer_name_buf), impl_->reviewer_name);
     impl_->modal_coordinator->show_reviewer_name_prompt = impl_->reviewer_name.empty();
 }
 

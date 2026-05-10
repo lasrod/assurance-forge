@@ -1,8 +1,8 @@
 #include "app/controllers/project_controller.h"
 
-#include <algorithm>
+#include "ui/imgui_buffer_utils.h"
+
 #include <chrono>
-#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
@@ -27,12 +27,6 @@ std::filesystem::path MakeTempDir() {
         std::filesystem::temp_directory_path() / ("assurance_forge_project_controller_test_" + std::to_string(stamp));
     std::filesystem::create_directories(path);
     return path;
-}
-
-void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
-    const size_t count = std::min(buffer_size - 1, value.size());
-    std::memcpy(buffer, value.data(), count);
-    buffer[count] = '\0';
 }
 
 } // namespace
@@ -71,8 +65,8 @@ TEST(ProjectControllerTest, ScanDirectoryFindsXmlAndSelectsCurrentFile) {
     std::ofstream(temp.path / "ignore.txt") << "ignore";
 
     app::controllers::ProjectController controller;
-    CopyToBuffer(controller.dir_path_buf, sizeof(controller.dir_path_buf), temp.path.string());
-    CopyToBuffer(controller.file_path_buf, sizeof(controller.file_path_buf), selected.string());
+    ui::CopyToBuffer(controller.dir_path_buf, sizeof(controller.dir_path_buf), temp.path.string());
+    ui::CopyToBuffer(controller.file_path_buf, sizeof(controller.file_path_buf), selected.string());
 
     controller.ScanDirectory();
 

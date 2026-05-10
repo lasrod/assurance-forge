@@ -1,19 +1,10 @@
 #include "ai/ai_types.h"
 
-#include <algorithm>
-#include <cctype>
+#include "core/string_utils.h"
+
 #include <utility>
 
 namespace ai {
-namespace {
-
-std::string Lower(std::string value) {
-    std::transform(
-        value.begin(), value.end(), value.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return value;
-}
-
-} // namespace
 
 const char* ToString(AiProviderId provider) {
     switch (provider) {
@@ -32,7 +23,7 @@ const char* ToSettingsString(AiProviderId provider) {
 }
 
 AiProviderId AiProviderIdFromString(const std::string& value) {
-    std::string normalized = Lower(value);
+    std::string normalized = core::ToLower(value);
     if (normalized == kOpenAiProviderId || normalized == "openai" || normalized == "chatgpt")
         return AiProviderId::OpenAI;
     return AiProviderId::OpenAI;

@@ -201,10 +201,13 @@ set(ASSURANCE_FORGE_SHARED_SOURCES
     src/core/app_state.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
+    src/core/string_utils.cpp
+    src/core/time_utils.cpp
     src/core/tree_editing.cpp
     src/core/problems/problem_attention.cpp
     src/core/problems/problem_item.cpp
     src/core/problems/problems_manager.cpp
+    src/core/problems/problem_utils.cpp
     src/core/project_model.cpp
     src/core/project_service.cpp
     src/core/reviews/review_item.cpp
@@ -212,6 +215,7 @@ set(ASSURANCE_FORGE_SHARED_SOURCES
     src/core/reviews/review_proposal.cpp
     src/core/reviews/review_proposal_manager.cpp
     src/core/reviews/review_proposal_patch_service.cpp
+    src/core/reviews/review_text_utils.cpp
     src/core/sha256.cpp
     src/core/terminology_package_service.cpp
     src/core/terminology_scope_service.cpp
@@ -263,6 +267,7 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/app/controllers/project_controller.cpp
     src/app/controllers/proposal_controller.cpp
     src/app/project_workflow.cpp
+    src/app/proposal_ui_state.cpp
     src/app/recent_projects.cpp
     src/app/controllers/review_controller.cpp
     src/app/sacm_argument_sync.cpp
@@ -327,6 +332,7 @@ add_executable(tests
     tests/test_localization.cpp
     tests/test_ui_state.cpp
     tests/test_recent_projects.cpp
+    tests/test_shared_utils.cpp
     src/ai/ai_service.cpp
     src/ai/ai_claim_review.cpp
     src/ai/ai_settings.cpp
@@ -350,10 +356,13 @@ add_executable(tests
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
+    src/core/string_utils.cpp
+    src/core/time_utils.cpp
     src/core/tree_editing.cpp
     src/core/problems/problem_attention.cpp
     src/core/problems/problem_item.cpp
     src/core/problems/problems_manager.cpp
+    src/core/problems/problem_utils.cpp
     src/core/project_model.cpp
     src/core/project_service.cpp
     src/core/app_state.cpp
@@ -362,6 +371,7 @@ add_executable(tests
     src/core/reviews/review_proposal.cpp
     src/core/reviews/review_proposal_manager.cpp
     src/core/reviews/review_proposal_patch_service.cpp
+    src/core/reviews/review_text_utils.cpp
     src/core/sha256.cpp
     src/core/terminology_package_service.cpp
     src/core/terminology_scope_service.cpp

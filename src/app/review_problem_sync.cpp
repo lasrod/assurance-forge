@@ -1,7 +1,8 @@
 #include "app/review_problem_sync.h"
 
-#include <algorithm>
-#include <cctype>
+#include "core/problems/problem_utils.h"
+#include "core/string_utils.h"
+
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -9,34 +10,12 @@
 namespace app {
 namespace {
 
-std::string ToLower(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
-        return static_cast<char>(std::tolower(ch));
-    });
-    return value;
-}
-
 std::string BuildProblemMessage(const core::reviews::ReviewItem& item) {
     if (item.title.empty())
         return item.message;
     if (item.message.empty())
         return item.title;
     return item.title + ": " + item.message;
-}
-
-bool StartsWith(const std::string& value, const std::string& prefix) {
-    return value.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), value.begin());
-}
-
-void ClearProblemsByIdPrefix(core::ProblemsManager& problems_manager, const std::string& prefix) {
-    std::vector<std::string> problem_ids;
-    for (const core::ProblemItem& problem : problems_manager.GetProblems()) {
-        if (StartsWith(problem.id, prefix))
-            problem_ids.push_back(problem.id);
-    }
-    for (const std::string& problem_id : problem_ids) {
-        problems_manager.RemoveProblem(problem_id);
-    }
 }
 
 } // namespace
@@ -50,7 +29,7 @@ std::string GuidelineReviewProblemId(const core::reviews::ReviewItem& item, cons
 }
 
 core::ProblemSeverity ReviewProblemSeverity(const std::string& review_severity) {
-    const std::string lowered = ToLower(review_severity);
+    const std::string lowered = core::ToLower(review_severity);
     if (lowered == "error")
         return core::ProblemSeverity::Error;
     if (lowered == "warning")
@@ -87,8 +66,8 @@ core::ProblemItem MakeGuidelineProblemFromReviewItem(const core::reviews::Review
 
 void SyncReviewProblems(core::ProblemsManager& problems_manager,
                         const std::vector<core::reviews::ReviewItem>& review_items) {
-    ClearProblemsByIdPrefix(problems_manager, "review-comment:");
-    ClearProblemsByIdPrefix(problems_manager, "guideline-review:");
+    core::ClearProblemsByIdPrefix(problems_manager, "review-comment:");
+    core::ClearProblemsByIdPrefix(problems_manager, "guideline-review:");
 
     for (const core::reviews::ReviewItem& item : review_items) {
         if (item.status != core::reviews::ReviewItemStatus::Open)

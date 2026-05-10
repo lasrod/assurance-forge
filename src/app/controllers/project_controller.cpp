@@ -1,24 +1,14 @@
 #include "app/controllers/project_controller.h"
 
+#include "core/string_utils.h"
+#include "ui/imgui_buffer_utils.h"
+
 #include <algorithm>
-#include <cctype>
-#include <cstring>
 #include <filesystem>
 #include <string>
 #include <system_error>
 
 namespace app::controllers {
-namespace {
-
-void CopyToBuffer(char* buffer, size_t buffer_size, const std::string& value) {
-    if (!buffer || buffer_size == 0)
-        return;
-    const size_t count = std::min(buffer_size - 1, value.size());
-    std::memcpy(buffer, value.data(), count);
-    buffer[count] = '\0';
-}
-
-} // namespace
 
 void ProjectController::ScanDirectory() {
     xml_files.clear();
@@ -34,8 +24,7 @@ void ProjectController::ScanDirectory() {
             continue;
 
         auto ext = entry.path().extension().string();
-        std::transform(
-            ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        ext = core::ToLower(std::move(ext));
         if (ext == ".xml") {
             xml_files.push_back(entry.path().string());
         }
@@ -67,7 +56,7 @@ void ProjectController::ScanDirectory() {
 
 void ProjectController::BeginProjectFileCreate(ProjectFileCreateKind kind, const std::string& default_name) {
     pending_project_file_kind = kind;
-    CopyToBuffer(project_file_name_buf, sizeof(project_file_name_buf), default_name);
+    ui::CopyToBuffer(project_file_name_buf, sizeof(project_file_name_buf), default_name);
     show_project_file_name_modal = true;
 }
 
