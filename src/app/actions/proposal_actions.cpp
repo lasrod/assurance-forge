@@ -27,7 +27,7 @@ void SetStatus(AppRuntimeState& state, const std::string& message) {
 
 const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model, const std::string& element_id) {
     auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
-        return element.id == element_id;
+        return element.id == element_id || element.gid == element_id;
     });
     return found == model.elements.end() ? nullptr : &*found;
 }
