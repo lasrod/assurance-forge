@@ -7,6 +7,7 @@
 #include "ui/panels/review_panel.h"
 #include "ui/ui_state.h"
 
+#include <chrono>
 #include <optional>
 #include <sstream>
 #include <unordered_set>

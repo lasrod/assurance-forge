@@ -26,7 +26,7 @@ flowchart TD
 | Element panel | `ui::panels::ShowElementPanel` | Selected parser element and SACM package | Direct in-panel edits plus `sync_to_sacm()`, then AppRuntime emits dirty events. |
 | Problems panel | `ui::panels::ShowProblemsPanel` | `core::ProblemsManager`, `ui::UiState` | Problem activation and AI review callbacks. |
 | Review panel | `ui::panels::ShowReviewPanel` | Review items, guidelines, proposal validity | Review/proposal callbacks. |
-| Project files panel | `ui::panels::ShowProjectFilesPanel` | `core::AssuranceProject` | Add/open file callbacks. |
+| Project explorer panel | `ui::panels::ShowProjectExplorerPanel` | `core::AssuranceProject` | Add/open file callbacks. |
 | SACM viewer panel | `ui::panels::ShowSacmViewerPanel` | `core::AppState`, directory buffers, XML file list | Scan/load callbacks. Defined in the codebase, but not mounted in the current `RenderFrame()` layout. |
 | Preferences window | `ui::panels::ShowPreferencesWindow` | AI settings, language, FPS, reviewer name | Settings, API key, language, FPS callbacks. |
 | Welcome modal | `ui::panels::ShowWelcomeModal` | Recent project list | Create/open/import callbacks. |
@@ -37,8 +37,8 @@ flowchart TD
 
 | Area | Current panels and views |
 | --- | --- |
-| `ProjectExplorerArea` | Project files panel and SACM package tree entries. |
-| `ArgumentNavigatorArea` | Safety case tree view. |
+| `ProjectExplorerArea` | Project explorer panel and SACM package tree entries. |
+| `ArgumentNavigatorArea` | Argument navigator tree view. |
 | `WorkbenchArea` | GSN canvas, CSE register, evidence register, package details, and terminology package tabs. |
 | `InspectorArea` | Element properties panel and proposal element editor. |
 | `FeedbackDockArea` | Problems, term usages, review, and AI debug tabs. |
@@ -70,7 +70,7 @@ flowchart LR
         Element[Element panel]
         Problems[Problems panel]
         ReviewPanel[Review panel]
-        ProjectFiles[Project files panel]
+        ProjectExplorer[Project explorer panel]
         Preferences[Preferences]
     end
 
@@ -78,7 +78,7 @@ flowchart LR
         ContextActions[ElementContextActions]
         ReviewCallbacks[ReviewPanelCallbacks]
         ProblemCallbacks[ProblemsPanelCallbacks]
-        ProjectCallbacks[ProjectFilesPanelCallbacks]
+        ProjectCallbacks[ProjectExplorerPanelCallbacks]
         PreferenceCallbacks[PreferencesPanelCallbacks]
     end
 
@@ -95,7 +95,7 @@ flowchart LR
     Element --> ContextActions
     Problems --> ProblemCallbacks
     ReviewPanel --> ReviewCallbacks
-    ProjectFiles --> ProjectCallbacks
+    ProjectExplorer --> ProjectCallbacks
     Preferences --> PreferenceCallbacks
 
     ContextActions --> ElementEdit
@@ -132,8 +132,8 @@ Panels do not own project or document state. They render current state, collect 
 
 The current main-frame layout is:
 
-- Project explorer: project files panel
-- Argument navigator: safety case tree
+- Project explorer: project explorer panel
+- Argument navigator: argument tree
 - Workbench: GSN canvas, register tabs, package details, or terminology package tabs
 - Inspector: element properties
 - Feedback dock: problems, term usages, review, and AI debug tabs

@@ -8,7 +8,7 @@ Assurance Forge uses a named application shell to keep the frame layout separate
 | --- | --- |
 | `AppShell` | Persistent outer frame, main menu, future toolbar, splitters, and layout region calculation. |
 | `ProjectExplorerArea` | Project files, SACM package nodes, registers, proposal patch files, and project-level navigation. |
-| `ArgumentNavigatorArea` | Safety case tree navigation and tree editing commands. |
+| `ArgumentNavigatorArea` | Argument tree navigation and tree editing commands. |
 | `WorkbenchArea` | Main editable/viewing surface, including the GSN canvas, register views, package details, and terminology package view. |
 | `InspectorArea` | Right-side details and selected element editing. |
 | `FeedbackDockArea` | Problems, terminology usages, review items, and AI debug feedback. |

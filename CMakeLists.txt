@@ -183,7 +183,7 @@ set(ASSURANCE_FORGE_SHARED_SOURCES
     src/ui/panels/package_details_panel.cpp
     src/ui/panels/preferences_panel.cpp
     src/ui/panels/problems_panel.cpp
-    src/ui/panels/project_files_panel.cpp
+    src/ui/panels/project_explorer_panel.cpp
     src/ui/panels/review_panel.cpp
     src/ui/panels/sacm_viewer_panel.cpp
     src/ui/panels/terminology_package_panel.cpp

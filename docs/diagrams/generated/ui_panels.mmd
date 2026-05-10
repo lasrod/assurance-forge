@@ -46,17 +46,20 @@ classDiagram
         +on_ai_review_requested : std::function&lt;void &lpar;&rpar;&gt;
         +on_problem_activated : std::function&lt;void &lpar;const core::ProblemItem &&rpar;&gt;
     }
-    class C_0006198266850458626743["ui::panels::ProjectFilesPanelModel"]
+    class C_0006198266850458626743["ui::panels::ProjectExplorerPanelModel"]
     class C_0006198266850458626743 {
         +project : const core::AssuranceProject *
         +proposal_validity_by_path : std::map&lt;std::string,core::reviews::ProposalValidityResult&gt;
+        +sacm_package_trees_by_path : std::map&lt;std::string,sacm::SacmPackageTreeResult&gt;
     }
-    class C_0007151013292163442346["ui::panels::ProjectFilesPanelCallbacks"]
+    class C_0007151013292163442346["ui::panels::ProjectExplorerPanelCallbacks"]
     class C_0007151013292163442346 {
         +add_evidence_register : std::function&lt;void &lpar;&rpar;&gt;
         +add_j3377_cae_register : std::function&lt;void &lpar;&rpar;&gt;
         +add_sacm_file : std::function&lt;void &lpar;&rpar;&gt;
+        +add_terminology_package : std::function&lt;void &lpar;const core::ProjectFileEntry &,const sacm::SacmPackageTreeNode &&rpar;&gt;
         +open_file : std::function&lt;void &lpar;const core::ProjectFileEntry &&rpar;&gt;
+        +open_package_node : std::function&lt;void &lpar;const core::ProjectFileEntry &,const sacm::SacmPackageTreeNode &&rpar;&gt;
     }
     class C_0003696604191690353867["ui::panels::ReviewPanelModel"]
     class C_0003696604191690353867 {

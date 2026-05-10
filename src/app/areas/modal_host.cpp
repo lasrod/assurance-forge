@@ -91,8 +91,9 @@ void SetCategoryChecked(AppRuntimeState& state, const sacm::Category& category, 
         if (!category.gid.empty())
             refs.erase(std::remove(refs.begin(), refs.end(), category.gid), refs.end());
     }
-    CopyToBuffer(
-        state.terminology.term_categories_buf, sizeof(state.terminology.term_categories_buf), core::JoinCategoryRefs(refs));
+    CopyToBuffer(state.terminology.term_categories_buf,
+                 sizeof(state.terminology.term_categories_buf),
+                 core::JoinCategoryRefs(refs));
 }
 
 void RenderTermCategoryPickerForPackage(AppRuntimeState& state, const core::TerminologyPackageRef& package_ref) {
