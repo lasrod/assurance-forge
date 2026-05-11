@@ -82,6 +82,8 @@ private:
     void BeginCreateProjectEvidenceRegister();
     void BeginCreateProjectJ3377CaeRegister();
     void OpenProjectFile(const core::ProjectFileEntry& entry);
+    void PerformOpenProjectFile(const core::ProjectFileEntry& entry);
+    void ConfirmPendingProjectFileOpen(bool save_current);
     void OpenProjectPackageNode(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node);
     void BeginAddTerminologyPackage(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& parent_node);
     void ConfirmAddTerminologyPackage();

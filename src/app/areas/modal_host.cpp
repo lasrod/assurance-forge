@@ -235,6 +235,7 @@ private:
     void RenderProjectFileNameModal();
     void RenderProjectLoadReportModal();
     void RenderSaveBeforeExitModal();
+    void RenderSaveBeforeProjectFileOpenModal();
     void RenderCreateTerminologyPackageModal();
     void RenderDeleteTerminologyPackageModal();
     void RenderTerminologyTermEditorModal();
@@ -264,6 +265,7 @@ void ModalHost::Render() {
     RenderDeleteTerminologyTermModal();
     RenderTerminologyCategoryEditorModal();
     RenderDeleteTerminologyCategoryModal();
+    RenderSaveBeforeProjectFileOpenModal();
     RenderSaveBeforeExitModal();
     RenderStartupProjectWindow();
     RenderNotImplementedModal();
@@ -668,6 +670,44 @@ void ModalHost::RenderSaveBeforeExitModal() {
         ImGui::EndPopup();
     } else if (state_.modal_coordinator->show_save_before_exit_modal) {
         ImGui::OpenPopup("Unsaved Changes");
+    }
+}
+
+void ModalHost::RenderSaveBeforeProjectFileOpenModal() {
+    if (!state_.project_controller->show_save_before_project_file_open_modal)
+        return;
+
+    const std::string target =
+        state_.project_controller->pending_open_project_file_entry.has_value()
+            ? state_.project_controller->pending_open_project_file_entry->relativePath.generic_string()
+            : std::string{"the selected project file"};
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal("Open Project File", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped("You have unsaved changes in the current SACM file. Save before opening %s?",
+                           target.c_str());
+        ImGui::Spacing();
+
+        if (ImGui::Button("Save", ImVec2(100.0f, 0.0f))) {
+            callbacks_.confirm_pending_project_file_open(true);
+            if (!state_.project_controller->show_save_before_project_file_open_modal)
+                ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Don't Save", ImVec2(100.0f, 0.0f))) {
+            callbacks_.confirm_pending_project_file_open(false);
+            if (!state_.project_controller->show_save_before_project_file_open_modal)
+                ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(100.0f, 0.0f))) {
+            state_.project_controller->pending_open_project_file_entry.reset();
+            state_.project_controller->show_save_before_project_file_open_modal = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    } else if (state_.project_controller->show_save_before_project_file_open_modal) {
+        ImGui::OpenPopup("Open Project File");
     }
 }
 
