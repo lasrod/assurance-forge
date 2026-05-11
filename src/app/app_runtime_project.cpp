@@ -40,8 +40,9 @@ bool IsActiveProjectSacmFile(const core::AppState& app_state, const core::Projec
 }
 
 bool CurrentSacmDocumentHasUnsavedChanges(const AppRuntimeState& state) {
-    return state.app_state.active_project_file_role == core::ProjectFileRole::SacmArgument &&
-           (state.document_dirty || state.app_state.has_unsaved_changes);
+    const bool sacm_document_loaded =
+        state.app_state.sacm_package.has_value() || state.app_state.loaded_case.has_value();
+    return sacm_document_loaded && (state.document_dirty || state.app_state.has_unsaved_changes);
 }
 
 bool EnsureProjectSacmFileOpen(AppRuntimeState& state, const core::ProjectFileEntry& entry, bool require_loaded_case) {
