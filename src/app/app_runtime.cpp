@@ -694,6 +694,9 @@ void AppRuntime::RenderFrame(bool& done) {
     modal_callbacks.ensure_review_item_storage = [this]() { return EnsureReviewItemStorage(); };
     modal_callbacks.touch_current_project_recent = [this]() { TouchCurrentProjectRecent(); };
     modal_callbacks.save_project = [this]() { return SaveProject(); };
+    modal_callbacks.confirm_pending_project_file_open = [this](bool save_current) {
+        ConfirmPendingProjectFileOpen(save_current);
+    };
     modal_callbacks.set_status = [this](const std::string& message) { SetStatus(message); };
     modal_callbacks.delete_review_item = [this](const core::reviews::ReviewItem& item) {
         return DeleteReviewItem(item);

@@ -5,6 +5,7 @@
 #include "core/app_state.h"
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -23,7 +24,9 @@ public:
     bool show_startup_project_window = true;
     bool show_create_project_modal = false;
     bool show_project_file_name_modal = false;
+    bool show_save_before_project_file_open_modal = false;
     ProjectFileCreateKind pending_project_file_kind = ProjectFileCreateKind::Sacm;
+    std::optional<core::ProjectFileEntry> pending_open_project_file_entry;
     char project_name_buf[128] = "MySafetyCase";
     char project_parent_buf[kPathBufferSize] = ".";
     char open_project_path_buf[kPathBufferSize] = "";

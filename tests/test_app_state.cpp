@@ -80,6 +80,36 @@ TEST(AppStateTest, LoadFileHidesTerminologyArtifactReferencesButKeepsEvidenceSol
     EXPECT_EQ(state.sacm_package->argumentPackages.front().assertedContexts.size(), 1u);
 }
 
+TEST(AppStateTest, OpenProjectSacmFilePreservesActiveProjectFile) {
+    TempDir temp(MakeTempDir());
+    std::filesystem::create_directories(temp.path / "arguments");
+    const std::filesystem::path relative_path = std::filesystem::path("arguments") / "main.sacm";
+    const std::filesystem::path sacm_path = temp.path / relative_path;
+    std::ofstream(sacm_path) << R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="urn:test" id="T" name="T">
+  <argumentPackage id="AP" name="AP">
+    <claim id="G1" name="Goal" assertionDeclaration="asserted"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    core::AppState state;
+    core::AssuranceProject project;
+    project.name = "Project";
+    project.rootPath = temp.path;
+    core::ProjectFileEntry entry;
+    entry.relativePath = relative_path;
+    entry.role = core::ProjectFileRole::SacmArgument;
+    project.files.push_back(entry);
+    state.current_project = project;
+
+    ASSERT_TRUE(state.open_project_file(entry)) << state.status_message;
+    EXPECT_EQ(state.active_project_file_role, core::ProjectFileRole::SacmArgument);
+    EXPECT_EQ(state.active_project_file_path, sacm_path);
+    EXPECT_EQ(state.loaded_file_path, sacm_path);
+    EXPECT_TRUE(state.loaded_case.has_value());
+    EXPECT_TRUE(state.sacm_package.has_value());
+}
+
 TEST(AppStateTest, LoadFileKeepsVisibleTerminologyContextOnCanvas) {
     TempDir temp(MakeTempDir());
     const std::filesystem::path sacm_path = temp.path / "case.sacm";

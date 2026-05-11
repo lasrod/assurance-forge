@@ -296,13 +296,20 @@ bool AppState::open_project_file(const ProjectFileEntry& entry) {
         status_message = "Create or open a project first.";
         return false;
     }
-    active_project_file_role = entry.role;
-    active_project_file_path = current_project->rootPath / entry.relativePath;
+    const std::filesystem::path project_file_path = current_project->rootPath / entry.relativePath;
     if (entry.role != ProjectFileRole::SacmArgument) {
+        active_project_file_role = entry.role;
+        active_project_file_path = project_file_path;
         status_message = "Opened: " + entry.relativePath.generic_string();
         return true;
     }
-    return load_file((current_project->rootPath / entry.relativePath).string());
+
+    if (!load_file(project_file_path.string()))
+        return false;
+
+    active_project_file_role = entry.role;
+    active_project_file_path = project_file_path;
+    return true;
 }
 
 } // namespace core

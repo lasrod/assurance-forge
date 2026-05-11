@@ -5,7 +5,9 @@
 #include <functional>
 #include <string>
 
-namespace app { struct AppRuntimeState; }
+namespace app {
+struct AppRuntimeState;
+}
 
 namespace app::areas {
 
@@ -17,6 +19,7 @@ struct ModalHostCallbacks {
     std::function<bool()> ensure_review_item_storage;
     std::function<void()> touch_current_project_recent;
     std::function<bool()> save_project;
+    std::function<void(bool)> confirm_pending_project_file_open;
     std::function<void(const std::string&)> set_status;
     std::function<bool(const core::reviews::ReviewItem&)> delete_review_item;
     std::function<void()> confirm_add_terminology_package;

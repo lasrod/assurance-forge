@@ -39,6 +39,11 @@ bool IsActiveProjectSacmFile(const core::AppState& app_state, const core::Projec
     return app_state.active_project_file_path == app_state.current_project->rootPath / entry.relativePath;
 }
 
+bool CurrentSacmDocumentHasUnsavedChanges(const AppRuntimeState& state) {
+    return state.app_state.active_project_file_role == core::ProjectFileRole::SacmArgument &&
+           (state.document_dirty || state.app_state.has_unsaved_changes);
+}
+
 bool EnsureProjectSacmFileOpen(AppRuntimeState& state, const core::ProjectFileEntry& entry, bool require_loaded_case) {
     if (IsActiveProjectSacmFile(state.app_state, entry) && state.app_state.sacm_package.has_value() &&
         (!require_loaded_case || state.app_state.loaded_case.has_value())) {
@@ -181,6 +186,27 @@ void AppRuntime::BeginCreateProjectJ3377CaeRegister() {
 }
 
 void AppRuntime::OpenProjectFile(const core::ProjectFileEntry& entry) {
+    if (entry.role == core::ProjectFileRole::SacmArgument) {
+        if (IsActiveProjectSacmFile(impl_->app_state, entry) && impl_->app_state.loaded_case.has_value()) {
+            ui::UiState& ui_state = ui::GetUiState();
+            impl_->workbench.show_gsn_tab = true;
+            ui_state.center_view = ui::CenterView::GsnCanvas;
+            impl_->workbench.force_center_tab_selection = true;
+            SetStatus("SACM file is already open: " + entry.relativePath.generic_string());
+            return;
+        }
+
+        if (CurrentSacmDocumentHasUnsavedChanges(*impl_)) {
+            impl_->project_controller->pending_open_project_file_entry = entry;
+            impl_->project_controller->show_save_before_project_file_open_modal = true;
+            return;
+        }
+    }
+
+    PerformOpenProjectFile(entry);
+}
+
+void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
     if (!impl_->app_state.open_project_file(entry))
         return;
 
@@ -211,6 +237,21 @@ void AppRuntime::OpenProjectFile(const core::ProjectFileEntry& entry) {
         }
         PreviewProposalById(proposal_id);
     }
+}
+
+void AppRuntime::ConfirmPendingProjectFileOpen(bool save_current) {
+    if (!impl_->project_controller->pending_open_project_file_entry.has_value()) {
+        impl_->project_controller->show_save_before_project_file_open_modal = false;
+        return;
+    }
+
+    if (save_current && !SaveProject())
+        return;
+
+    core::ProjectFileEntry entry = impl_->project_controller->pending_open_project_file_entry.value();
+    impl_->project_controller->pending_open_project_file_entry.reset();
+    impl_->project_controller->show_save_before_project_file_open_modal = false;
+    PerformOpenProjectFile(entry);
 }
 
 void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
