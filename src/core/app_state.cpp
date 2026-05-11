@@ -182,9 +182,9 @@ bool AppState::save_project() {
     }
 
     if (has_unsaved_changes) {
-        std::filesystem::path save_path = active_project_file_path;
-        if (save_path.empty())
-            save_path = loaded_file_path;
+        std::filesystem::path save_path = loaded_file_path;
+        if (save_path.empty() && active_project_file_role == ProjectFileRole::SacmArgument)
+            save_path = active_project_file_path;
         if (save_path.empty()) {
             status_message = "Error: Could not determine which file to save.";
             return false;
@@ -304,8 +304,22 @@ bool AppState::open_project_file(const ProjectFileEntry& entry) {
         return true;
     }
 
-    if (!load_file(project_file_path.string()))
+    const ProjectFileRole previous_active_project_file_role = active_project_file_role;
+    const std::filesystem::path previous_active_project_file_path = active_project_file_path;
+    const std::filesystem::path previous_loaded_file_path = loaded_file_path;
+    const bool previous_has_unsaved_changes = has_unsaved_changes;
+    const auto previous_loaded_case = loaded_case;
+    const auto previous_sacm_package = sacm_package;
+
+    if (!load_file(project_file_path.string())) {
+        active_project_file_role = previous_active_project_file_role;
+        active_project_file_path = previous_active_project_file_path;
+        loaded_file_path = previous_loaded_file_path;
+        has_unsaved_changes = previous_has_unsaved_changes;
+        loaded_case = previous_loaded_case;
+        sacm_package = previous_sacm_package;
         return false;
+    }
 
     active_project_file_role = entry.role;
     active_project_file_path = project_file_path;

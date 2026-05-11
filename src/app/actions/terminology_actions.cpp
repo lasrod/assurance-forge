@@ -191,13 +191,18 @@ bool CanSwitchProjectSacmFile(const core::AppState& app_state, const core::Proje
     if (!app_state.current_project.has_value() || !app_state.has_unsaved_changes)
         return true;
     const std::filesystem::path target_path = app_state.current_project->rootPath / entry.relativePath;
-    return app_state.active_project_file_path.empty() || app_state.active_project_file_path == target_path;
+    const std::filesystem::path current_sacm_path =
+        !app_state.loaded_file_path.empty() ? app_state.loaded_file_path : app_state.active_project_file_path;
+    return current_sacm_path.empty() || current_sacm_path == target_path;
 }
 
 bool IsActiveProjectSacmFile(const core::AppState& app_state, const core::ProjectFileEntry& entry) {
-    if (!app_state.current_project.has_value() || app_state.active_project_file_path.empty())
+    if (!app_state.current_project.has_value())
         return false;
-    return app_state.active_project_file_path == app_state.current_project->rootPath / entry.relativePath;
+    const std::filesystem::path target_path = app_state.current_project->rootPath / entry.relativePath;
+    if (!app_state.loaded_file_path.empty())
+        return app_state.loaded_file_path == target_path;
+    return !app_state.active_project_file_path.empty() && app_state.active_project_file_path == target_path;
 }
 
 bool EnsureProjectSacmFileOpen(AppRuntimeState& state, const core::ProjectFileEntry& entry, bool require_loaded_case) {

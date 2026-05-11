@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
+#include <sstream>
 
 namespace {
 
@@ -32,6 +33,22 @@ const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const
             return &element;
     }
     return nullptr;
+}
+
+const core::ProjectFileEntry* FindProjectFileWithRole(const core::AssuranceProject& project,
+                                                      core::ProjectFileRole role) {
+    for (const core::ProjectFileEntry& entry : project.files) {
+        if (entry.role == role)
+            return &entry;
+    }
+    return nullptr;
+}
+
+std::string ReadTextFile(const std::filesystem::path& path) {
+    std::ifstream input(path);
+    std::ostringstream buffer;
+    buffer << input.rdbuf();
+    return buffer.str();
 }
 
 } // namespace
@@ -108,6 +125,66 @@ TEST(AppStateTest, OpenProjectSacmFilePreservesActiveProjectFile) {
     EXPECT_EQ(state.loaded_file_path, sacm_path);
     EXPECT_TRUE(state.loaded_case.has_value());
     EXPECT_TRUE(state.sacm_package.has_value());
+}
+
+TEST(AppStateTest, FailedProjectSacmOpenPreservesCurrentDocument) {
+    TempDir temp(MakeTempDir());
+    core::AppState state;
+    ASSERT_TRUE(state.create_empty_project("Project", temp.path.string())) << state.status_message;
+    ASSERT_TRUE(state.current_project.has_value());
+
+    const core::ProjectFileEntry* main_entry =
+        FindProjectFileWithRole(state.current_project.value(), core::ProjectFileRole::SacmArgument);
+    ASSERT_NE(main_entry, nullptr);
+    const std::filesystem::path sacm_path = state.current_project->rootPath / main_entry->relativePath;
+
+    ASSERT_TRUE(state.open_project_file(*main_entry)) << state.status_message;
+    state.mark_dirty();
+
+    core::ProjectFileEntry missing_entry;
+    missing_entry.relativePath = std::filesystem::path("arguments") / "missing.sacm";
+    missing_entry.role = core::ProjectFileRole::SacmArgument;
+
+    ASSERT_FALSE(state.open_project_file(missing_entry));
+    EXPECT_EQ(state.active_project_file_role, core::ProjectFileRole::SacmArgument);
+    EXPECT_EQ(state.active_project_file_path, sacm_path);
+    EXPECT_EQ(state.loaded_file_path, sacm_path);
+    EXPECT_TRUE(state.has_unsaved_changes);
+    EXPECT_TRUE(state.loaded_case.has_value());
+    EXPECT_TRUE(state.sacm_package.has_value());
+}
+
+TEST(AppStateTest, SaveProjectKeepsSacmTargetAfterOpeningNonSacmFile) {
+    TempDir temp(MakeTempDir());
+    core::AppState state;
+    ASSERT_TRUE(state.create_empty_project("Project", temp.path.string())) << state.status_message;
+    ASSERT_TRUE(state.current_project.has_value());
+
+    core::ProjectFileEntry evidence_entry;
+    ASSERT_TRUE(state.create_project_evidence_register("evidence-register.af.json", &evidence_entry))
+        << state.status_message;
+
+    const core::ProjectFileEntry* main_entry =
+        FindProjectFileWithRole(state.current_project.value(), core::ProjectFileRole::SacmArgument);
+    ASSERT_NE(main_entry, nullptr);
+    const std::filesystem::path sacm_path = state.current_project->rootPath / main_entry->relativePath;
+    const std::filesystem::path evidence_path = state.current_project->rootPath / evidence_entry.relativePath;
+    const std::string evidence_before = ReadTextFile(evidence_path);
+
+    ASSERT_TRUE(state.open_project_file(*main_entry)) << state.status_message;
+    ASSERT_TRUE(state.sacm_package.has_value());
+    state.sacm_package->name = "Updated Project";
+    state.mark_dirty();
+
+    ASSERT_TRUE(state.open_project_file(evidence_entry)) << state.status_message;
+    EXPECT_EQ(state.active_project_file_role, core::ProjectFileRole::EvidenceRegister);
+    EXPECT_EQ(state.active_project_file_path, evidence_path);
+
+    ASSERT_TRUE(state.save_project()) << state.status_message;
+    EXPECT_EQ(ReadTextFile(evidence_path), evidence_before);
+    EXPECT_NE(ReadTextFile(sacm_path).find("Updated Project"), std::string::npos);
+    EXPECT_EQ(state.loaded_file_path, sacm_path);
+    EXPECT_FALSE(state.has_unsaved_changes);
 }
 
 TEST(AppStateTest, LoadFileKeepsVisibleTerminologyContextOnCanvas) {

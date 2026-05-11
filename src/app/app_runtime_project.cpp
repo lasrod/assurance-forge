@@ -30,13 +30,27 @@ bool CanSwitchProjectSacmFile(const core::AppState& app_state, const core::Proje
     if (!app_state.current_project.has_value() || !app_state.has_unsaved_changes)
         return true;
     const std::filesystem::path target_path = app_state.current_project->rootPath / entry.relativePath;
-    return app_state.active_project_file_path.empty() || app_state.active_project_file_path == target_path;
+    const std::filesystem::path current_sacm_path =
+        !app_state.loaded_file_path.empty() ? app_state.loaded_file_path : app_state.active_project_file_path;
+    return current_sacm_path.empty() || current_sacm_path == target_path;
 }
 
-bool IsActiveProjectSacmFile(const core::AppState& app_state, const core::ProjectFileEntry& entry) {
-    if (!app_state.current_project.has_value() || app_state.active_project_file_path.empty())
+std::filesystem::path ProjectFilePath(const core::AppState& app_state, const core::ProjectFileEntry& entry) {
+    if (!app_state.current_project.has_value())
+        return {};
+    return app_state.current_project->rootPath / entry.relativePath;
+}
+
+bool IsLoadedProjectSacmFile(const core::AppState& app_state, const core::ProjectFileEntry& entry) {
+    if (entry.role != core::ProjectFileRole::SacmArgument || app_state.loaded_file_path.empty())
         return false;
-    return app_state.active_project_file_path == app_state.current_project->rootPath / entry.relativePath;
+    return app_state.loaded_file_path == ProjectFilePath(app_state, entry);
+}
+
+bool ProjectFileOpenWouldLeaveLoadedSacm(const core::AppState& app_state, const core::ProjectFileEntry& entry) {
+    if (app_state.loaded_file_path.empty())
+        return true;
+    return app_state.loaded_file_path != ProjectFilePath(app_state, entry);
 }
 
 bool CurrentSacmDocumentHasUnsavedChanges(const AppRuntimeState& state) {
@@ -46,7 +60,7 @@ bool CurrentSacmDocumentHasUnsavedChanges(const AppRuntimeState& state) {
 }
 
 bool EnsureProjectSacmFileOpen(AppRuntimeState& state, const core::ProjectFileEntry& entry, bool require_loaded_case) {
-    if (IsActiveProjectSacmFile(state.app_state, entry) && state.app_state.sacm_package.has_value() &&
+    if (IsLoadedProjectSacmFile(state.app_state, entry) && state.app_state.sacm_package.has_value() &&
         (!require_loaded_case || state.app_state.loaded_case.has_value())) {
         return true;
     }
@@ -188,20 +202,22 @@ void AppRuntime::BeginCreateProjectJ3377CaeRegister() {
 
 void AppRuntime::OpenProjectFile(const core::ProjectFileEntry& entry) {
     if (entry.role == core::ProjectFileRole::SacmArgument) {
-        if (IsActiveProjectSacmFile(impl_->app_state, entry) && impl_->app_state.loaded_case.has_value()) {
+        if (IsLoadedProjectSacmFile(impl_->app_state, entry) && impl_->app_state.loaded_case.has_value()) {
             ui::UiState& ui_state = ui::GetUiState();
+            impl_->app_state.active_project_file_role = entry.role;
+            impl_->app_state.active_project_file_path = ProjectFilePath(impl_->app_state, entry);
             impl_->workbench.show_gsn_tab = true;
             ui_state.center_view = ui::CenterView::GsnCanvas;
             impl_->workbench.force_center_tab_selection = true;
             SetStatus("SACM file is already open: " + entry.relativePath.generic_string());
             return;
         }
+    }
 
-        if (CurrentSacmDocumentHasUnsavedChanges(*impl_)) {
-            impl_->project_controller->pending_open_project_file_entry = entry;
-            impl_->project_controller->show_save_before_project_file_open_modal = true;
-            return;
-        }
+    if (CurrentSacmDocumentHasUnsavedChanges(*impl_) && ProjectFileOpenWouldLeaveLoadedSacm(impl_->app_state, entry)) {
+        impl_->project_controller->pending_open_project_file_entry = entry;
+        impl_->project_controller->show_save_before_project_file_open_modal = true;
+        return;
     }
 
     PerformOpenProjectFile(entry);

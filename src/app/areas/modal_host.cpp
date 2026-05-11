@@ -680,10 +680,10 @@ void ModalHost::RenderSaveBeforeProjectFileOpenModal() {
     const std::string target =
         state_.project_controller->pending_open_project_file_entry.has_value()
             ? state_.project_controller->pending_open_project_file_entry->relativePath.generic_string()
-            : std::string{"the selected SACM file"};
+            : std::string{"the selected project file"};
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal("Open SACM File", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal("Open Project File", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextWrapped("You have unsaved changes in the current SACM file. Save before opening %s?",
                            target.c_str());
         ImGui::Spacing();
@@ -707,7 +707,7 @@ void ModalHost::RenderSaveBeforeProjectFileOpenModal() {
         }
         ImGui::EndPopup();
     } else if (state_.project_controller->show_save_before_project_file_open_modal) {
-        ImGui::OpenPopup("Open SACM File");
+        ImGui::OpenPopup("Open Project File");
     }
 }
 
