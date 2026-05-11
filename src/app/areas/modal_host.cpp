@@ -663,6 +663,8 @@ void ModalHost::RenderSaveBeforeExitModal() {
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(100.0f, 0.0f))) {
             state_.modal_coordinator->show_save_before_exit_modal = false;
+            if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams())
+                runner_params->appShallExit = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
