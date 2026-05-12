@@ -7,10 +7,10 @@
 
 namespace export_gsn {
 
-struct GsnLayoutResult {
+struct GsnSvgLayoutResult {
     std::vector<std::string> warnings;
 };
 
-GsnLayoutResult LayoutGsnDiagram(GsnDiagram& diagram);
+GsnSvgLayoutResult LayoutGsnSvgDiagram(GsnDiagram& diagram);
 
 } // namespace export_gsn

@@ -1,6 +1,6 @@
-#include "export/gsn_layout.h"
 #include "export/gsn_projection.h"
 #include "export/gsn_svg_exporter.h"
+#include "export/gsn_svg_layout.h"
 #include "export/svg_writer.h"
 #include "core/terminology_package_service.h"
 #include "parser/xml_parser.h"
@@ -156,6 +156,7 @@ TEST(GsnSvgExporterTest, ProjectionExportsVisibleTerminologyContextsAsNormalCont
     const export_gsn::GsnNode* context = FindNode(projection.diagram, "C1");
     ASSERT_NE(context, nullptr);
     EXPECT_EQ(context->kind, export_gsn::GsnNodeKind::Context);
+    EXPECT_EQ(context->title, "ABS: Anti-lock braking system");
     EXPECT_EQ(context->text, "Term definition.");
     EXPECT_EQ(FindNode(projection.diagram, "TC1"), nullptr);
     ASSERT_EQ(projection.diagram.edges.size(), 1u);
@@ -213,14 +214,28 @@ TEST(GsnSvgExporterTest, ProjectionSkipsVisibleTermContextAttachedToContextNode)
     EXPECT_EQ(projection.diagram.edges.front().kind, export_gsn::GsnEdgeKind::InContextOf);
 }
 
-TEST(GsnSvgExporterTest, ProjectionUsesContentBeforeElementName) {
+TEST(GsnSvgExporterTest, ProjectionKeepsElementNameAndContent) {
     parser::AssuranceCase model;
     model.elements = {Element("G1", "claim", "Term-like label", "Actual safety claim content.")};
 
     export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
 
     ASSERT_EQ(projection.diagram.nodes.size(), 1u);
+    EXPECT_EQ(projection.diagram.nodes.front().title, "Term-like label");
     EXPECT_EQ(projection.diagram.nodes.front().text, "Actual safety claim content.");
+}
+
+TEST(GsnSvgExporterTest, SvgRendersElementNameAndContent) {
+    parser::AssuranceCase model;
+    model.elements = {Element("G1", "claim", "Top safety claim", "Actual safety claim content.")};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+
+    const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
+
+    EXPECT_NE(svg.find("G1: Top safety claim"), std::string::npos);
+    EXPECT_NE(svg.find("Actual safety claim content."), std::string::npos);
 }
 
 TEST(GsnSvgExporterTest, MissingRelationshipEndpointProducesWarning) {
@@ -248,7 +263,7 @@ TEST(GsnSvgExporterTest, DuplicateNodeIdsAreMadeSafeForSvg) {
 
 TEST(GsnSvgExporterTest, LayoutPlacesSupportBelowAndContextToSide) {
     export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(BuildRepresentativeCase());
-    export_gsn::LayoutGsnDiagram(projection.diagram);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
 
     const export_gsn::GsnNode* goal = FindNode(projection.diagram, "G1");
     const export_gsn::GsnNode* strategy = FindNode(projection.diagram, "S1");
@@ -266,7 +281,7 @@ TEST(GsnSvgExporterTest, LayoutPlacesSupportBelowAndContextToSide) {
 
 TEST(GsnSvgExporterTest, LayoutCentersMultipleSideAttachmentsAroundOwner) {
     export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(BuildRepresentativeCase());
-    export_gsn::LayoutGsnDiagram(projection.diagram);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
 
     const export_gsn::GsnNode* goal = FindNode(projection.diagram, "G1");
     const export_gsn::GsnNode* context = FindNode(projection.diagram, "C1");
@@ -298,7 +313,7 @@ TEST(GsnSvgExporterTest, LayoutKeepsVisibleTermContextClearOfSiblingGoal) {
                       visible_context};
 
     export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
-    export_gsn::LayoutGsnDiagram(projection.diagram);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
 
     const export_gsn::GsnNode* sibling = FindNode(projection.diagram, "G10");
     const export_gsn::GsnNode* generated_context = FindNode(projection.diagram, "C1");
@@ -317,7 +332,7 @@ TEST(GsnSvgExporterTest, LayoutResizesLongTextNodes) {
                               "instead of spilling outside the element.")};
 
     export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
-    export_gsn::LayoutGsnDiagram(projection.diagram);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
 
     ASSERT_EQ(projection.diagram.nodes.size(), 1u);
     EXPECT_GT(projection.diagram.nodes.front().height, 86.0);
@@ -325,7 +340,7 @@ TEST(GsnSvgExporterTest, LayoutResizesLongTextNodes) {
 
 TEST(GsnSvgExporterTest, SvgContainsNamespaceMarkersAndPublicationStyle) {
     export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(BuildRepresentativeCase());
-    export_gsn::LayoutGsnDiagram(projection.diagram);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
 
     std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
 

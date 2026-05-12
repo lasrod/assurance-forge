@@ -15,6 +15,11 @@ constexpr double kCanvasPadding = 48.0;
 constexpr double kTextLineHeight = 18.0;
 constexpr double kFontSize = 13.0;
 
+struct TextLine {
+    std::string text;
+    bool bold = false;
+};
+
 std::string EscapeXml(const std::string& value) {
     std::ostringstream out;
     for (char ch : value) {
@@ -103,25 +108,34 @@ std::vector<std::string> WrapParagraph(const std::string& text, size_t max_chars
     return lines;
 }
 
-std::vector<std::string> WrappedTextLines(const GsnNode& node) {
+std::vector<TextLine> WrappedTextLines(const GsnNode& node) {
     const double available_width = node.kind == GsnNodeKind::Solution ? node.width * 0.62 : node.width - 32.0;
     const size_t max_chars = std::max<size_t>(8, static_cast<size_t>(available_width / 7.0));
-    std::vector<std::string> lines;
-    lines.push_back(node.id);
+    std::vector<TextLine> lines;
+    std::string title_line = node.id;
+    if (!node.title.empty())
+        title_line += ": " + node.title;
+    for (const std::string& line : WrapParagraph(title_line, max_chars))
+        lines.push_back({line, true});
     for (const std::string& paragraph : SplitParagraphs(node.text)) {
+        if (paragraph.empty())
+            continue;
         std::vector<std::string> wrapped = WrapParagraph(paragraph, max_chars);
-        lines.insert(lines.end(), wrapped.begin(), wrapped.end());
+        for (const std::string& line : wrapped)
+            lines.push_back({line, false});
     }
     return lines;
 }
 
 void WriteText(std::ostringstream& out, const GsnNode& node, double x, double y) {
-    const std::vector<std::string> lines = WrappedTextLines(node);
+    const std::vector<TextLine> lines = WrappedTextLines(node);
     out << "    <text x=\"" << x << "\" y=\"" << y << "\" font-family=\"Arial, Helvetica, sans-serif\" font-size=\""
         << kFontSize << "\" fill=\"black\">\n";
     for (size_t i = 0; i < lines.size(); ++i) {
-        out << "      <tspan x=\"" << x << "\" dy=\"" << (i == 0 ? 0.0 : kTextLineHeight) << "\">"
-            << EscapeXml(lines[i]) << "</tspan>\n";
+        out << "      <tspan x=\"" << x << "\" dy=\"" << (i == 0 ? 0.0 : kTextLineHeight) << "\"";
+        if (lines[i].bold)
+            out << " font-weight=\"700\"";
+        out << ">" << EscapeXml(lines[i].text) << "</tspan>\n";
     }
     out << "    </text>\n";
 }

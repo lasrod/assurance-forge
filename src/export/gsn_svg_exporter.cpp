@@ -1,8 +1,8 @@
 #include "export/gsn_svg_exporter.h"
 
 #include "core/string_utils.h"
-#include "export/gsn_layout.h"
 #include "export/gsn_projection.h"
+#include "export/gsn_svg_layout.h"
 #include "export/svg_writer.h"
 
 #include <algorithm>
@@ -107,7 +107,7 @@ GsnSvgExportResult ExportCurrentSafetyCaseToGsnSvg(const parser::AssuranceCase& 
         return result;
     }
 
-    GsnLayoutResult layout = LayoutGsnDiagram(projection.diagram);
+    GsnSvgLayoutResult layout = LayoutGsnSvgDiagram(projection.diagram);
     AppendWarnings(result.warnings, layout.warnings);
 
     const std::string svg = GenerateGsnSvg(projection.diagram);

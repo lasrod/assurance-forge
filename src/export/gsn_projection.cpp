@@ -145,12 +145,8 @@ bool UsesContentText(const parser::SacmElement& element) {
 }
 
 std::string TextFor(const parser::SacmElement& element) {
-    const std::string detail = UsesContentText(element)
-                                   ? (!element.content.empty() ? element.content : element.description)
-                                   : (!element.description.empty() ? element.description : element.content);
-    if (!detail.empty())
-        return detail;
-    return element.name;
+    return UsesContentText(element) ? (!element.content.empty() ? element.content : element.description)
+                                    : (!element.description.empty() ? element.description : element.content);
 }
 
 void AddReference(std::unordered_map<std::string, size_t>& node_by_ref,
@@ -293,10 +289,11 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
         node.id = MakeUniqueSvgId(source_id, node_id_counts, result.warnings);
         node.source_gid = element.gid;
         node.kind = is_visible_terminology_context ? GsnNodeKind::Context : InitialKindFor(element);
+        node.title = element.name;
         node.text = TextFor(element);
-        if (node.text.empty()) {
-            node.text = "(no text)";
-            result.warnings.push_back("Node '" + node.id + "' had no text; placeholder text was used.");
+        if (node.title.empty() && node.text.empty()) {
+            node.title = "(no title)";
+            result.warnings.push_back("Node '" + node.id + "' had no title or text; placeholder title was used.");
         }
 
         const size_t node_index = result.diagram.nodes.size();

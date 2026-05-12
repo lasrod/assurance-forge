@@ -56,7 +56,10 @@ std::vector<std::string> ExistingChildren(const LayoutState& state, const std::v
     return children;
 }
 
-int ComputeChildrenSpan(const LayoutState& state, const std::vector<std::string>& children, int start_index, int end_index) {
+int ComputeChildrenSpan(const LayoutState& state,
+                        const std::vector<std::string>& children,
+                        int start_index,
+                        int end_index) {
     int span = 0;
     for (int i = start_index; i < end_index; ++i) {
         const WorkNode* child = FindNode(state, children[i]);
@@ -70,24 +73,6 @@ int ComputeChildrenSpan(const LayoutState& state, const std::vector<std::string>
         }
     }
     return span;
-}
-
-int ComputeArmWidth(const LayoutState& state, const std::vector<std::string>& children, int mid, bool is_left_arm) {
-    if (is_left_arm) {
-        int arm = ComputeChildrenSpan(state, children, 0, mid);
-        const WorkNode* left = FindNode(state, children[mid - 1]);
-        const WorkNode* center = FindNode(state, children[mid]);
-        if (left && center)
-            arm += left->right_overhang + center->left_overhang;
-        return arm;
-    }
-
-    int arm = ComputeChildrenSpan(state, children, mid + 1, static_cast<int>(children.size()));
-    const WorkNode* center = FindNode(state, children[mid]);
-    const WorkNode* right = FindNode(state, children[mid + 1]);
-    if (center && right)
-        arm += center->right_overhang + right->left_overhang;
-    return arm;
 }
 
 void ComputeSubtreeInfo(LayoutState& state, const std::string& node_id) {
@@ -108,17 +93,8 @@ void ComputeSubtreeInfo(LayoutState& state, const std::string& node_id) {
 
     if (children.empty()) {
         node->subtree_width = 1;
-    } else if (children.size() == 1) {
-        const WorkNode* child = FindNode(state, children[0]);
-        node->subtree_width = child ? child->subtree_width : 1;
-    } else if (children.size() % 2 == 1) {
-        const int mid = static_cast<int>(children.size()) / 2;
-        const int left_arm = ComputeArmWidth(state, children, mid, true);
-        const int right_arm = ComputeArmWidth(state, children, mid, false);
-        const WorkNode* center = FindNode(state, children[mid]);
-        node->subtree_width = (center ? center->subtree_width : 1) + 2 * std::max(left_arm, right_arm);
     } else {
-        node->subtree_width = ComputeChildrenSpan(state, children, 0, static_cast<int>(children.size()));
+        node->subtree_width = std::max(1, ComputeChildrenSpan(state, children, 0, static_cast<int>(children.size())));
     }
 
     const int attachment_count = static_cast<int>(ExistingChildren(state, node->input->group2_attachments).size());
@@ -134,15 +110,6 @@ void ComputeSubtreeInfo(LayoutState& state, const std::string& node_id) {
         const WorkNode* last = FindNode(state, children.back());
         child_left_overhang = first ? first->left_overhang : 0;
         child_right_overhang = last ? last->right_overhang : 0;
-
-        if (children.size() > 1 && children.size() % 2 == 1) {
-            const int mid = static_cast<int>(children.size()) / 2;
-            const int left_arm = ComputeArmWidth(state, children, mid, true);
-            const int right_arm = ComputeArmWidth(state, children, mid, false);
-            const int max_arm = std::max(left_arm, right_arm);
-            child_left_overhang = std::max(0, child_left_overhang - (max_arm - left_arm));
-            child_right_overhang = std::max(0, child_right_overhang - (max_arm - right_arm));
-        }
     }
 
     node->left_overhang = std::max(own_left, child_left_overhang);
@@ -204,66 +171,21 @@ void AssignGridPositions(LayoutState& state, const std::string& node_id, double 
     }
 
     const int child_row = row + 1;
-    if (children.size() == 1) {
-        AssignGridPositions(state, children[0], column, child_row);
-    } else if (children.size() % 2 == 1) {
-        const int mid = static_cast<int>(children.size()) / 2;
-        const WorkNode* center = FindNode(state, children[mid]);
-        const double half_mid_width = static_cast<double>(center ? center->subtree_width : 1) / 2.0;
-
-        AssignGridPositions(state, children[mid], column, child_row);
-
-        double cursor = column - half_mid_width;
-        for (int i = mid - 1; i >= 0; --i) {
-            const WorkNode* child = FindNode(state, children[i]);
-            const WorkNode* next = FindNode(state, children[i + 1]);
-            if (!child || !next)
-                continue;
-            cursor -= static_cast<double>(child->right_overhang + next->left_overhang);
-            const double child_col = cursor - static_cast<double>(child->subtree_width) / 2.0;
-            AssignGridPositions(state, children[i], child_col, child_row);
-            cursor -= static_cast<double>(child->subtree_width);
-        }
-
-        cursor = column + half_mid_width;
-        for (int i = mid + 1; i < static_cast<int>(children.size()); ++i) {
+    const double total_width =
+        static_cast<double>(std::max(1, ComputeChildrenSpan(state, children, 0, static_cast<int>(children.size()))));
+    double cursor = column - total_width / 2.0;
+    for (int i = 0; i < static_cast<int>(children.size()); ++i) {
+        const WorkNode* child = FindNode(state, children[i]);
+        if (!child)
+            continue;
+        if (i > 0) {
             const WorkNode* previous = FindNode(state, children[i - 1]);
-            const WorkNode* child = FindNode(state, children[i]);
-            if (!previous || !child)
-                continue;
-            cursor += static_cast<double>(previous->right_overhang + child->left_overhang);
-            const double child_col = cursor + static_cast<double>(child->subtree_width) / 2.0;
-            AssignGridPositions(state, children[i], child_col, child_row);
-            cursor += static_cast<double>(child->subtree_width);
+            if (previous)
+                cursor += static_cast<double>(previous->right_overhang + child->left_overhang);
         }
-    } else {
-        double total_width = 0.0;
-        for (int i = 0; i < static_cast<int>(children.size()); ++i) {
-            const WorkNode* child = FindNode(state, children[i]);
-            if (!child)
-                continue;
-            total_width += static_cast<double>(child->subtree_width);
-            if (i > 0) {
-                const WorkNode* previous = FindNode(state, children[i - 1]);
-                if (previous)
-                    total_width += static_cast<double>(previous->right_overhang + child->left_overhang);
-            }
-        }
-
-        double cursor = column - total_width / 2.0;
-        for (int i = 0; i < static_cast<int>(children.size()); ++i) {
-            const WorkNode* child = FindNode(state, children[i]);
-            if (!child)
-                continue;
-            if (i > 0) {
-                const WorkNode* previous = FindNode(state, children[i - 1]);
-                if (previous)
-                    cursor += static_cast<double>(previous->right_overhang + child->left_overhang);
-            }
-            const double child_col = cursor + static_cast<double>(child->subtree_width) / 2.0;
-            AssignGridPositions(state, children[i], child_col, child_row);
-            cursor += static_cast<double>(child->subtree_width);
-        }
+        const double child_col = cursor + static_cast<double>(child->subtree_width) / 2.0;
+        AssignGridPositions(state, children[i], child_col, child_row);
+        cursor += static_cast<double>(child->subtree_width);
     }
 
     node->placement_state = 2;
@@ -387,8 +309,7 @@ GsnLayoutGraphResult LayoutGsnGraph(const GsnLayoutInput& input,
         row_y[static_cast<size_t>(row)] = cumulative_y;
         const auto stack_it = row_group2_stack_height.find(row);
         const double group2_height = stack_it != row_group2_stack_height.end() ? stack_it->second : 0.0;
-        row_heights[static_cast<size_t>(row)] =
-            std::max(row_max_height[static_cast<size_t>(row)], group2_height);
+        row_heights[static_cast<size_t>(row)] = std::max(row_max_height[static_cast<size_t>(row)], group2_height);
         cumulative_y += row_heights[static_cast<size_t>(row)] + options.vertical_spacing;
     }
 

@@ -178,7 +178,7 @@ endfunction()
 set(ASSURANCE_FORGE_SHARED_SOURCES
     src/export/gsn_svg_exporter.cpp
     src/export/gsn_projection.cpp
-    src/export/gsn_layout.cpp
+    src/export/gsn_svg_layout.cpp
     src/export/svg_writer.cpp
     src/parser/model_utils.cpp
     src/parser/xml_parser.cpp
@@ -344,7 +344,7 @@ add_executable(tests
     tests/test_gsn_svg_exporter.cpp
     src/export/gsn_svg_exporter.cpp
     src/export/gsn_projection.cpp
-    src/export/gsn_layout.cpp
+    src/export/gsn_svg_layout.cpp
     src/export/svg_writer.cpp
     src/ai/ai_service.cpp
     src/ai/ai_claim_review.cpp

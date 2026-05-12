@@ -26,6 +26,7 @@ struct GsnNode {
     std::string id;
     std::string source_gid;
     GsnNodeKind kind = GsnNodeKind::Goal;
+    std::string title;
     std::string text;
 
     double x = 0.0;

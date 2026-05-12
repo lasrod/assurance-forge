@@ -1,4 +1,4 @@
-#include "export/gsn_layout.h"
+#include "export/gsn_svg_layout.h"
 
 #include "core/gsn_layout.h"
 
@@ -47,12 +47,24 @@ NodeSizeLimits SizeLimitsFor(GsnNodeKind kind) {
     return {};
 }
 
+std::string DisplayTextForLayout(const GsnNode& node) {
+    std::string label = node.id;
+    if (!node.title.empty())
+        label += ": " + node.title;
+    if (!node.text.empty()) {
+        if (!label.empty())
+            label += "\n";
+        label += node.text;
+    }
+    return label;
+}
+
 size_t WrappedLineCount(const GsnNode& node, double width) {
     const double available_width = node.kind == GsnNodeKind::Solution ? width * 0.62 : width - 36.0;
     const size_t max_chars = std::max<size_t>(8, static_cast<size_t>(available_width / kTextCharWidth));
     size_t lines = 1;
 
-    std::istringstream paragraphs(node.text);
+    std::istringstream paragraphs(DisplayTextForLayout(node));
     std::string paragraph;
     while (std::getline(paragraphs, paragraph)) {
         std::istringstream words(paragraph);
@@ -125,8 +137,8 @@ core::ElementGroup ToCoreGroup(GsnNodeKind kind) {
 
 } // namespace
 
-GsnLayoutResult LayoutGsnDiagram(GsnDiagram& diagram) {
-    GsnLayoutResult result;
+GsnSvgLayoutResult LayoutGsnSvgDiagram(GsnDiagram& diagram) {
+    GsnSvgLayoutResult result;
     core::GsnLayoutInput input;
     std::unordered_map<std::string, size_t> node_by_id;
     std::unordered_map<std::string, core::GsnLayoutSize> node_sizes;
@@ -143,7 +155,7 @@ GsnLayoutResult LayoutGsnDiagram(GsnDiagram& diagram) {
         node.id = diagram.nodes[i].id;
         node.role = ToCoreRole(diagram.nodes[i].kind);
         node.group = ToCoreGroup(diagram.nodes[i].kind);
-        node.label = diagram.nodes[i].text;
+        node.label = DisplayTextForLayout(diagram.nodes[i]);
         input_nodes[node.id] = std::move(node);
     }
 
