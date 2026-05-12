@@ -176,6 +176,10 @@ function(af_copy_sccg_data target_name)
 endfunction()
 
 set(ASSURANCE_FORGE_SHARED_SOURCES
+    src/export/gsn_svg_exporter.cpp
+    src/export/gsn_projection.cpp
+    src/export/gsn_layout.cpp
+    src/export/svg_writer.cpp
     src/parser/model_utils.cpp
     src/parser/xml_parser.cpp
     src/ui/panels/welcome_modal.cpp
@@ -336,6 +340,11 @@ add_executable(tests
     tests/test_ui_state.cpp
     tests/test_recent_projects.cpp
     tests/test_shared_utils.cpp
+    tests/test_gsn_svg_exporter.cpp
+    src/export/gsn_svg_exporter.cpp
+    src/export/gsn_projection.cpp
+    src/export/gsn_layout.cpp
+    src/export/svg_writer.cpp
     src/ai/ai_service.cpp
     src/ai/ai_claim_review.cpp
     src/ai/ai_settings.cpp

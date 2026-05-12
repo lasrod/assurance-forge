@@ -114,6 +114,17 @@ float RenderAppMenuBar(AppRuntimeState& state, bool& done, const AppMenuBarCallb
         if (ImGui::MenuItem(ui::Tr(ui::MessageId::SaveProject)) && callbacks.save_project) {
             callbacks.save_project();
         }
+        if (ImGui::BeginMenu(ui::Tr(ui::MessageId::ExportMenu))) {
+            bool can_export_gsn_svg = has_project && state.app_state.loaded_case.has_value();
+            if (!can_export_gsn_svg)
+                ImGui::BeginDisabled();
+            if (ImGui::MenuItem(ui::Tr(ui::MessageId::ExportGsnSvg)) && callbacks.export_gsn_svg) {
+                callbacks.export_gsn_svg();
+            }
+            if (!can_export_gsn_svg)
+                ImGui::EndDisabled();
+            ImGui::EndMenu();
+        }
         if (!has_project)
             ImGui::EndDisabled();
         ImGui::Separator();

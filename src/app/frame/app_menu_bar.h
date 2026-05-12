@@ -10,6 +10,7 @@ struct AppMenuBarCallbacks {
     std::function<void()> begin_create_project;
     std::function<void()> begin_open_project;
     std::function<bool()> save_project;
+    std::function<void()> export_gsn_svg;
     std::function<void(bool&)> request_exit;
     std::function<void()> begin_create_project_sacm_file;
     std::function<void()> begin_create_project_evidence_register;

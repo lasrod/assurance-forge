@@ -14,6 +14,8 @@ enum class MessageId {
     CreateEmptyProject,
     OpenProject,
     SaveProject,
+    ExportMenu,
+    ExportGsnSvg,
     Exit,
     AddMenu,
     NewGsnSacmFile,

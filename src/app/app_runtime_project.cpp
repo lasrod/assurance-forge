@@ -5,10 +5,12 @@
 #include "app/proposal_ui_state.h"
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
+#include "core/problems/problem_utils.h"
 #include "core/project_service.h"
 #include "core/reviews/review_item.h"
 #include "core/terminology_package_service.h"
 #include "core/terminology_text_utils.h"
+#include "export/gsn_svg_exporter.h"
 #include "imgui.h"
 #include "parser/model_utils.h"
 #include "sacm/sacm_package_tree.h"
@@ -624,6 +626,57 @@ bool AppRuntime::SaveProject() {
     }
 
     return impl_->app_state.save_project();
+}
+
+void AppRuntime::ExportGsnSvg() {
+    constexpr const char* kExportProblemPrefix = "gsn-svg-export:";
+    core::ClearProblemsByIdPrefix(impl_->problems_manager, kExportProblemPrefix);
+
+    if (!impl_->app_state.current_project.has_value()) {
+        SetStatus("GSN SVG export failed: no project is open.");
+        return;
+    }
+    if (!impl_->app_state.loaded_case.has_value()) {
+        SetStatus("GSN SVG export failed: no SACM safety case is open.");
+        return;
+    }
+
+    std::filesystem::path source_path = impl_->app_state.active_project_file_path;
+    if (source_path.empty())
+        source_path = impl_->app_state.loaded_file_path;
+    std::string source_stem = source_path.stem().string();
+    if (source_stem.empty())
+        source_stem = impl_->app_state.loaded_case->name;
+
+    export_gsn::GsnSvgExportResult export_result = export_gsn::ExportCurrentSafetyCaseToGsnSvg(
+        impl_->app_state.loaded_case.value(), impl_->app_state.current_project->rootPath, source_stem);
+    if (!export_result.success) {
+        SetStatus("GSN SVG export failed: " + export_result.error_message);
+        return;
+    }
+
+    for (size_t i = 0; i < export_result.warnings.size(); ++i) {
+        core::ProblemItem problem;
+        problem.id = std::string(kExportProblemPrefix) + std::to_string(i + 1);
+        problem.severity = core::ProblemSeverity::Warning;
+        problem.source = core::ProblemSource::ImportExport;
+        problem.type = "GsnSvgExport";
+        problem.message = export_result.warnings[i];
+        impl_->problems_manager.AddOrUpdateProblem(problem);
+    }
+
+    std::filesystem::path display_path = export_result.output_path;
+    std::error_code ec;
+    std::filesystem::path relative_path =
+        std::filesystem::relative(export_result.output_path, impl_->app_state.current_project->rootPath, ec);
+    if (!ec && !relative_path.empty())
+        display_path = relative_path;
+
+    if (!export_result.warnings.empty()) {
+        SetStatus("GSN SVG exported with warnings. See Problems/Export log.");
+    } else {
+        SetStatus("GSN SVG exported to " + display_path.generic_string());
+    }
 }
 
 } // namespace app
