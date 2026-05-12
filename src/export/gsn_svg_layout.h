@@ -1,6 +1,6 @@
 #pragma once
 
-#include "export/gsn_svg_exporter.h"
+#include "export/gsn_diagram.h"
 
 #include <string>
 #include <vector>

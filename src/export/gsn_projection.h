@@ -1,6 +1,6 @@
 #pragma once
 
-#include "export/gsn_svg_exporter.h"
+#include "export/gsn_diagram.h"
 #include "parser/xml_parser.h"
 
 #include <string>

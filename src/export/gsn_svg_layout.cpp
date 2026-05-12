@@ -181,7 +181,7 @@ GsnSvgLayoutResult LayoutGsnSvgDiagram(GsnDiagram& diagram) {
 
     for (const GsnNode& node : diagram.nodes) {
         if (support_child_ids.find(node.id) == support_child_ids.end() &&
-            side_child_ids.find(node.id) == side_child_ids.end() && !IsSideInformation(node.kind)) {
+            side_child_ids.find(node.id) == side_child_ids.end()) {
             input.roots.push_back(node.id);
         }
     }

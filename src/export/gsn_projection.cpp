@@ -163,7 +163,7 @@ void AddReference(std::unordered_map<std::string, size_t>& node_by_ref,
     node_by_ref[key] = node_index;
 }
 
-size_t* FindNodeIndex(std::unordered_map<std::string, size_t>& node_by_ref, const std::string& ref) {
+const size_t* FindNodeIndex(const std::unordered_map<std::string, size_t>& node_by_ref, const std::string& ref) {
     std::string key = core::NormalizeRef(ref);
     auto it = node_by_ref.find(key);
     if (it == node_by_ref.end())
@@ -171,12 +171,34 @@ size_t* FindNodeIndex(std::unordered_map<std::string, size_t>& node_by_ref, cons
     return &it->second;
 }
 
-const size_t* FindNodeIndex(const std::unordered_map<std::string, size_t>& node_by_ref, const std::string& ref) {
-    std::string key = core::NormalizeRef(ref);
-    auto it = node_by_ref.find(key);
-    if (it == node_by_ref.end())
-        return nullptr;
-    return &it->second;
+const size_t* FindFirstNodeIndex(const std::unordered_map<std::string, size_t>& node_by_ref,
+                                 const std::vector<std::string>& refs) {
+    for (const std::string& ref : refs) {
+        const size_t* node_index = FindNodeIndex(node_by_ref, ref);
+        if (node_index)
+            return node_index;
+    }
+    return nullptr;
+}
+
+const size_t* FindContextTargetIndex(
+    const parser::SacmElement& relationship,
+    const std::unordered_map<std::string, const parser::SacmElement*>& elements_by_ref,
+    const std::unordered_set<std::string>& context_attachment_refs,
+    const std::unordered_map<std::string, size_t>& node_by_ref) {
+    for (const std::string& target_ref : relationship.target_refs) {
+        const std::string normalized_ref = core::NormalizeRef(target_ref);
+        auto target_it = elements_by_ref.find(normalized_ref);
+        if (target_it == elements_by_ref.end() || !target_it->second ||
+            !IsContextRelationshipTarget(*target_it->second, context_attachment_refs)) {
+            continue;
+        }
+
+        const size_t* node_index = FindNodeIndex(node_by_ref, normalized_ref);
+        if (node_index)
+            return node_index;
+    }
+    return nullptr;
 }
 
 std::string EdgeId(const parser::SacmElement& relationship, const std::string& from_id, const std::string& to_id) {
@@ -307,12 +329,7 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
             continue;
 
         if (relationship.type == "assertedinference") {
-            const size_t* target_index = nullptr;
-            for (const std::string& target_ref : relationship.target_refs) {
-                target_index = FindNodeIndex(node_by_ref, target_ref);
-                if (target_index)
-                    break;
-            }
+            const size_t* target_index = FindFirstNodeIndex(node_by_ref, relationship.target_refs);
             if (!target_index) {
                 result.warnings.push_back("Skipped SupportedBy relationship '" + DisplaySourceId(relationship) +
                                           "' because its target was missing.");
@@ -357,12 +374,7 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
                         GsnEdgeKind::SupportedBy);
             }
         } else if (relationship.type == "assertedevidence") {
-            const size_t* target_index = nullptr;
-            for (const std::string& target_ref : relationship.target_refs) {
-                target_index = FindNodeIndex(node_by_ref, target_ref);
-                if (target_index)
-                    break;
-            }
+            const size_t* target_index = FindFirstNodeIndex(node_by_ref, relationship.target_refs);
             if (!target_index) {
                 result.warnings.push_back("Skipped evidence relationship '" + DisplaySourceId(relationship) +
                                           "' because its target was missing.");
@@ -392,12 +404,8 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
             if (!HasContextRelationshipTarget(relationship, elements_by_ref, context_attachment_refs))
                 continue;
 
-            const size_t* target_index = nullptr;
-            for (const std::string& target_ref : relationship.target_refs) {
-                target_index = FindNodeIndex(node_by_ref, target_ref);
-                if (target_index)
-                    break;
-            }
+            const size_t* target_index =
+                FindContextTargetIndex(relationship, elements_by_ref, context_attachment_refs, node_by_ref);
             if (!target_index) {
                 result.warnings.push_back("Skipped InContextOf relationship '" + DisplaySourceId(relationship) +
                                           "' because its target was missing.");

@@ -28,8 +28,6 @@ struct Placement {
 struct LayoutState {
     std::unordered_map<std::string, WorkNode> nodes;
     std::vector<Placement> placements;
-    std::unordered_map<int, int> row_max_group2_stack;
-    std::vector<std::string> warnings;
     bool cycle_seen = false;
 };
 
@@ -143,10 +141,6 @@ void PlaceGroup2Attachments(LayoutState& state, const WorkNode& node, double col
         state.placements.push_back({attachments[right_indices[stack_pos]], column + 1.0, row, true, false, stack_pos});
     }
 
-    const int max_side_count = std::max(static_cast<int>(left_indices.size()), static_cast<int>(right_indices.size()));
-    auto it = state.row_max_group2_stack.find(row);
-    if (it == state.row_max_group2_stack.end() || it->second < max_side_count)
-        state.row_max_group2_stack[row] = max_side_count;
 }
 
 void AssignGridPositions(LayoutState& state, const std::string& node_id, double column, int row) {
@@ -347,7 +341,6 @@ GsnLayoutGraphResult LayoutGsnGraph(const GsnLayoutInput& input,
     }
 
     ShiftIntoPositiveCoordinates(result.nodes, options);
-    result.warnings.insert(result.warnings.end(), state.warnings.begin(), state.warnings.end());
     return result;
 }
 

@@ -299,6 +299,23 @@ TEST(GsnSvgExporterTest, LayoutCentersMultipleSideAttachmentsAroundOwner) {
     EXPECT_NEAR(right_stack_center_y, goal_center_y, 1.0);
 }
 
+TEST(GsnSvgExporterTest, LayoutPlacesStandaloneAssumptionsAsRoots) {
+    parser::AssuranceCase model;
+    parser::SacmElement assumption = Element("A1", "claim", "Standalone assumption", "Assumption text.");
+    assumption.assertion_declaration = "assumed";
+    model.elements = {Element("G1", "claim", "Goal", "Goal text."), assumption};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+
+    const export_gsn::GsnNode* goal = FindNode(projection.diagram, "G1");
+    const export_gsn::GsnNode* standalone_assumption = FindNode(projection.diagram, "A1");
+    ASSERT_NE(goal, nullptr);
+    ASSERT_NE(standalone_assumption, nullptr);
+    EXPECT_GT(standalone_assumption->x, goal->x);
+    EXPECT_GE(standalone_assumption->y, 48.0);
+}
+
 TEST(GsnSvgExporterTest, LayoutKeepsVisibleTermContextClearOfSiblingGoal) {
     parser::AssuranceCase model;
     parser::SacmElement visible_term = Element("TC1", "artifactreference", "Kitchen", "Kitchen term definition.");
