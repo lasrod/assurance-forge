@@ -46,7 +46,10 @@ void AddElementReference(std::unordered_map<std::string, const parser::SacmEleme
         elements_by_ref[key] = &element;
 }
 
-bool IsContextRelationshipTarget(const parser::SacmElement& element) {
+bool IsContextRelationshipTarget(const parser::SacmElement& element,
+                                 const std::unordered_set<std::string>& context_attachment_refs) {
+    if (ReferencesElement(context_attachment_refs, element))
+        return false;
     if (element.type == "argumentreasoning")
         return true;
     return element.type == "claim" && element.assertion_declaration != "assumed" &&
@@ -55,10 +58,12 @@ bool IsContextRelationshipTarget(const parser::SacmElement& element) {
 
 bool HasContextRelationshipTarget(
     const parser::SacmElement& relationship,
-    const std::unordered_map<std::string, const parser::SacmElement*>& elements_by_ref) {
+    const std::unordered_map<std::string, const parser::SacmElement*>& elements_by_ref,
+    const std::unordered_set<std::string>& context_attachment_refs) {
     for (const std::string& target_ref : relationship.target_refs) {
         auto target_it = elements_by_ref.find(core::NormalizeRef(target_ref));
-        if (target_it != elements_by_ref.end() && target_it->second && IsContextRelationshipTarget(*target_it->second))
+        if (target_it != elements_by_ref.end() && target_it->second &&
+            IsContextRelationshipTarget(*target_it->second, context_attachment_refs))
             return true;
     }
     return false;
@@ -219,6 +224,7 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
     std::unordered_map<std::string, int> edge_id_counts;
     std::unordered_set<std::string> exported_artifact_refs;
     std::unordered_set<std::string> visible_terminology_context_refs;
+    std::unordered_set<std::string> context_attachment_refs;
     std::unordered_map<std::string, const parser::SacmElement*> elements_by_ref;
     std::set<std::string> reserved_source_ids;
 
@@ -230,11 +236,18 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
     }
 
     for (const parser::SacmElement& relationship : model.elements) {
+        if (relationship.type != "assertedcontext")
+            continue;
+        for (const std::string& source_ref : relationship.source_refs)
+            context_attachment_refs.insert(core::NormalizeRef(source_ref));
+    }
+
+    for (const parser::SacmElement& relationship : model.elements) {
         if (relationship.type == "assertedevidence") {
             for (const std::string& source_ref : relationship.source_refs)
                 exported_artifact_refs.insert(core::NormalizeRef(source_ref));
         } else if (relationship.type == "assertedcontext") {
-            if (!HasContextRelationshipTarget(relationship, elements_by_ref))
+            if (!HasContextRelationshipTarget(relationship, elements_by_ref, context_attachment_refs))
                 continue;
             for (const std::string& source_ref : relationship.source_refs) {
                 const std::string normalized_ref = core::NormalizeRef(source_ref);
@@ -380,7 +393,7 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
                         GsnEdgeKind::SupportedBy);
             }
         } else if (relationship.type == "assertedcontext") {
-            if (!HasContextRelationshipTarget(relationship, elements_by_ref))
+            if (!HasContextRelationshipTarget(relationship, elements_by_ref, context_attachment_refs))
                 continue;
 
             const size_t* target_index = nullptr;

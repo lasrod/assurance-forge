@@ -179,6 +179,32 @@ TEST(GsnSvgExporterTest, ProjectionIgnoresHiddenTermAssociationsOnContextNodes) 
     EXPECT_EQ(projection.diagram.edges.front().kind, export_gsn::GsnEdgeKind::InContextOf);
 }
 
+TEST(GsnSvgExporterTest, ProjectionSkipsVisibleTermContextAttachedToContextNode) {
+    parser::AssuranceCase model;
+    parser::SacmElement context = Element("C3", "claim", "Kitchen context", "The kitchen operating area.");
+    parser::SacmElement visible_term = Element("TC2", "artifactreference", "kitchen", "Kitchen term definition.");
+    parser::SacmElement visible_context = Relationship("AC5", "assertedcontext", {"TC2"}, {"C3"});
+    visible_context.description = core::kVisibleTerminologyContextMarker;
+    model.elements = {Element("G1", "claim", "Goal", "Robot operation remains safe."),
+                      context,
+                      visible_term,
+                      Relationship("R29", "assertedcontext", {"C3"}, {"G1"}),
+                      visible_context};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+
+    ASSERT_EQ(projection.diagram.nodes.size(), 2u);
+    EXPECT_NE(FindNode(projection.diagram, "G1"), nullptr);
+    const export_gsn::GsnNode* context_node = FindNode(projection.diagram, "C3");
+    ASSERT_NE(context_node, nullptr);
+    EXPECT_EQ(context_node->kind, export_gsn::GsnNodeKind::Context);
+    EXPECT_EQ(FindNode(projection.diagram, "TC2"), nullptr);
+    ASSERT_EQ(projection.diagram.edges.size(), 1u);
+    EXPECT_EQ(projection.diagram.edges.front().from_id, "G1");
+    EXPECT_EQ(projection.diagram.edges.front().to_id, "C3");
+    EXPECT_EQ(projection.diagram.edges.front().kind, export_gsn::GsnEdgeKind::InContextOf);
+}
+
 TEST(GsnSvgExporterTest, ProjectionUsesContentBeforeElementName) {
     parser::AssuranceCase model;
     model.elements = {Element("G1", "claim", "Term-like label", "Actual safety claim content.")};
