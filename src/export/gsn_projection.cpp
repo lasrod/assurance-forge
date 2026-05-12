@@ -7,6 +7,7 @@
 #include <cctype>
 #include <iomanip>
 #include <sstream>
+#include <set>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -29,6 +30,38 @@ bool IsArtifactElementType(const std::string& type) {
 bool IsVisibleTerminologyContextElement(const parser::SacmElement& element) {
     return element.type == "assertedcontext" &&
            core::TrimWhitespace(element.description) == core::kVisibleTerminologyContextMarker;
+}
+
+bool ReferencesElement(const std::unordered_set<std::string>& refs, const parser::SacmElement& element) {
+    const std::string id_ref = core::NormalizeRef(element.id);
+    const std::string gid_ref = core::NormalizeRef(element.gid);
+    return (!id_ref.empty() && refs.count(id_ref) > 0) || (!gid_ref.empty() && refs.count(gid_ref) > 0);
+}
+
+void AddElementReference(std::unordered_map<std::string, const parser::SacmElement*>& elements_by_ref,
+                         const std::string& ref,
+                         const parser::SacmElement& element) {
+    const std::string key = core::NormalizeRef(ref);
+    if (!key.empty() && elements_by_ref.find(key) == elements_by_ref.end())
+        elements_by_ref[key] = &element;
+}
+
+bool IsContextRelationshipTarget(const parser::SacmElement& element) {
+    if (element.type == "argumentreasoning")
+        return true;
+    return element.type == "claim" && element.assertion_declaration != "assumed" &&
+           element.assertion_declaration != "justification";
+}
+
+bool HasContextRelationshipTarget(
+    const parser::SacmElement& relationship,
+    const std::unordered_map<std::string, const parser::SacmElement*>& elements_by_ref) {
+    for (const std::string& target_ref : relationship.target_refs) {
+        auto target_it = elements_by_ref.find(core::NormalizeRef(target_ref));
+        if (target_it != elements_by_ref.end() && target_it->second && IsContextRelationshipTarget(*target_it->second))
+            return true;
+    }
+    return false;
 }
 
 std::string DisplaySourceId(const parser::SacmElement& element) {
@@ -77,6 +110,18 @@ std::string MakeUniqueSvgId(const std::string& base,
 
     warnings.push_back("Duplicate SVG id base '" + safe_base + "' was made unique.");
     return safe_base + "_" + std::to_string(count);
+}
+
+std::string NextContextDisplayId(const std::set<std::string>& reserved_ids,
+                                 const std::unordered_map<std::string, int>& id_counts) {
+    for (int index = 1; index < 100000; ++index) {
+        const std::string candidate = "C" + std::to_string(index);
+        const std::string safe_candidate = MakeSafeSvgId(candidate);
+        if (reserved_ids.find(safe_candidate) == reserved_ids.end() &&
+            id_counts.find(safe_candidate) == id_counts.end())
+            return candidate;
+    }
+    return "C";
 }
 
 GsnNodeKind InitialKindFor(const parser::SacmElement& element) {
@@ -173,14 +218,41 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
     std::unordered_map<std::string, int> node_id_counts;
     std::unordered_map<std::string, int> edge_id_counts;
     std::unordered_set<std::string> exported_artifact_refs;
+    std::unordered_set<std::string> visible_terminology_context_refs;
+    std::unordered_map<std::string, const parser::SacmElement*> elements_by_ref;
+    std::set<std::string> reserved_source_ids;
+
+    for (const parser::SacmElement& element : model.elements) {
+        if (IsRelationshipType(element.type))
+            continue;
+        AddElementReference(elements_by_ref, element.id, element);
+        AddElementReference(elements_by_ref, element.gid, element);
+    }
 
     for (const parser::SacmElement& relationship : model.elements) {
         if (relationship.type == "assertedevidence") {
             for (const std::string& source_ref : relationship.source_refs)
                 exported_artifact_refs.insert(core::NormalizeRef(source_ref));
-        } else if (relationship.type == "assertedcontext" && !IsVisibleTerminologyContextElement(relationship)) {
-            for (const std::string& source_ref : relationship.source_refs)
-                exported_artifact_refs.insert(core::NormalizeRef(source_ref));
+        } else if (relationship.type == "assertedcontext") {
+            if (!HasContextRelationshipTarget(relationship, elements_by_ref))
+                continue;
+            for (const std::string& source_ref : relationship.source_refs) {
+                const std::string normalized_ref = core::NormalizeRef(source_ref);
+                exported_artifact_refs.insert(normalized_ref);
+                if (IsVisibleTerminologyContextElement(relationship))
+                    visible_terminology_context_refs.insert(normalized_ref);
+            }
+        }
+    }
+
+    for (const parser::SacmElement& element : model.elements) {
+        if (IsRelationshipType(element.type))
+            continue;
+        if (ReferencesElement(visible_terminology_context_refs, element))
+            continue;
+        const std::string source_id = DisplaySourceId(element);
+        if (!source_id.empty()) {
+            reserved_source_ids.insert(MakeSafeSvgId(source_id));
         }
     }
 
@@ -191,16 +263,15 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
             result.warnings.push_back("Skipped unsupported element type '" + element.type + "'.");
             continue;
         }
+        const bool is_visible_terminology_context = ReferencesElement(visible_terminology_context_refs, element);
         if (IsArtifactElementType(element.type)) {
-            const std::string id_ref = core::NormalizeRef(element.id);
-            const std::string gid_ref = core::NormalizeRef(element.gid);
-            const bool is_referenced_artifact = (!id_ref.empty() && exported_artifact_refs.count(id_ref) > 0) ||
-                                                (!gid_ref.empty() && exported_artifact_refs.count(gid_ref) > 0);
-            if (!is_referenced_artifact)
+            if (!ReferencesElement(exported_artifact_refs, element))
                 continue;
         }
 
-        std::string source_id = DisplaySourceId(element);
+        std::string source_id = is_visible_terminology_context
+                        ? NextContextDisplayId(reserved_source_ids, node_id_counts)
+                        : DisplaySourceId(element);
         if (source_id.empty()) {
             source_id = MakeFallbackId(result.diagram.nodes.size() + 1);
             result.warnings.push_back("Generated fallback id '" + source_id + "' for an exported node.");
@@ -209,7 +280,7 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
         GsnNode node;
         node.id = MakeUniqueSvgId(source_id, node_id_counts, result.warnings);
         node.source_gid = element.gid;
-        node.kind = InitialKindFor(element);
+        node.kind = is_visible_terminology_context ? GsnNodeKind::Context : InitialKindFor(element);
         node.text = TextFor(element);
         if (node.text.empty()) {
             node.text = "(no text)";
@@ -309,7 +380,7 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
                         GsnEdgeKind::SupportedBy);
             }
         } else if (relationship.type == "assertedcontext") {
-            if (IsVisibleTerminologyContextElement(relationship))
+            if (!HasContextRelationshipTarget(relationship, elements_by_ref))
                 continue;
 
             const size_t* target_index = nullptr;

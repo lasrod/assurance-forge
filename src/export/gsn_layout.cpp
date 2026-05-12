@@ -222,7 +222,8 @@ void PlaceSubtree(LayoutState& state, const std::string& node_id, int left_colum
 
     GsnNode& node = state.diagram.nodes[node_it->second];
     const int span = std::max(1, state.spans[node_id]);
-    const double center_x = kMargin + (static_cast<double>(left_column) + static_cast<double>(span) / 2.0) * kColumnWidth;
+    const double center_x =
+        kMargin + (static_cast<double>(left_column) + static_cast<double>(span) / 2.0) * kColumnWidth;
     node.x = center_x - node.width / 2.0;
     node.y = y;
 

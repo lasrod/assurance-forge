@@ -117,9 +117,8 @@ std::vector<std::string> WrappedTextLines(const GsnNode& node) {
 
 void WriteText(std::ostringstream& out, const GsnNode& node, double x, double y) {
     const std::vector<std::string> lines = WrappedTextLines(node);
-    out << "    <text x=\"" << x << "\" y=\"" << y
-        << "\" font-family=\"Arial, Helvetica, sans-serif\" font-size=\"" << kFontSize
-        << "\" fill=\"black\">\n";
+    out << "    <text x=\"" << x << "\" y=\"" << y << "\" font-family=\"Arial, Helvetica, sans-serif\" font-size=\""
+        << kFontSize << "\" fill=\"black\">\n";
     for (size_t i = 0; i < lines.size(); ++i) {
         out << "      <tspan x=\"" << x << "\" dy=\"" << (i == 0 ? 0.0 : kTextLineHeight) << "\">"
             << EscapeXml(lines[i]) << "</tspan>\n";
@@ -131,16 +130,15 @@ void WriteNode(std::ostringstream& out, const GsnNode& node) {
     out << "  <g id=\"" << EscapeXml(node.id) << "\" class=\"" << CssClassFor(node.kind) << "\">\n";
     switch (node.kind) {
     case GsnNodeKind::Goal:
-        out << "    <rect x=\"" << node.x << "\" y=\"" << node.y << "\" width=\"" << node.width
-            << "\" height=\"" << node.height << "\" fill=\"white\" stroke=\"black\" stroke-width=\"1.2\"/>\n";
+        out << "    <rect x=\"" << node.x << "\" y=\"" << node.y << "\" width=\"" << node.width << "\" height=\""
+            << node.height << "\" fill=\"white\" stroke=\"black\" stroke-width=\"1.2\"/>\n";
         WriteText(out, node, node.x + 18.0, node.y + 24.0);
         break;
     case GsnNodeKind::Strategy: {
         const double skew = 30.0;
-        out << "    <polygon points=\"" << node.x + skew << "," << node.y << " " << node.x + node.width
-            << "," << node.y << " " << node.x + node.width - skew << "," << node.y + node.height << " "
-            << node.x << "," << node.y + node.height
-            << "\" fill=\"white\" stroke=\"black\" stroke-width=\"1.2\"/>\n";
+        out << "    <polygon points=\"" << node.x + skew << "," << node.y << " " << node.x + node.width << "," << node.y
+            << " " << node.x + node.width - skew << "," << node.y + node.height << " " << node.x << ","
+            << node.y + node.height << "\" fill=\"white\" stroke=\"black\" stroke-width=\"1.2\"/>\n";
         WriteText(out, node, node.x + 34.0, node.y + 25.0);
         break;
     }
@@ -153,18 +151,16 @@ void WriteNode(std::ostringstream& out, const GsnNode& node) {
         break;
     }
     case GsnNodeKind::Context:
-        out << "    <rect x=\"" << node.x << "\" y=\"" << node.y << "\" width=\"" << node.width
-            << "\" height=\"" << node.height
-            << "\" rx=\"18\" ry=\"18\" fill=\"white\" stroke=\"black\" stroke-width=\"1.2\"/>\n";
+        out << "    <rect x=\"" << node.x << "\" y=\"" << node.y << "\" width=\"" << node.width << "\" height=\""
+            << node.height << "\" rx=\"18\" ry=\"18\" fill=\"white\" stroke=\"black\" stroke-width=\"1.2\"/>\n";
         WriteText(out, node, node.x + 18.0, node.y + 24.0);
         break;
     case GsnNodeKind::Assumption:
     case GsnNodeKind::Justification: {
         const double cx = node.x + node.width / 2.0;
         const double cy = node.y + node.height / 2.0;
-        out << "    <ellipse cx=\"" << cx << "\" cy=\"" << cy << "\" rx=\"" << node.width / 2.0
-            << "\" ry=\"" << node.height / 2.0
-            << "\" fill=\"white\" stroke=\"black\" stroke-width=\"1.2\"/>\n";
+        out << "    <ellipse cx=\"" << cx << "\" cy=\"" << cy << "\" rx=\"" << node.width / 2.0 << "\" ry=\""
+            << node.height / 2.0 << "\" fill=\"white\" stroke=\"black\" stroke-width=\"1.2\"/>\n";
         WriteText(out, node, node.x + 22.0, node.y + 27.0);
         out << "    <text x=\"" << node.x + node.width - 25.0 << "\" y=\"" << node.y + 25.0
             << "\" font-family=\"Arial, Helvetica, sans-serif\" font-size=\"14\" fill=\"black\">"
@@ -205,7 +201,8 @@ void WriteEdge(std::ostringstream& out, const GsnEdge& edge, const GsnNode& from
     const Point start = SidePoint(from, to_right);
     const Point end = SidePoint(to, !to_right);
     out << "  <path d=\"M " << start.x << " " << start.y << " L " << end.x << " " << end.y
-        << "\" fill=\"none\" stroke=\"black\" stroke-width=\"1.2\" stroke-dasharray=\"6,4\" marker-end=\"url(#contextArrow)\"/>\n";
+        << "\" fill=\"none\" stroke=\"black\" stroke-width=\"1.2\" stroke-dasharray=\"6,4\" "
+           "marker-end=\"url(#contextArrow)\"/>\n";
 }
 
 } // namespace
@@ -234,15 +231,18 @@ std::string GenerateGsnSvg(const GsnDiagram& diagram) {
     out << "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"" << width << "\" height=\"" << height
         << "\" viewBox=\"0 0 " << width << " " << height << "\">\n";
     out << "<defs>\n";
-    out << "  <marker id=\"supportedByArrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"10\" refY=\"5\" orient=\"auto\" markerUnits=\"strokeWidth\">\n";
+    out << "  <marker id=\"supportedByArrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"10\" refY=\"5\" "
+           "orient=\"auto\" markerUnits=\"strokeWidth\">\n";
     out << "    <path d=\"M 0 0 L 10 5 L 0 10 Z\" fill=\"black\"/>\n";
     out << "  </marker>\n";
-    out << "  <marker id=\"contextArrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"10\" refY=\"5\" orient=\"auto\" markerUnits=\"strokeWidth\">\n";
+    out << "  <marker id=\"contextArrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"10\" refY=\"5\" "
+           "orient=\"auto\" markerUnits=\"strokeWidth\">\n";
     out << "    <path d=\"M 0 0 L 10 5 L 0 10\" fill=\"none\" stroke=\"black\" stroke-width=\"1\"/>\n";
     out << "  </marker>\n";
     out << "</defs>\n";
     out << "<rect x=\"0\" y=\"0\" width=\"100%\" height=\"100%\" fill=\"white\"/>\n";
-    out << "<g id=\"diagram\" font-family=\"Arial, Helvetica, sans-serif\" font-size=\"13\" fill=\"none\" stroke=\"black\" stroke-width=\"1.2\">\n";
+    out << "<g id=\"diagram\" font-family=\"Arial, Helvetica, sans-serif\" font-size=\"13\" fill=\"none\" "
+           "stroke=\"black\" stroke-width=\"1.2\">\n";
 
     for (const GsnEdge& edge : diagram.edges) {
         auto from_it = node_by_id.find(edge.from_id);

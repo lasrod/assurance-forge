@@ -655,6 +655,27 @@ void AppRuntime::ExportGsnSvg() {
         return;
     }
 
+    std::filesystem::path display_path = export_result.output_path;
+    std::error_code ec;
+    std::filesystem::path relative_path =
+        std::filesystem::relative(export_result.output_path, impl_->app_state.current_project->rootPath, ec);
+    if (!ec && !relative_path.empty()) {
+        display_path = relative_path;
+        core::ProjectFileEntry tracked_export;
+        std::string track_error;
+        if (!core::ProjectService::TrackExistingFile(impl_->app_state.current_project.value(),
+                                                     relative_path,
+                                                     core::ProjectFileRole::ExportedReport,
+                                                     tracked_export,
+                                                     track_error)) {
+            export_result.warnings.push_back("Exported SVG was written but could not be added to Project Explorer: " +
+                                            track_error);
+        }
+    } else {
+        export_result.warnings.push_back(
+            "Exported SVG was written but its project-relative path could not be determined.");
+    }
+
     for (size_t i = 0; i < export_result.warnings.size(); ++i) {
         core::ProblemItem problem;
         problem.id = std::string(kExportProblemPrefix) + std::to_string(i + 1);
@@ -664,13 +685,6 @@ void AppRuntime::ExportGsnSvg() {
         problem.message = export_result.warnings[i];
         impl_->problems_manager.AddOrUpdateProblem(problem);
     }
-
-    std::filesystem::path display_path = export_result.output_path;
-    std::error_code ec;
-    std::filesystem::path relative_path =
-        std::filesystem::relative(export_result.output_path, impl_->app_state.current_project->rootPath, ec);
-    if (!ec && !relative_path.empty())
-        display_path = relative_path;
 
     if (!export_result.warnings.empty()) {
         SetStatus("GSN SVG exported with warnings. See Problems/Export log.");

@@ -66,10 +66,12 @@ parser::AssuranceCase BuildRepresentativeCase() {
     parser::SacmElement sub_goal = Element("G2", "claim", "Sub goal", "Hazards are mitigated.");
     parser::SacmElement strategy = Element("S1", "argumentreasoning", "Hazard strategy", "Argument over hazards.");
     parser::SacmElement solution = Element("Sn1", "artifactreference", "Test report", "Verification evidence.");
-    parser::SacmElement context = Element("C1", "artifactreference", "Operational context", "Defined operating domain.");
+    parser::SacmElement context =
+        Element("C1", "artifactreference", "Operational context", "Defined operating domain.");
     parser::SacmElement assumption = Element("A1", "claim", "Hazard assumption", "All hazards are identified.");
     assumption.assertion_declaration = "assumed";
-    parser::SacmElement justification = Element("J1", "claim", "Decomposition justification", "Decomposition is appropriate.");
+    parser::SacmElement justification =
+        Element("J1", "claim", "Decomposition justification", "Decomposition is appropriate.");
     justification.assertion_declaration = "justification";
 
     model.elements = {goal,
@@ -131,19 +133,50 @@ TEST(GsnSvgExporterTest, ProjectionMapsCoreNodesAndRelationships) {
     EXPECT_EQ(projection.diagram.edges.size(), 6u);
 }
 
-TEST(GsnSvgExporterTest, ProjectionIgnoresVisibleTerminologyContexts) {
+TEST(GsnSvgExporterTest, ProjectionExportsVisibleTerminologyContextsAsNormalContexts) {
     parser::AssuranceCase model;
-    parser::SacmElement visible_term = Element("TC1", "artifactreference", "ABS: Anti-lock braking system", "Term definition.");
+    parser::SacmElement visible_term =
+        Element("TC1", "artifactreference", "ABS: Anti-lock braking system", "Term definition.");
     parser::SacmElement visible_context = Relationship("AC1", "assertedcontext", {"TC1"}, {"G1"});
     visible_context.description = core::kVisibleTerminologyContextMarker;
     model.elements = {Element("G1", "claim", "Goal", "Vehicle braking remains safe."), visible_term, visible_context};
 
     export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
 
-    ASSERT_EQ(projection.diagram.nodes.size(), 1u);
+    ASSERT_EQ(projection.diagram.nodes.size(), 2u);
     EXPECT_NE(FindNode(projection.diagram, "G1"), nullptr);
+    const export_gsn::GsnNode* context = FindNode(projection.diagram, "C1");
+    ASSERT_NE(context, nullptr);
+    EXPECT_EQ(context->kind, export_gsn::GsnNodeKind::Context);
+    EXPECT_EQ(context->text, "Term definition.");
     EXPECT_EQ(FindNode(projection.diagram, "TC1"), nullptr);
-    EXPECT_TRUE(projection.diagram.edges.empty());
+    ASSERT_EQ(projection.diagram.edges.size(), 1u);
+    EXPECT_EQ(projection.diagram.edges.front().from_id, "G1");
+    EXPECT_EQ(projection.diagram.edges.front().to_id, "C1");
+    EXPECT_EQ(projection.diagram.edges.front().kind, export_gsn::GsnEdgeKind::InContextOf);
+}
+
+TEST(GsnSvgExporterTest, ProjectionIgnoresHiddenTermAssociationsOnContextNodes) {
+    parser::AssuranceCase model;
+    parser::SacmElement context =
+        Element("C1", "artifactreference", "Operational context", "Defined operating domain.");
+    parser::SacmElement term_reference = Element("AR1", "artifactreference", "ABS", "Anti-lock braking system.");
+    model.elements = {Element("G1", "claim", "Goal", "Vehicle braking remains safe."),
+                      context,
+                      term_reference,
+                      Relationship("ctx1", "assertedcontext", {"C1"}, {"G1"}),
+                      Relationship("term-link", "assertedcontext", {"AR1"}, {"C1"})};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+
+    ASSERT_EQ(projection.diagram.nodes.size(), 2u);
+    EXPECT_NE(FindNode(projection.diagram, "G1"), nullptr);
+    EXPECT_NE(FindNode(projection.diagram, "C1"), nullptr);
+    EXPECT_EQ(FindNode(projection.diagram, "AR1"), nullptr);
+    ASSERT_EQ(projection.diagram.edges.size(), 1u);
+    EXPECT_EQ(projection.diagram.edges.front().from_id, "G1");
+    EXPECT_EQ(projection.diagram.edges.front().to_id, "C1");
+    EXPECT_EQ(projection.diagram.edges.front().kind, export_gsn::GsnEdgeKind::InContextOf);
 }
 
 TEST(GsnSvgExporterTest, ProjectionUsesContentBeforeElementName) {
