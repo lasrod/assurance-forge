@@ -135,6 +135,7 @@ private:
     void SyncReviewVisualStatesFromReviews();
     void TouchCurrentProjectRecent();
     bool SaveProject();
+    void ExportGsnSvg();
     void RequestExit(bool& done);
 
     bool BeginProposalForReviewItem(const core::reviews::ReviewItem& item);

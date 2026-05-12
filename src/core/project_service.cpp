@@ -917,6 +917,71 @@ bool ProjectService::SaveReviewProposalFile(AssuranceProject& project,
     return true;
 }
 
+bool ProjectService::TrackExistingFile(AssuranceProject& project,
+                                       const std::filesystem::path& relative_path,
+                                       ProjectFileRole role,
+                                       ProjectFileEntry& entry,
+                                       std::string& error) {
+    if (!IsSafeRelativePath(relative_path)) {
+        error = "Invalid project file path";
+        return false;
+    }
+
+    const std::filesystem::path absolute_path = project.rootPath / relative_path;
+    std::error_code ec;
+    if (!std::filesystem::exists(absolute_path, ec) || ec) {
+        error = "File does not exist: " + relative_path.generic_string();
+        return false;
+    }
+    if (!std::filesystem::is_regular_file(absolute_path, ec) || ec) {
+        error = "Tracked path is not a file: " + relative_path.generic_string();
+        return false;
+    }
+
+    auto found = std::find_if(project.files.begin(), project.files.end(), [&](const ProjectFileEntry& candidate) {
+        return candidate.relativePath.generic_string() == relative_path.generic_string();
+    });
+
+    if (found != project.files.end() && found->role != role) {
+        error = "Tracked file has a different role: " + relative_path.generic_string();
+        return false;
+    }
+
+    const bool new_entry = found == project.files.end();
+    ProjectFileEntry previous_entry;
+    if (new_entry) {
+        ProjectFileEntry tracked;
+        tracked.id = GenerateId("af-file");
+        tracked.relativePath = relative_path;
+        tracked.role = role;
+        tracked.hashAlgorithm = "sha256";
+        project.files.push_back(tracked);
+        found = project.files.end() - 1;
+    } else {
+        previous_entry = *found;
+    }
+
+    if (!RefreshEntryHashes(project, *found, false, error)) {
+        if (new_entry)
+            project.files.pop_back();
+        else
+            *found = previous_entry;
+        return false;
+    }
+
+    project.modifiedUtc = NowUtc();
+    if (!WriteManifestSafely(project, error)) {
+        if (new_entry)
+            project.files.pop_back();
+        else
+            *found = previous_entry;
+        return false;
+    }
+
+    entry = *found;
+    return true;
+}
+
 bool ProjectService::RemoveTrackedFile(AssuranceProject& project,
                                        const std::filesystem::path& relative_path,
                                        bool delete_file,

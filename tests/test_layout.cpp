@@ -1,4 +1,5 @@
 #include "core/assurance_tree.h"
+#include "core/gsn_layout.h"
 #include "imgui.h"
 #include "parser/xml_parser.h"
 #include "ui/gsn/gsn_dpi.h"
@@ -6,6 +7,8 @@
 
 #include <algorithm>
 #include <gtest/gtest.h>
+#include <string>
+#include <unordered_map>
 
 // We test the layout engine indirectly through the tree since the layout
 // engine is coupled to ImGui types. Instead, we test the tree structure
@@ -313,6 +316,35 @@ TEST(LayoutTest, SolutionMinimumSizeIsUnchanged) {
     EXPECT_FLOAT_EQ(layout[0].size.y, scaled_size(160.0f));
 }
 
+TEST(LayoutTest, WideNodesAreCenteredWithinExpandedColumns) {
+    GsnLayoutInput input;
+    GsnLayoutInputNode wide;
+    wide.id = "Wide";
+    GsnLayoutInputNode narrow;
+    narrow.id = "Narrow";
+    input.nodes = {wide, narrow};
+    input.roots = {"Wide", "Narrow"};
+
+    GsnLayoutOptions options;
+    options.margin_x = 20.0;
+    options.margin_y = 20.0;
+    options.base_node_width = 260.0;
+    options.default_node_height = 100.0;
+    options.horizontal_spacing = 40.0;
+
+    std::unordered_map<std::string, GsnLayoutSize> sizes;
+    sizes["Wide"] = {500.0, 100.0};
+    sizes["Narrow"] = {260.0, 100.0};
+
+    const GsnLayoutGraphResult layout = LayoutGsnGraph(input, sizes, options);
+
+    const auto wide_it = std::find_if(layout.nodes.begin(), layout.nodes.end(), [](const GsnLayoutNode& node) {
+        return node.id == "Wide";
+    });
+    ASSERT_NE(wide_it, layout.nodes.end());
+    EXPECT_DOUBLE_EQ(wide_it->x, 290.0);
+}
+
 TEST(LayoutTest, WideGroup2AttachmentNoOverlapWithParent) {
     ScopedImGuiFrame imgui_frame;
 
@@ -499,48 +531,39 @@ TEST(LayoutTest, Group2AttachmentNoOverlapWithSibling) {
         << " ev=(" << ev_node->position.x << "," << ev_node->position.y << ")";
 }
 
-TEST(LayoutTest, OddChildrenMiddleCenteredUnderParent) {
-    // When a node has 3 children, the middle child should be at the same
-    // X-center as the parent.
-    const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>
-<sacm:AssuranceCasePackage xmlns:sacm="urn:test" id="T" name="T">
-  <argumentPackage id="AP" name="AP">
-    <claim id="Top" name="Top" assertionDeclaration="asserted"/>
-    <argumentReasoning id="Strat" name="Strat"/>
-    <claim id="A" name="A" assertionDeclaration="asserted"/>
-    <claim id="B" name="B" assertionDeclaration="asserted"/>
-    <claim id="C" name="C" assertionDeclaration="asserted"/>
-    <assertedInference id="AI1" name="AI1">
-      <source ref="A"/>
-      <source ref="B"/>
-      <source ref="C"/>
-      <target ref="Top"/>
-      <reasoning ref="Strat"/>
-    </assertedInference>
-  </argumentPackage>
-</sacm:AssuranceCasePackage>)";
+TEST(LayoutTest, AsymmetricOddChildrenUseCompactSpan) {
+    ScopedImGuiFrame imgui_frame;
 
-    auto tree = build_tree(xml);
-    ASSERT_NE(tree.root, nullptr);
+    AssuranceTree tree;
+    TreeNode* root = add_layout_node(tree, "Root", NodeRole::Claim, ElementGroup::Group1, "Root");
+    TreeNode* left = add_layout_node(tree, "Left", NodeRole::Claim, ElementGroup::Group1, "Left");
+    TreeNode* middle = add_layout_node(tree, "Middle", NodeRole::Claim, ElementGroup::Group1, "Middle");
+    TreeNode* right = add_layout_node(tree, "Right", NodeRole::Claim, ElementGroup::Group1, "Right");
+
+    left->parent = root;
+    middle->parent = root;
+    right->parent = root;
+    root->group1_children = {left, middle, right};
+
+    for (int leaf_index = 0; leaf_index < 5; ++leaf_index) {
+        TreeNode* leaf = add_layout_node(
+            tree, "LeftLeaf" + std::to_string(leaf_index), NodeRole::Claim, ElementGroup::Group1, "Left leaf");
+        leaf->parent = left;
+        left->group1_children.push_back(leaf);
+    }
+    tree.root = root;
 
     ui::gsn::LayoutEngine engine;
     auto layout = engine.ComputeLayout(tree);
 
-    const ui::gsn::LayoutNode* strat = nullptr;
-    const ui::gsn::LayoutNode* mid = nullptr;
-    for (const auto& ln : layout) {
-        if (ln.id == "Strat")
-            strat = &ln;
-        if (ln.id == "B")
-            mid = &ln;
-    }
-    ASSERT_NE(strat, nullptr);
-    ASSERT_NE(mid, nullptr);
+    const ui::gsn::LayoutNode* root_node = find_layout_node(layout, "Root");
+    const ui::gsn::LayoutNode* middle_node = find_layout_node(layout, "Middle");
+    ASSERT_NE(root_node, nullptr);
+    ASSERT_NE(middle_node, nullptr);
 
-    // Middle child B should have the same X-center as its parent Strat
-    float strat_center = strat->position.x + strat->size.x / 2.0f;
-    float mid_center = mid->position.x + mid->size.x / 2.0f;
-    EXPECT_NEAR(strat_center, mid_center, 1.0f) << "Middle child should be centered under parent";
+    const float root_center_x = root_node->position.x + root_node->size.x / 2.0f;
+    const float middle_center_x = middle_node->position.x + middle_node->size.x / 2.0f;
+    EXPECT_LT(root_center_x, middle_center_x - scaled_size(200.0f));
 }
 
 TEST(LayoutTest, UndevelopedFlagPropagatesToLayoutNode) {

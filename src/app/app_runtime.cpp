@@ -547,6 +547,7 @@ void AppRuntime::RenderFrame(bool& done) {
     menu_callbacks.begin_create_project = [this]() { BeginCreateProject(); };
     menu_callbacks.begin_open_project = [this]() { BeginOpenProject(); };
     menu_callbacks.save_project = [this]() { return SaveProject(); };
+    menu_callbacks.export_gsn_svg = [this]() { ExportGsnSvg(); };
     menu_callbacks.request_exit = [this](bool& done_ref) { RequestExit(done_ref); };
     menu_callbacks.begin_create_project_sacm_file = [this]() { BeginCreateProjectSacmFile(); };
     menu_callbacks.begin_create_project_evidence_register = [this]() { BeginCreateProjectEvidenceRegister(); };

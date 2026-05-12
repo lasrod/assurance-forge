@@ -149,6 +149,34 @@ TEST(ProjectServiceTest, AddAndRemoveReviewProposalTracksManifestEntry) {
         project, "reviews/proposals/proposal-0001.afpatch.json", core::ProjectFileRole::ReviewProposal));
 }
 
+TEST(ProjectServiceTest, TrackExistingExportedReportAddsExportsManifestEntry) {
+    TempDir tmp(MakeTempParent());
+    auto& parent = tmp.path;
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    core::ProjectFileEntry entry;
+    std::string error;
+
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("MySafetyCase", parent, project, report, error)) << error;
+    const std::filesystem::path relative_path = std::filesystem::path("exports") / "main_gsn.svg";
+    {
+        std::ofstream file(project.rootPath / relative_path, std::ios::binary);
+        file << "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>\n";
+    }
+
+    ASSERT_TRUE(core::ProjectService::TrackExistingFile(
+        project, relative_path, core::ProjectFileRole::ExportedReport, entry, error))
+        << error;
+    EXPECT_EQ(entry.relativePath.generic_string(), "exports/main_gsn.svg");
+    EXPECT_EQ(entry.role, core::ProjectFileRole::ExportedReport);
+    EXPECT_TRUE(ContainsFileWithRole(project, "exports/main_gsn.svg", core::ProjectFileRole::ExportedReport));
+
+    core::AssuranceProject reopened;
+    core::ProjectLoadReport open_report;
+    ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, reopened, open_report, error)) << error;
+    EXPECT_TRUE(ContainsFileWithRole(reopened, "exports/main_gsn.svg", core::ProjectFileRole::ExportedReport));
+}
+
 TEST(ProjectServiceTest, SaveReviewProposalFileRefreshesTrackedHash) {
     TempDir tmp(MakeTempParent());
     auto& parent = tmp.path;

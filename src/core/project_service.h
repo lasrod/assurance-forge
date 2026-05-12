@@ -58,6 +58,12 @@ public:
                                        ProjectFileEntry& entry,
                                        std::string& error);
 
+    static bool TrackExistingFile(AssuranceProject& project,
+                                  const std::filesystem::path& relative_path,
+                                  ProjectFileRole role,
+                                  ProjectFileEntry& entry,
+                                  std::string& error);
+
     static bool RemoveTrackedFile(AssuranceProject& project,
                                   const std::filesystem::path& relative_path,
                                   bool delete_file,
