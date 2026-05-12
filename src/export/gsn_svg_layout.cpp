@@ -62,7 +62,7 @@ std::string DisplayTextForLayout(const GsnNode& node) {
 size_t WrappedLineCount(const GsnNode& node, double width) {
     const double available_width = node.kind == GsnNodeKind::Solution ? width * 0.62 : width - 36.0;
     const size_t max_chars = std::max<size_t>(8, static_cast<size_t>(available_width / kTextCharWidth));
-    size_t lines = 1;
+    size_t lines = 0;
 
     std::istringstream paragraphs(DisplayTextForLayout(node));
     std::string paragraph;
@@ -86,8 +86,7 @@ size_t WrappedLineCount(const GsnNode& node, double width) {
                 line_chars -= max_chars;
             }
         }
-        if (has_word)
-            ++lines;
+        ++lines;
     }
 
     return lines;

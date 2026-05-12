@@ -1,4 +1,5 @@
 #include "core/assurance_tree.h"
+#include "core/gsn_layout.h"
 #include "imgui.h"
 #include "parser/xml_parser.h"
 #include "ui/gsn/gsn_dpi.h"
@@ -7,6 +8,7 @@
 #include <algorithm>
 #include <gtest/gtest.h>
 #include <string>
+#include <unordered_map>
 
 // We test the layout engine indirectly through the tree since the layout
 // engine is coupled to ImGui types. Instead, we test the tree structure
@@ -312,6 +314,35 @@ TEST(LayoutTest, SolutionMinimumSizeIsUnchanged) {
     ASSERT_EQ(layout.size(), 1u);
     EXPECT_FLOAT_EQ(layout[0].size.x, scaled_size(160.0f));
     EXPECT_FLOAT_EQ(layout[0].size.y, scaled_size(160.0f));
+}
+
+TEST(LayoutTest, WideNodesAreCenteredWithinExpandedColumns) {
+    GsnLayoutInput input;
+    GsnLayoutInputNode wide;
+    wide.id = "Wide";
+    GsnLayoutInputNode narrow;
+    narrow.id = "Narrow";
+    input.nodes = {wide, narrow};
+    input.roots = {"Wide", "Narrow"};
+
+    GsnLayoutOptions options;
+    options.margin_x = 20.0;
+    options.margin_y = 20.0;
+    options.base_node_width = 260.0;
+    options.default_node_height = 100.0;
+    options.horizontal_spacing = 40.0;
+
+    std::unordered_map<std::string, GsnLayoutSize> sizes;
+    sizes["Wide"] = {500.0, 100.0};
+    sizes["Narrow"] = {260.0, 100.0};
+
+    const GsnLayoutGraphResult layout = LayoutGsnGraph(input, sizes, options);
+
+    const auto wide_it = std::find_if(layout.nodes.begin(), layout.nodes.end(), [](const GsnLayoutNode& node) {
+        return node.id == "Wide";
+    });
+    ASSERT_NE(wide_it, layout.nodes.end());
+    EXPECT_DOUBLE_EQ(wide_it->x, 290.0);
 }
 
 TEST(LayoutTest, WideGroup2AttachmentNoOverlapWithParent) {

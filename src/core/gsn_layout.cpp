@@ -140,7 +140,6 @@ void PlaceGroup2Attachments(LayoutState& state, const WorkNode& node, double col
     for (int stack_pos = 0; stack_pos < static_cast<int>(right_indices.size()); ++stack_pos) {
         state.placements.push_back({attachments[right_indices[stack_pos]], column + 1.0, row, true, false, stack_pos});
     }
-
 }
 
 void AssignGridPositions(LayoutState& state, const std::string& node_id, double column, int row) {
@@ -327,7 +326,7 @@ GsnLayoutGraphResult LayoutGsnGraph(const GsnLayoutInput& input,
         node.height = size.height;
         node.side_stack_index = placement.stack_index;
         node.is_left_side = placement.is_left_side;
-        node.x = options.margin_x + placement.column * column_unit + (options.base_node_width - node.width) * 0.5;
+        node.x = options.margin_x + placement.column * column_unit + (max_node_width - node.width) * 0.5;
         node.y = row_y[static_cast<size_t>(placement.row)] + std::max(0.0, (row_height - node.height) * 0.5);
 
         if (placement.is_group2) {

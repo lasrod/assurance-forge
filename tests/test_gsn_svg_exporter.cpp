@@ -355,6 +355,17 @@ TEST(GsnSvgExporterTest, LayoutResizesLongTextNodes) {
     EXPECT_GT(projection.diagram.nodes.front().height, 86.0);
 }
 
+TEST(GsnSvgExporterTest, LayoutKeepsShortTitleAndContentAtBaseHeight) {
+    parser::AssuranceCase model;
+    model.elements = {Element("G1", "claim", "Goal", "Short claim.")};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+
+    ASSERT_EQ(projection.diagram.nodes.size(), 1u);
+    EXPECT_DOUBLE_EQ(projection.diagram.nodes.front().height, 86.0);
+}
+
 TEST(GsnSvgExporterTest, SvgContainsNamespaceMarkersAndPublicationStyle) {
     export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(BuildRepresentativeCase());
     export_gsn::LayoutGsnSvgDiagram(projection.diagram);

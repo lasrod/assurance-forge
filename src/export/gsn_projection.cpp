@@ -181,11 +181,10 @@ const size_t* FindFirstNodeIndex(const std::unordered_map<std::string, size_t>& 
     return nullptr;
 }
 
-const size_t* FindContextTargetIndex(
-    const parser::SacmElement& relationship,
-    const std::unordered_map<std::string, const parser::SacmElement*>& elements_by_ref,
-    const std::unordered_set<std::string>& context_attachment_refs,
-    const std::unordered_map<std::string, size_t>& node_by_ref) {
+const size_t* FindContextTargetIndex(const parser::SacmElement& relationship,
+                                     const std::unordered_map<std::string, const parser::SacmElement*>& elements_by_ref,
+                                     const std::unordered_set<std::string>& context_attachment_refs,
+                                     const std::unordered_map<std::string, size_t>& node_by_ref) {
     for (const std::string& target_ref : relationship.target_refs) {
         const std::string normalized_ref = core::NormalizeRef(target_ref);
         auto target_it = elements_by_ref.find(normalized_ref);
