@@ -95,6 +95,14 @@ const export_gsn::GsnNode* FindNode(const export_gsn::GsnDiagram& diagram, const
     return nullptr;
 }
 
+bool RectanglesOverlap(const export_gsn::GsnNode& first, const export_gsn::GsnNode& second) {
+    const double first_right = first.x + first.width;
+    const double first_bottom = first.y + first.height;
+    const double second_right = second.x + second.width;
+    const double second_bottom = second.y + second.height;
+    return first.x < second_right && first_right > second.x && first.y < second_bottom && first_bottom > second.y;
+}
+
 } // namespace
 
 TEST(GsnSvgExporterTest, EnsureExportsFolderCreatesDirectory) {
@@ -262,14 +270,41 @@ TEST(GsnSvgExporterTest, LayoutCentersMultipleSideAttachmentsAroundOwner) {
 
     const export_gsn::GsnNode* goal = FindNode(projection.diagram, "G1");
     const export_gsn::GsnNode* context = FindNode(projection.diagram, "C1");
+    const export_gsn::GsnNode* assumption = FindNode(projection.diagram, "A1");
     const export_gsn::GsnNode* justification = FindNode(projection.diagram, "J1");
     ASSERT_NE(goal, nullptr);
     ASSERT_NE(context, nullptr);
+    ASSERT_NE(assumption, nullptr);
     ASSERT_NE(justification, nullptr);
 
     const double goal_center_y = goal->y + goal->height / 2.0;
-    const double side_stack_center_y = (context->y + justification->y + justification->height) / 2.0;
-    EXPECT_NEAR(side_stack_center_y, goal_center_y, 1.0);
+    const double left_stack_center_y = (context->y + assumption->y + assumption->height) / 2.0;
+    const double right_stack_center_y = justification->y + justification->height / 2.0;
+    EXPECT_NEAR(left_stack_center_y, goal_center_y, 1.0);
+    EXPECT_NEAR(right_stack_center_y, goal_center_y, 1.0);
+}
+
+TEST(GsnSvgExporterTest, LayoutKeepsVisibleTermContextClearOfSiblingGoal) {
+    parser::AssuranceCase model;
+    parser::SacmElement visible_term = Element("TC1", "artifactreference", "Kitchen", "Kitchen term definition.");
+    parser::SacmElement visible_context = Relationship("AC1", "assertedcontext", {"TC1"}, {"G11"});
+    visible_context.description = core::kVisibleTerminologyContextMarker;
+    model.elements = {Element("G1", "claim", "Top goal", "System operation is safe."),
+                      Element("S1", "argumentreasoning", "Strategy", "Argument over operating areas."),
+                      Element("G10", "claim", "Sibling goal", "Nearby sibling remains safe."),
+                      Element("G11", "claim", "Kitchen goal", "Kitchen operation remains safe."),
+                      visible_term,
+                      Relationship("R1", "assertedinference", {"G10", "G11"}, {"G1"}, "S1"),
+                      visible_context};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+    export_gsn::LayoutGsnDiagram(projection.diagram);
+
+    const export_gsn::GsnNode* sibling = FindNode(projection.diagram, "G10");
+    const export_gsn::GsnNode* generated_context = FindNode(projection.diagram, "C1");
+    ASSERT_NE(sibling, nullptr);
+    ASSERT_NE(generated_context, nullptr);
+    EXPECT_FALSE(RectanglesOverlap(*sibling, *generated_context));
 }
 
 TEST(GsnSvgExporterTest, LayoutResizesLongTextNodes) {

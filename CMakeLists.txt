@@ -206,6 +206,7 @@ set(ASSURANCE_FORGE_SHARED_SOURCES
     src/core/app_state.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
+    src/core/gsn_layout.cpp
     src/core/string_utils.cpp
     src/core/time_utils.cpp
     src/core/tree_editing.cpp
@@ -369,6 +370,7 @@ add_executable(tests
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp
     src/core/element_factory.cpp
+    src/core/gsn_layout.cpp
     src/core/string_utils.cpp
     src/core/time_utils.cpp
     src/core/tree_editing.cpp

@@ -56,10 +56,9 @@ bool IsContextRelationshipTarget(const parser::SacmElement& element,
            element.assertion_declaration != "justification";
 }
 
-bool HasContextRelationshipTarget(
-    const parser::SacmElement& relationship,
-    const std::unordered_map<std::string, const parser::SacmElement*>& elements_by_ref,
-    const std::unordered_set<std::string>& context_attachment_refs) {
+bool HasContextRelationshipTarget(const parser::SacmElement& relationship,
+                                  const std::unordered_map<std::string, const parser::SacmElement*>& elements_by_ref,
+                                  const std::unordered_set<std::string>& context_attachment_refs) {
     for (const std::string& target_ref : relationship.target_refs) {
         auto target_it = elements_by_ref.find(core::NormalizeRef(target_ref));
         if (target_it != elements_by_ref.end() && target_it->second &&
@@ -283,8 +282,8 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
         }
 
         std::string source_id = is_visible_terminology_context
-                        ? NextContextDisplayId(reserved_source_ids, node_id_counts)
-                        : DisplaySourceId(element);
+                                    ? NextContextDisplayId(reserved_source_ids, node_id_counts)
+                                    : DisplaySourceId(element);
         if (source_id.empty()) {
             source_id = MakeFallbackId(result.diagram.nodes.size() + 1);
             result.warnings.push_back("Generated fallback id '" + source_id + "' for an exported node.");

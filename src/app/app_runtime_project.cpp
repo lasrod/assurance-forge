@@ -669,7 +669,7 @@ void AppRuntime::ExportGsnSvg() {
                                                      tracked_export,
                                                      track_error)) {
             export_result.warnings.push_back("Exported SVG was written but could not be added to Project Explorer: " +
-                                            track_error);
+                                             track_error);
         }
     } else {
         export_result.warnings.push_back(
