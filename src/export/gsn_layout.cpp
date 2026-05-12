@@ -1,54 +1,108 @@
 #include "export/gsn_layout.h"
 
 #include <algorithm>
-#include <map>
-#include <set>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 namespace export_gsn {
 namespace {
 
 constexpr double kMargin = 48.0;
-constexpr double kColumnWidth = 320.0;
+constexpr double kColumnWidth = 360.0;
 constexpr double kRowHeight = 170.0;
-constexpr double kSideGap = 32.0;
-constexpr double kSideStackGap = 18.0;
+constexpr double kSideGap = 36.0;
+constexpr double kSideStackGap = 20.0;
+constexpr double kSupportGap = 88.0;
+constexpr double kTextLineHeight = 18.0;
+constexpr double kTextCharWidth = 7.0;
+constexpr double kTextVerticalPadding = 38.0;
 
 bool IsSideInformation(GsnNodeKind kind) {
     return kind == GsnNodeKind::Context || kind == GsnNodeKind::Assumption || kind == GsnNodeKind::Justification;
 }
 
-void ApplyNodeSize(GsnNode& node) {
-    switch (node.kind) {
+struct NodeSizeLimits {
+    double base_width = 240.0;
+    double base_height = 86.0;
+    double max_width = 360.0;
+};
+
+NodeSizeLimits SizeLimitsFor(GsnNodeKind kind) {
+    switch (kind) {
     case GsnNodeKind::Goal:
-        node.width = 240.0;
-        node.height = 86.0;
-        break;
+        return {240.0, 86.0, 380.0};
     case GsnNodeKind::Strategy:
-        node.width = 260.0;
-        node.height = 86.0;
-        break;
+        return {260.0, 86.0, 400.0};
     case GsnNodeKind::Solution:
-        node.width = 116.0;
-        node.height = 116.0;
-        break;
+        return {116.0, 116.0, 220.0};
     case GsnNodeKind::Context:
-        node.width = 210.0;
-        node.height = 76.0;
-        break;
+        return {210.0, 76.0, 360.0};
     case GsnNodeKind::Assumption:
     case GsnNodeKind::Justification:
-        node.width = 190.0;
-        node.height = 82.0;
-        break;
+        return {190.0, 82.0, 340.0};
+    }
+    return {};
+}
+
+size_t WrappedLineCount(const GsnNode& node, double width) {
+    const double available_width = node.kind == GsnNodeKind::Solution ? width * 0.62 : width - 36.0;
+    const size_t max_chars = std::max<size_t>(8, static_cast<size_t>(available_width / kTextCharWidth));
+    size_t lines = 1;
+
+    std::istringstream paragraphs(node.text);
+    std::string paragraph;
+    while (std::getline(paragraphs, paragraph)) {
+        std::istringstream words(paragraph);
+        std::string word;
+        size_t line_chars = 0;
+        bool has_word = false;
+        while (words >> word) {
+            has_word = true;
+            if (line_chars == 0) {
+                line_chars = word.size();
+            } else if (line_chars + 1 + word.size() <= max_chars) {
+                line_chars += 1 + word.size();
+            } else {
+                ++lines;
+                line_chars = word.size();
+            }
+            while (line_chars > max_chars && max_chars > 4) {
+                ++lines;
+                line_chars -= max_chars;
+            }
+        }
+        if (has_word)
+            ++lines;
+    }
+
+    return lines;
+}
+
+void ApplyNodeSize(GsnNode& node) {
+    const NodeSizeLimits limits = SizeLimitsFor(node.kind);
+    double width = limits.base_width;
+    size_t line_count = WrappedLineCount(node, width);
+    while (width < limits.max_width && line_count > 5) {
+        width = std::min(limits.max_width, width + 30.0);
+        line_count = WrappedLineCount(node, width);
+    }
+
+    const double required_height = static_cast<double>(line_count) * kTextLineHeight + kTextVerticalPadding;
+    if (node.kind == GsnNodeKind::Solution) {
+        const double diameter = std::max({limits.base_width, width, required_height / 0.72});
+        node.width = diameter;
+        node.height = diameter;
+    } else {
+        node.width = width;
+        node.height = std::max(limits.base_height, required_height);
     }
 }
 
 struct LayoutState {
     GsnDiagram& diagram;
-    std::vector<std::string> warnings;
     std::unordered_map<std::string, size_t> node_by_id;
     std::unordered_map<std::string, std::vector<std::string>> support_children;
     std::unordered_map<std::string, std::vector<std::string>> side_children;
@@ -83,37 +137,74 @@ int ComputeSpan(LayoutState& state, const std::string& node_id) {
     return span;
 }
 
-void PlaceSideChildren(LayoutState& state, const std::string& node_id) {
-    auto parent_it = state.node_by_id.find(node_id);
-    if (parent_it == state.node_by_id.end())
-        return;
-    GsnNode& parent = state.diagram.nodes[parent_it->second];
+double StackHeight(const std::vector<GsnNode*>& nodes) {
+    if (nodes.empty())
+        return 0.0;
+    double height = 0.0;
+    for (const GsnNode* node : nodes)
+        height += node->height;
+    height += static_cast<double>(nodes.size() - 1) * kSideStackGap;
+    return height;
+}
+
+void SideStacks(LayoutState& state,
+                const std::string& node_id,
+                std::vector<GsnNode*>& left_nodes,
+                std::vector<GsnNode*>& right_nodes) {
     const auto side_it = state.side_children.find(node_id);
     if (side_it == state.side_children.end())
         return;
 
-    int left_count = 0;
-    int right_count = 0;
     for (size_t i = 0; i < side_it->second.size(); ++i) {
-        const std::string& child_id = side_it->second[i];
-        auto child_it = state.node_by_id.find(child_id);
+        auto child_it = state.node_by_id.find(side_it->second[i]);
         if (child_it == state.node_by_id.end())
             continue;
-        GsnNode& child = state.diagram.nodes[child_it->second];
-        const bool place_left = (i % 2 == 0);
-        int& stack_index = place_left ? left_count : right_count;
-        const double stack_y = parent.y + stack_index * (child.height + kSideStackGap);
-        if (place_left) {
-            child.x = parent.x - kSideGap - child.width;
-        } else {
-            child.x = parent.x + parent.width + kSideGap;
-        }
-        child.y = stack_y;
-        ++stack_index;
+        if (i % 2 == 0)
+            left_nodes.push_back(&state.diagram.nodes[child_it->second]);
+        else
+            right_nodes.push_back(&state.diagram.nodes[child_it->second]);
     }
 }
 
-void PlaceSubtree(LayoutState& state, const std::string& node_id, int left_column, int depth) {
+double SideStackHeight(LayoutState& state, const std::string& node_id) {
+    std::vector<GsnNode*> left_nodes;
+    std::vector<GsnNode*> right_nodes;
+    SideStacks(state, node_id, left_nodes, right_nodes);
+    return std::max(StackHeight(left_nodes), StackHeight(right_nodes));
+}
+
+void PlaceSideChildren(LayoutState& state, const std::string& node_id) {
+    auto parent_it = state.node_by_id.find(node_id);
+    if (parent_it == state.node_by_id.end())
+        return;
+
+    GsnNode& parent = state.diagram.nodes[parent_it->second];
+    std::vector<GsnNode*> left_nodes;
+    std::vector<GsnNode*> right_nodes;
+    SideStacks(state, node_id, left_nodes, right_nodes);
+
+    auto place_stack = [&](const std::vector<GsnNode*>& nodes, bool left_side) {
+        double y = parent.y + parent.height / 2.0 - StackHeight(nodes) / 2.0;
+        for (GsnNode* child : nodes) {
+            child->x = left_side ? parent.x - kSideGap - child->width : parent.x + parent.width + kSideGap;
+            child->y = y;
+            y += child->height + kSideStackGap;
+        }
+    };
+
+    place_stack(left_nodes, true);
+    place_stack(right_nodes, false);
+}
+
+double SupportYOffset(LayoutState& state, const std::string& node_id) {
+    auto node_it = state.node_by_id.find(node_id);
+    if (node_it == state.node_by_id.end())
+        return kRowHeight;
+    const GsnNode& node = state.diagram.nodes[node_it->second];
+    return std::max(kRowHeight, std::max(node.height, SideStackHeight(state, node_id)) + kSupportGap);
+}
+
+void PlaceSubtree(LayoutState& state, const std::string& node_id, int left_column, double y) {
     int& placement = state.placement_state[node_id];
     if (placement == 1) {
         state.cycle_seen = true;
@@ -133,16 +224,17 @@ void PlaceSubtree(LayoutState& state, const std::string& node_id, int left_colum
     const int span = std::max(1, state.spans[node_id]);
     const double center_x = kMargin + (static_cast<double>(left_column) + static_cast<double>(span) / 2.0) * kColumnWidth;
     node.x = center_x - node.width / 2.0;
-    node.y = kMargin + static_cast<double>(depth) * kRowHeight;
+    node.y = y;
 
     PlaceSideChildren(state, node_id);
 
     int child_left = left_column;
+    const double child_y = y + SupportYOffset(state, node_id);
     for (const std::string& child_id : state.support_children[node_id]) {
         if (state.node_by_id.find(child_id) == state.node_by_id.end())
             continue;
         const int child_span = std::max(1, state.spans[child_id]);
-        PlaceSubtree(state, child_id, child_left, depth + 1);
+        PlaceSubtree(state, child_id, child_left, child_y);
         child_left += child_span;
     }
     placement = 2;
@@ -217,7 +309,7 @@ GsnLayoutResult LayoutGsnDiagram(GsnDiagram& diagram) {
 
     int left_column = 0;
     for (const std::string& root_id : roots) {
-        PlaceSubtree(state, root_id, left_column, 0);
+        PlaceSubtree(state, root_id, left_column, kMargin);
         left_column += std::max(1, state.spans[root_id]) + 1;
     }
 

@@ -2,6 +2,7 @@
 #include "export/gsn_projection.h"
 #include "export/gsn_svg_exporter.h"
 #include "export/svg_writer.h"
+#include "core/terminology_package_service.h"
 #include "parser/xml_parser.h"
 
 #include <chrono>
@@ -130,6 +131,31 @@ TEST(GsnSvgExporterTest, ProjectionMapsCoreNodesAndRelationships) {
     EXPECT_EQ(projection.diagram.edges.size(), 6u);
 }
 
+TEST(GsnSvgExporterTest, ProjectionIgnoresVisibleTerminologyContexts) {
+    parser::AssuranceCase model;
+    parser::SacmElement visible_term = Element("TC1", "artifactreference", "ABS: Anti-lock braking system", "Term definition.");
+    parser::SacmElement visible_context = Relationship("AC1", "assertedcontext", {"TC1"}, {"G1"});
+    visible_context.description = core::kVisibleTerminologyContextMarker;
+    model.elements = {Element("G1", "claim", "Goal", "Vehicle braking remains safe."), visible_term, visible_context};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+
+    ASSERT_EQ(projection.diagram.nodes.size(), 1u);
+    EXPECT_NE(FindNode(projection.diagram, "G1"), nullptr);
+    EXPECT_EQ(FindNode(projection.diagram, "TC1"), nullptr);
+    EXPECT_TRUE(projection.diagram.edges.empty());
+}
+
+TEST(GsnSvgExporterTest, ProjectionUsesContentBeforeElementName) {
+    parser::AssuranceCase model;
+    model.elements = {Element("G1", "claim", "Term-like label", "Actual safety claim content.")};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+
+    ASSERT_EQ(projection.diagram.nodes.size(), 1u);
+    EXPECT_EQ(projection.diagram.nodes.front().text, "Actual safety claim content.");
+}
+
 TEST(GsnSvgExporterTest, MissingRelationshipEndpointProducesWarning) {
     parser::AssuranceCase model;
     model.elements = {Element("G1", "claim", "Goal"), Relationship("inf1", "assertedinference", {"missing"}, {"G1"})};
@@ -169,6 +195,38 @@ TEST(GsnSvgExporterTest, LayoutPlacesSupportBelowAndContextToSide) {
     EXPECT_GT(strategy->y, goal->y);
     EXPECT_GT(solution->y, strategy->y);
     EXPECT_NE(context->x, goal->x);
+}
+
+TEST(GsnSvgExporterTest, LayoutCentersMultipleSideAttachmentsAroundOwner) {
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(BuildRepresentativeCase());
+    export_gsn::LayoutGsnDiagram(projection.diagram);
+
+    const export_gsn::GsnNode* goal = FindNode(projection.diagram, "G1");
+    const export_gsn::GsnNode* context = FindNode(projection.diagram, "C1");
+    const export_gsn::GsnNode* justification = FindNode(projection.diagram, "J1");
+    ASSERT_NE(goal, nullptr);
+    ASSERT_NE(context, nullptr);
+    ASSERT_NE(justification, nullptr);
+
+    const double goal_center_y = goal->y + goal->height / 2.0;
+    const double side_stack_center_y = (context->y + justification->y + justification->height) / 2.0;
+    EXPECT_NEAR(side_stack_center_y, goal_center_y, 1.0);
+}
+
+TEST(GsnSvgExporterTest, LayoutResizesLongTextNodes) {
+    parser::AssuranceCase model;
+    model.elements = {Element("G1",
+                              "claim",
+                              "Goal",
+                              "This safety claim contains a deliberately long publication text block that should "
+                              "force the exported GSN goal shape to grow so the SVG text remains inside the border "
+                              "instead of spilling outside the element.")};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+    export_gsn::LayoutGsnDiagram(projection.diagram);
+
+    ASSERT_EQ(projection.diagram.nodes.size(), 1u);
+    EXPECT_GT(projection.diagram.nodes.front().height, 86.0);
 }
 
 TEST(GsnSvgExporterTest, SvgContainsNamespaceMarkersAndPublicationStyle) {

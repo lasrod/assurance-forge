@@ -1,6 +1,7 @@
 #include "export/gsn_projection.h"
 
 #include "core/string_utils.h"
+#include "core/terminology_package_service.h"
 
 #include <algorithm>
 #include <cctype>
@@ -19,6 +20,15 @@ bool IsRelationshipType(const std::string& type) {
 bool IsSupportedElementType(const std::string& type) {
     return type == "claim" || type == "argumentreasoning" || type == "artifact" || type == "artifactreference" ||
            type == "expression";
+}
+
+bool IsArtifactElementType(const std::string& type) {
+    return type == "artifact" || type == "artifactreference" || type == "expression";
+}
+
+bool IsVisibleTerminologyContextElement(const parser::SacmElement& element) {
+    return element.type == "assertedcontext" &&
+           core::TrimWhitespace(element.description) == core::kVisibleTerminologyContextMarker;
 }
 
 std::string DisplaySourceId(const parser::SacmElement& element) {
@@ -89,11 +99,9 @@ std::string TextFor(const parser::SacmElement& element) {
     const std::string detail = UsesContentText(element)
                                    ? (!element.content.empty() ? element.content : element.description)
                                    : (!element.description.empty() ? element.description : element.content);
-    if (!element.name.empty() && !detail.empty())
-        return element.name + "\n" + detail;
-    if (!element.name.empty())
-        return element.name;
-    return detail;
+    if (!detail.empty())
+        return detail;
+    return element.name;
 }
 
 void AddReference(std::unordered_map<std::string, size_t>& node_by_ref,
@@ -164,6 +172,17 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
     std::unordered_map<std::string, size_t> node_by_ref;
     std::unordered_map<std::string, int> node_id_counts;
     std::unordered_map<std::string, int> edge_id_counts;
+    std::unordered_set<std::string> exported_artifact_refs;
+
+    for (const parser::SacmElement& relationship : model.elements) {
+        if (relationship.type == "assertedevidence") {
+            for (const std::string& source_ref : relationship.source_refs)
+                exported_artifact_refs.insert(core::NormalizeRef(source_ref));
+        } else if (relationship.type == "assertedcontext" && !IsVisibleTerminologyContextElement(relationship)) {
+            for (const std::string& source_ref : relationship.source_refs)
+                exported_artifact_refs.insert(core::NormalizeRef(source_ref));
+        }
+    }
 
     for (const parser::SacmElement& element : model.elements) {
         if (IsRelationshipType(element.type))
@@ -171,6 +190,14 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
         if (!IsSupportedElementType(element.type)) {
             result.warnings.push_back("Skipped unsupported element type '" + element.type + "'.");
             continue;
+        }
+        if (IsArtifactElementType(element.type)) {
+            const std::string id_ref = core::NormalizeRef(element.id);
+            const std::string gid_ref = core::NormalizeRef(element.gid);
+            const bool is_referenced_artifact = (!id_ref.empty() && exported_artifact_refs.count(id_ref) > 0) ||
+                                                (!gid_ref.empty() && exported_artifact_refs.count(gid_ref) > 0);
+            if (!is_referenced_artifact)
+                continue;
         }
 
         std::string source_id = DisplaySourceId(element);
@@ -282,6 +309,9 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
                         GsnEdgeKind::SupportedBy);
             }
         } else if (relationship.type == "assertedcontext") {
+            if (IsVisibleTerminologyContextElement(relationship))
+                continue;
+
             const size_t* target_index = nullptr;
             for (const std::string& target_ref : relationship.target_refs) {
                 target_index = FindNodeIndex(node_by_ref, target_ref);
