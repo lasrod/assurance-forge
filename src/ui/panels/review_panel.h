@@ -18,6 +18,12 @@ struct ReviewGuidelineOption {
     std::string title;
 };
 
+struct ProposalTextChangePreview {
+    std::string field;
+    std::string old_value;
+    std::string new_value;
+};
+
 struct ReviewPanelModel {
     std::string selected_element_id;
     std::vector<core::reviews::ReviewItem> review_items;
@@ -25,6 +31,7 @@ struct ReviewPanelModel {
     std::vector<ReviewGuidelineOption> guideline_options;
     std::string guideline_status;
     std::map<std::string, core::reviews::ProposalValidityResult> proposal_validity;
+    std::map<std::string, std::vector<ProposalTextChangePreview>> proposal_text_changes;
     std::string review_status_text;
     std::string review_status_detail;
     std::string active_proposal_review_item_id;

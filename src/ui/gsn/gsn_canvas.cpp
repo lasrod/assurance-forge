@@ -97,6 +97,72 @@ static ImU32 OutlineColor() {
     return WithAlpha(GetTheme().border_strong, 0.85f);
 }
 
+static std::string ProposalFieldDisplayLabel(const std::string& field) {
+    if (field == "name")
+        return "Name";
+    if (field == "content")
+        return "Content";
+    if (field == "description")
+        return "Description";
+    if (field.empty())
+        return "Text";
+    return field;
+}
+
+static ImVec2 ProposalOriginalTextCardPosition(ImVec2 node_min, ImVec2 node_max) {
+    const float offset = DpiSize(8.0f);
+    const float estimated_width = DpiSize(360.0f);
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const ImVec2 work_min = viewport ? viewport->WorkPos : ImVec2(0.0f, 0.0f);
+    const ImVec2 work_max =
+        viewport ? ImVec2(viewport->WorkPos.x + viewport->WorkSize.x, viewport->WorkPos.y + viewport->WorkSize.y)
+                 : ImVec2(FLT_MAX, FLT_MAX);
+
+    float x = node_max.x + offset;
+    if (x + estimated_width > work_max.x) {
+        x = node_min.x - estimated_width - offset;
+    }
+    x = std::max(work_min.x + offset, std::min(x, work_max.x - estimated_width - offset));
+
+    float y = node_min.y;
+    const float estimated_height = ImGui::GetTextLineHeightWithSpacing() * 8.0f;
+    if (y + estimated_height > work_max.y) {
+        y = std::max(work_min.y + offset, work_max.y - estimated_height);
+    }
+    return ImVec2(x, y);
+}
+
+static void RenderProposalOriginalTextCard(const std::vector<ProposalTextChangePreview>& changes,
+                                           ImVec2 node_min,
+                                           ImVec2 node_max) {
+    if (changes.empty())
+        return;
+
+    ImGui::SetNextWindowPos(ProposalOriginalTextCardPosition(node_min, node_max), ImGuiCond_Always);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(DpiSize(280.0f), 0.0f), ImVec2(DpiSize(420.0f), FLT_MAX));
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
+                                   ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoFocusOnAppearing |
+                                   ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar |
+                                   ImGuiWindowFlags_NoInputs;
+    if (ImGui::Begin("Original Text##proposal_original_text_node_hover", nullptr, flags)) {
+        ImGui::TextUnformatted("Original text");
+        ImGui::Separator();
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + DpiSize(380.0f));
+        for (size_t index = 0; index < changes.size(); ++index) {
+            if (index > 0)
+                ImGui::Separator();
+            ImGui::TextDisabled("%s", ProposalFieldDisplayLabel(changes[index].field).c_str());
+            if (changes[index].old_value.empty()) {
+                ImGui::TextDisabled("(empty)");
+            } else {
+                ImGui::TextWrapped("%s", changes[index].old_value.c_str());
+            }
+        }
+        ImGui::PopTextWrapPos();
+    }
+    ImGui::End();
+}
+
 // Draw a soft 3-layer drop shadow under a rounded rectangle.
 static void DrawRectShadow(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, float rounding, float zoom) {
     const Theme& th = GetTheme();
@@ -1035,6 +1101,11 @@ void DrawGsnNode(const GsnNode& node,
     ImGui::SetNextItemAllowOverlap();
     ImGui::InvisibleButton(node.id.c_str(), scaled_size);
     const bool term_click_consumed = terminology_card_state && terminology_card_state->clicked_term_this_frame;
+    auto proposal_text_change = ui_state.proposal_text_changes.find(node.id);
+    if (!g_overlay_hovered && proposal_text_change != ui_state.proposal_text_changes.end() &&
+        ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup)) {
+        RenderProposalOriginalTextCard(proposal_text_change->second, top_left, bottom_right);
+    }
     if (ImGui::IsItemClicked() && !g_overlay_hovered && !term_click_consumed) {
         ui_state.selected_element_id = node.id;
     }

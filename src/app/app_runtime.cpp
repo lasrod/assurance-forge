@@ -167,6 +167,7 @@ void AppRuntime::RegisterAppEventListeners() {
     impl_->events.Subscribe<ProposalHighlightEvent>([](const ProposalHighlightEvent& event) {
         ui::UiState& ui_state = ui::GetUiState();
         ui_state.proposal_highlight_ids = event.highlight_ids;
+        ui_state.proposal_text_changes.clear();
         ui_state.marked_for_removal = event.marked_for_removal;
         ui_state.dim_non_proposal_nodes = event.dim_non_proposal_nodes;
         ui_state.center_on_marked = event.center_on_marked;

@@ -22,6 +22,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -300,6 +301,31 @@ std::unordered_set<std::string> CollectProposalHighlightIds(const core::reviews:
     return ids;
 }
 
+std::unordered_map<std::string, std::vector<ui::ProposalTextChangePreview>>
+CollectProposalTextChanges(const core::reviews::ReviewProposal& proposal,
+                           const std::map<std::string, std::string>& generated_ids) {
+    std::unordered_map<std::string, std::vector<ui::ProposalTextChangePreview>> changes_by_element;
+    for (const core::reviews::PatchOperation& operation : proposal.operations) {
+        if (operation.type != core::reviews::PatchOperationType::UpdateElementText &&
+            operation.type != core::reviews::PatchOperationType::UpdateElementName) {
+            continue;
+        }
+        if (!operation.element.has_value() || operation.old_value == operation.new_value)
+            continue;
+
+        const std::string element_id = PreviewIdForProposalRef(operation.element.value(), generated_ids);
+        if (element_id.empty())
+            continue;
+
+        changes_by_element[element_id].push_back(ui::ProposalTextChangePreview{
+            operation.field.empty() ? "text" : operation.field,
+            operation.old_value,
+            operation.new_value,
+        });
+    }
+    return changes_by_element;
+}
+
 bool DeleteProposalPatchFile(AppRuntimeState& state, const std::string& proposal_id, std::string& error) {
     if (!state.app_state.current_project.has_value()) {
         error = "Open a project before deleting proposed changes.";
@@ -356,6 +382,7 @@ void ApplyProposalPreviewVisualState(ui::UiState& ui_state,
     RestoreRemovedExistingElementsForProposalPreview(preview_model, base_model, removed_ids);
 
     ui_state.proposal_highlight_ids = CollectProposalHighlightIds(proposal, generated_ids);
+    ui_state.proposal_text_changes = CollectProposalTextChanges(proposal, generated_ids);
     ui_state.proposal_highlight_ids.insert(removed_ids.begin(), removed_ids.end());
     ui_state.marked_for_removal = std::move(removed_ids);
     ui_state.dim_non_proposal_nodes = !ui_state.proposal_highlight_ids.empty();

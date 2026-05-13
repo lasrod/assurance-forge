@@ -52,6 +52,26 @@ void SetStatus(const ReviewPanelAreaCallbacks& callbacks, const std::string& mes
         callbacks.set_status(message);
 }
 
+std::vector<ui::panels::ProposalTextChangePreview>
+CollectProposalTextChanges(const core::reviews::ReviewProposal& proposal) {
+    std::vector<ui::panels::ProposalTextChangePreview> changes;
+    for (const core::reviews::PatchOperation& operation : proposal.operations) {
+        if (operation.type != core::reviews::PatchOperationType::UpdateElementText &&
+            operation.type != core::reviews::PatchOperationType::UpdateElementName) {
+            continue;
+        }
+        if (operation.old_value == operation.new_value)
+            continue;
+
+        changes.push_back(ui::panels::ProposalTextChangePreview{
+            operation.field.empty() ? "text" : operation.field,
+            operation.old_value,
+            operation.new_value,
+        });
+    }
+    return changes;
+}
+
 void AddManualReviewItem(AppRuntimeState& state,
                          const ReviewPanelAreaCallbacks& callbacks,
                          const std::string& title,
@@ -191,12 +211,18 @@ ui::panels::ReviewPanelModel BuildReviewPanelModel(AppRuntimeState& state) {
             proposals.manager.LoadProposal(item.proposal_id.value(), error);
         if (!proposal.has_value()) {
             model.proposal_validity[item.proposal_id.value()] = {core::reviews::ProposalValidity::Broken, error};
-        } else if (state.app_state.loaded_case.has_value()) {
-            model.proposal_validity[item.proposal_id.value()] =
-                core::reviews::EvaluateReviewProposalValidity(proposal.value(), state.app_state.loaded_case.value());
         } else {
-            model.proposal_validity[item.proposal_id.value()] = {core::reviews::ProposalValidity::Broken,
-                                                                 "No SACM model is loaded."};
+            std::vector<ui::panels::ProposalTextChangePreview> text_changes = CollectProposalTextChanges(*proposal);
+            if (!text_changes.empty()) {
+                model.proposal_text_changes[item.proposal_id.value()] = std::move(text_changes);
+            }
+            if (state.app_state.loaded_case.has_value()) {
+                model.proposal_validity[item.proposal_id.value()] = core::reviews::EvaluateReviewProposalValidity(
+                    proposal.value(), state.app_state.loaded_case.value());
+            } else {
+                model.proposal_validity[item.proposal_id.value()] = {core::reviews::ProposalValidity::Broken,
+                                                                     "No SACM model is loaded."};
+            }
         }
     }
 

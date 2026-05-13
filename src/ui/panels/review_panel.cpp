@@ -6,6 +6,7 @@
 #include "ui/theme.h"
 
 #include <algorithm>
+#include <cfloat>
 #include <string>
 #include <vector>
 
@@ -56,6 +57,78 @@ std::string GuidelineDisplayLabel(const ReviewGuidelineOption& option) {
     if (option.title.empty())
         return option.id;
     return option.id + " - " + option.title;
+}
+
+std::string FieldDisplayLabel(const std::string& field) {
+    if (field == "name")
+        return "Name";
+    if (field == "content")
+        return "Content";
+    if (field == "description")
+        return "Description";
+    if (field.empty())
+        return "Text";
+    return field;
+}
+
+ImVec2 ProposalHoverCardPosition(ImVec2 item_min, ImVec2 item_max) {
+    constexpr float kOffset = 8.0f;
+    constexpr float kEstimatedWidth = 360.0f;
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const ImVec2 work_min = viewport ? viewport->WorkPos : ImVec2(0.0f, 0.0f);
+    const ImVec2 work_max =
+        viewport ? ImVec2(viewport->WorkPos.x + viewport->WorkSize.x, viewport->WorkPos.y + viewport->WorkSize.y)
+                 : ImVec2(FLT_MAX, FLT_MAX);
+
+    float x = item_max.x + kOffset;
+    if (x + kEstimatedWidth > work_max.x) {
+        x = item_min.x - kEstimatedWidth - kOffset;
+    }
+    x = std::max(work_min.x + kOffset, std::min(x, work_max.x - kEstimatedWidth - kOffset));
+
+    float y = item_min.y;
+    const float line_height = ImGui::GetTextLineHeightWithSpacing();
+    if (y + line_height * 8.0f > work_max.y) {
+        y = std::max(work_min.y + kOffset, work_max.y - line_height * 8.0f);
+    }
+    return ImVec2(x, y);
+}
+
+void RenderProposalOriginalTextHoverCard(const std::vector<ProposalTextChangePreview>& changes,
+                                         ImVec2 item_min,
+                                         ImVec2 item_max) {
+    if (changes.empty())
+        return;
+
+    ImGui::SetNextWindowPos(ProposalHoverCardPosition(item_min, item_max), ImGuiCond_Always);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(280.0f, 0.0f), ImVec2(420.0f, FLT_MAX));
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
+                                   ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoFocusOnAppearing |
+                                   ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar |
+                                   ImGuiWindowFlags_NoInputs;
+    if (ImGui::Begin("Original Text##proposal_original_text_hover", nullptr, flags)) {
+        ImGui::TextUnformatted("Original text");
+        ImGui::Separator();
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 380.0f);
+        for (size_t index = 0; index < changes.size(); ++index) {
+            if (index > 0)
+                ImGui::Separator();
+            ImGui::TextDisabled("%s", FieldDisplayLabel(changes[index].field).c_str());
+            if (changes[index].old_value.empty()) {
+                ImGui::TextDisabled("(empty)");
+            } else {
+                ImGui::TextWrapped("%s", changes[index].old_value.c_str());
+            }
+        }
+        ImGui::PopTextWrapPos();
+    }
+    ImGui::End();
+}
+
+const std::vector<ProposalTextChangePreview>* FindProposalTextChanges(const ReviewPanelModel& model,
+                                                                      const std::string& proposal_id) {
+    auto found = model.proposal_text_changes.find(proposal_id);
+    return found == model.proposal_text_changes.end() ? nullptr : &found->second;
 }
 
 void OpenGuidelineStub(const std::string& guideline_id, std::string& popup_guideline_id) {
@@ -222,6 +295,10 @@ void DrawProposalActions(const core::reviews::ReviewItem& item,
         validity = validity_it->second;
     }
 
+    const std::vector<ProposalTextChangePreview>* text_changes =
+        FindProposalTextChanges(model, item.proposal_id.value());
+    ImGui::BeginGroup();
+
     const bool is_valid = validity.validity == core::reviews::ProposalValidity::Valid;
     ImU32 proposal_color = is_valid ? ui::GetTheme().success : ui::GetTheme().danger;
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(proposal_color));
@@ -246,6 +323,11 @@ void DrawProposalActions(const core::reviews::ReviewItem& item,
     }
     if (ImGui::Button("Delete Proposal") && callbacks.delete_proposal)
         callbacks.delete_proposal(item);
+
+    ImGui::EndGroup();
+    if (text_changes && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup)) {
+        RenderProposalOriginalTextHoverCard(*text_changes, ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+    }
 }
 
 void DrawReviewItemActions(const core::reviews::ReviewItem& item,
