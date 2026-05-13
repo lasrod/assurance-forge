@@ -303,6 +303,15 @@ TEST(GuidelinesParserTest, ParsesRealSccgDistArtifacts) {
     ASSERT_NE(profile, nullptr);
     EXPECT_FALSE(profile->applies_to.empty());
     EXPECT_FALSE(result.document.FindGuidelinesByReviewProfile(profile->id).empty());
+
+    const parser::ReviewProfile* decomposition_profile = result.document.FindReviewProfileById("decomposition_review");
+    ASSERT_NE(decomposition_profile, nullptr);
+    for (const std::string& applicable_element : {"GSN Strategy", "SACM ArgumentReasoning", "CAE Argument"}) {
+        const bool applies = std::find(decomposition_profile->applies_to.begin(),
+                                       decomposition_profile->applies_to.end(),
+                                       applicable_element) != decomposition_profile->applies_to.end();
+        EXPECT_TRUE(applies) << applicable_element;
+    }
 }
 
 TEST(GuidelinesParserTest, SccgSchemaContractsArePresentAndReadable) {
