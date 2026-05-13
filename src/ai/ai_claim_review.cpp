@@ -639,7 +639,7 @@ Field rules:
 - severity should normally be "warning" for claim quality issues.
 - message should describe what is violated.
 - why_it_matters should explain the review concern briefly.
-- suggested_fix should describe how the user can improve the claim.
+- suggested_fix should describe how the user can improve the selected element or its immediate review context.
 - suggested_element_text should provide replacement text for the selected element when a concise text edit would fix the finding. Use this for selected strategies, reasoning steps, claims, or other reviewed elements when appropriate.
 - suggested_claim_wording is a legacy alias for claim wording suggestions. Prefer suggested_element_text; leave suggested_claim_wording empty unless the selected element is a claim and you need claim-specific wording.
 - related_element_ids should include the selected element ID and any parent/child IDs relevant to the finding.

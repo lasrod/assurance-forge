@@ -384,6 +384,48 @@ TEST(AiReviewControllerTest, StrategyReviewEmitsProposalSuggestionFromSuggestedE
               "stability, residual-risk communication, and production conformity.");
 }
 
+TEST(AiReviewControllerTest, EvidenceReviewEmitsProposalSuggestionFromSuggestedElementText) {
+    ServiceControllerHarness harness;
+    harness.provider->response_text = R"json({
+        "reviewed_element_id": "evidence-1",
+        "reviewed_element_type": "GSN Solution / SACM ArtifactReference",
+        "findings": [
+            {
+                "source": "SCCG",
+                "guideline_id": "EV.2",
+                "guideline_title": "Use evidence types that can be independently reviewed",
+                "severity": "warning",
+                "confidence": "high",
+                "message": "The evidence reference is too vague for independent review.",
+                "why_it_matters": "Reviewers need a precise artifact reference.",
+                "suggested_fix": "Name the specific evidence artifact.",
+                "suggested_element_text": "Blade access verification report BAV-01 rev C",
+                "related_element_ids": ["evidence-1"]
+            }
+        ]
+    })json";
+
+    parser::AssuranceCase assurance_case = MakeCaseWithElement("evidence-1", "artifactreference");
+    assurance_case.elements.front().content.clear();
+    assurance_case.elements.front().name = "Evidence";
+    core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+
+    harness.controller.BeginReviewForSelection(&assurance_case, tree, "evidence-1", "evidence_item_review");
+    ASSERT_TRUE(harness.controller.HasPendingRequest());
+    harness.controller.StartPendingRequest();
+    ASSERT_TRUE(harness.controller.WaitForCompletion(std::chrono::seconds(10)));
+    harness.controller.PollTask();
+
+    std::vector<core::reviews::ReviewItem> comments = harness.reviews.ItemsForElement("evidence-1");
+    ASSERT_EQ(comments.size(), 1u);
+    ASSERT_EQ(harness.proposal_suggestion_events.size(), 1u);
+    ASSERT_EQ(harness.proposal_suggestion_events[0].suggestions.size(), 1u);
+    EXPECT_EQ(harness.proposal_suggestion_events[0].suggestions[0].review_item_id, comments[0].id);
+    EXPECT_EQ(harness.proposal_suggestion_events[0].suggestions[0].element_id, "evidence-1");
+    EXPECT_EQ(harness.proposal_suggestion_events[0].suggestions[0].suggested_text,
+              "Blade access verification report BAV-01 rev C");
+}
+
 TEST(AiReviewControllerTest, StartPendingRequestEmitsRunningVisualEvent) {
     ServiceControllerHarness harness;
     harness.provider->response_text = R"json({"reviewed_element_id":"claim-1","findings":[]})json";
