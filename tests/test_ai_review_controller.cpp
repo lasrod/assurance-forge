@@ -340,6 +340,50 @@ TEST(AiReviewControllerTest, CompletedAiFindingsAreAddedAsReviewComments) {
     EXPECT_EQ(harness.statuses.back(), "AI review completed with 1 finding(s) added as review comment(s).");
 }
 
+TEST(AiReviewControllerTest, StrategyReviewEmitsProposalSuggestionFromSuggestedElementText) {
+    ServiceControllerHarness harness;
+    harness.provider->response_text = R"json({
+        "reviewed_element_id": "strategy-1",
+        "reviewed_element_type": "GSN Strategy / SACM ArgumentReasoning",
+        "findings": [
+            {
+                "source": "SCCG",
+                "guideline_id": "AR.2",
+                "guideline_title": "State the inference step explicitly",
+                "severity": "warning",
+                "confidence": "high",
+                "message": "The strategy does not explain why the children support the parent.",
+                "why_it_matters": "Reviewers need to understand the decomposition rule.",
+                "suggested_fix": "State the decomposition basis explicitly.",
+                "suggested_element_text": "Argument by credible hazard class, covering blade contact, electrical and thermal hazards, mechanical stability, residual-risk communication, and production conformity.",
+                "related_element_ids": ["strategy-1"]
+            }
+        ]
+    })json";
+
+    parser::AssuranceCase assurance_case;
+    assurance_case.elements.push_back(MakeCaseWithElement("goal-1", "claim").elements.front());
+    assurance_case.elements.push_back(MakeCaseWithElement("strategy-1", "argumentreasoning").elements.front());
+    assurance_case.elements.back().content = "Argument by credible hazard control.";
+    core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+
+    harness.controller.BeginReviewForSelection(&assurance_case, tree, "strategy-1", "decomposition_review");
+    ASSERT_TRUE(harness.controller.HasPendingRequest());
+    harness.controller.StartPendingRequest();
+    ASSERT_TRUE(harness.controller.WaitForCompletion(std::chrono::seconds(10)));
+    harness.controller.PollTask();
+
+    std::vector<core::reviews::ReviewItem> comments = harness.reviews.ItemsForElement("strategy-1");
+    ASSERT_EQ(comments.size(), 1u);
+    ASSERT_EQ(harness.proposal_suggestion_events.size(), 1u);
+    ASSERT_EQ(harness.proposal_suggestion_events[0].suggestions.size(), 1u);
+    EXPECT_EQ(harness.proposal_suggestion_events[0].suggestions[0].review_item_id, comments[0].id);
+    EXPECT_EQ(harness.proposal_suggestion_events[0].suggestions[0].element_id, "strategy-1");
+    EXPECT_EQ(harness.proposal_suggestion_events[0].suggestions[0].suggested_text,
+              "Argument by credible hazard class, covering blade contact, electrical and thermal hazards, mechanical "
+              "stability, residual-risk communication, and production conformity.");
+}
+
 TEST(AiReviewControllerTest, StartPendingRequestEmitsRunningVisualEvent) {
     ServiceControllerHarness harness;
     harness.provider->response_text = R"json({"reviewed_element_id":"claim-1","findings":[]})json";

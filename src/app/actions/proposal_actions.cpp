@@ -709,7 +709,7 @@ void ProposalActions::CreateAiGenerated(const std::vector<AiReviewProposalSugges
             continue;
 
         const parser::SacmElement* anchor = parser::FindElementByIdOrGidValue(model, item->element_id);
-        if (!anchor || anchor->type != "claim")
+        if (!anchor || (anchor->type != "claim" && anchor->type != "argumentreasoning"))
             continue;
 
         const std::string current_text = anchor->content.empty() ? anchor->description : anchor->content;
@@ -718,7 +718,7 @@ void ProposalActions::CreateAiGenerated(const std::vector<AiReviewProposalSugges
 
         core::reviews::ReviewProposal proposal = BuildDraftReviewProposal(*item, model, *anchor);
         proposal.author_name = "AI Review";
-        proposal.summary = "AI suggested replacement wording for " + anchor->id + ".";
+        proposal.summary = "AI suggested replacement text for " + anchor->id + ".";
 
         core::reviews::PatchOperation operation;
         operation.type = core::reviews::PatchOperationType::UpdateElementText;

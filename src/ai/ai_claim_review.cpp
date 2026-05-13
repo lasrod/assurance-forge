@@ -246,15 +246,18 @@ std::string BuildProblemMessage(const nlohmann::json& finding) {
     std::string message = JsonStringValue(finding, "message");
     std::string why = JsonStringValue(finding, "why_it_matters");
     std::string suggested_fix = JsonStringValue(finding, "suggested_fix");
-    std::string suggested_wording = JsonStringValue(finding, "suggested_claim_wording");
+    std::string suggested_element_text = JsonStringValue(finding, "suggested_element_text");
+    std::string suggested_claim_wording = JsonStringValue(finding, "suggested_claim_wording");
     std::string confidence = JsonStringValue(finding, "confidence");
 
     if (!why.empty())
         message += " Why it matters: " + why;
     if (!suggested_fix.empty())
         message += " Suggested fix: " + suggested_fix;
-    if (!suggested_wording.empty())
-        message += " Suggested claim wording: " + suggested_wording;
+    if (!suggested_element_text.empty())
+        message += " Suggested element text: " + suggested_element_text;
+    else if (!suggested_claim_wording.empty())
+        message += " Suggested claim wording: " + suggested_claim_wording;
     if (!confidence.empty())
         message += " Confidence: " + confidence;
     return message;
@@ -621,6 +624,7 @@ std::string BuildExpectedAiReviewResponseSchemaText() {
       "message": "string",
       "why_it_matters": "string",
       "suggested_fix": "string",
+            "suggested_element_text": "string",
       "suggested_claim_wording": "string",
       "related_element_ids": ["string"]
     }
@@ -636,7 +640,8 @@ Field rules:
 - message should describe what is violated.
 - why_it_matters should explain the review concern briefly.
 - suggested_fix should describe how the user can improve the claim.
-- suggested_claim_wording should provide a better wording for the selected claim when appropriate.
+- suggested_element_text should provide replacement text for the selected element when a concise text edit would fix the finding. Use this for selected strategies, reasoning steps, claims, or other reviewed elements when appropriate.
+- suggested_claim_wording is a legacy alias for claim wording suggestions. Prefer suggested_element_text; leave suggested_claim_wording empty unless the selected element is a claim and you need claim-specific wording.
 - related_element_ids should include the selected element ID and any parent/child IDs relevant to the finding.
 - If there are no findings, return "findings": [].
 
@@ -716,7 +721,10 @@ AiReviewParseResult ParseAiReviewResponse(const std::string& response_text,
             }
             problem.guideline_id = unknown_guideline_id || guideline_id == "unknown" ? std::string{} : guideline_id;
             result.problems.push_back(std::move(problem));
-            result.suggestedClaimWordings.push_back(JsonStringValue(finding, "suggested_claim_wording"));
+            std::string suggested_element_text = JsonStringValue(finding, "suggested_element_text");
+            if (suggested_element_text.empty())
+                suggested_element_text = JsonStringValue(finding, "suggested_claim_wording");
+            result.suggestedElementTexts.push_back(std::move(suggested_element_text));
         }
 
         result.success = true;
