@@ -17,6 +17,7 @@ public:
     bool show_theme_tweak_window = false;
 
     void RequestClose();
+    void CancelClose();
     bool ConsumeCloseRequest();
     void ApplyModalRequest(const ModalRequestEvent& event);
 };

@@ -24,3 +24,15 @@ TEST(ModalCoordinatorTest, ConsumeCloseRequestReturnsAndClearsRequest) {
     EXPECT_TRUE(coordinator.ConsumeCloseRequest());
     EXPECT_FALSE(coordinator.ConsumeCloseRequest());
 }
+
+TEST(ModalCoordinatorTest, CancelCloseDismissesExitModalAndClearsPendingRequest) {
+    app::controllers::ModalCoordinator coordinator;
+
+    coordinator.RequestClose();
+    coordinator.show_save_before_exit_modal = true;
+
+    coordinator.CancelClose();
+
+    EXPECT_FALSE(coordinator.show_save_before_exit_modal);
+    EXPECT_FALSE(coordinator.ConsumeCloseRequest());
+}

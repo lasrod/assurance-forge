@@ -2,6 +2,7 @@
 
 #include "app/app_runtime.h"
 #include "app/app_ui_bootstrap.h"
+#include "GLFW/glfw3.h"
 #include "hello_imgui/hello_imgui.h"
 #include "ui/localization.h"
 
@@ -10,6 +11,13 @@ namespace {
 constexpr const char* kLanguagePreference = "AssuranceForge.Language";
 constexpr const char* kRecentProjectsPreference = "AssuranceForge.RecentProjects";
 constexpr const char* kReviewerNamePreference = "AssuranceForge.ReviewerName";
+
+void CancelNativeWindowCloseRequest(HelloImGui::RunnerParams& runner_params) {
+    runner_params.appShallExit = false;
+    if (runner_params.backendPointers.glfwWindow != nullptr) {
+        glfwSetWindowShouldClose(static_cast<GLFWwindow*>(runner_params.backendPointers.glfwWindow), GLFW_FALSE);
+    }
+}
 
 } // namespace
 
@@ -44,7 +52,7 @@ int main(int, char**) {
     params.callbacks.ShowGui = [&]() {
         HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
         if (runner_params && runner_params->appShallExit && !done) {
-            runner_params->appShallExit = false;
+            CancelNativeWindowCloseRequest(*runner_params);
             runtime.RequestClose();
         }
 

@@ -6,6 +6,11 @@ void ModalCoordinator::RequestClose() {
     close_requested = true;
 }
 
+void ModalCoordinator::CancelClose() {
+    close_requested = false;
+    show_save_before_exit_modal = false;
+}
+
 bool ModalCoordinator::ConsumeCloseRequest() {
     const bool requested = close_requested;
     close_requested = false;
