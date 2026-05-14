@@ -39,6 +39,27 @@ bool MatchesFilter(const core::ProblemItem& problem, ui::ProblemFilter filter) {
     return true;
 }
 
+std::string SingleLineMessage(const std::string& message) {
+    std::string flattened;
+    flattened.reserve(message.size());
+    bool last_was_space = false;
+    for (char ch : message) {
+        const bool is_space = ch == '\r' || ch == '\n' || ch == '\t' || ch == ' ';
+        if (is_space) {
+            if (!flattened.empty() && !last_was_space) {
+                flattened.push_back(' ');
+                last_was_space = true;
+            }
+            continue;
+        }
+        flattened.push_back(ch);
+        last_was_space = false;
+    }
+    if (!flattened.empty() && flattened.back() == ' ')
+        flattened.pop_back();
+    return flattened;
+}
+
 int CountMatches(const std::vector<core::ProblemItem>& problems, ui::ProblemFilter filter) {
     int count = 0;
     for (const auto& problem : problems) {
@@ -123,8 +144,39 @@ void ClearRemovedSelection(const std::vector<core::ProblemItem>& problems, ui::U
     ui_state.selected_problem_element_id.clear();
 }
 
+void SelectAndActivateProblem(const core::ProblemItem& problem,
+                              ui::UiState& ui_state,
+                              const ProblemsPanelCallbacks& callbacks) {
+    ui_state.selected_problem_id = problem.id;
+    ui_state.selected_problem_element_id = problem.element_id;
+    if (callbacks.on_problem_activated)
+        callbacks.on_problem_activated(problem);
+}
+
+bool DrawClickableCell(const char* id_suffix,
+                      const std::string& text,
+                      const core::ProblemItem& problem,
+                      ui::UiState& ui_state,
+                      const ProblemsPanelCallbacks& callbacks,
+                      ImVec4* text_color = nullptr) {
+    if (text_color)
+        ImGui::PushStyleColor(ImGuiCol_Text, *text_color);
+    const float cell_width = ImGui::GetColumnWidth();
+    const bool clicked = ImGui::Selectable((text + "##" + id_suffix).c_str(),
+                                           false,
+                                           ImGuiSelectableFlags_AllowDoubleClick,
+                                           ImVec2(cell_width, 0.0f));
+    if (text_color)
+        ImGui::PopStyleColor();
+    if (clicked)
+        SelectAndActivateProblem(problem, ui_state, callbacks);
+    return clicked;
+}
+
 void DrawProblemRow(const core::ProblemItem& problem, ui::UiState& ui_state, const ProblemsPanelCallbacks& callbacks) {
     const bool selected = ui_state.selected_problem_id == problem.id;
+    const std::string message = SingleLineMessage(problem.message);
+    const bool review_problem = IsReviewSource(problem.source);
 
     ImGui::PushID(problem.id.c_str());
     ImGui::TableNextRow();
@@ -133,40 +185,33 @@ void DrawProblemRow(const core::ProblemItem& problem, ui::UiState& ui_state, con
     }
 
     ImGui::TableSetColumnIndex(0);
-    ImGui::PushStyleColor(ImGuiCol_Text, SeverityColor(problem.severity));
-    ImGui::Selectable(core::ToString(problem.severity),
-                      selected,
-                      ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick);
-    ImGui::PopStyleColor();
-    if (ImGui::IsItemClicked()) {
-        ui_state.selected_problem_id = problem.id;
-        ui_state.selected_problem_element_id = problem.element_id;
-    }
-    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-        if (callbacks.on_problem_activated)
-            callbacks.on_problem_activated(problem);
-    }
+    ImVec4 severity_color = SeverityColor(problem.severity);
+    DrawClickableCell("severity", core::ToString(problem.severity), problem, ui_state, callbacks, &severity_color);
 
     ImGui::TableSetColumnIndex(1);
-    ImGui::TextUnformatted(core::ToString(problem.source));
+    DrawClickableCell("source", core::ToString(problem.source), problem, ui_state, callbacks);
 
     ImGui::TableSetColumnIndex(2);
-    ImGui::TextUnformatted(problem.element_id.empty() ? "-" : problem.element_id.c_str());
+    DrawClickableCell("element", problem.element_id.empty() ? "-" : problem.element_id, problem, ui_state, callbacks);
 
     ImGui::TableSetColumnIndex(3);
-    ImGui::TextUnformatted(problem.type.c_str());
+    DrawClickableCell("type", problem.type, problem, ui_state, callbacks);
 
     ImGui::TableSetColumnIndex(4);
-    ImGui::TextUnformatted(problem.message.c_str());
+    DrawClickableCell("message", message, problem, ui_state, callbacks);
     if (ImGui::IsItemHovered() && !problem.message.empty()) {
         ImGui::SetTooltip("%s", problem.message.c_str());
     }
 
     ImGui::TableSetColumnIndex(5);
-    ImGui::TextUnformatted(problem.guideline_id.empty() ? "-" : problem.guideline_id.c_str());
+    DrawClickableCell(
+        "guideline", problem.guideline_id.empty() ? "-" : problem.guideline_id, problem, ui_state, callbacks);
 
     ImGui::TableSetColumnIndex(6);
-    if (!problem.quick_fix_label.empty() && callbacks.on_quick_fix) {
+    if (review_problem && callbacks.on_open_review) {
+        if (ImGui::SmallButton("Open review"))
+            callbacks.on_open_review(problem);
+    } else if (!problem.quick_fix_label.empty() && callbacks.on_quick_fix) {
         if (ImGui::SmallButton(problem.quick_fix_label.c_str()))
             callbacks.on_quick_fix(problem);
     } else {

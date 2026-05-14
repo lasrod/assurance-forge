@@ -142,6 +142,7 @@ ui::panels::ReviewPanelModel BuildReviewPanelModel(AppRuntimeState& state) {
     auto& proposals = *state.proposal_controller;
     model.selected_element_id =
         proposals.creator_active ? proposals.draft.anchor_element_id : ui_state.selected_element_id;
+    model.focus_review_item_id = state.workbench.focus_review_item_id;
     model.has_project = state.app_state.current_project.has_value();
     EnsureReviewGuidelineCatalogLoaded(state);
     if (state.guideline_catalog.has_value()) {
@@ -287,6 +288,7 @@ void RenderReviewPanelContent(AppRuntimeState& state, const ReviewPanelAreaCallb
             callbacks.set_manual_review_ok(element_id, manual_ok);
     };
     ui::panels::ShowReviewPanel(model, panel_callbacks);
+    state.workbench.focus_review_item_id.clear();
 }
 
 } // namespace app::areas

@@ -50,6 +50,7 @@ struct WorkbenchState {
     bool force_center_tab_selection = false;
     bool pending_focus_root = false;
     bool focus_review_tab = false;
+    std::string focus_review_item_id;
     bool show_gsn_tab = true;
     bool show_cse_tab = false;
     bool show_evidence_tab = false;

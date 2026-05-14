@@ -26,6 +26,7 @@ struct ProposalTextChangePreview {
 
 struct ReviewPanelModel {
     std::string selected_element_id;
+    std::string focus_review_item_id;
     std::vector<core::reviews::ReviewItem> review_items;
     std::vector<core::ProblemItem> problem_items;
     std::vector<ReviewGuidelineOption> guideline_options;

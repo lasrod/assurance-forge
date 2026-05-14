@@ -436,15 +436,25 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
     }
 
     for (const core::reviews::ReviewItem& item : model.review_items) {
+        const bool focused_item = !model.focus_review_item_id.empty() && model.focus_review_item_id == item.id;
         ImGui::PushID(item.id.c_str());
         ImGui::Separator();
         DrawStatusBadge(item);
         ImGui::SameLine();
+        if (focused_item) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(ui::GetTheme().accent));
+        }
         ImGui::TextWrapped("%s", item.title.empty() ? "Review comment" : item.title.c_str());
+        if (focused_item) {
+            ImGui::PopStyleColor();
+        }
         ImGui::TextDisabled("Reviewed by %s", item.reviewer_name.empty() ? "not recorded" : item.reviewer_name.c_str());
         DrawSelectableMessageText("review_message", item.message, 4.0f);
         DrawGuidelineTags(model, item.guideline_ids, popup_guideline_id);
         DrawReviewItemActions(item, model, callbacks);
+        if (focused_item) {
+            ImGui::SetScrollHereY(0.2f);
+        }
         ImGui::PopID();
     }
 
