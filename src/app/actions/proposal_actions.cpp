@@ -22,6 +22,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -32,6 +33,11 @@ namespace {
 using core::NowUtcString;
 using core::TrimWhitespace;
 using core::reviews::BuildDraftReviewProposal;
+
+struct ElementTextTarget {
+    std::string field;
+    std::string current_text;
+};
 
 void SetStatus(AppRuntimeState& state, const std::string& message) {
     state.events.Emit(StatusMessageEvent{message});
@@ -76,6 +82,12 @@ const char* CreateRefPrefixFor(core::NewElementKind kind) {
 bool IsContextLike(core::NewElementKind kind) {
     return kind == core::NewElementKind::Context || kind == core::NewElementKind::Assumption ||
            kind == core::NewElementKind::Justification;
+}
+
+ElementTextTarget TextTargetFor(const parser::SacmElement& element) {
+    if (element.type == "claim" || element.type == "argumentreasoning")
+        return {"content", element.content};
+    return {"description", element.description};
 }
 
 const char* RemoveModeField(core::RemoveMode mode) {
@@ -287,6 +299,31 @@ std::unordered_set<std::string> CollectProposalHighlightIds(const core::reviews:
     return ids;
 }
 
+std::unordered_map<std::string, std::vector<ui::ProposalTextChangePreview>>
+CollectProposalTextChanges(const core::reviews::ReviewProposal& proposal,
+                           const std::map<std::string, std::string>& generated_ids) {
+    std::unordered_map<std::string, std::vector<ui::ProposalTextChangePreview>> changes_by_element;
+    for (const core::reviews::PatchOperation& operation : proposal.operations) {
+        if (operation.type != core::reviews::PatchOperationType::UpdateElementText &&
+            operation.type != core::reviews::PatchOperationType::UpdateElementName) {
+            continue;
+        }
+        if (!operation.element.has_value() || operation.old_value == operation.new_value)
+            continue;
+
+        const std::string element_id = PreviewIdForProposalRef(operation.element.value(), generated_ids);
+        if (element_id.empty())
+            continue;
+
+        changes_by_element[element_id].push_back(ui::ProposalTextChangePreview{
+            operation.field.empty() ? "text" : operation.field,
+            operation.old_value,
+            operation.new_value,
+        });
+    }
+    return changes_by_element;
+}
+
 bool DeleteProposalPatchFile(AppRuntimeState& state, const std::string& proposal_id, std::string& error) {
     if (!state.app_state.current_project.has_value()) {
         error = "Open a project before deleting proposed changes.";
@@ -343,6 +380,7 @@ void ApplyProposalPreviewVisualState(ui::UiState& ui_state,
     RestoreRemovedExistingElementsForProposalPreview(preview_model, base_model, removed_ids);
 
     ui_state.proposal_highlight_ids = CollectProposalHighlightIds(proposal, generated_ids);
+    ui_state.proposal_text_changes = CollectProposalTextChanges(proposal, generated_ids);
     ui_state.proposal_highlight_ids.insert(removed_ids.begin(), removed_ids.end());
     ui_state.marked_for_removal = std::move(removed_ids);
     ui_state.dim_non_proposal_nodes = !ui_state.proposal_highlight_ids.empty();
@@ -691,7 +729,7 @@ void ProposalActions::CreateAiGenerated(const std::vector<AiReviewProposalSugges
     if (suggestions.empty())
         return;
     if (!state_.app_state.current_project.has_value() || !state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "AI found proposed wording, but a project and SACM file must be open to save proposals.");
+        SetStatus(state_, "AI found proposed text, but a project and SACM file must be open to save proposals.");
         return;
     }
 
@@ -709,22 +747,22 @@ void ProposalActions::CreateAiGenerated(const std::vector<AiReviewProposalSugges
             continue;
 
         const parser::SacmElement* anchor = parser::FindElementByIdOrGidValue(model, item->element_id);
-        if (!anchor || anchor->type != "claim")
+        if (!anchor)
             continue;
 
-        const std::string current_text = anchor->content.empty() ? anchor->description : anchor->content;
-        if (TrimWhitespace(current_text) == suggested_text)
+        const ElementTextTarget text_target = TextTargetFor(*anchor);
+        if (TrimWhitespace(text_target.current_text) == suggested_text)
             continue;
 
         core::reviews::ReviewProposal proposal = BuildDraftReviewProposal(*item, model, *anchor);
         proposal.author_name = "AI Review";
-        proposal.summary = "AI suggested replacement wording for " + anchor->id + ".";
+        proposal.summary = "AI suggested replacement text for " + anchor->id + ".";
 
         core::reviews::PatchOperation operation;
         operation.type = core::reviews::PatchOperationType::UpdateElementText;
         operation.element = core::reviews::ElementRef{anchor->id, std::nullopt};
-        operation.field = "content";
-        operation.old_value = current_text;
+        operation.field = text_target.field;
+        operation.old_value = text_target.current_text;
         operation.new_value = suggested_text;
         proposal.operations.push_back(std::move(operation));
 

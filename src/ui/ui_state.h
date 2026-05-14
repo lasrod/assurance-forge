@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 namespace ui {
 
@@ -36,6 +37,12 @@ struct ElementReviewVisualState {
     std::string last_review_message;
 };
 
+struct ProposalTextChangePreview {
+    std::string field;
+    std::string old_value;
+    std::string new_value;
+};
+
 struct UiState {
     std::string selected_element_id;
 
@@ -62,6 +69,7 @@ struct UiState {
     // Proposal preview/creator highlighting. When enabled, nodes outside this
     // set are rendered subdued so proposed changes stand out.
     std::unordered_set<std::string> proposal_highlight_ids;
+    std::unordered_map<std::string, std::vector<ProposalTextChangePreview>> proposal_text_changes;
     bool dim_non_proposal_nodes = false;
 
     // True while any proposal canvas mode (creator or preview) is active.

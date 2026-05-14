@@ -221,13 +221,45 @@ TEST(AiClaimReviewTest, ParsesFencedJsonAndMapsFindingsToProblems) {
 
     ASSERT_TRUE(parsed.success) << parsed.errorMessage;
     ASSERT_EQ(parsed.problems.size(), 1u);
-    ASSERT_EQ(parsed.suggestedClaimWordings.size(), 1u);
+    ASSERT_EQ(parsed.suggestedElementTexts.size(), 1u);
     EXPECT_EQ(parsed.problems[0].id, "ai-review:G1:CL.2:1");
     EXPECT_EQ(parsed.problems[0].source, core::ProblemSource::AIReview);
     EXPECT_EQ(parsed.problems[0].severity, core::ProblemSeverity::Warning);
     EXPECT_EQ(parsed.problems[0].guideline_id, "CL.2");
-    EXPECT_EQ(parsed.suggestedClaimWordings[0], "The braking controller safety is acceptable.");
+    EXPECT_EQ(parsed.suggestedElementTexts[0], "The braking controller safety is acceptable.");
     EXPECT_NE(parsed.problems[0].message.find("Suggested fix: Split the claim."), std::string::npos);
+}
+
+TEST(AiClaimReviewTest, ParsesGenericSuggestedElementText) {
+    const std::string response = R"json({
+    "reviewed_element_id": "S1",
+    "reviewed_element_type": "GSN Strategy / SACM ArgumentReasoning",
+    "findings": [
+        {
+            "source": "SCCG",
+            "guideline_id": "AR.2",
+            "guideline_title": "State the inference step explicitly",
+            "severity": "warning",
+            "confidence": "high",
+            "message": "The strategy does not explain the decomposition rule.",
+            "why_it_matters": "Reviewers need to understand why the children support the parent.",
+            "suggested_fix": "State the decomposition rule explicitly.",
+            "suggested_element_text": "Argument by credible hazard class, covering blade contact, electrical, thermal, mechanical, residual-risk, and production-control hazards.",
+            "related_element_ids": ["S1"]
+        }
+    ]
+})json";
+
+    ai::ParsedAiReviewResponse parsed =
+        ai::ParseAiReviewResponse(response, "S1", "GSN Strategy / SACM ArgumentReasoning");
+
+    ASSERT_TRUE(parsed.success) << parsed.errorMessage;
+    ASSERT_EQ(parsed.suggestedElementTexts.size(), 1u);
+    EXPECT_EQ(parsed.suggestedElementTexts[0],
+              "Argument by credible hazard class, covering blade contact, electrical, thermal, mechanical, "
+              "residual-risk, and production-control hazards.");
+    ASSERT_EQ(parsed.problems.size(), 1u);
+    EXPECT_NE(parsed.problems[0].message.find("Suggested element text"), std::string::npos);
 }
 
 TEST(AiClaimReviewTest, ReportsMissingFindingsArray) {
