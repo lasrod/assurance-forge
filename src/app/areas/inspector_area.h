@@ -21,6 +21,7 @@ struct InspectorAreaCallbacks {
         use_terminology_term_for_element;
     std::function<void(const std::string&, const std::string&)> ignore_terminology_suggestion;
     std::function<bool(const std::string&, const std::string&)> is_terminology_suggestion_ignored;
+    std::function<void()> focus_review_tab;
     std::function<void()> mark_element_modified;
 };
 

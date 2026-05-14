@@ -27,11 +27,13 @@ void RenderFeedbackDockArea(AppRuntimeState& state,
         }
         state.terminology.focus_usages_tab = false;
 
-        if (ImGui::BeginTabItem("Review")) {
+        ImGuiTabItemFlags review_flags = state.workbench.focus_review_tab ? ImGuiTabItemFlags_SetSelected : 0;
+        if (ImGui::BeginTabItem("Review", nullptr, review_flags)) {
             if (callbacks.render_review_content)
                 callbacks.render_review_content();
             ImGui::EndTabItem();
         }
+        state.workbench.focus_review_tab = false;
 
         if (ImGui::BeginTabItem("AI Debug")) {
             if (callbacks.render_ai_debug_content)

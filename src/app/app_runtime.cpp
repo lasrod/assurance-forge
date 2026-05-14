@@ -679,6 +679,7 @@ void AppRuntime::RenderFrame(bool& done) {
         [this](const std::string& element_id, const std::string& term_value) {
             return IsTerminologySuggestionIgnored(element_id, term_value);
         },
+        [this]() { impl_->workbench.focus_review_tab = true; },
         [this]() {
             impl_->events.Emit(TreeDirtyEvent{});
             impl_->events.Emit(DocumentDirtyEvent{});

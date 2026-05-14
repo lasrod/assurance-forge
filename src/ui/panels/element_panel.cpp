@@ -307,6 +307,32 @@ void RenderTerminologySuggestions(const sacm::AssuranceCasePackage* sacm_pkg,
     }
 }
 
+bool RenderReviewAttentionNotice(const ui::UiState& state, const std::string& element_id, const ElementTerminologyAssistCallbacks* terminology_callbacks) {
+    const ui::ElementReviewVisualState* review_state = ui::FindElementReviewVisualState(state, element_id);
+    if (!review_state || ui::ResolveElementReviewVisualStatus(*review_state) != ui::ElementReviewVisualStatus::Failed)
+        return false;
+
+    const char* label = "Unresolved review";
+    const ImVec4 button_color(0.82f, 0.53f, 0.12f, 1.0f);
+    const ImVec4 button_hover(0.92f, 0.63f, 0.18f, 1.0f);
+    const ImVec4 button_active(0.72f, 0.46f, 0.10f, 1.0f);
+    ImGui::PushStyleColor(ImGuiCol_Button, button_color);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, button_hover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, button_active);
+    if (ImGui::SmallButton(label) && terminology_callbacks && terminology_callbacks->focus_review_tab) {
+        terminology_callbacks->focus_review_tab();
+    }
+    ImGui::PopStyleColor(3);
+    if (ImGui::IsItemHovered()) {
+        if (review_state->last_review_message.empty()) {
+            ImGui::SetTooltip("Open review comments or AI review failures for this element.");
+        } else {
+            ImGui::SetTooltip("%s\nClick to open the Review tab.", review_state->last_review_message.c_str());
+        }
+    }
+    return true;
+}
+
 } // namespace
 
 bool ShowElementPanel(parser::AssuranceCase* ac,
@@ -349,6 +375,10 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     ImGui::Separator();
     ImGui::TextWrapped("%s", elem->type.c_str());
     ImGui::Spacing();
+
+    if (RenderReviewAttentionNotice(state, elem->id, terminology_callbacks)) {
+        ImGui::Spacing();
+    }
 
     // Name (editable)
     ImGui::Text("Name");

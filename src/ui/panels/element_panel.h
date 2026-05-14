@@ -18,6 +18,7 @@ struct ElementTerminologyAssistCallbacks {
         use_term_for_element;
     std::function<void(const std::string& element_id, const std::string& term)> ignore_term;
     std::function<bool(const std::string& element_id, const std::string& term)> is_ignored;
+    std::function<void()> focus_review_tab;
 };
 
 // Render the element properties panel with editable fields.
