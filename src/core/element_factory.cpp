@@ -29,19 +29,19 @@ const char* PrefixFor(NewElementKind kind) {
 const char* DefaultNameFor(NewElementKind kind) {
     switch (kind) {
     case NewElementKind::Goal:
-        return "New Goal";
+        return "";
     case NewElementKind::Strategy:
-        return "New Strategy";
+        return "";
     case NewElementKind::Solution:
-        return "New Solution";
+        return "";
     case NewElementKind::Context:
-        return "New Context";
+        return "";
     case NewElementKind::Assumption:
-        return "New Assumption";
+        return "";
     case NewElementKind::Justification:
-        return "New Justification";
+        return "";
     }
-    return "New Element";
+    return "";
 }
 
 std::unordered_set<std::string> CollectIds(const parser::AssuranceCase& ac) {

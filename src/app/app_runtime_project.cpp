@@ -439,6 +439,8 @@ void AppRuntime::BeginLinkExistingTerminologyTerm(const std::string& element_id,
 
 void AppRuntime::IgnoreTerminologySuggestion(const std::string& element_id, const std::string& term_value) {
     actions::TerminologyActions(*impl_).IgnoreSuggestion(element_id, term_value);
+    SyncTerminologyProblems();
+    SyncReviewVisualStatesFromReviews();
 }
 
 bool AppRuntime::IsTerminologySuggestionIgnored(const std::string& element_id, const std::string& term_value) const {

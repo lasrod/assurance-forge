@@ -1386,33 +1386,6 @@ void ShowGsnCanvasContent(UiState& ui_state,
         }
     }
 
-    // --- Keyboard and mouse shortcut hints (top-left) ---
-    {
-        const char* hint_1 = "Ctrl+Wheel  Zoom";
-        const char* hint_2 = "Middle Drag  Pan";
-
-        ImDrawList* fg_hints = ImGui::GetWindowDrawList();
-        ImVec2 hint_pos(child_pos.x + DpiSize(12.0f), child_pos.y + DpiSize(12.0f));
-        ImVec2 hint_size(DpiSize(164.0f), DpiSize(44.0f));
-
-        const Theme& th_hint = GetTheme();
-        fg_hints->AddRectFilled(hint_pos,
-                                ImVec2(hint_pos.x + hint_size.x, hint_pos.y + hint_size.y),
-                                WithAlpha(th_hint.surface_2, 0.85f),
-                                DpiSize(8.0f));
-        fg_hints->AddRect(hint_pos,
-                          ImVec2(hint_pos.x + hint_size.x, hint_pos.y + hint_size.y),
-                          th_hint.border,
-                          DpiSize(8.0f),
-                          0,
-                          DpiSize(1.0f));
-
-        fg_hints->AddText(
-            ImVec2(hint_pos.x + DpiSize(10.0f), hint_pos.y + DpiSize(8.0f)), th_hint.text_secondary, hint_1);
-        fg_hints->AddText(
-            ImVec2(hint_pos.x + DpiSize(10.0f), hint_pos.y + DpiSize(26.0f)), th_hint.text_secondary, hint_2);
-    }
-
     // --- Overlay zoom buttons in bottom-right corner ---
     {
         ImVec2 child_size = ImGui::GetWindowSize();
@@ -1438,17 +1411,18 @@ void ShowGsnCanvasContent(UiState& ui_state,
             renderer.ZoomOut();
         }
 
-        ImGui::SameLine();
+        ImGui::SameLine(0.0f, 0.0f);
         // Zoom percentage label
         char zoom_label[16];
         snprintf(zoom_label, sizeof(zoom_label), "%d%%", static_cast<int>(renderer.GetZoom() * 100.0f + 0.5f));
+        ImVec2 label_slot_pos = ImGui::GetCursorScreenPos();
+        ImGui::InvisibleButton("##zoom_label", ImVec2(label_width, button_size));
         ImVec2 text_size = ImGui::CalcTextSize(zoom_label);
-        float label_x = ImGui::GetCursorScreenPos().x + (label_width - text_size.x) * 0.5f;
-        float label_y = ImGui::GetCursorScreenPos().y + (button_size - text_size.y) * 0.5f;
+        float label_x = label_slot_pos.x + (label_width - text_size.x) * 0.5f;
+        float label_y = label_slot_pos.y + (button_size - text_size.y) * 0.5f;
         fg->AddText(ImVec2(label_x, label_y), GetTheme().text_secondary, zoom_label);
-        ImGui::Dummy(ImVec2(label_width, button_size));
 
-        ImGui::SameLine();
+        ImGui::SameLine(0.0f, 0.0f);
         if (ImGui::Button("+##zoom_in", ImVec2(button_size, button_size))) {
             renderer.ZoomIn();
         }
