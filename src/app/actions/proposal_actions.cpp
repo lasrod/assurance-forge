@@ -85,11 +85,9 @@ bool IsContextLike(core::NewElementKind kind) {
 }
 
 ElementTextTarget TextTargetFor(const parser::SacmElement& element) {
-    if (!element.content.empty())
+    if (element.type == "claim" || element.type == "argumentreasoning")
         return {"content", element.content};
-    if (!element.description.empty())
-        return {"description", element.description};
-    return {"name", element.name};
+    return {"description", element.description};
 }
 
 const char* RemoveModeField(core::RemoveMode mode) {

@@ -1,6 +1,7 @@
 #include "parser/guidelines_parser.h"
 #include "parser/sccg_dist_parser.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <gtest/gtest.h>
 #include <fstream>
