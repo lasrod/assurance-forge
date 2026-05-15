@@ -1,5 +1,6 @@
 #include "ui/gsn/gsn_canvas.h"
 
+#include "core/string_utils.h"
 #include "core/terminology_scope_service.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/gsn/gsn_dpi.h"
@@ -863,7 +864,7 @@ static std::string CandidateSummary(const sacm::TerminologyPackage* package, con
     if (!term)
         return "Missing term";
     std::string result = term->value.empty() ? "Term" : term->value;
-    if (!term->name.empty())
+    if (!term->name.empty() && core::TrimWhitespace(term->name) != core::TrimWhitespace(term->value))
         result += " - " + term->name;
     if (package && !term->category_refs.empty()) {
         const std::string categories = JoinCategoryNames(*package, term->category_refs);
@@ -883,7 +884,7 @@ static void RenderTermDetails(const sacm::AssuranceCasePackage* package,
     }
 
     ImGui::TextUnformatted(term->value.empty() ? card_state.text.c_str() : term->value.c_str());
-    if (!term->name.empty())
+    if (!term->name.empty() && core::TrimWhitespace(term->name) != core::TrimWhitespace(term->value))
         ImGui::TextWrapped("%s", term->name.c_str());
     if (!term->description.empty()) {
         ImGui::Separator();
