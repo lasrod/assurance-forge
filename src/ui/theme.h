@@ -60,6 +60,15 @@ struct Theme {
     ImU32 node_justification;
     ImU32 node_evidence;
 
+    // ===== GSN/tree role text colors =====
+    ImU32 node_claim_text;
+    ImU32 node_strategy_text;
+    ImU32 node_solution_text;
+    ImU32 node_context_text;
+    ImU32 node_assumption_text;
+    ImU32 node_justification_text;
+    ImU32 node_evidence_text;
+
     // ===== Edges =====
     ImU32 edge_group1; // Structural (solid)
     ImU32 edge_group2; // Contextual (dashed) - accent tinted

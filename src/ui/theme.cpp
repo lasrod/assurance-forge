@@ -51,9 +51,9 @@ void ApplySharedStyle() {
     style.GrabRounding = 6.0f;
     style.TabRounding = 6.0f;
 
-    style.WindowBorderSize = 0.0f;
+    style.WindowBorderSize = 1.0f;
     style.ChildBorderSize = 0.0f;
-    style.PopupBorderSize = 0.0f;
+    style.PopupBorderSize = 1.0f;
     style.FrameBorderSize = 0.0f;
     style.TabBorderSize = 0.0f;
 
@@ -62,6 +62,7 @@ void ApplySharedStyle() {
     style.CellPadding = ImVec2(8.0f, 5.0f);
     style.ItemSpacing = ImVec2(8.0f, 6.0f);
     style.ItemInnerSpacing = ImVec2(6.0f, 5.0f);
+    style.IndentSpacing = 14.0f;
     style.ScrollbarSize = 13.0f;
     style.GrabMinSize = 11.0f;
 
@@ -189,12 +190,12 @@ void ApplyLightColors() {
     colors[ImGuiCol_ResizeGripHovered] = Color(0x29, 0x6B, 0xB8, 0x5E);
     colors[ImGuiCol_ResizeGripActive] = Color(0x29, 0x6B, 0xB8, 0x90);
     colors[ImGuiCol_Tab] = panel;
-    colors[ImGuiCol_TabHovered] = control_hover;
-    colors[ImGuiCol_TabSelected] = Color(0xFF, 0xFF, 0xFF);
-    colors[ImGuiCol_TabSelectedOverline] = Color(0x29, 0x6B, 0xB8, 0x00);
+    colors[ImGuiCol_TabHovered] = Color(0xC8, 0xDD, 0xF6);
+    colors[ImGuiCol_TabSelected] = Color(0xD6, 0xE8, 0xFB);
+    colors[ImGuiCol_TabSelectedOverline] = Color(0x29, 0x6B, 0xB8, 0xCC);
     colors[ImGuiCol_TabDimmed] = Color(0xEA, 0xEF, 0xF5);
-    colors[ImGuiCol_TabDimmedSelected] = Color(0xF7, 0xFA, 0xFC);
-    colors[ImGuiCol_TabDimmedSelectedOverline] = Color(0x29, 0x6B, 0xB8, 0x00);
+    colors[ImGuiCol_TabDimmedSelected] = Color(0xE2, 0xEC, 0xF8);
+    colors[ImGuiCol_TabDimmedSelectedOverline] = Color(0x29, 0x6B, 0xB8, 0x99);
     colors[ImGuiCol_DockingPreview] = Color(0x29, 0x6B, 0xB8, 0x55);
     colors[ImGuiCol_DockingEmptyBg] = bg;
     colors[ImGuiCol_TableHeaderBg] = Color(0xEC, 0xF1, 0xF7);
@@ -243,6 +244,14 @@ Theme MakeTheme(AppTheme app_theme) {
         t.node_justification = RGB(0xD1, 0xDA, 0xEF);
         t.node_evidence = RGB(0xF2, 0xDC, 0xB4);
 
+        t.node_claim_text = RGB(0x2F, 0x75, 0x46);
+        t.node_strategy_text = RGB(0x38, 0x66, 0x98);
+        t.node_solution_text = RGB(0x9A, 0x62, 0x17);
+        t.node_context_text = RGB(0x5A, 0x66, 0x76);
+        t.node_assumption_text = RGB(0xA9, 0x43, 0x43);
+        t.node_justification_text = RGB(0x5A, 0x68, 0x94);
+        t.node_evidence_text = t.node_solution_text;
+
         t.edge_group1 = WithAlpha(t.text_secondary, 0.82f);
         t.edge_group2 = WithAlpha(t.accent, 0.68f);
 
@@ -280,6 +289,14 @@ Theme MakeTheme(AppTheme app_theme) {
         t.node_assumption = RGB(0xE6, 0x8B, 0x8B);
         t.node_justification = RGB(0x9F, 0xB6, 0xE2);
         t.node_evidence = RGB(0xE0, 0xA2, 0x4A);
+
+        t.node_claim_text = t.node_claim;
+        t.node_strategy_text = t.node_strategy;
+        t.node_solution_text = t.node_solution;
+        t.node_context_text = t.node_context;
+        t.node_assumption_text = t.node_assumption;
+        t.node_justification_text = t.node_justification;
+        t.node_evidence_text = t.node_evidence;
 
         t.edge_group1 = WithAlpha(t.text_secondary, 0.85f);
         t.edge_group2 = WithAlpha(t.accent, 0.70f);
@@ -323,7 +340,11 @@ void ApplyAppTheme(AppTheme theme) {
     if (ImGui::GetCurrentContext() == nullptr)
         return;
 
-    ImGuiTheme::ApplyTheme(base_theme);
+    if (HelloImGui::IsUsingHelloImGui()) {
+        ImGuiTheme::ApplyTheme(base_theme);
+    } else {
+        ImGui::GetStyle() = ImGuiTheme::ThemeToStyle(base_theme);
+    }
     ApplySharedStyle();
     if (theme == AppTheme::Light) {
         ApplyLightColors();

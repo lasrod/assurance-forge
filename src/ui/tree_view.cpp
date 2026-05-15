@@ -33,17 +33,17 @@ static ImVec4 RoleColor(core::NodeRole role) {
     const Theme& t = GetTheme();
     switch (role) {
     case core::NodeRole::Claim:
-        return ImGui::ColorConvertU32ToFloat4(t.node_claim);
+        return ImGui::ColorConvertU32ToFloat4(t.node_claim_text);
     case core::NodeRole::Strategy:
-        return ImGui::ColorConvertU32ToFloat4(t.node_strategy);
+        return ImGui::ColorConvertU32ToFloat4(t.node_strategy_text);
     case core::NodeRole::Solution:
-        return ImGui::ColorConvertU32ToFloat4(t.node_solution);
+        return ImGui::ColorConvertU32ToFloat4(t.node_solution_text);
     case core::NodeRole::Context:
-        return ImGui::ColorConvertU32ToFloat4(t.node_context);
+        return ImGui::ColorConvertU32ToFloat4(t.node_context_text);
     case core::NodeRole::Assumption:
-        return ImGui::ColorConvertU32ToFloat4(t.node_assumption);
+        return ImGui::ColorConvertU32ToFloat4(t.node_assumption_text);
     case core::NodeRole::Justification:
-        return ImGui::ColorConvertU32ToFloat4(t.node_justification);
+        return ImGui::ColorConvertU32ToFloat4(t.node_justification_text);
     default:
         return ImGui::ColorConvertU32ToFloat4(t.text_secondary);
     }

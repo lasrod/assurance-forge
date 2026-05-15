@@ -25,6 +25,7 @@ void CancelNativeWindowCloseRequest(HelloImGui::RunnerParams& runner_params) {
 int main(int, char**) {
     app::AppRuntime runtime;
     bool done = false;
+    bool app_theme_applied_after_runner_theme_load = false;
 
     HelloImGui::RunnerParams params;
     params.appWindowParams.windowTitle = "Assurance Forge";
@@ -41,13 +42,6 @@ int main(int, char**) {
     params.callbacks.SetupImGuiConfig = app::ConfigureImGuiConfig;
     params.callbacks.LoadAdditionalFonts = app::ConfigureImGuiFonts;
     params.callbacks.PostInit = [&runtime]() {
-        if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams()) {
-            const char* loaded_theme_name =
-                ImGuiTheme::ImGuiTheme_Name(runner_params->imGuiWindowParams.tweakedTheme.Theme);
-            ui::ApplyAppTheme(ui::ParseAppTheme(loaded_theme_name));
-        } else {
-            ui::ApplyAppTheme(ui::GetDefaultAppTheme());
-        }
         ui::SetCurrentLanguage(ui::ParseLanguageCode(HelloImGui::LoadUserPref(kLanguagePreference)));
         runtime.LoadRecentProjectsPreference(HelloImGui::LoadUserPref(kRecentProjectsPreference));
         runtime.LoadReviewerNamePreference(HelloImGui::LoadUserPref(kReviewerNamePreference));
@@ -59,6 +53,12 @@ int main(int, char**) {
     };
     params.callbacks.ShowGui = [&]() {
         HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
+        if (!app_theme_applied_after_runner_theme_load) {
+            const char* loaded_theme_name =
+                ImGuiTheme::ImGuiTheme_Name(runner_params->imGuiWindowParams.tweakedTheme.Theme);
+            ui::ApplyAppTheme(ui::ParseAppTheme(loaded_theme_name));
+            app_theme_applied_after_runner_theme_load = true;
+        }
         if (runner_params && runner_params->appShallExit && !done) {
             CancelNativeWindowCloseRequest(*runner_params);
             runtime.RequestClose();
