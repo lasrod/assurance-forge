@@ -68,9 +68,11 @@ Prefer local helpers over widening core APIs for one caller. If a helper is need
 
 ## HelloImGui Scope
 
-HelloImGui provides the platform runner, window creation, event loop, DPI scaling, macOS bundling, global ImGui themes, and application settings/user preferences. Assurance Forge keeps its manual `NoDefaultWindow` layout and custom menu flow, but generic widget styling now comes from HelloImGui themes and the selected theme is remembered through HelloImGui settings.
+HelloImGui provides the platform runner, window creation, event loop, DPI scaling, macOS bundling, and application settings/user preferences. Assurance Forge keeps its manual `NoDefaultWindow` layout and custom menu flow. User-facing appearance is intentionally limited to the two app themes exposed by `ui::AppTheme`: `Dark` and `Light`.
 
-Higher-level HelloImGui features such as docking layouts, default layout management, status bars, logging windows, and asset image utilities remain outside the current architecture. The `ui` layer keeps a small semantic palette for GSN node colors, canvas colors, edge colors, and status severity colors because those values carry domain meaning beyond generic ImGui theme colors.
+HelloImGui's built-in theme names are used only as an internal persistence bridge for the existing INI settings file. The Assurance Forge theme layer applies the final ImGui style, migrates old or invalid saved theme names to `Dark` or `Light`, and owns the semantic palette for GSN node colors, canvas colors, edge colors, status severity colors, and attention states.
+
+Higher-level HelloImGui features such as docking layouts, default layout management, status bars, logging windows, theme tweak windows, and asset image utilities remain outside the current architecture. Domain colors should flow through `ui::GetTheme()` or the small semantic color helpers rather than local hardcoded `ImVec4` values.
 
 Application chrome localization is handled by a lightweight Assurance Forge message catalog. This is separate from SACM/model translations, which remain part of the parsed assurance-case data and UI state.
 

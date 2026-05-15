@@ -143,6 +143,21 @@ void RenderAppearanceSection(PreferencesPanelModel model, const PreferencesPanel
     ImGui::TextUnformatted(ui::Tr(ui::MessageId::Appearance));
     ImGui::Separator();
 
+    ImGui::TextUnformatted(ui::Tr(ui::MessageId::Theme));
+    ImGui::SetNextItemWidth(220.0f);
+    if (ImGui::BeginCombo("##theme", ui::GetThemeDisplayName(model.theme))) {
+        for (ui::AppTheme theme : ui::kAppThemes) {
+            const bool selected = model.theme == theme;
+            if (ImGui::Selectable(ui::GetThemeDisplayName(theme), selected)) {
+                if (callbacks.set_theme)
+                    callbacks.set_theme(theme);
+            }
+            if (selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
     ImGui::TextUnformatted(ui::Tr(ui::MessageId::Language));
     ImGui::SetNextItemWidth(220.0f);
     if (ImGui::BeginCombo("##language", ui::LanguageDisplayName(model.language))) {

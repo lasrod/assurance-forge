@@ -33,17 +33,17 @@ static ImVec4 RoleColor(core::NodeRole role) {
     const Theme& t = GetTheme();
     switch (role) {
     case core::NodeRole::Claim:
-        return ImGui::ColorConvertU32ToFloat4(t.node_claim);
+        return ImGui::ColorConvertU32ToFloat4(t.node_claim_text);
     case core::NodeRole::Strategy:
-        return ImGui::ColorConvertU32ToFloat4(t.node_strategy);
+        return ImGui::ColorConvertU32ToFloat4(t.node_strategy_text);
     case core::NodeRole::Solution:
-        return ImGui::ColorConvertU32ToFloat4(t.node_solution);
+        return ImGui::ColorConvertU32ToFloat4(t.node_solution_text);
     case core::NodeRole::Context:
-        return ImGui::ColorConvertU32ToFloat4(t.node_context);
+        return ImGui::ColorConvertU32ToFloat4(t.node_context_text);
     case core::NodeRole::Assumption:
-        return ImGui::ColorConvertU32ToFloat4(t.node_assumption);
+        return ImGui::ColorConvertU32ToFloat4(t.node_assumption_text);
     case core::NodeRole::Justification:
-        return ImGui::ColorConvertU32ToFloat4(t.node_justification);
+        return ImGui::ColorConvertU32ToFloat4(t.node_justification_text);
     default:
         return ImGui::ColorConvertU32ToFloat4(t.text_secondary);
     }
@@ -72,7 +72,7 @@ static void
 DrawDropFeedback(const ImVec2& item_min, const ImVec2& item_max, core::TreeDropMode drop_mode, const ImU32 color) {
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     if (drop_mode == core::TreeDropMode::AsChild) {
-        draw_list->AddRectFilled(item_min, item_max, ImGui::ColorConvertFloat4ToU32(ImVec4(0.35f, 0.55f, 1.0f, 0.18f)));
+        draw_list->AddRectFilled(item_min, item_max, WithAlpha(GetTheme().accent, 0.18f));
         draw_list->AddRect(item_min, item_max, color, 0.0f, 0, 1.5f);
         return;
     }

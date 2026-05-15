@@ -339,6 +339,7 @@ add_executable(tests
     tests/test_guidelines_parser.cpp
     tests/test_guideline_catalog.cpp
     tests/test_localization.cpp
+    tests/test_theme.cpp
     tests/test_ui_state.cpp
     tests/test_recent_projects.cpp
     tests/test_shared_utils.cpp
@@ -398,13 +399,14 @@ add_executable(tests
     src/core/terminology_text_utils.cpp
     src/ui/gsn/gsn_layout.cpp
     src/ui/localization.cpp
+    src/ui/theme.cpp
     src/ui/ui_state.cpp
     src/sacm/sacm_parser.cpp
     src/sacm/sacm_package_tree.cpp
     src/sacm/sacm_serializer.cpp
 )
 target_include_directories(tests PRIVATE src ${ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS})
-target_link_libraries(tests PRIVATE GTest::gtest_main pugixml imgui picosha2 nlohmann_json::nlohmann_json ${AF_YAML_CPP_TARGET} CURL::libcurl)
+target_link_libraries(tests PRIVATE GTest::gtest_main hello_imgui pugixml imgui picosha2 nlohmann_json::nlohmann_json ${AF_YAML_CPP_TARGET} CURL::libcurl)
 if(WIN32)
     target_link_libraries(tests PRIVATE bcrypt advapi32)
 

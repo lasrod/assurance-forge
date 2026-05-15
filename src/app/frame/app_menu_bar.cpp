@@ -41,12 +41,11 @@ void RenderThemeMenu() {
         return;
     }
 
-    for (int i = 0; i < ImGuiTheme::ImGuiTheme_Count; ++i) {
-        auto theme = static_cast<ImGuiTheme::ImGuiTheme_>(i);
-        bool selected = runner_params->imGuiWindowParams.tweakedTheme.Theme == theme;
-        if (ImGui::MenuItem(ImGuiTheme::ImGuiTheme_Name(theme), nullptr, selected)) {
-            runner_params->imGuiWindowParams.tweakedTheme.Theme = theme;
-            ImGuiTheme::ApplyTweakedTheme(runner_params->imGuiWindowParams.tweakedTheme);
+    (void)runner_params;
+    for (ui::AppTheme theme : ui::kAppThemes) {
+        const bool selected = ui::GetCurrentAppTheme() == theme;
+        if (ImGui::MenuItem(ui::GetThemeDisplayName(theme), nullptr, selected)) {
+            ui::ApplyAppTheme(theme);
         }
     }
 
@@ -170,9 +169,6 @@ float RenderAppMenuBar(AppRuntimeState& state, bool& done, const AppMenuBarCallb
 
         ImGui::Separator();
         if (ImGui::BeginMenu(ui::Tr(ui::MessageId::Appearance))) {
-            if (ImGui::MenuItem(ui::Tr(ui::MessageId::ThemeTweaks))) {
-                state.modal_coordinator->show_theme_tweak_window = true;
-            }
             RenderThemeMenu();
             RenderLanguageMenu();
             ImGui::EndMenu();

@@ -106,7 +106,6 @@ enum class ModalKind {
     ReviewerNamePrompt,
     AiReviewDebug,
     Preferences,
-    ThemeTweaks,
 };
 
 struct ModalRequestEvent {

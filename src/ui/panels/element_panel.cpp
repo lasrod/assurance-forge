@@ -3,6 +3,7 @@
 #include "core/terminology_scope_service.h"
 #include "imgui.h"
 #include "ui/gsn/gsn_canvas.h"
+#include "ui/theme.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
@@ -165,6 +166,31 @@ static bool element_has_secondary(const parser::SacmElement& elem, const std::st
     return false;
 }
 
+static void RenderMetadataRow(const char* label, const std::string& value) {
+    const Theme& theme = GetTheme();
+    const char* display_value = value.empty() ? "-" : value.c_str();
+
+    ImGui::PushStyleColor(ImGuiCol_Text, theme.text_secondary);
+    ImGui::Text("%s:", label);
+    ImGui::PopStyleColor();
+
+    ImGui::SameLine(0.0f, 6.0f);
+
+    if (ui::gsn::g_BoldFont)
+        ImGui::PushFont(ui::gsn::g_BoldFont);
+    ImGui::PushStyleColor(ImGuiCol_Text, theme.text_primary);
+    ImGui::TextWrapped("%s", display_value);
+    ImGui::PopStyleColor();
+    if (ui::gsn::g_BoldFont)
+        ImGui::PopFont();
+}
+
+static void RenderElementMetadata(const parser::SacmElement& elem) {
+    RenderMetadataRow("ID", elem.id);
+    RenderMetadataRow("Type", elem.type);
+    ImGui::Spacing();
+}
+
 // Supported secondary languages (no special font requirements except ja which uses merged font)
 static const char* const kLangCodes[] = {
     "ja", "de", "fr", "es", "it", "pt", "nl", "sv", "no", "da", "fi", "pl", "cs", "ro", "hu"};
@@ -253,7 +279,7 @@ void RenderTerminologySuggestions(const sacm::AssuranceCasePackage* sacm_pkg,
     for (const TerminologySuggestion& suggestion : suggestions) {
         ImGui::PushID(suggestion.text.c_str());
         if (suggestion.kind == TerminologySuggestion::Kind::AmbiguousTerm) {
-            ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "%s has multiple meanings.", suggestion.text.c_str());
+            ImGui::TextColored(ui::GetWarningColor(), "%s has multiple meanings.", suggestion.text.c_str());
             int candidate_index = 0;
             for (const auto& candidate : suggestion.candidates) {
                 ImGui::PushID(candidate_index++);
@@ -276,7 +302,7 @@ void RenderTerminologySuggestions(const sacm::AssuranceCasePackage* sacm_pkg,
             continue;
         }
 
-        ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "%s is not defined.", suggestion.text.c_str());
+        ImGui::TextColored(ui::GetWarningColor(), "%s is not defined.", suggestion.text.c_str());
         if (callbacks && callbacks->define_term) {
             if (ImGui::Button("Define"))
                 callbacks->define_term(element_id, suggestion.text);
@@ -313,9 +339,10 @@ bool RenderReviewAttentionNotice(const ui::UiState& state, const std::string& el
         return false;
 
     const char* label = "Unresolved review";
-    const ImVec4 button_color(0.82f, 0.53f, 0.12f, 1.0f);
-    const ImVec4 button_hover(0.92f, 0.63f, 0.18f, 1.0f);
-    const ImVec4 button_active(0.72f, 0.46f, 0.10f, 1.0f);
+    const ui::Theme& theme = ui::GetTheme();
+    const ImVec4 button_color = ImGui::ColorConvertU32ToFloat4(ui::WithAlpha(theme.attention, 0.86f));
+    const ImVec4 button_hover = ImGui::ColorConvertU32ToFloat4(theme.warning);
+    const ImVec4 button_active = ImGui::ColorConvertU32ToFloat4(ui::ShadeColor(theme.attention, -0.16f));
     ImGui::PushStyleColor(ImGuiCol_Button, button_color);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, button_hover);
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, button_active);
@@ -364,17 +391,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     const std::string sec_lang = state.active_secondary_lang;
     bool has_secondary = element_has_secondary(*elem, sec_lang);
 
-    // ID (read-only)
-    ImGui::Text("ID");
-    ImGui::Separator();
-    ImGui::TextWrapped("%s", elem->id.c_str());
-    ImGui::Spacing();
-
-    // Type (read-only)
-    ImGui::Text("Type");
-    ImGui::Separator();
-    ImGui::TextWrapped("%s", elem->type.c_str());
-    ImGui::Spacing();
+    RenderElementMetadata(*elem);
 
     if (RenderReviewAttentionNotice(state, elem->id, terminology_callbacks)) {
         ImGui::Spacing();

@@ -10,6 +10,7 @@
 #include "ui/imgui_buffer_utils.h"
 #include "ui/panels/preferences_panel.h"
 #include "ui/panels/welcome_modal.h"
+#include "ui/theme.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
@@ -152,14 +153,13 @@ void RenderTerminologyTermValidationMessages(bool missing_value,
                                              bool missing_definition,
                                              bool missing_category) {
     if (missing_value)
-        ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.2f, 1.0f), "Term value is required.");
+        ImGui::TextColored(ui::GetErrorColor(), "Term value is required.");
     if (missing_target_package)
-        ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.2f, 1.0f), "Choose a target TerminologyPackage.");
+        ImGui::TextColored(ui::GetErrorColor(), "Choose a target TerminologyPackage.");
     if (duplicate_definition)
-        ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f),
-                           "Duplicate term value and definition exist in this package.");
+        ImGui::TextColored(ui::GetWarningColor(), "Duplicate term value and definition exist in this package.");
     if (missing_definition)
-        ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "Concrete term has no description.");
+        ImGui::TextColored(ui::GetWarningColor(), "Concrete term has no description.");
     if (missing_category)
         ImGui::TextDisabled("Term has no category.");
 }
@@ -226,7 +226,6 @@ public:
 
 private:
     void RenderPreferencesWindow();
-    void RenderThemeTweaksWindow();
     void RenderNotImplementedModal();
     void RenderRemoveConfirmModal();
     void RenderDeleteReviewItemConfirmModal();
@@ -252,7 +251,6 @@ private:
 
 void ModalHost::Render() {
     RenderPreferencesWindow();
-    RenderThemeTweaksWindow();
     RenderRemoveConfirmModal();
     RenderDeleteReviewItemConfirmModal();
     RenderCreateProjectModal();
@@ -299,6 +297,7 @@ void ModalHost::RenderPreferencesWindow() {
     model.modelBufferSize = sizeof(state_.ai.model_buf);
     model.reviewerNameBuffer = state_.reviewer_name_buf;
     model.reviewerNameBufferSize = sizeof(state_.reviewer_name_buf);
+    model.theme = ui::GetCurrentAppTheme();
     model.language = ui::CurrentLanguage();
     if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams()) {
         model.showFps = runner_params->imGuiWindowParams.showStatus_Fps;
@@ -353,6 +352,7 @@ void ModalHost::RenderPreferencesWindow() {
         state_.ai.test_task =
             state_.ai.task_runner.RunConnectionTest([service]() { return service->TestConnection(); });
     };
+    callbacks.set_theme = [](ui::AppTheme theme) { ui::ApplyAppTheme(theme); };
     callbacks.set_language = [](ui::Language language) { ui::SetCurrentLanguage(language); };
     callbacks.set_show_fps = [](bool show_fps) {
         if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams()) {
@@ -368,12 +368,6 @@ void ModalHost::RenderPreferencesWindow() {
     };
 
     ui::panels::ShowPreferencesWindow(state_.modal_coordinator->show_preferences_window, model, callbacks);
-}
-
-void ModalHost::RenderThemeTweaksWindow() {
-    if (!state_.modal_coordinator->show_theme_tweak_window)
-        return;
-    HelloImGui::ShowThemeTweakGuiWindow(&state_.modal_coordinator->show_theme_tweak_window);
 }
 
 void ModalHost::RenderNotImplementedModal() {
@@ -834,7 +828,7 @@ void ModalHost::RenderQuickDefineTermModal() {
 
         ImGui::TextUnformatted("Store in");
         if (package_choices.empty()) {
-            ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.2f, 1.0f), "No TerminologyPackage is available.");
+            ImGui::TextColored(ui::GetErrorColor(), "No TerminologyPackage is available.");
         } else {
             const char* preview = package_choices[static_cast<std::size_t>(selected_package_index)].label.c_str();
             ImGui::SetNextItemWidth(460.0f);
@@ -949,7 +943,7 @@ void ModalHost::RenderTerminologyCategoryEditorModal() {
 
         const bool can_save = !TrimWhitespace(state_.terminology.category_name_buf).empty();
         if (!can_save)
-            ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.2f, 1.0f), "Category name is required.");
+            ImGui::TextColored(ui::GetErrorColor(), "Category name is required.");
 
         ImGui::Spacing();
         if (!can_save)

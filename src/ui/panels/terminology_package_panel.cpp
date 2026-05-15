@@ -3,6 +3,7 @@
 #include "core/string_utils.h"
 #include "core/terminology_text_utils.h"
 #include "imgui.h"
+#include "ui/theme.h"
 
 #include <algorithm>
 
@@ -126,13 +127,13 @@ std::vector<core::TerminologyTermIssue> IssuesFor(const core::TerminologyTermRef
 ImVec4 IssueColor(core::TerminologyTermIssueSeverity severity) {
     switch (severity) {
     case core::TerminologyTermIssueSeverity::Error:
-        return ImVec4(0.9f, 0.25f, 0.2f, 1.0f);
+        return ui::GetErrorColor();
     case core::TerminologyTermIssueSeverity::Warning:
-        return ImVec4(0.95f, 0.65f, 0.15f, 1.0f);
+        return ui::GetWarningColor();
     case core::TerminologyTermIssueSeverity::Info:
-        return ImVec4(0.45f, 0.55f, 0.7f, 1.0f);
+        return ui::GetInfoColor();
     }
-    return ImVec4(0.45f, 0.55f, 0.7f, 1.0f);
+    return ui::GetInfoColor();
 }
 
 void RenderIssueMarker(const std::vector<core::TerminologyTermIssue>& issues) {

@@ -3,9 +3,25 @@
 // domain colors for GSN/canvas rendering.
 #pragma once
 
+#include <array>
 #include <imgui.h>
+#include <string_view>
 
 namespace ui {
+
+enum class AppTheme {
+    Dark,
+    Light,
+};
+
+inline constexpr std::array<AppTheme, 2> kAppThemes = {AppTheme::Dark, AppTheme::Light};
+
+void ApplyAppTheme(AppTheme theme);
+AppTheme GetCurrentAppTheme();
+AppTheme GetDefaultAppTheme();
+const char* GetThemeDisplayName(AppTheme theme);
+AppTheme ParseAppTheme(std::string_view value);
+std::string_view SerializeAppTheme(AppTheme theme);
 
 struct Theme {
     // ===== Surfaces (background tiers) =====
@@ -32,6 +48,8 @@ struct Theme {
     ImU32 success;
     ImU32 warning;
     ImU32 danger;
+    ImU32 info;
+    ImU32 attention;
 
     // ===== GSN node fills (desaturated for dark canvas) =====
     ImU32 node_claim;
@@ -41,6 +59,15 @@ struct Theme {
     ImU32 node_assumption;
     ImU32 node_justification;
     ImU32 node_evidence;
+
+    // ===== GSN/tree role text colors =====
+    ImU32 node_claim_text;
+    ImU32 node_strategy_text;
+    ImU32 node_solution_text;
+    ImU32 node_context_text;
+    ImU32 node_assumption_text;
+    ImU32 node_justification_text;
+    ImU32 node_evidence_text;
 
     // ===== Edges =====
     ImU32 edge_group1; // Structural (solid)
@@ -80,5 +107,12 @@ ImU32 ShadeColor(ImU32 c, float amount);
 // Returns a color for a viewport cull ratio (culled/total). Uses theme
 // semantic colors: success (high cull), warning (medium), text_secondary (low).
 ImVec4 CullRatioColor(float ratio);
+
+ImVec4 GetSuccessColor();
+ImVec4 GetWarningColor();
+ImVec4 GetErrorColor();
+ImVec4 GetInfoColor();
+ImVec4 GetMutedTextColor();
+ImVec4 GetAttentionColor();
 
 } // namespace ui

@@ -19,11 +19,11 @@ ImVec4 ElementTypeColor(const char* type) {
         return ImGui::ColorConvertU32ToFloat4(theme.text_primary);
     std::string_view sv(type);
     if (sv == "claim")
-        return ImGui::ColorConvertU32ToFloat4(theme.node_claim);
+        return ImGui::ColorConvertU32ToFloat4(theme.node_claim_text);
     if (sv == "argumentreasoning")
-        return ImGui::ColorConvertU32ToFloat4(theme.node_strategy);
+        return ImGui::ColorConvertU32ToFloat4(theme.node_strategy_text);
     if (sv == "artifact" || sv == "artifactreference") {
-        return ImGui::ColorConvertU32ToFloat4(theme.node_solution);
+        return ImGui::ColorConvertU32ToFloat4(theme.node_solution_text);
     }
     return ImGui::ColorConvertU32ToFloat4(theme.text_primary);
 }

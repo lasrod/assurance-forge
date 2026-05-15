@@ -14,7 +14,6 @@ public:
     bool close_requested = false;
     bool show_reviewer_name_prompt = false;
     bool show_preferences_window = false;
-    bool show_theme_tweak_window = false;
 
     void RequestClose();
     void CancelClose();

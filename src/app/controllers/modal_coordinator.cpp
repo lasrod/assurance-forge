@@ -33,9 +33,6 @@ void ModalCoordinator::ApplyModalRequest(const ModalRequestEvent& event) {
     case ModalKind::Preferences:
         show_preferences_window = event.open;
         break;
-    case ModalKind::ThemeTweaks:
-        show_theme_tweak_window = event.open;
-        break;
     default:
         break;
     }
