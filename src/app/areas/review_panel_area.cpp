@@ -277,6 +277,10 @@ void RenderReviewPanelContent(AppRuntimeState& state, const ReviewPanelAreaCallb
         if (callbacks.delete_review_item)
             callbacks.delete_review_item(item);
     };
+    panel_callbacks.quick_fix_problem = [&callbacks](const core::ProblemItem& problem) {
+        if (callbacks.quick_fix_problem)
+            callbacks.quick_fix_problem(problem);
+    };
     panel_callbacks.delete_problem = [&state, &callbacks](const core::ProblemItem& problem) {
         state.problems_manager.RemoveProblem(problem.id);
         if (callbacks.sync_review_visual_states)

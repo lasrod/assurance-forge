@@ -315,6 +315,7 @@ add_executable(tests
     tests/test_review_proposal_patch_service.cpp
     tests/test_sacm_roundtrip.cpp
     tests/test_sacm_package_tree.cpp
+    tests/test_terminology_actions.cpp
     tests/test_terminology_package_service.cpp
     tests/test_terminology_scope_service.cpp
     tests/test_element_factory.cpp
@@ -351,9 +352,12 @@ add_executable(tests
     src/ai/ai_settings.cpp
     src/ai/ai_task_runner.cpp
     src/ai/ai_types.cpp
+    src/ai/libcurl_http_client.cpp
     src/ai/http_client.cpp
     src/ai/openai_provider.cpp
     src/ai/secret_store.cpp
+    src/app/app_runtime_state.cpp
+    src/app/actions/terminology_actions.cpp
     src/app/controllers/ai_review_controller.cpp
     src/app/controllers/element_edit_controller.cpp
     src/app/controllers/modal_coordinator.cpp

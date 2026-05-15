@@ -368,6 +368,12 @@ void DrawProblemItem(const core::ProblemItem& problem, const ReviewPanelCallback
     ImGui::TextWrapped("%s", problem.type.empty() ? "Problem" : problem.type.c_str());
     ImGui::TextDisabled("Source: %s", core::ToString(problem.source));
     DrawSelectableMessageText("problem_message", problem.message, 3.5f);
+    if (!problem.quick_fix_label.empty() && callbacks.quick_fix_problem) {
+        if (ImGui::Button(problem.quick_fix_label.c_str())) {
+            callbacks.quick_fix_problem(problem);
+        }
+        ImGui::SameLine();
+    }
     if (ImGui::Button("Resolve") && callbacks.delete_problem) {
         callbacks.delete_problem(problem);
     }

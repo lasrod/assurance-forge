@@ -643,6 +643,9 @@ void AppRuntime::RenderFrame(bool& done) {
     review_panel_callbacks.delete_review_item = [this](const core::reviews::ReviewItem& item) {
         BeginDeleteReviewItem(item);
     };
+    review_panel_callbacks.quick_fix_problem = [this](const core::ProblemItem& problem) {
+        HandleProblemQuickFix(problem);
+    };
     review_panel_callbacks.sync_review_visual_states = [this]() { SyncReviewVisualStatesFromReviews(); };
     review_panel_callbacks.set_manual_review_ok = [this](const std::string& element_id, bool manual_ok) {
         return SetManualReviewOk(element_id, manual_ok);
