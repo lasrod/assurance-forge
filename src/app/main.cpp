@@ -2,7 +2,15 @@
 
 #include "app/app_runtime.h"
 #include "app/app_ui_bootstrap.h"
+#ifdef _WIN32
+#include <windows.h>
+#include <dwmapi.h>
+#define GLFW_EXPOSE_NATIVE_WIN32
+#endif
 #include "GLFW/glfw3.h"
+#ifdef _WIN32
+#include "GLFW/glfw3native.h"
+#endif
 #include "hello_imgui/hello_imgui.h"
 #include "ui/localization.h"
 #include "ui/theme.h"
@@ -12,6 +20,27 @@ namespace {
 constexpr const char* kLanguagePreference = "AssuranceForge.Language";
 constexpr const char* kRecentProjectsPreference = "AssuranceForge.RecentProjects";
 constexpr const char* kReviewerNamePreference = "AssuranceForge.ReviewerName";
+
+#ifdef _WIN32
+void EnableDarkTitleBar(GLFWwindow* glfw_window) {
+    if (glfw_window == nullptr) {
+        return;
+    }
+
+    HWND hwnd = glfwGetWin32Window(glfw_window);
+    if (hwnd == nullptr) {
+        return;
+    }
+
+    BOOL use_dark_mode = TRUE;
+    DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &use_dark_mode, sizeof(use_dark_mode));
+
+    COLORREF caption_color = RGB(10, 15, 24);
+    COLORREF text_color = RGB(230, 235, 245);
+    DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, &caption_color, sizeof(caption_color));
+    DwmSetWindowAttribute(hwnd, DWMWA_TEXT_COLOR, &text_color, sizeof(text_color));
+}
+#endif
 
 void CancelNativeWindowCloseRequest(HelloImGui::RunnerParams& runner_params) {
     runner_params.appShallExit = false;
@@ -45,6 +74,12 @@ int main(int, char**) {
         ui::SetCurrentLanguage(ui::ParseLanguageCode(HelloImGui::LoadUserPref(kLanguagePreference)));
         runtime.LoadRecentProjectsPreference(HelloImGui::LoadUserPref(kRecentProjectsPreference));
         runtime.LoadReviewerNamePreference(HelloImGui::LoadUserPref(kReviewerNamePreference));
+#ifdef _WIN32
+        HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
+        if (runner_params != nullptr && runner_params->backendPointers.glfwWindow != nullptr) {
+            EnableDarkTitleBar(static_cast<GLFWwindow*>(runner_params->backendPointers.glfwWindow));
+        }
+#endif
     };
     params.callbacks.BeforeExit = [&runtime]() {
         HelloImGui::SaveUserPref(kLanguagePreference, ui::LanguageCode(ui::CurrentLanguage()));
