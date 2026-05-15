@@ -166,6 +166,31 @@ static bool element_has_secondary(const parser::SacmElement& elem, const std::st
     return false;
 }
 
+static void RenderMetadataRow(const char* label, const std::string& value) {
+    const Theme& theme = GetTheme();
+    const char* display_value = value.empty() ? "-" : value.c_str();
+
+    ImGui::PushStyleColor(ImGuiCol_Text, theme.text_secondary);
+    ImGui::Text("%s:", label);
+    ImGui::PopStyleColor();
+
+    ImGui::SameLine(0.0f, 6.0f);
+
+    if (ui::gsn::g_BoldFont)
+        ImGui::PushFont(ui::gsn::g_BoldFont);
+    ImGui::PushStyleColor(ImGuiCol_Text, theme.text_primary);
+    ImGui::TextWrapped("%s", display_value);
+    ImGui::PopStyleColor();
+    if (ui::gsn::g_BoldFont)
+        ImGui::PopFont();
+}
+
+static void RenderElementMetadata(const parser::SacmElement& elem) {
+    RenderMetadataRow("ID", elem.id);
+    RenderMetadataRow("Type", elem.type);
+    ImGui::Spacing();
+}
+
 // Supported secondary languages (no special font requirements except ja which uses merged font)
 static const char* const kLangCodes[] = {
     "ja", "de", "fr", "es", "it", "pt", "nl", "sv", "no", "da", "fi", "pl", "cs", "ro", "hu"};
@@ -366,17 +391,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     const std::string sec_lang = state.active_secondary_lang;
     bool has_secondary = element_has_secondary(*elem, sec_lang);
 
-    // ID (read-only)
-    ImGui::Text("ID");
-    ImGui::Separator();
-    ImGui::TextWrapped("%s", elem->id.c_str());
-    ImGui::Spacing();
-
-    // Type (read-only)
-    ImGui::Text("Type");
-    ImGui::Separator();
-    ImGui::TextWrapped("%s", elem->type.c_str());
-    ImGui::Spacing();
+    RenderElementMetadata(*elem);
 
     if (RenderReviewAttentionNotice(state, elem->id, terminology_callbacks)) {
         ImGui::Spacing();
