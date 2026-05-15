@@ -878,7 +878,7 @@ static void RenderTermDetails(const sacm::AssuranceCasePackage* package,
                               const sacm::Term* term,
                               const TerminologyCardState& card_state) {
     if (!term) {
-        ImGui::TextColored(ImVec4(0.9f, 0.25f, 0.2f, 1.0f), "Term reference could not be resolved.");
+        ImGui::TextColored(GetErrorColor(), "Term reference could not be resolved.");
         return;
     }
 
@@ -908,7 +908,7 @@ static void RenderTerminologyCardContents(const TerminologyCardState& card_state
                                           bool interactive) {
     ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + DpiSize(320.0f));
     if (card_state.kind == TerminologyCardKind::Undefined) {
-        ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "%s is not defined.", card_state.text.c_str());
+        ImGui::TextColored(GetWarningColor(), "%s is not defined.", card_state.text.c_str());
         ImGui::TextWrapped("Define this term from the active terminology scope.");
         if (interactive && actions.define_terminology_term) {
             if (ImGui::Button("Define term", ImVec2(120.0f, 0.0f)))
@@ -919,7 +919,7 @@ static void RenderTerminologyCardContents(const TerminologyCardState& card_state
     }
 
     if (card_state.kind == TerminologyCardKind::Ambiguous) {
-        ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.15f, 1.0f), "%s has multiple meanings.", card_state.text.c_str());
+        ImGui::TextColored(GetWarningColor(), "%s has multiple meanings.", card_state.text.c_str());
         int shown = 0;
         for (const auto& candidate : card_state.candidates) {
             ImGui::PushID(shown);
@@ -1191,14 +1191,7 @@ void ShowGsnCanvasContent(UiState& ui_state,
     // so no ImGui scrollbars are needed.
     ImU32 canvas_bg = GetTheme().canvas_bg;
     if (ui_state.proposal_canvas_active) {
-        // Blend canvas_bg toward a dark olive tone to signal proposal mode.
-        ImVec4 bg = ImGui::ColorConvertU32ToFloat4(canvas_bg);
-        const ImVec4 tint = ImGui::ColorConvertU32ToFloat4(IM_COL32(42, 45, 30, 255));
-        const float t = 0.45f;
-        bg.x = bg.x * (1.0f - t) + tint.x * t;
-        bg.y = bg.y * (1.0f - t) + tint.y * t;
-        bg.z = bg.z * (1.0f - t) + tint.z * t;
-        canvas_bg = ImGui::ColorConvertFloat4ToU32(bg);
+        canvas_bg = LerpColor(canvas_bg, GetTheme().attention, 0.16f);
     }
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(canvas_bg));
     ImGui::BeginChild("gsn_canvas_child",

@@ -9,6 +9,7 @@
 #include "ui/panels/package_details_panel.h"
 #include "ui/panels/terminology_package_panel.h"
 #include "ui/register_views.h"
+#include "ui/theme.h"
 #include "ui/ui_state.h"
 
 namespace app::areas {
@@ -40,7 +41,8 @@ ui::ElementContextActions MakeCanvasContextActions(const WorkbenchAreaCallbacks&
 void RenderProposalBanner(AppRuntimeState& state, const WorkbenchAreaCallbacks& callbacks) {
     const float banner_h = ImGui::GetStyle().WindowPadding.y * 2.0f + ImGui::GetTextLineHeight() +
                            ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeight() + 2.0f;
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(IM_COL32(42, 45, 30, 255)));
+    const ImU32 banner_bg = ui::LerpColor(ui::GetTheme().surface_1, ui::GetTheme().attention, 0.18f);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(banner_bg));
     ImGui::BeginChild("##proposal_preview_banner", ImVec2(0.0f, banner_h), true, ImGuiWindowFlags_NoScrollbar);
     auto& proposals = *state.proposal_controller;
     ImGui::TextUnformatted(proposals.creator_active ? "PROPOSAL CREATOR" : "PROPOSAL PREVIEW");

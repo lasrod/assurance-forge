@@ -2,6 +2,7 @@
 
 #include "ai/ai_types.h"
 #include "ui/localization.h"
+#include "ui/theme.h"
 
 #include <cstddef>
 #include <functional>
@@ -20,6 +21,7 @@ struct PreferencesPanelModel {
     size_t modelBufferSize = 0;
     char* reviewerNameBuffer = nullptr;
     size_t reviewerNameBufferSize = 0;
+    ui::AppTheme theme = ui::AppTheme::Dark;
     ui::Language language = ui::Language::English;
     bool showFps = false;
 };
@@ -29,6 +31,7 @@ struct PreferencesPanelCallbacks {
     std::function<void(const char*)> save_api_key;
     std::function<void()> remove_api_key;
     std::function<void()> test_connection;
+    std::function<void(ui::AppTheme)> set_theme;
     std::function<void(ui::Language)> set_language;
     std::function<void(bool)> set_show_fps;
     std::function<void(const char*)> save_reviewer_name;

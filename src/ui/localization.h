@@ -31,7 +31,6 @@ enum class MessageId {
     WelcomeScreen,
     Appearance,
     Theme,
-    ThemeTweaks,
     Language,
     ShowFps,
     PerfLegendHigh,

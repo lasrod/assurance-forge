@@ -72,7 +72,7 @@ static void
 DrawDropFeedback(const ImVec2& item_min, const ImVec2& item_max, core::TreeDropMode drop_mode, const ImU32 color) {
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     if (drop_mode == core::TreeDropMode::AsChild) {
-        draw_list->AddRectFilled(item_min, item_max, ImGui::ColorConvertFloat4ToU32(ImVec4(0.35f, 0.55f, 1.0f, 0.18f)));
+        draw_list->AddRectFilled(item_min, item_max, WithAlpha(GetTheme().accent, 0.18f));
         draw_list->AddRect(item_min, item_max, color, 0.0f, 0, 1.5f);
         return;
     }

@@ -5,6 +5,7 @@
 #include "GLFW/glfw3.h"
 #include "hello_imgui/hello_imgui.h"
 #include "ui/localization.h"
+#include "ui/theme.h"
 
 namespace {
 
@@ -32,7 +33,7 @@ int main(int, char**) {
     params.imGuiWindowParams.defaultImGuiWindowType = HelloImGui::DefaultImGuiWindowType::NoDefaultWindow;
     params.imGuiWindowParams.showMenuBar = false;
     params.imGuiWindowParams.rememberTheme = true;
-    params.imGuiWindowParams.tweakedTheme.Theme = ImGuiTheme::ImGuiTheme_DarculaDarker;
+    params.imGuiWindowParams.tweakedTheme.Theme = ImGuiTheme::ImGuiTheme_ImGuiColorsDark;
     params.iniFolderType = HelloImGui::IniFolderType::AppUserConfigFolder;
     params.iniFilename = "AssuranceForge/hello_imgui.ini";
     params.iniFilename_useAppWindowTitle = false;
@@ -40,6 +41,13 @@ int main(int, char**) {
     params.callbacks.SetupImGuiConfig = app::ConfigureImGuiConfig;
     params.callbacks.LoadAdditionalFonts = app::ConfigureImGuiFonts;
     params.callbacks.PostInit = [&runtime]() {
+        if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams()) {
+            const char* loaded_theme_name =
+                ImGuiTheme::ImGuiTheme_Name(runner_params->imGuiWindowParams.tweakedTheme.Theme);
+            ui::ApplyAppTheme(ui::ParseAppTheme(loaded_theme_name));
+        } else {
+            ui::ApplyAppTheme(ui::GetDefaultAppTheme());
+        }
         ui::SetCurrentLanguage(ui::ParseLanguageCode(HelloImGui::LoadUserPref(kLanguagePreference)));
         runtime.LoadRecentProjectsPreference(HelloImGui::LoadUserPref(kRecentProjectsPreference));
         runtime.LoadReviewerNamePreference(HelloImGui::LoadUserPref(kReviewerNamePreference));
