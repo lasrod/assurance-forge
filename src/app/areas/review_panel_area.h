@@ -23,6 +23,7 @@ struct ReviewPanelAreaCallbacks {
     std::function<void(const core::reviews::ReviewItem&)> delete_proposal;
     std::function<bool(const core::reviews::ReviewItem&)> resolve_review_item;
     std::function<void(const core::reviews::ReviewItem&)> delete_review_item;
+    std::function<void(const core::ProblemItem&)> quick_fix_problem;
     std::function<void()> sync_review_visual_states;
     std::function<bool(const std::string&, bool)> set_manual_review_ok;
 };

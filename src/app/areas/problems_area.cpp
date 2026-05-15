@@ -14,6 +14,7 @@ void RenderProblemsAreaContent(AppRuntimeState& state, const ProblemsAreaCallbac
     ui::panels::ProblemsPanelCallbacks panel_callbacks{
         callbacks.activate_problem,
         callbacks.quick_fix_problem,
+        callbacks.open_review_problem,
     };
     ui::panels::ShowProblemsPanelContent(model, panel_callbacks, false);
 }

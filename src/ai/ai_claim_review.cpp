@@ -250,17 +250,27 @@ std::string BuildProblemMessage(const nlohmann::json& finding) {
     std::string suggested_claim_wording = JsonStringValue(finding, "suggested_claim_wording");
     std::string confidence = JsonStringValue(finding, "confidence");
 
+    std::vector<std::string> sections;
+    if (!message.empty())
+        sections.push_back(message);
     if (!why.empty())
-        message += " Why it matters: " + why;
+        sections.push_back("Why it matters:\n" + why);
     if (!suggested_fix.empty())
-        message += " Suggested fix: " + suggested_fix;
+        sections.push_back("Suggested fix:\n" + suggested_fix);
     if (!suggested_element_text.empty())
-        message += " Suggested element text: " + suggested_element_text;
+        sections.push_back("Suggested element text:\n" + suggested_element_text);
     else if (!suggested_claim_wording.empty())
-        message += " Suggested claim wording: " + suggested_claim_wording;
+        sections.push_back("Suggested claim wording:\n" + suggested_claim_wording);
     if (!confidence.empty())
-        message += " Confidence: " + confidence;
-    return message;
+        sections.push_back("Confidence:\n" + confidence);
+
+    std::string formatted_message;
+    for (size_t index = 0; index < sections.size(); ++index) {
+        if (index > 0)
+            formatted_message += "\n\n";
+        formatted_message += sections[index];
+    }
+    return formatted_message;
 }
 
 } // namespace

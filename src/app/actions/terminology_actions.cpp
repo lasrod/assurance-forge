@@ -178,6 +178,43 @@ core::TerminologyPackageRef ResolveQuickDefineTargetPackage(const AppRuntimeStat
     return {};
 }
 
+struct QuickDefineTargetPackageResult {
+    core::TerminologyPackageRef package_ref;
+    bool created = false;
+    std::string error;
+};
+
+QuickDefineTargetPackageResult EnsureQuickDefineTargetPackage(AppRuntimeState& state, const std::string& element_id) {
+    QuickDefineTargetPackageResult target;
+    target.package_ref = ResolveQuickDefineTargetPackage(state, element_id);
+    if (HasTerminologyPackageRef(target.package_ref))
+        return target;
+
+    if (!state.app_state.sacm_package.has_value()) {
+        target.error = "Open a SACM model before defining terms.";
+        return target;
+    }
+
+    core::TerminologyPackageCreateResult created = core::CreateTerminologyPackage(
+        state.app_state.sacm_package.value(), "Terminology Package", "Terms used by this safety case.");
+    if (!created.success) {
+        target.error = created.error;
+        return target;
+    }
+
+    target.package_ref = created.package_ref;
+    target.created = true;
+    state.terminology.selected_package_ref = created.package_ref;
+    state.terminology.selected_term_ref = core::TerminologyTermRef{};
+    state.terminology.selected_category_ref = core::TerminologyCategoryRef{};
+    state.terminology.selected_package_file_path = state.app_state.active_project_file_path;
+    if (const sacm::TerminologyPackage* package =
+            core::FindTerminologyPackage(state.app_state.sacm_package.value(), created.package_ref)) {
+        CopyTerminologyPackageToEditor(state, *package);
+    }
+    return target;
+}
+
 void MarkTerminologyDocumentDirty(AppRuntimeState& state) {
     state.app_state.mark_dirty();
     state.document_dirty = true;
@@ -938,10 +975,23 @@ void TerminologyActions::BeginQuickDefineTerm(const std::string& element_id, con
         return;
     }
 
-    const core::TerminologyPackageRef target_package_ref = ResolveQuickDefineTargetPackage(state_, element_id);
-    if (!HasTerminologyPackageRef(target_package_ref)) {
-        SetStatus(state_, "Create a TerminologyPackage before defining terms from text.");
+    const QuickDefineTargetPackageResult target = EnsureQuickDefineTargetPackage(state_, element_id);
+    if (!HasTerminologyPackageRef(target.package_ref)) {
+        SetStatus(state_,
+                  target.error.empty() ? "Could not create a TerminologyPackage for the new term."
+                                       : "Terminology package create failed: " + target.error);
         return;
+    }
+    if (target.created) {
+        MarkTerminologyDocumentDirty(state_);
+        state_.events.Emit(TreeDirtyEvent{});
+        state_.events.Emit(DocumentDirtyEvent{});
+        if (state_.app_state.current_project.has_value() && !state_.app_state.active_project_file_path.empty()) {
+            const std::filesystem::path relative = std::filesystem::relative(
+                state_.app_state.active_project_file_path, state_.app_state.current_project->rootPath);
+            InvalidateSacmPackageTreeCache(state_, relative);
+        }
+        SetStatus(state_, "Created a TerminologyPackage for new terms.");
     }
 
     const std::string trimmed_term = TrimWhitespace(term_value);
@@ -949,7 +999,7 @@ void TerminologyActions::BeginQuickDefineTerm(const std::string& element_id, con
     CopyToBuffer(state_.terminology.term_value_buf, sizeof(state_.terminology.term_value_buf), trimmed_term);
     state_.terminology.quick_define_element_id = element_id;
     state_.terminology.quick_define_source_text = trimmed_term;
-    state_.terminology.quick_define_target_package_ref = target_package_ref;
+    state_.terminology.quick_define_target_package_ref = target.package_ref;
     state_.terminology.show_quick_define_term_modal = true;
 }
 

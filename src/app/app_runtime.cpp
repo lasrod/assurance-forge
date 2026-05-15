@@ -58,6 +58,24 @@ bool IsReviewDerivedProblem(const core::ProblemItem& problem) {
     return problem.id.rfind("review-comment:", 0) == 0 || problem.id.rfind("guideline-review:", 0) == 0;
 }
 
+std::string ReviewItemIdFromProblemId(const std::string& problem_id) {
+    constexpr const char* kReviewPrefix = "review-comment:";
+    constexpr const char* kGuidelinePrefix = "guideline-review:";
+
+    if (problem_id.rfind(kReviewPrefix, 0) == 0)
+        return problem_id.substr(std::char_traits<char>::length(kReviewPrefix));
+
+    if (problem_id.rfind(kGuidelinePrefix, 0) == 0) {
+        const size_t start = std::char_traits<char>::length(kGuidelinePrefix);
+        const size_t end = problem_id.find(':', start);
+        if (end == std::string::npos)
+            return problem_id.substr(start);
+        return problem_id.substr(start, end - start);
+    }
+
+    return {};
+}
+
 } // namespace
 
 ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
@@ -625,6 +643,9 @@ void AppRuntime::RenderFrame(bool& done) {
     review_panel_callbacks.delete_review_item = [this](const core::reviews::ReviewItem& item) {
         BeginDeleteReviewItem(item);
     };
+    review_panel_callbacks.quick_fix_problem = [this](const core::ProblemItem& problem) {
+        HandleProblemQuickFix(problem);
+    };
     review_panel_callbacks.sync_review_visual_states = [this]() { SyncReviewVisualStatesFromReviews(); };
     review_panel_callbacks.set_manual_review_ok = [this](const std::string& element_id, bool manual_ok) {
         return SetManualReviewOk(element_id, manual_ok);
@@ -644,6 +665,16 @@ void AppRuntime::RenderFrame(bool& done) {
     };
     feedback_dock_callbacks.problems.quick_fix_problem = [this](const core::ProblemItem& problem) {
         HandleProblemQuickFix(problem);
+    };
+    feedback_dock_callbacks.problems.open_review_problem = [this](const core::ProblemItem& problem) {
+        if (problem.element_id.empty())
+            return;
+        ui::UiState& ui_state = ui::GetUiState();
+        ui_state.selected_problem_element_id = problem.element_id;
+        impl_->workbench.focus_review_tab = true;
+        impl_->workbench.focus_review_item_id = ReviewItemIdFromProblemId(problem.id);
+        impl_->events.Emit(SelectionChangedEvent{problem.element_id, true});
+        impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
     };
     feedback_dock_callbacks.term_usages.activate_usage = [this](std::size_t usage_index) {
         NavigateToTerminologyUsage(usage_index);
@@ -679,6 +710,7 @@ void AppRuntime::RenderFrame(bool& done) {
         [this](const std::string& element_id, const std::string& term_value) {
             return IsTerminologySuggestionIgnored(element_id, term_value);
         },
+        [this]() { impl_->workbench.focus_review_tab = true; },
         [this]() {
             impl_->events.Emit(TreeDirtyEvent{});
             impl_->events.Emit(DocumentDirtyEvent{});

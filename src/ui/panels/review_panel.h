@@ -26,6 +26,7 @@ struct ProposalTextChangePreview {
 
 struct ReviewPanelModel {
     std::string selected_element_id;
+    std::string focus_review_item_id;
     std::vector<core::reviews::ReviewItem> review_items;
     std::vector<core::ProblemItem> problem_items;
     std::vector<ReviewGuidelineOption> guideline_options;
@@ -56,6 +57,7 @@ struct ReviewPanelCallbacks {
     std::function<void(const core::reviews::ReviewItem& item)> delete_proposal;
     std::function<void(const core::reviews::ReviewItem& item)> resolve_review_item;
     std::function<void(const core::reviews::ReviewItem& item)> delete_review_item;
+    std::function<void(const core::ProblemItem& problem)> quick_fix_problem;
     std::function<void(const core::ProblemItem& problem)> delete_problem;
     std::function<void(bool manual_ok)> set_manual_review_ok;
 };

@@ -227,7 +227,7 @@ TEST(AiClaimReviewTest, ParsesFencedJsonAndMapsFindingsToProblems) {
     EXPECT_EQ(parsed.problems[0].severity, core::ProblemSeverity::Warning);
     EXPECT_EQ(parsed.problems[0].guideline_id, "CL.2");
     EXPECT_EQ(parsed.suggestedElementTexts[0], "The braking controller safety is acceptable.");
-    EXPECT_NE(parsed.problems[0].message.find("Suggested fix: Split the claim."), std::string::npos);
+    EXPECT_NE(parsed.problems[0].message.find("Suggested fix:\nSplit the claim."), std::string::npos);
 }
 
 TEST(AiClaimReviewTest, ParsesGenericSuggestedElementText) {

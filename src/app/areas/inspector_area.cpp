@@ -30,6 +30,7 @@ void RenderInspectorArea(AppRuntimeState& state,
         terminology_callbacks.use_term_for_element = callbacks.use_terminology_term_for_element;
         terminology_callbacks.ignore_term = callbacks.ignore_terminology_suggestion;
         terminology_callbacks.is_ignored = callbacks.is_terminology_suggestion_ignored;
+        terminology_callbacks.focus_review_tab = callbacks.focus_review_tab;
         if (ui::panels::ShowElementPanel(loaded_case, sacm_package, &terminology_callbacks)) {
             if (callbacks.mark_element_modified)
                 callbacks.mark_element_modified();

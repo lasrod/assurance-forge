@@ -345,13 +345,34 @@ void DrawReviewItemActions(const core::reviews::ReviewItem& item,
     }
 }
 
+void DrawSelectableMessageText(const char* id_suffix, const std::string& message, float line_count) {
+    if (message.empty())
+        return;
+
+    std::vector<char> buffer(message.begin(), message.end());
+    buffer.push_back('\0');
+
+    const float min_lines = line_count < 2.0f ? 2.0f : line_count;
+    ImGui::PushID(id_suffix);
+    ImGui::InputTextMultiline("##message",
+                              buffer.data(),
+                              buffer.size(),
+                              ImVec2(-1.0f, ImGui::GetTextLineHeightWithSpacing() * min_lines),
+                              ImGuiInputTextFlags_ReadOnly);
+    ImGui::PopID();
+}
+
 void DrawProblemItem(const core::ProblemItem& problem, const ReviewPanelCallbacks& callbacks) {
     DrawProblemSeverityBadge(problem);
     ImGui::SameLine();
     ImGui::TextWrapped("%s", problem.type.empty() ? "Problem" : problem.type.c_str());
     ImGui::TextDisabled("Source: %s", core::ToString(problem.source));
-    if (!problem.message.empty()) {
-        ImGui::TextWrapped("%s", problem.message.c_str());
+    DrawSelectableMessageText("problem_message", problem.message, 3.5f);
+    if (!problem.quick_fix_label.empty() && callbacks.quick_fix_problem) {
+        if (ImGui::Button(problem.quick_fix_label.c_str())) {
+            callbacks.quick_fix_problem(problem);
+        }
+        ImGui::SameLine();
     }
     if (ImGui::Button("Resolve") && callbacks.delete_problem) {
         callbacks.delete_problem(problem);
@@ -403,25 +424,76 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
     static char guideline_filter_buf[160] = "";
     static std::vector<std::string> selected_guideline_ids;
     static std::string popup_guideline_id;
+    static bool show_guideline_selector = false;
     if (active_element_id != model.selected_element_id) {
         active_element_id = model.selected_element_id;
         title_buf[0] = '\0';
         message_buf[0] = '\0';
         guideline_filter_buf[0] = '\0';
         selected_guideline_ids.clear();
+        show_guideline_selector = false;
+    }
+
+    ImGui::Separator();
+    ImGui::Text("Comments (%d)", static_cast<int>(model.review_items.size()));
+
+    if (model.review_items.empty() && model.problem_items.empty()) {
+        ImGui::TextDisabled("No review comments for this element.");
+    }
+
+    for (const core::reviews::ReviewItem& item : model.review_items) {
+        const bool focused_item = !model.focus_review_item_id.empty() && model.focus_review_item_id == item.id;
+        ImGui::PushID(item.id.c_str());
+        ImGui::Separator();
+        DrawStatusBadge(item);
+        ImGui::SameLine();
+        if (focused_item) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(ui::GetTheme().accent));
+        }
+        ImGui::TextWrapped("%s", item.title.empty() ? "Review comment" : item.title.c_str());
+        if (focused_item) {
+            ImGui::PopStyleColor();
+        }
+        ImGui::TextDisabled("Reviewed by %s", item.reviewer_name.empty() ? "not recorded" : item.reviewer_name.c_str());
+        DrawSelectableMessageText("review_message", item.message, 4.0f);
+        DrawGuidelineTags(model, item.guideline_ids, popup_guideline_id);
+        DrawReviewItemActions(item, model, callbacks);
+        if (focused_item) {
+            ImGui::SetScrollHereY(0.2f);
+        }
+        ImGui::PopID();
+    }
+
+    if (!model.problem_items.empty()) {
+        ImGui::Separator();
+        ImGui::Text("Other Problems (%d)", static_cast<int>(model.problem_items.size()));
+        for (const core::ProblemItem& problem : model.problem_items) {
+            ImGui::PushID(problem.id.c_str());
+            ImGui::Separator();
+            DrawProblemItem(problem, callbacks);
+            ImGui::PopID();
+        }
     }
 
     if (title_buf[0] == '\0')
         CopyToBuffer(title_buf, sizeof(title_buf), "Review comment");
 
+    ImGui::Separator();
     ImGui::TextUnformatted("New Comment");
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::InputText("##review_title", title_buf, sizeof(title_buf));
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::InputTextMultiline(
         "##review_message", message_buf, sizeof(message_buf), ImVec2(-1.0f, ImGui::GetTextLineHeight() * 4.0f));
-    DrawGuidelineSelector(
-        model, selected_guideline_ids, guideline_filter_buf, sizeof(guideline_filter_buf), popup_guideline_id);
+
+    if (ImGui::Button("Add SCCG violation")) {
+        show_guideline_selector = !show_guideline_selector;
+    }
+
+    if (show_guideline_selector) {
+        DrawGuidelineSelector(
+            model, selected_guideline_ids, guideline_filter_buf, sizeof(guideline_filter_buf), popup_guideline_id);
+    }
 
     const bool can_add = title_buf[0] != '\0' && message_buf[0] != '\0';
     if (!can_add)
@@ -432,49 +504,12 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
         message_buf[0] = '\0';
         guideline_filter_buf[0] = '\0';
         selected_guideline_ids.clear();
+        show_guideline_selector = false;
     }
     if (!can_add)
         ImGui::EndDisabled();
 
     DrawGuidelineStubPopup(model, popup_guideline_id);
-
-    ImGui::Separator();
-    ImGui::Text("Comments (%d)", static_cast<int>(model.review_items.size()));
-
-    if (model.review_items.empty() && model.problem_items.empty()) {
-        ImGui::TextDisabled("No review comments for this element.");
-        return;
-    }
-
-    if (ImGui::BeginChild("##review_items", ImVec2(0.0f, 0.0f), false)) {
-        for (const core::reviews::ReviewItem& item : model.review_items) {
-            ImGui::PushID(item.id.c_str());
-            ImGui::Separator();
-            DrawStatusBadge(item);
-            ImGui::SameLine();
-            ImGui::TextWrapped("%s", item.title.empty() ? "Review comment" : item.title.c_str());
-            ImGui::TextDisabled("Reviewed by %s",
-                                item.reviewer_name.empty() ? "not recorded" : item.reviewer_name.c_str());
-            if (!item.message.empty()) {
-                ImGui::TextWrapped("%s", item.message.c_str());
-            }
-            DrawGuidelineTags(model, item.guideline_ids, popup_guideline_id);
-            DrawReviewItemActions(item, model, callbacks);
-            ImGui::PopID();
-        }
-
-        if (!model.problem_items.empty()) {
-            ImGui::Separator();
-            ImGui::Text("Other Problems (%d)", static_cast<int>(model.problem_items.size()));
-            for (const core::ProblemItem& problem : model.problem_items) {
-                ImGui::PushID(problem.id.c_str());
-                ImGui::Separator();
-                DrawProblemItem(problem, callbacks);
-                ImGui::PopID();
-            }
-        }
-    }
-    ImGui::EndChild();
 }
 
 } // namespace ui::panels

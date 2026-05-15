@@ -53,19 +53,19 @@ const char* PrefixFor(PatchOperationType type) {
 const char* DefaultNameFor(PatchOperationType type) {
     switch (type) {
     case PatchOperationType::CreateClaim:
-        return "New Goal";
+        return "";
     case PatchOperationType::CreateStrategy:
-        return "New Strategy";
+        return "";
     case PatchOperationType::CreateSolution:
-        return "New Solution";
+        return "";
     case PatchOperationType::CreateContext:
-        return "New Context";
+        return "";
     case PatchOperationType::CreateAssumption:
-        return "New Assumption";
+        return "";
     case PatchOperationType::CreateJustification:
-        return "New Justification";
+        return "";
     default:
-        return "New Element";
+        return "";
     }
 }
 

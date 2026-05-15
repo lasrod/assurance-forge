@@ -16,6 +16,7 @@ struct ProblemsPanelModel {
 struct ProblemsPanelCallbacks {
     std::function<void(const core::ProblemItem&)> on_problem_activated;
     std::function<void(const core::ProblemItem&)> on_quick_fix;
+    std::function<void(const core::ProblemItem&)> on_open_review;
 };
 
 void ShowProblemsPanel(float x,
