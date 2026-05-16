@@ -22,7 +22,7 @@ constexpr const char* kRecentProjectsPreference = "AssuranceForge.RecentProjects
 constexpr const char* kReviewerNamePreference = "AssuranceForge.ReviewerName";
 
 #ifdef _WIN32
-void EnableDarkTitleBar(GLFWwindow* glfw_window) {
+void ApplyWindowTheme(GLFWwindow* glfw_window, ui::AppTheme theme) {
     if (glfw_window == nullptr) {
         return;
     }
@@ -32,11 +32,12 @@ void EnableDarkTitleBar(GLFWwindow* glfw_window) {
         return;
     }
 
-    BOOL use_dark_mode = TRUE;
+    const bool use_dark_theme = theme == ui::AppTheme::Dark;
+    BOOL use_dark_mode = use_dark_theme ? TRUE : FALSE;
     DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &use_dark_mode, sizeof(use_dark_mode));
 
-    COLORREF caption_color = RGB(10, 15, 24);
-    COLORREF text_color = RGB(230, 235, 245);
+    COLORREF caption_color = use_dark_theme ? RGB(10, 15, 24) : RGB(251, 252, 253);
+    COLORREF text_color = use_dark_theme ? RGB(230, 235, 245) : RGB(23, 28, 34);
     DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, &caption_color, sizeof(caption_color));
     DwmSetWindowAttribute(hwnd, DWMWA_TEXT_COLOR, &text_color, sizeof(text_color));
 }
@@ -69,19 +70,23 @@ int main(int, char**) {
     params.iniDisable = false;
     params.callbacks.SetupImGuiConfig = app::ConfigureImGuiConfig;
     params.callbacks.LoadAdditionalFonts = app::ConfigureImGuiFonts;
+    params.callbacks.SetupImGuiStyle = []() {
+        HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
+        const char* loaded_theme_name = nullptr;
+        if (runner_params != nullptr) {
+            loaded_theme_name = ImGuiTheme::ImGuiTheme_Name(runner_params->imGuiWindowParams.tweakedTheme.Theme);
+        }
+        ui::ApplyAppTheme(ui::ParseAppTheme(loaded_theme_name != nullptr ? loaded_theme_name : ""));
+    };
     params.callbacks.PostInit = [&runtime]() {
         ui::SetCurrentLanguage(ui::ParseLanguageCode(HelloImGui::LoadUserPref(kLanguagePreference)));
         runtime.LoadRecentProjectsPreference(HelloImGui::LoadUserPref(kRecentProjectsPreference));
         runtime.LoadReviewerNamePreference(HelloImGui::LoadUserPref(kReviewerNamePreference));
-        HelloImGui::RunnerParams* post_init_runner_params = HelloImGui::GetRunnerParams();
-        if (post_init_runner_params != nullptr) {
-            const char* loaded_theme_name =
-                ImGuiTheme::ImGuiTheme_Name(post_init_runner_params->imGuiWindowParams.tweakedTheme.Theme);
-            ui::ApplyAppTheme(ui::ParseAppTheme(loaded_theme_name != nullptr ? loaded_theme_name : ""));
-        }
 #ifdef _WIN32
+        HelloImGui::RunnerParams* post_init_runner_params = HelloImGui::GetRunnerParams();
         if (post_init_runner_params != nullptr && post_init_runner_params->backendPointers.glfwWindow != nullptr) {
-            EnableDarkTitleBar(static_cast<GLFWwindow*>(post_init_runner_params->backendPointers.glfwWindow));
+            ApplyWindowTheme(static_cast<GLFWwindow*>(post_init_runner_params->backendPointers.glfwWindow),
+                             ui::GetCurrentAppTheme());
         }
 #endif
     };
