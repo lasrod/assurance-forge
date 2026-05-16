@@ -154,8 +154,8 @@ static void RenderTreeNode(const core::TreeNode* node,
     // items, so clicks/right-clicks always land on the tree node).
     {
         constexpr float kArrowIconGapTightenPx = 6.0f;
-        float text_x = std::max(item_min.x,
-                                item_min.x + ImGui::GetTreeNodeToLabelSpacing() - kArrowIconGapTightenPx);
+        float text_x =
+            item_min.x + std::max(0.0f, ImGui::GetTreeNodeToLabelSpacing() - kArrowIconGapTightenPx);
         float text_y = item_min.y + (item_size.y - ImGui::GetTextLineHeight()) * 0.5f;
 
         ImDrawList* dl = ImGui::GetWindowDrawList();
