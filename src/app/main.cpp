@@ -73,14 +73,15 @@ int main(int, char**) {
         ui::SetCurrentLanguage(ui::ParseLanguageCode(HelloImGui::LoadUserPref(kLanguagePreference)));
         runtime.LoadRecentProjectsPreference(HelloImGui::LoadUserPref(kRecentProjectsPreference));
         runtime.LoadReviewerNamePreference(HelloImGui::LoadUserPref(kReviewerNamePreference));
-        HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
-        if (runner_params != nullptr) {
-            const char* loaded_theme_name = ImGuiTheme::ImGuiTheme_Name(runner_params->imGuiWindowParams.tweakedTheme.Theme);
+        HelloImGui::RunnerParams* post_init_runner_params = HelloImGui::GetRunnerParams();
+        if (post_init_runner_params != nullptr) {
+            const char* loaded_theme_name =
+                ImGuiTheme::ImGuiTheme_Name(post_init_runner_params->imGuiWindowParams.tweakedTheme.Theme);
             ui::ApplyAppTheme(ui::ParseAppTheme(loaded_theme_name != nullptr ? loaded_theme_name : ""));
         }
 #ifdef _WIN32
-        if (runner_params != nullptr && runner_params->backendPointers.glfwWindow != nullptr) {
-            EnableDarkTitleBar(static_cast<GLFWwindow*>(runner_params->backendPointers.glfwWindow));
+        if (post_init_runner_params != nullptr && post_init_runner_params->backendPointers.glfwWindow != nullptr) {
+            EnableDarkTitleBar(static_cast<GLFWwindow*>(post_init_runner_params->backendPointers.glfwWindow));
         }
 #endif
     };
