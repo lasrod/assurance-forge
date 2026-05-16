@@ -31,7 +31,7 @@ void DrawTextCentered(ImDrawList* draw_list, ImVec2 center, const char* text, Im
     draw_list->AddText(ImVec2(center.x - size.x * 0.5f, center.y - size.y * 0.5f), color, text);
 }
 
-bool DrawOpinionSliderBar(const char* label, SubjectiveOpinion& opinion, OpinionComponent component, ImU32 color) {
+void DrawOpinionSliderBar(const char* label, SubjectiveOpinion& opinion, OpinionComponent component, ImU32 color) {
     const Theme& theme = GetTheme();
     NormalizeOpinion(opinion);
 
@@ -65,14 +65,10 @@ bool DrawOpinionSliderBar(const char* label, SubjectiveOpinion& opinion, Opinion
     const bool hovered = ImGui::IsItemHovered();
     const bool active = ImGui::IsItemActive();
 
-    bool changed = false;
     if (active && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
         const float t = (ImGui::GetIO().MousePos.x - cursor.x) / std::max(1.0f, size.x);
         const float next_value = ClampConfidenceValue(t);
-        if (std::fabs(next_value - value) > 0.0005f) {
-            SetOpinionComponent(opinion, component, next_value);
-            changed = true;
-        }
+        SetOpinionComponent(opinion, component, next_value);
     }
 
     if (hovered || active)
@@ -92,7 +88,6 @@ bool DrawOpinionSliderBar(const char* label, SubjectiveOpinion& opinion, Opinion
         ImGui::SetTooltip("Drag to adjust %s", label);
 
     ImGui::PopID();
-    return changed;
 }
 
 bool DrawSegmentButton(const char* label, bool selected, float width) {
@@ -112,22 +107,18 @@ bool DrawSegmentButton(const char* label, bool selected, float width) {
     return clicked;
 }
 
-bool DrawModeSelector(ElementConfidence& confidence) {
-    bool changed = false;
+void DrawModeSelector(ElementConfidence& confidence) {
     const float gap = ImGui::GetStyle().ItemSpacing.x;
     const float available = ImGui::GetContentRegionAvail().x;
     const float button_width = std::max(92.0f, (available - gap) * 0.5f);
 
     if (DrawSegmentButton("Direct value", confidence.mode == ConfidenceInputMode::DirectValue, button_width)) {
         confidence.mode = ConfidenceInputMode::DirectValue;
-        changed = true;
     }
     ImGui::SameLine();
     if (DrawSegmentButton("Opinion triangle", confidence.mode == ConfidenceInputMode::OpinionTriangle, button_width)) {
         confidence.mode = ConfidenceInputMode::OpinionTriangle;
-        changed = true;
     }
-    return changed;
 }
 
 void DrawProjectedConfidence(float value) {
@@ -147,7 +138,7 @@ void DrawProjectedConfidence(float value) {
     ImGui::ProgressBar(value, ImVec2(-1.0f, 8.0f), "");
 }
 
-bool DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec2& requested_size) {
+void DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec2& requested_size) {
     const Theme& theme = GetTheme();
     NormalizeOpinion(opinion);
 
@@ -160,7 +151,6 @@ bool DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
     ImGui::InvisibleButton("##triangle", size);
     const bool hovered = ImGui::IsItemHovered();
     const bool active = ImGui::IsItemActive();
-    const bool pressed_or_dragged = active && ImGui::IsMouseDown(ImGuiMouseButton_Left);
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
     const float rounding = theme.rounding_panel;
@@ -171,6 +161,13 @@ bool DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
     const ImVec2 help_min(help_center.x - help_radius - 2.0f, help_center.y - help_radius - 2.0f);
     const ImVec2 help_max(help_center.x + help_radius + 2.0f, help_center.y + help_radius + 2.0f);
     const bool help_hovered = ImGui::IsMouseHoveringRect(help_min, help_max, true);
+    const ImGuiID suppress_triangle_drag_id = ImGui::GetID("##suppress_triangle_drag");
+    if (ImGui::IsItemActivated())
+        ImGui::GetStateStorage()->SetBool(suppress_triangle_drag_id, help_hovered);
+    if (!active)
+        ImGui::GetStateStorage()->SetBool(suppress_triangle_drag_id, false);
+    const bool suppress_triangle_drag = ImGui::GetStateStorage()->GetBool(suppress_triangle_drag_id, false);
+    const bool pressed_or_dragged = active && !suppress_triangle_drag && ImGui::IsMouseDown(ImGuiMouseButton_Left);
 
     draw_list->AddRectFilled(surface_min, surface_max, WithAlpha(theme.surface_2, hovered || active ? 0.96f : 0.78f), rounding);
     draw_list->AddRect(surface_min,
@@ -249,20 +246,14 @@ bool DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
         DrawTextCentered(draw_list, centroid, "0.33", WithAlpha(theme.text_muted, 0.70f));
     }
 
-    bool changed = false;
     if (pressed_or_dragged) {
         const ImVec2 mouse = ImGui::GetIO().MousePos;
         SubjectiveOpinion next = OpinionFromPoint(ToConfidencePoint(mouse),
                                                   uncertainty_vertex,
                                                   disbelief_vertex,
                                                   belief_vertex,
-                                                  opinion.baseRate);
-        if (std::fabs(next.belief - opinion.belief) > 0.0005f ||
-            std::fabs(next.disbelief - opinion.disbelief) > 0.0005f ||
-            std::fabs(next.uncertainty - opinion.uncertainty) > 0.0005f) {
-            opinion = next;
-            changed = true;
-        }
+                                                  opinion.base_rate);
+        opinion = next;
     }
 
     const ConfidencePoint selected_point = OpinionToPoint(opinion, uncertainty_vertex, disbelief_vertex, belief_vertex);
@@ -289,16 +280,15 @@ bool DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
     }
 
     ImGui::PopID();
-    return changed;
 }
 
 void DrawDirectMode(ElementConfidence& confidence) {
-    confidence.directValue = ClampConfidenceValue(confidence.directValue);
+    confidence.direct_value = ClampConfidenceValue(confidence.direct_value);
     ImGui::TextUnformatted("Confidence");
     ImGui::SetNextItemWidth(-1.0f);
-    if (ImGui::SliderFloat("##direct_confidence", &confidence.directValue, 0.0f, 1.0f, "%.2f"))
-        confidence.directValue = ClampConfidenceValue(confidence.directValue);
-    DrawProjectedConfidence(confidence.directValue);
+    if (ImGui::SliderFloat("##direct_confidence", &confidence.direct_value, 0.0f, 1.0f, "%.2f"))
+        confidence.direct_value = ClampConfidenceValue(confidence.direct_value);
+    DrawProjectedConfidence(confidence.direct_value);
 }
 
 void DrawOpinionMode(ElementConfidence& confidence) {
@@ -315,14 +305,15 @@ void DrawOpinionMode(ElementConfidence& confidence) {
     DrawOpinionSliderBar("Uncertainty", confidence.opinion, OpinionComponent::Uncertainty, theme.info);
 
     ImGui::Spacing();
-    ImGui::Text("Base rate %.2f", confidence.opinion.baseRate);
+    const char* base_rate_tooltip = "Base rate controls how much unresolved uncertainty counts toward projected confidence.\nProjected confidence = belief + base rate * uncertainty.";
+    ImGui::Text("Base rate %.2f", confidence.opinion.base_rate);
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("When uncertainty remains, this is the assumed share treated as confidence in the projected value.");
+        ImGui::SetTooltip("%s", base_rate_tooltip);
     ImGui::SetNextItemWidth(-1.0f);
-    if (ImGui::SliderFloat("##base_rate", &confidence.opinion.baseRate, 0.0f, 1.0f, "%.2f"))
-        confidence.opinion.baseRate = ClampConfidenceValue(confidence.opinion.baseRate);
+    if (ImGui::SliderFloat("##base_rate", &confidence.opinion.base_rate, 0.0f, 1.0f, "%.2f"))
+        confidence.opinion.base_rate = ClampConfidenceValue(confidence.opinion.base_rate);
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Projected confidence = belief + base rate * uncertainty.");
+        ImGui::SetTooltip("%s", base_rate_tooltip);
 
     DrawProjectedConfidence(confidence.opinion.ProjectedConfidence());
 }

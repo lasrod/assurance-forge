@@ -71,12 +71,8 @@ float ClampConfidenceValue(float value) {
     return std::clamp(value, 0.0f, 1.0f);
 }
 
-float ProjectedConfidence(const SubjectiveOpinion& opinion) {
-    return ClampConfidenceValue(opinion.belief + ClampConfidenceValue(opinion.baseRate) * opinion.uncertainty);
-}
-
 float SubjectiveOpinion::ProjectedConfidence() const {
-    return ui::ProjectedConfidence(*this);
+    return ClampConfidenceValue(belief + ClampConfidenceValue(base_rate) * uncertainty);
 }
 
 void NormalizeOpinion(SubjectiveOpinion& opinion) {
@@ -95,7 +91,7 @@ void NormalizeOpinion(SubjectiveOpinion& opinion) {
         opinion.uncertainty = 1.0f - opinion.belief - opinion.disbelief;
     }
 
-    opinion.baseRate = ClampConfidenceValue(opinion.baseRate);
+    opinion.base_rate = ClampConfidenceValue(opinion.base_rate);
 }
 
 SubjectiveOpinion NormalizedOpinion(SubjectiveOpinion opinion) {
@@ -160,7 +156,7 @@ SubjectiveOpinion OpinionFromPoint(ConfidencePoint point,
     opinion.belief = weights.belief;
     opinion.disbelief = weights.disbelief;
     opinion.uncertainty = weights.uncertainty;
-    opinion.baseRate = base_rate;
+    opinion.base_rate = base_rate;
     NormalizeOpinion(opinion);
     return opinion;
 }
