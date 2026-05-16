@@ -37,7 +37,7 @@ ImGuiTheme::ImGuiTheme_ BaseImGuiTheme(AppTheme theme) {
 }
 
 #ifdef _WIN32
-void ApplyWindowTheme(AppTheme theme, HelloImGui::RunnerParams* runner_params) {
+void ApplyWin32WindowTheme(AppTheme theme, HelloImGui::RunnerParams* runner_params) {
     if (runner_params == nullptr || runner_params->backendPointers.glfwWindow == nullptr)
         return;
 
@@ -365,7 +365,7 @@ void ApplyAppTheme(AppTheme theme) {
         if (runner_params != nullptr) {
             runner_params->imGuiWindowParams.tweakedTheme = ImGuiTheme::ImGuiTweakedTheme(base_theme);
 #ifdef _WIN32
-            ApplyWindowTheme(theme, runner_params);
+            ApplyWin32WindowTheme(theme, runner_params);
 #endif
         }
     }
