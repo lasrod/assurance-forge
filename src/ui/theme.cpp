@@ -351,7 +351,6 @@ void ApplyAppTheme(AppTheme theme) {
     } else {
         ApplyDarkColors();
     }
-
     if (HelloImGui::IsUsingHelloImGui()) {
         HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
         if (runner_params != nullptr) {
