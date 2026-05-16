@@ -3,6 +3,7 @@
 #include "core/terminology_scope_service.h"
 #include "imgui.h"
 #include "ui/gsn/gsn_canvas.h"
+#include "ui/panels/confidence_panel.h"
 #include "ui/theme.h"
 #include "ui/ui_state.h"
 
@@ -512,6 +513,8 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
             modified = true;
         }
     }
+
+    ShowConfidencePanel(elem->id);
 
     // Sync edits to SACM model
     if (modified) {

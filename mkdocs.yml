@@ -58,6 +58,7 @@ nav:
   - Features:
     - Overview: features/index.md
     - Terminology Assist: features/terminology-assist.md
+    - Confidence Panel Prototype: features/confidence-panel-prototype.md
   - Roadmap:
     - Product Roadmap: roadmap/public.md
     - Workflow: roadmap/workflow.md

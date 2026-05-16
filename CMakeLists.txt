@@ -182,7 +182,9 @@ set(ASSURANCE_FORGE_SHARED_SOURCES
     src/export/svg_writer.cpp
     src/parser/model_utils.cpp
     src/parser/xml_parser.cpp
+    src/ui/confidence_model.cpp
     src/ui/panels/welcome_modal.cpp
+    src/ui/panels/confidence_panel.cpp
     src/ui/panels/element_panel.cpp
     src/ui/panels/package_details_panel.cpp
     src/ui/panels/preferences_panel.cpp
@@ -341,6 +343,7 @@ add_executable(tests
     tests/test_localization.cpp
     tests/test_theme.cpp
     tests/test_ui_state.cpp
+    tests/test_confidence_model.cpp
     tests/test_recent_projects.cpp
     tests/test_shared_utils.cpp
     tests/test_gsn_svg_exporter.cpp
@@ -398,6 +401,7 @@ add_executable(tests
     src/core/terminology_scope_service.cpp
     src/core/terminology_text_utils.cpp
     src/ui/gsn/gsn_layout.cpp
+    src/ui/confidence_model.cpp
     src/ui/localization.cpp
     src/ui/theme.cpp
     src/ui/ui_state.cpp
