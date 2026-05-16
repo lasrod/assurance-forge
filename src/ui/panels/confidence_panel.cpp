@@ -236,10 +236,17 @@ bool DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
     DrawTextCentered(draw_list, ImVec2(belief.x - (labels_fit ? 16.0f : 8.0f), belief.y + 16.0f), "Belief", theme.text_secondary);
 
     if (labels_fit) {
-        DrawTextCentered(draw_list, ImVec2(uncertainty.x - 18.0f, uncertainty.y + 20.0f), "1", WithAlpha(theme.text_muted, 0.80f));
-        DrawTextCentered(draw_list, ImVec2(disbelief.x + 13.0f, disbelief.y - 13.0f), "1", WithAlpha(theme.text_muted, 0.80f));
-        DrawTextCentered(draw_list, ImVec2(belief.x - 13.0f, belief.y - 13.0f), "1", WithAlpha(theme.text_muted, 0.80f));
-        DrawTextCentered(draw_list, ImVec2(centroid.x, centroid.y + 12.0f), "0.33", WithAlpha(theme.text_muted, 0.70f));
+        const auto marker_position = [centroid](ImVec2 vertex) {
+            const float dx = centroid.x - vertex.x;
+            const float dy = centroid.y - vertex.y;
+            const float length = std::max(1.0f, std::sqrt(dx * dx + dy * dy));
+            constexpr float inset = 18.0f;
+            return ImVec2(vertex.x + dx / length * inset, vertex.y + dy / length * inset);
+        };
+        DrawTextCentered(draw_list, marker_position(uncertainty), "1", WithAlpha(theme.text_muted, 0.80f));
+        DrawTextCentered(draw_list, marker_position(disbelief), "1", WithAlpha(theme.text_muted, 0.80f));
+        DrawTextCentered(draw_list, marker_position(belief), "1", WithAlpha(theme.text_muted, 0.80f));
+        DrawTextCentered(draw_list, centroid, "0.33", WithAlpha(theme.text_muted, 0.70f));
     }
 
     bool changed = false;
