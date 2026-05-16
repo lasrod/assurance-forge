@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "parser/xml_parser.h"
+#include "ui/confidence_model.h"
 
 #include <string>
 #include <unordered_map>
@@ -63,6 +64,11 @@ struct UiState {
     // Session-only visual review state for GSN nodes. Persistence needs a
     // dedicated review-result model rather than SACM metadata.
     std::unordered_map<std::string, ElementReviewVisualState> review_visual_states;
+
+    // Session-only confidence prototype state. Persistence and propagation are
+    // intentionally deferred until the feature model is proven in the UI.
+    std::unordered_map<std::string, ElementConfidence> confidence_states;
+
     std::unordered_set<std::string> ai_review_scope_element_ids;
     std::string ai_review_primary_element_id;
 
