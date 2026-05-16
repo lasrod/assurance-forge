@@ -211,6 +211,9 @@ void ShowTreeViewPanel(const core::AssuranceTree* tree,
         return;
     }
 
+    const ImVec2 window_padding = ImGui::GetStyle().WindowPadding;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(1.0f, window_padding.y));
+    ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 8.0f);
     if (ImGui::BeginChild("TreeViewScroll", ImVec2(0, 0), false)) {
         RenderTreeNode(tree->root, active_case, state, actions, tree_edit_actions);
 
@@ -226,6 +229,7 @@ void ShowTreeViewPanel(const core::AssuranceTree* tree,
         }
     }
     ImGui::EndChild();
+    ImGui::PopStyleVar(2);
 }
 
 } // namespace ui
