@@ -290,13 +290,13 @@ Theme MakeTheme(AppTheme app_theme) {
         t.node_justification = RGB(0x9F, 0xB6, 0xE2);
         t.node_evidence = RGB(0xE0, 0xA2, 0x4A);
 
-        t.node_claim_text = t.node_claim;
-        t.node_strategy_text = t.node_strategy;
-        t.node_solution_text = t.node_solution;
-        t.node_context_text = t.node_context;
-        t.node_assumption_text = t.node_assumption;
-        t.node_justification_text = t.node_justification;
-        t.node_evidence_text = t.node_evidence;
+        t.node_claim_text = ShadeColor(t.node_claim, 0.25f);
+        t.node_strategy_text = ShadeColor(t.node_strategy, 0.25f);
+        t.node_solution_text = ShadeColor(t.node_solution, 0.25f);
+        t.node_context_text = ShadeColor(t.node_context, 0.25f);
+        t.node_assumption_text = ShadeColor(t.node_assumption, 0.25f);
+        t.node_justification_text = ShadeColor(t.node_justification, 0.25f);
+        t.node_evidence_text = t.node_solution_text;
 
         t.edge_group1 = WithAlpha(t.text_secondary, 0.85f);
         t.edge_group2 = WithAlpha(t.accent, 0.70f);
