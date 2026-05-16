@@ -88,10 +88,22 @@ static ImU32 ColorForType(const std::string& type) {
 }
 
 static ImU32 DimmedProposalColor(ImU32 color) {
+    if (GetCurrentAppTheme() == AppTheme::Light) {
+        ImU32 softened = LerpColor(color, GetTheme().surface_1, 0.72f);
+        return LerpColor(softened, GetTheme().canvas_bg, 0.42f);
+    }
+
     ImVec4 value = ImGui::ColorConvertU32ToFloat4(color);
     float gray = value.x * 0.299f + value.y * 0.587f + value.z * 0.114f;
     ImVec4 dimmed(gray * 0.62f, gray * 0.62f, gray * 0.62f, value.w * 0.58f);
     return ImGui::ColorConvertFloat4ToU32(dimmed);
+}
+
+static ImU32 DimmedProposalInk(ImU32 fill_color) {
+    if (GetCurrentAppTheme() == AppTheme::Light) {
+        return WithAlpha(InkOn(fill_color), 0.72f);
+    }
+    return WithAlpha(GetTheme().text_secondary, 0.62f);
 }
 
 static ImU32 OutlineColor() {
@@ -1088,7 +1100,7 @@ void DrawGsnNode(const GsnNode& node,
     ComputeTextRegion(node, top_left, bottom_right, zoom, has_attention, text_left, text_wrap);
     ImU32 ink = marked_for_removal ? GetTheme().text_primary : InkOn(fill_color);
     if (proposal_dimmed)
-        ink = WithAlpha(GetTheme().text_secondary, 0.62f);
+        ink = DimmedProposalInk(fill_color);
     DrawNodeLabel(draw_list, node, top_left, bottom_right, text_left, text_wrap, zoom, ink, ui_state);
     const std::vector<TerminologySpanHitRegion> terminology_regions = BuildAndDrawTerminologySpans(
         draw_list, node, top_left, text_left, text_wrap, zoom, ui_state, terminology_service);

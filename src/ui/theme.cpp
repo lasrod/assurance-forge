@@ -2,6 +2,13 @@
 
 #include "hello_imgui/hello_imgui.h"
 #include "hello_imgui/imgui_theme.h"
+#ifdef _WIN32
+#include "GLFW/glfw3.h"
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include "GLFW/glfw3native.h"
+#include <windows.h>
+#include <dwmapi.h>
+#endif
 
 #include <algorithm>
 #include <cctype>
@@ -12,7 +19,7 @@ namespace ui {
 
 namespace {
 
-constexpr ImU32 RGB(int r, int g, int b, int a = 255) {
+constexpr ImU32 PackedColor(int r, int g, int b, int a = 255) {
     return IM_COL32(r, g, b, a);
 }
 
@@ -28,6 +35,27 @@ AppTheme g_current_app_theme = AppTheme::Dark;
 ImGuiTheme::ImGuiTheme_ BaseImGuiTheme(AppTheme theme) {
     return theme == AppTheme::Light ? ImGuiTheme::ImGuiTheme_ImGuiColorsLight : ImGuiTheme::ImGuiTheme_ImGuiColorsDark;
 }
+
+#ifdef _WIN32
+void ApplyWin32WindowTheme(AppTheme theme, HelloImGui::RunnerParams* runner_params) {
+    if (runner_params == nullptr || runner_params->backendPointers.glfwWindow == nullptr)
+        return;
+
+    auto* glfw_window = static_cast<GLFWwindow*>(runner_params->backendPointers.glfwWindow);
+    HWND hwnd = glfwGetWin32Window(glfw_window);
+    if (hwnd == nullptr)
+        return;
+
+    const bool use_dark_theme = theme == AppTheme::Dark;
+    BOOL use_dark_mode = use_dark_theme ? TRUE : FALSE;
+    DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &use_dark_mode, sizeof(use_dark_mode));
+
+    COLORREF caption_color = use_dark_theme ? RGB(10, 15, 24) : RGB(251, 252, 253);
+    COLORREF text_color = use_dark_theme ? RGB(230, 235, 245) : RGB(23, 28, 34);
+    DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, &caption_color, sizeof(caption_color));
+    DwmSetWindowAttribute(hwnd, DWMWA_TEXT_COLOR, &text_color, sizeof(text_color));
+}
+#endif
 
 std::string NormalizeThemeName(std::string_view value) {
     std::string normalized;
@@ -213,82 +241,82 @@ Theme MakeTheme(AppTheme app_theme) {
     Theme t{};
 
     if (app_theme == AppTheme::Light) {
-        t.bg_app = RGB(0xFB, 0xFC, 0xFD);
-        t.surface_1 = RGB(0xF2, 0xF5, 0xF9);
-        t.surface_2 = RGB(0xE6, 0xE9, 0xF0);
-        t.surface_3 = RGB(0xD8, 0xE5, 0xF5);
+        t.bg_app = PackedColor(0xFB, 0xFC, 0xFD);
+        t.surface_1 = PackedColor(0xF2, 0xF5, 0xF9);
+        t.surface_2 = PackedColor(0xE6, 0xE9, 0xF0);
+        t.surface_3 = PackedColor(0xD8, 0xE5, 0xF5);
 
-        t.border = RGB(0xD9, 0xE1, 0xEC);
-        t.border_strong = RGB(0xB7, 0xC4, 0xD3);
+        t.border = PackedColor(0xD9, 0xE1, 0xEC);
+        t.border_strong = PackedColor(0xB7, 0xC4, 0xD3);
 
-        t.text_primary = RGB(0x17, 0x1C, 0x22);
-        t.text_secondary = RGB(0x5D, 0x68, 0x78);
-        t.text_muted = RGB(0x7C, 0x86, 0x96);
-        t.ink_dark = RGB(0x17, 0x1C, 0x22);
-        t.ink_darker = RGB(0x0F, 0x14, 0x1A);
+        t.text_primary = PackedColor(0x17, 0x1C, 0x22);
+        t.text_secondary = PackedColor(0x5D, 0x68, 0x78);
+        t.text_muted = PackedColor(0x7C, 0x86, 0x96);
+        t.ink_dark = PackedColor(0x17, 0x1C, 0x22);
+        t.ink_darker = PackedColor(0x0F, 0x14, 0x1A);
 
-        t.accent = RGB(0x29, 0x6B, 0xB8);
-        t.accent_hover = RGB(0x3C, 0x7E, 0xCB);
-        t.accent_pressed = RGB(0x1F, 0x58, 0x9D);
-        t.success = RGB(0x2F, 0x8A, 0x52);
-        t.warning = RGB(0xB8, 0x72, 0x18);
-        t.danger = RGB(0xC8, 0x3E, 0x3E);
-        t.info = RGB(0x3B, 0x72, 0xB2);
-        t.attention = RGB(0xB8, 0x72, 0x18);
+        t.accent = PackedColor(0x29, 0x6B, 0xB8);
+        t.accent_hover = PackedColor(0x3C, 0x7E, 0xCB);
+        t.accent_pressed = PackedColor(0x1F, 0x58, 0x9D);
+        t.success = PackedColor(0x2F, 0x8A, 0x52);
+        t.warning = PackedColor(0xB8, 0x72, 0x18);
+        t.danger = PackedColor(0xC8, 0x3E, 0x3E);
+        t.info = PackedColor(0x3B, 0x72, 0xB2);
+        t.attention = PackedColor(0xB8, 0x72, 0x18);
 
-        t.node_claim = RGB(0xB8, 0xDB, 0xC3);
-        t.node_strategy = RGB(0xC7, 0xD9, 0xF2);
-        t.node_solution = RGB(0xF2, 0xDC, 0xB4);
-        t.node_context = RGB(0xE1, 0xE6, 0xED);
-        t.node_assumption = RGB(0xF2, 0xC6, 0xC6);
-        t.node_justification = RGB(0xD1, 0xDA, 0xEF);
-        t.node_evidence = RGB(0xF2, 0xDC, 0xB4);
+        t.node_claim = PackedColor(0xB8, 0xDB, 0xC3);
+        t.node_strategy = PackedColor(0xC7, 0xD9, 0xF2);
+        t.node_solution = PackedColor(0xF2, 0xDC, 0xB4);
+        t.node_context = PackedColor(0xE1, 0xE6, 0xED);
+        t.node_assumption = PackedColor(0xF2, 0xC6, 0xC6);
+        t.node_justification = PackedColor(0xD1, 0xDA, 0xEF);
+        t.node_evidence = PackedColor(0xF2, 0xDC, 0xB4);
 
-        t.node_claim_text = RGB(0x2F, 0x75, 0x46);
-        t.node_strategy_text = RGB(0x38, 0x66, 0x98);
-        t.node_solution_text = RGB(0x9A, 0x62, 0x17);
-        t.node_context_text = RGB(0x5A, 0x66, 0x76);
-        t.node_assumption_text = RGB(0xA9, 0x43, 0x43);
-        t.node_justification_text = RGB(0x5A, 0x68, 0x94);
+        t.node_claim_text = PackedColor(0x2F, 0x75, 0x46);
+        t.node_strategy_text = PackedColor(0x38, 0x66, 0x98);
+        t.node_solution_text = PackedColor(0x9A, 0x62, 0x17);
+        t.node_context_text = PackedColor(0x5A, 0x66, 0x76);
+        t.node_assumption_text = PackedColor(0xA9, 0x43, 0x43);
+        t.node_justification_text = PackedColor(0x5A, 0x68, 0x94);
         t.node_evidence_text = t.node_solution_text;
 
         t.edge_group1 = WithAlpha(t.text_secondary, 0.82f);
         t.edge_group2 = WithAlpha(t.accent, 0.68f);
 
-        t.canvas_bg = RGB(0xFF, 0xFF, 0xFF);
+        t.canvas_bg = PackedColor(0xFF, 0xFF, 0xFF);
         t.canvas_grid_minor = WithAlpha(t.border, 0.70f);
         t.canvas_grid_major = WithAlpha(t.border_strong, 0.65f);
     } else {
-        t.bg_app = RGB(0x0E, 0x12, 0x18);
-        t.surface_1 = RGB(0x13, 0x18, 0x20);
-        t.surface_2 = RGB(0x1B, 0x23, 0x2F);
-        t.surface_3 = RGB(0x25, 0x32, 0x44);
+        t.bg_app = PackedColor(0x0E, 0x12, 0x18);
+        t.surface_1 = PackedColor(0x13, 0x18, 0x20);
+        t.surface_2 = PackedColor(0x1B, 0x23, 0x2F);
+        t.surface_3 = PackedColor(0x25, 0x32, 0x44);
 
-        t.border = RGB(0x2A, 0x38, 0x4A);
-        t.border_strong = RGB(0x3A, 0x4D, 0x66);
+        t.border = PackedColor(0x2A, 0x38, 0x4A);
+        t.border_strong = PackedColor(0x3A, 0x4D, 0x66);
 
-        t.text_primary = RGB(0xE6, 0xEA, 0xF2);
-        t.text_secondary = RGB(0x94, 0xA6, 0xB8);
-        t.text_muted = RGB(0x6D, 0x7D, 0x8F);
-        t.ink_dark = RGB(0x1A, 0x1F, 0x2A);
-        t.ink_darker = RGB(0x0E, 0x11, 0x16);
+        t.text_primary = PackedColor(0xE6, 0xEA, 0xF2);
+        t.text_secondary = PackedColor(0x94, 0xA6, 0xB8);
+        t.text_muted = PackedColor(0x6D, 0x7D, 0x8F);
+        t.ink_dark = PackedColor(0x1A, 0x1F, 0x2A);
+        t.ink_darker = PackedColor(0x0E, 0x11, 0x16);
 
-        t.accent = RGB(0x42, 0x85, 0xCC);
-        t.accent_hover = RGB(0x5B, 0x9B, 0xDD);
-        t.accent_pressed = RGB(0x31, 0x67, 0xA3);
-        t.success = RGB(0x59, 0xC2, 0x7A);
-        t.warning = RGB(0xE3, 0xA5, 0x43);
-        t.danger = RGB(0xE8, 0x66, 0x66);
-        t.info = RGB(0x6F, 0xA8, 0xE5);
-        t.attention = RGB(0xE3, 0xA5, 0x43);
+        t.accent = PackedColor(0x42, 0x85, 0xCC);
+        t.accent_hover = PackedColor(0x5B, 0x9B, 0xDD);
+        t.accent_pressed = PackedColor(0x31, 0x67, 0xA3);
+        t.success = PackedColor(0x59, 0xC2, 0x7A);
+        t.warning = PackedColor(0xE3, 0xA5, 0x43);
+        t.danger = PackedColor(0xE8, 0x66, 0x66);
+        t.info = PackedColor(0x6F, 0xA8, 0xE5);
+        t.attention = PackedColor(0xE3, 0xA5, 0x43);
 
-        t.node_claim = RGB(0x5F, 0xB9, 0x7A);
-        t.node_strategy = RGB(0x6E, 0xA8, 0xE5);
-        t.node_solution = RGB(0xE0, 0xA2, 0x4A);
-        t.node_context = RGB(0xB7, 0xBE, 0xC9);
-        t.node_assumption = RGB(0xE6, 0x8B, 0x8B);
-        t.node_justification = RGB(0x9F, 0xB6, 0xE2);
-        t.node_evidence = RGB(0xE0, 0xA2, 0x4A);
+        t.node_claim = PackedColor(0x5F, 0xB9, 0x7A);
+        t.node_strategy = PackedColor(0x6E, 0xA8, 0xE5);
+        t.node_solution = PackedColor(0xE0, 0xA2, 0x4A);
+        t.node_context = PackedColor(0xB7, 0xBE, 0xC9);
+        t.node_assumption = PackedColor(0xE6, 0x8B, 0x8B);
+        t.node_justification = PackedColor(0x9F, 0xB6, 0xE2);
+        t.node_evidence = PackedColor(0xE0, 0xA2, 0x4A);
 
         t.node_claim_text = ShadeColor(t.node_claim, 0.25f);
         t.node_strategy_text = ShadeColor(t.node_strategy, 0.25f);
@@ -334,7 +362,12 @@ void ApplyAppTheme(AppTheme theme) {
     const ImGuiTheme::ImGuiTheme_ base_theme = BaseImGuiTheme(theme);
     if (HelloImGui::IsUsingHelloImGui()) {
         HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
-        runner_params->imGuiWindowParams.tweakedTheme = ImGuiTheme::ImGuiTweakedTheme(base_theme);
+        if (runner_params != nullptr) {
+            runner_params->imGuiWindowParams.tweakedTheme = ImGuiTheme::ImGuiTweakedTheme(base_theme);
+#ifdef _WIN32
+            ApplyWin32WindowTheme(theme, runner_params);
+#endif
+        }
     }
 
     if (ImGui::GetCurrentContext() == nullptr)
