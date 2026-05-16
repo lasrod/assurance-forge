@@ -2,7 +2,8 @@
 
 Assurance Forge is an open-source tool for safety case development, review, and navigation. It is built around the SACM (Structured Assurance Case Metamodel) standard and designed for safety engineers who need a rigorous, efficient workflow for constructing and maintaining assurance arguments.
 
-![Early Screenshot](docs/screenshot/early-screenshot.png)
+![Dark Screenshot](docs/screenshot/dark.png)
+![Light Screenshot](docs/screenshot/light.png)
 
 ---
 
