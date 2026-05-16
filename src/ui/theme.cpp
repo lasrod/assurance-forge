@@ -129,7 +129,7 @@ void ApplyDarkColors() {
     colors[ImGuiCol_TabDimmedSelected] = Color(0x19, 0x20, 0x2B);
     colors[ImGuiCol_TabDimmedSelectedOverline] = Color(0x42, 0x85, 0xCC, 0x00);
     colors[ImGuiCol_DockingPreview] = Color(0x42, 0x85, 0xCC, 0x66);
-    colors[ImGuiCol_DockingEmptyBg] = bg;
+    colors[ImGuiCol_DockingEmptyBg] = panel;
     colors[ImGuiCol_TableHeaderBg] = Color(0x18, 0x20, 0x2B);
     colors[ImGuiCol_TableBorderStrong] = Color(0x33, 0x42, 0x56, 0x90);
     colors[ImGuiCol_TableBorderLight] = Color(0x2A, 0x38, 0x4A, 0x58);
@@ -197,7 +197,7 @@ void ApplyLightColors() {
     colors[ImGuiCol_TabDimmedSelected] = Color(0xE2, 0xEC, 0xF8);
     colors[ImGuiCol_TabDimmedSelectedOverline] = Color(0x29, 0x6B, 0xB8, 0x99);
     colors[ImGuiCol_DockingPreview] = Color(0x29, 0x6B, 0xB8, 0x55);
-    colors[ImGuiCol_DockingEmptyBg] = bg;
+    colors[ImGuiCol_DockingEmptyBg] = panel;
     colors[ImGuiCol_TableHeaderBg] = Color(0xEC, 0xF1, 0xF7);
     colors[ImGuiCol_TableBorderStrong] = Color(0xC9, 0xD3, 0xE0, 0xB8);
     colors[ImGuiCol_TableBorderLight] = Color(0xDF, 0xE6, 0xEF, 0xA0);
@@ -290,13 +290,13 @@ Theme MakeTheme(AppTheme app_theme) {
         t.node_justification = RGB(0x9F, 0xB6, 0xE2);
         t.node_evidence = RGB(0xE0, 0xA2, 0x4A);
 
-        t.node_claim_text = t.node_claim;
-        t.node_strategy_text = t.node_strategy;
-        t.node_solution_text = t.node_solution;
-        t.node_context_text = t.node_context;
-        t.node_assumption_text = t.node_assumption;
-        t.node_justification_text = t.node_justification;
-        t.node_evidence_text = t.node_evidence;
+        t.node_claim_text = ShadeColor(t.node_claim, 0.25f);
+        t.node_strategy_text = ShadeColor(t.node_strategy, 0.25f);
+        t.node_solution_text = ShadeColor(t.node_solution, 0.25f);
+        t.node_context_text = ShadeColor(t.node_context, 0.25f);
+        t.node_assumption_text = ShadeColor(t.node_assumption, 0.25f);
+        t.node_justification_text = ShadeColor(t.node_justification, 0.25f);
+        t.node_evidence_text = ShadeColor(t.node_evidence, 0.25f);
 
         t.edge_group1 = WithAlpha(t.text_secondary, 0.85f);
         t.edge_group2 = WithAlpha(t.accent, 0.70f);
@@ -350,6 +350,14 @@ void ApplyAppTheme(AppTheme theme) {
         ApplyLightColors();
     } else {
         ApplyDarkColors();
+    }
+    if (HelloImGui::IsUsingHelloImGui()) {
+        HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
+        if (runner_params != nullptr) {
+            // Ensure the framebuffer clear color matches panel background so
+            // rounded panel corners blend instead of revealing a dark underlay.
+            runner_params->imGuiWindowParams.backgroundColor = ImGui::GetStyle().Colors[ImGuiCol_DockingEmptyBg];
+        }
     }
 }
 

@@ -35,13 +35,6 @@ void RenderThemeMenu() {
     if (!ImGui::BeginMenu(ui::Tr(ui::MessageId::Theme)))
         return;
 
-    HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
-    if (!runner_params) {
-        ImGui::EndMenu();
-        return;
-    }
-
-    (void)runner_params;
     for (ui::AppTheme theme : ui::kAppThemes) {
         const bool selected = ui::GetCurrentAppTheme() == theme;
         if (ImGui::MenuItem(ui::GetThemeDisplayName(theme), nullptr, selected)) {

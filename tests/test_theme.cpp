@@ -98,4 +98,24 @@ TEST(AppTheme, LightThemeRoleTextColorsAreDarkerThanNodeFills) {
     EXPECT_LT(solution_text.x + solution_text.y + solution_text.z, solution_fill.x + solution_fill.y + solution_fill.z);
 }
 
+TEST(AppTheme, DarkThemeRoleTextColorsAreBrighterThanNodeFills) {
+    ui::ApplyAppTheme(ui::AppTheme::Dark);
+    const ui::Theme& theme = ui::GetTheme();
+
+    EXPECT_NE(theme.node_claim, theme.node_claim_text);
+    EXPECT_NE(theme.node_strategy, theme.node_strategy_text);
+    EXPECT_NE(theme.node_solution, theme.node_solution_text);
+
+    const ImVec4 claim_fill = ImGui::ColorConvertU32ToFloat4(theme.node_claim);
+    const ImVec4 claim_text = ImGui::ColorConvertU32ToFloat4(theme.node_claim_text);
+    const ImVec4 strategy_fill = ImGui::ColorConvertU32ToFloat4(theme.node_strategy);
+    const ImVec4 strategy_text = ImGui::ColorConvertU32ToFloat4(theme.node_strategy_text);
+    const ImVec4 solution_fill = ImGui::ColorConvertU32ToFloat4(theme.node_solution);
+    const ImVec4 solution_text = ImGui::ColorConvertU32ToFloat4(theme.node_solution_text);
+
+    EXPECT_GT(claim_text.x + claim_text.y + claim_text.z, claim_fill.x + claim_fill.y + claim_fill.z);
+    EXPECT_GT(strategy_text.x + strategy_text.y + strategy_text.z, strategy_fill.x + strategy_fill.y + strategy_fill.z);
+    EXPECT_GT(solution_text.x + solution_text.y + solution_text.z, solution_fill.x + solution_fill.y + solution_fill.z);
+}
+
 } // namespace

@@ -1,5 +1,6 @@
 #include "ui/panels/welcome_modal.h"
 
+#include "hello_imgui/hello_imgui.h"
 #include "imgui.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_dpi.h"
@@ -33,6 +34,10 @@ constexpr float kWelcomeWalkthroughColumnRatio = 0.52f;
 constexpr float kWelcomeSectionTopSpacing = 6.0f;
 constexpr float kWelcomeRecentSectionSpacing = 18.0f;
 constexpr float kWelcomeWalkthroughCardSpacing = 8.0f;
+constexpr float kWelcomeTitleIconSize = 52.0f;
+constexpr float kWelcomeTitleIconSpacing = 12.0f;
+constexpr float kWelcomeTitleIconTopOffset = 2.0f;
+constexpr float kWelcomeTitleToTaglineSpacing = 2.0f;
 
 constexpr float kGetStartedProgress = 0.34f;
 constexpr float kFundamentalsProgress = 0.18f;
@@ -42,6 +47,7 @@ constexpr const char* kWelcomePopupId = "Welcome!";
 constexpr const char* kWelcomeLayoutTableId = "WelcomeLayout";
 constexpr const char* kWelcomeStartColumnId = "StartColumn";
 constexpr const char* kWelcomeWalkthroughColumnId = "WalkthroughColumn";
+constexpr const char* kWelcomeTitleIconAsset = "app_settings/icon.png";
 constexpr const char* kTemplatePopupId = "CreateTemplate##not_implemented_popup";
 constexpr const char* kWalkthroughPopupId = "Walkthroughs##not_implemented_popup";
 constexpr const char* kImportSacmPopupId = "ImportSACM##not_implemented_popup";
@@ -261,17 +267,34 @@ void ShowWelcomeModal(bool& is_open,
 
         ImGui::SetWindowFontScale(kWelcomeBodyFontScale);
 
+        const bool has_welcome_title_icon = HelloImGui::AssetExists(kWelcomeTitleIconAsset);
+
+        ImGui::BeginGroup();
+        if (has_welcome_title_icon) {
+            const float start_y = ImGui::GetCursorPosY();
+            ImGui::SetCursorPosY(start_y + Px(kWelcomeTitleIconTopOffset));
+            HelloImGui::ImageFromAsset(
+                kWelcomeTitleIconAsset, ImVec2(Px(kWelcomeTitleIconSize), Px(kWelcomeTitleIconSize)));
+            ImGui::SameLine(0.0f, Px(kWelcomeTitleIconSpacing));
+            ImGui::SetCursorPosY(start_y);
+        }
+
+        ImGui::BeginGroup();
         ImGui::SetWindowFontScale(kWelcomeTitleFontScale);
         ImGui::PushFont(ui::gsn::g_BoldFont);
         ImGui::PushStyleColor(ImGuiCol_Text, ToVec4(theme.text_primary));
         ImGui::TextUnformatted("Assurance Forge");
         ImGui::PopStyleColor();
         ImGui::PopFont();
+
         ImGui::SetWindowFontScale(kWelcomeBodyFontScale);
+        ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeTitleToTaglineSpacing)));
 
         ImGui::PushStyleColor(ImGuiCol_Text, ToVec4(theme.text_secondary));
         ImGui::TextUnformatted(ui::Tr(ui::MessageId::WelcomeTagline));
         ImGui::PopStyleColor();
+        ImGui::EndGroup();
+        ImGui::EndGroup();
 
         ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeTaglineTopSpacing)));
 

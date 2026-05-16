@@ -1,5 +1,6 @@
 #include "ui/tree_view.h"
 
+#include "hello_imgui/icons_font_awesome_4.h"
 #include "ui/theme.h"
 
 #include "imgui.h"
@@ -10,22 +11,22 @@
 
 namespace ui {
 
-static const char* RoleLabel(core::NodeRole role) {
+static const char* RoleIcon(core::NodeRole role) {
     switch (role) {
     case core::NodeRole::Claim:
-        return "[Claim]";
+        return ICON_FA_BULLSEYE;
     case core::NodeRole::Strategy:
-        return "[Strategy]";
+        return ICON_FA_RANDOM;
     case core::NodeRole::Solution:
-        return "[Solution]";
+        return ICON_FA_FILE;
     case core::NodeRole::Context:
-        return "[Context]";
+        return ICON_FA_DOT_CIRCLE;
     case core::NodeRole::Assumption:
-        return "[Assumption]";
+        return ICON_FA_DOT_CIRCLE;
     case core::NodeRole::Justification:
-        return "[Justification]";
+        return ICON_FA_DOT_CIRCLE;
     default:
-        return "[Other]";
+        return ICON_FA_PROJECT_DIAGRAM;
     }
 }
 
@@ -45,7 +46,7 @@ static ImVec4 RoleColor(core::NodeRole role) {
     case core::NodeRole::Justification:
         return ImGui::ColorConvertU32ToFloat4(t.node_justification_text);
     default:
-        return ImGui::ColorConvertU32ToFloat4(t.text_secondary);
+        return ImGui::ColorConvertU32ToFloat4(t.accent);
     }
 }
 
@@ -149,21 +150,23 @@ static void RenderTreeNode(const core::TreeNode* node,
 
     bool popup_open = ImGui::BeginPopupContextItem(node->id.c_str());
 
-    // Overlay the colored [Tag] and node name using AddText (no new ImGui
+    // Overlay the colored role icon and node name using AddText (no new ImGui
     // items, so clicks/right-clicks always land on the tree node).
     {
-        float text_x = item_min.x + ImGui::GetTreeNodeToLabelSpacing();
+        constexpr float kArrowIconGapTightenPx = 6.0f;
+        float text_x =
+            item_min.x + std::max(0.0f, ImGui::GetTreeNodeToLabelSpacing() - kArrowIconGapTightenPx);
         float text_y = item_min.y + (item_size.y - ImGui::GetTextLineHeight()) * 0.5f;
 
         ImDrawList* dl = ImGui::GetWindowDrawList();
         ImFont* font = ImGui::GetFont();
         float font_size = ImGui::GetFontSize();
 
-        const char* tag = RoleLabel(node->role);
+        const char* role_icon = RoleIcon(node->role);
         ImU32 tag_col = ImGui::ColorConvertFloat4ToU32(RoleColor(node->role));
-        dl->AddText(font, font_size, ImVec2(text_x, text_y), tag_col, tag);
+        dl->AddText(font, font_size, ImVec2(text_x, text_y), tag_col, role_icon);
 
-        float tag_w = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, tag).x;
+        float tag_w = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, role_icon).x;
         float space_w = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, " ").x;
 
         std::string name = ShortName(node);
@@ -208,6 +211,9 @@ void ShowTreeViewPanel(const core::AssuranceTree* tree,
         return;
     }
 
+    const ImVec2 window_padding = ImGui::GetStyle().WindowPadding;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(1.0f, window_padding.y));
+    ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 8.0f);
     if (ImGui::BeginChild("TreeViewScroll", ImVec2(0, 0), false)) {
         RenderTreeNode(tree->root, active_case, state, actions, tree_edit_actions);
 
@@ -223,6 +229,7 @@ void ShowTreeViewPanel(const core::AssuranceTree* tree,
         }
     }
     ImGui::EndChild();
+    ImGui::PopStyleVar(2);
 }
 
 } // namespace ui

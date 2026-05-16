@@ -290,7 +290,7 @@ hello_imgui_add_app(assurance-forge ${ASSURANCE_FORGE_APP_SOURCES})
 target_include_directories(assurance-forge PRIVATE src ${ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS})
 target_link_libraries(assurance-forge PRIVATE imgui pugixml nfd picosha2 nlohmann_json::nlohmann_json ${AF_YAML_CPP_TARGET} CURL::libcurl)
 if(WIN32)
-    target_link_libraries(assurance-forge PRIVATE bcrypt advapi32 ole32 shell32)
+    target_link_libraries(assurance-forge PRIVATE bcrypt advapi32 ole32 shell32 dwmapi)
 endif()
 af_copy_sccg_data(assurance-forge)
 
