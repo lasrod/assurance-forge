@@ -408,7 +408,7 @@ add_executable(tests
 target_include_directories(tests PRIVATE src ${ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS})
 target_link_libraries(tests PRIVATE GTest::gtest_main hello_imgui pugixml imgui picosha2 nlohmann_json::nlohmann_json ${AF_YAML_CPP_TARGET} CURL::libcurl)
 if(WIN32)
-    target_link_libraries(tests PRIVATE bcrypt advapi32)
+    target_link_libraries(tests PRIVATE bcrypt advapi32 dwmapi)
 
     add_custom_command(TARGET tests POST_BUILD
         COMMAND "$<$<BOOL:$<TARGET_RUNTIME_DLLS:tests>>:${CMAKE_COMMAND};-E;copy_if_different;$<TARGET_RUNTIME_DLLS:tests>;$<TARGET_FILE_DIR:tests>>"
