@@ -296,7 +296,7 @@ Theme MakeTheme(AppTheme app_theme) {
         t.node_context_text = ShadeColor(t.node_context, 0.25f);
         t.node_assumption_text = ShadeColor(t.node_assumption, 0.25f);
         t.node_justification_text = ShadeColor(t.node_justification, 0.25f);
-        t.node_evidence_text = t.node_solution_text;
+        t.node_evidence_text = ShadeColor(t.node_evidence, 0.25f);
 
         t.edge_group1 = WithAlpha(t.text_secondary, 0.85f);
         t.edge_group2 = WithAlpha(t.accent, 0.70f);
