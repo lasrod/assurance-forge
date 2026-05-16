@@ -1256,24 +1256,27 @@ void ShowGsnCanvasContent(UiState& ui_state,
     }
 
     // Ctrl + mouse scroll wheel: zoom at mouse pointer position
-    // Plain scroll wheel (no Ctrl): pan vertically
+    // Plain scrolling (no Ctrl): pan using both wheel axes when available
     if (ImGui::IsWindowHovered()) {
-        float wheel = ImGui::GetIO().MouseWheel;
-        if (wheel != 0.0f && ImGui::GetIO().KeyCtrl) {
+        const ImGuiIO& io = ImGui::GetIO();
+        float wheel_y = io.MouseWheel;
+        float wheel_x = io.MouseWheelH;
+        if (wheel_y != 0.0f && io.KeyCtrl) {
             // Convert mouse screen position to content-space (unzoomed layout coords)
-            ImVec2 mouse = ImGui::GetIO().MousePos;
+            ImVec2 mouse = io.MousePos;
             ImVec2 offset = renderer.GetViewOffset();
             float zoom = renderer.GetZoom();
             ImVec2 focus_content((mouse.x - child_pos.x + offset.x) / zoom, (mouse.y - child_pos.y + offset.y) / zoom);
-            float new_zoom = zoom + (wheel > 0.0f ? kZoomStep : -kZoomStep);
+            float new_zoom = zoom + (wheel_y > 0.0f ? kZoomStep : -kZoomStep);
             renderer.ZoomAtPoint(new_zoom, focus_content);
-        } else if (wheel != 0.0f) {
-            // Scroll wheel without Ctrl: pan vertically (Shift+wheel: pan horizontally)
+        } else if (wheel_x != 0.0f || wheel_y != 0.0f) {
+            // Prefer native horizontal deltas from touchpads; keep Shift+wheel as a fallback.
             float scroll_speed = DpiSize(60.0f);
-            if (ImGui::GetIO().KeyShift)
-                renderer.Pan(-wheel * scroll_speed, 0.0f);
-            else
-                renderer.Pan(0.0f, -wheel * scroll_speed);
+            float pan_x = -wheel_x * scroll_speed;
+            float pan_y = -wheel_y * scroll_speed;
+            if (io.KeyShift && wheel_x == 0.0f)
+                pan_x = -wheel_y * scroll_speed;
+            renderer.Pan(pan_x, pan_y);
         }
     }
 
