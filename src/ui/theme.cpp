@@ -2,6 +2,13 @@
 
 #include "hello_imgui/hello_imgui.h"
 #include "hello_imgui/imgui_theme.h"
+#ifdef _WIN32
+#include "GLFW/glfw3.h"
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include "GLFW/glfw3native.h"
+#include <windows.h>
+#include <dwmapi.h>
+#endif
 
 #include <algorithm>
 #include <cctype>
@@ -28,6 +35,27 @@ AppTheme g_current_app_theme = AppTheme::Dark;
 ImGuiTheme::ImGuiTheme_ BaseImGuiTheme(AppTheme theme) {
     return theme == AppTheme::Light ? ImGuiTheme::ImGuiTheme_ImGuiColorsLight : ImGuiTheme::ImGuiTheme_ImGuiColorsDark;
 }
+
+#ifdef _WIN32
+void ApplyWindowTheme(AppTheme theme, HelloImGui::RunnerParams* runner_params) {
+    if (runner_params == nullptr || runner_params->backendPointers.glfwWindow == nullptr)
+        return;
+
+    auto* glfw_window = static_cast<GLFWwindow*>(runner_params->backendPointers.glfwWindow);
+    HWND hwnd = glfwGetWin32Window(glfw_window);
+    if (hwnd == nullptr)
+        return;
+
+    const bool use_dark_theme = theme == AppTheme::Dark;
+    BOOL use_dark_mode = use_dark_theme ? TRUE : FALSE;
+    DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &use_dark_mode, sizeof(use_dark_mode));
+
+    COLORREF caption_color = use_dark_theme ? RGB(10, 15, 24) : RGB(251, 252, 253);
+    COLORREF text_color = use_dark_theme ? RGB(230, 235, 245) : RGB(23, 28, 34);
+    DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, &caption_color, sizeof(caption_color));
+    DwmSetWindowAttribute(hwnd, DWMWA_TEXT_COLOR, &text_color, sizeof(text_color));
+}
+#endif
 
 std::string NormalizeThemeName(std::string_view value) {
     std::string normalized;
@@ -334,7 +362,12 @@ void ApplyAppTheme(AppTheme theme) {
     const ImGuiTheme::ImGuiTheme_ base_theme = BaseImGuiTheme(theme);
     if (HelloImGui::IsUsingHelloImGui()) {
         HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
-        runner_params->imGuiWindowParams.tweakedTheme = ImGuiTheme::ImGuiTweakedTheme(base_theme);
+        if (runner_params != nullptr) {
+            runner_params->imGuiWindowParams.tweakedTheme = ImGuiTheme::ImGuiTweakedTheme(base_theme);
+#ifdef _WIN32
+            ApplyWindowTheme(theme, runner_params);
+#endif
+        }
     }
 
     if (ImGui::GetCurrentContext() == nullptr)

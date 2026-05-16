@@ -2,15 +2,7 @@
 
 #include "app/app_runtime.h"
 #include "app/app_ui_bootstrap.h"
-#ifdef _WIN32
-#include <windows.h>
-#include <dwmapi.h>
-#define GLFW_EXPOSE_NATIVE_WIN32
-#endif
 #include "GLFW/glfw3.h"
-#ifdef _WIN32
-#include "GLFW/glfw3native.h"
-#endif
 #include "hello_imgui/hello_imgui.h"
 #include "ui/localization.h"
 #include "ui/theme.h"
@@ -20,28 +12,6 @@ namespace {
 constexpr const char* kLanguagePreference = "AssuranceForge.Language";
 constexpr const char* kRecentProjectsPreference = "AssuranceForge.RecentProjects";
 constexpr const char* kReviewerNamePreference = "AssuranceForge.ReviewerName";
-
-#ifdef _WIN32
-void ApplyWindowTheme(GLFWwindow* glfw_window, ui::AppTheme theme) {
-    if (glfw_window == nullptr) {
-        return;
-    }
-
-    HWND hwnd = glfwGetWin32Window(glfw_window);
-    if (hwnd == nullptr) {
-        return;
-    }
-
-    const bool use_dark_theme = theme == ui::AppTheme::Dark;
-    BOOL use_dark_mode = use_dark_theme ? TRUE : FALSE;
-    DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &use_dark_mode, sizeof(use_dark_mode));
-
-    COLORREF caption_color = use_dark_theme ? RGB(10, 15, 24) : RGB(251, 252, 253);
-    COLORREF text_color = use_dark_theme ? RGB(230, 235, 245) : RGB(23, 28, 34);
-    DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, &caption_color, sizeof(caption_color));
-    DwmSetWindowAttribute(hwnd, DWMWA_TEXT_COLOR, &text_color, sizeof(text_color));
-}
-#endif
 
 void CancelNativeWindowCloseRequest(HelloImGui::RunnerParams& runner_params) {
     runner_params.appShallExit = false;
@@ -82,13 +52,6 @@ int main(int, char**) {
         ui::SetCurrentLanguage(ui::ParseLanguageCode(HelloImGui::LoadUserPref(kLanguagePreference)));
         runtime.LoadRecentProjectsPreference(HelloImGui::LoadUserPref(kRecentProjectsPreference));
         runtime.LoadReviewerNamePreference(HelloImGui::LoadUserPref(kReviewerNamePreference));
-#ifdef _WIN32
-        HelloImGui::RunnerParams* post_init_runner_params = HelloImGui::GetRunnerParams();
-        if (post_init_runner_params != nullptr && post_init_runner_params->backendPointers.glfwWindow != nullptr) {
-            ApplyWindowTheme(static_cast<GLFWwindow*>(post_init_runner_params->backendPointers.glfwWindow),
-                             ui::GetCurrentAppTheme());
-        }
-#endif
     };
     params.callbacks.BeforeExit = [&runtime]() {
         HelloImGui::SaveUserPref(kLanguagePreference, ui::LanguageCode(ui::CurrentLanguage()));
