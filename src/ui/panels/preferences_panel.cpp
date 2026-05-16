@@ -1,6 +1,7 @@
 #include "ui/panels/preferences_panel.h"
 
 #include "imgui.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/localization.h"
 #include "ui/theme.h"
 
@@ -142,9 +143,10 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
 void RenderAppearanceSection(PreferencesPanelModel model, const PreferencesPanelCallbacks& callbacks) {
     ImGui::TextUnformatted(ui::Tr(ui::MessageId::Appearance));
     ImGui::Separator();
+    const float combo_width = ui::gsn::DpiSize(220.0f);
 
     ImGui::TextUnformatted(ui::Tr(ui::MessageId::Theme));
-    ImGui::SetNextItemWidth(220.0f);
+    ImGui::SetNextItemWidth(combo_width);
     if (ImGui::BeginCombo("##theme", ui::GetThemeDisplayName(model.theme))) {
         for (ui::AppTheme theme : ui::kAppThemes) {
             const bool selected = model.theme == theme;
@@ -159,7 +161,7 @@ void RenderAppearanceSection(PreferencesPanelModel model, const PreferencesPanel
     }
 
     ImGui::TextUnformatted(ui::Tr(ui::MessageId::Language));
-    ImGui::SetNextItemWidth(220.0f);
+    ImGui::SetNextItemWidth(combo_width);
     if (ImGui::BeginCombo("##language", ui::LanguageDisplayName(model.language))) {
         const ui::Language languages[] = {ui::Language::English, ui::Language::Japanese};
         for (ui::Language language : languages) {
