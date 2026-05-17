@@ -29,6 +29,7 @@ struct ElementContextActions {
         add_visible_terminology_term_context;
     std::function<void(const core::TerminologyPackageRef&, const core::TerminologyTermRef&)> find_terminology_usages;
     std::function<void(const std::string& element_id, const std::string& term_value)> change_terminology_meaning;
+    std::function<void(const std::string& message)> set_status;
 };
 
 void RenderAddElementMenu(const ElementContextActions& actions);

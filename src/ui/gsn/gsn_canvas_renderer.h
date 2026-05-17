@@ -23,6 +23,7 @@ struct CanvasRenderStats {
     int nodes_culled = 0;
     int edges_drawn = 0;
     int edges_culled = 0;
+    bool relationship_context_menu_active = false;
 };
 
 // Returns stats from the most recent GSN canvas render pass.

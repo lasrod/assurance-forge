@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cfloat>
 #include <imgui.h>
 #include <optional>
 #include <string>
@@ -47,16 +48,28 @@ static std::string EdgeKey(const std::string& parent_id, const std::string& chil
     return parent_id + "\x1f" + child_id;
 }
 
-static std::unordered_map<std::string, std::vector<const parser::AcpRecord*>>
+static std::unordered_map<std::string, std::vector<parser::AcpRecord>>
 BuildRelationshipAcpLookup(const parser::AssuranceCase* active_case) {
-    std::unordered_map<std::string, std::vector<const parser::AcpRecord*>> acps_by_relationship;
+    std::unordered_map<std::string, std::vector<parser::AcpRecord>> acps_by_relationship;
     if (!active_case)
         return acps_by_relationship;
     for (const parser::AcpRecord& acp : active_case->acps) {
         if (acp.target_kind == "relationship" && !acp.target_id.empty())
-            acps_by_relationship[acp.target_id].push_back(&acp);
+            acps_by_relationship[acp.target_id].push_back(acp);
     }
     return acps_by_relationship;
+}
+
+static std::unordered_map<std::string, std::vector<parser::AcpRecord>>
+BuildElementAcpLookup(const parser::AssuranceCase* active_case) {
+    std::unordered_map<std::string, std::vector<parser::AcpRecord>> acps_by_element;
+    if (!active_case)
+        return acps_by_element;
+    for (const parser::AcpRecord& acp : active_case->acps) {
+        if (acp.target_kind == "element" && !acp.target_id.empty())
+            acps_by_element[acp.target_id].push_back(acp);
+    }
+    return acps_by_element;
 }
 
 static std::unordered_map<std::string, const core::acp::AcpRelationshipTarget*>
@@ -73,17 +86,17 @@ static void DrawAcpRelationshipDecorator(ImDrawList* draw_list,
                                          ImVec2 center,
                                          float zoom,
                                          const core::acp::AcpRelationshipTarget& target,
-                                         const std::vector<const parser::AcpRecord*>& acps,
+                                         const std::vector<parser::AcpRecord>& acps,
                                          const ElementContextActions& actions,
                                          UiState& ui_state) {
     if (acps.empty())
         return;
 
-    const bool selected = std::any_of(acps.begin(), acps.end(), [&](const parser::AcpRecord* acp) {
-        return acp && acp->id == ui_state.selected_acp_id;
+    const bool selected = std::any_of(acps.begin(), acps.end(), [&](const parser::AcpRecord& acp) {
+        return acp.id == ui_state.selected_acp_id;
     });
-    const bool instantiated = std::any_of(acps.begin(), acps.end(), [](const parser::AcpRecord* acp) {
-        return acp && AcpRecordIsInstantiated(*acp);
+    const bool instantiated = std::any_of(acps.begin(), acps.end(), [](const parser::AcpRecord& acp) {
+        return AcpRecordIsInstantiated(acp);
     });
 
     const Theme& theme = GetTheme();
@@ -99,11 +112,13 @@ static void DrawAcpRelationshipDecorator(ImDrawList* draw_list,
     draw_list->AddRectFilled(box_min, box_max, fill, rounding);
     draw_list->AddRect(box_min, box_max, outline, rounding, 0, selected ? 2.4f * scale : 1.4f * scale);
 
-    if (zoom >= 0.6f && !acps.front()->id.empty()) {
-        const std::string label = acps.front()->id;
-        const ImVec2 text_size = ImGui::CalcTextSize(label.c_str());
+    if (zoom >= 0.6f && !acps.front().id.empty()) {
+        const std::string label = acps.front().id;
+        ImFont* font = ImGui::GetFont();
+        const float font_size = ImGui::GetFontSize() * zoom;
+        const ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, label.c_str());
         const ImVec2 text_pos(center.x - text_size.x * 0.5f, center.y - text_size.y * 0.5f);
-        draw_list->AddText(text_pos, InkOn(fill), label.c_str());
+        draw_list->AddText(font, font_size, text_pos, InkOn(fill), label.c_str());
     }
 
     ImGui::SetCursorScreenPos(ImVec2(box_min.x - hit_pad, box_min.y - hit_pad));
@@ -111,21 +126,22 @@ static void DrawAcpRelationshipDecorator(ImDrawList* draw_list,
     const std::string widget_id = "ACP##" + target.relationship_id + "##" + target.parent_id + "##" + target.child_id;
     ImGui::InvisibleButton(widget_id.c_str(), ImVec2((half_size.x + hit_pad) * 2.0f, (half_size.y + hit_pad) * 2.0f));
     if (ImGui::IsItemClicked()) {
-        ui_state.selected_acp_id = acps.front()->id;
+        ui_state.selected_acp_id = acps.front().id;
         ui_state.selected_element_id.clear();
         ui_state.selected_relationship_id.clear();
         ui_state.selected_relationship_edge_key.clear();
     }
     if (ImGui::BeginPopupContextItem(widget_id.c_str())) {
-        if (!acps.empty() && acps.front()) {
-            ui_state.selected_acp_id = acps.front()->id;
+        if (!acps.empty()) {
+            const std::string acp_id = acps.front().id;
+            ui_state.selected_acp_id = acp_id;
             ui_state.selected_element_id.clear();
             ui_state.selected_relationship_id.clear();
             ui_state.selected_relationship_edge_key.clear();
-            ImGui::TextUnformatted(acps.front()->id.c_str());
+            ImGui::TextUnformatted(acp_id.c_str());
             ImGui::Separator();
             if (ImGui::MenuItem("Remove ACP", nullptr, false, static_cast<bool>(actions.remove_acp))) {
-                actions.remove_acp(acps.front()->id);
+                actions.remove_acp(acp_id);
             }
         }
         ImGui::EndPopup();
@@ -136,78 +152,161 @@ static void DrawAcpRelationshipDecorator(ImDrawList* draw_list,
         ImGui::Separator();
         ImGui::Text("Target: %s", target.summary.c_str());
         ImGui::Text("SACM relationship: %s", target.relationship_id.c_str());
-        for (const parser::AcpRecord* acp : acps) {
-            if (!acp)
-                continue;
-            ImGui::Text("%s: %s", acp->id.c_str(), AcpRecordIsInstantiated(*acp) ? "instantiated" : "uninstantiated");
+        for (const parser::AcpRecord& acp : acps) {
+            ImGui::Text("%s: %s", acp.id.c_str(), AcpRecordIsInstantiated(acp) ? "instantiated" : "uninstantiated");
         }
         ImGui::EndTooltip();
     }
 }
 
-static void RenderAcpRelationshipContextMenu(const core::acp::AcpRelationshipTarget* target,
-                                             const std::vector<const parser::AcpRecord*>* acps,
+static void DrawAcpElementDecorator(ImDrawList* draw_list,
+                                    const LayoutNode& node,
+                                    ImVec2 node_min,
+                                    ImVec2 node_max,
+                                    float zoom,
+                                    const std::vector<parser::AcpRecord>& acps,
+                                    const ElementContextActions& actions,
+                                    UiState& ui_state) {
+    if (acps.empty())
+        return;
+
+    const bool selected = std::any_of(acps.begin(), acps.end(), [&](const parser::AcpRecord& acp) {
+        return acp.id == ui_state.selected_acp_id;
+    });
+    const bool instantiated = std::any_of(acps.begin(), acps.end(), [](const parser::AcpRecord& acp) {
+        return AcpRecordIsInstantiated(acp);
+    });
+
+    const Theme& theme = GetTheme();
+    const float scale = DpiScale() * zoom;
+    const ImVec2 half_size(20.0f * scale, 11.0f * scale);
+    const float gap = 4.0f * scale;
+    const float rounding = 2.0f * scale;
+    const float hit_pad = 2.0f * scale;
+    const ImVec2 center((node_min.x + node_max.x) * 0.5f, node_max.y + gap + half_size.y);
+    const ImVec2 box_min(center.x - half_size.x, center.y - half_size.y);
+    const ImVec2 box_max(center.x + half_size.x, center.y + half_size.y);
+    const ImU32 fill = instantiated ? theme.success : theme.warning;
+    const ImU32 outline = selected ? theme.accent : theme.border_strong;
+
+    draw_list->AddRectFilled(box_min, box_max, fill, rounding);
+    draw_list->AddRect(box_min, box_max, outline, rounding, 0, selected ? 2.4f * scale : 1.4f * scale);
+
+    if (zoom >= 0.6f && !acps.front().id.empty()) {
+        const std::string label = acps.front().id;
+        ImFont* font = ImGui::GetFont();
+        const float font_size = ImGui::GetFontSize() * zoom;
+        const ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, label.c_str());
+        const ImVec2 text_pos(center.x - text_size.x * 0.5f, center.y - text_size.y * 0.5f);
+        draw_list->AddText(font, font_size, text_pos, InkOn(fill), label.c_str());
+    }
+
+    ImGui::SetCursorScreenPos(ImVec2(box_min.x - hit_pad, box_min.y - hit_pad));
+    ImGui::SetNextItemAllowOverlap();
+    const std::string widget_id = "ACP element##" + node.id;
+    ImGui::InvisibleButton(widget_id.c_str(), ImVec2((half_size.x + hit_pad) * 2.0f, (half_size.y + hit_pad) * 2.0f));
+    if (ImGui::IsItemClicked()) {
+        ui_state.selected_acp_id = acps.front().id;
+        ui_state.selected_element_id.clear();
+        ui_state.selected_relationship_id.clear();
+        ui_state.selected_relationship_edge_key.clear();
+    }
+    if (ImGui::BeginPopupContextItem(widget_id.c_str())) {
+        const std::string acp_id = acps.front().id;
+        ui_state.selected_acp_id = acp_id;
+        ui_state.selected_element_id.clear();
+        ui_state.selected_relationship_id.clear();
+        ui_state.selected_relationship_edge_key.clear();
+        ImGui::TextUnformatted(acp_id.c_str());
+        ImGui::Separator();
+        if (ImGui::MenuItem("Remove ACP", nullptr, false, static_cast<bool>(actions.remove_acp))) {
+            actions.remove_acp(acp_id);
+        }
+        ImGui::EndPopup();
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup)) {
+        ImGui::BeginTooltip();
+        ImGui::TextUnformatted(acps.size() == 1 ? "Assurance Claim Point" : "Assurance Claim Points");
+        ImGui::Separator();
+        ImGui::Text("Target element: %s", node.id.c_str());
+        for (const parser::AcpRecord& acp : acps) {
+            ImGui::Text("%s: %s", acp.id.c_str(), AcpRecordIsInstantiated(acp) ? "instantiated" : "uninstantiated");
+        }
+        ImGui::EndTooltip();
+    }
+}
+
+static bool RenderAcpRelationshipContextMenu(const core::acp::AcpRelationshipTarget* target,
+                                             const std::vector<parser::AcpRecord>* acps,
                                              const ElementContextActions& actions,
                                              UiState& ui_state,
                                              const std::string& edge_key,
+                                             const std::string& parent_id,
+                                             const std::string& child_id,
                                              ImVec2 edge_min,
                                              ImVec2 edge_max) {
-    if (!target)
-        return;
-
     const float min_hit = DpiSize(24.0f);
     const float width = std::max(min_hit, edge_max.x - edge_min.x);
     const float height = std::max(min_hit, edge_max.y - edge_min.y);
     ImGui::SetCursorScreenPos(edge_min);
     ImGui::SetNextItemAllowOverlap();
-    const std::string widget_id = "ACP edge##" + target->relationship_id + "##" + target->parent_id + "##" +
-                                  target->child_id;
+    const std::string widget_id = target ? "ACP edge##" + target->relationship_id + "##" + target->parent_id + "##" +
+                                               target->child_id
+                                         : "ACP edge##" + edge_key;
+    const std::string popup_id = widget_id + " popup";
     ImGui::InvisibleButton(widget_id.c_str(), ImVec2(width, height));
-    if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
+    bool consumed_context_click = false;
+    if (target && ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
         ui_state.selected_relationship_id = target->relationship_id;
         ui_state.selected_relationship_edge_key = edge_key;
         ui_state.selected_element_id.clear();
         ui_state.selected_acp_id.clear();
     }
 
-    if (ImGui::BeginPopupContextItem(widget_id.c_str())) {
-        ui_state.selected_relationship_id = target->relationship_id;
+    const bool edge_hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) ||
+                              ImGui::IsMouseHoveringRect(edge_min, edge_max, true);
+    if (edge_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+        ui_state.selected_relationship_id = target ? target->relationship_id : std::string{};
         ui_state.selected_relationship_edge_key = edge_key;
         ui_state.selected_element_id.clear();
         ui_state.selected_acp_id.clear();
-        ImGui::TextUnformatted(target->summary.c_str());
+        ImGui::OpenPopup(popup_id.c_str());
+        consumed_context_click = true;
+    }
+
+    if (ImGui::BeginPopup(popup_id.c_str())) {
+        consumed_context_click = true;
+        const std::string summary = target ? target->summary : "Relationship " + parent_id + " -> " + child_id;
+        ImGui::TextUnformatted(summary.c_str());
         ImGui::Separator();
-        if (!target->eligible_for_acp) {
-            ImGui::TextWrapped("%s", target->blocked_reason.c_str());
-        } else {
-            const bool has_existing_acp = acps && !acps->empty();
-            if (has_existing_acp) {
-                for (const parser::AcpRecord* acp : *acps) {
-                    if (!acp)
-                        continue;
-                    const std::string label = "Select " + acp->id;
-                    if (ImGui::MenuItem(label.c_str())) {
-                        ui_state.selected_acp_id = acp->id;
-                        ui_state.selected_element_id.clear();
-                        ui_state.selected_relationship_id.clear();
-                        ui_state.selected_relationship_edge_key.clear();
-                    }
+        const bool has_existing_acp = acps && !acps->empty();
+        if (has_existing_acp) {
+            for (const parser::AcpRecord& acp : *acps) {
+                const std::string label = "Select " + acp.id;
+                if (ImGui::MenuItem(label.c_str())) {
+                    ui_state.selected_acp_id = acp.id;
+                    ui_state.selected_element_id.clear();
+                    ui_state.selected_relationship_id.clear();
+                    ui_state.selected_relationship_edge_key.clear();
                 }
-                ImGui::Separator();
             }
-            if (ImGui::MenuItem("Add ACP",
-                                nullptr,
-                                false,
-                                !has_existing_acp && static_cast<bool>(actions.add_acp_to_relationship))) {
+            ImGui::Separator();
+        }
+        const bool can_create_acp = target && target->eligible_for_acp && static_cast<bool>(actions.add_acp_to_relationship);
+        const bool can_warn_for_blocked_acp = (!target || !target->eligible_for_acp) && static_cast<bool>(actions.set_status);
+        if (ImGui::MenuItem("Add ACP", nullptr, false, !has_existing_acp && (can_create_acp || can_warn_for_blocked_acp))) {
+            if (can_create_acp) {
                 actions.add_acp_to_relationship(target->relationship_id);
+            } else if (actions.set_status) {
+                const std::string blocked_reason = target && !target->blocked_reason.empty()
+                                                       ? target->blocked_reason
+                                                       : "ACP is not supported for this relationship.";
+                actions.set_status("Add ACP failed: " + blocked_reason);
             }
         }
         ImGui::EndPopup();
     }
-
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) && !target->eligible_for_acp) {
-        ImGui::SetTooltip("%s", target->blocked_reason.c_str());
-    }
+    return consumed_context_click;
 }
 
 static bool RectsIntersect(ImVec2 a_min, ImVec2 a_max, ImVec2 b_min, ImVec2 b_max) {
@@ -672,6 +771,7 @@ void GsnCanvas::Render(UiState& ui_state,
                     : std::vector<core::acp::AcpRelationshipTarget>{};
     const auto acp_target_by_edge = BuildRelationshipTargetLookup(acp_targets);
     const auto acp_by_relationship = BuildRelationshipAcpLookup(active_case);
+    const auto acp_by_element = BuildElementAcpLookup(active_case);
 
     // Draw edges first (beneath nodes)
     for (const auto& child_node : layout_nodes_) {
@@ -697,7 +797,7 @@ void GsnCanvas::Render(UiState& ui_state,
             const auto target_it = acp_target_by_edge.find(edge_key);
             const core::acp::AcpRelationshipTarget* acp_target =
                 target_it == acp_target_by_edge.end() ? nullptr : target_it->second;
-            const std::vector<const parser::AcpRecord*>* edge_acps = nullptr;
+            const std::vector<parser::AcpRecord>* edge_acps = nullptr;
             if (acp_target) {
                 const auto acp_it = acp_by_relationship.find(acp_target->relationship_id);
                 if (acp_it != acp_by_relationship.end())
@@ -705,7 +805,17 @@ void GsnCanvas::Render(UiState& ui_state,
             }
             if (RelationshipEdgeSelected(ui_state, acp_target, edge_key))
                 DrawGroup2EdgeHighlight(draw_list, parent_side, attachment_edge, child_node.is_left_side, zoom);
-            RenderAcpRelationshipContextMenu(acp_target, edge_acps, actions, ui_state, edge_key, edge_min, edge_max);
+            frame_stats.relationship_context_menu_active =
+                RenderAcpRelationshipContextMenu(acp_target,
+                                                 edge_acps,
+                                                 actions,
+                                                 ui_state,
+                                                 edge_key,
+                                                 parent_node.id,
+                                                 child_node.id,
+                                                 edge_min,
+                                                 edge_max) ||
+                frame_stats.relationship_context_menu_active;
             if (acp_target && acp_target->eligible_for_acp && edge_acps) {
                 DrawAcpRelationshipDecorator(draw_list,
                                              ImVec2((parent_side.x + attachment_edge.x) * 0.5f,
@@ -731,7 +841,7 @@ void GsnCanvas::Render(UiState& ui_state,
             const auto target_it = acp_target_by_edge.find(edge_key);
             const core::acp::AcpRelationshipTarget* acp_target =
                 target_it == acp_target_by_edge.end() ? nullptr : target_it->second;
-            const std::vector<const parser::AcpRecord*>* edge_acps = nullptr;
+            const std::vector<parser::AcpRecord>* edge_acps = nullptr;
             if (acp_target) {
                 const auto acp_it = acp_by_relationship.find(acp_target->relationship_id);
                 if (acp_it != acp_by_relationship.end())
@@ -739,7 +849,17 @@ void GsnCanvas::Render(UiState& ui_state,
             }
             if (RelationshipEdgeSelected(ui_state, acp_target, edge_key))
                 DrawGroup1EdgeHighlight(draw_list, parent_bottom, child_top, zoom);
-            RenderAcpRelationshipContextMenu(acp_target, edge_acps, actions, ui_state, edge_key, edge_min, edge_max);
+            frame_stats.relationship_context_menu_active =
+                RenderAcpRelationshipContextMenu(acp_target,
+                                                 edge_acps,
+                                                 actions,
+                                                 ui_state,
+                                                 edge_key,
+                                                 parent_node.id,
+                                                 child_node.id,
+                                                 edge_min,
+                                                 edge_max) ||
+                frame_stats.relationship_context_menu_active;
             if (acp_target && acp_target->eligible_for_acp && edge_acps) {
                 DrawAcpRelationshipDecorator(draw_list,
                                              ImVec2((parent_bottom.x + child_top.x) * 0.5f,
@@ -805,6 +925,10 @@ void GsnCanvas::Render(UiState& ui_state,
                     terminology_package,
                     &terminology_card_state_,
                     zoom);
+        const auto element_acps = acp_by_element.find(node.id);
+        if (element_acps != acp_by_element.end()) {
+            DrawAcpElementDecorator(draw_list, node, node_min, node_max, zoom, element_acps->second, actions, ui_state);
+        }
         ++frame_stats.nodes_drawn;
     }
 

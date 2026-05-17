@@ -49,6 +49,11 @@ public:
     bool AddAcpToSelectedElement();
     bool AddAcpToRelationship(const std::string& relationship_id);
     bool RemoveAcp(const std::string& acp_id);
+    void OpenArgumentPackageCanvas(const std::string& package_id,
+                                   const std::string& package_gid,
+                                   const std::string& display_name,
+                                   const std::string& focus_element_id = {});
+    void OpenFirstArgumentPackageCanvas();
 
     // Remove the currently selected element using the given mode. If the
     // planned removal targets more than one element, opens the confirmation

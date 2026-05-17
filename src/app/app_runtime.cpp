@@ -81,7 +81,7 @@ std::string ReviewItemIdFromProblemId(const std::string& problem_id) {
 } // namespace
 
 ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
-    return ui::ElementContextActions{
+    ui::ElementContextActions actions{
         [&runtime](core::NewElementKind kind) { runtime.AddChildToSelected(kind); },
         [&runtime]() { runtime.AddTopGoal(); },
         [&runtime]() { runtime.AddAcpToSelectedElement(); },
@@ -94,6 +94,8 @@ ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
                 runtime.ShowNotImplementedModal(feature);
         },
     };
+    actions.set_status = [&runtime](const std::string& message) { runtime.SetStatus(message); };
+    return actions;
 }
 
 AppRuntime::AppRuntime() : impl_(new AppRuntimeState()) {
@@ -178,6 +180,9 @@ void AppRuntime::RegisterAppEventListeners() {
     });
     impl_->events.Subscribe<AiReviewProposalSuggestionsEvent>([this](const AiReviewProposalSuggestionsEvent& event) {
         actions::ProposalActions(*impl_).CreateAiGenerated(event.suggestions);
+    });
+    impl_->events.Subscribe<ArgumentPackageCanvasRequestEvent>([this](const ArgumentPackageCanvasRequestEvent& event) {
+        OpenArgumentPackageCanvas(event.package_id, event.package_gid, event.display_name, event.focus_element_id);
     });
     impl_->events.Subscribe<CenterRequestEvent>([this](const CenterRequestEvent& event) {
         ui::UiState& ui_state = ui::GetUiState();

@@ -49,6 +49,14 @@ struct AiUiState {
 };
 
 struct WorkbenchState {
+    struct ArgumentPackageCanvasTab {
+        std::string key;
+        std::string package_id;
+        std::string package_gid;
+        std::string title;
+        std::filesystem::path source_file_path;
+    };
+
     bool force_center_tab_selection = false;
     bool pending_focus_root = false;
     bool focus_review_tab = false;
@@ -58,6 +66,8 @@ struct WorkbenchState {
     bool show_evidence_tab = false;
     bool show_package_details_tab = false;
     bool show_terminology_package_tab = false;
+    std::vector<ArgumentPackageCanvasTab> argument_package_canvas_tabs;
+    std::string active_argument_package_canvas_key;
 };
 
 struct TerminologyUiState {

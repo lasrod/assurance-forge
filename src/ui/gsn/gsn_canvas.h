@@ -39,6 +39,8 @@ struct TerminologyCardCandidate {
     core::TerminologyTermRef term_ref;
 };
 
+class GsnCanvas;
+
 struct TerminologyCardState {
     bool pinned = false;
     bool clicked_term_this_frame = false;
@@ -85,8 +87,11 @@ void ShowGsnCanvasContent(UiState& ui_state,
                           const ElementContextActions& actions,
                           const sacm::AssuranceCasePackage* terminology_package = nullptr);
 
-// High-level renderer class (in implementation file)
-class GsnCanvas;
+void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
+                                      UiState& ui_state,
+                                      const parser::AssuranceCase* active_case,
+                                      const ElementContextActions& actions,
+                                      const sacm::AssuranceCasePackage* terminology_package = nullptr);
 
 // Provide a simple setter so external code (app) can push elements to the
 // canvas renderer (legacy).

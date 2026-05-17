@@ -1202,10 +1202,11 @@ void DrawGsnNode(const GsnNode& node,
     }
 }
 
-void ShowGsnCanvasContent(UiState& ui_state,
-                          const parser::AssuranceCase* active_case,
-                          const ElementContextActions& actions,
-                          const sacm::AssuranceCasePackage* terminology_package) {
+void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
+                                      UiState& ui_state,
+                                      const parser::AssuranceCase* active_case,
+                                      const ElementContextActions& actions,
+                                      const sacm::AssuranceCasePackage* terminology_package) {
     // Child region with clipping; we manage our own pan/zoom offset
     // so no ImGui scrollbars are needed.
     ImU32 canvas_bg = GetTheme().canvas_bg;
@@ -1220,7 +1221,6 @@ void ShowGsnCanvasContent(UiState& ui_state,
     ImGui::PopStyleColor();
 
     // --- Zoom & pan input handling ---
-    GsnCanvas& renderer = GlobalRenderer();
     ImVec2 child_pos = ImGui::GetWindowPos();
 
     // --- Background dot grid (drawn behind everything else) ---
@@ -1355,7 +1355,9 @@ void ShowGsnCanvasContent(UiState& ui_state,
     // Render the canvas content
     renderer.Render(ui_state, active_case, actions, terminology_package);
 
-    if (ImGui::BeginPopupContextWindow("##gsn_canvas_background_context",
+    const bool relationship_context_menu_active = renderer.GetLastRenderStats().relationship_context_menu_active;
+    if (!relationship_context_menu_active &&
+        ImGui::BeginPopupContextWindow("##gsn_canvas_background_context",
                                        ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems)) {
         const bool can_add_top_goal = static_cast<bool>(actions.add_top_goal);
         if (ImGui::MenuItem("Add New Top Goal", nullptr, false, can_add_top_goal)) {
@@ -1547,6 +1549,13 @@ void ShowGsnCanvasContent(UiState& ui_state,
     }
 
     ImGui::EndChild();
+}
+
+void ShowGsnCanvasContent(UiState& ui_state,
+                          const parser::AssuranceCase* active_case,
+                          const ElementContextActions& actions,
+                          const sacm::AssuranceCasePackage* terminology_package) {
+    ShowGsnCanvasContentWithRenderer(GlobalRenderer(), ui_state, active_case, actions, terminology_package);
 }
 
 void ShowGsnCanvasWindow() {

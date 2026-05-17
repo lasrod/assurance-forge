@@ -10,6 +10,8 @@ namespace {
 constexpr const char* kStrategyChildBlockedReason =
     "ACP on a Strategy -> Goal edge is ambiguous in GSN. The confidence argument should apply to the whole inference "
     "through the strategy. Add ACP to the parent Goal -> Strategy relationship instead?";
+constexpr const char* kUnsupportedRelationshipBlockedReason =
+    "ACP is only supported for GSN SupportedBy and InContextOf relationships between the eligible element types.";
 
 bool IsRelationshipType(const std::string& type) {
     return type == "assertedinference" || type == "assertedcontext" || type == "assertedevidence";
@@ -48,6 +50,24 @@ std::string ElementKind(const std::unordered_map<std::string, const parser::Sacm
     return element.type;
 }
 
+bool IsGoal(const std::unordered_map<std::string, const parser::SacmElement*>& elements, const std::string& id) {
+    return ElementKind(elements, id) == "Goal";
+}
+
+bool IsStrategy(const std::unordered_map<std::string, const parser::SacmElement*>& elements, const std::string& id) {
+    return ElementKind(elements, id) == "Strategy";
+}
+
+bool IsSolution(const std::unordered_map<std::string, const parser::SacmElement*>& elements, const std::string& id) {
+    return ElementKind(elements, id) == "Solution";
+}
+
+bool IsContextAttachment(const std::unordered_map<std::string, const parser::SacmElement*>& elements,
+                         const std::string& id) {
+    const std::string kind = ElementKind(elements, id);
+    return kind == "Solution" || kind == "Assumption" || kind == "Justification";
+}
+
 std::string RelationshipSummary(AcpRelationshipKind kind,
                                 const std::string& parent_id,
                                 const std::string& child_id,
@@ -75,7 +95,9 @@ void AddTarget(std::vector<AcpRelationshipTarget>& targets,
                std::string child_id,
                std::string source_id,
                std::string target_id,
-               bool strategy_child_edge) {
+               bool strategy_child_edge,
+               bool eligible_for_acp,
+               std::string blocked_reason = {}) {
     AcpRelationshipTarget target;
     target.relationship_id = relationship.id;
     target.kind = kind;
@@ -85,9 +107,11 @@ void AddTarget(std::vector<AcpRelationshipTarget>& targets,
     target.target_id = std::move(target_id);
     target.reasoning_id = relationship.reasoning_ref;
     target.strategy_child_edge = strategy_child_edge;
-    target.eligible_for_acp = !strategy_child_edge;
+    target.eligible_for_acp = eligible_for_acp;
     if (strategy_child_edge)
         target.blocked_reason = kStrategyChildBlockedReason;
+    else if (!eligible_for_acp)
+        target.blocked_reason = blocked_reason.empty() ? kUnsupportedRelationshipBlockedReason : std::move(blocked_reason);
     target.summary = RelationshipSummary(kind, target.parent_id, target.child_id, target.reasoning_id, strategy_child_edge);
     targets.push_back(std::move(target));
 }
@@ -117,6 +141,7 @@ std::vector<AcpRelationshipTarget> BuildAcpRelationshipTargets(const parser::Ass
         if (relationship.type == "assertedinference") {
             for (const std::string& target_id : relationship.target_refs) {
                 if (!relationship.reasoning_ref.empty()) {
+                    const bool goal_to_strategy = IsGoal(elements, target_id) && IsStrategy(elements, relationship.reasoning_ref);
                     AddTarget(targets,
                               AcpRelationshipKind::SupportedBy,
                               relationship,
@@ -124,9 +149,10 @@ std::vector<AcpRelationshipTarget> BuildAcpRelationshipTargets(const parser::Ass
                               relationship.reasoning_ref,
                               relationship.reasoning_ref,
                               target_id,
-                              false);
+                              false,
+                              goal_to_strategy);
                     for (const std::string& source_id : relationship.source_refs) {
-                        const bool source_is_goal = ElementKind(elements, source_id) == "Goal";
+                        const bool strategy_to_goal = IsStrategy(elements, relationship.reasoning_ref) && IsGoal(elements, source_id);
                         AddTarget(targets,
                                   AcpRelationshipKind::SupportedBy,
                                   relationship,
@@ -134,10 +160,15 @@ std::vector<AcpRelationshipTarget> BuildAcpRelationshipTargets(const parser::Ass
                                   source_id,
                                   source_id,
                                   target_id,
-                                  source_is_goal);
+                                  strategy_to_goal,
+                                  false,
+                                  strategy_to_goal ? kStrategyChildBlockedReason : kUnsupportedRelationshipBlockedReason);
                     }
                 } else {
                     for (const std::string& source_id : relationship.source_refs) {
+                        const bool goal_to_goal = IsGoal(elements, target_id) && IsGoal(elements, source_id);
+                        const bool goal_to_strategy = IsGoal(elements, target_id) && IsStrategy(elements, source_id);
+                        const bool goal_to_solution = IsGoal(elements, target_id) && IsSolution(elements, source_id);
                         AddTarget(targets,
                                   AcpRelationshipKind::SupportedBy,
                                   relationship,
@@ -145,13 +176,16 @@ std::vector<AcpRelationshipTarget> BuildAcpRelationshipTargets(const parser::Ass
                                   source_id,
                                   source_id,
                                   target_id,
-                                  false);
+                                  false,
+                                  goal_to_goal || goal_to_strategy || goal_to_solution);
                     }
                 }
             }
         } else if (relationship.type == "assertedcontext") {
             for (const std::string& target_id : relationship.target_refs) {
                 for (const std::string& source_id : relationship.source_refs) {
+                    const bool eligible_context = (IsGoal(elements, target_id) || IsStrategy(elements, target_id)) &&
+                                                  IsContextAttachment(elements, source_id);
                     AddTarget(targets,
                               AcpRelationshipKind::InContextOf,
                               relationship,
@@ -159,12 +193,14 @@ std::vector<AcpRelationshipTarget> BuildAcpRelationshipTargets(const parser::Ass
                               source_id,
                               source_id,
                               target_id,
-                              false);
+                              false,
+                              eligible_context);
                 }
             }
         } else if (relationship.type == "assertedevidence") {
             for (const std::string& target_id : relationship.target_refs) {
                 for (const std::string& source_id : relationship.source_refs) {
+                    const bool goal_to_solution = IsGoal(elements, target_id) && IsSolution(elements, source_id);
                     AddTarget(targets,
                               AcpRelationshipKind::AssertedEvidence,
                               relationship,
@@ -172,7 +208,8 @@ std::vector<AcpRelationshipTarget> BuildAcpRelationshipTargets(const parser::Ass
                               source_id,
                               source_id,
                               target_id,
-                              false);
+                              false,
+                              goal_to_solution);
                 }
             }
         }

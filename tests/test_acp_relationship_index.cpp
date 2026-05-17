@@ -91,3 +91,48 @@ TEST(AcpRelationshipIndexTest, MapsDirectSupportedByEvidenceAndContextRelationsh
     EXPECT_EQ(context->kind, core::acp::AcpRelationshipKind::InContextOf);
     EXPECT_TRUE(context->eligible_for_acp);
 }
+
+TEST(AcpRelationshipIndexTest, AllowsInContextOfForGoalAndStrategyAttachments) {
+    parser::AssuranceCase model;
+    model.elements.push_back(Element("G1", "claim"));
+    model.elements.push_back(Element("S1", "argumentreasoning"));
+    model.elements.push_back(Element("C1", "artifactreference"));
+    model.elements.push_back(Element("A1", "claim", "assumed"));
+    model.elements.push_back(Element("J1", "claim", "justification"));
+    model.elements.push_back(Relationship("R1", "assertedcontext", {"G1"}, {"C1", "A1", "J1"}));
+    model.elements.push_back(Relationship("R2", "assertedcontext", {"S1"}, {"C1", "A1", "J1"}));
+
+    const std::vector<core::acp::AcpRelationshipTarget> targets = core::acp::BuildAcpRelationshipTargets(model);
+    for (const std::pair<std::string, std::string> edge : {std::pair{"G1", "C1"},
+                                                           std::pair{"G1", "A1"},
+                                                           std::pair{"G1", "J1"},
+                                                           std::pair{"S1", "C1"},
+                                                           std::pair{"S1", "A1"},
+                                                           std::pair{"S1", "J1"}}) {
+        const auto* target = core::acp::FindAcpRelationshipTarget(targets, edge.first, edge.second);
+        ASSERT_NE(target, nullptr) << edge.first << " -> " << edge.second;
+        EXPECT_TRUE(target->eligible_for_acp) << edge.first << " -> " << edge.second;
+    }
+}
+
+TEST(AcpRelationshipIndexTest, BlocksUnsupportedRelationshipPairs) {
+    parser::AssuranceCase model;
+    model.elements.push_back(Element("G1", "claim"));
+    model.elements.push_back(Element("S1", "argumentreasoning"));
+    model.elements.push_back(Element("A1", "claim", "assumed"));
+    model.elements.push_back(Element("Sol1", "artifactreference"));
+    model.elements.push_back(Relationship("R1", "assertedinference", {"S1"}, {"G1"}));
+    model.elements.push_back(Relationship("R2", "assertedevidence", {"S1"}, {"Sol1"}));
+    model.elements.push_back(Relationship("R3", "assertedcontext", {"A1"}, {"Sol1"}));
+
+    const std::vector<core::acp::AcpRelationshipTarget> targets = core::acp::BuildAcpRelationshipTargets(model);
+
+    for (const std::pair<std::string, std::string> edge : {std::pair{"S1", "G1"},
+                                                           std::pair{"S1", "Sol1"},
+                                                           std::pair{"A1", "Sol1"}}) {
+        const auto* target = core::acp::FindAcpRelationshipTarget(targets, edge.first, edge.second);
+        ASSERT_NE(target, nullptr) << edge.first << " -> " << edge.second;
+        EXPECT_FALSE(target->eligible_for_acp) << edge.first << " -> " << edge.second;
+        EXPECT_FALSE(target->blocked_reason.empty());
+    }
+}

@@ -92,6 +92,32 @@ bool ParserTargetExists(const parser::AssuranceCase& model,
     return false;
 }
 
+const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model, const std::string& element_id) {
+    auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
+        return element.id == element_id;
+    });
+    return found == model.elements.end() ? nullptr : &*found;
+}
+
+bool ElementEligibleForAcp(const parser::AssuranceCase& model, const std::string& element_id) {
+    const parser::SacmElement* element = FindParserElement(model, element_id);
+    return element && element->type == "artifactreference";
+}
+
+bool RelationshipEligibleForAcp(const parser::AssuranceCase& model, const std::string& relationship_id) {
+    const std::vector<AcpRelationshipTarget> targets = BuildAcpRelationshipTargets(model);
+    return std::any_of(targets.begin(), targets.end(), [&](const AcpRelationshipTarget& target) {
+        return target.relationship_id == relationship_id && target.eligible_for_acp;
+    });
+}
+
+std::string IneligibleTargetMessage(const std::string& target_kind) {
+    if (target_kind == kTargetKindElement) {
+        return "Element ACP is only allowed on artefact references, such as Solutions or artefact-backed Contexts.";
+    }
+    return "Relationship ACP is only allowed on eligible SupportedBy or InContextOf relationships.";
+}
+
 parser::AcpRecord ToRecord(const Acp& acp) {
     parser::AcpRecord record;
     record.id = acp.id;
@@ -211,6 +237,10 @@ AcpEditResult AddAcp(parser::AssuranceCase& model,
         return ErrorResult({}, "Unsupported ACP target kind.");
     if (!ParserTargetExists(model, target_kind, target_id))
         return ErrorResult({}, "ACP target was not found in the active model.");
+    if (target_kind == kTargetKindElement && !ElementEligibleForAcp(model, target_id))
+        return ErrorResult({}, IneligibleTargetMessage(target_kind));
+    if (target_kind == kTargetKindRelationship && !RelationshipEligibleForAcp(model, target_id))
+        return ErrorResult({}, IneligibleTargetMessage(target_kind));
     if (target_kind == kTargetKindRelationship && RelationshipAlreadyHasAcp(model, target_id))
         return ErrorResult({}, "This relationship already has an ACP.");
 
@@ -238,6 +268,10 @@ AcpEditResult UpsertAcp(parser::AssuranceCase& model,
         return ErrorResult(record.id, "Unsupported ACP target kind.");
     if (!ParserTargetExists(model, record.target_kind, record.target_id))
         return ErrorResult(record.id, "ACP target was not found in the active model.");
+    if (record.target_kind == kTargetKindElement && !ElementEligibleForAcp(model, record.target_id))
+        return ErrorResult(record.id, IneligibleTargetMessage(record.target_kind));
+    if (record.target_kind == kTargetKindRelationship && !RelationshipEligibleForAcp(model, record.target_id))
+        return ErrorResult(record.id, IneligibleTargetMessage(record.target_kind));
     if (record.target_kind == kTargetKindRelationship && RelationshipAlreadyHasAcp(model, record.target_id, record.id))
         return ErrorResult(record.id, "This relationship already has an ACP.");
 

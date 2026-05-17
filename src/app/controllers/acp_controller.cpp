@@ -106,6 +106,10 @@ bool AcpController::CreateConfidenceArgumentTreeForAcp(parser::AssuranceCase& mo
     events_.Emit(TreeDirtyEvent{});
     events_.Emit(DocumentDirtyEvent{});
     events_.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
+    events_.Emit(ArgumentPackageCanvasRequestEvent{result.argument_package_id,
+                                                   {},
+                                                   "Confidence argument for " + result.acp_id,
+                                                   result.top_goal_id});
     events_.Emit(StatusMessageEvent{"Created confidence argument tree " + result.argument_package_id + " for " +
                                     result.acp_id});
     SyncProblems(model, package);

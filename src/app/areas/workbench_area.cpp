@@ -5,15 +5,80 @@
 #include "app/frame/app_shell.h"
 #include "core/problems/problem_attention.h"
 #include "ui/gsn/gsn_canvas.h"
+#include "ui/gsn/gsn_adapter.h"
+#include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/localization.h"
 #include "ui/panels/package_details_panel.h"
 #include "ui/panels/terminology_package_panel.h"
 #include "ui/register_views.h"
+#include "sacm/sacm_model.h"
 #include "ui/theme.h"
 #include "ui/ui_state.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <functional>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+
 namespace app::areas {
 namespace {
+
+std::unordered_map<std::string, ui::gsn::GsnCanvas> g_argument_package_canvas_renderers;
+
+template <typename ElementT>
+void AddElementIdentity(const ElementT& element,
+                        std::unordered_set<std::string>& ids,
+                        std::unordered_set<std::string>& gids) {
+    if (!element.id.empty())
+        ids.insert(element.id);
+    if (!element.gid.empty())
+        gids.insert(element.gid);
+}
+
+const sacm::ArgumentPackage* FindArgumentPackage(const sacm::AssuranceCasePackage& package,
+                                                 const WorkbenchState::ArgumentPackageCanvasTab& tab) {
+    auto found = std::find_if(package.argumentPackages.begin(), package.argumentPackages.end(), [&](const auto& pkg) {
+        const bool id_matches = !tab.package_id.empty() && pkg.id == tab.package_id;
+        const bool gid_matches = !tab.package_gid.empty() && pkg.gid == tab.package_gid;
+        return id_matches || gid_matches;
+    });
+    return found == package.argumentPackages.end() ? nullptr : &*found;
+}
+
+parser::AssuranceCase BuildArgumentPackageProjection(const parser::AssuranceCase& source_model,
+                                                     const sacm::ArgumentPackage& argument_package,
+                                                     const std::string& fallback_name) {
+    std::unordered_set<std::string> element_ids;
+    std::unordered_set<std::string> element_gids;
+    for (const sacm::Claim& claim : argument_package.claims)
+        AddElementIdentity(claim, element_ids, element_gids);
+    for (const sacm::ArgumentReasoning& reasoning : argument_package.argumentReasonings)
+        AddElementIdentity(reasoning, element_ids, element_gids);
+    for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences)
+        AddElementIdentity(artifact_reference, element_ids, element_gids);
+    for (const sacm::AssertedInference& inference : argument_package.assertedInferences)
+        AddElementIdentity(inference, element_ids, element_gids);
+    for (const sacm::AssertedContext& context : argument_package.assertedContexts)
+        AddElementIdentity(context, element_ids, element_gids);
+    for (const sacm::AssertedEvidence& evidence : argument_package.assertedEvidences)
+        AddElementIdentity(evidence, element_ids, element_gids);
+
+    parser::AssuranceCase projection;
+    projection.id = argument_package.id.empty() ? source_model.id : argument_package.id;
+    projection.name = argument_package.name.empty() ? fallback_name : argument_package.name;
+    projection.description = argument_package.description;
+    for (const parser::SacmElement& element : source_model.elements) {
+        if (element_ids.count(element.id) > 0 || element_gids.count(element.gid) > 0)
+            projection.elements.push_back(element);
+    }
+    for (const parser::AcpRecord& acp : source_model.acps) {
+        if (element_ids.count(acp.target_id) > 0 || element_gids.count(acp.target_id) > 0)
+            projection.acps.push_back(acp);
+    }
+    return projection;
+}
 
 ui::ElementContextActions MakeProposalContextActions(const WorkbenchAreaCallbacks& callbacks) {
     return ui::ElementContextActions{
@@ -100,6 +165,41 @@ void RenderGsnCanvasTab(AppRuntimeState& state, ui::UiState& ui_state, const Wor
     ui::gsn::ShowGsnCanvasContent(ui_state, visible_case, actions, terminology_package);
 }
 
+void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
+                                    ui::UiState& ui_state,
+                                    const WorkbenchAreaCallbacks& callbacks,
+                                    const WorkbenchState::ArgumentPackageCanvasTab& tab) {
+    ui_state.center_view = ui::CenterView::GsnCanvas;
+    if (!state.app_state.loaded_case.has_value() || !state.app_state.sacm_package.has_value()) {
+        ImGui::TextDisabled("No SACM argument model is loaded.");
+        return;
+    }
+
+    const sacm::ArgumentPackage* argument_package = FindArgumentPackage(state.app_state.sacm_package.value(), tab);
+    if (!argument_package) {
+        ImGui::TextDisabled("Argument package was not found in the loaded SACM model.");
+        return;
+    }
+
+    parser::AssuranceCase visible_case =
+        BuildArgumentPackageProjection(state.app_state.loaded_case.value(), *argument_package, tab.title);
+    core::AssuranceTree visible_tree = ui::gsn::BuildAssuranceTree(visible_case);
+    core::ApplyTreeDisplayOrder(visible_tree, state.tree_display_order);
+
+    ui::ElementContextActions actions = MakeCanvasContextActions(callbacks);
+    ui_state.proposal_canvas_active = false;
+    ui_state.attention_element_ids = core::CollectAttentionElementIds(state.problems_manager.GetProblems());
+    if (callbacks.sync_review_visual_states)
+        callbacks.sync_review_visual_states();
+    ui::gsn::GsnCanvas& renderer = g_argument_package_canvas_renderers[tab.key];
+    renderer.SetTree(visible_tree);
+    ui::gsn::ShowGsnCanvasContentWithRenderer(renderer,
+                                             ui_state,
+                                             &visible_case,
+                                             actions,
+                                             &state.app_state.sacm_package.value());
+}
+
 void RenderTerminologyPackageTab(AppRuntimeState& state, const WorkbenchAreaCallbacks& callbacks) {
     const sacm::TerminologyPackage* terminology_package = nullptr;
     if (state.app_state.sacm_package.has_value()) {
@@ -163,14 +263,44 @@ void RenderWorkbenchArea(AppRuntimeState& state,
     frame::NormalizeCenterViewSelection(state, ui_state.center_view);
 
     if (ImGui::BeginTabBar("##center_tabs")) {
-        if (state.workbench.show_gsn_tab) {
+        if (state.workbench.show_gsn_tab && state.IsProposalCanvasActive()) {
             ImGuiTabItemFlags gsn_flags =
-                (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::GsnCanvas)
+            (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::GsnCanvas)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
             if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::GsnCanvas), nullptr, gsn_flags)) {
+                state.workbench.active_argument_package_canvas_key.clear();
                 RenderGsnCanvasTab(state, ui_state, callbacks);
                 ImGui::EndTabItem();
+            }
+        }
+
+        if (state.workbench.show_gsn_tab) {
+            for (std::size_t index = 0; index < state.workbench.argument_package_canvas_tabs.size();) {
+                const auto& tab = state.workbench.argument_package_canvas_tabs[index];
+                bool open = true;
+                const bool select_tab = state.workbench.force_center_tab_selection &&
+                                        state.workbench.active_argument_package_canvas_key == tab.key;
+                const ImGuiTabItemFlags tab_flags = select_tab ? ImGuiTabItemFlags_SetSelected : 0;
+                const std::string tab_label =
+                    tab.title + "###argument_package_canvas_" + std::to_string(std::hash<std::string>{}(tab.key));
+                if (ImGui::BeginTabItem(tab_label.c_str(), &open, tab_flags)) {
+                    state.workbench.active_argument_package_canvas_key = tab.key;
+                    RenderArgumentPackageCanvasTab(state, ui_state, callbacks, tab);
+                    ImGui::EndTabItem();
+                }
+                if (!open) {
+                    const bool removed_active = state.workbench.active_argument_package_canvas_key == tab.key;
+                    g_argument_package_canvas_renderers.erase(tab.key);
+                    state.workbench.argument_package_canvas_tabs.erase(
+                        state.workbench.argument_package_canvas_tabs.begin() + static_cast<std::ptrdiff_t>(index));
+                    if (removed_active) {
+                        state.workbench.active_argument_package_canvas_key.clear();
+                        state.workbench.force_center_tab_selection = true;
+                    }
+                    continue;
+                }
+                ++index;
             }
         }
 

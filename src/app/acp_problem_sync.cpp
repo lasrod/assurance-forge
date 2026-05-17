@@ -1,5 +1,6 @@
 #include "app/acp_problem_sync.h"
 
+#include "core/acp/acp_relationship_index.h"
 #include "core/acp/assurance_claim_point.h"
 #include "core/problems/problem_utils.h"
 
@@ -7,6 +8,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 namespace app {
 namespace {
@@ -58,6 +60,17 @@ bool TopGoalExists(const sacm::AssuranceCasePackage& package,
 bool PackageIsConfidenceArgument(const sacm::AssuranceCasePackage& package, const std::string& argument_package_id) {
     const sacm::ArgumentPackage* argument_package = FindArgumentPackage(package, argument_package_id);
     return argument_package && core::acp::IsConfidenceArgumentPackage(*argument_package);
+}
+
+bool ElementEligibleForAcp(const parser::SacmElement& element) {
+    return element.type == "artifactreference";
+}
+
+bool RelationshipEligibleForAcp(const parser::AssuranceCase& model, const std::string& relationship_id) {
+    const std::vector<core::acp::AcpRelationshipTarget> targets = core::acp::BuildAcpRelationshipTargets(model);
+    return std::any_of(targets.begin(), targets.end(), [&](const core::acp::AcpRelationshipTarget& target) {
+        return target.relationship_id == relationship_id && target.eligible_for_acp;
+    });
 }
 
 core::ProblemItem MakeProblem(const parser::AcpRecord& acp,
@@ -126,11 +139,19 @@ void SyncAcpProblems(core::ProblemsManager& problems_manager,
                                                             "ACP " + acp.id + " is uninstantiated. Add a text confidence argument or link a confidence top goal."));
         }
 
-        if (acp.target_kind == "element" && target->type != "artifactreference") {
+        if (acp.target_kind == "element" && !ElementEligibleForAcp(*target)) {
             problems_manager.AddOrUpdateProblem(MakeProblem(acp,
                                                             core::ProblemSeverity::Warning,
                                                             "NonArtefactReferenceTarget",
-                                                            "ACP " + acp.id + " is attached to a non-artefact-reference element."));
+                                                            "ACP " + acp.id + " is attached to an element that is not an artefact reference."));
+        }
+
+        if (acp.target_kind == "relationship" && IsRelationshipType(target->type) &&
+            !RelationshipEligibleForAcp(*model, acp.target_id)) {
+            problems_manager.AddOrUpdateProblem(MakeProblem(acp,
+                                                            core::ProblemSeverity::Warning,
+                                                            "IneligibleRelationshipTarget",
+                                                            "ACP " + acp.id + " is attached to a relationship that is not eligible for ACP."));
         }
 
         if (acp.resolution_kind == "topGoalReference") {
