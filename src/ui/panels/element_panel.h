@@ -25,7 +25,7 @@ struct ElementTerminologyAssistCallbacks {
 struct ElementConfidenceAssistCallbacks {
     std::function<ConfidencePanelModel(const parser::SacmElement& element)> model_for_element;
     std::function<bool(parser::SacmElement& element, const ui::ElementConfidence& confidence)> save_confidence;
-    std::function<bool(parser::SacmElement& element)> clear_confidence;
+    std::function<bool(parser::SacmElement& element, bool active)> set_confidence_active;
     std::function<bool(parser::SacmElement& element)> mark_reviewed;
     std::function<bool()> backup_invalid_and_reset;
 };

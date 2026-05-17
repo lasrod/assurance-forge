@@ -6,6 +6,8 @@
 #include "core/sacm_identity.h"
 #include "ui/panels/element_panel.h"
 
+#include <string>
+
 namespace app::areas {
 
 void RenderInspectorArea(AppRuntimeState& state,
@@ -54,7 +56,7 @@ void RenderInspectorArea(AppRuntimeState& state,
                 model.method_label = assessment->method == core::confidence::ConfidenceMethod::JosangOpinion
                                          ? "Jøsang opinion"
                                          : "Fixed value";
-                model.status_label = assessment->status == core::confidence::ConfidenceStatus::Archived ? "Archived"
+                model.status_label = assessment->status == core::confidence::ConfidenceStatus::Inactive ? "Inactive"
                                                                                                          : "Active";
             }
             return model;
@@ -74,11 +76,12 @@ void RenderInspectorArea(AppRuntimeState& state,
                     return false;
                 }
                 std::string error;
-                generated_gid = core::EnsureElementGid(*loaded_case, sacm_package, element, error);
-                if (!error.empty()) {
+                const core::EnsureGidResult gid_result = core::EnsureElementGid(*loaded_case, sacm_package, element, error);
+                if (gid_result == core::EnsureGidResult::Failed) {
                     state.events.Emit(StatusMessageEvent{"Confidence save failed: " + error});
                     return false;
                 }
+                generated_gid = gid_result == core::EnsureGidResult::Generated;
             }
             std::string error;
             if (!state.confidence_controller->UpsertElementConfidence(element, confidence, error)) {
@@ -87,12 +90,12 @@ void RenderInspectorArea(AppRuntimeState& state,
             }
             return generated_gid;
         };
-        confidence_callbacks.clear_confidence = [&](parser::SacmElement& element) {
+        confidence_callbacks.set_confidence_active = [&](parser::SacmElement& element, bool active) {
             if (!state.confidence_controller)
                 return false;
             std::string error;
-            if (!state.confidence_controller->ClearElementConfidence(element, error) && !error.empty())
-                state.events.Emit(StatusMessageEvent{"Confidence clear failed: " + error});
+            if (!state.confidence_controller->SetElementConfidenceActive(element, active, error) && !error.empty())
+                state.events.Emit(StatusMessageEvent{"Confidence update failed: " + error});
             return false;
         };
         confidence_callbacks.mark_reviewed = [&](parser::SacmElement& element) {
@@ -115,6 +118,13 @@ void RenderInspectorArea(AppRuntimeState& state,
             return true;
         };
         if (ui::panels::ShowElementPanel(loaded_case, sacm_package, &terminology_callbacks, &confidence_callbacks)) {
+            if (state.confidence_controller && loaded_case &&
+                state.confidence_controller->RefreshStaleFlags(*loaded_case) &&
+                state.confidence_controller->LastInactivatedCount() > 0) {
+                const int count = state.confidence_controller->LastInactivatedCount();
+                state.events.Emit(StatusMessageEvent{std::to_string(count) +
+                                                     " confidence assessment(s) were marked inactive because their target elements changed."});
+            }
             if (callbacks.mark_element_modified)
                 callbacks.mark_element_modified();
         }

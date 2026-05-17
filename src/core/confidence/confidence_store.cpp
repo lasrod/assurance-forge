@@ -222,8 +222,8 @@ const char* ToString(ConfidenceStatus status) {
     switch (status) {
     case ConfidenceStatus::Active:
         return "active";
-    case ConfidenceStatus::Archived:
-        return "archived";
+    case ConfidenceStatus::Inactive:
+        return "inactive";
     }
     return "active";
 }
@@ -241,8 +241,8 @@ ConfidenceMethod ConfidenceMethodFromString(const std::string& value) {
 }
 
 ConfidenceStatus ConfidenceStatusFromString(const std::string& value) {
-    if (value == "archived")
-        return ConfidenceStatus::Archived;
+    if (value == "inactive" || value == "archived")
+        return ConfidenceStatus::Inactive;
     return ConfidenceStatus::Active;
 }
 
@@ -433,42 +433,26 @@ std::string NextAssessmentId(const ConfidenceStore& store) {
     return out.str();
 }
 
-const ConfidenceAssessment* FindActiveAssessment(const ConfidenceStore& store,
-                                                 const std::string& source_id,
-                                                 const std::string& sacm_gid) {
-    for (const ConfidenceAssessment& assessment : store.assessments) {
-        if (assessment.status == ConfidenceStatus::Active && assessment.target.kind == ConfidenceTargetKind::Element &&
-            assessment.target.sourceId == source_id && assessment.target.sacmGid == sacm_gid) {
-            return &assessment;
-        }
-    }
-    return nullptr;
-}
-
-ConfidenceAssessment* FindActiveAssessment(ConfidenceStore& store,
+const ConfidenceAssessment* FindAssessment(const ConfidenceStore& store,
                                            const std::string& source_id,
                                            const std::string& sacm_gid) {
-    for (ConfidenceAssessment& assessment : store.assessments) {
-        if (assessment.status == ConfidenceStatus::Active && assessment.target.kind == ConfidenceTargetKind::Element &&
-            assessment.target.sourceId == source_id && assessment.target.sacmGid == sacm_gid) {
+    for (const ConfidenceAssessment& assessment : store.assessments) {
+        if (assessment.target.kind == ConfidenceTargetKind::Element && assessment.target.sourceId == source_id &&
+            assessment.target.sacmGid == sacm_gid) {
             return &assessment;
         }
     }
     return nullptr;
 }
 
-bool RemoveActiveAssessment(ConfidenceStore& store, const std::string& source_id, const std::string& sacm_gid) {
-    const auto old_size = store.assessments.size();
-    store.assessments.erase(std::remove_if(store.assessments.begin(),
-                                           store.assessments.end(),
-                                           [&](const ConfidenceAssessment& assessment) {
-                                               return assessment.status == ConfidenceStatus::Active &&
-                                                      assessment.target.kind == ConfidenceTargetKind::Element &&
-                                                      assessment.target.sourceId == source_id &&
-                                                      assessment.target.sacmGid == sacm_gid;
-                                           }),
-                            store.assessments.end());
-    return store.assessments.size() != old_size;
+ConfidenceAssessment* FindAssessment(ConfidenceStore& store, const std::string& source_id, const std::string& sacm_gid) {
+    for (ConfidenceAssessment& assessment : store.assessments) {
+        if (assessment.target.kind == ConfidenceTargetKind::Element && assessment.target.sourceId == source_id &&
+            assessment.target.sacmGid == sacm_gid) {
+            return &assessment;
+        }
+    }
+    return nullptr;
 }
 
 void UpsertSacmSource(ConfidenceStore& store, SacmSource source) {
@@ -484,7 +468,12 @@ void UpsertSacmSource(ConfidenceStore& store, SacmSource source) {
     }
 }
 
-bool RefreshStaleFlags(ConfidenceStore& store, const std::string& source_id, const parser::AssuranceCase& model) {
+bool RefreshStaleFlags(ConfidenceStore& store,
+                       const std::string& source_id,
+                       const parser::AssuranceCase& model,
+                       int* inactivated_count) {
+    if (inactivated_count)
+        *inactivated_count = 0;
     std::unordered_map<std::string, const parser::SacmElement*> by_gid;
     for (const parser::SacmElement& element : model.elements) {
         if (!element.gid.empty())
@@ -505,6 +494,12 @@ bool RefreshStaleFlags(ConfidenceStore& store, const std::string& source_id, con
         if (assessment.stale != stale) {
             assessment.stale = stale;
             changed = true;
+        }
+        if (stale && assessment.status == ConfidenceStatus::Active) {
+            assessment.status = ConfidenceStatus::Inactive;
+            changed = true;
+            if (inactivated_count)
+                ++(*inactivated_count);
         }
         if (assessment.target.sacmType.empty())
             assessment.target.sacmType = DisplaySacmType(*found->second);

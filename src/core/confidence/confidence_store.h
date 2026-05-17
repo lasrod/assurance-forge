@@ -20,7 +20,7 @@ enum class ConfidenceMethod {
 
 enum class ConfidenceStatus {
     Active,
-    Archived,
+    Inactive,
 };
 
 struct SacmSource {
@@ -104,14 +104,14 @@ std::string DisplaySacmType(const parser::SacmElement& element);
 std::string FingerprintElement(const parser::SacmElement& element);
 std::string NextAssessmentId(const ConfidenceStore& store);
 
-const ConfidenceAssessment* FindActiveAssessment(const ConfidenceStore& store,
-                                                 const std::string& source_id,
-                                                 const std::string& sacm_gid);
-ConfidenceAssessment* FindActiveAssessment(ConfidenceStore& store,
+const ConfidenceAssessment* FindAssessment(const ConfidenceStore& store,
                                            const std::string& source_id,
                                            const std::string& sacm_gid);
-bool RemoveActiveAssessment(ConfidenceStore& store, const std::string& source_id, const std::string& sacm_gid);
+ConfidenceAssessment* FindAssessment(ConfidenceStore& store, const std::string& source_id, const std::string& sacm_gid);
 void UpsertSacmSource(ConfidenceStore& store, SacmSource source);
-bool RefreshStaleFlags(ConfidenceStore& store, const std::string& source_id, const parser::AssuranceCase& model);
+bool RefreshStaleFlags(ConfidenceStore& store,
+                       const std::string& source_id,
+                       const parser::AssuranceCase& model,
+                       int* inactivated_count = nullptr);
 
 } // namespace core::confidence

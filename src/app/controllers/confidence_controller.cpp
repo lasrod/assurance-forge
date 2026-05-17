@@ -87,6 +87,8 @@ bool ConfidenceController::ConfigureStorage(const std::filesystem::path& confide
     store_.projectId = project_id;
     storage_error_.clear();
     dirty_ = false;
+    persistence_dirty_ = false;
+    last_inactivated_count_ = 0;
 
     if (file_path_.empty())
         return true;
@@ -119,12 +121,14 @@ void ConfidenceController::ClearStorage() {
     store_ = core::confidence::ConfidenceStore{};
     storage_error_.clear();
     dirty_ = false;
+    persistence_dirty_ = false;
+    last_inactivated_count_ = 0;
     active_source_ = core::confidence::SacmSource{};
     active_source_.sourceId = "main";
 }
 
 bool ConfidenceController::SaveIfDirty(core::AssuranceProject& project, std::string& error) {
-    if (!dirty_)
+    if (!dirty_ && !persistence_dirty_)
         return true;
     if (!storage_error_.empty()) {
         error = "confidence storage has not been recovered: " + storage_error_;
@@ -141,6 +145,7 @@ bool ConfidenceController::SaveIfDirty(core::AssuranceProject& project, std::str
 
     file_path_ = project.rootPath / entry.relativePath;
     dirty_ = false;
+    persistence_dirty_ = false;
     return true;
 }
 
@@ -162,20 +167,23 @@ bool ConfidenceController::BackupInvalidAndStartNew(std::string& error) {
     store_ = core::confidence::ConfidenceStore{};
     storage_error_.clear();
     dirty_ = true;
+    persistence_dirty_ = false;
     events_.Emit(ConfidenceDirtyEvent{});
     return true;
 }
 
 bool ConfidenceController::IsDirty() const {
-    return dirty_;
+    return dirty_ || persistence_dirty_;
 }
 
 void ConfidenceController::ClearDirty() {
     dirty_ = false;
+    persistence_dirty_ = false;
 }
 
 void ConfidenceController::MarkDirty() {
     dirty_ = true;
+    persistence_dirty_ = false;
     events_.Emit(ConfidenceDirtyEvent{});
 }
 
@@ -202,18 +210,24 @@ const std::string& ConfidenceController::ActiveSourceId() const {
 }
 
 bool ConfidenceController::RefreshStaleFlags(const parser::AssuranceCase& model) {
-    if (storage_error_.empty() && core::confidence::RefreshStaleFlags(store_, active_source_.sourceId, model)) {
-        MarkDirty();
+    last_inactivated_count_ = 0;
+    if (storage_error_.empty() &&
+        core::confidence::RefreshStaleFlags(store_, active_source_.sourceId, model, &last_inactivated_count_)) {
+        persistence_dirty_ = true;
         return true;
     }
     return false;
+}
+
+int ConfidenceController::LastInactivatedCount() const {
+    return last_inactivated_count_;
 }
 
 const core::confidence::ConfidenceAssessment* ConfidenceController::FindForElement(
     const parser::SacmElement& element) const {
     if (element.gid.empty() || !storage_error_.empty())
         return nullptr;
-    return core::confidence::FindActiveAssessment(store_, active_source_.sourceId, element.gid);
+    return core::confidence::FindAssessment(store_, active_source_.sourceId, element.gid);
 }
 
 std::optional<ui::ElementConfidence> ConfidenceController::ConfidenceForElement(const parser::SacmElement& element) const {
@@ -236,7 +250,7 @@ bool ConfidenceController::UpsertElementConfidence(const parser::SacmElement& el
     }
 
     core::confidence::ConfidenceAssessment* assessment =
-        core::confidence::FindActiveAssessment(store_, active_source_.sourceId, element.gid);
+        core::confidence::FindAssessment(store_, active_source_.sourceId, element.gid);
     const std::string now = core::NowUtcString();
     if (!assessment) {
         core::confidence::ConfidenceAssessment created;
@@ -252,12 +266,12 @@ bool ConfidenceController::UpsertElementConfidence(const parser::SacmElement& el
     assessment->target.sacmType = core::confidence::DisplaySacmType(element);
     assessment->targetFingerprint = core::confidence::FingerprintElement(element);
     assessment->stale = false;
-    assessment->status = core::confidence::ConfidenceStatus::Active;
+    assessment->status = confidence.enabled ? core::confidence::ConfidenceStatus::Active
+                                            : core::confidence::ConfidenceStatus::Inactive;
     assessment->updatedAt = now;
     if (assessment->createdAt.empty())
         assessment->createdAt = now;
 
-    confidence.enabled = true;
     if (confidence.mode == ui::ConfidenceInputMode::OpinionTriangle) {
         const core::confidence::JosangOpinion opinion = ToCoreOpinion(confidence.opinion);
         if (!core::confidence::ValidateJosangOpinion(opinion, error))
@@ -280,7 +294,9 @@ bool ConfidenceController::UpsertElementConfidence(const parser::SacmElement& el
     return true;
 }
 
-bool ConfidenceController::ClearElementConfidence(const parser::SacmElement& element, std::string& error) {
+bool ConfidenceController::SetElementConfidenceActive(const parser::SacmElement& element,
+                                                      bool active,
+                                                      std::string& error) {
     error.clear();
     if (!storage_error_.empty()) {
         error = "confidence storage has not been recovered: " + storage_error_;
@@ -288,31 +304,30 @@ bool ConfidenceController::ClearElementConfidence(const parser::SacmElement& ele
     }
     if (element.gid.empty())
         return true;
-    if (core::confidence::RemoveActiveAssessment(store_, active_source_.sourceId, element.gid))
-        MarkDirty();
+
+    core::confidence::ConfidenceAssessment* assessment =
+        core::confidence::FindAssessment(store_, active_source_.sourceId, element.gid);
+    if (!assessment)
+        return true;
+
+    const core::confidence::ConfidenceStatus next_status = active ? core::confidence::ConfidenceStatus::Active
+                                                                  : core::confidence::ConfidenceStatus::Inactive;
+    if (assessment->status == next_status && (!active || !assessment->stale))
+        return true;
+
+    assessment->status = next_status;
+    if (active) {
+        assessment->targetFingerprint = core::confidence::FingerprintElement(element);
+        assessment->target.sacmType = core::confidence::DisplaySacmType(element);
+        assessment->stale = false;
+    }
+    assessment->updatedAt = core::NowUtcString();
+    MarkDirty();
     return true;
 }
 
 bool ConfidenceController::MarkElementReviewed(const parser::SacmElement& element, std::string& error) {
-    error.clear();
-    if (!storage_error_.empty()) {
-        error = "confidence storage has not been recovered: " + storage_error_;
-        return false;
-    }
-    if (element.gid.empty()) {
-        error = "selected element does not have a SACM gid.";
-        return false;
-    }
-    core::confidence::ConfidenceAssessment* assessment =
-        core::confidence::FindActiveAssessment(store_, active_source_.sourceId, element.gid);
-    if (!assessment)
-        return true;
-    assessment->targetFingerprint = core::confidence::FingerprintElement(element);
-    assessment->target.sacmType = core::confidence::DisplaySacmType(element);
-    assessment->stale = false;
-    assessment->updatedAt = core::NowUtcString();
-    MarkDirty();
-    return true;
+    return SetElementConfidenceActive(element, true, error);
 }
 
 } // namespace app::controllers

@@ -68,8 +68,13 @@ void SetConfidenceSource(AppRuntimeState& state, const core::ProjectFileEntry& e
         return;
     state.confidence_controller->SetActiveSource(
         entry.id.empty() ? "main" : entry.id, entry.relativePath.generic_string(), ConfidenceSourceHash(entry));
-    if (state.app_state.loaded_case.has_value())
-        state.confidence_controller->RefreshStaleFlags(state.app_state.loaded_case.value());
+    if (state.app_state.loaded_case.has_value() &&
+        state.confidence_controller->RefreshStaleFlags(state.app_state.loaded_case.value()) &&
+        state.confidence_controller->LastInactivatedCount() > 0) {
+        const int count = state.confidence_controller->LastInactivatedCount();
+        state.events.Emit(StatusMessageEvent{std::to_string(count) +
+                                             " confidence assessment(s) were marked inactive because their target elements changed."});
+    }
 }
 
 bool ProjectFileOpenWouldLeaveLoadedSacm(const core::AppState& app_state, const core::ProjectFileEntry& entry) {

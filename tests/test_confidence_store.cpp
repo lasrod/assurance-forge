@@ -1,3 +1,5 @@
+#include "app/app_events.h"
+#include "app/controllers/confidence_controller.h"
 #include "core/confidence/confidence_store.h"
 #include "core/project_service.h"
 #include "core/sacm_identity.h"
@@ -6,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
+#include <regex>
 
 namespace {
 
@@ -92,6 +95,26 @@ TEST(ConfidenceStoreTest, FixedValueRoundTripsWithExpectedConfidence) {
     EXPECT_DOUBLE_EQ(assessment.derived.expectedConfidence, 0.80);
 }
 
+TEST(ConfidenceStoreTest, InactiveAssessmentRoundTripsAndRemainsFindable) {
+    const parser::SacmElement element = MakeClaim();
+    core::confidence::ConfidenceStore store;
+    store.assessments.push_back(MakeFixedAssessment(element));
+    store.assessments.front().status = core::confidence::ConfidenceStatus::Inactive;
+
+    const std::string json = core::confidence::SerializeConfidenceStore(store);
+    EXPECT_NE(json.find("\"status\": \"inactive\""), std::string::npos);
+
+    core::confidence::ConfidenceStore restored;
+    std::string error;
+    ASSERT_TRUE(core::confidence::DeserializeConfidenceStore(json, restored, error)) << error;
+    const core::confidence::ConfidenceAssessment* assessment =
+        core::confidence::FindAssessment(restored, "main", element.gid);
+    ASSERT_NE(assessment, nullptr);
+    EXPECT_EQ(assessment->status, core::confidence::ConfidenceStatus::Inactive);
+    ASSERT_TRUE(assessment->fixedValue.has_value());
+    EXPECT_DOUBLE_EQ(assessment->fixedValue->value, 0.80);
+}
+
 TEST(ConfidenceStoreTest, JosangOpinionStoresRawValuesAndDerivedConfidence) {
     core::confidence::JosangOpinion opinion;
     opinion.belief = 0.65;
@@ -151,15 +174,90 @@ TEST(ConfidenceStoreTest, RefreshStaleFlagsMarksChangedTargetsButIgnoresOrphans)
     changed_model.elements.push_back(MakeClaim("G1", "The ODD is completely defined for target use cases"));
     changed_model.elements.push_back(MakeClaim("G2", "Other claim"));
 
-    EXPECT_TRUE(core::confidence::RefreshStaleFlags(store, "main", changed_model));
+    int inactivated_count = 0;
+    EXPECT_TRUE(core::confidence::RefreshStaleFlags(store, "main", changed_model, &inactivated_count));
     ASSERT_EQ(store.assessments.size(), 1u);
     EXPECT_TRUE(store.assessments.front().stale);
+    EXPECT_EQ(store.assessments.front().status, core::confidence::ConfidenceStatus::Inactive);
+    ASSERT_TRUE(store.assessments.front().fixedValue.has_value());
+    EXPECT_DOUBLE_EQ(store.assessments.front().fixedValue->value, 0.80);
+    EXPECT_EQ(inactivated_count, 1);
+
+    EXPECT_FALSE(core::confidence::RefreshStaleFlags(store, "main", changed_model, &inactivated_count));
+    EXPECT_EQ(inactivated_count, 0);
 
     core::confidence::ConfidenceAssessment orphan = MakeFixedAssessment(MakeClaim("G3", "Deleted claim"));
     orphan.id = "conf-000002";
     store.assessments.push_back(orphan);
     EXPECT_FALSE(core::confidence::RefreshStaleFlags(store, "main", changed_model));
     EXPECT_FALSE(store.assessments.back().stale);
+}
+
+TEST(ConfidenceStoreTest, RefreshStaleFlagsMarksNameChangesInactive) {
+    parser::SacmElement original = MakeClaim("G1", "The ODD is well defined");
+    original.name = "Original claim";
+    core::confidence::ConfidenceStore store;
+    store.assessments.push_back(MakeFixedAssessment(original));
+
+    parser::SacmElement renamed = original;
+    renamed.name = "Renamed claim";
+    parser::AssuranceCase changed_model;
+    changed_model.elements.push_back(renamed);
+
+    int inactivated_count = 0;
+    EXPECT_TRUE(core::confidence::RefreshStaleFlags(store, "main", changed_model, &inactivated_count));
+    ASSERT_EQ(store.assessments.size(), 1u);
+    EXPECT_TRUE(store.assessments.front().stale);
+    EXPECT_EQ(store.assessments.front().status, core::confidence::ConfidenceStatus::Inactive);
+    EXPECT_EQ(inactivated_count, 1);
+}
+
+TEST(ConfidenceStoreTest, GenerateSacmGidUsesFullUuidShapeAndEntropy) {
+    const std::regex uuid_regex(
+        "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$");
+    bool saw_nonzero_final_prefix = false;
+    for (int index = 0; index < 64; ++index) {
+        const std::string gid = core::GenerateSacmGid();
+        EXPECT_TRUE(std::regex_match(gid, uuid_regex)) << gid;
+        const std::string final_group = gid.substr(gid.rfind('-') + 1);
+        if (final_group.substr(0, 4) != "0000")
+            saw_nonzero_final_prefix = true;
+    }
+    EXPECT_TRUE(saw_nonzero_final_prefix);
+}
+
+TEST(ConfidenceControllerTest, RefreshStaleFlagsDoesNotEmitDirtyEvent) {
+    TempDir tmp(MakeTempParent());
+    const std::filesystem::path confidence_path = tmp.path / "confidence.af.json";
+
+    parser::SacmElement original = MakeClaim("G1", "Original claim text");
+    core::confidence::ConfidenceStore store;
+    store.projectId = "project-1";
+    store.assessments.push_back(MakeFixedAssessment(original));
+    {
+        std::ofstream file(confidence_path, std::ios::binary);
+        file << core::confidence::SerializeConfidenceStore(store);
+    }
+
+    app::AppEvents events;
+    int dirty_events = 0;
+    const auto subscription = events.Subscribe<app::ConfidenceDirtyEvent>(
+        [&](const app::ConfidenceDirtyEvent&) { ++dirty_events; });
+
+    app::controllers::ConfidenceController controller(events);
+    std::string error;
+    ASSERT_TRUE(controller.ConfigureStorage(confidence_path, "project-1", error)) << error;
+    controller.SetActiveSource("main", "arguments/main.sacm", {});
+
+    parser::AssuranceCase changed_model;
+    changed_model.elements.push_back(MakeClaim("G1", "Changed claim text"));
+
+    EXPECT_TRUE(controller.RefreshStaleFlags(changed_model));
+    EXPECT_TRUE(controller.IsDirty());
+    EXPECT_EQ(controller.LastInactivatedCount(), 1);
+    EXPECT_EQ(dirty_events, 0);
+
+    events.Unsubscribe(subscription);
 }
 
 TEST(ConfidenceStoreTest, EnsureElementGidGeneratesAndMirrorsToSacmPackage) {
@@ -174,9 +272,12 @@ TEST(ConfidenceStoreTest, EnsureElementGidGeneratesAndMirrorsToSacmPackage) {
     package.argumentPackages.front().claims.push_back(claim);
 
     std::string error;
-    ASSERT_TRUE(core::EnsureElementGid(model, &package, model.elements.front(), error)) << error;
+    EXPECT_EQ(core::EnsureElementGid(model, &package, model.elements.front(), error), core::EnsureGidResult::Generated)
+        << error;
     EXPECT_FALSE(model.elements.front().gid.empty());
     EXPECT_EQ(package.argumentPackages.front().claims.front().gid, model.elements.front().gid);
+    EXPECT_EQ(core::EnsureElementGid(model, &package, model.elements.front(), error), core::EnsureGidResult::AlreadyPresent)
+        << error;
 }
 
 TEST(ConfidenceStoreTest, SaveConfidenceFileCreatesAnalysisSidecarAndTracksManifestRole) {

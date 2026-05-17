@@ -7,10 +7,16 @@
 
 namespace core {
 
+enum class EnsureGidResult {
+    AlreadyPresent,
+    Generated,
+    Failed,
+};
+
 std::string GenerateSacmGid();
-bool EnsureElementGid(parser::AssuranceCase& model,
-                      sacm::AssuranceCasePackage* package,
-                      parser::SacmElement& element,
-                      std::string& error);
+EnsureGidResult EnsureElementGid(parser::AssuranceCase& model,
+                                 sacm::AssuranceCasePackage* package,
+                                 parser::SacmElement& element,
+                                 std::string& error);
 
 } // namespace core

@@ -2,20 +2,30 @@
 
 #include <algorithm>
 #include <chrono>
-#include <iomanip>
 #include <random>
-#include <sstream>
 #include <unordered_set>
 
 namespace core {
 namespace {
 
 std::string HexGroup(std::mt19937_64& rng, int width) {
-    std::uniform_int_distribution<unsigned long long> dist(0, (1ULL << 32) - 1);
-    std::ostringstream out;
-    out << std::hex << std::nouppercase << std::setw(width) << std::setfill('0')
-        << (dist(rng) & ((1ULL << (width * 4)) - 1));
-    return out.str();
+    static constexpr char kHexDigits[] = "0123456789abcdef";
+    std::uniform_int_distribution<int> dist(0, 15);
+    std::string value;
+    value.reserve(static_cast<size_t>(width));
+    for (int i = 0; i < width; ++i)
+        value.push_back(kHexDigits[dist(rng)]);
+    return value;
+}
+
+std::string UuidVariantGroup(std::mt19937_64& rng) {
+    static constexpr char kVariantDigits[] = "89ab";
+    std::uniform_int_distribution<int> variant_dist(0, 3);
+    std::string value;
+    value.reserve(4);
+    value.push_back(kVariantDigits[variant_dist(rng)]);
+    value += HexGroup(rng, 3);
+    return value;
 }
 
 template <typename T>
@@ -93,17 +103,17 @@ std::unordered_set<std::string> ExistingGids(const parser::AssuranceCase& model)
 std::string GenerateSacmGid() {
     static std::mt19937_64 rng{static_cast<unsigned long long>(
         std::chrono::high_resolution_clock::now().time_since_epoch().count())};
-    return HexGroup(rng, 8) + "-" + HexGroup(rng, 4) + "-4" + HexGroup(rng, 3) + "-a" + HexGroup(rng, 3) + "-" +
+    return HexGroup(rng, 8) + "-" + HexGroup(rng, 4) + "-4" + HexGroup(rng, 3) + "-" + UuidVariantGroup(rng) + "-" +
            HexGroup(rng, 12);
 }
 
-bool EnsureElementGid(parser::AssuranceCase& model,
-                      sacm::AssuranceCasePackage* package,
-                      parser::SacmElement& element,
-                      std::string& error) {
+EnsureGidResult EnsureElementGid(parser::AssuranceCase& model,
+                                 sacm::AssuranceCasePackage* package,
+                                 parser::SacmElement& element,
+                                 std::string& error) {
     error.clear();
     if (!element.gid.empty())
-        return false;
+        return EnsureGidResult::AlreadyPresent;
 
     std::unordered_set<std::string> gids = ExistingGids(model);
     std::string gid;
@@ -113,10 +123,10 @@ bool EnsureElementGid(parser::AssuranceCase& model,
 
     if (package && !SetPackageElementGid(*package, element.id, gid)) {
         error = "Could not assign generated gid to the SACM model element.";
-        return false;
+        return EnsureGidResult::Failed;
     }
     element.gid = gid;
-    return true;
+    return EnsureGidResult::Generated;
 }
 
 } // namespace core

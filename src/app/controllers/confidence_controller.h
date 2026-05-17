@@ -34,13 +34,14 @@ public:
     void SetActiveSource(std::string source_id, std::string path, std::string file_hash = {});
     const std::string& ActiveSourceId() const;
     bool RefreshStaleFlags(const parser::AssuranceCase& model);
+    int LastInactivatedCount() const;
 
     const core::confidence::ConfidenceAssessment* FindForElement(const parser::SacmElement& element) const;
     std::optional<ui::ElementConfidence> ConfidenceForElement(const parser::SacmElement& element) const;
     bool UpsertElementConfidence(const parser::SacmElement& element,
                                  ui::ElementConfidence confidence,
                                  std::string& error);
-    bool ClearElementConfidence(const parser::SacmElement& element, std::string& error);
+    bool SetElementConfidenceActive(const parser::SacmElement& element, bool active, std::string& error);
     bool MarkElementReviewed(const parser::SacmElement& element, std::string& error);
 
 private:
@@ -50,6 +51,8 @@ private:
     core::confidence::SacmSource active_source_;
     std::string storage_error_;
     bool dirty_ = false;
+    bool persistence_dirty_ = false;
+    int last_inactivated_count_ = 0;
 };
 
 } // namespace app::controllers

@@ -21,7 +21,7 @@ struct ConfidencePanelModel {
 struct ConfidencePanelCallbacks {
     std::function<bool(ConfidenceInputMode)> add_confidence;
     std::function<bool(const ElementConfidence&)> save_confidence;
-    std::function<bool()> clear_confidence;
+	std::function<bool(bool)> set_active;
     std::function<bool()> mark_reviewed;
     std::function<bool()> backup_invalid_and_reset;
 };
