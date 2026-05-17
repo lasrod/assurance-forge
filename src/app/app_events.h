@@ -29,6 +29,11 @@ struct ReviewItemsDirtyEvent {
     bool mark_app_dirty = true;
 };
 
+struct ConfidenceDirtyEvent {
+    bool dirty = true;
+    bool mark_app_dirty = true;
+};
+
 struct ProjectFilesChangedEvent {};
 
 struct ActiveModelChangedEvent {
@@ -118,6 +123,7 @@ using AppEvent = std::variant<StatusMessageEvent,
                               TreeDirtyEvent,
                               DocumentDirtyEvent,
                               ReviewItemsDirtyEvent,
+                              ConfidenceDirtyEvent,
                               ProjectFilesChangedEvent,
                               ActiveModelChangedEvent,
                               SelectionChangedEvent,

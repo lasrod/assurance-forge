@@ -58,6 +58,11 @@ public:
                                        ProjectFileEntry& entry,
                                        std::string& error);
 
+    static bool SaveConfidenceFile(AssuranceProject& project,
+                                   const std::string& content,
+                                   ProjectFileEntry& entry,
+                                   std::string& error);
+
     static bool TrackExistingFile(AssuranceProject& project,
                                   const std::filesystem::path& relative_path,
                                   ProjectFileRole role,

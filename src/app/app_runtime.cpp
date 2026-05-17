@@ -129,6 +129,10 @@ void AppRuntime::RegisterAppEventListeners() {
         SyncReviewProblems();
         SyncReviewVisualStatesFromReviews();
     });
+    impl_->events.Subscribe<ConfidenceDirtyEvent>([this](const ConfidenceDirtyEvent& event) {
+        if (event.mark_app_dirty)
+            impl_->app_state.mark_dirty();
+    });
     impl_->events.Subscribe<SelectionChangedEvent>([](const SelectionChangedEvent& event) {
         ui::UiState& ui_state = ui::GetUiState();
         ui_state.selected_element_id = event.element_id;

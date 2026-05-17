@@ -365,7 +365,8 @@ bool RenderReviewAttentionNotice(const ui::UiState& state, const std::string& el
 
 bool ShowElementPanel(parser::AssuranceCase* ac,
                       sacm::AssuranceCasePackage* sacm_pkg,
-                      const ElementTerminologyAssistCallbacks* terminology_callbacks) {
+                      const ElementTerminologyAssistCallbacks* terminology_callbacks,
+                      const ElementConfidenceAssistCallbacks* confidence_callbacks) {
     const UiState& state = GetUiState();
     bool modified = false;
 
@@ -514,7 +515,39 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
         }
     }
 
-    ShowConfidencePanel(elem->id);
+    if (confidence_callbacks && confidence_callbacks->model_for_element) {
+        ConfidencePanelModel confidence_model = confidence_callbacks->model_for_element(*elem);
+        ConfidencePanelCallbacks panel_callbacks;
+        panel_callbacks.add_confidence = [&](ConfidenceInputMode mode) {
+            if (!confidence_callbacks->save_confidence)
+                return false;
+            ElementConfidence confidence;
+            confidence.enabled = true;
+            confidence.mode = mode;
+            const bool element_changed = confidence_callbacks->save_confidence(*elem, confidence);
+            modified = modified || element_changed;
+            return element_changed;
+        };
+        panel_callbacks.save_confidence = [&](const ElementConfidence& confidence) {
+            if (!confidence_callbacks->save_confidence)
+                return false;
+            const bool element_changed = confidence_callbacks->save_confidence(*elem, confidence);
+            modified = modified || element_changed;
+            return element_changed;
+        };
+        panel_callbacks.clear_confidence = [&]() {
+            if (!confidence_callbacks->clear_confidence)
+                return false;
+            return confidence_callbacks->clear_confidence(*elem);
+        };
+        panel_callbacks.mark_reviewed = [&]() {
+            if (!confidence_callbacks->mark_reviewed)
+                return false;
+            return confidence_callbacks->mark_reviewed(*elem);
+        };
+        panel_callbacks.backup_invalid_and_reset = confidence_callbacks->backup_invalid_and_reset;
+        ShowConfidencePanel(confidence_model, panel_callbacks);
+    }
 
     // Sync edits to SACM model
     if (modified) {

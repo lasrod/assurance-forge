@@ -22,6 +22,8 @@ const char* ProjectFileRoleToString(ProjectFileRole role) {
         return "af.reviewItems";
     case ProjectFileRole::ReviewProposal:
         return "af.reviewProposal";
+    case ProjectFileRole::ConfidenceAssessments:
+        return "af.confidenceAssessments";
     case ProjectFileRole::ConformanceSheet:
         return "af.conformanceSheet";
     case ProjectFileRole::ExportedReport:
@@ -44,6 +46,8 @@ const char* ProjectFileRoleToDisplayString(ProjectFileRole role) {
         return "Review Items";
     case ProjectFileRole::ReviewProposal:
         return "Review Proposal";
+    case ProjectFileRole::ConfidenceAssessments:
+        return "Confidence Assessments";
     case ProjectFileRole::ConformanceSheet:
         return "Conformance Sheet";
     case ProjectFileRole::ExportedReport:
@@ -65,6 +69,8 @@ ProjectFileRole ProjectFileRoleFromString(const std::string& value) {
         return ProjectFileRole::ReviewItems;
     if (value == "af.reviewProposal")
         return ProjectFileRole::ReviewProposal;
+    if (value == "af.confidenceAssessments")
+        return ProjectFileRole::ConfidenceAssessments;
     if (value == "af.conformanceSheet")
         return ProjectFileRole::ConformanceSheet;
     if (value == "af.exportedReport")
