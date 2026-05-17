@@ -6,6 +6,7 @@
 #include "ai/secret_store.h"
 #include "app/app_events.h"
 #include "app/controllers/ai_review_controller.h"
+#include "app/controllers/confidence_controller.h"
 #include "app/controllers/element_edit_controller.h"
 #include "app/controllers/modal_coordinator.h"
 #include "app/controllers/project_controller.h"
@@ -123,6 +124,7 @@ struct AppRuntimeState {
     std::unique_ptr<controllers::ProjectController> project_controller;
     std::unique_ptr<controllers::ProposalController> proposal_controller;
     std::unique_ptr<controllers::ReviewController> review_controller;
+    std::unique_ptr<controllers::ConfidenceController> confidence_controller;
     std::optional<GuidelineCatalog> guideline_catalog;
     bool guideline_catalog_load_attempted = false;
     std::string guideline_catalog_error;

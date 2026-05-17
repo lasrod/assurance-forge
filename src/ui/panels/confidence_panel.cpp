@@ -4,7 +4,6 @@
 #include "ui/confidence_model.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/theme.h"
-#include "ui/ui_state.h"
 
 #include <algorithm>
 #include <cmath>
@@ -121,6 +120,22 @@ void DrawModeSelector(ElementConfidence& confidence) {
     }
 }
 
+bool NearlyEqual(float lhs, float rhs) {
+    return std::fabs(lhs - rhs) <= 0.0001f;
+}
+
+bool ConfidenceChanged(const ElementConfidence& lhs, const ElementConfidence& rhs) {
+    return lhs.enabled != rhs.enabled || lhs.mode != rhs.mode || !NearlyEqual(lhs.direct_value, rhs.direct_value) ||
+           !NearlyEqual(lhs.opinion.belief, rhs.opinion.belief) ||
+           !NearlyEqual(lhs.opinion.disbelief, rhs.opinion.disbelief) ||
+           !NearlyEqual(lhs.opinion.uncertainty, rhs.opinion.uncertainty) ||
+           !NearlyEqual(lhs.opinion.base_rate, rhs.opinion.base_rate);
+}
+
+const char* MethodLabel(ConfidenceInputMode mode) {
+    return mode == ConfidenceInputMode::DirectValue ? "Fixed value" : "Jøsang opinion";
+}
+
 void DrawProjectedConfidence(float value) {
     const Theme& theme = GetTheme();
     value = ClampConfidenceValue(value);
@@ -136,6 +151,26 @@ void DrawProjectedConfidence(float value) {
         ImGui::PopFont();
 
     ImGui::ProgressBar(value, ImVec2(-1.0f, 8.0f), "");
+}
+
+void DrawFinalConfidence(float value, bool active) {
+    const Theme& theme = GetTheme();
+    value = ClampConfidenceValue(value);
+    ImGui::TextUnformatted("Confidence");
+    if (ui::gsn::g_BoldFont)
+        ImGui::PushFont(ui::gsn::g_BoldFont);
+    ImGui::PushStyleColor(ImGuiCol_Text,
+                          ImGui::ColorConvertU32ToFloat4(active ? theme.accent_hover : WithAlpha(theme.text_secondary, 0.58f)));
+    ImGui::Text("%.2f", value);
+    ImGui::PopStyleColor();
+    if (ui::gsn::g_BoldFont)
+        ImGui::PopFont();
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::ColorConvertU32ToFloat4(WithAlpha(theme.surface_3, active ? 0.68f : 0.28f)));
+    ImGui::PushStyleColor(ImGuiCol_PlotHistogram,
+                          ImGui::ColorConvertU32ToFloat4(WithAlpha(active ? theme.accent : theme.text_secondary,
+                                                                    active ? 0.90f : 0.22f)));
+    ImGui::ProgressBar(value, ImVec2(-1.0f, 10.0f), "");
+    ImGui::PopStyleColor(2);
 }
 
 void DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec2& requested_size) {
@@ -320,13 +355,7 @@ void DrawOpinionMode(ElementConfidence& confidence) {
 
 } // namespace
 
-void ShowConfidencePanel(const std::string& element_id) {
-    if (element_id.empty())
-        return;
-
-    UiState& state = GetUiState();
-    ElementConfidence& confidence = state.confidence_states[element_id];
-
+bool ShowConfidencePanel(const ConfidencePanelModel& model, const ConfidencePanelCallbacks& callbacks) {
     const Theme& theme = GetTheme();
     ImGui::Spacing();
     ImGui::Separator();
@@ -337,20 +366,61 @@ void ShowConfidencePanel(const std::string& element_id) {
     ImGui::TextUnformatted("Confidence");
     if (ui::gsn::g_BoldFont)
         ImGui::PopFont();
-    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.text_muted));
-    ImGui::TextWrapped("Experimental confidence modeling");
-    ImGui::PopStyleColor();
 
     ImGui::Spacing();
-    ImGui::Checkbox("Enable confidence for this element", &confidence.enabled);
+    bool changed = false;
 
-    if (!confidence.enabled) {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.text_secondary));
-        ImGui::TextWrapped("Confidence is not enabled for this element. Enable it to assign direct confidence or define a subjective opinion.");
+    if (!model.storage_warning.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.warning));
+        ImGui::TextWrapped("%s", model.storage_warning.c_str());
         ImGui::PopStyleColor();
-        return;
+        if (callbacks.backup_invalid_and_reset && ImGui::Button("Back up and start new confidence file"))
+            changed = callbacks.backup_invalid_and_reset() || changed;
+        return changed;
     }
 
+    if (!model.has_assessment) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.text_secondary));
+        ImGui::TextWrapped("No confidence assessment stored for this element.");
+        ImGui::PopStyleColor();
+
+        if (ImGui::Button("Add fixed confidence") && callbacks.add_confidence)
+            changed = callbacks.add_confidence(ConfidenceInputMode::DirectValue) || changed;
+        ImGui::SameLine();
+        if (ImGui::Button("Add Jøsang confidence") && callbacks.add_confidence)
+            changed = callbacks.add_confidence(ConfidenceInputMode::OpinionTriangle) || changed;
+        return changed;
+    }
+
+    ElementConfidence confidence = model.confidence;
+    const ElementConfidence before = confidence;
+
+    DrawFinalConfidence(model.expected_confidence, confidence.enabled);
+    ImGui::Spacing();
+    ImGui::Text("Method: %s", model.method_label.empty() ? MethodLabel(confidence.mode) : model.method_label.c_str());
+    ImGui::Text("Status: %s", model.status_label.empty() ? "Active" : model.status_label.c_str());
+
+    if (model.stale) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.warning));
+        ImGui::TextWrapped("This confidence assessment may be stale because the element changed after the value was stored.");
+        ImGui::PopStyleColor();
+        if (ImGui::Button("Mark as reviewed") && callbacks.mark_reviewed)
+            changed = callbacks.mark_reviewed() || changed;
+    }
+
+    bool enabled = confidence.enabled;
+    bool active_toggled = false;
+    if (ImGui::Checkbox("Enable confidence for this element", &enabled)) {
+        confidence.enabled = enabled;
+        active_toggled = true;
+        if (callbacks.set_active)
+            changed = callbacks.set_active(enabled) || changed;
+    }
+
+    if (!confidence.enabled)
+        return changed;
+
+    ImGui::Separator();
     ImGui::Spacing();
     ImGui::TextUnformatted("Mode");
     DrawModeSelector(confidence);
@@ -360,6 +430,15 @@ void ShowConfidencePanel(const std::string& element_id) {
         DrawDirectMode(confidence);
     else
         DrawOpinionMode(confidence);
+
+    ElementConfidence value_before = before;
+    ElementConfidence value_after = confidence;
+    if (active_toggled)
+        value_after.enabled = value_before.enabled;
+    if (ConfidenceChanged(value_before, value_after) && callbacks.save_confidence)
+        changed = callbacks.save_confidence(confidence) || changed;
+
+    return changed;
 }
 
 } // namespace ui::panels

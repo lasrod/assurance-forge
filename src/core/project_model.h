@@ -12,6 +12,7 @@ enum class ProjectFileRole {
     J3377CaeRegister,
     ReviewItems,
     ReviewProposal,
+    ConfidenceAssessments,
     ConformanceSheet,
     ExportedReport,
     Unknown

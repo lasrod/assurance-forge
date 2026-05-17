@@ -22,6 +22,7 @@ AppRuntimeState::AppRuntimeState() {
     project_controller = std::make_unique<controllers::ProjectController>();
     proposal_controller = std::make_unique<controllers::ProposalController>();
     review_controller = std::make_unique<controllers::ReviewController>(events);
+    confidence_controller = std::make_unique<controllers::ConfidenceController>(events);
     ai.review_controller = std::make_unique<controllers::AiReviewController>(
         events, problems_manager, *review_controller, ai.task_runner, ai.service);
     LoadAiSettingsState();

@@ -21,8 +21,9 @@ struct PackageNodeRenderEntry {
     std::size_t child_index = 0;
 };
 
-constexpr std::array<FolderSpec, 5> kVisibleFolders = {{
+constexpr std::array<FolderSpec, 6> kVisibleFolders = {{
     {"arguments", "arguments/"},
+    {"analysis", "analysis/"},
     {"registers", "registers/"},
     {"reviews", "reviews/"},
     {"conformance", "conformance/"},

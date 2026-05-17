@@ -2,6 +2,7 @@
 
 #include "core/terminology_scope_service.h"
 #include "imgui.h"
+#include "imgui_stdlib.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/panels/confidence_panel.h"
 #include "ui/theme.h"
@@ -115,25 +116,15 @@ void sync_to_sacm(sacm::AssuranceCasePackage* pkg,
 // Helper: multi-line InputText with a buffer sized to accommodate edits.
 // Returns true if the text was modified.
 static bool EditableTextField(const char* label, std::string& text, float width = -1.0f) {
-    char buf[2048];
-    size_t len = text.size();
-    if (len >= sizeof(buf))
-        len = sizeof(buf) - 1;
-    memcpy(buf, text.c_str(), len);
-    buf[len] = '\0';
-
     ImGui::PushID(label);
     if (width > 0.0f)
         ImGui::SetNextItemWidth(width);
     else
         ImGui::SetNextItemWidth(-1);
 
-    bool changed = ImGui::InputTextMultiline(
-        "##edit", buf, sizeof(buf), ImVec2(-1, ImGui::GetTextLineHeight() * 4), ImGuiInputTextFlags_AllowTabInput);
-
-    if (changed) {
-        text = buf;
-    }
+    const ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_NoHorizontalScroll |
+                                      ImGuiInputTextFlags_WordWrap;
+    bool changed = ImGui::InputTextMultiline("##edit", &text, ImVec2(-1, ImGui::GetTextLineHeight() * 5), flags);
     ImGui::PopID();
     return changed;
 }
@@ -365,7 +356,8 @@ bool RenderReviewAttentionNotice(const ui::UiState& state, const std::string& el
 
 bool ShowElementPanel(parser::AssuranceCase* ac,
                       sacm::AssuranceCasePackage* sacm_pkg,
-                      const ElementTerminologyAssistCallbacks* terminology_callbacks) {
+                      const ElementTerminologyAssistCallbacks* terminology_callbacks,
+                      const ElementConfidenceAssistCallbacks* confidence_callbacks) {
     const UiState& state = GetUiState();
     bool modified = false;
 
@@ -514,7 +506,39 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
         }
     }
 
-    ShowConfidencePanel(elem->id);
+    if (confidence_callbacks && confidence_callbacks->model_for_element) {
+        ConfidencePanelModel confidence_model = confidence_callbacks->model_for_element(*elem);
+        ConfidencePanelCallbacks panel_callbacks;
+        panel_callbacks.add_confidence = [&](ConfidenceInputMode mode) {
+            if (!confidence_callbacks->save_confidence)
+                return false;
+            ElementConfidence confidence;
+            confidence.enabled = true;
+            confidence.mode = mode;
+            const bool element_changed = confidence_callbacks->save_confidence(*elem, confidence);
+            modified = modified || element_changed;
+            return element_changed;
+        };
+        panel_callbacks.save_confidence = [&](const ElementConfidence& confidence) {
+            if (!confidence_callbacks->save_confidence)
+                return false;
+            const bool element_changed = confidence_callbacks->save_confidence(*elem, confidence);
+            modified = modified || element_changed;
+            return element_changed;
+        };
+        panel_callbacks.set_active = [&](bool active) {
+            if (!confidence_callbacks->set_confidence_active)
+                return false;
+            return confidence_callbacks->set_confidence_active(*elem, active);
+        };
+        panel_callbacks.mark_reviewed = [&]() {
+            if (!confidence_callbacks->mark_reviewed)
+                return false;
+            return confidence_callbacks->mark_reviewed(*elem);
+        };
+        panel_callbacks.backup_invalid_and_reset = confidence_callbacks->backup_invalid_and_reset;
+        ShowConfidencePanel(confidence_model, panel_callbacks);
+    }
 
     // Sync edits to SACM model
     if (modified) {

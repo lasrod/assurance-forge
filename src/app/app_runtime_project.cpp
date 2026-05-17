@@ -1,6 +1,7 @@
 #include "app/app_runtime.h"
 #include "app/actions/terminology_actions.h"
 #include "app/app_runtime_state.h"
+#include "app/confidence_problem_sync.h"
 #include "app/native_file_dialogs.h"
 #include "app/proposal_ui_state.h"
 #include "app/project_workflow.h"
@@ -47,6 +48,34 @@ bool IsLoadedProjectSacmFile(const core::AppState& app_state, const core::Projec
     if (entry.role != core::ProjectFileRole::SacmArgument || app_state.loaded_file_path.empty())
         return false;
     return app_state.loaded_file_path == ProjectFilePath(app_state, entry);
+}
+
+std::filesystem::path ConfidenceItemsPath(const core::AssuranceProject& project) {
+    for (const core::ProjectFileEntry& entry : project.files) {
+        if (entry.role == core::ProjectFileRole::ConfidenceAssessments)
+            return project.rootPath / entry.relativePath;
+    }
+    return {};
+}
+
+std::string ConfidenceSourceHash(const core::ProjectFileEntry& entry) {
+    if (entry.rawHash.empty())
+        return {};
+    return entry.hashAlgorithm.empty() ? entry.rawHash : entry.hashAlgorithm + ":" + entry.rawHash;
+}
+
+void SetConfidenceSource(AppRuntimeState& state, const core::ProjectFileEntry& entry) {
+    if (!state.confidence_controller)
+        return;
+    state.confidence_controller->SetActiveSource(
+        entry.id.empty() ? "main" : entry.id, entry.relativePath.generic_string(), ConfidenceSourceHash(entry));
+    if (state.app_state.loaded_case.has_value() &&
+        state.confidence_controller->RefreshStaleFlags(state.app_state.loaded_case.value()) &&
+        state.confidence_controller->LastInactivatedCount() > 0) {
+        const int count = state.confidence_controller->LastInactivatedCount();
+        state.events.Emit(StatusMessageEvent{std::to_string(count) +
+                                             " confidence assessment(s) were marked inactive because their target elements changed."});
+    }
 }
 
 bool ProjectFileOpenWouldLeaveLoadedSacm(const core::AppState& app_state, const core::ProjectFileEntry& entry) {
@@ -231,6 +260,9 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
 
     ui::UiState& ui_state = ui::GetUiState();
     if (entry.role == core::ProjectFileRole::SacmArgument) {
+        SetConfidenceSource(*impl_, entry);
+        SyncConfidenceProblems();
+        SyncReviewVisualStatesFromReviews();
         impl_->proposal_controller->ClearActiveState();
         ClearProposalHighlightState(ui_state);
         impl_->document_dirty = false;
@@ -534,6 +566,9 @@ bool AppRuntime::OpenFirstProjectSacmFile() {
         if (entry.state == core::ProjectFileState::Missing)
             continue;
         if (impl_->app_state.open_project_file(entry)) {
+            SetConfidenceSource(*impl_, entry);
+            SyncConfidenceProblems();
+            SyncReviewVisualStatesFromReviews();
             impl_->tree_needs_rebuild = true;
             impl_->workbench.pending_focus_root = true;
             impl_->workbench.show_gsn_tab = true;
@@ -572,6 +607,32 @@ bool AppRuntime::EnsureReviewItemStorage() {
     return false;
 }
 
+bool AppRuntime::EnsureConfidenceStorage() {
+    if (!impl_->app_state.current_project.has_value()) {
+        impl_->confidence_controller->ClearStorage();
+        SyncConfidenceProblems();
+        SyncReviewVisualStatesFromReviews();
+        return false;
+    }
+
+    core::AssuranceProject& project = impl_->app_state.current_project.value();
+    std::filesystem::path confidence_path = ConfidenceItemsPath(project);
+    if (confidence_path.empty())
+        confidence_path = project.rootPath / "analysis" / "confidence.af.json";
+
+    std::string error;
+    if (impl_->confidence_controller->ConfigureStorage(confidence_path, project.id, error)) {
+        SyncConfidenceProblems();
+        SyncReviewVisualStatesFromReviews();
+        return true;
+    }
+
+    SyncConfidenceProblems();
+    SyncReviewVisualStatesFromReviews();
+    SetStatus("Confidence assessments could not be loaded: " + error);
+    return false;
+}
+
 bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {
     std::filesystem::path manifest_path(selected_path);
     if (!IsProjectManifestPath(manifest_path)) {
@@ -583,10 +644,12 @@ bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {
     }
     impl_->document_dirty = false;
     impl_->review_controller->ClearDirty();
+    impl_->confidence_controller->ClearDirty();
     impl_->guideline_catalog_load_attempted = false;
     if (impl_->app_state.current_project.has_value()) {
         impl_->proposal_controller->manager.SetProjectRoot(impl_->app_state.current_project->rootPath);
         EnsureReviewItemStorage();
+        EnsureConfidenceStorage();
     }
     RefreshSacmPackageTreeCache();
     OpenFirstProjectSacmFile();
@@ -613,11 +676,20 @@ bool AppRuntime::SaveProject() {
         }
     }
 
+    if (impl_->confidence_controller->IsDirty()) {
+        core::AssuranceProject& project = impl_->app_state.current_project.value();
+        std::string error;
+        if (!impl_->confidence_controller->SaveIfDirty(project, error)) {
+            impl_->app_state.status_message = "Confidence save failed: " + error;
+            return false;
+        }
+    }
+
     if (impl_->document_dirty) {
         if (!impl_->app_state.save_project())
             return false;
         impl_->document_dirty = false;
-        impl_->app_state.has_unsaved_changes = impl_->review_controller->IsDirty();
+        impl_->app_state.has_unsaved_changes = impl_->review_controller->IsDirty() || impl_->confidence_controller->IsDirty();
         return true;
     }
 
