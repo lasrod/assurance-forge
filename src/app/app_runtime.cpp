@@ -466,7 +466,8 @@ void AppRuntime::SyncConfidenceProblems() {
         impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
     const core::confidence::ConfidenceStore* store =
         impl_->confidence_controller ? &impl_->confidence_controller->Store() : nullptr;
-    const std::string source_id = impl_->confidence_controller ? impl_->confidence_controller->ActiveSourceId() : std::string{};
+    const std::string source_id =
+        impl_->confidence_controller ? impl_->confidence_controller->ActiveSourceId() : std::string{};
     app::SyncConfidenceProblems(impl_->problems_manager, model, store, source_id);
 }
 

@@ -29,8 +29,8 @@ core::ProblemItem MakeProblemFromStaleConfidence(const parser::SacmElement& elem
     problem.source = core::ProblemSource::ModelValidation;
     problem.element_id = element.id;
     problem.type = "ConfidenceReviewRequired";
-    problem.message =
-        "The stored confidence assessment needs review because this element changed. Review the value and reactivate confidence if it is still valid.";
+    problem.message = "The stored confidence assessment needs review because this element changed. Review the value "
+                      "and reactivate confidence if it is still valid.";
     return problem;
 }
 

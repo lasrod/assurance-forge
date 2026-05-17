@@ -73,8 +73,9 @@ void SetConfidenceSource(AppRuntimeState& state, const core::ProjectFileEntry& e
         state.confidence_controller->RefreshStaleFlags(state.app_state.loaded_case.value()) &&
         state.confidence_controller->LastInactivatedCount() > 0) {
         const int count = state.confidence_controller->LastInactivatedCount();
-        state.events.Emit(StatusMessageEvent{std::to_string(count) +
-                                             " confidence assessment(s) were marked inactive because their target elements changed."});
+        state.events.Emit(StatusMessageEvent{
+            std::to_string(count) +
+            " confidence assessment(s) were marked inactive because their target elements changed."});
     }
 }
 
@@ -689,7 +690,8 @@ bool AppRuntime::SaveProject() {
         if (!impl_->app_state.save_project())
             return false;
         impl_->document_dirty = false;
-        impl_->app_state.has_unsaved_changes = impl_->review_controller->IsDirty() || impl_->confidence_controller->IsDirty();
+        impl_->app_state.has_unsaved_changes =
+            impl_->review_controller->IsDirty() || impl_->confidence_controller->IsDirty();
         return true;
     }
 

@@ -140,7 +140,8 @@ TEST(ConfidenceStoreTest, JosangOpinionStoresRawValuesAndDerivedConfidence) {
     store.assessments.push_back(assessment);
 
     core::confidence::ConfidenceStore restored;
-    ASSERT_TRUE(core::confidence::DeserializeConfidenceStore(core::confidence::SerializeConfidenceStore(store), restored, error))
+    ASSERT_TRUE(core::confidence::DeserializeConfidenceStore(
+        core::confidence::SerializeConfidenceStore(store), restored, error))
         << error;
     ASSERT_EQ(restored.assessments.size(), 1u);
     ASSERT_TRUE(restored.assessments.front().josangOpinion.has_value());
@@ -213,8 +214,7 @@ TEST(ConfidenceStoreTest, RefreshStaleFlagsMarksNameChangesInactive) {
 }
 
 TEST(ConfidenceStoreTest, GenerateSacmGidUsesFullUuidShapeAndEntropy) {
-    const std::regex uuid_regex(
-        "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$");
+    const std::regex uuid_regex("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$");
     bool saw_nonzero_final_prefix = false;
     for (int index = 0; index < 64; ++index) {
         const std::string gid = core::GenerateSacmGid();
@@ -241,8 +241,8 @@ TEST(ConfidenceControllerTest, RefreshStaleFlagsDoesNotEmitDirtyEvent) {
 
     app::AppEvents events;
     int dirty_events = 0;
-    const auto subscription = events.Subscribe<app::ConfidenceDirtyEvent>(
-        [&](const app::ConfidenceDirtyEvent&) { ++dirty_events; });
+    const auto subscription =
+        events.Subscribe<app::ConfidenceDirtyEvent>([&](const app::ConfidenceDirtyEvent&) { ++dirty_events; });
 
     app::controllers::ConfidenceController controller(events);
     std::string error;
@@ -276,7 +276,8 @@ TEST(ConfidenceStoreTest, EnsureElementGidGeneratesAndMirrorsToSacmPackage) {
         << error;
     EXPECT_FALSE(model.elements.front().gid.empty());
     EXPECT_EQ(package.argumentPackages.front().claims.front().gid, model.elements.front().gid);
-    EXPECT_EQ(core::EnsureElementGid(model, &package, model.elements.front(), error), core::EnsureGidResult::AlreadyPresent)
+    EXPECT_EQ(core::EnsureElementGid(model, &package, model.elements.front(), error),
+              core::EnsureGidResult::AlreadyPresent)
         << error;
 }
 
@@ -286,8 +287,8 @@ TEST(ConfidenceStoreTest, SaveConfidenceFileCreatesAnalysisSidecarAndTracksManif
     core::ProjectLoadReport report;
     std::string error;
     ASSERT_TRUE(core::ProjectService::CreateEmptyProject("MySafetyCase", tmp.path, project, report, error)) << error;
-    EXPECT_FALSE(ContainsFileWithRole(
-        project, "analysis/confidence.af.json", core::ProjectFileRole::ConfidenceAssessments));
+    EXPECT_FALSE(
+        ContainsFileWithRole(project, "analysis/confidence.af.json", core::ProjectFileRole::ConfidenceAssessments));
 
     core::confidence::ConfidenceStore store;
     store.projectId = project.id;
@@ -300,12 +301,12 @@ TEST(ConfidenceStoreTest, SaveConfidenceFileCreatesAnalysisSidecarAndTracksManif
     EXPECT_EQ(entry.relativePath.generic_string(), "analysis/confidence.af.json");
     EXPECT_EQ(entry.role, core::ProjectFileRole::ConfidenceAssessments);
     EXPECT_TRUE(std::filesystem::exists(project.rootPath / "analysis" / "confidence.af.json"));
-    EXPECT_TRUE(ContainsFileWithRole(
-        project, "analysis/confidence.af.json", core::ProjectFileRole::ConfidenceAssessments));
+    EXPECT_TRUE(
+        ContainsFileWithRole(project, "analysis/confidence.af.json", core::ProjectFileRole::ConfidenceAssessments));
 
     core::AssuranceProject reopened;
     core::ProjectLoadReport open_report;
     ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, reopened, open_report, error)) << error;
-    EXPECT_TRUE(ContainsFileWithRole(
-        reopened, "analysis/confidence.af.json", core::ProjectFileRole::ConfidenceAssessments));
+    EXPECT_TRUE(
+        ContainsFileWithRole(reopened, "analysis/confidence.af.json", core::ProjectFileRole::ConfidenceAssessments));
 }

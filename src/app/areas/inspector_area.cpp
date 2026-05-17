@@ -57,8 +57,8 @@ void RenderInspectorArea(AppRuntimeState& state,
                 model.method_label = assessment->method == core::confidence::ConfidenceMethod::JosangOpinion
                                          ? "Jøsang opinion"
                                          : "Fixed value";
-                model.status_label = assessment->status == core::confidence::ConfidenceStatus::Inactive ? "Inactive"
-                                                                                                         : "Active";
+                model.status_label =
+                    assessment->status == core::confidence::ConfidenceStatus::Inactive ? "Inactive" : "Active";
             }
             return model;
         };
@@ -77,7 +77,8 @@ void RenderInspectorArea(AppRuntimeState& state,
                     return false;
                 }
                 std::string error;
-                const core::EnsureGidResult gid_result = core::EnsureElementGid(*loaded_case, sacm_package, element, error);
+                const core::EnsureGidResult gid_result =
+                    core::EnsureElementGid(*loaded_case, sacm_package, element, error);
                 if (gid_result == core::EnsureGidResult::Failed) {
                     state.events.Emit(StatusMessageEvent{"Confidence save failed: " + error});
                     return false;
@@ -115,7 +116,8 @@ void RenderInspectorArea(AppRuntimeState& state,
                 state.events.Emit(StatusMessageEvent{"Confidence reset failed: " + error});
                 return false;
             }
-            state.events.Emit(StatusMessageEvent{"Backed up invalid confidence file; new confidence storage will be saved with the project."});
+            state.events.Emit(StatusMessageEvent{
+                "Backed up invalid confidence file; new confidence storage will be saved with the project."});
             return true;
         };
         if (ui::panels::ShowElementPanel(loaded_case, sacm_package, &terminology_callbacks, &confidence_callbacks)) {
@@ -129,8 +131,9 @@ void RenderInspectorArea(AppRuntimeState& state,
                 }
                 if (confidence_changed && state.confidence_controller->LastInactivatedCount() > 0) {
                     const int count = state.confidence_controller->LastInactivatedCount();
-                    state.events.Emit(StatusMessageEvent{std::to_string(count) +
-                                                         " confidence assessment(s) were marked inactive because their target elements changed."});
+                    state.events.Emit(StatusMessageEvent{
+                        std::to_string(count) +
+                        " confidence assessment(s) were marked inactive because their target elements changed."});
                 }
             }
             if (callbacks.mark_element_modified)
