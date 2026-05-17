@@ -111,8 +111,10 @@ void AddTarget(std::vector<AcpRelationshipTarget>& targets,
     if (strategy_child_edge)
         target.blocked_reason = kStrategyChildBlockedReason;
     else if (!eligible_for_acp)
-        target.blocked_reason = blocked_reason.empty() ? kUnsupportedRelationshipBlockedReason : std::move(blocked_reason);
-    target.summary = RelationshipSummary(kind, target.parent_id, target.child_id, target.reasoning_id, strategy_child_edge);
+        target.blocked_reason =
+            blocked_reason.empty() ? kUnsupportedRelationshipBlockedReason : std::move(blocked_reason);
+    target.summary =
+        RelationshipSummary(kind, target.parent_id, target.child_id, target.reasoning_id, strategy_child_edge);
     targets.push_back(std::move(target));
 }
 
@@ -141,7 +143,8 @@ std::vector<AcpRelationshipTarget> BuildAcpRelationshipTargets(const parser::Ass
         if (relationship.type == "assertedinference") {
             for (const std::string& target_id : relationship.target_refs) {
                 if (!relationship.reasoning_ref.empty()) {
-                    const bool goal_to_strategy = IsGoal(elements, target_id) && IsStrategy(elements, relationship.reasoning_ref);
+                    const bool goal_to_strategy =
+                        IsGoal(elements, target_id) && IsStrategy(elements, relationship.reasoning_ref);
                     AddTarget(targets,
                               AcpRelationshipKind::SupportedBy,
                               relationship,
@@ -152,7 +155,8 @@ std::vector<AcpRelationshipTarget> BuildAcpRelationshipTargets(const parser::Ass
                               false,
                               goal_to_strategy);
                     for (const std::string& source_id : relationship.source_refs) {
-                        const bool strategy_to_goal = IsStrategy(elements, relationship.reasoning_ref) && IsGoal(elements, source_id);
+                        const bool strategy_to_goal =
+                            IsStrategy(elements, relationship.reasoning_ref) && IsGoal(elements, source_id);
                         AddTarget(targets,
                                   AcpRelationshipKind::SupportedBy,
                                   relationship,
@@ -162,7 +166,8 @@ std::vector<AcpRelationshipTarget> BuildAcpRelationshipTargets(const parser::Ass
                                   target_id,
                                   strategy_to_goal,
                                   false,
-                                  strategy_to_goal ? kStrategyChildBlockedReason : kUnsupportedRelationshipBlockedReason);
+                                  strategy_to_goal ? kStrategyChildBlockedReason
+                                                   : kUnsupportedRelationshipBlockedReason);
                     }
                 } else {
                     for (const std::string& source_id : relationship.source_refs) {

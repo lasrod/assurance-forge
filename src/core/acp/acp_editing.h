@@ -20,13 +20,10 @@ AcpEditResult AddAcp(parser::AssuranceCase& model,
                      const std::string& target_kind,
                      const std::string& target_id);
 
-AcpEditResult UpsertAcp(parser::AssuranceCase& model,
-                        sacm::AssuranceCasePackage* package,
-                        const parser::AcpRecord& acp);
+AcpEditResult
+UpsertAcp(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package, const parser::AcpRecord& acp);
 
-AcpEditResult RemoveAcp(parser::AssuranceCase& model,
-                        sacm::AssuranceCasePackage* package,
-                        const std::string& acp_id);
+AcpEditResult RemoveAcp(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package, const std::string& acp_id);
 
 AcpEditResult CreateConfidenceArgumentTreeForAcp(parser::AssuranceCase& model,
                                                  sacm::AssuranceCasePackage* package,

@@ -28,18 +28,16 @@ const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const
 
 const sacm::ArgumentPackage* FindArgumentPackage(const sacm::AssuranceCasePackage& package,
                                                  const std::string& package_id) {
-    auto found = std::find_if(package.argumentPackages.begin(),
-                              package.argumentPackages.end(),
-                              [&](const sacm::ArgumentPackage& argument_package) {
-                                  return argument_package.id == package_id;
-                              });
+    auto found =
+        std::find_if(package.argumentPackages.begin(),
+                     package.argumentPackages.end(),
+                     [&](const sacm::ArgumentPackage& argument_package) { return argument_package.id == package_id; });
     return found == package.argumentPackages.end() ? nullptr : &*found;
 }
 
 const sacm::Claim* FindClaim(const sacm::ArgumentPackage& package, const std::string& claim_id) {
-    auto found = std::find_if(package.claims.begin(), package.claims.end(), [&](const sacm::Claim& claim) {
-        return claim.id == claim_id;
-    });
+    auto found = std::find_if(
+        package.claims.begin(), package.claims.end(), [&](const sacm::Claim& claim) { return claim.id == claim_id; });
     return found == package.claims.end() ? nullptr : &*found;
 }
 
@@ -52,9 +50,11 @@ bool TopGoalExists(const sacm::AssuranceCasePackage& package,
         const sacm::ArgumentPackage* argument_package = FindArgumentPackage(package, argument_package_id);
         return argument_package && FindClaim(*argument_package, top_goal_id);
     }
-    return std::any_of(package.argumentPackages.begin(), package.argumentPackages.end(), [&](const sacm::ArgumentPackage& argument_package) {
-        return FindClaim(argument_package, top_goal_id) != nullptr;
-    });
+    return std::any_of(package.argumentPackages.begin(),
+                       package.argumentPackages.end(),
+                       [&](const sacm::ArgumentPackage& argument_package) {
+                           return FindClaim(argument_package, top_goal_id) != nullptr;
+                       });
 }
 
 bool PackageIsConfidenceArgument(const sacm::AssuranceCasePackage& package, const std::string& argument_package_id) {
@@ -73,10 +73,8 @@ bool RelationshipEligibleForAcp(const parser::AssuranceCase& model, const std::s
     });
 }
 
-core::ProblemItem MakeProblem(const parser::AcpRecord& acp,
-                              core::ProblemSeverity severity,
-                              std::string code,
-                              std::string message) {
+core::ProblemItem
+MakeProblem(const parser::AcpRecord& acp, core::ProblemSeverity severity, std::string code, std::string message) {
     core::ProblemItem problem;
     problem.id = std::string(kAcpProblemPrefix) + acp.id + ":" + code;
     problem.severity = severity;
@@ -106,65 +104,75 @@ void SyncAcpProblems(core::ProblemsManager& problems_manager,
         const parser::SacmElement* target = FindElement(*model, acp.target_id);
 
         if (id_counts[acp.id] > 1) {
-            problems_manager.AddOrUpdateProblem(MakeProblem(acp,
-                                                            core::ProblemSeverity::Error,
-                                                            "DuplicateId",
-                                                            "ACP id " + acp.id + " is duplicated in this argument package."));
+            problems_manager.AddOrUpdateProblem(
+                MakeProblem(acp,
+                            core::ProblemSeverity::Error,
+                            "DuplicateId",
+                            "ACP id " + acp.id + " is duplicated in this argument package."));
         }
 
         if (!target) {
-            problems_manager.AddOrUpdateProblem(MakeProblem(acp,
-                                                            core::ProblemSeverity::Error,
-                                                            "MissingTarget",
-                                                            "ACP " + acp.id + " targets an element or relationship that no longer exists."));
+            problems_manager.AddOrUpdateProblem(
+                MakeProblem(acp,
+                            core::ProblemSeverity::Error,
+                            "MissingTarget",
+                            "ACP " + acp.id + " targets an element or relationship that no longer exists."));
             continue;
         }
 
         if (acp.target_kind == "relationship" && !IsRelationshipType(target->type)) {
-            problems_manager.AddOrUpdateProblem(MakeProblem(acp,
-                                                            core::ProblemSeverity::Error,
-                                                            "WrongTargetKind",
-                                                            "ACP " + acp.id + " is marked as a relationship ACP but targets a non-relationship element."));
+            problems_manager.AddOrUpdateProblem(MakeProblem(
+                acp,
+                core::ProblemSeverity::Error,
+                "WrongTargetKind",
+                "ACP " + acp.id + " is marked as a relationship ACP but targets a non-relationship element."));
         } else if (acp.target_kind == "element" && IsRelationshipType(target->type)) {
-            problems_manager.AddOrUpdateProblem(MakeProblem(acp,
-                                                            core::ProblemSeverity::Error,
-                                                            "WrongTargetKind",
-                                                            "ACP " + acp.id + " is marked as an element ACP but targets a relationship."));
+            problems_manager.AddOrUpdateProblem(
+                MakeProblem(acp,
+                            core::ProblemSeverity::Error,
+                            "WrongTargetKind",
+                            "ACP " + acp.id + " is marked as an element ACP but targets a relationship."));
         }
 
         if (acp.resolution_kind != "text" && acp.resolution_kind != "topGoalReference") {
-            problems_manager.AddOrUpdateProblem(MakeProblem(acp,
-                                                            core::ProblemSeverity::Warning,
-                                                            "Uninstantiated",
-                                                            "ACP " + acp.id + " is uninstantiated. Add a text confidence argument or link a confidence top goal."));
+            problems_manager.AddOrUpdateProblem(MakeProblem(
+                acp,
+                core::ProblemSeverity::Warning,
+                "Uninstantiated",
+                "ACP " + acp.id + " is uninstantiated. Add a text confidence argument or link a confidence top goal."));
         }
 
         if (acp.target_kind == "element" && !ElementEligibleForAcp(*target)) {
-            problems_manager.AddOrUpdateProblem(MakeProblem(acp,
-                                                            core::ProblemSeverity::Warning,
-                                                            "NonArtefactReferenceTarget",
-                                                            "ACP " + acp.id + " is attached to an element that is not an artefact reference."));
+            problems_manager.AddOrUpdateProblem(
+                MakeProblem(acp,
+                            core::ProblemSeverity::Warning,
+                            "NonArtefactReferenceTarget",
+                            "ACP " + acp.id + " is attached to an element that is not an artefact reference."));
         }
 
         if (acp.target_kind == "relationship" && IsRelationshipType(target->type) &&
             !RelationshipEligibleForAcp(*model, acp.target_id)) {
-            problems_manager.AddOrUpdateProblem(MakeProblem(acp,
-                                                            core::ProblemSeverity::Warning,
-                                                            "IneligibleRelationshipTarget",
-                                                            "ACP " + acp.id + " is attached to a relationship that is not eligible for ACP."));
+            problems_manager.AddOrUpdateProblem(
+                MakeProblem(acp,
+                            core::ProblemSeverity::Warning,
+                            "IneligibleRelationshipTarget",
+                            "ACP " + acp.id + " is attached to a relationship that is not eligible for ACP."));
         }
 
         if (acp.resolution_kind == "topGoalReference") {
             if (!package || !TopGoalExists(*package, acp.argument_package_id, acp.top_goal_id)) {
-                problems_manager.AddOrUpdateProblem(MakeProblem(acp,
-                                                                core::ProblemSeverity::Error,
-                                                                "MissingTopGoal",
-                                                                "ACP " + acp.id + " links to a confidence top goal that no longer exists."));
-            } else if (!acp.argument_package_id.empty() && !PackageIsConfidenceArgument(*package, acp.argument_package_id)) {
-                problems_manager.AddOrUpdateProblem(MakeProblem(acp,
-                                                                core::ProblemSeverity::Warning,
-                                                                "NonConfidenceArgumentPackage",
-                                                                "ACP " + acp.id + " links to a package that is not marked as a confidence argument package."));
+                problems_manager.AddOrUpdateProblem(
+                    MakeProblem(acp,
+                                core::ProblemSeverity::Error,
+                                "MissingTopGoal",
+                                "ACP " + acp.id + " links to a confidence top goal that no longer exists."));
+            } else if (!acp.argument_package_id.empty() &&
+                       !PackageIsConfidenceArgument(*package, acp.argument_package_id)) {
+                problems_manager.AddOrUpdateProblem(MakeProblem(
+                    acp,
+                    core::ProblemSeverity::Warning,
+                    "NonConfidenceArgumentPackage",
+                    "ACP " + acp.id + " links to a package that is not marked as a confidence argument package."));
             }
         }
     }

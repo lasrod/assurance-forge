@@ -18,9 +18,8 @@ parser::SacmElement Element(std::string id, std::string type) {
 
 bool HasProblemType(const core::ProblemsManager& manager, const std::string& type) {
     const auto& problems = manager.GetProblems();
-    return std::any_of(problems.begin(), problems.end(), [&](const core::ProblemItem& problem) {
-        return problem.type == type;
-    });
+    return std::any_of(
+        problems.begin(), problems.end(), [&](const core::ProblemItem& problem) { return problem.type == type; });
 }
 
 } // namespace

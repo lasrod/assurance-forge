@@ -193,11 +193,8 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
         callbacks.sync_review_visual_states();
     ui::gsn::GsnCanvas& renderer = g_argument_package_canvas_renderers[tab.key];
     renderer.SetTree(visible_tree);
-    ui::gsn::ShowGsnCanvasContentWithRenderer(renderer,
-                                             ui_state,
-                                             &visible_case,
-                                             actions,
-                                             &state.app_state.sacm_package.value());
+    ui::gsn::ShowGsnCanvasContentWithRenderer(
+        renderer, ui_state, &visible_case, actions, &state.app_state.sacm_package.value());
 }
 
 void RenderTerminologyPackageTab(AppRuntimeState& state, const WorkbenchAreaCallbacks& callbacks) {
@@ -265,7 +262,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
     if (ImGui::BeginTabBar("##center_tabs")) {
         if (state.workbench.show_gsn_tab && state.IsProposalCanvasActive()) {
             ImGuiTabItemFlags gsn_flags =
-            (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::GsnCanvas)
+                (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::GsnCanvas)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
             if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::GsnCanvas), nullptr, gsn_flags)) {
@@ -355,10 +352,10 @@ void RenderWorkbenchArea(AppRuntimeState& state,
         }
 
         if (state.workbench.show_terminology_package_tab) {
-            ImGuiTabItemFlags terminology_flags =
-                (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::TerminologyPackage)
-                    ? ImGuiTabItemFlags_SetSelected
-                    : 0;
+            ImGuiTabItemFlags terminology_flags = (state.workbench.force_center_tab_selection &&
+                                                   ui_state.center_view == ui::CenterView::TerminologyPackage)
+                                                      ? ImGuiTabItemFlags_SetSelected
+                                                      : 0;
             if (ImGui::BeginTabItem("Terminology Package", nullptr, terminology_flags)) {
                 ui_state.center_view = ui::CenterView::TerminologyPackage;
                 RenderTerminologyPackageTab(state, callbacks);

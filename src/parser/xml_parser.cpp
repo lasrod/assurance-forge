@@ -278,10 +278,7 @@ void extract_elements_recursive(pugi::xml_node node, AssuranceCase& assurance_ca
                 }
             }
 
-            extract_acps(child,
-                         is_relationship_element ? "relationship" : "element",
-                         element.id,
-                         assurance_case.acps);
+            extract_acps(child, is_relationship_element ? "relationship" : "element", element.id, assurance_case.acps);
             assurance_case.elements.push_back(element);
         }
 

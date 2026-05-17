@@ -49,9 +49,8 @@ void MetadataRow(const char* label, const std::string& value) {
     ImGui::TextWrapped("%s", value.empty() ? "-" : value.c_str());
 }
 
-const core::acp::AcpRelationshipTarget* FindSelectedTarget(
-    const std::vector<core::acp::AcpRelationshipTarget>& targets,
-    const UiState& ui_state) {
+const core::acp::AcpRelationshipTarget* FindSelectedTarget(const std::vector<core::acp::AcpRelationshipTarget>& targets,
+                                                           const UiState& ui_state) {
     if (ui_state.selected_relationship_id.empty())
         return nullptr;
     if (!ui_state.selected_relationship_edge_key.empty()) {

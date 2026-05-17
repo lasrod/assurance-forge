@@ -207,9 +207,10 @@ TEST(AcpEditingTest, CreatesConfidenceArgumentTreeForAcpAndLinksTopGoal) {
     EXPECT_EQ(acp->argument_package_id, "AP2");
     EXPECT_EQ(acp->top_goal_id, "CC1");
 
-    auto parser_top_goal = std::find_if(fixture.model.elements.begin(), fixture.model.elements.end(), [](const auto& element) {
-        return element.id == "CC1" && element.type == "claim";
-    });
+    auto parser_top_goal =
+        std::find_if(fixture.model.elements.begin(), fixture.model.elements.end(), [](const auto& element) {
+            return element.id == "CC1" && element.type == "claim";
+        });
     EXPECT_NE(parser_top_goal, fixture.model.elements.end());
 
     const std::vector<core::acp::Acp> sacm_acps = core::acp::CollectAcps(fixture.package);

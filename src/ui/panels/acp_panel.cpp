@@ -16,9 +16,8 @@ namespace {
 parser::AcpRecord* FindSelectedAcp(parser::AssuranceCase* model, const std::string& selected_id) {
     if (!model)
         return nullptr;
-    auto found = std::find_if(model->acps.begin(), model->acps.end(), [&](const parser::AcpRecord& acp) {
-        return acp.id == selected_id;
-    });
+    auto found = std::find_if(
+        model->acps.begin(), model->acps.end(), [&](const parser::AcpRecord& acp) { return acp.id == selected_id; });
     return found == model->acps.end() ? nullptr : &*found;
 }
 

@@ -17,18 +17,13 @@ class AcpController {
 public:
     AcpController(AppEvents& events, core::ProblemsManager& problems_manager);
 
-    bool AddElementAcp(parser::AssuranceCase& model,
-                       sacm::AssuranceCasePackage* package,
-                       const std::string& element_id);
+    bool
+    AddElementAcp(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package, const std::string& element_id);
     bool AddRelationshipAcp(parser::AssuranceCase& model,
                             sacm::AssuranceCasePackage* package,
                             const std::string& relationship_id);
-    bool RemoveAcp(parser::AssuranceCase& model,
-                   sacm::AssuranceCasePackage* package,
-                   const std::string& acp_id);
-    bool UpsertAcp(parser::AssuranceCase& model,
-                   sacm::AssuranceCasePackage* package,
-                   const parser::AcpRecord& acp);
+    bool RemoveAcp(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package, const std::string& acp_id);
+    bool UpsertAcp(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package, const parser::AcpRecord& acp);
     bool CreateConfidenceArgumentTreeForAcp(parser::AssuranceCase& model,
                                             sacm::AssuranceCasePackage* package,
                                             const std::string& acp_id);

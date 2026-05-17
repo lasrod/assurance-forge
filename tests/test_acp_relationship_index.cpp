@@ -127,9 +127,8 @@ TEST(AcpRelationshipIndexTest, BlocksUnsupportedRelationshipPairs) {
 
     const std::vector<core::acp::AcpRelationshipTarget> targets = core::acp::BuildAcpRelationshipTargets(model);
 
-    for (const std::pair<std::string, std::string> edge : {std::pair{"S1", "G1"},
-                                                           std::pair{"S1", "Sol1"},
-                                                           std::pair{"A1", "Sol1"}}) {
+    for (const std::pair<std::string, std::string> edge :
+         {std::pair{"S1", "G1"}, std::pair{"S1", "Sol1"}, std::pair{"A1", "Sol1"}}) {
         const auto* target = core::acp::FindAcpRelationshipTarget(targets, edge.first, edge.second);
         ASSERT_NE(target, nullptr) << edge.first << " -> " << edge.second;
         EXPECT_FALSE(target->eligible_for_acp) << edge.first << " -> " << edge.second;

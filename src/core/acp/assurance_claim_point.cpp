@@ -48,9 +48,7 @@ void AddTag(std::vector<sacm::TaggedValue>& tags, std::string key, std::string v
     tags.push_back(std::move(tag));
 }
 
-void CollectFromElement(const sacm::SacmElement& element,
-                        AcpTargetKind target_kind,
-                        std::vector<Acp>& out_acps) {
+void CollectFromElement(const sacm::SacmElement& element, AcpTargetKind target_kind, std::vector<Acp>& out_acps) {
     std::unordered_set<std::string> seen_ids;
     for (const sacm::TaggedValue& tag : element.taggedValues) {
         if (tag.key != kAcpMarkerKey || tag.value.empty())
@@ -62,7 +60,8 @@ void CollectFromElement(const sacm::SacmElement& element,
         acp.id = tag.value;
         acp.target.kind = target_kind;
         acp.target.target_id = element.id;
-        acp.resolution.kind = AcpResolutionKindFromString(TaggedValueFor(element, FieldKey(acp.id, kResolutionKindField)));
+        acp.resolution.kind =
+            AcpResolutionKindFromString(TaggedValueFor(element, FieldKey(acp.id, kResolutionKindField)));
         acp.resolution.text = TaggedValueFor(element, FieldKey(acp.id, kTextField));
         acp.resolution.argument_package_id = TaggedValueFor(element, FieldKey(acp.id, kArgumentPackageIdField));
         acp.resolution.top_goal_id = TaggedValueFor(element, FieldKey(acp.id, kTopGoalIdField));
@@ -126,8 +125,7 @@ AcpResolutionKind AcpResolutionKindFromString(const std::string& value) {
 }
 
 bool IsInstantiated(const Acp& acp) {
-    return acp.resolution.kind == AcpResolutionKind::Text ||
-           acp.resolution.kind == AcpResolutionKind::TopGoalReference;
+    return acp.resolution.kind == AcpResolutionKind::Text || acp.resolution.kind == AcpResolutionKind::TopGoalReference;
 }
 
 std::vector<Acp> AcpsForTaggedElement(const sacm::SacmElement& element, AcpTargetKind target_kind) {
@@ -185,8 +183,8 @@ void UpsertAcpTags(sacm::SacmElement& element, const Acp& acp) {
 bool RemoveAcpTags(sacm::SacmElement& element, const std::string& acp_id) {
     const auto original_size = element.taggedValues.size();
     element.taggedValues.erase(std::remove_if(element.taggedValues.begin(),
-                                             element.taggedValues.end(),
-                                             [&](const sacm::TaggedValue& tag) { return IsAcpTagForId(tag, acp_id); }),
+                                              element.taggedValues.end(),
+                                              [&](const sacm::TaggedValue& tag) { return IsAcpTagForId(tag, acp_id); }),
                                element.taggedValues.end());
     return element.taggedValues.size() != original_size;
 }
@@ -200,10 +198,11 @@ bool IsConfidenceArgumentPackage(const sacm::ArgumentPackage& package) {
 }
 
 void SetConfidenceArgumentPackage(sacm::ArgumentPackage& package, bool confidence_argument) {
-    package.taggedValues.erase(std::remove_if(package.taggedValues.begin(),
-                                             package.taggedValues.end(),
-                                             [](const sacm::TaggedValue& tag) { return tag.key == kPackagePurposeKey; }),
-                               package.taggedValues.end());
+    package.taggedValues.erase(
+        std::remove_if(package.taggedValues.begin(),
+                       package.taggedValues.end(),
+                       [](const sacm::TaggedValue& tag) { return tag.key == kPackagePurposeKey; }),
+        package.taggedValues.end());
     if (confidence_argument)
         AddTag(package.taggedValues, std::string(kPackagePurposeKey), std::string(kPackagePurposeConfidence));
 }

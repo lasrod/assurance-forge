@@ -28,9 +28,7 @@ AcpEditResult ErrorResult(std::string acp_id, std::string error) {
     return result;
 }
 
-AcpEditResult SuccessResult(std::string acp_id,
-                            std::string argument_package_id = {},
-                            std::string top_goal_id = {}) {
+AcpEditResult SuccessResult(std::string acp_id, std::string argument_package_id = {}, std::string top_goal_id = {}) {
     AcpEditResult result;
     result.changed = true;
     result.acp_id = std::move(acp_id);
@@ -41,15 +39,13 @@ AcpEditResult SuccessResult(std::string acp_id,
 
 template <typename ElementT>
 sacm::SacmElement* FindById(std::vector<ElementT>& elements, const std::string& id) {
-    auto found = std::find_if(elements.begin(), elements.end(), [&](const ElementT& element) {
-        return element.id == id;
-    });
+    auto found =
+        std::find_if(elements.begin(), elements.end(), [&](const ElementT& element) { return element.id == id; });
     return found == elements.end() ? nullptr : &*found;
 }
 
-SacmTargetRef FindSacmTarget(sacm::AssuranceCasePackage* package,
-                             const std::string& target_kind,
-                             const std::string& target_id) {
+SacmTargetRef
+FindSacmTarget(sacm::AssuranceCasePackage* package, const std::string& target_kind, const std::string& target_id) {
     if (!package || target_id.empty())
         return {};
 
@@ -216,16 +212,14 @@ std::string TargetSummaryForDefaultClaim(const parser::AssuranceCase& model, con
 } // namespace
 
 const parser::AcpRecord* FindAcp(const parser::AssuranceCase& model, const std::string& acp_id) {
-    auto found = std::find_if(model.acps.begin(), model.acps.end(), [&](const parser::AcpRecord& acp) {
-        return acp.id == acp_id;
-    });
+    auto found = std::find_if(
+        model.acps.begin(), model.acps.end(), [&](const parser::AcpRecord& acp) { return acp.id == acp_id; });
     return found == model.acps.end() ? nullptr : &*found;
 }
 
 parser::AcpRecord* FindAcp(parser::AssuranceCase& model, const std::string& acp_id) {
-    auto found = std::find_if(model.acps.begin(), model.acps.end(), [&](const parser::AcpRecord& acp) {
-        return acp.id == acp_id;
-    });
+    auto found = std::find_if(
+        model.acps.begin(), model.acps.end(), [&](const parser::AcpRecord& acp) { return acp.id == acp_id; });
     return found == model.acps.end() ? nullptr : &*found;
 }
 
@@ -259,9 +253,8 @@ AcpEditResult AddAcp(parser::AssuranceCase& model,
     return SuccessResult(acp.id);
 }
 
-AcpEditResult UpsertAcp(parser::AssuranceCase& model,
-                        sacm::AssuranceCasePackage* package,
-                        const parser::AcpRecord& record) {
+AcpEditResult
+UpsertAcp(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package, const parser::AcpRecord& record) {
     if (record.id.empty())
         return ErrorResult({}, "ACP id is empty.");
     if (record.target_kind != kTargetKindElement && record.target_kind != kTargetKindRelationship)
@@ -284,9 +277,7 @@ AcpEditResult UpsertAcp(parser::AssuranceCase& model,
     return SuccessResult(record.id);
 }
 
-AcpEditResult RemoveAcp(parser::AssuranceCase& model,
-                        sacm::AssuranceCasePackage* package,
-                        const std::string& acp_id) {
+AcpEditResult RemoveAcp(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package, const std::string& acp_id) {
     const parser::AcpRecord* existing = FindAcp(model, acp_id);
     if (!existing)
         return ErrorResult(acp_id, "ACP was not found.");
