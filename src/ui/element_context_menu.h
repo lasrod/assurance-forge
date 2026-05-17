@@ -12,6 +12,9 @@ namespace ui {
 struct ElementContextActions {
     std::function<void(core::NewElementKind)> add_child;
     std::function<void()> add_top_goal;
+    std::function<void()> add_acp_to_selected_element;
+    std::function<void(const std::string& relationship_id)> add_acp_to_relationship;
+    std::function<void(const std::string& acp_id)> remove_acp;
     std::function<void(core::RemoveMode)> remove_selected;
     std::function<void()> render_ai_review_menu;
     std::function<void(const char*)> not_implemented;

@@ -212,6 +212,16 @@ static void parse_element_base(pugi::xml_node node, SacmElement& element) {
         if (auto abs_form = find_child(node, "abstractform"))
             element.abstractForm = read_id_ref(abs_form);
     }
+
+    for (auto child : node.children()) {
+        if (local_name(child.name()) != "taggedvalue")
+            continue;
+        TaggedValue tag;
+        tag.id = child.attribute("id").as_string();
+        tag.key = child.attribute("key").as_string();
+        tag.value = child.attribute("value").as_string();
+        element.taggedValues.push_back(std::move(tag));
+    }
 }
 
 // Parse the body of an AssertedRelationship (sources, targets, attributes).

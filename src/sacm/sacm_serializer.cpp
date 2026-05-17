@@ -100,6 +100,18 @@ static void add_refs(pugi::xml_node parent, const char* tag, const std::vector<s
     }
 }
 
+static void add_tagged_values(pugi::xml_node parent, const SacmElement& elem) {
+    for (const TaggedValue& tag : elem.taggedValues) {
+        if (tag.key.empty())
+            continue;
+        auto node = parent.append_child("taggedValue");
+        if (!tag.id.empty())
+            node.append_attribute("id") = tag.id.c_str();
+        node.append_attribute("key") = tag.key.c_str();
+        node.append_attribute("value") = tag.value.c_str();
+    }
+}
+
 // Serialize common SACMElement attributes (clause 8.2) plus name translations.
 static void set_base(pugi::xml_node node, const SacmElement& elem) {
     if (!elem.id.empty())
@@ -117,6 +129,7 @@ static void set_base(pugi::xml_node node, const SacmElement& elem) {
     if (!elem.abstractForm.empty())
         node.append_attribute("abstractForm") = elem.abstractForm.c_str();
     add_name_ml(node, elem.name_ml);
+    add_tagged_values(node, elem);
 }
 
 // ===== Element serializers =====

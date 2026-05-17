@@ -184,12 +184,14 @@ set(ASSURANCE_FORGE_SHARED_SOURCES
     src/parser/xml_parser.cpp
     src/ui/confidence_model.cpp
     src/ui/panels/welcome_modal.cpp
+    src/ui/panels/acp_panel.cpp
     src/ui/panels/confidence_panel.cpp
     src/ui/panels/element_panel.cpp
     src/ui/panels/package_details_panel.cpp
     src/ui/panels/preferences_panel.cpp
     src/ui/panels/problems_panel.cpp
     src/ui/panels/project_explorer_panel.cpp
+    src/ui/panels/relationship_panel.cpp
     src/ui/panels/review_panel.cpp
     src/ui/panels/sacm_viewer_panel.cpp
     src/ui/panels/terminology_package_panel.cpp
@@ -207,6 +209,9 @@ set(ASSURANCE_FORGE_SHARED_SOURCES
     src/ui/theme.cpp
     src/core/app_state.cpp
     src/core/assurance_tree.cpp
+    src/core/acp/acp_editing.cpp
+    src/core/acp/acp_relationship_index.cpp
+    src/core/acp/assurance_claim_point.cpp
     src/core/element_factory.cpp
     src/core/confidence/confidence_store.cpp
     src/core/gsn_layout.cpp
@@ -246,6 +251,8 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/ai/openai_provider.cpp
     src/ai/secret_store.cpp
     src/app/main.cpp
+    src/app/acp_problem_sync.cpp
+    src/app/controllers/acp_controller.cpp
     src/app/controllers/ai_review_controller.cpp
     src/app/controllers/confidence_controller.cpp
     src/app/app_runtime_ai.cpp
@@ -332,6 +339,7 @@ add_executable(tests
     tests/test_proposal_controller.cpp
     tests/test_sha256.cpp
     tests/test_app_events.cpp
+    tests/test_acp_problem_sync.cpp
     tests/test_confidence_problem_sync.cpp
     tests/test_ai_review_controller.cpp
     tests/test_review_problem_sync.cpp
@@ -350,6 +358,9 @@ add_executable(tests
     tests/test_ui_state.cpp
     tests/test_confidence_model.cpp
     tests/test_confidence_store.cpp
+    tests/test_assurance_claim_point.cpp
+    tests/test_acp_editing.cpp
+    tests/test_acp_relationship_index.cpp
     tests/test_recent_projects.cpp
     tests/test_shared_utils.cpp
     tests/test_gsn_svg_exporter.cpp
@@ -367,7 +378,9 @@ add_executable(tests
     src/ai/openai_provider.cpp
     src/ai/secret_store.cpp
     src/app/app_runtime_state.cpp
+    src/app/acp_problem_sync.cpp
     src/app/actions/terminology_actions.cpp
+    src/app/controllers/acp_controller.cpp
     src/app/controllers/ai_review_controller.cpp
     src/app/controllers/confidence_controller.cpp
     src/app/controllers/element_edit_controller.cpp
@@ -385,6 +398,9 @@ add_executable(tests
     src/parser/model_utils.cpp
     src/parser/xml_parser.cpp
     src/core/assurance_tree.cpp
+    src/core/acp/acp_editing.cpp
+    src/core/acp/acp_relationship_index.cpp
+    src/core/acp/assurance_claim_point.cpp
     src/core/confidence/confidence_store.cpp
     src/core/element_factory.cpp
     src/core/gsn_layout.cpp

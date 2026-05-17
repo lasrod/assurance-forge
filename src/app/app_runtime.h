@@ -46,6 +46,10 @@ public:
     // Add a new top-level Goal (root claim) to the current model.
     bool AddTopGoal();
 
+    bool AddAcpToSelectedElement();
+    bool AddAcpToRelationship(const std::string& relationship_id);
+    bool RemoveAcp(const std::string& acp_id);
+
     // Remove the currently selected element using the given mode. If the
     // planned removal targets more than one element, opens the confirmation
     // modal (with canvas highlight + fit-to-view) instead of removing.
@@ -133,6 +137,7 @@ private:
     void SyncReviewProblems();
     void SyncTerminologyProblems();
     void SyncConfidenceProblems();
+    void SyncAcpProblems();
     void HandleProblemQuickFix(const core::ProblemItem& problem);
     void SyncReviewVisualStatesFromReviews();
     void TouchCurrentProjectRecent();

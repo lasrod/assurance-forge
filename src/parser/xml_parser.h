@@ -29,12 +29,23 @@ struct SacmElement {
     std::string assertion_declaration;    // from assertionDeclaration attribute
 };
 
+struct AcpRecord {
+    std::string id;
+    std::string target_kind; // "relationship" or "element"
+    std::string target_id;
+    std::string resolution_kind; // "none", "text", or "topGoalReference"
+    std::string text;
+    std::string argument_package_id;
+    std::string top_goal_id;
+};
+
 // Represents a parsed SACM assurance case
 struct AssuranceCase {
     std::string id;
     std::string name;
     std::string description;
     std::vector<SacmElement> elements;
+    std::vector<AcpRecord> acps;
 };
 
 // Result of parsing operation

@@ -11,6 +11,7 @@
 #include "app/areas/proposal_editor_area.h"
 #include "app/areas/project_explorer_area.h"
 #include "app/areas/review_panel_area.h"
+#include "app/acp_problem_sync.h"
 #include "app/areas/workbench_area.h"
 #include "app/app_runtime_state.h"
 #include "app/confidence_problem_sync.h"
@@ -83,6 +84,9 @@ ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
     return ui::ElementContextActions{
         [&runtime](core::NewElementKind kind) { runtime.AddChildToSelected(kind); },
         [&runtime]() { runtime.AddTopGoal(); },
+        [&runtime]() { runtime.AddAcpToSelectedElement(); },
+        [&runtime](const std::string& relationship_id) { runtime.AddAcpToRelationship(relationship_id); },
+        [&runtime](const std::string& acp_id) { runtime.RemoveAcp(acp_id); },
         [&runtime](core::RemoveMode mode) { runtime.RemoveSelected(mode); },
         [&runtime]() { runtime.RenderAiReviewContextMenuForSelected(); },
         [&runtime](const char* feature) {
@@ -102,6 +106,9 @@ AppRuntime::AppRuntime() : impl_(new AppRuntimeState()) {
     ui::UiState& ui_state = ui::GetUiState();
     ui_state.center_view = ui::CenterView::GsnCanvas;
     ui_state.selected_element_id.clear();
+    ui_state.selected_acp_id.clear();
+    ui_state.selected_relationship_id.clear();
+    ui_state.selected_relationship_edge_key.clear();
     ui_state.selected_problem_id.clear();
     ui_state.selected_problem_element_id.clear();
 }
@@ -139,6 +146,9 @@ void AppRuntime::RegisterAppEventListeners() {
     impl_->events.Subscribe<SelectionChangedEvent>([](const SelectionChangedEvent& event) {
         ui::UiState& ui_state = ui::GetUiState();
         ui_state.selected_element_id = event.element_id;
+        ui_state.selected_acp_id.clear();
+        ui_state.selected_relationship_id.clear();
+        ui_state.selected_relationship_edge_key.clear();
         ui_state.center_on_selection = event.center_on_selection;
     });
     impl_->events.Subscribe<ElementReviewVisualEvent>([](const ElementReviewVisualEvent& event) {
@@ -219,6 +229,18 @@ bool AppRuntime::AddChildToSelected(core::NewElementKind kind) {
 
 bool AppRuntime::AddTopGoal() {
     return actions::ElementActions(*impl_).AddTopGoal();
+}
+
+bool AppRuntime::AddAcpToSelectedElement() {
+    return actions::ElementActions(*impl_).AddAcpToSelectedElement();
+}
+
+bool AppRuntime::AddAcpToRelationship(const std::string& relationship_id) {
+    return actions::ElementActions(*impl_).AddAcpToRelationship(relationship_id);
+}
+
+bool AppRuntime::RemoveAcp(const std::string& acp_id) {
+    return actions::ElementActions(*impl_).RemoveAcp(acp_id);
 }
 
 void AppRuntime::RemoveSelected(core::RemoveMode mode) {
@@ -339,6 +361,7 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     ui::RebuildRegisterViews(&ac);
     ui::GetUiState().model_has_translations = ui::ModelHasTranslations(ac);
     SyncTerminologyProblems();
+    SyncAcpProblems();
 
     if (impl_->workbench.pending_focus_root && impl_->current_tree.root) {
         ui::UiState& ui_state = ui::GetUiState();
@@ -469,6 +492,14 @@ void AppRuntime::SyncConfidenceProblems() {
     const std::string source_id =
         impl_->confidence_controller ? impl_->confidence_controller->ActiveSourceId() : std::string{};
     app::SyncConfidenceProblems(impl_->problems_manager, model, store, source_id);
+}
+
+void AppRuntime::SyncAcpProblems() {
+    const parser::AssuranceCase* model =
+        impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
+    const sacm::AssuranceCasePackage* package =
+        impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
+    app::SyncAcpProblems(impl_->problems_manager, model, package);
 }
 
 void AppRuntime::SyncReviewVisualStatesFromReviews() {
@@ -670,6 +701,10 @@ void AppRuntime::RenderFrame(bool& done) {
 
     areas::FeedbackDockAreaCallbacks feedback_dock_callbacks;
     feedback_dock_callbacks.problems.activate_problem = [this](const core::ProblemItem& problem) {
+        if (problem.type.rfind("Acp", 0) == 0) {
+            HandleProblemQuickFix(problem);
+            return;
+        }
         if (problem.type.rfind("TerminologyTerm", 0) == 0) {
             HandleProblemQuickFix(problem);
             return;

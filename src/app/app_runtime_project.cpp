@@ -481,6 +481,21 @@ bool AppRuntime::IsTerminologySuggestionIgnored(const std::string& element_id, c
 }
 
 void AppRuntime::HandleProblemQuickFix(const core::ProblemItem& problem) {
+    if (problem.type.rfind("Acp", 0) == 0) {
+        if (problem.quick_fix_payload.empty()) {
+            SetStatus("ACP problem does not identify an ACP.");
+            return;
+        }
+        ui::UiState& ui_state = ui::GetUiState();
+        ui_state.selected_acp_id = problem.quick_fix_payload;
+        ui_state.selected_element_id.clear();
+        ui_state.selected_relationship_id.clear();
+        ui_state.selected_relationship_edge_key.clear();
+        ui_state.center_view = ui::CenterView::GsnCanvas;
+        impl_->workbench.force_center_tab_selection = true;
+        SetStatus("Opened " + problem.quick_fix_payload);
+        return;
+    }
     actions::TerminologyActions(*impl_).HandleProblemQuickFix(problem);
 }
 

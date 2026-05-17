@@ -37,8 +37,8 @@
 //     Participant, ArtifactAssetRelationship (12.8 - 12.14).
 //   - Full Terminology metamodel: TerminologyAsset and full
 //     externalReference/origin typing (10.7 - 10.11).
-//   - UtilityElement attachments: Note, TaggedValue, ImplementationConstraint
-//     (8.7 - 8.12).
+//   - UtilityElement attachments: Note and ImplementationConstraint (8.7 -
+//     8.12). TaggedValue is modeled minimally for Assurance Forge metadata.
 //   - SACM UML Profile (Annex F).
 // =============================================================================
 
@@ -89,6 +89,14 @@ struct MultiLangText {
     }
 };
 
+// ===== Utility metadata (SACM TaggedValue, clause 8.10) =====
+
+struct TaggedValue {
+    std::string id;
+    std::string key;
+    std::string value;
+};
+
 // ===== Base element (SACM SACMElement, clause 8.2) =====
 //
 // All SACM elements ultimately derive from SACMElement.
@@ -108,6 +116,10 @@ struct SacmElement {
     bool isAbstract = false;  // True for pattern/template elements
     std::string citedElement; // Id of the SACMElement this element cites
     std::string abstractForm; // Id of the abstract element this conforms to
+
+    // Minimal SACM TaggedValue support for Assurance Forge metadata such as
+    // ACP decorators and confidence-argument package purpose markers.
+    std::vector<TaggedValue> taggedValues;
 };
 
 // ===== Terminology (SACM clause 10) =====

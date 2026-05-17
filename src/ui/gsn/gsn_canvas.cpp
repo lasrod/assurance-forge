@@ -1121,11 +1121,17 @@ void DrawGsnNode(const GsnNode& node,
     }
     if (ImGui::IsItemClicked() && !g_overlay_hovered && !term_click_consumed) {
         ui_state.selected_element_id = node.id;
+        ui_state.selected_acp_id.clear();
+        ui_state.selected_relationship_id.clear();
+        ui_state.selected_relationship_edge_key.clear();
     }
 
     // Right-click context menu: select the node, then offer the Add submenu.
     if (ImGui::BeginPopupContextItem(node.id.c_str())) {
         ui_state.selected_element_id = node.id;
+        ui_state.selected_acp_id.clear();
+        ui_state.selected_relationship_id.clear();
+        ui_state.selected_relationship_edge_key.clear();
         RenderAddElementMenu(actions);
         RenderRemoveSubmenu(active_case, ui_state.selected_element_id, actions);
         ImGui::Separator();
