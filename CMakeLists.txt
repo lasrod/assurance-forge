@@ -273,6 +273,7 @@ set(ASSURANCE_FORGE_APP_SOURCES
     src/app/frame/app_menu_bar.cpp
     src/app/frame/app_shell.cpp
     src/app/guideline_catalog.cpp
+    src/app/confidence_problem_sync.cpp
     src/app/review_problem_sync.cpp
     src/app/controllers/element_edit_controller.cpp
     src/app/controllers/modal_coordinator.cpp
@@ -331,6 +332,7 @@ add_executable(tests
     tests/test_proposal_controller.cpp
     tests/test_sha256.cpp
     tests/test_app_events.cpp
+    tests/test_confidence_problem_sync.cpp
     tests/test_ai_review_controller.cpp
     tests/test_review_problem_sync.cpp
     tests/test_review_controller.cpp
@@ -375,6 +377,7 @@ add_executable(tests
     src/app/controllers/proposal_controller.cpp
     src/app/recent_projects.cpp
     src/app/guideline_catalog.cpp
+    src/app/confidence_problem_sync.cpp
     src/app/review_problem_sync.cpp
     src/app/controllers/review_controller.cpp
     src/parser/guidelines_parser.cpp

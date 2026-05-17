@@ -132,6 +132,7 @@ private:
     void RefreshSacmPackageTreeCache();
     void SyncReviewProblems();
     void SyncTerminologyProblems();
+    void SyncConfidenceProblems();
     void HandleProblemQuickFix(const core::ProblemItem& problem);
     void SyncReviewVisualStatesFromReviews();
     void TouchCurrentProjectRecent();

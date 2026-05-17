@@ -1,6 +1,7 @@
 #include "app/app_runtime.h"
 #include "app/actions/terminology_actions.h"
 #include "app/app_runtime_state.h"
+#include "app/confidence_problem_sync.h"
 #include "app/native_file_dialogs.h"
 #include "app/proposal_ui_state.h"
 #include "app/project_workflow.h"
@@ -260,6 +261,8 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
     ui::UiState& ui_state = ui::GetUiState();
     if (entry.role == core::ProjectFileRole::SacmArgument) {
         SetConfidenceSource(*impl_, entry);
+        SyncConfidenceProblems();
+        SyncReviewVisualStatesFromReviews();
         impl_->proposal_controller->ClearActiveState();
         ClearProposalHighlightState(ui_state);
         impl_->document_dirty = false;
@@ -564,6 +567,8 @@ bool AppRuntime::OpenFirstProjectSacmFile() {
             continue;
         if (impl_->app_state.open_project_file(entry)) {
             SetConfidenceSource(*impl_, entry);
+            SyncConfidenceProblems();
+            SyncReviewVisualStatesFromReviews();
             impl_->tree_needs_rebuild = true;
             impl_->workbench.pending_focus_root = true;
             impl_->workbench.show_gsn_tab = true;
@@ -605,6 +610,8 @@ bool AppRuntime::EnsureReviewItemStorage() {
 bool AppRuntime::EnsureConfidenceStorage() {
     if (!impl_->app_state.current_project.has_value()) {
         impl_->confidence_controller->ClearStorage();
+        SyncConfidenceProblems();
+        SyncReviewVisualStatesFromReviews();
         return false;
     }
 
@@ -614,9 +621,14 @@ bool AppRuntime::EnsureConfidenceStorage() {
         confidence_path = project.rootPath / "analysis" / "confidence.af.json";
 
     std::string error;
-    if (impl_->confidence_controller->ConfigureStorage(confidence_path, project.id, error))
+    if (impl_->confidence_controller->ConfigureStorage(confidence_path, project.id, error)) {
+        SyncConfidenceProblems();
+        SyncReviewVisualStatesFromReviews();
         return true;
+    }
 
+    SyncConfidenceProblems();
+    SyncReviewVisualStatesFromReviews();
     SetStatus("Confidence assessments could not be loaded: " + error);
     return false;
 }

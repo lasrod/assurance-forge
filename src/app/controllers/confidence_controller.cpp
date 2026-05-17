@@ -199,6 +199,10 @@ bool ConfidenceController::HasStorageError() const {
     return !storage_error_.empty();
 }
 
+const core::confidence::ConfidenceStore& ConfidenceController::Store() const {
+    return store_;
+}
+
 void ConfidenceController::SetActiveSource(std::string source_id, std::string path, std::string file_hash) {
     active_source_.sourceId = SourceIdOrMain(source_id);
     active_source_.path = std::move(path);

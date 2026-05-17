@@ -13,6 +13,7 @@
 #include "app/areas/review_panel_area.h"
 #include "app/areas/workbench_area.h"
 #include "app/app_runtime_state.h"
+#include "app/confidence_problem_sync.h"
 #include "app/frame/app_menu_bar.h"
 #include "app/frame/app_shell.h"
 #include "app/proposal_ui_state.h"
@@ -132,6 +133,8 @@ void AppRuntime::RegisterAppEventListeners() {
     impl_->events.Subscribe<ConfidenceDirtyEvent>([this](const ConfidenceDirtyEvent& event) {
         if (event.mark_app_dirty)
             impl_->app_state.mark_dirty();
+        SyncConfidenceProblems();
+        SyncReviewVisualStatesFromReviews();
     });
     impl_->events.Subscribe<SelectionChangedEvent>([](const SelectionChangedEvent& event) {
         ui::UiState& ui_state = ui::GetUiState();
@@ -456,6 +459,15 @@ void AppRuntime::SyncTerminologyProblems() {
         impl_->problems_manager, model, package, [this](const std::string& element_id, const std::string& term_value) {
             return IsTerminologySuggestionIgnored(element_id, term_value);
         });
+}
+
+void AppRuntime::SyncConfidenceProblems() {
+    const parser::AssuranceCase* model =
+        impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
+    const core::confidence::ConfidenceStore* store =
+        impl_->confidence_controller ? &impl_->confidence_controller->Store() : nullptr;
+    const std::string source_id = impl_->confidence_controller ? impl_->confidence_controller->ActiveSourceId() : std::string{};
+    app::SyncConfidenceProblems(impl_->problems_manager, model, store, source_id);
 }
 
 void AppRuntime::SyncReviewVisualStatesFromReviews() {

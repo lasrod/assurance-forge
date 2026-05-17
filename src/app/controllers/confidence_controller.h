@@ -30,6 +30,7 @@ public:
     const std::filesystem::path& FilePath() const;
     const std::string& StorageError() const;
     bool HasStorageError() const;
+    const core::confidence::ConfidenceStore& Store() const;
 
     void SetActiveSource(std::string source_id, std::string path, std::string file_hash = {});
     const std::string& ActiveSourceId() const;

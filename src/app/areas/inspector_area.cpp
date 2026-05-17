@@ -1,6 +1,7 @@
 #include "app/areas/inspector_area.h"
 
 #include "app/app_runtime_state.h"
+#include "app/confidence_problem_sync.h"
 #include "app/frame/app_layout_regions.h"
 #include "core/confidence/confidence_store.h"
 #include "core/sacm_identity.h"
@@ -118,12 +119,19 @@ void RenderInspectorArea(AppRuntimeState& state,
             return true;
         };
         if (ui::panels::ShowElementPanel(loaded_case, sacm_package, &terminology_callbacks, &confidence_callbacks)) {
-            if (state.confidence_controller && loaded_case &&
-                state.confidence_controller->RefreshStaleFlags(*loaded_case) &&
-                state.confidence_controller->LastInactivatedCount() > 0) {
-                const int count = state.confidence_controller->LastInactivatedCount();
-                state.events.Emit(StatusMessageEvent{std::to_string(count) +
-                                                     " confidence assessment(s) were marked inactive because their target elements changed."});
+            if (state.confidence_controller && loaded_case) {
+                const bool confidence_changed = state.confidence_controller->RefreshStaleFlags(*loaded_case);
+                if (confidence_changed) {
+                    app::SyncConfidenceProblems(state.problems_manager,
+                                                loaded_case,
+                                                &state.confidence_controller->Store(),
+                                                state.confidence_controller->ActiveSourceId());
+                }
+                if (confidence_changed && state.confidence_controller->LastInactivatedCount() > 0) {
+                    const int count = state.confidence_controller->LastInactivatedCount();
+                    state.events.Emit(StatusMessageEvent{std::to_string(count) +
+                                                         " confidence assessment(s) were marked inactive because their target elements changed."});
+                }
             }
             if (callbacks.mark_element_modified)
                 callbacks.mark_element_modified();
