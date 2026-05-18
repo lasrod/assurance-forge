@@ -23,8 +23,11 @@ add_library(af_core OBJECT
     sacm_identity.cpp
     sha256.cpp
     string_utils.cpp
+    terminology_category_service.cpp
+    terminology_internal.cpp
     terminology_package_service.cpp
     terminology_scope_service.cpp
+    terminology_term_usage.cpp
     terminology_text_utils.cpp
     time_utils.cpp
     tree_editing.cpp
