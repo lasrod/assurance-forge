@@ -5,10 +5,14 @@ add_library(af_app OBJECT
     actions/ai_review_actions.cpp
     actions/element_actions.cpp
     actions/proposal_actions.cpp
+    actions/proposal_actions_helpers.cpp
     actions/review_actions.cpp
     actions/terminology_actions.cpp
+    actions/terminology_actions_helpers.cpp
     app_runtime.cpp
     app_runtime_ai.cpp
+    app_runtime_frame.cpp
+    app_runtime_io.cpp
     app_runtime_project.cpp
     app_runtime_state.cpp
     app_ui_bootstrap.cpp
@@ -17,6 +21,7 @@ add_library(af_app OBJECT
     areas/feedback_dock_area.cpp
     areas/inspector_area.cpp
     areas/modal_host.cpp
+    areas/modal_host_terminology.cpp
     areas/problems_area.cpp
     areas/project_explorer_area.cpp
     areas/proposal_editor_area.cpp
