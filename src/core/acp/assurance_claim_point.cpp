@@ -9,8 +9,10 @@ namespace {
 
 constexpr const char* kAcpMarkerKey = "assuranceForge.acp";
 constexpr const char* kAcpFieldPrefix = "assuranceForge.acp.";
+constexpr const char* kNameField = ".name";
 constexpr const char* kResolutionKindField = ".resolutionKind";
 constexpr const char* kTextField = ".text";
+constexpr const char* kConfidenceClaimIdField = ".confidenceClaimId";
 constexpr const char* kArgumentPackageIdField = ".argumentPackageId";
 constexpr const char* kTopGoalIdField = ".topGoalId";
 constexpr const char* kPackagePurposeKey = "assuranceForge.argumentPackage.purpose";
@@ -58,11 +60,13 @@ void CollectFromElement(const sacm::SacmElement& element, AcpTargetKind target_k
 
         Acp acp;
         acp.id = tag.value;
+        acp.name = TaggedValueFor(element, FieldKey(acp.id, kNameField));
         acp.target.kind = target_kind;
         acp.target.target_id = element.id;
         acp.resolution.kind =
             AcpResolutionKindFromString(TaggedValueFor(element, FieldKey(acp.id, kResolutionKindField)));
         acp.resolution.text = TaggedValueFor(element, FieldKey(acp.id, kTextField));
+        acp.resolution.confidence_claim_id = TaggedValueFor(element, FieldKey(acp.id, kConfidenceClaimIdField));
         acp.resolution.argument_package_id = TaggedValueFor(element, FieldKey(acp.id, kArgumentPackageIdField));
         acp.resolution.top_goal_id = TaggedValueFor(element, FieldKey(acp.id, kTopGoalIdField));
         out_acps.push_back(std::move(acp));
@@ -171,9 +175,14 @@ void UpsertAcpTags(sacm::SacmElement& element, const Acp& acp) {
         return;
 
     AddTag(element.taggedValues, std::string(kAcpMarkerKey), acp.id, acp.id);
+    if (!acp.name.empty())
+        AddTag(element.taggedValues, FieldKey(acp.id, kNameField), acp.name);
     AddTag(element.taggedValues, FieldKey(acp.id, kResolutionKindField), ToString(acp.resolution.kind));
     if (acp.resolution.kind == AcpResolutionKind::Text) {
         AddTag(element.taggedValues, FieldKey(acp.id, kTextField), acp.resolution.text);
+        if (!acp.resolution.confidence_claim_id.empty())
+            AddTag(element.taggedValues, FieldKey(acp.id, kConfidenceClaimIdField),
+                   acp.resolution.confidence_claim_id);
     } else if (acp.resolution.kind == AcpResolutionKind::TopGoalReference) {
         AddTag(element.taggedValues, FieldKey(acp.id, kArgumentPackageIdField), acp.resolution.argument_package_id);
         AddTag(element.taggedValues, FieldKey(acp.id, kTopGoalIdField), acp.resolution.top_goal_id);

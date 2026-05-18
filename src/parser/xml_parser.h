@@ -25,16 +25,19 @@ struct SacmElement {
     // Relationship fields (populated for assertedinference, assertedcontext, assertedevidence)
     std::vector<std::string> source_refs; // ids from <source ref="..."/>
     std::vector<std::string> target_refs; // ids from <target ref="..."/>
+    std::vector<std::string> meta_claim_refs; // ids from <metaClaim ref="..."/>
     std::string reasoning_ref;            // from reasoning attribute (assertedinference)
     std::string assertion_declaration;    // from assertionDeclaration attribute
 };
 
 struct AcpRecord {
     std::string id;
+    std::string name;
     std::string target_kind; // "relationship" or "element"
     std::string target_id;
     std::string resolution_kind; // "none", "text", or "topGoalReference"
     std::string text;
+    std::string confidence_claim_id;
     std::string argument_package_id;
     std::string top_goal_id;
 };

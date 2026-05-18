@@ -83,12 +83,14 @@ static void extract_acps(pugi::xml_node child,
 
         AcpRecord acp;
         acp.id = acp_id;
+        acp.name = tagged_value(child, acp_field_key(acp_id, "name"));
         acp.target_kind = target_kind;
         acp.target_id = target_id;
         acp.resolution_kind = tagged_value(child, acp_field_key(acp_id, "resolutionKind"));
         if (acp.resolution_kind.empty())
             acp.resolution_kind = "none";
         acp.text = tagged_value(child, acp_field_key(acp_id, "text"));
+        acp.confidence_claim_id = tagged_value(child, acp_field_key(acp_id, "confidenceClaimId"));
         acp.argument_package_id = tagged_value(child, acp_field_key(acp_id, "argumentPackageId"));
         acp.top_goal_id = tagged_value(child, acp_field_key(acp_id, "topGoalId"));
         acps.push_back(std::move(acp));
@@ -261,6 +263,10 @@ void extract_elements_recursive(pugi::xml_node node, AssuranceCase& assurance_ca
                         std::string ref = get_ref(ref_child);
                         if (!ref.empty())
                             element.target_refs.push_back(ref);
+                    } else if (ref_local_name == "metaclaim") {
+                        std::string ref = get_ref(ref_child);
+                        if (!ref.empty())
+                            element.meta_claim_refs.push_back(ref);
                     } else if (ref_local_name == "reasoning") {
                         std::string ref = get_ref(ref_child);
                         if (!ref.empty())

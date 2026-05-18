@@ -194,6 +194,7 @@ struct ArtifactReference : SacmElement {
 struct AssertedRelationship : SacmElement {
     std::vector<std::string> sources; // id references (multi-valued)
     std::vector<std::string> targets; // id references (multi-valued)
+    std::vector<std::string> metaClaims; // id references to claims about this assertion
     std::string assertionDeclaration; // see Claim::assertionDeclaration
     bool isCounter = false;           // 11.13 attribute, default false
 };

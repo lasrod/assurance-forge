@@ -26,12 +26,14 @@ struct AcpTarget {
 struct AcpResolution {
     AcpResolutionKind kind = AcpResolutionKind::None;
     std::string text;
+    std::string confidence_claim_id;
     std::string argument_package_id;
     std::string top_goal_id;
 };
 
 struct Acp {
     std::string id;
+    std::string name;
     AcpTarget target;
     AcpResolution resolution;
 };

@@ -233,6 +233,7 @@ static void serialize_relationship_common(pugi::xml_node node, const AssertedRel
     if (rel.isCounter)
         node.append_attribute("isCounter") = "true";
     add_description(node, rel.description, rel.description_ml);
+    add_refs(node, "metaClaim", rel.metaClaims);
     add_refs(node, "source", rel.sources);
     add_refs(node, "target", rel.targets);
 }

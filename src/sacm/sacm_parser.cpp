@@ -230,12 +230,13 @@ static void parse_relationship_fields(pugi::xml_node node, AssertedRelationship&
         std::string ln = local_name(child.name());
         if (ln == "source") {
             std::string ref = read_id_ref(child);
-            if (!ref.empty())
-                rel.sources.push_back(ref);
+            append_ref_if_present(rel.sources, ref);
         } else if (ln == "target") {
             std::string ref = read_id_ref(child);
-            if (!ref.empty())
-                rel.targets.push_back(ref);
+            append_ref_if_present(rel.targets, ref);
+        } else if (ln == "metaclaim") {
+            std::string ref = read_id_ref(child);
+            append_ref_if_present(rel.metaClaims, ref);
         }
     }
     rel.assertionDeclaration = node.attribute("assertionDeclaration").as_string();

@@ -5,6 +5,8 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+
 namespace {
 
 sacm::AssuranceCasePackage MakePackageWithAcpOnRelationship() {
@@ -37,10 +39,12 @@ sacm::AssuranceCasePackage MakePackageWithAcpOnRelationship() {
 
     core::acp::Acp acp;
     acp.id = "ACP1";
+    acp.name = "Review confidence";
     acp.target.kind = core::acp::AcpTargetKind::Relationship;
     acp.target.target_id = "R1";
     acp.resolution.kind = core::acp::AcpResolutionKind::Text;
     acp.resolution.text = "Confidence is justified by independent review.";
+    acp.resolution.confidence_claim_id = "CC1";
     core::acp::UpsertAcpTags(inference, acp);
 
     argument_package.assertedInferences.push_back(std::move(inference));
@@ -90,11 +94,54 @@ TEST(AssuranceClaimPointTest, RelationshipAcpRoundTripsThroughSacm) {
     const std::vector<core::acp::Acp> acps = core::acp::CollectAcps(parsed.package.argumentPackages.front());
     ASSERT_EQ(acps.size(), 1u);
     EXPECT_EQ(acps[0].id, "ACP1");
+    EXPECT_EQ(acps[0].name, "Review confidence");
     EXPECT_EQ(acps[0].target.kind, core::acp::AcpTargetKind::Relationship);
     EXPECT_EQ(acps[0].target.target_id, "R1");
     EXPECT_EQ(acps[0].resolution.kind, core::acp::AcpResolutionKind::Text);
     EXPECT_EQ(acps[0].resolution.text, "Confidence is justified by independent review.");
+    EXPECT_EQ(acps[0].resolution.confidence_claim_id, "CC1");
     EXPECT_TRUE(core::acp::IsInstantiated(acps[0]));
+}
+
+TEST(AssuranceClaimPointTest, RelationshipMetaClaimsRoundTripThroughSacm) {
+    sacm::AssuranceCasePackage package;
+    package.id = "CASE1";
+    package.namespace_prefix = "sacm";
+    package.namespace_uri = "http://example.org/sacm/2.3";
+
+    sacm::ArgumentPackage argument_package;
+    argument_package.id = "AP1";
+
+    sacm::Claim top;
+    top.id = "G1";
+    argument_package.claims.push_back(std::move(top));
+
+    sacm::Claim child;
+    child.id = "G2";
+    argument_package.claims.push_back(std::move(child));
+
+    sacm::Claim confidence;
+    confidence.id = "CC1";
+    argument_package.claims.push_back(std::move(confidence));
+
+    sacm::AssertedInference inference;
+    inference.id = "R1";
+    inference.sources.push_back("G2");
+    inference.targets.push_back("G1");
+    inference.metaClaims.push_back("CC1");
+    argument_package.assertedInferences.push_back(std::move(inference));
+    package.argumentPackages.push_back(std::move(argument_package));
+
+    const std::string xml = sacm::serialize_sacm(package);
+    ASSERT_NE(xml.find("<metaClaim href=\"#CC1\""), std::string::npos);
+
+    sacm::SacmParseResult parsed = sacm::parse_sacm_string(xml);
+    ASSERT_TRUE(parsed.success) << parsed.error_message;
+    ASSERT_EQ(parsed.package.argumentPackages.size(), 1u);
+    ASSERT_EQ(parsed.package.argumentPackages.front().assertedInferences.size(), 1u);
+    const sacm::AssertedInference& parsed_inference = parsed.package.argumentPackages.front().assertedInferences.front();
+    ASSERT_EQ(parsed_inference.metaClaims.size(), 1u);
+    EXPECT_EQ(parsed_inference.metaClaims.front(), "CC1");
 }
 
 TEST(AssuranceClaimPointTest, FlatParserProjectsSacmBackedAcpRecords) {
@@ -104,10 +151,39 @@ TEST(AssuranceClaimPointTest, FlatParserProjectsSacmBackedAcpRecords) {
     ASSERT_TRUE(parsed.success) << parsed.error_message;
     ASSERT_EQ(parsed.assurance_case.acps.size(), 1u);
     EXPECT_EQ(parsed.assurance_case.acps[0].id, "ACP1");
+    EXPECT_EQ(parsed.assurance_case.acps[0].name, "Review confidence");
     EXPECT_EQ(parsed.assurance_case.acps[0].target_kind, "relationship");
     EXPECT_EQ(parsed.assurance_case.acps[0].target_id, "R1");
     EXPECT_EQ(parsed.assurance_case.acps[0].resolution_kind, "text");
     EXPECT_EQ(parsed.assurance_case.acps[0].text, "Confidence is justified by independent review.");
+    EXPECT_EQ(parsed.assurance_case.acps[0].confidence_claim_id, "CC1");
+}
+
+TEST(AssuranceClaimPointTest, FlatParserProjectsRelationshipMetaClaims) {
+        const char* xml = R"xml(
+<sacm:AssuranceCasePackage xmlns:sacm="http://example.org/sacm/2.3" id="CASE1">
+    <argumentPackage id="AP1">
+        <claim id="G1" />
+        <claim id="G2" />
+        <claim id="CC1" />
+        <assertedEvidence id="R1">
+            <metaClaim href="#CC1" />
+            <source href="#G2" />
+            <target href="#G1" />
+        </assertedEvidence>
+    </argumentPackage>
+</sacm:AssuranceCasePackage>
+)xml";
+
+        parser::ParseResult parsed = parser::parse_sacm_xml_string(xml);
+        ASSERT_TRUE(parsed.success) << parsed.error_message;
+
+        auto relationship = std::find_if(parsed.assurance_case.elements.begin(),
+                                                                         parsed.assurance_case.elements.end(),
+                                                                         [](const parser::SacmElement& element) { return element.id == "R1"; });
+        ASSERT_NE(relationship, parsed.assurance_case.elements.end());
+        ASSERT_EQ(relationship->meta_claim_refs.size(), 1u);
+        EXPECT_EQ(relationship->meta_claim_refs.front(), "CC1");
 }
 
 TEST(AssuranceClaimPointTest, ConfidenceArgumentPackagePurposeUsesSacmTaggedValue) {

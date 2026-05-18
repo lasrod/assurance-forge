@@ -21,6 +21,11 @@ struct SacmTargetRef {
     sacm::SacmElement* element = nullptr;
 };
 
+struct SacmRelationshipRef {
+    sacm::ArgumentPackage* owning_package = nullptr;
+    sacm::AssertedRelationship* relationship = nullptr;
+};
+
 AcpEditResult ErrorResult(std::string acp_id, std::string error) {
     AcpEditResult result;
     result.acp_id = std::move(acp_id);
@@ -70,6 +75,76 @@ FindSacmTarget(sacm::AssuranceCasePackage* package, const std::string& target_ki
     return {};
 }
 
+SacmRelationshipRef FindSacmRelationship(sacm::AssuranceCasePackage* package, const std::string& relationship_id) {
+    if (!package || relationship_id.empty())
+        return {};
+
+    for (sacm::ArgumentPackage& argument_package : package->argumentPackages) {
+        if (sacm::SacmElement* element = FindById(argument_package.assertedInferences, relationship_id))
+            return SacmRelationshipRef{&argument_package, static_cast<sacm::AssertedRelationship*>(element)};
+        if (sacm::SacmElement* element = FindById(argument_package.assertedContexts, relationship_id))
+            return SacmRelationshipRef{&argument_package, static_cast<sacm::AssertedRelationship*>(element)};
+        if (sacm::SacmElement* element = FindById(argument_package.assertedEvidences, relationship_id))
+            return SacmRelationshipRef{&argument_package, static_cast<sacm::AssertedRelationship*>(element)};
+    }
+    return {};
+}
+
+void AddRefIfMissing(std::vector<std::string>& refs, const std::string& ref) {
+    if (ref.empty())
+        return;
+    if (std::find(refs.begin(), refs.end(), ref) == refs.end())
+        refs.push_back(ref);
+}
+
+void RemoveRef(std::vector<std::string>& refs, const std::string& ref) {
+    if (ref.empty())
+        return;
+    refs.erase(std::remove(refs.begin(), refs.end(), ref), refs.end());
+}
+
+std::string RelationshipSemanticClaimId(const parser::AcpRecord& acp) {
+    if (acp.target_kind != kTargetKindRelationship)
+        return {};
+    if (acp.resolution_kind == "topGoalReference")
+        return acp.top_goal_id;
+    if (acp.resolution_kind == "text")
+        return acp.confidence_claim_id;
+    return {};
+}
+
+void SyncRelationshipMetaClaim(sacm::AssuranceCasePackage* package,
+                               const parser::AcpRecord& previous,
+                               const parser::AcpRecord& current) {
+    if (!package || current.target_kind != kTargetKindRelationship)
+        return;
+
+    const std::string previous_claim_id = RelationshipSemanticClaimId(previous);
+    if (previous.target_kind == kTargetKindRelationship && previous.target_id != current.target_id) {
+        SacmRelationshipRef previous_relationship = FindSacmRelationship(package, previous.target_id);
+        if (previous_relationship.relationship)
+            RemoveRef(previous_relationship.relationship->metaClaims, previous_claim_id);
+    }
+
+    SacmRelationshipRef relationship = FindSacmRelationship(package, current.target_id);
+    if (!relationship.relationship)
+        return;
+
+    const std::string current_claim_id = RelationshipSemanticClaimId(current);
+    if (previous.target_id == current.target_id && previous_claim_id != current_claim_id)
+        RemoveRef(relationship.relationship->metaClaims, previous_claim_id);
+    AddRefIfMissing(relationship.relationship->metaClaims, current_claim_id);
+}
+
+void ClearRelationshipMetaClaim(sacm::AssuranceCasePackage* package, const parser::AcpRecord& acp) {
+    if (!package || acp.target_kind != kTargetKindRelationship)
+        return;
+    SacmRelationshipRef relationship = FindSacmRelationship(package, acp.target_id);
+    if (!relationship.relationship)
+        return;
+    RemoveRef(relationship.relationship->metaClaims, RelationshipSemanticClaimId(acp));
+}
+
 bool ParserTargetExists(const parser::AssuranceCase& model,
                         const std::string& target_kind,
                         const std::string& target_id) {
@@ -89,6 +164,13 @@ bool ParserTargetExists(const parser::AssuranceCase& model,
 }
 
 const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model, const std::string& element_id) {
+    auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
+        return element.id == element_id;
+    });
+    return found == model.elements.end() ? nullptr : &*found;
+}
+
+parser::SacmElement* FindParserElement(parser::AssuranceCase& model, const std::string& element_id) {
     auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
         return element.id == element_id;
     });
@@ -117,10 +199,12 @@ std::string IneligibleTargetMessage(const std::string& target_kind) {
 parser::AcpRecord ToRecord(const Acp& acp) {
     parser::AcpRecord record;
     record.id = acp.id;
+    record.name = acp.name;
     record.target_kind = ToString(acp.target.kind);
     record.target_id = acp.target.target_id;
     record.resolution_kind = ToString(acp.resolution.kind);
     record.text = acp.resolution.text;
+    record.confidence_claim_id = acp.resolution.confidence_claim_id;
     record.argument_package_id = acp.resolution.argument_package_id;
     record.top_goal_id = acp.resolution.top_goal_id;
     return record;
@@ -129,13 +213,33 @@ parser::AcpRecord ToRecord(const Acp& acp) {
 Acp ToDomain(const parser::AcpRecord& record) {
     Acp acp;
     acp.id = record.id;
+    acp.name = record.name;
     acp.target.kind = AcpTargetKindFromString(record.target_kind);
     acp.target.target_id = record.target_id;
     acp.resolution.kind = AcpResolutionKindFromString(record.resolution_kind);
     acp.resolution.text = record.text;
+    acp.resolution.confidence_claim_id = record.confidence_claim_id;
     acp.resolution.argument_package_id = record.argument_package_id;
     acp.resolution.top_goal_id = record.top_goal_id;
     return acp;
+}
+
+parser::AcpRecord NormalizeResolutionFields(parser::AcpRecord record) {
+    const AcpResolutionKind kind = AcpResolutionKindFromString(record.resolution_kind);
+    record.resolution_kind = ToString(kind);
+    if (kind == AcpResolutionKind::None) {
+        record.text.clear();
+        record.confidence_claim_id.clear();
+        record.argument_package_id.clear();
+        record.top_goal_id.clear();
+    } else if (kind == AcpResolutionKind::Text) {
+        record.argument_package_id.clear();
+        record.top_goal_id.clear();
+    } else if (kind == AcpResolutionKind::TopGoalReference) {
+        record.text.clear();
+        record.confidence_claim_id.clear();
+    }
+    return record;
 }
 
 bool UpsertParserRecord(parser::AssuranceCase& model, const parser::AcpRecord& record) {
@@ -209,6 +313,75 @@ std::string TargetSummaryForDefaultClaim(const parser::AssuranceCase& model, con
     return acp.target_kind + " " + acp.target_id;
 }
 
+sacm::Claim* FindClaim(sacm::AssuranceCasePackage& package, const std::string& claim_id) {
+    if (claim_id.empty())
+        return nullptr;
+    for (sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        auto found = std::find_if(argument_package.claims.begin(),
+                                  argument_package.claims.end(),
+                                  [&](const sacm::Claim& claim) { return claim.id == claim_id; });
+        if (found != argument_package.claims.end())
+            return &*found;
+    }
+    return nullptr;
+}
+
+void UpdateTextConfidenceClaimFields(sacm::Claim& claim, const parser::AcpRecord& acp) {
+    const std::string claim_name = acp.name.empty() ? "Confidence argument for " + acp.id : acp.name;
+    claim.name = claim_name;
+    claim.name_ml.set("en", claim_name);
+    claim.content = acp.text;
+    claim.content_ml.set("en", acp.text);
+    claim.assertionDeclaration = "asserted";
+}
+
+void UpsertParserClaimProjection(parser::AssuranceCase& model, const sacm::Claim& claim) {
+    parser::SacmElement* existing = FindParserElement(model, claim.id);
+    if (!existing) {
+        parser::SacmElement element;
+        element.id = claim.id;
+        element.type = "claim";
+        existing = &model.elements.emplace_back(std::move(element));
+    }
+    existing->name = claim.name;
+    existing->content = claim.content;
+    existing->assertion_declaration = claim.assertionDeclaration;
+    existing->name_langs["en"] = claim.name;
+    existing->content_langs["en"] = claim.content;
+}
+
+parser::AcpRecord EnsureTextConfidenceClaim(parser::AssuranceCase& model,
+                                            sacm::AssuranceCasePackage* package,
+                                            parser::AcpRecord record) {
+    if (!package || record.resolution_kind != "text")
+        return record;
+
+    if (record.confidence_claim_id.empty())
+        record.confidence_claim_id = NextTopGoalId(model, *package);
+
+    sacm::Claim* claim = FindClaim(*package, record.confidence_claim_id);
+    if (!claim) {
+        sacm::ArgumentPackage argument_package;
+        argument_package.id = NextArgumentPackageId(*package);
+        argument_package.name = "Confidence argument for " + record.id;
+        argument_package.name_ml.set("en", argument_package.name);
+        SetConfidenceArgumentPackage(argument_package, true);
+
+        sacm::Claim generated_claim;
+        generated_claim.id = record.confidence_claim_id;
+        UpdateTextConfidenceClaimFields(generated_claim, record);
+        argument_package.claims.push_back(std::move(generated_claim));
+        package->argumentPackages.push_back(std::move(argument_package));
+        claim = FindClaim(*package, record.confidence_claim_id);
+    }
+
+    if (claim) {
+        UpdateTextConfidenceClaimFields(*claim, record);
+        UpsertParserClaimProjection(model, *claim);
+    }
+    return record;
+}
+
 } // namespace
 
 const parser::AcpRecord* FindAcp(const parser::AssuranceCase& model, const std::string& acp_id) {
@@ -244,6 +417,7 @@ AcpEditResult AddAcp(parser::AssuranceCase& model,
 
     Acp acp;
     acp.id = NextAcpId(CollectAcpsForIdGeneration(model, target.owning_package));
+    acp.name = acp.id;
     acp.target.kind = AcpTargetKindFromString(target_kind);
     acp.target.target_id = target_id;
     acp.resolution.kind = AcpResolutionKind::None;
@@ -272,8 +446,19 @@ UpsertAcp(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package, con
     if (!target.element)
         return ErrorResult(record.id, "ACP target was not found in the SACM package.");
 
-    UpsertAcpTags(*target.element, ToDomain(record));
-    UpsertParserRecord(model, record);
+    parser::AcpRecord previous;
+    if (const parser::AcpRecord* existing = FindAcp(model, record.id))
+        previous = *existing;
+    parser::AcpRecord normalized = NormalizeResolutionFields(record);
+    normalized = EnsureTextConfidenceClaim(model, package, normalized);
+
+    target = FindSacmTarget(package, normalized.target_kind, normalized.target_id);
+    if (!target.element)
+        return ErrorResult(record.id, "ACP target was not found in the SACM package.");
+
+    UpsertAcpTags(*target.element, ToDomain(normalized));
+    SyncRelationshipMetaClaim(package, previous, normalized);
+    UpsertParserRecord(model, normalized);
     return SuccessResult(record.id);
 }
 
@@ -287,6 +472,7 @@ AcpEditResult RemoveAcp(parser::AssuranceCase& model, sacm::AssuranceCasePackage
         return ErrorResult(acp_id, "ACP target was not found in the SACM package.");
 
     RemoveAcpTags(*target.element, acp_id);
+    ClearRelationshipMetaClaim(package, *existing);
     model.acps.erase(std::remove_if(model.acps.begin(),
                                     model.acps.end(),
                                     [&](const parser::AcpRecord& acp) { return acp.id == acp_id; }),
@@ -340,6 +526,7 @@ AcpEditResult CreateConfidenceArgumentTreeForAcp(parser::AssuranceCase& model,
     parser::AcpRecord updated = *acp;
     updated.resolution_kind = "topGoalReference";
     updated.text.clear();
+    updated.confidence_claim_id.clear();
     updated.argument_package_id = argument_package_id;
     updated.top_goal_id = top_goal_id;
 
