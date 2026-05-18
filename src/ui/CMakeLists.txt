@@ -9,7 +9,9 @@ add_library(af_ui OBJECT
     gsn/gsn_edge_renderer.cpp
     gsn/gsn_hit_tester.cpp
     gsn/gsn_layout.cpp
+    gsn/gsn_node_text.cpp
     gsn/gsn_shapes.cpp
+    gsn/gsn_terminology_card.cpp
     localization.cpp
     panels/acp_panel.cpp
     panels/confidence_panel.cpp
