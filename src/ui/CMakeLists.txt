@@ -6,6 +6,7 @@ add_library(af_ui OBJECT
     gsn/gsn_canvas.cpp
     gsn/gsn_canvas_renderer.cpp
     gsn/gsn_edge_renderer.cpp
+    gsn/gsn_hit_tester.cpp
     gsn/gsn_layout.cpp
     localization.cpp
     panels/acp_panel.cpp
