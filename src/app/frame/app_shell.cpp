@@ -76,7 +76,8 @@ void RenderAppSplitters(AppRuntimeState& state,
         const float min_problems_h = std::min(kMinProblemsPanelHeight, available_h * 0.5f);
         const float min_center_h = std::min(kMinCenterSectionHeight, available_h - min_problems_h);
         const float max_problems_h = std::max(min_problems_h, available_h - min_center_h);
-        state.layout.problems_panel_height = std::clamp(state.layout.problems_panel_height, min_problems_h, max_problems_h);
+        state.layout.problems_panel_height =
+            std::clamp(state.layout.problems_panel_height, min_problems_h, max_problems_h);
     };
 
     clamp_problems_height();
@@ -93,8 +94,8 @@ void RenderAppSplitters(AppRuntimeState& state,
 } // namespace
 
 void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center_view) {
-    if (!state.workbench.show_gsn_tab && !state.workbench.show_cse_tab && !state.workbench.show_evidence_tab && !state.workbench.show_package_details_tab &&
-        !state.workbench.show_terminology_package_tab) {
+    if (!state.workbench.show_gsn_tab && !state.workbench.show_cse_tab && !state.workbench.show_evidence_tab &&
+        !state.workbench.show_package_details_tab && !state.workbench.show_terminology_package_tab) {
         state.workbench.show_gsn_tab = true;
     }
 

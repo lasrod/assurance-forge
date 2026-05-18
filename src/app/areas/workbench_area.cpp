@@ -15,6 +15,8 @@
 #include "ui/theme.h"
 #include "ui/ui_state.h"
 
+#include "imgui_internal.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <functional>
@@ -259,7 +261,24 @@ void RenderWorkbenchArea(AppRuntimeState& state,
     ui::UiState& ui_state = ui::GetUiState();
     frame::NormalizeCenterViewSelection(state, ui_state.center_view);
 
-    if (ImGui::BeginTabBar("##center_tabs")) {
+    if (ImGui::BeginTabBar("##center_tabs", ImGuiTabBarFlags_AutoSelectNewTabs)) {
+        // If a package canvas tab activation was requested, explicitly queue focus to it.
+        // AutoSelectNewTabs handles the "tab just created" case; this handles the "tab already exists" case
+        // (Open Confidence Argument Tree on an ACP whose tree tab is already open).
+        if (state.workbench.force_center_tab_selection &&
+            !state.workbench.active_argument_package_canvas_key.empty()) {
+            const auto& tabs = state.workbench.argument_package_canvas_tabs;
+            auto it = std::find_if(tabs.begin(), tabs.end(), [&](const auto& t) {
+                return t.key == state.workbench.active_argument_package_canvas_key;
+            });
+            if (it != tabs.end()) {
+                const std::string target_label =
+                    it->title + "###argument_package_canvas_" + std::to_string(std::hash<std::string>{}(it->key));
+                if (ImGuiTabBar* tb = ImGui::GetCurrentTabBar())
+                    ImGui::TabBarQueueFocus(tb, target_label.c_str());
+            }
+        }
+
         if (state.workbench.show_gsn_tab && state.IsProposalCanvasActive()) {
             ImGuiTabItemFlags gsn_flags =
                 (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::GsnCanvas)
@@ -364,7 +383,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
         }
 
         ImGui::EndTabBar();
-        state.workbench.force_center_tab_selection = false;
+    state.workbench.force_center_tab_selection = false;
     }
 
     ImGui::End();
