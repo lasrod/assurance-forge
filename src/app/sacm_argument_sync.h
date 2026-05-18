@@ -1,8 +1,6 @@
 #pragma once
 
-namespace parser {
-struct AssuranceCase;
-}
+#include "core/sacm_model.h"
 
 namespace sacm {
 struct AssuranceCasePackage;

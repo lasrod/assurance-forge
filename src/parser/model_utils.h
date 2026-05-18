@@ -1,11 +1,10 @@
 #pragma once
 
+#include "core/sacm_model.h"
+
 #include <string>
 
 namespace parser {
-
-struct AssuranceCase;
-struct SacmElement;
 
 const SacmElement* FindElementById(const AssuranceCase& model, const std::string& id);
 SacmElement* FindElementById(AssuranceCase& model, const std::string& id);

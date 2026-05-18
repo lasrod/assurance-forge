@@ -2,7 +2,7 @@
 
 #include "core/assurance_tree.h"
 #include "core/tree_editing.h"
-#include "parser/xml_parser.h"
+#include "core/sacm_model.h"
 #include "ui/element_context_menu.h"
 #include "ui/ui_state.h"
 

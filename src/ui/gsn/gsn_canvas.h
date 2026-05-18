@@ -3,7 +3,7 @@
 #include "core/assurance_tree.h"
 #include "core/terminology_package_service.h"
 #include "imgui.h"
-#include "parser/xml_parser.h"
+#include "core/sacm_model.h"
 #include "ui/element_context_menu.h"
 #include "ui/gsn/gsn_model.h"
 #include "ui/ui_state.h"

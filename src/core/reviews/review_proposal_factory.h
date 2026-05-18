@@ -1,11 +1,8 @@
 #pragma once
 
-#include <string>
+#include "core/sacm_model.h"
 
-namespace parser {
-struct AssuranceCase;
-struct SacmElement;
-} // namespace parser
+#include <string>
 
 namespace core::reviews {
 

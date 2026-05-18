@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/assurance_tree.h"
-#include "parser/xml_parser.h"
+#include "core/sacm_model.h"
 #include "ui/element_context_menu.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_model.h"

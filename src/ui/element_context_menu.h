@@ -2,7 +2,7 @@
 
 #include "core/element_factory.h"
 #include "core/terminology_package_service.h"
-#include "parser/xml_parser.h"
+#include "core/sacm_model.h"
 
 #include <functional>
 #include <string>

@@ -2,6 +2,7 @@
 
 #include "core/problems/problem_item.h"
 #include "core/problems/problems_manager.h"
+#include "core/sacm_model.h"
 
 #include <string>
 
@@ -9,11 +10,6 @@ namespace core::confidence {
 struct ConfidenceAssessment;
 struct ConfidenceStore;
 } // namespace core::confidence
-
-namespace parser {
-struct AssuranceCase;
-struct SacmElement;
-} // namespace parser
 
 namespace app {
 
