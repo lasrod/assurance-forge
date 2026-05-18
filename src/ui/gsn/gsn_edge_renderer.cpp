@@ -11,12 +11,12 @@ namespace ui::gsn {
 namespace {
 
 // ===== Edge rendering constants =====
-constexpr float kArrowSize = 9.0f;          // arrowhead triangle side length
-constexpr float kArrowOutlineWidth = 1.5f;  // hollow arrowhead outline thickness
-constexpr float kSolidEdgeWidth = 2.2f;     // Group1 solid line thickness
-constexpr float kDashedEdgeWidth = 1.8f;    // Group2 dashed line thickness
-constexpr float kDashLength = 6.0f;         // dash on-length for dashed lines
-constexpr float kDashGap = 4.0f;            // dash off-length for dashed lines
+constexpr float kArrowSize = 9.0f;         // arrowhead triangle side length
+constexpr float kArrowOutlineWidth = 1.5f; // hollow arrowhead outline thickness
+constexpr float kSolidEdgeWidth = 2.2f;    // Group1 solid line thickness
+constexpr float kDashedEdgeWidth = 1.8f;   // Group2 dashed line thickness
+constexpr float kDashLength = 6.0f;        // dash on-length for dashed lines
+constexpr float kDashGap = 4.0f;           // dash off-length for dashed lines
 // kStubLength, kVerticalControlPct, kBezierSamples are declared in the header so
 // hit-testing code in the renderer can share them.
 

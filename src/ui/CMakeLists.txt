@@ -3,6 +3,7 @@ add_library(af_ui OBJECT
     element_context_menu.cpp
     gsn/gsn_adapter.cpp
     gsn/gsn_acp_decorator.cpp
+    gsn/gsn_badges.cpp
     gsn/gsn_canvas.cpp
     gsn/gsn_canvas_renderer.cpp
     gsn/gsn_edge_renderer.cpp

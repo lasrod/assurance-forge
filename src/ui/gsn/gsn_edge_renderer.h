@@ -26,12 +26,8 @@ inline constexpr int kBezierSamples = 64;          // arc-length sample count al
 ImVec2 EvalBezier(ImVec2 p0, ImVec2 p1, ImVec2 p2, ImVec2 p3, float t);
 
 // Compute screen-space endpoints for a Group1 (structural) edge.
-void ComputeGroup1Endpoints(const LayoutNode& parent,
-                            const LayoutNode& child,
-                            ImVec2 origin,
-                            float zoom,
-                            ImVec2& out_start,
-                            ImVec2& out_end);
+void ComputeGroup1Endpoints(
+    const LayoutNode& parent, const LayoutNode& child, ImVec2 origin, float zoom, ImVec2& out_start, ImVec2& out_end);
 
 // Compute screen-space endpoints for a Group2 (side-attached) edge.
 void ComputeGroup2Endpoints(const LayoutNode& parent,
@@ -42,39 +38,24 @@ void ComputeGroup2Endpoints(const LayoutNode& parent,
                             ImVec2& out_attachment_edge);
 
 // Compute an AABB (with padding) covering everything DrawGroup1Edge would draw.
-void ComputeGroup1EdgeBounds(ImVec2 parent_bottom,
-                             ImVec2 child_top,
-                             float zoom,
-                             ImVec2& out_min,
-                             ImVec2& out_max);
+void ComputeGroup1EdgeBounds(ImVec2 parent_bottom, ImVec2 child_top, float zoom, ImVec2& out_min, ImVec2& out_max);
 
 // Compute an AABB (with padding) covering everything DrawGroup2Edge would draw.
-void ComputeGroup2EdgeBounds(ImVec2 parent_side,
-                             ImVec2 attachment_edge,
-                             bool is_left_side,
-                             float zoom,
-                             ImVec2& out_min,
-                             ImVec2& out_max);
+void ComputeGroup2EdgeBounds(
+    ImVec2 parent_side, ImVec2 attachment_edge, bool is_left_side, float zoom, ImVec2& out_min, ImVec2& out_max);
 
 // Draw a Group1 structural edge between two node anchor points.
 void DrawGroup1Edge(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 child_top, float zoom);
 
 // Draw a Group2 contextual edge between a parent side and an attachment side.
-void DrawGroup2Edge(ImDrawList* draw_list,
-                    ImVec2 parent_side,
-                    ImVec2 attachment_edge,
-                    bool is_left_side,
-                    float zoom);
+void DrawGroup2Edge(ImDrawList* draw_list, ImVec2 parent_side, ImVec2 attachment_edge, bool is_left_side, float zoom);
 
 // Draw a thick, semi-transparent highlight along the Group1 edge path
 // (used to mark the currently-selected relationship).
 void DrawGroup1EdgeHighlight(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 child_top, float zoom);
 
 // Draw a thick, semi-transparent highlight along the Group2 edge path.
-void DrawGroup2EdgeHighlight(ImDrawList* draw_list,
-                             ImVec2 parent_side,
-                             ImVec2 attachment_edge,
-                             bool is_left_side,
-                             float zoom);
+void DrawGroup2EdgeHighlight(
+    ImDrawList* draw_list, ImVec2 parent_side, ImVec2 attachment_edge, bool is_left_side, float zoom);
 
 } // namespace ui::gsn
