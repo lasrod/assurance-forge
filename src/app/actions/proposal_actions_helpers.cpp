@@ -17,10 +17,6 @@
 
 namespace app::actions::detail {
 
-void SetStatus(AppRuntimeState& state, const std::string& message) {
-    state.events.Emit(StatusMessageEvent{message});
-}
-
 core::reviews::PatchOperationType CreateOperationFor(core::NewElementKind kind) {
     switch (kind) {
     case core::NewElementKind::Goal:

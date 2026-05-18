@@ -177,6 +177,19 @@ endfunction()
 
 add_subdirectory(src)
 
+# --- Layer-gate check ---
+# Standalone CMake script enforces src/ include-direction rules.
+# Runs at configure time so violations fail fast.
+include(${CMAKE_SOURCE_DIR}/cmake/check_layer_gates.cmake)
+add_custom_target(check_layer_gates ALL
+    COMMAND ${CMAKE_COMMAND}
+        -DAF_SOURCE_DIR=${CMAKE_SOURCE_DIR}/src
+        -P ${CMAKE_SOURCE_DIR}/cmake/check_layer_gates.cmake
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Checking src/ layer gates"
+    VERBATIM
+)
+
 # --- Main application ---
 # Source lists live in src/<layer>/CMakeLists.txt as OBJECT libraries.
 # main.cpp is compiled directly into the executable; everything else

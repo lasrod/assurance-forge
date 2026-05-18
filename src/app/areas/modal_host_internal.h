@@ -1,12 +1,17 @@
 #pragma once
 
 #include "app/areas/modal_host.h"
+#include "core/string_utils.h"
+#include "ui/imgui_buffer_utils.h"
 
 namespace app {
 struct AppRuntimeState;
 }
 
 namespace app::areas {
+
+using core::TrimWhitespace;
+using ui::CopyToBuffer;
 
 class ModalHost {
 public:

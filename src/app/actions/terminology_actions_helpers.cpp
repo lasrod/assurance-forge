@@ -20,10 +20,6 @@ namespace app::actions::detail {
 using core::TrimWhitespace;
 using ui::CopyToBuffer;
 
-void SetStatus(AppRuntimeState& state, const std::string& message) {
-    state.events.Emit(StatusMessageEvent{message});
-}
-
 std::string TerminologySuggestionKey(const std::string& element_id, const std::string& term_value) {
     return element_id + "\n" + term_value;
 }

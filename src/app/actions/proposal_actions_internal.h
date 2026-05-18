@@ -1,5 +1,7 @@
 #pragma once
 
+#include "app/app_events.h"
+#include "app/app_runtime_state.h"
 #include "core/element_factory.h"
 #include "core/reviews/review_proposal.h"
 #include "core/sacm_model.h"
@@ -12,10 +14,6 @@
 #include <unordered_set>
 #include <vector>
 
-namespace parser {
-struct AssuranceCase;
-}
-
 namespace app {
 struct AppRuntimeState;
 }
@@ -27,7 +25,9 @@ struct ElementTextTarget {
     std::string current_text;
 };
 
-void SetStatus(AppRuntimeState& state, const std::string& message);
+inline void SetStatus(AppRuntimeState& state, const std::string& message) {
+    state.events.Emit(StatusMessageEvent{message});
+}
 
 core::reviews::PatchOperationType CreateOperationFor(core::NewElementKind kind);
 bool IsContextLike(core::NewElementKind kind);

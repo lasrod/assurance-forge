@@ -1,5 +1,7 @@
 #pragma once
 
+#include "app/app_events.h"
+#include "app/app_runtime_state.h"
 #include "core/app_state.h"
 #include "core/sacm_model.h"
 #include "core/terminology_package_service.h"
@@ -14,7 +16,9 @@ struct AppRuntimeState;
 
 namespace actions::detail {
 
-void SetStatus(AppRuntimeState& state, const std::string& message);
+inline void SetStatus(AppRuntimeState& state, const std::string& message) {
+    state.events.Emit(StatusMessageEvent{message});
+}
 
 std::string TerminologySuggestionKey(const std::string& element_id, const std::string& term_value);
 
