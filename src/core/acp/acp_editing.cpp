@@ -228,7 +228,6 @@ parser::AcpRecord NormalizeResolutionFields(parser::AcpRecord record) {
     const AcpResolutionKind kind = AcpResolutionKindFromString(record.resolution_kind);
     record.resolution_kind = ToString(kind);
     if (kind == AcpResolutionKind::None) {
-        record.text.clear();
         record.confidence_claim_id.clear();
         record.argument_package_id.clear();
         record.top_goal_id.clear();
@@ -236,7 +235,6 @@ parser::AcpRecord NormalizeResolutionFields(parser::AcpRecord record) {
         record.argument_package_id.clear();
         record.top_goal_id.clear();
     } else if (kind == AcpResolutionKind::TopGoalReference) {
-        record.text.clear();
         record.confidence_claim_id.clear();
     }
     return record;
@@ -290,6 +288,24 @@ std::string NextArgumentPackageId(const sacm::AssuranceCasePackage& package) {
     return "AP" + std::to_string(max_number + 1);
 }
 
+bool ArgumentPackageIdExists(const sacm::AssuranceCasePackage& package, const std::string& id) {
+    return std::any_of(package.argumentPackages.begin(), package.argumentPackages.end(), [&](const auto& argument_package) {
+        return argument_package.id == id;
+    });
+}
+
+std::string NextAcpArgumentPackageId(const sacm::AssuranceCasePackage& package, const std::string& acp_id) {
+    const std::string prefix = acp_id.empty() ? "ACP_AP" : acp_id + "_AP";
+    if (!ArgumentPackageIdExists(package, prefix))
+        return prefix;
+    for (int index = 2; index < 100000; ++index) {
+        const std::string candidate = prefix + std::to_string(index);
+        if (!ArgumentPackageIdExists(package, candidate))
+            return candidate;
+    }
+    return prefix + "x";
+}
+
 std::string NextTopGoalId(const parser::AssuranceCase& model, const sacm::AssuranceCasePackage& package) {
     int max_number = 0;
     for (const parser::SacmElement& element : model.elements)
@@ -299,6 +315,36 @@ std::string NextTopGoalId(const parser::AssuranceCase& model, const sacm::Assura
             max_number = std::max(max_number, NumericSuffix(claim.id, "CC"));
     }
     return "CC" + std::to_string(max_number + 1);
+}
+
+std::string NextElementIdWithPrefix(const parser::AssuranceCase& model,
+                                    const sacm::AssuranceCasePackage& package,
+                                    const std::string& prefix) {
+    std::unordered_set<std::string> existing_ids;
+    for (const parser::SacmElement& element : model.elements) {
+        if (!element.id.empty())
+            existing_ids.insert(element.id);
+    }
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::Claim& claim : argument_package.claims)
+            existing_ids.insert(claim.id);
+        for (const sacm::ArgumentReasoning& reasoning : argument_package.argumentReasonings)
+            existing_ids.insert(reasoning.id);
+        for (const sacm::ArtifactReference& reference : argument_package.artifactReferences)
+            existing_ids.insert(reference.id);
+        for (const sacm::AssertedInference& inference : argument_package.assertedInferences)
+            existing_ids.insert(inference.id);
+        for (const sacm::AssertedContext& context : argument_package.assertedContexts)
+            existing_ids.insert(context.id);
+        for (const sacm::AssertedEvidence& evidence : argument_package.assertedEvidences)
+            existing_ids.insert(evidence.id);
+    }
+    for (int index = 1; index < 100000; ++index) {
+        const std::string candidate = prefix + std::to_string(index);
+        if (existing_ids.find(candidate) == existing_ids.end())
+            return candidate;
+    }
+    return prefix + "x";
 }
 
 std::string TargetSummaryForDefaultClaim(const parser::AssuranceCase& model, const parser::AcpRecord& acp) {
@@ -326,6 +372,15 @@ sacm::Claim* FindClaim(sacm::AssuranceCasePackage& package, const std::string& c
     return nullptr;
 }
 
+sacm::ArgumentPackage* PackageForTextConfidenceClaim(sacm::AssuranceCasePackage& package,
+                                                     const parser::AcpRecord& record) {
+    if (SacmTargetRef target = FindSacmTarget(&package, record.target_kind, record.target_id); target.owning_package)
+        return target.owning_package;
+    if (package.argumentPackages.empty())
+        package.argumentPackages.emplace_back();
+    return &package.argumentPackages.front();
+}
+
 void UpdateTextConfidenceClaimFields(sacm::Claim& claim, const parser::AcpRecord& acp) {
     const std::string claim_name = acp.name.empty() ? "Confidence argument for " + acp.id : acp.name;
     claim.name = claim_name;
@@ -333,6 +388,29 @@ void UpdateTextConfidenceClaimFields(sacm::Claim& claim, const parser::AcpRecord
     claim.content = acp.text;
     claim.content_ml.set("en", acp.text);
     claim.assertionDeclaration = "asserted";
+}
+
+void UpdateTreeConfidenceNames(sacm::AssuranceCasePackage* package, const parser::AcpRecord& acp) {
+    if (!package || acp.resolution_kind != "topGoalReference" || acp.argument_package_id.empty())
+        return;
+    auto package_found = std::find_if(package->argumentPackages.begin(),
+                                      package->argumentPackages.end(),
+                                      [&](const sacm::ArgumentPackage& argument_package) {
+                                          return argument_package.id == acp.argument_package_id;
+                                      });
+    if (package_found == package->argumentPackages.end())
+        return;
+
+    const std::string display_name = acp.name.empty() ? acp.id : acp.name;
+    const std::string native_name = acp.id + ": " + display_name;
+    package_found->name = native_name;
+    package_found->name_ml.set("en", native_name);
+
+    sacm::Claim* top_goal = FindClaim(*package, acp.top_goal_id);
+    if (top_goal) {
+        top_goal->name = native_name;
+        top_goal->name_ml.set("en", native_name);
+    }
 }
 
 void UpsertParserClaimProjection(parser::AssuranceCase& model, const sacm::Claim& claim) {
@@ -361,17 +439,11 @@ parser::AcpRecord EnsureTextConfidenceClaim(parser::AssuranceCase& model,
 
     sacm::Claim* claim = FindClaim(*package, record.confidence_claim_id);
     if (!claim) {
-        sacm::ArgumentPackage argument_package;
-        argument_package.id = NextArgumentPackageId(*package);
-        argument_package.name = "Confidence argument for " + record.id;
-        argument_package.name_ml.set("en", argument_package.name);
-        SetConfidenceArgumentPackage(argument_package, true);
-
+        sacm::ArgumentPackage* argument_package = PackageForTextConfidenceClaim(*package, record);
         sacm::Claim generated_claim;
         generated_claim.id = record.confidence_claim_id;
         UpdateTextConfidenceClaimFields(generated_claim, record);
-        argument_package.claims.push_back(std::move(generated_claim));
-        package->argumentPackages.push_back(std::move(argument_package));
+        argument_package->claims.push_back(std::move(generated_claim));
         claim = FindClaim(*package, record.confidence_claim_id);
     }
 
@@ -458,6 +530,7 @@ UpsertAcp(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package, con
 
     UpsertAcpTags(*target.element, ToDomain(normalized));
     SyncRelationshipMetaClaim(package, previous, normalized);
+    UpdateTreeConfidenceNames(package, normalized);
     UpsertParserRecord(model, normalized);
     return SuccessResult(record.id);
 }
@@ -491,10 +564,11 @@ AcpEditResult CreateConfidenceArgumentTreeForAcp(parser::AssuranceCase& model,
     if (acp->resolution_kind == "topGoalReference" && !acp->argument_package_id.empty() && !acp->top_goal_id.empty())
         return ErrorResult(acp_id, "ACP already links to a confidence argument tree.");
 
-    const std::string argument_package_id = NextArgumentPackageId(*package);
-    const std::string top_goal_id = NextTopGoalId(model, *package);
+    const std::string argument_package_id = NextAcpArgumentPackageId(*package, acp->id);
+    const std::string top_goal_id = NextElementIdWithPrefix(model, *package, acp->id + "_G");
     const std::string target_summary = TargetSummaryForDefaultClaim(model, *acp);
-    const std::string top_goal_name = "Confidence argument for " + acp->id;
+    const std::string acp_display_name = acp->name.empty() ? acp->id : acp->name;
+    const std::string top_goal_name = acp->id + ": " + acp_display_name;
     const std::string top_goal_content = "Confidence in " + target_summary + " is sufficient.";
 
     sacm::ArgumentPackage argument_package;
@@ -525,7 +599,6 @@ AcpEditResult CreateConfidenceArgumentTreeForAcp(parser::AssuranceCase& model,
 
     parser::AcpRecord updated = *acp;
     updated.resolution_kind = "topGoalReference";
-    updated.text.clear();
     updated.confidence_claim_id.clear();
     updated.argument_package_id = argument_package_id;
     updated.top_goal_id = top_goal_id;

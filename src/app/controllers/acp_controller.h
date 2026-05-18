@@ -27,6 +27,7 @@ public:
     bool CreateConfidenceArgumentTreeForAcp(parser::AssuranceCase& model,
                                             sacm::AssuranceCasePackage* package,
                                             const std::string& acp_id);
+    bool OpenConfidenceArgumentTreeForAcp(const parser::AssuranceCase& model, const std::string& acp_id);
 
 private:
     bool HandleResult(const char* action, const core::acp::AcpEditResult& result);

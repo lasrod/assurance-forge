@@ -44,6 +44,70 @@ static bool AcpRecordIsInstantiated(const parser::AcpRecord& acp) {
     return acp.resolution_kind == "text" || acp.resolution_kind == "topGoalReference";
 }
 
+static std::string AcpIncompleteReason(const parser::AcpRecord& acp) {
+    if (acp.resolution_kind == "text") {
+        if (acp.text.empty())
+            return "Text confidence argument is empty.";
+        if (acp.confidence_claim_id.empty())
+            return "Native text confidence claim is missing.";
+        return {};
+    }
+    if (acp.resolution_kind == "topGoalReference") {
+        if (acp.argument_package_id.empty() || acp.top_goal_id.empty())
+            return "Confidence argument tree is not linked.";
+        return {};
+    }
+    return "No confidence argument has been selected.";
+}
+
+static bool AcpRecordIsComplete(const parser::AcpRecord& acp) {
+    return AcpIncompleteReason(acp).empty();
+}
+
+static std::string AcpDisplayLabel(const parser::AcpRecord& acp) {
+    std::string label = acp.id;
+    const std::string name = acp.name.empty() ? acp.id : acp.name;
+    if (!name.empty() && name != acp.id) {
+        label += ": ";
+        label += name;
+    }
+    return label;
+}
+
+static const char* AcpModeDescription(const parser::AcpRecord& acp) {
+    if (acp.resolution_kind == "text")
+        return "Text confidence argument";
+    if (acp.resolution_kind == "topGoalReference")
+        return "Separate confidence argument tree";
+    return "Incomplete";
+}
+
+static ImU32 AcpFillColor(const parser::AcpRecord& acp) {
+    const Theme& theme = GetTheme();
+    if (!AcpRecordIsComplete(acp))
+        return theme.warning;
+    if (acp.resolution_kind == "topGoalReference")
+        return theme.accent;
+    return theme.success;
+}
+
+static void DrawAcpAlertBadge(ImDrawList* draw_list, ImVec2 box_min, ImVec2 box_max, float scale) {
+    const Theme& theme = GetTheme();
+    const float radius = 5.5f * scale;
+    const ImVec2 center(box_max.x - radius * 0.15f, box_min.y + radius * 0.15f);
+    draw_list->AddCircleFilled(center, radius, theme.warning);
+    draw_list->AddCircle(center, radius, theme.canvas_bg, 12, 1.2f * scale);
+    ImFont* font = ImGui::GetFont();
+    const float font_size = ImGui::GetFontSize() * 0.78f * scale;
+    const char* mark = "!";
+    const ImVec2 mark_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, mark);
+    draw_list->AddText(font,
+                       font_size,
+                       ImVec2(center.x - mark_size.x * 0.5f, center.y - mark_size.y * 0.58f),
+                       InkOn(theme.warning),
+                       mark);
+}
+
 static std::string EdgeKey(const std::string& parent_id, const std::string& child_id) {
     return parent_id + "\x1f" + child_id;
 }
@@ -94,35 +158,39 @@ static void DrawAcpRelationshipDecorator(ImDrawList* draw_list,
 
     const bool selected = std::any_of(
         acps.begin(), acps.end(), [&](const parser::AcpRecord& acp) { return acp.id == ui_state.selected_acp_id; });
-    const bool instantiated = std::any_of(
-        acps.begin(), acps.end(), [](const parser::AcpRecord& acp) { return AcpRecordIsInstantiated(acp); });
+    const parser::AcpRecord& display_acp = acps.front();
+    const bool complete = AcpRecordIsComplete(display_acp);
+    const std::string label = AcpDisplayLabel(display_acp);
 
     const Theme& theme = GetTheme();
     const float scale = DpiScale() * zoom;
-    const ImVec2 half_size(20.0f * scale, 11.0f * scale);
+    const ImVec2 half_size(8.0f * scale, 8.0f * scale);
     const float rounding = 2.0f * scale;
     const float hit_pad = 2.0f * scale;
-    const ImU32 fill = instantiated ? theme.success : theme.warning;
+    const ImU32 fill = AcpFillColor(display_acp);
     const ImU32 outline = selected ? theme.accent : theme.border_strong;
+    ImFont* font = ImGui::GetFont();
+    const float font_size = ImGui::GetFontSize() * zoom;
+    const ImVec2 text_size = zoom >= 0.45f ? font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, label.c_str()) : ImVec2(0, 0);
 
     const ImVec2 box_min(center.x - half_size.x, center.y - half_size.y);
     const ImVec2 box_max(center.x + half_size.x, center.y + half_size.y);
     draw_list->AddRectFilled(box_min, box_max, fill, rounding);
     draw_list->AddRect(box_min, box_max, outline, rounding, 0, selected ? 2.4f * scale : 1.4f * scale);
+    if (!complete)
+        DrawAcpAlertBadge(draw_list, box_min, box_max, scale);
 
-    if (zoom >= 0.6f && !acps.front().id.empty()) {
-        const std::string label = acps.front().id;
-        ImFont* font = ImGui::GetFont();
-        const float font_size = ImGui::GetFontSize() * zoom;
-        const ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, label.c_str());
-        const ImVec2 text_pos(center.x - text_size.x * 0.5f, center.y - text_size.y * 0.5f);
-        draw_list->AddText(font, font_size, text_pos, InkOn(fill), label.c_str());
+    if (zoom >= 0.45f && !label.empty()) {
+        const ImVec2 text_pos(box_max.x + 6.0f * scale, center.y - text_size.y * 0.5f);
+        draw_list->AddText(font, font_size, text_pos, theme.text_primary, label.c_str());
     }
 
     ImGui::SetCursorScreenPos(ImVec2(box_min.x - hit_pad, box_min.y - hit_pad));
     ImGui::SetNextItemAllowOverlap();
     const std::string widget_id = "ACP##" + target.relationship_id + "##" + target.parent_id + "##" + target.child_id;
-    ImGui::InvisibleButton(widget_id.c_str(), ImVec2((half_size.x + hit_pad) * 2.0f, (half_size.y + hit_pad) * 2.0f));
+    ImGui::InvisibleButton(widget_id.c_str(),
+                           ImVec2((half_size.x + hit_pad) * 2.0f + text_size.x + 8.0f * scale,
+                                  (half_size.y + hit_pad) * 2.0f));
     if (ImGui::IsItemClicked()) {
         ui_state.selected_acp_id = acps.front().id;
         ui_state.selected_element_id.clear();
@@ -151,7 +219,11 @@ static void DrawAcpRelationshipDecorator(ImDrawList* draw_list,
         ImGui::Text("Target: %s", target.summary.c_str());
         ImGui::Text("SACM relationship: %s", target.relationship_id.c_str());
         for (const parser::AcpRecord& acp : acps) {
-            ImGui::Text("%s: %s", acp.id.c_str(), AcpRecordIsInstantiated(acp) ? "instantiated" : "uninstantiated");
+            ImGui::Text("%s", AcpDisplayLabel(acp).c_str());
+            ImGui::TextDisabled("%s", AcpModeDescription(acp));
+            const std::string reason = AcpIncompleteReason(acp);
+            if (!reason.empty())
+                ImGui::TextDisabled("%s", reason.c_str());
         }
         ImGui::EndTooltip();
     }
@@ -170,37 +242,41 @@ static void DrawAcpElementDecorator(ImDrawList* draw_list,
 
     const bool selected = std::any_of(
         acps.begin(), acps.end(), [&](const parser::AcpRecord& acp) { return acp.id == ui_state.selected_acp_id; });
-    const bool instantiated = std::any_of(
-        acps.begin(), acps.end(), [](const parser::AcpRecord& acp) { return AcpRecordIsInstantiated(acp); });
+    const parser::AcpRecord& display_acp = acps.front();
+    const bool complete = AcpRecordIsComplete(display_acp);
+    const std::string label = AcpDisplayLabel(display_acp);
 
     const Theme& theme = GetTheme();
     const float scale = DpiScale() * zoom;
-    const ImVec2 half_size(20.0f * scale, 11.0f * scale);
+    const ImVec2 half_size(8.0f * scale, 8.0f * scale);
     const float gap = 4.0f * scale;
     const float rounding = 2.0f * scale;
     const float hit_pad = 2.0f * scale;
     const ImVec2 center((node_min.x + node_max.x) * 0.5f, node_max.y + gap + half_size.y);
     const ImVec2 box_min(center.x - half_size.x, center.y - half_size.y);
     const ImVec2 box_max(center.x + half_size.x, center.y + half_size.y);
-    const ImU32 fill = instantiated ? theme.success : theme.warning;
+    const ImU32 fill = AcpFillColor(display_acp);
     const ImU32 outline = selected ? theme.accent : theme.border_strong;
+    ImFont* font = ImGui::GetFont();
+    const float font_size = ImGui::GetFontSize() * zoom;
+    const ImVec2 text_size = zoom >= 0.45f ? font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, label.c_str()) : ImVec2(0, 0);
 
     draw_list->AddRectFilled(box_min, box_max, fill, rounding);
     draw_list->AddRect(box_min, box_max, outline, rounding, 0, selected ? 2.4f * scale : 1.4f * scale);
+    if (!complete)
+        DrawAcpAlertBadge(draw_list, box_min, box_max, scale);
 
-    if (zoom >= 0.6f && !acps.front().id.empty()) {
-        const std::string label = acps.front().id;
-        ImFont* font = ImGui::GetFont();
-        const float font_size = ImGui::GetFontSize() * zoom;
-        const ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, label.c_str());
-        const ImVec2 text_pos(center.x - text_size.x * 0.5f, center.y - text_size.y * 0.5f);
-        draw_list->AddText(font, font_size, text_pos, InkOn(fill), label.c_str());
+    if (zoom >= 0.45f && !label.empty()) {
+        const ImVec2 text_pos(box_max.x + 6.0f * scale, center.y - text_size.y * 0.5f);
+        draw_list->AddText(font, font_size, text_pos, theme.text_primary, label.c_str());
     }
 
     ImGui::SetCursorScreenPos(ImVec2(box_min.x - hit_pad, box_min.y - hit_pad));
     ImGui::SetNextItemAllowOverlap();
     const std::string widget_id = "ACP element##" + node.id;
-    ImGui::InvisibleButton(widget_id.c_str(), ImVec2((half_size.x + hit_pad) * 2.0f, (half_size.y + hit_pad) * 2.0f));
+    ImGui::InvisibleButton(widget_id.c_str(),
+                           ImVec2((half_size.x + hit_pad) * 2.0f + text_size.x + 8.0f * scale,
+                                  (half_size.y + hit_pad) * 2.0f));
     if (ImGui::IsItemClicked()) {
         ui_state.selected_acp_id = acps.front().id;
         ui_state.selected_element_id.clear();
@@ -226,7 +302,11 @@ static void DrawAcpElementDecorator(ImDrawList* draw_list,
         ImGui::Separator();
         ImGui::Text("Target element: %s", node.id.c_str());
         for (const parser::AcpRecord& acp : acps) {
-            ImGui::Text("%s: %s", acp.id.c_str(), AcpRecordIsInstantiated(acp) ? "instantiated" : "uninstantiated");
+            ImGui::Text("%s", AcpDisplayLabel(acp).c_str());
+            ImGui::TextDisabled("%s", AcpModeDescription(acp));
+            const std::string reason = AcpIncompleteReason(acp);
+            if (!reason.empty())
+                ImGui::TextDisabled("%s", reason.c_str());
         }
         ImGui::EndTooltip();
     }

@@ -1,4 +1,5 @@
 #include "core/assurance_tree.h"
+#include "core/acp/assurance_claim_point.h"
 #include "core/element_factory.h"
 #include "core/terminology_package_service.h"
 #include "parser/xml_parser.h"
@@ -114,6 +115,38 @@ TEST(ElementFactoryAdd, AddContextCreatesArtifactReferenceAndAssertedContext) {
     ASSERT_EQ(tree.root->group2_attachments.size(), 1u);
     EXPECT_EQ(tree.root->group2_attachments.front()->id, context_id);
     EXPECT_EQ(tree.root->group2_attachments.front()->role, core::NodeRole::Context);
+}
+
+TEST(ElementFactoryAdd, UsesAcpPackagePrefixInsideConfidenceArgumentPackage) {
+    parser::AssuranceCase ac;
+    parser::SacmElement top_goal;
+    top_goal.id = "ACP1_G1";
+    top_goal.type = "claim";
+    ac.elements.push_back(top_goal);
+
+    sacm::AssuranceCasePackage pkg;
+    sacm::ArgumentPackage confidence_package;
+    confidence_package.id = "ACP1_AP";
+    core::acp::SetConfidenceArgumentPackage(confidence_package, true);
+    sacm::Claim top_claim;
+    top_claim.id = "ACP1_G1";
+    confidence_package.claims.push_back(top_claim);
+    pkg.argumentPackages.push_back(confidence_package);
+
+    std::string child_id;
+    std::string err;
+    ASSERT_TRUE(core::AddChildElement(ac, &pkg, "ACP1_G1", core::NewElementKind::Goal, child_id, err)) << err;
+    EXPECT_EQ(child_id, "ACP1_G2");
+    EXPECT_TRUE(ParserHasId(ac, "ACP1_G2"));
+    EXPECT_TRUE(ParserHasId(ac, "ACP1_R1"));
+    ASSERT_EQ(pkg.argumentPackages.size(), 1u);
+    ASSERT_EQ(pkg.argumentPackages.front().assertedInferences.size(), 1u);
+    EXPECT_EQ(pkg.argumentPackages.front().assertedInferences.front().id, "ACP1_R1");
+
+    std::string context_id;
+    ASSERT_TRUE(core::AddChildElement(ac, &pkg, "ACP1_G1", core::NewElementKind::Context, context_id, err)) << err;
+    EXPECT_EQ(context_id, "ACP1_C1");
+    EXPECT_TRUE(ParserHasId(ac, "ACP1_R2"));
 }
 
 TEST(ElementFactoryRemove, RemoveLeafElement) {

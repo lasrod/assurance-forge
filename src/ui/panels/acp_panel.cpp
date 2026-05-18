@@ -32,6 +32,27 @@ bool IsInstantiated(const parser::AcpRecord& acp) {
     return acp.resolution_kind == "text" || acp.resolution_kind == "topGoalReference";
 }
 
+bool IsComplete(const parser::AcpRecord& acp) {
+    if (acp.resolution_kind == "text")
+        return !acp.text.empty() && !acp.confidence_claim_id.empty();
+    if (acp.resolution_kind == "topGoalReference")
+        return !acp.argument_package_id.empty() && !acp.top_goal_id.empty();
+    return false;
+}
+
+const char* ResolutionLabel(const parser::AcpRecord& acp) {
+    if (acp.resolution_kind == "text")
+        return "Text confidence argument";
+    if (acp.resolution_kind == "topGoalReference")
+        return "Separate confidence argument tree";
+    return "Incomplete";
+}
+
+void UpsertIfAvailable(const AcpPanelCallbacks* callbacks, const parser::AcpRecord& acp, bool& modified) {
+    if (callbacks && callbacks->upsert_acp)
+        modified = callbacks->upsert_acp(acp) || modified;
+}
+
 std::string DisplayType(const parser::SacmElement& element) {
     if (element.type == "claim") {
         if (element.assertion_declaration == "assumed")
@@ -104,24 +125,51 @@ bool ShowAcpPanel(parser::AssuranceCase* model, const AcpPanelCallbacks* callbac
 
     ImGui::PushID(edited.id.c_str());
     MetadataRow("ID:", edited.id);
+    ImGui::SetNextItemWidth(-1.0f);
+    if (ImGui::InputText("Name", &edited.name))
+        UpsertIfAvailable(callbacks, edited, modified);
     MetadataRow("Target:", TargetSummary(*model, edited));
-    MetadataRow("State:", IsInstantiated(edited) ? "Instantiated" : "Uninstantiated");
-    MetadataRow("Resolution:", edited.resolution_kind.empty() ? "none" : edited.resolution_kind);
+    MetadataRow("State:", IsComplete(edited) ? "Complete" : "Incomplete");
+    MetadataRow("Resolution:", ResolutionLabel(edited));
 
     ImGui::Spacing();
-    ImGui::TextUnformatted("Text confidence argument");
+    ImGui::TextUnformatted("Resolution mode");
     ImGui::Separator();
-    ImGui::SetNextItemWidth(-1);
-    if (ImGui::InputTextMultiline("##acp_text",
-                                  &edited.text,
-                                  ImVec2(-1.0f, ImGui::GetTextLineHeight() * 7.0f),
-                                  ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_NoHorizontalScroll |
-                                      ImGuiInputTextFlags_WordWrap)) {
-        edited.resolution_kind = edited.text.empty() ? "none" : "text";
+    if (ImGui::RadioButton("Incomplete", edited.resolution_kind != "text" && edited.resolution_kind != "topGoalReference")) {
+        edited.resolution_kind = "none";
+        edited.confidence_claim_id.clear();
         edited.argument_package_id.clear();
         edited.top_goal_id.clear();
-        if (callbacks && callbacks->upsert_acp)
-            modified = callbacks->upsert_acp(edited) || modified;
+        UpsertIfAvailable(callbacks, edited, modified);
+    }
+    if (ImGui::RadioButton("Text confidence argument", edited.resolution_kind == "text")) {
+        edited.resolution_kind = "text";
+        edited.argument_package_id.clear();
+        edited.top_goal_id.clear();
+        UpsertIfAvailable(callbacks, edited, modified);
+    }
+    if (ImGui::RadioButton("Separate confidence argument tree", edited.resolution_kind == "topGoalReference")) {
+        edited.resolution_kind = "topGoalReference";
+        edited.confidence_claim_id.clear();
+        UpsertIfAvailable(callbacks, edited, modified);
+    }
+
+    if (edited.resolution_kind == "text") {
+        ImGui::Spacing();
+        ImGui::TextUnformatted("Text confidence argument");
+        ImGui::Separator();
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::InputTextMultiline("##acp_text",
+                                      &edited.text,
+                                      ImVec2(-1.0f, ImGui::GetTextLineHeight() * 7.0f),
+                                      ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_NoHorizontalScroll |
+                                          ImGuiInputTextFlags_WordWrap)) {
+            edited.argument_package_id.clear();
+            edited.top_goal_id.clear();
+            UpsertIfAvailable(callbacks, edited, modified);
+        }
+        if (!edited.confidence_claim_id.empty())
+            MetadataRow("Native claim:", edited.confidence_claim_id);
     }
 
     if (edited.resolution_kind == "topGoalReference") {
@@ -131,19 +179,27 @@ bool ShowAcpPanel(parser::AssuranceCase* model, const AcpPanelCallbacks* callbac
     }
 
     ImGui::Spacing();
-    const bool already_linked = edited.resolution_kind == "topGoalReference" && !edited.argument_package_id.empty() &&
-                                !edited.top_goal_id.empty();
-    if (already_linked)
-        ImGui::BeginDisabled();
-    if (ImGui::Button("Create confidence argument tree")) {
-        if (callbacks && callbacks->create_confidence_argument_tree)
-            modified = callbacks->create_confidence_argument_tree(edited.id) || modified;
-    }
-    if (already_linked)
-        ImGui::EndDisabled();
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip(already_linked ? "This ACP already links to a confidence argument tree."
-                                         : "Create a normal SACM argument package and link this ACP to its top goal.");
+    if (edited.resolution_kind == "topGoalReference") {
+        const bool already_linked = !edited.argument_package_id.empty() && !edited.top_goal_id.empty();
+        if (already_linked)
+            ImGui::BeginDisabled();
+        if (ImGui::Button("Create confidence argument tree")) {
+            if (callbacks && callbacks->create_confidence_argument_tree)
+                modified = callbacks->create_confidence_argument_tree(edited.id) || modified;
+        }
+        if (already_linked)
+            ImGui::EndDisabled();
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(already_linked ? "This ACP already links to a confidence argument tree."
+                                             : "Create a normal SACM argument package and link this ACP to its top goal.");
+        }
+        if (already_linked) {
+            ImGui::SameLine();
+            if (ImGui::Button("Open confidence argument tree")) {
+                if (callbacks && callbacks->open_confidence_argument_tree)
+                    modified = callbacks->open_confidence_argument_tree(edited.id) || modified;
+            }
+        }
     }
 
     ImGui::Spacing();

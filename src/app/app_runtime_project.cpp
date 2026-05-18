@@ -15,6 +15,7 @@
 #include "imgui.h"
 #include "parser/model_utils.h"
 #include "sacm/sacm_package_tree.h"
+#include "sacm/sacm_serializer.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/ui_state.h"
@@ -48,6 +49,16 @@ bool IsLoadedProjectSacmFile(const core::AppState& app_state, const core::Projec
     if (entry.role != core::ProjectFileRole::SacmArgument || app_state.loaded_file_path.empty())
         return false;
     return app_state.loaded_file_path == ProjectFilePath(app_state, entry);
+}
+
+sacm::SacmPackageTreeResult BuildLoadedSacmPackageTree(const core::AppState& app_state,
+                                                       const core::AssuranceProject& project,
+                                                       const core::ProjectFileEntry& entry) {
+    sacm::SacmPackageTreeResult result = sacm::build_sacm_package_tree_from_string(
+        sacm::serialize_sacm(app_state.sacm_package.value()), entry.relativePath.filename().generic_string());
+    result.source_path = project.rootPath / entry.relativePath;
+    result.root.id = result.source_path.generic_string();
+    return result;
 }
 
 std::string ArgumentPackageCanvasKey(const std::filesystem::path& source_file_path,
@@ -640,6 +651,11 @@ void AppRuntime::RefreshSacmPackageTreeCache() {
         live_paths.insert(relative);
         if (impl_->sacm_package_tree_cache.find(relative) != impl_->sacm_package_tree_cache.end())
             continue;
+        if (IsLoadedProjectSacmFile(impl_->app_state, entry) && impl_->app_state.sacm_package.has_value()) {
+            impl_->sacm_package_tree_cache[relative] =
+                BuildLoadedSacmPackageTree(impl_->app_state, project, entry);
+            continue;
+        }
         impl_->sacm_package_tree_cache[relative] = sacm::build_sacm_package_tree(project.rootPath / entry.relativePath);
     }
 

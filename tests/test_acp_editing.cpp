@@ -106,12 +106,13 @@ TEST(AcpEditingTest, AddsUpdatesAndRemovesRelationshipAcpInParserAndSacm) {
     EXPECT_EQ(sacm_acps[0].resolution.text, edited.text);
     EXPECT_EQ(sacm_acps[0].resolution.confidence_claim_id, "CC1");
 
-    ASSERT_EQ(fixture.package.argumentPackages.size(), 2u);
-    const sacm::ArgumentPackage& confidence_package = fixture.package.argumentPackages.back();
-    EXPECT_TRUE(core::acp::IsConfidenceArgumentPackage(confidence_package));
-    ASSERT_EQ(confidence_package.claims.size(), 1u);
-    EXPECT_EQ(confidence_package.claims.front().id, "CC1");
-    EXPECT_EQ(confidence_package.claims.front().content, edited.text);
+    ASSERT_EQ(fixture.package.argumentPackages.size(), 1u);
+    const sacm::ArgumentPackage& main_package = fixture.package.argumentPackages.front();
+    auto text_claim = std::find_if(main_package.claims.begin(), main_package.claims.end(), [](const sacm::Claim& claim) {
+        return claim.id == "CC1";
+    });
+    ASSERT_NE(text_claim, main_package.claims.end());
+    EXPECT_EQ(text_claim->content, edited.text);
     const sacm::AssertedInference& updated_inference = fixture.package.argumentPackages.front().assertedInferences.front();
     ASSERT_EQ(updated_inference.metaClaims.size(), 1u);
     EXPECT_EQ(updated_inference.metaClaims.front(), "CC1");
@@ -209,39 +210,71 @@ TEST(AcpEditingTest, CreatesConfidenceArgumentTreeForAcpAndLinksTopGoal) {
     core::acp::AcpEditResult created =
         core::acp::CreateConfidenceArgumentTreeForAcp(fixture.model, &fixture.package, added.acp_id);
     ASSERT_TRUE(created.changed) << created.error;
-    EXPECT_EQ(created.argument_package_id, "AP2");
-    EXPECT_EQ(created.top_goal_id, "CC1");
+    EXPECT_EQ(created.argument_package_id, "ACP1_AP");
+    EXPECT_EQ(created.top_goal_id, "ACP1_G1");
 
     ASSERT_EQ(fixture.package.argumentPackages.size(), 2u);
     const sacm::ArgumentPackage& confidence_package = fixture.package.argumentPackages.back();
     EXPECT_TRUE(core::acp::IsConfidenceArgumentPackage(confidence_package));
     ASSERT_EQ(confidence_package.claims.size(), 1u);
-    EXPECT_EQ(confidence_package.claims.front().id, "CC1");
+    EXPECT_EQ(confidence_package.id, "ACP1_AP");
+    EXPECT_EQ(confidence_package.claims.front().id, "ACP1_G1");
     EXPECT_NE(confidence_package.claims.front().content.find("Confidence in"), std::string::npos);
 
     const parser::AcpRecord* acp = core::acp::FindAcp(fixture.model, added.acp_id);
     ASSERT_NE(acp, nullptr);
     EXPECT_EQ(acp->resolution_kind, "topGoalReference");
-    EXPECT_EQ(acp->argument_package_id, "AP2");
-    EXPECT_EQ(acp->top_goal_id, "CC1");
+    EXPECT_EQ(acp->argument_package_id, "ACP1_AP");
+    EXPECT_EQ(acp->top_goal_id, "ACP1_G1");
 
     const sacm::AssertedInference& inference = fixture.package.argumentPackages.front().assertedInferences.front();
     ASSERT_EQ(inference.metaClaims.size(), 1u);
-    EXPECT_EQ(inference.metaClaims.front(), "CC1");
+    EXPECT_EQ(inference.metaClaims.front(), "ACP1_G1");
 
     auto parser_top_goal =
         std::find_if(fixture.model.elements.begin(), fixture.model.elements.end(), [](const auto& element) {
-            return element.id == "CC1" && element.type == "claim";
+            return element.id == "ACP1_G1" && element.type == "claim";
         });
     EXPECT_NE(parser_top_goal, fixture.model.elements.end());
 
     const std::vector<core::acp::Acp> sacm_acps = core::acp::CollectAcps(fixture.package);
     ASSERT_EQ(sacm_acps.size(), 1u);
     EXPECT_EQ(sacm_acps.front().resolution.kind, core::acp::AcpResolutionKind::TopGoalReference);
-    EXPECT_EQ(sacm_acps.front().resolution.argument_package_id, "AP2");
-    EXPECT_EQ(sacm_acps.front().resolution.top_goal_id, "CC1");
+    EXPECT_EQ(sacm_acps.front().resolution.argument_package_id, "ACP1_AP");
+    EXPECT_EQ(sacm_acps.front().resolution.top_goal_id, "ACP1_G1");
 
     const core::acp::AcpEditResult removed = core::acp::RemoveAcp(fixture.model, &fixture.package, added.acp_id);
     ASSERT_TRUE(removed.changed) << removed.error;
     EXPECT_TRUE(fixture.package.argumentPackages.front().assertedInferences.front().metaClaims.empty());
+}
+
+TEST(AcpEditingTest, PreservesDraftTextWhenCreatingConfidenceArgumentTree) {
+    AcpEditingFixture fixture;
+    core::acp::AcpEditResult added = core::acp::AddAcp(fixture.model, &fixture.package, "relationship", "R1");
+    ASSERT_TRUE(added.changed) << added.error;
+
+    parser::AcpRecord drafted = fixture.model.acps.front();
+    drafted.resolution_kind = "text";
+    drafted.text = "Draft confidence rationale that should survive mode changes.";
+    drafted.confidence_claim_id = "CC1";
+    core::acp::AcpEditResult drafted_result = core::acp::UpsertAcp(fixture.model, &fixture.package, drafted);
+    ASSERT_TRUE(drafted_result.changed) << drafted_result.error;
+
+    core::acp::AcpEditResult created =
+        core::acp::CreateConfidenceArgumentTreeForAcp(fixture.model, &fixture.package, added.acp_id);
+    ASSERT_TRUE(created.changed) << created.error;
+
+    const parser::AcpRecord* acp = core::acp::FindAcp(fixture.model, added.acp_id);
+    ASSERT_NE(acp, nullptr);
+    EXPECT_EQ(acp->resolution_kind, "topGoalReference");
+    EXPECT_EQ(acp->text, drafted.text);
+    EXPECT_TRUE(acp->confidence_claim_id.empty());
+    EXPECT_EQ(acp->argument_package_id, "ACP1_AP");
+    EXPECT_EQ(acp->top_goal_id, "ACP1_G1");
+
+    const std::vector<core::acp::Acp> sacm_acps = core::acp::CollectAcps(fixture.package);
+    ASSERT_EQ(sacm_acps.size(), 1u);
+    EXPECT_EQ(sacm_acps.front().resolution.kind, core::acp::AcpResolutionKind::TopGoalReference);
+    EXPECT_EQ(sacm_acps.front().resolution.text, drafted.text);
+    EXPECT_TRUE(sacm_acps.front().resolution.confidence_claim_id.empty());
 }
