@@ -1,0 +1,28 @@
+add_library(af_ui OBJECT
+    confidence_model.cpp
+    element_context_menu.cpp
+    gsn/gsn_adapter.cpp
+    gsn/gsn_canvas.cpp
+    gsn/gsn_canvas_renderer.cpp
+    gsn/gsn_layout.cpp
+    localization.cpp
+    panels/acp_panel.cpp
+    panels/confidence_panel.cpp
+    panels/element_panel.cpp
+    panels/package_details_panel.cpp
+    panels/preferences_panel.cpp
+    panels/problems_panel.cpp
+    panels/project_explorer_panel.cpp
+    panels/relationship_panel.cpp
+    panels/review_panel.cpp
+    panels/sacm_viewer_panel.cpp
+    panels/terminology_package_panel.cpp
+    panels/terminology_usages_panel.cpp
+    panels/welcome_modal.cpp
+    register_views.cpp
+    theme.cpp
+    tree_view.cpp
+    ui_state.cpp
+    widgets/splitter.cpp
+)
+target_link_libraries(af_ui PUBLIC af_common hello_imgui)

@@ -98,7 +98,7 @@ ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
     return actions;
 }
 
-AppRuntime::AppRuntime() : impl_(new AppRuntimeState()) {
+AppRuntime::AppRuntime() : impl_(std::make_unique<AppRuntimeState>()) {
     RegisterAppEventListeners();
 
     impl_->current_tree = core::AssuranceTree();
@@ -115,9 +115,7 @@ AppRuntime::AppRuntime() : impl_(new AppRuntimeState()) {
     ui_state.selected_problem_element_id.clear();
 }
 
-AppRuntime::~AppRuntime() {
-    delete impl_;
-}
+AppRuntime::~AppRuntime() = default;
 
 void AppRuntime::RegisterAppEventListeners() {
     impl_->events.Subscribe<StatusMessageEvent>(

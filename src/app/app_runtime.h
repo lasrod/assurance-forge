@@ -10,6 +10,7 @@
 #include "sacm/sacm_package_tree.h"
 
 #include <cstddef>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -174,7 +175,7 @@ private:
     void PollAiReviewTask();
 
 private:
-    AppRuntimeState* impl_ = nullptr;
+    std::unique_ptr<AppRuntimeState> impl_;
 };
 
 } // namespace app

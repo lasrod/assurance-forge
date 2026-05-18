@@ -1,0 +1,47 @@
+# Note: src/app/main.cpp is intentionally excluded — it is compiled
+# directly into the executable target via hello_imgui_add_app().
+add_library(af_app OBJECT
+    acp_problem_sync.cpp
+    actions/ai_review_actions.cpp
+    actions/element_actions.cpp
+    actions/proposal_actions.cpp
+    actions/review_actions.cpp
+    actions/terminology_actions.cpp
+    app_runtime.cpp
+    app_runtime_ai.cpp
+    app_runtime_project.cpp
+    app_runtime_state.cpp
+    app_ui_bootstrap.cpp
+    areas/ai_debug_area.cpp
+    areas/argument_navigator_area.cpp
+    areas/feedback_dock_area.cpp
+    areas/inspector_area.cpp
+    areas/modal_host.cpp
+    areas/problems_area.cpp
+    areas/project_explorer_area.cpp
+    areas/proposal_editor_area.cpp
+    areas/review_panel_area.cpp
+    areas/term_usages_area.cpp
+    areas/workbench_area.cpp
+    confidence_problem_sync.cpp
+    controllers/acp_controller.cpp
+    controllers/ai_review_controller.cpp
+    controllers/confidence_controller.cpp
+    controllers/element_edit_controller.cpp
+    controllers/modal_coordinator.cpp
+    controllers/project_controller.cpp
+    controllers/proposal_controller.cpp
+    controllers/review_controller.cpp
+    frame/app_layout_regions.cpp
+    frame/app_menu_bar.cpp
+    frame/app_shell.cpp
+    guideline_catalog.cpp
+    native_file_dialogs.cpp
+    project_workflow.cpp
+    proposal_ui_state.cpp
+    recent_projects.cpp
+    review_problem_sync.cpp
+    sacm_argument_sync.cpp
+    terminology_problem_sync.cpp
+)
+target_link_libraries(af_app PUBLIC af_common hello_imgui)
