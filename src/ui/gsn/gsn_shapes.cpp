@@ -167,11 +167,8 @@ void DrawRoundedRect(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right
     draw_list->AddRect(top_left, bottom_right, OutlineColor(), rounding, 0, outline);
 }
 
-void DrawUndevelopedMarker(ImDrawList* draw_list,
-                           const GsnNode& node,
-                           ImVec2 top_left,
-                           ImVec2 bottom_right,
-                           float zoom) {
+void DrawUndevelopedMarker(
+    ImDrawList* draw_list, const GsnNode& node, ImVec2 top_left, ImVec2 bottom_right, float zoom) {
     if (!node.undeveloped)
         return;
 
@@ -212,11 +209,7 @@ void DrawUndevelopedMarker(ImDrawList* draw_list,
     draw_list->AddText(font, font_size, text_pos, und_ink, und);
 }
 
-void DrawReviewScopeHighlight(ImDrawList* draw_list,
-                              ImVec2 top_left,
-                              ImVec2 bottom_right,
-                              float zoom,
-                              bool primary) {
+void DrawReviewScopeHighlight(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, float zoom, bool primary) {
     const Theme& theme = GetTheme();
     float scale = DpiScale() * zoom;
     float pulse = 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 4.0f);

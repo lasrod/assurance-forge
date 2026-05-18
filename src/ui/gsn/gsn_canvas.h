@@ -70,7 +70,8 @@ void DrawGsnNode(const GsnNode& node,
                  const core::TerminologyService* terminology_service = nullptr,
                  const sacm::AssuranceCasePackage* terminology_package = nullptr,
                  TerminologyCardState* terminology_card_state = nullptr,
-                 float zoom = 1.0f);
+                 float zoom = 1.0f,
+                 bool overlay_hovered = false);
 
 void RenderPinnedTerminologyCard(TerminologyCardState& card_state,
                                  const sacm::AssuranceCasePackage* terminology_package,

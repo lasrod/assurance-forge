@@ -36,11 +36,16 @@ public:
     void SetTree(const core::AssuranceTree& tree);
     // Set elements (legacy flat list)
     void SetElements(const std::vector<CanvasElement>& elements);
-    // Render into the current ImGui window/child
+    // Render into the current ImGui window/child.
+    // `overlay_hovered` should be `true` when the mouse is over a floating
+    // canvas overlay (zoom buttons, language toggle) so that node clicks and
+    // hovers are suppressed accordingly. Computed by the host frame before
+    // this call.
     void Render(UiState& ui_state,
                 const parser::AssuranceCase* active_case,
                 const ElementContextActions& actions,
-                const sacm::AssuranceCasePackage* terminology_package = nullptr);
+                const sacm::AssuranceCasePackage* terminology_package = nullptr,
+                bool overlay_hovered = false);
 
     // Zoom controls
     void ZoomIn();

@@ -31,10 +31,6 @@ namespace ui::gsn {
 // Zoom step used by keyboard and button controls (matches renderer constant)
 static constexpr float kZoomStep = 0.1f;
 
-// Flag: true when mouse is hovering over overlay controls (zoom/language buttons).
-// Set each frame before node rendering so that node clicks are suppressed.
-static bool g_overlay_hovered = false;
-
 // Single shared renderer instance used by the compatibility wrapper.
 static GsnCanvas& GlobalRenderer() {
     static GsnCanvas instance;
@@ -171,7 +167,8 @@ void DrawGsnNode(const GsnNode& node,
                  const core::TerminologyService* terminology_service,
                  const sacm::AssuranceCasePackage* terminology_package,
                  TerminologyCardState* terminology_card_state,
-                 float zoom) {
+                 float zoom,
+                 bool overlay_hovered) {
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     ImVec2 top_left = ImVec2(canvas_origin.x + node.position.x * zoom, canvas_origin.y + node.position.y * zoom);
     ImVec2 bottom_right = ImVec2(top_left.x + node.size.x * zoom, top_left.y + node.size.y * zoom);
@@ -203,7 +200,7 @@ void DrawGsnNode(const GsnNode& node,
     // Subtle hover brighten so nodes feel responsive without shifting layout.
     {
         ImVec2 mouse = ImGui::GetIO().MousePos;
-        if (!g_overlay_hovered && mouse.x >= top_left.x && mouse.x <= bottom_right.x && mouse.y >= top_left.y &&
+        if (!overlay_hovered && mouse.x >= top_left.x && mouse.x <= bottom_right.x && mouse.y >= top_left.y &&
             mouse.y <= bottom_right.y) {
             fill_color = ShadeColor(fill_color, 0.06f);
         }
@@ -230,7 +227,7 @@ void DrawGsnNode(const GsnNode& node,
     const std::vector<TerminologySpanHitRegion> terminology_regions = BuildAndDrawTerminologySpans(
         draw_list, node, top_left, text_left, text_wrap, zoom, ui_state, terminology_service);
     HandleTerminologySpanInteractions(
-        terminology_regions, terminology_card_state, terminology_package, actions, g_overlay_hovered);
+        terminology_regions, terminology_card_state, terminology_package, actions, overlay_hovered);
     DrawUndevelopedMarker(draw_list, node, top_left, bottom_right, zoom);
 
     // Invisible button for hit-testing.
@@ -241,11 +238,11 @@ void DrawGsnNode(const GsnNode& node,
     ImGui::InvisibleButton(node.id.c_str(), scaled_size);
     const bool term_click_consumed = terminology_card_state && terminology_card_state->clicked_term_this_frame;
     auto proposal_text_change = ui_state.proposal_text_changes.find(node.id);
-    if (!g_overlay_hovered && proposal_text_change != ui_state.proposal_text_changes.end() &&
+    if (!overlay_hovered && proposal_text_change != ui_state.proposal_text_changes.end() &&
         ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup)) {
         RenderProposalOriginalTextCard(proposal_text_change->second, top_left, bottom_right);
     }
-    if (ImGui::IsItemClicked() && !g_overlay_hovered && !term_click_consumed) {
+    if (ImGui::IsItemClicked() && !overlay_hovered && !term_click_consumed) {
         ui_state.selected_element_id = node.id;
         ui_state.selected_acp_id.clear();
         ui_state.selected_relationship_id.clear();
@@ -445,10 +442,10 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
 
     // --- Pre-compute overlay button rects and check if mouse is over them ---
     // This prevents node clicks from firing when clicking overlay controls.
+    bool overlay_hovered = false;
     {
         ImVec2 child_size_pre = ImGui::GetWindowSize();
         ImVec2 mouse_pos = ImGui::GetIO().MousePos;
-        g_overlay_hovered = false;
 
         // Zoom strip rect
         float btn_sz = DpiSize(28.0f);
@@ -461,7 +458,7 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
         ImVec2 zoom_br(zx + strip_w, zy + btn_sz + DpiSize(2.0f));
         if (mouse_pos.x >= zoom_tl.x && mouse_pos.x <= zoom_br.x && mouse_pos.y >= zoom_tl.y &&
             mouse_pos.y <= zoom_br.y) {
-            g_overlay_hovered = true;
+            overlay_hovered = true;
         }
 
         // Language button rect
@@ -473,13 +470,13 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
             ImVec2 lang_br(lx + lbw + DpiSize(2.0f), ly + lbh + DpiSize(2.0f));
             if (mouse_pos.x >= lang_tl.x && mouse_pos.x <= lang_br.x && mouse_pos.y >= lang_tl.y &&
                 mouse_pos.y <= lang_br.y) {
-                g_overlay_hovered = true;
+                overlay_hovered = true;
             }
         }
     }
 
     // Render the canvas content
-    renderer.Render(ui_state, active_case, actions, terminology_package);
+    renderer.Render(ui_state, active_case, actions, terminology_package, overlay_hovered);
 
     const bool relationship_context_menu_active = renderer.GetLastRenderStats().relationship_context_menu_active;
     if (!relationship_context_menu_active &&

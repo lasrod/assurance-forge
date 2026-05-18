@@ -120,7 +120,8 @@ void GsnCanvas::GetContentBounds(ImVec2& out_min, ImVec2& out_max) const {
 void GsnCanvas::Render(UiState& ui_state,
                        const parser::AssuranceCase* active_case,
                        const ElementContextActions& actions,
-                       const sacm::AssuranceCasePackage* terminology_package) {
+                       const sacm::AssuranceCasePackage* terminology_package,
+                       bool overlay_hovered) {
     CanvasRenderStats frame_stats{};
 
     std::optional<core::TerminologyService> terminology_service;
@@ -306,7 +307,8 @@ void GsnCanvas::Render(UiState& ui_state,
                     terminology_service_ptr,
                     terminology_package,
                     &terminology_card_state_,
-                    zoom);
+                    zoom,
+                    overlay_hovered);
         const auto element_acps = acp_by_element.find(node.id);
         if (element_acps != acp_by_element.end()) {
             DrawAcpElementDecorator(draw_list, node, node_min, node_max, zoom, element_acps->second, actions, ui_state);

@@ -171,8 +171,8 @@ bool RegionContains(const TerminologySpanHitRegion& region, ImVec2 point) {
     return point.x >= region.min.x && point.x <= region.max.x && point.y >= region.min.y && point.y <= region.max.y;
 }
 
-const TerminologySpanHitRegion*
-FindHoveredTerminologyRegion(const std::vector<TerminologySpanHitRegion>& regions, ImVec2 mouse_pos) {
+const TerminologySpanHitRegion* FindHoveredTerminologyRegion(const std::vector<TerminologySpanHitRegion>& regions,
+                                                             ImVec2 mouse_pos) {
     const TerminologySpanHitRegion* hovered = nullptr;
     float hovered_area = 0.0f;
     for (const auto& region : regions) {

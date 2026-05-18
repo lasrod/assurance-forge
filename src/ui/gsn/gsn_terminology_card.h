@@ -29,15 +29,14 @@ struct TerminologySpanHitRegion {
 // underlines, and return the corresponding hit regions for hover/click
 // handling. Returns an empty vector if `terminology_service` is null, the
 // node has no description, or `zoom` is below the label-rendering threshold.
-std::vector<TerminologySpanHitRegion>
-BuildAndDrawTerminologySpans(ImDrawList* draw_list,
-                             const GsnNode& node,
-                             ImVec2 top_left,
-                             float text_left,
-                             float text_wrap,
-                             float zoom,
-                             const UiState& ui_state,
-                             const core::TerminologyService* terminology_service);
+std::vector<TerminologySpanHitRegion> BuildAndDrawTerminologySpans(ImDrawList* draw_list,
+                                                                   const GsnNode& node,
+                                                                   ImVec2 top_left,
+                                                                   float text_left,
+                                                                   float text_wrap,
+                                                                   float zoom,
+                                                                   const UiState& ui_state,
+                                                                   const core::TerminologyService* terminology_service);
 
 // Render the hover tooltip for the region under the mouse and pin the card
 // on click. `overlay_hovered` should be `true` when the mouse is over a
