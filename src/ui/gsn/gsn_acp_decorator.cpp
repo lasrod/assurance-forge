@@ -139,7 +139,8 @@ void DrawAcpRelationshipDecorator(ImDrawList* draw_list,
     const ImU32 outline = selected ? theme.accent : theme.border_strong;
     ImFont* font = ImGui::GetFont();
     const float font_size = ImGui::GetFontSize() * zoom;
-    const ImVec2 text_size = zoom >= 0.45f ? font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, label.c_str()) : ImVec2(0, 0);
+    const ImVec2 text_size =
+        zoom >= 0.45f ? font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, label.c_str()) : ImVec2(0, 0);
 
     const ImVec2 box_min(center.x - half_size.x, center.y - half_size.y);
     const ImVec2 box_max(center.x + half_size.x, center.y + half_size.y);
@@ -156,9 +157,9 @@ void DrawAcpRelationshipDecorator(ImDrawList* draw_list,
     ImGui::SetCursorScreenPos(ImVec2(box_min.x - hit_pad, box_min.y - hit_pad));
     ImGui::SetNextItemAllowOverlap();
     const std::string widget_id = "ACP##" + target.relationship_id + "##" + target.parent_id + "##" + target.child_id;
-    ImGui::InvisibleButton(widget_id.c_str(),
-                           ImVec2((half_size.x + hit_pad) * 2.0f + text_size.x + 8.0f * scale,
-                                  (half_size.y + hit_pad) * 2.0f));
+    ImGui::InvisibleButton(
+        widget_id.c_str(),
+        ImVec2((half_size.x + hit_pad) * 2.0f + text_size.x + 8.0f * scale, (half_size.y + hit_pad) * 2.0f));
     if (ImGui::IsItemClicked()) {
         ui_state.selected_acp_id = acps.front().id;
         ui_state.selected_element_id.clear();
@@ -227,7 +228,8 @@ void DrawAcpElementDecorator(ImDrawList* draw_list,
     const ImU32 outline = selected ? theme.accent : theme.border_strong;
     ImFont* font = ImGui::GetFont();
     const float font_size = ImGui::GetFontSize() * zoom;
-    const ImVec2 text_size = zoom >= 0.45f ? font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, label.c_str()) : ImVec2(0, 0);
+    const ImVec2 text_size =
+        zoom >= 0.45f ? font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, label.c_str()) : ImVec2(0, 0);
 
     draw_list->AddRectFilled(box_min, box_max, fill, rounding);
     draw_list->AddRect(box_min, box_max, outline, rounding, 0, selected ? 2.4f * scale : 1.4f * scale);
@@ -242,9 +244,9 @@ void DrawAcpElementDecorator(ImDrawList* draw_list,
     ImGui::SetCursorScreenPos(ImVec2(box_min.x - hit_pad, box_min.y - hit_pad));
     ImGui::SetNextItemAllowOverlap();
     const std::string widget_id = "ACP element##" + node.id;
-    ImGui::InvisibleButton(widget_id.c_str(),
-                           ImVec2((half_size.x + hit_pad) * 2.0f + text_size.x + 8.0f * scale,
-                                  (half_size.y + hit_pad) * 2.0f));
+    ImGui::InvisibleButton(
+        widget_id.c_str(),
+        ImVec2((half_size.x + hit_pad) * 2.0f + text_size.x + 8.0f * scale, (half_size.y + hit_pad) * 2.0f));
     if (ImGui::IsItemClicked()) {
         ui_state.selected_acp_id = acps.front().id;
         ui_state.selected_element_id.clear();
