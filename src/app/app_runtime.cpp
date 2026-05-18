@@ -131,9 +131,8 @@ void AppRuntime::RegisterAppEventListeners() {
         if (event.mark_app_dirty)
             impl_->app_state.mark_dirty();
     });
-    impl_->events.Subscribe<ProjectFilesChangedEvent>([this](const ProjectFilesChangedEvent&) {
-        impl_->sacm_package_tree_cache.clear();
-    });
+    impl_->events.Subscribe<ProjectFilesChangedEvent>(
+        [this](const ProjectFilesChangedEvent&) { impl_->sacm_package_tree_cache.clear(); });
     impl_->events.Subscribe<ReviewItemsDirtyEvent>([this](const ReviewItemsDirtyEvent& event) {
         if (event.mark_app_dirty)
             impl_->app_state.mark_dirty();

@@ -30,11 +30,11 @@ struct SacmElement {
     std::map<std::string, std::string> content_langs;
 
     // Relationship fields (populated for assertedinference, assertedcontext, assertedevidence)
-    std::vector<std::string> source_refs; // ids from <source ref="..."/>
-    std::vector<std::string> target_refs; // ids from <target ref="..."/>
+    std::vector<std::string> source_refs;     // ids from <source ref="..."/>
+    std::vector<std::string> target_refs;     // ids from <target ref="..."/>
     std::vector<std::string> meta_claim_refs; // ids from <metaClaim ref="..."/>
-    std::string reasoning_ref;            // from reasoning attribute (assertedinference)
-    std::string assertion_declaration;    // from assertionDeclaration attribute
+    std::string reasoning_ref;                // from reasoning attribute (assertedinference)
+    std::string assertion_declaration;        // from assertionDeclaration attribute
 };
 
 struct AcpRecord {
@@ -65,7 +65,7 @@ struct AssuranceCase {
 // old spellings so consumers that previously included `parser/xml_parser.h`
 // can switch to this header without source-wide renames.
 namespace parser {
-using SacmElement   = core::SacmElement;
-using AcpRecord     = core::AcpRecord;
+using SacmElement = core::SacmElement;
+using AcpRecord = core::AcpRecord;
 using AssuranceCase = core::AssuranceCase;
 } // namespace parser
