@@ -24,6 +24,7 @@ add_library(af_core OBJECT
     sha256.cpp
     string_utils.cpp
     terminology_category_service.cpp
+    terminology_context_service.cpp
     terminology_internal.cpp
     terminology_package_service.cpp
     terminology_scope_service.cpp
