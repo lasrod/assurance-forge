@@ -23,6 +23,7 @@
 #include "app/recent_projects.h"
 #include "app/review_problem_sync.h"
 #include "app/terminology_problem_sync.h"
+#include "core/acp/assurance_claim_point.h"
 #include "core/app_state.h"
 #include "core/element_factory.h"
 #include "core/problems/problem_attention.h"
@@ -56,6 +57,63 @@ namespace {
 
 bool IsReviewDerivedProblem(const core::ProblemItem& problem) {
     return problem.id.rfind("review-comment:", 0) == 0 || problem.id.rfind("guideline-review:", 0) == 0;
+}
+
+// Collect every element id/gid that belongs to a confidence argument package. These elements
+// (the confidence top-goal claim and any other claims/reasonings/relationships authored inside
+// the separate confidence tree) must be hidden from the main GSN tree; they only belong on the
+// confidence argument package canvas tab.
+void CollectConfidencePackageElementIdentities(const sacm::AssuranceCasePackage& package,
+                                               std::unordered_set<std::string>& ids,
+                                               std::unordered_set<std::string>& gids) {
+    auto add = [&](const sacm::SacmElement& element) {
+        if (!element.id.empty())
+            ids.insert(element.id);
+        if (!element.gid.empty())
+            gids.insert(element.gid);
+    };
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        if (!core::acp::IsConfidenceArgumentPackage(argument_package))
+            continue;
+        for (const sacm::Claim& claim : argument_package.claims)
+            add(claim);
+        for (const sacm::ArgumentReasoning& reasoning : argument_package.argumentReasonings)
+            add(reasoning);
+        for (const sacm::AssertedInference& inference : argument_package.assertedInferences)
+            add(inference);
+        for (const sacm::AssertedContext& context : argument_package.assertedContexts)
+            add(context);
+        for (const sacm::AssertedEvidence& evidence : argument_package.assertedEvidences)
+            add(evidence);
+        for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences)
+            add(artifact_reference);
+    }
+}
+
+parser::AssuranceCase FilterConfidencePackageElementsFromMainTree(const parser::AssuranceCase& source,
+                                                                  const sacm::AssuranceCasePackage* package) {
+    if (!package)
+        return source;
+    std::unordered_set<std::string> hidden_ids;
+    std::unordered_set<std::string> hidden_gids;
+    CollectConfidencePackageElementIdentities(*package, hidden_ids, hidden_gids);
+    if (hidden_ids.empty() && hidden_gids.empty())
+        return source;
+
+    parser::AssuranceCase filtered;
+    filtered.id = source.id;
+    filtered.name = source.name;
+    filtered.description = source.description;
+    filtered.elements.reserve(source.elements.size());
+    for (const parser::SacmElement& element : source.elements) {
+        if (hidden_ids.count(element.id) > 0)
+            continue;
+        if (!element.gid.empty() && hidden_gids.count(element.gid) > 0)
+            continue;
+        filtered.elements.push_back(element);
+    }
+    filtered.acps = source.acps;
+    return filtered;
 }
 
 } // namespace
@@ -358,7 +416,10 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     }
 
     const auto& ac = impl_->app_state.loaded_case.value();
-    impl_->current_tree = ui::gsn::BuildAssuranceTree(ac);
+    const sacm::AssuranceCasePackage* sacm_package =
+        impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
+    const parser::AssuranceCase filtered_case = FilterConfidencePackageElementsFromMainTree(ac, sacm_package);
+    impl_->current_tree = ui::gsn::BuildAssuranceTree(filtered_case);
     core::ApplyTreeDisplayOrder(impl_->current_tree, impl_->tree_display_order);
     impl_->tree_edit_index = core::BuildTreeEditIndex(ac);
     impl_->tree_edit_index_valid = true;

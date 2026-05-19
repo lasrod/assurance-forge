@@ -333,18 +333,14 @@ void DrawGsnNode(const GsnNode& node,
     }
 
     // Status badges drawn last so they always render above all outlines.
+    // Keep a single badge per element and let the glyph express the most
+    // relevant state for that node.
     if (has_attention || has_review_badge) {
-        const int slot_count = (has_attention ? 1 : 0) + (has_review_badge ? 1 : 0);
-        int slot = 0;
-        if (has_attention) {
-            DrawAttentionBadge(draw_list, ComputeBadgeRect(top_left, bottom_right, zoom, slot++, slot_count), zoom);
-        }
+        const BadgeRect badge = ComputeBadgeRect(top_left, bottom_right, zoom, 0, 1);
         if (has_review_badge && review_state) {
-            DrawReviewBadge(draw_list,
-                            ComputeBadgeRect(top_left, bottom_right, zoom, slot, slot_count),
-                            zoom,
-                            review_status,
-                            *review_state);
+            DrawReviewBadge(draw_list, badge, zoom, review_status, *review_state);
+        } else if (has_attention) {
+            DrawAttentionBadge(draw_list, badge, zoom);
         }
     }
 }

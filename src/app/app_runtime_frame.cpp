@@ -64,6 +64,8 @@ void AppRuntime::RenderFrame(bool& done) {
         [this]() { BeginCreateProjectEvidenceRegister(); },
         [this]() { BeginCreateProjectJ3377CaeRegister(); },
         [this](const core::ProjectFileEntry& entry) { OpenProjectFile(entry); },
+        [this](const core::ProjectFileEntry& entry) { RemoveProjectFile(entry); },
+        [this](const core::ProjectFileEntry& entry) { RevealProjectFileInExplorer(entry); },
         [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
             OpenProjectPackageNode(entry, node);
         },

@@ -148,6 +148,12 @@ static void RenderTreeNode(const core::TreeNode* node,
         }
     }
 
+    // Capture the tree window's draw list BEFORE BeginPopupContextItem. When the right-click popup
+    // opens, ImGui pushes the popup window as the current window and GetWindowDrawList() would
+    // return the popup's draw list, causing the row's overlay icon and label to be drawn into the
+    // popup instead of the tree row.
+    ImDrawList* tree_dl = ImGui::GetWindowDrawList();
+
     bool popup_open = ImGui::BeginPopupContextItem(node->id.c_str());
 
     // Overlay the colored role icon and node name using AddText (no new ImGui
@@ -158,7 +164,7 @@ static void RenderTreeNode(const core::TreeNode* node,
             item_min.x + std::max(0.0f, ImGui::GetTreeNodeToLabelSpacing() - kArrowIconGapTightenPx);
         float text_y = item_min.y + (item_size.y - ImGui::GetTextLineHeight()) * 0.5f;
 
-        ImDrawList* dl = ImGui::GetWindowDrawList();
+        ImDrawList* dl = tree_dl;
         ImFont* font = ImGui::GetFont();
         float font_size = ImGui::GetFontSize();
 

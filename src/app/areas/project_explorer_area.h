@@ -21,6 +21,8 @@ struct ProjectExplorerAreaCallbacks {
     std::function<void()> create_evidence_register;
     std::function<void()> create_j3377_cae_register;
     std::function<void(const core::ProjectFileEntry&)> open_file;
+    std::function<void(const core::ProjectFileEntry&)> remove_file;
+    std::function<void(const core::ProjectFileEntry&)> reveal_in_file_explorer;
     std::function<void(const core::ProjectFileEntry&, const sacm::SacmPackageTreeNode&)> open_package_node;
     std::function<void(const core::ProjectFileEntry&, const sacm::SacmPackageTreeNode&)> add_terminology_package;
     std::function<void(const core::ProjectFileEntry&, const sacm::SacmPackageTreeNode&)> remove_package;

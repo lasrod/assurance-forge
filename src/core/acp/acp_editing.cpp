@@ -401,8 +401,10 @@ void UpdateTreeConfidenceNames(sacm::AssuranceCasePackage* package, const parser
     if (package_found == package->argumentPackages.end())
         return;
 
-    const std::string display_name = acp.name.empty() ? acp.id : acp.name;
-    const std::string native_name = acp.id + ": " + display_name;
+    // Only synthesize a tree label when the user has set a custom display name on the ACP.
+    // Otherwise leave the package and top-goal name empty so the user can fill it in themselves.
+    const bool has_custom_display_name = !acp.name.empty() && acp.name != acp.id;
+    const std::string native_name = has_custom_display_name ? acp.id + ": " + acp.name : std::string{};
     package_found->name = native_name;
     package_found->name_ml.set("en", native_name);
 
@@ -449,7 +451,6 @@ parser::AcpRecord EnsureTextConfidenceClaim(parser::AssuranceCase& model,
 
     if (claim) {
         UpdateTextConfidenceClaimFields(*claim, record);
-        UpsertParserClaimProjection(model, *claim);
     }
     return record;
 }
@@ -591,8 +592,8 @@ AcpEditResult CreateConfidenceArgumentTreeForAcp(parser::AssuranceCase& model,
     const std::string argument_package_id = NextAcpArgumentPackageId(*package, acp->id);
     const std::string top_goal_id = NextElementIdWithPrefix(model, *package, acp->id + "_G");
     const std::string target_summary = TargetSummaryForDefaultClaim(model, *acp);
-    const std::string acp_display_name = acp->name.empty() ? acp->id : acp->name;
-    const std::string top_goal_name = acp->id + ": " + acp_display_name;
+    const bool has_custom_display_name = !acp->name.empty() && acp->name != acp->id;
+    const std::string top_goal_name = has_custom_display_name ? acp->id + ": " + acp->name : std::string{};
     const std::string top_goal_content = "Confidence in " + target_summary + " is sufficient.";
 
     sacm::ArgumentPackage argument_package;

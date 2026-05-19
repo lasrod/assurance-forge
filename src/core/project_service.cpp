@@ -573,11 +573,17 @@ bool ProjectService::RemoveTrackedFile(AssuranceProject& project,
         return false;
     }
 
+    // Capture the path value up front. Callers commonly invoke this with a reference that aliases
+    // the relativePath of an entry inside project.files; once we erase that entry below, the
+    // original reference dangles and reads turn into reads of the next vector element, which
+    // would cause us to delete the WRONG file from disk.
+    const std::filesystem::path target_relative_path = relative_path;
+
     auto found = std::find_if(project.files.begin(), project.files.end(), [&](const ProjectFileEntry& entry) {
-        return entry.relativePath.generic_string() == relative_path.generic_string();
+        return entry.relativePath.generic_string() == target_relative_path.generic_string();
     });
     if (found == project.files.end()) {
-        error = "Tracked file was not found: " + relative_path.generic_string();
+        error = "Tracked file was not found: " + target_relative_path.generic_string();
         return false;
     }
 
@@ -587,7 +593,7 @@ bool ProjectService::RemoveTrackedFile(AssuranceProject& project,
 
     std::error_code ec;
     if (delete_file) {
-        std::filesystem::remove(project.rootPath / relative_path, ec);
+        std::filesystem::remove(project.rootPath / target_relative_path, ec);
         if (ec) {
             project.files.push_back(std::move(removed_entry));
             error = "Could not delete file: " + ec.message();
