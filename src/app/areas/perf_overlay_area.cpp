@@ -1044,24 +1044,34 @@ void RenderPerfOverlay(bool& open) {
         const ui::Theme& th_legend = ui::GetTheme();
         ImGui::TextUnformatted("Frame interval (4s) —");
         ImGui::SameLine(0.0f, 6.0f);
-        // Wall-clock swatch
+        // Wall-clock swatch — drawn as a gradient (green/warning/danger) to
+        // signal that the trace itself is color-coded by FPS thresholds, not
+        // always green. This matches FrameTimeStatusColor used by the trace.
         {
-            ImDrawList* dl = ImGui::GetWindowDrawList();
-            const ImVec2 p = ImGui::GetCursorScreenPos();
-            const float h_line = ImGui::GetTextLineHeight();
-            dl->AddRectFilled(ImVec2(p.x, p.y + h_line * 0.35f),
-                              ImVec2(p.x + 14.0f, p.y + h_line * 0.65f),
-                              ui::WithAlpha(th_legend.success, 0.85f));
-            ImGui::Dummy(ImVec2(16.0f, h_line));
+            ImDrawList*  dl     = ImGui::GetWindowDrawList();
+            const ImVec2 p      = ImGui::GetCursorScreenPos();
+            const float  h_line = ImGui::GetTextLineHeight();
+            const float  sw_w   = 20.0f;
+            const ImVec2 s0     = ImVec2(p.x, p.y + h_line * 0.35f);
+            const ImVec2 s1     = ImVec2(p.x + sw_w, p.y + h_line * 0.65f);
+            // Two-stop gradient: green -> warning -> danger across the swatch.
+            const ImU32 c_good = ui::WithAlpha(th_legend.success, 0.85f);
+            const ImU32 c_warn = ui::WithAlpha(th_legend.warning, 0.85f);
+            const ImU32 c_bad  = ui::WithAlpha(th_legend.danger, 0.85f);
+            const ImVec2 mid0  = ImVec2(p.x + sw_w * 0.5f, s0.y);
+            const ImVec2 mid1  = ImVec2(p.x + sw_w * 0.5f, s1.y);
+            dl->AddRectFilledMultiColor(s0, mid1, c_good, c_warn, c_warn, c_good);
+            dl->AddRectFilledMultiColor(mid0, s1, c_warn, c_bad, c_bad, c_warn);
+            ImGui::Dummy(ImVec2(sw_w + 2.0f, h_line));
         }
         ImGui::SameLine(0.0f, 4.0f);
-        ImGui::TextDisabled("wall-clock (what the user sees)");
+        ImGui::TextDisabled("frame interval (colored by FPS)");
         ImGui::SameLine(0.0f, 10.0f);
         // Render-cost swatch
         {
-            ImDrawList* dl = ImGui::GetWindowDrawList();
-            const ImVec2 p = ImGui::GetCursorScreenPos();
-            const float h_line = ImGui::GetTextLineHeight();
+            ImDrawList*  dl     = ImGui::GetWindowDrawList();
+            const ImVec2 p      = ImGui::GetCursorScreenPos();
+            const float  h_line = ImGui::GetTextLineHeight();
             dl->AddLine(ImVec2(p.x, p.y + h_line * 0.5f),
                         ImVec2(p.x + 14.0f, p.y + h_line * 0.5f),
                         ui::WithAlpha(th_legend.text_secondary, 0.95f),
@@ -1069,7 +1079,7 @@ void RenderPerfOverlay(bool& open) {
             ImGui::Dummy(ImVec2(16.0f, h_line));
         }
         ImGui::SameLine(0.0f, 4.0f);
-        ImGui::TextDisabled("render cost (CPU work this frame)");
+        ImGui::TextDisabled("render cost only");
     }
     DrawFrameTimeGraph(h, avg_ms, spikes.threshold_ms, 130.0f);
 
