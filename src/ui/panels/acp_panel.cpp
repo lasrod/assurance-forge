@@ -107,7 +107,6 @@ void RenderTargetRow(const parser::AssuranceCase& model,
             ImGui::SameLine(0.0f, 6.0f);
             const bool is_context = found->kind == core::acp::AcpRelationshipKind::InContextOf;
             if (is_context) {
-                ImGui::TextDisabled("c");
                 ImGui::SameLine(0.0f, 3.0f);
             }
             {
@@ -124,11 +123,10 @@ void RenderTargetRow(const parser::AssuranceCase& model,
                 const float x0 = p.x;
                 const float x1 = p.x + arrow_w;
                 draw_list->AddLine(ImVec2(x0, cy), ImVec2(x1 - head_w * 0.6f, cy), col, 1.5f);
-                draw_list->AddTriangleFilled(
-                    ImVec2(x1, cy),
-                    ImVec2(x1 - head_w, cy - head_h * 0.5f),
-                    ImVec2(x1 - head_w, cy + head_h * 0.5f),
-                    col);
+                draw_list->AddTriangleFilled(ImVec2(x1, cy),
+                                             ImVec2(x1 - head_w, cy - head_h * 0.5f),
+                                             ImVec2(x1 - head_w, cy + head_h * 0.5f),
+                                             col);
                 if (is_context && ImGui::IsItemHovered()) {
                     ImGui::SetTooltip("InContextOf");
                 }
