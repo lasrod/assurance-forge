@@ -1,13 +1,10 @@
 #pragma once
 
 #include "core/problems/problems_manager.h"
+#include "core/sacm_model.h"
 
 #include <functional>
 #include <string>
-
-namespace parser {
-struct AssuranceCase;
-}
 
 namespace sacm {
 struct AssuranceCasePackage;

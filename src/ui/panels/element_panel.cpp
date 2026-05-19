@@ -122,8 +122,8 @@ static bool EditableTextField(const char* label, std::string& text, float width 
     else
         ImGui::SetNextItemWidth(-1);
 
-    const ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_NoHorizontalScroll |
-                                      ImGuiInputTextFlags_WordWrap;
+    const ImGuiInputTextFlags flags =
+        ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_NoHorizontalScroll | ImGuiInputTextFlags_WordWrap;
     bool changed = ImGui::InputTextMultiline("##edit", &text, ImVec2(-1, ImGui::GetTextLineHeight() * 5), flags);
     ImGui::PopID();
     return changed;
@@ -325,7 +325,9 @@ void RenderTerminologySuggestions(const sacm::AssuranceCasePackage* sacm_pkg,
     }
 }
 
-bool RenderReviewAttentionNotice(const ui::UiState& state, const std::string& element_id, const ElementTerminologyAssistCallbacks* terminology_callbacks) {
+bool RenderReviewAttentionNotice(const ui::UiState& state,
+                                 const std::string& element_id,
+                                 const ElementTerminologyAssistCallbacks* terminology_callbacks) {
     const ui::ElementReviewVisualState* review_state = ui::FindElementReviewVisualState(state, element_id);
     if (!review_state || ui::ResolveElementReviewVisualStatus(*review_state) != ui::ElementReviewVisualStatus::Failed)
         return false;

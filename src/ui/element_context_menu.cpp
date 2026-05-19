@@ -22,6 +22,9 @@ void RenderAddElementMenu(const ElementContextActions& actions) {
         if (ImGui::MenuItem("Justification", nullptr, false, can_add))
             actions.add_child(core::NewElementKind::Justification);
         ImGui::Separator();
+        if (ImGui::MenuItem("ACP", nullptr, false, static_cast<bool>(actions.add_acp_to_selected_element)))
+            actions.add_acp_to_selected_element();
+        ImGui::Separator();
         if (ImGui::MenuItem("Challenge", nullptr, false, static_cast<bool>(actions.not_implemented))) {
             actions.not_implemented("Challenge");
         }

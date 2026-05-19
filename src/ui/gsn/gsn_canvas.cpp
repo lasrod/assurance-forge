@@ -2,8 +2,12 @@
 
 #include "core/string_utils.h"
 #include "core/terminology_scope_service.h"
+#include "ui/gsn/gsn_badges.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/gsn/gsn_dpi.h"
+#include "ui/gsn/gsn_node_text.h"
+#include "ui/gsn/gsn_shapes.h"
+#include "ui/gsn/gsn_terminology_card.h"
 #include "ui/theme.h"
 #include "ui/ui_state.h"
 
@@ -20,50 +24,17 @@ namespace ui::gsn {
 // g_BoldFont is defined in gsn_layout.cpp (shared between layout and drawing)
 
 // ===== Node drawing constants =====
-static constexpr float kTextPadding = 6.0f;        // padding between shape edge and text
-static constexpr float kMinTextWrap = 40.0f;       // minimum text wrap width
-static constexpr float kParallelogramSkew = 0.15f; // fraction of width used for skew inset
-static constexpr float kCircleTextInset = 0.29f;   // fraction of radius for circle text area (~1 - sqrt(2)/2)
-static constexpr float kStadiumTextInset = 0.15f;  // fraction of height for stadium shape text inset
-static constexpr float kClaimRounding = 8.0f;      // corner rounding for rectangular Claim nodes
-static constexpr float kOutlineThickness = 1.0f;   // shape outline stroke width (hairline)
-static constexpr int kCircleSegments = 48;         // number of segments for circle rendering
-static constexpr float kUndDiamondRadius = 24.0f;
-static constexpr float kUndGap = 0.50f;
-static constexpr float kAttentionBadgeSize = 18.0f;
-static constexpr float kAttentionBadgeGap = 6.0f;
-static constexpr float kAttentionFontScale = 0.95f;
-static constexpr float kPi = 3.14159265358979323846f;
-
-// Number of stacked offset layers used for soft drop shadows under nodes.
-static constexpr int kShadowLayers = 3;
+// `kTextPadding` and `kFullLabelZoom` are declared in `ui/gsn/gsn_node_text.h`
+// because both label rendering and the terminology-span renderer below need
+// them. Shape geometry constants live in `ui/gsn/gsn_shapes.h`.
 
 // Zoom step used by keyboard and button controls (matches renderer constant)
 static constexpr float kZoomStep = 0.1f;
-static constexpr float kDetailedNodeZoom = 0.70f;
-static constexpr float kFullLabelZoom = 0.75f;
-static constexpr float kUndLabelZoom = 0.55f;
-
-// Flag: true when mouse is hovering over overlay controls (zoom/language buttons).
-// Set each frame before node rendering so that node clicks are suppressed.
-static bool g_overlay_hovered = false;
 
 // Single shared renderer instance used by the compatibility wrapper.
 static GsnCanvas& GlobalRenderer() {
     static GsnCanvas instance;
     return instance;
-}
-
-static bool ShouldDrawDetailedNodeEffects(float zoom) {
-    return zoom >= kDetailedNodeZoom;
-}
-
-static int CircleSegmentsForZoom(float zoom) {
-    if (zoom < 0.50f)
-        return 16;
-    if (zoom < 0.85f)
-        return 24;
-    return kCircleSegments;
 }
 
 // ===== Shape color mapping =====
@@ -104,10 +75,6 @@ static ImU32 DimmedProposalInk(ImU32 fill_color) {
         return WithAlpha(InkOn(fill_color), 0.72f);
     }
     return WithAlpha(GetTheme().text_secondary, 0.62f);
-}
-
-static ImU32 OutlineColor() {
-    return WithAlpha(GetTheme().border_strong, 0.85f);
 }
 
 static std::string ProposalFieldDisplayLabel(const std::string& field) {
@@ -176,865 +143,19 @@ static void RenderProposalOriginalTextCard(const std::vector<ProposalTextChangeP
     ImGui::End();
 }
 
-// Draw a soft 3-layer drop shadow under a rounded rectangle.
-static void DrawRectShadow(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, float rounding, float zoom) {
-    const Theme& th = GetTheme();
-    float scale = DpiScale() * zoom;
-    for (int i = 0; i < kShadowLayers; ++i) {
-        float oy = (i + 1) * th.shadow_offset * scale;
-        float ox = oy * 0.25f;
-        float alpha_mul = th.shadow_alpha_top * (1.0f - (float)i / (float)kShadowLayers);
-        ImU32 col = WithAlpha(IM_COL32(0, 0, 0, 255), alpha_mul);
-        draw_list->AddRectFilled(
-            ImVec2(top_left.x + ox, top_left.y + oy), ImVec2(bottom_right.x + ox, bottom_right.y + oy), col, rounding);
-    }
-}
-
-// Draw a soft 3-layer drop shadow under a circle.
-static void DrawCircleShadow(ImDrawList* draw_list, ImVec2 center, float radius, float zoom) {
-    const Theme& th = GetTheme();
-    float scale = DpiScale() * zoom;
-    for (int i = 0; i < kShadowLayers; ++i) {
-        float oy = (i + 1) * th.shadow_offset * scale;
-        float ox = oy * 0.25f;
-        float alpha_mul = th.shadow_alpha_top * (1.0f - (float)i / (float)kShadowLayers);
-        ImU32 col = WithAlpha(IM_COL32(0, 0, 0, 255), alpha_mul);
-        draw_list->AddCircleFilled(ImVec2(center.x + ox, center.y + oy), radius, col, kCircleSegments);
-    }
-}
-
-// Draw a soft drop shadow under an arbitrary convex polygon.
-static void DrawPolyShadow(ImDrawList* draw_list, const ImVec2* points, int count, float zoom) {
-    const Theme& th = GetTheme();
-    float scale = DpiScale() * zoom;
-    for (int i = 0; i < kShadowLayers; ++i) {
-        float oy = (i + 1) * th.shadow_offset * scale;
-        float ox = oy * 0.25f;
-        float alpha_mul = th.shadow_alpha_top * (1.0f - (float)i / (float)kShadowLayers);
-        ImU32 col = WithAlpha(IM_COL32(0, 0, 0, 255), alpha_mul);
-        ImVec2 shifted[8];
-        int n = count > 8 ? 8 : count;
-        for (int k = 0; k < n; ++k)
-            shifted[k] = ImVec2(points[k].x + ox, points[k].y + oy);
-        draw_list->AddConvexPolyFilled(shifted, n, col);
-    }
-}
-
-// Add a thin top highlight + subtle bottom shading inside a rounded rect.
-// Draws a full-size rounded rect (so ImGui doesn't clamp the rounding) and
-// clips it to the band's vertical slice. The band edges then perfectly trace
-// the shape's curvature - which matters for stadiums whose end-cap radius is
-// far larger than the band height.
-static void
-AddInteriorShading(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 base_color, float rounding) {
-    float h = bottom_right.y - top_left.y;
-    if (h < 6.0f)
-        return;
-    ImU32 highlight = WithAlpha(ShadeColor(base_color, 0.25f), 0.55f);
-    ImU32 shade = WithAlpha(ShadeColor(base_color, -0.25f), 0.35f);
-    float band_h = h * 0.18f;
-
-    // Top highlight band
-    draw_list->PushClipRect(ImVec2(top_left.x, top_left.y), ImVec2(bottom_right.x, top_left.y + band_h), true);
-    draw_list->AddRectFilled(top_left, bottom_right, highlight, rounding);
-    draw_list->PopClipRect();
-
-    // Bottom shade band
-    draw_list->PushClipRect(ImVec2(top_left.x, bottom_right.y - band_h), ImVec2(bottom_right.x, bottom_right.y), true);
-    draw_list->AddRectFilled(top_left, bottom_right, shade, rounding);
-    draw_list->PopClipRect();
-}
-
-// ===== Shape drawing helpers =====
-
-// Draw a parallelogram (Strategy shape) with inward-skewed top/bottom edges.
-static void
-DrawParallelogram(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color, float zoom) {
-    float skew = (bottom_right.x - top_left.x) * kParallelogramSkew;
-    float outline = DpiSize(kOutlineThickness) * zoom;
-    ImVec2 corners[4] = {
-        ImVec2(top_left.x + skew, top_left.y),         // top-left (inset right)
-        ImVec2(bottom_right.x, top_left.y),            // top-right
-        ImVec2(bottom_right.x - skew, bottom_right.y), // bottom-right (inset left)
-        ImVec2(top_left.x, bottom_right.y)             // bottom-left
-    };
-    if (ShouldDrawDetailedNodeEffects(zoom))
-        DrawPolyShadow(draw_list, corners, 4, zoom);
-    draw_list->AddConvexPolyFilled(corners, 4, fill_color);
-    if (ShouldDrawDetailedNodeEffects(zoom)) {
-        ImU32 hl = WithAlpha(ShadeColor(fill_color, 0.30f), 0.55f);
-        ImVec2 hl_pts[4] = {corners[0],
-                            corners[1],
-                            ImVec2(corners[1].x - skew * 0.15f, corners[1].y + (bottom_right.y - top_left.y) * 0.18f),
-                            ImVec2(corners[0].x - skew * 0.15f, corners[0].y + (bottom_right.y - top_left.y) * 0.18f)};
-        draw_list->AddConvexPolyFilled(hl_pts, 4, hl);
-    }
-    draw_list->AddPolyline(corners, 4, OutlineColor(), ImDrawFlags_Closed, outline);
-}
-
-// Draw a stadium / rounded rectangle (Context, Assumption, Justification shapes).
-static void DrawStadium(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color, float zoom) {
-    float rounding = (bottom_right.y - top_left.y) * 0.5f;
-    float outline = DpiSize(kOutlineThickness) * zoom;
-    if (ShouldDrawDetailedNodeEffects(zoom))
-        DrawRectShadow(draw_list, top_left, bottom_right, rounding, zoom);
-    draw_list->AddRectFilled(top_left, bottom_right, fill_color, rounding);
-    if (ShouldDrawDetailedNodeEffects(zoom))
-        AddInteriorShading(draw_list, top_left, bottom_right, fill_color, rounding);
-    draw_list->AddRect(top_left, bottom_right, OutlineColor(), rounding, 0, outline);
-}
-
-// Draw a circle (Solution, Evidence shapes) centered in the bounding box.
-static void DrawCircle(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color, float zoom) {
-    float width = bottom_right.x - top_left.x;
-    float height = bottom_right.y - top_left.y;
-    ImVec2 center((top_left.x + bottom_right.x) * 0.5f, (top_left.y + bottom_right.y) * 0.5f);
-    float radius = (width < height ? width : height) * 0.5f;
-    float outline = DpiSize(kOutlineThickness) * zoom;
-    int segments = CircleSegmentsForZoom(zoom);
-    if (ShouldDrawDetailedNodeEffects(zoom))
-        DrawCircleShadow(draw_list, center, radius, zoom);
-    draw_list->AddCircleFilled(center, radius, fill_color, segments);
-    if (ShouldDrawDetailedNodeEffects(zoom)) {
-        ImU32 hl = WithAlpha(ShadeColor(fill_color, 0.35f), 0.45f);
-        draw_list->AddCircleFilled(
-            ImVec2(center.x - radius * 0.18f, center.y - radius * 0.30f), radius * 0.55f, hl, segments);
-    }
-    draw_list->AddCircle(center, radius, OutlineColor(), segments, outline);
-}
-
-// Draw a rounded rectangle (Claim / default shape).
-static void DrawRoundedRect(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color, float zoom) {
-    float rounding = DpiSize(kClaimRounding) * zoom;
-    float outline = DpiSize(kOutlineThickness) * zoom;
-    if (ShouldDrawDetailedNodeEffects(zoom))
-        DrawRectShadow(draw_list, top_left, bottom_right, rounding, zoom);
-    draw_list->AddRectFilled(top_left, bottom_right, fill_color, rounding);
-    if (ShouldDrawDetailedNodeEffects(zoom))
-        AddInteriorShading(draw_list, top_left, bottom_right, fill_color, rounding);
-    draw_list->AddRect(top_left, bottom_right, OutlineColor(), rounding, 0, outline);
-}
-
-static void
-DrawUndevelopedMarker(ImDrawList* draw_list, const GsnNode& node, ImVec2 top_left, ImVec2 bottom_right, float zoom) {
-    if (!node.undeveloped)
-        return;
-
-    float radius = DpiSize(kUndDiamondRadius) * zoom;
-    float gap = DpiSize(kUndGap) * zoom;
-    ImVec2 center((top_left.x + bottom_right.x) * 0.5f, bottom_right.y + gap + radius);
-    ImVec2 diamond[4] = {ImVec2(center.x, center.y - radius),
-                         ImVec2(center.x + radius, center.y),
-                         ImVec2(center.x, center.y + radius),
-                         ImVec2(center.x - radius, center.y)};
-    if (ShouldDrawDetailedNodeEffects(zoom))
-        DrawPolyShadow(draw_list, diamond, 4, zoom);
-    ImU32 und_fill = IM_COL32(245, 247, 252, 255); // near-white for high contrast
-    ImU32 und_ink = InkOn(und_fill);
-    draw_list->AddConvexPolyFilled(diamond, 4, und_fill);
-    draw_list->AddPolyline(diamond, 4, OutlineColor(), ImDrawFlags_Closed, DpiSize(kOutlineThickness) * zoom);
-
-    if (zoom < kUndLabelZoom)
-        return;
-
-    const char* und = "UND";
-    ImFont* font = ImGui::GetFont();
-    float desired_font_size = ImGui::GetFontSize() * zoom * 1.4f;
-
-    // Keep the label readable at normal zoom levels, but do not let a fixed
-    // minimum font size outgrow the zoom-scaled diamond marker.
-    ImVec2 unit_text_size = font->CalcTextSizeA(1.0f, FLT_MAX, 0.0f, und);
-    float max_text_extent = radius * 1.8f;
-    float max_font_size_from_width =
-        (unit_text_size.x > 0.0f) ? (max_text_extent / unit_text_size.x) : desired_font_size;
-    float max_font_size_from_height =
-        (unit_text_size.y > 0.0f) ? (max_text_extent / unit_text_size.y) : desired_font_size;
-    float max_font_size = std::min(max_font_size_from_width, max_font_size_from_height);
-    float min_font_size = std::min(DpiSize(10.0f), max_font_size);
-    float font_size = std::clamp(desired_font_size, min_font_size, max_font_size);
-    ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, und);
-    ImVec2 text_pos(center.x - text_size.x * 0.5f, center.y - text_size.y * 0.5f);
-    draw_list->AddText(font, font_size, text_pos, und_ink, und);
-}
-
-struct BadgeRect {
-    ImVec2 min;
-    ImVec2 max;
-};
-
-static BadgeRect ComputeBadgeRect(ImVec2 top_left, ImVec2 bottom_right, float zoom, int slot, int slot_count) {
-    float badge_size = DpiSize(kAttentionBadgeSize) * zoom;
-    float badge_gap = DpiSize(kAttentionBadgeGap) * zoom;
-    float center_x = (top_left.x + bottom_right.x) * 0.5f;
-    float badge_y = top_left.y - badge_size * 0.45f;
-    float row_width = badge_size * (float)slot_count + badge_gap * (float)std::max(0, slot_count - 1);
-    float badge_x = center_x - row_width * 0.5f + (float)slot * (badge_size + badge_gap);
-    ImVec2 badge_min(badge_x, badge_y);
-    return BadgeRect{badge_min, ImVec2(badge_min.x + badge_size, badge_min.y + badge_size)};
-}
-
-static bool IsMouseOverBadge(const BadgeRect& badge) {
-    if (!ImGui::IsWindowHovered())
-        return false;
-    ImVec2 mouse = ImGui::GetIO().MousePos;
-    return mouse.x >= badge.min.x && mouse.x <= badge.max.x && mouse.y >= badge.min.y && mouse.y <= badge.max.y;
-}
-
-static void DrawBadgeShell(ImDrawList* draw_list, const BadgeRect& badge, ImU32 fill, float zoom) {
-    float badge_size = badge.max.x - badge.min.x;
-    float rounding = badge_size * 0.32f;
-    draw_list->AddRectFilled(badge.min, badge.max, fill, rounding);
-    draw_list->AddRect(badge.min, badge.max, ShadeColor(fill, -0.30f), rounding, 0, DpiSize(1.0f) * zoom);
-}
-
-static void DrawAttentionBadge(ImDrawList* draw_list, const BadgeRect& badge, float zoom) {
-    const Theme& theme = GetTheme();
-    DrawBadgeShell(draw_list, badge, theme.warning, zoom);
-
-    const char* glyph = "!";
-    ImFont* font = g_BoldFont ? g_BoldFont : ImGui::GetFont();
-    float font_size = ImGui::GetFontSize() * zoom * kAttentionFontScale;
-    ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, glyph);
-    ImVec2 text_pos((badge.min.x + badge.max.x - text_size.x) * 0.5f,
-                    (badge.min.y + badge.max.y - text_size.y) * 0.5f - DpiScale() * zoom * 0.5f);
-    draw_list->AddText(font, font_size, text_pos, theme.ink_dark, glyph);
-}
-
-static void DrawCheckGlyph(ImDrawList* draw_list, const BadgeRect& badge, ImU32 color, float zoom) {
-    float size = badge.max.x - badge.min.x;
-    float stroke = std::max(DpiSize(1.8f) * zoom, 1.0f);
-    ImVec2 a(badge.min.x + size * 0.27f, badge.min.y + size * 0.55f);
-    ImVec2 b(badge.min.x + size * 0.43f, badge.min.y + size * 0.70f);
-    ImVec2 c(badge.min.x + size * 0.74f, badge.min.y + size * 0.34f);
-    draw_list->AddLine(a, b, color, stroke);
-    draw_list->AddLine(b, c, color, stroke);
-}
-
-static void DrawCrossGlyph(ImDrawList* draw_list, const BadgeRect& badge, ImU32 color, float zoom) {
-    float size = badge.max.x - badge.min.x;
-    float stroke = std::max(DpiSize(1.8f) * zoom, 1.0f);
-    float pad = size * 0.32f;
-    draw_list->AddLine(
-        ImVec2(badge.min.x + pad, badge.min.y + pad), ImVec2(badge.max.x - pad, badge.max.y - pad), color, stroke);
-    draw_list->AddLine(
-        ImVec2(badge.max.x - pad, badge.min.y + pad), ImVec2(badge.min.x + pad, badge.max.y - pad), color, stroke);
-}
-
-static void DrawSpinnerGlyph(ImDrawList* draw_list, const BadgeRect& badge, ImU32 color, float zoom) {
-    float size = badge.max.x - badge.min.x;
-    float stroke = std::max(DpiSize(1.7f) * zoom, 1.0f);
-    ImVec2 center((badge.min.x + badge.max.x) * 0.5f, (badge.min.y + badge.max.y) * 0.5f);
-    float radius = size * 0.26f;
-    float start = std::fmod((float)ImGui::GetTime() * 5.2f, kPi * 2.0f);
-    float end = start + kPi * 1.45f;
-    draw_list->PathClear();
-    for (int i = 0; i <= 14; ++i) {
-        float t = start + (end - start) * ((float)i / 14.0f);
-        draw_list->PathLineTo(ImVec2(center.x + std::cos(t) * radius, center.y + std::sin(t) * radius));
-    }
-    draw_list->PathStroke(color, false, stroke);
-}
-
-static std::string ReviewBadgeTooltip(ElementReviewVisualStatus status, const ElementReviewVisualState& state) {
-    switch (status) {
-    case ElementReviewVisualStatus::AiRunning:
-        return "AI review in progress.";
-    case ElementReviewVisualStatus::ManualOk:
-        return "Review status: manually marked OK";
-    case ElementReviewVisualStatus::AiOk: {
-        std::string tooltip = "Review status: AI review completed with no findings";
-        if (!state.review_profile_name.empty())
-            tooltip += "\nProfile: " + state.review_profile_name;
-        else if (!state.review_profile_id.empty())
-            tooltip += "\nProfile: " + state.review_profile_id;
-        return tooltip;
-    }
-    case ElementReviewVisualStatus::Failed:
-        return state.last_review_message.empty() ? "Review status: AI review failed\nSee Problems panel for details."
-                                                 : state.last_review_message + "\nSee Problems panel for details.";
-    case ElementReviewVisualStatus::None:
-        break;
-    }
-    return {};
-}
-
-static void DrawReviewBadge(ImDrawList* draw_list,
-                            const BadgeRect& badge,
-                            float zoom,
-                            ElementReviewVisualStatus status,
-                            const ElementReviewVisualState& state) {
-    const Theme& theme = GetTheme();
-    ImU32 fill = theme.surface_3;
-    switch (status) {
-    case ElementReviewVisualStatus::AiRunning:
-        fill = theme.accent;
-        break;
-    case ElementReviewVisualStatus::AiOk:
-        fill = theme.success;
-        break;
-    case ElementReviewVisualStatus::ManualOk:
-        fill = theme.accent;
-        break;
-    case ElementReviewVisualStatus::Failed:
-        fill = theme.danger;
-        break;
-    case ElementReviewVisualStatus::None:
-        return;
-    }
-
-    DrawBadgeShell(draw_list, badge, fill, zoom);
-    ImU32 ink = InkOn(fill);
-    if (status == ElementReviewVisualStatus::Failed) {
-        DrawCrossGlyph(draw_list, badge, ink, zoom);
-    } else if (status == ElementReviewVisualStatus::AiRunning) {
-        DrawSpinnerGlyph(draw_list, badge, ink, zoom);
-    } else {
-        DrawCheckGlyph(draw_list, badge, ink, zoom);
-    }
-
-    if (IsMouseOverBadge(badge)) {
-        std::string tooltip = ReviewBadgeTooltip(status, state);
-        if (!tooltip.empty())
-            ImGui::SetTooltip("%s", tooltip.c_str());
-    }
-}
-
-static void
-DrawReviewScopeHighlight(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, float zoom, bool primary) {
-    const Theme& theme = GetTheme();
-    float scale = DpiScale() * zoom;
-    float pulse = 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 4.0f);
-    float alpha = primary ? 0.40f + pulse * 0.20f : 0.22f + pulse * 0.14f;
-    float pad = (primary ? 7.0f : 5.0f) * scale;
-    float thickness = (primary ? 2.2f : 1.6f) * scale;
-    draw_list->AddRect(ImVec2(top_left.x - pad, top_left.y - pad),
-                       ImVec2(bottom_right.x + pad, bottom_right.y + pad),
-                       WithAlpha(theme.accent, alpha),
-                       DpiSize(kClaimRounding) * zoom + pad,
-                       0,
-                       thickness);
-}
+// Node shape primitives (`DrawParallelogram`, `DrawStadium`, `DrawCircle`,
+// `DrawRoundedRect`, `DrawUndevelopedMarker`, `DrawReviewScopeHighlight`) plus
+// their private shadow/shading helpers live in `ui/gsn/gsn_shapes.{h,cpp}`.
+// `BadgeRect`, `ComputeBadgeRect`, `DrawAttentionBadge`, and `DrawReviewBadge`
+// live in `ui/gsn/gsn_badges.{h,cpp}`.
 
 // ===== Text layout helper =====
+// `ComputeTextRegion` and `DrawNodeLabel` live in `ui/gsn/gsn_node_text.{h,cpp}`.
 
-// Compute the horizontal text region (left edge and wrap width) for a given node shape.
-// All outputs are in screen-space (already scaled by zoom).
-static void ComputeTextRegion(const GsnNode& node,
-                              ImVec2 top_left,
-                              ImVec2 bottom_right,
-                              float zoom,
-                              bool reserve_attention_badge,
-                              float& out_text_left,
-                              float& out_text_wrap) {
-    float scaled_padding = DpiSize(kTextPadding) * zoom;
-    float scaled_width = node.size.x * zoom;
-    float scaled_height = node.size.y * zoom;
-
-    out_text_left = top_left.x + scaled_padding;
-    out_text_wrap = scaled_width - scaled_padding * 2.0f;
-
-    if (node.type == "Strategy") {
-        float skew = scaled_width * kParallelogramSkew;
-        out_text_left = top_left.x + skew + scaled_padding;
-        out_text_wrap = scaled_width - skew * 2.0f - scaled_padding * 2.0f;
-    } else if (node.type == "Solution" || node.type == "Evidence") {
-        float center_x = (top_left.x + bottom_right.x) * 0.5f;
-        float radius = (scaled_width < scaled_height ? scaled_width : scaled_height) * 0.5f;
-        float inset = radius * kCircleTextInset;
-        out_text_left = center_x - radius + inset + scaled_padding;
-        out_text_wrap = (radius - inset) * 2.0f - scaled_padding * 2.0f;
-    } else if (node.type == "Context" || node.type == "Assumption" || node.type == "Justification") {
-        float inset = scaled_height * kStadiumTextInset;
-        out_text_left = top_left.x + inset + scaled_padding;
-        out_text_wrap = scaled_width - inset * 2.0f - scaled_padding * 2.0f;
-    }
-
-    float scaled_min_wrap = DpiSize(kMinTextWrap) * zoom;
-    if (out_text_wrap < scaled_min_wrap)
-        out_text_wrap = scaled_min_wrap;
-}
-
-// Draw the node label: bold first line (ID: Name), normal text for rest (description).
-// Text is vertically centered within the node bounding box.
-static void DrawNodeLabel(ImDrawList* draw_list,
-                          const GsnNode& node,
-                          ImVec2 top_left,
-                          ImVec2 bottom_right,
-                          float text_left,
-                          float text_wrap,
-                          float zoom,
-                          ImU32 ink_color,
-                          const UiState& ui_state) {
-    ImFont* bold_font = g_BoldFont ? g_BoldFont : ImGui::GetFont();
-    ImFont* normal_font = ImGui::GetFont();
-    float font_size = ImGui::GetFontSize() * zoom;
-    float scaled_padding = DpiSize(kTextPadding) * zoom;
-    const bool compact_label = zoom < kFullLabelZoom;
-
-    // Pick label based on language toggle
-    const std::string& active_label =
-        (ui_state.show_secondary_language && !node.label_secondary.empty()) ? node.label_secondary : node.label;
-    const char* label_start = active_label.c_str();
-    const char* first_newline = strchr(label_start, '\n');
-
-    // Measure both parts for vertical centering
-    ImVec2 bold_text_size(0, 0);
-    ImVec2 rest_text_size(0, 0);
-    if (first_newline) {
-        bold_text_size = bold_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, label_start, first_newline);
-        if (!compact_label) {
-            rest_text_size = normal_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, first_newline + 1, nullptr);
-        }
-    } else {
-        bold_text_size = bold_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, label_start, nullptr);
-    }
-
-    float scaled_node_height = node.size.y * zoom;
-    float total_text_height = bold_text_size.y + rest_text_size.y;
-    float text_y = top_left.y + (scaled_node_height - total_text_height) * 0.5f;
-    if (text_y < top_left.y + scaled_padding)
-        text_y = top_left.y + scaled_padding;
-
-    // Bold first line
-    draw_list->AddText(bold_font,
-                       font_size,
-                       ImVec2(text_left, text_y),
-                       ink_color,
-                       label_start,
-                       first_newline ? first_newline : nullptr,
-                       text_wrap);
-    // Normal rest
-    if (first_newline && !compact_label) {
-        draw_list->AddText(normal_font,
-                           font_size,
-                           ImVec2(text_left, text_y + bold_text_size.y),
-                           ink_color,
-                           first_newline + 1,
-                           nullptr,
-                           text_wrap);
-    }
-}
-
-static ImU32 TerminologyUnderlineColor(const core::TermOccurrence& occurrence) {
-    const Theme& theme = GetTheme();
-    if (occurrence.kind == core::TermOccurrenceKind::UndefinedAcronym)
-        return WithAlpha(theme.warning, 0.68f);
-    if (occurrence.resolution.status == core::TermResolutionStatus::Ambiguous)
-        return theme.warning;
-    if (occurrence.resolution.status == core::TermResolutionStatus::Unique ||
-        occurrence.resolution.status == core::TermResolutionStatus::Explicit)
-        return WithAlpha(theme.success, 0.78f);
-    return WithAlpha(theme.accent, 0.72f);
-}
-
-struct TerminologySpanHitRegion {
-    ImVec2 min;
-    ImVec2 max;
-    TerminologyCardState card;
-};
-
-static bool HasTermRef(const core::TerminologyTermRef& term_ref) {
-    return !term_ref.id.empty() || !term_ref.gid.empty();
-}
-
-static bool HasPackageRef(const core::TerminologyPackageRef& package_ref) {
-    return !package_ref.id.empty() || !package_ref.gid.empty();
-}
-
-static TerminologyCardState
-CardStateFromOccurrence(const std::string& element_id, const core::TermOccurrence& occurrence, ImVec2 anchor) {
-    TerminologyCardState card;
-    card.element_id = element_id;
-    card.text = occurrence.text;
-    card.start_offset = occurrence.start_offset;
-    card.end_offset = occurrence.end_offset;
-    card.anchor = anchor;
-
-    if (occurrence.kind == core::TermOccurrenceKind::UndefinedAcronym) {
-        card.kind = TerminologyCardKind::Undefined;
-        return card;
-    }
-
-    if (occurrence.resolution.status == core::TermResolutionStatus::Ambiguous) {
-        card.kind = TerminologyCardKind::Ambiguous;
-        for (const auto& candidate : occurrence.resolution.candidates) {
-            card.candidates.push_back({candidate.package_ref, candidate.term_ref});
-        }
-        return card;
-    }
-
-    card.kind = TerminologyCardKind::Resolved;
-    if (occurrence.resolution.selected.has_value()) {
-        card.package_ref = occurrence.resolution.selected->package_ref;
-        card.term_ref = occurrence.resolution.selected->term_ref;
-    } else if (!occurrence.resolution.candidates.empty()) {
-        card.package_ref = occurrence.resolution.candidates.front().package_ref;
-        card.term_ref = occurrence.resolution.candidates.front().term_ref;
-    }
-    return card;
-}
-
-static void
-DrawDottedUnderline(ImDrawList* draw_list, ImVec2 start, ImVec2 end, ImU32 color, float thickness, float zoom) {
-    const float length = end.x - start.x;
-    if (length <= 0.5f)
-        return;
-    const float dash = std::max(2.0f, DpiSize(3.0f) * zoom);
-    const float gap = std::max(2.0f, DpiSize(3.0f) * zoom);
-    if (length <= dash * 1.5f) {
-        draw_list->AddLine(start, end, color, thickness);
-        return;
-    }
-    for (float x = start.x; x < end.x; x += dash + gap) {
-        const float x2 = std::min(end.x, x + dash);
-        draw_list->AddLine(ImVec2(x, start.y), ImVec2(x2, end.y), color, thickness);
-    }
-}
-
-static std::vector<TerminologySpanHitRegion>
-BuildAndDrawTerminologySpansForText(ImDrawList* draw_list,
-                                    const std::string& element_id,
-                                    const char* text_start,
-                                    const char* text_end,
-                                    ImFont* font,
-                                    float font_size,
-                                    float text_wrap,
-                                    ImVec2 text_pos,
-                                    float zoom,
-                                    const std::vector<core::TermOccurrence>& occurrences) {
-    std::vector<TerminologySpanHitRegion> regions;
-    if (!text_start || !text_end || text_start >= text_end)
-        return regions;
-
-    const char* line_start = text_start;
-    float line_y = text_pos.y;
-    const float underline_offset = std::max(1.0f, DpiSize(1.0f) * zoom);
-    const float underline_thickness = std::max(1.0f, DpiSize(1.4f) * zoom);
-    const float font_scale = zoom;
-
-    while (line_start < text_end) {
-        const char* hard_break = static_cast<const char*>(memchr(line_start, '\n', text_end - line_start));
-        const char* line_limit = hard_break ? hard_break : text_end;
-        const char* line_end = line_limit;
-        if (text_wrap > 0.0f && line_start < line_limit) {
-            const char* wrap_end = font->CalcWordWrapPositionA(font_scale, line_start, line_limit, text_wrap);
-            if (wrap_end && wrap_end > line_start && wrap_end < line_limit)
-                line_end = wrap_end;
-        }
-        const char* visible_end = line_end;
-
-        while (visible_end > line_start && std::isspace(static_cast<unsigned char>(*(visible_end - 1))))
-            --visible_end;
-
-        const std::size_t line_start_offset = static_cast<std::size_t>(line_start - text_start);
-        const std::size_t line_end_offset = static_cast<std::size_t>(visible_end - text_start);
-        for (const auto& occurrence : occurrences) {
-            if (occurrence.end_offset <= line_start_offset || occurrence.start_offset >= line_end_offset)
-                continue;
-
-            const std::size_t range_start_offset = std::max(occurrence.start_offset, line_start_offset);
-            const std::size_t range_end_offset = std::min(occurrence.end_offset, line_end_offset);
-            if (range_start_offset >= range_end_offset)
-                continue;
-
-            const char* range_start = text_start + range_start_offset;
-            const char* range_end = text_start + range_end_offset;
-            float x1 = text_pos.x + font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, line_start, range_start).x;
-            float x2 = text_pos.x + font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, line_start, range_end).x;
-            float y = line_y + font_size - underline_offset;
-            DrawDottedUnderline(draw_list,
-                                ImVec2(x1, y),
-                                ImVec2(x2, y),
-                                TerminologyUnderlineColor(occurrence),
-                                underline_thickness,
-                                zoom);
-
-            TerminologySpanHitRegion region;
-            region.min = ImVec2(x1, line_y);
-            region.max = ImVec2(x2, line_y + font_size);
-            region.card = CardStateFromOccurrence(element_id, occurrence, ImVec2(x2 + DpiSize(8.0f), line_y));
-            regions.push_back(std::move(region));
-        }
-
-        line_y += font_size;
-
-        if (line_end >= line_limit) {
-            line_start = hard_break ? hard_break + 1 : text_end;
-        } else {
-            line_start = line_end;
-            while (line_start < line_limit && std::isspace(static_cast<unsigned char>(*line_start)))
-                ++line_start;
-        }
-    }
-
-    return regions;
-}
-
-static std::vector<TerminologySpanHitRegion>
-BuildAndDrawTerminologySpans(ImDrawList* draw_list,
-                             const GsnNode& node,
-                             ImVec2 top_left,
-                             float text_left,
-                             float text_wrap,
-                             float zoom,
-                             const UiState& ui_state,
-                             const core::TerminologyService* terminology_service) {
-    if (!terminology_service || zoom < kFullLabelZoom)
-        return {};
-
-    const std::string& active_label =
-        (ui_state.show_secondary_language && !node.label_secondary.empty()) ? node.label_secondary : node.label;
-    if (active_label.empty())
-        return {};
-
-    ImFont* bold_font = g_BoldFont ? g_BoldFont : ImGui::GetFont();
-    ImFont* normal_font = ImGui::GetFont();
-    float font_size = ImGui::GetFontSize() * zoom;
-    float scaled_padding = DpiSize(kTextPadding) * zoom;
-    const char* label_start = active_label.c_str();
-    const char* label_end = label_start + active_label.size();
-    const char* first_newline = strchr(label_start, '\n');
-    if (!first_newline || first_newline + 1 >= label_end)
-        return {};
-
-    const char* detail_start = first_newline + 1;
-    const std::string detail_text(detail_start, label_end);
-    const std::vector<core::TermOccurrence> occurrences = terminology_service->DetectTermsInText(node.id, detail_text);
-    if (occurrences.empty())
-        return {};
-
-    ImVec2 bold_text_size = bold_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, label_start, first_newline);
-    ImVec2 rest_text_size = normal_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, detail_start, nullptr);
-
-    float scaled_node_height = node.size.y * zoom;
-    float total_text_height = bold_text_size.y + rest_text_size.y;
-    float text_y = top_left.y + (scaled_node_height - total_text_height) * 0.5f;
-    if (text_y < top_left.y + scaled_padding)
-        text_y = top_left.y + scaled_padding;
-
-    return BuildAndDrawTerminologySpansForText(draw_list,
-                                               node.id,
-                                               detail_start,
-                                               label_end,
-                                               normal_font,
-                                               font_size,
-                                               text_wrap,
-                                               ImVec2(text_left, text_y + bold_text_size.y),
-                                               zoom,
-                                               occurrences);
-}
-
-static bool RegionContains(const TerminologySpanHitRegion& region, ImVec2 point) {
-    return point.x >= region.min.x && point.x <= region.max.x && point.y >= region.min.y && point.y <= region.max.y;
-}
-
-static const TerminologySpanHitRegion*
-FindHoveredTerminologyRegion(const std::vector<TerminologySpanHitRegion>& regions, ImVec2 mouse_pos) {
-    const TerminologySpanHitRegion* hovered = nullptr;
-    float hovered_area = 0.0f;
-    for (const auto& region : regions) {
-        if (!RegionContains(region, mouse_pos))
-            continue;
-        const float area = std::max(1.0f, (region.max.x - region.min.x) * (region.max.y - region.min.y));
-        if (!hovered || area < hovered_area) {
-            hovered = &region;
-            hovered_area = area;
-        }
-    }
-    return hovered;
-}
-
-static const sacm::Term* ResolveCardTerm(const sacm::AssuranceCasePackage* package,
-                                         const core::TerminologyPackageRef& package_ref,
-                                         const core::TerminologyTermRef& term_ref,
-                                         const sacm::TerminologyPackage** out_package = nullptr) {
-    if (out_package)
-        *out_package = nullptr;
-    if (!package || !HasPackageRef(package_ref) || !HasTermRef(term_ref))
-        return nullptr;
-    const sacm::TerminologyPackage* terminology_package = core::FindTerminologyPackage(*package, package_ref);
-    if (!terminology_package)
-        return nullptr;
-    if (out_package)
-        *out_package = terminology_package;
-    return core::FindTerminologyTerm(*terminology_package, term_ref);
-}
-
-static std::string JoinCategoryNames(const sacm::TerminologyPackage& package, const std::vector<std::string>& refs) {
-    std::string result;
-    for (const auto& ref : refs) {
-        if (ref.empty())
-            continue;
-        if (!result.empty())
-            result += ", ";
-        result += core::CategoryDisplayName(package, ref);
-    }
-    return result;
-}
-
-static std::string CandidateSummary(const sacm::TerminologyPackage* package, const sacm::Term* term) {
-    if (!term)
-        return "Missing term";
-    std::string result = term->value.empty() ? "Term" : term->value;
-    if (!term->name.empty() && core::TrimWhitespace(term->name) != core::TrimWhitespace(term->value))
-        result += " - " + term->name;
-    if (package && !term->category_refs.empty()) {
-        const std::string categories = JoinCategoryNames(*package, term->category_refs);
-        if (!categories.empty())
-            result += " (" + categories + ")";
-    }
-    return result;
-}
-
-static void RenderTermDetails(const sacm::AssuranceCasePackage* package,
-                              const sacm::TerminologyPackage* terminology_package,
-                              const sacm::Term* term,
-                              const TerminologyCardState& card_state) {
-    if (!term) {
-        ImGui::TextColored(GetErrorColor(), "Term reference could not be resolved.");
-        return;
-    }
-
-    ImGui::TextUnformatted(term->value.empty() ? card_state.text.c_str() : term->value.c_str());
-    if (!term->name.empty() && core::TrimWhitespace(term->name) != core::TrimWhitespace(term->value))
-        ImGui::TextWrapped("%s", term->name.c_str());
-    if (!term->description.empty()) {
-        ImGui::Separator();
-        ImGui::TextWrapped("%s", term->description.c_str());
-    }
-    if (terminology_package && !term->category_refs.empty()) {
-        const std::string categories = JoinCategoryNames(*terminology_package, term->category_refs);
-        if (!categories.empty())
-            ImGui::TextDisabled("Category: %s", categories.c_str());
-    }
-    if (!term->externalReference.empty())
-        ImGui::TextDisabled("Reference: %s", term->externalReference.c_str());
-    if (!term->origin.empty())
-        ImGui::TextDisabled("Origin: %s", term->origin.c_str());
-    if (package)
-        ImGui::TextDisabled("Usage count: %d", core::CountTerminologyTermUsage(*package, *term));
-}
-
-static void RenderTerminologyCardContents(const TerminologyCardState& card_state,
-                                          const sacm::AssuranceCasePackage* package,
-                                          const ElementContextActions& actions,
-                                          bool interactive) {
-    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + DpiSize(320.0f));
-    if (card_state.kind == TerminologyCardKind::Undefined) {
-        ImGui::TextColored(GetWarningColor(), "%s is not defined.", card_state.text.c_str());
-        ImGui::TextWrapped("Define this term from the active terminology scope.");
-        if (interactive && actions.define_terminology_term) {
-            if (ImGui::Button("Define term", ImVec2(120.0f, 0.0f)))
-                actions.define_terminology_term(card_state.element_id, card_state.text);
-        }
-        ImGui::PopTextWrapPos();
-        return;
-    }
-
-    if (card_state.kind == TerminologyCardKind::Ambiguous) {
-        ImGui::TextColored(GetWarningColor(), "%s has multiple meanings.", card_state.text.c_str());
-        int shown = 0;
-        for (const auto& candidate : card_state.candidates) {
-            ImGui::PushID(shown);
-            const sacm::TerminologyPackage* candidate_package = nullptr;
-            const sacm::Term* candidate_term =
-                ResolveCardTerm(package, candidate.package_ref, candidate.term_ref, &candidate_package);
-            ImGui::BulletText("%s", CandidateSummary(candidate_package, candidate_term).c_str());
-            if (interactive && actions.add_terminology_term_as_context && candidate_term) {
-                if (ImGui::SmallButton("Use for this element")) {
-                    actions.add_terminology_term_as_context(
-                        card_state.element_id, candidate.package_ref, candidate.term_ref);
-                }
-            }
-            ImGui::PopID();
-            if (++shown >= 4 && static_cast<int>(card_state.candidates.size()) > shown) {
-                ImGui::TextDisabled("%d more candidate(s).", static_cast<int>(card_state.candidates.size()) - shown);
-                break;
-            }
-        }
-        if (interactive) {
-            if (actions.define_terminology_term && ImGui::Button("Create new meaning", ImVec2(165.0f, 0.0f)))
-                actions.define_terminology_term(card_state.element_id, card_state.text);
-        }
-        ImGui::PopTextWrapPos();
-        return;
-    }
-
-    const sacm::TerminologyPackage* terminology_package = nullptr;
-    const sacm::Term* term =
-        ResolveCardTerm(package, card_state.package_ref, card_state.term_ref, &terminology_package);
-    RenderTermDetails(package, terminology_package, term, card_state);
-    if (interactive && term) {
-        ImGui::Spacing();
-        if (actions.open_terminology_term && ImGui::Button("Open term", ImVec2(100.0f, 0.0f)))
-            actions.open_terminology_term(card_state.package_ref, card_state.term_ref);
-        ImGui::SameLine();
-        if (actions.edit_terminology_term && ImGui::Button("Edit term", ImVec2(95.0f, 0.0f)))
-            actions.edit_terminology_term(card_state.package_ref, card_state.term_ref);
-        if (actions.add_visible_terminology_term_context && ImGui::Button("Add as context", ImVec2(130.0f, 0.0f))) {
-            actions.add_visible_terminology_term_context(
-                card_state.element_id, card_state.package_ref, card_state.term_ref);
-        }
-        ImGui::SameLine();
-        if (actions.find_terminology_usages && ImGui::Button("Find usages", ImVec2(120.0f, 0.0f)))
-            actions.find_terminology_usages(card_state.package_ref, card_state.term_ref);
-    }
-    ImGui::PopTextWrapPos();
-}
-
-static void RenderTerminologyHoverCard(const TerminologyCardState& card_state,
-                                       const sacm::AssuranceCasePackage* package,
-                                       const ElementContextActions& actions) {
-    ImGui::BeginTooltip();
-    RenderTerminologyCardContents(card_state, package, actions, false);
-    ImGui::EndTooltip();
-}
-
-void RenderPinnedTerminologyCard(TerminologyCardState& card_state,
-                                 const sacm::AssuranceCasePackage* terminology_package,
-                                 const ElementContextActions& actions) {
-    if (!card_state.pinned)
-        return;
-
-    ImGui::SetNextWindowPos(card_state.anchor, ImGuiCond_Appearing);
-    ImGui::SetNextWindowSizeConstraints(ImVec2(DpiSize(280.0f), 0.0f), ImVec2(DpiSize(420.0f), FLT_MAX));
-    bool open = true;
-    const ImGuiWindowFlags flags =
-        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking;
-    if (ImGui::Begin("Term Card##gsn_term_card", &open, flags)) {
-        card_state.card_hovered_this_frame =
-            ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup | ImGuiHoveredFlags_ChildWindows);
-        RenderTerminologyCardContents(card_state, terminology_package, actions, true);
-    }
-    ImGui::End();
-    if (!open || ImGui::IsKeyPressed(ImGuiKey_Escape))
-        card_state.pinned = false;
-}
-
-static void HandleTerminologySpanInteractions(const std::vector<TerminologySpanHitRegion>& regions,
-                                              TerminologyCardState* card_state,
-                                              const sacm::AssuranceCasePackage* terminology_package,
-                                              const ElementContextActions& actions) {
-    if (!card_state || regions.empty() || g_overlay_hovered)
-        return;
-
-    const TerminologySpanHitRegion* hovered_region = FindHoveredTerminologyRegion(regions, ImGui::GetIO().MousePos);
-    if (!hovered_region)
-        return;
-
-    RenderTerminologyHoverCard(hovered_region->card, terminology_package, actions);
-    if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
-        hovered_region->card.kind == TerminologyCardKind::Resolved && actions.open_terminology_term) {
-        card_state->clicked_term_this_frame = true;
-        actions.open_terminology_term(hovered_region->card.package_ref, hovered_region->card.term_ref);
-        return;
-    }
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        *card_state = hovered_region->card;
-        card_state->pinned = true;
-        card_state->clicked_term_this_frame = true;
-    }
-}
+// ===== Terminology hover/pinned card =====
+// `TerminologySpanHitRegion`, `BuildAndDrawTerminologySpans`,
+// `HandleTerminologySpanInteractions`, and `RenderPinnedTerminologyCard`
+// live in `ui/gsn/gsn_terminology_card.{h,cpp}`.
 
 // ===== Main node drawing function =====
 
@@ -1046,7 +167,8 @@ void DrawGsnNode(const GsnNode& node,
                  const core::TerminologyService* terminology_service,
                  const sacm::AssuranceCasePackage* terminology_package,
                  TerminologyCardState* terminology_card_state,
-                 float zoom) {
+                 float zoom,
+                 bool overlay_hovered) {
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     ImVec2 top_left = ImVec2(canvas_origin.x + node.position.x * zoom, canvas_origin.y + node.position.y * zoom);
     ImVec2 bottom_right = ImVec2(top_left.x + node.size.x * zoom, top_left.y + node.size.y * zoom);
@@ -1078,7 +200,7 @@ void DrawGsnNode(const GsnNode& node,
     // Subtle hover brighten so nodes feel responsive without shifting layout.
     {
         ImVec2 mouse = ImGui::GetIO().MousePos;
-        if (!g_overlay_hovered && mouse.x >= top_left.x && mouse.x <= bottom_right.x && mouse.y >= top_left.y &&
+        if (!overlay_hovered && mouse.x >= top_left.x && mouse.x <= bottom_right.x && mouse.y >= top_left.y &&
             mouse.y <= bottom_right.y) {
             fill_color = ShadeColor(fill_color, 0.06f);
         }
@@ -1104,7 +226,8 @@ void DrawGsnNode(const GsnNode& node,
     DrawNodeLabel(draw_list, node, top_left, bottom_right, text_left, text_wrap, zoom, ink, ui_state);
     const std::vector<TerminologySpanHitRegion> terminology_regions = BuildAndDrawTerminologySpans(
         draw_list, node, top_left, text_left, text_wrap, zoom, ui_state, terminology_service);
-    HandleTerminologySpanInteractions(terminology_regions, terminology_card_state, terminology_package, actions);
+    HandleTerminologySpanInteractions(
+        terminology_regions, terminology_card_state, terminology_package, actions, overlay_hovered);
     DrawUndevelopedMarker(draw_list, node, top_left, bottom_right, zoom);
 
     // Invisible button for hit-testing.
@@ -1115,17 +238,23 @@ void DrawGsnNode(const GsnNode& node,
     ImGui::InvisibleButton(node.id.c_str(), scaled_size);
     const bool term_click_consumed = terminology_card_state && terminology_card_state->clicked_term_this_frame;
     auto proposal_text_change = ui_state.proposal_text_changes.find(node.id);
-    if (!g_overlay_hovered && proposal_text_change != ui_state.proposal_text_changes.end() &&
+    if (!overlay_hovered && proposal_text_change != ui_state.proposal_text_changes.end() &&
         ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup)) {
         RenderProposalOriginalTextCard(proposal_text_change->second, top_left, bottom_right);
     }
-    if (ImGui::IsItemClicked() && !g_overlay_hovered && !term_click_consumed) {
+    if (ImGui::IsItemClicked() && !overlay_hovered && !term_click_consumed) {
         ui_state.selected_element_id = node.id;
+        ui_state.selected_acp_id.clear();
+        ui_state.selected_relationship_id.clear();
+        ui_state.selected_relationship_edge_key.clear();
     }
 
     // Right-click context menu: select the node, then offer the Add submenu.
     if (ImGui::BeginPopupContextItem(node.id.c_str())) {
         ui_state.selected_element_id = node.id;
+        ui_state.selected_acp_id.clear();
+        ui_state.selected_relationship_id.clear();
+        ui_state.selected_relationship_edge_key.clear();
         RenderAddElementMenu(actions);
         RenderRemoveSubmenu(active_case, ui_state.selected_element_id, actions);
         ImGui::Separator();
@@ -1196,10 +325,11 @@ void DrawGsnNode(const GsnNode& node,
     }
 }
 
-void ShowGsnCanvasContent(UiState& ui_state,
-                          const parser::AssuranceCase* active_case,
-                          const ElementContextActions& actions,
-                          const sacm::AssuranceCasePackage* terminology_package) {
+void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
+                                      UiState& ui_state,
+                                      const parser::AssuranceCase* active_case,
+                                      const ElementContextActions& actions,
+                                      const sacm::AssuranceCasePackage* terminology_package) {
     // Child region with clipping; we manage our own pan/zoom offset
     // so no ImGui scrollbars are needed.
     ImU32 canvas_bg = GetTheme().canvas_bg;
@@ -1214,7 +344,6 @@ void ShowGsnCanvasContent(UiState& ui_state,
     ImGui::PopStyleColor();
 
     // --- Zoom & pan input handling ---
-    GsnCanvas& renderer = GlobalRenderer();
     ImVec2 child_pos = ImGui::GetWindowPos();
 
     // --- Background dot grid (drawn behind everything else) ---
@@ -1313,10 +442,10 @@ void ShowGsnCanvasContent(UiState& ui_state,
 
     // --- Pre-compute overlay button rects and check if mouse is over them ---
     // This prevents node clicks from firing when clicking overlay controls.
+    bool overlay_hovered = false;
     {
         ImVec2 child_size_pre = ImGui::GetWindowSize();
         ImVec2 mouse_pos = ImGui::GetIO().MousePos;
-        g_overlay_hovered = false;
 
         // Zoom strip rect
         float btn_sz = DpiSize(28.0f);
@@ -1329,7 +458,7 @@ void ShowGsnCanvasContent(UiState& ui_state,
         ImVec2 zoom_br(zx + strip_w, zy + btn_sz + DpiSize(2.0f));
         if (mouse_pos.x >= zoom_tl.x && mouse_pos.x <= zoom_br.x && mouse_pos.y >= zoom_tl.y &&
             mouse_pos.y <= zoom_br.y) {
-            g_overlay_hovered = true;
+            overlay_hovered = true;
         }
 
         // Language button rect
@@ -1341,15 +470,17 @@ void ShowGsnCanvasContent(UiState& ui_state,
             ImVec2 lang_br(lx + lbw + DpiSize(2.0f), ly + lbh + DpiSize(2.0f));
             if (mouse_pos.x >= lang_tl.x && mouse_pos.x <= lang_br.x && mouse_pos.y >= lang_tl.y &&
                 mouse_pos.y <= lang_br.y) {
-                g_overlay_hovered = true;
+                overlay_hovered = true;
             }
         }
     }
 
     // Render the canvas content
-    renderer.Render(ui_state, active_case, actions, terminology_package);
+    renderer.Render(ui_state, active_case, actions, terminology_package, overlay_hovered);
 
-    if (ImGui::BeginPopupContextWindow("##gsn_canvas_background_context",
+    const bool relationship_context_menu_active = renderer.GetLastRenderStats().relationship_context_menu_active;
+    if (!relationship_context_menu_active &&
+        ImGui::BeginPopupContextWindow("##gsn_canvas_background_context",
                                        ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems)) {
         const bool can_add_top_goal = static_cast<bool>(actions.add_top_goal);
         if (ImGui::MenuItem("Add New Top Goal", nullptr, false, can_add_top_goal)) {
@@ -1541,6 +672,13 @@ void ShowGsnCanvasContent(UiState& ui_state,
     }
 
     ImGui::EndChild();
+}
+
+void ShowGsnCanvasContent(UiState& ui_state,
+                          const parser::AssuranceCase* active_case,
+                          const ElementContextActions& actions,
+                          const sacm::AssuranceCasePackage* terminology_package) {
+    ShowGsnCanvasContentWithRenderer(GlobalRenderer(), ui_state, active_case, actions, terminology_package);
 }
 
 void ShowGsnCanvasWindow() {

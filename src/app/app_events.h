@@ -40,6 +40,13 @@ struct ActiveModelChangedEvent {
     bool focus_root = false;
 };
 
+struct ArgumentPackageCanvasRequestEvent {
+    std::string package_id;
+    std::string package_gid;
+    std::string display_name;
+    std::string focus_element_id;
+};
+
 struct SelectionChangedEvent {
     std::string element_id;
     bool center_on_selection = false;
@@ -126,6 +133,7 @@ using AppEvent = std::variant<StatusMessageEvent,
                               ConfidenceDirtyEvent,
                               ProjectFilesChangedEvent,
                               ActiveModelChangedEvent,
+                              ArgumentPackageCanvasRequestEvent,
                               SelectionChangedEvent,
                               ElementReviewVisualEvent,
                               AiReviewProposalSuggestionsEvent,

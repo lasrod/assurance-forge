@@ -3,7 +3,7 @@
 #include "core/assurance_tree.h"
 #include "core/terminology_package_service.h"
 #include "imgui.h"
-#include "parser/xml_parser.h"
+#include "core/sacm_model.h"
 #include "ui/element_context_menu.h"
 #include "ui/gsn/gsn_model.h"
 #include "ui/ui_state.h"
@@ -39,6 +39,8 @@ struct TerminologyCardCandidate {
     core::TerminologyTermRef term_ref;
 };
 
+class GsnCanvas;
+
 struct TerminologyCardState {
     bool pinned = false;
     bool clicked_term_this_frame = false;
@@ -68,7 +70,8 @@ void DrawGsnNode(const GsnNode& node,
                  const core::TerminologyService* terminology_service = nullptr,
                  const sacm::AssuranceCasePackage* terminology_package = nullptr,
                  TerminologyCardState* terminology_card_state = nullptr,
-                 float zoom = 1.0f);
+                 float zoom = 1.0f,
+                 bool overlay_hovered = false);
 
 void RenderPinnedTerminologyCard(TerminologyCardState& card_state,
                                  const sacm::AssuranceCasePackage* terminology_package,
@@ -85,8 +88,11 @@ void ShowGsnCanvasContent(UiState& ui_state,
                           const ElementContextActions& actions,
                           const sacm::AssuranceCasePackage* terminology_package = nullptr);
 
-// High-level renderer class (in implementation file)
-class GsnCanvas;
+void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
+                                      UiState& ui_state,
+                                      const parser::AssuranceCase* active_case,
+                                      const ElementContextActions& actions,
+                                      const sacm::AssuranceCasePackage* terminology_package = nullptr);
 
 // Provide a simple setter so external code (app) can push elements to the
 // canvas renderer (legacy).

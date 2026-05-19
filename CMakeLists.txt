@@ -175,126 +175,29 @@ function(af_copy_sccg_data target_name)
     endif()
 endfunction()
 
-set(ASSURANCE_FORGE_SHARED_SOURCES
-    src/export/gsn_svg_exporter.cpp
-    src/export/gsn_projection.cpp
-    src/export/gsn_svg_layout.cpp
-    src/export/svg_writer.cpp
-    src/parser/model_utils.cpp
-    src/parser/xml_parser.cpp
-    src/ui/confidence_model.cpp
-    src/ui/panels/welcome_modal.cpp
-    src/ui/panels/confidence_panel.cpp
-    src/ui/panels/element_panel.cpp
-    src/ui/panels/package_details_panel.cpp
-    src/ui/panels/preferences_panel.cpp
-    src/ui/panels/problems_panel.cpp
-    src/ui/panels/project_explorer_panel.cpp
-    src/ui/panels/review_panel.cpp
-    src/ui/panels/sacm_viewer_panel.cpp
-    src/ui/panels/terminology_package_panel.cpp
-    src/ui/panels/terminology_usages_panel.cpp
-    src/ui/widgets/splitter.cpp
-    src/ui/gsn/gsn_canvas.cpp
-    src/ui/gsn/gsn_layout.cpp
-    src/ui/gsn/gsn_canvas_renderer.cpp
-    src/ui/gsn/gsn_adapter.cpp
-    src/ui/element_context_menu.cpp
-    src/ui/tree_view.cpp
-    src/ui/register_views.cpp
-    src/ui/ui_state.cpp
-    src/ui/localization.cpp
-    src/ui/theme.cpp
-    src/core/app_state.cpp
-    src/core/assurance_tree.cpp
-    src/core/element_factory.cpp
-    src/core/confidence/confidence_store.cpp
-    src/core/gsn_layout.cpp
-    src/core/string_utils.cpp
-    src/core/time_utils.cpp
-    src/core/tree_editing.cpp
-    src/core/problems/problem_attention.cpp
-    src/core/problems/problem_item.cpp
-    src/core/problems/problems_manager.cpp
-    src/core/problems/problem_utils.cpp
-    src/core/project_model.cpp
-    src/core/project_service.cpp
-    src/core/reviews/review_item.cpp
-    src/core/reviews/review_item_manager.cpp
-    src/core/reviews/review_proposal.cpp
-    src/core/reviews/review_proposal_factory.cpp
-    src/core/reviews/review_proposal_manager.cpp
-    src/core/reviews/review_proposal_patch_service.cpp
-    src/core/reviews/review_text_utils.cpp
-    src/core/sacm_identity.cpp
-    src/core/sha256.cpp
-    src/core/terminology_package_service.cpp
-    src/core/terminology_scope_service.cpp
-    src/core/terminology_text_utils.cpp
-    src/sacm/sacm_parser.cpp
-    src/sacm/sacm_package_tree.cpp
-    src/sacm/sacm_serializer.cpp
-)
-set(ASSURANCE_FORGE_APP_SOURCES
-    src/ai/ai_claim_review.cpp
-    src/ai/ai_service.cpp
-    src/ai/ai_settings.cpp
-    src/ai/ai_task_runner.cpp
-    src/ai/ai_types.cpp
-    src/ai/http_client.cpp
-    src/ai/libcurl_http_client.cpp
-    src/ai/openai_provider.cpp
-    src/ai/secret_store.cpp
-    src/app/main.cpp
-    src/app/controllers/ai_review_controller.cpp
-    src/app/controllers/confidence_controller.cpp
-    src/app/app_runtime_ai.cpp
-    src/app/app_ui_bootstrap.cpp
-    src/app/app_runtime_project.cpp
-    src/app/app_runtime.cpp
-    src/app/app_runtime_state.cpp
-    src/app/actions/ai_review_actions.cpp
-    src/app/actions/element_actions.cpp
-    src/app/actions/proposal_actions.cpp
-    src/app/actions/review_actions.cpp
-    src/app/actions/terminology_actions.cpp
-    src/app/areas/ai_debug_area.cpp
-    src/app/areas/argument_navigator_area.cpp
-    src/app/areas/feedback_dock_area.cpp
-    src/app/areas/inspector_area.cpp
-    src/app/areas/modal_host.cpp
-    src/app/areas/problems_area.cpp
-    src/app/areas/proposal_editor_area.cpp
-    src/app/areas/project_explorer_area.cpp
-    src/app/areas/review_panel_area.cpp
-    src/app/areas/term_usages_area.cpp
-    src/app/areas/workbench_area.cpp
-    src/app/frame/app_layout_regions.cpp
-    src/app/frame/app_menu_bar.cpp
-    src/app/frame/app_shell.cpp
-    src/app/guideline_catalog.cpp
-    src/app/confidence_problem_sync.cpp
-    src/app/review_problem_sync.cpp
-    src/app/controllers/element_edit_controller.cpp
-    src/app/controllers/modal_coordinator.cpp
-    src/app/native_file_dialogs.cpp
-    src/app/controllers/project_controller.cpp
-    src/app/controllers/proposal_controller.cpp
-    src/app/project_workflow.cpp
-    src/app/proposal_ui_state.cpp
-    src/app/recent_projects.cpp
-    src/app/controllers/review_controller.cpp
-    src/app/sacm_argument_sync.cpp
-    src/app/terminology_problem_sync.cpp
-    src/parser/guidelines_parser.cpp
-    src/parser/sccg_dist_parser.cpp
-    ${ASSURANCE_FORGE_SHARED_SOURCES}
+add_subdirectory(src)
+
+# --- Layer-gate check ---
+# Standalone CMake script enforces src/ include-direction rules.
+# Runs at configure time so violations fail fast.
+include(${CMAKE_SOURCE_DIR}/cmake/check_layer_gates.cmake)
+add_custom_target(check_layer_gates ALL
+    COMMAND ${CMAKE_COMMAND}
+        -DAF_SOURCE_DIR=${CMAKE_SOURCE_DIR}/src
+        -P ${CMAKE_SOURCE_DIR}/cmake/check_layer_gates.cmake
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Checking src/ layer gates"
+    VERBATIM
 )
 
 # --- Main application ---
-hello_imgui_add_app(assurance-forge ${ASSURANCE_FORGE_APP_SOURCES})
-target_include_directories(assurance-forge PRIVATE src ${ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS})
-target_link_libraries(assurance-forge PRIVATE imgui pugixml nfd picosha2 nlohmann_json::nlohmann_json ${AF_YAML_CPP_TARGET} CURL::libcurl)
+# Source lists live in src/<layer>/CMakeLists.txt as OBJECT libraries.
+# main.cpp is compiled directly into the executable; everything else
+# is linked in via the per-layer af_* targets.
+hello_imgui_add_app(assurance-forge src/app/main.cpp)
+target_link_libraries(assurance-forge PRIVATE
+    af_app af_ui af_ai af_export af_core af_sacm af_parser
+)
 if(WIN32)
     target_link_libraries(assurance-forge PRIVATE bcrypt advapi32 ole32 shell32 dwmapi)
 endif()
@@ -324,6 +227,7 @@ add_executable(tests
     tests/test_terminology_actions.cpp
     tests/test_terminology_package_service.cpp
     tests/test_terminology_scope_service.cpp
+    tests/test_terminology_visible_term_context.cpp
     tests/test_element_factory.cpp
     tests/test_tree_editing.cpp
     tests/test_app_state.cpp
@@ -332,6 +236,7 @@ add_executable(tests
     tests/test_proposal_controller.cpp
     tests/test_sha256.cpp
     tests/test_app_events.cpp
+    tests/test_acp_problem_sync.cpp
     tests/test_confidence_problem_sync.cpp
     tests/test_ai_review_controller.cpp
     tests/test_review_problem_sync.cpp
@@ -350,77 +255,21 @@ add_executable(tests
     tests/test_ui_state.cpp
     tests/test_confidence_model.cpp
     tests/test_confidence_store.cpp
+    tests/test_assurance_claim_point.cpp
+    tests/test_acp_editing.cpp
+    tests/test_acp_relationship_index.cpp
     tests/test_recent_projects.cpp
     tests/test_shared_utils.cpp
     tests/test_gsn_svg_exporter.cpp
-    src/export/gsn_svg_exporter.cpp
-    src/export/gsn_projection.cpp
-    src/export/gsn_svg_layout.cpp
-    src/export/svg_writer.cpp
-    src/ai/ai_service.cpp
-    src/ai/ai_claim_review.cpp
-    src/ai/ai_settings.cpp
-    src/ai/ai_task_runner.cpp
-    src/ai/ai_types.cpp
-    src/ai/libcurl_http_client.cpp
-    src/ai/http_client.cpp
-    src/ai/openai_provider.cpp
-    src/ai/secret_store.cpp
-    src/app/app_runtime_state.cpp
-    src/app/actions/terminology_actions.cpp
-    src/app/controllers/ai_review_controller.cpp
-    src/app/controllers/confidence_controller.cpp
-    src/app/controllers/element_edit_controller.cpp
-    src/app/controllers/modal_coordinator.cpp
-    src/app/controllers/project_controller.cpp
-    src/app/project_workflow.cpp
-    src/app/controllers/proposal_controller.cpp
-    src/app/recent_projects.cpp
-    src/app/guideline_catalog.cpp
-    src/app/confidence_problem_sync.cpp
-    src/app/review_problem_sync.cpp
-    src/app/controllers/review_controller.cpp
-    src/parser/guidelines_parser.cpp
-    src/parser/sccg_dist_parser.cpp
-    src/parser/model_utils.cpp
-    src/parser/xml_parser.cpp
-    src/core/assurance_tree.cpp
-    src/core/confidence/confidence_store.cpp
-    src/core/element_factory.cpp
-    src/core/gsn_layout.cpp
-    src/core/string_utils.cpp
-    src/core/time_utils.cpp
-    src/core/tree_editing.cpp
-    src/core/problems/problem_attention.cpp
-    src/core/problems/problem_item.cpp
-    src/core/problems/problems_manager.cpp
-    src/core/problems/problem_utils.cpp
-    src/core/project_model.cpp
-    src/core/project_service.cpp
-    src/core/app_state.cpp
-    src/core/reviews/review_item.cpp
-    src/core/reviews/review_item_manager.cpp
-    src/core/reviews/review_proposal.cpp
-    src/core/reviews/review_proposal_factory.cpp
-    src/core/reviews/review_proposal_manager.cpp
-    src/core/reviews/review_proposal_patch_service.cpp
-    src/core/reviews/review_text_utils.cpp
-    src/core/sacm_identity.cpp
-    src/core/sha256.cpp
-    src/core/terminology_package_service.cpp
-    src/core/terminology_scope_service.cpp
-    src/core/terminology_text_utils.cpp
-    src/ui/gsn/gsn_layout.cpp
-    src/ui/confidence_model.cpp
-    src/ui/localization.cpp
-    src/ui/theme.cpp
-    src/ui/ui_state.cpp
-    src/sacm/sacm_parser.cpp
-    src/sacm/sacm_package_tree.cpp
-    src/sacm/sacm_serializer.cpp
 )
-target_include_directories(tests PRIVATE src ${ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS})
-target_link_libraries(tests PRIVATE GTest::gtest_main hello_imgui pugixml imgui picosha2 nlohmann_json::nlohmann_json ${AF_YAML_CPP_TARGET} CURL::libcurl)
+# Production sources are pulled in via the per-layer af_* OBJECT libraries
+# (see src/<layer>/CMakeLists.txt). The tests target intentionally links
+# everything so any production header is reachable from tests.
+target_link_libraries(tests PRIVATE
+    GTest::gtest_main
+    hello_imgui
+    af_app af_ui af_ai af_export af_core af_sacm af_parser
+)
 if(WIN32)
     target_link_libraries(tests PRIVATE bcrypt advapi32 dwmapi)
 

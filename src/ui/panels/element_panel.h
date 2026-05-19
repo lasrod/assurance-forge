@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/terminology_package_service.h"
-#include "parser/xml_parser.h"
+#include "core/sacm_model.h"
 #include "sacm/sacm_model.h"
 #include "ui/panels/confidence_panel.h"
 

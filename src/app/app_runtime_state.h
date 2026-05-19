@@ -6,6 +6,7 @@
 #include "ai/secret_store.h"
 #include "app/app_events.h"
 #include "app/controllers/ai_review_controller.h"
+#include "app/controllers/acp_controller.h"
 #include "app/controllers/confidence_controller.h"
 #include "app/controllers/element_edit_controller.h"
 #include "app/controllers/modal_coordinator.h"
@@ -48,6 +49,14 @@ struct AiUiState {
 };
 
 struct WorkbenchState {
+    struct ArgumentPackageCanvasTab {
+        std::string key;
+        std::string package_id;
+        std::string package_gid;
+        std::string title;
+        std::filesystem::path source_file_path;
+    };
+
     bool force_center_tab_selection = false;
     bool pending_focus_root = false;
     bool focus_review_tab = false;
@@ -57,6 +66,8 @@ struct WorkbenchState {
     bool show_evidence_tab = false;
     bool show_package_details_tab = false;
     bool show_terminology_package_tab = false;
+    std::vector<ArgumentPackageCanvasTab> argument_package_canvas_tabs;
+    std::string active_argument_package_canvas_key;
 };
 
 struct TerminologyUiState {
@@ -125,6 +136,7 @@ struct AppRuntimeState {
     std::unique_ptr<controllers::ProposalController> proposal_controller;
     std::unique_ptr<controllers::ReviewController> review_controller;
     std::unique_ptr<controllers::ConfidenceController> confidence_controller;
+    std::unique_ptr<controllers::AcpController> acp_controller;
     std::optional<GuidelineCatalog> guideline_catalog;
     bool guideline_catalog_load_attempted = false;
     std::string guideline_catalog_error;

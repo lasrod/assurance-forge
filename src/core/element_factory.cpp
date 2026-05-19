@@ -1,6 +1,9 @@
 #include "core/element_factory.h"
 
+#include "core/acp/assurance_claim_point.h"
+
 #include <algorithm>
+#include <cctype>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -61,6 +64,32 @@ std::string GenerateUniqueId(const std::unordered_set<std::string>& existing, co
             return candidate;
     }
     return prefix + "x";
+}
+
+std::string AcpPrefixForPackage(const sacm::ArgumentPackage* package) {
+    if (!package || !core::acp::IsConfidenceArgumentPackage(*package))
+        return {};
+    const std::string marker = "_AP";
+    const std::size_t marker_pos = package->id.rfind(marker);
+    if (marker_pos == std::string::npos || marker_pos == 0)
+        return {};
+    for (std::size_t index = marker_pos + marker.size(); index < package->id.size(); ++index) {
+        if (!std::isdigit(static_cast<unsigned char>(package->id[index])))
+            return {};
+    }
+    return package->id.substr(0, marker_pos);
+}
+
+std::string ScopedPrefixFor(const sacm::ArgumentPackage* package, NewElementKind kind) {
+    const std::string acp_prefix = AcpPrefixForPackage(package);
+    if (acp_prefix.empty())
+        return PrefixFor(kind);
+    return acp_prefix + "_" + PrefixFor(kind);
+}
+
+std::string ScopedRelationshipPrefixFor(const sacm::ArgumentPackage* package) {
+    const std::string acp_prefix = AcpPrefixForPackage(package);
+    return acp_prefix.empty() ? std::string("R") : acp_prefix + "_R";
 }
 
 const parser::SacmElement* FindElement(const parser::AssuranceCase& ac, const std::string& id) {
@@ -208,11 +237,11 @@ bool AddChildElement(parser::AssuranceCase& ac,
 
     // Build the new element + its relationship.
     parser::SacmElement new_elem;
-    new_elem.id = reserve_id(PrefixFor(kind));
+    new_elem.id = reserve_id(ScopedPrefixFor(ap, kind));
     new_elem.name = DefaultNameFor(kind);
 
     parser::SacmElement rel;
-    rel.id = reserve_id("R");
+    rel.id = reserve_id(ScopedRelationshipPrefixFor(ap));
     rel.target_refs.push_back(parent_id);
 
     switch (kind) {

@@ -8,8 +8,10 @@
 
 namespace app {
 struct AppRuntimeState;
-namespace frame { struct AppLayoutRegion; }
+namespace frame {
+struct AppLayoutRegion;
 }
+} // namespace app
 
 namespace app::areas {
 
@@ -21,6 +23,7 @@ struct ProjectExplorerAreaCallbacks {
     std::function<void(const core::ProjectFileEntry&)> open_file;
     std::function<void(const core::ProjectFileEntry&, const sacm::SacmPackageTreeNode&)> open_package_node;
     std::function<void(const core::ProjectFileEntry&, const sacm::SacmPackageTreeNode&)> add_terminology_package;
+    std::function<void(const core::ProjectFileEntry&, const sacm::SacmPackageTreeNode&)> remove_package;
 };
 
 void RenderProjectExplorerArea(AppRuntimeState& state,

@@ -16,9 +16,8 @@ class ConfidenceController {
 public:
     explicit ConfidenceController(AppEvents& events);
 
-    bool ConfigureStorage(const std::filesystem::path& confidence_path,
-                          const std::string& project_id,
-                          std::string& error);
+    bool
+    ConfigureStorage(const std::filesystem::path& confidence_path, const std::string& project_id, std::string& error);
     void ClearStorage();
     bool SaveIfDirty(core::AssuranceProject& project, std::string& error);
     bool BackupInvalidAndStartNew(std::string& error);
@@ -39,9 +38,8 @@ public:
 
     const core::confidence::ConfidenceAssessment* FindForElement(const parser::SacmElement& element) const;
     std::optional<ui::ElementConfidence> ConfidenceForElement(const parser::SacmElement& element) const;
-    bool UpsertElementConfidence(const parser::SacmElement& element,
-                                 ui::ElementConfidence confidence,
-                                 std::string& error);
+    bool
+    UpsertElementConfidence(const parser::SacmElement& element, ui::ElementConfidence confidence, std::string& error);
     bool SetElementConfidenceActive(const parser::SacmElement& element, bool active, std::string& error);
     bool MarkElementReviewed(const parser::SacmElement& element, std::string& error);
 

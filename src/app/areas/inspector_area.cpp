@@ -5,7 +5,10 @@
 #include "app/frame/app_layout_regions.h"
 #include "core/confidence/confidence_store.h"
 #include "core/sacm_identity.h"
+#include "ui/panels/acp_panel.h"
 #include "ui/panels/element_panel.h"
+#include "ui/panels/relationship_panel.h"
+#include "ui/ui_state.h"
 
 #include <string>
 
@@ -29,6 +32,43 @@ void RenderInspectorArea(AppRuntimeState& state,
             state.app_state.loaded_case.has_value() ? &state.app_state.loaded_case.value() : nullptr;
         sacm::AssuranceCasePackage* sacm_package =
             state.app_state.sacm_package.has_value() ? &state.app_state.sacm_package.value() : nullptr;
+        if (!ui::GetUiState().selected_acp_id.empty()) {
+            ui::panels::AcpPanelCallbacks acp_callbacks;
+            acp_callbacks.upsert_acp = [&](const parser::AcpRecord& acp) {
+                return state.acp_controller && loaded_case &&
+                       state.acp_controller->UpsertAcp(*loaded_case, sacm_package, acp);
+            };
+            acp_callbacks.remove_acp = [&](const std::string& acp_id) {
+                return state.acp_controller && loaded_case &&
+                       state.acp_controller->RemoveAcp(*loaded_case, sacm_package, acp_id);
+            };
+            acp_callbacks.create_confidence_argument_tree = [&](const std::string& acp_id) {
+                return state.acp_controller && loaded_case &&
+                       state.acp_controller->CreateConfidenceArgumentTreeForAcp(*loaded_case, sacm_package, acp_id);
+            };
+            acp_callbacks.open_confidence_argument_tree = [&](const std::string& acp_id) {
+                return state.acp_controller && loaded_case &&
+                       state.acp_controller->OpenConfidenceArgumentTreeForAcp(*loaded_case, acp_id);
+            };
+            acp_callbacks.navigate_to_element = [&](const std::string& element_id) {
+                state.events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
+                state.events.Emit(SelectionChangedEvent{element_id, true});
+            };
+            ui::panels::ShowAcpPanel(loaded_case, sacm_package, &acp_callbacks);
+            ImGui::End();
+            return;
+        }
+        if (!ui::GetUiState().selected_relationship_id.empty()) {
+            ui::panels::RelationshipPanelCallbacks relationship_callbacks;
+            relationship_callbacks.add_acp = [&](const std::string& relationship_id) {
+                return state.acp_controller && loaded_case &&
+                       state.acp_controller->AddRelationshipAcp(*loaded_case, sacm_package, relationship_id);
+            };
+            relationship_callbacks.open_acp = [](const std::string&) {};
+            ui::panels::ShowRelationshipPanel(loaded_case, &relationship_callbacks);
+            ImGui::End();
+            return;
+        }
         ui::panels::ElementTerminologyAssistCallbacks terminology_callbacks;
         terminology_callbacks.define_term = callbacks.define_terminology_term;
         terminology_callbacks.link_existing_term = callbacks.link_existing_terminology_term;
@@ -57,8 +97,8 @@ void RenderInspectorArea(AppRuntimeState& state,
                 model.method_label = assessment->method == core::confidence::ConfidenceMethod::JosangOpinion
                                          ? "Jøsang opinion"
                                          : "Fixed value";
-                model.status_label = assessment->status == core::confidence::ConfidenceStatus::Inactive ? "Inactive"
-                                                                                                         : "Active";
+                model.status_label =
+                    assessment->status == core::confidence::ConfidenceStatus::Inactive ? "Inactive" : "Active";
             }
             return model;
         };
@@ -77,7 +117,8 @@ void RenderInspectorArea(AppRuntimeState& state,
                     return false;
                 }
                 std::string error;
-                const core::EnsureGidResult gid_result = core::EnsureElementGid(*loaded_case, sacm_package, element, error);
+                const core::EnsureGidResult gid_result =
+                    core::EnsureElementGid(*loaded_case, sacm_package, element, error);
                 if (gid_result == core::EnsureGidResult::Failed) {
                     state.events.Emit(StatusMessageEvent{"Confidence save failed: " + error});
                     return false;
@@ -115,7 +156,8 @@ void RenderInspectorArea(AppRuntimeState& state,
                 state.events.Emit(StatusMessageEvent{"Confidence reset failed: " + error});
                 return false;
             }
-            state.events.Emit(StatusMessageEvent{"Backed up invalid confidence file; new confidence storage will be saved with the project."});
+            state.events.Emit(StatusMessageEvent{
+                "Backed up invalid confidence file; new confidence storage will be saved with the project."});
             return true;
         };
         if (ui::panels::ShowElementPanel(loaded_case, sacm_package, &terminology_callbacks, &confidence_callbacks)) {
@@ -129,8 +171,9 @@ void RenderInspectorArea(AppRuntimeState& state,
                 }
                 if (confidence_changed && state.confidence_controller->LastInactivatedCount() > 0) {
                     const int count = state.confidence_controller->LastInactivatedCount();
-                    state.events.Emit(StatusMessageEvent{std::to_string(count) +
-                                                         " confidence assessment(s) were marked inactive because their target elements changed."});
+                    state.events.Emit(StatusMessageEvent{
+                        std::to_string(count) +
+                        " confidence assessment(s) were marked inactive because their target elements changed."});
                 }
             }
             if (callbacks.mark_element_modified)

@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "parser/xml_parser.h"
+#include "core/sacm_model.h"
 #include "ui/confidence_model.h"
 
 #include <string>
@@ -46,6 +46,9 @@ struct ProposalTextChangePreview {
 
 struct UiState {
     std::string selected_element_id;
+    std::string selected_acp_id;
+    std::string selected_relationship_id;
+    std::string selected_relationship_edge_key;
 
     // Language toggle for GSN canvas
     bool show_secondary_language = false;

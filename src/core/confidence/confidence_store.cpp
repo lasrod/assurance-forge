@@ -425,17 +425,15 @@ std::string NextAssessmentId(const ConfidenceStore& store) {
             continue;
         try {
             max_id = std::max(max_id, std::stoi(assessment.id.substr(prefix.size())));
-        } catch (...) {
-        }
+        } catch (...) {}
     }
     std::ostringstream out;
     out << "conf-" << std::setw(6) << std::setfill('0') << (max_id + 1);
     return out.str();
 }
 
-const ConfidenceAssessment* FindAssessment(const ConfidenceStore& store,
-                                           const std::string& source_id,
-                                           const std::string& sacm_gid) {
+const ConfidenceAssessment*
+FindAssessment(const ConfidenceStore& store, const std::string& source_id, const std::string& sacm_gid) {
     for (const ConfidenceAssessment& assessment : store.assessments) {
         if (assessment.target.kind == ConfidenceTargetKind::Element && assessment.target.sourceId == source_id &&
             assessment.target.sacmGid == sacm_gid) {
@@ -445,7 +443,8 @@ const ConfidenceAssessment* FindAssessment(const ConfidenceStore& store,
     return nullptr;
 }
 
-ConfidenceAssessment* FindAssessment(ConfidenceStore& store, const std::string& source_id, const std::string& sacm_gid) {
+ConfidenceAssessment*
+FindAssessment(ConfidenceStore& store, const std::string& source_id, const std::string& sacm_gid) {
     for (ConfidenceAssessment& assessment : store.assessments) {
         if (assessment.target.kind == ConfidenceTargetKind::Element && assessment.target.sourceId == source_id &&
             assessment.target.sacmGid == sacm_gid) {

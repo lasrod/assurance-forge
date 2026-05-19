@@ -51,7 +51,8 @@ void DrawOpinionSliderBar(const char* label, SubjectiveOpinion& opinion, Opinion
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(label);
 
-    const bool value_fits_on_label_line = label_width + ImGui::GetStyle().ItemSpacing.x + value_width <= available_width;
+    const bool value_fits_on_label_line =
+        label_width + ImGui::GetStyle().ItemSpacing.x + value_width <= available_width;
     if (value_fits_on_label_line) {
         const float value_x = std::max(label_width + ImGui::GetStyle().ItemSpacing.x, available_width - value_width);
         ImGui::SameLine(value_x);
@@ -78,7 +79,8 @@ void DrawOpinionSliderBar(const char* label, SubjectiveOpinion& opinion, Opinion
     const ImVec2 min(cursor.x, y);
     const ImVec2 max(cursor.x + size.x, y + bar_height);
     const float fill_x = min.x + size.x * value;
-    draw_list->AddRectFilled(min, max, WithAlpha(theme.surface_3, hovered || active ? 0.86f : 0.60f), bar_height * 0.5f);
+    draw_list->AddRectFilled(
+        min, max, WithAlpha(theme.surface_3, hovered || active ? 0.86f : 0.60f), bar_height * 0.5f);
     draw_list->AddRectFilled(min, ImVec2(fill_x, max.y), WithAlpha(color, active ? 1.0f : 0.88f), bar_height * 0.5f);
     draw_list->AddCircleFilled(ImVec2(fill_x, (min.y + max.y) * 0.5f), active ? 6.0f : 4.8f, theme.text_primary, 18);
     draw_list->AddCircleFilled(ImVec2(fill_x, (min.y + max.y) * 0.5f), active ? 4.0f : 3.0f, color, 18);
@@ -159,16 +161,18 @@ void DrawFinalConfidence(float value, bool active) {
     ImGui::TextUnformatted("Confidence");
     if (ui::gsn::g_BoldFont)
         ImGui::PushFont(ui::gsn::g_BoldFont);
-    ImGui::PushStyleColor(ImGuiCol_Text,
-                          ImGui::ColorConvertU32ToFloat4(active ? theme.accent_hover : WithAlpha(theme.text_secondary, 0.58f)));
+    ImGui::PushStyleColor(
+        ImGuiCol_Text,
+        ImGui::ColorConvertU32ToFloat4(active ? theme.accent_hover : WithAlpha(theme.text_secondary, 0.58f)));
     ImGui::Text("%.2f", value);
     ImGui::PopStyleColor();
     if (ui::gsn::g_BoldFont)
         ImGui::PopFont();
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::ColorConvertU32ToFloat4(WithAlpha(theme.surface_3, active ? 0.68f : 0.28f)));
+    ImGui::PushStyleColor(ImGuiCol_FrameBg,
+                          ImGui::ColorConvertU32ToFloat4(WithAlpha(theme.surface_3, active ? 0.68f : 0.28f)));
     ImGui::PushStyleColor(ImGuiCol_PlotHistogram,
-                          ImGui::ColorConvertU32ToFloat4(WithAlpha(active ? theme.accent : theme.text_secondary,
-                                                                    active ? 0.90f : 0.22f)));
+                          ImGui::ColorConvertU32ToFloat4(
+                              WithAlpha(active ? theme.accent : theme.text_secondary, active ? 0.90f : 0.22f)));
     ImGui::ProgressBar(value, ImVec2(-1.0f, 10.0f), "");
     ImGui::PopStyleColor(2);
 }
@@ -204,7 +208,8 @@ void DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
     const bool suppress_triangle_drag = ImGui::GetStateStorage()->GetBool(suppress_triangle_drag_id, false);
     const bool pressed_or_dragged = active && !suppress_triangle_drag && ImGui::IsMouseDown(ImGuiMouseButton_Left);
 
-    draw_list->AddRectFilled(surface_min, surface_max, WithAlpha(theme.surface_2, hovered || active ? 0.96f : 0.78f), rounding);
+    draw_list->AddRectFilled(
+        surface_min, surface_max, WithAlpha(theme.surface_2, hovered || active ? 0.96f : 0.78f), rounding);
     draw_list->AddRect(surface_min,
                        surface_max,
                        WithAlpha(hovered || active ? theme.accent : theme.border, hovered || active ? 0.78f : 0.72f),
@@ -257,15 +262,29 @@ void DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
         draw_list->AddLine(ToImVec2(b_top), ToImVec2(b_bottom), grid_color, 1.0f);
     }
 
-    draw_list->AddLine(uncertainty, ImVec2((disbelief.x + belief.x) * 0.5f, bottom), WithAlpha(theme.border_strong, 0.44f), 1.2f);
-    draw_list->AddLine(disbelief, ImVec2((uncertainty.x + belief.x) * 0.5f, (uncertainty.y + belief.y) * 0.5f), WithAlpha(theme.border_strong, 0.36f), 1.0f);
-    draw_list->AddLine(belief, ImVec2((uncertainty.x + disbelief.x) * 0.5f, (uncertainty.y + disbelief.y) * 0.5f), WithAlpha(theme.border_strong, 0.36f), 1.0f);
+    draw_list->AddLine(
+        uncertainty, ImVec2((disbelief.x + belief.x) * 0.5f, bottom), WithAlpha(theme.border_strong, 0.44f), 1.2f);
+    draw_list->AddLine(disbelief,
+                       ImVec2((uncertainty.x + belief.x) * 0.5f, (uncertainty.y + belief.y) * 0.5f),
+                       WithAlpha(theme.border_strong, 0.36f),
+                       1.0f);
+    draw_list->AddLine(belief,
+                       ImVec2((uncertainty.x + disbelief.x) * 0.5f, (uncertainty.y + disbelief.y) * 0.5f),
+                       WithAlpha(theme.border_strong, 0.36f),
+                       1.0f);
     draw_list->AddTriangle(uncertainty, disbelief, belief, WithAlpha(theme.border_strong, 0.95f), 1.8f);
 
     const bool labels_fit = size.x >= 230.0f;
-    DrawTextCentered(draw_list, ImVec2(uncertainty.x, std::max(origin.y + 10.0f, uncertainty.y - 15.0f)), "Uncertainty", theme.text_secondary);
-    DrawTextCentered(draw_list, ImVec2(disbelief.x + (labels_fit ? 22.0f : 12.0f), disbelief.y + 16.0f), "Disbelief", theme.text_secondary);
-    DrawTextCentered(draw_list, ImVec2(belief.x - (labels_fit ? 16.0f : 8.0f), belief.y + 16.0f), "Belief", theme.text_secondary);
+    DrawTextCentered(draw_list,
+                     ImVec2(uncertainty.x, std::max(origin.y + 10.0f, uncertainty.y - 15.0f)),
+                     "Uncertainty",
+                     theme.text_secondary);
+    DrawTextCentered(draw_list,
+                     ImVec2(disbelief.x + (labels_fit ? 22.0f : 12.0f), disbelief.y + 16.0f),
+                     "Disbelief",
+                     theme.text_secondary);
+    DrawTextCentered(
+        draw_list, ImVec2(belief.x - (labels_fit ? 16.0f : 8.0f), belief.y + 16.0f), "Belief", theme.text_secondary);
 
     if (labels_fit) {
         const auto marker_position = [centroid](ImVec2 vertex) {
@@ -283,11 +302,8 @@ void DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
 
     if (pressed_or_dragged) {
         const ImVec2 mouse = ImGui::GetIO().MousePos;
-        SubjectiveOpinion next = OpinionFromPoint(ToConfidencePoint(mouse),
-                                                  uncertainty_vertex,
-                                                  disbelief_vertex,
-                                                  belief_vertex,
-                                                  opinion.base_rate);
+        SubjectiveOpinion next = OpinionFromPoint(
+            ToConfidencePoint(mouse), uncertainty_vertex, disbelief_vertex, belief_vertex, opinion.base_rate);
         opinion = next;
     }
 
@@ -311,7 +327,8 @@ void DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
     if (help_hovered) {
         ImGui::SetTooltip("Jøsang's opinion triangle");
     } else if (hovered || active) {
-        ImGui::SetTooltip("Belief %.2f\nDisbelief %.2f\nUncertainty %.2f", opinion.belief, opinion.disbelief, opinion.uncertainty);
+        ImGui::SetTooltip(
+            "Belief %.2f\nDisbelief %.2f\nUncertainty %.2f", opinion.belief, opinion.disbelief, opinion.uncertainty);
     }
 
     ImGui::PopID();
@@ -340,7 +357,8 @@ void DrawOpinionMode(ElementConfidence& confidence) {
     DrawOpinionSliderBar("Uncertainty", confidence.opinion, OpinionComponent::Uncertainty, theme.info);
 
     ImGui::Spacing();
-    const char* base_rate_tooltip = "Base rate controls how much unresolved uncertainty counts toward projected confidence.\nProjected confidence = belief + base rate * uncertainty.";
+    const char* base_rate_tooltip = "Base rate controls how much unresolved uncertainty counts toward projected "
+                                    "confidence.\nProjected confidence = belief + base rate * uncertainty.";
     ImGui::Text("Base rate %.2f", confidence.opinion.base_rate);
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", base_rate_tooltip);
@@ -402,7 +420,8 @@ bool ShowConfidencePanel(const ConfidencePanelModel& model, const ConfidencePane
 
     if (model.stale) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.warning));
-        ImGui::TextWrapped("This confidence assessment may be stale because the element changed after the value was stored.");
+        ImGui::TextWrapped(
+            "This confidence assessment may be stale because the element changed after the value was stored.");
         ImGui::PopStyleColor();
         if (ImGui::Button("Mark as reviewed") && callbacks.mark_reviewed)
             changed = callbacks.mark_reviewed() || changed;

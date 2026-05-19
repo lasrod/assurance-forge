@@ -32,7 +32,8 @@ core::confidence::ConfidenceAssessment MakeAssessment(const parser::SacmElement&
     assessment.method = core::confidence::ConfidenceMethod::FixedValue;
     assessment.fixedValue = fixed;
     assessment.derived = core::confidence::DerivedFor(fixed);
-    assessment.status = stale ? core::confidence::ConfidenceStatus::Inactive : core::confidence::ConfidenceStatus::Active;
+    assessment.status =
+        stale ? core::confidence::ConfidenceStatus::Inactive : core::confidence::ConfidenceStatus::Active;
     assessment.stale = stale;
     return assessment;
 }

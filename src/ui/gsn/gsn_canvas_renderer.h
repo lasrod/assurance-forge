@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/assurance_tree.h"
-#include "parser/xml_parser.h"
+#include "core/sacm_model.h"
 #include "ui/element_context_menu.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_model.h"
@@ -23,6 +23,7 @@ struct CanvasRenderStats {
     int nodes_culled = 0;
     int edges_drawn = 0;
     int edges_culled = 0;
+    bool relationship_context_menu_active = false;
 };
 
 // Returns stats from the most recent GSN canvas render pass.
@@ -35,11 +36,16 @@ public:
     void SetTree(const core::AssuranceTree& tree);
     // Set elements (legacy flat list)
     void SetElements(const std::vector<CanvasElement>& elements);
-    // Render into the current ImGui window/child
+    // Render into the current ImGui window/child.
+    // `overlay_hovered` should be `true` when the mouse is over a floating
+    // canvas overlay (zoom buttons, language toggle) so that node clicks and
+    // hovers are suppressed accordingly. Computed by the host frame before
+    // this call.
     void Render(UiState& ui_state,
                 const parser::AssuranceCase* active_case,
                 const ElementContextActions& actions,
-                const sacm::AssuranceCasePackage* terminology_package = nullptr);
+                const sacm::AssuranceCasePackage* terminology_package = nullptr,
+                bool overlay_hovered = false);
 
     // Zoom controls
     void ZoomIn();

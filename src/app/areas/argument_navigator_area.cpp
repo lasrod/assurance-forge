@@ -18,6 +18,9 @@ ui::ElementContextActions MakeNavigatorContextActions(const AppRuntimeState& sta
         return ui::ElementContextActions{
             callbacks.add_proposal_child,
             callbacks.add_proposal_top_goal,
+            nullptr,
+            nullptr,
+            nullptr,
             callbacks.remove_proposal_selected,
             nullptr,
             callbacks.show_not_implemented,

@@ -212,6 +212,16 @@ static void parse_element_base(pugi::xml_node node, SacmElement& element) {
         if (auto abs_form = find_child(node, "abstractform"))
             element.abstractForm = read_id_ref(abs_form);
     }
+
+    for (auto child : node.children()) {
+        if (local_name(child.name()) != "taggedvalue")
+            continue;
+        TaggedValue tag;
+        tag.id = child.attribute("id").as_string();
+        tag.key = child.attribute("key").as_string();
+        tag.value = child.attribute("value").as_string();
+        element.taggedValues.push_back(std::move(tag));
+    }
 }
 
 // Parse the body of an AssertedRelationship (sources, targets, attributes).
@@ -220,12 +230,13 @@ static void parse_relationship_fields(pugi::xml_node node, AssertedRelationship&
         std::string ln = local_name(child.name());
         if (ln == "source") {
             std::string ref = read_id_ref(child);
-            if (!ref.empty())
-                rel.sources.push_back(ref);
+            append_ref_if_present(rel.sources, ref);
         } else if (ln == "target") {
             std::string ref = read_id_ref(child);
-            if (!ref.empty())
-                rel.targets.push_back(ref);
+            append_ref_if_present(rel.targets, ref);
+        } else if (ln == "metaclaim") {
+            std::string ref = read_id_ref(child);
+            append_ref_if_present(rel.metaClaims, ref);
         }
     }
     rel.assertionDeclaration = node.attribute("assertionDeclaration").as_string();

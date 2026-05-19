@@ -4,6 +4,8 @@
 #include <cctype>
 #include <pugixml.hpp>
 #include <string>
+#include <unordered_set>
+#include <utility>
 
 namespace parser {
 
@@ -48,6 +50,51 @@ static bool read_bool_attr(pugi::xml_node node, const char* attr_name, bool defa
     if (s == "false" || s == "0")
         return false;
     return default_value;
+}
+
+static std::string tagged_value(pugi::xml_node node, const std::string& key) {
+    for (pugi::xml_node child : node.children()) {
+        if (get_local_name(child.name()) != "taggedvalue")
+            continue;
+        if (child.attribute("key").as_string() == key)
+            return child.attribute("value").as_string();
+    }
+    return {};
+}
+
+static std::string acp_field_key(const std::string& acp_id, const char* field) {
+    return "assuranceForge.acp." + acp_id + "." + field;
+}
+
+static void extract_acps(pugi::xml_node child,
+                         const std::string& target_kind,
+                         const std::string& target_id,
+                         std::vector<AcpRecord>& acps) {
+    std::unordered_set<std::string> seen_ids;
+    for (pugi::xml_node tag : child.children()) {
+        if (get_local_name(tag.name()) != "taggedvalue")
+            continue;
+        if (std::string(tag.attribute("key").as_string()) != "assuranceForge.acp")
+            continue;
+
+        const std::string acp_id = tag.attribute("value").as_string();
+        if (acp_id.empty() || !seen_ids.insert(acp_id).second)
+            continue;
+
+        AcpRecord acp;
+        acp.id = acp_id;
+        acp.name = tagged_value(child, acp_field_key(acp_id, "name"));
+        acp.target_kind = target_kind;
+        acp.target_id = target_id;
+        acp.resolution_kind = tagged_value(child, acp_field_key(acp_id, "resolutionKind"));
+        if (acp.resolution_kind.empty())
+            acp.resolution_kind = "none";
+        acp.text = tagged_value(child, acp_field_key(acp_id, "text"));
+        acp.confidence_claim_id = tagged_value(child, acp_field_key(acp_id, "confidenceClaimId"));
+        acp.argument_package_id = tagged_value(child, acp_field_key(acp_id, "argumentPackageId"));
+        acp.top_goal_id = tagged_value(child, acp_field_key(acp_id, "topGoalId"));
+        acps.push_back(std::move(acp));
+    }
 }
 
 // Extract description text and multi-language variants from a node.
@@ -159,7 +206,7 @@ static void extract_content(pugi::xml_node child, SacmElement& element) {
     }
 }
 
-void extract_elements_recursive(pugi::xml_node node, std::vector<SacmElement>& elements) {
+void extract_elements_recursive(pugi::xml_node node, AssuranceCase& assurance_case) {
     for (pugi::xml_node child : node.children()) {
         std::string local_name = get_local_name(child.name());
 
@@ -216,6 +263,10 @@ void extract_elements_recursive(pugi::xml_node node, std::vector<SacmElement>& e
                         std::string ref = get_ref(ref_child);
                         if (!ref.empty())
                             element.target_refs.push_back(ref);
+                    } else if (ref_local_name == "metaclaim") {
+                        std::string ref = get_ref(ref_child);
+                        if (!ref.empty())
+                            element.meta_claim_refs.push_back(ref);
                     } else if (ref_local_name == "reasoning") {
                         std::string ref = get_ref(ref_child);
                         if (!ref.empty())
@@ -233,10 +284,11 @@ void extract_elements_recursive(pugi::xml_node node, std::vector<SacmElement>& e
                 }
             }
 
-            elements.push_back(element);
+            extract_acps(child, is_relationship_element ? "relationship" : "element", element.id, assurance_case.acps);
+            assurance_case.elements.push_back(element);
         }
 
-        extract_elements_recursive(child, elements);
+        extract_elements_recursive(child, assurance_case);
     }
 }
 
@@ -264,7 +316,7 @@ ParseResult parse_document(pugi::xml_document& doc) {
     result.assurance_case.description = root.attribute("description").as_string();
 
     // Extract all relevant elements recursively
-    extract_elements_recursive(root, result.assurance_case.elements);
+    extract_elements_recursive(root, result.assurance_case);
 
     result.success = true;
     return result;

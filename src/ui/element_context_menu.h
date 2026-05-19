@@ -2,7 +2,7 @@
 
 #include "core/element_factory.h"
 #include "core/terminology_package_service.h"
-#include "parser/xml_parser.h"
+#include "core/sacm_model.h"
 
 #include <functional>
 #include <string>
@@ -12,6 +12,9 @@ namespace ui {
 struct ElementContextActions {
     std::function<void(core::NewElementKind)> add_child;
     std::function<void()> add_top_goal;
+    std::function<void()> add_acp_to_selected_element;
+    std::function<void(const std::string& relationship_id)> add_acp_to_relationship;
+    std::function<void(const std::string& acp_id)> remove_acp;
     std::function<void(core::RemoveMode)> remove_selected;
     std::function<void()> render_ai_review_menu;
     std::function<void(const char*)> not_implemented;
@@ -26,6 +29,7 @@ struct ElementContextActions {
         add_visible_terminology_term_context;
     std::function<void(const core::TerminologyPackageRef&, const core::TerminologyTermRef&)> find_terminology_usages;
     std::function<void(const std::string& element_id, const std::string& term_value)> change_terminology_meaning;
+    std::function<void(const std::string& message)> set_status;
 };
 
 void RenderAddElementMenu(const ElementContextActions& actions);

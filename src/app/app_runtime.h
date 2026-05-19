@@ -10,6 +10,7 @@
 #include "sacm/sacm_package_tree.h"
 
 #include <cstddef>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -45,6 +46,15 @@ public:
 
     // Add a new top-level Goal (root claim) to the current model.
     bool AddTopGoal();
+
+    bool AddAcpToSelectedElement();
+    bool AddAcpToRelationship(const std::string& relationship_id);
+    bool RemoveAcp(const std::string& acp_id);
+    void OpenArgumentPackageCanvas(const std::string& package_id,
+                                   const std::string& package_gid,
+                                   const std::string& display_name,
+                                   const std::string& focus_element_id = {});
+    void OpenFirstArgumentPackageCanvas();
 
     // Remove the currently selected element using the given mode. If the
     // planned removal targets more than one element, opens the confirmation
@@ -90,6 +100,7 @@ private:
     void ApplyTerminologyPackageEdits();
     void BeginDeleteTerminologyPackage();
     void ConfirmDeleteTerminologyPackage();
+    void RemoveProjectPackage(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node);
     void SelectTerminologyTerm(const core::TerminologyTermRef& term_ref);
     void BeginAddTerminologyTerm();
     void BeginEditTerminologyTerm(const core::TerminologyTermRef& term_ref);
@@ -133,6 +144,7 @@ private:
     void SyncReviewProblems();
     void SyncTerminologyProblems();
     void SyncConfidenceProblems();
+    void SyncAcpProblems();
     void HandleProblemQuickFix(const core::ProblemItem& problem);
     void SyncReviewVisualStatesFromReviews();
     void TouchCurrentProjectRecent();
@@ -164,7 +176,7 @@ private:
     void PollAiReviewTask();
 
 private:
-    AppRuntimeState* impl_ = nullptr;
+    std::unique_ptr<AppRuntimeState> impl_;
 };
 
 } // namespace app

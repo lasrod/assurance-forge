@@ -49,8 +49,8 @@ bool SetPackageElementGid(sacm::AssuranceCasePackage& package, const std::string
             terminology_package.gid = gid;
             return true;
         }
-        if (SetGidById(terminology_package.categories, id, gid) || SetGidById(terminology_package.expressions, id, gid) ||
-            SetGidById(terminology_package.terms, id, gid)) {
+        if (SetGidById(terminology_package.categories, id, gid) ||
+            SetGidById(terminology_package.expressions, id, gid) || SetGidById(terminology_package.terms, id, gid)) {
             return true;
         }
     }
@@ -67,8 +67,7 @@ bool SetPackageElementGid(sacm::AssuranceCasePackage& package, const std::string
             argument_package.gid = gid;
             return true;
         }
-        if (SetGidById(argument_package.claims, id, gid) ||
-            SetGidById(argument_package.argumentReasonings, id, gid) ||
+        if (SetGidById(argument_package.claims, id, gid) || SetGidById(argument_package.argumentReasonings, id, gid) ||
             SetGidById(argument_package.artifactReferences, id, gid) ||
             SetGidById(argument_package.assertedInferences, id, gid) ||
             SetGidById(argument_package.assertedContexts, id, gid) ||
@@ -81,7 +80,8 @@ bool SetPackageElementGid(sacm::AssuranceCasePackage& package, const std::string
                 return true;
             }
             if (SetGidById(terminology_package.categories, id, gid) ||
-                SetGidById(terminology_package.expressions, id, gid) || SetGidById(terminology_package.terms, id, gid)) {
+                SetGidById(terminology_package.expressions, id, gid) ||
+                SetGidById(terminology_package.terms, id, gid)) {
                 return true;
             }
         }
@@ -101,8 +101,8 @@ std::unordered_set<std::string> ExistingGids(const parser::AssuranceCase& model)
 } // namespace
 
 std::string GenerateSacmGid() {
-    static std::mt19937_64 rng{static_cast<unsigned long long>(
-        std::chrono::high_resolution_clock::now().time_since_epoch().count())};
+    static std::mt19937_64 rng{
+        static_cast<unsigned long long>(std::chrono::high_resolution_clock::now().time_since_epoch().count())};
     return HexGroup(rng, 8) + "-" + HexGroup(rng, 4) + "-4" + HexGroup(rng, 3) + "-" + UuidVariantGroup(rng) + "-" +
            HexGroup(rng, 12);
 }

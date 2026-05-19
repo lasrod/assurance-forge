@@ -1,41 +1,20 @@
 ﻿#pragma once
 
-#include <map>
-#include <optional>
+// XML parsing entry points for SACM documents.
+//
+// The data-model PODs (SacmElement, AcpRecord, AssuranceCase) live in
+// `core/sacm_model.h` so UI/core layers can depend on them without pulling in
+// the parser. Backward-compatible type aliases keep existing `parser::Xxx`
+// spellings valid throughout the codebase.
+
+#include "core/sacm_model.h"
+
 #include <string>
-#include <vector>
 
 namespace parser {
 
-// Represents a SACM element (claim, strategy, evidence, etc.)
-struct SacmElement {
-    std::string id;
-    std::string gid;
-    std::string name;
-    std::string type; // "claim", "argumentreasoning", "artifact", etc. (lowercased local-name)
-    std::string content;
-    std::string description;
-    bool undeveloped = false;
-
-    // Multi-language maps: lang code -> text (e.g. "en" -> "...", "ja" -> "...")
-    std::map<std::string, std::string> name_langs;
-    std::map<std::string, std::string> description_langs;
-    std::map<std::string, std::string> content_langs;
-
-    // Relationship fields (populated for assertedinference, assertedcontext, assertedevidence)
-    std::vector<std::string> source_refs; // ids from <source ref="..."/>
-    std::vector<std::string> target_refs; // ids from <target ref="..."/>
-    std::string reasoning_ref;            // from reasoning attribute (assertedinference)
-    std::string assertion_declaration;    // from assertionDeclaration attribute
-};
-
-// Represents a parsed SACM assurance case
-struct AssuranceCase {
-    std::string id;
-    std::string name;
-    std::string description;
-    std::vector<SacmElement> elements;
-};
+// SacmElement, AcpRecord, AssuranceCase are declared in core::sacm_model.h
+// and exposed under `namespace parser` via transitional aliases there.
 
 // Result of parsing operation
 struct ParseResult {

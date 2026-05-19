@@ -5,7 +5,9 @@
 
 #include <string>
 
-namespace app { struct AppRuntimeState; }
+namespace app {
+struct AppRuntimeState;
+}
 
 namespace app::actions {
 
@@ -15,6 +17,9 @@ public:
 
     bool AddChildToSelected(core::NewElementKind kind);
     bool AddTopGoal();
+    bool AddAcpToSelectedElement();
+    bool AddAcpToRelationship(const std::string& relationship_id);
+    bool RemoveAcp(const std::string& acp_id);
     void RemoveSelected(core::RemoveMode mode);
     core::TreeDropValidationResult
     ValidateTreeDrop(const std::string& dragged_id, const std::string& target_id, core::TreeDropMode drop_mode);

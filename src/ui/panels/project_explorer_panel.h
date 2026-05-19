@@ -24,6 +24,7 @@ struct ProjectExplorerPanelCallbacks {
     std::function<void(const core::ProjectFileEntry&)> open_file;
     std::function<void(const core::ProjectFileEntry&, const sacm::SacmPackageTreeNode&)> open_package_node;
     std::function<void(const core::ProjectFileEntry&, const sacm::SacmPackageTreeNode&)> add_terminology_package;
+    std::function<void(const core::ProjectFileEntry&, const sacm::SacmPackageTreeNode&)> remove_package;
 };
 
 void ShowProjectExplorerPanel(float width,

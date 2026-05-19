@@ -40,6 +40,44 @@ bool ElementActions::AddTopGoal() {
     return state_.element_edit_controller->AddTopGoal(ac, pkg);
 }
 
+bool ElementActions::AddAcpToSelectedElement() {
+    if (!state_.app_state.loaded_case.has_value()) {
+        SetStatus(state_, "No assurance case loaded.");
+        return false;
+    }
+    const std::string selected_id = ui::GetUiState().selected_element_id;
+    if (selected_id.empty()) {
+        SetStatus(state_, "No element selected.");
+        return false;
+    }
+    parser::AssuranceCase& ac = state_.app_state.loaded_case.value();
+    sacm::AssuranceCasePackage* pkg =
+        state_.app_state.sacm_package.has_value() ? &state_.app_state.sacm_package.value() : nullptr;
+    return state_.acp_controller->AddElementAcp(ac, pkg, selected_id);
+}
+
+bool ElementActions::AddAcpToRelationship(const std::string& relationship_id) {
+    if (!state_.app_state.loaded_case.has_value()) {
+        SetStatus(state_, "No assurance case loaded.");
+        return false;
+    }
+    parser::AssuranceCase& ac = state_.app_state.loaded_case.value();
+    sacm::AssuranceCasePackage* pkg =
+        state_.app_state.sacm_package.has_value() ? &state_.app_state.sacm_package.value() : nullptr;
+    return state_.acp_controller->AddRelationshipAcp(ac, pkg, relationship_id);
+}
+
+bool ElementActions::RemoveAcp(const std::string& acp_id) {
+    if (!state_.app_state.loaded_case.has_value()) {
+        SetStatus(state_, "No assurance case loaded.");
+        return false;
+    }
+    parser::AssuranceCase& ac = state_.app_state.loaded_case.value();
+    sacm::AssuranceCasePackage* pkg =
+        state_.app_state.sacm_package.has_value() ? &state_.app_state.sacm_package.value() : nullptr;
+    return state_.acp_controller->RemoveAcp(ac, pkg, acp_id);
+}
+
 void ElementActions::RemoveSelected(core::RemoveMode mode) {
     if (!state_.app_state.loaded_case.has_value()) {
         SetStatus(state_, "No assurance case loaded.");

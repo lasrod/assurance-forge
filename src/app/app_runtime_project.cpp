@@ -15,6 +15,7 @@
 #include "imgui.h"
 #include "parser/model_utils.h"
 #include "sacm/sacm_package_tree.h"
+#include "sacm/sacm_serializer.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/ui_state.h"
@@ -50,6 +51,22 @@ bool IsLoadedProjectSacmFile(const core::AppState& app_state, const core::Projec
     return app_state.loaded_file_path == ProjectFilePath(app_state, entry);
 }
 
+sacm::SacmPackageTreeResult BuildLoadedSacmPackageTree(const core::AppState& app_state,
+                                                       const core::AssuranceProject& project,
+                                                       const core::ProjectFileEntry& entry) {
+    sacm::SacmPackageTreeResult result = sacm::build_sacm_package_tree_from_string(
+        sacm::serialize_sacm(app_state.sacm_package.value()), entry.relativePath.filename().generic_string());
+    result.source_path = project.rootPath / entry.relativePath;
+    result.root.id = result.source_path.generic_string();
+    return result;
+}
+
+std::string ArgumentPackageCanvasKey(const std::filesystem::path& source_file_path,
+                                     const std::string& package_id,
+                                     const std::string& package_gid) {
+    return source_file_path.generic_string() + "\x1f" + package_id + "\x1f" + package_gid;
+}
+
 std::filesystem::path ConfidenceItemsPath(const core::AssuranceProject& project) {
     for (const core::ProjectFileEntry& entry : project.files) {
         if (entry.role == core::ProjectFileRole::ConfidenceAssessments)
@@ -73,8 +90,9 @@ void SetConfidenceSource(AppRuntimeState& state, const core::ProjectFileEntry& e
         state.confidence_controller->RefreshStaleFlags(state.app_state.loaded_case.value()) &&
         state.confidence_controller->LastInactivatedCount() > 0) {
         const int count = state.confidence_controller->LastInactivatedCount();
-        state.events.Emit(StatusMessageEvent{std::to_string(count) +
-                                             " confidence assessment(s) were marked inactive because their target elements changed."});
+        state.events.Emit(StatusMessageEvent{
+            std::to_string(count) +
+            " confidence assessment(s) were marked inactive because their target elements changed."});
     }
 }
 
@@ -120,6 +138,20 @@ std::string FirstElementIdForArgumentPackage(const sacm::AssuranceCasePackage& p
             return argument_package.artifactReferences.front().id;
     }
     return {};
+}
+
+std::string FirstElementIdForArgumentPackage(const sacm::ArgumentPackage& argument_package) {
+    if (!argument_package.claims.empty())
+        return argument_package.claims.front().id;
+    if (!argument_package.argumentReasonings.empty())
+        return argument_package.argumentReasonings.front().id;
+    if (!argument_package.artifactReferences.empty())
+        return argument_package.artifactReferences.front().id;
+    return {};
+}
+
+const sacm::ArgumentPackage* FirstArgumentPackage(const sacm::AssuranceCasePackage& package) {
+    return package.argumentPackages.empty() ? nullptr : &package.argumentPackages.front();
 }
 
 bool RefreshVisibleTerminologyContextProjection(core::AppState& app_state) {
@@ -240,6 +272,8 @@ void AppRuntime::OpenProjectFile(const core::ProjectFileEntry& entry) {
             impl_->workbench.show_gsn_tab = true;
             ui_state.center_view = ui::CenterView::GsnCanvas;
             impl_->workbench.force_center_tab_selection = true;
+            if (impl_->workbench.argument_package_canvas_tabs.empty())
+                OpenFirstArgumentPackageCanvas();
             SetStatus("SACM file is already open: " + entry.relativePath.generic_string());
             return;
         }
@@ -267,10 +301,13 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
         ClearProposalHighlightState(ui_state);
         impl_->document_dirty = false;
         impl_->tree_needs_rebuild = true;
-        impl_->workbench.pending_focus_root = true;
+        impl_->workbench.argument_package_canvas_tabs.clear();
+        impl_->workbench.active_argument_package_canvas_key.clear();
+        impl_->workbench.pending_focus_root = false;
         impl_->workbench.show_gsn_tab = true;
         ui_state.center_view = ui::CenterView::GsnCanvas;
         impl_->workbench.force_center_tab_selection = true;
+        OpenFirstArgumentPackageCanvas();
     } else if (entry.role == core::ProjectFileRole::EvidenceRegister) {
         impl_->workbench.show_evidence_tab = true;
         ui_state.center_view = ui::CenterView::EvidenceRegister;
@@ -317,20 +354,23 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
             SetStatus("Save the current SACM file before opening another package.");
             return;
         }
+        const bool same_file_loaded = IsLoadedProjectSacmFile(impl_->app_state, entry);
         if (!EnsureProjectSacmFileOpen(*impl_, entry, true))
             return;
+        if (!same_file_loaded) {
+            impl_->workbench.argument_package_canvas_tabs.clear();
+            impl_->workbench.active_argument_package_canvas_key.clear();
+        }
 
         impl_->proposal_controller->ClearActiveState();
         ClearProposalHighlightState(ui_state);
         impl_->document_dirty = false;
         impl_->tree_needs_rebuild = true;
         impl_->workbench.pending_focus_root = false;
-        impl_->workbench.show_gsn_tab = true;
-        ui_state.center_view = ui::CenterView::GsnCanvas;
-        impl_->workbench.force_center_tab_selection = true;
 
+        std::string first_id;
         if (impl_->app_state.sacm_package.has_value()) {
-            std::string first_id = FirstElementIdForArgumentPackage(impl_->app_state.sacm_package.value(), node);
+            first_id = FirstElementIdForArgumentPackage(impl_->app_state.sacm_package.value(), node);
             if (!first_id.empty()) {
                 ui_state.selected_element_id = first_id;
                 ui_state.center_on_selection = true;
@@ -338,6 +378,7 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
                 SetStatus("Opened argument package; no focusable argument element was found in the package.");
             }
         }
+        OpenArgumentPackageCanvas(node.id, node.gid, node.displayName, first_id);
         return;
     }
 
@@ -378,6 +419,57 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
     impl_->workbench.force_center_tab_selection = true;
 }
 
+void AppRuntime::OpenArgumentPackageCanvas(const std::string& package_id,
+                                           const std::string& package_gid,
+                                           const std::string& display_name,
+                                           const std::string& focus_element_id) {
+    std::filesystem::path source_file_path = impl_->app_state.loaded_file_path;
+    if (source_file_path.empty())
+        source_file_path = impl_->app_state.active_project_file_path;
+
+    const std::string key = ArgumentPackageCanvasKey(source_file_path, package_id, package_gid);
+    auto& tabs = impl_->workbench.argument_package_canvas_tabs;
+    auto found = std::find_if(tabs.begin(), tabs.end(), [&](const auto& tab) { return tab.key == key; });
+    if (found == tabs.end()) {
+        WorkbenchState::ArgumentPackageCanvasTab tab;
+        tab.key = key;
+        tab.package_id = package_id;
+        tab.package_gid = package_gid;
+        tab.title = display_name.empty() ? (package_id.empty() ? "Argument Package" : package_id) : display_name;
+        tab.source_file_path = source_file_path;
+        tabs.push_back(std::move(tab));
+    } else if (!display_name.empty()) {
+        found->title = display_name;
+    }
+
+    impl_->workbench.active_argument_package_canvas_key = key;
+    impl_->workbench.show_gsn_tab = true;
+    impl_->workbench.pending_focus_root = false;
+    impl_->workbench.force_center_tab_selection = true;
+    ui::UiState& ui_state = ui::GetUiState();
+    ui_state.center_view = ui::CenterView::GsnCanvas;
+    if (!focus_element_id.empty()) {
+        ui_state.selected_element_id = focus_element_id;
+        ui_state.selected_acp_id.clear();
+        ui_state.selected_relationship_id.clear();
+        ui_state.selected_relationship_edge_key.clear();
+        ui_state.center_on_selection = true;
+    }
+}
+
+void AppRuntime::OpenFirstArgumentPackageCanvas() {
+    if (!impl_->app_state.sacm_package.has_value())
+        return;
+    const sacm::ArgumentPackage* argument_package = FirstArgumentPackage(impl_->app_state.sacm_package.value());
+    if (!argument_package)
+        return;
+    const std::string title = argument_package->name.empty() ? argument_package->id : argument_package->name;
+    OpenArgumentPackageCanvas(argument_package->id,
+                              argument_package->gid,
+                              title.empty() ? "Argument Package" : title,
+                              FirstElementIdForArgumentPackage(*argument_package));
+}
+
 void AppRuntime::BeginAddTerminologyPackage(const core::ProjectFileEntry& entry,
                                             const sacm::SacmPackageTreeNode& parent_node) {
     actions::TerminologyActions(*impl_).BeginAddPackage(entry, parent_node);
@@ -400,6 +492,76 @@ void AppRuntime::BeginDeleteTerminologyPackage() {
 void AppRuntime::ConfirmDeleteTerminologyPackage() {
     if (actions::TerminologyActions(*impl_).ConfirmDeletePackage())
         SyncTerminologyProblems();
+}
+
+void AppRuntime::RemoveProjectPackage(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
+    if (!CanSwitchProjectSacmFile(impl_->app_state, entry)) {
+        SetStatus("Save the current SACM file before removing a package.");
+        return;
+    }
+    if (!EnsureProjectSacmFileOpen(*impl_, entry, false))
+        return;
+    if (!impl_->app_state.sacm_package.has_value()) {
+        SetStatus("Could not load an editable SACM package model.");
+        return;
+    }
+
+    sacm::AssuranceCasePackage& package = impl_->app_state.sacm_package.value();
+    const std::string label = node.displayName.empty() ? node.id : node.displayName;
+    bool removed = false;
+    std::string status_message;
+
+    auto matches_node = [&](const sacm::SacmElement& element) {
+        return (!node.id.empty() && element.id == node.id) || (!node.gid.empty() && element.gid == node.gid);
+    };
+
+    if (node.type == sacm::SacmPackageNodeType::TerminologyPackage) {
+        std::string error;
+        if (!core::DeleteTerminologyPackage(package, core::TerminologyPackageRef{node.id, node.gid}, error)) {
+            SetStatus("Remove terminology package failed: " + error);
+            return;
+        }
+        removed = true;
+        status_message = "Removed terminology package " + label + ".";
+        if (impl_->terminology.selected_package_ref.id == node.id &&
+            impl_->terminology.selected_package_ref.gid == node.gid) {
+            impl_->terminology.selected_package_ref = core::TerminologyPackageRef{};
+            impl_->workbench.show_terminology_package_tab = false;
+        }
+    } else if (node.type == sacm::SacmPackageNodeType::ArgumentPackage) {
+        auto& vec = package.argumentPackages;
+        const auto it = std::find_if(vec.begin(), vec.end(), matches_node);
+        if (it == vec.end()) {
+            SetStatus("Argument package was not found in the editable model.");
+            return;
+        }
+        vec.erase(it);
+        removed = true;
+        status_message = "Removed argument package " + label + ".";
+    } else if (node.type == sacm::SacmPackageNodeType::ArtifactPackage) {
+        auto& vec = package.artifactPackages;
+        const auto it = std::find_if(vec.begin(), vec.end(), matches_node);
+        if (it == vec.end()) {
+            SetStatus("Artifact package was not found in the editable model.");
+            return;
+        }
+        vec.erase(it);
+        removed = true;
+        status_message = "Removed artifact package " + label + ".";
+    } else {
+        SetStatus("Removing this package type is not supported yet.");
+        return;
+    }
+
+    if (!removed)
+        return;
+
+    impl_->app_state.mark_dirty();
+    impl_->document_dirty = true;
+    impl_->sacm_package_tree_cache.erase(entry.relativePath.generic_string());
+    SyncTerminologyProblems();
+    SyncAcpProblems();
+    SetStatus(status_message);
 }
 
 void AppRuntime::SelectTerminologyTerm(const core::TerminologyTermRef& term_ref) {
@@ -480,6 +642,21 @@ bool AppRuntime::IsTerminologySuggestionIgnored(const std::string& element_id, c
 }
 
 void AppRuntime::HandleProblemQuickFix(const core::ProblemItem& problem) {
+    if (problem.type.rfind("Acp", 0) == 0) {
+        if (problem.quick_fix_payload.empty()) {
+            SetStatus("ACP problem does not identify an ACP.");
+            return;
+        }
+        ui::UiState& ui_state = ui::GetUiState();
+        ui_state.selected_acp_id = problem.quick_fix_payload;
+        ui_state.selected_element_id.clear();
+        ui_state.selected_relationship_id.clear();
+        ui_state.selected_relationship_edge_key.clear();
+        ui_state.center_view = ui::CenterView::GsnCanvas;
+        impl_->workbench.force_center_tab_selection = true;
+        SetStatus("Opened " + problem.quick_fix_payload);
+        return;
+    }
     actions::TerminologyActions(*impl_).HandleProblemQuickFix(problem);
 }
 
@@ -544,6 +721,10 @@ void AppRuntime::RefreshSacmPackageTreeCache() {
         live_paths.insert(relative);
         if (impl_->sacm_package_tree_cache.find(relative) != impl_->sacm_package_tree_cache.end())
             continue;
+        if (IsLoadedProjectSacmFile(impl_->app_state, entry) && impl_->app_state.sacm_package.has_value()) {
+            impl_->sacm_package_tree_cache[relative] = BuildLoadedSacmPackageTree(impl_->app_state, project, entry);
+            continue;
+        }
         impl_->sacm_package_tree_cache[relative] = sacm::build_sacm_package_tree(project.rootPath / entry.relativePath);
     }
 
@@ -570,11 +751,14 @@ bool AppRuntime::OpenFirstProjectSacmFile() {
             SyncConfidenceProblems();
             SyncReviewVisualStatesFromReviews();
             impl_->tree_needs_rebuild = true;
-            impl_->workbench.pending_focus_root = true;
+            impl_->workbench.argument_package_canvas_tabs.clear();
+            impl_->workbench.active_argument_package_canvas_key.clear();
+            impl_->workbench.pending_focus_root = false;
             impl_->workbench.show_gsn_tab = true;
             ui::UiState& ui_state = ui::GetUiState();
             ui_state.center_view = ui::CenterView::GsnCanvas;
             impl_->workbench.force_center_tab_selection = true;
+            OpenFirstArgumentPackageCanvas();
             return true;
         }
     }
@@ -659,112 +843,6 @@ bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {
                  selected_path);
     ImGui::CloseCurrentPopup();
     return true;
-}
-
-bool AppRuntime::SaveProject() {
-    if (!impl_->app_state.current_project.has_value()) {
-        impl_->app_state.status_message = "Create or open a project first.";
-        return false;
-    }
-
-    if (impl_->review_controller->IsDirty()) {
-        core::AssuranceProject& project = impl_->app_state.current_project.value();
-        std::string error;
-        if (!impl_->review_controller->SaveIfDirty(project, error)) {
-            impl_->app_state.status_message = "Review item save failed: " + error;
-            return false;
-        }
-    }
-
-    if (impl_->confidence_controller->IsDirty()) {
-        core::AssuranceProject& project = impl_->app_state.current_project.value();
-        std::string error;
-        if (!impl_->confidence_controller->SaveIfDirty(project, error)) {
-            impl_->app_state.status_message = "Confidence save failed: " + error;
-            return false;
-        }
-    }
-
-    if (impl_->document_dirty) {
-        if (!impl_->app_state.save_project())
-            return false;
-        impl_->document_dirty = false;
-        impl_->app_state.has_unsaved_changes = impl_->review_controller->IsDirty() || impl_->confidence_controller->IsDirty();
-        return true;
-    }
-
-    if (impl_->app_state.has_unsaved_changes) {
-        impl_->app_state.has_unsaved_changes = false;
-        impl_->app_state.status_message = "Project saved: " + impl_->app_state.current_project->name;
-        return true;
-    }
-
-    return impl_->app_state.save_project();
-}
-
-void AppRuntime::ExportGsnSvg() {
-    constexpr const char* kExportProblemPrefix = "gsn-svg-export:";
-    core::ClearProblemsByIdPrefix(impl_->problems_manager, kExportProblemPrefix);
-
-    if (!impl_->app_state.current_project.has_value()) {
-        SetStatus("GSN SVG export failed: no project is open.");
-        return;
-    }
-    if (!impl_->app_state.loaded_case.has_value()) {
-        SetStatus("GSN SVG export failed: no SACM safety case is open.");
-        return;
-    }
-
-    std::filesystem::path source_path = impl_->app_state.active_project_file_path;
-    if (source_path.empty())
-        source_path = impl_->app_state.loaded_file_path;
-    std::string source_stem = source_path.stem().string();
-    if (source_stem.empty())
-        source_stem = impl_->app_state.loaded_case->name;
-
-    export_gsn::GsnSvgExportResult export_result = export_gsn::ExportCurrentSafetyCaseToGsnSvg(
-        impl_->app_state.loaded_case.value(), impl_->app_state.current_project->rootPath, source_stem);
-    if (!export_result.success) {
-        SetStatus("GSN SVG export failed: " + export_result.error_message);
-        return;
-    }
-
-    std::filesystem::path display_path = export_result.output_path;
-    std::error_code ec;
-    std::filesystem::path relative_path =
-        std::filesystem::relative(export_result.output_path, impl_->app_state.current_project->rootPath, ec);
-    if (!ec && !relative_path.empty()) {
-        display_path = relative_path;
-        core::ProjectFileEntry tracked_export;
-        std::string track_error;
-        if (!core::ProjectService::TrackExistingFile(impl_->app_state.current_project.value(),
-                                                     relative_path,
-                                                     core::ProjectFileRole::ExportedReport,
-                                                     tracked_export,
-                                                     track_error)) {
-            export_result.warnings.push_back("Exported SVG was written but could not be added to Project Explorer: " +
-                                             track_error);
-        }
-    } else {
-        export_result.warnings.push_back(
-            "Exported SVG was written but its project-relative path could not be determined.");
-    }
-
-    for (size_t i = 0; i < export_result.warnings.size(); ++i) {
-        core::ProblemItem problem;
-        problem.id = std::string(kExportProblemPrefix) + std::to_string(i + 1);
-        problem.severity = core::ProblemSeverity::Warning;
-        problem.source = core::ProblemSource::ImportExport;
-        problem.type = "GsnSvgExport";
-        problem.message = export_result.warnings[i];
-        impl_->problems_manager.AddOrUpdateProblem(problem);
-    }
-
-    if (!export_result.warnings.empty()) {
-        SetStatus("GSN SVG exported with warnings. See Problems/Export log.");
-    } else {
-        SetStatus("GSN SVG exported to " + display_path.generic_string());
-    }
 }
 
 } // namespace app

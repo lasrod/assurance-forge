@@ -42,7 +42,8 @@ std::string SourceIdOrMain(const std::string& source_id) {
 ui::ElementConfidence ToUiConfidence(const core::confidence::ConfidenceAssessment& assessment) {
     ui::ElementConfidence confidence;
     confidence.enabled = assessment.status == core::confidence::ConfidenceStatus::Active;
-    if (assessment.method == core::confidence::ConfidenceMethod::JosangOpinion && assessment.josangOpinion.has_value()) {
+    if (assessment.method == core::confidence::ConfidenceMethod::JosangOpinion &&
+        assessment.josangOpinion.has_value()) {
         confidence.mode = ui::ConfidenceInputMode::OpinionTriangle;
         confidence.opinion.belief = static_cast<float>(assessment.josangOpinion->belief);
         confidence.opinion.disbelief = static_cast<float>(assessment.josangOpinion->disbelief);
@@ -140,7 +141,8 @@ bool ConfidenceController::SaveIfDirty(core::AssuranceProject& project, std::str
         core::confidence::UpsertSacmSource(store_, active_source_);
 
     core::ProjectFileEntry entry;
-    if (!core::ProjectService::SaveConfidenceFile(project, core::confidence::SerializeConfidenceStore(store_), entry, error))
+    if (!core::ProjectService::SaveConfidenceFile(
+            project, core::confidence::SerializeConfidenceStore(store_), entry, error))
         return false;
 
     file_path_ = project.rootPath / entry.relativePath;
@@ -156,8 +158,8 @@ bool ConfidenceController::BackupInvalidAndStartNew(std::string& error) {
     }
     std::error_code ec;
     if (std::filesystem::exists(file_path_, ec)) {
-        const std::filesystem::path backup_path = file_path_.parent_path() /
-            ("confidence.af.invalid-" + BackupTimestamp() + ".json");
+        const std::filesystem::path backup_path =
+            file_path_.parent_path() / ("confidence.af.invalid-" + BackupTimestamp() + ".json");
         std::filesystem::copy_file(file_path_, backup_path, std::filesystem::copy_options::overwrite_existing, ec);
         if (ec) {
             error = "Could not back up invalid confidence file: " + ec.message();
@@ -227,14 +229,15 @@ int ConfidenceController::LastInactivatedCount() const {
     return last_inactivated_count_;
 }
 
-const core::confidence::ConfidenceAssessment* ConfidenceController::FindForElement(
-    const parser::SacmElement& element) const {
+const core::confidence::ConfidenceAssessment*
+ConfidenceController::FindForElement(const parser::SacmElement& element) const {
     if (element.gid.empty() || !storage_error_.empty())
         return nullptr;
     return core::confidence::FindAssessment(store_, active_source_.sourceId, element.gid);
 }
 
-std::optional<ui::ElementConfidence> ConfidenceController::ConfidenceForElement(const parser::SacmElement& element) const {
+std::optional<ui::ElementConfidence>
+ConfidenceController::ConfidenceForElement(const parser::SacmElement& element) const {
     const core::confidence::ConfidenceAssessment* assessment = FindForElement(element);
     if (!assessment)
         return std::nullopt;
@@ -270,8 +273,8 @@ bool ConfidenceController::UpsertElementConfidence(const parser::SacmElement& el
     assessment->target.sacmType = core::confidence::DisplaySacmType(element);
     assessment->targetFingerprint = core::confidence::FingerprintElement(element);
     assessment->stale = false;
-    assessment->status = confidence.enabled ? core::confidence::ConfidenceStatus::Active
-                                            : core::confidence::ConfidenceStatus::Inactive;
+    assessment->status =
+        confidence.enabled ? core::confidence::ConfidenceStatus::Active : core::confidence::ConfidenceStatus::Inactive;
     assessment->updatedAt = now;
     if (assessment->createdAt.empty())
         assessment->createdAt = now;
@@ -314,8 +317,8 @@ bool ConfidenceController::SetElementConfidenceActive(const parser::SacmElement&
     if (!assessment)
         return true;
 
-    const core::confidence::ConfidenceStatus next_status = active ? core::confidence::ConfidenceStatus::Active
-                                                                  : core::confidence::ConfidenceStatus::Inactive;
+    const core::confidence::ConfidenceStatus next_status =
+        active ? core::confidence::ConfidenceStatus::Active : core::confidence::ConfidenceStatus::Inactive;
     if (assessment->status == next_status && (!active || !assessment->stale))
         return true;
 
