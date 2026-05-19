@@ -488,7 +488,9 @@ AcpEditResult AddAcp(parser::AssuranceCase& model,
         return ErrorResult({}, "ACP target was not found in the SACM package.");
 
     Acp acp;
-    acp.id = NextAcpId(CollectAcpsForIdGeneration(model, target.owning_package));
+    // Generate the id from the full flat model (all packages) to avoid colliding with ACP ids that
+    // already exist in other argument packages.
+    acp.id = NextAcpId(CollectAcpsForIdGeneration(model, nullptr));
     acp.name = acp.id;
     acp.target.kind = AcpTargetKindFromString(target_kind);
     acp.target.target_id = target_id;
@@ -528,6 +530,15 @@ UpsertAcp(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package, con
     if (!target.element)
         return ErrorResult(record.id, "ACP target was not found in the SACM package.");
 
+    // If the upsert retargets an existing ACP to a different SACM element/relationship, strip the
+    // ACP tags from the previous target so the saved SACM does not leak a stale duplicate.
+    if (!previous.id.empty() &&
+        (previous.target_kind != normalized.target_kind || previous.target_id != normalized.target_id)) {
+        SacmTargetRef previous_target = FindSacmTarget(package, previous.target_kind, previous.target_id);
+        if (previous_target.element)
+            RemoveAcpTags(*previous_target.element, previous.id);
+    }
+
     UpsertAcpTags(*target.element, ToDomain(normalized));
     SyncRelationshipMetaClaim(package, previous, normalized);
     UpdateTreeConfidenceNames(package, normalized);
@@ -563,6 +574,19 @@ AcpEditResult CreateConfidenceArgumentTreeForAcp(parser::AssuranceCase& model,
         return ErrorResult(acp_id, "ACP was not found.");
     if (acp->resolution_kind == "topGoalReference" && !acp->argument_package_id.empty() && !acp->top_goal_id.empty())
         return ErrorResult(acp_id, "ACP already links to a confidence argument tree.");
+
+    // Validate the ACP's target up front so the subsequent UpsertAcp call cannot fail after we have
+    // already inserted the new argument package and parser top-goal projection below.
+    if (acp->target_kind != kTargetKindElement && acp->target_kind != kTargetKindRelationship)
+        return ErrorResult(acp_id, "Unsupported ACP target kind.");
+    if (!ParserTargetExists(model, acp->target_kind, acp->target_id))
+        return ErrorResult(acp_id, "ACP target was not found in the active model.");
+    if (acp->target_kind == kTargetKindElement && !ElementEligibleForAcp(model, acp->target_id))
+        return ErrorResult(acp_id, IneligibleTargetMessage(acp->target_kind));
+    if (acp->target_kind == kTargetKindRelationship && !RelationshipEligibleForAcp(model, acp->target_id))
+        return ErrorResult(acp_id, IneligibleTargetMessage(acp->target_kind));
+    if (!FindSacmTarget(package, acp->target_kind, acp->target_id).element)
+        return ErrorResult(acp_id, "ACP target was not found in the SACM package.");
 
     const std::string argument_package_id = NextAcpArgumentPackageId(*package, acp->id);
     const std::string top_goal_id = NextElementIdWithPrefix(model, *package, acp->id + "_G");
