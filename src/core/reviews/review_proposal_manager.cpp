@@ -100,8 +100,7 @@ std::uint64_t ComputeProposalsDirectorySignature(const std::filesystem::path& di
         const auto mtime = std::filesystem::last_write_time(entry, ec);
         if (ec)
             continue;
-        const auto mtime_value =
-            static_cast<std::uint64_t>(mtime.time_since_epoch().count());
+        const auto mtime_value = static_cast<std::uint64_t>(mtime.time_since_epoch().count());
         const auto size = std::filesystem::file_size(entry, ec);
         const auto size_value = ec ? 0ull : static_cast<std::uint64_t>(size);
         signature ^= mtime_value;

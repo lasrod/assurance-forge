@@ -157,8 +157,7 @@ void GsnCanvas::Render(UiState& ui_state,
         cached_acp_targets_case_ = nullptr;
         cached_acp_targets_revision_ = ~std::uint64_t{0};
         cached_acp_targets_.clear();
-    } else if (active_case != cached_acp_targets_case_
-               || case_revision_ != cached_acp_targets_revision_) {
+    } else if (active_case != cached_acp_targets_case_ || case_revision_ != cached_acp_targets_revision_) {
         core::perf::ScopedTimer perf_scope_acp("gsn.acp.build_targets");
         cached_acp_targets_ = core::acp::BuildAcpRelationshipTargets(*active_case);
         cached_acp_targets_case_ = active_case;

@@ -210,8 +210,8 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
     if (!inputs_match) {
         {
             core::perf::ScopedTimer perf_scope("app.wb.build_visible_case");
-            cache.visible_case = BuildArgumentPackageProjection(
-                state.app_state.loaded_case.value(), *argument_package, tab.title);
+            cache.visible_case =
+                BuildArgumentPackageProjection(state.app_state.loaded_case.value(), *argument_package, tab.title);
         }
         {
             core::perf::ScopedTimer perf_scope("app.wb.build_assurance_tree");
@@ -311,8 +311,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
         // If a package canvas tab activation was requested, explicitly queue focus to it.
         // AutoSelectNewTabs handles the "tab just created" case; this handles the "tab already exists" case
         // (Open Confidence Argument Tree on an ACP whose tree tab is already open).
-        if (state.workbench.force_center_tab_selection &&
-            !state.workbench.active_argument_package_canvas_key.empty()) {
+        if (state.workbench.force_center_tab_selection && !state.workbench.active_argument_package_canvas_key.empty()) {
             const auto& tabs = state.workbench.argument_package_canvas_tabs;
             auto it = std::find_if(tabs.begin(), tabs.end(), [&](const auto& t) {
                 return t.key == state.workbench.active_argument_package_canvas_key;
@@ -430,7 +429,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
         }
 
         ImGui::EndTabBar();
-    state.workbench.force_center_tab_selection = false;
+        state.workbench.force_center_tab_selection = false;
     }
 
     ImGui::End();

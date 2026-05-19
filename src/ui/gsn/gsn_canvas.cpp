@@ -235,9 +235,15 @@ void DrawGsnNode(const GsnNode& node,
     std::vector<TerminologySpanHitRegion> terminology_regions;
     if (core::perf::GetPerfToggles().terminology_spans) {
         core::perf::ScopedTimer perf_scope("gsn.node.terminology_spans");
-        terminology_regions = BuildAndDrawTerminologySpans(
-            draw_list, node, top_left, text_left, text_wrap, zoom, ui_state, terminology_service,
-            terminology_occurrence_cache);
+        terminology_regions = BuildAndDrawTerminologySpans(draw_list,
+                                                           node,
+                                                           top_left,
+                                                           text_left,
+                                                           text_wrap,
+                                                           zoom,
+                                                           ui_state,
+                                                           terminology_service,
+                                                           terminology_occurrence_cache);
         if (auto* stats = CurrentRenderStats())
             stats->terminology_spans_drawn += static_cast<int>(terminology_regions.size());
     }

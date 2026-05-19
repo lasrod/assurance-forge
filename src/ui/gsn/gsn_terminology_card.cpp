@@ -335,16 +335,15 @@ void RenderTerminologyHoverCard(const TerminologyCardState& card_state,
 
 } // namespace
 
-std::vector<TerminologySpanHitRegion>
-BuildAndDrawTerminologySpans(ImDrawList* draw_list,
-                             const GsnNode& node,
-                             ImVec2 top_left,
-                             float text_left,
-                             float text_wrap,
-                             float zoom,
-                             const UiState& ui_state,
-                             const core::TerminologyService* terminology_service,
-                             TerminologyOccurrenceCache* occurrence_cache) {
+std::vector<TerminologySpanHitRegion> BuildAndDrawTerminologySpans(ImDrawList* draw_list,
+                                                                   const GsnNode& node,
+                                                                   ImVec2 top_left,
+                                                                   float text_left,
+                                                                   float text_wrap,
+                                                                   float zoom,
+                                                                   const UiState& ui_state,
+                                                                   const core::TerminologyService* terminology_service,
+                                                                   TerminologyOccurrenceCache* occurrence_cache) {
     if (!terminology_service || zoom < kFullLabelZoom)
         return {};
 

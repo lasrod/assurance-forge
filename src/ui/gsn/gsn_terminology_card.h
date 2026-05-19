@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/terminology_scope_service.h" // core::TermOccurrence (full type used in cache)
-#include "ui/gsn/gsn_canvas.h" // GsnNode, TerminologyCardState, ElementContextActions, UiState
+#include "ui/gsn/gsn_canvas.h"              // GsnNode, TerminologyCardState, ElementContextActions, UiState
 
 #include <imgui.h>
 
