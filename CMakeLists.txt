@@ -9,7 +9,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(MSVC)
-    add_compile_options(/FS /utf-8)
+    # /MP enables per-project parallel compilation across translation units.
+    add_compile_options(/FS /utf-8 /MP)
 endif()
 
 option(ENABLE_COVERAGE "Enable code coverage instrumentation (Linux/GCC 14+ only)" OFF)

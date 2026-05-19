@@ -33,7 +33,14 @@ constexpr float kBudget60Fps = 1000.0f / 60.0f; // 16.67 ms
 constexpr float kBudget30Fps = 1000.0f / 30.0f; // 33.33 ms
 
 struct FrameTimeHistory {
+    // Primary series: wall-clock interval between presents (ms). This is what
+    // the user actually experiences and what `ImGui::GetIO().Framerate` is
+    // derived from — it includes any idle throttling done by hello_imgui.
     float samples_ms[kFrameTimeHistorySize] = {};
+    // Secondary series: active render cost (ms), i.e. profiler total per
+    // frame. Sits inside samples_ms when the runtime is not idle-throttled
+    // and well below it when it is. Drawn as a thin overlay on the graph.
+    float render_ms[kFrameTimeHistorySize] = {};
     int next_index = 0;
     int filled = 0;
 };
@@ -43,9 +50,10 @@ FrameTimeHistory& History() {
     return h;
 }
 
-void PushFrameTime(float ms) {
+void PushFrameTime(float wall_ms, float render_ms) {
     FrameTimeHistory& h = History();
-    h.samples_ms[h.next_index] = ms;
+    h.samples_ms[h.next_index] = wall_ms;
+    h.render_ms[h.next_index] = render_ms;
     h.next_index = (h.next_index + 1) % kFrameTimeHistorySize;
     if (h.filled < kFrameTimeHistorySize)
         ++h.filled;
@@ -257,8 +265,18 @@ void DrawKpiCard(const char* label,
     ImGui::Dummy(ImVec2(width, height));
 }
 
-// Draws the rolling frame-time graph using ImDrawList: gradient fill,
-// reference lines at 60 / 30 FPS, and spike markers above the threshold.
+// Draws the rolling frame-time graph using ImDrawList.
+//
+// Conventions (frame-TIME plot, read as FPS):
+//   * Y axis is inverted so LOWER frame time (= HIGHER FPS) sits near the TOP.
+//     The 60 FPS reference line therefore sits ABOVE the 30 FPS reference
+//     line, matching user intuition ("higher is better").
+//   * Zone bands: green at top (>60 FPS), warning in middle (30-60 FPS),
+//     danger at bottom (<30 FPS).
+//   * Filled area drops from the measured line DOWN to the baseline so a
+//     well-performing run visibly fills the plot.
+//   * Reference lines + labels are drawn LAST so they always sit on top of
+//     the data.
 void DrawFrameTimeGraph(const FrameTimeHistory& h, float avg_ms, float spike_threshold_ms, float graph_height) {
     const ui::Theme& th = ui::GetTheme();
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -271,40 +289,69 @@ void DrawFrameTimeGraph(const FrameTimeHistory& h, float avg_ms, float spike_thr
     dl->AddRectFilled(p0, p1, th.canvas_bg, 4.0f);
     dl->AddRect(p0, p1, th.border, 4.0f);
 
-    // Y range: at least up to 1.4× max(33.3, max_sample) so spikes don't clip
+    // Y range: at least up to 1.2 × 30 FPS budget so the 30 FPS line stays
+    // visible even when measurements are excellent; stretches further if a
+    // spike exceeds that. Includes the render-cost trace too — normally
+    // smaller than wall-clock, but plotted on the same axis.
     float y_max_ms = kBudget30Fps * 1.2f;
-    for (int i = 0; i < h.filled; ++i)
+    for (int i = 0; i < h.filled; ++i) {
         y_max_ms = std::max(y_max_ms, h.samples_ms[i]);
+        y_max_ms = std::max(y_max_ms, h.render_ms[i]);
+    }
     y_max_ms = std::max(y_max_ms, kBudget30Fps * 1.2f);
 
+    // Inverted: 0 ms -> top, y_max_ms -> bottom.
+    const float inner_top = p0.y + 1.0f;
+    const float inner_bot = p1.y - 1.0f;
+    const float inner_h = inner_bot - inner_top;
     auto y_for = [&](float ms) {
         const float t = std::clamp(ms / y_max_ms, 0.0f, 1.0f);
-        return p1.y - t * (p1.y - p0.y - 2.0f);
+        return inner_top + t * inner_h;
     };
 
-    // Zone bands (very subtle)
     const float y_60 = y_for(kBudget60Fps);
     const float y_30 = y_for(kBudget30Fps);
-    dl->AddRectFilled(ImVec2(p0.x, p0.y), ImVec2(p1.x, y_30), ui::WithAlpha(th.danger, 0.07f));
-    dl->AddRectFilled(ImVec2(p0.x, y_30), ImVec2(p1.x, y_60), ui::WithAlpha(th.warning, 0.07f));
-    dl->AddRectFilled(ImVec2(p0.x, y_60), ImVec2(p1.x, p1.y), ui::WithAlpha(th.success, 0.05f));
 
-    // Reference lines
-    dl->AddLine(ImVec2(p0.x + 1, y_60), ImVec2(p1.x - 1, y_60), ui::WithAlpha(th.warning, 0.55f), 1.0f);
-    dl->AddLine(ImVec2(p0.x + 1, y_30), ImVec2(p1.x - 1, y_30), ui::WithAlpha(th.danger, 0.55f), 1.0f);
+    // Zone bands: green above 60 FPS, warning between 30-60, danger below 30.
+    dl->AddRectFilled(ImVec2(p0.x, inner_top), ImVec2(p1.x, y_60),      ui::WithAlpha(th.success, 0.06f));
+    dl->AddRectFilled(ImVec2(p0.x, y_60),      ImVec2(p1.x, y_30),      ui::WithAlpha(th.warning, 0.07f));
+    dl->AddRectFilled(ImVec2(p0.x, y_30),      ImVec2(p1.x, inner_bot), ui::WithAlpha(th.danger,  0.08f));
 
-    // Labels for reference lines (right-aligned, small, inside the plot area)
-    char buf[16];
-    std::snprintf(buf, sizeof(buf), "60 FPS");
-    const float label_60_w = ImGui::CalcTextSize(buf).x;
-    dl->AddText(ImVec2(p1.x - label_60_w - 8.0f, y_60 - ImGui::GetTextLineHeight() - 1.0f),
-                ui::WithAlpha(th.warning, 0.85f), buf);
-    std::snprintf(buf, sizeof(buf), "30 FPS");
-    const float label_30_w = ImGui::CalcTextSize(buf).x;
-    dl->AddText(ImVec2(p1.x - label_30_w - 8.0f, y_30 - ImGui::GetTextLineHeight() - 1.0f),
-                ui::WithAlpha(th.danger, 0.85f), buf);
+    auto draw_reference_lines_and_labels = [&]() {
+        // Hide the 60 FPS line when it would visually overlap the 30 FPS
+        // line (happens at very low FPS where y_max stretches and both
+        // budgets compress toward the top of the chart). At that point
+        // showing both is misleading — the 30 FPS line is the meaningful
+        // boundary to focus on.
+        const float min_line_gap_px = ImGui::GetTextLineHeight() + 4.0f;
+        const bool show_60 = (y_30 - y_60) >= min_line_gap_px;
+
+        if (show_60) {
+            dl->AddLine(ImVec2(p0.x + 1, y_60), ImVec2(p1.x - 1, y_60), ui::WithAlpha(th.warning, 0.75f), 1.0f);
+        }
+        dl->AddLine(ImVec2(p0.x + 1, y_30), ImVec2(p1.x - 1, y_30), ui::WithAlpha(th.danger,  0.75f), 1.0f);
+
+        // Both labels sit just below their reference line, inside the band
+        // that line caps off (60 FPS -> warning band, 30 FPS -> danger band).
+        // Because the bands are stacked top-to-bottom, the labels can never
+        // collide regardless of how compressed the upper portion of the
+        // axis becomes at very low FPS.
+        char buf[16];
+        float label_w;
+        if (show_60) {
+            std::snprintf(buf, sizeof(buf), "60 FPS");
+            label_w = ImGui::CalcTextSize(buf).x;
+            dl->AddText(ImVec2(p1.x - label_w - 8.0f, y_60 + 2.0f),
+                        ui::WithAlpha(th.warning, 0.9f), buf);
+        }
+        std::snprintf(buf, sizeof(buf), "30 FPS");
+        label_w = ImGui::CalcTextSize(buf).x;
+        dl->AddText(ImVec2(p1.x - label_w - 8.0f, y_30 + 2.0f),
+                    ui::WithAlpha(th.danger, 0.9f), buf);
+    };
 
     if (h.filled < 2) {
+        draw_reference_lines_and_labels();
         ImGui::Dummy(ImVec2(avail_w, graph_height));
         return;
     }
@@ -317,20 +364,39 @@ void DrawFrameTimeGraph(const FrameTimeHistory& h, float avg_ms, float spike_thr
         return p0.x + 1.0f + t * plot_w;
     };
 
-    // Filled area + line + spike dots
-    // We do a per-segment fill so each segment gets a color from the value gradient.
+    // Per-segment trapezoid fill + colored line. The trapezoid is filled from
+    // the line DOWN to the baseline so the area visibly represents "frame
+    // time consumed". Colors come from FrameTimeStatusColor so each segment
+    // of the trace signals whether we crossed a threshold.
     for (int i = 1; i < h.filled; ++i) {
         const float ms_prev = h.samples_ms[(start + i - 1) % kFrameTimeHistorySize];
-        const float ms_cur = h.samples_ms[(start + i) % kFrameTimeHistorySize];
+        const float ms_cur  = h.samples_ms[(start + i)     % kFrameTimeHistorySize];
         const ImVec2 a = ImVec2(x_for(i - 1), y_for(ms_prev));
-        const ImVec2 b = ImVec2(x_for(i), y_for(ms_cur));
+        const ImVec2 b = ImVec2(x_for(i),     y_for(ms_cur));
 
-        const ImU32 col_a = ui::WithAlpha(FrameTimeStatusColor(ms_prev), 0.35f);
-        const ImU32 col_b = ui::WithAlpha(FrameTimeStatusColor(ms_cur), 0.35f);
-        // Trapezoid fill from baseline up to line segment
-        dl->AddQuadFilled(ImVec2(a.x, p1.y - 1), ImVec2(b.x, p1.y - 1), b, a, ui::LerpColor(col_a, col_b, 0.5f));
-        // Line on top
-        dl->AddLine(a, b, ui::LerpColor(FrameTimeStatusColor(ms_prev), FrameTimeStatusColor(ms_cur), 0.5f), 1.4f);
+        const ImU32 col_a = FrameTimeStatusColor(ms_prev);
+        const ImU32 col_b = FrameTimeStatusColor(ms_cur);
+        const ImU32 mid   = ui::LerpColor(col_a, col_b, 0.5f);
+        const ImU32 fill  = ui::WithAlpha(mid, 0.55f);
+
+        // Trapezoid from line down to baseline
+        dl->AddQuadFilled(a, b, ImVec2(b.x, inner_bot), ImVec2(a.x, inner_bot), fill);
+        // Crisp line on top of fill
+        dl->AddLine(a, b, mid, 1.6f);
+    }
+
+    // Secondary trace: render cost (ms inside the frame, excluding any
+    // hello_imgui idle throttling). Drawn as a thin muted line so the gap
+    // between this and the primary (wall-clock) trace visualises idle time.
+    {
+        const ImU32 render_col = ui::WithAlpha(th.text_secondary, 0.85f);
+        for (int i = 1; i < h.filled; ++i) {
+            const float r_prev = h.render_ms[(start + i - 1) % kFrameTimeHistorySize];
+            const float r_cur  = h.render_ms[(start + i)     % kFrameTimeHistorySize];
+            const ImVec2 a = ImVec2(x_for(i - 1), y_for(r_prev));
+            const ImVec2 b = ImVec2(x_for(i),     y_for(r_cur));
+            dl->AddLine(a, b, render_col, 1.0f);
+        }
     }
 
     // Spike markers
@@ -341,13 +407,16 @@ void DrawFrameTimeGraph(const FrameTimeHistory& h, float avg_ms, float spike_thr
         }
     }
 
-    // Average line (subtle horizontal dotted-ish)
+    // Average line (subtle dashed horizontal)
     if (avg_ms > 0.0f) {
         const float y_avg = y_for(avg_ms);
         const ImU32 col = ui::WithAlpha(th.text_secondary, 0.6f);
         for (float x = p0.x + 2.0f; x < p1.x - 6.0f; x += 6.0f)
             dl->AddLine(ImVec2(x, y_avg), ImVec2(x + 3.0f, y_avg), col, 1.0f);
     }
+
+    // Guidelines + labels drawn LAST so they sit on top of the trace.
+    draw_reference_lines_and_labels();
 
     ImGui::Dummy(ImVec2(avail_w, graph_height));
 }
@@ -763,8 +832,9 @@ void RenderPerfOverlay(bool& open) {
     // read the values without them flickering.
     static bool s_paused = false;
     struct PausedSnapshot {
-        std::uint64_t total_ns = 0;
-        float total_ms = 0.0f;
+        std::uint64_t total_ns = 0;     // render cost in ns (sum of profiler buckets)
+        float render_ms = 0.0f;         // render cost in ms (== total_ns / 1e6)
+        float wall_ms = 0.0f;           // wall-clock interval since previous frame
         float fps = 0.0f;
         std::vector<core::perf::FrameSample> samples;
         ui::gsn::CanvasRenderStats canvas_stats{};
@@ -772,9 +842,10 @@ void RenderPerfOverlay(bool& open) {
     static PausedSnapshot s_snapshot;
 
     const std::uint64_t live_total_ns = core::perf::GetLastFrameTotalNs();
-    const float live_total_ms = static_cast<float>(live_total_ns) / 1.0e6f;
+    const float live_render_ms = static_cast<float>(live_total_ns) / 1.0e6f;
+    const float live_wall_ms = ImGui::GetIO().DeltaTime * 1000.0f;
     if (!s_paused)
-        PushFrameTime(live_total_ms);
+        PushFrameTime(live_wall_ms, live_render_ms);
 
     ImGui::SetNextWindowSize(ImVec2(620, 820), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin("Performance", &open)) {
@@ -786,7 +857,8 @@ void RenderPerfOverlay(bool& open) {
     // the last captured values.
     if (!s_paused) {
         s_snapshot.total_ns = live_total_ns;
-        s_snapshot.total_ms = live_total_ms;
+        s_snapshot.render_ms = live_render_ms;
+        s_snapshot.wall_ms = live_wall_ms;
         s_snapshot.fps = ImGui::GetIO().Framerate;
         const auto& live_samples = core::perf::GetLastFrameSamples();
         s_snapshot.samples.assign(live_samples.begin(), live_samples.end());
@@ -794,7 +866,10 @@ void RenderPerfOverlay(bool& open) {
     }
 
     const std::uint64_t total_ns = s_snapshot.total_ns;
-    const float total_ms = s_snapshot.total_ms;
+    const float render_ms = s_snapshot.render_ms;
+    // Primary "total_ms" used for top-line KPIs and headroom: wall-clock
+    // interval, so it matches the FPS value the user sees on screen.
+    const float total_ms = s_snapshot.wall_ms;
     const float fps = s_snapshot.fps;
 
     const FrameTimeHistory& h = History();
@@ -883,7 +958,37 @@ void RenderPerfOverlay(bool& open) {
     // =================================================================
     // Section 2: Frame-time graph
     // =================================================================
-    ImGui::TextUnformatted("Frame time (4s history)");
+    {
+        const ui::Theme& th_legend = ui::GetTheme();
+        ImGui::TextUnformatted("Frame interval (4s) —");
+        ImGui::SameLine(0.0f, 6.0f);
+        // Wall-clock swatch
+        {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 p = ImGui::GetCursorScreenPos();
+            const float h_line = ImGui::GetTextLineHeight();
+            dl->AddRectFilled(ImVec2(p.x, p.y + h_line * 0.35f),
+                              ImVec2(p.x + 14.0f, p.y + h_line * 0.65f),
+                              ui::WithAlpha(th_legend.success, 0.85f));
+            ImGui::Dummy(ImVec2(16.0f, h_line));
+        }
+        ImGui::SameLine(0.0f, 4.0f);
+        ImGui::TextDisabled("wall-clock (what the user sees)");
+        ImGui::SameLine(0.0f, 10.0f);
+        // Render-cost swatch
+        {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 p = ImGui::GetCursorScreenPos();
+            const float h_line = ImGui::GetTextLineHeight();
+            dl->AddLine(ImVec2(p.x, p.y + h_line * 0.5f),
+                        ImVec2(p.x + 14.0f, p.y + h_line * 0.5f),
+                        ui::WithAlpha(th_legend.text_secondary, 0.95f),
+                        1.4f);
+            ImGui::Dummy(ImVec2(16.0f, h_line));
+        }
+        ImGui::SameLine(0.0f, 4.0f);
+        ImGui::TextDisabled("render cost (CPU work this frame)");
+    }
     DrawFrameTimeGraph(h, avg_ms, spikes.threshold_ms, 130.0f);
 
     ImGui::Spacing();
@@ -900,7 +1005,7 @@ void RenderPerfOverlay(bool& open) {
 
     {
         const auto groups = GroupBySubsystem(samples);
-        ImGui::Text("This frame: %.2f ms across %zu buckets", total_ms, samples.size());
+        ImGui::Text("This frame: %.2f ms render across %zu buckets", render_ms, samples.size());
         DrawSubsystemStackedBar(groups, total_ns, 28.0f);
     }
 
