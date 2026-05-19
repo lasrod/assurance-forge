@@ -142,6 +142,7 @@ void ClearRemovedSelection(const std::vector<core::ProblemItem>& problems, ui::U
         return;
     ui_state.selected_problem_id.clear();
     ui_state.selected_problem_element_id.clear();
+    ui_state.problems_panel_focus_pending = false;
 }
 
 void SelectAndActivateProblem(const core::ProblemItem& problem,
@@ -175,6 +176,7 @@ bool DrawClickableCell(const char* id_suffix,
 
 void DrawProblemRow(const core::ProblemItem& problem, ui::UiState& ui_state, const ProblemsPanelCallbacks& callbacks) {
     const bool selected = ui_state.selected_problem_id == problem.id;
+    const bool focus_this_row = selected && ui_state.problems_panel_focus_pending;
     const std::string message = SingleLineMessage(problem.message);
     const bool review_problem = IsReviewSource(problem.source);
 
@@ -182,6 +184,11 @@ void DrawProblemRow(const core::ProblemItem& problem, ui::UiState& ui_state, con
     ImGui::TableNextRow();
     if (selected) {
         ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ui::WithAlpha(ui::GetTheme().accent, 0.28f));
+    }
+    if (focus_this_row) {
+        // SetScrollHereY needs to be called from inside the table row context.
+        ImGui::SetScrollHereY(0.5f);
+        ui_state.problems_panel_focus_pending = false;
     }
 
     ImGui::TableSetColumnIndex(0);

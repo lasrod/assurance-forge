@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "core/problems/problem_attention.h"
 #include "core/sacm_model.h"
 #include "ui/confidence_model.h"
 
@@ -18,24 +19,6 @@ enum class ProblemFilter {
     Review,
     Warnings,
     Info,
-};
-
-enum class ElementReviewVisualStatus {
-    None,
-    AiRunning,
-    AiOk,
-    ManualOk,
-    Failed,
-};
-
-struct ElementReviewVisualState {
-    bool ai_running = false;
-    bool ai_ok = false;
-    bool manual_ok = false;
-    bool failed = false;
-    std::string review_profile_id;
-    std::string review_profile_name;
-    std::string last_review_message;
 };
 
 struct ProposalTextChangePreview {
@@ -61,12 +44,15 @@ struct UiState {
     // Nodes pending confirmation of removal. The canvas tints these red.
     std::unordered_set<std::string> marked_for_removal;
 
-    // Nodes with element-scoped problems that need user attention.
-    std::unordered_set<std::string> attention_element_ids;
+    // Per-element alert-badge summary derived from the current ProblemsManager
+    // snapshot. The ProblemsManager is the single source of truth: every badge
+    // visible on the canvas, tree views, and inspector reflects an entry here.
+    // Updated by workbench_area after every Sync* call.
+    std::unordered_map<std::string, core::ElementBadgeSummary> element_badge_summaries;
 
-    // Session-only visual review state for GSN nodes. Persistence needs a
-    // dedicated review-result model rather than SACM metadata.
-    std::unordered_map<std::string, ElementReviewVisualState> review_visual_states;
+    // Elements that currently have an AI review running. Rendered as a small
+    // spinner overlay distinct from the problem alert badge.
+    std::unordered_set<std::string> ai_review_running_element_ids;
 
     // Session-only confidence prototype state. Persistence and propagation are
     // intentionally deferred until the feature model is proven in the UI.
@@ -96,6 +82,13 @@ struct UiState {
     std::string selected_problem_id;
     std::string selected_problem_element_id;
 
+    // One-shot focus request: when set, the Problems panel will scroll to and
+    // select the row matching `selected_problem_id`, then clear the flag.
+    bool problems_panel_focus_pending = false;
+    // One-shot request to make the Problems panel visible (e.g. raised when
+    // the user clicks an element badge that should reveal the panel).
+    bool problems_panel_open_pending = false;
+
     // Performance analysis overlay (Phase 3 of the perf-analysis plan). When
     // true, the perf overlay window is shown with profiler buckets, render
     // stats, and feature toggles.
@@ -108,25 +101,22 @@ UiState& GetUiState();
 // Returns true if any element in the assurance case has a non-empty secondary language entry.
 bool ModelHasTranslations(const parser::AssuranceCase& ac, const std::string& secondary_lang = "ja");
 
-ElementReviewVisualStatus ResolveElementReviewVisualStatus(const ElementReviewVisualState& state);
-ElementReviewVisualStatus ResolveElementReviewVisualStatus(const UiState& ui_state, const std::string& element_id);
-const ElementReviewVisualState* FindElementReviewVisualState(const UiState& ui_state, const std::string& element_id);
+// Marks `element_id` as having an AI review in progress; tracks the scope
+// (used for highlighting all elements involved in the run) and the primary
+// element for badge placement.
+void BeginAiReviewSpinner(UiState& ui_state,
+                          const std::string& element_id,
+                          std::unordered_set<std::string> review_scope_element_ids = {});
 
-void MarkAiReviewRunning(UiState& ui_state,
-                         const std::string& element_id,
-                         const std::string& review_profile_id = {},
-                         const std::string& review_profile_name = {},
-                         std::unordered_set<std::string> review_scope_element_ids = {});
-void MarkAiReviewNoFindings(UiState& ui_state,
-                            const std::string& element_id,
-                            const std::string& review_profile_id = {},
-                            const std::string& review_profile_name = {});
-void MarkAiReviewFindings(UiState& ui_state, const std::string& element_id);
-void MarkAiReviewFailed(UiState& ui_state,
-                        const std::string& element_id,
-                        const std::string& message = {},
-                        const std::string& review_profile_id = {},
-                        const std::string& review_profile_name = {});
-void MarkReviewOkManually(UiState& ui_state, const std::string& element_id);
+// Clears the AI-running flag for `element_id`. The resulting alert badge (if
+// any) is driven entirely by the ProblemsManager snapshot.
+void EndAiReviewSpinner(UiState& ui_state, const std::string& element_id);
+
+// Requests that the Problems panel scroll to and select the row that matches
+// `problem_id`. Sets selection fields and the focus / open one-shot flags.
+// `element_id` is optional and stored for the inspector context.
+void FocusProblemInPanel(UiState& ui_state,
+                         const std::string& problem_id,
+                         const std::string& element_id = {});
 
 } // namespace ui

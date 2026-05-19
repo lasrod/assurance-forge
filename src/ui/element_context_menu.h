@@ -30,6 +30,10 @@ struct ElementContextActions {
     std::function<void(const core::TerminologyPackageRef&, const core::TerminologyTermRef&)> find_terminology_usages;
     std::function<void(const std::string& element_id, const std::string& term_value)> change_terminology_meaning;
     std::function<void(const std::string& message)> set_status;
+    // Invoked when the user clicks an element's problem badge. Receives the
+    // highest-severity problem id and its element id; the runtime opens the
+    // Problems panel and selects the matching row.
+    std::function<void(const std::string& problem_id, const std::string& element_id)> focus_problem;
 };
 
 void RenderAddElementMenu(const ElementContextActions& actions);

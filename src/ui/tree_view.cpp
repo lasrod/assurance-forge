@@ -180,9 +180,76 @@ static void RenderTreeNode(const core::TreeNode* node,
         dl->AddText(font, font_size, ImVec2(text_x + tag_w + space_w, text_y), name_col, name.c_str());
     }
 
+    // Per-element problem badge: small severity-coloured dot at the row's
+    // right edge. Sourced from ui_state.element_badge_summaries (which is
+    // populated from the ProblemsManager every frame). Clicking the dot
+    // opens the Problems panel scrolled to that problem instead of selecting
+    // the element on the canvas.
+    ImVec2 badge_min{};
+    ImVec2 badge_max{};
+    bool has_badge = false;
+    const core::ElementBadgeSummary* badge_summary = nullptr;
+    {
+        auto it = state.element_badge_summaries.find(node->id);
+        if (it != state.element_badge_summaries.end()) {
+            badge_summary = &it->second;
+            has_badge = true;
+            const Theme& theme = GetTheme();
+            ImU32 color = theme.accent;
+            const char* glyph = "i";
+            switch (badge_summary->highest_severity) {
+            case core::ProblemSeverity::Error:
+                color = theme.danger;
+                glyph = "!";
+                break;
+            case core::ProblemSeverity::Warning:
+                color = theme.warning;
+                glyph = "!";
+                break;
+            case core::ProblemSeverity::Info:
+            default:
+                color = theme.accent;
+                glyph = "i";
+                break;
+            }
+            const float radius = ImGui::GetFontSize() * 0.45f;
+            const float pad = ImGui::GetStyle().FramePadding.x + radius + 2.0f;
+            ImVec2 center(item_max.x - pad, item_min.y + item_size.y * 0.5f);
+            tree_dl->AddCircleFilled(center, radius, color);
+            ImFont* font = ImGui::GetFont();
+            const float gf = ImGui::GetFontSize() * 0.8f;
+            ImVec2 ts = font->CalcTextSizeA(gf, FLT_MAX, 0.0f, glyph);
+            tree_dl->AddText(font,
+                             gf,
+                             ImVec2(center.x - ts.x * 0.5f, center.y - ts.y * 0.5f),
+                             IM_COL32_WHITE,
+                             glyph);
+            badge_min = ImVec2(center.x - radius, center.y - radius);
+            badge_max = ImVec2(center.x + radius, center.y + radius);
+        }
+    }
+
     if (clicked) {
-        state.selected_element_id = node->id;
-        state.center_on_selection = true;
+        // If the click landed on the badge, route to Problems panel instead of
+        // selecting the element.
+        const ImVec2 mp = ImGui::GetIO().MousePos;
+        if (has_badge && badge_summary && mp.x >= badge_min.x && mp.x <= badge_max.x &&
+            mp.y >= badge_min.y && mp.y <= badge_max.y) {
+            FocusProblemInPanel(state, badge_summary->top_problem_id, node->id);
+        } else {
+            state.selected_element_id = node->id;
+            state.center_on_selection = true;
+        }
+    } else if (has_badge && badge_summary) {
+        const ImVec2 mp = ImGui::GetIO().MousePos;
+        if (ImGui::IsItemHovered() && mp.x >= badge_min.x && mp.x <= badge_max.x &&
+            mp.y >= badge_min.y && mp.y <= badge_max.y) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            ImGui::SetTooltip("%zu problem%s · top: %s\nClick to open the Problems panel.",
+                              badge_summary->problem_count,
+                              badge_summary->problem_count == 1 ? "" : "s",
+                              badge_summary->top_problem_message.c_str());
+        }
     }
 
     if (popup_open) {

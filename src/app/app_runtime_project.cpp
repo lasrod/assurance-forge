@@ -298,7 +298,6 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
     if (entry.role == core::ProjectFileRole::SacmArgument) {
         SetConfidenceSource(*impl_, entry);
         SyncConfidenceProblems();
-        SyncReviewVisualStatesFromReviews();
         impl_->proposal_controller->ClearActiveState();
         ClearProposalHighlightState(ui_state);
         impl_->document_dirty = false;
@@ -746,7 +745,6 @@ void AppRuntime::BeginLinkExistingTerminologyTerm(const std::string& element_id,
 void AppRuntime::IgnoreTerminologySuggestion(const std::string& element_id, const std::string& term_value) {
     actions::TerminologyActions(*impl_).IgnoreSuggestion(element_id, term_value);
     SyncTerminologyProblems();
-    SyncReviewVisualStatesFromReviews();
 }
 
 bool AppRuntime::IsTerminologySuggestionIgnored(const std::string& element_id, const std::string& term_value) const {
@@ -861,7 +859,6 @@ bool AppRuntime::OpenFirstProjectSacmFile() {
         if (impl_->app_state.open_project_file(entry)) {
             SetConfidenceSource(*impl_, entry);
             SyncConfidenceProblems();
-            SyncReviewVisualStatesFromReviews();
             impl_->tree_needs_rebuild = true;
             impl_->workbench.argument_package_canvas_tabs.clear();
             impl_->workbench.active_argument_package_canvas_key.clear();
@@ -907,7 +904,6 @@ bool AppRuntime::EnsureConfidenceStorage() {
     if (!impl_->app_state.current_project.has_value()) {
         impl_->confidence_controller->ClearStorage();
         SyncConfidenceProblems();
-        SyncReviewVisualStatesFromReviews();
         return false;
     }
 
@@ -919,12 +915,10 @@ bool AppRuntime::EnsureConfidenceStorage() {
     std::string error;
     if (impl_->confidence_controller->ConfigureStorage(confidence_path, project.id, error)) {
         SyncConfidenceProblems();
-        SyncReviewVisualStatesFromReviews();
         return true;
     }
 
     SyncConfidenceProblems();
-    SyncReviewVisualStatesFromReviews();
     SetStatus("Confidence assessments could not be loaded: " + error);
     return false;
 }

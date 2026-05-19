@@ -3,6 +3,7 @@
 #include "app/app_runtime_state.h"
 #include "app/controllers/review_controller.h"
 #include "app/guideline_catalog.h"
+#include "core/problems/problem_utils.h"
 #include "core/time_utils.h"
 #include "ui/panels/review_panel.h"
 #include "ui/ui_state.h"
@@ -25,10 +26,6 @@ std::string GenerateReviewItemId() {
     std::ostringstream out;
     out << "review-" << std::hex << ticks << "-" << ++counter;
     return out.str();
-}
-
-bool IsReviewDerivedProblem(const core::ProblemItem& problem) {
-    return problem.id.rfind("review-comment:", 0) == 0 || problem.id.rfind("guideline-review:", 0) == 0;
 }
 
 void EnsureReviewGuidelineCatalogLoaded(AppRuntimeState& state) {
@@ -170,7 +167,7 @@ ui::panels::ReviewPanelModel BuildReviewPanelModel(AppRuntimeState& state) {
     for (const core::ProblemItem& problem : state.problems_manager.GetProblems()) {
         if (problem.element_id != model.selected_element_id)
             continue;
-        if (IsReviewDerivedProblem(problem))
+        if (core::IsReviewDerivedProblem(problem))
             continue;
         model.problem_items.push_back(problem);
         has_blocking_problem = true;
@@ -283,8 +280,6 @@ void RenderReviewPanelContent(AppRuntimeState& state, const ReviewPanelAreaCallb
     };
     panel_callbacks.delete_problem = [&state, &callbacks](const core::ProblemItem& problem) {
         state.problems_manager.RemoveProblem(problem.id);
-        if (callbacks.sync_review_visual_states)
-            callbacks.sync_review_visual_states();
         SetStatus(callbacks, "Problem deleted.");
     };
     panel_callbacks.set_manual_review_ok = [&callbacks, element_id = model.selected_element_id](bool manual_ok) {

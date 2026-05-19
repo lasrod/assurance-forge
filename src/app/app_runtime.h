@@ -148,7 +148,6 @@ private:
     void SyncConfidenceProblems();
     void SyncAcpProblems();
     void HandleProblemQuickFix(const core::ProblemItem& problem);
-    void SyncReviewVisualStatesFromReviews();
     void TouchCurrentProjectRecent();
     bool SaveProject();
     void ExportGsnSvg();

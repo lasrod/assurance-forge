@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/problems/problem_attention.h"
 #include "ui/ui_state.h"
 
 #include <imgui.h>
@@ -16,14 +17,19 @@ struct BadgeRect {
 // `slot_count` badges horizontally centered above the node bounding box.
 BadgeRect ComputeBadgeRect(ImVec2 top_left, ImVec2 bottom_right, float zoom, int slot, int slot_count);
 
-// Draw the yellow "!" attention badge.
-void DrawAttentionBadge(ImDrawList* draw_list, const BadgeRect& badge, float zoom);
+// True if `mouse_pos` (typically `ImGui::GetIO().MousePos`) is inside `badge`.
+bool IsPointInsideBadge(const BadgeRect& badge, ImVec2 point);
 
-// Draw the per-element AI/manual review status badge and its hover tooltip.
-void DrawReviewBadge(ImDrawList* draw_list,
+// Draw the unified problem alert badge. Icon and colour reflect the highest
+// severity in `summary`: Error -> red x, Warning -> orange !, Info -> blue i.
+// The hover tooltip summarises the top problem and total count.
+void DrawProblemBadge(ImDrawList* draw_list,
                      const BadgeRect& badge,
                      float zoom,
-                     ElementReviewVisualStatus status,
-                     const ElementReviewVisualState& state);
+                     const core::ElementBadgeSummary& summary);
+
+// Draw the AI-in-progress spinner overlay. Rendered in its own slot so it can
+// co-exist with a problem badge for the same element.
+void DrawAiSpinnerBadge(ImDrawList* draw_list, const BadgeRect& badge, float zoom);
 
 } // namespace ui::gsn

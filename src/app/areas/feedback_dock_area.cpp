@@ -2,6 +2,7 @@
 
 #include "app/app_runtime_state.h"
 #include "app/frame/app_layout_regions.h"
+#include "ui/ui_state.h"
 
 namespace app::areas {
 
@@ -14,10 +15,14 @@ void RenderFeedbackDockArea(AppRuntimeState& state,
     ImGui::Begin("Problems and Review", nullptr, panel_flags | ImGuiWindowFlags_NoTitleBar);
 
     if (ImGui::BeginTabBar("##problems_review_tabs")) {
-        if (ImGui::BeginTabItem("Problems")) {
+        ui::UiState& ui_state = ui::GetUiState();
+        ImGuiTabItemFlags problems_flags =
+            ui_state.problems_panel_open_pending ? ImGuiTabItemFlags_SetSelected : 0;
+        if (ImGui::BeginTabItem("Problems", nullptr, problems_flags)) {
             RenderProblemsAreaContent(state, callbacks.problems);
             ImGui::EndTabItem();
         }
+        ui_state.problems_panel_open_pending = false;
 
         ImGuiTabItemFlags terminology_usage_flags =
             state.terminology.focus_usages_tab ? ImGuiTabItemFlags_SetSelected : 0;

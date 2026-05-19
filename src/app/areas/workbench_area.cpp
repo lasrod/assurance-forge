@@ -177,9 +177,7 @@ void RenderGsnCanvasTab(AppRuntimeState& state, ui::UiState& ui_state, const Wor
             ? &state.proposal_controller->preview_model
             : (state.app_state.loaded_case.has_value() ? &state.app_state.loaded_case.value() : nullptr);
     ui_state.proposal_canvas_active = state.IsProposalCanvasActive();
-    ui_state.attention_element_ids = core::CollectAttentionElementIds(state.problems_manager.GetProblems());
-    if (callbacks.sync_review_visual_states)
-        callbacks.sync_review_visual_states();
+    ui_state.element_badge_summaries = core::BuildElementBadgeSummaries(state.problems_manager.GetProblems());
     const sacm::AssuranceCasePackage* terminology_package =
         state.app_state.sacm_package.has_value() ? &state.app_state.sacm_package.value() : nullptr;
     ui::gsn::ShowGsnCanvasContent(ui_state, visible_case, actions, terminology_package);
@@ -228,9 +226,7 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
 
     ui::ElementContextActions actions = MakeCanvasContextActions(callbacks);
     ui_state.proposal_canvas_active = false;
-    ui_state.attention_element_ids = core::CollectAttentionElementIds(state.problems_manager.GetProblems());
-    if (callbacks.sync_review_visual_states)
-        callbacks.sync_review_visual_states();
+    ui_state.element_badge_summaries = core::BuildElementBadgeSummaries(state.problems_manager.GetProblems());
     ui::gsn::GsnCanvas& renderer = g_argument_package_canvas_renderers[tab.key];
     renderer.SetCaseRevision(state.app_state.case_revision);
     if (!cache.renderer_seeded) {
