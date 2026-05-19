@@ -159,8 +159,24 @@ void SyncAcpProblems(core::ProblemsManager& problems_manager,
                             "ACP " + acp.id + " is attached to a relationship that is not eligible for ACP."));
         }
 
+        if (acp.resolution_kind == "text") {
+            if (acp.text.empty()) {
+                problems_manager.AddOrUpdateProblem(MakeProblem(
+                    acp,
+                    core::ProblemSeverity::Warning,
+                    "MissingText",
+                    "ACP " + acp.id + " is set to 'text confidence argument' but no text has been provided."));
+            }
+        }
+
         if (acp.resolution_kind == "topGoalReference") {
-            if (!package || !TopGoalExists(*package, acp.argument_package_id, acp.top_goal_id)) {
+            if (acp.argument_package_id.empty() || acp.top_goal_id.empty()) {
+                problems_manager.AddOrUpdateProblem(MakeProblem(
+                    acp,
+                    core::ProblemSeverity::Warning,
+                    "MissingTopGoal",
+                    "ACP " + acp.id + " is set to 'separate confidence argument tree' but is not yet linked to one."));
+            } else if (!package || !TopGoalExists(*package, acp.argument_package_id, acp.top_goal_id)) {
                 problems_manager.AddOrUpdateProblem(
                     MakeProblem(acp,
                                 core::ProblemSeverity::Error,

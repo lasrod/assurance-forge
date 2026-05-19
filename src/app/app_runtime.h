@@ -100,6 +100,7 @@ private:
     void ApplyTerminologyPackageEdits();
     void BeginDeleteTerminologyPackage();
     void ConfirmDeleteTerminologyPackage();
+    void RemoveProjectPackage(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node);
     void SelectTerminologyTerm(const core::TerminologyTermRef& term_ref);
     void BeginAddTerminologyTerm();
     void BeginEditTerminologyTerm(const core::TerminologyTermRef& term_ref);

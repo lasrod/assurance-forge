@@ -146,6 +146,17 @@ void RenderPackageNode(const core::ProjectFileEntry& entry,
             ImGui::EndPopup();
         }
     }
+    const bool is_removable_package = node.type == sacm::SacmPackageNodeType::ArgumentPackage ||
+                                      node.type == sacm::SacmPackageNodeType::ArtifactPackage ||
+                                      node.type == sacm::SacmPackageNodeType::TerminologyPackage;
+    if (is_removable_package && callbacks.remove_package) {
+        if (ImGui::BeginPopupContextItem("##package_remove_context")) {
+            if (ImGui::MenuItem("Remove")) {
+                callbacks.remove_package(entry, node);
+            }
+            ImGui::EndPopup();
+        }
+    }
     if (has_children && open) {
         RenderPackageChildren(entry, node, callbacks, tree_path);
         ImGui::TreePop();

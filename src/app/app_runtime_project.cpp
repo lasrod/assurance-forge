@@ -494,6 +494,76 @@ void AppRuntime::ConfirmDeleteTerminologyPackage() {
         SyncTerminologyProblems();
 }
 
+void AppRuntime::RemoveProjectPackage(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
+    if (!CanSwitchProjectSacmFile(impl_->app_state, entry)) {
+        SetStatus("Save the current SACM file before removing a package.");
+        return;
+    }
+    if (!EnsureProjectSacmFileOpen(*impl_, entry, false))
+        return;
+    if (!impl_->app_state.sacm_package.has_value()) {
+        SetStatus("Could not load an editable SACM package model.");
+        return;
+    }
+
+    sacm::AssuranceCasePackage& package = impl_->app_state.sacm_package.value();
+    const std::string label = node.displayName.empty() ? node.id : node.displayName;
+    bool removed = false;
+    std::string status_message;
+
+    auto matches_node = [&](const sacm::SacmElement& element) {
+        return (!node.id.empty() && element.id == node.id) || (!node.gid.empty() && element.gid == node.gid);
+    };
+
+    if (node.type == sacm::SacmPackageNodeType::TerminologyPackage) {
+        std::string error;
+        if (!core::DeleteTerminologyPackage(package, core::TerminologyPackageRef{node.id, node.gid}, error)) {
+            SetStatus("Remove terminology package failed: " + error);
+            return;
+        }
+        removed = true;
+        status_message = "Removed terminology package " + label + ".";
+        if (impl_->terminology.selected_package_ref.id == node.id &&
+            impl_->terminology.selected_package_ref.gid == node.gid) {
+            impl_->terminology.selected_package_ref = core::TerminologyPackageRef{};
+            impl_->workbench.show_terminology_package_tab = false;
+        }
+    } else if (node.type == sacm::SacmPackageNodeType::ArgumentPackage) {
+        auto& vec = package.argumentPackages;
+        const auto it = std::find_if(vec.begin(), vec.end(), matches_node);
+        if (it == vec.end()) {
+            SetStatus("Argument package was not found in the editable model.");
+            return;
+        }
+        vec.erase(it);
+        removed = true;
+        status_message = "Removed argument package " + label + ".";
+    } else if (node.type == sacm::SacmPackageNodeType::ArtifactPackage) {
+        auto& vec = package.artifactPackages;
+        const auto it = std::find_if(vec.begin(), vec.end(), matches_node);
+        if (it == vec.end()) {
+            SetStatus("Artifact package was not found in the editable model.");
+            return;
+        }
+        vec.erase(it);
+        removed = true;
+        status_message = "Removed artifact package " + label + ".";
+    } else {
+        SetStatus("Removing this package type is not supported yet.");
+        return;
+    }
+
+    if (!removed)
+        return;
+
+    impl_->app_state.mark_dirty();
+    impl_->document_dirty = true;
+    impl_->sacm_package_tree_cache.erase(entry.relativePath.generic_string());
+    SyncTerminologyProblems();
+    SyncAcpProblems();
+    SetStatus(status_message);
+}
+
 void AppRuntime::SelectTerminologyTerm(const core::TerminologyTermRef& term_ref) {
     actions::TerminologyActions(*impl_).SelectTerm(term_ref);
 }
@@ -652,8 +722,7 @@ void AppRuntime::RefreshSacmPackageTreeCache() {
         if (impl_->sacm_package_tree_cache.find(relative) != impl_->sacm_package_tree_cache.end())
             continue;
         if (IsLoadedProjectSacmFile(impl_->app_state, entry) && impl_->app_state.sacm_package.has_value()) {
-            impl_->sacm_package_tree_cache[relative] =
-                BuildLoadedSacmPackageTree(impl_->app_state, project, entry);
+            impl_->sacm_package_tree_cache[relative] = BuildLoadedSacmPackageTree(impl_->app_state, project, entry);
             continue;
         }
         impl_->sacm_package_tree_cache[relative] = sacm::build_sacm_package_tree(project.rootPath / entry.relativePath);
@@ -775,6 +844,5 @@ bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {
     ImGui::CloseCurrentPopup();
     return true;
 }
-
 
 } // namespace app

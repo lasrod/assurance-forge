@@ -50,7 +50,11 @@ void RenderInspectorArea(AppRuntimeState& state,
                 return state.acp_controller && loaded_case &&
                        state.acp_controller->OpenConfidenceArgumentTreeForAcp(*loaded_case, acp_id);
             };
-            ui::panels::ShowAcpPanel(loaded_case, &acp_callbacks);
+            acp_callbacks.navigate_to_element = [&](const std::string& element_id) {
+                state.events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
+                state.events.Emit(SelectionChangedEvent{element_id, true});
+            };
+            ui::panels::ShowAcpPanel(loaded_case, sacm_package, &acp_callbacks);
             ImGui::End();
             return;
         }

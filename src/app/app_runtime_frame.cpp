@@ -58,6 +58,9 @@ void AppRuntime::RenderFrame(bool& done) {
         [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
             BeginAddTerminologyPackage(entry, node);
         },
+        [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
+            RemoveProjectPackage(entry, node);
+        },
     };
 
     areas::ArgumentNavigatorAreaCallbacks argument_navigator_callbacks{
