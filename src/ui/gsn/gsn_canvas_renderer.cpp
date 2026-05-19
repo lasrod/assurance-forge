@@ -334,7 +334,8 @@ void GsnCanvas::Render(UiState& ui_state,
                             terminology_package,
                             &terminology_card_state_,
                             zoom,
-                            overlay_hovered);
+                            overlay_hovered,
+                            &terminology_occurrence_cache_);
             }
             const auto element_acps = acp_by_element.find(node.id);
             if (element_acps != acp_by_element.end() && core::perf::GetPerfToggles().acp_decorators) {

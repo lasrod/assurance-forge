@@ -101,6 +101,13 @@ public:
                                                   const std::string& text,
                                                   const TerminologyDetectionOptions& options = {}) const;
 
+    // Returns the package this service operates on. The pointer is stable
+    // for the lifetime of the service and can be used as a cache
+    // invalidation key by callers that rebuild a service each frame.
+    const sacm::AssuranceCasePackage* GetPackage() const {
+        return &package_;
+    }
+
 private:
     const sacm::AssuranceCasePackage& package_;
 };

@@ -169,7 +169,8 @@ void DrawGsnNode(const GsnNode& node,
                  const sacm::AssuranceCasePackage* terminology_package,
                  TerminologyCardState* terminology_card_state,
                  float zoom,
-                 bool overlay_hovered) {
+                 bool overlay_hovered,
+                 TerminologyOccurrenceCache* terminology_occurrence_cache) {
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     ImVec2 top_left = ImVec2(canvas_origin.x + node.position.x * zoom, canvas_origin.y + node.position.y * zoom);
     ImVec2 bottom_right = ImVec2(top_left.x + node.size.x * zoom, top_left.y + node.size.y * zoom);
@@ -235,7 +236,8 @@ void DrawGsnNode(const GsnNode& node,
     if (core::perf::GetPerfToggles().terminology_spans) {
         core::perf::ScopedTimer perf_scope("gsn.node.terminology_spans");
         terminology_regions = BuildAndDrawTerminologySpans(
-            draw_list, node, top_left, text_left, text_wrap, zoom, ui_state, terminology_service);
+            draw_list, node, top_left, text_left, text_wrap, zoom, ui_state, terminology_service,
+            terminology_occurrence_cache);
         if (auto* stats = CurrentRenderStats())
             stats->terminology_spans_drawn += static_cast<int>(terminology_regions.size());
     }

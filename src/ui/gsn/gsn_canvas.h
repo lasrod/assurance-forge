@@ -71,7 +71,8 @@ void DrawGsnNode(const GsnNode& node,
                  const sacm::AssuranceCasePackage* terminology_package = nullptr,
                  TerminologyCardState* terminology_card_state = nullptr,
                  float zoom = 1.0f,
-                 bool overlay_hovered = false);
+                 bool overlay_hovered = false,
+                 struct TerminologyOccurrenceCache* terminology_occurrence_cache = nullptr);
 
 void RenderPinnedTerminologyCard(TerminologyCardState& card_state,
                                  const sacm::AssuranceCasePackage* terminology_package,

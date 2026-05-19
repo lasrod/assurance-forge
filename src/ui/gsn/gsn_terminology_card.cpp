@@ -343,7 +343,8 @@ BuildAndDrawTerminologySpans(ImDrawList* draw_list,
                              float text_wrap,
                              float zoom,
                              const UiState& ui_state,
-                             const core::TerminologyService* terminology_service) {
+                             const core::TerminologyService* terminology_service,
+                             TerminologyOccurrenceCache* occurrence_cache) {
     if (!terminology_service || zoom < kFullLabelZoom)
         return {};
 
@@ -364,8 +365,31 @@ BuildAndDrawTerminologySpans(ImDrawList* draw_list,
 
     const char* detail_start = first_newline + 1;
     const std::string detail_text(detail_start, label_end);
-    const std::vector<core::TermOccurrence> occurrences = terminology_service->DetectTermsInText(node.id, detail_text);
-    if (occurrences.empty())
+
+    const sacm::AssuranceCasePackage* package_ptr = terminology_service->GetPackage();
+    const std::vector<core::TermOccurrence>* occurrences_ptr = nullptr;
+    std::vector<core::TermOccurrence> fresh_occurrences;
+    if (occurrence_cache) {
+        if (occurrence_cache->package_ptr != package_ptr) {
+            occurrence_cache->entries.clear();
+            occurrence_cache->package_ptr = package_ptr;
+        }
+        auto it = occurrence_cache->entries.find(node.id);
+        if (it != occurrence_cache->entries.end() && it->second.text == detail_text) {
+            occurrences_ptr = &it->second.occurrences;
+        } else {
+            fresh_occurrences = terminology_service->DetectTermsInText(node.id, detail_text);
+            TerminologyOccurrenceCache::Entry entry;
+            entry.text = detail_text;
+            entry.occurrences = fresh_occurrences;
+            auto inserted = occurrence_cache->entries.insert_or_assign(node.id, std::move(entry));
+            occurrences_ptr = &inserted.first->second.occurrences;
+        }
+    } else {
+        fresh_occurrences = terminology_service->DetectTermsInText(node.id, detail_text);
+        occurrences_ptr = &fresh_occurrences;
+    }
+    if (occurrences_ptr->empty())
         return {};
 
     ImVec2 bold_text_size = bold_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, label_start, first_newline);
@@ -386,7 +410,7 @@ BuildAndDrawTerminologySpans(ImDrawList* draw_list,
                                                text_wrap,
                                                ImVec2(text_left, text_y + bold_text_size.y),
                                                zoom,
-                                               occurrences);
+                                               *occurrences_ptr);
 }
 
 void RenderPinnedTerminologyCard(TerminologyCardState& card_state,

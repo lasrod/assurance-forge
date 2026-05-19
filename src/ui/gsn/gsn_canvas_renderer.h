@@ -5,6 +5,7 @@
 #include "ui/element_context_menu.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_model.h"
+#include "ui/gsn/gsn_terminology_card.h"
 #include "ui/ui_state.h"
 
 #include <string>
@@ -110,6 +111,7 @@ private:
     float zoom_level_ = 1.0f;
     ImVec2 view_offset_ = ImVec2(0.0f, 0.0f); // pixel-space pan offset
     TerminologyCardState terminology_card_state_;
+    TerminologyOccurrenceCache terminology_occurrence_cache_;
     CanvasRenderStats last_render_stats_{};
 };
 

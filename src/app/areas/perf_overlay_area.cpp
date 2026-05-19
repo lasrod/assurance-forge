@@ -157,13 +157,17 @@ void RenderPerfOverlay(bool& open) {
     if (ImGui::Button("Copy report to clipboard")) {
         const auto& samples = core::perf::GetLastFrameSamples();
         std::vector<core::perf::FrameSample> sorted(samples.begin(), samples.end());
-        std::sort(sorted.begin(), sorted.end(),
-                  [](const core::perf::FrameSample& a, const core::perf::FrameSample& b) {
-                      return a.total_ns > b.total_ns;
-                  });
+        std::sort(sorted.begin(), sorted.end(), [](const core::perf::FrameSample& a, const core::perf::FrameSample& b) {
+            return a.total_ns > b.total_ns;
+        });
         const ui::gsn::CanvasRenderStats stats = ui::gsn::GetLastCanvasRenderStats();
-        const std::string report = BuildReport(total_ms, Average(h), Maximum(h),
-                                               ImGui::GetIO().Framerate, sorted, total_ns, stats,
+        const std::string report = BuildReport(total_ms,
+                                               Average(h),
+                                               Maximum(h),
+                                               ImGui::GetIO().Framerate,
+                                               sorted,
+                                               total_ns,
+                                               stats,
                                                core::perf::GetPerfToggles());
         ImGui::SetClipboardText(report.c_str());
     }
@@ -172,13 +176,17 @@ void RenderPerfOverlay(bool& open) {
     if (ImGui::Button("Save report to file")) {
         const auto& samples = core::perf::GetLastFrameSamples();
         std::vector<core::perf::FrameSample> sorted(samples.begin(), samples.end());
-        std::sort(sorted.begin(), sorted.end(),
-                  [](const core::perf::FrameSample& a, const core::perf::FrameSample& b) {
-                      return a.total_ns > b.total_ns;
-                  });
+        std::sort(sorted.begin(), sorted.end(), [](const core::perf::FrameSample& a, const core::perf::FrameSample& b) {
+            return a.total_ns > b.total_ns;
+        });
         const ui::gsn::CanvasRenderStats stats = ui::gsn::GetLastCanvasRenderStats();
-        const std::string report = BuildReport(total_ms, Average(h), Maximum(h),
-                                               ImGui::GetIO().Framerate, sorted, total_ns, stats,
+        const std::string report = BuildReport(total_ms,
+                                               Average(h),
+                                               Maximum(h),
+                                               ImGui::GetIO().Framerate,
+                                               sorted,
+                                               total_ns,
+                                               stats,
                                                core::perf::GetPerfToggles());
         std::time_t now = std::time(nullptr);
         std::tm tm_buf{};
@@ -189,7 +197,15 @@ void RenderPerfOverlay(bool& open) {
 #endif
         char name[64];
         std::strftime(name, sizeof(name), "perf-report-%Y%m%d-%H%M%S.txt", &tm_buf);
-        std::filesystem::path path = std::filesystem::current_path() / name;
+        // Write into the "build" folder under the current working directory
+        // so reports are kept out of source control (build/ is gitignored).
+        // Fall back to CWD if the build directory cannot be created.
+        std::filesystem::path output_dir = std::filesystem::current_path() / "build";
+        std::error_code ec;
+        std::filesystem::create_directories(output_dir, ec);
+        if (ec || !std::filesystem::is_directory(output_dir))
+            output_dir = std::filesystem::current_path();
+        std::filesystem::path path = output_dir / name;
         std::ofstream f(path);
         if (f) {
             f << report;
