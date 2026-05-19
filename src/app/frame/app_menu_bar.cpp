@@ -172,6 +172,9 @@ float RenderAppMenuBar(AppRuntimeState& state, bool& done, const AppMenuBarCallb
             state.project_controller->show_startup_project_window = true;
         }
 
+        ImGui::Separator();
+        ImGui::MenuItem("Performance overlay", nullptr, &ui_state.show_perf_overlay);
+
         ImGui::EndMenu();
     }
 

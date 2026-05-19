@@ -7,6 +7,7 @@ add_library(af_core OBJECT
     confidence/confidence_store.cpp
     element_factory.cpp
     gsn_layout.cpp
+    perf/frame_profiler.cpp
     problems/problem_attention.cpp
     problems/problem_item.cpp
     problems/problem_utils.cpp

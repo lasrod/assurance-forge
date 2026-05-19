@@ -1,6 +1,7 @@
 ﻿#include "ui/gsn/gsn_canvas_renderer.h"
 
 #include "core/acp/acp_relationship_index.h"
+#include "core/perf/frame_profiler.h"
 #include "core/terminology_scope_service.h"
 #include "ui/gsn/gsn_acp_decorator.h"
 #include "ui/gsn/gsn_canvas.h" // for DrawGsnNode
@@ -122,10 +123,13 @@ void GsnCanvas::Render(UiState& ui_state,
                        const ElementContextActions& actions,
                        const sacm::AssuranceCasePackage* terminology_package,
                        bool overlay_hovered) {
+    core::perf::ScopedTimer perf_scope_render("gsn.render");
     CanvasRenderStats frame_stats{};
+    SetCurrentRenderStats(&frame_stats);
 
     std::optional<core::TerminologyService> terminology_service;
     if (terminology_package) {
+        core::perf::ScopedTimer perf_scope_term("gsn.terminology_service_build");
         terminology_service.emplace(*terminology_package);
     }
     const core::TerminologyService* terminology_service_ptr =
@@ -150,171 +154,198 @@ void GsnCanvas::Render(UiState& ui_state,
     ImVec2 cull_max(viewport_max.x + cull_margin, viewport_max.y + cull_margin);
 
     const std::vector<core::acp::AcpRelationshipTarget> acp_targets =
-        active_case ? core::acp::BuildAcpRelationshipTargets(*active_case)
+        active_case ? [&]() {
+            core::perf::ScopedTimer perf_scope_acp("gsn.acp.build_targets");
+            return core::acp::BuildAcpRelationshipTargets(*active_case);
+        }()
                     : std::vector<core::acp::AcpRelationshipTarget>{};
-    const auto acp_target_by_edge = BuildRelationshipTargetLookup(acp_targets);
-    const auto acp_by_relationship = BuildRelationshipAcpLookup(active_case);
-    const auto acp_by_element = BuildElementAcpLookup(active_case);
-    const std::string picked_edge_key =
-        PickRelationshipEdge(layout_nodes_, node_by_id_, origin, zoom, viewport_min, viewport_max);
+    const auto acp_target_by_edge = [&]() {
+        core::perf::ScopedTimer perf_scope("gsn.acp.target_lookup");
+        return BuildRelationshipTargetLookup(acp_targets);
+    }();
+    const auto acp_by_relationship = [&]() {
+        core::perf::ScopedTimer perf_scope("gsn.acp.relationship_lookup");
+        return BuildRelationshipAcpLookup(active_case);
+    }();
+    const auto acp_by_element = [&]() {
+        core::perf::ScopedTimer perf_scope("gsn.acp.element_lookup");
+        return BuildElementAcpLookup(active_case);
+    }();
+    const std::string picked_edge_key = [&]() {
+        core::perf::ScopedTimer perf_scope("gsn.pick_edge");
+        return PickRelationshipEdge(layout_nodes_, node_by_id_, origin, zoom, viewport_min, viewport_max);
+    }();
 
     // Draw edges first (beneath nodes)
-    for (const auto& child_node : layout_nodes_) {
-        if (child_node.parent_id.empty())
-            continue;
-
-        auto parent_it = node_by_id_.find(child_node.parent_id);
-        if (parent_it == node_by_id_.end())
-            continue;
-        const LayoutNode& parent_node = *parent_it->second;
-
-        if (child_node.group == ElementGroup::Group2) {
-            ImVec2 parent_side, attachment_edge;
-            ComputeGroup2Endpoints(parent_node, child_node, origin, zoom, parent_side, attachment_edge);
-            ImVec2 edge_min, edge_max;
-            ComputeGroup2EdgeBounds(parent_side, attachment_edge, child_node.is_left_side, zoom, edge_min, edge_max);
-            if (!RectsIntersect(edge_min, edge_max, cull_min, cull_max)) {
-                ++frame_stats.edges_culled;
+    {
+        core::perf::ScopedTimer perf_scope_edges("gsn.edges");
+        for (const auto& child_node : layout_nodes_) {
+            if (child_node.parent_id.empty())
                 continue;
-            }
-            DrawGroup2Edge(draw_list, parent_side, attachment_edge, child_node.is_left_side, zoom);
-            const std::string edge_key = EdgeKey(parent_node.id, child_node.id);
-            const auto target_it = acp_target_by_edge.find(edge_key);
-            const core::acp::AcpRelationshipTarget* acp_target =
-                target_it == acp_target_by_edge.end() ? nullptr : target_it->second;
-            const std::vector<parser::AcpRecord>* edge_acps = nullptr;
-            if (acp_target) {
-                const auto acp_it = acp_by_relationship.find(acp_target->relationship_id);
-                if (acp_it != acp_by_relationship.end())
-                    edge_acps = &acp_it->second;
-            }
-            if (RelationshipEdgeSelected(ui_state, acp_target, edge_key))
-                DrawGroup2EdgeHighlight(draw_list, parent_side, attachment_edge, child_node.is_left_side, zoom);
-            frame_stats.relationship_context_menu_active =
-                RenderAcpRelationshipContextMenu(acp_target,
-                                                 edge_acps,
-                                                 actions,
-                                                 ui_state,
-                                                 edge_key,
-                                                 parent_node.id,
-                                                 child_node.id,
-                                                 picked_edge_key == edge_key) ||
-                frame_stats.relationship_context_menu_active;
-            if (acp_target && acp_target->eligible_for_acp && edge_acps) {
-                DrawAcpRelationshipDecorator(
-                    draw_list,
-                    ImVec2((parent_side.x + attachment_edge.x) * 0.5f, (parent_side.y + attachment_edge.y) * 0.5f),
-                    zoom,
-                    *acp_target,
-                    *edge_acps,
-                    actions,
-                    ui_state);
-            }
-            ++frame_stats.edges_drawn;
-        } else {
-            ImVec2 parent_bottom, child_top;
-            ComputeGroup1Endpoints(parent_node, child_node, origin, zoom, parent_bottom, child_top);
-            ImVec2 edge_min, edge_max;
-            ComputeGroup1EdgeBounds(parent_bottom, child_top, zoom, edge_min, edge_max);
-            if (!RectsIntersect(edge_min, edge_max, cull_min, cull_max)) {
-                ++frame_stats.edges_culled;
+
+            auto parent_it = node_by_id_.find(child_node.parent_id);
+            if (parent_it == node_by_id_.end())
                 continue;
+            const LayoutNode& parent_node = *parent_it->second;
+
+            if (child_node.group == ElementGroup::Group2) {
+                ImVec2 parent_side, attachment_edge;
+                ComputeGroup2Endpoints(parent_node, child_node, origin, zoom, parent_side, attachment_edge);
+                ImVec2 edge_min, edge_max;
+                ComputeGroup2EdgeBounds(
+                    parent_side, attachment_edge, child_node.is_left_side, zoom, edge_min, edge_max);
+                if (!RectsIntersect(edge_min, edge_max, cull_min, cull_max)) {
+                    ++frame_stats.edges_culled;
+                    continue;
+                }
+                DrawGroup2Edge(draw_list, parent_side, attachment_edge, child_node.is_left_side, zoom);
+                const std::string edge_key = EdgeKey(parent_node.id, child_node.id);
+                const auto target_it = acp_target_by_edge.find(edge_key);
+                const core::acp::AcpRelationshipTarget* acp_target =
+                    target_it == acp_target_by_edge.end() ? nullptr : target_it->second;
+                const std::vector<parser::AcpRecord>* edge_acps = nullptr;
+                if (acp_target) {
+                    const auto acp_it = acp_by_relationship.find(acp_target->relationship_id);
+                    if (acp_it != acp_by_relationship.end())
+                        edge_acps = &acp_it->second;
+                }
+                if (RelationshipEdgeSelected(ui_state, acp_target, edge_key))
+                    DrawGroup2EdgeHighlight(draw_list, parent_side, attachment_edge, child_node.is_left_side, zoom);
+                frame_stats.relationship_context_menu_active =
+                    RenderAcpRelationshipContextMenu(acp_target,
+                                                     edge_acps,
+                                                     actions,
+                                                     ui_state,
+                                                     edge_key,
+                                                     parent_node.id,
+                                                     child_node.id,
+                                                     picked_edge_key == edge_key) ||
+                    frame_stats.relationship_context_menu_active;
+                if (acp_target && acp_target->eligible_for_acp && edge_acps) {
+                    DrawAcpRelationshipDecorator(
+                        draw_list,
+                        ImVec2((parent_side.x + attachment_edge.x) * 0.5f, (parent_side.y + attachment_edge.y) * 0.5f),
+                        zoom,
+                        *acp_target,
+                        *edge_acps,
+                        actions,
+                        ui_state);
+                }
+                ++frame_stats.edges_drawn;
+            } else {
+                ImVec2 parent_bottom, child_top;
+                ComputeGroup1Endpoints(parent_node, child_node, origin, zoom, parent_bottom, child_top);
+                ImVec2 edge_min, edge_max;
+                ComputeGroup1EdgeBounds(parent_bottom, child_top, zoom, edge_min, edge_max);
+                if (!RectsIntersect(edge_min, edge_max, cull_min, cull_max)) {
+                    ++frame_stats.edges_culled;
+                    continue;
+                }
+                DrawGroup1Edge(draw_list, parent_bottom, child_top, zoom);
+                const std::string edge_key = EdgeKey(parent_node.id, child_node.id);
+                const auto target_it = acp_target_by_edge.find(edge_key);
+                const core::acp::AcpRelationshipTarget* acp_target =
+                    target_it == acp_target_by_edge.end() ? nullptr : target_it->second;
+                const std::vector<parser::AcpRecord>* edge_acps = nullptr;
+                if (acp_target) {
+                    const auto acp_it = acp_by_relationship.find(acp_target->relationship_id);
+                    if (acp_it != acp_by_relationship.end())
+                        edge_acps = &acp_it->second;
+                }
+                if (RelationshipEdgeSelected(ui_state, acp_target, edge_key))
+                    DrawGroup1EdgeHighlight(draw_list, parent_bottom, child_top, zoom);
+                frame_stats.relationship_context_menu_active =
+                    RenderAcpRelationshipContextMenu(acp_target,
+                                                     edge_acps,
+                                                     actions,
+                                                     ui_state,
+                                                     edge_key,
+                                                     parent_node.id,
+                                                     child_node.id,
+                                                     picked_edge_key == edge_key) ||
+                    frame_stats.relationship_context_menu_active;
+                if (acp_target && acp_target->eligible_for_acp && edge_acps) {
+                    DrawAcpRelationshipDecorator(
+                        draw_list,
+                        ImVec2((parent_bottom.x + child_top.x) * 0.5f, (parent_bottom.y + child_top.y) * 0.5f),
+                        zoom,
+                        *acp_target,
+                        *edge_acps,
+                        actions,
+                        ui_state);
+                }
+                ++frame_stats.edges_drawn;
             }
-            DrawGroup1Edge(draw_list, parent_bottom, child_top, zoom);
-            const std::string edge_key = EdgeKey(parent_node.id, child_node.id);
-            const auto target_it = acp_target_by_edge.find(edge_key);
-            const core::acp::AcpRelationshipTarget* acp_target =
-                target_it == acp_target_by_edge.end() ? nullptr : target_it->second;
-            const std::vector<parser::AcpRecord>* edge_acps = nullptr;
-            if (acp_target) {
-                const auto acp_it = acp_by_relationship.find(acp_target->relationship_id);
-                if (acp_it != acp_by_relationship.end())
-                    edge_acps = &acp_it->second;
-            }
-            if (RelationshipEdgeSelected(ui_state, acp_target, edge_key))
-                DrawGroup1EdgeHighlight(draw_list, parent_bottom, child_top, zoom);
-            frame_stats.relationship_context_menu_active =
-                RenderAcpRelationshipContextMenu(acp_target,
-                                                 edge_acps,
-                                                 actions,
-                                                 ui_state,
-                                                 edge_key,
-                                                 parent_node.id,
-                                                 child_node.id,
-                                                 picked_edge_key == edge_key) ||
-                frame_stats.relationship_context_menu_active;
-            if (acp_target && acp_target->eligible_for_acp && edge_acps) {
-                DrawAcpRelationshipDecorator(
-                    draw_list,
-                    ImVec2((parent_bottom.x + child_top.x) * 0.5f, (parent_bottom.y + child_top.y) * 0.5f),
-                    zoom,
-                    *acp_target,
-                    *edge_acps,
-                    actions,
-                    ui_state);
-            }
-            ++frame_stats.edges_drawn;
         }
-    }
+    } // gsn.edges
 
     // Draw nodes on top of edges
-    for (const auto& node : layout_nodes_) {
-        ImVec2 node_min(origin.x + node.position.x * zoom, origin.y + node.position.y * zoom);
-        ImVec2 node_max(node_min.x + node.size.x * zoom, node_min.y + node.size.y * zoom);
-        if (!RectsIntersect(node_min, node_max, cull_min, cull_max)) {
-            ++frame_stats.nodes_culled;
-            continue;
-        }
+    {
+        core::perf::ScopedTimer perf_scope_nodes("gsn.nodes");
+        for (const auto& node : layout_nodes_) {
+            ImVec2 node_min(origin.x + node.position.x * zoom, origin.y + node.position.y * zoom);
+            ImVec2 node_max(node_min.x + node.size.x * zoom, node_min.y + node.size.y * zoom);
+            if (!RectsIntersect(node_min, node_max, cull_min, cull_max)) {
+                ++frame_stats.nodes_culled;
+                continue;
+            }
 
-        GsnNode gsn_node;
-        gsn_node.id = node.id;
-        switch (node.role) {
-        case ElementRole::Claim:
-            gsn_node.type = "Claim";
-            break;
-        case ElementRole::Strategy:
-            gsn_node.type = "Strategy";
-            break;
-        case ElementRole::Solution:
-            gsn_node.type = "Solution";
-            break;
-        case ElementRole::Context:
-            gsn_node.type = "Context";
-            break;
-        case ElementRole::Assumption:
-            gsn_node.type = "Assumption";
-            break;
-        case ElementRole::Justification:
-            gsn_node.type = "Justification";
-            break;
-        case ElementRole::Evidence:
-            gsn_node.type = "Evidence";
-            break;
-        default:
-            gsn_node.type = "Other";
-            break;
+            GsnNode gsn_node;
+            gsn_node.id = node.id;
+            switch (node.role) {
+            case ElementRole::Claim:
+                gsn_node.type = "Claim";
+                break;
+            case ElementRole::Strategy:
+                gsn_node.type = "Strategy";
+                break;
+            case ElementRole::Solution:
+                gsn_node.type = "Solution";
+                break;
+            case ElementRole::Context:
+                gsn_node.type = "Context";
+                break;
+            case ElementRole::Assumption:
+                gsn_node.type = "Assumption";
+                break;
+            case ElementRole::Justification:
+                gsn_node.type = "Justification";
+                break;
+            case ElementRole::Evidence:
+                gsn_node.type = "Evidence";
+                break;
+            default:
+                gsn_node.type = "Other";
+                break;
+            }
+            gsn_node.position = node.position;
+            gsn_node.size = node.size;
+            gsn_node.label = node.label;
+            gsn_node.label_secondary = node.label_secondary;
+            gsn_node.undeveloped = node.undeveloped;
+            {
+                core::perf::ScopedTimer perf_scope("gsn.node.draw");
+                DrawGsnNode(gsn_node,
+                            origin,
+                            ui_state,
+                            active_case,
+                            actions,
+                            terminology_service_ptr,
+                            terminology_package,
+                            &terminology_card_state_,
+                            zoom,
+                            overlay_hovered);
+            }
+            const auto element_acps = acp_by_element.find(node.id);
+            if (element_acps != acp_by_element.end() && core::perf::GetPerfToggles().acp_decorators) {
+                core::perf::ScopedTimer perf_scope("gsn.node.acp_decorator");
+                DrawAcpElementDecorator(
+                    draw_list, node, node_min, node_max, zoom, element_acps->second, actions, ui_state);
+                ++frame_stats.acp_decorators_drawn;
+            }
+            ++frame_stats.nodes_drawn;
         }
-        gsn_node.position = node.position;
-        gsn_node.size = node.size;
-        gsn_node.label = node.label;
-        gsn_node.label_secondary = node.label_secondary;
-        gsn_node.undeveloped = node.undeveloped;
-        DrawGsnNode(gsn_node,
-                    origin,
-                    ui_state,
-                    active_case,
-                    actions,
-                    terminology_service_ptr,
-                    terminology_package,
-                    &terminology_card_state_,
-                    zoom,
-                    overlay_hovered);
-        const auto element_acps = acp_by_element.find(node.id);
-        if (element_acps != acp_by_element.end()) {
-            DrawAcpElementDecorator(draw_list, node, node_min, node_max, zoom, element_acps->second, actions, ui_state);
-        }
-        ++frame_stats.nodes_drawn;
-    }
+    } // gsn.nodes
 
     RenderPinnedTerminologyCard(terminology_card_state_, terminology_package, actions);
     if (terminology_card_state_.pinned && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
@@ -323,7 +354,12 @@ void GsnCanvas::Render(UiState& ui_state,
         terminology_card_state_.pinned = false;
     }
 
+    frame_stats.draw_list_vtx = draw_list->VtxBuffer.Size;
+    frame_stats.draw_list_idx = draw_list->IdxBuffer.Size;
+    frame_stats.draw_list_cmds = draw_list->CmdBuffer.Size;
     last_render_stats_ = frame_stats;
+    g_last_render_stats_snapshot = frame_stats;
+    SetCurrentRenderStats(nullptr);
 }
 
 bool GsnCanvas::CenterOnNode(const std::string& node_id, ImVec2 viewport_size) {

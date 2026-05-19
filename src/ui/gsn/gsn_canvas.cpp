@@ -1,5 +1,6 @@
 #include "ui/gsn/gsn_canvas.h"
 
+#include "core/perf/frame_profiler.h"
 #include "core/string_utils.h"
 #include "core/terminology_scope_service.h"
 #include "ui/gsn/gsn_badges.h"
@@ -207,14 +208,17 @@ void DrawGsnNode(const GsnNode& node,
     }
 
     // Draw the GSN shape
-    if (node.type == "Strategy") {
-        DrawParallelogram(draw_list, top_left, bottom_right, fill_color, zoom);
-    } else if (node.type == "Context" || node.type == "Assumption" || node.type == "Justification") {
-        DrawStadium(draw_list, top_left, bottom_right, fill_color, zoom);
-    } else if (node.type == "Solution" || node.type == "Evidence") {
-        DrawCircle(draw_list, top_left, bottom_right, fill_color, zoom);
-    } else {
-        DrawRoundedRect(draw_list, top_left, bottom_right, fill_color, zoom);
+    {
+        core::perf::ScopedTimer perf_scope("gsn.node.shape");
+        if (node.type == "Strategy") {
+            DrawParallelogram(draw_list, top_left, bottom_right, fill_color, zoom);
+        } else if (node.type == "Context" || node.type == "Assumption" || node.type == "Justification") {
+            DrawStadium(draw_list, top_left, bottom_right, fill_color, zoom);
+        } else if (node.type == "Solution" || node.type == "Evidence") {
+            DrawCircle(draw_list, top_left, bottom_right, fill_color, zoom);
+        } else {
+            DrawRoundedRect(draw_list, top_left, bottom_right, fill_color, zoom);
+        }
     }
 
     // Draw label text
@@ -223,9 +227,18 @@ void DrawGsnNode(const GsnNode& node,
     ImU32 ink = marked_for_removal ? GetTheme().text_primary : InkOn(fill_color);
     if (proposal_dimmed)
         ink = DimmedProposalInk(fill_color);
-    DrawNodeLabel(draw_list, node, top_left, bottom_right, text_left, text_wrap, zoom, ink, ui_state);
-    const std::vector<TerminologySpanHitRegion> terminology_regions = BuildAndDrawTerminologySpans(
-        draw_list, node, top_left, text_left, text_wrap, zoom, ui_state, terminology_service);
+    {
+        core::perf::ScopedTimer perf_scope("gsn.node.label");
+        DrawNodeLabel(draw_list, node, top_left, bottom_right, text_left, text_wrap, zoom, ink, ui_state);
+    }
+    std::vector<TerminologySpanHitRegion> terminology_regions;
+    if (core::perf::GetPerfToggles().terminology_spans) {
+        core::perf::ScopedTimer perf_scope("gsn.node.terminology_spans");
+        terminology_regions = BuildAndDrawTerminologySpans(
+            draw_list, node, top_left, text_left, text_wrap, zoom, ui_state, terminology_service);
+        if (auto* stats = CurrentRenderStats())
+            stats->terminology_spans_drawn += static_cast<int>(terminology_regions.size());
+    }
     HandleTerminologySpanInteractions(
         terminology_regions, terminology_card_state, terminology_package, actions, overlay_hovered);
     DrawUndevelopedMarker(draw_list, node, top_left, bottom_right, zoom);
@@ -264,7 +277,8 @@ void DrawGsnNode(const GsnNode& node,
 
     // Highlight selected node with a soft accent glow ring (3 concentric rects,
     // decreasing alpha) instead of a hard outline.
-    if (ui_state.selected_element_id == node.id) {
+    if (ui_state.selected_element_id == node.id && core::perf::GetPerfToggles().selection_glow) {
+        core::perf::ScopedTimer perf_scope("gsn.node.selection_glow");
         const Theme& th_sel = GetTheme();
         float scale = DpiScale() * zoom;
         for (int i = 0; i < 3; ++i) {
@@ -277,6 +291,8 @@ void DrawGsnNode(const GsnNode& node,
                                0,
                                1.5f * scale);
         }
+        if (auto* stats = CurrentRenderStats())
+            ++stats->selection_glow_drawn;
     }
 
     if (proposal_highlighted) {
@@ -701,7 +717,21 @@ void SetCanvasTree(const core::AssuranceTree& tree) {
 }
 
 CanvasRenderStats GetLastCanvasRenderStats() {
-    return GlobalRenderer().GetLastRenderStats();
+    return g_last_render_stats_snapshot;
+}
+
+namespace {
+CanvasRenderStats* g_current_render_stats = nullptr;
+} // namespace
+
+CanvasRenderStats g_last_render_stats_snapshot{};
+
+CanvasRenderStats* CurrentRenderStats() {
+    return g_current_render_stats;
+}
+
+void SetCurrentRenderStats(CanvasRenderStats* stats) {
+    g_current_render_stats = stats;
 }
 
 } // namespace ui::gsn

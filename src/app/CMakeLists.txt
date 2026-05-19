@@ -22,6 +22,7 @@ add_library(af_app OBJECT
     areas/inspector_area.cpp
     areas/modal_host.cpp
     areas/modal_host_terminology.cpp
+    areas/perf_overlay_area.cpp
     areas/problems_area.cpp
     areas/project_explorer_area.cpp
     areas/proposal_editor_area.cpp

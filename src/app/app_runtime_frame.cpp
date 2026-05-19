@@ -10,6 +10,7 @@
 #include "app/areas/feedback_dock_area.h"
 #include "app/areas/inspector_area.h"
 #include "app/areas/modal_host.h"
+#include "app/areas/perf_overlay_area.h"
 #include "app/areas/project_explorer_area.h"
 #include "app/areas/proposal_editor_area.h"
 #include "app/areas/review_panel_area.h"
@@ -17,6 +18,7 @@
 #include "app/frame/app_layout_regions.h"
 #include "app/frame/app_menu_bar.h"
 #include "app/frame/app_shell.h"
+#include "core/perf/frame_profiler.h"
 #include "ui/ui_state.h"
 
 #include <cstddef>
@@ -25,6 +27,7 @@
 namespace app {
 
 void AppRuntime::RenderFrame(bool& done) {
+    core::perf::BeginFrame();
     if (impl_->modal_coordinator->ConsumeCloseRequest()) {
         RequestExit(done);
     }
@@ -40,9 +43,18 @@ void AppRuntime::RenderFrame(bool& done) {
     menu_callbacks.begin_create_project_j3377_cae_register = [this]() { BeginCreateProjectJ3377CaeRegister(); };
     const float menu_height = frame::RenderAppMenuBar(*impl_, done, menu_callbacks);
 
-    RebuildDerivedViewsIfNeeded();
-    ProcessPendingProposalCreatorPreviewRefresh();
-    PollAiReviewTask();
+    {
+        core::perf::ScopedTimer s("app.derived_views");
+        RebuildDerivedViewsIfNeeded();
+    }
+    {
+        core::perf::ScopedTimer s("app.proposal_preview_refresh");
+        ProcessPendingProposalCreatorPreviewRefresh();
+    }
+    {
+        core::perf::ScopedTimer s("app.ai_poll");
+        PollAiReviewTask();
+    }
 
     const frame::AppLayoutRegions regions = frame::RenderAppShell(*impl_, menu_height, kPanelFlags);
 
@@ -82,9 +94,19 @@ void AppRuntime::RenderFrame(bool& done) {
         },
     };
 
-    areas::RenderProjectExplorerArea(*impl_, regions.project_explorer, kPanelFlags, project_explorer_callbacks);
-    areas::RenderArgumentNavigatorArea(*impl_, regions.argument_navigator, kPanelFlags, argument_navigator_callbacks);
-    areas::RenderWorkbenchArea(*impl_, regions.workbench, kPanelFlags, MakeWorkbenchAreaCallbacks());
+    {
+        core::perf::ScopedTimer s("app.area.project_explorer");
+        areas::RenderProjectExplorerArea(*impl_, regions.project_explorer, kPanelFlags, project_explorer_callbacks);
+    }
+    {
+        core::perf::ScopedTimer s("app.area.argument_navigator");
+        areas::RenderArgumentNavigatorArea(
+            *impl_, regions.argument_navigator, kPanelFlags, argument_navigator_callbacks);
+    }
+    {
+        core::perf::ScopedTimer s("app.area.workbench");
+        areas::RenderWorkbenchArea(*impl_, regions.workbench, kPanelFlags, MakeWorkbenchAreaCallbacks());
+    }
 
     areas::ReviewPanelAreaCallbacks review_panel_callbacks;
     review_panel_callbacks.ensure_review_item_storage = [this]() { return EnsureReviewItemStorage(); };
@@ -157,7 +179,10 @@ void AppRuntime::RenderFrame(bool& done) {
         areas::RenderReviewPanelContent(*impl_, review_panel_callbacks);
     };
     feedback_dock_callbacks.render_ai_debug_content = [this]() { areas::RenderAiDebugPanelContent(*impl_); };
-    areas::RenderFeedbackDockArea(*impl_, regions.feedback_dock, kPanelFlags, feedback_dock_callbacks);
+    {
+        core::perf::ScopedTimer s("app.area.feedback_dock");
+        areas::RenderFeedbackDockArea(*impl_, regions.feedback_dock, kPanelFlags, feedback_dock_callbacks);
+    }
 
     areas::ProposalEditorAreaCallbacks proposal_editor_callbacks{
         [this](core::RemoveMode mode) { RemoveProposalSelected(mode); },
@@ -190,7 +215,10 @@ void AppRuntime::RenderFrame(bool& done) {
             impl_->events.Emit(DocumentDirtyEvent{});
         },
     };
-    areas::RenderInspectorArea(*impl_, regions.inspector, kPanelFlags, inspector_callbacks);
+    {
+        core::perf::ScopedTimer s("app.area.inspector");
+        areas::RenderInspectorArea(*impl_, regions.inspector, kPanelFlags, inspector_callbacks);
+    }
 
     areas::ModalHostCallbacks modal_callbacks;
     modal_callbacks.begin_create_project = [this]() { BeginCreateProject(); };
@@ -218,7 +246,16 @@ void AppRuntime::RenderFrame(bool& done) {
     modal_callbacks.confirm_delete_terminology_term = [this]() { ConfirmDeleteTerminologyTerm(); };
     modal_callbacks.confirm_terminology_category_edit = [this]() { ConfirmTerminologyCategoryEdit(); };
     modal_callbacks.confirm_delete_terminology_category = [this]() { ConfirmDeleteTerminologyCategory(); };
-    areas::RenderModalHost(*impl_, done, modal_callbacks);
+    {
+        core::perf::ScopedTimer s("app.modal_host");
+        areas::RenderModalHost(*impl_, done, modal_callbacks);
+    }
+
+    if (ui::GetUiState().show_perf_overlay) {
+        areas::RenderPerfOverlay(ui::GetUiState().show_perf_overlay);
+    }
+
+    core::perf::EndFrame();
 }
 
 } // namespace app

@@ -23,11 +23,32 @@ struct CanvasRenderStats {
     int nodes_culled = 0;
     int edges_drawn = 0;
     int edges_culled = 0;
+    int shadows_drawn = 0;
+    int interior_shading_drawn = 0;
+    int selection_glow_drawn = 0;
+    int acp_decorators_drawn = 0;
+    int terminology_spans_drawn = 0;
+    int terminology_tokens_scanned = 0;
+    int clip_rect_pushes = 0;
+    int draw_list_vtx = 0;
+    int draw_list_idx = 0;
+    int draw_list_cmds = 0;
     bool relationship_context_menu_active = false;
 };
 
 // Returns stats from the most recent GSN canvas render pass.
 CanvasRenderStats GetLastCanvasRenderStats();
+
+// Pointer to the CanvasRenderStats accumulator for the currently-rendering
+// canvas, if any. Used by draw helpers (shapes, badges, terminology) to bump
+// fine-grained counters without plumbing a stats pointer through every call.
+// Set to non-null only between `GsnCanvas::Render` enter and exit.
+CanvasRenderStats* CurrentRenderStats();
+void SetCurrentRenderStats(CanvasRenderStats* stats);
+
+// Snapshot of the most recent frame's stats from whichever GsnCanvas
+// instance rendered last. Populated at the end of GsnCanvas::Render.
+extern CanvasRenderStats g_last_render_stats_snapshot;
 
 class GsnCanvas {
 public:

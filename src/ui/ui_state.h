@@ -95,6 +95,11 @@ struct UiState {
     ProblemFilter active_problem_filter = ProblemFilter::All;
     std::string selected_problem_id;
     std::string selected_problem_element_id;
+
+    // Performance analysis overlay (Phase 3 of the perf-analysis plan). When
+    // true, the perf overlay window is shown with profiler buckets, render
+    // stats, and feature toggles.
+    bool show_perf_overlay = false;
 };
 
 // Global shared UI state accessible from all panels.

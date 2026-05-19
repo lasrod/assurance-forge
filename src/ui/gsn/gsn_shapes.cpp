@@ -1,5 +1,7 @@
 #include "ui/gsn/gsn_shapes.h"
 
+#include "core/perf/frame_profiler.h"
+#include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/gsn/gsn_dpi.h"
 #include "ui/theme.h"
 
@@ -18,11 +20,17 @@ constexpr float kUndGap = 0.50f;
 constexpr float kDetailedNodeZoom = 0.70f;
 constexpr float kUndLabelZoom = 0.55f;
 
-bool ShouldDrawDetailedNodeEffects(float zoom) {
-    return zoom >= kDetailedNodeZoom;
+bool ShouldDrawShadows(float zoom) {
+    return core::perf::GetPerfToggles().node_shadows && zoom >= kDetailedNodeZoom;
+}
+
+bool ShouldDrawShading(float zoom) {
+    return core::perf::GetPerfToggles().node_interior_shading && zoom >= kDetailedNodeZoom;
 }
 
 int CircleSegmentsForZoom(float zoom) {
+    if (!core::perf::GetPerfToggles().high_segment_circles)
+        return 12;
     if (zoom < 0.50f)
         return 16;
     if (zoom < 0.85f)
@@ -113,16 +121,21 @@ void DrawParallelogram(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_rig
         ImVec2(bottom_right.x - skew, bottom_right.y), // bottom-right (inset left)
         ImVec2(top_left.x, bottom_right.y)             // bottom-left
     };
-    if (ShouldDrawDetailedNodeEffects(zoom))
+    if (ShouldDrawShadows(zoom)) {
         DrawPolyShadow(draw_list, corners, 4, zoom);
+        if (auto* stats = CurrentRenderStats())
+            ++stats->shadows_drawn;
+    }
     draw_list->AddConvexPolyFilled(corners, 4, fill_color);
-    if (ShouldDrawDetailedNodeEffects(zoom)) {
+    if (ShouldDrawShading(zoom)) {
         ImU32 hl = WithAlpha(ShadeColor(fill_color, 0.30f), 0.55f);
         ImVec2 hl_pts[4] = {corners[0],
                             corners[1],
                             ImVec2(corners[1].x - skew * 0.15f, corners[1].y + (bottom_right.y - top_left.y) * 0.18f),
                             ImVec2(corners[0].x - skew * 0.15f, corners[0].y + (bottom_right.y - top_left.y) * 0.18f)};
         draw_list->AddConvexPolyFilled(hl_pts, 4, hl);
+        if (auto* stats = CurrentRenderStats())
+            ++stats->interior_shading_drawn;
     }
     draw_list->AddPolyline(corners, 4, OutlineColor(), ImDrawFlags_Closed, outline);
 }
@@ -130,11 +143,19 @@ void DrawParallelogram(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_rig
 void DrawStadium(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color, float zoom) {
     float rounding = (bottom_right.y - top_left.y) * 0.5f;
     float outline = DpiSize(kOutlineThickness) * zoom;
-    if (ShouldDrawDetailedNodeEffects(zoom))
+    if (ShouldDrawShadows(zoom)) {
         DrawRectShadow(draw_list, top_left, bottom_right, rounding, zoom);
+        if (auto* stats = CurrentRenderStats())
+            ++stats->shadows_drawn;
+    }
     draw_list->AddRectFilled(top_left, bottom_right, fill_color, rounding);
-    if (ShouldDrawDetailedNodeEffects(zoom))
+    if (ShouldDrawShading(zoom)) {
         AddInteriorShading(draw_list, top_left, bottom_right, fill_color, rounding);
+        if (auto* stats = CurrentRenderStats()) {
+            ++stats->interior_shading_drawn;
+            stats->clip_rect_pushes += 2;
+        }
+    }
     draw_list->AddRect(top_left, bottom_right, OutlineColor(), rounding, 0, outline);
 }
 
@@ -145,13 +166,18 @@ void DrawCircle(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU
     float radius = (width < height ? width : height) * 0.5f;
     float outline = DpiSize(kOutlineThickness) * zoom;
     int segments = CircleSegmentsForZoom(zoom);
-    if (ShouldDrawDetailedNodeEffects(zoom))
+    if (ShouldDrawShadows(zoom)) {
         DrawCircleShadow(draw_list, center, radius, zoom);
+        if (auto* stats = CurrentRenderStats())
+            ++stats->shadows_drawn;
+    }
     draw_list->AddCircleFilled(center, radius, fill_color, segments);
-    if (ShouldDrawDetailedNodeEffects(zoom)) {
+    if (ShouldDrawShading(zoom)) {
         ImU32 hl = WithAlpha(ShadeColor(fill_color, 0.35f), 0.45f);
         draw_list->AddCircleFilled(
             ImVec2(center.x - radius * 0.18f, center.y - radius * 0.30f), radius * 0.55f, hl, segments);
+        if (auto* stats = CurrentRenderStats())
+            ++stats->interior_shading_drawn;
     }
     draw_list->AddCircle(center, radius, OutlineColor(), segments, outline);
 }
@@ -159,11 +185,19 @@ void DrawCircle(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU
 void DrawRoundedRect(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color, float zoom) {
     float rounding = DpiSize(kClaimRounding) * zoom;
     float outline = DpiSize(kOutlineThickness) * zoom;
-    if (ShouldDrawDetailedNodeEffects(zoom))
+    if (ShouldDrawShadows(zoom)) {
         DrawRectShadow(draw_list, top_left, bottom_right, rounding, zoom);
+        if (auto* stats = CurrentRenderStats())
+            ++stats->shadows_drawn;
+    }
     draw_list->AddRectFilled(top_left, bottom_right, fill_color, rounding);
-    if (ShouldDrawDetailedNodeEffects(zoom))
+    if (ShouldDrawShading(zoom)) {
         AddInteriorShading(draw_list, top_left, bottom_right, fill_color, rounding);
+        if (auto* stats = CurrentRenderStats()) {
+            ++stats->interior_shading_drawn;
+            stats->clip_rect_pushes += 2;
+        }
+    }
     draw_list->AddRect(top_left, bottom_right, OutlineColor(), rounding, 0, outline);
 }
 
@@ -179,8 +213,11 @@ void DrawUndevelopedMarker(
                          ImVec2(center.x + radius, center.y),
                          ImVec2(center.x, center.y + radius),
                          ImVec2(center.x - radius, center.y)};
-    if (ShouldDrawDetailedNodeEffects(zoom))
+    if (ShouldDrawShadows(zoom)) {
         DrawPolyShadow(draw_list, diamond, 4, zoom);
+        if (auto* stats = CurrentRenderStats())
+            ++stats->shadows_drawn;
+    }
     ImU32 und_fill = IM_COL32(245, 247, 252, 255); // near-white for high contrast
     ImU32 und_ink = InkOn(und_fill);
     draw_list->AddConvexPolyFilled(diamond, 4, und_fill);

@@ -2,6 +2,7 @@
 
 #include "app/app_runtime_state.h"
 #include "app/frame/app_layout_regions.h"
+#include "core/perf/frame_profiler.h"
 #include "ui/panels/project_explorer_panel.h"
 
 namespace app::areas {
@@ -14,15 +15,23 @@ ui::panels::ProjectExplorerPanelModel BuildProjectExplorerModel(AppRuntimeState&
     if (!model.project)
         return model;
 
-    if (callbacks.refresh_sacm_package_tree_cache)
+    if (callbacks.refresh_sacm_package_tree_cache) {
+        core::perf::ScopedTimer s("app.pe.refresh_sacm_tree_cache");
         callbacks.refresh_sacm_package_tree_cache();
+    }
 
-    model.sacm_package_trees_by_path = state.sacm_package_tree_cache;
+    {
+        core::perf::ScopedTimer s("app.pe.copy_tree_cache");
+        model.sacm_package_trees_by_path = state.sacm_package_tree_cache;
+    }
     const parser::AssuranceCase* loaded_case =
         state.app_state.loaded_case.has_value() ? &state.app_state.loaded_case.value() : nullptr;
-    for (const core::reviews::ReviewProposalSummary& summary :
-         state.proposal_controller->manager.ListProposals(loaded_case)) {
-        model.proposal_validity_by_path[summary.relative_path.generic_string()] = summary.validity;
+    {
+        core::perf::ScopedTimer s("app.pe.list_proposals");
+        for (const core::reviews::ReviewProposalSummary& summary :
+             state.proposal_controller->manager.ListProposals(loaded_case)) {
+            model.proposal_validity_by_path[summary.relative_path.generic_string()] = summary.validity;
+        }
     }
     return model;
 }
@@ -46,12 +55,20 @@ void RenderProjectExplorerArea(AppRuntimeState& state,
                                const frame::AppLayoutRegion& region,
                                ImGuiWindowFlags panel_flags,
                                const ProjectExplorerAreaCallbacks& callbacks) {
-    ui::panels::ShowProjectExplorerPanel(region.size.x,
-                                         region.size.y,
-                                         region.pos.y,
-                                         panel_flags,
-                                         BuildProjectExplorerModel(state, callbacks),
-                                         MakeProjectExplorerPanelCallbacks(callbacks));
+    ui::panels::ProjectExplorerPanelModel model;
+    {
+        core::perf::ScopedTimer s("app.pe.build_model");
+        model = BuildProjectExplorerModel(state, callbacks);
+    }
+    {
+        core::perf::ScopedTimer s("app.pe.show_panel");
+        ui::panels::ShowProjectExplorerPanel(region.size.x,
+                                             region.size.y,
+                                             region.pos.y,
+                                             panel_flags,
+                                             model,
+                                             MakeProjectExplorerPanelCallbacks(callbacks));
+    }
 }
 
 } // namespace app::areas
