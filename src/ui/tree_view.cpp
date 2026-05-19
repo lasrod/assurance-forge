@@ -101,7 +101,8 @@ static void RenderTreeNode(const core::TreeNode* node,
     ImGui::TableSetColumnIndex(0);
 
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick |
-                               ImGuiTreeNodeFlags_SpanAllColumns | ImGuiTreeNodeFlags_DefaultOpen;
+                               ImGuiTreeNodeFlags_SpanAllColumns | ImGuiTreeNodeFlags_AllowOverlap |
+                               ImGuiTreeNodeFlags_DefaultOpen;
 
     bool has_children = !node->group1_children.empty() || !node->group2_attachments.empty();
     if (!has_children)
@@ -163,8 +164,7 @@ static void RenderTreeNode(const core::TreeNode* node,
     // items, so clicks/right-clicks always land on the tree node).
     {
         constexpr float kArrowIconGapTightenPx = 6.0f;
-        float text_x =
-            item_min.x + std::max(0.0f, ImGui::GetTreeNodeToLabelSpacing() - kArrowIconGapTightenPx);
+        float text_x = item_min.x + std::max(0.0f, ImGui::GetTreeNodeToLabelSpacing() - kArrowIconGapTightenPx);
         float text_y = item_min.y + (item_size.y - ImGui::GetTextLineHeight()) * 0.5f;
 
         ImDrawList* dl = tree_dl;
@@ -228,7 +228,8 @@ static void RenderTreeNode(const core::TreeNode* node,
             const ImVec2 button_size(radius * 2.0f + 2.0f, radius * 2.0f + 2.0f);
             const ImVec2 button_pos = ImGui::GetCursorScreenPos();
             ImGui::PushID(node->id.c_str());
-            const bool badge_clicked = ImGui::InvisibleButton("##tree_badge", button_size);
+            const bool badge_clicked =
+                ImGui::InvisibleButton("##tree_badge", button_size, ImGuiButtonFlags_AllowOverlap);
             ImGui::PopID();
             const bool badge_hovered = ImGui::IsItemHovered();
             ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -237,11 +238,7 @@ static void RenderTreeNode(const core::TreeNode* node,
             ImFont* font = ImGui::GetFont();
             const float gf = ImGui::GetFontSize() * 0.8f;
             const ImVec2 ts = font->CalcTextSizeA(gf, FLT_MAX, 0.0f, glyph);
-            dl->AddText(font,
-                        gf,
-                        ImVec2(center.x - ts.x * 0.5f, center.y - ts.y * 0.5f),
-                        IM_COL32_WHITE,
-                        glyph);
+            dl->AddText(font, gf, ImVec2(center.x - ts.x * 0.5f, center.y - ts.y * 0.5f), IM_COL32_WHITE, glyph);
             if (badge_hovered) {
                 ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
                 ImGui::SetTooltip("%zu problem%s · top: %s\nClick to open the Problems panel.",

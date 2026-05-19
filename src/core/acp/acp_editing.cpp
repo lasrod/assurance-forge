@@ -289,9 +289,9 @@ std::string NextArgumentPackageId(const sacm::AssuranceCasePackage& package) {
 }
 
 bool ArgumentPackageIdExists(const sacm::AssuranceCasePackage& package, const std::string& id) {
-    return std::any_of(package.argumentPackages.begin(), package.argumentPackages.end(), [&](const auto& argument_package) {
-        return argument_package.id == id;
-    });
+    return std::any_of(package.argumentPackages.begin(),
+                       package.argumentPackages.end(),
+                       [&](const auto& argument_package) { return argument_package.id == id; });
 }
 
 std::string NextAcpArgumentPackageId(const sacm::AssuranceCasePackage& package, const std::string& acp_id) {
@@ -393,11 +393,10 @@ void UpdateTextConfidenceClaimFields(sacm::Claim& claim, const parser::AcpRecord
 void UpdateTreeConfidenceNames(sacm::AssuranceCasePackage* package, const parser::AcpRecord& acp) {
     if (!package || acp.resolution_kind != "topGoalReference" || acp.argument_package_id.empty())
         return;
-    auto package_found = std::find_if(package->argumentPackages.begin(),
-                                      package->argumentPackages.end(),
-                                      [&](const sacm::ArgumentPackage& argument_package) {
-                                          return argument_package.id == acp.argument_package_id;
-                                      });
+    auto package_found = std::find_if(
+        package->argumentPackages.begin(),
+        package->argumentPackages.end(),
+        [&](const sacm::ArgumentPackage& argument_package) { return argument_package.id == acp.argument_package_id; });
     if (package_found == package->argumentPackages.end())
         return;
 
@@ -430,9 +429,8 @@ void UpsertParserClaimProjection(parser::AssuranceCase& model, const sacm::Claim
     existing->content_langs["en"] = claim.content;
 }
 
-parser::AcpRecord EnsureTextConfidenceClaim(parser::AssuranceCase& model,
-                                            sacm::AssuranceCasePackage* package,
-                                            parser::AcpRecord record) {
+parser::AcpRecord
+EnsureTextConfidenceClaim(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package, parser::AcpRecord record) {
     if (!package || record.resolution_kind != "text")
         return record;
 

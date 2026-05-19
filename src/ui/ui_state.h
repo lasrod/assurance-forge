@@ -115,8 +115,6 @@ void EndAiReviewSpinner(UiState& ui_state, const std::string& element_id);
 // Requests that the Problems panel scroll to and select the row that matches
 // `problem_id`. Sets selection fields and the focus / open one-shot flags.
 // `element_id` is optional and stored for the inspector context.
-void FocusProblemInPanel(UiState& ui_state,
-                         const std::string& problem_id,
-                         const std::string& element_id = {});
+void FocusProblemInPanel(UiState& ui_state, const std::string& problem_id, const std::string& element_id = {});
 
 } // namespace ui

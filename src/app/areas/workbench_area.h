@@ -10,8 +10,10 @@
 
 namespace app {
 struct AppRuntimeState;
-namespace frame { struct AppLayoutRegion; }
+namespace frame {
+struct AppLayoutRegion;
 }
+} // namespace app
 
 namespace app::areas {
 

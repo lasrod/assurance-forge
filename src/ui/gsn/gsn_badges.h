@@ -24,9 +24,9 @@ bool IsPointInsideBadge(const BadgeRect& badge, ImVec2 point);
 // severity in `summary`: Error -> red x, Warning -> orange !, Info -> blue i.
 // The hover tooltip summarises the top problem and total count.
 void DrawProblemBadge(ImDrawList* draw_list,
-                     const BadgeRect& badge,
-                     float zoom,
-                     const core::ElementBadgeSummary& summary);
+                      const BadgeRect& badge,
+                      float zoom,
+                      const core::ElementBadgeSummary& summary);
 
 // Draw the AI-in-progress spinner overlay. Rendered in its own slot so it can
 // co-exist with a problem badge for the same element.

@@ -16,8 +16,7 @@ void RenderFeedbackDockArea(AppRuntimeState& state,
 
     if (ImGui::BeginTabBar("##problems_review_tabs")) {
         ui::UiState& ui_state = ui::GetUiState();
-        ImGuiTabItemFlags problems_flags =
-            ui_state.problems_panel_open_pending ? ImGuiTabItemFlags_SetSelected : 0;
+        ImGuiTabItemFlags problems_flags = ui_state.problems_panel_open_pending ? ImGuiTabItemFlags_SetSelected : 0;
         if (ImGui::BeginTabItem("Problems", nullptr, problems_flags)) {
             RenderProblemsAreaContent(state, callbacks.problems);
             ImGui::EndTabItem();

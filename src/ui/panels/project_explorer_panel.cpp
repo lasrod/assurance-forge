@@ -191,8 +191,8 @@ void RenderFile(const core::ProjectFileEntry& entry,
     // file row's label has no effect (the small trailing tag would be the only hit zone).
     const bool is_proposal = entry.role == core::ProjectFileRole::ReviewProposal;
     const bool is_export = entry.role == core::ProjectFileRole::ExportedReport;
-    const bool wants_file_context_menu =
-        (is_proposal && callbacks.remove_file) || (is_export && (callbacks.remove_file || callbacks.reveal_in_file_explorer));
+    const bool wants_file_context_menu = (is_proposal && callbacks.remove_file) ||
+                                         (is_export && (callbacks.remove_file || callbacks.reveal_in_file_explorer));
     if (wants_file_context_menu) {
         ImGui::OpenPopupOnItemClick("##file_context", ImGuiPopupFlags_MouseButtonRight);
     }

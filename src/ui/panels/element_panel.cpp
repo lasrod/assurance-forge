@@ -346,10 +346,15 @@ bool RenderReviewAttentionNotice(const ui::UiState& state,
     }
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) {
-        if (summary.top_problem_message.empty()) {
+        // Describe the review-derived problem specifically, since clicking
+        // opens the Review tab. The overall `top_problem_message` may belong
+        // to a higher-severity non-review problem (e.g. validation error) and
+        // would be misleading here.
+        const std::string& review_msg = summary.top_review_problem_message;
+        if (review_msg.empty()) {
             ImGui::SetTooltip("Open review comments or AI review failures for this element.");
         } else {
-            ImGui::SetTooltip("%s\nClick to open the Review tab.", summary.top_problem_message.c_str());
+            ImGui::SetTooltip("%s\nClick to open the Review tab.", review_msg.c_str());
         }
     }
     return true;

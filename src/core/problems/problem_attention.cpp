@@ -67,6 +67,10 @@ BuildElementBadgeSummaries(const std::vector<ProblemItem>& problems) {
     // Track the currently-chosen "top problem" for each element so we can
     // compare new candidates against it without doing a second pass.
     std::unordered_map<std::string, const ProblemItem*> top_problem_ptrs;
+    // Separate tracker for the highest-severity *review-derived* problem so
+    // "Go to Review" affordances can describe what they will open, even when
+    // a higher-severity non-review problem dominates the overall summary.
+    std::unordered_map<std::string, const ProblemItem*> top_review_problem_ptrs;
 
     for (const ProblemItem& problem : problems) {
         if (!ShouldHighlightProblemAttention(problem))
@@ -74,8 +78,6 @@ BuildElementBadgeSummaries(const std::vector<ProblemItem>& problems) {
 
         ElementBadgeSummary& summary = summaries[problem.element_id];
         summary.problem_count += 1;
-        if (IsReviewDerivedProblem(problem))
-            summary.has_review_problem = true;
 
         auto top_it = top_problem_ptrs.find(problem.element_id);
         if (top_it == top_problem_ptrs.end() || ShouldPromoteAsTop(*top_it->second, problem)) {
@@ -83,6 +85,17 @@ BuildElementBadgeSummaries(const std::vector<ProblemItem>& problems) {
             summary.highest_severity = problem.severity;
             summary.top_problem_id = problem.id;
             summary.top_problem_message = problem.message;
+        }
+
+        if (IsReviewDerivedProblem(problem)) {
+            summary.has_review_problem = true;
+            auto rv_it = top_review_problem_ptrs.find(problem.element_id);
+            if (rv_it == top_review_problem_ptrs.end() || ShouldPromoteAsTop(*rv_it->second, problem)) {
+                top_review_problem_ptrs[problem.element_id] = &problem;
+                summary.top_review_severity = problem.severity;
+                summary.top_review_problem_id = problem.id;
+                summary.top_review_problem_message = problem.message;
+            }
         }
     }
 

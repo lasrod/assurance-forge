@@ -56,11 +56,7 @@ void DrawSpinnerGlyph(ImDrawList* draw_list, const BadgeRect& badge, ImU32 color
 }
 
 // Draw a single character glyph (e.g. "!" / "i") centered inside the badge.
-void DrawCenteredGlyph(ImDrawList* draw_list,
-                       const BadgeRect& badge,
-                       const char* glyph,
-                       ImU32 color,
-                       float zoom) {
+void DrawCenteredGlyph(ImDrawList* draw_list, const BadgeRect& badge, const char* glyph, ImU32 color, float zoom) {
     ImFont* font = g_BoldFont ? g_BoldFont : ImGui::GetFont();
     float font_size = ImGui::GetFontSize() * zoom * kAttentionFontScale;
     ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, glyph);
@@ -99,9 +95,9 @@ bool IsPointInsideBadge(const BadgeRect& badge, ImVec2 point) {
 }
 
 void DrawProblemBadge(ImDrawList* draw_list,
-                     const BadgeRect& badge,
-                     float zoom,
-                     const core::ElementBadgeSummary& summary) {
+                      const BadgeRect& badge,
+                      float zoom,
+                      const core::ElementBadgeSummary& summary) {
     const Theme& theme = GetTheme();
 
     ImU32 fill = theme.warning;

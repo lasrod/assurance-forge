@@ -19,10 +19,17 @@ std::unordered_set<std::string> CollectAttentionElementIds(const std::vector<Pro
 // from the Problems panel.
 struct ElementBadgeSummary {
     ProblemSeverity highest_severity = ProblemSeverity::Info;
-    std::string top_problem_id;       // highest-severity problem id (stable: tie-broken by id)
-    std::string top_problem_message;  // copied from the highest-severity problem for tooltips
+    std::string top_problem_id;      // highest-severity problem id (stable: tie-broken by id)
+    std::string top_problem_message; // copied from the highest-severity problem for tooltips
     std::size_t problem_count = 0;
     bool has_review_problem = false;
+    // Highest-severity *review-derived* problem (ReviewComment / AIReview /
+    // GuidelineReview). Used by "Open Review tab" affordances so the tooltip
+    // and action stay consistent even when a higher-severity non-review
+    // problem is the overall `top_problem_*` for the element.
+    ProblemSeverity top_review_severity = ProblemSeverity::Info;
+    std::string top_review_problem_id;
+    std::string top_review_problem_message;
 };
 
 // Reduce a problem snapshot to a per-element summary. Skips problems that

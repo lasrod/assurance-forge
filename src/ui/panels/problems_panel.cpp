@@ -155,18 +155,16 @@ void SelectAndActivateProblem(const core::ProblemItem& problem,
 }
 
 bool DrawClickableCell(const char* id_suffix,
-                      const std::string& text,
-                      const core::ProblemItem& problem,
-                      ui::UiState& ui_state,
-                      const ProblemsPanelCallbacks& callbacks,
-                      ImVec4* text_color = nullptr) {
+                       const std::string& text,
+                       const core::ProblemItem& problem,
+                       ui::UiState& ui_state,
+                       const ProblemsPanelCallbacks& callbacks,
+                       ImVec4* text_color = nullptr) {
     if (text_color)
         ImGui::PushStyleColor(ImGuiCol_Text, *text_color);
     const float cell_width = ImGui::GetColumnWidth();
-    const bool clicked = ImGui::Selectable((text + "##" + id_suffix).c_str(),
-                                           false,
-                                           ImGuiSelectableFlags_AllowDoubleClick,
-                                           ImVec2(cell_width, 0.0f));
+    const bool clicked = ImGui::Selectable(
+        (text + "##" + id_suffix).c_str(), false, ImGuiSelectableFlags_AllowDoubleClick, ImVec2(cell_width, 0.0f));
     if (text_color)
         ImGui::PopStyleColor();
     if (clicked)
