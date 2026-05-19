@@ -33,7 +33,14 @@ constexpr float kBudget60Fps = 1000.0f / 60.0f; // 16.67 ms
 constexpr float kBudget30Fps = 1000.0f / 30.0f; // 33.33 ms
 
 struct FrameTimeHistory {
+    // Primary series: wall-clock interval between presents (ms). This is what
+    // the user actually experiences and what `ImGui::GetIO().Framerate` is
+    // derived from — it includes any idle throttling done by hello_imgui.
     float samples_ms[kFrameTimeHistorySize] = {};
+    // Secondary series: active render cost (ms), i.e. profiler total per
+    // frame. Sits inside samples_ms when the runtime is not idle-throttled
+    // and well below it when it is. Drawn as a thin overlay on the graph.
+    float render_ms[kFrameTimeHistorySize] = {};
     int next_index = 0;
     int filled = 0;
 };
@@ -43,9 +50,10 @@ FrameTimeHistory& History() {
     return h;
 }
 
-void PushFrameTime(float ms) {
+void PushFrameTime(float wall_ms, float render_ms) {
     FrameTimeHistory& h = History();
-    h.samples_ms[h.next_index] = ms;
+    h.samples_ms[h.next_index] = wall_ms;
+    h.render_ms[h.next_index] = render_ms;
     h.next_index = (h.next_index + 1) % kFrameTimeHistorySize;
     if (h.filled < kFrameTimeHistorySize)
         ++h.filled;
@@ -84,13 +92,9 @@ SpikeStats ComputeSpikeStats(const FrameTimeHistory& h, float avg_ms) {
 
 // =====================================================================
 //  Subsystem grouping
+//  Buckets are emitted by the profiler as dotted names (e.g. "app.area.gsn").
+//  The first segment(s) determine the subsystem the bucket belongs to.
 // =====================================================================
-
-struct SubsystemDef {
-    const char* label;
-    std::string_view prefix; // matched on first dotted segment(s) of the bucket name
-    ImU32 color; // resolved from theme on each frame
-};
 
 enum class SubsystemId : int {
     UiAreas = 0,
@@ -106,30 +110,48 @@ enum class SubsystemId : int {
 
 const char* SubsystemLabel(SubsystemId id) {
     switch (id) {
-    case SubsystemId::UiAreas:         return "UI Areas";
-    case SubsystemId::Workbench:       return "Workbench";
-    case SubsystemId::ProjectExplorer: return "Project Explorer";
-    case SubsystemId::GsnCanvas:       return "GSN Canvas";
-    case SubsystemId::AppMisc:         return "App misc";
-    case SubsystemId::AI:              return "AI";
-    case SubsystemId::Modals:          return "Modals";
-    case SubsystemId::Other:           return "Other";
-    default:                           return "?";
+    case SubsystemId::UiAreas:
+        return "UI Areas";
+    case SubsystemId::Workbench:
+        return "Workbench";
+    case SubsystemId::ProjectExplorer:
+        return "Project Explorer";
+    case SubsystemId::GsnCanvas:
+        return "GSN Canvas";
+    case SubsystemId::AppMisc:
+        return "App misc";
+    case SubsystemId::AI:
+        return "AI";
+    case SubsystemId::Modals:
+        return "Modals";
+    case SubsystemId::Other:
+        return "Other";
+    default:
+        return "?";
     }
 }
 
 ImU32 SubsystemColor(SubsystemId id) {
     const ui::Theme& th = ui::GetTheme();
     switch (id) {
-    case SubsystemId::UiAreas:         return th.accent;
-    case SubsystemId::Workbench:       return th.success;
-    case SubsystemId::ProjectExplorer: return th.info;
-    case SubsystemId::GsnCanvas:       return th.warning;
-    case SubsystemId::AppMisc:         return th.node_solution;
-    case SubsystemId::AI:              return th.attention;
-    case SubsystemId::Modals:          return th.node_context;
-    case SubsystemId::Other:           return th.text_muted;
-    default:                           return th.text_muted;
+    case SubsystemId::UiAreas:
+        return th.accent;
+    case SubsystemId::Workbench:
+        return th.success;
+    case SubsystemId::ProjectExplorer:
+        return th.info;
+    case SubsystemId::GsnCanvas:
+        return th.warning;
+    case SubsystemId::AppMisc:
+        return th.node_solution;
+    case SubsystemId::AI:
+        return th.attention;
+    case SubsystemId::Modals:
+        return th.node_context;
+    case SubsystemId::Other:
+        return th.text_muted;
+    default:
+        return th.text_muted;
     }
 }
 
@@ -210,12 +232,8 @@ ImU32 HeadroomStatusColor(float headroom_pct) {
 }
 
 // Draw a KPI card. Returns the cursor advance.
-void DrawKpiCard(const char* label,
-                 const char* value,
-                 const char* unit,
-                 ImU32 status_color,
-                 float width,
-                 float height) {
+void DrawKpiCard(
+    const char* label, const char* value, const char* unit, ImU32 status_color, float width, float height) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ui::Theme& th = ui::GetTheme();
     const ImVec2 p0 = ImGui::GetCursorScreenPos();
@@ -257,8 +275,18 @@ void DrawKpiCard(const char* label,
     ImGui::Dummy(ImVec2(width, height));
 }
 
-// Draws the rolling frame-time graph using ImDrawList: gradient fill,
-// reference lines at 60 / 30 FPS, and spike markers above the threshold.
+// Draws the rolling frame-time graph using ImDrawList.
+//
+// Conventions (frame-TIME plot, read as FPS):
+//   * Y axis is inverted so LOWER frame time (= HIGHER FPS) sits near the TOP.
+//     The 60 FPS reference line therefore sits ABOVE the 30 FPS reference
+//     line, matching user intuition ("higher is better").
+//   * Zone bands: green at top (>60 FPS), warning in middle (30-60 FPS),
+//     danger at bottom (<30 FPS).
+//   * Filled area drops from the measured line DOWN to the baseline so a
+//     well-performing run visibly fills the plot.
+//   * Reference lines + labels are drawn LAST so they always sit on top of
+//     the data.
 void DrawFrameTimeGraph(const FrameTimeHistory& h, float avg_ms, float spike_threshold_ms, float graph_height) {
     const ui::Theme& th = ui::GetTheme();
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -271,40 +299,67 @@ void DrawFrameTimeGraph(const FrameTimeHistory& h, float avg_ms, float spike_thr
     dl->AddRectFilled(p0, p1, th.canvas_bg, 4.0f);
     dl->AddRect(p0, p1, th.border, 4.0f);
 
-    // Y range: at least up to 1.4× max(33.3, max_sample) so spikes don't clip
+    // Y range: at least up to 1.2 × 30 FPS budget so the 30 FPS line stays
+    // visible even when measurements are excellent; stretches further if a
+    // spike exceeds that. Includes the render-cost trace too — normally
+    // smaller than wall-clock, but plotted on the same axis.
     float y_max_ms = kBudget30Fps * 1.2f;
-    for (int i = 0; i < h.filled; ++i)
+    for (int i = 0; i < h.filled; ++i) {
         y_max_ms = std::max(y_max_ms, h.samples_ms[i]);
+        y_max_ms = std::max(y_max_ms, h.render_ms[i]);
+    }
     y_max_ms = std::max(y_max_ms, kBudget30Fps * 1.2f);
 
+    // Inverted: 0 ms -> top, y_max_ms -> bottom.
+    const float inner_top = p0.y + 1.0f;
+    const float inner_bot = p1.y - 1.0f;
+    const float inner_h = inner_bot - inner_top;
     auto y_for = [&](float ms) {
         const float t = std::clamp(ms / y_max_ms, 0.0f, 1.0f);
-        return p1.y - t * (p1.y - p0.y - 2.0f);
+        return inner_top + t * inner_h;
     };
 
-    // Zone bands (very subtle)
     const float y_60 = y_for(kBudget60Fps);
     const float y_30 = y_for(kBudget30Fps);
-    dl->AddRectFilled(ImVec2(p0.x, p0.y), ImVec2(p1.x, y_30), ui::WithAlpha(th.danger, 0.07f));
-    dl->AddRectFilled(ImVec2(p0.x, y_30), ImVec2(p1.x, y_60), ui::WithAlpha(th.warning, 0.07f));
-    dl->AddRectFilled(ImVec2(p0.x, y_60), ImVec2(p1.x, p1.y), ui::WithAlpha(th.success, 0.05f));
 
-    // Reference lines
-    dl->AddLine(ImVec2(p0.x + 1, y_60), ImVec2(p1.x - 1, y_60), ui::WithAlpha(th.warning, 0.55f), 1.0f);
-    dl->AddLine(ImVec2(p0.x + 1, y_30), ImVec2(p1.x - 1, y_30), ui::WithAlpha(th.danger, 0.55f), 1.0f);
+    // Zone bands: green above 60 FPS, warning between 30-60, danger below 30.
+    dl->AddRectFilled(ImVec2(p0.x, inner_top), ImVec2(p1.x, y_60), ui::WithAlpha(th.success, 0.06f));
+    dl->AddRectFilled(ImVec2(p0.x, y_60), ImVec2(p1.x, y_30), ui::WithAlpha(th.warning, 0.07f));
+    dl->AddRectFilled(ImVec2(p0.x, y_30), ImVec2(p1.x, inner_bot), ui::WithAlpha(th.danger, 0.08f));
 
-    // Labels for reference lines (right-aligned, small, inside the plot area)
-    char buf[16];
-    std::snprintf(buf, sizeof(buf), "60 FPS");
-    const float label_60_w = ImGui::CalcTextSize(buf).x;
-    dl->AddText(ImVec2(p1.x - label_60_w - 8.0f, y_60 - ImGui::GetTextLineHeight() - 1.0f),
-                ui::WithAlpha(th.warning, 0.85f), buf);
-    std::snprintf(buf, sizeof(buf), "30 FPS");
-    const float label_30_w = ImGui::CalcTextSize(buf).x;
-    dl->AddText(ImVec2(p1.x - label_30_w - 8.0f, y_30 - ImGui::GetTextLineHeight() - 1.0f),
-                ui::WithAlpha(th.danger, 0.85f), buf);
+    auto draw_reference_lines_and_labels = [&]() {
+        // Hide the 60 FPS line when it would visually overlap the 30 FPS
+        // line (happens at very low FPS where y_max stretches and both
+        // budgets compress toward the top of the chart). At that point
+        // showing both is misleading — the 30 FPS line is the meaningful
+        // boundary to focus on.
+        const float min_line_gap_px = ImGui::GetTextLineHeight() + 4.0f;
+        const bool show_60 = (y_30 - y_60) >= min_line_gap_px;
+
+        if (show_60) {
+            dl->AddLine(ImVec2(p0.x + 1, y_60), ImVec2(p1.x - 1, y_60), ui::WithAlpha(th.warning, 0.75f), 1.0f);
+        }
+        dl->AddLine(ImVec2(p0.x + 1, y_30), ImVec2(p1.x - 1, y_30), ui::WithAlpha(th.danger, 0.75f), 1.0f);
+
+        // Both labels sit just below their reference line, inside the band
+        // that line caps off (60 FPS -> warning band, 30 FPS -> danger band).
+        // Because the bands are stacked top-to-bottom, the labels can never
+        // collide regardless of how compressed the upper portion of the
+        // axis becomes at very low FPS.
+        char buf[16];
+        float label_w;
+        if (show_60) {
+            std::snprintf(buf, sizeof(buf), "60 FPS");
+            label_w = ImGui::CalcTextSize(buf).x;
+            dl->AddText(ImVec2(p1.x - label_w - 8.0f, y_60 + 2.0f), ui::WithAlpha(th.warning, 0.9f), buf);
+        }
+        std::snprintf(buf, sizeof(buf), "30 FPS");
+        label_w = ImGui::CalcTextSize(buf).x;
+        dl->AddText(ImVec2(p1.x - label_w - 8.0f, y_30 + 2.0f), ui::WithAlpha(th.danger, 0.9f), buf);
+    };
 
     if (h.filled < 2) {
+        draw_reference_lines_and_labels();
         ImGui::Dummy(ImVec2(avail_w, graph_height));
         return;
     }
@@ -317,20 +372,39 @@ void DrawFrameTimeGraph(const FrameTimeHistory& h, float avg_ms, float spike_thr
         return p0.x + 1.0f + t * plot_w;
     };
 
-    // Filled area + line + spike dots
-    // We do a per-segment fill so each segment gets a color from the value gradient.
+    // Per-segment trapezoid fill + colored line. The trapezoid is filled from
+    // the line DOWN to the baseline so the area visibly represents "frame
+    // time consumed". Colors come from FrameTimeStatusColor so each segment
+    // of the trace signals whether we crossed a threshold.
     for (int i = 1; i < h.filled; ++i) {
         const float ms_prev = h.samples_ms[(start + i - 1) % kFrameTimeHistorySize];
         const float ms_cur = h.samples_ms[(start + i) % kFrameTimeHistorySize];
         const ImVec2 a = ImVec2(x_for(i - 1), y_for(ms_prev));
         const ImVec2 b = ImVec2(x_for(i), y_for(ms_cur));
 
-        const ImU32 col_a = ui::WithAlpha(FrameTimeStatusColor(ms_prev), 0.35f);
-        const ImU32 col_b = ui::WithAlpha(FrameTimeStatusColor(ms_cur), 0.35f);
-        // Trapezoid fill from baseline up to line segment
-        dl->AddQuadFilled(ImVec2(a.x, p1.y - 1), ImVec2(b.x, p1.y - 1), b, a, ui::LerpColor(col_a, col_b, 0.5f));
-        // Line on top
-        dl->AddLine(a, b, ui::LerpColor(FrameTimeStatusColor(ms_prev), FrameTimeStatusColor(ms_cur), 0.5f), 1.4f);
+        const ImU32 col_a = FrameTimeStatusColor(ms_prev);
+        const ImU32 col_b = FrameTimeStatusColor(ms_cur);
+        const ImU32 mid = ui::LerpColor(col_a, col_b, 0.5f);
+        const ImU32 fill = ui::WithAlpha(mid, 0.55f);
+
+        // Trapezoid from line down to baseline
+        dl->AddQuadFilled(a, b, ImVec2(b.x, inner_bot), ImVec2(a.x, inner_bot), fill);
+        // Crisp line on top of fill
+        dl->AddLine(a, b, mid, 1.6f);
+    }
+
+    // Secondary trace: render cost (ms inside the frame, excluding any
+    // hello_imgui idle throttling). Drawn as a thin muted line so the gap
+    // between this and the primary (wall-clock) trace visualises idle time.
+    {
+        const ImU32 render_col = ui::WithAlpha(th.text_secondary, 0.85f);
+        for (int i = 1; i < h.filled; ++i) {
+            const float r_prev = h.render_ms[(start + i - 1) % kFrameTimeHistorySize];
+            const float r_cur = h.render_ms[(start + i) % kFrameTimeHistorySize];
+            const ImVec2 a = ImVec2(x_for(i - 1), y_for(r_prev));
+            const ImVec2 b = ImVec2(x_for(i), y_for(r_cur));
+            dl->AddLine(a, b, render_col, 1.0f);
+        }
     }
 
     // Spike markers
@@ -341,13 +415,16 @@ void DrawFrameTimeGraph(const FrameTimeHistory& h, float avg_ms, float spike_thr
         }
     }
 
-    // Average line (subtle horizontal dotted-ish)
+    // Average line (subtle dashed horizontal)
     if (avg_ms > 0.0f) {
         const float y_avg = y_for(avg_ms);
         const ImU32 col = ui::WithAlpha(th.text_secondary, 0.6f);
         for (float x = p0.x + 2.0f; x < p1.x - 6.0f; x += 6.0f)
             dl->AddLine(ImVec2(x, y_avg), ImVec2(x + 3.0f, y_avg), col, 1.0f);
     }
+
+    // Guidelines + labels drawn LAST so they sit on top of the trace.
+    draw_reference_lines_and_labels();
 
     ImGui::Dummy(ImVec2(avail_w, graph_height));
 }
@@ -406,8 +483,8 @@ void DrawSubsystemStackedBar(const std::array<SubsystemAccum, static_cast<size_t
             flags |= ImDrawFlags_RoundCornersRight;
         dl->AddRectFilled(s0, s1, col, 4.0f, flags);
         // Subtle highlight at top
-        dl->AddRectFilled(s0, ImVec2(s1.x, s0.y + bar_h * 0.35f), ui::WithAlpha(IM_COL32(255, 255, 255, 255), 0.05f),
-                          4.0f, flags);
+        dl->AddRectFilled(
+            s0, ImVec2(s1.x, s0.y + bar_h * 0.35f), ui::WithAlpha(IM_COL32(255, 255, 255, 255), 0.05f), 4.0f, flags);
 
         // Inline label if there's room
         if (w >= 60.0f) {
@@ -421,8 +498,8 @@ void DrawSubsystemStackedBar(const std::array<SubsystemAccum, static_cast<size_t
 
         // Tooltip on hover
         if (ImGui::IsMouseHoveringRect(s0, s1)) {
-            ImGui::SetTooltip("%s\n%.2f ms  (%.1f%%)", SubsystemLabel(v.id),
-                              static_cast<float>(v.ns) / 1.0e6f, frac * 100.0f);
+            ImGui::SetTooltip(
+                "%s\n%.2f ms  (%.1f%%)", SubsystemLabel(v.id), static_cast<float>(v.ns) / 1.0e6f, frac * 100.0f);
         }
 
         x += w;
@@ -446,8 +523,7 @@ void DrawSubsystemStackedBar(const std::array<SubsystemAccum, static_cast<size_t
 
     for (const auto& v : views) {
         char label[96];
-        std::snprintf(label, sizeof(label), "%s  %.2f ms", SubsystemLabel(v.id),
-                      static_cast<float>(v.ns) / 1.0e6f);
+        std::snprintf(label, sizeof(label), "%s  %.2f ms", SubsystemLabel(v.id), static_cast<float>(v.ns) / 1.0e6f);
         const float lbl_w = ImGui::CalcTextSize(label).x;
         const float dot_r = 4.0f;
         const float chip_w = chip_pad_x + dot_r * 2.0f + 6.0f + lbl_w + chip_pad_x;
@@ -473,7 +549,7 @@ void DrawSubsystemStackedBar(const std::array<SubsystemAccum, static_cast<size_t
 
 struct BucketNode {
     std::string segment;
-    std::string full_name; // only set on leaves
+    std::string full_name; // dotted path from root, set for every node (used as stable UI ID)
     std::uint64_t total_ns = 0;
     std::uint32_t hit_count = 0;
     std::map<std::string, BucketNode> children;
@@ -498,15 +574,20 @@ void InsertSample(BucketNode& root, const core::perf::FrameSample& s) {
 
     BucketNode* node = &root;
     node->total_ns += s.total_ns;
+    std::string path;
     for (size_t i = 0; i < parts.size(); ++i) {
+        if (!path.empty())
+            path += '.';
+        path += parts[i];
         auto [it, inserted] = node->children.try_emplace(parts[i]);
         BucketNode& child = it->second;
-        if (inserted)
+        if (inserted) {
             child.segment = parts[i];
+            child.full_name = path; // dotted path, stable across frames
+        }
         child.total_ns += s.total_ns;
         if (i + 1 == parts.size()) {
             child.is_leaf = true;
-            child.full_name = std::string(name);
             child.hit_count += s.hit_count;
         }
         node = &child;
@@ -531,11 +612,30 @@ void DrawBarInline(float frac, float width, ImU32 color, float height) {
     ImGui::Dummy(ImVec2(width, height));
 }
 
-void DrawTreeNodeRow(const BucketNode& node, std::uint64_t frame_total_ns, int depth) {
+// Shared layout constants for the bucket-tree rows. The section-level
+// setup (which computes the uniform bar geometry once) and DrawTreeNodeRow
+// (which renders each row) both consume these so they cannot drift apart.
+struct BucketRowLayout {
+    static constexpr float kMsW = 78.0f;
+    static constexpr float kPctW = 60.0f;
+    static constexpr float kHitsW = 42.0f;
+    static constexpr float kGap = 8.0f;
+    static constexpr float kRightPad = 4.0f;
+    static constexpr float kMinBarW = 80.0f;
+    static constexpr float kLabelReserve = 120.0f; // min horizontal room reserved for the label column
+    static constexpr float NumericBlock() {
+        return kMsW + kPctW + kHitsW + kGap * 2;
+    }
+};
+
+// `bar_x_window` and `bar_w` are precomputed window-local coordinates so
+// every row in the tree gets an identically positioned and sized bar,
+// regardless of label length or tree depth — the bar is meant to be read
+// as a comparative chart, so uniform geometry is essential.
+void DrawTreeNodeRow(const BucketNode& node, std::uint64_t frame_total_ns, int depth, float bar_x_window, float bar_w) {
     const ui::Theme& th = ui::GetTheme();
-    const float frac = frame_total_ns > 0
-        ? static_cast<float>(node.total_ns) / static_cast<float>(frame_total_ns)
-        : 0.0f;
+    const float frac =
+        frame_total_ns > 0 ? static_cast<float>(node.total_ns) / static_cast<float>(frame_total_ns) : 0.0f;
     const float ms = static_cast<float>(node.total_ns) / 1.0e6f;
 
     char header[128];
@@ -550,8 +650,9 @@ void DrawTreeNodeRow(const BucketNode& node, std::uint64_t frame_total_ns, int d
     sorted_children.reserve(node.children.size());
     for (const auto& kv : node.children)
         sorted_children.push_back(&kv.second);
-    std::sort(sorted_children.begin(), sorted_children.end(),
-              [](const BucketNode* a, const BucketNode* b) { return a->total_ns > b->total_ns; });
+    std::sort(sorted_children.begin(), sorted_children.end(), [](const BucketNode* a, const BucketNode* b) {
+        return a->total_ns > b->total_ns;
+    });
 
     const bool is_leaf_only = node.is_leaf && node.children.empty();
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_FramePadding;
@@ -560,38 +661,46 @@ void DrawTreeNodeRow(const BucketNode& node, std::uint64_t frame_total_ns, int d
     if (depth <= 1)
         flags |= ImGuiTreeNodeFlags_DefaultOpen;
 
-    const float row_start_x = ImGui::GetCursorPosX();
-    bool open = ImGui::TreeNodeEx((std::string("##") + std::to_string(reinterpret_cast<std::uintptr_t>(&node))).c_str(),
-                                  flags, "%s", header);
+    // ID must be stable across frames so the open/closed state persists.
+    // The BucketNode tree is rebuilt every frame, so node *pointers* are NOT
+    // stable — using them as the ID caused expanded nodes to snap shut on
+    // the next frame ("blinking arrow"). full_name is a path string and is
+    // stable across frames as long as the profiler emits the same buckets.
+    const std::string& id_path = node.full_name.empty() ? node.segment : node.full_name;
+    ImGui::PushID(id_path.c_str());
+    bool open = ImGui::TreeNodeEx("##row", flags, "%s", header);
+    ImGui::PopID();
 
-    // On the same line: time, %, hits, inline bar
+    // Numeric columns are anchored at fixed window-local positions to the
+    // right of the bar. `bar_x_window` / `bar_w` are uniform across all rows.
     ImGui::SameLine();
-    const float right_edge = ImGui::GetWindowContentRegionMax().x + ImGui::GetWindowPos().x;
-    const float window_x0 = ImGui::GetWindowPos().x;
-    // Columns laid out from the right edge:
-    //   [ms (60px) | pct (50px) | hits (40px) | bar (90px) ]
-    const float bar_w = 90.0f;
-    const float hits_w = 42.0f;
-    const float pct_w = 52.0f;
-    const float ms_w = 62.0f;
-    const float gap = 4.0f;
-    const float total_right = bar_w + hits_w + pct_w + ms_w + gap * 3;
-    const float right_x = right_edge - window_x0 - 4.0f;
+    using L = BucketRowLayout;
+    const float ms_x = bar_x_window + bar_w + L::kGap;
+    const float pct_x = ms_x + L::kMsW + L::kGap;
+    const float hits_x = pct_x + L::kPctW + L::kGap;
+
+    // bar (drawn first so SameLine cursors flow left-to-right correctly).
+    // Classification uses full_name (dotted path) so nested non-leaf nodes
+    // pick the correct subsystem color — segment+"." only matches at depth 1.
+    ImGui::SameLine(bar_x_window);
+    const SubsystemId sid = ClassifyBucket(node.full_name);
+    const ImU32 bar_col = (depth == 0) ? th.accent : SubsystemColor(sid);
+    DrawBarInline(frac, bar_w, bar_col, ImGui::GetTextLineHeight() * 0.6f);
 
     // ms
-    ImGui::SameLine(right_x - total_right);
+    ImGui::SameLine(ms_x);
     ImGui::PushStyleColor(ImGuiCol_Text, th.text_primary);
     ImGui::Text("%6.2f ms", ms);
     ImGui::PopStyleColor();
 
     // pct
-    ImGui::SameLine(right_x - total_right + ms_w + gap);
+    ImGui::SameLine(pct_x);
     ImGui::PushStyleColor(ImGuiCol_Text, th.text_secondary);
     ImGui::Text("%5.1f%%", frac * 100.0f);
     ImGui::PopStyleColor();
 
     // hits
-    ImGui::SameLine(right_x - total_right + ms_w + pct_w + gap * 2);
+    ImGui::SameLine(hits_x);
     ImGui::PushStyleColor(ImGuiCol_Text, th.text_muted);
     if (is_leaf_only)
         ImGui::Text("%4u", node.hit_count);
@@ -599,23 +708,9 @@ void DrawTreeNodeRow(const BucketNode& node, std::uint64_t frame_total_ns, int d
         ImGui::TextUnformatted("    ");
     ImGui::PopStyleColor();
 
-    // bar
-    ImGui::SameLine(right_x - bar_w);
-    const SubsystemId sid = ClassifyBucket(node.is_leaf ? node.full_name : "");
-    ImU32 bar_col = (depth == 0)
-        ? th.accent
-        : (node.is_leaf ? SubsystemColor(sid) : SubsystemColor(ClassifyBucket(node.segment + ".")));
-    // Top-level groups: pick a color by first segment
-    if (depth == 1) {
-        bar_col = SubsystemColor(ClassifyBucket(node.segment + "."));
-    }
-    DrawBarInline(frac, bar_w, bar_col, ImGui::GetTextLineHeight() * 0.6f);
-
-    (void)row_start_x;
-
     if (open && !is_leaf_only) {
         for (const BucketNode* child : sorted_children)
-            DrawTreeNodeRow(*child, frame_total_ns, depth + 1);
+            DrawTreeNodeRow(*child, frame_total_ns, depth + 1, bar_x_window, bar_w);
         ImGui::TreePop();
     }
 }
@@ -624,47 +719,41 @@ void DrawTreeNodeRow(const BucketNode& node, std::uint64_t frame_total_ns, int d
 //  Existing helpers (canvas stats chips)
 // =====================================================================
 
-void DrawCounterChip(const char* label, int value, std::optional<ImVec4> color_opt = std::nullopt) {
+// Shared pill background + label. If `leading_dot_col` is set, a small
+// colored dot is drawn left of the text. Returns the pill content width
+// (excluding horizontal padding) for callers that need it; the cursor is
+// advanced to the full pill size via Dummy.
+void DrawPill(const char* text, std::optional<ImU32> leading_dot_col = std::nullopt) {
     const ui::Theme& th = ui::GetTheme();
-    ImDrawList* dl = ImGui::GetWindowDrawList();
-    char buf[64];
-    std::snprintf(buf, sizeof(buf), "%s %d", label, value);
-    const ImVec2 ts = ImGui::CalcTextSize(buf);
-    const float pad_x = 8.0f;
-    const float pad_y = 3.0f;
-    const ImVec2 p0 = ImGui::GetCursorScreenPos();
-    const ImVec2 p1 = ImVec2(p0.x + ts.x + pad_x * 2, p0.y + ts.y + pad_y * 2);
+    ImDrawList*      dl = ImGui::GetWindowDrawList();
+    const ImVec2     ts = ImGui::CalcTextSize(text);
+    const float      pad_x   = 8.0f;
+    const float      pad_y   = 3.0f;
+    const float      dot_off = leading_dot_col.has_value() ? 6.0f : 0.0f;
+    const ImVec2     p0      = ImGui::GetCursorScreenPos();
+    const ImVec2     p1      = ImVec2(p0.x + ts.x + pad_x * 2 + dot_off, p0.y + ts.y + pad_y * 2);
     dl->AddRectFilled(p0, p1, th.surface_2, 10.0f);
     dl->AddRect(p0, p1, th.border, 10.0f);
-    ImU32 text_col = color_opt.has_value() ? ImGui::ColorConvertFloat4ToU32(*color_opt) : th.text_secondary;
-    dl->AddText(ImVec2(p0.x + pad_x, p0.y + pad_y), text_col, buf);
-    ImGui::Dummy(ImVec2(ts.x + pad_x * 2, ts.y + pad_y * 2));
+    if (leading_dot_col.has_value()) {
+        dl->AddCircleFilled(ImVec2(p0.x + pad_x - 1.0f, p0.y + (ts.y + pad_y * 2) * 0.5f), 3.0f, *leading_dot_col);
+    }
+    dl->AddText(ImVec2(p0.x + pad_x + dot_off, p0.y + pad_y), th.text_secondary, text);
+    ImGui::Dummy(ImVec2(p1.x - p0.x, p1.y - p0.y));
+}
+
+void DrawCounterChip(const char* label, int value) {
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "%s %d", label, value);
+    DrawPill(buf);
 }
 
 void DrawCullChip(const char* label, int drawn, int culled) {
-    const int total = drawn + culled;
+    const int   total = drawn + culled;
     const float ratio = total > 0 ? static_cast<float>(culled) / static_cast<float>(total) : 0.0f;
-    char buf[96];
+    char        buf[96];
     std::snprintf(buf, sizeof(buf), "%s %d/%d  %.0f%% culled", label, drawn, total, ratio * 100.0f);
-    const ui::Theme& th = ui::GetTheme();
-    ImDrawList* dl = ImGui::GetWindowDrawList();
-    const ImVec2 ts = ImGui::CalcTextSize(buf);
-    const float pad_x = 8.0f;
-    const float pad_y = 3.0f;
-    const ImVec2 p0 = ImGui::GetCursorScreenPos();
-    const ImVec2 p1 = ImVec2(p0.x + ts.x + pad_x * 2, p0.y + ts.y + pad_y * 2);
-    dl->AddRectFilled(p0, p1, th.surface_2, 10.0f);
-    dl->AddRect(p0, p1, th.border, 10.0f);
-    const ImU32 col = ImGui::ColorConvertFloat4ToU32(ui::CullRatioColor(ratio));
-    // dot
-    dl->AddCircleFilled(ImVec2(p0.x + pad_x - 1.0f, p0.y + (ts.y + pad_y * 2) * 0.5f), 3.0f, col);
-    dl->AddText(ImVec2(p0.x + pad_x + 6.0f, p0.y + pad_y), th.text_secondary, buf);
-    ImGui::Dummy(ImVec2(ts.x + pad_x * 2 + 6.0f, ts.y + pad_y * 2));
-    (void)th; (void)col;
-}
-
-void ChipsRowBegin() {
-    // helper: nothing for now, callers use SameLine between chips.
+    const ImU32 dot_col = ImGui::ColorConvertFloat4ToU32(ui::CullRatioColor(ratio));
+    DrawPill(buf, dot_col);
 }
 
 // =====================================================================
@@ -744,11 +833,6 @@ std::string BuildReport(float total_ms,
     return out;
 }
 
-// Legacy helper kept (used by raw table only)
-void DrawCounter(const char* label, int value) {
-    ImGui::Text("%-26s %d", label, value);
-}
-
 } // namespace
 
 void RenderPerfOverlay(bool& open) {
@@ -763,8 +847,9 @@ void RenderPerfOverlay(bool& open) {
     // read the values without them flickering.
     static bool s_paused = false;
     struct PausedSnapshot {
-        std::uint64_t total_ns = 0;
-        float total_ms = 0.0f;
+        std::uint64_t total_ns = 0; // render cost in ns (sum of profiler buckets)
+        float render_ms = 0.0f;     // render cost in ms (== total_ns / 1e6)
+        float wall_ms = 0.0f;       // wall-clock interval since previous frame
         float fps = 0.0f;
         std::vector<core::perf::FrameSample> samples;
         ui::gsn::CanvasRenderStats canvas_stats{};
@@ -772,9 +857,10 @@ void RenderPerfOverlay(bool& open) {
     static PausedSnapshot s_snapshot;
 
     const std::uint64_t live_total_ns = core::perf::GetLastFrameTotalNs();
-    const float live_total_ms = static_cast<float>(live_total_ns) / 1.0e6f;
+    const float live_render_ms = static_cast<float>(live_total_ns) / 1.0e6f;
+    const float live_wall_ms = ImGui::GetIO().DeltaTime * 1000.0f;
     if (!s_paused)
-        PushFrameTime(live_total_ms);
+        PushFrameTime(live_wall_ms, live_render_ms);
 
     ImGui::SetNextWindowSize(ImVec2(620, 820), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin("Performance", &open)) {
@@ -786,7 +872,8 @@ void RenderPerfOverlay(bool& open) {
     // the last captured values.
     if (!s_paused) {
         s_snapshot.total_ns = live_total_ns;
-        s_snapshot.total_ms = live_total_ms;
+        s_snapshot.render_ms = live_render_ms;
+        s_snapshot.wall_ms = live_wall_ms;
         s_snapshot.fps = ImGui::GetIO().Framerate;
         const auto& live_samples = core::perf::GetLastFrameSamples();
         s_snapshot.samples.assign(live_samples.begin(), live_samples.end());
@@ -794,16 +881,17 @@ void RenderPerfOverlay(bool& open) {
     }
 
     const std::uint64_t total_ns = s_snapshot.total_ns;
-    const float total_ms = s_snapshot.total_ms;
+    const float render_ms = s_snapshot.render_ms;
+    // Primary "total_ms" used for top-line KPIs and headroom: wall-clock
+    // interval, so it matches the FPS value the user sees on screen.
+    const float total_ms = s_snapshot.wall_ms;
     const float fps = s_snapshot.fps;
 
     const FrameTimeHistory& h = History();
     const float avg_ms = Average(h);
     const float max_ms = Maximum(h);
     const SpikeStats spikes = ComputeSpikeStats(h, avg_ms);
-    const float headroom_pct = total_ms > 0.0f
-        ? std::max(0.0f, (1.0f - total_ms / kBudget60Fps)) * 100.0f
-        : 100.0f;
+    const float headroom_pct = total_ms > 0.0f ? std::max(0.0f, (1.0f - total_ms / kBudget60Fps)) * 100.0f : 100.0f;
 
     // Top bar: pause toggle + status indicator
     {
@@ -838,6 +926,60 @@ void RenderPerfOverlay(bool& open) {
                 rp->fpsIdling.vsyncToMonitor = vsync;
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Disable to uncap the frame rate (useful for measuring raw render cost).");
+
+            // Idling control + live indicator. hello_imgui's FpsIdling throttles
+            // the main loop to fpsIdle (default 9 FPS) when the UI is quiet,
+            // which is why the FPS / wall-clock graph shows long intervals
+            // even though render cost is tiny. `isIdling` is updated each frame.
+            ImGui::SameLine();
+            ImGui::Dummy(ImVec2(12.0f, 0.0f));
+            ImGui::SameLine();
+            bool idling_enabled = rp->fpsIdling.enableIdling;
+            if (ImGui::Checkbox("Idling", &idling_enabled))
+                rp->fpsIdling.enableIdling = idling_enabled;
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("hello_imgui FpsIdling: when the UI is quiet, throttle to %.0f FPS to save power.\n"
+                                  "Uncheck to keep the app running at full speed even when idle.",
+                                  rp->fpsIdling.fpsIdle);
+            }
+
+            // Live "currently idling" indicator — auto-set, not user-clickable.
+            // Three states:
+            //   - Idling feature off          -> "disabled"  (grey)
+            //   - Idling on but not throttled -> "unthrottled" (info / soft)
+            //   - Idling on and throttled     -> "throttled" (warning)
+            ImGui::SameLine();
+            const ui::Theme& th_top = ui::GetTheme();
+            ImU32 dot_col;
+            const char* status_label;
+            ImVec4 status_text_col;
+            const char* tooltip_extra;
+            if (!rp->fpsIdling.enableIdling) {
+                dot_col = ui::WithAlpha(th_top.text_muted, 0.5f);
+                status_label = "disabled";
+                status_text_col = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+                tooltip_extra = "Idling feature is turned off — the main loop runs at full speed.";
+            } else if (rp->fpsIdling.isIdling) {
+                dot_col = ui::WithAlpha(th_top.warning, 1.0f);
+                status_label = "throttled";
+                status_text_col = ui::GetWarningColor();
+                tooltip_extra = "Main loop is currently throttled because no input was detected.";
+            } else {
+                dot_col = ui::WithAlpha(th_top.success, 0.9f);
+                status_label = "unthrottled";
+                status_text_col = ImGui::ColorConvertU32ToFloat4(th_top.text_secondary);
+                tooltip_extra = "Idling is enabled but not currently throttling — input is active.";
+            }
+            const float r = ImGui::GetTextLineHeight() * 0.30f;
+            const ImVec2 cp = ImGui::GetCursorScreenPos();
+            const float line_h = ImGui::GetTextLineHeight();
+            ImGui::GetWindowDrawList()->AddCircleFilled(
+                ImVec2(cp.x + r + 2.0f, cp.y + line_h * 0.5f + 1.0f), r, dot_col);
+            ImGui::Dummy(ImVec2(r * 2.0f + 6.0f, line_h));
+            ImGui::SameLine();
+            ImGui::TextColored(status_text_col, "%s", status_label);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Live status from runnerParams.fpsIdling.\n%s", tooltip_extra);
         }
     }
     ImGui::Spacing();
@@ -846,36 +988,36 @@ void RenderPerfOverlay(bool& open) {
     // Section 1: KPI cards row
     // =================================================================
     {
-        const float avail = ImGui::GetContentRegionAvail().x;
-        const int cards = 6;
+        const float avail   = ImGui::GetContentRegionAvail().x;
+        const int   cards   = 6;
         const float spacing = 6.0f;
-        const float card_w = std::max(64.0f, (avail - spacing * (cards - 1)) / cards);
-        const float card_h = 72.0f;
+        const float card_w  = std::max(64.0f, (avail - spacing * (cards - 1)) / cards);
+        const float card_h  = 72.0f;
 
+        // Driven by a small table so all six metrics use identical layout
+        // and adding/removing a KPI is a one-line change.
+        struct Kpi {
+            const char* label;
+            const char* fmt;
+            double      value;
+            const char* unit;
+            ImU32       color;
+        };
+        const Kpi kpis[cards] = {
+            {"FPS",      "%.1f",  fps,          "",   FpsStatusColor(fps)},
+            {"FRAME",    "%.2f",  total_ms,     "ms", FrameTimeStatusColor(total_ms)},
+            {"AVG",      "%.2f",  avg_ms,       "ms", FrameTimeStatusColor(avg_ms)},
+            {"MAX",      "%.2f",  max_ms,       "ms", FrameTimeStatusColor(max_ms)},
+            {"HEADROOM", "%.0f%%", headroom_pct, "",   HeadroomStatusColor(headroom_pct)},
+            {"SPIKES",   "%.0f",  (double)spikes.count, "/4s", SpikeStatusColor(spikes.count)},
+        };
         char buf[32];
-
-        std::snprintf(buf, sizeof(buf), "%.1f", fps);
-        DrawKpiCard("FPS", buf, "", FpsStatusColor(fps), card_w, card_h);
-        ImGui::SameLine(0.0f, spacing);
-
-        std::snprintf(buf, sizeof(buf), "%.2f", total_ms);
-        DrawKpiCard("FRAME", buf, "ms", FrameTimeStatusColor(total_ms), card_w, card_h);
-        ImGui::SameLine(0.0f, spacing);
-
-        std::snprintf(buf, sizeof(buf), "%.2f", avg_ms);
-        DrawKpiCard("AVG", buf, "ms", FrameTimeStatusColor(avg_ms), card_w, card_h);
-        ImGui::SameLine(0.0f, spacing);
-
-        std::snprintf(buf, sizeof(buf), "%.2f", max_ms);
-        DrawKpiCard("MAX", buf, "ms", FrameTimeStatusColor(max_ms), card_w, card_h);
-        ImGui::SameLine(0.0f, spacing);
-
-        std::snprintf(buf, sizeof(buf), "%.0f%%", headroom_pct);
-        DrawKpiCard("HEADROOM", buf, "", HeadroomStatusColor(headroom_pct), card_w, card_h);
-        ImGui::SameLine(0.0f, spacing);
-
-        std::snprintf(buf, sizeof(buf), "%d", spikes.count);
-        DrawKpiCard("SPIKES", buf, "/4s", SpikeStatusColor(spikes.count), card_w, card_h);
+        for (int i = 0; i < cards; ++i) {
+            std::snprintf(buf, sizeof(buf), kpis[i].fmt, kpis[i].value);
+            DrawKpiCard(kpis[i].label, buf, kpis[i].unit, kpis[i].color, card_w, card_h);
+            if (i + 1 < cards)
+                ImGui::SameLine(0.0f, spacing);
+        }
     }
 
     ImGui::Spacing();
@@ -883,7 +1025,47 @@ void RenderPerfOverlay(bool& open) {
     // =================================================================
     // Section 2: Frame-time graph
     // =================================================================
-    ImGui::TextUnformatted("Frame time (4s history)");
+    {
+        const ui::Theme& th_legend = ui::GetTheme();
+        ImGui::TextUnformatted("Frame interval (4s) —");
+        ImGui::SameLine(0.0f, 6.0f);
+        // Wall-clock swatch — drawn as a gradient (green/warning/danger) to
+        // signal that the trace itself is color-coded by FPS thresholds, not
+        // always green. This matches FrameTimeStatusColor used by the trace.
+        {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 p = ImGui::GetCursorScreenPos();
+            const float h_line = ImGui::GetTextLineHeight();
+            const float sw_w = 20.0f;
+            const ImVec2 s0 = ImVec2(p.x, p.y + h_line * 0.35f);
+            const ImVec2 s1 = ImVec2(p.x + sw_w, p.y + h_line * 0.65f);
+            // Two-stop gradient: green -> warning -> danger across the swatch.
+            const ImU32 c_good = ui::WithAlpha(th_legend.success, 0.85f);
+            const ImU32 c_warn = ui::WithAlpha(th_legend.warning, 0.85f);
+            const ImU32 c_bad = ui::WithAlpha(th_legend.danger, 0.85f);
+            const ImVec2 mid0 = ImVec2(p.x + sw_w * 0.5f, s0.y);
+            const ImVec2 mid1 = ImVec2(p.x + sw_w * 0.5f, s1.y);
+            dl->AddRectFilledMultiColor(s0, mid1, c_good, c_warn, c_warn, c_good);
+            dl->AddRectFilledMultiColor(mid0, s1, c_warn, c_bad, c_bad, c_warn);
+            ImGui::Dummy(ImVec2(sw_w + 2.0f, h_line));
+        }
+        ImGui::SameLine(0.0f, 4.0f);
+        ImGui::TextDisabled("frame interval (colored by FPS)");
+        ImGui::SameLine(0.0f, 10.0f);
+        // Render-cost swatch
+        {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 p = ImGui::GetCursorScreenPos();
+            const float h_line = ImGui::GetTextLineHeight();
+            dl->AddLine(ImVec2(p.x, p.y + h_line * 0.5f),
+                        ImVec2(p.x + 14.0f, p.y + h_line * 0.5f),
+                        ui::WithAlpha(th_legend.text_secondary, 0.95f),
+                        1.4f);
+            ImGui::Dummy(ImVec2(16.0f, h_line));
+        }
+        ImGui::SameLine(0.0f, 4.0f);
+        ImGui::TextDisabled("render cost only");
+    }
     DrawFrameTimeGraph(h, avg_ms, spikes.threshold_ms, 130.0f);
 
     ImGui::Spacing();
@@ -893,14 +1075,13 @@ void RenderPerfOverlay(bool& open) {
     // =================================================================
     const auto& samples = s_snapshot.samples;
     std::vector<core::perf::FrameSample> sorted(samples.begin(), samples.end());
-    std::sort(sorted.begin(), sorted.end(),
-              [](const core::perf::FrameSample& a, const core::perf::FrameSample& b) {
-                  return a.total_ns > b.total_ns;
-              });
+    std::sort(sorted.begin(), sorted.end(), [](const core::perf::FrameSample& a, const core::perf::FrameSample& b) {
+        return a.total_ns > b.total_ns;
+    });
 
     {
         const auto groups = GroupBySubsystem(samples);
-        ImGui::Text("This frame: %.2f ms across %zu buckets", total_ms, samples.size());
+        ImGui::Text("This frame: %.2f ms render across %zu buckets", render_ms, samples.size());
         DrawSubsystemStackedBar(groups, total_ns, 28.0f);
     }
 
@@ -920,10 +1101,26 @@ void RenderPerfOverlay(bool& open) {
         top.reserve(tree.children.size());
         for (const auto& kv : tree.children)
             top.push_back(&kv.second);
-        std::sort(top.begin(), top.end(),
-                  [](const BucketNode* a, const BucketNode* b) { return a->total_ns > b->total_ns; });
-        for (const BucketNode* n : top)
-            DrawTreeNodeRow(*n, total_ns, 1);
+        std::sort(
+            top.begin(), top.end(), [](const BucketNode* a, const BucketNode* b) { return a->total_ns > b->total_ns; });
+        // Compute a single uniform bar geometry for the whole tree so bars
+        // line up vertically and are visually comparable. Bar width is
+        // computed against the actual space between the reserved label
+        // column and the numeric block on the right — capped so narrow
+        // overlay windows cannot push the bar into the numeric columns.
+        {
+            using L = BucketRowLayout;
+            const float avail_w = ImGui::GetContentRegionAvail().x;
+            const float ms_x_window = std::max(0.0f, avail_w - L::NumericBlock() - L::kRightPad);
+            const float bar_avail_w = std::max(0.0f, ms_x_window - L::kGap - L::kLabelReserve);
+            const float bar_w_preferred = std::max(L::kMinBarW, avail_w * 0.45f);
+            // Never exceed the space available between the label area and
+            // the numeric block; never drop below kMinBarW (legibility).
+            const float bar_w_uniform = std::max(L::kMinBarW, std::min(bar_w_preferred, bar_avail_w));
+            const float bar_x_window = std::max(0.0f, ms_x_window - L::kGap - bar_w_uniform);
+            for (const BucketNode* n : top)
+                DrawTreeNodeRow(*n, total_ns, 1, bar_x_window, bar_w_uniform);
+        }
 
         if (ImGui::CollapsingHeader("Raw bucket table")) {
             if (ImGui::BeginTable("perf_buckets_raw",
@@ -942,9 +1139,8 @@ void RenderPerfOverlay(bool& open) {
                     ImGui::TableSetColumnIndex(1);
                     ImGui::Text("%.3f", static_cast<float>(s.total_ns) / 1.0e6f);
                     ImGui::TableSetColumnIndex(2);
-                    const float pct = total_ns > 0
-                        ? 100.0f * static_cast<float>(s.total_ns) / static_cast<float>(total_ns)
-                        : 0.0f;
+                    const float pct =
+                        total_ns > 0 ? 100.0f * static_cast<float>(s.total_ns) / static_cast<float>(total_ns) : 0.0f;
                     ImGui::Text("%.1f%%", pct);
                     ImGui::TableSetColumnIndex(3);
                     ImGui::Text("%u", s.hit_count);
@@ -1009,15 +1205,15 @@ void RenderPerfOverlay(bool& open) {
         static std::string last_saved_path;
         if (ImGui::Button("Copy report to clipboard")) {
             const ui::gsn::CanvasRenderStats& stats = s_snapshot.canvas_stats;
-            const std::string report = BuildReport(total_ms, avg_ms, max_ms, fps, sorted, total_ns, stats,
-                                                   core::perf::GetPerfToggles());
+            const std::string report =
+                BuildReport(total_ms, avg_ms, max_ms, fps, sorted, total_ns, stats, core::perf::GetPerfToggles());
             ImGui::SetClipboardText(report.c_str());
         }
         ImGui::SameLine();
         if (ImGui::Button("Save report to file")) {
             const ui::gsn::CanvasRenderStats& stats = s_snapshot.canvas_stats;
-            const std::string report = BuildReport(total_ms, avg_ms, max_ms, fps, sorted, total_ns, stats,
-                                                   core::perf::GetPerfToggles());
+            const std::string report =
+                BuildReport(total_ms, avg_ms, max_ms, fps, sorted, total_ns, stats, core::perf::GetPerfToggles());
             std::time_t now = std::time(nullptr);
             std::tm tm_buf{};
 #if defined(_WIN32)
