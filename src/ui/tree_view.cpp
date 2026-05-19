@@ -97,8 +97,11 @@ static void RenderTreeNode(const core::TreeNode* node,
                            UiState& state,
                            const ElementContextActions& actions,
                            const TreeEditActions* tree_edit_actions) {
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
+
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick |
-                               ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen;
+                               ImGuiTreeNodeFlags_SpanAllColumns | ImGuiTreeNodeFlags_DefaultOpen;
 
     bool has_children = !node->group1_children.empty() || !node->group2_attachments.empty();
     if (!has_children)
@@ -180,24 +183,33 @@ static void RenderTreeNode(const core::TreeNode* node,
         dl->AddText(font, font_size, ImVec2(text_x + tag_w + space_w, text_y), name_col, name.c_str());
     }
 
-    // Per-element problem badge: small severity-coloured dot at the row's
-    // right edge. Sourced from ui_state.element_badge_summaries (which is
-    // populated from the ProblemsManager every frame). Clicking the dot
-    // opens the Problems panel scrolled to that problem instead of selecting
-    // the element on the canvas.
-    ImVec2 badge_min{};
-    ImVec2 badge_max{};
-    bool has_badge = false;
-    const core::ElementBadgeSummary* badge_summary = nullptr;
+    if (clicked) {
+        state.selected_element_id = node->id;
+        state.center_on_selection = true;
+    }
+
+    if (popup_open) {
+        state.selected_element_id = node->id;
+        RenderAddElementMenu(actions);
+        RenderRemoveSubmenu(active_case, state.selected_element_id, actions);
+        ImGui::Separator();
+        RenderAiReviewMenu(actions);
+        ImGui::EndPopup();
+    }
+
+    // Column 1: per-element problem badge sourced from the ProblemsManager
+    // (single source of truth, populated into ui_state.element_badge_summaries
+    // every frame). The badge lives in its own table column so it never
+    // overlaps the node label.
+    ImGui::TableSetColumnIndex(1);
     {
         auto it = state.element_badge_summaries.find(node->id);
         if (it != state.element_badge_summaries.end()) {
-            badge_summary = &it->second;
-            has_badge = true;
+            const core::ElementBadgeSummary& summary = it->second;
             const Theme& theme = GetTheme();
             ImU32 color = theme.accent;
             const char* glyph = "i";
-            switch (badge_summary->highest_severity) {
+            switch (summary.highest_severity) {
             case core::ProblemSeverity::Error:
                 color = theme.danger;
                 glyph = "!";
@@ -213,52 +225,34 @@ static void RenderTreeNode(const core::TreeNode* node,
                 break;
             }
             const float radius = ImGui::GetFontSize() * 0.45f;
-            const float pad = ImGui::GetStyle().FramePadding.x + radius + 2.0f;
-            ImVec2 center(item_max.x - pad, item_min.y + item_size.y * 0.5f);
-            tree_dl->AddCircleFilled(center, radius, color);
+            const ImVec2 button_size(radius * 2.0f + 2.0f, radius * 2.0f + 2.0f);
+            const ImVec2 button_pos = ImGui::GetCursorScreenPos();
+            ImGui::PushID(node->id.c_str());
+            const bool badge_clicked = ImGui::InvisibleButton("##tree_badge", button_size);
+            ImGui::PopID();
+            const bool badge_hovered = ImGui::IsItemHovered();
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 center(button_pos.x + button_size.x * 0.5f, button_pos.y + button_size.y * 0.5f);
+            dl->AddCircleFilled(center, radius, color);
             ImFont* font = ImGui::GetFont();
             const float gf = ImGui::GetFontSize() * 0.8f;
-            ImVec2 ts = font->CalcTextSizeA(gf, FLT_MAX, 0.0f, glyph);
-            tree_dl->AddText(font,
-                             gf,
-                             ImVec2(center.x - ts.x * 0.5f, center.y - ts.y * 0.5f),
-                             IM_COL32_WHITE,
-                             glyph);
-            badge_min = ImVec2(center.x - radius, center.y - radius);
-            badge_max = ImVec2(center.x + radius, center.y + radius);
+            const ImVec2 ts = font->CalcTextSizeA(gf, FLT_MAX, 0.0f, glyph);
+            dl->AddText(font,
+                        gf,
+                        ImVec2(center.x - ts.x * 0.5f, center.y - ts.y * 0.5f),
+                        IM_COL32_WHITE,
+                        glyph);
+            if (badge_hovered) {
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                ImGui::SetTooltip("%zu problem%s · top: %s\nClick to open the Problems panel.",
+                                  summary.problem_count,
+                                  summary.problem_count == 1 ? "" : "s",
+                                  summary.top_problem_message.c_str());
+            }
+            if (badge_clicked) {
+                FocusProblemInPanel(state, summary.top_problem_id, node->id);
+            }
         }
-    }
-
-    if (clicked) {
-        // If the click landed on the badge, route to Problems panel instead of
-        // selecting the element.
-        const ImVec2 mp = ImGui::GetIO().MousePos;
-        if (has_badge && badge_summary && mp.x >= badge_min.x && mp.x <= badge_max.x &&
-            mp.y >= badge_min.y && mp.y <= badge_max.y) {
-            FocusProblemInPanel(state, badge_summary->top_problem_id, node->id);
-        } else {
-            state.selected_element_id = node->id;
-            state.center_on_selection = true;
-        }
-    } else if (has_badge && badge_summary) {
-        const ImVec2 mp = ImGui::GetIO().MousePos;
-        if (ImGui::IsItemHovered() && mp.x >= badge_min.x && mp.x <= badge_max.x &&
-            mp.y >= badge_min.y && mp.y <= badge_max.y) {
-            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-            ImGui::SetTooltip("%zu problem%s · top: %s\nClick to open the Problems panel.",
-                              badge_summary->problem_count,
-                              badge_summary->problem_count == 1 ? "" : "s",
-                              badge_summary->top_problem_message.c_str());
-        }
-    }
-
-    if (popup_open) {
-        state.selected_element_id = node->id;
-        RenderAddElementMenu(actions);
-        RenderRemoveSubmenu(active_case, state.selected_element_id, actions);
-        ImGui::Separator();
-        RenderAiReviewMenu(actions);
-        ImGui::EndPopup();
     }
 
     if (has_children && open) {
@@ -288,17 +282,32 @@ void ShowTreeViewPanel(const core::AssuranceTree* tree,
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(1.0f, window_padding.y));
     ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 8.0f);
     if (ImGui::BeginChild("TreeViewScroll", ImVec2(0, 0), false)) {
-        RenderTreeNode(tree->root, active_case, state, actions, tree_edit_actions);
+        // Two-column table: stretchy tree column + fixed-width badge column on
+        // the right so the alert badge doesn't overlap the node label.
+        const float badge_col_width = ImGui::GetFontSize() * 1.4f;
+        constexpr ImGuiTableFlags kTreeTableFlags =
+            ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_NoPadOuterX | ImGuiTableFlags_SizingFixedFit;
+        if (ImGui::BeginTable("##tree_view_table", 2, kTreeTableFlags)) {
+            ImGui::TableSetupColumn("##tree", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("##badge", ImGuiTableColumnFlags_WidthFixed, badge_col_width);
 
-        // Show orphan nodes if any
-        if (!tree->orphans.empty()) {
-            ImGui::Separator();
-            if (ImGui::TreeNodeEx("##orphans", ImGuiTreeNodeFlags_None, "Orphans (%d)", (int)tree->orphans.size())) {
-                for (const auto* orphan : tree->orphans) {
-                    RenderTreeNode(orphan, active_case, state, actions, tree_edit_actions);
+            RenderTreeNode(tree->root, active_case, state, actions, tree_edit_actions);
+
+            // Show orphan nodes if any
+            if (!tree->orphans.empty()) {
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::Separator();
+                if (ImGui::TreeNodeEx(
+                        "##orphans", ImGuiTreeNodeFlags_SpanAllColumns, "Orphans (%d)", (int)tree->orphans.size())) {
+                    for (const auto* orphan : tree->orphans) {
+                        RenderTreeNode(orphan, active_case, state, actions, tree_edit_actions);
+                    }
+                    ImGui::TreePop();
                 }
-                ImGui::TreePop();
             }
+
+            ImGui::EndTable();
         }
     }
     ImGui::EndChild();
