@@ -4,6 +4,9 @@
 #include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/theme.h"
 
+#include <hello_imgui/hello_imgui.h>
+#include <hello_imgui/runner_params.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -822,6 +825,19 @@ void RenderPerfOverlay(bool& open) {
             ImGui::TextDisabled("(history & values frozen)");
         } else {
             ImGui::TextDisabled("(live)");
+        }
+
+        // VSync toggle — flips runnerParams.fpsIdling.vsyncToMonitor, which
+        // hello_imgui re-applies to the backend swap interval every frame.
+        if (HelloImGui::RunnerParams* rp = HelloImGui::GetRunnerParams()) {
+            ImGui::SameLine();
+            ImGui::Dummy(ImVec2(12.0f, 0.0f));
+            ImGui::SameLine();
+            bool vsync = rp->fpsIdling.vsyncToMonitor;
+            if (ImGui::Checkbox("VSync", &vsync))
+                rp->fpsIdling.vsyncToMonitor = vsync;
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Disable to uncap the frame rate (useful for measuring raw render cost).");
         }
     }
     ImGui::Spacing();
