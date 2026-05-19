@@ -69,6 +69,7 @@ void ReviewProposalManager::InvalidateProposalCache() const {
     cached_dir_signature_ = 0;
     cached_model_ptr_ = nullptr;
     cached_project_root_.clear();
+    last_signature_time_ = {};
 }
 
 std::filesystem::path ReviewProposalManager::ProposalsDirectory() const {
@@ -122,8 +123,21 @@ std::uint64_t ComputeProposalsDirectorySignature(const std::filesystem::path& di
 
 std::vector<ReviewProposalSummary>
 ReviewProposalManager::ListProposals(const parser::AssuranceCase* current_model) const {
+    // Fast path: re-use the cached results without touching the filesystem
+    // when the cache is valid, the inputs match, and the directory signature
+    // was checked recently. In-app mutations bypass this via
+    // `InvalidateProposalCache`, so the staleness window only affects
+    // proposal files edited by other tools.
+    constexpr auto kProposalDirectoryPollInterval = std::chrono::seconds(1);
+    const auto now = std::chrono::steady_clock::now();
+    if (cache_valid_ && cached_model_ptr_ == current_model && cached_project_root_ == project_root_ &&
+        (now - last_signature_time_) < kProposalDirectoryPollInterval) {
+        return cached_summaries_;
+    }
+
     const std::filesystem::path directory = ProposalsDirectory();
     const std::uint64_t signature = ComputeProposalsDirectorySignature(directory);
+    last_signature_time_ = now;
 
     if (cache_valid_ && cached_dir_signature_ == signature && cached_model_ptr_ == current_model &&
         cached_project_root_ == project_root_) {

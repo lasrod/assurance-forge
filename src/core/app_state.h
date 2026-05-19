@@ -4,6 +4,7 @@
 #include "parser/xml_parser.h"
 #include "sacm/sacm_model.h"
 
+#include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -31,6 +32,16 @@ struct AppState {
 
     // Status message for UI display
     std::string status_message;
+
+    // Monotonic counter bumped whenever the loaded document is loaded,
+    // mutated, or otherwise invalidated. Render-side caches (e.g. the
+    // per-tab workbench visible-case projection) compare this against a
+    // stored value to detect when a rebuild can be skipped.
+    std::uint64_t case_revision = 0;
+
+    void bump_case_revision() {
+        ++case_revision;
+    }
 
     // Load an assurance case from file
     bool load_file(const std::string& file_path);

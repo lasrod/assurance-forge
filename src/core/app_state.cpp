@@ -126,6 +126,7 @@ bool AppState::load_file(const std::string& file_path) {
         loaded_file_path = std::filesystem::path(file_path);
         has_unsaved_changes = false;
         loaded_case = std::move(result.assurance_case);
+        ++case_revision;
         status_message =
             "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
 
@@ -208,6 +209,7 @@ bool AppState::save_project() {
 
 void AppState::mark_dirty() {
     has_unsaved_changes = true;
+    ++case_revision;
 }
 
 bool AppState::create_empty_project(const std::string& project_name, const std::string& parent_location) {
@@ -318,6 +320,7 @@ bool AppState::open_project_file(const ProjectFileEntry& entry) {
         has_unsaved_changes = previous_has_unsaved_changes;
         loaded_case = previous_loaded_case;
         sacm_package = previous_sacm_package;
+        ++case_revision;
         return false;
     }
 

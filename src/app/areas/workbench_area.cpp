@@ -3,6 +3,7 @@
 #include "app/app_runtime_state.h"
 #include "app/frame/app_layout_regions.h"
 #include "app/frame/app_shell.h"
+#include "core/perf/frame_profiler.h"
 #include "core/problems/problem_attention.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_adapter.h"
@@ -28,6 +29,23 @@ namespace app::areas {
 namespace {
 
 std::unordered_map<std::string, ui::gsn::GsnCanvas> g_argument_package_canvas_renderers;
+
+// Per-tab cache of the expensive rebuild outputs (visible_case projection,
+// derived AssuranceTree, and the case_revision the renderer was last seeded
+// with). When the inputs are unchanged, we reuse the cached projection and
+// skip both `BuildArgumentPackageProjection` (~7 ms) and
+// `renderer.SetTree` (~3.7 ms, dominated by LayoutEngine::ComputeLayout).
+struct ArgumentPackageTabCache {
+    std::uint64_t case_revision = ~0ull;
+    std::string argument_package_id;
+    std::string argument_package_gid;
+    std::string tab_title;
+    parser::AssuranceCase visible_case;
+    core::AssuranceTree visible_tree;
+    bool renderer_seeded = false;
+    bool valid = false;
+};
+std::unordered_map<std::string, ArgumentPackageTabCache> g_argument_package_canvas_caches;
 
 template <typename ElementT>
 void AddElementIdentity(const ElementT& element,
@@ -183,10 +201,30 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
         return;
     }
 
-    parser::AssuranceCase visible_case =
-        BuildArgumentPackageProjection(state.app_state.loaded_case.value(), *argument_package, tab.title);
-    core::AssuranceTree visible_tree = ui::gsn::BuildAssuranceTree(visible_case);
-    core::ApplyTreeDisplayOrder(visible_tree, state.tree_display_order);
+    ArgumentPackageTabCache& cache = g_argument_package_canvas_caches[tab.key];
+    const std::uint64_t current_revision = state.app_state.case_revision;
+    const bool inputs_match = cache.valid && cache.case_revision == current_revision &&
+                              cache.argument_package_id == argument_package->id &&
+                              cache.argument_package_gid == argument_package->gid && cache.tab_title == tab.title;
+
+    if (!inputs_match) {
+        {
+            core::perf::ScopedTimer perf_scope("app.wb.build_visible_case");
+            cache.visible_case = BuildArgumentPackageProjection(
+                state.app_state.loaded_case.value(), *argument_package, tab.title);
+        }
+        {
+            core::perf::ScopedTimer perf_scope("app.wb.build_assurance_tree");
+            cache.visible_tree = ui::gsn::BuildAssuranceTree(cache.visible_case);
+            core::ApplyTreeDisplayOrder(cache.visible_tree, state.tree_display_order);
+        }
+        cache.case_revision = current_revision;
+        cache.argument_package_id = argument_package->id;
+        cache.argument_package_gid = argument_package->gid;
+        cache.tab_title = tab.title;
+        cache.renderer_seeded = false;
+        cache.valid = true;
+    }
 
     ui::ElementContextActions actions = MakeCanvasContextActions(callbacks);
     ui_state.proposal_canvas_active = false;
@@ -194,9 +232,17 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
     if (callbacks.sync_review_visual_states)
         callbacks.sync_review_visual_states();
     ui::gsn::GsnCanvas& renderer = g_argument_package_canvas_renderers[tab.key];
-    renderer.SetTree(visible_tree);
-    ui::gsn::ShowGsnCanvasContentWithRenderer(
-        renderer, ui_state, &visible_case, actions, &state.app_state.sacm_package.value());
+    renderer.SetCaseRevision(state.app_state.case_revision);
+    if (!cache.renderer_seeded) {
+        core::perf::ScopedTimer perf_scope("app.wb.set_tree");
+        renderer.SetTree(cache.visible_tree);
+        cache.renderer_seeded = true;
+    }
+    {
+        core::perf::ScopedTimer perf_scope("app.wb.show_canvas_content");
+        ui::gsn::ShowGsnCanvasContentWithRenderer(
+            renderer, ui_state, &cache.visible_case, actions, &state.app_state.sacm_package.value());
+    }
 }
 
 void RenderTerminologyPackageTab(AppRuntimeState& state, const WorkbenchAreaCallbacks& callbacks) {
@@ -308,6 +354,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 if (!open) {
                     const bool removed_active = state.workbench.active_argument_package_canvas_key == tab.key;
                     g_argument_package_canvas_renderers.erase(tab.key);
+                    g_argument_package_canvas_caches.erase(tab.key);
                     state.workbench.argument_package_canvas_tabs.erase(
                         state.workbench.argument_package_canvas_tabs.begin() + static_cast<std::ptrdiff_t>(index));
                     if (removed_active) {

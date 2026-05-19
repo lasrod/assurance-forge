@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/acp/acp_relationship_index.h"
 #include "core/assurance_tree.h"
 #include "core/sacm_model.h"
 #include "ui/element_context_menu.h"
@@ -8,6 +9,7 @@
 #include "ui/gsn/gsn_terminology_card.h"
 #include "ui/ui_state.h"
 
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -56,6 +58,12 @@ public:
     GsnCanvas();
     // Set elements from tree (new — spec-compliant layout)
     void SetTree(const core::AssuranceTree& tree);
+    // Set the monotonic revision counter of the underlying assurance case.
+    // Used by Render() to invalidate per-frame caches (e.g. ACP relationship
+    // targets) when the model has actually changed. Call next to SetTree().
+    void SetCaseRevision(std::uint64_t revision) {
+        case_revision_ = revision;
+    }
     // Set elements (legacy flat list)
     void SetElements(const std::vector<CanvasElement>& elements);
     // Render into the current ImGui window/child.
@@ -113,6 +121,14 @@ private:
     TerminologyCardState terminology_card_state_;
     TerminologyOccurrenceCache terminology_occurrence_cache_;
     CanvasRenderStats last_render_stats_{};
+
+    // Revision-counter cache for BuildAcpRelationshipTargets. Keyed on
+    // (active_case pointer, case_revision). Valid only while the workbench
+    // tab cache keeps the AssuranceCase storage stable across frames.
+    std::uint64_t case_revision_ = 0;
+    const parser::AssuranceCase* cached_acp_targets_case_ = nullptr;
+    std::uint64_t cached_acp_targets_revision_ = ~std::uint64_t{0};
+    std::vector<core::acp::AcpRelationshipTarget> cached_acp_targets_;
 };
 
 } // namespace ui::gsn

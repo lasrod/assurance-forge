@@ -153,12 +153,18 @@ void GsnCanvas::Render(UiState& ui_state,
     ImVec2 cull_min(viewport_min.x - cull_margin, viewport_min.y - cull_margin);
     ImVec2 cull_max(viewport_max.x + cull_margin, viewport_max.y + cull_margin);
 
-    const std::vector<core::acp::AcpRelationshipTarget> acp_targets =
-        active_case ? [&]() {
-            core::perf::ScopedTimer perf_scope_acp("gsn.acp.build_targets");
-            return core::acp::BuildAcpRelationshipTargets(*active_case);
-        }()
-                    : std::vector<core::acp::AcpRelationshipTarget>{};
+    if (active_case == nullptr) {
+        cached_acp_targets_case_ = nullptr;
+        cached_acp_targets_revision_ = ~std::uint64_t{0};
+        cached_acp_targets_.clear();
+    } else if (active_case != cached_acp_targets_case_
+               || case_revision_ != cached_acp_targets_revision_) {
+        core::perf::ScopedTimer perf_scope_acp("gsn.acp.build_targets");
+        cached_acp_targets_ = core::acp::BuildAcpRelationshipTargets(*active_case);
+        cached_acp_targets_case_ = active_case;
+        cached_acp_targets_revision_ = case_revision_;
+    }
+    const std::vector<core::acp::AcpRelationshipTarget>& acp_targets = cached_acp_targets_;
     const auto acp_target_by_edge = [&]() {
         core::perf::ScopedTimer perf_scope("gsn.acp.target_lookup");
         return BuildRelationshipTargetLookup(acp_targets);

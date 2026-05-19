@@ -128,6 +128,8 @@ void AppRuntime::RegisterAppEventListeners() {
         impl_->document_dirty = event.dirty;
         if (event.mark_app_dirty)
             impl_->app_state.mark_dirty();
+        else
+            impl_->app_state.bump_case_revision();
     });
     impl_->events.Subscribe<ProjectFilesChangedEvent>(
         [this](const ProjectFilesChangedEvent&) { impl_->sacm_package_tree_cache.clear(); });

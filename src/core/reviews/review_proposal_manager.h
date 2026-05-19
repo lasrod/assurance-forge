@@ -2,6 +2,7 @@
 
 #include "core/reviews/review_proposal.h"
 
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <optional>
@@ -42,6 +43,11 @@ private:
     mutable const parser::AssuranceCase* cached_model_ptr_ = nullptr;
     mutable std::filesystem::path cached_project_root_;
     mutable bool cache_valid_ = false;
+    // Last time the on-disk signature was recomputed. Used to throttle
+    // the per-frame directory_iterator + stat sweep to at most once per
+    // `kProposalDirectoryPollInterval`. In-app mutations bypass the
+    // throttle via `InvalidateProposalCache`.
+    mutable std::chrono::steady_clock::time_point last_signature_time_{};
 };
 
 } // namespace core::reviews
