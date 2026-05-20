@@ -19,6 +19,7 @@
 #include "app/frame/app_menu_bar.h"
 #include "app/frame/app_shell.h"
 #include "core/perf/frame_profiler.h"
+#include "core/problems/problem_attention.h"
 #include "ui/ui_state.h"
 
 #include <cstddef>
@@ -54,6 +55,12 @@ void AppRuntime::RenderFrame(bool& done) {
     {
         core::perf::ScopedTimer s("app.ai_poll");
         PollAiReviewTask();
+    }
+
+    {
+        core::perf::ScopedTimer s("app.problem_badges");
+        ui::GetUiState().element_badge_summaries =
+            core::BuildElementBadgeSummaries(impl_->problems_manager.GetProblems());
     }
 
     const frame::AppLayoutRegions regions = frame::RenderAppShell(*impl_, menu_height, kPanelFlags);

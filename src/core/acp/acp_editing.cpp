@@ -393,10 +393,11 @@ void UpdateTreeConfidenceNames(sacm::AssuranceCasePackage* package, const parser
     if (package_found == package->argumentPackages.end())
         return;
 
-    // Only synthesize a tree label when the user has set a custom display name on the ACP.
-    // Otherwise leave the package and top-goal name empty so the user can fill it in themselves.
     const bool has_custom_display_name = !acp.name.empty() && acp.name != acp.id;
-    const std::string native_name = has_custom_display_name ? acp.id + ": " + acp.name : std::string{};
+    if (!has_custom_display_name)
+        return;
+
+    const std::string native_name = acp.id + ": " + acp.name;
     package_found->name = native_name;
     package_found->name_ml.set("en", native_name);
 
