@@ -139,12 +139,18 @@ bool AppState::load_file(const std::string& file_path) {
         "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
 
     // Also populate the SACM domain model for save support
+    sacm_package.reset();
     if (auto sacm_result = sacm::parse_sacm(file_path)) {
         sacm_package = std::move(*sacm_result);
         HideTerminologyArtifactReferences(loaded_case.value(), sacm_package.value());
         RefreshVisibleTerminologyContextDisplay(loaded_case.value(), sacm_package.value());
         status_message =
             "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
+    } else {
+        status_message =
+            "Loaded with warning: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size())
+            + " elements), but save support is unavailable (SACM parse failed: " + std::string(sacm_result.error())
+            + ")";
     }
 
     return true;
