@@ -50,6 +50,8 @@ public:
     bool AddAcpToSelectedElement();
     bool AddAcpToRelationship(const std::string& relationship_id);
     bool RemoveAcp(const std::string& acp_id);
+    bool RemoveProjectFile(const core::ProjectFileEntry& entry);
+    bool RevealProjectFileInExplorer(const core::ProjectFileEntry& entry);
     void OpenArgumentPackageCanvas(const std::string& package_id,
                                    const std::string& package_gid,
                                    const std::string& display_name,
@@ -146,7 +148,6 @@ private:
     void SyncConfidenceProblems();
     void SyncAcpProblems();
     void HandleProblemQuickFix(const core::ProblemItem& problem);
-    void SyncReviewVisualStatesFromReviews();
     void TouchCurrentProjectRecent();
     bool SaveProject();
     void ExportGsnSvg();

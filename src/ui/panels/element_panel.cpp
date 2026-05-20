@@ -328,9 +328,10 @@ void RenderTerminologySuggestions(const sacm::AssuranceCasePackage* sacm_pkg,
 bool RenderReviewAttentionNotice(const ui::UiState& state,
                                  const std::string& element_id,
                                  const ElementTerminologyAssistCallbacks* terminology_callbacks) {
-    const ui::ElementReviewVisualState* review_state = ui::FindElementReviewVisualState(state, element_id);
-    if (!review_state || ui::ResolveElementReviewVisualStatus(*review_state) != ui::ElementReviewVisualStatus::Failed)
+    auto summary_it = state.element_badge_summaries.find(element_id);
+    if (summary_it == state.element_badge_summaries.end() || !summary_it->second.has_review_problem)
         return false;
+    const core::ElementBadgeSummary& summary = summary_it->second;
 
     const char* label = "Unresolved review";
     const ui::Theme& theme = ui::GetTheme();
@@ -345,10 +346,15 @@ bool RenderReviewAttentionNotice(const ui::UiState& state,
     }
     ImGui::PopStyleColor(3);
     if (ImGui::IsItemHovered()) {
-        if (review_state->last_review_message.empty()) {
+        // Describe the review-derived problem specifically, since clicking
+        // opens the Review tab. The overall `top_problem_message` may belong
+        // to a higher-severity non-review problem (e.g. validation error) and
+        // would be misleading here.
+        const std::string& review_msg = summary.top_review_problem_message;
+        if (review_msg.empty()) {
             ImGui::SetTooltip("Open review comments or AI review failures for this element.");
         } else {
-            ImGui::SetTooltip("%s\nClick to open the Review tab.", review_state->last_review_message.c_str());
+            ImGui::SetTooltip("%s\nClick to open the Review tab.", review_msg.c_str());
         }
     }
     return true;

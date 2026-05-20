@@ -2,87 +2,86 @@
 
 #include <gtest/gtest.h>
 
-TEST(UiStateReviewVisualTest, RunningHasHighestInitialPriority) {
+TEST(UiStateAiSpinnerTest, BeginAddsRunningElementAndScope) {
     ui::UiState state;
 
-    ui::MarkReviewOkManually(state, "claim-1");
-    ui::MarkAiReviewRunning(state, "claim-1", "profile-1", "Profile 1", {"claim-1", "claim-2"});
+    ui::BeginAiReviewSpinner(state, "claim-1", {"claim-1", "claim-2", "claim-3"});
 
-    const ui::ElementReviewVisualState* visual = ui::FindElementReviewVisualState(state, "claim-1");
-    ASSERT_NE(visual, nullptr);
-    EXPECT_EQ(ui::ResolveElementReviewVisualStatus(*visual), ui::ElementReviewVisualStatus::AiRunning);
-    EXPECT_TRUE(visual->manual_ok);
-    EXPECT_EQ(visual->review_profile_id, "profile-1");
-    EXPECT_EQ(visual->review_profile_name, "Profile 1");
+    EXPECT_TRUE(state.ai_review_running_element_ids.count("claim-1") > 0);
     EXPECT_EQ(state.ai_review_primary_element_id, "claim-1");
+    EXPECT_EQ(state.ai_review_scope_element_ids.size(), 3u);
     EXPECT_TRUE(state.ai_review_scope_element_ids.count("claim-2") > 0);
 }
 
-TEST(UiStateReviewVisualTest, ManualOkBeatsAiOkAfterNoFindings) {
+TEST(UiStateAiSpinnerTest, EndRemovesPrimaryElementAndClearsScope) {
     ui::UiState state;
 
-    ui::MarkReviewOkManually(state, "claim-1");
-    ui::MarkAiReviewNoFindings(state, "claim-1");
+    ui::BeginAiReviewSpinner(state, "claim-1", {"claim-1", "claim-2"});
+    ui::EndAiReviewSpinner(state, "claim-1");
 
-    const ui::ElementReviewVisualState* visual = ui::FindElementReviewVisualState(state, "claim-1");
-    ASSERT_NE(visual, nullptr);
-    EXPECT_TRUE(visual->manual_ok);
-    EXPECT_FALSE(visual->ai_ok);
-    EXPECT_EQ(ui::ResolveElementReviewVisualStatus(*visual), ui::ElementReviewVisualStatus::ManualOk);
-}
-
-TEST(UiStateReviewVisualTest, NoFindingsShowsAiOkWhenNoManualOkExists) {
-    ui::UiState state;
-
-    ui::MarkAiReviewRunning(state, "claim-1");
-    ui::MarkAiReviewNoFindings(state, "claim-1");
-
-    const ui::ElementReviewVisualState* visual = ui::FindElementReviewVisualState(state, "claim-1");
-    ASSERT_NE(visual, nullptr);
-    EXPECT_FALSE(visual->ai_running);
-    EXPECT_TRUE(visual->ai_ok);
-    EXPECT_TRUE(state.ai_review_scope_element_ids.empty());
+    EXPECT_TRUE(state.ai_review_running_element_ids.empty());
     EXPECT_TRUE(state.ai_review_primary_element_id.empty());
-    EXPECT_EQ(ui::ResolveElementReviewVisualStatus(state, "claim-1"), ui::ElementReviewVisualStatus::AiOk);
+    EXPECT_TRUE(state.ai_review_scope_element_ids.empty());
 }
 
-TEST(UiStateReviewVisualTest, FailedClearsRunningAndAiOk) {
+TEST(UiStateAiSpinnerTest, EndSecondaryElementKeepsPrimaryScope) {
     ui::UiState state;
 
-    ui::MarkAiReviewRunning(state, "claim-1");
-    ui::MarkAiReviewNoFindings(state, "claim-1");
-    ui::MarkAiReviewFailed(state, "claim-1", "AI review request failed.");
+    ui::BeginAiReviewSpinner(state, "claim-1", {"claim-1", "claim-2"});
+    ui::BeginAiReviewSpinner(state, "claim-2", {});
+    ui::EndAiReviewSpinner(state, "claim-2");
 
-    const ui::ElementReviewVisualState* visual = ui::FindElementReviewVisualState(state, "claim-1");
-    ASSERT_NE(visual, nullptr);
-    EXPECT_FALSE(visual->ai_running);
-    EXPECT_FALSE(visual->ai_ok);
-    EXPECT_TRUE(visual->failed);
-    EXPECT_EQ(ui::ResolveElementReviewVisualStatus(*visual), ui::ElementReviewVisualStatus::Failed);
+    EXPECT_TRUE(state.ai_review_running_element_ids.count("claim-1") > 0);
+    EXPECT_FALSE(state.ai_review_running_element_ids.count("claim-2") > 0);
+    EXPECT_EQ(state.ai_review_primary_element_id, "claim-1");
+    EXPECT_TRUE(state.ai_review_scope_element_ids.count("claim-1") > 0);
+    EXPECT_TRUE(state.ai_review_scope_element_ids.count("claim-2") > 0);
 }
 
-TEST(UiStateReviewVisualTest, FindingsClearAiStatusButPreserveManualOk) {
+TEST(UiStateAiSpinnerTest, BeginWithoutScopeDoesNotOverridePrimary) {
     ui::UiState state;
 
-    ui::MarkReviewOkManually(state, "claim-1");
-    ui::MarkAiReviewRunning(state, "claim-1");
-    ui::MarkAiReviewFindings(state, "claim-1");
+    ui::BeginAiReviewSpinner(state, "claim-1", {"claim-1"});
+    ui::BeginAiReviewSpinner(state, "claim-2", {});
 
-    const ui::ElementReviewVisualState* visual = ui::FindElementReviewVisualState(state, "claim-1");
-    ASSERT_NE(visual, nullptr);
-    EXPECT_FALSE(visual->ai_running);
-    EXPECT_FALSE(visual->ai_ok);
-    EXPECT_FALSE(visual->failed);
-    EXPECT_TRUE(visual->manual_ok);
-    EXPECT_EQ(ui::ResolveElementReviewVisualStatus(*visual), ui::ElementReviewVisualStatus::ManualOk);
+    EXPECT_EQ(state.ai_review_primary_element_id, "claim-1");
+    EXPECT_TRUE(state.ai_review_running_element_ids.count("claim-2") > 0);
 }
 
-TEST(UiStateReviewVisualTest, EmptyAiFindingsStateIsRemoved) {
+TEST(UiStateAiSpinnerTest, BeginWithScopeDoesNotOverridePrimary) {
     ui::UiState state;
 
-    ui::MarkAiReviewRunning(state, "claim-1");
-    ui::MarkAiReviewFindings(state, "claim-1");
+    ui::BeginAiReviewSpinner(state, "claim-1", {"claim-1", "claim-2"});
+    ui::BeginAiReviewSpinner(state, "claim-3", {"claim-3", "claim-4"});
 
-    EXPECT_EQ(ui::FindElementReviewVisualState(state, "claim-1"), nullptr);
-    EXPECT_EQ(ui::ResolveElementReviewVisualStatus(state, "claim-1"), ui::ElementReviewVisualStatus::None);
+    EXPECT_EQ(state.ai_review_primary_element_id, "claim-1");
+    EXPECT_TRUE(state.ai_review_running_element_ids.count("claim-3") > 0);
+    EXPECT_TRUE(state.ai_review_scope_element_ids.count("claim-1") > 0);
+    EXPECT_TRUE(state.ai_review_scope_element_ids.count("claim-2") > 0);
+    EXPECT_FALSE(state.ai_review_scope_element_ids.count("claim-3") > 0);
+    EXPECT_FALSE(state.ai_review_scope_element_ids.count("claim-4") > 0);
+}
+
+TEST(UiStateFocusProblemTest, SetsFocusFlagsAndProblemSelection) {
+    ui::UiState state;
+
+    ui::FocusProblemInPanel(state, "problem-42", "claim-1");
+
+    EXPECT_EQ(state.selected_problem_id, "problem-42");
+    EXPECT_EQ(state.selected_problem_element_id, "claim-1");
+    EXPECT_TRUE(state.problems_panel_open_pending);
+    EXPECT_TRUE(state.problems_panel_focus_pending);
+}
+
+TEST(UiStateFocusProblemTest, EmptyProblemIdClearsPendingFlags) {
+    ui::UiState state;
+    state.problems_panel_focus_pending = true;
+    state.problems_panel_open_pending = true;
+
+    ui::FocusProblemInPanel(state, "", "");
+
+    EXPECT_TRUE(state.selected_problem_id.empty());
+    EXPECT_TRUE(state.selected_problem_element_id.empty());
+    EXPECT_FALSE(state.problems_panel_focus_pending);
+    EXPECT_FALSE(state.problems_panel_open_pending);
 }

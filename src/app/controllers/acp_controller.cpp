@@ -107,8 +107,7 @@ bool AcpController::CreateConfidenceArgumentTreeForAcp(parser::AssuranceCase& mo
     events_.Emit(DocumentDirtyEvent{});
     events_.Emit(ProjectFilesChangedEvent{});
     events_.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
-    events_.Emit(ArgumentPackageCanvasRequestEvent{
-        result.argument_package_id, {}, "Confidence argument for " + result.acp_id, result.top_goal_id});
+    events_.Emit(ArgumentPackageCanvasRequestEvent{result.argument_package_id, {}, "Confidence argument", result.top_goal_id});
     events_.Emit(
         StatusMessageEvent{"Created confidence argument tree " + result.argument_package_id + " for " + result.acp_id});
     SyncProblems(model, package);
@@ -125,7 +124,8 @@ bool AcpController::OpenConfidenceArgumentTreeForAcp(const parser::AssuranceCase
         events_.Emit(StatusMessageEvent{"Open confidence argument tree failed: ACP is not linked to a tree."});
         return false;
     }
-    const std::string title = acp->name.empty() ? "Confidence argument for " + acp->id : acp->id + ": " + acp->name;
+    const std::string title = (acp->name.empty() || acp->name == acp->id) ? "Confidence argument for " + acp->id
+                                                                          : acp->id + ": " + acp->name;
     events_.Emit(ArgumentPackageCanvasRequestEvent{acp->argument_package_id, {}, title, acp->top_goal_id});
     events_.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
     return true;

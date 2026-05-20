@@ -23,6 +23,7 @@
 #include "app/recent_projects.h"
 #include "app/review_problem_sync.h"
 #include "app/terminology_problem_sync.h"
+#include "core/acp/assurance_claim_point.h"
 #include "core/app_state.h"
 #include "core/element_factory.h"
 #include "core/problems/problem_attention.h"
@@ -54,8 +55,64 @@
 namespace app {
 namespace {
 
-bool IsReviewDerivedProblem(const core::ProblemItem& problem) {
-    return problem.id.rfind("review-comment:", 0) == 0 || problem.id.rfind("guideline-review:", 0) == 0;
+// Collect every element id/gid that belongs to a confidence argument package. These elements
+// (the confidence top-goal claim and any other claims/reasonings/relationships authored inside
+// the separate confidence tree) must be hidden from the main GSN tree; they only belong on the
+// confidence argument package canvas tab.
+void CollectConfidencePackageElementIdentities(const sacm::AssuranceCasePackage& package,
+                                               std::unordered_set<std::string>& ids,
+                                               std::unordered_set<std::string>& gids) {
+    auto add = [&](const sacm::SacmElement& element) {
+        if (!element.id.empty())
+            ids.insert(element.id);
+        if (!element.gid.empty())
+            gids.insert(element.gid);
+    };
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        if (!core::acp::IsConfidenceArgumentPackage(argument_package))
+            continue;
+        for (const sacm::Claim& claim : argument_package.claims)
+            add(claim);
+        for (const sacm::ArgumentReasoning& reasoning : argument_package.argumentReasonings)
+            add(reasoning);
+        for (const sacm::AssertedInference& inference : argument_package.assertedInferences)
+            add(inference);
+        for (const sacm::AssertedContext& context : argument_package.assertedContexts)
+            add(context);
+        for (const sacm::AssertedEvidence& evidence : argument_package.assertedEvidences)
+            add(evidence);
+        for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences)
+            add(artifact_reference);
+    }
+}
+
+std::optional<parser::AssuranceCase> FilterConfidencePackageElementsFromMainTree(
+    const parser::AssuranceCase& source,
+    const sacm::AssuranceCasePackage* package) {
+    if (!package)
+        return std::nullopt;
+    std::unordered_set<std::string> hidden_ids;
+    std::unordered_set<std::string> hidden_gids;
+    CollectConfidencePackageElementIdentities(*package, hidden_ids, hidden_gids);
+    if (hidden_ids.empty() && hidden_gids.empty())
+        return std::nullopt;
+
+    parser::AssuranceCase filtered;
+    filtered.id = source.id;
+    filtered.name = source.name;
+    filtered.description = source.description;
+    filtered.elements.reserve(source.elements.size());
+    for (const parser::SacmElement& element : source.elements) {
+        if (hidden_ids.count(element.id) > 0)
+            continue;
+        if (!element.gid.empty() && hidden_gids.count(element.gid) > 0)
+            continue;
+        filtered.elements.push_back(element);
+    }
+    filtered.acps = source.acps;
+    if (filtered.elements.size() == source.elements.size())
+        return std::nullopt;
+    return filtered;
 }
 
 } // namespace
@@ -93,6 +150,9 @@ ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
         },
     };
     actions.set_status = [&runtime](const std::string& message) { runtime.SetStatus(message); };
+    actions.focus_problem = [](const std::string& problem_id, const std::string& element_id) {
+        ui::FocusProblemInPanel(ui::GetUiState(), problem_id, element_id);
+    };
     return actions;
 }
 
@@ -137,13 +197,11 @@ void AppRuntime::RegisterAppEventListeners() {
         if (event.mark_app_dirty)
             impl_->app_state.mark_dirty();
         SyncReviewProblems();
-        SyncReviewVisualStatesFromReviews();
     });
     impl_->events.Subscribe<ConfidenceDirtyEvent>([this](const ConfidenceDirtyEvent& event) {
         if (event.mark_app_dirty)
             impl_->app_state.mark_dirty();
         SyncConfidenceProblems();
-        SyncReviewVisualStatesFromReviews();
     });
     impl_->events.Subscribe<SelectionChangedEvent>([](const SelectionChangedEvent& event) {
         ui::UiState& ui_state = ui::GetUiState();
@@ -157,24 +215,17 @@ void AppRuntime::RegisterAppEventListeners() {
         ui::UiState& ui_state = ui::GetUiState();
         switch (event.kind) {
         case ElementReviewVisualEventKind::AiStarted:
-            ui::MarkAiReviewRunning(ui_state,
-                                    event.element_id,
-                                    event.review_profile_id,
-                                    event.review_profile_name,
-                                    event.review_scope_element_ids);
+            ui::BeginAiReviewSpinner(ui_state, event.element_id, event.review_scope_element_ids);
             break;
         case ElementReviewVisualEventKind::AiNoFindings:
-            ui::MarkAiReviewNoFindings(ui_state, event.element_id, event.review_profile_id, event.review_profile_name);
-            break;
         case ElementReviewVisualEventKind::AiFindings:
-            ui::MarkAiReviewFindings(ui_state, event.element_id);
-            break;
         case ElementReviewVisualEventKind::AiFailed:
-            ui::MarkAiReviewFailed(
-                ui_state, event.element_id, event.message, event.review_profile_id, event.review_profile_name);
+            ui::EndAiReviewSpinner(ui_state, event.element_id);
             break;
         case ElementReviewVisualEventKind::ManualOk:
-            ui::MarkReviewOkManually(ui_state, event.element_id);
+            // No badge change required - problems panel reflects status via
+            // the underlying ProblemsManager state, which is the single source
+            // of truth for badges.
             break;
         }
     });
@@ -358,7 +409,10 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     }
 
     const auto& ac = impl_->app_state.loaded_case.value();
-    impl_->current_tree = ui::gsn::BuildAssuranceTree(ac);
+    const sacm::AssuranceCasePackage* sacm_package =
+        impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
+    const std::optional<parser::AssuranceCase> filtered_case = FilterConfidencePackageElementsFromMainTree(ac, sacm_package);
+    impl_->current_tree = ui::gsn::BuildAssuranceTree(filtered_case ? *filtered_case : ac);
     core::ApplyTreeDisplayOrder(impl_->current_tree, impl_->tree_display_order);
     impl_->tree_edit_index = core::BuildTreeEditIndex(ac);
     impl_->tree_edit_index_valid = true;
@@ -455,7 +509,6 @@ areas::WorkbenchAreaCallbacks AppRuntime::MakeWorkbenchAreaCallbacks() {
         [this](const std::string& element_id, const std::string& term_value) {
             ChangeTerminologyMeaningFromCanvas(element_id, term_value);
         },
-        [this]() { SyncReviewVisualStatesFromReviews(); },
         [this]() { ApplyTerminologyPackageEdits(); },
         [this]() { BeginDeleteTerminologyPackage(); },
         [this]() { BeginAddTerminologyTerm(); },
@@ -507,52 +560,6 @@ void AppRuntime::SyncAcpProblems() {
     app::SyncAcpProblems(impl_->problems_manager, model, package);
 }
 
-void AppRuntime::SyncReviewVisualStatesFromReviews() {
-    ui::UiState& ui_state = ui::GetUiState();
-    std::unordered_map<std::string, ui::ElementReviewVisualState> next_states;
-
-    for (const auto& [element_id, stored_state] : impl_->review_controller->ElementReviewStates()) {
-        ui::ElementReviewVisualState visual;
-        visual.manual_ok = stored_state.manual_ok;
-        visual.ai_ok = stored_state.ai_ok;
-        visual.failed = stored_state.failed;
-        visual.review_profile_id = stored_state.review_profile_id;
-        visual.review_profile_name = stored_state.review_profile_name;
-        visual.last_review_message = stored_state.last_review_message;
-        next_states[element_id] = std::move(visual);
-    }
-
-    for (const core::reviews::ReviewItem& item : impl_->review_controller->Items()) {
-        if (item.element_id.empty() || item.status != core::reviews::ReviewItemStatus::Open)
-            continue;
-        ui::ElementReviewVisualState& visual = next_states[item.element_id];
-        visual.failed = true;
-        visual.last_review_message = "Open review items require attention.";
-    }
-
-    for (const core::ProblemItem& problem : impl_->problems_manager.GetProblems()) {
-        if (problem.element_id.empty() || IsReviewDerivedProblem(problem))
-            continue;
-        ui::ElementReviewVisualState& visual = next_states[problem.element_id];
-        visual.failed = true;
-        visual.last_review_message = "Open problems require attention.";
-    }
-
-    for (const auto& [element_id, existing_state] : ui_state.review_visual_states) {
-        if (!existing_state.ai_running)
-            continue;
-        ui::ElementReviewVisualState& visual = next_states[element_id];
-        visual.ai_running = true;
-        if (!existing_state.review_profile_id.empty())
-            visual.review_profile_id = existing_state.review_profile_id;
-        if (!existing_state.review_profile_name.empty())
-            visual.review_profile_name = existing_state.review_profile_name;
-        visual.last_review_message = existing_state.last_review_message;
-    }
-
-    ui_state.review_visual_states = std::move(next_states);
-}
-
 bool AppRuntime::SetManualReviewOk(const std::string& element_id, bool manual_ok) {
     if (element_id.empty()) {
         SetStatus("Select an element before changing manual review status.");
@@ -574,7 +581,6 @@ bool AppRuntime::SetManualReviewOk(const std::string& element_id, bool manual_ok
         SetStatus("Could not update manual review status.");
         return false;
     }
-    SyncReviewVisualStatesFromReviews();
     return true;
 }
 

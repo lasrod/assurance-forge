@@ -278,3 +278,34 @@ TEST(AcpEditingTest, PreservesDraftTextWhenCreatingConfidenceArgumentTree) {
     EXPECT_EQ(sacm_acps.front().resolution.text, drafted.text);
     EXPECT_TRUE(sacm_acps.front().resolution.confidence_claim_id.empty());
 }
+
+TEST(AcpEditingTest, TopGoalReferenceWithoutCustomNamePreservesExistingConfidenceTreeLabels) {
+    AcpEditingFixture fixture;
+    core::acp::AcpEditResult added = core::acp::AddAcp(fixture.model, &fixture.package, "relationship", "R1");
+    ASSERT_TRUE(added.changed) << added.error;
+    core::acp::AcpEditResult created =
+        core::acp::CreateConfidenceArgumentTreeForAcp(fixture.model, &fixture.package, added.acp_id);
+    ASSERT_TRUE(created.changed) << created.error;
+
+    ASSERT_EQ(fixture.package.argumentPackages.size(), 2u);
+    sacm::ArgumentPackage& confidence_package = fixture.package.argumentPackages.back();
+    ASSERT_EQ(confidence_package.claims.size(), 1u);
+    confidence_package.name = "User confidence tree label";
+    confidence_package.name_ml.set("en", confidence_package.name);
+    confidence_package.claims.front().name = "User top goal label";
+    confidence_package.claims.front().name_ml.set("en", confidence_package.claims.front().name);
+
+    parser::AcpRecord edited = fixture.model.acps.front();
+    edited.name.clear();
+    edited.resolution_kind = "topGoalReference";
+    edited.argument_package_id = created.argument_package_id;
+    edited.top_goal_id = created.top_goal_id;
+    core::acp::AcpEditResult updated = core::acp::UpsertAcp(fixture.model, &fixture.package, edited);
+    ASSERT_TRUE(updated.changed) << updated.error;
+
+    EXPECT_EQ(confidence_package.name, "User confidence tree label");
+    EXPECT_EQ(confidence_package.name_ml.get("en"), "User confidence tree label");
+    ASSERT_EQ(confidence_package.claims.size(), 1u);
+    EXPECT_EQ(confidence_package.claims.front().name, "User top goal label");
+    EXPECT_EQ(confidence_package.claims.front().name_ml.get("en"), "User top goal label");
+}

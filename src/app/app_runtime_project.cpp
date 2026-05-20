@@ -6,6 +6,7 @@
 #include "app/proposal_ui_state.h"
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
+#include "core/acp/assurance_claim_point.h"
 #include "core/problems/problem_utils.h"
 #include "core/project_service.h"
 #include "core/reviews/review_item.h"
@@ -24,6 +25,7 @@
 #include <filesystem>
 #include <set>
 #include <string>
+#include <unordered_set>
 
 namespace app {
 namespace {
@@ -296,7 +298,6 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
     if (entry.role == core::ProjectFileRole::SacmArgument) {
         SetConfidenceSource(*impl_, entry);
         SyncConfidenceProblems();
-        SyncReviewVisualStatesFromReviews();
         impl_->proposal_controller->ClearActiveState();
         ClearProposalHighlightState(ui_state);
         impl_->document_dirty = false;
@@ -419,6 +420,62 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
     impl_->workbench.force_center_tab_selection = true;
 }
 
+bool AppRuntime::RemoveProjectFile(const core::ProjectFileEntry& entry) {
+    if (!impl_->app_state.current_project.has_value()) {
+        SetStatus("Open a project before removing files.");
+        return false;
+    }
+
+    const core::ProjectFileRole role = entry.role;
+    const std::filesystem::path relative_path = entry.relativePath;
+    core::AssuranceProject& project = impl_->app_state.current_project.value();
+    std::string error;
+    bool removed = false;
+
+    if (role == core::ProjectFileRole::ReviewProposal) {
+        std::string proposal_id = relative_path.filename().generic_string();
+        const std::string suffix = ".afpatch.json";
+        if (proposal_id.size() >= suffix.size() &&
+            proposal_id.compare(proposal_id.size() - suffix.size(), suffix.size(), suffix) == 0) {
+            proposal_id.erase(proposal_id.size() - suffix.size());
+        }
+        removed = DeleteProposalPatchFile(proposal_id, error);
+        if (removed)
+            CloseProposalPreviewIfOpen(proposal_id);
+    } else if (role == core::ProjectFileRole::ExportedReport) {
+        removed = core::ProjectService::RemoveTrackedFile(project, relative_path, true, error);
+    } else {
+        SetStatus("Removing this file type is not supported here.");
+        return false;
+    }
+
+    if (!removed) {
+        SetStatus("Remove file failed: " + error);
+        return false;
+    }
+
+    impl_->events.Emit(DocumentDirtyEvent{});
+    impl_->events.Emit(ProjectFilesChangedEvent{});
+    core::ProjectService::RefreshFileStatus(project);
+    SetStatus("Removed " + relative_path.generic_string() + ".");
+    return true;
+}
+
+bool AppRuntime::RevealProjectFileInExplorer(const core::ProjectFileEntry& entry) {
+    if (!impl_->app_state.current_project.has_value()) {
+        SetStatus("Open a project before revealing files.");
+        return false;
+    }
+
+    const std::filesystem::path absolute_path = impl_->app_state.current_project->rootPath / entry.relativePath;
+    std::string error;
+    if (!app::dialogs::RevealPathInFileExplorer(absolute_path, error)) {
+        SetStatus("Could not open File Explorer: " + error);
+        return false;
+    }
+    return true;
+}
+
 void AppRuntime::OpenArgumentPackageCanvas(const std::string& package_id,
                                            const std::string& package_gid,
                                            const std::string& display_name,
@@ -535,7 +592,63 @@ void AppRuntime::RemoveProjectPackage(const core::ProjectFileEntry& entry, const
             SetStatus("Argument package was not found in the editable model.");
             return;
         }
+        // Capture identities of every element that lived inside the removed argument package so we
+        // can scrub matching parser projections (otherwise claims/reasonings linger as orphans in
+        // the main GSN tree) and so we can detect any ACPs that referenced this package as their
+        // separate confidence argument tree.
+        const std::string removed_argument_package_id = it->id;
+        std::unordered_set<std::string> removed_element_ids;
+        std::unordered_set<std::string> removed_element_gids;
+        auto record_identity = [&](const sacm::SacmElement& element) {
+            if (!element.id.empty())
+                removed_element_ids.insert(element.id);
+            if (!element.gid.empty())
+                removed_element_gids.insert(element.gid);
+        };
+        for (const sacm::Claim& claim : it->claims)
+            record_identity(claim);
+        for (const sacm::ArgumentReasoning& reasoning : it->argumentReasonings)
+            record_identity(reasoning);
+        for (const sacm::ArtifactReference& artifact_reference : it->artifactReferences)
+            record_identity(artifact_reference);
+        for (const sacm::AssertedInference& inference : it->assertedInferences)
+            record_identity(inference);
+        for (const sacm::AssertedContext& context : it->assertedContexts)
+            record_identity(context);
+        for (const sacm::AssertedEvidence& evidence : it->assertedEvidences)
+            record_identity(evidence);
+        const bool was_confidence_argument_package = core::acp::IsConfidenceArgumentPackage(*it);
         vec.erase(it);
+
+        if (impl_->app_state.loaded_case.has_value()) {
+            parser::AssuranceCase& loaded = impl_->app_state.loaded_case.value();
+            // Drop parser projections of every element that lived in the removed argument package
+            // so they don't show up as orphans in the main GSN tree.
+            loaded.elements.erase(std::remove_if(loaded.elements.begin(),
+                                                 loaded.elements.end(),
+                                                 [&](const parser::SacmElement& element) {
+                                                     if (removed_element_ids.count(element.id) > 0)
+                                                         return true;
+                                                     if (!element.gid.empty() &&
+                                                         removed_element_gids.count(element.gid) > 0)
+                                                         return true;
+                                                     return false;
+                                                 }),
+                                  loaded.elements.end());
+            // If the removed package backed a separate confidence argument tree, clear the
+            // link on any ACPs that pointed to it. This makes the ACP "incomplete" again so
+            // that the GSN-canvas decorator surfaces an alert badge on the affected element.
+            if (was_confidence_argument_package) {
+                for (parser::AcpRecord& acp_record : loaded.acps) {
+                    if (acp_record.resolution_kind == "topGoalReference" &&
+                        acp_record.argument_package_id == removed_argument_package_id) {
+                        acp_record.argument_package_id.clear();
+                        acp_record.top_goal_id.clear();
+                    }
+                }
+            }
+        }
+        impl_->tree_needs_rebuild = true;
         removed = true;
         status_message = "Removed argument package " + label + ".";
     } else if (node.type == sacm::SacmPackageNodeType::ArtifactPackage) {
@@ -634,7 +747,6 @@ void AppRuntime::BeginLinkExistingTerminologyTerm(const std::string& element_id,
 void AppRuntime::IgnoreTerminologySuggestion(const std::string& element_id, const std::string& term_value) {
     actions::TerminologyActions(*impl_).IgnoreSuggestion(element_id, term_value);
     SyncTerminologyProblems();
-    SyncReviewVisualStatesFromReviews();
 }
 
 bool AppRuntime::IsTerminologySuggestionIgnored(const std::string& element_id, const std::string& term_value) const {
@@ -749,7 +861,6 @@ bool AppRuntime::OpenFirstProjectSacmFile() {
         if (impl_->app_state.open_project_file(entry)) {
             SetConfidenceSource(*impl_, entry);
             SyncConfidenceProblems();
-            SyncReviewVisualStatesFromReviews();
             impl_->tree_needs_rebuild = true;
             impl_->workbench.argument_package_canvas_tabs.clear();
             impl_->workbench.active_argument_package_canvas_key.clear();
@@ -795,7 +906,6 @@ bool AppRuntime::EnsureConfidenceStorage() {
     if (!impl_->app_state.current_project.has_value()) {
         impl_->confidence_controller->ClearStorage();
         SyncConfidenceProblems();
-        SyncReviewVisualStatesFromReviews();
         return false;
     }
 
@@ -807,12 +917,10 @@ bool AppRuntime::EnsureConfidenceStorage() {
     std::string error;
     if (impl_->confidence_controller->ConfigureStorage(confidence_path, project.id, error)) {
         SyncConfidenceProblems();
-        SyncReviewVisualStatesFromReviews();
         return true;
     }
 
     SyncConfidenceProblems();
-    SyncReviewVisualStatesFromReviews();
     SetStatus("Confidence assessments could not be loaded: " + error);
     return false;
 }

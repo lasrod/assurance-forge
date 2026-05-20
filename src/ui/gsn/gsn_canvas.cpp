@@ -147,7 +147,7 @@ static void RenderProposalOriginalTextCard(const std::vector<ProposalTextChangeP
 // Node shape primitives (`DrawParallelogram`, `DrawStadium`, `DrawCircle`,
 // `DrawRoundedRect`, `DrawUndevelopedMarker`, `DrawReviewScopeHighlight`) plus
 // their private shadow/shading helpers live in `ui/gsn/gsn_shapes.{h,cpp}`.
-// `BadgeRect`, `ComputeBadgeRect`, `DrawAttentionBadge`, and `DrawReviewBadge`
+// `BadgeRect`, `ComputeBadgeRect`, `DrawProblemBadge`, and `DrawAiSpinnerBadge`
 // live in `ui/gsn/gsn_badges.{h,cpp}`.
 
 // ===== Text layout helper =====
@@ -179,11 +179,11 @@ void DrawGsnNode(const GsnNode& node,
     const bool proposal_dim_active = ui_state.dim_non_proposal_nodes && !ui_state.proposal_highlight_ids.empty();
     const bool proposal_highlighted = proposal_dim_active && ui_state.proposal_highlight_ids.count(node.id) > 0;
     const bool proposal_dimmed = proposal_dim_active && !proposal_highlighted;
-    const bool has_attention = ui_state.attention_element_ids.count(node.id) > 0;
-    const ElementReviewVisualState* review_state = FindElementReviewVisualState(ui_state, node.id);
-    const ElementReviewVisualStatus review_status =
-        review_state ? ResolveElementReviewVisualStatus(*review_state) : ElementReviewVisualStatus::None;
-    const bool has_review_badge = review_status != ElementReviewVisualStatus::None;
+    auto badge_summary_it = ui_state.element_badge_summaries.find(node.id);
+    const core::ElementBadgeSummary* badge_summary =
+        badge_summary_it == ui_state.element_badge_summaries.end() ? nullptr : &badge_summary_it->second;
+    const bool has_attention = badge_summary != nullptr;
+    const bool ai_review_running = ui_state.ai_review_running_element_ids.count(node.id) > 0;
     const bool in_review_scope = ui_state.ai_review_scope_element_ids.count(node.id) > 0;
     const bool primary_review_scope_node = in_review_scope && ui_state.ai_review_primary_element_id == node.id;
 
@@ -333,18 +333,34 @@ void DrawGsnNode(const GsnNode& node,
     }
 
     // Status badges drawn last so they always render above all outlines.
-    if (has_attention || has_review_badge) {
-        const int slot_count = (has_attention ? 1 : 0) + (has_review_badge ? 1 : 0);
+    // The unified problem badge shows whenever the element has any open
+    // problem (icon + colour match highest severity). A separate spinner
+    // badge sits in slot 1 while an AI review is running for the element.
+    {
+        const int badge_slot_count = (has_attention ? 1 : 0) + (ai_review_running ? 1 : 0);
         int slot = 0;
-        if (has_attention) {
-            DrawAttentionBadge(draw_list, ComputeBadgeRect(top_left, bottom_right, zoom, slot++, slot_count), zoom);
+        if (has_attention && badge_summary) {
+            const BadgeRect badge = ComputeBadgeRect(top_left, bottom_right, zoom, slot++, badge_slot_count);
+            DrawProblemBadge(draw_list, badge, zoom, *badge_summary);
+
+            // Invisible click target over the badge. SetNextItemAllowOverlap
+            // lets the node body remain clickable around it. Pushing a
+            // distinct id avoids collision with the node hit-test button.
+            ImGui::SetCursorScreenPos(badge.min);
+            ImGui::SetNextItemAllowOverlap();
+            const ImVec2 badge_size(badge.max.x - badge.min.x, badge.max.y - badge.min.y);
+            ImGui::PushID(node.id.c_str());
+            const bool badge_clicked = ImGui::InvisibleButton("##problem_badge", badge_size);
+            if (ImGui::IsItemHovered())
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            ImGui::PopID();
+            if (badge_clicked && actions.focus_problem) {
+                actions.focus_problem(badge_summary->top_problem_id, node.id);
+            }
         }
-        if (has_review_badge && review_state) {
-            DrawReviewBadge(draw_list,
-                            ComputeBadgeRect(top_left, bottom_right, zoom, slot, slot_count),
-                            zoom,
-                            review_status,
-                            *review_state);
+        if (ai_review_running) {
+            const BadgeRect badge = ComputeBadgeRect(top_left, bottom_right, zoom, slot++, badge_slot_count);
+            DrawAiSpinnerBadge(draw_list, badge, zoom);
         }
     }
 }

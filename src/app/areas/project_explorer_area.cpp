@@ -43,6 +43,8 @@ MakeProjectExplorerPanelCallbacks(const ProjectExplorerAreaCallbacks& callbacks)
         callbacks.create_evidence_register,
         callbacks.create_j3377_cae_register,
         callbacks.open_file,
+        callbacks.remove_file,
+        callbacks.reveal_in_file_explorer,
         callbacks.open_package_node,
         callbacks.add_terminology_package,
         callbacks.remove_package,

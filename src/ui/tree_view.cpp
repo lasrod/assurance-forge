@@ -97,8 +97,12 @@ static void RenderTreeNode(const core::TreeNode* node,
                            UiState& state,
                            const ElementContextActions& actions,
                            const TreeEditActions* tree_edit_actions) {
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
+
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick |
-                               ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen;
+                               ImGuiTreeNodeFlags_SpanAllColumns | ImGuiTreeNodeFlags_AllowOverlap |
+                               ImGuiTreeNodeFlags_DefaultOpen;
 
     bool has_children = !node->group1_children.empty() || !node->group2_attachments.empty();
     if (!has_children)
@@ -106,6 +110,10 @@ static void RenderTreeNode(const core::TreeNode* node,
 
     if (state.selected_element_id == node->id)
         flags |= ImGuiTreeNodeFlags_Selected;
+
+    constexpr float kArrowIconGapTightenPx = 6.0f;
+    const float label_x = ImGui::GetCursorScreenPos().x +
+                          std::max(0.0f, ImGui::GetTreeNodeToLabelSpacing() - kArrowIconGapTightenPx);
 
     // Render arrow + selection background only; the visible label is drawn
     // directly onto the draw list so no extra ImGui items are created that
@@ -148,30 +156,33 @@ static void RenderTreeNode(const core::TreeNode* node,
         }
     }
 
+    // Capture the tree window's draw list BEFORE BeginPopupContextItem. When the right-click popup
+    // opens, ImGui pushes the popup window as the current window and GetWindowDrawList() would
+    // return the popup's draw list, causing the row's overlay icon and label to be drawn into the
+    // popup instead of the tree row.
+    ImDrawList* tree_dl = ImGui::GetWindowDrawList();
+
     bool popup_open = ImGui::BeginPopupContextItem(node->id.c_str());
 
     // Overlay the colored role icon and node name using AddText (no new ImGui
     // items, so clicks/right-clicks always land on the tree node).
     {
-        constexpr float kArrowIconGapTightenPx = 6.0f;
-        float text_x =
-            item_min.x + std::max(0.0f, ImGui::GetTreeNodeToLabelSpacing() - kArrowIconGapTightenPx);
         float text_y = item_min.y + (item_size.y - ImGui::GetTextLineHeight()) * 0.5f;
 
-        ImDrawList* dl = ImGui::GetWindowDrawList();
+        ImDrawList* dl = tree_dl;
         ImFont* font = ImGui::GetFont();
         float font_size = ImGui::GetFontSize();
 
         const char* role_icon = RoleIcon(node->role);
         ImU32 tag_col = ImGui::ColorConvertFloat4ToU32(RoleColor(node->role));
-        dl->AddText(font, font_size, ImVec2(text_x, text_y), tag_col, role_icon);
+        dl->AddText(font, font_size, ImVec2(label_x, text_y), tag_col, role_icon);
 
         float tag_w = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, role_icon).x;
         float space_w = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, " ").x;
 
         std::string name = ShortName(node);
         ImU32 name_col = ImGui::GetColorU32(ImGuiCol_Text);
-        dl->AddText(font, font_size, ImVec2(text_x + tag_w + space_w, text_y), name_col, name.c_str());
+        dl->AddText(font, font_size, ImVec2(label_x + tag_w + space_w, text_y), name_col, name.c_str());
     }
 
     if (clicked) {
@@ -186,6 +197,61 @@ static void RenderTreeNode(const core::TreeNode* node,
         ImGui::Separator();
         RenderAiReviewMenu(actions);
         ImGui::EndPopup();
+    }
+
+    // Column 1: per-element problem badge sourced from the ProblemsManager
+    // (single source of truth, populated into ui_state.element_badge_summaries
+    // every frame). The badge lives in its own table column so it never
+    // overlaps the node label.
+    ImGui::TableSetColumnIndex(1);
+    {
+        auto it = state.element_badge_summaries.find(node->id);
+        if (it != state.element_badge_summaries.end()) {
+            const core::ElementBadgeSummary& summary = it->second;
+            const Theme& theme = GetTheme();
+            ImU32 color = theme.accent;
+            const char* glyph = "i";
+            switch (summary.highest_severity) {
+            case core::ProblemSeverity::Error:
+                color = theme.danger;
+                glyph = "!";
+                break;
+            case core::ProblemSeverity::Warning:
+                color = theme.warning;
+                glyph = "!";
+                break;
+            case core::ProblemSeverity::Info:
+            default:
+                color = theme.accent;
+                glyph = "i";
+                break;
+            }
+            const float radius = ImGui::GetFontSize() * 0.45f;
+            const ImVec2 button_size(radius * 2.0f + 2.0f, radius * 2.0f + 2.0f);
+            const ImVec2 button_pos = ImGui::GetCursorScreenPos();
+            ImGui::PushID(node->id.c_str());
+            const bool badge_clicked =
+                ImGui::InvisibleButton("##tree_badge", button_size, ImGuiButtonFlags_AllowOverlap);
+            ImGui::PopID();
+            const bool badge_hovered = ImGui::IsItemHovered();
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 center(button_pos.x + button_size.x * 0.5f, button_pos.y + button_size.y * 0.5f);
+            dl->AddCircleFilled(center, radius, color);
+            ImFont* font = ImGui::GetFont();
+            const float gf = ImGui::GetFontSize() * 0.8f;
+            const ImVec2 ts = font->CalcTextSizeA(gf, FLT_MAX, 0.0f, glyph);
+            dl->AddText(font, gf, ImVec2(center.x - ts.x * 0.5f, center.y - ts.y * 0.5f), IM_COL32_WHITE, glyph);
+            if (badge_hovered) {
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                ImGui::SetTooltip("%zu problem%s · top: %s\nClick to open the Problems panel.",
+                                  summary.problem_count,
+                                  summary.problem_count == 1 ? "" : "s",
+                                  summary.top_problem_message.c_str());
+            }
+            if (badge_clicked) {
+                FocusProblemInPanel(state, summary.top_problem_id, node->id);
+            }
+        }
     }
 
     if (has_children && open) {
@@ -215,17 +281,32 @@ void ShowTreeViewPanel(const core::AssuranceTree* tree,
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(1.0f, window_padding.y));
     ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 8.0f);
     if (ImGui::BeginChild("TreeViewScroll", ImVec2(0, 0), false)) {
-        RenderTreeNode(tree->root, active_case, state, actions, tree_edit_actions);
+        // Two-column table: stretchy tree column + fixed-width badge column on
+        // the right so the alert badge doesn't overlap the node label.
+        const float badge_col_width = ImGui::GetFontSize() * 1.4f;
+        constexpr ImGuiTableFlags kTreeTableFlags =
+            ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_NoPadOuterX | ImGuiTableFlags_SizingFixedFit;
+        if (ImGui::BeginTable("##tree_view_table", 2, kTreeTableFlags)) {
+            ImGui::TableSetupColumn("##tree", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("##badge", ImGuiTableColumnFlags_WidthFixed, badge_col_width);
 
-        // Show orphan nodes if any
-        if (!tree->orphans.empty()) {
-            ImGui::Separator();
-            if (ImGui::TreeNodeEx("##orphans", ImGuiTreeNodeFlags_None, "Orphans (%d)", (int)tree->orphans.size())) {
-                for (const auto* orphan : tree->orphans) {
-                    RenderTreeNode(orphan, active_case, state, actions, tree_edit_actions);
+            RenderTreeNode(tree->root, active_case, state, actions, tree_edit_actions);
+
+            // Show orphan nodes if any
+            if (!tree->orphans.empty()) {
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::Separator();
+                if (ImGui::TreeNodeEx(
+                        "##orphans", ImGuiTreeNodeFlags_SpanAllColumns, "Orphans (%d)", (int)tree->orphans.size())) {
+                    for (const auto* orphan : tree->orphans) {
+                        RenderTreeNode(orphan, active_case, state, actions, tree_edit_actions);
+                    }
+                    ImGui::TreePop();
                 }
-                ImGui::TreePop();
             }
+
+            ImGui::EndTable();
         }
     }
     ImGui::EndChild();

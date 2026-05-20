@@ -184,6 +184,19 @@ void RenderFile(const core::ProjectFileEntry& entry,
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen() && callbacks.open_file) {
         callbacks.open_file(entry);
     }
+
+    // Trigger the file context popup against the tree node itself, BEFORE any SameLine() text
+    // (state tag, validity tag, etc.) is appended. BeginPopupContextItem uses the previous item
+    // for hit testing, so attaching it after the SameLine text would mean right-clicking the
+    // file row's label has no effect (the small trailing tag would be the only hit zone).
+    const bool is_proposal = entry.role == core::ProjectFileRole::ReviewProposal;
+    const bool is_export = entry.role == core::ProjectFileRole::ExportedReport;
+    const bool wants_file_context_menu = (is_proposal && callbacks.remove_file) ||
+                                         (is_export && (callbacks.remove_file || callbacks.reveal_in_file_explorer));
+    if (wants_file_context_menu) {
+        ImGui::OpenPopupOnItemClick("##file_context", ImGuiPopupFlags_MouseButtonRight);
+    }
+
     if (entry.state != core::ProjectFileState::Clean) {
         ImGui::SameLine();
         ImGui::TextDisabled("(%s)", core::ProjectFileStateToDisplayString(entry.state));
@@ -201,6 +214,21 @@ void RenderFile(const core::ProjectFileEntry& entry,
 
     if (has_package_tree && !tree_it->second.success) {
         ImGui::TextDisabled("Package tree unavailable: %s", tree_it->second.error_message.c_str());
+    }
+
+    if (wants_file_context_menu) {
+        if (ImGui::BeginPopup("##file_context")) {
+            // Use "Delete" for filesystem-backed exports so the destructive nature of the
+            // operation is unambiguous. Proposals remain "Remove" to match the existing UX.
+            const char* remove_label = is_export ? "Delete" : "Remove";
+            if (callbacks.remove_file && (is_proposal || is_export) && ImGui::MenuItem(remove_label)) {
+                callbacks.remove_file(entry);
+            }
+            if (is_export && callbacks.reveal_in_file_explorer && ImGui::MenuItem("Open in File Explorer")) {
+                callbacks.reveal_in_file_explorer(entry);
+            }
+            ImGui::EndPopup();
+        }
     }
 
     if (has_package_children && open) {

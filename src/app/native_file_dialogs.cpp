@@ -5,6 +5,11 @@
 #include <filesystem>
 #include <system_error>
 
+#ifdef _WIN32
+#include <windows.h>
+#include <shellapi.h>
+#endif
+
 namespace app::dialogs {
 namespace {
 
@@ -119,6 +124,40 @@ BrowseForProjectManifest(const std::string& default_path, std::string& selected_
     NFD::UniquePath out_path;
     const nfdresult_t result = NFD::OpenDialog(out_path, filters, 1, default_folder.c_str());
     return RunDialog(result, out_path, selected_path, error_message);
+}
+
+bool RevealPathInFileExplorer(const std::filesystem::path& path, std::string& error_message) {
+    std::error_code ec;
+    if (path.empty() || !std::filesystem::exists(path, ec)) {
+        error_message = "File was not found: " + path.generic_string();
+        return false;
+    }
+
+#ifdef _WIN32
+    // ShellExecute's /select, parser expects Windows-style backslash separators. The path passed
+    // in is often built from a project root joined with a relativePath whose generic_string()
+    // form contains forward slashes; without normalization the comma-delimited /select, argument
+    // ends up with mixed separators and Explorer falls back to opening Documents instead of
+    // selecting the target file.
+    const std::filesystem::path native_path = std::filesystem::path(path).make_preferred();
+    std::wstring parameters;
+    if (std::filesystem::is_directory(native_path, ec)) {
+        parameters = L"/e,\"" + native_path.wstring() + L"\"";
+    } else {
+        parameters = L"/select,\"" + native_path.wstring() + L"\"";
+    }
+
+    HINSTANCE result = ShellExecuteW(nullptr, L"open", L"explorer.exe", parameters.c_str(), nullptr, SW_SHOWNORMAL);
+    if (reinterpret_cast<intptr_t>(result) <= 32) {
+        error_message = "Could not open File Explorer for: " + path.generic_string();
+        return false;
+    }
+    error_message.clear();
+    return true;
+#else
+    error_message = "Opening File Explorer is not supported on this platform.";
+    return false;
+#endif
 }
 
 } // namespace app::dialogs

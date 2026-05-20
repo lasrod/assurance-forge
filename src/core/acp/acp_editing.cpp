@@ -170,13 +170,6 @@ const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model,
     return found == model.elements.end() ? nullptr : &*found;
 }
 
-parser::SacmElement* FindParserElement(parser::AssuranceCase& model, const std::string& element_id) {
-    auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
-        return element.id == element_id;
-    });
-    return found == model.elements.end() ? nullptr : &*found;
-}
-
 bool ElementEligibleForAcp(const parser::AssuranceCase& model, const std::string& element_id) {
     const parser::SacmElement* element = FindParserElement(model, element_id);
     return element && element->type == "artifactreference";
@@ -289,9 +282,9 @@ std::string NextArgumentPackageId(const sacm::AssuranceCasePackage& package) {
 }
 
 bool ArgumentPackageIdExists(const sacm::AssuranceCasePackage& package, const std::string& id) {
-    return std::any_of(package.argumentPackages.begin(), package.argumentPackages.end(), [&](const auto& argument_package) {
-        return argument_package.id == id;
-    });
+    return std::any_of(package.argumentPackages.begin(),
+                       package.argumentPackages.end(),
+                       [&](const auto& argument_package) { return argument_package.id == id; });
 }
 
 std::string NextAcpArgumentPackageId(const sacm::AssuranceCasePackage& package, const std::string& acp_id) {
@@ -393,16 +386,18 @@ void UpdateTextConfidenceClaimFields(sacm::Claim& claim, const parser::AcpRecord
 void UpdateTreeConfidenceNames(sacm::AssuranceCasePackage* package, const parser::AcpRecord& acp) {
     if (!package || acp.resolution_kind != "topGoalReference" || acp.argument_package_id.empty())
         return;
-    auto package_found = std::find_if(package->argumentPackages.begin(),
-                                      package->argumentPackages.end(),
-                                      [&](const sacm::ArgumentPackage& argument_package) {
-                                          return argument_package.id == acp.argument_package_id;
-                                      });
+    auto package_found = std::find_if(
+        package->argumentPackages.begin(),
+        package->argumentPackages.end(),
+        [&](const sacm::ArgumentPackage& argument_package) { return argument_package.id == acp.argument_package_id; });
     if (package_found == package->argumentPackages.end())
         return;
 
-    const std::string display_name = acp.name.empty() ? acp.id : acp.name;
-    const std::string native_name = acp.id + ": " + display_name;
+    const bool has_custom_display_name = !acp.name.empty() && acp.name != acp.id;
+    if (!has_custom_display_name)
+        return;
+
+    const std::string native_name = acp.id + ": " + acp.name;
     package_found->name = native_name;
     package_found->name_ml.set("en", native_name);
 
@@ -413,24 +408,8 @@ void UpdateTreeConfidenceNames(sacm::AssuranceCasePackage* package, const parser
     }
 }
 
-void UpsertParserClaimProjection(parser::AssuranceCase& model, const sacm::Claim& claim) {
-    parser::SacmElement* existing = FindParserElement(model, claim.id);
-    if (!existing) {
-        parser::SacmElement element;
-        element.id = claim.id;
-        element.type = "claim";
-        existing = &model.elements.emplace_back(std::move(element));
-    }
-    existing->name = claim.name;
-    existing->content = claim.content;
-    existing->assertion_declaration = claim.assertionDeclaration;
-    existing->name_langs["en"] = claim.name;
-    existing->content_langs["en"] = claim.content;
-}
-
-parser::AcpRecord EnsureTextConfidenceClaim(parser::AssuranceCase& model,
-                                            sacm::AssuranceCasePackage* package,
-                                            parser::AcpRecord record) {
+parser::AcpRecord
+EnsureTextConfidenceClaim(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package, parser::AcpRecord record) {
     if (!package || record.resolution_kind != "text")
         return record;
 
@@ -449,7 +428,6 @@ parser::AcpRecord EnsureTextConfidenceClaim(parser::AssuranceCase& model,
 
     if (claim) {
         UpdateTextConfidenceClaimFields(*claim, record);
-        UpsertParserClaimProjection(model, *claim);
     }
     return record;
 }
@@ -591,8 +569,8 @@ AcpEditResult CreateConfidenceArgumentTreeForAcp(parser::AssuranceCase& model,
     const std::string argument_package_id = NextAcpArgumentPackageId(*package, acp->id);
     const std::string top_goal_id = NextElementIdWithPrefix(model, *package, acp->id + "_G");
     const std::string target_summary = TargetSummaryForDefaultClaim(model, *acp);
-    const std::string acp_display_name = acp->name.empty() ? acp->id : acp->name;
-    const std::string top_goal_name = acp->id + ": " + acp_display_name;
+    const bool has_custom_display_name = !acp->name.empty() && acp->name != acp->id;
+    const std::string top_goal_name = has_custom_display_name ? acp->id + ": " + acp->name : std::string{};
     const std::string top_goal_content = "Confidence in " + target_summary + " is sufficient.";
 
     sacm::ArgumentPackage argument_package;

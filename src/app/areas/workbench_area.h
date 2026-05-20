@@ -10,8 +10,10 @@
 
 namespace app {
 struct AppRuntimeState;
-namespace frame { struct AppLayoutRegion; }
+namespace frame {
+struct AppLayoutRegion;
 }
+} // namespace app
 
 namespace app::areas {
 
@@ -32,7 +34,6 @@ struct WorkbenchAreaCallbacks {
         add_visible_terminology_term_context;
     std::function<void(const core::TerminologyPackageRef&, const core::TerminologyTermRef&)> find_terminology_usages;
     std::function<void(const std::string&, const std::string&)> change_terminology_meaning;
-    std::function<void()> sync_review_visual_states;
     std::function<void()> apply_terminology_package_edits;
     std::function<void()> delete_terminology_package;
     std::function<void()> add_terminology_term;

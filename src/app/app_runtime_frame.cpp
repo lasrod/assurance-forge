@@ -19,6 +19,7 @@
 #include "app/frame/app_menu_bar.h"
 #include "app/frame/app_shell.h"
 #include "core/perf/frame_profiler.h"
+#include "core/problems/problem_attention.h"
 #include "ui/ui_state.h"
 
 #include <cstddef>
@@ -56,6 +57,12 @@ void AppRuntime::RenderFrame(bool& done) {
         PollAiReviewTask();
     }
 
+    {
+        core::perf::ScopedTimer s("app.problem_badges");
+        ui::GetUiState().element_badge_summaries =
+            core::BuildElementBadgeSummaries(impl_->problems_manager.GetProblems());
+    }
+
     const frame::AppLayoutRegions regions = frame::RenderAppShell(*impl_, menu_height, kPanelFlags);
 
     areas::ProjectExplorerAreaCallbacks project_explorer_callbacks{
@@ -64,6 +71,8 @@ void AppRuntime::RenderFrame(bool& done) {
         [this]() { BeginCreateProjectEvidenceRegister(); },
         [this]() { BeginCreateProjectJ3377CaeRegister(); },
         [this](const core::ProjectFileEntry& entry) { OpenProjectFile(entry); },
+        [this](const core::ProjectFileEntry& entry) { RemoveProjectFile(entry); },
+        [this](const core::ProjectFileEntry& entry) { RevealProjectFileInExplorer(entry); },
         [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
             OpenProjectPackageNode(entry, node);
         },
@@ -138,7 +147,6 @@ void AppRuntime::RenderFrame(bool& done) {
     review_panel_callbacks.quick_fix_problem = [this](const core::ProblemItem& problem) {
         HandleProblemQuickFix(problem);
     };
-    review_panel_callbacks.sync_review_visual_states = [this]() { SyncReviewVisualStatesFromReviews(); };
     review_panel_callbacks.set_manual_review_ok = [this](const std::string& element_id, bool manual_ok) {
         return SetManualReviewOk(element_id, manual_ok);
     };

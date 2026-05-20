@@ -19,4 +19,18 @@ void ClearProblemsByIdPrefix(ProblemsManager& problems_manager, const std::strin
     }
 }
 
+bool IsReviewDerivedProblem(const ProblemItem& problem) {
+    switch (problem.source) {
+    case ProblemSource::ReviewComment:
+    case ProblemSource::GuidelineReview:
+    case ProblemSource::AIReview:
+        return true;
+    case ProblemSource::Manual:
+    case ProblemSource::ModelValidation:
+    case ProblemSource::ImportExport:
+        return false;
+    }
+    return false;
+}
+
 } // namespace core
