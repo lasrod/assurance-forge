@@ -111,6 +111,10 @@ static void RenderTreeNode(const core::TreeNode* node,
     if (state.selected_element_id == node->id)
         flags |= ImGuiTreeNodeFlags_Selected;
 
+    constexpr float kArrowIconGapTightenPx = 6.0f;
+    const float label_x = ImGui::GetCursorScreenPos().x +
+                          std::max(0.0f, ImGui::GetTreeNodeToLabelSpacing() - kArrowIconGapTightenPx);
+
     // Render arrow + selection background only; the visible label is drawn
     // directly onto the draw list so no extra ImGui items are created that
     // could intercept hover / click events on the tree node.
@@ -163,8 +167,6 @@ static void RenderTreeNode(const core::TreeNode* node,
     // Overlay the colored role icon and node name using AddText (no new ImGui
     // items, so clicks/right-clicks always land on the tree node).
     {
-        constexpr float kArrowIconGapTightenPx = 6.0f;
-        float text_x = item_min.x + std::max(0.0f, ImGui::GetTreeNodeToLabelSpacing() - kArrowIconGapTightenPx);
         float text_y = item_min.y + (item_size.y - ImGui::GetTextLineHeight()) * 0.5f;
 
         ImDrawList* dl = tree_dl;
@@ -173,14 +175,14 @@ static void RenderTreeNode(const core::TreeNode* node,
 
         const char* role_icon = RoleIcon(node->role);
         ImU32 tag_col = ImGui::ColorConvertFloat4ToU32(RoleColor(node->role));
-        dl->AddText(font, font_size, ImVec2(text_x, text_y), tag_col, role_icon);
+        dl->AddText(font, font_size, ImVec2(label_x, text_y), tag_col, role_icon);
 
         float tag_w = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, role_icon).x;
         float space_w = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, " ").x;
 
         std::string name = ShortName(node);
         ImU32 name_col = ImGui::GetColorU32(ImGuiCol_Text);
-        dl->AddText(font, font_size, ImVec2(text_x + tag_w + space_w, text_y), name_col, name.c_str());
+        dl->AddText(font, font_size, ImVec2(label_x + tag_w + space_w, text_y), name_col, name.c_str());
     }
 
     if (clicked) {
