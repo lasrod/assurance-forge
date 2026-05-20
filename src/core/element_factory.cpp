@@ -489,20 +489,13 @@ std::unordered_set<std::string> CollectSubtreeIds(const TreeIndex& idx, const st
 // Remove from `vec` every element whose id is in `removed_ids`.
 template <typename T>
 void EraseByIdSet(std::vector<T>& vec, const std::unordered_set<std::string>& removed_ids) {
-    vec.erase(std::remove_if(vec.begin(), vec.end(), [&](const T& item) { return removed_ids.count(item.id) > 0; }),
-              vec.end());
+    std::erase_if(vec, [&](const T& item) { return removed_ids.count(item.id) > 0; });
 }
 
 // Strip removed ids from the source/target vectors of a SACM relationship.
 void ScrubRelationshipRefs(sacm::AssertedRelationship& rel, const std::unordered_set<std::string>& removed_ids) {
-    rel.sources.erase(std::remove_if(rel.sources.begin(),
-                                     rel.sources.end(),
-                                     [&](const std::string& r) { return removed_ids.count(r) > 0; }),
-                      rel.sources.end());
-    rel.targets.erase(std::remove_if(rel.targets.begin(),
-                                     rel.targets.end(),
-                                     [&](const std::string& r) { return removed_ids.count(r) > 0; }),
-                      rel.targets.end());
+    std::erase_if(rel.sources, [&](const std::string& r) { return removed_ids.count(r) > 0; });
+    std::erase_if(rel.targets, [&](const std::string& r) { return removed_ids.count(r) > 0; });
 }
 
 // True if a SACM relationship is now structurally empty: has no targets, or
@@ -523,14 +516,8 @@ bool IsInferenceDangling(const sacm::AssertedInference& inf) {
 // Strip removed ids from a parser-side relationship's source/target/reasoning
 // references.
 void ScrubParserRelationshipRefs(parser::SacmElement& rel, const std::unordered_set<std::string>& removed_ids) {
-    rel.source_refs.erase(std::remove_if(rel.source_refs.begin(),
-                                         rel.source_refs.end(),
-                                         [&](const std::string& r) { return removed_ids.count(r) > 0; }),
-                          rel.source_refs.end());
-    rel.target_refs.erase(std::remove_if(rel.target_refs.begin(),
-                                         rel.target_refs.end(),
-                                         [&](const std::string& r) { return removed_ids.count(r) > 0; }),
-                          rel.target_refs.end());
+    std::erase_if(rel.source_refs, [&](const std::string& r) { return removed_ids.count(r) > 0; });
+    std::erase_if(rel.target_refs, [&](const std::string& r) { return removed_ids.count(r) > 0; });
     if (!rel.reasoning_ref.empty() && removed_ids.count(rel.reasoning_ref)) {
         rel.reasoning_ref.clear();
     }
@@ -668,16 +655,13 @@ bool RemoveElement(parser::AssuranceCase& ac,
             ScrubParserRelationshipRefs(e, removed_ids);
         }
     }
-    ac.elements.erase(std::remove_if(ac.elements.begin(),
-                                     ac.elements.end(),
-                                     [&](const parser::SacmElement& e) {
-                                         if (removed_ids.count(e.id))
-                                             return true;
-                                         if (!IsRelationshipType(e.type))
-                                             return false;
-                                         return IsParserRelationshipDangling(e);
-                                     }),
-                      ac.elements.end());
+    std::erase_if(ac.elements, [&](const parser::SacmElement& e) {
+        if (removed_ids.count(e.id))
+            return true;
+        if (!IsRelationshipType(e.type))
+            return false;
+        return IsParserRelationshipDangling(e);
+    });
 
     // ---- SACM model: scrub references then drop dead/empty relationships ---
     if (pkg) {
@@ -697,28 +681,17 @@ bool RemoveElement(parser::AssuranceCase& ac,
             for (auto& r : ap.assertedEvidences)
                 ScrubRelationshipRefs(r, removed_ids);
 
-            ap.assertedInferences.erase(std::remove_if(ap.assertedInferences.begin(),
-                                                       ap.assertedInferences.end(),
-                                                       [&](const sacm::AssertedInference& r) {
-                                                           if (removed_ids.count(r.id))
-                                                               return true;
-                                                           return IsInferenceDangling(r);
-                                                       }),
-                                        ap.assertedInferences.end());
-            ap.assertedContexts.erase(std::remove_if(ap.assertedContexts.begin(),
-                                                     ap.assertedContexts.end(),
-                                                     [&](const sacm::AssertedContext& r) {
-                                                         return removed_ids.count(r.id) > 0 ||
-                                                                IsRelationshipDangling(r);
-                                                     }),
-                                      ap.assertedContexts.end());
-            ap.assertedEvidences.erase(std::remove_if(ap.assertedEvidences.begin(),
-                                                      ap.assertedEvidences.end(),
-                                                      [&](const sacm::AssertedEvidence& r) {
-                                                          return removed_ids.count(r.id) > 0 ||
-                                                                 IsRelationshipDangling(r);
-                                                      }),
-                                       ap.assertedEvidences.end());
+            std::erase_if(ap.assertedInferences, [&](const sacm::AssertedInference& r) {
+                if (removed_ids.count(r.id))
+                    return true;
+                return IsInferenceDangling(r);
+            });
+            std::erase_if(ap.assertedContexts, [&](const sacm::AssertedContext& r) {
+                return removed_ids.count(r.id) > 0 || IsRelationshipDangling(r);
+            });
+            std::erase_if(ap.assertedEvidences, [&](const sacm::AssertedEvidence& r) {
+                return removed_ids.count(r.id) > 0 || IsRelationshipDangling(r);
+            });
         }
     }
 

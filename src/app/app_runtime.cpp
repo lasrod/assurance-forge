@@ -408,9 +408,9 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
         return;
     }
 
-    const auto& ac = impl_->app_state.loaded_case.value();
+    const auto& ac = *impl_->app_state.loaded_case;
     const sacm::AssuranceCasePackage* sacm_package =
-        impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
+        impl_->app_state.sacm_package ? &*impl_->app_state.sacm_package : nullptr;
     const std::optional<parser::AssuranceCase> filtered_case = FilterConfidencePackageElementsFromMainTree(ac, sacm_package);
     impl_->current_tree = ui::gsn::BuildAssuranceTree(filtered_case ? *filtered_case : ac);
     core::ApplyTreeDisplayOrder(impl_->current_tree, impl_->tree_display_order);

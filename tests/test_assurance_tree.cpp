@@ -9,9 +9,9 @@ using namespace parser;
 
 // Helper: parse XML string and build tree
 static AssuranceTree build_tree_from_xml(const char* xml) {
-    ParseResult r = parse_sacm_xml_string(xml);
-    EXPECT_TRUE(r.success) << r.error_message;
-    return AssuranceTree::Build(r.assurance_case);
+    auto r = parse_sacm_xml_string(xml);
+    EXPECT_TRUE(r.has_value()) << (r ? "" : r.error());
+    return AssuranceTree::Build(*r);
 }
 
 // ----- Root identification -----

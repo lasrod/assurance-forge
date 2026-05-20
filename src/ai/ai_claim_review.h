@@ -59,8 +59,8 @@ struct AiReviewRequestArtifacts {
 
 using AiReviewPromptParts = AiReviewRequestArtifacts;
 
+// `errorMessage` is the success/failure signal: empty means success.
 struct AiReviewParseResult {
-    bool success = false;
     std::string errorMessage;
     std::string sanitizedJson;
     std::string reviewedElementId;

@@ -393,24 +393,12 @@ void RemoveSourceFromSacmRelationship(sacm::AssuranceCasePackage* package,
                 RemoveValue(relationship.sources, source_id);
         }
 
-        argument_package.assertedInferences.erase(std::remove_if(argument_package.assertedInferences.begin(),
-                                                                 argument_package.assertedInferences.end(),
-                                                                 [](const sacm::AssertedInference& relationship) {
-                                                                     return IsSacmInferenceDangling(relationship);
-                                                                 }),
-                                                  argument_package.assertedInferences.end());
-        argument_package.assertedContexts.erase(std::remove_if(argument_package.assertedContexts.begin(),
-                                                               argument_package.assertedContexts.end(),
-                                                               [](const sacm::AssertedContext& relationship) {
-                                                                   return IsSacmRelationshipDangling(relationship);
-                                                               }),
-                                                argument_package.assertedContexts.end());
-        argument_package.assertedEvidences.erase(std::remove_if(argument_package.assertedEvidences.begin(),
-                                                                argument_package.assertedEvidences.end(),
-                                                                [](const sacm::AssertedEvidence& relationship) {
-                                                                    return IsSacmRelationshipDangling(relationship);
-                                                                }),
-                                                 argument_package.assertedEvidences.end());
+        std::erase_if(argument_package.assertedInferences,
+                      [](const sacm::AssertedInference& r) { return IsSacmInferenceDangling(r); });
+        std::erase_if(argument_package.assertedContexts,
+                      [](const sacm::AssertedContext& r) { return IsSacmRelationshipDangling(r); });
+        std::erase_if(argument_package.assertedEvidences,
+                      [](const sacm::AssertedEvidence& r) { return IsSacmRelationshipDangling(r); });
     }
 }
 

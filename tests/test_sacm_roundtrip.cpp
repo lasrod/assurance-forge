@@ -120,15 +120,15 @@ static std::string test_data_path(const std::string& filename) {
 
 static void round_trip_file(const std::string& file_path) {
     auto result1 = sacm::parse_sacm(file_path);
-    ASSERT_TRUE(result1.success) << "Parse failed: " << result1.error_message;
+    ASSERT_TRUE(result1.has_value()) << "Parse failed: " << (result1 ? "" : result1.error());
 
-    std::string xml = sacm::serialize_sacm(result1.package);
+    std::string xml = sacm::serialize_sacm(*result1);
     ASSERT_FALSE(xml.empty()) << "Serialization produced empty string";
 
     auto result2 = sacm::parse_sacm_string(xml);
-    ASSERT_TRUE(result2.success) << "Re-parse failed: " << result2.error_message;
+    ASSERT_TRUE(result2.has_value()) << "Re-parse failed: " << (result2 ? "" : result2.error());
 
-    expect_packages_eq(result1.package, result2.package);
+    expect_packages_eq(*result1, *result2);
 }
 
 // ===== Tests =====
@@ -157,9 +157,9 @@ TEST(SacmRoundTrip, UpdatedV2File) {
 
 TEST(SacmParser, SampleFileStructure) {
     auto result = sacm::parse_sacm(test_data_path("fixture_roundtrip_sample.sacm.xml"));
-    ASSERT_TRUE(result.success);
+    ASSERT_TRUE(result.has_value());
 
-    const auto& pkg = result.package;
+    const auto& pkg = *result;
     EXPECT_EQ(pkg.id, "SAMPLE");
     EXPECT_EQ(pkg.name, "Sample Assurance Case");
     EXPECT_EQ(pkg.namespace_prefix, "sacm");
@@ -185,9 +185,9 @@ TEST(SacmParser, SampleFileStructure) {
 
 TEST(SacmParser, CoreArgumentFileStructure) {
     auto result = sacm::parse_sacm(test_data_path("fixture_roundtrip_core_argument.sacm.xml"));
-    ASSERT_TRUE(result.success);
+    ASSERT_TRUE(result.has_value());
 
-    const auto& pkg = result.package;
+    const auto& pkg = *result;
     EXPECT_EQ(pkg.id, "acp_vehicle_braking");
     EXPECT_EQ(pkg.namespace_prefix, "SACM");
 
@@ -210,33 +210,33 @@ TEST(SacmParser, CoreArgumentFileStructure) {
 TEST(SacmParser, NamespacePreservation) {
     // SACM: prefix (uppercase)
     auto r1 = sacm::parse_sacm(test_data_path("fixture_roundtrip_core_argument.sacm.xml"));
-    ASSERT_TRUE(r1.success);
-    EXPECT_EQ(r1.package.namespace_prefix, "SACM");
-    EXPECT_EQ(r1.package.namespace_uri, "http://example.org/sacm/2.3");
+    ASSERT_TRUE(r1.has_value());
+    EXPECT_EQ(r1->namespace_prefix, "SACM");
+    EXPECT_EQ(r1->namespace_uri, "http://example.org/sacm/2.3");
 
     // sacm: prefix (lowercase)
     auto r2 = sacm::parse_sacm(test_data_path("fixture_roundtrip_sample.sacm.xml"));
-    ASSERT_TRUE(r2.success);
-    EXPECT_EQ(r2.package.namespace_prefix, "sacm");
-    EXPECT_EQ(r2.package.namespace_uri, "http://www.omg.org/spec/SACM/2.2/Argumentation");
+    ASSERT_TRUE(r2.has_value());
+    EXPECT_EQ(r2->namespace_prefix, "sacm");
+    EXPECT_EQ(r2->namespace_uri, "http://www.omg.org/spec/SACM/2.2/Argumentation");
 }
 
 TEST(SacmParser, InvalidXmlReturnsError) {
     auto result = sacm::parse_sacm_string("<not valid xml");
-    EXPECT_FALSE(result.success);
-    EXPECT_FALSE(result.error_message.empty());
+    EXPECT_FALSE(result.has_value());
+    EXPECT_FALSE(result.error().empty());
 }
 
 TEST(SacmParser, NonExistentFileReturnsError) {
     auto result = sacm::parse_sacm("nonexistent_file.xml");
-    EXPECT_FALSE(result.success);
-    EXPECT_FALSE(result.error_message.empty());
+    EXPECT_FALSE(result.has_value());
+    EXPECT_FALSE(result.error().empty());
 }
 
 TEST(SacmParser, MissingRootReturnsError) {
     auto result = sacm::parse_sacm_string("<?xml version=\"1.0\"?><wrongRoot/>");
-    EXPECT_FALSE(result.success);
-    EXPECT_EQ(result.error_message, "Root element 'AssuranceCasePackage' not found");
+    EXPECT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), "Root element 'AssuranceCasePackage' not found");
 }
 
 TEST(SacmSerializer, ProducesValidXml) {
@@ -267,7 +267,7 @@ TEST(SacmSerializer, ProducesValidXml) {
 
     // Parse it back
     auto result = sacm::parse_sacm_string(xml);
-    ASSERT_TRUE(result.success);
-    EXPECT_EQ(result.package.argumentPackages[0].claims[0].content, "Test claim");
-    EXPECT_TRUE(result.package.argumentPackages[0].claims[0].undeveloped);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->argumentPackages[0].claims[0].content, "Test claim");
+    EXPECT_TRUE(result->argumentPackages[0].claims[0].undeveloped);
 }

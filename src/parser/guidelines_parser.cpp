@@ -338,57 +338,42 @@ std::vector<Precheck> ParsePrechecks(const YAML::Node& node) {
 }
 
 GuidelinesParseResult ParseRoot(const YAML::Node& root) {
-    GuidelinesParseResult result;
-    if (!IsDefinedNode(root) || !root.IsMap()) {
-        result.error_message = "SCCG catalog YAML root must be a map";
-        return result;
-    }
+    if (!IsDefinedNode(root) || !root.IsMap())
+        return std::unexpected("SCCG catalog YAML root must be a map");
 
-    result.document.schema_version = ReadStringKey(root, "schema_version");
-    result.document.sccg_version = ReadStringKey(root, "sccg_version");
-    if (result.document.schema_version.empty()) {
-        result.error_message = "Missing schema_version";
-        return result;
-    }
+    GuidelinesDocument document;
+    document.schema_version = ReadStringKey(root, "schema_version");
+    document.sccg_version = ReadStringKey(root, "sccg_version");
+    if (document.schema_version.empty())
+        return std::unexpected("Missing schema_version");
 
-    result.document.metadata = ParseMetadata(root);
+    document.metadata = ParseMetadata(root);
 
     std::string error_message;
-    if (!RequireSequence(root, "guidelines", error_message)) {
-        result.error_message = error_message;
-        return result;
-    }
+    if (!RequireSequence(root, "guidelines", error_message))
+        return std::unexpected(std::move(error_message));
 
     if (IsDefinedNode(ReadMapValue(root, "reference_sources"))) {
-        result.document.reference_sources =
-            ParseReferenceSources(ReadMapValue(root, "reference_sources"), error_message);
-        if (!error_message.empty()) {
-            result.error_message = error_message;
-            return result;
-        }
+        document.reference_sources = ParseReferenceSources(ReadMapValue(root, "reference_sources"), error_message);
+        if (!error_message.empty())
+            return std::unexpected(std::move(error_message));
     }
 
     if (IsDefinedNode(ReadMapValue(root, "categories"))) {
-        result.document.categories = ParseCategories(ReadMapValue(root, "categories"), error_message);
-        if (!error_message.empty()) {
-            result.error_message = error_message;
-            return result;
-        }
+        document.categories = ParseCategories(ReadMapValue(root, "categories"), error_message);
+        if (!error_message.empty())
+            return std::unexpected(std::move(error_message));
     }
 
-    result.document.guidelines = ParseGuidelines(ReadMapValue(root, "guidelines"), error_message);
-    if (!error_message.empty()) {
-        result.error_message = error_message;
-        return result;
-    }
+    document.guidelines = ParseGuidelines(ReadMapValue(root, "guidelines"), error_message);
+    if (!error_message.empty())
+        return std::unexpected(std::move(error_message));
 
-    result.document.review_profiles =
-        ParseReviewProfiles(ReadSectionFallback(root, "review_profiles", "review_profiles"));
-    result.document.data_packages = ParseDataPackages(ReadSectionFallback(root, "data_packages", "data_packages"));
-    result.document.prechecks = ParsePrechecks(ReadSectionFallback(root, "prechecks", "prechecks"));
+    document.review_profiles = ParseReviewProfiles(ReadSectionFallback(root, "review_profiles", "review_profiles"));
+    document.data_packages = ParseDataPackages(ReadSectionFallback(root, "data_packages", "data_packages"));
+    document.prechecks = ParsePrechecks(ReadSectionFallback(root, "prechecks", "prechecks"));
 
-    result.success = true;
-    return result;
+    return document;
 }
 
 } // namespace
@@ -481,28 +466,16 @@ const GuidelineCategory* GuidelinesDocument::FindCategoryById(const std::string&
 GuidelinesParseResult GuidelinesParser::ParseFile(const std::string& file_path) {
     try {
         return ParseRoot(YAML::LoadFile(file_path));
-    } catch (const YAML::Exception& exception) {
-        GuidelinesParseResult result;
-        result.error_message = exception.what();
-        return result;
     } catch (const std::exception& exception) {
-        GuidelinesParseResult result;
-        result.error_message = exception.what();
-        return result;
+        return std::unexpected(std::string(exception.what()));
     }
 }
 
 GuidelinesParseResult GuidelinesParser::ParseString(const std::string& yaml_content) {
     try {
         return ParseRoot(YAML::Load(yaml_content));
-    } catch (const YAML::Exception& exception) {
-        GuidelinesParseResult result;
-        result.error_message = exception.what();
-        return result;
     } catch (const std::exception& exception) {
-        GuidelinesParseResult result;
-        result.error_message = exception.what();
-        return result;
+        return std::unexpected(std::string(exception.what()));
     }
 }
 

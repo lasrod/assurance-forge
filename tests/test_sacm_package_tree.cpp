@@ -102,9 +102,9 @@ TEST(SacmPackageTree, SacmParserWrapsStandalonePackageRoots) {
 
     auto result = sacm::parse_sacm_string(xml);
 
-    ASSERT_TRUE(result.success) << result.error_message;
-    ASSERT_EQ(result.package.argumentPackages.size(), 1u);
-    EXPECT_EQ(result.package.argumentPackages[0].id, "AP1");
-    ASSERT_EQ(result.package.argumentPackages[0].claims.size(), 1u);
-    EXPECT_EQ(result.package.argumentPackages[0].claims[0].id, "G1");
+    ASSERT_TRUE(result.has_value()) << (result ? "" : result.error());
+    ASSERT_EQ(result->argumentPackages.size(), 1u);
+    EXPECT_EQ(result->argumentPackages[0].id, "AP1");
+    ASSERT_EQ(result->argumentPackages[0].claims.size(), 1u);
+    EXPECT_EQ(result->argumentPackages[0].claims[0].id, "G1");
 }

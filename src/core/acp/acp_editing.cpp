@@ -535,10 +535,7 @@ AcpEditResult RemoveAcp(parser::AssuranceCase& model, sacm::AssuranceCasePackage
 
     RemoveAcpTags(*target.element, acp_id);
     ClearRelationshipMetaClaim(package, *existing);
-    model.acps.erase(std::remove_if(model.acps.begin(),
-                                    model.acps.end(),
-                                    [&](const parser::AcpRecord& acp) { return acp.id == acp_id; }),
-                     model.acps.end());
+    std::erase_if(model.acps, [&](const parser::AcpRecord& acp) { return acp.id == acp_id; });
     return SuccessResult(acp_id);
 }
 

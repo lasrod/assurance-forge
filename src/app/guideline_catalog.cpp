@@ -119,13 +119,13 @@ bool LoadGuidelineCatalog(GuidelineCatalog& catalog, std::string& error) {
 
     const std::filesystem::path dist_dir = FindSccgDistDirectory();
     if (!dist_dir.empty()) {
-        parser::GuidelinesParseResult result = parser::SccgDistParser::ParseDirectory(dist_dir);
-        if (!result.success) {
-            error = "SCCG dist artifacts could not be parsed: " + result.error_message;
+        auto result = parser::SccgDistParser::ParseDirectory(dist_dir);
+        if (!result) {
+            error = "SCCG dist artifacts could not be parsed: " + std::move(result.error());
             return false;
         }
 
-        catalog = BuildGuidelineCatalog(std::move(result.document), dist_dir);
+        catalog = BuildGuidelineCatalog(std::move(*result), dist_dir);
         if (catalog.entries.empty()) {
             error = "No SCCG rules were found in dist artifacts.";
             return false;
@@ -143,13 +143,13 @@ bool LoadGuidelineCatalog(GuidelineCatalog& catalog, std::string& error) {
         return false;
     }
 
-    parser::GuidelinesParseResult result = parser::GuidelinesParser::ParseFile(guidelines_path.string());
-    if (!result.success) {
-        error = "SCCG catalog could not be parsed: " + result.error_message;
+    auto result = parser::GuidelinesParser::ParseFile(guidelines_path.string());
+    if (!result) {
+        error = "SCCG catalog could not be parsed: " + std::move(result.error());
         return false;
     }
 
-    catalog = BuildGuidelineCatalog(std::move(result.document), guidelines_path);
+    catalog = BuildGuidelineCatalog(std::move(*result), guidelines_path);
     if (catalog.entries.empty()) {
         error = "No SCCG guidelines were found.";
         return false;

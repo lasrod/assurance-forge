@@ -462,9 +462,7 @@ static void detect_sacm_namespace(pugi::xml_node root, std::string& out_prefix, 
     }
 }
 
-static SacmParseResult parse_document(pugi::xml_document& doc) {
-    SacmParseResult result;
-
+static std::expected<AssuranceCasePackage, std::string> parse_document(pugi::xml_document& doc) {
     pugi::xml_node root;
     for (auto child : doc.children()) {
         const std::string ln = local_name(child.name());
@@ -474,30 +472,25 @@ static SacmParseResult parse_document(pugi::xml_document& doc) {
             break;
         }
     }
-    if (!root) {
-        result.error_message = "Root element 'AssuranceCasePackage' not found";
-        return result;
-    }
+    if (!root)
+        return std::unexpected("Root element 'AssuranceCasePackage' not found");
 
-    AssuranceCasePackage& pkg = result.package;
+    AssuranceCasePackage pkg;
     parse_element_base(root, pkg);
     detect_sacm_namespace(root, pkg.namespace_prefix, pkg.namespace_uri);
 
     const std::string root_ln = local_name(root.name());
     if (root_ln == "argumentpackage") {
         pkg.argumentPackages.push_back(parse_argument_package(root));
-        result.success = true;
-        return result;
+        return pkg;
     }
     if (root_ln == "artifactpackage") {
         pkg.artifactPackages.push_back(parse_artifact_package(root));
-        result.success = true;
-        return result;
+        return pkg;
     }
     if (root_ln == "terminologypackage") {
         pkg.terminologyPackages.push_back(parse_terminology_package(root));
-        result.success = true;
-        return result;
+        return pkg;
     }
 
     for (auto child : root.children()) {
@@ -511,31 +504,24 @@ static SacmParseResult parse_document(pugi::xml_document& doc) {
         }
     }
 
-    result.success = true;
-    return result;
+    return pkg;
 }
 
 } // namespace
 
-SacmParseResult parse_sacm(const std::string& file_path) {
-    SacmParseResult result;
+std::expected<AssuranceCasePackage, std::string> parse_sacm(const std::string& file_path) {
     pugi::xml_document doc;
     auto status = doc.load_file(file_path.c_str());
-    if (!status) {
-        result.error_message = "XML parse error: " + std::string(status.description());
-        return result;
-    }
+    if (!status)
+        return std::unexpected("XML parse error: " + std::string(status.description()));
     return parse_document(doc);
 }
 
-SacmParseResult parse_sacm_string(const std::string& xml_content) {
-    SacmParseResult result;
+std::expected<AssuranceCasePackage, std::string> parse_sacm_string(const std::string& xml_content) {
     pugi::xml_document doc;
     auto status = doc.load_string(xml_content.c_str());
-    if (!status) {
-        result.error_message = "XML parse error: " + std::string(status.description());
-        return result;
-    }
+    if (!status)
+        return std::unexpected("XML parse error: " + std::string(status.description()));
     return parse_document(doc);
 }
 

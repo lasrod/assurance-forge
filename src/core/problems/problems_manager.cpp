@@ -22,10 +22,7 @@ void ProblemsManager::AddOrUpdateProblem(const ProblemItem& problem) {
 }
 
 void ProblemsManager::RemoveProblem(const std::string& problem_id) {
-    problems_.erase(std::remove_if(problems_.begin(),
-                                   problems_.end(),
-                                   [&](const ProblemItem& problem) { return problem.id == problem_id; }),
-                    problems_.end());
+    std::erase_if(problems_, [&](const ProblemItem& problem) { return problem.id == problem_id; });
 }
 
 void ProblemsManager::ClearProblems() {
@@ -33,26 +30,17 @@ void ProblemsManager::ClearProblems() {
 }
 
 void ProblemsManager::ClearProblemsBySource(ProblemSource source) {
-    problems_.erase(std::remove_if(problems_.begin(),
-                                   problems_.end(),
-                                   [&](const ProblemItem& problem) { return problem.source == source; }),
-                    problems_.end());
+    std::erase_if(problems_, [&](const ProblemItem& problem) { return problem.source == source; });
 }
 
 void ProblemsManager::ClearProblemsForElement(const std::string& element_id) {
-    problems_.erase(std::remove_if(problems_.begin(),
-                                   problems_.end(),
-                                   [&](const ProblemItem& problem) { return problem.element_id == element_id; }),
-                    problems_.end());
+    std::erase_if(problems_, [&](const ProblemItem& problem) { return problem.element_id == element_id; });
 }
 
 void ProblemsManager::ClearProblemsForElementAndSource(const std::string& element_id, ProblemSource source) {
-    problems_.erase(std::remove_if(problems_.begin(),
-                                   problems_.end(),
-                                   [&](const ProblemItem& problem) {
-                                       return problem.element_id == element_id && problem.source == source;
-                                   }),
-                    problems_.end());
+    std::erase_if(problems_, [&](const ProblemItem& problem) {
+        return problem.element_id == element_id && problem.source == source;
+    });
 }
 
 const std::vector<ProblemItem>& ProblemsManager::GetProblems() const {

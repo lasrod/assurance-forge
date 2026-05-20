@@ -330,11 +330,10 @@ bool ValidateConsistency(const GuidelinesDocument& document, std::string& error)
 } // namespace
 
 GuidelinesParseResult SccgDistParser::ParseDirectory(const std::filesystem::path& dist_dir) {
-    GuidelinesParseResult result;
     std::error_code filesystem_error;
-    if (!std::filesystem::exists(dist_dir, filesystem_error) || !std::filesystem::is_directory(dist_dir, filesystem_error)) {
-        result.error_message = "SCCG dist directory was not found: " + dist_dir.string();
-        return result;
+    if (!std::filesystem::exists(dist_dir, filesystem_error) ||
+        !std::filesystem::is_directory(dist_dir, filesystem_error)) {
+        return std::unexpected("SCCG dist directory was not found: " + dist_dir.string());
     }
 
     const std::filesystem::path review_profiles_path = dist_dir / "review_profiles.json";
@@ -345,23 +344,22 @@ GuidelinesParseResult SccgDistParser::ParseDirectory(const std::filesystem::path
 
     for (const std::filesystem::path& required_path : {review_profiles_path, data_packages_path, rules_path}) {
         if (!std::filesystem::exists(required_path, filesystem_error)) {
-            result.error_message = "SCCG runtime artifact missing: " + required_path.filename().string() + " in " + dist_dir.string();
-            return result;
+            return std::unexpected("SCCG runtime artifact missing: " + required_path.filename().string() + " in " +
+                                   dist_dir.string());
         }
     }
 
+    GuidelinesDocument document;
     std::string error;
-    if (!ParseRulesJsonl(rules_path, result.document, error) ||
-        !ParseReviewProfiles(review_profiles_path, result.document, error) ||
-        !ParseDataPackages(data_packages_path, result.document, error) ||
-        !ParsePrechecks(dist_dir / "prechecks.json", result.document, error) ||
-        !ValidateConsistency(result.document, error)) {
-        result.error_message = error;
-        return result;
+    if (!ParseRulesJsonl(rules_path, document, error) ||
+        !ParseReviewProfiles(review_profiles_path, document, error) ||
+        !ParseDataPackages(data_packages_path, document, error) ||
+        !ParsePrechecks(dist_dir / "prechecks.json", document, error) ||
+        !ValidateConsistency(document, error)) {
+        return std::unexpected(std::move(error));
     }
 
-    result.success = true;
-    return result;
+    return document;
 }
 
 } // namespace parser

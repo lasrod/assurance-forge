@@ -74,7 +74,7 @@ TEST(ProjectServiceTest, CreateEmptyProjectCreatesRequiredStructureAndManifest) 
     EXPECT_TRUE(std::filesystem::is_directory(root / ".af" / "history"));
     EXPECT_TRUE(std::filesystem::exists(root / "arguments" / "main.sacm"));
     EXPECT_TRUE(std::filesystem::exists(root / "reviews" / "review-items.af.json"));
-    EXPECT_TRUE(parser::parse_sacm_xml((root / "arguments" / "main.sacm").string()).success);
+    EXPECT_TRUE(parser::parse_sacm_xml((root / "arguments" / "main.sacm").string()).has_value());
     EXPECT_TRUE(ContainsFileWithRole(project, "arguments/main.sacm", core::ProjectFileRole::SacmArgument));
     EXPECT_TRUE(ContainsFileWithRole(project, "reviews/review-items.af.json", core::ProjectFileRole::ReviewItems));
     EXPECT_FALSE(report.steps.empty());
@@ -98,7 +98,7 @@ TEST(ProjectServiceTest, AddProjectFilesNormalizesNamesAndTracksManifestEntries)
     ASSERT_TRUE(core::ProjectService::AddSacmFile(project, "safety-core", entry, error)) << error;
     EXPECT_EQ(entry.relativePath.generic_string(), "arguments/safety-core.sacm");
     EXPECT_TRUE(std::filesystem::exists(project.rootPath / entry.relativePath));
-    EXPECT_TRUE(parser::parse_sacm_xml((project.rootPath / entry.relativePath).string()).success);
+    EXPECT_TRUE(parser::parse_sacm_xml((project.rootPath / entry.relativePath).string()).has_value());
 
     ASSERT_TRUE(core::ProjectService::AddEvidenceRegister(project, "", entry, error)) << error;
     EXPECT_EQ(entry.relativePath.generic_string(), "registers/evidence-register.af.json");

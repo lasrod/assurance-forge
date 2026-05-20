@@ -118,37 +118,36 @@ void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model, const
 } // namespace
 
 bool AppState::load_file(const std::string& file_path) {
-    parser::ParseResult result = parser::parse_sacm_xml(file_path);
+    auto result = parser::parse_sacm_xml(file_path);
 
-    if (result.success) {
-        active_project_file_role = ProjectFileRole::Unknown;
-        active_project_file_path.clear();
-        loaded_file_path = std::filesystem::path(file_path);
-        has_unsaved_changes = false;
-        loaded_case = std::move(result.assurance_case);
-        ++case_revision;
-        status_message =
-            "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
-
-        // Also populate the SACM domain model for save support
-        auto sacm_result = sacm::parse_sacm(file_path);
-        if (sacm_result.success) {
-            sacm_package = std::move(sacm_result.package);
-            HideTerminologyArtifactReferences(loaded_case.value(), sacm_package.value());
-            RefreshVisibleTerminologyContextDisplay(loaded_case.value(), sacm_package.value());
-            status_message =
-                "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
-        }
-
-        return true;
-    } else {
+    if (!result) {
         loaded_file_path.clear();
         has_unsaved_changes = false;
         loaded_case.reset();
         sacm_package.reset();
-        status_message = "Error: " + result.error_message;
+        status_message = "Error: " + std::move(result.error());
         return false;
     }
+
+    active_project_file_role = ProjectFileRole::Unknown;
+    active_project_file_path.clear();
+    loaded_file_path = std::filesystem::path(file_path);
+    has_unsaved_changes = false;
+    loaded_case = std::move(*result);
+    ++case_revision;
+    status_message =
+        "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
+
+    // Also populate the SACM domain model for save support
+    if (auto sacm_result = sacm::parse_sacm(file_path)) {
+        sacm_package = std::move(*sacm_result);
+        HideTerminologyArtifactReferences(loaded_case.value(), sacm_package.value());
+        RefreshVisibleTerminologyContextDisplay(loaded_case.value(), sacm_package.value());
+        status_message =
+            "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
+    }
+
+    return true;
 }
 
 bool AppState::save_file(const std::string& file_path) {

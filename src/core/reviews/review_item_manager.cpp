@@ -117,24 +117,15 @@ bool ReviewItemManager::AddOrUpdateItem(ReviewItem item) {
 }
 
 bool ReviewItemManager::RemoveItem(const std::string& id) {
-    const auto old_size = items_.size();
-    items_.erase(std::remove_if(items_.begin(), items_.end(), [&](const ReviewItem& item) { return item.id == id; }),
-                 items_.end());
-    return items_.size() != old_size;
+    return std::erase_if(items_, [&](const ReviewItem& item) { return item.id == id; }) > 0;
 }
 
 size_t ReviewItemManager::RemoveItemsForElementSourceAndIdPrefix(const std::string& element_id,
                                                                  ReviewItemSource source,
                                                                  const std::string& id_prefix) {
-    const auto old_size = items_.size();
-    items_.erase(std::remove_if(items_.begin(),
-                                items_.end(),
-                                [&](const ReviewItem& item) {
-                                    return item.element_id == element_id && item.source == source &&
-                                           item.id.rfind(id_prefix, 0) == 0;
-                                }),
-                 items_.end());
-    return old_size - items_.size();
+    return std::erase_if(items_, [&](const ReviewItem& item) {
+        return item.element_id == element_id && item.source == source && item.id.rfind(id_prefix, 0) == 0;
+    });
 }
 
 bool ReviewItemManager::SetProposal(const std::string& review_item_id, const std::string& proposal_id) {

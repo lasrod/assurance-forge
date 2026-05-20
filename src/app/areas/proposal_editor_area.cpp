@@ -79,12 +79,9 @@ void UpsertElementUpdate(core::reviews::ReviewProposal& proposal,
                          const std::string& field,
                          const std::string& old_value,
                          const std::string& new_value) {
-    proposal.operations.erase(std::remove_if(proposal.operations.begin(),
-                                             proposal.operations.end(),
-                                             [&](const core::reviews::PatchOperation& operation) {
-                                                 return IsUpdateForElement(operation, type, ref, field);
-                                             }),
-                              proposal.operations.end());
+    std::erase_if(proposal.operations, [&](const core::reviews::PatchOperation& operation) {
+        return IsUpdateForElement(operation, type, ref, field);
+    });
 
     if (old_value == new_value)
         return;

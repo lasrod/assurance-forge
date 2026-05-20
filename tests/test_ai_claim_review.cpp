@@ -189,7 +189,7 @@ TEST(AiClaimReviewTest, PreservesFindingWithResponseGuidelineIdThatWasNotProvide
 
     ai::AiReviewParseResult parsed = ai::ParseAiReviewResponse(response, "G1", std::vector<std::string>{"CL.1"});
 
-    ASSERT_TRUE(parsed.success) << parsed.errorMessage;
+    ASSERT_TRUE(parsed.errorMessage.empty()) << parsed.errorMessage;
     ASSERT_EQ(parsed.problems.size(), 1u);
     EXPECT_TRUE(parsed.problems[0].guideline_id.empty());
     EXPECT_NE(parsed.problems[0].message.find("Unknown SCCG rule reference: CL.9"), std::string::npos);
@@ -219,7 +219,7 @@ TEST(AiClaimReviewTest, ParsesFencedJsonAndMapsFindingsToProblems) {
 
     ai::ParsedAiReviewResponse parsed = ai::ParseAiReviewResponse(response, "G1", "GSN Goal / SACM Claim");
 
-    ASSERT_TRUE(parsed.success) << parsed.errorMessage;
+    ASSERT_TRUE(parsed.errorMessage.empty()) << parsed.errorMessage;
     ASSERT_EQ(parsed.problems.size(), 1u);
     ASSERT_EQ(parsed.suggestedElementTexts.size(), 1u);
     EXPECT_EQ(parsed.problems[0].id, "ai-review:G1:CL.2:1");
@@ -253,7 +253,7 @@ TEST(AiClaimReviewTest, ParsesGenericSuggestedElementText) {
     ai::ParsedAiReviewResponse parsed =
         ai::ParseAiReviewResponse(response, "S1", "GSN Strategy / SACM ArgumentReasoning");
 
-    ASSERT_TRUE(parsed.success) << parsed.errorMessage;
+    ASSERT_TRUE(parsed.errorMessage.empty()) << parsed.errorMessage;
     ASSERT_EQ(parsed.suggestedElementTexts.size(), 1u);
     EXPECT_EQ(parsed.suggestedElementTexts[0],
               "Argument by credible hazard class, covering blade contact, electrical, thermal, mechanical, "
@@ -266,6 +266,6 @@ TEST(AiClaimReviewTest, ReportsMissingFindingsArray) {
     ai::ParsedAiReviewResponse parsed =
         ai::ParseAiReviewResponse(R"({"reviewed_element_id":"G1"})", "G1", "GSN Goal / SACM Claim");
 
-    EXPECT_FALSE(parsed.success);
+    EXPECT_FALSE(parsed.errorMessage.empty());
     EXPECT_NE(parsed.errorMessage.find("findings"), std::string::npos);
 }

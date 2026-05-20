@@ -162,10 +162,7 @@ public:
     }
 
     void Unsubscribe(SubscriptionId id) {
-        listeners_.erase(std::remove_if(listeners_.begin(),
-                                        listeners_.end(),
-                                        [id](const Subscription& listener) { return listener.id == id; }),
-                         listeners_.end());
+        std::erase_if(listeners_, [id](const Subscription& listener) { return listener.id == id; });
     }
 
     template <typename EventT>

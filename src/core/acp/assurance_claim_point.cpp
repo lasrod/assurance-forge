@@ -191,12 +191,8 @@ void UpsertAcpTags(sacm::SacmElement& element, const Acp& acp) {
 }
 
 bool RemoveAcpTags(sacm::SacmElement& element, const std::string& acp_id) {
-    const auto original_size = element.taggedValues.size();
-    element.taggedValues.erase(std::remove_if(element.taggedValues.begin(),
-                                              element.taggedValues.end(),
-                                              [&](const sacm::TaggedValue& tag) { return IsAcpTagForId(tag, acp_id); }),
-                               element.taggedValues.end());
-    return element.taggedValues.size() != original_size;
+    return std::erase_if(element.taggedValues,
+                         [&](const sacm::TaggedValue& tag) { return IsAcpTagForId(tag, acp_id); }) > 0;
 }
 
 bool IsConfidenceArgumentPackage(const sacm::ArgumentPackage& package) {

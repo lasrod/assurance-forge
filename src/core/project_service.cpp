@@ -191,15 +191,18 @@ bool AddTrackedFile(AssuranceProject& project,
         return false;
     }
 
-    if (!WriteTextFile(absolute_path, content, error))
+    if (auto r = WriteTextFile(absolute_path, content); !r) {
+        error = std::move(r.error());
         return false;
+    }
 
     ProjectFileEntry new_entry;
     new_entry.id = GenerateId("af-file");
     new_entry.relativePath = relative_path;
     new_entry.role = role;
     new_entry.hashAlgorithm = "sha256";
-    if (!RefreshEntryHashes(project, new_entry, false, error)) {
+    if (auto r = RefreshEntryHashes(project, new_entry, false); !r) {
+        error = std::move(r.error());
         std::filesystem::remove(absolute_path, ec);
         return false;
     }
@@ -292,15 +295,16 @@ bool ProjectService::OpenProject(const std::filesystem::path& project_or_manifes
     }
 
     report = ProjectLoadReport{};
-    std::string manifest_text = ReadTextFile(manifest, error);
-    if (!error.empty()) {
+    auto manifest_text = ReadTextFile(manifest);
+    if (!manifest_text) {
+        error = std::move(manifest_text.error());
         AddStep(report, "Load af.proj", ProjectLoadStepStatus::Failed, error);
         report.showPopup = true;
         return false;
     }
 
     AssuranceProject loaded;
-    if (!ParseManifest(manifest_text, manifest.parent_path(), loaded, error)) {
+    if (!ParseManifest(*manifest_text, manifest.parent_path(), loaded, error)) {
         AddStep(report, "Load af.proj", ProjectLoadStepStatus::Failed, error);
         report.showPopup = true;
         return false;
@@ -373,8 +377,10 @@ bool ProjectService::SaveReviewItemsFile(AssuranceProject& project,
         error = "Could not create project directory: " + absolute_path.parent_path().string();
         return false;
     }
-    if (!WriteTextFile(absolute_path, content, error))
+    if (auto r = WriteTextFile(absolute_path, content); !r) {
+        error = std::move(r.error());
         return false;
+    }
 
     if (found == project.files.end()) {
         ProjectFileEntry new_entry;
@@ -382,14 +388,17 @@ bool ProjectService::SaveReviewItemsFile(AssuranceProject& project,
         new_entry.relativePath = relative_path;
         new_entry.role = ProjectFileRole::ReviewItems;
         new_entry.hashAlgorithm = "sha256";
-        if (!RefreshEntryHashes(project, new_entry, false, error))
+        if (auto r = RefreshEntryHashes(project, new_entry, false); !r) {
+            error = std::move(r.error());
             return false;
+        }
         project.files.push_back(new_entry);
         found = project.files.end() - 1;
     } else if (found->role != ProjectFileRole::ReviewItems) {
         error = "Tracked file is not a review item file: " + relative_path.generic_string();
         return false;
-    } else if (!RefreshEntryHashes(project, *found, false, error)) {
+    } else if (auto r = RefreshEntryHashes(project, *found, false); !r) {
+        error = std::move(r.error());
         return false;
     }
 
@@ -438,11 +447,15 @@ bool ProjectService::SaveReviewProposalFile(AssuranceProject& project,
     }
 
     const std::filesystem::path absolute_path = project.rootPath / relative_path;
-    if (!WriteTextFile(absolute_path, content, error))
+    if (auto r = WriteTextFile(absolute_path, content); !r) {
+        error = std::move(r.error());
         return false;
+    }
 
-    if (!RefreshEntryHashes(project, *found, false, error))
+    if (auto r = RefreshEntryHashes(project, *found, false); !r) {
+        error = std::move(r.error());
         return false;
+    }
     project.modifiedUtc = NowUtc();
     if (!WriteManifestSafely(project, error))
         return false;
@@ -471,8 +484,10 @@ bool ProjectService::SaveConfidenceFile(AssuranceProject& project,
         error = "Could not create project directory: " + absolute_path.parent_path().string();
         return false;
     }
-    if (!WriteTextFile(absolute_path, content, error))
+    if (auto r = WriteTextFile(absolute_path, content); !r) {
+        error = std::move(r.error());
         return false;
+    }
 
     if (found == project.files.end()) {
         ProjectFileEntry new_entry;
@@ -480,14 +495,17 @@ bool ProjectService::SaveConfidenceFile(AssuranceProject& project,
         new_entry.relativePath = relative_path;
         new_entry.role = ProjectFileRole::ConfidenceAssessments;
         new_entry.hashAlgorithm = "sha256";
-        if (!RefreshEntryHashes(project, new_entry, false, error))
+        if (auto r = RefreshEntryHashes(project, new_entry, false); !r) {
+            error = std::move(r.error());
             return false;
+        }
         project.files.push_back(new_entry);
         found = project.files.end() - 1;
     } else if (found->role != ProjectFileRole::ConfidenceAssessments) {
         error = "Tracked file is not a confidence assessment file: " + relative_path.generic_string();
         return false;
-    } else if (!RefreshEntryHashes(project, *found, false, error)) {
+    } else if (auto r = RefreshEntryHashes(project, *found, false); !r) {
+        error = std::move(r.error());
         return false;
     }
 
@@ -543,7 +561,8 @@ bool ProjectService::TrackExistingFile(AssuranceProject& project,
         previous_entry = *found;
     }
 
-    if (!RefreshEntryHashes(project, *found, false, error)) {
+    if (auto r = RefreshEntryHashes(project, *found, false); !r) {
+        error = std::move(r.error());
         if (new_entry)
             project.files.pop_back();
         else
@@ -621,8 +640,10 @@ bool ProjectService::WriteManifestSafely(const AssuranceProject& project, std::s
         return false;
     }
 
-    if (!WriteTextFile(temp_manifest, content, error))
+    if (auto r = WriteTextFile(temp_manifest, content); !r) {
+        error = std::move(r.error());
         return false;
+    }
 
     std::error_code ec;
     if (std::filesystem::exists(manifest, ec)) {
@@ -671,10 +692,9 @@ ProjectLoadReport ProjectService::RefreshFileStatus(AssuranceProject& project) {
 
     for (auto& entry : project.files) {
         std::string previous_raw_hash = entry.rawHash;
-        std::string error;
-        if (!RefreshEntryHashes(project, entry, true, error)) {
+        if (auto r = RefreshEntryHashes(project, entry, true); !r) {
             raw_hashes_ok = false;
-            entry.lastError = error;
+            entry.lastError = std::move(r.error());
         }
         if (entry.state == ProjectFileState::Missing) {
             ++missing_count;

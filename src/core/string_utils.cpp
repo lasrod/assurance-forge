@@ -36,4 +36,9 @@ std::string NormalizeRef(std::string value) {
     return StripLeadingHash(TrimWhitespace(value));
 }
 
+std::string PathToUtf8(const std::filesystem::path& path) {
+    auto u8 = path.u8string();
+    return std::string(reinterpret_cast<const char*>(u8.data()), u8.size());
+}
+
 } // namespace core

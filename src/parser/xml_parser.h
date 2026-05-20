@@ -9,6 +9,7 @@
 
 #include "core/sacm_model.h"
 
+#include <expected>
 #include <string>
 
 namespace parser {
@@ -16,17 +17,10 @@ namespace parser {
 // SacmElement, AcpRecord, AssuranceCase are declared in core::sacm_model.h
 // and exposed under `namespace parser` via transitional aliases there.
 
-// Result of parsing operation
-struct ParseResult {
-    bool success = false;
-    std::string error_message;
-    AssuranceCase assurance_case;
-};
+// Parses a SACM XML file. Returns the parsed case on success; the error string on failure.
+std::expected<AssuranceCase, std::string> parse_sacm_xml(const std::string& file_path);
 
-// Parses a SACM XML file and returns the result
-ParseResult parse_sacm_xml(const std::string& file_path);
-
-// Parses SACM XML from a string buffer
-ParseResult parse_sacm_xml_string(const std::string& xml_content);
+// Parses SACM XML from a string buffer.
+std::expected<AssuranceCase, std::string> parse_sacm_xml_string(const std::string& xml_content);
 
 } // namespace parser
