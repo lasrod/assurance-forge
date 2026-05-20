@@ -54,7 +54,8 @@ RecentProjectEntry MakeRecentProjectEntry(const core::AppState& app_state) {
 
     const core::AssuranceProject& project = app_state.current_project.value();
     entry.name = project.name;
-    entry.path = core::ProjectService::ManifestPath(project).u8string();
+    auto u8 = core::ProjectService::ManifestPath(project).u8string();
+    entry.path = std::string(reinterpret_cast<const char*>(u8.data()), u8.size());
 
     if (!app_state.loaded_case.has_value())
         return entry;

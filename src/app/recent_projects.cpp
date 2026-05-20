@@ -12,6 +12,12 @@
 namespace app {
 namespace {
 
+// path::u8string() returns std::u8string in C++20+; reinterpret to std::string (same bytes).
+std::string PathToUtf8(const std::filesystem::path& p) {
+    auto u8 = p.u8string();
+    return std::string(reinterpret_cast<const char*>(u8.data()), u8.size());
+}
+
 std::string RecentProjectKey(const std::string& path) {
     std::string key = NormalizeRecentProjectPath(path);
 #ifdef _WIN32
@@ -25,7 +31,7 @@ std::string DefaultProjectNameForPath(const std::string& path) {
     if (manifest_path.has_parent_path()) {
         std::filesystem::path project_folder = manifest_path.parent_path().filename();
         if (!project_folder.empty())
-            return project_folder.u8string();
+            return PathToUtf8(project_folder);
     }
     return path;
 }
@@ -91,7 +97,7 @@ std::string NormalizeRecentProjectPath(const std::string& path) {
     if (ec || normalized.empty()) {
         normalized = raw_path;
     }
-    return normalized.lexically_normal().u8string();
+    return PathToUtf8(normalized.lexically_normal());
 }
 
 std::vector<RecentProjectEntry> LoadRecentProjectsPreference(const std::string& content) {

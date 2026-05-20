@@ -86,7 +86,7 @@ Lower layers should not depend on higher layers. In particular, `core`, `parser`
 
 ### C++ Readability
 
-Assurance Forge uses C++17 with the standard library. Keep modern C++ usage conservative and readable in a browser-based code review.
+Assurance Forge uses C++23 with the standard library. Keep modern C++ usage conservative and readable in a browser-based code review.
 
 - Prefer explicit types over `auto` unless the type is noisy, repeated, or impractical to spell.
 - Prefer named helper functions over lambdas when the logic is reused or non-trivial.

@@ -56,7 +56,7 @@ Releases are currently Windows x64 only. To build on other platforms, see [Build
 
 - Windows 10/11, Linux, or macOS
 - [CMake](https://cmake.org/) 3.20 or newer
-- A C++17 compiler, such as Visual Studio 2022, GCC, or Clang
+- A C++23 compiler, such as Visual Studio 2022 (17.8+), GCC 14+, or Clang 17+
 - [Git](https://git-scm.com/download/win)
 
 The application uses `hello_imgui` with GLFW/OpenGL as its UI backend and Native File Dialog Extended for OS-native file and folder pickers.

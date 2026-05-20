@@ -13,6 +13,12 @@
 namespace app::dialogs {
 namespace {
 
+// path::u8string() returns std::u8string in C++20+; reinterpret to std::string (same bytes).
+std::string PathToUtf8(const std::filesystem::path& p) {
+    auto u8 = p.u8string();
+    return std::string(reinterpret_cast<const char*>(u8.data()), u8.size());
+}
+
 std::string AbsoluteFolderForDialog(const std::filesystem::path& path) {
     std::error_code ec;
     std::filesystem::path absolute_path = std::filesystem::weakly_canonical(path, ec);
@@ -21,8 +27,8 @@ std::string AbsoluteFolderForDialog(const std::filesystem::path& path) {
         absolute_path = std::filesystem::absolute(path, ec);
     }
     if (ec || absolute_path.empty())
-        return path.u8string();
-    return absolute_path.u8string();
+        return PathToUtf8(path);
+    return PathToUtf8(absolute_path);
 }
 
 std::string ExistingFolderForDialog(const std::string& raw_path) {
