@@ -426,12 +426,14 @@ bool AppRuntime::RemoveProjectFile(const core::ProjectFileEntry& entry) {
         return false;
     }
 
+    const core::ProjectFileRole role = entry.role;
+    const std::filesystem::path relative_path = entry.relativePath;
     core::AssuranceProject& project = impl_->app_state.current_project.value();
     std::string error;
     bool removed = false;
 
-    if (entry.role == core::ProjectFileRole::ReviewProposal) {
-        std::string proposal_id = entry.relativePath.filename().generic_string();
+    if (role == core::ProjectFileRole::ReviewProposal) {
+        std::string proposal_id = relative_path.filename().generic_string();
         const std::string suffix = ".afpatch.json";
         if (proposal_id.size() >= suffix.size() &&
             proposal_id.compare(proposal_id.size() - suffix.size(), suffix.size(), suffix) == 0) {
@@ -440,8 +442,8 @@ bool AppRuntime::RemoveProjectFile(const core::ProjectFileEntry& entry) {
         removed = DeleteProposalPatchFile(proposal_id, error);
         if (removed)
             CloseProposalPreviewIfOpen(proposal_id);
-    } else if (entry.role == core::ProjectFileRole::ExportedReport) {
-        removed = core::ProjectService::RemoveTrackedFile(project, entry.relativePath, true, error);
+    } else if (role == core::ProjectFileRole::ExportedReport) {
+        removed = core::ProjectService::RemoveTrackedFile(project, relative_path, true, error);
     } else {
         SetStatus("Removing this file type is not supported here.");
         return false;
@@ -455,7 +457,7 @@ bool AppRuntime::RemoveProjectFile(const core::ProjectFileEntry& entry) {
     impl_->events.Emit(DocumentDirtyEvent{});
     impl_->events.Emit(ProjectFilesChangedEvent{});
     core::ProjectService::RefreshFileStatus(project);
-    SetStatus("Removed " + entry.relativePath.generic_string() + ".");
+    SetStatus("Removed " + relative_path.generic_string() + ".");
     return true;
 }
 

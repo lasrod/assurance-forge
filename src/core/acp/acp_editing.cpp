@@ -170,13 +170,6 @@ const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model,
     return found == model.elements.end() ? nullptr : &*found;
 }
 
-parser::SacmElement* FindParserElement(parser::AssuranceCase& model, const std::string& element_id) {
-    auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
-        return element.id == element_id;
-    });
-    return found == model.elements.end() ? nullptr : &*found;
-}
-
 bool ElementEligibleForAcp(const parser::AssuranceCase& model, const std::string& element_id) {
     const parser::SacmElement* element = FindParserElement(model, element_id);
     return element && element->type == "artifactreference";
@@ -412,21 +405,6 @@ void UpdateTreeConfidenceNames(sacm::AssuranceCasePackage* package, const parser
         top_goal->name = native_name;
         top_goal->name_ml.set("en", native_name);
     }
-}
-
-void UpsertParserClaimProjection(parser::AssuranceCase& model, const sacm::Claim& claim) {
-    parser::SacmElement* existing = FindParserElement(model, claim.id);
-    if (!existing) {
-        parser::SacmElement element;
-        element.id = claim.id;
-        element.type = "claim";
-        existing = &model.elements.emplace_back(std::move(element));
-    }
-    existing->name = claim.name;
-    existing->content = claim.content;
-    existing->assertion_declaration = claim.assertionDeclaration;
-    existing->name_langs["en"] = claim.name;
-    existing->content_langs["en"] = claim.content;
 }
 
 parser::AcpRecord

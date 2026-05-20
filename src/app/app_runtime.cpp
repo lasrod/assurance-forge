@@ -86,15 +86,16 @@ void CollectConfidencePackageElementIdentities(const sacm::AssuranceCasePackage&
     }
 }
 
-parser::AssuranceCase FilterConfidencePackageElementsFromMainTree(const parser::AssuranceCase& source,
-                                                                  const sacm::AssuranceCasePackage* package) {
+std::optional<parser::AssuranceCase> FilterConfidencePackageElementsFromMainTree(
+    const parser::AssuranceCase& source,
+    const sacm::AssuranceCasePackage* package) {
     if (!package)
-        return source;
+        return std::nullopt;
     std::unordered_set<std::string> hidden_ids;
     std::unordered_set<std::string> hidden_gids;
     CollectConfidencePackageElementIdentities(*package, hidden_ids, hidden_gids);
     if (hidden_ids.empty() && hidden_gids.empty())
-        return source;
+        return std::nullopt;
 
     parser::AssuranceCase filtered;
     filtered.id = source.id;
@@ -109,6 +110,8 @@ parser::AssuranceCase FilterConfidencePackageElementsFromMainTree(const parser::
         filtered.elements.push_back(element);
     }
     filtered.acps = source.acps;
+    if (filtered.elements.size() == source.elements.size())
+        return std::nullopt;
     return filtered;
 }
 
@@ -408,8 +411,8 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     const auto& ac = impl_->app_state.loaded_case.value();
     const sacm::AssuranceCasePackage* sacm_package =
         impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
-    const parser::AssuranceCase filtered_case = FilterConfidencePackageElementsFromMainTree(ac, sacm_package);
-    impl_->current_tree = ui::gsn::BuildAssuranceTree(filtered_case);
+    const std::optional<parser::AssuranceCase> filtered_case = FilterConfidencePackageElementsFromMainTree(ac, sacm_package);
+    impl_->current_tree = ui::gsn::BuildAssuranceTree(filtered_case ? *filtered_case : ac);
     core::ApplyTreeDisplayOrder(impl_->current_tree, impl_->tree_display_order);
     impl_->tree_edit_index = core::BuildTreeEditIndex(ac);
     impl_->tree_edit_index_valid = true;

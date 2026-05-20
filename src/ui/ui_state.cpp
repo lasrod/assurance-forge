@@ -45,9 +45,9 @@ void BeginAiReviewSpinner(UiState& ui_state,
         return;
     ui_state.ai_review_running_element_ids.insert(element_id);
     // Only the first concurrent review owns the scope/primary anchor. A
-    // secondary spinner (no scope provided) joins the running set without
+    // secondary spinner joins the running set without
     // displacing the existing primary element or its scope highlight.
-    if (!review_scope_element_ids.empty()) {
+    if (ui_state.ai_review_primary_element_id.empty() && !review_scope_element_ids.empty()) {
         ui_state.ai_review_scope_element_ids = std::move(review_scope_element_ids);
         ui_state.ai_review_primary_element_id = element_id;
     } else if (ui_state.ai_review_primary_element_id.empty()) {

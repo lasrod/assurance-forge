@@ -48,6 +48,20 @@ TEST(UiStateAiSpinnerTest, BeginWithoutScopeDoesNotOverridePrimary) {
     EXPECT_TRUE(state.ai_review_running_element_ids.count("claim-2") > 0);
 }
 
+TEST(UiStateAiSpinnerTest, BeginWithScopeDoesNotOverridePrimary) {
+    ui::UiState state;
+
+    ui::BeginAiReviewSpinner(state, "claim-1", {"claim-1", "claim-2"});
+    ui::BeginAiReviewSpinner(state, "claim-3", {"claim-3", "claim-4"});
+
+    EXPECT_EQ(state.ai_review_primary_element_id, "claim-1");
+    EXPECT_TRUE(state.ai_review_running_element_ids.count("claim-3") > 0);
+    EXPECT_TRUE(state.ai_review_scope_element_ids.count("claim-1") > 0);
+    EXPECT_TRUE(state.ai_review_scope_element_ids.count("claim-2") > 0);
+    EXPECT_FALSE(state.ai_review_scope_element_ids.count("claim-3") > 0);
+    EXPECT_FALSE(state.ai_review_scope_element_ids.count("claim-4") > 0);
+}
+
 TEST(UiStateFocusProblemTest, SetsFocusFlagsAndProblemSelection) {
     ui::UiState state;
 
