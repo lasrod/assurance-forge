@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdio>
 #include <ctime>
+#include <format>
 #include <filesystem>
 #include <fstream>
 #include <imgui.h>
@@ -346,16 +347,14 @@ void DrawFrameTimeGraph(const FrameTimeHistory& h, float avg_ms, float spike_thr
         // Because the bands are stacked top-to-bottom, the labels can never
         // collide regardless of how compressed the upper portion of the
         // axis becomes at very low FPS.
-        char buf[16];
-        float label_w;
         if (show_60) {
-            std::snprintf(buf, sizeof(buf), "60 FPS");
-            label_w = ImGui::CalcTextSize(buf).x;
-            dl->AddText(ImVec2(p1.x - label_w - 8.0f, y_60 + 2.0f), ui::WithAlpha(th.warning, 0.9f), buf);
+            const char* label_60 = "60 FPS";
+            const float w_60 = ImGui::CalcTextSize(label_60).x;
+            dl->AddText(ImVec2(p1.x - w_60 - 8.0f, y_60 + 2.0f), ui::WithAlpha(th.warning, 0.9f), label_60);
         }
-        std::snprintf(buf, sizeof(buf), "30 FPS");
-        label_w = ImGui::CalcTextSize(buf).x;
-        dl->AddText(ImVec2(p1.x - label_w - 8.0f, y_30 + 2.0f), ui::WithAlpha(th.danger, 0.9f), buf);
+        const char* label_30 = "30 FPS";
+        const float w_30 = ImGui::CalcTextSize(label_30).x;
+        dl->AddText(ImVec2(p1.x - w_30 - 8.0f, y_30 + 2.0f), ui::WithAlpha(th.danger, 0.9f), label_30);
     };
 
     if (h.filled < 2) {
@@ -522,9 +521,9 @@ void DrawSubsystemStackedBar(const std::array<SubsystemAccum, static_cast<size_t
     float row_max_h = chip_h;
 
     for (const auto& v : views) {
-        char label[96];
-        std::snprintf(label, sizeof(label), "%s  %.2f ms", SubsystemLabel(v.id), static_cast<float>(v.ns) / 1.0e6f);
-        const float lbl_w = ImGui::CalcTextSize(label).x;
+        const std::string label =
+            std::format("{}  {:.2f} ms", SubsystemLabel(v.id), static_cast<float>(v.ns) / 1.0e6f);
+        const float lbl_w = ImGui::CalcTextSize(label.c_str()).x;
         const float dot_r = 4.0f;
         const float chip_w = chip_pad_x + dot_r * 2.0f + 6.0f + lbl_w + chip_pad_x;
         if (row_x + chip_w > row_right) {
@@ -537,7 +536,7 @@ void DrawSubsystemStackedBar(const std::array<SubsystemAccum, static_cast<size_t
         dl2->AddRectFilled(c0, c1, th.surface_2, 10.0f);
         dl2->AddRect(c0, c1, th.border, 10.0f);
         dl2->AddCircleFilled(ImVec2(c0.x + chip_pad_x + dot_r, c0.y + chip_h * 0.5f), dot_r, SubsystemColor(v.id));
-        dl2->AddText(ImVec2(c0.x + chip_pad_x + dot_r * 2.0f + 6.0f, c0.y + chip_pad_y), th.text_secondary, label);
+        dl2->AddText(ImVec2(c0.x + chip_pad_x + dot_r * 2.0f + 6.0f, c0.y + chip_pad_y), th.text_secondary, label.c_str());
         row_x += chip_w + chip_spacing;
     }
     ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvail().x, row_max_h + 2.0f));
@@ -638,12 +637,9 @@ void DrawTreeNodeRow(const BucketNode& node, std::uint64_t frame_total_ns, int d
         frame_total_ns > 0 ? static_cast<float>(node.total_ns) / static_cast<float>(frame_total_ns) : 0.0f;
     const float ms = static_cast<float>(node.total_ns) / 1.0e6f;
 
-    char header[128];
-    if (node.is_leaf && node.children.empty()) {
-        std::snprintf(header, sizeof(header), "%s", node.segment.c_str());
-    } else {
-        std::snprintf(header, sizeof(header), "%s  (%.2f ms)", node.segment.c_str(), ms);
-    }
+    const std::string header = (node.is_leaf && node.children.empty())
+                                    ? node.segment
+                                    : std::format("{}  ({:.2f} ms)", node.segment, ms);
 
     // Sort children by descending total_ns
     std::vector<const BucketNode*> sorted_children;
@@ -668,7 +664,7 @@ void DrawTreeNodeRow(const BucketNode& node, std::uint64_t frame_total_ns, int d
     // stable across frames as long as the profiler emits the same buckets.
     const std::string& id_path = node.full_name.empty() ? node.segment : node.full_name;
     ImGui::PushID(id_path.c_str());
-    bool open = ImGui::TreeNodeEx("##row", flags, "%s", header);
+    bool open = ImGui::TreeNodeEx("##row", flags, "%s", header.c_str());
     ImGui::PopID();
 
     // Numeric columns are anchored at fixed window-local positions to the
@@ -742,18 +738,15 @@ void DrawPill(const char* text, std::optional<ImU32> leading_dot_col = std::null
 }
 
 void DrawCounterChip(const char* label, int value) {
-    char buf[64];
-    std::snprintf(buf, sizeof(buf), "%s %d", label, value);
-    DrawPill(buf);
+    DrawPill(std::format("{} {}", label, value).c_str());
 }
 
 void DrawCullChip(const char* label, int drawn, int culled) {
     const int   total = drawn + culled;
     const float ratio = total > 0 ? static_cast<float>(culled) / static_cast<float>(total) : 0.0f;
-    char        buf[96];
-    std::snprintf(buf, sizeof(buf), "%s %d/%d  %.0f%% culled", label, drawn, total, ratio * 100.0f);
+    const std::string text = std::format("{} {}/{}  {:.0f}% culled", label, drawn, total, ratio * 100.0f);
     const ImU32 dot_col = ImGui::ColorConvertFloat4ToU32(ui::CullRatioColor(ratio));
-    DrawPill(buf, dot_col);
+    DrawPill(text.c_str(), dot_col);
 }
 
 // =====================================================================
@@ -770,65 +763,54 @@ std::string BuildReport(float total_ms,
                         const core::perf::PerfToggles& toggles) {
     std::string out;
     out.reserve(2048);
-    char buf[256];
 
-    std::snprintf(buf,
-                  sizeof(buf),
-                  "Performance snapshot\n"
-                  "FPS: %.1f  Frame: %.2f ms  (avg %.2f / max %.2f ms over history)\n\n",
-                  fps,
-                  total_ms,
-                  avg_ms,
-                  max_ms);
-    out += buf;
+    out += std::format("Performance snapshot\n"
+                       "FPS: {:.1f}  Frame: {:.2f} ms  (avg {:.2f} / max {:.2f} ms over history)\n\n",
+                       fps,
+                       total_ms,
+                       avg_ms,
+                       max_ms);
 
     out += "Profiler buckets (sorted by time):\n";
     out += "  Bucket                                        Time(ms)   %Frame   Hits\n";
     for (const auto& s : sorted_samples) {
         const float ms = static_cast<float>(s.total_ns) / 1.0e6f;
         const float pct = total_ns > 0 ? 100.0f * static_cast<float>(s.total_ns) / static_cast<float>(total_ns) : 0.0f;
-        std::snprintf(
-            buf, sizeof(buf), "  %-44s %8.3f %7.1f%% %6u\n", s.name ? s.name : "(null)", ms, pct, s.hit_count);
-        out += buf;
+        out += std::format(
+            "  {:<44} {:8.3f} {:7.1f}% {:6}\n", s.name ? s.name : "(null)", ms, pct, s.hit_count);
     }
 
     out += "\nCanvas render stats:\n";
-    std::snprintf(buf,
-                  sizeof(buf),
-                  "  nodes_drawn=%d nodes_culled=%d edges_drawn=%d edges_culled=%d\n"
-                  "  shadows=%d interior_shading=%d selection_glow=%d acp_decorators=%d\n"
-                  "  terminology_spans=%d terminology_tokens_scanned=%d clip_rect_pushes=%d\n"
-                  "  draw_list_vtx=%d draw_list_idx=%d draw_list_cmds=%d\n",
-                  stats.nodes_drawn,
-                  stats.nodes_culled,
-                  stats.edges_drawn,
-                  stats.edges_culled,
-                  stats.shadows_drawn,
-                  stats.interior_shading_drawn,
-                  stats.selection_glow_drawn,
-                  stats.acp_decorators_drawn,
-                  stats.terminology_spans_drawn,
-                  stats.terminology_tokens_scanned,
-                  stats.clip_rect_pushes,
-                  stats.draw_list_vtx,
-                  stats.draw_list_idx,
-                  stats.draw_list_cmds);
-    out += buf;
+    out += std::format("  nodes_drawn={} nodes_culled={} edges_drawn={} edges_culled={}\n"
+                       "  shadows={} interior_shading={} selection_glow={} acp_decorators={}\n"
+                       "  terminology_spans={} terminology_tokens_scanned={} clip_rect_pushes={}\n"
+                       "  draw_list_vtx={} draw_list_idx={} draw_list_cmds={}\n",
+                       stats.nodes_drawn,
+                       stats.nodes_culled,
+                       stats.edges_drawn,
+                       stats.edges_culled,
+                       stats.shadows_drawn,
+                       stats.interior_shading_drawn,
+                       stats.selection_glow_drawn,
+                       stats.acp_decorators_drawn,
+                       stats.terminology_spans_drawn,
+                       stats.terminology_tokens_scanned,
+                       stats.clip_rect_pushes,
+                       stats.draw_list_vtx,
+                       stats.draw_list_idx,
+                       stats.draw_list_cmds);
 
     out += "\nFeature toggles:\n";
-    std::snprintf(buf,
-                  sizeof(buf),
-                  "  node_shadows=%d node_interior_shading=%d selection_glow=%d\n"
-                  "  terminology_spans=%d acp_decorators=%d high_segment_circles=%d\n"
-                  "  freeze_acp_builds=%d\n",
-                  toggles.node_shadows,
-                  toggles.node_interior_shading,
-                  toggles.selection_glow,
-                  toggles.terminology_spans,
-                  toggles.acp_decorators,
-                  toggles.high_segment_circles,
-                  toggles.freeze_acp_builds);
-    out += buf;
+    out += std::format("  node_shadows={} node_interior_shading={} selection_glow={}\n"
+                       "  terminology_spans={} acp_decorators={} high_segment_circles={}\n"
+                       "  freeze_acp_builds={}\n",
+                       toggles.node_shadows,
+                       toggles.node_interior_shading,
+                       toggles.selection_glow,
+                       toggles.terminology_spans,
+                       toggles.acp_decorators,
+                       toggles.high_segment_circles,
+                       toggles.freeze_acp_builds);
 
     return out;
 }

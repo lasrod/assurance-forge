@@ -69,9 +69,9 @@ static std::string long_layout_label(const std::string& id) {
 }
 
 static AssuranceTree build_tree(const char* xml) {
-    ParseResult r = parse_sacm_xml_string(xml);
-    EXPECT_TRUE(r.success) << r.error_message;
-    return AssuranceTree::Build(r.assurance_case);
+    auto r = parse_sacm_xml_string(xml);
+    EXPECT_TRUE(r.has_value()) << (r ? "" : r.error());
+    return AssuranceTree::Build(*r);
 }
 
 // ----- Subtree width calculation -----

@@ -25,7 +25,7 @@ std::string DefaultProjectNameForPath(const std::string& path) {
     if (manifest_path.has_parent_path()) {
         std::filesystem::path project_folder = manifest_path.parent_path().filename();
         if (!project_folder.empty())
-            return project_folder.u8string();
+            return core::PathToUtf8(project_folder);
     }
     return path;
 }
@@ -91,7 +91,7 @@ std::string NormalizeRecentProjectPath(const std::string& path) {
     if (ec || normalized.empty()) {
         normalized = raw_path;
     }
-    return normalized.lexically_normal().u8string();
+    return core::PathToUtf8(normalized.lexically_normal());
 }
 
 std::vector<RecentProjectEntry> LoadRecentProjectsPreference(const std::string& content) {
@@ -140,11 +140,8 @@ void TouchRecentProject(std::vector<RecentProjectEntry>& recent_projects, Recent
         entry.name = DefaultProjectNameForPath(entry.path);
 
     const std::string key = RecentProjectKey(entry.path);
-    recent_projects.erase(
-        std::remove_if(recent_projects.begin(),
-                       recent_projects.end(),
-                       [&](const RecentProjectEntry& existing) { return RecentProjectKey(existing.path) == key; }),
-        recent_projects.end());
+    std::erase_if(recent_projects,
+                  [&](const RecentProjectEntry& existing) { return RecentProjectKey(existing.path) == key; });
     recent_projects.insert(recent_projects.begin(), std::move(entry));
 
     if (recent_projects.size() > kMaxRecentProjects) {
@@ -156,11 +153,8 @@ void RemoveRecentProject(std::vector<RecentProjectEntry>& recent_projects, const
     const std::string key = RecentProjectKey(path);
     if (key.empty())
         return;
-    recent_projects.erase(
-        std::remove_if(recent_projects.begin(),
-                       recent_projects.end(),
-                       [&](const RecentProjectEntry& existing) { return RecentProjectKey(existing.path) == key; }),
-        recent_projects.end());
+    std::erase_if(recent_projects,
+                  [&](const RecentProjectEntry& existing) { return RecentProjectKey(existing.path) == key; });
 }
 
 } // namespace app

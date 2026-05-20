@@ -1,5 +1,6 @@
 #pragma once
 
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -144,11 +145,7 @@ struct GuidelinesDocument {
     const GuidelineCategory* FindCategoryById(const std::string& category_id) const;
 };
 
-struct GuidelinesParseResult {
-    bool success = false;
-    std::string error_message;
-    GuidelinesDocument document;
-};
+using GuidelinesParseResult = std::expected<GuidelinesDocument, std::string>;
 
 class GuidelinesParser {
 public:

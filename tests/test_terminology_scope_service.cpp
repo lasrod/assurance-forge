@@ -175,12 +175,12 @@ TEST(TerminologyScopeService, ArgumentPackageTerminologyRoundTrips) {
     std::string xml = sacm::serialize_sacm(package);
     ASSERT_FALSE(xml.empty());
 
-    sacm::SacmParseResult parsed = sacm::parse_sacm_string(xml);
-    ASSERT_TRUE(parsed.success) << parsed.error_message;
-    ASSERT_EQ(parsed.package.argumentPackages.size(), 1u);
-    ASSERT_EQ(parsed.package.argumentPackages.front().terminologyPackages.size(), 1u);
+    auto parsed = sacm::parse_sacm_string(xml);
+    ASSERT_TRUE(parsed.has_value()) << (parsed ? "" : parsed.error());
+    ASSERT_EQ(parsed->argumentPackages.size(), 1u);
+    ASSERT_EQ(parsed->argumentPackages.front().terminologyPackages.size(), 1u);
     const sacm::TerminologyPackage& terminology_package =
-        parsed.package.argumentPackages.front().terminologyPackages.front();
+        parsed->argumentPackages.front().terminologyPackages.front();
     EXPECT_EQ(terminology_package.id, "TP_ARG");
     ASSERT_EQ(terminology_package.terms.size(), 1u);
     EXPECT_EQ(terminology_package.terms.front().id, "T_ARG");
@@ -330,13 +330,13 @@ TEST(TerminologyScopeService, TermContextAssociationSurvivesRoundTripAndResolves
                     .success);
 
     std::string xml = sacm::serialize_sacm(package);
-    sacm::SacmParseResult parsed = sacm::parse_sacm_string(xml);
-    ASSERT_TRUE(parsed.success) << parsed.error_message;
-    ASSERT_EQ(parsed.package.argumentPackages.size(), 1u);
-    EXPECT_EQ(parsed.package.argumentPackages.front().artifactReferences.size(), 1u);
-    EXPECT_EQ(parsed.package.argumentPackages.front().assertedContexts.size(), 1u);
+    auto parsed = sacm::parse_sacm_string(xml);
+    ASSERT_TRUE(parsed.has_value()) << (parsed ? "" : parsed.error());
+    ASSERT_EQ(parsed->argumentPackages.size(), 1u);
+    EXPECT_EQ(parsed->argumentPackages.front().artifactReferences.size(), 1u);
+    EXPECT_EQ(parsed->argumentPackages.front().assertedContexts.size(), 1u);
 
-    core::TerminologyService service(parsed.package);
+    core::TerminologyService service(*parsed);
     std::vector<core::TermOccurrence> occurrences = service.DetectTermsInText("G1", "The ODD is well defined.");
 
     ASSERT_EQ(occurrences.size(), 1u);

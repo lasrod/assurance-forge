@@ -17,15 +17,15 @@ TEST(XmlParserTest, ParseMinimalValidXml) {
     </argumentPackage>
 </sacm:AssuranceCasePackage>)";
 
-    ParseResult result = parse_sacm_xml_string(xml);
+    auto result = parse_sacm_xml_string(xml);
 
-    EXPECT_TRUE(result.success);
-    EXPECT_EQ(result.assurance_case.id, "TEST");
-    EXPECT_EQ(result.assurance_case.name, "Test Case");
-    EXPECT_EQ(result.assurance_case.description, "A test assurance case");
-    EXPECT_EQ(result.assurance_case.elements.size(), 1);
+    EXPECT_TRUE(result.has_value());
+    EXPECT_EQ(result.value().id, "TEST");
+    EXPECT_EQ(result.value().name, "Test Case");
+    EXPECT_EQ(result.value().description, "A test assurance case");
+    EXPECT_EQ(result.value().elements.size(), 1);
 
-    const auto& claim = result.assurance_case.elements[0];
+    const auto& claim = result.value().elements[0];
     EXPECT_EQ(claim.id, "G1");
     EXPECT_EQ(claim.gid, "gid-g1");
     EXPECT_EQ(claim.name, "Goal 1");
@@ -47,15 +47,15 @@ TEST(XmlParserTest, ParseMultipleElementTypes) {
     </argumentPackage>
 </sacm:AssuranceCasePackage>)";
 
-    ParseResult result = parse_sacm_xml_string(xml);
+    auto result = parse_sacm_xml_string(xml);
 
-    EXPECT_TRUE(result.success);
-    EXPECT_EQ(result.assurance_case.elements.size(), 3);
+    EXPECT_TRUE(result.has_value());
+    EXPECT_EQ(result.value().elements.size(), 3);
 
     // Check types are correctly identified
-    EXPECT_EQ(result.assurance_case.elements[0].type, "claim");
-    EXPECT_EQ(result.assurance_case.elements[1].type, "argumentreasoning");
-    EXPECT_EQ(result.assurance_case.elements[2].type, "artifactreference");
+    EXPECT_EQ(result.value().elements[0].type, "claim");
+    EXPECT_EQ(result.value().elements[1].type, "argumentreasoning");
+    EXPECT_EQ(result.value().elements[2].type, "artifactreference");
 }
 
 // Test parsing expression elements (terminology)
@@ -69,12 +69,12 @@ TEST(XmlParserTest, ParseTerminologyExpressions) {
     </terminologyPackage>
 </sacm:AssuranceCasePackage>)";
 
-    ParseResult result = parse_sacm_xml_string(xml);
+    auto result = parse_sacm_xml_string(xml);
 
-    EXPECT_TRUE(result.success);
-    EXPECT_EQ(result.assurance_case.elements.size(), 1);
-    EXPECT_EQ(result.assurance_case.elements[0].type, "expression");
-    EXPECT_EQ(result.assurance_case.elements[0].content, "ISO 26262 - Functional Safety");
+    EXPECT_TRUE(result.has_value());
+    EXPECT_EQ(result.value().elements.size(), 1);
+    EXPECT_EQ(result.value().elements[0].type, "expression");
+    EXPECT_EQ(result.value().elements[0].content, "ISO 26262 - Functional Safety");
 }
 
 TEST(XmlParserTest, ParseStandaloneArgumentPackageRoot) {
@@ -84,26 +84,26 @@ TEST(XmlParserTest, ParseStandaloneArgumentPackageRoot) {
     <argumentReasoning id="S1" name="Strategy" content="By decomposition."/>
 </argumentPackage>)";
 
-    ParseResult result = parse_sacm_xml_string(xml);
+    auto result = parse_sacm_xml_string(xml);
 
-    ASSERT_TRUE(result.success) << result.error_message;
-    EXPECT_EQ(result.assurance_case.id, "AP1");
-    EXPECT_EQ(result.assurance_case.name, "Main Argument");
-    ASSERT_EQ(result.assurance_case.elements.size(), 2u);
-    EXPECT_EQ(result.assurance_case.elements[0].type, "claim");
-    EXPECT_EQ(result.assurance_case.elements[0].id, "G1");
-    EXPECT_EQ(result.assurance_case.elements[1].type, "argumentreasoning");
-    EXPECT_EQ(result.assurance_case.elements[1].id, "S1");
+    ASSERT_TRUE(result.has_value()) << (result ? "" : result.error());
+    EXPECT_EQ(result.value().id, "AP1");
+    EXPECT_EQ(result.value().name, "Main Argument");
+    ASSERT_EQ(result.value().elements.size(), 2u);
+    EXPECT_EQ(result.value().elements[0].type, "claim");
+    EXPECT_EQ(result.value().elements[0].id, "G1");
+    EXPECT_EQ(result.value().elements[1].type, "argumentreasoning");
+    EXPECT_EQ(result.value().elements[1].id, "S1");
 }
 
 // Test parsing invalid XML
 TEST(XmlParserTest, ParseInvalidXml) {
     const char* xml = "This is not valid XML <>";
 
-    ParseResult result = parse_sacm_xml_string(xml);
+    auto result = parse_sacm_xml_string(xml);
 
-    EXPECT_FALSE(result.success);
-    EXPECT_FALSE(result.error_message.empty());
+    EXPECT_FALSE(result.has_value());
+    EXPECT_FALSE(result.error().empty());
 }
 
 // Test parsing XML without root element
@@ -111,10 +111,10 @@ TEST(XmlParserTest, ParseMissingRootElement) {
     const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <wrongElement id="TEST" name="Test"/>)";
 
-    ParseResult result = parse_sacm_xml_string(xml);
+    auto result = parse_sacm_xml_string(xml);
 
-    EXPECT_FALSE(result.success);
-    EXPECT_TRUE(result.error_message.find("AssuranceCasePackage") != std::string::npos);
+    EXPECT_FALSE(result.has_value());
+    EXPECT_TRUE(result.error().find("AssuranceCasePackage") != std::string::npos);
 }
 
 // Test parsing empty elements list
@@ -125,18 +125,18 @@ TEST(XmlParserTest, ParseEmptyAssuranceCase) {
     id="EMPTY" name="Empty Case" description="No elements">
 </sacm:AssuranceCasePackage>)";
 
-    ParseResult result = parse_sacm_xml_string(xml);
+    auto result = parse_sacm_xml_string(xml);
 
-    EXPECT_TRUE(result.success);
-    EXPECT_EQ(result.assurance_case.elements.size(), 0);
+    EXPECT_TRUE(result.has_value());
+    EXPECT_EQ(result.value().elements.size(), 0);
 }
 
 // Test file not found
 TEST(XmlParserTest, ParseNonExistentFile) {
-    ParseResult result = parse_sacm_xml("nonexistent_file_12345.xml");
+    auto result = parse_sacm_xml("nonexistent_file_12345.xml");
 
-    EXPECT_FALSE(result.success);
-    EXPECT_FALSE(result.error_message.empty());
+    EXPECT_FALSE(result.has_value());
+    EXPECT_FALSE(result.error().empty());
 }
 
 // Test that relationship elements have source/target refs parsed
@@ -165,14 +165,14 @@ TEST(XmlParserTest, ParseRelationshipSourceTargetRefs) {
     </argumentPackage>
 </sacm:AssuranceCasePackage>)";
 
-    ParseResult result = parse_sacm_xml_string(xml);
-    ASSERT_TRUE(result.success);
+    auto result = parse_sacm_xml_string(xml);
+    ASSERT_TRUE(result.has_value());
 
     // Find the assertedInference element
     const SacmElement* inf = nullptr;
     const SacmElement* ctx = nullptr;
     const SacmElement* ev = nullptr;
-    for (const auto& e : result.assurance_case.elements) {
+    for (const auto& e : result.value().elements) {
         if (e.id == "inf_1")
             inf = &e;
         if (e.id == "acx_1")
@@ -212,11 +212,11 @@ TEST(XmlParserTest, ParseAssertionDeclaration) {
     </argumentPackage>
 </sacm:AssuranceCasePackage>)";
 
-    ParseResult result = parse_sacm_xml_string(xml);
-    ASSERT_TRUE(result.success);
-    ASSERT_EQ(result.assurance_case.elements.size(), 2);
-    EXPECT_EQ(result.assurance_case.elements[0].assertion_declaration, "asserted");
-    EXPECT_EQ(result.assurance_case.elements[1].assertion_declaration, "assumed");
+    auto result = parse_sacm_xml_string(xml);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result.value().elements.size(), 2);
+    EXPECT_EQ(result.value().elements[0].assertion_declaration, "asserted");
+    EXPECT_EQ(result.value().elements[1].assertion_declaration, "assumed");
 }
 
 TEST(XmlParserTest, ParseUndevelopedOnlyForClaimAndStrategy) {
@@ -231,12 +231,12 @@ TEST(XmlParserTest, ParseUndevelopedOnlyForClaimAndStrategy) {
     </argumentPackage>
 </sacm:AssuranceCasePackage>)";
 
-    ParseResult result = parse_sacm_xml_string(xml);
-    ASSERT_TRUE(result.success);
-    ASSERT_EQ(result.assurance_case.elements.size(), 3);
-    EXPECT_TRUE(result.assurance_case.elements[0].undeveloped);
-    EXPECT_TRUE(result.assurance_case.elements[1].undeveloped);
-    EXPECT_FALSE(result.assurance_case.elements[2].undeveloped);
+    auto result = parse_sacm_xml_string(xml);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result.value().elements.size(), 3);
+    EXPECT_TRUE(result.value().elements[0].undeveloped);
+    EXPECT_TRUE(result.value().elements[1].undeveloped);
+    EXPECT_FALSE(result.value().elements[2].undeveloped);
 }
 
 // Test parsing href attributes with # prefix (OASC-style XML)
@@ -267,13 +267,13 @@ TEST(XmlParserTest, ParseHrefWithHashPrefix) {
     </argumentPackage>
 </sacm:AssuranceCasePackage>)";
 
-    ParseResult result = parse_sacm_xml_string(xml);
-    ASSERT_TRUE(result.success);
+    auto result = parse_sacm_xml_string(xml);
+    ASSERT_TRUE(result.has_value());
 
     const SacmElement* inf = nullptr;
     const SacmElement* ctx = nullptr;
     const SacmElement* ev = nullptr;
-    for (const auto& e : result.assurance_case.elements) {
+    for (const auto& e : result.value().elements) {
         if (e.id == "AI1")
             inf = &e;
         if (e.id == "AC1")
@@ -325,12 +325,12 @@ TEST(XmlParserTest, ParseCrossPackageReferences) {
     </argumentPackage>
 </sacm:AssuranceCasePackage>)";
 
-    ParseResult result = parse_sacm_xml_string(xml);
-    ASSERT_TRUE(result.success);
+    auto result = parse_sacm_xml_string(xml);
+    ASSERT_TRUE(result.has_value());
 
     // Should find elements from both packages
     bool found_g1 = false, found_g3 = false, found_s2 = false, found_ai1 = false;
-    for (const auto& e : result.assurance_case.elements) {
+    for (const auto& e : result.value().elements) {
         if (e.id == "G1")
             found_g1 = true;
         if (e.id == "G3")
@@ -366,11 +366,11 @@ TEST(XmlParserTest, ParseMultiLangDescription) {
     </argumentPackage>
 </sacm:AssuranceCasePackage>)";
 
-    ParseResult result = parse_sacm_xml_string(xml);
-    ASSERT_TRUE(result.success);
-    ASSERT_EQ(result.assurance_case.elements.size(), 1);
+    auto result = parse_sacm_xml_string(xml);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result.value().elements.size(), 1);
 
-    const auto& claim = result.assurance_case.elements[0];
+    const auto& claim = result.value().elements[0];
     EXPECT_EQ(claim.description, "Top safety claim");
 
     // description_langs should have both en and ja
@@ -396,9 +396,9 @@ TEST(XmlParserTest, ParseDescriptionDefaultLang) {
     </argumentPackage>
 </sacm:AssuranceCasePackage>)";
 
-    ParseResult result = parse_sacm_xml_string(xml);
-    ASSERT_TRUE(result.success);
-    ASSERT_EQ(result.assurance_case.elements.size(), 1);
-    const auto& claim = result.assurance_case.elements[0];
+    auto result = parse_sacm_xml_string(xml);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result.value().elements.size(), 1);
+    const auto& claim = result.value().elements[0];
     EXPECT_EQ(claim.description, "Simple description");
 }

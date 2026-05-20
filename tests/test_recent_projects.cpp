@@ -1,4 +1,5 @@
 #include "app/recent_projects.h"
+#include "core/string_utils.h"
 
 #include <filesystem>
 #include <gtest/gtest.h>
@@ -10,7 +11,7 @@ namespace {
 app::RecentProjectEntry Entry(const std::string& name, const std::filesystem::path& path, int claims) {
     app::RecentProjectEntry entry;
     entry.name = name;
-    entry.path = path.u8string();
+    entry.path = core::PathToUtf8(path);
     entry.claims = claims;
     entry.strategies = claims + 1;
     entry.evidence = claims + 2;
@@ -79,7 +80,7 @@ TEST(RecentProjectsTest, RemoveDeletesMatchingPath) {
     app::TouchRecentProject(recent, Entry("Keep", keep, 1));
     app::TouchRecentProject(recent, Entry("Remove", remove, 2));
 
-    app::RemoveRecentProject(recent, remove.u8string());
+    app::RemoveRecentProject(recent, core::PathToUtf8(remove));
 
     ASSERT_EQ(recent.size(), 1u);
     EXPECT_EQ(recent[0].name, "Keep");

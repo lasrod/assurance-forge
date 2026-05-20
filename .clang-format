@@ -29,7 +29,7 @@ PointerAlignment: Left
 SortIncludes: Never
 SpaceAfterCStyleCast: false
 SpaceBeforeParens: ControlStatements
-Standard: c++17
+Standard: c++23
 TabWidth: 4
 UseTab: Never
 ...

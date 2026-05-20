@@ -3,8 +3,9 @@
 #include "core/string_utils.h"
 
 #include <algorithm>
+#include <format>
 #include <nlohmann/json.hpp>
-#include <sstream>
+#include <string>
 
 namespace ai {
 namespace {
@@ -536,7 +537,8 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
                               const AiReviewDataPackageBundle* data_packages) {
     nlohmann::json selected = ReviewElementToJson(payload.selected);
     nlohmann::json parent =
-        payload.parent.has_value() ? ReviewElementToJson(payload.parent.value()) : nlohmann::json(nullptr);
+        payload.parent.transform([](const AiReviewElement& p) { return ReviewElementToJson(p); })
+            .value_or(nlohmann::json(nullptr));
     nlohmann::json children = nlohmann::json::array();
     for (const AiReviewElement& child : payload.children) {
         children.push_back(ReviewElementToJson(child));
@@ -558,56 +560,65 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
     artifacts.responseSchemaJson = BuildExpectedAiReviewResponseSchemaText();
     artifacts.expectedResponseSchema = artifacts.responseSchemaJson;
 
-    std::ostringstream prompt;
-    prompt << "You are reviewing the selected assurance case element using the SCCG review profile below.\n\n"
-           << "Assurance Forge is an assurance case tool using SACM as the domain model and GSN as one graphical view. "
-              "Use SCCG applies_to values and the selected element data to interpret the element.\n\n"
-           << "Use only the SCCG rules provided in this request. Return findings that reference the relevant SCCG rule "
-              "IDs.\n\n"
-           << "Review only the selected element. Use related elements and data packages only as context.\n\n"
-           << "Do not invent missing project information.\n"
-           << "Treat unavailable data packages as unavailable; do not assume their contents.\n"
-           << "Do not claim that a rule is violated unless the provided data supports that finding.\n"
-           << "If there is no clear violation, return an empty findings array.\n"
-           << "Return JSON only. Do not include Markdown. Do not include explanations outside the JSON object.\n\n"
-           << "## SCCG review profile" << (review_profile ? ": " + review_profile->id : ": CL category fallback")
-           << "\n\n"
-           << artifacts.reviewProfileJson << "\n\n"
-           << "## SCCG rules\n\n"
-           << artifacts.guidelinesJson << "\n\n"
-           << "## Available data packages\n\n"
-           << artifacts.availableDataPackagesJson << "\n\n"
-           << "## Unavailable data packages\n\n"
-           << artifacts.unavailableDataPackagesJson << "\n\n"
-           << "## Selected element\n\n"
-           << artifacts.selectedElementJson << "\n\n"
-           << "## Parent element\n\n"
-           << artifacts.parentElementJson << "\n\n"
-           << "## Direct child/sub-elements\n\n"
-           << artifacts.childElementsJson << "\n\n"
-           << "## Required JSON response\n\n"
-           << artifacts.responseSchemaJson << "\n";
-    artifacts.prompt = prompt.str();
-    std::ostringstream debug;
-    debug << "Selected element data\n"
-          << artifacts.selectedElementJson << "\n\n"
-          << "Parent element data\n"
-          << artifacts.parentElementJson << "\n\n"
-          << "Child/sub-element data\n"
-          << artifacts.childElementsJson << "\n\n"
-          << "Available data packages\n"
-          << artifacts.availableDataPackagesJson << "\n\n"
-          << "Unavailable data packages\n"
-          << artifacts.unavailableDataPackagesJson << "\n\n"
-          << "SCCG review profile data\n"
-          << artifacts.reviewProfileJson << "\n\n"
-          << "SCCG guideline data\n"
-          << artifacts.guidelinesJson << "\n\n"
-          << "Final AI prompt text\n"
-          << artifacts.prompt << "\n\n"
-          << "Expected JSON response schema\n"
-          << artifacts.responseSchemaJson << "\n";
-    artifacts.debugText = debug.str();
+    const std::string review_profile_heading =
+        review_profile ? ": " + review_profile->id : std::string(": CL category fallback");
+    artifacts.prompt = std::format(
+        "You are reviewing the selected assurance case element using the SCCG review profile below.\n\n"
+        "Assurance Forge is an assurance case tool using SACM as the domain model and GSN as one graphical view. "
+        "Use SCCG applies_to values and the selected element data to interpret the element.\n\n"
+        "Use only the SCCG rules provided in this request. Return findings that reference the relevant SCCG rule "
+        "IDs.\n\n"
+        "Review only the selected element. Use related elements and data packages only as context.\n\n"
+        "Do not invent missing project information.\n"
+        "Treat unavailable data packages as unavailable; do not assume their contents.\n"
+        "Do not claim that a rule is violated unless the provided data supports that finding.\n"
+        "If there is no clear violation, return an empty findings array.\n"
+        "Return JSON only. Do not include Markdown. Do not include explanations outside the JSON object.\n\n"
+        "## SCCG review profile{}\n\n"
+        "{}\n\n"
+        "## SCCG rules\n\n"
+        "{}\n\n"
+        "## Available data packages\n\n"
+        "{}\n\n"
+        "## Unavailable data packages\n\n"
+        "{}\n\n"
+        "## Selected element\n\n"
+        "{}\n\n"
+        "## Parent element\n\n"
+        "{}\n\n"
+        "## Direct child/sub-elements\n\n"
+        "{}\n\n"
+        "## Required JSON response\n\n"
+        "{}\n",
+        review_profile_heading,
+        artifacts.reviewProfileJson,
+        artifacts.guidelinesJson,
+        artifacts.availableDataPackagesJson,
+        artifacts.unavailableDataPackagesJson,
+        artifacts.selectedElementJson,
+        artifacts.parentElementJson,
+        artifacts.childElementsJson,
+        artifacts.responseSchemaJson);
+
+    artifacts.debugText = std::format(
+        "Selected element data\n{}\n\n"
+        "Parent element data\n{}\n\n"
+        "Child/sub-element data\n{}\n\n"
+        "Available data packages\n{}\n\n"
+        "Unavailable data packages\n{}\n\n"
+        "SCCG review profile data\n{}\n\n"
+        "SCCG guideline data\n{}\n\n"
+        "Final AI prompt text\n{}\n\n"
+        "Expected JSON response schema\n{}\n",
+        artifacts.selectedElementJson,
+        artifacts.parentElementJson,
+        artifacts.childElementsJson,
+        artifacts.availableDataPackagesJson,
+        artifacts.unavailableDataPackagesJson,
+        artifacts.reviewProfileJson,
+        artifacts.guidelinesJson,
+        artifacts.prompt,
+        artifacts.responseSchemaJson);
     return artifacts;
 }
 
@@ -737,10 +748,6 @@ AiReviewParseResult ParseAiReviewResponse(const std::string& response_text,
             result.suggestedElementTexts.push_back(std::move(suggested_element_text));
         }
 
-        result.success = true;
-        return result;
-    } catch (const nlohmann::json::exception& exception) {
-        result.errorMessage = exception.what();
         return result;
     } catch (const std::exception& exception) {
         result.errorMessage = exception.what();

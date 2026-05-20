@@ -491,7 +491,7 @@ void AiReviewController::PollTask() {
     last_raw_response_ = response.text.empty() ? response.rawJson : response.text;
     ai::AiReviewParseResult parse_result =
         ai::ParseAiReviewResponse(last_raw_response_, pending_review_element_id_, pending_guideline_ids_);
-    if (!parse_result.success) {
+    if (!parse_result.errorMessage.empty()) {
         last_parse_error_ = parse_result.errorMessage;
         std::string message = "AI response could not be parsed as the expected JSON format.";
         if (!parse_result.errorMessage.empty())

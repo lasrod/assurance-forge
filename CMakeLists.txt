@@ -5,7 +5,7 @@ if(APPLE)
     enable_language(OBJC OBJCXX)
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(MSVC)
@@ -48,6 +48,12 @@ set(HELLOIMGUI_USE_GLFW3 ON CACHE BOOL "" FORCE)
 set(HELLOIMGUI_HAS_OPENGL3 ON CACHE BOOL "" FORCE)
 set(HELLOIMGUI_USE_EXTERNAL_JSON ON CACHE BOOL "" FORCE)
 add_subdirectory(external/hello_imgui)
+
+# hello_imgui sets CMAKE_CXX_STANDARD to 17 in its own top-level CMake,
+# which affects subsequently-created targets in this project. Reassert
+# our required language level for Assurance Forge targets.
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(NFD_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(NFD_BUILD_SDL2_TESTS OFF CACHE BOOL "" FORCE)

@@ -1,5 +1,6 @@
 #include "app/native_file_dialogs.h"
 
+#include "core/string_utils.h"
 #include "nfd.hpp"
 
 #include <filesystem>
@@ -21,8 +22,8 @@ std::string AbsoluteFolderForDialog(const std::filesystem::path& path) {
         absolute_path = std::filesystem::absolute(path, ec);
     }
     if (ec || absolute_path.empty())
-        return path.u8string();
-    return absolute_path.u8string();
+        return core::PathToUtf8(path);
+    return core::PathToUtf8(absolute_path);
 }
 
 std::string ExistingFolderForDialog(const std::string& raw_path) {

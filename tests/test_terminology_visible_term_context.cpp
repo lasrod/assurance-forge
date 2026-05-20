@@ -172,12 +172,12 @@ TEST(TerminologyVisibleTermContext, SurvivesSaveReloadForClaimAndStrategy) {
     std::string xml = sacm::serialize_sacm(package);
     ASSERT_FALSE(xml.empty());
 
-    sacm::SacmParseResult parsed = sacm::parse_sacm_string(xml);
-    ASSERT_TRUE(parsed.success) << parsed.error_message;
-    ASSERT_EQ(parsed.package.terminologyPackages.size(), 1u);
-    ASSERT_EQ(parsed.package.terminologyPackages.front().terms.size(), 1u);
-    ASSERT_EQ(parsed.package.argumentPackages.size(), 1u);
-    const sacm::ArgumentPackage& argument_package = parsed.package.argumentPackages.front();
+    auto parsed = sacm::parse_sacm_string(xml);
+    ASSERT_TRUE(parsed.has_value()) << (parsed ? "" : parsed.error());
+    ASSERT_EQ(parsed->terminologyPackages.size(), 1u);
+    ASSERT_EQ(parsed->terminologyPackages.front().terms.size(), 1u);
+    ASSERT_EQ(parsed->argumentPackages.size(), 1u);
+    const sacm::ArgumentPackage& argument_package = parsed->argumentPackages.front();
     ASSERT_EQ(argument_package.artifactReferences.size(), 2u);
     ASSERT_EQ(argument_package.assertedContexts.size(), 2u);
     EXPECT_EQ(std::count_if(argument_package.assertedContexts.begin(),

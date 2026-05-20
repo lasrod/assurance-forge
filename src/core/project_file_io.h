@@ -2,22 +2,26 @@
 
 #include "core/project_model.h"
 
+#include <expected>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace core {
 
-std::string ReadTextFile(const std::filesystem::path& path, std::string& error);
-bool WriteTextFile(const std::filesystem::path& path, const std::string& content, std::string& error);
-bool ReadFileBytes(const std::filesystem::path& path, std::vector<unsigned char>& bytes, std::string& error);
-bool Sha256String(const std::string& content, std::string& hash, std::string& error);
-bool Sha256File(const std::filesystem::path& path, std::string& hash, std::string& error);
-bool IsSafeRelativePath(const std::filesystem::path& path);
-void ComputeSacmHashes(ProjectFileEntry& entry, const std::filesystem::path& absolute_path);
-bool RefreshEntryHashes(AssuranceProject& project,
-                        ProjectFileEntry& entry,
-                        bool detect_external_change,
-                        std::string& error);
+std::expected<std::string, std::string>                ReadTextFile(const std::filesystem::path& path);
+std::expected<void, std::string>                       WriteTextFile(const std::filesystem::path& path,
+                                                                     std::string_view content);
+std::expected<std::vector<unsigned char>, std::string> ReadFileBytes(const std::filesystem::path& path);
+// Sha256String currently cannot fail; returns the hex digest directly.
+std::string                                            Sha256String(const std::string& content);
+std::expected<std::string, std::string>                Sha256File(const std::filesystem::path& path);
+bool                                                   IsSafeRelativePath(const std::filesystem::path& path);
+void                                                   ComputeSacmHashes(ProjectFileEntry& entry,
+                                                                         const std::filesystem::path& absolute_path);
+std::expected<void, std::string>                       RefreshEntryHashes(AssuranceProject& project,
+                                                                          ProjectFileEntry& entry,
+                                                                          bool detect_external_change);
 
 } // namespace core

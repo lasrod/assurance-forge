@@ -125,13 +125,10 @@ CollectProposalRemovedExistingIds(const core::reviews::ReviewProposal& proposal,
         if (element_id.empty() || !parser::FindElementByIdOrGidValue(base_model, element_id))
             continue;
 
-        std::optional<core::RemoveMode> mode = ProposalRemoveModeFromField(operation.field);
-        if (mode.has_value()) {
-            std::unordered_set<std::string> planned = core::PlanRemoval(base_model, element_id, mode.value());
-            ids.insert(planned.begin(), planned.end());
-        } else {
-            ids.insert(element_id);
-        }
+        const auto planned = ProposalRemoveModeFromField(operation.field)
+                                 .transform([&](core::RemoveMode m) { return core::PlanRemoval(base_model, element_id, m); })
+                                 .value_or(std::unordered_set<std::string>{element_id});
+        ids.insert(planned.begin(), planned.end());
     }
     return ids;
 }

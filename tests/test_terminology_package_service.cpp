@@ -607,10 +607,10 @@ TEST(TerminologyPackageService, CreatedPackageSerializesAndParses) {
     std::string xml = sacm::serialize_sacm(package);
     ASSERT_FALSE(xml.empty());
 
-    sacm::SacmParseResult parsed = sacm::parse_sacm_string(xml);
-    ASSERT_TRUE(parsed.success) << parsed.error_message;
+    auto parsed = sacm::parse_sacm_string(xml);
+    ASSERT_TRUE(parsed.has_value()) << (parsed ? "" : parsed.error());
 
-    const sacm::TerminologyPackage* reparsed = core::FindTerminologyPackage(parsed.package, created.package_ref);
+    const sacm::TerminologyPackage* reparsed = core::FindTerminologyPackage(*parsed, created.package_ref);
     ASSERT_NE(reparsed, nullptr);
     EXPECT_EQ(reparsed->name, "Vocabulary");
     EXPECT_EQ(reparsed->description, "Shared definitions.");
@@ -639,11 +639,11 @@ TEST(TerminologyPackageService, CreatedTermsSerializeAndParse) {
     ASSERT_FALSE(xml.empty());
     EXPECT_EQ(xml.find("definition"), std::string::npos);
 
-    sacm::SacmParseResult parsed = sacm::parse_sacm_string(xml);
-    ASSERT_TRUE(parsed.success) << parsed.error_message;
+    auto parsed = sacm::parse_sacm_string(xml);
+    ASSERT_TRUE(parsed.has_value()) << (parsed ? "" : parsed.error());
 
     const sacm::TerminologyPackage* reparsed =
-        core::FindTerminologyPackage(parsed.package, terminology_package.package_ref);
+        core::FindTerminologyPackage(*parsed, terminology_package.package_ref);
     ASSERT_NE(reparsed, nullptr);
     ASSERT_EQ(reparsed->terms.size(), 2u);
     EXPECT_EQ(reparsed->terms[0].value, "hazard");
@@ -679,11 +679,11 @@ TEST(TerminologyPackageService, CreatedCategoriesSerializeAndParseWithTermAssign
     std::string xml = sacm::serialize_sacm(package);
     ASSERT_FALSE(xml.empty());
 
-    sacm::SacmParseResult parsed = sacm::parse_sacm_string(xml);
-    ASSERT_TRUE(parsed.success) << parsed.error_message;
+    auto parsed = sacm::parse_sacm_string(xml);
+    ASSERT_TRUE(parsed.has_value()) << (parsed ? "" : parsed.error());
 
     const sacm::TerminologyPackage* reparsed =
-        core::FindTerminologyPackage(parsed.package, terminology_package.package_ref);
+        core::FindTerminologyPackage(*parsed, terminology_package.package_ref);
     ASSERT_NE(reparsed, nullptr);
     ASSERT_EQ(reparsed->categories.size(), 1u);
     EXPECT_EQ(reparsed->categories.front().id, category.category_ref.id);
