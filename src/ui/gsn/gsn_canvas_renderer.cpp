@@ -349,6 +349,32 @@ void GsnCanvas::Render(UiState& ui_state,
                     draw_list, node, node_min, node_max, zoom, element_acps->second, actions, ui_state);
                 ++frame_stats.acp_decorators_drawn;
             }
+            // History-timeline highlight overlay (read-only audit view).
+            if (!history_highlights_.empty()) {
+                auto hl_it = history_highlights_.find(node.id);
+                if (hl_it != history_highlights_.end()) {
+                    ImU32 color = 0;
+                    switch (hl_it->second) {
+                    case core::audit::HistoryHighlightKind::Added:
+                        color = ui::GetTheme().success;
+                        break;
+                    case core::audit::HistoryHighlightKind::Modified:
+                        color = ui::GetTheme().warning;
+                        break;
+                    case core::audit::HistoryHighlightKind::Deleted:
+                        color = ui::GetTheme().attention;
+                        break;
+                    }
+                    const float thickness = std::max(2.0f, 3.0f * zoom);
+                    const float pad = thickness * 0.5f + 1.0f;
+                    draw_list->AddRect(ImVec2(node_min.x - pad, node_min.y - pad),
+                                       ImVec2(node_max.x + pad, node_max.y + pad),
+                                       color,
+                                       4.0f * zoom,
+                                       0,
+                                       thickness);
+                }
+            }
             ++frame_stats.nodes_drawn;
         }
     } // gsn.nodes

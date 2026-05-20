@@ -348,6 +348,15 @@ void ModalHost::RenderProjectFileNameModal() {
                     state_.project_controller->project_file_name_buf);
             }
             if (created) {
+                // Newly created SACM files are opened immediately so the
+                // audit command bus gets installed for the rest of the
+                // session; otherwise subsequent edits fall through the
+                // legacy direct-mutation path and the history timeline
+                // stays empty.
+                if (state_.project_controller->pending_project_file_kind == ProjectFileCreateKind::Sacm &&
+                    callbacks_.open_first_project_sacm_file) {
+                    callbacks_.open_first_project_sacm_file();
+                }
                 state_.project_controller->show_project_file_name_modal = false;
                 ImGui::CloseCurrentPopup();
             }

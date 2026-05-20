@@ -5,6 +5,7 @@ add_library(af_core OBJECT
     app_state.cpp
     assurance_tree.cpp
     audit/audit_event.cpp
+    audit/audit_diff.cpp
     audit/audit_manifest.cpp
     audit/audit_paths.cpp
     audit/audit_snapshot.cpp
@@ -13,6 +14,8 @@ add_library(af_core OBJECT
     audit/canonical_model_hash.cpp
     audit/event_replayer.cpp
     audit/event_store.cpp
+    audit/history_highlights.cpp
+    audit/history_reconstruction.cpp
     audit/replay_verifier.cpp
     commands/command_bus.cpp
     commands/element_commands.cpp

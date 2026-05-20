@@ -95,7 +95,8 @@ void RenderAppSplitters(AppRuntimeState& state,
 
 void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center_view) {
     if (!state.workbench.show_gsn_tab && !state.workbench.show_cse_tab && !state.workbench.show_evidence_tab &&
-        !state.workbench.show_package_details_tab && !state.workbench.show_terminology_package_tab) {
+        !state.workbench.show_package_details_tab && !state.workbench.show_terminology_package_tab &&
+        !state.workbench.show_history_timeline_tab) {
         state.workbench.show_gsn_tab = true;
     }
 
@@ -111,6 +112,8 @@ void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center
             return state.workbench.show_package_details_tab;
         case ui::CenterView::TerminologyPackage:
             return state.workbench.show_terminology_package_tab;
+        case ui::CenterView::HistoryTimeline:
+            return state.workbench.show_history_timeline_tab;
         }
         return false;
     };
@@ -124,6 +127,8 @@ void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center
             center_view = ui::CenterView::TerminologyPackage;
         } else if (state.workbench.show_package_details_tab) {
             center_view = ui::CenterView::PackageDetails;
+        } else if (state.workbench.show_history_timeline_tab) {
+            center_view = ui::CenterView::HistoryTimeline;
         } else {
             center_view = ui::CenterView::EvidenceRegister;
         }

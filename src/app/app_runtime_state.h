@@ -68,6 +68,7 @@ struct WorkbenchState {
     bool show_evidence_tab = false;
     bool show_package_details_tab = false;
     bool show_terminology_package_tab = false;
+    bool show_history_timeline_tab = false;
     std::vector<ArgumentPackageCanvasTab> argument_package_canvas_tabs;
     std::string active_argument_package_canvas_key;
 };

@@ -1,6 +1,7 @@
 #include "app/areas/workbench_area.h"
 
 #include "app/app_runtime_state.h"
+#include "app/areas/history_timeline_area.h"
 #include "app/frame/app_layout_regions.h"
 #include "app/frame/app_shell.h"
 #include "core/perf/frame_profiler.h"
@@ -417,6 +418,18 @@ void RenderWorkbenchArea(AppRuntimeState& state,
             if (ImGui::BeginTabItem("Terminology Package", nullptr, terminology_flags)) {
                 ui_state.center_view = ui::CenterView::TerminologyPackage;
                 RenderTerminologyPackageTab(state, callbacks);
+                ImGui::EndTabItem();
+            }
+        }
+
+        if (state.workbench.show_history_timeline_tab) {
+            ImGuiTabItemFlags history_flags = (state.workbench.force_center_tab_selection &&
+                                               ui_state.center_view == ui::CenterView::HistoryTimeline)
+                                                  ? ImGuiTabItemFlags_SetSelected
+                                                  : 0;
+            if (ImGui::BeginTabItem("History Timeline", nullptr, history_flags)) {
+                ui_state.center_view = ui::CenterView::HistoryTimeline;
+                RenderHistoryTimelineArea(state);
                 ImGui::EndTabItem();
             }
         }

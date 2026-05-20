@@ -274,6 +274,9 @@ add_executable(tests
     tests/test_initial_snapshot.cpp
     tests/test_command_bus.cpp
     tests/test_event_replayer.cpp
+    tests/test_audit_diff.cpp
+    tests/test_history_highlights.cpp
+    tests/test_history_reconstruction.cpp
 )
 # Production sources are pulled in via the per-layer af_* OBJECT libraries
 # (see src/<layer>/CMakeLists.txt). The tests target intentionally links

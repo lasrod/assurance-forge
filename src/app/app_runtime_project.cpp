@@ -342,6 +342,12 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
                     msg += "\n  - " + d;
                 SetStatus(msg);
             }
+            // Surface the History Timeline tab once a project with an audit
+            // store has been opened, so the user can browse the recorded
+            // transactions. View > History Timeline still toggles visibility.
+            if (verification.ran) {
+                impl_->workbench.show_history_timeline_tab = true;
+            }
         }
     } else if (entry.role == core::ProjectFileRole::EvidenceRegister) {
         impl_->workbench.show_evidence_tab = true;
@@ -892,20 +898,12 @@ bool AppRuntime::OpenFirstProjectSacmFile() {
             continue;
         if (entry.state == core::ProjectFileState::Missing)
             continue;
-        if (impl_->app_state.open_project_file(entry)) {
-            SetConfidenceSource(*impl_, entry);
-            SyncConfidenceProblems();
-            impl_->tree_needs_rebuild = true;
-            impl_->workbench.argument_package_canvas_tabs.clear();
-            impl_->workbench.active_argument_package_canvas_key.clear();
-            impl_->workbench.pending_focus_root = false;
-            impl_->workbench.show_gsn_tab = true;
-            ui::UiState& ui_state = ui::GetUiState();
-            ui_state.center_view = ui::CenterView::GsnCanvas;
-            impl_->workbench.force_center_tab_selection = true;
-            OpenFirstArgumentPackageCanvas();
+        // Delegate to the same path used by explicit Open File so the audit
+        // command bus gets installed and history-timeline recording is
+        // active for any subsequent mutations.
+        PerformOpenProjectFile(entry);
+        if (impl_->app_state.loaded_case.has_value())
             return true;
-        }
     }
 
     SetStatus("Project opened, but no SACM file could be loaded.");

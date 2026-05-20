@@ -2,6 +2,7 @@
 
 #include "core/acp/acp_relationship_index.h"
 #include "core/assurance_tree.h"
+#include "core/audit/history_highlights.h"
 #include "core/sacm_model.h"
 #include "ui/element_context_menu.h"
 #include "ui/gsn/gsn_canvas.h"
@@ -110,6 +111,20 @@ public:
         return last_render_stats_;
     }
 
+    // History-timeline integration: when set, nodes whose id appears in the
+    // map are overlaid with a colored border indicating the change kind
+    // (Added=green, Modified=yellow, Deleted=red). The renderer never uses
+    // this map for hit-testing — purely visual.
+    void SetHistoryHighlights(std::unordered_map<std::string, core::audit::HistoryHighlightKind> highlights) {
+        history_highlights_ = std::move(highlights);
+    }
+    void ClearHistoryHighlights() {
+        history_highlights_.clear();
+    }
+    const std::unordered_map<std::string, core::audit::HistoryHighlightKind>& GetHistoryHighlights() const {
+        return history_highlights_;
+    }
+
 private:
     void RebuildNodeLookup();
 
@@ -129,6 +144,9 @@ private:
     const parser::AssuranceCase* cached_acp_targets_case_ = nullptr;
     std::uint64_t cached_acp_targets_revision_ = ~std::uint64_t{0};
     std::vector<core::acp::AcpRelationshipTarget> cached_acp_targets_;
+
+    // Optional per-element highlight overlay used by the History Timeline.
+    std::unordered_map<std::string, core::audit::HistoryHighlightKind> history_highlights_;
 };
 
 } // namespace ui::gsn
