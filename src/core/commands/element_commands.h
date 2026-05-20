@@ -41,11 +41,13 @@ public:
     bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
     const std::string& GeneratedId() const { return generated_id_; }
+    const std::string& GeneratedRelationshipId() const { return generated_relationship_id_; }
 
 private:
     std::string    parent_id_;
     NewElementKind kind_;
     std::string    generated_id_;
+    std::string    generated_relationship_id_;
 };
 
 // Remove an element (and optionally its descendants) from the case.

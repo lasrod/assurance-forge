@@ -4,6 +4,7 @@
 #include "core/audit/canonical_model_hash.h"
 #include "core/project_file_io.h"
 #include "core/sha256.h"
+#include "sacm/sacm_parser.h"
 #include "sacm/sacm_serializer.h"
 
 #include <filesystem>
@@ -41,8 +42,10 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     // Compute post-state hashes off the in-memory model, then serialize to
     // disk. We serialize once and hash the bytes we actually wrote so the
     // raw_file_hash recorded in the manifest is guaranteed to match the file
-    // a reader will later open.
-    const std::string canonical_after = audit::CanonicalModelHash(ctx.package);
+    // a reader will later open. The canonical hash is computed from a
+    // re-parse of the serialized bytes so it matches the value the audit
+    // replay verifier would derive after a fresh open (canonical hash is not
+    // currently invariant under in-memory mutation vs. serialize/reparse).
     const std::string xml = sacm::serialize_sacm(ctx.package);
 
     auto write = WriteTextFile(sacm_path_, xml);
@@ -52,6 +55,13 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
         return result;
     }
     const std::string raw_after = Sha256::HexDigest(xml);
+
+    std::string canonical_after;
+    if (auto reparsed = sacm::parse_sacm_string(xml); reparsed) {
+        canonical_after = audit::CanonicalModelHash(*reparsed);
+    } else {
+        canonical_after = audit::CanonicalModelHash(ctx.package);
+    }
 
     // Append a single-event transaction. EventStore::Append assigns the
     // sequences and previous_transaction_hash; we just supply the metadata.

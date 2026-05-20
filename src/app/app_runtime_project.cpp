@@ -7,6 +7,7 @@
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
 #include "core/acp/assurance_claim_point.h"
+#include "core/audit/replay_verifier.h"
 #include "core/commands/command_bus.h"
 #include "core/problems/problem_utils.h"
 #include "core/project_service.h"
@@ -328,6 +329,20 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
             }
         }
         impl_->element_edit_controller->SetCommandBus(impl_->command_bus.get());
+
+        // Audit replay verification (design §13). Best-effort: a mismatch is
+        // surfaced as a warning, not an error — the loaded SACM remains the
+        // user's working state.
+        if (impl_->app_state.current_project.has_value()) {
+            auto verification =
+                core::audit::VerifyProject(impl_->app_state.current_project.value());
+            if (verification.ran && !verification.success) {
+                std::string msg = "Audit replay verification failed:";
+                for (const auto& d : verification.diagnostics)
+                    msg += "\n  - " + d;
+                SetStatus(msg);
+            }
+        }
     } else if (entry.role == core::ProjectFileRole::EvidenceRegister) {
         impl_->workbench.show_evidence_tab = true;
         ui_state.center_view = ui::CenterView::EvidenceRegister;

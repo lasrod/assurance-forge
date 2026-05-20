@@ -190,17 +190,25 @@ void MirrorEvidence(sacm::ArgumentPackage* ap, const parser::SacmElement& rel) {
 
 } // namespace
 
-bool AddChildElement(parser::AssuranceCase& ac,
-                     sacm::AssuranceCasePackage* pkg,
-                     const std::string& parent_id,
-                     NewElementKind kind,
-                     std::string& out_new_id,
-                     std::string& out_error) {
-    out_new_id.clear();
-    out_error.clear();
+namespace {
 
+// Shared installation logic: validate parent, then build the new element +
+// relationship using the supplied ids and install into both models. Both the
+// id-generating `AddChildElement` and the replay-only `AddChildElementWithIds`
+// route through here.
+bool InstallChildElement(parser::AssuranceCase& ac,
+                         sacm::AssuranceCasePackage* pkg,
+                         const std::string& parent_id,
+                         NewElementKind kind,
+                         const std::string& element_id,
+                         const std::string& relationship_id,
+                         std::string& out_error) {
     if (parent_id.empty()) {
         out_error = "No parent element selected.";
+        return false;
+    }
+    if (element_id.empty() || relationship_id.empty()) {
+        out_error = "Element and relationship ids must be non-empty.";
         return false;
     }
 
@@ -210,38 +218,25 @@ bool AddChildElement(parser::AssuranceCase& ac,
         return false;
     }
 
-    // Minimal validation: only Claim-like elements (claims, strategies) can be parents
-    // for structural / contextual children. Solutions and references are leaves.
     const std::string& ptype = parent->type;
     const bool parent_is_container = (ptype == "claim" || ptype == "argumentreasoning");
     if (!parent_is_container) {
         out_error = "Cannot add a child to a leaf element (" + ptype + ").";
         return false;
     }
-
-    // Strategy can only be added under a Claim (matches existing reasoning insertion model).
     if (kind == NewElementKind::Strategy && ptype != "claim") {
         out_error = "Strategy can only be added under a Claim.";
         return false;
     }
 
-    auto existing_ids = CollectIds(ac);
-
-    auto reserve_id = [&](const std::string& prefix) {
-        std::string id = GenerateUniqueId(existing_ids, prefix);
-        existing_ids.insert(id);
-        return id;
-    };
-
     sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, parent_id);
 
-    // Build the new element + its relationship.
     parser::SacmElement new_elem;
-    new_elem.id = reserve_id(ScopedPrefixFor(ap, kind));
+    new_elem.id = element_id;
     new_elem.name = DefaultNameFor(kind);
 
     parser::SacmElement rel;
-    rel.id = reserve_id(ScopedRelationshipPrefixFor(ap));
+    rel.id = relationship_id;
     rel.target_refs.push_back(parent_id);
 
     switch (kind) {
@@ -279,9 +274,6 @@ bool AddChildElement(parser::AssuranceCase& ac,
         break;
     }
 
-    out_new_id = new_elem.id;
-
-    // Mirror into sacm model first (uses a copy of new_elem before move).
     if (ap) {
         switch (kind) {
         case NewElementKind::Goal:
@@ -308,11 +300,99 @@ bool AddChildElement(parser::AssuranceCase& ac,
         }
     }
 
-    // Append to parser model (drives the tree/canvas rebuild).
     ac.elements.push_back(std::move(new_elem));
     ac.elements.push_back(std::move(rel));
-
     return true;
+}
+
+bool InstallTopGoal(parser::AssuranceCase& ac,
+                    sacm::AssuranceCasePackage* pkg,
+                    const std::string& element_id,
+                    std::string& out_error) {
+    if (element_id.empty()) {
+        out_error = "Element id must be non-empty.";
+        return false;
+    }
+    parser::SacmElement goal;
+    goal.id = element_id;
+    goal.type = "claim";
+    goal.name = DefaultNameFor(NewElementKind::Goal);
+
+    sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, goal.id);
+    if (ap)
+        MirrorClaim(ap, goal);
+
+    ac.elements.push_back(std::move(goal));
+    return true;
+}
+
+} // namespace
+
+bool AddChildElement(parser::AssuranceCase& ac,
+                     sacm::AssuranceCasePackage* pkg,
+                     const std::string& parent_id,
+                     NewElementKind kind,
+                     std::string& out_new_id,
+                     std::string& out_error) {
+    std::string rel_id;
+    return AddChildElement(ac, pkg, parent_id, kind, out_new_id, rel_id, out_error);
+}
+
+bool AddChildElement(parser::AssuranceCase& ac,
+                     sacm::AssuranceCasePackage* pkg,
+                     const std::string& parent_id,
+                     NewElementKind kind,
+                     std::string& out_new_id,
+                     std::string& out_new_relationship_id,
+                     std::string& out_error) {
+    out_new_id.clear();
+    out_new_relationship_id.clear();
+    out_error.clear();
+
+    if (parent_id.empty()) {
+        out_error = "No parent element selected.";
+        return false;
+    }
+    const parser::SacmElement* parent = FindElement(ac, parent_id);
+    if (!parent) {
+        out_error = "Selected element not found in model.";
+        return false;
+    }
+    const std::string& ptype = parent->type;
+    const bool parent_is_container = (ptype == "claim" || ptype == "argumentreasoning");
+    if (!parent_is_container) {
+        out_error = "Cannot add a child to a leaf element (" + ptype + ").";
+        return false;
+    }
+    if (kind == NewElementKind::Strategy && ptype != "claim") {
+        out_error = "Strategy can only be added under a Claim.";
+        return false;
+    }
+
+    auto existing_ids = CollectIds(ac);
+    sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, parent_id);
+
+    std::string element_id = GenerateUniqueId(existing_ids, ScopedPrefixFor(ap, kind));
+    existing_ids.insert(element_id);
+    std::string relationship_id = GenerateUniqueId(existing_ids, ScopedRelationshipPrefixFor(ap));
+
+    if (!InstallChildElement(ac, pkg, parent_id, kind, element_id, relationship_id, out_error))
+        return false;
+
+    out_new_id = std::move(element_id);
+    out_new_relationship_id = std::move(relationship_id);
+    return true;
+}
+
+bool AddChildElementWithIds(parser::AssuranceCase& ac,
+                            sacm::AssuranceCasePackage* pkg,
+                            const std::string& parent_id,
+                            NewElementKind kind,
+                            const std::string& element_id,
+                            const std::string& relationship_id,
+                            std::string& out_error) {
+    out_error.clear();
+    return InstallChildElement(ac, pkg, parent_id, kind, element_id, relationship_id, out_error);
 }
 
 bool AddTopGoal(parser::AssuranceCase& ac,
@@ -323,20 +403,19 @@ bool AddTopGoal(parser::AssuranceCase& ac,
     out_error.clear();
 
     auto existing_ids = CollectIds(ac);
-    parser::SacmElement goal;
-    goal.id = GenerateUniqueId(existing_ids, PrefixFor(NewElementKind::Goal));
-    goal.type = "claim";
-    goal.name = DefaultNameFor(NewElementKind::Goal);
-
-    out_new_id = goal.id;
-
-    sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, goal.id);
-    if (ap) {
-        MirrorClaim(ap, goal);
-    }
-
-    ac.elements.push_back(std::move(goal));
+    std::string id = GenerateUniqueId(existing_ids, PrefixFor(NewElementKind::Goal));
+    if (!InstallTopGoal(ac, pkg, id, out_error))
+        return false;
+    out_new_id = std::move(id);
     return true;
+}
+
+bool AddTopGoalWithId(parser::AssuranceCase& ac,
+                      sacm::AssuranceCasePackage* pkg,
+                      const std::string& element_id,
+                      std::string& out_error) {
+    out_error.clear();
+    return InstallTopGoal(ac, pkg, element_id, out_error);
 }
 
 // ===== Remove helpers (planner) ============================================

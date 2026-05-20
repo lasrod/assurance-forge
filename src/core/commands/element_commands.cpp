@@ -55,7 +55,8 @@ bool CreateChildElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& ou
         out_error = "CreateChildElementCommand requires a parent id";
         return false;
     }
-    if (!core::AddChildElement(ctx.model, &ctx.package, parent_id_, kind_, generated_id_, out_error))
+    if (!core::AddChildElement(ctx.model, &ctx.package, parent_id_, kind_, generated_id_,
+                               generated_relationship_id_, out_error))
         return false;
 
     out_event.event_type = "CreateChildElement";
@@ -63,6 +64,7 @@ bool CreateChildElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& ou
     out_event.payload["parent_id"] = parent_id_;
     out_event.payload["kind"] = NewElementKindToToken(kind_);
     out_event.payload["generated_id"] = generated_id_;
+    out_event.payload["generated_relationship_id"] = generated_relationship_id_;
     return true;
 }
 
