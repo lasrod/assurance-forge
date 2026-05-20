@@ -268,6 +268,10 @@ add_executable(tests
     tests/test_recent_projects.cpp
     tests/test_shared_utils.cpp
     tests/test_gsn_svg_exporter.cpp
+    tests/test_canonical_model_hash.cpp
+    tests/test_audit_manifest.cpp
+    tests/test_event_store_jsonl.cpp
+    tests/test_initial_snapshot.cpp
 )
 # Production sources are pulled in via the per-layer af_* OBJECT libraries
 # (see src/<layer>/CMakeLists.txt). The tests target intentionally links

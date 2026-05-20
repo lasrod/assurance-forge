@@ -1,5 +1,6 @@
 #include "core/app_state.h"
 
+#include "core/audit/audit_store.h"
 #include "core/project_service.h"
 #include "core/string_utils.h"
 #include "core/terminology_package_service.h"
@@ -244,6 +245,21 @@ bool AppState::open_project(const std::string& project_or_manifest_path) {
     current_project = std::move(project);
     last_project_load_report = std::move(report);
     status_message = "Opened project: " + current_project->name;
+
+    // Auto-migrate existing projects: ensure an audit store exists so the
+    // history-timeline subsystem has a starting snapshot. The first
+    // SacmArgument file is treated as the project's primary working SACM.
+    for (const ProjectFileEntry& entry : current_project->files) {
+        if (entry.role == ProjectFileRole::SacmArgument && !entry.relativePath.empty()) {
+            audit::EnsureAuditStoreResult audit_result;
+            std::string audit_error;
+            if (!audit::EnsureAuditStore(current_project.value(), entry.relativePath, audit_result, audit_error)) {
+                // Non-fatal: surface as a warning but allow the project to open.
+                last_project_load_report.warnings.push_back("Audit store initialization failed: " + audit_error);
+            }
+            break;
+        }
+    }
     return true;
 }
 
@@ -261,6 +277,14 @@ bool AppState::create_project_sacm_file(const std::string& file_name, ProjectFil
     if (created_entry)
         *created_entry = entry;
     status_message = "Created: " + entry.relativePath.generic_string();
+
+    // Ensure the audit store is initialized using the newly-created SACM as
+    // snapshot 0. Failure here is non-fatal: the file is already on disk.
+    audit::EnsureAuditStoreResult audit_result;
+    std::string audit_error;
+    if (!audit::EnsureAuditStore(current_project.value(), entry.relativePath, audit_result, audit_error)) {
+        status_message += " (audit store init failed: " + audit_error + ")";
+    }
     return true;
 }
 

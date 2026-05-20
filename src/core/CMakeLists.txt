@@ -4,6 +4,14 @@ add_library(af_core OBJECT
     acp/assurance_claim_point.cpp
     app_state.cpp
     assurance_tree.cpp
+    audit/audit_event.cpp
+    audit/audit_manifest.cpp
+    audit/audit_paths.cpp
+    audit/audit_snapshot.cpp
+    audit/audit_store.cpp
+    audit/audit_transaction.cpp
+    audit/canonical_model_hash.cpp
+    audit/event_store.cpp
     confidence/confidence_store.cpp
     element_factory.cpp
     gsn_layout.cpp
