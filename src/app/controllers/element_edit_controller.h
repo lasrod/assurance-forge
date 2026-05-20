@@ -8,11 +8,19 @@
 #include <string>
 #include <vector>
 
+namespace core::commands { class CommandBus; }
+
 namespace app::controllers {
 
 class ElementEditController {
 public:
     explicit ElementEditController(AppEvents& events);
+
+    // Optional: when set, mutations are dispatched through the audited
+    // command bus instead of calling the core mutators directly. The runtime
+    // wires this on project open and clears it on close.
+    void SetCommandBus(core::commands::CommandBus* bus) { command_bus_ = bus; }
+    core::commands::CommandBus* GetCommandBus() const { return command_bus_; }
 
     bool AddChildToSelected(parser::AssuranceCase& model,
                             sacm::AssuranceCasePackage* package,
@@ -33,6 +41,7 @@ public:
 
 private:
     AppEvents& events_;
+    core::commands::CommandBus* command_bus_ = nullptr;
     bool show_remove_confirm_ = false;
     std::string pending_remove_id_;
     core::RemoveMode pending_remove_mode_ = core::RemoveMode::NodeOnly;

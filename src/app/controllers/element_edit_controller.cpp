@@ -1,5 +1,8 @@
 #include "app/controllers/element_edit_controller.h"
 
+#include "core/commands/command_bus.h"
+#include "core/commands/element_commands.h"
+
 #include <algorithm>
 #include <cstddef>
 
@@ -17,10 +20,21 @@ bool ElementEditController::AddChildToSelected(parser::AssuranceCase& model,
     }
 
     std::string new_id;
-    std::string error;
-    if (!core::AddChildElement(model, package, selected_id, kind, new_id, error)) {
-        events_.Emit(StatusMessageEvent{"Add failed: " + error});
-        return false;
+    if (command_bus_ && package) {
+        core::commands::CreateChildElementCommand cmd(selected_id, kind);
+        core::commands::CommandContext ctx{model, *package};
+        const auto result = command_bus_->Execute(cmd, ctx, {});
+        if (!result.success) {
+            events_.Emit(StatusMessageEvent{"Add failed: " + result.error});
+            return false;
+        }
+        new_id = cmd.GeneratedId();
+    } else {
+        std::string error;
+        if (!core::AddChildElement(model, package, selected_id, kind, new_id, error)) {
+            events_.Emit(StatusMessageEvent{"Add failed: " + error});
+            return false;
+        }
     }
 
     events_.Emit(TreeDirtyEvent{});
@@ -32,10 +46,21 @@ bool ElementEditController::AddChildToSelected(parser::AssuranceCase& model,
 
 bool ElementEditController::AddTopGoal(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package) {
     std::string new_id;
-    std::string error;
-    if (!core::AddTopGoal(model, package, new_id, error)) {
-        events_.Emit(StatusMessageEvent{"Add failed: " + error});
-        return false;
+    if (command_bus_ && package) {
+        core::commands::CreateTopGoalCommand cmd;
+        core::commands::CommandContext ctx{model, *package};
+        const auto result = command_bus_->Execute(cmd, ctx, {});
+        if (!result.success) {
+            events_.Emit(StatusMessageEvent{"Add failed: " + result.error});
+            return false;
+        }
+        new_id = cmd.GeneratedId();
+    } else {
+        std::string error;
+        if (!core::AddTopGoal(model, package, new_id, error)) {
+            events_.Emit(StatusMessageEvent{"Add failed: " + error});
+            return false;
+        }
     }
 
     events_.Emit(TreeDirtyEvent{});
@@ -61,10 +86,20 @@ bool ElementEditController::RemoveSelected(parser::AssuranceCase& model,
     }
 
     if (planned.size() == 1) {
-        std::string error;
-        if (!core::RemoveElement(model, package, selected_id, mode, error)) {
-            events_.Emit(StatusMessageEvent{"Remove failed: " + error});
-            return false;
+        if (command_bus_ && package) {
+            core::commands::RemoveElementCommand cmd(selected_id, mode);
+            core::commands::CommandContext ctx{model, *package};
+            const auto result = command_bus_->Execute(cmd, ctx, {});
+            if (!result.success) {
+                events_.Emit(StatusMessageEvent{"Remove failed: " + result.error});
+                return false;
+            }
+        } else {
+            std::string error;
+            if (!core::RemoveElement(model, package, selected_id, mode, error)) {
+                events_.Emit(StatusMessageEvent{"Remove failed: " + error});
+                return false;
+            }
         }
         events_.Emit(TreeDirtyEvent{});
         events_.Emit(SelectionChangedEvent{});
@@ -90,10 +125,20 @@ bool ElementEditController::ConfirmPendingRemoval(parser::AssuranceCase& model, 
     if (id.empty())
         return false;
 
-    std::string error;
-    if (!core::RemoveElement(model, package, id, mode, error)) {
-        events_.Emit(StatusMessageEvent{"Remove failed: " + error});
-        return false;
+    if (command_bus_ && package) {
+        core::commands::RemoveElementCommand cmd(id, mode);
+        core::commands::CommandContext ctx{model, *package};
+        const auto result = command_bus_->Execute(cmd, ctx, {});
+        if (!result.success) {
+            events_.Emit(StatusMessageEvent{"Remove failed: " + result.error});
+            return false;
+        }
+    } else {
+        std::string error;
+        if (!core::RemoveElement(model, package, id, mode, error)) {
+            events_.Emit(StatusMessageEvent{"Remove failed: " + error});
+            return false;
+        }
     }
 
     events_.Emit(TreeDirtyEvent{});

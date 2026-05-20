@@ -7,6 +7,7 @@
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
 #include "core/acp/assurance_claim_point.h"
+#include "core/commands/command_bus.h"
 #include "core/problems/problem_utils.h"
 #include "core/project_service.h"
 #include "core/reviews/review_item.h"
@@ -309,6 +310,24 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
         ui_state.center_view = ui::CenterView::GsnCanvas;
         impl_->workbench.force_center_tab_selection = true;
         OpenFirstArgumentPackageCanvas();
+
+        // Construct the audited command bus over the project's audit store.
+        // `EnsureAuditStore` was already called in `AppState::open_project` /
+        // `create_project_sacm_file`, so the manifest and event log exist on
+        // disk. If construction fails, fall back to direct mutation (legacy
+        // behaviour) and surface a warning.
+        impl_->command_bus.reset();
+        if (impl_->app_state.current_project.has_value()) {
+            std::string bus_error;
+            auto bus = core::commands::CommandBus::Open(impl_->app_state.current_project.value(),
+                                                        ProjectFilePath(impl_->app_state, entry), bus_error);
+            if (!bus) {
+                SetStatus("Audit bus init failed: " + bus_error);
+            } else {
+                impl_->command_bus = std::move(bus);
+            }
+        }
+        impl_->element_edit_controller->SetCommandBus(impl_->command_bus.get());
     } else if (entry.role == core::ProjectFileRole::EvidenceRegister) {
         impl_->workbench.show_evidence_tab = true;
         ui_state.center_view = ui::CenterView::EvidenceRegister;

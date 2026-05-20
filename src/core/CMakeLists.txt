@@ -12,6 +12,8 @@ add_library(af_core OBJECT
     audit/audit_transaction.cpp
     audit/canonical_model_hash.cpp
     audit/event_store.cpp
+    commands/command_bus.cpp
+    commands/element_commands.cpp
     confidence/confidence_store.cpp
     element_factory.cpp
     gsn_layout.cpp

@@ -21,6 +21,8 @@
 #include "core/tree_editing.h"
 #include "sacm/sacm_package_tree.h"
 
+namespace core::commands { class CommandBus; }
+
 #include <filesystem>
 #include <map>
 #include <memory>
@@ -126,6 +128,7 @@ struct LayoutState {
 
 struct AppRuntimeState {
     AppRuntimeState();
+    ~AppRuntimeState();
 
     core::AppState app_state;
     AppEvents events;
@@ -145,6 +148,12 @@ struct AppRuntimeState {
     char reviewer_name_buf[128] = {};
 
     AiUiState ai;
+
+    // Audited command bus for the currently-open project's SACM working file.
+    // Constructed when a project's SacmArgument file is loaded; cleared when
+    // no project SACM file is active. Nullptr is the legacy direct-mutation
+    // fallback (e.g. when a SACM file is opened outside any project).
+    std::unique_ptr<core::commands::CommandBus> command_bus;
 
     bool tree_needs_rebuild = false;
     core::AssuranceTree current_tree;
