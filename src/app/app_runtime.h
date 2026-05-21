@@ -140,6 +140,11 @@ private:
     void SeedRecommendedTerminologyCategories();
     bool OpenFirstProjectSacmFile();
     bool TryOpenProjectManifest(const std::string& selected_path);
+    // Reconcile the audit log when replay verification reports divergence.
+    // Backs up the current `.af/` artifacts, rebuilds the store from the
+    // currently-loaded SACM, reinstalls the command bus, and re-runs the
+    // verifier. Returns true on success.
+    bool ReconcileAuditStore();
     bool EnsureReviewItemStorage();
     bool EnsureConfidenceStorage();
     void RefreshSacmPackageTreeCache();

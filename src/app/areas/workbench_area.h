@@ -47,6 +47,9 @@ struct WorkbenchAreaCallbacks {
     std::function<void(const core::TerminologyCategoryRef&)> edit_terminology_category;
     std::function<void(const core::TerminologyCategoryRef&)> delete_terminology_category;
     std::function<void()> seed_recommended_terminology_categories;
+    // Invoked by the History Timeline area when the user clicks the
+    // "Reconcile audit log" button on the divergence warning banner.
+    std::function<void()> reconcile_audit_store;
 };
 
 void RenderWorkbenchArea(AppRuntimeState& state,

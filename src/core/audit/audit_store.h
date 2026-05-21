@@ -31,4 +31,35 @@ bool EnsureAuditStore(const AssuranceProject& project,
                       EnsureAuditStoreResult& out_result,
                       std::string& error);
 
+// Result of a reconciliation operation.
+struct ReconcileAuditStoreResult {
+    // Absolute path to the backup directory the previous audit-store
+    // artifacts were moved into. Empty when no backup was needed.
+    std::string backup_dir;
+    // Identifier of the new initial snapshot ("snapshot_000000").
+    std::string snapshot_id;
+    std::string canonical_model_hash;
+};
+
+// Rebuild the audit store for `project` from the currently-materialized SACM
+// file. Used when replay verification (`VerifyProject`) reports divergence
+// between the on-disk SACM and the replayed audit log — i.e., mutations
+// happened without being recorded as transactions and the log can no longer
+// reproduce live state.
+//
+// Behavior:
+//   1) Move the existing `manifest.af.json`, `snapshots/` and `audit/`
+//      directory under a timestamped `.af/backup_<utc>/` so prior history is
+//      preserved on disk for forensics.
+//   2) Re-run `EnsureAuditStore` against the current SACM, which writes a
+//      fresh snapshot 0, an empty event log and a new manifest whose
+//      `last_known_canonical_model_hash` matches the live model.
+//
+// On success, the caller is responsible for reopening any `EventStore` or
+// `CommandBus` instance that referenced the previous state.
+bool ReconcileAuditStore(const AssuranceProject& project,
+                         const std::filesystem::path& sacm_relative_path,
+                         ReconcileAuditStoreResult& out_result,
+                         std::string& error);
+
 } // namespace core::audit

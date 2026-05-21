@@ -6,7 +6,57 @@
 #include "core/audit/event_store.h"
 #include "core/time_utils.h"
 
+#include <string>
+#include <system_error>
+
 namespace core::audit {
+
+namespace {
+
+// Replace ':' with '-' so the UTC ISO timestamp is a valid path component on
+// Windows and easy to copy/paste elsewhere.
+std::string FilenameSafeNowUtc() {
+    std::string s = NowUtcString();
+    for (char& c : s) {
+        if (c == ':')
+            c = '-';
+    }
+    return s;
+}
+
+// Move `source` (a file or directory) into `target`, falling back to a
+// recursive copy + remove when `rename` is not supported across the
+// underlying filesystem boundary. Missing source is a no-op.
+bool MoveIntoBackup(const std::filesystem::path& source,
+                    const std::filesystem::path& target,
+                    std::string& error) {
+    std::error_code ec;
+    if (!std::filesystem::exists(source, ec))
+        return true;
+
+    std::filesystem::rename(source, target, ec);
+    if (!ec)
+        return true;
+
+    std::error_code copy_ec;
+    std::filesystem::copy(source, target,
+                          std::filesystem::copy_options::recursive |
+                              std::filesystem::copy_options::overwrite_existing,
+                          copy_ec);
+    if (copy_ec) {
+        error = "Could not back up " + source.string() + ": " + copy_ec.message();
+        return false;
+    }
+    std::error_code rm_ec;
+    std::filesystem::remove_all(source, rm_ec);
+    if (rm_ec) {
+        error = "Could not remove " + source.string() + " after backup: " + rm_ec.message();
+        return false;
+    }
+    return true;
+}
+
+} // namespace
 
 bool EnsureAuditStore(const AssuranceProject& project,
                       const std::filesystem::path& sacm_relative_path,
@@ -82,6 +132,69 @@ bool EnsureAuditStore(const AssuranceProject& project,
     out_result.snapshot_id = snapshot.snapshot_id;
     out_result.raw_file_hash = snapshot.raw_file_hash;
     out_result.canonical_model_hash = snapshot.canonical_model_hash;
+    return true;
+}
+
+bool ReconcileAuditStore(const AssuranceProject& project,
+                         const std::filesystem::path& sacm_relative_path,
+                         ReconcileAuditStoreResult& out_result,
+                         std::string& error) {
+    out_result = ReconcileAuditStoreResult{};
+
+    if (project.rootPath.empty()) {
+        error = "Project has no root path; cannot reconcile audit store";
+        return false;
+    }
+    if (sacm_relative_path.empty()) {
+        error = "No SACM file path supplied for audit store reconciliation";
+        return false;
+    }
+
+    const std::filesystem::path& root = project.rootPath;
+    std::error_code ec;
+    const std::filesystem::path source_sacm = root / sacm_relative_path;
+    if (!std::filesystem::exists(source_sacm, ec)) {
+        error = "SACM file not found for audit store reconciliation: " + source_sacm.string();
+        return false;
+    }
+
+    std::filesystem::create_directories(AfDir(root), ec);
+    if (ec) {
+        error = "Could not create .af directory: " + ec.message();
+        return false;
+    }
+
+    // Build a unique backup directory under `.af/backup_<ts>[_n]/`.
+    const std::string ts = FilenameSafeNowUtc();
+    std::filesystem::path backup = AfDir(root) / ("backup_" + ts);
+    int attempt = 0;
+    while (std::filesystem::exists(backup, ec)) {
+        ++attempt;
+        backup = AfDir(root) / ("backup_" + ts + "_" + std::to_string(attempt));
+    }
+    std::filesystem::create_directories(backup, ec);
+    if (ec) {
+        error = "Could not create backup directory: " + ec.message();
+        return false;
+    }
+
+    // Move prior manifest, snapshots and event log into the backup. Each call
+    // tolerates a missing source, so partially-initialized stores still
+    // reconcile cleanly.
+    if (!MoveIntoBackup(ManifestPath(root), backup / kManifestFileName, error))
+        return false;
+    if (!MoveIntoBackup(SnapshotsDir(root), backup / kSnapshotsDirName, error))
+        return false;
+    if (!MoveIntoBackup(AuditDir(root), backup / kAuditDirName, error))
+        return false;
+
+    EnsureAuditStoreResult ensure;
+    if (!EnsureAuditStore(project, sacm_relative_path, ensure, error))
+        return false;
+
+    out_result.backup_dir = backup.string();
+    out_result.snapshot_id = ensure.snapshot_id;
+    out_result.canonical_model_hash = ensure.canonical_model_hash;
     return true;
 }
 

@@ -16,6 +16,7 @@
 #include "app/guideline_catalog.h"
 #include "core/app_state.h"
 #include "core/assurance_tree.h"
+#include "core/audit/replay_verifier.h"
 #include "core/problems/problems_manager.h"
 #include "core/terminology_package_service.h"
 #include "core/tree_editing.h"
@@ -155,6 +156,12 @@ struct AppRuntimeState {
     // no project SACM file is active. Nullptr is the legacy direct-mutation
     // fallback (e.g. when a SACM file is opened outside any project).
     std::unique_ptr<core::commands::CommandBus> command_bus;
+
+    // Most recent audit replay verification result for the currently-loaded
+    // project SACM file. Populated immediately after the project file is
+    // opened; cleared on project close. When `ran && !success` the History
+    // Timeline area surfaces a warning banner offering to reconcile.
+    std::optional<core::audit::ReplayVerificationResult> last_audit_verification;
 
     bool tree_needs_rebuild = false;
     core::AssuranceTree current_tree;

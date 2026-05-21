@@ -3,6 +3,7 @@ add_library(af_core OBJECT
     acp/acp_relationship_index.cpp
     acp/assurance_claim_point.cpp
     app_state.cpp
+    argument_package_projection.cpp
     assurance_tree.cpp
     audit/audit_event.cpp
     audit/audit_diff.cpp
@@ -13,6 +14,7 @@ add_library(af_core OBJECT
     audit/audit_transaction.cpp
     audit/canonical_model_hash.cpp
     audit/event_replayer.cpp
+    audit/event_scope.cpp
     audit/event_store.cpp
     audit/history_highlights.cpp
     audit/history_reconstruction.cpp

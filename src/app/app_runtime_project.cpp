@@ -8,6 +8,7 @@
 #include "app/recent_projects.h"
 #include "core/acp/assurance_claim_point.h"
 #include "core/audit/replay_verifier.h"
+#include "core/audit/audit_store.h"
 #include "core/commands/command_bus.h"
 #include "core/problems/problem_utils.h"
 #include "core/project_service.h"
@@ -333,19 +334,24 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
         // Audit replay verification (design §13). Best-effort: a mismatch is
         // surfaced as a warning, not an error — the loaded SACM remains the
         // user's working state.
+        impl_->last_audit_verification.reset();
         if (impl_->app_state.current_project.has_value()) {
             auto verification =
                 core::audit::VerifyProject(impl_->app_state.current_project.value());
             if (verification.ran && !verification.success) {
-                std::string msg = "Audit replay verification failed:";
+                std::string msg = "Audit replay verification failed — the recorded "
+                                  "history no longer reproduces the on-disk SACM. "
+                                  "Open the History Timeline tab to reconcile.";
                 for (const auto& d : verification.diagnostics)
                     msg += "\n  - " + d;
                 SetStatus(msg);
             }
+            impl_->last_audit_verification = std::move(verification);
             // Surface the History Timeline tab once a project with an audit
             // store has been opened, so the user can browse the recorded
             // transactions. View > History Timeline still toggles visibility.
-            if (verification.ran) {
+            if (impl_->last_audit_verification.has_value() &&
+                impl_->last_audit_verification->ran) {
                 impl_->workbench.show_history_timeline_tab = true;
             }
         }
@@ -381,6 +387,63 @@ void AppRuntime::ConfirmPendingProjectFileOpen(bool save_current) {
     impl_->project_controller->pending_open_project_file_entry.reset();
     impl_->project_controller->show_save_before_project_file_open_modal = false;
     PerformOpenProjectFile(entry);
+}
+
+bool AppRuntime::ReconcileAuditStore() {
+    if (!impl_->app_state.current_project.has_value()) {
+        SetStatus("Cannot reconcile audit log: no project is open.");
+        return false;
+    }
+    if (impl_->app_state.active_project_file_role != core::ProjectFileRole::SacmArgument) {
+        SetStatus("Cannot reconcile audit log: no SACM file is active.");
+        return false;
+    }
+
+    const core::AssuranceProject& project = impl_->app_state.current_project.value();
+    // Locate the currently-active project file entry so we can re-open it
+    // after the audit store has been rebuilt.
+    const core::ProjectFileEntry* active_entry = nullptr;
+    for (const auto& f : project.files) {
+        if (project.rootPath / f.relativePath == impl_->app_state.active_project_file_path) {
+            active_entry = &f;
+            break;
+        }
+    }
+    if (!active_entry) {
+        SetStatus("Cannot reconcile audit log: active SACM file is no longer listed in the project.");
+        return false;
+    }
+
+    // Persist any in-memory edits first; the new initial snapshot is built
+    // from the on-disk SACM bytes, so we want them to reflect live state.
+    if (impl_->document_dirty) {
+        if (!SaveProject()) {
+            SetStatus("Cannot reconcile audit log: failed to save current SACM file.");
+            return false;
+        }
+    }
+
+    // Tear down the bus before mutating the audit store; the bus holds an
+    // open handle to `transactions.af.jsonl` on Windows and rename would
+    // fail otherwise.
+    impl_->command_bus.reset();
+    if (impl_->element_edit_controller)
+        impl_->element_edit_controller->SetCommandBus(nullptr);
+
+    core::ProjectFileEntry entry_copy = *active_entry;
+    core::audit::ReconcileAuditStoreResult result;
+    std::string error;
+    if (!core::audit::ReconcileAuditStore(project, entry_copy.relativePath, result, error)) {
+        SetStatus("Audit reconciliation failed: " + error);
+        return false;
+    }
+
+    SetStatus("Audit log reconciled. Previous artifacts backed up to " + result.backup_dir + ".");
+
+    // Re-open the SACM file: this reinstalls the command bus over the fresh
+    // event store and re-runs replay verification (which should now succeed).
+    PerformOpenProjectFile(entry_copy);
+    return true;
 }
 
 void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {

@@ -4,6 +4,7 @@
 #include "app/areas/history_timeline_area.h"
 #include "app/frame/app_layout_regions.h"
 #include "app/frame/app_shell.h"
+#include "core/argument_package_projection.h"
 #include "core/perf/frame_profiler.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_adapter.h"
@@ -59,45 +60,13 @@ void AddElementIdentity(const ElementT& element,
 
 const sacm::ArgumentPackage* FindArgumentPackage(const sacm::AssuranceCasePackage& package,
                                                  const WorkbenchState::ArgumentPackageCanvasTab& tab) {
-    auto found = std::find_if(package.argumentPackages.begin(), package.argumentPackages.end(), [&](const auto& pkg) {
-        const bool id_matches = !tab.package_id.empty() && pkg.id == tab.package_id;
-        const bool gid_matches = !tab.package_gid.empty() && pkg.gid == tab.package_gid;
-        return id_matches || gid_matches;
-    });
-    return found == package.argumentPackages.end() ? nullptr : &*found;
+    return core::FindArgumentPackageByIdentity(package, tab.package_id, tab.package_gid);
 }
 
 parser::AssuranceCase BuildArgumentPackageProjection(const parser::AssuranceCase& source_model,
                                                      const sacm::ArgumentPackage& argument_package,
                                                      const std::string& fallback_name) {
-    std::unordered_set<std::string> element_ids;
-    std::unordered_set<std::string> element_gids;
-    for (const sacm::Claim& claim : argument_package.claims)
-        AddElementIdentity(claim, element_ids, element_gids);
-    for (const sacm::ArgumentReasoning& reasoning : argument_package.argumentReasonings)
-        AddElementIdentity(reasoning, element_ids, element_gids);
-    for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences)
-        AddElementIdentity(artifact_reference, element_ids, element_gids);
-    for (const sacm::AssertedInference& inference : argument_package.assertedInferences)
-        AddElementIdentity(inference, element_ids, element_gids);
-    for (const sacm::AssertedContext& context : argument_package.assertedContexts)
-        AddElementIdentity(context, element_ids, element_gids);
-    for (const sacm::AssertedEvidence& evidence : argument_package.assertedEvidences)
-        AddElementIdentity(evidence, element_ids, element_gids);
-
-    parser::AssuranceCase projection;
-    projection.id = argument_package.id.empty() ? source_model.id : argument_package.id;
-    projection.name = argument_package.name.empty() ? fallback_name : argument_package.name;
-    projection.description = argument_package.description;
-    for (const parser::SacmElement& element : source_model.elements) {
-        if (element_ids.count(element.id) > 0 || element_gids.count(element.gid) > 0)
-            projection.elements.push_back(element);
-    }
-    for (const parser::AcpRecord& acp : source_model.acps) {
-        if (element_ids.count(acp.target_id) > 0 || element_gids.count(acp.target_id) > 0)
-            projection.acps.push_back(acp);
-    }
-    return projection;
+    return core::BuildArgumentPackageProjection(source_model, argument_package, fallback_name);
 }
 
 ui::ElementContextActions MakeProposalContextActions(const WorkbenchAreaCallbacks& callbacks) {
@@ -429,7 +398,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                                                   : 0;
             if (ImGui::BeginTabItem("History Timeline", nullptr, history_flags)) {
                 ui_state.center_view = ui::CenterView::HistoryTimeline;
-                RenderHistoryTimelineArea(state);
+                RenderHistoryTimelineArea(state, callbacks);
                 ImGui::EndTabItem();
             }
         }
