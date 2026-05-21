@@ -170,7 +170,8 @@ void RefreshReconstruction(ReconstructionCache& cache,
 void RenderHistoricalCanvas(CanvasHistoryState& tab_state,
                             ui::UiState& ui_state,
                             const std::vector<core::audit::AuditTransaction>& transactions,
-                            std::uint64_t target_seq) {
+                            std::uint64_t target_seq,
+                            const ui::gsn::CanvasOverlayButtons* overlay_buttons) {
     if (!tab_state.reconstruction.has_state) {
         if (!tab_state.reconstruction.error.empty())
             ImGui::TextDisabled("Reconstruction failed: %s", tab_state.reconstruction.error.c_str());
@@ -204,7 +205,7 @@ void RenderHistoricalCanvas(CanvasHistoryState& tab_state,
     ui::ElementContextActions readonly_actions;
     ui::gsn::ShowGsnCanvasContentWithRenderer(tab_state.historical_renderer, ui_state,
                                               &tab_state.reconstruction.state.model,
-                                              readonly_actions, nullptr);
+                                              readonly_actions, nullptr, overlay_buttons);
 }
 
 } // namespace
@@ -251,7 +252,8 @@ void RenderCanvasHistoryOverlay(AppRuntimeState& state,
                                 WorkbenchState::ArgumentPackageCanvasTab& tab,
                                 const sacm::ArgumentPackage& argument_package,
                                 const parser::AssuranceCase& live_projection,
-                                ui::gsn::GsnCanvas& live_renderer) {
+                                ui::gsn::GsnCanvas& live_renderer,
+                                const ui::gsn::CanvasOverlayButtons* overlay_buttons) {
     if (!state.app_state.current_project.has_value()) {
         ImGui::TextDisabled("Open a project to browse history.");
         return;
@@ -294,22 +296,10 @@ void RenderCanvasHistoryOverlay(AppRuntimeState& state,
 
     if (live) {
         model.selected_sequence.reset();
-        model.reconstructed_element_count =
-            argument_package.claims.size() + argument_package.argumentReasonings.size() +
-            argument_package.artifactReferences.size() + argument_package.assertedInferences.size() +
-            argument_package.assertedContexts.size() + argument_package.assertedEvidences.size();
-        model.reconstructed_canonical_hash =
-            state.app_state.sacm_package.has_value()
-                ? core::audit::CanonicalModelHash(state.app_state.sacm_package.value())
-                : std::string{};
-        model.reconstruction_error.clear();
     } else {
         RefreshReconstruction(tab_state.reconstruction, tab_state, project, target_seq,
                               argument_package);
         model.selected_sequence = tab.selected_transaction_sequence;
-        model.reconstructed_element_count = tab_state.reconstruction.element_count;
-        model.reconstructed_canonical_hash = tab_state.reconstruction.canonical_hash;
-        model.reconstruction_error = tab_state.reconstruction.error;
     }
 
     ui::panels::HistoryTimelinePanelCallbacks slider_callbacks;
@@ -331,6 +321,16 @@ void RenderCanvasHistoryOverlay(AppRuntimeState& state,
     else
         ImGui::SeparatorText((std::string("Reconstructed (read-only)") + scope_label).c_str());
 
+    // Augment the incoming overlay buttons with a return-to-live affordance
+    // whenever we're pinned to a past transaction.
+    ui::gsn::CanvasOverlayButtons inner_buttons;
+    if (overlay_buttons)
+        inner_buttons = *overlay_buttons;
+    if (!live)
+        inner_buttons.on_return_to_live = [&tab]() { tab.selected_transaction_sequence.reset(); };
+    const ui::gsn::CanvasOverlayButtons* inner_buttons_ptr =
+        (overlay_buttons || !live) ? &inner_buttons : nullptr;
+
     const float remaining = ImGui::GetContentRegionAvail().y;
     const float spacing = ImGui::GetStyle().ItemSpacing.y;
     const float canvas_h = std::max(120.0f, (remaining - spacing) * 0.65f);
@@ -345,9 +345,11 @@ void RenderCanvasHistoryOverlay(AppRuntimeState& state,
         const sacm::AssuranceCasePackage* terminology_package =
             state.app_state.sacm_package.has_value() ? &state.app_state.sacm_package.value() : nullptr;
         ui::gsn::ShowGsnCanvasContentWithRenderer(live_renderer, ui_state, &live_projection,
-                                                  readonly_actions, terminology_package);
+                                                  readonly_actions, terminology_package,
+                                                  inner_buttons_ptr);
     } else {
-        RenderHistoricalCanvas(tab_state, ui_state, visible_transactions, target_seq);
+        RenderHistoricalCanvas(tab_state, ui_state, visible_transactions, target_seq,
+                               inner_buttons_ptr);
     }
     ImGui::EndChild();
 

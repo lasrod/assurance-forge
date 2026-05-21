@@ -9,6 +9,7 @@
 #include "ui/ui_state.h"
 
 #include <cstddef>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -89,11 +90,24 @@ void ShowGsnCanvasContent(UiState& ui_state,
                           const ElementContextActions& actions,
                           const sacm::AssuranceCasePackage* terminology_package = nullptr);
 
+// Optional set of in-canvas overlay buttons rendered next to the zoom strip.
+// The canvas keeps this layer-clean by carrying only primitives and callbacks;
+// owners (app layer) interpret the actions. Presence of a callback signals
+// that the corresponding button should be rendered.
+struct CanvasOverlayButtons {
+    bool history_enabled = true;
+    bool history_active = false;
+    const char* history_disabled_tooltip = nullptr;
+    std::function<void()> on_toggle_history;     // Renders the history toggle when set.
+    std::function<void()> on_return_to_live;     // Renders the return-to-live button when set.
+};
+
 void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
                                       UiState& ui_state,
                                       const parser::AssuranceCase* active_case,
                                       const ElementContextActions& actions,
-                                      const sacm::AssuranceCasePackage* terminology_package = nullptr);
+                                      const sacm::AssuranceCasePackage* terminology_package = nullptr,
+                                      const CanvasOverlayButtons* overlay_buttons = nullptr);
 
 // Provide a simple setter so external code (app) can push elements to the
 // canvas renderer (legacy).

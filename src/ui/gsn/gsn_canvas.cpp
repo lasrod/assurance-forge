@@ -369,7 +369,8 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
                                       UiState& ui_state,
                                       const parser::AssuranceCase* active_case,
                                       const ElementContextActions& actions,
-                                      const sacm::AssuranceCasePackage* terminology_package) {
+                                      const sacm::AssuranceCasePackage* terminology_package,
+                                      const CanvasOverlayButtons* overlay_buttons) {
     // Child region with clipping; we manage our own pan/zoom offset
     // so no ImGui scrollbars are needed.
     ImU32 canvas_bg = GetTheme().canvas_bg;
@@ -513,6 +514,24 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
                 overlay_hovered = true;
             }
         }
+
+        // History overlay pill rect (left of zoom strip). Matches geometry in
+        // the render block below so node clicks under the pill are suppressed.
+        if (overlay_buttons && overlay_buttons->on_toggle_history) {
+            const bool show_return = static_cast<bool>(overlay_buttons->on_return_to_live);
+            const int num_btns = show_return ? 2 : 1;
+            float h_pad = DpiSize(6.0f);
+            float h_pill_w = num_btns * btn_sz + h_pad * 2.0f;
+            float h_pill_h = btn_sz + DpiSize(4.0f);
+            float h_pill_right = zoom_tl.x - DpiSize(6.0f);
+            float h_pill_left = h_pill_right - h_pill_w;
+            float h_pill_top = zy - DpiSize(2.0f);
+            float h_pill_bot = h_pill_top + h_pill_h;
+            if (mouse_pos.x >= h_pill_left && mouse_pos.x <= h_pill_right &&
+                mouse_pos.y >= h_pill_top && mouse_pos.y <= h_pill_bot) {
+                overlay_hovered = true;
+            }
+        }
     }
 
     // Render the canvas content
@@ -605,6 +624,62 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
         ImGui::SameLine(0.0f, 0.0f);
         if (ImGui::Button("+##zoom_in", ImVec2(button_size, button_size))) {
             renderer.ZoomIn();
+        }
+
+        // --- History overlay pill (left of zoom strip) ---
+        if (overlay_buttons && overlay_buttons->on_toggle_history) {
+            const bool show_return = static_cast<bool>(overlay_buttons->on_return_to_live);
+            const int num_btns = show_return ? 2 : 1;
+            float h_pad = DpiSize(6.0f);
+            float h_pill_w = num_btns * button_size + h_pad * 2.0f;
+            float h_pill_h = button_size + DpiSize(4.0f);
+            float h_pill_right = strip_tl.x - DpiSize(6.0f);
+            float h_pill_left = h_pill_right - h_pill_w;
+            float h_pill_top = buttons_y - DpiSize(2.0f);
+
+            const Theme& th_hist = GetTheme();
+            ImDrawList* fg_hist = ImGui::GetWindowDrawList();
+            fg_hist->AddRectFilled(ImVec2(h_pill_left, h_pill_top),
+                                   ImVec2(h_pill_left + h_pill_w, h_pill_top + h_pill_h),
+                                   WithAlpha(th_hist.surface_2, 0.85f), DpiSize(8.0f));
+            fg_hist->AddRect(ImVec2(h_pill_left, h_pill_top),
+                             ImVec2(h_pill_left + h_pill_w, h_pill_top + h_pill_h),
+                             th_hist.border, DpiSize(8.0f), 0, DpiSize(1.0f));
+
+            float btn_x = h_pill_left + h_pad;
+            float btn_y = buttons_y;
+
+            if (show_return) {
+                ImGui::SetCursorScreenPos(ImVec2(btn_x, btn_y));
+                if (ImGui::Button("Live##return_to_live", ImVec2(button_size, button_size)))
+                    overlay_buttons->on_return_to_live();
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Return to live view");
+                btn_x += button_size;
+            }
+
+            ImGui::SetCursorScreenPos(ImVec2(btn_x, btn_y));
+            ImGui::BeginDisabled(!overlay_buttons->history_enabled);
+            const bool tint_active = overlay_buttons->history_active;
+            if (tint_active) {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(
+                                                          WithAlpha(th_hist.accent, 0.85f)));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                      ImGui::ColorConvertU32ToFloat4(th_hist.accent_hover));
+            }
+            if (ImGui::Button("H##history_toggle", ImVec2(button_size, button_size)))
+                overlay_buttons->on_toggle_history();
+            const bool history_btn_hovered =
+                ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
+            if (tint_active)
+                ImGui::PopStyleColor(2);
+            ImGui::EndDisabled();
+            if (history_btn_hovered) {
+                if (!overlay_buttons->history_enabled && overlay_buttons->history_disabled_tooltip)
+                    ImGui::SetTooltip("%s", overlay_buttons->history_disabled_tooltip);
+                else if (overlay_buttons->history_enabled)
+                    ImGui::SetTooltip(overlay_buttons->history_active ? "Hide history" : "Show history");
+            }
         }
     }
 

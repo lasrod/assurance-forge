@@ -27,16 +27,8 @@ struct HistoryTimelinePanelModel {
     // All transactions in append order, owned by the caller.
     const std::vector<core::audit::AuditTransaction>* transactions = nullptr;
 
-    // Sequence the panel is currently pinned to. std::nullopt means "live"
-    // (no reconstruction performed; the panel just shows the log).
+    // Sequence the panel is currently pinned to. std::nullopt means "live".
     std::optional<std::uint64_t> selected_sequence;
-
-    // Summary of the reconstructed state at `selected_sequence`. Populated by
-    // the area after running the replayer. `reconstruction_error` short-
-    // circuits the summary when replay fails.
-    std::size_t reconstructed_element_count = 0;
-    std::string reconstructed_canonical_hash;
-    std::string reconstruction_error;
 };
 
 struct HistoryTimelinePanelCallbacks {
@@ -47,16 +39,11 @@ struct HistoryTimelinePanelCallbacks {
     std::function<void()> on_return_to_live;
 };
 
-void ShowHistoryTimelinePanel(const HistoryTimelinePanelModel& model,
-                              const HistoryTimelinePanelCallbacks& callbacks);
-
-// Render only the banner + slider + reconstructed-state summary. Used by the
-// area when it wants to sandwich the embedded reconstructed canvas between
-// the header and the transactions table.
+// Render the compact transaction slider above the canvas.
 void ShowHistoryTimelineHeader(const HistoryTimelinePanelModel& model,
                                const HistoryTimelinePanelCallbacks& callbacks);
 
-// Render only the transactions table. Pair with `ShowHistoryTimelineHeader`.
+// Render the transactions table. Pair with `ShowHistoryTimelineHeader`.
 void ShowHistoryTimelineTransactions(const HistoryTimelinePanelModel& model,
                                      const HistoryTimelinePanelCallbacks& callbacks);
 

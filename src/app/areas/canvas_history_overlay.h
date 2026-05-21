@@ -7,7 +7,7 @@
 #include <string>
 
 namespace ui { class UiState; }
-namespace ui::gsn { class GsnCanvas; }
+namespace ui::gsn { class GsnCanvas; struct CanvasOverlayButtons; }
 namespace sacm { struct ArgumentPackage; }
 
 namespace app::areas {
@@ -42,7 +42,8 @@ void RenderCanvasHistoryOverlay(::app::AppRuntimeState& state,
                                 ::app::WorkbenchState::ArgumentPackageCanvasTab& tab,
                                 const sacm::ArgumentPackage& argument_package,
                                 const parser::AssuranceCase& live_projection,
-                                ui::gsn::GsnCanvas& live_renderer);
+                                ui::gsn::GsnCanvas& live_renderer,
+                                const ui::gsn::CanvasOverlayButtons* overlay_buttons);
 
 // Drop overlay state for a closed tab.
 void ForgetCanvasHistoryTab(const std::string& tab_key);

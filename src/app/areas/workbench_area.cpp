@@ -174,17 +174,6 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
     if (has_audit_store)
         RenderCanvasDivergenceBanner(state, callbacks);
 
-    // Per-tab toolbar: history toggle. Disabled when there is no audit
-    // store for the project.
-    ImGui::BeginDisabled(!has_audit_store);
-    bool show_history_local = tab.show_history;
-    if (ImGui::Checkbox("Show history", &show_history_local))
-        tab.show_history = show_history_local;
-    ImGui::EndDisabled();
-    if (!has_audit_store && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-        ImGui::SetTooltip("This project has no audit store.");
-    ImGui::Separator();
-
     ArgumentPackageTabCache& cache = g_argument_package_canvas_caches[tab.key];
     const std::uint64_t current_revision = state.app_state.case_revision;
     const bool inputs_match = cache.valid && cache.case_revision == current_revision &&
@@ -220,15 +209,25 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
         cache.renderer_seeded = true;
     }
 
+    ui::gsn::CanvasOverlayButtons overlay_buttons;
+    overlay_buttons.history_enabled = has_audit_store;
+    overlay_buttons.history_active = tab.show_history && has_audit_store;
+    overlay_buttons.history_disabled_tooltip = "This project has no audit store.";
+    overlay_buttons.on_toggle_history = [&tab, has_audit_store]() {
+        if (has_audit_store)
+            tab.show_history = !tab.show_history;
+    };
+
     if (tab.show_history && has_audit_store) {
         // Delegate to the overlay; it handles the live/historical split and
         // owns its own per-tab caches.
         RenderCanvasHistoryOverlay(state, ui_state, callbacks, tab, *argument_package,
-                                   cache.visible_case, renderer);
+                                   cache.visible_case, renderer, &overlay_buttons);
     } else {
         core::perf::ScopedTimer perf_scope("app.wb.show_canvas_content");
         ui::gsn::ShowGsnCanvasContentWithRenderer(
-            renderer, ui_state, &cache.visible_case, actions, &state.app_state.sacm_package.value());
+            renderer, ui_state, &cache.visible_case, actions, &state.app_state.sacm_package.value(),
+            &overlay_buttons);
     }
 }
 

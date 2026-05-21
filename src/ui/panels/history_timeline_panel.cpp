@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
 #include <string>
 
 namespace ui::panels {
@@ -45,19 +46,82 @@ void RenderEmptyState(const HistoryTimelinePanelModel& model) {
         "each command will appear here.");
 }
 
-} // namespace
-
-void ShowHistoryTimelinePanel(const HistoryTimelinePanelModel& model,
+// Compact int slider modeled on `DrawOpinionSliderBar` in confidence_panel.cpp.
+// Label on the left, "N / M" value on the right, draggable rounded bar with a
+// circular handle. Snaps to integer values.
+void DrawTransactionSliderBar(int& value, int min_v, int max_v,
                               const HistoryTimelinePanelCallbacks& callbacks) {
-    if (!model.has_audit_store || !model.transactions || model.transactions->empty()) {
-        RenderEmptyState(model);
-        return;
+    const Theme& theme = GetTheme();
+    value = std::clamp(value, min_v, max_v);
+
+    ImGui::PushID("##transaction_slider_bar");
+    const float line_height = ImGui::GetTextLineHeight();
+    const float available_width = ImGui::GetContentRegionAvail().x;
+    const float bar_height = std::max(8.0f, line_height * 0.52f);
+
+    char value_text[48];
+    std::snprintf(value_text, sizeof(value_text), "%d / %d", value, max_v);
+    const float value_width = ImGui::CalcTextSize(value_text).x;
+    const char* label = "Transaction";
+    const float label_width = ImGui::CalcTextSize(label).x;
+
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(label);
+    const bool value_fits_on_label_line =
+        label_width + ImGui::GetStyle().ItemSpacing.x + value_width <= available_width;
+    if (value_fits_on_label_line) {
+        const float value_x =
+            std::max(label_width + ImGui::GetStyle().ItemSpacing.x, available_width - value_width);
+        ImGui::SameLine(value_x);
     }
-    ShowHistoryTimelineHeader(model, callbacks);
-    ImGui::Spacing();
-    ImGui::SeparatorText("Transactions");
-    ShowHistoryTimelineTransactions(model, callbacks);
+    ImGui::TextUnformatted(value_text);
+
+    const ImVec2 cursor = ImGui::GetCursorScreenPos();
+    const ImVec2 size(std::max(24.0f, ImGui::GetContentRegionAvail().x), line_height + 2.0f);
+    ImGui::InvisibleButton("##bar", size);
+    const bool hovered = ImGui::IsItemHovered();
+    const bool active = ImGui::IsItemActive();
+
+    if (active && ImGui::IsMouseDown(ImGuiMouseButton_Left) && max_v > min_v) {
+        const float t = std::clamp((ImGui::GetIO().MousePos.x - cursor.x) / std::max(1.0f, size.x),
+                                   0.0f, 1.0f);
+        const int next_value =
+            min_v + static_cast<int>(t * static_cast<float>(max_v - min_v) + 0.5f);
+        if (next_value != value) {
+            value = next_value;
+            if (callbacks.on_select_sequence)
+                callbacks.on_select_sequence(static_cast<std::uint64_t>(next_value));
+        }
+    }
+
+    if (hovered || active)
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+
+    const float t = (max_v > min_v)
+        ? static_cast<float>(value - min_v) / static_cast<float>(max_v - min_v)
+        : 1.0f;
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    const float y = cursor.y + (line_height - bar_height) * 0.5f;
+    const ImVec2 mn(cursor.x, y);
+    const ImVec2 mx(cursor.x + size.x, y + bar_height);
+    const float fill_x = mn.x + size.x * t;
+    const ImU32 color = theme.accent;
+    draw_list->AddRectFilled(
+        mn, mx, WithAlpha(theme.surface_3, hovered || active ? 0.86f : 0.60f), bar_height * 0.5f);
+    draw_list->AddRectFilled(mn, ImVec2(fill_x, mx.y), WithAlpha(color, active ? 1.0f : 0.88f),
+                             bar_height * 0.5f);
+    draw_list->AddCircleFilled(ImVec2(fill_x, (mn.y + mx.y) * 0.5f), active ? 6.0f : 4.8f,
+                               theme.text_primary, 18);
+    draw_list->AddCircleFilled(ImVec2(fill_x, (mn.y + mx.y) * 0.5f), active ? 4.0f : 3.0f, color,
+                               18);
+
+    if (hovered || active)
+        ImGui::SetTooltip("Drag to scrub transaction history");
+
+    ImGui::PopID();
 }
+
+} // namespace
 
 void ShowHistoryTimelineHeader(const HistoryTimelinePanelModel& model,
                                const HistoryTimelinePanelCallbacks& callbacks) {
@@ -70,62 +134,8 @@ void ShowHistoryTimelineHeader(const HistoryTimelinePanelModel& model,
     const std::uint64_t latest_seq = transactions.back().transaction_sequence;
     const std::uint64_t selected = model.selected_sequence.value_or(latest_seq);
 
-    // Status banner.
-    const bool live = !model.selected_sequence.has_value();
-    const ImU32 banner_bg = live
-        ? ui::GetTheme().surface_1
-        : ui::LerpColor(ui::GetTheme().surface_1, ui::GetTheme().attention, 0.18f);
-    const float banner_h = ImGui::GetStyle().WindowPadding.y * 2.0f +
-                           ImGui::GetTextLineHeightWithSpacing() * 2.0f;
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(banner_bg));
-    ImGui::BeginChild("##history_banner", ImVec2(0.0f, banner_h), true, ImGuiWindowFlags_NoScrollbar);
-    if (live) {
-        ImGui::TextUnformatted("LIVE — showing the latest recorded state.");
-        ImGui::TextDisabled("%llu transaction(s) recorded.",
-                            static_cast<unsigned long long>(transactions.size()));
-    } else {
-        ImGui::TextUnformatted("HISTORICAL VIEW (read-only)");
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Return to live") && callbacks.on_return_to_live)
-            callbacks.on_return_to_live();
-        ImGui::TextDisabled("Reconstructed at transaction %llu of %llu.",
-                            static_cast<unsigned long long>(selected),
-                            static_cast<unsigned long long>(latest_seq));
-    }
-    ImGui::EndChild();
-    ImGui::PopStyleColor();
-
-    ImGui::Spacing();
-
-    // Slider over [0, latest]. 0 = initial snapshot, latest = current.
     int slider_value = static_cast<int>(selected);
-    const int slider_min = 0;
-    const int slider_max = static_cast<int>(latest_seq);
-    ImGui::SetNextItemWidth(-FLT_MIN);
-    if (ImGui::SliderInt("##history_slider", &slider_value, slider_min, slider_max,
-                         "Transaction %d", ImGuiSliderFlags_AlwaysClamp)) {
-        if (callbacks.on_select_sequence) {
-            const std::uint64_t target = static_cast<std::uint64_t>(std::clamp(slider_value, slider_min, slider_max));
-            callbacks.on_select_sequence(target);
-        }
-    }
-
-    ImGui::Spacing();
-
-    // Reconstructed-state summary.
-    ImGui::SeparatorText("Reconstructed state");
-    if (!model.reconstruction_error.empty()) {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(ui::GetTheme().attention));
-        ImGui::TextWrapped("Reconstruction failed: %s", model.reconstruction_error.c_str());
-        ImGui::PopStyleColor();
-    } else {
-        ImGui::Text("Elements: %zu", model.reconstructed_element_count);
-        if (model.reconstructed_canonical_hash.empty()) {
-            ImGui::TextDisabled("Canonical hash: (pending)");
-        } else {
-            ImGui::TextDisabled("Canonical hash: %s", model.reconstructed_canonical_hash.c_str());
-        }
-    }
+    DrawTransactionSliderBar(slider_value, 0, static_cast<int>(latest_seq), callbacks);
 }
 
 void ShowHistoryTimelineTransactions(const HistoryTimelinePanelModel& model,
