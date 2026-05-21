@@ -341,19 +341,12 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
             if (verification.ran && !verification.success) {
                 std::string msg = "Audit replay verification failed — the recorded "
                                   "history no longer reproduces the on-disk SACM. "
-                                  "Open the History Timeline tab to reconcile.";
+                                  "Toggle 'Show history' on a canvas tab to reconcile.";
                 for (const auto& d : verification.diagnostics)
                     msg += "\n  - " + d;
                 SetStatus(msg);
             }
             impl_->last_audit_verification = std::move(verification);
-            // Surface the History Timeline tab once a project with an audit
-            // store has been opened, so the user can browse the recorded
-            // transactions. View > History Timeline still toggles visibility.
-            if (impl_->last_audit_verification.has_value() &&
-                impl_->last_audit_verification->ran) {
-                impl_->workbench.show_history_timeline_tab = true;
-            }
         }
     } else if (entry.role == core::ProjectFileRole::EvidenceRegister) {
         impl_->workbench.show_evidence_tab = true;

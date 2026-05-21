@@ -280,6 +280,7 @@ add_executable(tests
     tests/test_history_reconstruction.cpp
     tests/test_reconcile_audit_store.cpp
     tests/test_argument_package_projection.cpp
+    tests/test_canvas_history_overlay.cpp
 )
 # Production sources are pulled in via the per-layer af_* OBJECT libraries
 # (see src/<layer>/CMakeLists.txt). The tests target intentionally links

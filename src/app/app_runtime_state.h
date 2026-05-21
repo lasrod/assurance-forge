@@ -25,6 +25,7 @@
 namespace core::commands { class CommandBus; }
 
 #include <filesystem>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <optional>
@@ -58,6 +59,14 @@ struct WorkbenchState {
         std::string package_gid;
         std::string title;
         std::filesystem::path source_file_path;
+        // Whether the History overlay (slider + transactions table) is
+        // currently shown inside this canvas tab. Per-tab so each open
+        // ArgumentPackage canvas can independently scrub its own history.
+        bool show_history = false;
+        // History slider selection for this canvas tab. std::nullopt = LIVE
+        // (renders the current model). A value pins the canvas to the
+        // reconstructed state after applying transaction N.
+        std::optional<std::uint64_t> selected_transaction_sequence;
     };
 
     bool force_center_tab_selection = false;
@@ -69,7 +78,6 @@ struct WorkbenchState {
     bool show_evidence_tab = false;
     bool show_package_details_tab = false;
     bool show_terminology_package_tab = false;
-    bool show_history_timeline_tab = false;
     std::vector<ArgumentPackageCanvasTab> argument_package_canvas_tabs;
     std::string active_argument_package_canvas_key;
 };

@@ -19,7 +19,6 @@ enum class CenterView {
     EvidenceRegister,
     PackageDetails,
     TerminologyPackage,
-    HistoryTimeline,
 };
 
 enum class ProblemFilter {
@@ -102,13 +101,6 @@ struct UiState {
     // true, the perf overlay window is shown with profiler buckets, render
     // stats, and feature toggles.
     bool show_perf_overlay = false;
-
-    // History Timeline panel selection. std::nullopt means the panel is
-    // showing the live/latest state; a value pins the panel to that
-    // transaction sequence (0 = initial snapshot, N = state after applying
-    // transaction N). The panel keeps a small reconstruction cache keyed on
-    // this value.
-    std::optional<std::uint64_t> history_selected_transaction_sequence;
 };
 
 // Global shared UI state accessible from all panels.

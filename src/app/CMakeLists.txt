@@ -18,8 +18,8 @@ add_library(af_app OBJECT
     app_ui_bootstrap.cpp
     areas/ai_debug_area.cpp
     areas/argument_navigator_area.cpp
+    areas/canvas_history_overlay.cpp
     areas/feedback_dock_area.cpp
-    areas/history_timeline_area.cpp
     areas/inspector_area.cpp
     areas/modal_host.cpp
     areas/modal_host_terminology.cpp

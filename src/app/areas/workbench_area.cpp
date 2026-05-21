@@ -1,7 +1,7 @@
 #include "app/areas/workbench_area.h"
 
 #include "app/app_runtime_state.h"
-#include "app/areas/history_timeline_area.h"
+#include "app/areas/canvas_history_overlay.h"
 #include "app/frame/app_layout_regions.h"
 #include "app/frame/app_shell.h"
 #include "core/argument_package_projection.h"
@@ -154,7 +154,7 @@ void RenderGsnCanvasTab(AppRuntimeState& state, ui::UiState& ui_state, const Wor
 void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
                                     ui::UiState& ui_state,
                                     const WorkbenchAreaCallbacks& callbacks,
-                                    const WorkbenchState::ArgumentPackageCanvasTab& tab) {
+                                    WorkbenchState::ArgumentPackageCanvasTab& tab) {
     ui_state.center_view = ui::CenterView::GsnCanvas;
     if (!state.app_state.loaded_case.has_value() || !state.app_state.sacm_package.has_value()) {
         ImGui::TextDisabled("No SACM argument model is loaded.");
@@ -166,6 +166,24 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
         ImGui::TextDisabled("Argument package was not found in the loaded SACM model.");
         return;
     }
+
+    // Audit divergence banner (when this project has an audit store and the
+    // last replay didn't reproduce the SACM). Drawn before the toolbar so
+    // the warning is the first thing the user sees on any package canvas.
+    const bool has_audit_store = ProjectHasAuditStore(state);
+    if (has_audit_store)
+        RenderCanvasDivergenceBanner(state, callbacks);
+
+    // Per-tab toolbar: history toggle. Disabled when there is no audit
+    // store for the project.
+    ImGui::BeginDisabled(!has_audit_store);
+    bool show_history_local = tab.show_history;
+    if (ImGui::Checkbox("Show history", &show_history_local))
+        tab.show_history = show_history_local;
+    ImGui::EndDisabled();
+    if (!has_audit_store && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip("This project has no audit store.");
+    ImGui::Separator();
 
     ArgumentPackageTabCache& cache = g_argument_package_canvas_caches[tab.key];
     const std::uint64_t current_revision = state.app_state.case_revision;
@@ -201,7 +219,13 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
         renderer.SetTree(cache.visible_tree);
         cache.renderer_seeded = true;
     }
-    {
+
+    if (tab.show_history && has_audit_store) {
+        // Delegate to the overlay; it handles the live/historical split and
+        // owns its own per-tab caches.
+        RenderCanvasHistoryOverlay(state, ui_state, callbacks, tab, *argument_package,
+                                   cache.visible_case, renderer);
+    } else {
         core::perf::ScopedTimer perf_scope("app.wb.show_canvas_content");
         ui::gsn::ShowGsnCanvasContentWithRenderer(
             renderer, ui_state, &cache.visible_case, actions, &state.app_state.sacm_package.value());
@@ -301,7 +325,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
 
         if (state.workbench.show_gsn_tab) {
             for (std::size_t index = 0; index < state.workbench.argument_package_canvas_tabs.size();) {
-                const auto& tab = state.workbench.argument_package_canvas_tabs[index];
+                auto& tab = state.workbench.argument_package_canvas_tabs[index];
                 bool open = true;
                 const bool select_tab = state.workbench.force_center_tab_selection &&
                                         state.workbench.active_argument_package_canvas_key == tab.key;
@@ -317,6 +341,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                     const bool removed_active = state.workbench.active_argument_package_canvas_key == tab.key;
                     g_argument_package_canvas_renderers.erase(tab.key);
                     g_argument_package_canvas_caches.erase(tab.key);
+                    ForgetCanvasHistoryTab(tab.key);
                     state.workbench.argument_package_canvas_tabs.erase(
                         state.workbench.argument_package_canvas_tabs.begin() + static_cast<std::ptrdiff_t>(index));
                     if (removed_active) {
@@ -387,18 +412,6 @@ void RenderWorkbenchArea(AppRuntimeState& state,
             if (ImGui::BeginTabItem("Terminology Package", nullptr, terminology_flags)) {
                 ui_state.center_view = ui::CenterView::TerminologyPackage;
                 RenderTerminologyPackageTab(state, callbacks);
-                ImGui::EndTabItem();
-            }
-        }
-
-        if (state.workbench.show_history_timeline_tab) {
-            ImGuiTabItemFlags history_flags = (state.workbench.force_center_tab_selection &&
-                                               ui_state.center_view == ui::CenterView::HistoryTimeline)
-                                                  ? ImGuiTabItemFlags_SetSelected
-                                                  : 0;
-            if (ImGui::BeginTabItem("History Timeline", nullptr, history_flags)) {
-                ui_state.center_view = ui::CenterView::HistoryTimeline;
-                RenderHistoryTimelineArea(state, callbacks);
                 ImGui::EndTabItem();
             }
         }

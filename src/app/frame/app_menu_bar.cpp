@@ -158,7 +158,6 @@ float RenderAppMenuBar(AppRuntimeState& state, bool& done, const AppMenuBarCallb
         ImGui::MenuItem(ui::Tr(ui::MessageId::GsnCanvas), nullptr, &state.workbench.show_gsn_tab);
         ImGui::MenuItem(ui::Tr(ui::MessageId::CseRegister), nullptr, &state.workbench.show_cse_tab);
         ImGui::MenuItem(ui::Tr(ui::MessageId::EvidenceRegister), nullptr, &state.workbench.show_evidence_tab);
-        ImGui::MenuItem("History Timeline", nullptr, &state.workbench.show_history_timeline_tab);
         NormalizeCenterViewSelection(state, ui_state.center_view);
 
         ImGui::Separator();
