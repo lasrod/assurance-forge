@@ -68,15 +68,45 @@ std::unique_ptr<EventStore> EventStore::Open(const std::filesystem::path& projec
     }
     std::string content(reinterpret_cast<const char*>(bytes->data()), bytes->size());
 
-    // Verify chain while parsing.
+    // Verify chain while parsing. Track the byte range of each successfully
+    // parsed line so we can recover from a torn final write (process crash
+    // or power loss between the partial write and the fsync).
+    //
+    // Torn-write recovery rule: ONLY a final line that lacks a terminating
+    // newline is considered torn. A line that ends cleanly with '\n' but
+    // fails to parse or chains incorrectly is treated as tampering — we
+    // refuse to load and surface the error so the user can decide.
     std::string previous_line_hash;
     std::size_t pos = 0;
+    std::size_t last_good_end = 0; // byte offset one past the last good '\n'
+    bool        truncated_recovery_needed = false;
+    std::string truncated_diag;
     while (pos < content.size()) {
-        std::size_t eol = content.find('\n', pos);
-        std::string line = content.substr(pos, eol == std::string::npos ? std::string::npos : eol - pos);
-        pos = (eol == std::string::npos) ? content.size() : eol + 1;
-        if (line.empty())
-            continue;
+        const std::size_t eol = content.find('\n', pos);
+        const bool        has_newline = (eol != std::string::npos);
+        std::string       line = content.substr(pos, has_newline ? eol - pos : std::string::npos);
+        const std::size_t next_pos = has_newline ? eol + 1 : content.size();
+
+        if (line.empty()) {
+            if (has_newline) {
+                last_good_end = next_pos; // blank line, harmless
+                pos = next_pos;
+                continue;
+            }
+            // Trailing whitespace with no newline — treat as torn tail.
+            truncated_recovery_needed = true;
+            truncated_diag = "Trailing partial line had no content";
+            break;
+        }
+
+        // No terminating newline => torn write. Don't try to parse; truncate
+        // to the previous good line.
+        if (!has_newline) {
+            truncated_recovery_needed = true;
+            truncated_diag = "Final line is missing newline terminator (torn write at tx #" +
+                             std::to_string(store->latest_transaction_sequence_ + 1) + ")";
+            break;
+        }
 
         AuditTransaction tx;
         std::string parse_err;
@@ -96,6 +126,33 @@ std::unique_ptr<EventStore> EventStore::Open(const std::filesystem::path& projec
         store->transactions_.push_back(std::move(tx));
 
         previous_line_hash = Sha256::HexDigest(line);
+        last_good_end = next_pos;
+        pos = next_pos;
+    }
+
+    if (truncated_recovery_needed) {
+        // Repair: truncate the on-disk log to the last fully-committed line
+        // so subsequent appends chain cleanly. Do this via temp-file +
+        // atomic rename so the repair itself is crash-safe.
+        const std::string repaired(content.data(), last_good_end);
+        auto              w = WriteTextFileAtomic(store->log_path_, repaired);
+        if (!w) {
+            error = "Failed to truncate torn tail of event log: " + w.error();
+            return nullptr;
+        }
+        // Re-read for hash; cheaper than tracking a running hash here.
+        auto repaired_bytes = ReadFileBytes(store->log_path_);
+        if (repaired_bytes)
+            store->event_store_hash_ =
+                repaired_bytes->empty() ? std::string{} : Sha256::HexDigest(*repaired_bytes);
+        store->latest_transaction_hash_ = previous_line_hash;
+        // Emit a single recovery diagnostic so callers (VerifyProject /
+        // status bar) can surface it; we intentionally do not fail Open.
+        // The caller's `error` string is reserved for hard failures, so we
+        // attach the diagnostic via the in-memory recovery flag.
+        store->torn_tail_recovered_ = true;
+        store->torn_tail_diagnostic_ = std::move(truncated_diag);
+        return store;
     }
 
     store->latest_transaction_hash_ = previous_line_hash;
@@ -124,30 +181,49 @@ bool EventStore::Append(AuditTransaction& transaction, std::string& error) {
 
     const std::string line = SerializeAuditTransactionLine(transaction);
 
-    // Append atomically: open in append mode, write `line + "\n"` in a single
-    // write. The OS guarantees append-mode writes are atomic up to PIPE_BUF
-    // for pipes but not for regular files; for now we keep it simple and
-    // rely on POSIX/Win32 buffered append.
-    std::ofstream out(log_path_, std::ios::binary | std::ios::app);
-    if (!out) {
-        error = "Failed to open event log for append: " + log_path_.string();
+    // Single-write append + fsync. Composing the full payload (`line + \n`)
+    // into one buffer means a single `write()` syscall, which is the
+    // practical atomic unit for a single-process appender on a regular
+    // file. After the buffered write we flush and call FlushFileBuffers /
+    // fsync so committed transactions survive power loss.
+    std::string payload;
+    payload.reserve(line.size() + 1);
+    payload.append(line);
+    payload.push_back('\n');
+
+    {
+        std::ofstream out(log_path_, std::ios::binary | std::ios::app);
+        if (!out) {
+            error = "Failed to open event log for append: " + log_path_.string();
+            return false;
+        }
+        out.write(payload.data(), static_cast<std::streamsize>(payload.size()));
+        out.flush();
+        if (!out) {
+            error = "Failed to write transaction to event log";
+            return false;
+        }
+        // ofstream destructor closes the file at scope end.
+    }
+
+    std::string fsync_err;
+    if (!FsyncFile(log_path_, fsync_err)) {
+        // The bytes are buffered but not durably on disk. Report as failure
+        // so the caller can surface it; the next Open will torn-recover if
+        // the bytes actually never reach disk after a crash.
+        error = "Event log fsync failed: " + fsync_err;
         return false;
     }
-    out.write(line.data(), static_cast<std::streamsize>(line.size()));
-    out.put('\n');
-    if (!out) {
-        error = "Failed to write transaction to event log";
-        return false;
-    }
-    out.close();
 
     latest_transaction_sequence_ = transaction.transaction_sequence;
     latest_event_sequence_ = next_event_sequence;
     latest_transaction_hash_ = Sha256::HexDigest(line);
     transactions_.push_back(transaction);
 
-    // Update the running file hash by re-reading. Cheap for the sizes we
-    // expect; can be optimized later by maintaining an incremental hash.
+    // Update the running file hash by re-reading. O(n) per append but
+    // acceptable for current log sizes; the appended bytes are already
+    // durable on disk by this point, so a failure here only leaves the
+    // in-memory hash stale.
     auto bytes = ReadFileBytes(log_path_);
     if (bytes)
         event_store_hash_ = Sha256::HexDigest(*bytes);

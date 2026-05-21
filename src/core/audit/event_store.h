@@ -42,6 +42,13 @@ public:
     const std::string& LatestTransactionHash() const { return latest_transaction_hash_; }
     const std::filesystem::path& LogPath() const { return log_path_; }
 
+    // True if `Open` truncated a torn (partially written) trailing line.
+    // The on-disk log was repaired in place and is safe to append to;
+    // `TornTailDiagnostic()` describes what was discarded so the UI can
+    // surface a non-fatal warning instead of forcing destructive reconcile.
+    bool               TornTailRecovered() const { return torn_tail_recovered_; }
+    const std::string& TornTailDiagnostic() const { return torn_tail_diagnostic_; }
+
 private:
     EventStore() = default;
 
@@ -51,6 +58,8 @@ private:
     std::uint64_t                 latest_event_sequence_ = 0;
     std::string                   event_store_hash_;
     std::string                   latest_transaction_hash_;
+    bool                          torn_tail_recovered_ = false;
+    std::string                   torn_tail_diagnostic_;
 };
 
 } // namespace core::audit

@@ -2,6 +2,7 @@
 
 #include "app/app_runtime_state.h"
 #include "core/argument_package_projection.h"
+#include "core/audit/audit_diff.h"
 #include "core/audit/audit_paths.h"
 #include "core/audit/canonical_model_hash.h"
 #include "core/audit/event_scope.h"
@@ -179,11 +180,48 @@ void RenderHistoricalCanvas(CanvasHistoryState& tab_state,
             ImGui::TextDisabled("No reconstructed model to display.");
         return;
     }
-    if (!tab_state.historical_seeded ||
-        tab_state.historical_seeded_sequence != tab_state.reconstruction.sequence) {
+    const bool sequence_changed = !tab_state.historical_seeded ||
+                                  tab_state.historical_seeded_sequence != tab_state.reconstruction.sequence;
+    if (sequence_changed) {
         tab_state.historical_renderer.SetTree(tab_state.reconstruction.tree);
         tab_state.historical_seeded = true;
         tab_state.historical_seeded_sequence = tab_state.reconstruction.sequence;
+
+        // Compute a focus set so the canvas pans to whatever the selected
+        // transaction actually changed instead of leaving the user staring
+        // at empty space when the historical layout shifts. Priority:
+        //   1. Added or Modified ids that survive into the reconstructed
+        //      state at `target_seq` (i.e. the element exists right now and
+        //      can be centered).
+        //   2. Fit-all fallback when the transaction is a pure deletion
+        //      (the deleted element is gone from the reconstruction so the
+        //      best we can do without an extra reconstruction at seq-1 is
+        //      fit the entire visible package into the viewport).
+        std::unordered_set<std::string> focus_ids;
+        auto tx_it = std::find_if(transactions.begin(), transactions.end(),
+                                  [target_seq](const core::audit::AuditTransaction& tx) {
+                                      return tx.transaction_sequence == target_seq;
+                                  });
+        if (tx_it != transactions.end()) {
+            const core::audit::AuditChangeSet cs = core::audit::ComputeChangeSet(*tx_it);
+            const auto& model = tab_state.reconstruction.state.model;
+            std::unordered_set<std::string> reachable;
+            reachable.reserve(model.elements.size());
+            for (const auto& el : model.elements)
+                reachable.insert(el.id);
+            auto consider = [&](const std::unordered_set<std::string>& src) {
+                for (const std::string& id : src) {
+                    if (reachable.count(id))
+                        focus_ids.insert(id);
+                }
+            };
+            consider(cs.added);
+            consider(cs.modified);
+        }
+        // `fit_all_fallback=true` so target_seq==0 (no transaction) and
+        // pure-deletion transactions still re-frame the canvas rather than
+        // showing a blank area.
+        tab_state.historical_renderer.RequestFocusOnIds(std::move(focus_ids), /*fit_all_fallback=*/true);
     }
 
     // Highlights are restricted to ids in the active package's running
@@ -216,6 +254,22 @@ bool ProjectHasAuditStore(const AppRuntimeState& state) {
     return std::filesystem::exists(core::audit::ManifestPath(state.app_state.current_project->rootPath));
 }
 
+bool ProjectAuditLogHasTransactions(const AppRuntimeState& state) {
+    if (!ProjectHasAuditStore(state))
+        return false;
+    const auto         log = core::audit::EventLogPath(state.app_state.current_project->rootPath);
+    std::error_code    ec;
+    if (!std::filesystem::exists(log, ec))
+        return false;
+    // The log is JSON-Lines; one committed transaction == at least one
+    // non-empty line. File size 0 (or whitespace-only) means no transactions
+    // have been recorded yet.
+    const auto size = std::filesystem::file_size(log, ec);
+    if (ec)
+        return false;
+    return size > 0;
+}
+
 void RenderCanvasDivergenceBanner(AppRuntimeState& state,
                                   const WorkbenchAreaCallbacks& callbacks) {
     if (!state.last_audit_verification.has_value() || !state.last_audit_verification->ran ||
@@ -235,12 +289,58 @@ void RenderCanvasDivergenceBanner(AppRuntimeState& state,
         ImGui::Text("replay=%s  on_disk=%s", v.replayed_canonical_hash.substr(0, 12).c_str(),
                     v.on_disk_canonical_hash.substr(0, 12).c_str());
     }
-    if (ImGui::Button("Reconcile audit log")) {
-        if (callbacks.reconcile_audit_store)
-            callbacks.reconcile_audit_store();
-    }
+    if (ImGui::Button("Reconcile audit log\u2026"))
+        ImGui::OpenPopup("Reconcile audit log##reconcile_confirm");
     ImGui::SameLine();
     ImGui::TextDisabled("(archives current .af/ artifacts and rebuilds from the current SACM file)");
+
+    // Confirmation modal. The Reconcile action is destructive in the sense
+    // that the app will no longer surface the current audit history through
+    // the timeline \u2014 it is moved aside, not deleted. Make the consequence
+    // explicit so the user can back out.
+    ImVec2 viewport_center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(viewport_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal("Reconcile audit log##reconcile_confirm", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "This will rebuild the audit store.");
+        ImGui::Spacing();
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 32.0f);
+        ImGui::TextWrapped(
+            "The current `.af/manifest.af.json`, `.af/snapshots/`, and `.af/audit/` will be moved "
+            "to a timestamped `.af/backup_<UTC>/` folder, and a fresh audit store will be initialized "
+            "from the current SACM file on disk.");
+        ImGui::Spacing();
+        ImGui::TextWrapped(
+            "Your existing transaction history is preserved on disk under the backup folder, but the "
+            "application timeline will start over from a new initial snapshot. Pinned historical views "
+            "from before this operation will no longer be browsable in-app.");
+        ImGui::Spacing();
+        ImGui::TextWrapped("Continue?");
+        ImGui::PopTextWrapPos();
+        ImGui::Spacing();
+
+        const float button_width = 120.0f;
+        const float spacing = ImGui::GetStyle().ItemSpacing.x;
+        const float avail = ImGui::GetContentRegionAvail().x;
+        const float used = button_width * 2.0f + spacing;
+        if (avail > used)
+            ImGui::Dummy(ImVec2(avail - used, 0.0f));
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(button_width, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.20f, 0.20f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.80f, 0.25f, 0.25f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.55f, 0.15f, 0.15f, 1.0f));
+        if (ImGui::Button("Reconcile", ImVec2(button_width, 0.0f))) {
+            if (callbacks.reconcile_audit_store)
+                callbacks.reconcile_audit_store();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::PopStyleColor(3);
+        ImGui::EndPopup();
+    }
     ImGui::EndChild();
     ImGui::PopStyleColor();
     ImGui::Spacing();

@@ -465,4 +465,26 @@ bool GsnCanvas::CenterOnIds(const std::unordered_set<std::string>& ids, ImVec2 v
     return true;
 }
 
+bool GsnCanvas::ConsumePendingFocus(ImVec2 viewport_size) {
+    if (!has_pending_focus_)
+        return false;
+    bool applied = false;
+    if (!pending_focus_ids_.empty())
+        applied = CenterOnIds(pending_focus_ids_, viewport_size);
+    if (!applied && pending_focus_fit_all_fallback_) {
+        // Build a set of every node id currently in the layout and fit to
+        // that. Cheaper than adding a separate "fit all" code path.
+        std::unordered_set<std::string> all_ids;
+        all_ids.reserve(layout_nodes_.size());
+        for (const auto& node : layout_nodes_)
+            all_ids.insert(node.id);
+        if (!all_ids.empty())
+            applied = CenterOnIds(all_ids, viewport_size);
+    }
+    pending_focus_ids_.clear();
+    pending_focus_fit_all_fallback_ = false;
+    has_pending_focus_ = false;
+    return applied;
+}
+
 } // namespace ui::gsn

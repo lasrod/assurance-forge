@@ -53,4 +53,10 @@ void ForgetCanvasHistoryTab(const std::string& tab_key);
 // enabled.
 bool ProjectHasAuditStore(const ::app::AppRuntimeState& state);
 
+// True when the active project has an audit store *and* at least one
+// committed transaction. Distinguishes "audit not initialized" from
+// "audit initialized but empty" — used by the H-toggle to decide whether
+// switching into history view would land on a useful state.
+bool ProjectAuditLogHasTransactions(const ::app::AppRuntimeState& state);
+
 } // namespace app::areas

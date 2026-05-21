@@ -39,21 +39,9 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
         return result;
     }
 
-    // Compute post-state hashes off the in-memory model, then serialize to
-    // disk. We serialize once and hash the bytes we actually wrote so the
-    // raw_file_hash recorded in the manifest is guaranteed to match the file
-    // a reader will later open. The canonical hash is computed from a
-    // re-parse of the serialized bytes so it matches the value the audit
-    // replay verifier would derive after a fresh open (canonical hash is not
-    // currently invariant under in-memory mutation vs. serialize/reparse).
+    // Serialize once so the bytes we write, the bytes we hash, and the
+    // bytes we (notionally) re-parse for the canonical hash are identical.
     const std::string xml = sacm::serialize_sacm(ctx.package);
-
-    auto write = WriteTextFile(sacm_path_, xml);
-    if (!write) {
-        result.success = false;
-        result.error = "Autosave failed: " + write.error();
-        return result;
-    }
     const std::string raw_after = Sha256::HexDigest(xml);
 
     std::string canonical_after;
@@ -63,8 +51,11 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
         canonical_after = audit::CanonicalModelHash(ctx.package);
     }
 
-    // Append a single-event transaction. EventStore::Append assigns the
-    // sequences and previous_transaction_hash; we just supply the metadata.
+    // Step 1: append to the audit log FIRST and fsync. The log is the
+    // canonical record of intent — if we crash after this point the next
+    // open can re-derive SACM from replay. If we crashed *before* this
+    // point, no committed state exists yet and the next open sees the
+    // previous SACM unchanged.
     audit::AuditTransaction tx;
     tx.command_name = command.Name();
     tx.author = author.empty() ? std::string("system") : author;
@@ -72,14 +63,25 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
 
     std::string append_error;
     if (!store_->Append(tx, append_error)) {
-        // Disk SACM is updated but the audit log entry failed. Surface the
-        // error; the next project open will detect the hash mismatch and the
-        // reconciliation flow (phase 5) will handle it.
         result.success = false;
         result.error = "Event log append failed: " + append_error;
         return result;
     }
 
+    // Step 2: write SACM atomically (temp file + fsync + rename). A crash
+    // here leaves the audit log ahead of SACM by one transaction; on next
+    // open the verifier detects the gap and offers non-destructive
+    // remediation (Restore from audit replay).
+    auto write = WriteTextFileAtomic(sacm_path_, xml);
+    if (!write) {
+        result.success = false;
+        result.error = "Autosave failed (audit log entry was committed): " + write.error();
+        return result;
+    }
+
+    // Step 3: update manifest atomically. The manifest is a cache; if this
+    // fails the next open rebuilds it from the log + SACM. We still
+    // propagate the error so the UI can show a soft warning.
     manifest_.latest_transaction_sequence = store_->LatestTransactionSequence();
     manifest_.latest_event_sequence = store_->LatestEventSequence();
     manifest_.event_store_hash = store_->EventStoreHash();
@@ -88,11 +90,8 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
 
     std::string manifest_error;
     if (!audit::WriteAuditManifest(project_.rootPath, manifest_, manifest_error)) {
-        // The transaction is committed; only the manifest summary is stale.
-        // It will be regenerated on the next successful Execute. Surface a
-        // soft warning by returning success with a non-fatal error string.
         result.success = true;
-        result.error = "Manifest update failed (audit log is still consistent): " + manifest_error;
+        result.error = "Manifest update failed (audit log and SACM are consistent): " + manifest_error;
     } else {
         result.success = true;
     }

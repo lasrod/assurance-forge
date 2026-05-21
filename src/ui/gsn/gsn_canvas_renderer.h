@@ -125,6 +125,27 @@ public:
         return history_highlights_;
     }
 
+    // Request that the next render center / fit-to-view a specific set of
+    // node ids. Consumed on the next render call (which knows the viewport
+    // size). Used by the History Timeline to keep the historical canvas
+    // focused on whatever a slider transaction changed instead of leaving
+    // the user staring at empty space. If `fit_all_fallback` is true and
+    // none of the requested ids exist in the current layout, the renderer
+    // instead fits every layout node into the viewport. Calling with an
+    // empty set and `fit_all_fallback == true` performs a plain fit-all.
+    void RequestFocusOnIds(std::unordered_set<std::string> ids, bool fit_all_fallback) {
+        pending_focus_ids_ = std::move(ids);
+        pending_focus_fit_all_fallback_ = fit_all_fallback;
+        has_pending_focus_ = true;
+    }
+    bool HasPendingFocus() const {
+        return has_pending_focus_;
+    }
+    // Internal: consume the pending focus request after applying it. Used
+    // by `ShowGsnCanvasContentWithRenderer`. Returns true if a request was
+    // pending and applied (caller supplies the actual viewport size).
+    bool ConsumePendingFocus(ImVec2 viewport_size);
+
 private:
     void RebuildNodeLookup();
 
@@ -147,6 +168,12 @@ private:
 
     // Optional per-element highlight overlay used by the History Timeline.
     std::unordered_map<std::string, core::audit::HistoryHighlightKind> history_highlights_;
+
+    // Pending focus request set by `RequestFocusOnIds` and consumed inside
+    // the render loop where the real viewport size is known.
+    std::unordered_set<std::string> pending_focus_ids_;
+    bool pending_focus_fit_all_fallback_ = false;
+    bool has_pending_focus_ = false;
 };
 
 } // namespace ui::gsn

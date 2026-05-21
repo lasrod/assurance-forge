@@ -418,16 +418,21 @@ bool AppRuntime::ReconcileAuditStore() {
 
     // Tear down the bus before mutating the audit store; the bus holds an
     // open handle to `transactions.af.jsonl` on Windows and rename would
-    // fail otherwise.
-    impl_->command_bus.reset();
+    // fail otherwise. Order matters: clear the controller's raw pointer
+    // FIRST so it can never observe a freed CommandBus through a stray
+    // callback that fires during the reset() destructor.
     if (impl_->element_edit_controller)
         impl_->element_edit_controller->SetCommandBus(nullptr);
+    impl_->command_bus.reset();
 
     core::ProjectFileEntry entry_copy = *active_entry;
     core::audit::ReconcileAuditStoreResult result;
     std::string error;
     if (!core::audit::ReconcileAuditStore(project, entry_copy.relativePath, result, error)) {
         SetStatus("Audit reconciliation failed: " + error);
+        // Best-effort: re-open the project so the user retains a working
+        // session against the original (now-restored) audit artifacts.
+        PerformOpenProjectFile(entry_copy);
         return false;
     }
 

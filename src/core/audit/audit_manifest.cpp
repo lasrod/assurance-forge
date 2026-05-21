@@ -90,7 +90,7 @@ bool WriteAuditManifest(const std::filesystem::path& project_root,
         return false;
     }
     const std::string text = SerializeAuditManifest(manifest);
-    auto r = WriteTextFile(ManifestPath(project_root), text);
+    auto r = WriteTextFileAtomic(ManifestPath(project_root), text);
     if (!r) {
         error = std::move(r.error());
         return false;

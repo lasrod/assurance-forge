@@ -8,6 +8,16 @@
 #include <sstream>
 #include <system_error>
 
+#if defined(_WIN32)
+#include <windows.h>
+#include <io.h>
+#else
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
+
 namespace core {
 
 std::expected<std::string, std::string> ReadTextFile(const std::filesystem::path& path) {
@@ -28,6 +38,103 @@ std::expected<void, std::string> WriteTextFile(const std::filesystem::path& path
     file.write(content.data(), static_cast<std::streamsize>(content.size()));
     if (!file.good())
         return std::unexpected("Could not finish writing " + path.string());
+    return {};
+}
+
+namespace {
+
+#if defined(_WIN32)
+// fsync-equivalent on Windows for a path: open with FILE_FLAG_WRITE_THROUGH
+// is too restrictive (we want to fsync an already-written file), so we
+// open the path with GENERIC_WRITE and call FlushFileBuffers.
+bool FlushPathBuffers(const std::filesystem::path& path, std::string& error) {
+    HANDLE h = CreateFileW(path.wstring().c_str(), GENERIC_WRITE,
+                           FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) {
+        error = "Could not open for fsync: " + path.string() +
+                " (err=" + std::to_string(GetLastError()) + ")";
+        return false;
+    }
+    const BOOL ok = FlushFileBuffers(h);
+    const DWORD last = ok ? 0u : GetLastError();
+    CloseHandle(h);
+    if (!ok) {
+        error = "FlushFileBuffers failed for " + path.string() +
+                " (err=" + std::to_string(last) + ")";
+        return false;
+    }
+    return true;
+}
+#else
+bool FlushPathBuffers(const std::filesystem::path& path, std::string& error) {
+    const int fd = ::open(path.c_str(), O_WRONLY);
+    if (fd < 0) {
+        error = "Could not open for fsync: " + path.string();
+        return false;
+    }
+    const int rc = ::fsync(fd);
+    ::close(fd);
+    if (rc != 0) {
+        error = "fsync failed for " + path.string();
+        return false;
+    }
+    return true;
+}
+#endif
+
+} // namespace
+
+bool FsyncFile(const std::filesystem::path& path, std::string& error) {
+    return FlushPathBuffers(path, error);
+}
+
+std::expected<void, std::string> WriteTextFileAtomic(const std::filesystem::path& path,
+                                                     std::string_view content) {
+    // Write to `<path>.tmp` in the same directory, fsync, then atomically
+    // rename over `path`. Same-directory rename is required for atomicity on
+    // most filesystems.
+    std::filesystem::path tmp = path;
+    tmp += ".tmp";
+
+    // Best-effort cleanup of a stale `.tmp` from a prior crash; ignored on
+    // failure because the open-for-write below will overwrite it.
+    std::error_code ec;
+    std::filesystem::remove(tmp, ec);
+
+    {
+        std::ofstream file(tmp, std::ios::binary | std::ios::trunc);
+        if (!file.is_open())
+            return std::unexpected("Could not open temp file " + tmp.string());
+        file.write(content.data(), static_cast<std::streamsize>(content.size()));
+        file.flush();
+        if (!file.good())
+            return std::unexpected("Could not finish writing temp file " + tmp.string());
+        // ofstream destructor closes the handle; on Windows the file must be
+        // closed before MoveFileExW can replace `path`.
+    }
+
+    std::string fsync_err;
+    if (!FsyncFile(tmp, fsync_err)) {
+        std::filesystem::remove(tmp, ec);
+        return std::unexpected(std::move(fsync_err));
+    }
+
+#if defined(_WIN32)
+    if (!MoveFileExW(tmp.wstring().c_str(), path.wstring().c_str(),
+                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        const DWORD err = GetLastError();
+        std::filesystem::remove(tmp, ec);
+        return std::unexpected("Atomic rename failed for " + path.string() +
+                               " (err=" + std::to_string(err) + ")");
+    }
+#else
+    std::filesystem::rename(tmp, path, ec);
+    if (ec) {
+        std::filesystem::remove(tmp, ec);
+        return std::unexpected("Atomic rename failed for " + path.string() + ": " + ec.message());
+    }
+#endif
     return {};
 }
 

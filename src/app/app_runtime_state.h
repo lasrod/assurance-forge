@@ -67,6 +67,12 @@ struct WorkbenchState {
         // (renders the current model). A value pins the canvas to the
         // reconstructed state after applying transaction N.
         std::optional<std::uint64_t> selected_transaction_sequence;
+        // When set, the next frame of this canvas should open a modal
+        // explaining that History was requested but the audit log is empty,
+        // and then clear the flag. Used to abort the H-toggle gracefully
+        // instead of switching into an empty history view the user has no
+        // obvious way to exit.
+        bool show_history_empty_modal = false;
     };
 
     bool force_center_tab_selection = false;

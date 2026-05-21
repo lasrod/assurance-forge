@@ -435,6 +435,14 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
             renderer.CenterOnIds(ui_state.marked_for_removal, viewport_size);
             ui_state.center_on_marked = false;
         }
+        // Per-renderer pending focus (used by the History Timeline to pan
+        // the historical canvas to whatever a transaction changed). Lives
+        // on the renderer instance so it doesn't bleed across the live
+        // canvas / historical canvas split.
+        if (renderer.HasPendingFocus()) {
+            ImVec2 viewport_size = ImGui::GetWindowSize();
+            renderer.ConsumePendingFocus(viewport_size);
+        }
     }
 
     // Ctrl + mouse scroll wheel: zoom at mouse pointer position
