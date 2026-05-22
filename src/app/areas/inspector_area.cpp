@@ -160,7 +160,10 @@ void RenderInspectorArea(AppRuntimeState& state,
                 "Backed up invalid confidence file; new confidence storage will be saved with the project."});
             return true;
         };
-        if (ui::panels::ShowElementPanel(loaded_case, sacm_package, &terminology_callbacks, &confidence_callbacks)) {
+        ui::panels::ElementTextEditCallbacks text_edit_callbacks;
+        text_edit_callbacks.commit_text_edit = callbacks.commit_element_text_edit;
+        if (ui::panels::ShowElementPanel(loaded_case, sacm_package, &terminology_callbacks, &confidence_callbacks,
+                                          &text_edit_callbacks)) {
             if (state.confidence_controller && loaded_case) {
                 const bool confidence_changed = state.confidence_controller->RefreshStaleFlags(*loaded_case);
                 if (confidence_changed) {

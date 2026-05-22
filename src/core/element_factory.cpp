@@ -777,4 +777,167 @@ bool RemoveElement(parser::AssuranceCase& ac,
     return true;
 }
 
+// ===== Text-field updates (Phase 1 audit) =====
+
+const char* ElementTextFieldToToken(ElementTextField field) {
+    switch (field) {
+    case ElementTextField::Name:        return "name";
+    case ElementTextField::Description: return "description";
+    case ElementTextField::Content:     return "content";
+    }
+    return "name";
+}
+
+bool ElementTextFieldFromToken(const std::string& token, ElementTextField& out) {
+    if (token == "name")        { out = ElementTextField::Name; return true; }
+    if (token == "description") { out = ElementTextField::Description; return true; }
+    if (token == "content")     { out = ElementTextField::Content; return true; }
+    return false;
+}
+
+namespace {
+
+// Read the current value of `field`/`language` on the parser element.
+std::string ReadParserField(const parser::SacmElement& elem,
+                            ElementTextField field,
+                            const std::string& language) {
+    auto from_map = [&](const std::map<std::string, std::string>& m, const std::string& scalar) {
+        auto it = m.find(language);
+        if (it != m.end())
+            return it->second;
+        return language == "en" ? scalar : std::string{};
+    };
+    switch (field) {
+    case ElementTextField::Name:        return from_map(elem.name_langs, elem.name);
+    case ElementTextField::Description: return from_map(elem.description_langs, elem.description);
+    case ElementTextField::Content:     return from_map(elem.content_langs, elem.content);
+    }
+    return {};
+}
+
+// Write `new_value` to `field`/`language` on the parser element. Updates the
+// canonical scalar too when language == "en".
+void WriteParserField(parser::SacmElement& elem,
+                      ElementTextField field,
+                      const std::string& language,
+                      const std::string& new_value) {
+    switch (field) {
+    case ElementTextField::Name:
+        elem.name_langs[language] = new_value;
+        if (language == "en")
+            elem.name = new_value;
+        return;
+    case ElementTextField::Description:
+        elem.description_langs[language] = new_value;
+        if (language == "en")
+            elem.description = new_value;
+        return;
+    case ElementTextField::Content:
+        elem.content_langs[language] = new_value;
+        if (language == "en")
+            elem.content = new_value;
+        return;
+    }
+}
+
+// Mirror the parser-side write onto every matching SACM container element.
+// Returns true if at least one SACM element was found and updated; false
+// indicates the parser-only state (acceptable — e.g., relationship or
+// terminology elements with no SACM-side text). Errors are not signalled
+// here because the parser write is the audit source of truth.
+template <typename Element>
+bool UpdateSacmTexts(Element& e,
+                     ElementTextField field,
+                     const std::string& language,
+                     const std::string& new_value) {
+    auto write_ml = [&](sacm::MultiLangText& ml, std::string& scalar) {
+        ml.texts[language] = new_value;
+        if (language == "en")
+            scalar = new_value;
+    };
+    switch (field) {
+    case ElementTextField::Name:
+        write_ml(e.name_ml, e.name);
+        return true;
+    case ElementTextField::Description:
+        write_ml(e.description_ml, e.description);
+        return true;
+    case ElementTextField::Content:
+        if constexpr (requires { e.content_ml; e.content; }) {
+            write_ml(e.content_ml, e.content);
+            return true;
+        }
+        return false;
+    }
+    return false;
+}
+
+bool UpdateSacmElementText(sacm::AssuranceCasePackage& pkg,
+                           const std::string& element_id,
+                           ElementTextField field,
+                           const std::string& language,
+                           const std::string& new_value) {
+    for (auto& ap : pkg.argumentPackages) {
+        for (auto& c : ap.claims)               if (c.id == element_id) return UpdateSacmTexts(c, field, language, new_value);
+        for (auto& ar : ap.argumentReasonings)  if (ar.id == element_id) return UpdateSacmTexts(ar, field, language, new_value);
+        for (auto& ar : ap.artifactReferences)  if (ar.id == element_id) return UpdateSacmTexts(ar, field, language, new_value);
+        for (auto& ai : ap.assertedInferences)  if (ai.id == element_id) return UpdateSacmTexts(ai, field, language, new_value);
+        for (auto& ac : ap.assertedContexts)    if (ac.id == element_id) return UpdateSacmTexts(ac, field, language, new_value);
+        for (auto& ae : ap.assertedEvidences)   if (ae.id == element_id) return UpdateSacmTexts(ae, field, language, new_value);
+    }
+    for (auto& artpkg : pkg.artifactPackages) {
+        for (auto& a : artpkg.artifacts)        if (a.id == element_id) return UpdateSacmTexts(a, field, language, new_value);
+    }
+    for (auto& tp : pkg.terminologyPackages) {
+        for (auto& e : tp.expressions)          if (e.id == element_id) return UpdateSacmTexts(e, field, language, new_value);
+    }
+    return false;
+}
+
+} // namespace
+
+bool SetElementTextField(parser::AssuranceCase& ac,
+                         sacm::AssuranceCasePackage* pkg,
+                         const std::string& element_id,
+                         ElementTextField field,
+                         const std::string& language,
+                         const std::string& new_value,
+                         std::string& out_old_value,
+                         std::string& out_error) {
+    out_old_value.clear();
+    out_error.clear();
+    if (element_id.empty()) {
+        out_error = "Element id is empty.";
+        return false;
+    }
+    if (language.empty()) {
+        out_error = "Language code is empty.";
+        return false;
+    }
+    parser::SacmElement* elem = nullptr;
+    for (auto& e : ac.elements) {
+        if (e.id == element_id) { elem = &e; break; }
+    }
+    if (!elem) {
+        out_error = "Element not found: " + element_id;
+        return false;
+    }
+    if (field == ElementTextField::Content) {
+        if (elem->type != "claim" && elem->type != "argumentreasoning") {
+            out_error = "Element " + element_id + " of type '" + elem->type +
+                        "' has no content field.";
+            return false;
+        }
+    }
+
+    out_old_value = ReadParserField(*elem, field, language);
+    if (out_old_value == new_value)
+        return true; // no-op
+
+    WriteParserField(*elem, field, language, new_value);
+    if (pkg)
+        UpdateSacmElementText(*pkg, element_id, field, language, new_value);
+    return true;
+}
+
 } // namespace core

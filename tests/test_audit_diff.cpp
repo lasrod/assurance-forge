@@ -100,3 +100,31 @@ TEST(AuditDiff, UnknownEventTypeIsIgnored) {
     EXPECT_TRUE(cs.modified.empty());
     EXPECT_TRUE(cs.deleted.empty());
 }
+
+TEST(AuditDiff, UpdateElementTextMarksElementModified) {
+    auto tx = MakeTx(1, {MakeEvent("UpdateElementText",
+                                   {{"element_id", "G1"},
+                                    {"field", "description"},
+                                    {"language", "en"},
+                                    {"old_value", "before"},
+                                    {"new_value", "after"}})});
+    const auto cs = core::audit::ComputeChangeSet(tx);
+    EXPECT_TRUE(cs.added.empty());
+    EXPECT_TRUE(cs.deleted.empty());
+    EXPECT_EQ(cs.modified.size(), 1u);
+    EXPECT_TRUE(cs.modified.count("G1"));
+}
+
+TEST(AuditDiff, AggregateDoesNotMarkNewlyAddedElementAsModified) {
+    auto create = MakeTx(1, {MakeEvent("CreateTopGoal", {{"generated_id", "G1"}})});
+    auto edit = MakeTx(2, {MakeEvent("UpdateElementText",
+                                     {{"element_id", "G1"},
+                                      {"field", "name"},
+                                      {"language", "en"},
+                                      {"old_value", ""},
+                                      {"new_value", "Top"}})});
+    const auto cs = core::audit::ComputeChangeSet({create, edit});
+    EXPECT_TRUE(cs.added.count("G1"));
+    EXPECT_FALSE(cs.modified.count("G1"));
+    EXPECT_TRUE(cs.deleted.empty());
+}

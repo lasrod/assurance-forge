@@ -222,6 +222,18 @@ void AppRuntime::RenderFrame(bool& done) {
             impl_->events.Emit(TreeDirtyEvent{});
             impl_->events.Emit(DocumentDirtyEvent{});
         },
+        [this](const std::string& element_id, const std::string& field_token, const std::string& language,
+               const std::string& original_value, const std::string& new_value) {
+            if (!impl_->app_state.loaded_case.has_value())
+                return;
+            sacm::AssuranceCasePackage* pkg =
+                impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
+            const bool committed = impl_->element_edit_controller->CommitElementTextEdit(
+                impl_->app_state.loaded_case.value(), pkg, element_id, field_token, language, original_value,
+                new_value);
+            if (committed)
+                impl_->events.Emit(TreeDirtyEvent{});
+        },
     };
     {
         core::perf::ScopedTimer s("app.area.inspector");

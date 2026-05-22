@@ -5,6 +5,7 @@
 #include "imgui_stdlib.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/panels/confidence_panel.h"
+#include "ui/text_edit_session.h"
 #include "ui/theme.h"
 #include "ui/ui_state.h"
 
@@ -115,7 +116,8 @@ void sync_to_sacm(sacm::AssuranceCasePackage* pkg,
 
 // Helper: multi-line InputText with a buffer sized to accommodate edits.
 // Returns true if the text was modified.
-static bool EditableTextField(const char* label, std::string& text, float width = -1.0f) {
+static bool EditableTextField(const char* label, std::string& text, float width = -1.0f,
+                              ImGuiID* out_widget_id = nullptr) {
     ImGui::PushID(label);
     if (width > 0.0f)
         ImGui::SetNextItemWidth(width);
@@ -125,11 +127,13 @@ static bool EditableTextField(const char* label, std::string& text, float width 
     const ImGuiInputTextFlags flags =
         ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_NoHorizontalScroll | ImGuiInputTextFlags_WordWrap;
     bool changed = ImGui::InputTextMultiline("##edit", &text, ImVec2(-1, ImGui::GetTextLineHeight() * 5), flags);
+    if (out_widget_id)
+        *out_widget_id = ImGui::GetID("##edit");
     ImGui::PopID();
     return changed;
 }
 
-static bool EditableSingleLine(const char* label, std::string& text) {
+static bool EditableSingleLine(const char* label, std::string& text, ImGuiID* out_widget_id = nullptr) {
     char buf[512];
     size_t len = text.size();
     if (len >= sizeof(buf))
@@ -140,6 +144,8 @@ static bool EditableSingleLine(const char* label, std::string& text) {
     ImGui::PushID(label);
     ImGui::SetNextItemWidth(-1);
     bool changed = ImGui::InputText("##edit", buf, sizeof(buf));
+    if (out_widget_id)
+        *out_widget_id = ImGui::GetID("##edit");
     if (changed) {
         text = buf;
     }
@@ -365,7 +371,8 @@ bool RenderReviewAttentionNotice(const ui::UiState& state,
 bool ShowElementPanel(parser::AssuranceCase* ac,
                       sacm::AssuranceCasePackage* sacm_pkg,
                       const ElementTerminologyAssistCallbacks* terminology_callbacks,
-                      const ElementConfidenceAssistCallbacks* confidence_callbacks) {
+                      const ElementConfidenceAssistCallbacks* confidence_callbacks,
+                      const ElementTextEditCallbacks* text_edit_callbacks) {
     const UiState& state = GetUiState();
     bool modified = false;
 
@@ -398,12 +405,25 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
         ImGui::Spacing();
     }
 
+    auto commit_if_finished = [&](ImGuiID id, const std::string& current_value,
+                                  const char* field_token, const std::string& language) {
+        std::string original;
+        if (TextEditSession::TryCommit(id, current_value, original) && text_edit_callbacks &&
+            text_edit_callbacks->commit_text_edit) {
+            text_edit_callbacks->commit_text_edit(elem->id, field_token, language, original, current_value);
+        }
+    };
+
     // Name (editable)
     ImGui::Text("Name");
     ImGui::Separator();
-    if (EditableSingleLine("name", elem->name)) {
-        elem->name_langs["en"] = elem->name;
-        modified = true;
+    {
+        ImGuiID widget_id = 0;
+        if (EditableSingleLine("name", elem->name, &widget_id)) {
+            elem->name_langs["en"] = elem->name;
+            modified = true;
+        }
+        commit_if_finished(widget_id, elem->name, "name", "en");
     }
     // Secondary language name (only show if this field has the secondary language)
     if (elem->name_langs.count(sec_lang)) {
@@ -411,10 +431,12 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
         if (ui::gsn::g_BoldFont)
             ImGui::PushFont(ui::gsn::g_BoldFont);
         std::string sec_name = elem->name_langs.at(sec_lang);
-        if (EditableSingleLine("name_sec", sec_name)) {
+        ImGuiID widget_id = 0;
+        if (EditableSingleLine("name_sec", sec_name, &widget_id)) {
             elem->name_langs[sec_lang] = sec_name;
             modified = true;
         }
+        commit_if_finished(widget_id, sec_name, "name", sec_lang);
         if (ui::gsn::g_BoldFont)
             ImGui::PopFont();
     }
@@ -426,19 +448,25 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     if (has_content) {
         ImGui::Text("Content");
         ImGui::Separator();
-        if (EditableTextField("content", elem->content)) {
-            elem->content_langs["en"] = elem->content;
-            modified = true;
+        {
+            ImGuiID widget_id = 0;
+            if (EditableTextField("content", elem->content, -1.0f, &widget_id)) {
+                elem->content_langs["en"] = elem->content;
+                modified = true;
+            }
+            commit_if_finished(widget_id, elem->content, "content", "en");
         }
         RenderTerminologySuggestions(sacm_pkg, elem->id, elem->content, terminology_callbacks);
         // Secondary language content (only show if this field has the secondary language)
         if (elem->content_langs.count(sec_lang)) {
             ImGui::Text("Content (%s)", sec_lang.c_str());
             std::string sec_content = elem->content_langs.at(sec_lang);
-            if (EditableTextField("content_sec", sec_content)) {
+            ImGuiID widget_id = 0;
+            if (EditableTextField("content_sec", sec_content, -1.0f, &widget_id)) {
                 elem->content_langs[sec_lang] = sec_content;
                 modified = true;
             }
+            commit_if_finished(widget_id, sec_content, "content", sec_lang);
         }
         ImGui::Spacing();
     }
@@ -455,9 +483,13 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     // Description (editable)
     ImGui::Text("Description");
     ImGui::Separator();
-    if (EditableTextField("description", elem->description)) {
-        elem->description_langs["en"] = elem->description;
-        modified = true;
+    {
+        ImGuiID widget_id = 0;
+        if (EditableTextField("description", elem->description, -1.0f, &widget_id)) {
+            elem->description_langs["en"] = elem->description;
+            modified = true;
+        }
+        commit_if_finished(widget_id, elem->description, "description", "en");
     }
     if (!has_content)
         RenderTerminologySuggestions(sacm_pkg, elem->id, elem->description, terminology_callbacks);
@@ -465,10 +497,12 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     if (elem->description_langs.count(sec_lang)) {
         ImGui::Text("Description (%s)", sec_lang.c_str());
         std::string sec_desc = elem->description_langs.at(sec_lang);
-        if (EditableTextField("description_sec", sec_desc)) {
+        ImGuiID widget_id = 0;
+        if (EditableTextField("description_sec", sec_desc, -1.0f, &widget_id)) {
             elem->description_langs[sec_lang] = sec_desc;
             modified = true;
         }
+        commit_if_finished(widget_id, sec_desc, "description", sec_lang);
     }
 
     ImGui::Spacing();

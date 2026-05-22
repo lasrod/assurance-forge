@@ -67,4 +67,36 @@ private:
     std::size_t removed_count_ = 0;
 };
 
+// Update one localized text field (name / description / content) on an
+// element. One command per completed edit session — keystroke-level events
+// are NOT committed; the UI dispatches this once when focus leaves the
+// field or a forced flush hook fires (save / close / snapshot / verify /
+// exit). The previous value is captured into the audit event so a replayer
+// can both apply and visualize the change without re-reading prior state.
+class UpdateElementTextCommand final : public ICommand {
+public:
+    UpdateElementTextCommand(std::string element_id,
+                             ElementTextField field,
+                             std::string language,
+                             std::string new_value)
+        : element_id_(std::move(element_id)),
+          field_(field),
+          language_(std::move(language)),
+          new_value_(std::move(new_value)) {}
+
+    std::string Name() const override { return "UpdateElementText"; }
+    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+    const std::string& OldValue() const { return old_value_; }
+    bool               WasNoOp() const { return was_no_op_; }
+
+private:
+    std::string      element_id_;
+    ElementTextField field_;
+    std::string      language_;
+    std::string      new_value_;
+    std::string      old_value_;
+    bool             was_no_op_ = false;
+};
+
 } // namespace core::commands

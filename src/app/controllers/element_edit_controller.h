@@ -34,6 +34,20 @@ public:
     bool ConfirmPendingRemoval(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package);
     void CancelPendingRemoval();
 
+    // Commit a finished text-edit session as a single audited transaction.
+    // `original_value` is the value the field held when the user first
+    // focused it; `new_value` is the value at deactivation. When a command
+    // bus is wired the panel-side mutation is reverted to `original_value`
+    // first so the command captures the correct pre-edit state in its audit
+    // payload. Returns true if an audit transaction was appended.
+    bool CommitElementTextEdit(parser::AssuranceCase& model,
+                               sacm::AssuranceCasePackage* package,
+                               const std::string& element_id,
+                               const std::string& field_token,
+                               const std::string& language,
+                               const std::string& original_value,
+                               const std::string& new_value);
+
     bool ShouldShowRemoveConfirm() const;
     const std::string& PendingRemoveId() const;
     core::RemoveMode PendingRemoveMode() const;

@@ -5,6 +5,7 @@
 #include "core/audit/canonical_model_hash.h"
 #include "core/audit/event_replayer.h"
 #include "core/audit/event_store.h"
+#include "core/project_file_io.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_parser.h"
 #include "sacm/sacm_serializer.h"
@@ -139,8 +140,50 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
 
     result.ran = true;
     result.success = true;
-    if (!result.manifest_canonical_hash.empty() &&
-        result.manifest_canonical_hash != result.replayed_canonical_hash) {
+    // Phase 0 — silent manifest rebuild on cache-miss.
+    //
+    // The manifest is a *cache* of hashes derived from the canonical sources
+    // of truth (the snapshot + event log on one side, the materialized SACM
+    // on the other). When replay agrees with the on-disk SACM but the
+    // cached manifest hash is stale, the previous behavior surfaced a
+    // false-positive divergence and pushed the user into the (destructive)
+    // Reconcile flow. Here we instead rewrite the manifest silently and
+    // continue as if everything matched. We only flag a user-facing
+    // divergence when the log ↔ SACM relationship is actually broken.
+    const bool replay_matches_disk =
+        !result.on_disk_canonical_hash.empty() &&
+        result.on_disk_canonical_hash == result.replayed_canonical_hash;
+    const bool manifest_stale =
+        !result.manifest_canonical_hash.empty() &&
+        result.manifest_canonical_hash != result.replayed_canonical_hash;
+    if (replay_matches_disk && manifest_stale) {
+        AuditManifest rebuilt = manifest;
+        rebuilt.last_known_canonical_model_hash = result.replayed_canonical_hash;
+        // Refresh raw file hash too — if the canonical content matches, the
+        // raw hash is the one paired with that content. Best effort: if the
+        // hash read fails, leave the previous value.
+        if (auto raw = Sha256File(on_disk_sacm); raw) {
+            rebuilt.last_known_raw_file_hash = *raw;
+        }
+        // Event store hash and sequence counters reflect the log we just
+        // replayed successfully.
+        rebuilt.event_store_hash = store->EventStoreHash();
+        rebuilt.latest_transaction_sequence = store->LatestTransactionSequence();
+        rebuilt.latest_event_sequence = store->LatestEventSequence();
+        std::string write_err;
+        if (WriteAuditManifest(project.rootPath, rebuilt, write_err)) {
+            result.manifest_canonical_hash = rebuilt.last_known_canonical_model_hash;
+            result.diagnostics.emplace_back(
+                "Manifest hashes were stale relative to replayed state; "
+                "manifest silently rebuilt from snapshot+log+SACM.");
+        } else {
+            // Don't fail verification just because the cache refresh
+            // failed; surface a diagnostic and keep going.
+            result.diagnostics.emplace_back(
+                "Manifest hashes were stale and silent rebuild failed: " + write_err);
+        }
+    } else if (!result.manifest_canonical_hash.empty() &&
+               result.manifest_canonical_hash != result.replayed_canonical_hash) {
         result.success = false;
         result.diagnostics.emplace_back(
             "Replayed canonical hash does not match manifest.last_known_canonical_model_hash (replay=" +

@@ -39,6 +39,12 @@ void AddAddedFromEvent(const AuditEvent& event, AuditChangeSet& out) {
         }
         return;
     }
+    if (type == "UpdateElementText") {
+        auto el_it = payload.find("element_id");
+        if (el_it != payload.end() && el_it->is_string())
+            out.modified.insert(el_it->get<std::string>());
+        return;
+    }
     // Unknown event types contribute nothing; tolerated for forward compat.
 }
 

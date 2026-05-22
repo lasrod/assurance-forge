@@ -96,4 +96,30 @@ bool RemoveElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
     return true;
 }
 
+bool UpdateElementTextCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event,
+                                     std::string& out_error) {
+    if (element_id_.empty()) {
+        out_error = "UpdateElementTextCommand requires an element id";
+        return false;
+    }
+    if (language_.empty()) {
+        out_error = "UpdateElementTextCommand requires a language code";
+        return false;
+    }
+    if (!core::SetElementTextField(ctx.model, &ctx.package, element_id_, field_, language_,
+                                   new_value_, old_value_, out_error))
+        return false;
+
+    was_no_op_ = (old_value_ == new_value_);
+
+    out_event.event_type = "UpdateElementText";
+    out_event.payload = nlohmann::ordered_json::object();
+    out_event.payload["element_id"] = element_id_;
+    out_event.payload["field"] = core::ElementTextFieldToToken(field_);
+    out_event.payload["language"] = language_;
+    out_event.payload["old_value"] = old_value_;
+    out_event.payload["new_value"] = new_value_;
+    return true;
+}
+
 } // namespace core::commands

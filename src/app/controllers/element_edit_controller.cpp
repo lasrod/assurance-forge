@@ -154,6 +154,73 @@ void ElementEditController::CancelPendingRemoval() {
     pending_remove_ids_.clear();
 }
 
+bool ElementEditController::CommitElementTextEdit(parser::AssuranceCase& model,
+                                                  sacm::AssuranceCasePackage* package,
+                                                  const std::string& element_id,
+                                                  const std::string& field_token,
+                                                  const std::string& language,
+                                                  const std::string& original_value,
+                                                  const std::string& new_value) {
+    // The panel passes `new_value` as a reference to the parser element's
+    // own string (ImGui's per-keystroke binding writes directly into the
+    // model). Below we revert that string to `original_value` before
+    // executing the audited command — that revert would mutate the very
+    // memory `new_value` aliases, making the subsequent command see
+    // new == old and emit a no-op transaction. Snapshot both inputs into
+    // independent locals before doing anything else.
+    const std::string original_copy = original_value;
+    const std::string new_copy      = new_value;
+
+    if (element_id.empty() || language.empty())
+        return false;
+    if (original_copy == new_copy)
+        return false;
+    core::ElementTextField field;
+    if (!core::ElementTextFieldFromToken(field_token, field)) {
+        events_.Emit(StatusMessageEvent{"Edit failed: unknown field '" + field_token + "'."});
+        return false;
+    }
+
+    if (command_bus_ && package) {
+        // The panel's InputText already mutated the parser model in place
+        // as the user typed. Revert it (and the SACM mirror) to the
+        // pre-edit value so the audited command captures the correct
+        // `old_value` before writing the final state.
+        std::string discarded;
+        std::string revert_error;
+        if (!core::SetElementTextField(model, package, element_id, field, language, original_copy, discarded,
+                                       revert_error)) {
+            events_.Emit(StatusMessageEvent{"Edit failed: " + revert_error});
+            return false;
+        }
+        core::commands::UpdateElementTextCommand cmd(element_id, field, language, new_copy);
+        core::commands::CommandContext ctx{model, *package};
+        const auto result = command_bus_->Execute(cmd, ctx, {});
+        if (!result.success) {
+            events_.Emit(StatusMessageEvent{"Edit failed: " + result.error});
+            // Best-effort: restore the value the user just typed so the UI
+            // does not jump back to the pre-edit state on failure.
+            std::string restore_error;
+            core::SetElementTextField(model, package, element_id, field, language, new_copy, discarded,
+                                      restore_error);
+            return false;
+        }
+        events_.Emit(DocumentDirtyEvent{});
+        return true;
+    }
+
+    // No audit store wired (e.g., standalone-file mode). Parser was already
+    // mutated by the InputText binding; just ensure SACM mirrors it.
+    std::string discarded;
+    std::string error;
+    if (!core::SetElementTextField(model, package, element_id, field, language, new_copy, discarded, error)) {
+        events_.Emit(StatusMessageEvent{"Edit failed: " + error});
+        return false;
+    }
+    events_.Emit(DocumentDirtyEvent{});
+    return true;
+}
+
 bool ElementEditController::ShouldShowRemoveConfirm() const {
     return show_remove_confirm_;
 }

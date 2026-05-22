@@ -93,6 +93,33 @@ bool ApplyEvent(ReplayState& state,
         return true;
     }
 
+    if (type == "UpdateElementText") {
+        std::string element_id, field_token, language, new_value;
+        if (!require_string("element_id", element_id))
+            return false;
+        if (!require_string("field", field_token))
+            return false;
+        if (!require_string("language", language))
+            return false;
+        if (!require_string("new_value", new_value))
+            return false;
+        core::ElementTextField field;
+        if (!core::ElementTextFieldFromToken(field_token, field)) {
+            out_error = "Unknown element text field token '" + field_token + "' at " +
+                        FormatLocation(tx_seq, event.event_sequence, type);
+            return false;
+        }
+        std::string old_value_unused;
+        std::string err;
+        if (!core::SetElementTextField(state.model, &state.package, element_id, field, language,
+                                       new_value, old_value_unused, err)) {
+            out_error = "SetElementTextField failed at " +
+                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+            return false;
+        }
+        return true;
+    }
+
     out_error = "Unknown event type '" + type + "' at " +
                 FormatLocation(tx_seq, event.event_sequence, type);
     return false;

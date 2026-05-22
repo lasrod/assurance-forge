@@ -233,8 +233,8 @@ TEST(ReplayVerifier, ReportsSuccessForCleanProject) {
     EXPECT_EQ(result.replayed_canonical_hash, result.manifest_canonical_hash);
 }
 
-TEST(ReplayVerifier, ReportsMismatchWhenManifestHashIsTamperedWith) {
-    auto f = MakeFixture("verifier_manifest_tamper");
+TEST(ReplayVerifier, RebuildsStaleManifestSilentlyWhenReplayMatchesOnDiskSacm) {
+    auto f = MakeFixture("verifier_manifest_stale");
 
     std::string error;
     auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
@@ -243,20 +243,61 @@ TEST(ReplayVerifier, ReportsMismatchWhenManifestHashIsTamperedWith) {
     core::commands::CreateChildElementCommand cmd("G1", core::NewElementKind::Strategy);
     ASSERT_TRUE(bus->Execute(cmd, ctx, "tester").success);
 
-    // Corrupt the manifest's stored canonical hash.
+    // Stale manifest hash — log and on-disk SACM still agree, only the
+    // cached manifest is wrong. Phase 0: verifier rewrites it silently.
     core::audit::AuditManifest manifest;
     ASSERT_TRUE(core::audit::ReadAuditManifest(f.project.rootPath, manifest, error));
-    manifest.last_known_canonical_model_hash = std::string(64, '0');
+    const std::string stale_hash(64, '0');
+    manifest.last_known_canonical_model_hash = stale_hash;
+    manifest.last_known_raw_file_hash = stale_hash;
     ASSERT_TRUE(core::audit::WriteAuditManifest(f.project.rootPath, manifest, error));
 
     const auto result = core::audit::VerifyProject(f.project);
     EXPECT_TRUE(result.ran);
+    EXPECT_TRUE(result.success) << [&] {
+        std::string s;
+        for (const auto& d : result.diagnostics) s += "\n  - " + d;
+        return s;
+    }();
+    EXPECT_EQ(result.manifest_canonical_hash, result.replayed_canonical_hash);
+
+    // Manifest on disk should now reflect the rebuilt hashes.
+    core::audit::AuditManifest after;
+    ASSERT_TRUE(core::audit::ReadAuditManifest(f.project.rootPath, after, error));
+    EXPECT_EQ(after.last_known_canonical_model_hash, result.replayed_canonical_hash);
+    EXPECT_NE(after.last_known_canonical_model_hash, stale_hash);
+    EXPECT_NE(after.last_known_raw_file_hash, stale_hash);
+}
+
+TEST(ReplayVerifier, ReportsMismatchWhenOnDiskSacmDivergesFromLog) {
+    auto f = MakeFixture("verifier_disk_diverged");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package};
+    core::commands::CreateChildElementCommand cmd("G1", core::NewElementKind::Strategy);
+    ASSERT_TRUE(bus->Execute(cmd, ctx, "tester").success);
+
+    // Externally mutate the materialized SACM so it no longer matches the
+    // replayed state. This is the real divergence we must still flag.
+    static constexpr const char* kTampered = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="EXTERNALLY EDITED."/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    WriteFile(f.sacm_abs, kTampered);
+
+    const auto result = core::audit::VerifyProject(f.project);
+    EXPECT_TRUE(result.ran);
     EXPECT_FALSE(result.success);
-    bool mentions_manifest = false;
+    bool mentions_on_disk = false;
     for (const auto& d : result.diagnostics) {
-        if (d.find("manifest") != std::string::npos) mentions_manifest = true;
+        if (d.find("on-disk") != std::string::npos) mentions_on_disk = true;
     }
-    EXPECT_TRUE(mentions_manifest);
+    EXPECT_TRUE(mentions_on_disk);
 }
 
 TEST(ReplayVerifier, SkipsProjectWithoutAuditStore) {
@@ -267,4 +308,105 @@ TEST(ReplayVerifier, SkipsProjectWithoutAuditStore) {
     const auto result = core::audit::VerifyProject(project);
     EXPECT_TRUE(result.success);
     EXPECT_FALSE(result.ran);
+}
+
+TEST(EventReplayer, ReplaysUpdateElementTextToMatchLiveState) {
+    auto f = MakeFixture("update_text");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+
+    core::commands::CommandContext ctx{f.model, f.package};
+    core::commands::UpdateElementTextCommand edit("G1", core::ElementTextField::Description, "en",
+                                                  "Updated by test.");
+    const auto live_result = bus->Execute(edit, ctx, "tester");
+    ASSERT_TRUE(live_result.success) << live_result.error;
+    EXPECT_EQ(edit.OldValue(), "The system is safe.");
+    EXPECT_FALSE(edit.WasNoOp());
+
+    auto snapshot = LoadSnapshotState(f.project.rootPath, core::audit::kInitialSnapshotId);
+    auto replayed = core::audit::Replayer::ReplayFrom(
+        snapshot.model, snapshot.package, bus->Store().Transactions(),
+        std::numeric_limits<std::uint64_t>::max());
+    ASSERT_TRUE(replayed.has_value()) << (replayed.has_value() ? "" : replayed.error());
+    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package),
+              core::audit::CanonicalModelHash(f.package));
+
+    bool found = false;
+    for (const auto& e : replayed->model.elements) {
+        if (e.id == "G1") {
+            EXPECT_EQ(e.description, "Updated by test.");
+            found = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(found);
+}
+
+TEST(EventReplayer, ReplaysUpdateElementTextSecondaryLanguage) {
+    auto f = MakeFixture("update_text_lang");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+
+    core::commands::CommandContext ctx{f.model, f.package};
+    core::commands::UpdateElementTextCommand edit("G1", core::ElementTextField::Name, "ja",
+                                                  "\xe3\x83\x88\xe3\x83\x83\xe3\x83\x97");
+    ASSERT_TRUE(bus->Execute(edit, ctx, "tester").success);
+
+    auto snapshot = LoadSnapshotState(f.project.rootPath, core::audit::kInitialSnapshotId);
+    auto replayed = core::audit::Replayer::ReplayFrom(
+        snapshot.model, snapshot.package, bus->Store().Transactions(),
+        std::numeric_limits<std::uint64_t>::max());
+    ASSERT_TRUE(replayed.has_value()) << (replayed.has_value() ? "" : replayed.error());
+    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package),
+              core::audit::CanonicalModelHash(f.package));
+
+    for (const auto& e : replayed->model.elements) {
+        if (e.id == "G1") {
+            EXPECT_EQ(e.name, "Top goal");
+            auto it = e.name_langs.find("ja");
+            ASSERT_NE(it, e.name_langs.end());
+            EXPECT_EQ(it->second, "\xe3\x83\x88\xe3\x83\x83\xe3\x83\x97");
+        }
+    }
+}
+
+TEST(UpdateElementTextCommand, NoOpWhenValueUnchangedStillAppendsAuditEvent) {
+    auto f = MakeFixture("update_text_noop");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+
+    core::commands::CommandContext ctx{f.model, f.package};
+    core::commands::UpdateElementTextCommand edit("G1", core::ElementTextField::Description, "en",
+                                                  "The system is safe.");
+    const auto result = bus->Execute(edit, ctx, "tester");
+    ASSERT_TRUE(result.success) << result.error;
+    EXPECT_TRUE(edit.WasNoOp());
+    EXPECT_EQ(edit.OldValue(), "The system is safe.");
+    EXPECT_EQ(result.transaction_sequence, 1u);
+}
+
+TEST(UpdateElementTextCommand, RejectsContentFieldOnNonClaimElement) {
+    auto f = MakeFixture("update_text_bad_content");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package};
+
+    // Add a context element, then try to set its content — should fail.
+    core::commands::CreateChildElementCommand add_ctx("G1", core::NewElementKind::Context);
+    ASSERT_TRUE(bus->Execute(add_ctx, ctx, "tester").success);
+    const std::string context_id = add_ctx.GeneratedId();
+
+    core::commands::UpdateElementTextCommand bad(context_id, core::ElementTextField::Content, "en",
+                                                 "should fail");
+    const auto result = bus->Execute(bad, ctx, "tester");
+    EXPECT_FALSE(result.success);
+    EXPECT_NE(result.error.find("content"), std::string::npos);
 }

@@ -28,6 +28,7 @@ add_library(af_ui OBJECT
     panels/terminology_usages_panel.cpp
     panels/welcome_modal.cpp
     register_views.cpp
+    text_edit_session.cpp
     theme.cpp
     tree_view.cpp
     ui_state.cpp

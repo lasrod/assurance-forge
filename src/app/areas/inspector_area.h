@@ -23,6 +23,12 @@ struct InspectorAreaCallbacks {
     std::function<bool(const std::string&, const std::string&)> is_terminology_suggestion_ignored;
     std::function<void()> focus_review_tab;
     std::function<void()> mark_element_modified;
+    std::function<void(const std::string& element_id,
+                       const std::string& field_token,
+                       const std::string& language,
+                       const std::string& original_value,
+                       const std::string& new_value)>
+        commit_element_text_edit;
 };
 
 void RenderInspectorArea(AppRuntimeState& state,
