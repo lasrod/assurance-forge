@@ -17,9 +17,29 @@
 // decides how to surface diagnostics (warning banner, debug assert, etc.).
 namespace core::audit {
 
+// Structured classification of why a verification did not produce a fully
+// consistent state. Used by the remediation modal to pre-select a default
+// remedy and explain the situation in user-facing language. `None` is the
+// success case; `ManifestStale` is reported when the manifest cache was
+// silently rebuilt (success=true is still set) so that diagnostics consumers
+// can surface a soft notice without prompting the user.
+enum class DivergenceCause {
+    None = 0,
+    ManifestUnreadable,
+    SnapshotMissing,
+    EventLogCorrupt,
+    ReplayFailed,
+    ReplayDoesNotMatchOnDisk,
+    OnDiskMissing,
+    ManifestStale,
+};
+
+const char* ToString(DivergenceCause cause);
+
 struct ReplayVerificationResult {
     bool                     success = false;
     bool                     ran = false;
+    DivergenceCause          cause = DivergenceCause::None;
     std::string              snapshot_canonical_hash;
     std::string              replayed_canonical_hash;
     std::string              on_disk_canonical_hash;

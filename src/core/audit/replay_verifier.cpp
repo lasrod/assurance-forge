@@ -16,6 +16,20 @@
 
 namespace core::audit {
 
+const char* ToString(DivergenceCause cause) {
+    switch (cause) {
+    case DivergenceCause::None:                     return "None";
+    case DivergenceCause::ManifestUnreadable:       return "ManifestUnreadable";
+    case DivergenceCause::SnapshotMissing:          return "SnapshotMissing";
+    case DivergenceCause::EventLogCorrupt:          return "EventLogCorrupt";
+    case DivergenceCause::ReplayFailed:             return "ReplayFailed";
+    case DivergenceCause::ReplayDoesNotMatchOnDisk: return "ReplayDoesNotMatchOnDisk";
+    case DivergenceCause::OnDiskMissing:            return "OnDiskMissing";
+    case DivergenceCause::ManifestStale:            return "ManifestStale";
+    }
+    return "Unknown";
+}
+
 namespace {
 
 bool LoadSnapshot(const std::filesystem::path& project_root,
@@ -66,6 +80,7 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
         if (!ReadAuditManifest(project.rootPath, manifest, err)) {
             result.success = false;
             result.ran = true;
+            result.cause = DivergenceCause::ManifestUnreadable;
             result.diagnostics.emplace_back("Failed to read audit manifest: " + err);
             return result;
         }
@@ -80,6 +95,7 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
                           err)) {
             result.success = false;
             result.ran = true;
+            result.cause = DivergenceCause::SnapshotMissing;
             result.diagnostics.emplace_back(err);
             return result;
         }
@@ -93,6 +109,7 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
         if (!store) {
             result.success = false;
             result.ran = true;
+            result.cause = DivergenceCause::EventLogCorrupt;
             result.diagnostics.emplace_back("Failed to open event store: " + err);
             return result;
         }
@@ -103,6 +120,7 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
     if (!replayed) {
         result.success = false;
         result.ran = true;
+        result.cause = DivergenceCause::ReplayFailed;
         result.diagnostics.emplace_back("Replay failed: " + replayed.error());
         return result;
     }
@@ -119,6 +137,7 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
         if (!reparsed) {
             result.success = false;
             result.ran = true;
+            result.cause = DivergenceCause::ReplayFailed;
             result.diagnostics.emplace_back("Failed to reparse replayed SACM for normalization: " +
                                             reparsed.error());
             return result;
@@ -128,7 +147,8 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
 
     // Compare against the materialized SACM on disk, if available.
     const std::filesystem::path on_disk_sacm = project.rootPath / manifest.current_sacm;
-    if (std::filesystem::exists(on_disk_sacm)) {
+    bool on_disk_present = std::filesystem::exists(on_disk_sacm);
+    if (on_disk_present) {
         auto disk_pkg = sacm::parse_sacm(on_disk_sacm.string());
         if (!disk_pkg) {
             result.diagnostics.emplace_back("Failed to parse on-disk SACM for comparison: " +
@@ -157,6 +177,7 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
         !result.manifest_canonical_hash.empty() &&
         result.manifest_canonical_hash != result.replayed_canonical_hash;
     if (replay_matches_disk && manifest_stale) {
+        result.cause = DivergenceCause::ManifestStale;
         AuditManifest rebuilt = manifest;
         rebuilt.last_known_canonical_model_hash = result.replayed_canonical_hash;
         // Refresh raw file hash too — if the canonical content matches, the
@@ -185,6 +206,8 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
     } else if (!result.manifest_canonical_hash.empty() &&
                result.manifest_canonical_hash != result.replayed_canonical_hash) {
         result.success = false;
+        if (result.cause == DivergenceCause::None)
+            result.cause = DivergenceCause::ReplayDoesNotMatchOnDisk;
         result.diagnostics.emplace_back(
             "Replayed canonical hash does not match manifest.last_known_canonical_model_hash (replay=" +
             result.replayed_canonical_hash + ", manifest=" + result.manifest_canonical_hash + ").");
@@ -192,9 +215,16 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
     if (!result.on_disk_canonical_hash.empty() &&
         result.on_disk_canonical_hash != result.replayed_canonical_hash) {
         result.success = false;
+        result.cause = DivergenceCause::ReplayDoesNotMatchOnDisk;
         result.diagnostics.emplace_back(
             "Replayed canonical hash does not match on-disk SACM canonical hash (replay=" +
             result.replayed_canonical_hash + ", on_disk=" + result.on_disk_canonical_hash + ").");
+    }
+    if (!on_disk_present) {
+        result.success = false;
+        result.cause = DivergenceCause::OnDiskMissing;
+        result.diagnostics.emplace_back(
+            "On-disk SACM file referenced by the manifest is missing: " + on_disk_sacm.string());
     }
     return result;
 }

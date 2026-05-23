@@ -93,6 +93,17 @@ bool ApplyEvent(ReplayState& state,
         return true;
     }
 
+    if (type == "SacmRestoredFromAudit") {
+        // Provenance event for the non-destructive remediation flow. The
+        // SACM file was rewritten on disk to match the replayed state at
+        // the moment this event was appended. The replayer does not need
+        // to mutate `state` — by construction, replaying transactions up
+        // to and including this event yields exactly the model that was
+        // written to disk, so subsequent events apply on top of the same
+        // model the user observed live.
+        return true;
+    }
+
     if (type == "UpdateElementText") {
         std::string element_id, field_token, language, new_value;
         if (!require_string("element_id", element_id))

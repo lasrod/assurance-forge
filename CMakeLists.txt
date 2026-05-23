@@ -279,6 +279,7 @@ add_executable(tests
     tests/test_history_highlights.cpp
     tests/test_history_reconstruction.cpp
     tests/test_reconcile_audit_store.cpp
+    tests/test_audit_recovery.cpp
     tests/test_argument_package_projection.cpp
     tests/test_canvas_history_overlay.cpp
 )

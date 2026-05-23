@@ -9,6 +9,7 @@ add_library(af_core OBJECT
     audit/audit_diff.cpp
     audit/audit_manifest.cpp
     audit/audit_paths.cpp
+    audit/audit_recovery.cpp
     audit/audit_snapshot.cpp
     audit/audit_store.cpp
     audit/audit_transaction.cpp
