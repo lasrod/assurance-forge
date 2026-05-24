@@ -1,6 +1,7 @@
 #include "app/areas/history_panel_area.h"
 
 #include "app/app_runtime_state.h"
+#include "app/areas/audit_data_cache.h"
 #include "core/audit/audit_diff.h"
 #include "core/audit/event_store.h"
 #include "ui/panels/history_timeline_panel.h"
@@ -61,13 +62,10 @@ void RenderHistoryPanelContent(AppRuntimeState& state, const HistoryPanelAreaCal
     const core::AssuranceProject& project = state.app_state.current_project.value();
 
     std::string error;
-    auto store = core::audit::EventStore::Open(project.rootPath, error);
-    std::vector<core::audit::AuditTransaction> transactions;
-    bool has_audit = false;
-    if (store) {
-        transactions = store->Transactions();
-        has_audit = true;
-    } else if (!error.empty()) {
+    const std::vector<core::audit::AuditTransaction>& transactions =
+        GetCachedTransactions(project.rootPath, error);
+    const bool has_audit = error.empty();
+    if (!has_audit) {
         ImGui::TextColored(ImVec4(0.95f, 0.55f, 0.45f, 1.0f), "Audit store error: %s", error.c_str());
     }
 

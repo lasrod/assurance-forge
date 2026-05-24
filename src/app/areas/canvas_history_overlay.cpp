@@ -1,6 +1,7 @@
 #include "app/areas/canvas_history_overlay.h"
 
 #include "app/app_runtime_state.h"
+#include "app/areas/audit_data_cache.h"
 #include "app/areas/baseline_modal.h"
 #include "core/argument_package_projection.h"
 #include "core/audit/audit_baseline.h"
@@ -85,12 +86,9 @@ CanvasHistoryState& GetOrCreateHistoryState(const std::string& tab_key) {
     return g_history_state_by_tab_key[tab_key];
 }
 
-std::vector<core::audit::AuditTransaction> LoadTransactions(const core::AssuranceProject& project,
-                                                            std::string& error_out) {
-    auto store = core::audit::EventStore::Open(project.rootPath, error_out);
-    if (!store)
-        return {};
-    return store->Transactions();
+const std::vector<core::audit::AuditTransaction>& LoadTransactions(const core::AssuranceProject& project,
+                                                                  std::string& error_out) {
+    return GetCachedTransactions(project.rootPath, error_out);
 }
 
 // Walk transactions forward, growing the package scope as new child
@@ -382,7 +380,9 @@ void RenderArgumentPackageCanvasWithTimeline(
     const core::AssuranceProject& project = state.app_state.current_project.value();
     CanvasHistoryState& tab_state = GetOrCreateHistoryState(tab.key);
 
-    // Load + filter transactions.
+    // Load + filter transactions. The cached helper returns a reference
+    // owned by the audit-data cache; copy out so downstream code can keep
+    // working with `tab_state.source_transactions` by value as before.
     std::string store_error;
     tab_state.source_transactions = LoadTransactions(project, store_error);
     RebuildFilteredTransactions(tab_state.filtered, tab_state.source_transactions, argument_package);
@@ -390,30 +390,18 @@ void RenderArgumentPackageCanvasWithTimeline(
         tab_state.filtered.filtered;
 
     // Load baselines (best-effort: warnings are ignored at this layer; the
-    // timeline still renders with whatever loaded successfully).
-    std::vector<std::string> baseline_warnings;
-    std::vector<core::audit::BaselineMetadata> baselines =
-        core::audit::ListBaselines(project.rootPath, &baseline_warnings);
+    // timeline still renders with whatever loaded successfully). Cached so
+    // the manifest + per-baseline sidecar reads only run when the files
+    // actually change.
+    const std::vector<core::audit::BaselineMetadata>& baselines =
+        GetCachedBaselines(project.rootPath, nullptr);
 
     // Enumerate snapshots from disk (snapshot/<id>/snapshot.json). The
     // manifest only records `initial_snapshot_id`, so we walk the directory
-    // and read each metadata file. This is acceptable for the visible-tab
-    // hot path because snapshot counts are small.
-    std::vector<core::audit::SnapshotMetadata> snapshots;
-    {
-        std::error_code ec;
-        const auto snap_dir = core::audit::AfDir(project.rootPath) / "snapshots";
-        if (std::filesystem::exists(snap_dir, ec)) {
-            for (const auto& entry : std::filesystem::directory_iterator(snap_dir, ec)) {
-                if (!entry.is_directory()) continue;
-                const std::string snap_id = entry.path().filename().string();
-                core::audit::SnapshotMetadata md;
-                std::string err;
-                if (core::audit::ReadSnapshotMetadata(project.rootPath, snap_id, md, err))
-                    snapshots.push_back(std::move(md));
-            }
-        }
-    }
+    // and read each metadata file. Cached so the per-frame directory walk
+    // + metadata reads only run when the snapshots directory changes.
+    const std::vector<core::audit::SnapshotMetadata>& snapshots =
+        GetCachedSnapshots(project.rootPath);
 
     // Clamp + decide live-vs-preview.
     const std::uint64_t latest_seq =

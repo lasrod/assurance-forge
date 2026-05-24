@@ -1,6 +1,7 @@
 #include "app/areas/inspector_area.h"
 
 #include "app/app_runtime_state.h"
+#include "app/areas/audit_data_cache.h"
 #include "app/confidence_problem_sync.h"
 #include "app/frame/app_layout_regions.h"
 #include "core/audit/audit_baseline.h"
@@ -175,15 +176,15 @@ void RenderInspectorArea(AppRuntimeState& state,
                 if (element_id.empty())
                     return hm;
                 std::string err;
-                auto store = core::audit::EventStore::Open(project_root, err);
-                if (!store)
+                const std::vector<core::audit::AuditTransaction>& txs =
+                    GetCachedTransactions(project_root, err);
+                if (!err.empty() && txs.empty())
                     return hm;
                 hm.available = true;
-                const std::vector<core::audit::AuditTransaction> txs = store->Transactions();
 
                 // Determine the latest baseline (if any) by transaction_sequence.
-                std::vector<core::audit::BaselineMetadata> baselines =
-                    core::audit::ListBaselines(project_root, nullptr);
+                const std::vector<core::audit::BaselineMetadata>& baselines =
+                    GetCachedBaselines(project_root, nullptr);
                 std::optional<std::uint64_t> baseline_seq;
                 if (!baselines.empty()) {
                     auto it = std::max_element(baselines.begin(), baselines.end(),

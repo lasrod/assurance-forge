@@ -18,6 +18,7 @@ add_library(af_app OBJECT
     app_ui_bootstrap.cpp
     areas/ai_debug_area.cpp
     areas/argument_navigator_area.cpp
+    areas/audit_data_cache.cpp
     areas/baseline_modal.cpp
     areas/canvas_history_overlay.cpp
     areas/feedback_dock_area.cpp
