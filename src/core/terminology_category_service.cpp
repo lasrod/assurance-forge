@@ -44,9 +44,11 @@ const sacm::Category* FindTerminologyCategory(const sacm::AssuranceCasePackage& 
     return terminology_package ? FindTerminologyCategory(*terminology_package, category_ref) : nullptr;
 }
 
-TerminologyCategoryCreateResult CreateTerminologyCategory(sacm::AssuranceCasePackage& package,
-                                                          const TerminologyPackageRef& package_ref,
-                                                          const TerminologyCategoryDraft& draft) {
+TerminologyCategoryCreateResult CreateTerminologyCategoryWithIds(sacm::AssuranceCasePackage& package,
+                                                                 const TerminologyPackageRef& package_ref,
+                                                                 const TerminologyCategoryDraft& draft,
+                                                                 const std::string& forced_id,
+                                                                 const std::string& forced_gid) {
     TerminologyCategoryCreateResult result;
     if (TrimWhitespace(draft.name).empty()) {
         result.error = "Category name is required.";
@@ -60,13 +62,19 @@ TerminologyCategoryCreateResult CreateTerminologyCategory(sacm::AssuranceCasePac
     }
 
     sacm::Category category;
-    category.id = GenerateUniqueId(package, "CAT");
-    category.gid = GenerateUniqueGid(package, category.id);
+    category.id = forced_id.empty() ? GenerateUniqueId(package, "CAT") : forced_id;
+    category.gid = forced_gid.empty() ? GenerateUniqueGid(package, category.id) : forced_gid;
     ApplyCategoryDraft(category, draft);
     result.category_ref = RefFor(category);
     terminology_package->categories.push_back(std::move(category));
     result.success = true;
     return result;
+}
+
+TerminologyCategoryCreateResult CreateTerminologyCategory(sacm::AssuranceCasePackage& package,
+                                                          const TerminologyPackageRef& package_ref,
+                                                          const TerminologyCategoryDraft& draft) {
+    return CreateTerminologyCategoryWithIds(package, package_ref, draft, {}, {});
 }
 
 bool UpdateTerminologyCategory(sacm::AssuranceCasePackage& package,

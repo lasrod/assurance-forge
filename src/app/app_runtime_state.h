@@ -199,6 +199,14 @@ struct AppRuntimeState {
     // reflects their latest committed change.
     std::string last_autosave_error;
 
+    // When the user clicks "Reconcile" in the audit-divergence popup we
+    // cannot run the reconcile inline: it tears down the canvas tab
+    // currently being rendered (PerformOpenProjectFile clears the
+    // argument_package_canvas_tabs vector, invalidating the tab reference
+    // held by the in-flight render frame). Instead we set this flag and
+    // run ReconcileAuditStore() at the top of the next frame.
+    bool pending_reconcile_audit_store = false;
+
     bool tree_needs_rebuild = false;
     core::AssuranceTree current_tree;
     core::TreeDisplayOrder tree_display_order;

@@ -47,8 +47,24 @@ struct TerminologyContextAssociationResult {
     bool created_artifact_reference = false;
     bool created_asserted_context = false;
     std::string artifact_reference_id;
+    std::string artifact_reference_gid;
     std::string asserted_context_id;
+    std::string asserted_context_gid;
     std::string error;
+};
+
+// Optional forced identifiers for the artifact reference and asserted
+// context that may be created by `AssociateTerminologyTermWithElement`
+// or `AddTerminologyTermAsVisibleContext`. Used by replay handlers and
+// command Apply methods to reproduce the exact identities recorded in
+// the audit log. Each field is consulted only when the corresponding
+// entity is being newly created (existing entities are always reused as
+// in the non-`WithIds` variants).
+struct TerminologyContextForcedIds {
+    std::string artifact_reference_id;
+    std::string artifact_reference_gid;
+    std::string asserted_context_id;
+    std::string asserted_context_gid;
 };
 
 struct TerminologyCategoryRef {
@@ -158,6 +174,16 @@ const sacm::TerminologyPackage* FindTerminologyPackage(const sacm::AssuranceCase
 TerminologyPackageCreateResult
 CreateTerminologyPackage(sacm::AssuranceCasePackage& package, const std::string& name, const std::string& description);
 
+// Replay-friendly variant: caller supplies the (id, gid) instead of having
+// them generated. Used by `core::audit::Replayer` and by command Apply
+// methods that need to reproduce the exact identities recorded in the
+// audit log.
+TerminologyPackageCreateResult CreateTerminologyPackageWithIds(sacm::AssuranceCasePackage& package,
+                                                               const std::string& name,
+                                                               const std::string& description,
+                                                               const std::string& forced_id,
+                                                               const std::string& forced_gid);
+
 bool UpdateTerminologyPackage(sacm::AssuranceCasePackage& package,
                               const TerminologyPackageRef& package_ref,
                               const std::string& name,
@@ -183,6 +209,13 @@ TerminologyTermCreateResult CreateTerminologyTerm(sacm::AssuranceCasePackage& pa
                                                   const TerminologyPackageRef& package_ref,
                                                   const TerminologyTermDraft& draft);
 
+// Replay-friendly variant: forces the generated (id, gid) when non-empty.
+TerminologyTermCreateResult CreateTerminologyTermWithIds(sacm::AssuranceCasePackage& package,
+                                                         const TerminologyPackageRef& package_ref,
+                                                         const TerminologyTermDraft& draft,
+                                                         const std::string& forced_id,
+                                                         const std::string& forced_gid);
+
 bool UpdateTerminologyTerm(sacm::AssuranceCasePackage& package,
                            const TerminologyPackageRef& package_ref,
                            const TerminologyTermRef& term_ref,
@@ -198,10 +231,32 @@ TerminologyContextAssociationResult AssociateTerminologyTermWithElement(sacm::As
                                                                         const std::string& target_element_id,
                                                                         const TerminologyPackageRef& package_ref,
                                                                         const TerminologyTermRef& term_ref);
+
+// Replay-friendly variant of `AssociateTerminologyTermWithElement`. The
+// `forced` ids are consulted only when a new ArtifactReference or
+// AssertedContext is created; otherwise existing entities are reused.
+TerminologyContextAssociationResult
+AssociateTerminologyTermWithElementWithIds(sacm::AssuranceCasePackage& package,
+                                           const std::string&             target_element_id,
+                                           const TerminologyPackageRef&   package_ref,
+                                           const TerminologyTermRef&      term_ref,
+                                           const TerminologyContextForcedIds& forced);
+
 TerminologyContextAssociationResult AddTerminologyTermAsVisibleContext(sacm::AssuranceCasePackage& package,
                                                                        const std::string& target_element_id,
                                                                        const TerminologyPackageRef& package_ref,
                                                                        const TerminologyTermRef& term_ref);
+
+// Replay-friendly variant of `AddTerminologyTermAsVisibleContext`. The
+// `forced` ids are consulted only when a new ArtifactReference or
+// AssertedContext is created; otherwise existing entities are reused or
+// promoted in place.
+TerminologyContextAssociationResult
+AddTerminologyTermAsVisibleContextWithIds(sacm::AssuranceCasePackage&        package,
+                                          const std::string&                 target_element_id,
+                                          const TerminologyPackageRef&       package_ref,
+                                          const TerminologyTermRef&          term_ref,
+                                          const TerminologyContextForcedIds& forced);
 
 TerminologyTermReferenceResolution ResolveTerminologyTermReference(const sacm::AssuranceCasePackage& package,
                                                                    const std::string& raw_ref);
@@ -228,6 +283,13 @@ const sacm::Category* FindTerminologyCategory(const sacm::AssuranceCasePackage& 
 TerminologyCategoryCreateResult CreateTerminologyCategory(sacm::AssuranceCasePackage& package,
                                                           const TerminologyPackageRef& package_ref,
                                                           const TerminologyCategoryDraft& draft);
+
+// Replay-friendly variant: forces the generated (id, gid) when non-empty.
+TerminologyCategoryCreateResult CreateTerminologyCategoryWithIds(sacm::AssuranceCasePackage& package,
+                                                                 const TerminologyPackageRef& package_ref,
+                                                                 const TerminologyCategoryDraft& draft,
+                                                                 const std::string& forced_id,
+                                                                 const std::string& forced_gid);
 
 bool UpdateTerminologyCategory(sacm::AssuranceCasePackage& package,
                                const TerminologyPackageRef& package_ref,

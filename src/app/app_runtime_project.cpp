@@ -1,6 +1,8 @@
 #include "app/app_runtime.h"
 #include "app/actions/terminology_actions.h"
+#include "app/app_events.h"
 #include "app/app_runtime_state.h"
+#include "app/commands/dispatch.h"
 #include "app/confidence_problem_sync.h"
 #include "app/native_file_dialogs.h"
 #include "app/proposal_ui_state.h"
@@ -10,6 +12,7 @@
 #include "core/audit/replay_verifier.h"
 #include "core/audit/audit_store.h"
 #include "core/commands/command_bus.h"
+#include "core/commands/package_commands.h"
 #include "core/problems/problem_utils.h"
 #include "core/project_service.h"
 #include "core/reviews/review_item.h"
@@ -157,44 +160,6 @@ std::string FirstElementIdForArgumentPackage(const sacm::ArgumentPackage& argume
 
 const sacm::ArgumentPackage* FirstArgumentPackage(const sacm::AssuranceCasePackage& package) {
     return package.argumentPackages.empty() ? nullptr : &package.argumentPackages.front();
-}
-
-bool RefreshVisibleTerminologyContextProjection(core::AppState& app_state) {
-    if (!app_state.loaded_case.has_value() || !app_state.sacm_package.has_value())
-        return false;
-
-    bool changed = false;
-    parser::AssuranceCase& model = app_state.loaded_case.value();
-    const sacm::AssuranceCasePackage& package = app_state.sacm_package.value();
-    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
-        for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
-            if (!core::IsVisibleTerminologyArtifactReference(package, argument_package, artifact_reference))
-                continue;
-            parser::SacmElement* element =
-                parser::FindElementByIdOrGid(model, artifact_reference.id, artifact_reference.gid);
-            if (!element)
-                continue;
-            const core::TerminologyTermReferenceResolution resolution =
-                core::ResolveTerminologyTermReference(package, artifact_reference.referencedArtifact);
-            const std::string previous_name = element->name;
-            const std::string previous_description = element->description;
-            if (!resolution.resolved || !resolution.term) {
-                element->description.clear();
-                element->description_langs.clear();
-            } else {
-                element->name = core::TermContextDisplayLabel(*resolution.term);
-                element->name_langs = resolution.term->name_ml.texts;
-                if (element->name_langs.empty() && !element->name.empty())
-                    element->name_langs["en"] = element->name;
-                element->description = resolution.term->description;
-                element->description_langs = resolution.term->description_ml.texts;
-                if (element->description_langs.empty() && !element->description.empty())
-                    element->description_langs["en"] = element->description;
-            }
-            changed = changed || element->name != previous_name || element->description != previous_description;
-        }
-    }
-    return changed;
 }
 
 } // namespace
@@ -664,114 +629,49 @@ void AppRuntime::RemoveProjectPackage(const core::ProjectFileEntry& entry, const
         return;
     }
 
-    sacm::AssuranceCasePackage& package = impl_->app_state.sacm_package.value();
     const std::string label = node.displayName.empty() ? node.id : node.displayName;
-    bool removed = false;
     std::string status_message;
+    std::string kind_label;
+    std::unique_ptr<core::commands::ICommand> command;
 
-    auto matches_node = [&](const sacm::SacmElement& element) {
-        return (!node.id.empty() && element.id == node.id) || (!node.gid.empty() && element.gid == node.gid);
-    };
+    switch (node.type) {
+    case sacm::SacmPackageNodeType::TerminologyPackage: {
+        command = std::make_unique<core::commands::RemoveTerminologyPackageCommand>(node.id, node.gid);
+        kind_label = "terminology package";
+        break;
+    }
+    case sacm::SacmPackageNodeType::ArgumentPackage: {
+        command = std::make_unique<core::commands::RemoveArgumentPackageCommand>(node.id, node.gid);
+        kind_label = "argument package";
+        break;
+    }
+    case sacm::SacmPackageNodeType::ArtifactPackage: {
+        command = std::make_unique<core::commands::RemoveArtifactPackageCommand>(node.id, node.gid);
+        kind_label = "artifact package";
+        break;
+    }
+    default:
+        SetStatus("Removing this package type is not supported yet.");
+        return;
+    }
+
+    const auto outcome = app::commands::DispatchAuditedCommand(*impl_, *command);
+    if (!outcome.success) {
+        SetStatus("Remove " + kind_label + " failed: " + outcome.error);
+        return;
+    }
 
     if (node.type == sacm::SacmPackageNodeType::TerminologyPackage) {
-        std::string error;
-        if (!core::DeleteTerminologyPackage(package, core::TerminologyPackageRef{node.id, node.gid}, error)) {
-            SetStatus("Remove terminology package failed: " + error);
-            return;
-        }
-        removed = true;
-        status_message = "Removed terminology package " + label + ".";
         if (impl_->terminology.selected_package_ref.id == node.id &&
             impl_->terminology.selected_package_ref.gid == node.gid) {
             impl_->terminology.selected_package_ref = core::TerminologyPackageRef{};
             impl_->workbench.show_terminology_package_tab = false;
         }
     } else if (node.type == sacm::SacmPackageNodeType::ArgumentPackage) {
-        auto& vec = package.argumentPackages;
-        const auto it = std::find_if(vec.begin(), vec.end(), matches_node);
-        if (it == vec.end()) {
-            SetStatus("Argument package was not found in the editable model.");
-            return;
-        }
-        // Capture identities of every element that lived inside the removed argument package so we
-        // can scrub matching parser projections (otherwise claims/reasonings linger as orphans in
-        // the main GSN tree) and so we can detect any ACPs that referenced this package as their
-        // separate confidence argument tree.
-        const std::string removed_argument_package_id = it->id;
-        std::unordered_set<std::string> removed_element_ids;
-        std::unordered_set<std::string> removed_element_gids;
-        auto record_identity = [&](const sacm::SacmElement& element) {
-            if (!element.id.empty())
-                removed_element_ids.insert(element.id);
-            if (!element.gid.empty())
-                removed_element_gids.insert(element.gid);
-        };
-        for (const sacm::Claim& claim : it->claims)
-            record_identity(claim);
-        for (const sacm::ArgumentReasoning& reasoning : it->argumentReasonings)
-            record_identity(reasoning);
-        for (const sacm::ArtifactReference& artifact_reference : it->artifactReferences)
-            record_identity(artifact_reference);
-        for (const sacm::AssertedInference& inference : it->assertedInferences)
-            record_identity(inference);
-        for (const sacm::AssertedContext& context : it->assertedContexts)
-            record_identity(context);
-        for (const sacm::AssertedEvidence& evidence : it->assertedEvidences)
-            record_identity(evidence);
-        const bool was_confidence_argument_package = core::acp::IsConfidenceArgumentPackage(*it);
-        vec.erase(it);
-
-        if (impl_->app_state.loaded_case.has_value()) {
-            parser::AssuranceCase& loaded = impl_->app_state.loaded_case.value();
-            // Drop parser projections of every element that lived in the removed argument package
-            // so they don't show up as orphans in the main GSN tree.
-            loaded.elements.erase(std::remove_if(loaded.elements.begin(),
-                                                 loaded.elements.end(),
-                                                 [&](const parser::SacmElement& element) {
-                                                     if (removed_element_ids.count(element.id) > 0)
-                                                         return true;
-                                                     if (!element.gid.empty() &&
-                                                         removed_element_gids.count(element.gid) > 0)
-                                                         return true;
-                                                     return false;
-                                                 }),
-                                  loaded.elements.end());
-            // If the removed package backed a separate confidence argument tree, clear the
-            // link on any ACPs that pointed to it. This makes the ACP "incomplete" again so
-            // that the GSN-canvas decorator surfaces an alert badge on the affected element.
-            if (was_confidence_argument_package) {
-                for (parser::AcpRecord& acp_record : loaded.acps) {
-                    if (acp_record.resolution_kind == "topGoalReference" &&
-                        acp_record.argument_package_id == removed_argument_package_id) {
-                        acp_record.argument_package_id.clear();
-                        acp_record.top_goal_id.clear();
-                    }
-                }
-            }
-        }
         impl_->tree_needs_rebuild = true;
-        removed = true;
-        status_message = "Removed argument package " + label + ".";
-    } else if (node.type == sacm::SacmPackageNodeType::ArtifactPackage) {
-        auto& vec = package.artifactPackages;
-        const auto it = std::find_if(vec.begin(), vec.end(), matches_node);
-        if (it == vec.end()) {
-            SetStatus("Artifact package was not found in the editable model.");
-            return;
-        }
-        vec.erase(it);
-        removed = true;
-        status_message = "Removed artifact package " + label + ".";
-    } else {
-        SetStatus("Removing this package type is not supported yet.");
-        return;
     }
 
-    if (!removed)
-        return;
-
-    impl_->app_state.mark_dirty();
-    impl_->document_dirty = true;
+    status_message = "Removed " + kind_label + " " + label + ".";
     impl_->sacm_package_tree_cache.erase(entry.relativePath.generic_string());
     SyncTerminologyProblems();
     SyncAcpProblems();

@@ -215,10 +215,13 @@ VisibleContextSearchResult FindVisibleContextCandidates(sacm::ArgumentPackage& a
 }
 
 sacm::ArtifactReference CreateTerminologyArtifactReference(const sacm::AssuranceCasePackage& package,
-                                                           const sacm::Term& term) {
+                                                           const sacm::Term&                 term,
+                                                           const std::string&                forced_id,
+                                                           const std::string&                forced_gid) {
     sacm::ArtifactReference artifact_reference;
-    artifact_reference.id = GenerateUniqueId(package, "TC");
-    artifact_reference.gid = GenerateUniqueGid(package, artifact_reference.id);
+    artifact_reference.id = forced_id.empty() ? GenerateUniqueId(package, "TC") : forced_id;
+    artifact_reference.gid =
+        forced_gid.empty() ? GenerateUniqueGid(package, artifact_reference.id) : forced_gid;
     artifact_reference.name = TermContextLabel(term);
     artifact_reference.name_ml.set("en", artifact_reference.name);
     artifact_reference.referencedArtifact = !term.id.empty() ? term.id : term.gid;
@@ -226,12 +229,14 @@ sacm::ArtifactReference CreateTerminologyArtifactReference(const sacm::Assurance
 }
 
 sacm::AssertedContext CreateVisibleTerminologyContext(const sacm::AssuranceCasePackage& package,
-                                                      const sacm::Term& term,
-                                                      const std::string& source_ref,
-                                                      const std::string& target_ref) {
+                                                      const sacm::Term&                 term,
+                                                      const std::string&                source_ref,
+                                                      const std::string&                target_ref,
+                                                      const std::string&                forced_id,
+                                                      const std::string&                forced_gid) {
     sacm::AssertedContext context;
-    context.id = GenerateUniqueId(package, "AC");
-    context.gid = GenerateUniqueGid(package, context.id);
+    context.id  = forced_id.empty() ? GenerateUniqueId(package, "AC") : forced_id;
+    context.gid = forced_gid.empty() ? GenerateUniqueGid(package, context.id) : forced_gid;
     context.name = "Context: " + TermContextLabel(term);
     context.name_ml.set("en", context.name);
     context.description = kVisibleTerminologyContextMarker;
@@ -272,10 +277,12 @@ void RemoveUnreferencedTerminologyArtifacts(sacm::ArgumentPackage& argument_pack
 
 } // namespace
 
-TerminologyContextAssociationResult AssociateTerminologyTermWithElement(sacm::AssuranceCasePackage& package,
-                                                                        const std::string& target_element_id,
-                                                                        const TerminologyPackageRef& package_ref,
-                                                                        const TerminologyTermRef& term_ref) {
+TerminologyContextAssociationResult
+AssociateTerminologyTermWithElementWithIds(sacm::AssuranceCasePackage& package,
+                                           const std::string&             target_element_id,
+                                           const TerminologyPackageRef&   package_ref,
+                                           const TerminologyTermRef&      term_ref,
+                                           const TerminologyContextForcedIds& forced) {
     TerminologyContextAssociationResult result;
     if (NormalizeRef(target_element_id).empty()) {
         result.error = "Target element is required.";
@@ -306,7 +313,9 @@ TerminologyContextAssociationResult AssociateTerminologyTermWithElement(sacm::As
                 result.success = true;
                 result.already_associated = true;
                 result.artifact_reference_id = artifact_reference.id;
+                result.artifact_reference_gid = artifact_reference.gid;
                 result.asserted_context_id = context.id;
+                result.asserted_context_gid = context.gid;
                 return result;
             }
         }
@@ -314,8 +323,11 @@ TerminologyContextAssociationResult AssociateTerminologyTermWithElement(sacm::As
 
     if (!reusable_reference) {
         sacm::ArtifactReference artifact_reference;
-        artifact_reference.id = GenerateUniqueId(package, "AR");
-        artifact_reference.gid = GenerateUniqueGid(package, artifact_reference.id);
+        artifact_reference.id =
+            forced.artifact_reference_id.empty() ? GenerateUniqueId(package, "AR") : forced.artifact_reference_id;
+        artifact_reference.gid = forced.artifact_reference_gid.empty()
+                                     ? GenerateUniqueGid(package, artifact_reference.id)
+                                     : forced.artifact_reference_gid;
         artifact_reference.name = TermContextLabel(*term);
         artifact_reference.name_ml.set("en", artifact_reference.name);
         artifact_reference.referencedArtifact = !term->id.empty() ? term->id : term->gid;
@@ -325,8 +337,9 @@ TerminologyContextAssociationResult AssociateTerminologyTermWithElement(sacm::As
     }
 
     sacm::AssertedContext context;
-    context.id = GenerateUniqueId(package, "AC");
-    context.gid = GenerateUniqueGid(package, context.id);
+    context.id  = forced.asserted_context_id.empty() ? GenerateUniqueId(package, "AC") : forced.asserted_context_id;
+    context.gid = forced.asserted_context_gid.empty() ? GenerateUniqueGid(package, context.id)
+                                                      : forced.asserted_context_gid;
     context.name = "Context: " + TermContextLabel(*term);
     context.name_ml.set("en", context.name);
     context.sources.push_back(reusable_reference->id);
@@ -336,8 +349,17 @@ TerminologyContextAssociationResult AssociateTerminologyTermWithElement(sacm::As
     result.success = true;
     result.created_asserted_context = true;
     result.artifact_reference_id = reusable_reference->id;
+    result.artifact_reference_gid = reusable_reference->gid;
     result.asserted_context_id = argument_package->assertedContexts.back().id;
+    result.asserted_context_gid = argument_package->assertedContexts.back().gid;
     return result;
+}
+
+TerminologyContextAssociationResult AssociateTerminologyTermWithElement(sacm::AssuranceCasePackage& package,
+                                                                        const std::string& target_element_id,
+                                                                        const TerminologyPackageRef& package_ref,
+                                                                        const TerminologyTermRef& term_ref) {
+    return AssociateTerminologyTermWithElementWithIds(package, target_element_id, package_ref, term_ref, {});
 }
 
 bool IsVisibleTerminologyContext(const sacm::AssertedContext& context) {
@@ -478,10 +500,12 @@ ValidateTerminologyContextReferences(const sacm::AssuranceCasePackage& package) 
     return issues;
 }
 
-TerminologyContextAssociationResult AddTerminologyTermAsVisibleContext(sacm::AssuranceCasePackage& package,
-                                                                       const std::string& target_element_id,
-                                                                       const TerminologyPackageRef& package_ref,
-                                                                       const TerminologyTermRef& term_ref) {
+TerminologyContextAssociationResult
+AddTerminologyTermAsVisibleContextWithIds(sacm::AssuranceCasePackage&        package,
+                                          const std::string&                 target_element_id,
+                                          const TerminologyPackageRef&       package_ref,
+                                          const TerminologyTermRef&          term_ref,
+                                          const TerminologyContextForcedIds& forced) {
     TerminologyContextAssociationResult result;
     const std::string target_ref = NormalizeRef(target_element_id);
     if (target_ref.empty()) {
@@ -506,7 +530,9 @@ TerminologyContextAssociationResult AddTerminologyTermAsVisibleContext(sacm::Ass
         result.success = true;
         result.already_associated = true;
         result.artifact_reference_id = candidates.existing_visible_reference->id;
+        result.artifact_reference_gid = candidates.existing_visible_reference->gid;
         result.asserted_context_id = candidates.existing_visible_context->id;
+        result.asserted_context_gid = candidates.existing_visible_context->gid;
         return result;
     }
 
@@ -515,16 +541,22 @@ TerminologyContextAssociationResult AddTerminologyTermAsVisibleContext(sacm::Ass
         candidates.promotable_context->description_ml.texts.clear();
         result.success = true;
         result.artifact_reference_id = candidates.promotable_reference->id;
+        result.artifact_reference_gid = candidates.promotable_reference->gid;
         result.asserted_context_id = candidates.promotable_context->id;
+        result.asserted_context_gid = candidates.promotable_context->gid;
         return result;
     }
 
-    argument_package->artifactReferences.push_back(CreateTerminologyArtifactReference(package, *term));
+    argument_package->artifactReferences.push_back(
+        CreateTerminologyArtifactReference(package, *term, forced.artifact_reference_id,
+                                           forced.artifact_reference_gid));
     sacm::ArtifactReference& visible_reference = argument_package->artifactReferences.back();
     const std::string visible_reference_id = visible_reference.id;
+    const std::string visible_reference_gid = visible_reference.gid;
 
     argument_package->assertedContexts.push_back(
-        CreateVisibleTerminologyContext(package, *term, visible_reference.id, target_ref));
+        CreateVisibleTerminologyContext(package, *term, visible_reference.id, target_ref,
+                                        forced.asserted_context_id, forced.asserted_context_gid));
 
     RemoveContextsById(*argument_package, candidates.hidden_contexts_to_remove);
     RemoveUnreferencedTerminologyArtifacts(*argument_package, *term, visible_reference_id);
@@ -533,8 +565,17 @@ TerminologyContextAssociationResult AddTerminologyTermAsVisibleContext(sacm::Ass
     result.created_artifact_reference = true;
     result.created_asserted_context = true;
     result.artifact_reference_id = visible_reference_id;
+    result.artifact_reference_gid = visible_reference_gid;
     result.asserted_context_id = argument_package->assertedContexts.back().id;
+    result.asserted_context_gid = argument_package->assertedContexts.back().gid;
     return result;
+}
+
+TerminologyContextAssociationResult AddTerminologyTermAsVisibleContext(sacm::AssuranceCasePackage& package,
+                                                                       const std::string& target_element_id,
+                                                                       const TerminologyPackageRef& package_ref,
+                                                                       const TerminologyTermRef& term_ref) {
+    return AddTerminologyTermAsVisibleContextWithIds(package, target_element_id, package_ref, term_ref, {});
 }
 
 } // namespace core

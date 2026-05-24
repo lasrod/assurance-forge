@@ -3,6 +3,8 @@
 #include "app/actions/terminology_actions_internal.h"
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
+#include "app/commands/dispatch.h"
+#include "core/commands/terminology_commands.h"
 #include "core/string_utils.h"
 #include "core/terminology_text_utils.h"
 #include "parser/model_utils.h"
@@ -32,7 +34,6 @@ using detail::EnsureProjectSacmFileOpen;
 using detail::EnsureQuickDefineTargetPackage;
 using detail::HasTerminologyPackageRef;
 using detail::InvalidateSacmPackageTreeCache;
-using detail::MarkTerminologyDocumentDirty;
 using detail::OpenTerminologyProblemTerm;
 using detail::QuickDefineTargetPackageResult;
 using detail::RefreshVisibleTerminologyContextProjection;
@@ -84,32 +85,32 @@ bool TerminologyActions::ConfirmAddPackage() {
         return false;
     }
 
-    core::TerminologyPackageCreateResult result =
-        core::CreateTerminologyPackage(state_.app_state.sacm_package.value(),
-                                       TrimWhitespace(state_.terminology.new_package_name_buf),
-                                       TrimWhitespace(state_.terminology.new_package_description_buf));
-    if (!result.success) {
-        SetStatus(state_, "Terminology package create failed: " + result.error);
+    core::commands::CreateTerminologyPackageCommand command(
+        TrimWhitespace(state_.terminology.new_package_name_buf),
+        TrimWhitespace(state_.terminology.new_package_description_buf));
+    const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
+    if (!outcome.success) {
+        SetStatus(state_, "Terminology package create failed: " + outcome.error);
         return false;
     }
+    const core::TerminologyPackageRef created_ref = command.GeneratedRef();
 
-    state_.terminology.selected_package_ref = result.package_ref;
+    state_.terminology.selected_package_ref = created_ref;
     state_.terminology.selected_term_ref = core::TerminologyTermRef{};
     state_.terminology.selected_category_ref = core::TerminologyCategoryRef{};
     CopyToBuffer(state_.terminology.category_filter_buf, sizeof(state_.terminology.category_filter_buf), "");
     state_.terminology.selected_package_file_path = state_.app_state.active_project_file_path;
     if (const sacm::TerminologyPackage* package =
-            core::FindTerminologyPackage(state_.app_state.sacm_package.value(), result.package_ref)) {
+            core::FindTerminologyPackage(state_.app_state.sacm_package.value(), created_ref)) {
         CopyTerminologyPackageToEditor(state_, *package);
     }
-    MarkTerminologyDocumentDirty(state_);
     InvalidateSacmPackageTreeCache(state_, entry.relativePath);
     state_.terminology.show_create_package_modal = false;
     state_.terminology.pending_package_parent_entry.reset();
     state_.workbench.show_terminology_package_tab = true;
     ui::GetUiState().center_view = ui::CenterView::TerminologyPackage;
     state_.workbench.force_center_tab_selection = true;
-    SetStatus(state_, "Added terminology package " + result.package_ref.id + ".");
+    SetStatus(state_, "Added terminology package " + created_ref.id + ".");
     return true;
 }
 
@@ -117,17 +118,16 @@ bool TerminologyActions::ApplyPackageEdits() {
     if (!state_.app_state.sacm_package.has_value())
         return false;
 
-    std::string error;
-    if (!core::UpdateTerminologyPackage(state_.app_state.sacm_package.value(),
-                                        state_.terminology.selected_package_ref,
-                                        TrimWhitespace(state_.terminology.package_name_buf),
-                                        TrimWhitespace(state_.terminology.package_description_buf),
-                                        error)) {
-        SetStatus(state_, "Terminology package update failed: " + error);
+    core::commands::UpdateTerminologyPackageCommand command(
+        state_.terminology.selected_package_ref,
+        TrimWhitespace(state_.terminology.package_name_buf),
+        TrimWhitespace(state_.terminology.package_description_buf));
+    const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
+    if (!outcome.success) {
+        SetStatus(state_, "Terminology package update failed: " + outcome.error);
         return false;
     }
 
-    MarkTerminologyDocumentDirty(state_);
     if (state_.app_state.current_project.has_value() && !state_.app_state.active_project_file_path.empty()) {
         const std::filesystem::path relative = std::filesystem::relative(state_.app_state.active_project_file_path,
                                                                          state_.app_state.current_project->rootPath);
@@ -151,7 +151,7 @@ bool TerminologyActions::ConfirmDeletePackage() {
         return false;
     }
 
-    MarkTerminologyDocumentDirty(state_);
+    state_.events.Emit(DocumentDirtyEvent{});
     if (state_.app_state.current_project.has_value() && !state_.app_state.active_project_file_path.empty()) {
         const std::filesystem::path relative = std::filesystem::relative(state_.app_state.active_project_file_path,
                                                                          state_.app_state.current_project->rootPath);
@@ -223,15 +223,15 @@ bool TerminologyActions::AddTermAsContextFromCanvas(const std::string& element_i
         return false;
     }
 
-    core::TerminologyContextAssociationResult result = core::AssociateTerminologyTermWithElement(
-        state_.app_state.sacm_package.value(), element_id, package_ref, term_ref);
-    if (!result.success) {
-        SetStatus(state_, "Could not associate term with element: " + result.error);
+    core::commands::AssociateTerminologyTermWithElementCommand command(element_id, package_ref, term_ref);
+    const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
+    if (!outcome.success) {
+        SetStatus(state_, "Could not associate term with element: " + outcome.error);
         return false;
     }
+    const core::TerminologyContextAssociationResult& result = command.Result();
 
     if (!result.already_associated) {
-        MarkTerminologyDocumentDirty(state_);
         state_.events.Emit(DocumentDirtyEvent{});
         if (state_.app_state.current_project.has_value() && !state_.app_state.active_project_file_path.empty()) {
             const std::filesystem::path relative = std::filesystem::relative(
@@ -254,16 +254,19 @@ bool TerminologyActions::AddVisibleTermContextFromCanvas(const std::string& elem
     }
 
     const std::string term_label = TermStatusLabel(state_.app_state.sacm_package.value(), package_ref, term_ref);
-    core::TerminologyContextAssociationResult result = core::AddTerminologyTermAsVisibleContext(
-        state_.app_state.sacm_package.value(), element_id, package_ref, term_ref);
-    if (!result.success) {
-        SetStatus(state_, "Could not add term as context: " + result.error);
+    core::commands::AddTerminologyTermAsVisibleContextCommand command(element_id, package_ref, term_ref);
+    const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
+    if (!outcome.success) {
+        SetStatus(state_, "Could not add term as context: " + outcome.error);
         return false;
     }
+    const core::TerminologyContextAssociationResult& result = command.Result();
 
-    const bool parser_changed = SyncVisibleTerminologyContextToParser(state_.app_state, result);
+    // Parser projection is synchronised inside the command's Apply, so the
+    // parser model is already up to date; nothing more to do here besides
+    // refreshing dirty state and emitting tree events.
+    const bool parser_changed = !result.already_associated;
     if (!result.already_associated) {
-        MarkTerminologyDocumentDirty(state_);
         state_.events.Emit(DocumentDirtyEvent{});
         if (state_.app_state.current_project.has_value() && !state_.app_state.active_project_file_path.empty()) {
             const std::filesystem::path relative = std::filesystem::relative(
@@ -314,29 +317,27 @@ bool TerminologyActions::ConfirmTermEdit() {
         return false;
 
     const core::TerminologyTermDraft draft = TermDraftFromEditor(state_);
-    std::string error;
     if (state_.terminology.editing_existing_term) {
-        if (!core::UpdateTerminologyTerm(state_.app_state.sacm_package.value(),
-                                         state_.terminology.selected_package_ref,
-                                         state_.terminology.selected_term_ref,
-                                         draft,
-                                         error)) {
-            SetStatus(state_, "Term update failed: " + error);
+        core::commands::UpdateTerminologyTermCommand command(
+            state_.terminology.selected_package_ref, state_.terminology.selected_term_ref, draft);
+        const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
+        if (!outcome.success) {
+            SetStatus(state_, "Term update failed: " + outcome.error);
             return false;
         }
         SetStatus(state_, "Updated term " + draft.value + ".");
     } else {
-        core::TerminologyTermCreateResult result = core::CreateTerminologyTerm(
-            state_.app_state.sacm_package.value(), state_.terminology.selected_package_ref, draft);
-        if (!result.success) {
-            SetStatus(state_, "Term create failed: " + result.error);
+        core::commands::CreateTerminologyTermCommand command(state_.terminology.selected_package_ref, draft);
+        const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
+        if (!outcome.success) {
+            SetStatus(state_, "Term create failed: " + outcome.error);
             return false;
         }
-        state_.terminology.selected_term_ref = result.term_ref;
+        state_.terminology.selected_term_ref = command.GeneratedRef();
         SetStatus(state_, "Added term " + draft.value + ".");
     }
 
-    MarkTerminologyDocumentDirty(state_);
+    state_.events.Emit(DocumentDirtyEvent{});
     if (RefreshVisibleTerminologyContextProjection(state_.app_state))
         state_.events.Emit(TreeDirtyEvent{});
     state_.terminology.show_term_editor_modal = false;
@@ -362,18 +363,17 @@ bool TerminologyActions::ConfirmDeleteTerm() {
     if (!state_.app_state.sacm_package.has_value())
         return false;
 
-    std::string error;
-    if (!core::DeleteTerminologyTerm(state_.app_state.sacm_package.value(),
-                                     state_.terminology.selected_package_ref,
-                                     state_.terminology.selected_term_ref,
-                                     error)) {
-        SetStatus(state_, "Term delete failed: " + error);
+    core::commands::DeleteTerminologyTermCommand command(
+        state_.terminology.selected_package_ref, state_.terminology.selected_term_ref);
+    const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
+    if (!outcome.success) {
+        SetStatus(state_, "Term delete failed: " + outcome.error);
         return false;
     }
 
     state_.terminology.selected_term_ref = core::TerminologyTermRef{};
     state_.terminology.show_delete_term_modal = false;
-    MarkTerminologyDocumentDirty(state_);
+    state_.events.Emit(DocumentDirtyEvent{});
     if (RefreshVisibleTerminologyContextProjection(state_.app_state))
         state_.events.Emit(TreeDirtyEvent{});
     SetStatus(state_, "Deleted term.");
@@ -421,29 +421,28 @@ void TerminologyActions::ConfirmCategoryEdit() {
         return;
 
     const core::TerminologyCategoryDraft draft = CategoryDraftFromEditor(state_);
-    std::string error;
     if (state_.terminology.editing_existing_category) {
-        if (!core::UpdateTerminologyCategory(state_.app_state.sacm_package.value(),
-                                             state_.terminology.selected_package_ref,
-                                             state_.terminology.selected_category_ref,
-                                             draft,
-                                             error)) {
-            SetStatus(state_, "Category update failed: " + error);
+        core::commands::UpdateTerminologyCategoryCommand command(
+            state_.terminology.selected_package_ref, state_.terminology.selected_category_ref, draft);
+        const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
+        if (!outcome.success) {
+            SetStatus(state_, "Category update failed: " + outcome.error);
             return;
         }
         SetStatus(state_, "Updated category " + draft.name + ".");
     } else {
-        core::TerminologyCategoryCreateResult result = core::CreateTerminologyCategory(
-            state_.app_state.sacm_package.value(), state_.terminology.selected_package_ref, draft);
-        if (!result.success) {
-            SetStatus(state_, "Category create failed: " + result.error);
+        core::commands::CreateTerminologyCategoryCommand command(
+            state_.terminology.selected_package_ref, draft);
+        const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
+        if (!outcome.success) {
+            SetStatus(state_, "Category create failed: " + outcome.error);
             return;
         }
-        state_.terminology.selected_category_ref = result.category_ref;
+        state_.terminology.selected_category_ref = command.GeneratedRef();
         SetStatus(state_, "Added category " + draft.name + ".");
     }
 
-    MarkTerminologyDocumentDirty(state_);
+    state_.events.Emit(DocumentDirtyEvent{});
     state_.terminology.show_category_editor_modal = false;
 }
 
@@ -472,19 +471,18 @@ void TerminologyActions::ConfirmDeleteCategory() {
     if (!state_.app_state.sacm_package.has_value())
         return;
 
-    std::string error;
-    if (!core::DeleteTerminologyCategory(state_.app_state.sacm_package.value(),
-                                         state_.terminology.selected_package_ref,
-                                         state_.terminology.selected_category_ref,
-                                         error)) {
-        SetStatus(state_, "Category delete failed: " + error);
+    core::commands::DeleteTerminologyCategoryCommand command(
+        state_.terminology.selected_package_ref, state_.terminology.selected_category_ref);
+    const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
+    if (!outcome.success) {
+        SetStatus(state_, "Category delete failed: " + outcome.error);
         return;
     }
 
     state_.terminology.selected_category_ref = core::TerminologyCategoryRef{};
     CopyToBuffer(state_.terminology.category_filter_buf, sizeof(state_.terminology.category_filter_buf), "");
     state_.terminology.show_delete_category_modal = false;
-    MarkTerminologyDocumentDirty(state_);
+    state_.events.Emit(DocumentDirtyEvent{});
     SetStatus(state_, "Deleted category.");
 }
 
@@ -513,14 +511,15 @@ void TerminologyActions::SeedRecommendedCategories() {
             continue;
         core::TerminologyCategoryDraft draft;
         draft.name = name;
-        core::TerminologyCategoryCreateResult result = core::CreateTerminologyCategory(
-            state_.app_state.sacm_package.value(), state_.terminology.selected_package_ref, draft);
-        if (result.success)
+        core::commands::CreateTerminologyCategoryCommand command(
+            state_.terminology.selected_package_ref, draft);
+        const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
+        if (outcome.success)
             ++added;
     }
 
     if (added > 0) {
-        MarkTerminologyDocumentDirty(state_);
+        state_.events.Emit(DocumentDirtyEvent{});
         SetStatus(state_, "Added recommended terminology categories.");
     } else {
         SetStatus(state_, "Recommended terminology categories already exist.");
@@ -600,7 +599,6 @@ void TerminologyActions::BeginQuickDefineTerm(const std::string& element_id, con
         return;
     }
     if (target.created) {
-        MarkTerminologyDocumentDirty(state_);
         state_.events.Emit(TreeDirtyEvent{});
         state_.events.Emit(DocumentDirtyEvent{});
         if (state_.app_state.current_project.has_value() && !state_.app_state.active_project_file_path.empty()) {
@@ -647,15 +645,16 @@ bool TerminologyActions::ConfirmQuickDefineTerm(bool add_as_context) {
         return false;
 
     const core::TerminologyTermDraft draft = TermDraftFromEditor(state_);
-    core::TerminologyTermCreateResult result = core::CreateTerminologyTerm(
-        state_.app_state.sacm_package.value(), state_.terminology.quick_define_target_package_ref, draft);
-    if (!result.success) {
-        SetStatus(state_, "Term create failed: " + result.error);
+    core::commands::CreateTerminologyTermCommand command(state_.terminology.quick_define_target_package_ref, draft);
+    const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
+    if (!outcome.success) {
+        SetStatus(state_, "Term create failed: " + outcome.error);
         return false;
     }
+    const core::TerminologyTermRef new_term_ref = command.GeneratedRef();
 
     state_.terminology.selected_package_ref = state_.terminology.quick_define_target_package_ref;
-    state_.terminology.selected_term_ref = result.term_ref;
+    state_.terminology.selected_term_ref = new_term_ref;
     state_.terminology.selected_category_ref = core::TerminologyCategoryRef{};
     CopyToBuffer(state_.terminology.filter_buf, sizeof(state_.terminology.filter_buf), draft.value);
     CopyToBuffer(state_.terminology.category_filter_buf, sizeof(state_.terminology.category_filter_buf), "");
@@ -665,7 +664,6 @@ bool TerminologyActions::ConfirmQuickDefineTerm(bool add_as_context) {
         CopyTerminologyPackageToEditor(state_, *package);
     }
 
-    MarkTerminologyDocumentDirty(state_);
     state_.events.Emit(TreeDirtyEvent{});
     state_.events.Emit(DocumentDirtyEvent{});
     if (state_.app_state.current_project.has_value() && !state_.app_state.active_project_file_path.empty()) {
@@ -676,7 +674,7 @@ bool TerminologyActions::ConfirmQuickDefineTerm(bool add_as_context) {
     const std::string context_element_id = state_.terminology.quick_define_element_id;
     if (add_as_context)
         AddVisibleTermContextFromCanvas(
-            context_element_id, state_.terminology.quick_define_target_package_ref, result.term_ref);
+            context_element_id, state_.terminology.quick_define_target_package_ref, new_term_ref);
 
     state_.terminology.show_quick_define_term_modal = false;
     state_.terminology.quick_define_element_id.clear();

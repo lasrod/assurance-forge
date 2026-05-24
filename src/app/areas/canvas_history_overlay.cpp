@@ -284,20 +284,20 @@ void RenderCanvasDivergenceBanner(AppRuntimeState& state,
     const auto& v = *state.last_audit_verification;
     ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(80, 50, 0, 255));
     ImGui::BeginChild("##audit_warning_banner",
-                      ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 4.5f), true);
+                      ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 7.0f), true);
     ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "Audit log divergence detected");
     ImGui::TextWrapped(
         "The replayed audit history does not reproduce the on-disk SACM. This usually means "
         "edits were applied through a path that did not record transactions. Pinned historical "
         "views may be inaccurate.");
     if (!v.replayed_canonical_hash.empty() && !v.on_disk_canonical_hash.empty()) {
-        ImGui::Text("replay=%s  on_disk=%s", v.replayed_canonical_hash.substr(0, 12).c_str(),
-                    v.on_disk_canonical_hash.substr(0, 12).c_str());
+        ImGui::TextWrapped("replay=%s  on_disk=%s", v.replayed_canonical_hash.substr(0, 12).c_str(),
+                           v.on_disk_canonical_hash.substr(0, 12).c_str());
     }
     if (ImGui::Button("Reconcile audit log\u2026"))
         ImGui::OpenPopup("Reconcile audit log##reconcile_confirm");
     ImGui::SameLine();
-    ImGui::TextDisabled("(archives current .af/ artifacts and rebuilds from the current SACM file)");
+    ImGui::TextWrapped("(archives current .af/ artifacts and rebuilds from the current SACM file)");
 
     // Confirmation modal. The Reconcile action is destructive in the sense
     // that the app will no longer surface the current audit history through
@@ -306,13 +306,15 @@ void RenderCanvasDivergenceBanner(AppRuntimeState& state,
     ImVec2 viewport_center = ImGui::GetMainViewport()->GetCenter();
     ImGui::SetNextWindowPos(viewport_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     // Lock width to prevent the AlwaysAutoResize + GetContentRegionAvail()
-    // feedback loop that grows the popup horizontally every frame.
-    ImGui::SetNextWindowSizeConstraints(ImVec2(520.0f, 0.0f), ImVec2(520.0f, FLT_MAX));
+    // feedback loop that grows the popup horizontally every frame. Width is
+    // font-size relative so it scales with DPI.
+    const float popup_width = ImGui::GetFontSize() * 40.0f;
+    ImGui::SetNextWindowSizeConstraints(ImVec2(popup_width, 0.0f), ImVec2(popup_width, FLT_MAX));
     if (ImGui::BeginPopupModal("Reconcile audit log##reconcile_confirm", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "This will rebuild the audit store.");
         ImGui::Spacing();
-        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 32.0f);
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x);
         ImGui::TextWrapped(
             "The current `.af/manifest.af.json`, `.af/snapshots/`, and `.af/audit/` will be moved "
             "to a timestamped `.af/backup_<UTC>/` folder, and a fresh audit store will be initialized "

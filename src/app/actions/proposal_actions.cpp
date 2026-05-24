@@ -2,9 +2,11 @@
 
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
+#include "app/commands/dispatch.h"
 #include "app/proposal_ui_state.h"
 #include "app/project_workflow.h"
-#include "app/sacm_argument_sync.h"
+#include "core/commands/proposal_commands.h"
+#include "core/sacm_argument_sync.h"
 #include "core/project_service.h"
 #include "core/reviews/review_proposal_factory.h"
 #include "core/reviews/review_proposal_patch_service.h"
@@ -342,20 +344,19 @@ bool ProposalActions::ApplyReviewProposal(const core::reviews::ReviewItem& item)
         return false;
     }
 
-    core::reviews::ReviewProposalPatchService patch_service;
-    core::reviews::ApplyProposalResult apply_result =
-        patch_service.ApplyProposal(*proposal, state_.app_state.loaded_case.value());
-    if (!apply_result.success) {
-        SetStatus(state_, "Proposal apply failed: " + apply_result.error);
+    core::commands::ApplyProposalCommand command(*proposal);
+    const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(state_, command);
+    if (!outcome.success) {
+        SetStatus(state_, "Proposal apply failed: " + outcome.error);
         return false;
     }
 
     state_.proposal_controller->ClosePreviewIfOpen(item.proposal_id.value());
     ClearProposalHighlightState(ui::GetUiState());
-    if (!state_.app_state.sacm_package.has_value())
-        state_.app_state.sacm_package.emplace();
-    RebuildSacmArgumentPackageFromParser(state_.app_state.loaded_case.value(), state_.app_state.sacm_package.value());
-    state_.document_dirty = true;
+    // The command rebuilt the SACM package and (when a bus is wired) wrote
+    // SACM atomically. Mark the project dirty for the user-visible "unsaved"
+    // indicator — the subsequent `SaveProject` call below still has to
+    // flush the review-controller side files.
     state_.app_state.mark_dirty();
 
     core::AssuranceProject& project = state_.app_state.current_project.value();

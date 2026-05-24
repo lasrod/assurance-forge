@@ -553,4 +553,43 @@ ApplyProposalResult ReviewProposalPatchService::ApplyProposal(const ReviewPropos
     return result;
 }
 
+ApplyProposalResult ReviewProposalPatchService::ApplyProposalWithIds(
+    const ReviewProposal& proposal,
+    parser::AssuranceCase& current_model,
+    const std::map<std::string, std::string>& predetermined_ids) const {
+    ApplyProposalResult result;
+    result.generated_ids = predetermined_ids;
+
+    // Validate that every create operation has a matching predetermined id.
+    for (const PatchOperation& operation : proposal.operations) {
+        if (!IsCreateOperation(operation.type))
+            continue;
+        if (!operation.create_ref.has_value() || operation.create_ref->empty()) {
+            result.error = "Create operation is missing create_ref during replay.";
+            return result;
+        }
+        if (predetermined_ids.find(operation.create_ref.value()) == predetermined_ids.end()) {
+            result.error = "Missing predetermined id for create_ref '" + operation.create_ref.value() + "'.";
+            return result;
+        }
+    }
+
+    parser::AssuranceCase preview = current_model;
+    std::unordered_set<std::string> ids = CollectIds(preview);
+    for (size_t i = 0; i < proposal.operations.size(); ++i) {
+        std::string error;
+        if (!ApplyOperation(proposal.operations[i], preview, predetermined_ids, ids, error)) {
+            std::ostringstream message;
+            message << "Operation " << (i + 1) << " failed: " << error;
+            result.error = message.str();
+            return result;
+        }
+    }
+
+    current_model = std::move(preview);
+    result.success = true;
+    result.error.clear();
+    return result;
+}
+
 } // namespace core::reviews

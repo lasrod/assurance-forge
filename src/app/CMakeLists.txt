@@ -33,6 +33,7 @@ add_library(af_app OBJECT
     areas/review_panel_area.cpp
     areas/term_usages_area.cpp
     areas/workbench_area.cpp
+    commands/dispatch.cpp
     confidence_problem_sync.cpp
     controllers/acp_controller.cpp
     controllers/ai_review_controller.cpp
@@ -51,7 +52,6 @@ add_library(af_app OBJECT
     proposal_ui_state.cpp
     recent_projects.cpp
     review_problem_sync.cpp
-    sacm_argument_sync.cpp
     terminology_problem_sync.cpp
 )
 target_link_libraries(af_app PUBLIC af_common hello_imgui)

@@ -33,6 +33,16 @@ void AppRuntime::RenderFrame(bool& done) {
         RequestExit(done);
     }
 
+    // Process pending audit-log reconciliation request. This is deferred
+    // from the previous frame's click because ReconcileAuditStore tears
+    // down the canvas tab list, which would invalidate the tab reference
+    // held by the in-flight render frame and crash on return from the
+    // popup body.
+    if (impl_->pending_reconcile_audit_store) {
+        impl_->pending_reconcile_audit_store = false;
+        ReconcileAuditStore();
+    }
+
     frame::AppMenuBarCallbacks menu_callbacks;
     menu_callbacks.begin_create_project = [this]() { BeginCreateProject(); };
     menu_callbacks.begin_open_project = [this]() { BeginOpenProject(); };

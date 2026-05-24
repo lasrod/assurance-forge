@@ -2,7 +2,10 @@
 
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
+#include "app/commands/dispatch.h"
+#include "core/commands/terminology_commands.h"
 #include "core/string_utils.h"
+#include "core/terminology_context_projection.h"
 #include "core/terminology_text_utils.h"
 #include "parser/model_utils.h"
 #include "parser/xml_parser.h"
@@ -184,29 +187,30 @@ QuickDefineTargetPackageResult EnsureQuickDefineTargetPackage(AppRuntimeState& s
         return target;
     }
 
-    core::TerminologyPackageCreateResult created = core::CreateTerminologyPackage(
-        state.app_state.sacm_package.value(), "Terminology Package", "Terms used by this safety case.");
-    if (!created.success) {
-        target.error = created.error;
+    core::commands::CreateTerminologyPackageCommand command("Terminology Package",
+                                                            "Terms used by this safety case.");
+    const auto outcome = app::commands::DispatchAuditedCommand(state, command);
+    if (!outcome.success) {
+        target.error = outcome.error;
         return target;
     }
 
-    target.package_ref = created.package_ref;
+    target.package_ref = command.GeneratedRef();
     target.created = true;
-    state.terminology.selected_package_ref = created.package_ref;
+    // Direct mutation rather than emitting DocumentDirtyEvent: the caller
+    // (`BeginQuickDefineTerm`) emits the event once the helper returns,
+    // and emitting here too would publish twice on the same logical edit.
+    state.app_state.mark_dirty();
+    state.document_dirty = true;
+    state.terminology.selected_package_ref = command.GeneratedRef();
     state.terminology.selected_term_ref = core::TerminologyTermRef{};
     state.terminology.selected_category_ref = core::TerminologyCategoryRef{};
     state.terminology.selected_package_file_path = state.app_state.active_project_file_path;
     if (const sacm::TerminologyPackage* package =
-            core::FindTerminologyPackage(state.app_state.sacm_package.value(), created.package_ref)) {
+            core::FindTerminologyPackage(state.app_state.sacm_package.value(), command.GeneratedRef())) {
         CopyTerminologyPackageToEditor(state, *package);
     }
     return target;
-}
-
-void MarkTerminologyDocumentDirty(AppRuntimeState& state) {
-    state.app_state.mark_dirty();
-    state.document_dirty = true;
 }
 
 void InvalidateSacmPackageTreeCache(AppRuntimeState& state, const std::filesystem::path& relative_path) {
@@ -239,108 +243,19 @@ bool EnsureProjectSacmFileOpen(AppRuntimeState& state, const core::ProjectFileEn
     return state.app_state.open_project_file(entry);
 }
 
-const sacm::ArtifactReference* FindArtifactReferenceById(const sacm::AssuranceCasePackage& package,
-                                                         const std::string& artifact_reference_id) {
-    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
-        for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
-            if (artifact_reference.id == artifact_reference_id || artifact_reference.gid == artifact_reference_id)
-                return &artifact_reference;
-        }
-    }
-    return nullptr;
-}
-
-const sacm::AssertedContext* FindAssertedContextById(const sacm::AssuranceCasePackage& package,
-                                                     const std::string& asserted_context_id) {
-    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
-        for (const sacm::AssertedContext& context : argument_package.assertedContexts) {
-            if (context.id == asserted_context_id || context.gid == asserted_context_id)
-                return &context;
-        }
-    }
-    return nullptr;
-}
-
 bool RefreshVisibleTerminologyContextProjection(core::AppState& app_state) {
     if (!app_state.loaded_case.has_value() || !app_state.sacm_package.has_value())
         return false;
-
-    bool changed = false;
-    parser::AssuranceCase& model = app_state.loaded_case.value();
-    const sacm::AssuranceCasePackage& package = app_state.sacm_package.value();
-    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
-        for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
-            if (!core::IsVisibleTerminologyArtifactReference(package, argument_package, artifact_reference))
-                continue;
-            parser::SacmElement* element =
-                parser::FindElementByIdOrGid(model, artifact_reference.id, artifact_reference.gid);
-            if (!element)
-                continue;
-            const core::TerminologyTermReferenceResolution resolution =
-                core::ResolveTerminologyTermReference(package, artifact_reference.referencedArtifact);
-            const std::string previous_name = element->name;
-            const std::string previous_description = element->description;
-            if (!resolution.resolved || !resolution.term) {
-                element->description.clear();
-                element->description_langs.clear();
-            } else {
-                element->name = core::TermContextDisplayLabel(*resolution.term);
-                element->name_langs = resolution.term->name_ml.texts;
-                if (element->name_langs.empty() && !element->name.empty())
-                    element->name_langs["en"] = element->name;
-                element->description = resolution.term->description;
-                element->description_langs = resolution.term->description_ml.texts;
-                if (element->description_langs.empty() && !element->description.empty())
-                    element->description_langs["en"] = element->description;
-            }
-            changed = changed || element->name != previous_name || element->description != previous_description;
-        }
-    }
-    return changed;
+    return core::RefreshVisibleTerminologyContextProjection(app_state.loaded_case.value(),
+                                                            app_state.sacm_package.value());
 }
 
 bool SyncVisibleTerminologyContextToParser(core::AppState& app_state,
                                            const core::TerminologyContextAssociationResult& result) {
     if (!app_state.loaded_case.has_value() || !app_state.sacm_package.has_value())
         return false;
-
-    const sacm::ArtifactReference* artifact_reference =
-        FindArtifactReferenceById(app_state.sacm_package.value(), result.artifact_reference_id);
-    const sacm::AssertedContext* context =
-        FindAssertedContextById(app_state.sacm_package.value(), result.asserted_context_id);
-    if (!artifact_reference || !context || !core::IsVisibleTerminologyContext(*context))
-        return false;
-
-    parser::AssuranceCase& model = app_state.loaded_case.value();
-    bool changed = false;
-    if (!parser::FindElementByIdOrGid(model, artifact_reference->id, artifact_reference->gid)) {
-        parser::SacmElement element;
-        element.id = artifact_reference->id;
-        element.gid = artifact_reference->gid;
-        element.name = artifact_reference->name;
-        element.type = "artifactreference";
-        element.description = artifact_reference->description;
-        element.name_langs = artifact_reference->name_ml.texts;
-        element.description_langs = artifact_reference->description_ml.texts;
-        model.elements.push_back(std::move(element));
-        changed = true;
-    }
-    if (!parser::FindElementByIdOrGid(model, context->id, context->gid)) {
-        parser::SacmElement element;
-        element.id = context->id;
-        element.gid = context->gid;
-        element.name = context->name;
-        element.type = "assertedcontext";
-        element.description = context->description;
-        element.name_langs = context->name_ml.texts;
-        element.description_langs = context->description_ml.texts;
-        element.source_refs = context->sources;
-        element.target_refs = context->targets;
-        element.assertion_declaration = context->assertionDeclaration;
-        model.elements.push_back(std::move(element));
-        changed = true;
-    }
-    return RefreshVisibleTerminologyContextProjection(app_state) || changed;
+    return core::SyncVisibleTerminologyContextToParser(app_state.loaded_case.value(),
+                                                       app_state.sacm_package.value(), result);
 }
 
 std::string TermStatusLabel(const sacm::AssuranceCasePackage& package,

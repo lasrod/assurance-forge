@@ -24,6 +24,9 @@ add_library(af_core OBJECT
     audit/timeline_model_builder.cpp
     commands/command_bus.cpp
     commands/element_commands.cpp
+    commands/package_commands.cpp
+    commands/proposal_commands.cpp
+    commands/terminology_commands.cpp
     confidence/confidence_store.cpp
     element_factory.cpp
     gsn_layout.cpp
@@ -43,10 +46,12 @@ add_library(af_core OBJECT
     reviews/review_proposal_manager.cpp
     reviews/review_proposal_patch_service.cpp
     reviews/review_text_utils.cpp
+    sacm_argument_sync.cpp
     sacm_identity.cpp
     sha256.cpp
     string_utils.cpp
     terminology_category_service.cpp
+    terminology_context_projection.cpp
     terminology_context_service.cpp
     terminology_internal.cpp
     terminology_package_service.cpp

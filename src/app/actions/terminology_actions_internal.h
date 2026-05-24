@@ -55,17 +55,12 @@ struct QuickDefineTargetPackageResult {
 
 QuickDefineTargetPackageResult EnsureQuickDefineTargetPackage(AppRuntimeState& state, const std::string& element_id);
 
-void MarkTerminologyDocumentDirty(AppRuntimeState& state);
 void InvalidateSacmPackageTreeCache(AppRuntimeState& state, const std::filesystem::path& relative_path);
 
 bool CanSwitchProjectSacmFile(const core::AppState& app_state, const core::ProjectFileEntry& entry);
 bool IsActiveProjectSacmFile(const core::AppState& app_state, const core::ProjectFileEntry& entry);
 bool EnsureProjectSacmFileOpen(AppRuntimeState& state, const core::ProjectFileEntry& entry, bool require_loaded_case);
 
-const sacm::ArtifactReference* FindArtifactReferenceById(const sacm::AssuranceCasePackage& package,
-                                                         const std::string& artifact_reference_id);
-const sacm::AssertedContext* FindAssertedContextById(const sacm::AssuranceCasePackage& package,
-                                                     const std::string& asserted_context_id);
 bool RefreshVisibleTerminologyContextProjection(core::AppState& app_state);
 bool SyncVisibleTerminologyContextToParser(core::AppState& app_state,
                                            const core::TerminologyContextAssociationResult& result);

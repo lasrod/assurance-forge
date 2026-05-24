@@ -246,8 +246,11 @@ const sacm::TerminologyPackage* FindTerminologyPackage(const sacm::AssuranceCase
     return nullptr;
 }
 
-TerminologyPackageCreateResult
-CreateTerminologyPackage(sacm::AssuranceCasePackage& package, const std::string& name, const std::string& description) {
+TerminologyPackageCreateResult CreateTerminologyPackageWithIds(sacm::AssuranceCasePackage& package,
+                                                               const std::string& name,
+                                                               const std::string& description,
+                                                               const std::string& forced_id,
+                                                               const std::string& forced_gid) {
     TerminologyPackageCreateResult result;
     if (name.empty()) {
         result.error = "Terminology package name is required.";
@@ -255,8 +258,9 @@ CreateTerminologyPackage(sacm::AssuranceCasePackage& package, const std::string&
     }
 
     sacm::TerminologyPackage terminology_package;
-    terminology_package.id = GenerateUniqueId(package, "TP");
-    terminology_package.gid = GenerateUniqueGid(package, terminology_package.id);
+    terminology_package.id = forced_id.empty() ? GenerateUniqueId(package, "TP") : forced_id;
+    terminology_package.gid =
+        forced_gid.empty() ? GenerateUniqueGid(package, terminology_package.id) : forced_gid;
     terminology_package.name = name;
     terminology_package.name_ml.set("en", name);
     terminology_package.description = description;
@@ -268,6 +272,11 @@ CreateTerminologyPackage(sacm::AssuranceCasePackage& package, const std::string&
     package.terminologyPackages.push_back(std::move(terminology_package));
     result.success = true;
     return result;
+}
+
+TerminologyPackageCreateResult
+CreateTerminologyPackage(sacm::AssuranceCasePackage& package, const std::string& name, const std::string& description) {
+    return CreateTerminologyPackageWithIds(package, name, description, {}, {});
 }
 
 bool UpdateTerminologyPackage(sacm::AssuranceCasePackage& package,
@@ -364,9 +373,11 @@ const sacm::Term* FindTerminologyTerm(const sacm::AssuranceCasePackage& package,
     return terminology_package ? FindTerminologyTerm(*terminology_package, term_ref) : nullptr;
 }
 
-TerminologyTermCreateResult CreateTerminologyTerm(sacm::AssuranceCasePackage& package,
-                                                  const TerminologyPackageRef& package_ref,
-                                                  const TerminologyTermDraft& draft) {
+TerminologyTermCreateResult CreateTerminologyTermWithIds(sacm::AssuranceCasePackage& package,
+                                                         const TerminologyPackageRef& package_ref,
+                                                         const TerminologyTermDraft& draft,
+                                                         const std::string& forced_id,
+                                                         const std::string& forced_gid) {
     TerminologyTermCreateResult result;
     if (TrimWhitespace(draft.value).empty()) {
         result.error = "Term value is required.";
@@ -380,13 +391,19 @@ TerminologyTermCreateResult CreateTerminologyTerm(sacm::AssuranceCasePackage& pa
     }
 
     sacm::Term term;
-    term.id = GenerateUniqueId(package, "T");
-    term.gid = GenerateUniqueGid(package, term.id);
+    term.id = forced_id.empty() ? GenerateUniqueId(package, "T") : forced_id;
+    term.gid = forced_gid.empty() ? GenerateUniqueGid(package, term.id) : forced_gid;
     ApplyTermDraft(term, draft);
     result.term_ref = RefFor(term);
     terminology_package->terms.push_back(std::move(term));
     result.success = true;
     return result;
+}
+
+TerminologyTermCreateResult CreateTerminologyTerm(sacm::AssuranceCasePackage& package,
+                                                  const TerminologyPackageRef& package_ref,
+                                                  const TerminologyTermDraft& draft) {
+    return CreateTerminologyTermWithIds(package, package_ref, draft, {}, {});
 }
 
 bool UpdateTerminologyTerm(sacm::AssuranceCasePackage& package,

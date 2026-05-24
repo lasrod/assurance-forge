@@ -527,7 +527,7 @@ areas::WorkbenchAreaCallbacks AppRuntime::MakeWorkbenchAreaCallbacks() {
         [this](const core::TerminologyCategoryRef& category_ref) { BeginEditTerminologyCategory(category_ref); },
         [this](const core::TerminologyCategoryRef& category_ref) { BeginDeleteTerminologyCategory(category_ref); },
         [this]() { SeedRecommendedTerminologyCategories(); },
-        [this]() { ReconcileAuditStore(); },
+        [this]() { impl_->pending_reconcile_audit_store = true; },
     };
 }
 
