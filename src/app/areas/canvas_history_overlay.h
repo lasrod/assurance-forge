@@ -20,6 +20,12 @@ namespace app::areas {
 void RenderCanvasDivergenceBanner(::app::AppRuntimeState& state,
                                   const WorkbenchAreaCallbacks& callbacks);
 
+// Render the autosave-failure banner if `state.last_autosave_error` is
+// non-empty. The banner is sticky (no auto-dismiss) until the user clicks
+// Dismiss or a subsequent audited command succeeds and clears the field.
+// Indicates the in-memory model + audit log are ahead of the on-disk SACM.
+void RenderCanvasAutosaveErrorBanner(::app::AppRuntimeState& state);
+
 // Render an ArgumentPackage canvas tab with the always-visible Assurance
 // Timeline rail in its bottom overlay strip.
 //

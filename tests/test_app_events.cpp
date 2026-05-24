@@ -68,3 +68,21 @@ TEST(AppEventsTest, DispatchesElementReviewVisualEvents) {
     EXPECT_EQ(received[0].review_profile_id, "profile-1");
     EXPECT_EQ(received[0].review_profile_name, "Profile 1");
 }
+
+// Regression: AutosaveFailedEvent must dispatch to subscribers verbatim so the
+// runtime can latch the failure message into AppRuntimeState::last_autosave_error
+// and surface the sticky canvas banner. See Phase 1.6 of the autosave plan.
+TEST(AppEventsTest, DispatchesAutosaveFailedEventWithErrorMessage) {
+    app::AppEvents events;
+    std::vector<std::string> received_errors;
+
+    events.Subscribe<app::AutosaveFailedEvent>(
+        [&](const app::AutosaveFailedEvent& event) { received_errors.push_back(event.error); });
+
+    events.Emit(app::AutosaveFailedEvent{"disk full"});
+    events.Emit(app::AutosaveFailedEvent{""}); // empty string used to clear the banner
+
+    ASSERT_EQ(received_errors.size(), 2u);
+    EXPECT_EQ(received_errors[0], "disk full");
+    EXPECT_EQ(received_errors[1], "");
+}

@@ -354,6 +354,23 @@ void RenderCanvasDivergenceBanner(AppRuntimeState& state,
     ImGui::Spacing();
 }
 
+void RenderCanvasAutosaveErrorBanner(AppRuntimeState& state) {
+    if (state.last_autosave_error.empty())
+        return;
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(96, 16, 16, 255));
+    ImGui::BeginChild("##autosave_error_banner",
+                      ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 3.5f), true);
+    ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.55f, 1.0f), "Autosave write failed");
+    ImGui::TextWrapped("%s", state.last_autosave_error.c_str());
+    ImGui::TextWrapped("Your most recent change is recorded in the audit log but the on-disk SACM "
+                       "file may be out of date. Try a manual Save (File \xE2\x86\x92 Save) or "
+                       "verify free disk space, file permissions, and any external sync agent.");
+    if (ImGui::Button("Dismiss##autosave_error"))
+        state.last_autosave_error.clear();
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
+}
+
 void RenderArgumentPackageCanvasWithTimeline(
     AppRuntimeState& state,
     ui::UiState& ui_state,

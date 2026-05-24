@@ -17,6 +17,9 @@ bool AppRuntime::SaveProject() {
         return false;
     }
 
+    // Flush controllers that own their own persistence (review items,
+    // confidence assessments live in separate files outside SACM). These
+    // do not flow through CommandBus and never produce audit transactions.
     if (impl_->review_controller->IsDirty()) {
         core::AssuranceProject& project = impl_->app_state.current_project.value();
         std::string error;
@@ -35,22 +38,25 @@ bool AppRuntime::SaveProject() {
         }
     }
 
+    // Write SACM only when the in-memory model has unflushed mutations.
+    // Audited commands already wrote SACM atomically through CommandBus and
+    // left the audit manifest in sync; calling `app_state.save_project()`
+    // again would re-serialize the same bytes (the serializer is
+    // deterministic, so the on-disk hash stays valid) but does no useful
+    // work. The bypass paths (terminology / proposal / package-removal)
+    // are the reason this branch still has to fire when `document_dirty`
+    // is set without a corresponding bus call.
     if (impl_->document_dirty) {
         if (!impl_->app_state.save_project())
             return false;
         impl_->document_dirty = false;
-        impl_->app_state.has_unsaved_changes =
-            impl_->review_controller->IsDirty() || impl_->confidence_controller->IsDirty();
-        return true;
     }
 
-    if (impl_->app_state.has_unsaved_changes) {
-        impl_->app_state.has_unsaved_changes = false;
-        impl_->app_state.status_message = "Project saved: " + impl_->app_state.current_project->name;
-        return true;
-    }
-
-    return impl_->app_state.save_project();
+    // Either we just flushed everything, or there was nothing to flush. In
+    // both cases the project is consistent on disk now.
+    impl_->app_state.has_unsaved_changes = false;
+    impl_->app_state.status_message = "Project saved: " + impl_->app_state.current_project->name;
+    return true;
 }
 
 void AppRuntime::ExportGsnSvg() {

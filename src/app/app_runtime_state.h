@@ -191,6 +191,14 @@ struct AppRuntimeState {
     // Timeline area surfaces a warning banner offering to reconcile.
     std::optional<core::audit::ReplayVerificationResult> last_audit_verification;
 
+    // Most recent autosave write failure surfaced from CommandBus::Execute
+    // (atomic SACM write or audit-manifest update). Populated via
+    // `AutosaveFailedEvent`; cleared when the user dismisses the banner or
+    // when the next audited command succeeds. While non-empty, the canvas
+    // shows a prominent banner so the user knows the on-disk SACM no longer
+    // reflects their latest committed change.
+    std::string last_autosave_error;
+
     bool tree_needs_rebuild = false;
     core::AssuranceTree current_tree;
     core::TreeDisplayOrder tree_display_order;

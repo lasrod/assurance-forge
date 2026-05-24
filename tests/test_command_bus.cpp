@@ -183,6 +183,80 @@ TEST(CommandBus, ReopenSeesPriorTransactions) {
     EXPECT_EQ(bus2->Manifest().latest_transaction_sequence, 1u);
 }
 
+// Regression for the Phase 1.7 close-time snapshot wiring: after a series of
+// audited commands, taking a user snapshot should succeed without disturbing
+// the manifest's last_known_*_hash invariants, and reopening the bus must
+// still see the same transaction sequence. This is the exact path
+// AppRuntime::RequestExit follows when it auto-flushes on close.
+TEST(CommandBus, CreateUserSnapshotAfterExecuteKeepsManifestConsistent) {
+    auto f = MakeFixture("close_snapshot");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+
+    core::commands::CommandContext ctx{f.model, f.package};
+    core::commands::CreateChildElementCommand add("G1", core::NewElementKind::Strategy);
+    const auto exec_result = bus->Execute(add, ctx, "tester");
+    ASSERT_TRUE(exec_result.success) << exec_result.error;
+
+    const auto manifest_after_exec = bus->Manifest();
+    ASSERT_FALSE(manifest_after_exec.last_known_raw_file_hash.empty());
+
+    // Take the close-time snapshot. Mirrors what AppRuntime::RequestExit does.
+    core::audit::SnapshotMetadata snap;
+    ASSERT_TRUE(core::audit::CreateUserSnapshot(
+        f.project.rootPath, "automatic close snapshot", "tester", snap, error)) << error;
+    EXPECT_FALSE(snap.snapshot_id.empty());
+
+    // CreateUserSnapshot must not have mutated the audit manifest's hash
+    // chain — only the snapshots/ directory is touched.
+    core::audit::AuditManifest manifest_after_snapshot;
+    ASSERT_TRUE(core::audit::ReadAuditManifest(f.project.rootPath, manifest_after_snapshot, error)) << error;
+    EXPECT_EQ(manifest_after_snapshot.latest_transaction_sequence,
+              manifest_after_exec.latest_transaction_sequence);
+    EXPECT_EQ(manifest_after_snapshot.last_known_raw_file_hash,
+              manifest_after_exec.last_known_raw_file_hash);
+    EXPECT_EQ(manifest_after_snapshot.last_known_canonical_model_hash,
+              manifest_after_exec.last_known_canonical_model_hash);
+
+    // Reopen the bus: simulates the user re-opening the project after close.
+    // The committed transaction must still be visible and the on-disk SACM
+    // hash must still match what the manifest records (no divergence).
+    auto bus2 = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus2) << error;
+    EXPECT_EQ(bus2->Store().LatestTransactionSequence(), 1u);
+    EXPECT_EQ(bus2->Manifest().last_known_raw_file_hash, manifest_after_exec.last_known_raw_file_hash);
+}
+
+// Regression: calling CreateUserSnapshot twice at the same transaction
+// sequence (e.g. user closes, reopens, closes again with no edits) must not
+// clobber the existing snapshot. The function is documented to fail in that
+// case, which RequestExit treats as a non-fatal warning rather than blocking
+// the close.
+TEST(CommandBus, CreateUserSnapshotIsRejectedAtSameSequence) {
+    auto f = MakeFixture("snapshot_idempotent");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+
+    core::commands::CommandContext ctx{f.model, f.package};
+    core::commands::CreateChildElementCommand add("G1", core::NewElementKind::Solution);
+    ASSERT_TRUE(bus->Execute(add, ctx, "tester").success);
+
+    core::audit::SnapshotMetadata first;
+    ASSERT_TRUE(core::audit::CreateUserSnapshot(
+        f.project.rootPath, "automatic close snapshot", "tester", first, error)) << error;
+
+    core::audit::SnapshotMetadata second;
+    std::string second_error;
+    const bool ok = core::audit::CreateUserSnapshot(
+        f.project.rootPath, "automatic close snapshot", "tester", second, second_error);
+    EXPECT_FALSE(ok) << "second snapshot at the same sequence should be rejected";
+    EXPECT_FALSE(second_error.empty());
+}
+
 TEST(ElementCommands, KindAndModeTokensRoundTrip) {
     using core::NewElementKind;
     using core::RemoveMode;

@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace core::commands { class CommandBus; }
+namespace core::commands { class CommandBus; struct CommandResult; }
 
 namespace app::controllers {
 
@@ -60,6 +60,13 @@ private:
     std::string pending_remove_id_;
     core::RemoveMode pending_remove_mode_ = core::RemoveMode::NodeOnly;
     std::vector<std::string> pending_remove_ids_;
+
+    // Translate a CommandResult into an AutosaveFailedEvent: emits the
+    // error message when the SACM write or manifest update failed (sticky
+    // banner) and emits an empty string to clear the banner on plain
+    // success. No-op for command-apply rejections (those are surfaced via
+    // StatusMessageEvent at each call site).
+    void EmitAutosaveStatus(const core::commands::CommandResult& result);
 };
 
 } // namespace app::controllers

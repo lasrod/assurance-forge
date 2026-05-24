@@ -24,6 +24,7 @@ bool ElementEditController::AddChildToSelected(parser::AssuranceCase& model,
         core::commands::CreateChildElementCommand cmd(selected_id, kind);
         core::commands::CommandContext ctx{model, *package};
         const auto result = command_bus_->Execute(cmd, ctx, {});
+        EmitAutosaveStatus(result);
         if (!result.success) {
             events_.Emit(StatusMessageEvent{"Add failed: " + result.error});
             return false;
@@ -50,6 +51,7 @@ bool ElementEditController::AddTopGoal(parser::AssuranceCase& model, sacm::Assur
         core::commands::CreateTopGoalCommand cmd;
         core::commands::CommandContext ctx{model, *package};
         const auto result = command_bus_->Execute(cmd, ctx, {});
+        EmitAutosaveStatus(result);
         if (!result.success) {
             events_.Emit(StatusMessageEvent{"Add failed: " + result.error});
             return false;
@@ -90,6 +92,7 @@ bool ElementEditController::RemoveSelected(parser::AssuranceCase& model,
             core::commands::RemoveElementCommand cmd(selected_id, mode);
             core::commands::CommandContext ctx{model, *package};
             const auto result = command_bus_->Execute(cmd, ctx, {});
+            EmitAutosaveStatus(result);
             if (!result.success) {
                 events_.Emit(StatusMessageEvent{"Remove failed: " + result.error});
                 return false;
@@ -129,6 +132,7 @@ bool ElementEditController::ConfirmPendingRemoval(parser::AssuranceCase& model, 
         core::commands::RemoveElementCommand cmd(id, mode);
         core::commands::CommandContext ctx{model, *package};
         const auto result = command_bus_->Execute(cmd, ctx, {});
+        EmitAutosaveStatus(result);
         if (!result.success) {
             events_.Emit(StatusMessageEvent{"Remove failed: " + result.error});
             return false;
@@ -196,6 +200,7 @@ bool ElementEditController::CommitElementTextEdit(parser::AssuranceCase& model,
         core::commands::UpdateElementTextCommand cmd(element_id, field, language, new_copy);
         core::commands::CommandContext ctx{model, *package};
         const auto result = command_bus_->Execute(cmd, ctx, {});
+        EmitAutosaveStatus(result);
         if (!result.success) {
             events_.Emit(StatusMessageEvent{"Edit failed: " + result.error});
             // Best-effort: restore the value the user just typed so the UI
@@ -235,6 +240,19 @@ core::RemoveMode ElementEditController::PendingRemoveMode() const {
 
 const std::vector<std::string>& ElementEditController::PendingRemoveIds() const {
     return pending_remove_ids_;
+}
+
+void ElementEditController::EmitAutosaveStatus(const core::commands::CommandResult& result) {
+    // CommandBus contract: when the audited write to disk fails after the
+    // log entry was committed, `error` begins with "Autosave failed". When
+    // the manifest update fails but log and SACM are consistent, success is
+    // true with a non-empty error. Both are user-visible. Plain success
+    // (no error) clears any stale banner.
+    if (!result.error.empty()) {
+        events_.Emit(AutosaveFailedEvent{result.error});
+    } else if (result.success) {
+        events_.Emit(AutosaveFailedEvent{std::string{}});
+    }
 }
 
 } // namespace app::controllers

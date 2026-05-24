@@ -174,6 +174,12 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
     if (has_audit_store)
         RenderCanvasDivergenceBanner(state, callbacks);
 
+    // Autosave-failure banner (sticky until dismissed or a later command
+    // succeeds). Stacked above the divergence banner because an in-flight
+    // autosave failure is a fresher, more actionable signal than a stale
+    // replay-divergence verdict.
+    RenderCanvasAutosaveErrorBanner(state);
+
     ArgumentPackageTabCache& cache = g_argument_package_canvas_caches[tab.key];
     const std::uint64_t current_revision = state.app_state.case_revision;
     const bool inputs_match = cache.valid && cache.case_revision == current_revision &&
