@@ -6,9 +6,9 @@
 
 #include <string>
 
-namespace ui { class UiState; }
+namespace ui { class UiState; struct ElementContextActions; }
 namespace ui::gsn { class GsnCanvas; struct CanvasOverlayButtons; }
-namespace sacm { struct ArgumentPackage; }
+namespace sacm { struct ArgumentPackage; struct AssuranceCasePackage; }
 
 namespace app::areas {
 
@@ -20,30 +20,34 @@ namespace app::areas {
 void RenderCanvasDivergenceBanner(::app::AppRuntimeState& state,
                                   const WorkbenchAreaCallbacks& callbacks);
 
-// Render the in-canvas history overlay for an ArgumentPackage canvas tab.
+// Render an ArgumentPackage canvas tab with the always-visible Assurance
+// Timeline rail in its bottom overlay strip.
 //
-// Layout (vertical, top-to-bottom):
-//   1. Header strip   — LIVE/HISTORICAL banner, transaction-sequence slider,
-//                       reconstructed-state summary, "Return to live" button.
-//   2. Canvas region  — either the live per-tab renderer (when the slider is
-//                       at the latest sequence) or a per-tab historical
-//                       renderer seeded with the reconstructed model.
-//   3. Transactions   — table of transactions filtered to this argument
-//                       package's running scope.
+// Behaviour:
+//   - When the project has no audit store, this just renders the live
+//     canvas (no timeline rail, no Live pill).
+//   - When the project has an audit store, the function:
+//       * Loads transactions, baselines, and snapshots scoped to this
+//         argument package (per-tab cached).
+//       * Renders either the live canvas (`tab.timeline.preview_sequence`
+//         unset) or the reconstructed historical canvas (preview set).
+//       * Paints the Timeline widget into the bottom overlay strip via
+//         `CanvasOverlayButtons::on_render_timeline_strip` and dispatches
+//         widget actions back onto `tab.timeline`.
+//       * Shows a "Live" pill while a preview is active.
 //
-// The overlay owns one historical `ui::gsn::GsnCanvas` per `tab.key`; the
-// live canvas is the caller's existing per-tab renderer so pan/zoom state
-// survives toggling history on/off. Per-tab reconstruction and filtered-
-// transaction caches are keyed on `tab.key` and pruned via
-// `ForgetCanvasHistoryTab`.
-void RenderCanvasHistoryOverlay(::app::AppRuntimeState& state,
-                                ui::UiState& ui_state,
-                                const WorkbenchAreaCallbacks& callbacks,
-                                ::app::WorkbenchState::ArgumentPackageCanvasTab& tab,
-                                const sacm::ArgumentPackage& argument_package,
-                                const parser::AssuranceCase& live_projection,
-                                ui::gsn::GsnCanvas& live_renderer,
-                                const ui::gsn::CanvasOverlayButtons* overlay_buttons);
+// Per-tab reconstruction and filtered-transaction caches are keyed on
+// `tab.key` and pruned via `ForgetCanvasHistoryTab`.
+void RenderArgumentPackageCanvasWithTimeline(
+    ::app::AppRuntimeState& state,
+    ui::UiState& ui_state,
+    const WorkbenchAreaCallbacks& callbacks,
+    ::app::WorkbenchState::ArgumentPackageCanvasTab& tab,
+    const sacm::ArgumentPackage& argument_package,
+    const parser::AssuranceCase& live_projection,
+    ui::gsn::GsnCanvas& live_renderer,
+    const ui::ElementContextActions& live_actions,
+    const sacm::AssuranceCasePackage* terminology_package);
 
 // Drop overlay state for a closed tab.
 void ForgetCanvasHistoryTab(const std::string& tab_key);

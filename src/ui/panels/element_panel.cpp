@@ -372,7 +372,9 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
                       sacm::AssuranceCasePackage* sacm_pkg,
                       const ElementTerminologyAssistCallbacks* terminology_callbacks,
                       const ElementConfidenceAssistCallbacks* confidence_callbacks,
-                      const ElementTextEditCallbacks* text_edit_callbacks) {
+                      const ElementTextEditCallbacks* text_edit_callbacks,
+                      const ElementHistoryCallbacks* history_callbacks,
+                      bool read_only) {
     const UiState& state = GetUiState();
     bool modified = false;
 
@@ -403,6 +405,16 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
 
     if (RenderReviewAttentionNotice(state, elem->id, terminology_callbacks)) {
         ImGui::Spacing();
+    }
+
+    if (read_only) {
+        ImGui::PushStyleColor(ImGuiCol_Text,
+                              ImGui::ColorConvertU32ToFloat4(ui::GetTheme().text_secondary));
+        ImGui::TextWrapped(
+            "Historical preview — fields are read-only. Return to latest to edit.");
+        ImGui::PopStyleColor();
+        ImGui::Spacing();
+        ImGui::BeginDisabled(true);
     }
 
     auto commit_if_finished = [&](ImGuiID id, const std::string& current_value,
@@ -580,6 +592,49 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
         };
         panel_callbacks.backup_invalid_and_reset = confidence_callbacks->backup_invalid_and_reset;
         ShowConfidencePanel(confidence_model, panel_callbacks);
+    }
+
+    if (read_only) {
+        ImGui::EndDisabled();
+        // BeginDisabled silently swallows widget interactions, but inputs may
+        // still have produced spurious `modified` flags via in-place buffer
+        // edits earlier. Force `modified` off so no sync to SACM happens.
+        modified = false;
+    }
+
+    if (history_callbacks && history_callbacks->model_for_element) {
+        ElementHistoryModel hm = history_callbacks->model_for_element(elem->id);
+        if (hm.available) {
+            ImGui::Spacing();
+            ImGui::Text("History");
+            ImGui::Separator();
+            if (!hm.ever_seen) {
+                ImGui::TextDisabled("No recorded changes for this element.");
+            } else {
+                const std::string last_changed_value =
+                    hm.last_changed_at.empty()
+                        ? std::string("-")
+                        : (hm.last_changed_by.empty() ? hm.last_changed_at
+                                                      : hm.last_changed_at + "  by " + hm.last_changed_by);
+                RenderMetadataRow("Last changed", last_changed_value);
+                RenderMetadataRow("Changes", std::to_string(hm.change_count));
+                if (hm.has_baseline) {
+                    const std::string baseline_value =
+                        std::string(hm.changed_since_baseline ? "Yes" : "No") +
+                        (hm.baseline_label.empty() ? "" : "  (" + hm.baseline_label + ")");
+                    RenderMetadataRow("Changed since baseline", baseline_value);
+                }
+            }
+            ImGui::Spacing();
+            if (ImGui::SmallButton("View Element History") && history_callbacks->open_element_history)
+                history_callbacks->open_element_history(elem->id);
+            ImGui::SameLine();
+            ImGui::BeginDisabled(true);
+            ImGui::SmallButton("Compare to Baseline");
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("Available in a later release.");
+        }
     }
 
     // Sync edits to SACM model

@@ -234,6 +234,10 @@ void AppRuntime::RenderFrame(bool& done) {
             if (committed)
                 impl_->events.Emit(TreeDirtyEvent{});
         },
+        [this](const std::string& element_id) {
+            impl_->workbench.history_filter_element_id = element_id;
+            impl_->workbench.focus_history_tab = true;
+        },
     };
     {
         core::perf::ScopedTimer s("app.area.inspector");

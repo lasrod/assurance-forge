@@ -1,19 +1,24 @@
 #include "app/areas/canvas_history_overlay.h"
 
 #include "app/app_runtime_state.h"
+#include "app/areas/baseline_modal.h"
 #include "core/argument_package_projection.h"
+#include "core/audit/audit_baseline.h"
 #include "core/audit/audit_diff.h"
+#include "core/audit/audit_manifest.h"
 #include "core/audit/audit_paths.h"
+#include "core/audit/audit_snapshot.h"
 #include "core/audit/canonical_model_hash.h"
 #include "core/audit/event_scope.h"
 #include "core/audit/event_store.h"
 #include "core/audit/history_highlights.h"
 #include "core/audit/history_reconstruction.h"
+#include "core/audit/timeline_model_builder.h"
 #include "ui/element_context_menu.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
-#include "ui/panels/history_timeline_panel.h"
+#include "ui/timeline/timeline_widget.h"
 #include "ui/ui_state.h"
 
 #include "imgui.h"
@@ -23,7 +28,9 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <system_error>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace app::areas {
@@ -300,6 +307,9 @@ void RenderCanvasDivergenceBanner(AppRuntimeState& state,
     // explicit so the user can back out.
     ImVec2 viewport_center = ImGui::GetMainViewport()->GetCenter();
     ImGui::SetNextWindowPos(viewport_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    // Lock width to prevent the AlwaysAutoResize + GetContentRegionAvail()
+    // feedback loop that grows the popup horizontally every frame.
+    ImGui::SetNextWindowSizeConstraints(ImVec2(520.0f, 0.0f), ImVec2(520.0f, FLT_MAX));
     if (ImGui::BeginPopupModal("Reconcile audit log##reconcile_confirm", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "This will rebuild the audit store.");
@@ -346,117 +356,161 @@ void RenderCanvasDivergenceBanner(AppRuntimeState& state,
     ImGui::Spacing();
 }
 
-void RenderCanvasHistoryOverlay(AppRuntimeState& state,
-                                ui::UiState& ui_state,
-                                const WorkbenchAreaCallbacks& /*callbacks*/,
-                                WorkbenchState::ArgumentPackageCanvasTab& tab,
-                                const sacm::ArgumentPackage& argument_package,
-                                const parser::AssuranceCase& live_projection,
-                                ui::gsn::GsnCanvas& live_renderer,
-                                const ui::gsn::CanvasOverlayButtons* overlay_buttons) {
-    if (!state.app_state.current_project.has_value()) {
-        ImGui::TextDisabled("Open a project to browse history.");
-        return;
-    }
-    if (!ProjectHasAuditStore(state)) {
-        ImGui::TextDisabled("This project has no audit store.");
+void RenderArgumentPackageCanvasWithTimeline(
+    AppRuntimeState& state,
+    ui::UiState& ui_state,
+    const WorkbenchAreaCallbacks& /*callbacks*/,
+    WorkbenchState::ArgumentPackageCanvasTab& tab,
+    const sacm::ArgumentPackage& argument_package,
+    const parser::AssuranceCase& live_projection,
+    ui::gsn::GsnCanvas& live_renderer,
+    const ui::ElementContextActions& live_actions,
+    const sacm::AssuranceCasePackage* terminology_package) {
+    // No project / no audit store → render the live canvas without any
+    // timeline rail. (Keeps Phase-1 fall-back behaviour symmetrical to the
+    // old early-returns.)
+    const bool has_audit = state.app_state.current_project.has_value() &&
+                           std::filesystem::exists(
+                               core::audit::ManifestPath(
+                                   state.app_state.current_project->rootPath));
+    if (!has_audit) {
+        ui::gsn::ShowGsnCanvasContentWithRenderer(live_renderer, ui_state, &live_projection,
+                                                  live_actions, terminology_package, nullptr);
         return;
     }
 
     const core::AssuranceProject& project = state.app_state.current_project.value();
     CanvasHistoryState& tab_state = GetOrCreateHistoryState(tab.key);
 
+    // Load + filter transactions.
     std::string store_error;
     tab_state.source_transactions = LoadTransactions(project, store_error);
-    if (!store_error.empty()) {
-        ImGui::TextDisabled("Failed to open audit store: %s", store_error.c_str());
-        return;
-    }
-
     RebuildFilteredTransactions(tab_state.filtered, tab_state.source_transactions, argument_package);
-    const std::vector<core::audit::AuditTransaction>& visible_transactions = tab_state.filtered.filtered;
+    const std::vector<core::audit::AuditTransaction>& visible_transactions =
+        tab_state.filtered.filtered;
 
-    ui::panels::HistoryTimelinePanelModel model;
-    model.has_audit_store = true;
-    model.transactions = &visible_transactions;
+    // Load baselines (best-effort: warnings are ignored at this layer; the
+    // timeline still renders with whatever loaded successfully).
+    std::vector<std::string> baseline_warnings;
+    std::vector<core::audit::BaselineMetadata> baselines =
+        core::audit::ListBaselines(project.rootPath, &baseline_warnings);
 
-    if (visible_transactions.empty()) {
-        ImGui::TextDisabled("No transactions recorded for this argument package yet.");
-        tab.selected_transaction_sequence.reset();
-        return;
+    // Enumerate snapshots from disk (snapshot/<id>/snapshot.json). The
+    // manifest only records `initial_snapshot_id`, so we walk the directory
+    // and read each metadata file. This is acceptable for the visible-tab
+    // hot path because snapshot counts are small.
+    std::vector<core::audit::SnapshotMetadata> snapshots;
+    {
+        std::error_code ec;
+        const auto snap_dir = core::audit::AfDir(project.rootPath) / "snapshots";
+        if (std::filesystem::exists(snap_dir, ec)) {
+            for (const auto& entry : std::filesystem::directory_iterator(snap_dir, ec)) {
+                if (!entry.is_directory()) continue;
+                const std::string snap_id = entry.path().filename().string();
+                core::audit::SnapshotMetadata md;
+                std::string err;
+                if (core::audit::ReadSnapshotMetadata(project.rootPath, snap_id, md, err))
+                    snapshots.push_back(std::move(md));
+            }
+        }
     }
 
-    const std::uint64_t latest_seq = visible_transactions.back().transaction_sequence;
-    if (tab.selected_transaction_sequence.has_value() &&
-        *tab.selected_transaction_sequence > latest_seq) {
-        tab.selected_transaction_sequence.reset();
+    // Clamp + decide live-vs-preview.
+    const std::uint64_t latest_seq =
+        visible_transactions.empty() ? 0 : visible_transactions.back().transaction_sequence;
+    if (tab.timeline.preview_sequence.has_value() &&
+        *tab.timeline.preview_sequence > latest_seq) {
+        tab.timeline.preview_sequence.reset();
     }
-    const bool live = !tab.selected_transaction_sequence.has_value();
-    const std::uint64_t target_seq = tab.selected_transaction_sequence.value_or(latest_seq);
+    const bool live = !tab.timeline.preview_sequence.has_value();
+    const std::uint64_t target_seq = tab.timeline.preview_sequence.value_or(latest_seq);
+    // Mirror for legacy consumers (transactions table, Phase 2 removal).
+    tab.selected_transaction_sequence = tab.timeline.preview_sequence;
 
-    if (live) {
-        model.selected_sequence.reset();
-    } else {
+    if (!live) {
         RefreshReconstruction(tab_state.reconstruction, tab_state, project, target_seq,
                               argument_package);
-        model.selected_sequence = tab.selected_transaction_sequence;
     }
 
-    ui::panels::HistoryTimelinePanelCallbacks slider_callbacks;
-    slider_callbacks.on_select_sequence = [&tab, latest_seq](std::uint64_t seq) {
-        if (seq >= latest_seq)
-            tab.selected_transaction_sequence.reset();
-        else
-            tab.selected_transaction_sequence = seq;
+    // Build the overlay buttons: timeline strip always; Live pill only when
+    // a preview is active.
+    ui::gsn::CanvasOverlayButtons overlay;
+    if (!live) {
+        overlay.on_return_to_live = [&tab]() {
+            tab.timeline.preview_sequence.reset();
+        };
+        overlay.historical_badge_text =
+            "Preview: Tx " + std::to_string(target_seq) + " (read-only)";
+    }
+
+    // Capture by reference; the canvas invokes this synchronously during
+    // ShowGsnCanvasContentWithRenderer, so the locals above outlive the call.
+    auto strip_cb = [&, latest_seq](ImVec2 mn, ImVec2 mx) {
+        core::audit::TimelineQuery query;
+        query.view_mode = tab.timeline.view_mode;
+        query.scope = tab.timeline.scope;
+        query.package_id = argument_package.id;
+        query.package_gid = argument_package.gid;
+        core::audit::TimelineModel model = core::audit::BuildTimelineModel(
+            visible_transactions, baselines, snapshots, query);
+
+        ui::timeline::TimelineAction act =
+            ui::timeline::RenderTimelineWidget(tab.timeline, model, mn, mx, tab.key.c_str());
+
+        using ui::timeline::TimelineActionType;
+        switch (act.type) {
+            case TimelineActionType::PreviewSequence:
+                if (act.sequence.has_value()) {
+                    if (*act.sequence >= latest_seq)
+                        tab.timeline.preview_sequence.reset();
+                    else
+                        tab.timeline.preview_sequence = act.sequence;
+                }
+                break;
+            case TimelineActionType::ReturnToLatest:
+                tab.timeline.preview_sequence.reset();
+                break;
+            case TimelineActionType::ChangeViewMode:
+                if (act.view_mode.has_value())
+                    tab.timeline.view_mode = *act.view_mode;
+                break;
+            case TimelineActionType::CreateBaseline:
+                app::areas::OpenBaselineModal(tab.baseline_modal, latest_seq, std::string());
+                break;
+            case TimelineActionType::CreateSnapshot: {
+                core::audit::SnapshotMetadata created;
+                std::string err;
+                const std::string reason = "User-initiated snapshot from timeline";
+                if (core::audit::CreateUserSnapshot(project.rootPath, reason,
+                                                    state.reviewer_name, created, err)) {
+                    state.app_state.status_message =
+                        "Snapshot created at sequence " +
+                        std::to_string(created.transaction_sequence) + ".";
+                } else {
+                    state.app_state.status_message =
+                        "Failed to create snapshot: " + err;
+                }
+                break;
+            }
+            default:
+                break;
+        }
     };
-    slider_callbacks.on_return_to_live = [&tab]() { tab.selected_transaction_sequence.reset(); };
+    overlay.on_render_timeline_strip = strip_cb;
 
-    ui::panels::ShowHistoryTimelineHeader(model, slider_callbacks);
-
-    ImGui::Spacing();
-    const std::string scope_label = std::string(" — ArgumentPackage: ") +
-                                    (argument_package.name.empty() ? tab.title : argument_package.name);
-    if (live)
-        ImGui::SeparatorText((std::string("Live model") + scope_label).c_str());
-    else
-        ImGui::SeparatorText((std::string("Reconstructed (read-only)") + scope_label).c_str());
-
-    // Augment the incoming overlay buttons with a return-to-live affordance
-    // whenever we're pinned to a past transaction.
-    ui::gsn::CanvasOverlayButtons inner_buttons;
-    if (overlay_buttons)
-        inner_buttons = *overlay_buttons;
-    if (!live)
-        inner_buttons.on_return_to_live = [&tab]() { tab.selected_transaction_sequence.reset(); };
-    const ui::gsn::CanvasOverlayButtons* inner_buttons_ptr =
-        (overlay_buttons || !live) ? &inner_buttons : nullptr;
-
-    const float remaining = ImGui::GetContentRegionAvail().y;
-    const float spacing = ImGui::GetStyle().ItemSpacing.y;
-    const float canvas_h = std::max(120.0f, (remaining - spacing) * 0.65f);
-    ImGui::BeginChild("##canvas_history_canvas_region", ImVec2(0.0f, canvas_h), true,
-                      ImGuiWindowFlags_NoScrollbar);
+    // Render the chosen canvas (live or historical) with overlay attached.
     if (live) {
-        // The caller already seeded `live_renderer` against `live_projection`
-        // for this case_revision; we just need to clear any leftover
-        // historical highlights from a previous pinned view.
         live_renderer.ClearHistoryHighlights();
-        ui::ElementContextActions readonly_actions;
-        const sacm::AssuranceCasePackage* terminology_package =
-            state.app_state.sacm_package.has_value() ? &state.app_state.sacm_package.value() : nullptr;
         ui::gsn::ShowGsnCanvasContentWithRenderer(live_renderer, ui_state, &live_projection,
-                                                  readonly_actions, terminology_package,
-                                                  inner_buttons_ptr);
+                                                  live_actions, terminology_package, &overlay);
     } else {
-        RenderHistoricalCanvas(tab_state, ui_state, visible_transactions, target_seq,
-                               inner_buttons_ptr);
+        RenderHistoricalCanvas(tab_state, ui_state, visible_transactions, target_seq, &overlay);
     }
-    ImGui::EndChild();
 
-    ImGui::SeparatorText("Transactions");
-    ImGui::BeginChild("##canvas_history_transactions_region", ImVec2(0.0f, 0.0f), false);
-    ui::panels::ShowHistoryTimelineTransactions(model, slider_callbacks);
-    ImGui::EndChild();
+    // Baseline-creation modal (opened by the timeline's actions menu).
+    app::areas::RenderBaselineModal(
+        tab.baseline_modal, project.rootPath, state.reviewer_name,
+        [&state](const std::string& message) { state.app_state.status_message = message; });
 }
 
 void ForgetCanvasHistoryTab(const std::string& tab_key) {

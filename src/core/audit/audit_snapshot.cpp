@@ -1,5 +1,6 @@
 #include "core/audit/audit_snapshot.h"
 
+#include "core/audit/audit_manifest.h"
 #include "core/audit/audit_paths.h"
 #include "core/audit/canonical_model_hash.h"
 #include "core/project_file_io.h"
@@ -9,6 +10,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cstdio>
 #include <exception>
 
 namespace core::audit {
@@ -156,6 +158,91 @@ bool CreateInitialSnapshot(const std::filesystem::path& project_root,
     metadata.reason = "Initial snapshot for event-store replay verification";
     metadata.transaction_sequence = 0;
     metadata.event_sequence = 0;
+    metadata.raw_file_hash = raw_hash;
+    metadata.canonical_model_hash = canonical_hash;
+
+    if (!WriteSnapshotMetadata(project_root, metadata, error))
+        return false;
+
+    out_metadata = std::move(metadata);
+    return true;
+}
+
+bool CreateUserSnapshot(const std::filesystem::path& project_root,
+                        const std::string& reason,
+                        const std::string& created_by,
+                        SnapshotMetadata& out_metadata,
+                        std::string& error) {
+    AuditManifest manifest;
+    if (!ReadAuditManifest(project_root, manifest, error))
+        return false;
+
+    if (manifest.current_sacm.empty()) {
+        error = "Manifest has no current_sacm path; cannot create snapshot.";
+        return false;
+    }
+
+    const std::filesystem::path sacm_path = project_root / manifest.current_sacm;
+    std::error_code ec;
+    if (!std::filesystem::exists(sacm_path, ec)) {
+        error = "current_sacm file does not exist: " + sacm_path.string();
+        return false;
+    }
+
+    // Derive snapshot id from the current transaction sequence. The initial
+    // snapshot uses `snapshot_000000` (sequence 0); user snapshots reuse the
+    // same zero-padded scheme so they sort lexically alongside it.
+    char id_buf[32];
+    std::snprintf(id_buf, sizeof(id_buf), "snapshot_%06llu",
+                  static_cast<unsigned long long>(manifest.latest_transaction_sequence));
+    const std::string snapshot_id = id_buf;
+
+    const std::filesystem::path snapshot_dir = SnapshotDir(project_root, snapshot_id);
+    const std::filesystem::path snapshot_sacm = SnapshotSacmPath(project_root, snapshot_id);
+    const std::filesystem::path snapshot_meta = SnapshotMetadataPath(project_root, snapshot_id);
+
+    if (std::filesystem::exists(snapshot_meta, ec)) {
+        error = "A snapshot already exists at transaction sequence " +
+                std::to_string(manifest.latest_transaction_sequence) + ".";
+        return false;
+    }
+
+    if (!std::filesystem::create_directories(snapshot_dir, ec) && ec) {
+        error = "Could not create snapshot directory: " + ec.message();
+        return false;
+    }
+
+    auto bytes = ReadFileBytes(sacm_path);
+    if (!bytes) {
+        error = std::move(bytes.error());
+        return false;
+    }
+
+    auto write = WriteTextFile(snapshot_sacm,
+                               std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()));
+    if (!write) {
+        error = std::move(write.error());
+        return false;
+    }
+
+    const std::string raw_hash = Sha256::HexDigest(*bytes);
+
+    std::string canonical_hash;
+    auto parsed = sacm::parse_sacm(sacm_path.string());
+    if (parsed) {
+        canonical_hash = CanonicalModelHash(*parsed);
+    } else {
+        canonical_hash.clear();
+    }
+
+    SnapshotMetadata metadata;
+    metadata.snapshot_schema_version = kSnapshotSchemaVersion;
+    metadata.snapshot_id = snapshot_id;
+    metadata.created_at = NowUtcString();
+    metadata.created_by = created_by.empty() ? std::string("unknown") : created_by;
+    metadata.reason = reason;
+    metadata.transaction_sequence = manifest.latest_transaction_sequence;
+    metadata.event_sequence = manifest.latest_event_sequence;
     metadata.raw_file_hash = raw_hash;
     metadata.canonical_model_hash = canonical_hash;
 

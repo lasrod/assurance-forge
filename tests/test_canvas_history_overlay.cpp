@@ -16,7 +16,7 @@ namespace {
 
 TEST(CanvasHistoryOverlayState, TabDefaults) {
     app::WorkbenchState::ArgumentPackageCanvasTab tab;
-    EXPECT_FALSE(tab.show_history);
+    EXPECT_FALSE(tab.timeline.preview_sequence.has_value());
     EXPECT_FALSE(tab.selected_transaction_sequence.has_value());
 }
 
@@ -36,15 +36,15 @@ TEST(CanvasHistoryOverlayState, TabsAreIndependent) {
     auto& a = workbench.argument_package_canvas_tabs[0];
     auto& b = workbench.argument_package_canvas_tabs[1];
 
-    a.show_history = true;
+    a.timeline.preview_sequence = 5;
     a.selected_transaction_sequence = 5;
 
-    EXPECT_TRUE(a.show_history);
+    EXPECT_EQ(a.timeline.preview_sequence.value(), 5u);
     EXPECT_EQ(a.selected_transaction_sequence.value(), 5u);
-    EXPECT_FALSE(b.show_history);
+    EXPECT_FALSE(b.timeline.preview_sequence.has_value());
     EXPECT_FALSE(b.selected_transaction_sequence.has_value());
 
-    b.show_history = true;
+    b.timeline.preview_sequence = 2;
     b.selected_transaction_sequence = 2;
     EXPECT_EQ(a.selected_transaction_sequence.value(), 5u);
     EXPECT_EQ(b.selected_transaction_sequence.value(), 2u);

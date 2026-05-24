@@ -29,6 +29,7 @@ struct InspectorAreaCallbacks {
                        const std::string& original_value,
                        const std::string& new_value)>
         commit_element_text_edit;
+    std::function<void(const std::string& element_id)> open_element_history;
 };
 
 void RenderInspectorArea(AppRuntimeState& state,

@@ -48,4 +48,20 @@ bool CreateInitialSnapshot(const std::filesystem::path& project_root,
                            SnapshotMetadata& out_metadata,
                            std::string& error);
 
+// Create a user-initiated snapshot of the project's current SACM file.
+//
+// Reads `<project_root>/.af/manifest.af.json` to locate the materialized
+// SACM file (`current_sacm`) and the latest transaction/event sequences,
+// then writes a new snapshot directory at
+// `<project_root>/.af/snapshots/<snapshot_id>/` containing a verbatim copy
+// of the SACM bytes plus a metadata sidecar. `snapshot_id` is derived from
+// the current transaction sequence (zero-padded). The function fails when a
+// snapshot with that id already exists, when the manifest cannot be read,
+// or on any I/O error.
+bool CreateUserSnapshot(const std::filesystem::path& project_root,
+                        const std::string& reason,
+                        const std::string& created_by,
+                        SnapshotMetadata& out_metadata,
+                        std::string& error);
+
 } // namespace core::audit

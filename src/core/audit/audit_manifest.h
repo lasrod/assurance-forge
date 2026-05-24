@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 // On-disk manifest for the audit / event-store subsystem (design §6).
 // Stored at `<project_root>/.af/manifest.af.json`.
@@ -30,6 +31,11 @@ struct AuditManifest {
     // sha256 of the on-disk event log (transactions.af.jsonl) at the time the
     // manifest was last written. Empty when the log is empty.
     std::string event_store_hash;
+    // Index of baselines registered under `<project_root>/.af/baselines/`.
+    // Each id corresponds to a sidecar JSON file; see `audit_baseline.h`.
+    // Ordered chronologically (creation order). Forward-compatible: older
+    // manifests without this field parse cleanly as an empty list.
+    std::vector<std::string> baseline_ids;
 };
 
 // Serialize to pretty JSON text suitable for direct file write.

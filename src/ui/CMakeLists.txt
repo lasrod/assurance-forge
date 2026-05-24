@@ -30,6 +30,7 @@ add_library(af_ui OBJECT
     register_views.cpp
     text_edit_session.cpp
     theme.cpp
+    timeline/timeline_widget.cpp
     tree_view.cpp
     ui_state.cpp
     widgets/splitter.cpp

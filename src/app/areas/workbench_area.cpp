@@ -209,60 +209,11 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
         cache.renderer_seeded = true;
     }
 
-    ui::gsn::CanvasOverlayButtons overlay_buttons;
-    overlay_buttons.history_enabled = has_audit_store;
-    overlay_buttons.history_active = tab.show_history && has_audit_store;
-    overlay_buttons.history_disabled_tooltip = "This project has no audit store.";
-    overlay_buttons.on_toggle_history = [&state, &tab, has_audit_store]() {
-        if (!has_audit_store)
-            return;
-        // Switching INTO history view: refuse if the audit log is empty
-        // and surface a popup instead. Switching OUT is always allowed.
-        if (!tab.show_history && !ProjectAuditLogHasTransactions(state)) {
-            tab.show_history_empty_modal = true;
-            return;
-        }
-        tab.show_history = !tab.show_history;
-    };
-
-    // Modal: H pressed but no transactions exist. Owned by the canvas tab so
-    // each tab manages its own popup state.
-    if (tab.show_history_empty_modal) {
-        ImGui::OpenPopup("History unavailable##history_empty_modal");
-        tab.show_history_empty_modal = false;
-    }
-    if (ImGui::BeginPopupModal("History unavailable##history_empty_modal", nullptr,
-                               ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("No transactions have been recorded yet.");
-        ImGui::Spacing();
-        ImGui::TextWrapped(
-            "The history slider needs at least one committed transaction to show a "
-            "previous state. Use any model-mutating action (add or remove a node, edit "
-            "a claim) and the new transaction will appear here.");
-        ImGui::Spacing();
-        const float button_width = ImGui::CalcTextSize("OK").x + ImGui::GetStyle().FramePadding.x * 2.0f + 40.0f;
-        const float avail_width = ImGui::GetContentRegionAvail().x;
-        if (avail_width > button_width)
-            ImGui::Dummy(ImVec2(avail_width - button_width, 0.0f));
-        ImGui::SameLine();
-        if (ImGui::Button("OK", ImVec2(button_width, 0.0f)) ||
-            ImGui::IsKeyPressed(ImGuiKey_Escape) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
-
-    if (tab.show_history && has_audit_store) {
-        // Delegate to the overlay; it handles the live/historical split and
-        // owns its own per-tab caches.
-        RenderCanvasHistoryOverlay(state, ui_state, callbacks, tab, *argument_package,
-                                   cache.visible_case, renderer, &overlay_buttons);
-    } else {
-        core::perf::ScopedTimer perf_scope("app.wb.show_canvas_content");
-        ui::gsn::ShowGsnCanvasContentWithRenderer(
-            renderer, ui_state, &cache.visible_case, actions, &state.app_state.sacm_package.value(),
-            &overlay_buttons);
-    }
+    const sacm::AssuranceCasePackage* terminology_package =
+        state.app_state.sacm_package.has_value() ? &state.app_state.sacm_package.value() : nullptr;
+    RenderArgumentPackageCanvasWithTimeline(state, ui_state, callbacks, tab, *argument_package,
+                                            cache.visible_case, renderer, actions,
+                                            terminology_package);
 }
 
 void RenderTerminologyPackageTab(AppRuntimeState& state, const WorkbenchAreaCallbacks& callbacks) {

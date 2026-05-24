@@ -4,6 +4,7 @@
 #include "ai/ai_task_runner.h"
 #include "ai/http_client.h"
 #include "ai/secret_store.h"
+#include "app/areas/baseline_modal.h"
 #include "app/app_events.h"
 #include "app/controllers/ai_review_controller.h"
 #include "app/controllers/acp_controller.h"
@@ -21,6 +22,7 @@
 #include "core/terminology_package_service.h"
 #include "core/tree_editing.h"
 #include "sacm/sacm_package_tree.h"
+#include "ui/timeline/timeline_state.h"
 
 namespace core::commands { class CommandBus; }
 
@@ -59,26 +61,38 @@ struct WorkbenchState {
         std::string package_gid;
         std::string title;
         std::filesystem::path source_file_path;
-        // Whether the History overlay (slider + transactions table) is
-        // currently shown inside this canvas tab. Per-tab so each open
-        // ArgumentPackage canvas can independently scrub its own history.
-        bool show_history = false;
         // History slider selection for this canvas tab. std::nullopt = LIVE
         // (renders the current model). A value pins the canvas to the
         // reconstructed state after applying transaction N.
+        //
+        // Kept alongside `timeline.preview_sequence` during the Phase 1
+        // transition; the Timeline widget is the authoritative source of
+        // the preview sequence and the controller mirrors its value here
+        // so existing consumers (transactions table, etc.) keep working
+        // until Phase 2 retires them.
         std::optional<std::uint64_t> selected_transaction_sequence;
-        // When set, the next frame of this canvas should open a modal
-        // explaining that History was requested but the audit log is empty,
-        // and then clear the flag. Used to abort the H-toggle gracefully
-        // instead of switching into an empty history view the user has no
-        // obvious way to exit.
-        bool show_history_empty_modal = false;
+        // Always-visible Assurance Timeline rail state for this tab.
+        ui::timeline::TimelineState timeline;
+        // Per-tab baseline creation modal state.
+        app::areas::BaselineModalState baseline_modal;
     };
 
     bool force_center_tab_selection = false;
     bool pending_focus_root = false;
     bool focus_review_tab = false;
     std::string focus_review_item_id;
+    bool focus_history_tab = false;
+    // When non-empty, the History panel scopes its transaction list to changes
+    // touching this element id. Cleared by the History panel's "Clear filter"
+    // control or when the user opens a different element history.
+    std::string history_filter_element_id;
+    // Free-text author substring filter applied to the History panel
+    // (case-insensitive match against AuditTransaction::author). Empty = no
+    // author filter.
+    std::string history_filter_author;
+    // Exact command_name filter applied to the History panel (matches
+    // AuditTransaction::command_name). Empty = no command filter.
+    std::string history_filter_command;
     bool show_gsn_tab = true;
     bool show_cse_tab = false;
     bool show_evidence_tab = false;

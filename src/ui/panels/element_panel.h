@@ -5,6 +5,7 @@
 #include "sacm/sacm_model.h"
 #include "ui/panels/confidence_panel.h"
 
+#include <cstdint>
 #include <functional>
 #include <string>
 
@@ -45,12 +46,42 @@ struct ElementTextEditCallbacks {
         commit_text_edit;
 };
 
+// Per-element history summary surfaced in the Element Properties panel.
+// The app layer is responsible for producing the summary from the project's
+// audit store (transactions + latest baseline). The UI is presentation-only.
+struct ElementHistoryModel {
+    bool          available = false;             // false → audit data not loaded; section is hidden
+    bool          ever_seen = false;             // element has appeared in any transaction
+    std::uint64_t change_count = 0;
+    std::uint64_t last_sequence = 0;
+    std::string   last_changed_at;
+    std::string   last_changed_by;
+    bool          has_baseline = false;
+    std::string   baseline_label;                // e.g. "B2 — v1.2 release"
+    bool          changed_since_baseline = false;
+};
+
+struct ElementHistoryCallbacks {
+    // Build the summary for the given element. Called once per frame when an
+    // element is selected. Return `available=false` to hide the section.
+    std::function<ElementHistoryModel(const std::string& element_id)> model_for_element;
+    // Invoked when the user clicks "View Element History" — the app should
+    // activate the FeedbackDock "History" tab and apply an element filter.
+    std::function<void(const std::string& element_id)> open_element_history;
+};
+
 // Render the element properties panel with editable fields.
 // Returns true if any field was modified (caller should rebuild tree).
+// When `read_only` is true, all editable widgets (text fields, checkboxes,
+// translation/confidence controls) render visually disabled and cannot be
+// edited. The History section, terminology suggestion buttons that don't
+// mutate the model, and metadata stay interactive.
 bool ShowElementPanel(parser::AssuranceCase* ac,
                       sacm::AssuranceCasePackage* sacm_pkg,
                       const ElementTerminologyAssistCallbacks* terminology_callbacks = nullptr,
                       const ElementConfidenceAssistCallbacks* confidence_callbacks = nullptr,
-                      const ElementTextEditCallbacks* text_edit_callbacks = nullptr);
+                      const ElementTextEditCallbacks* text_edit_callbacks = nullptr,
+                      const ElementHistoryCallbacks* history_callbacks = nullptr,
+                      bool read_only = false);
 
 } // namespace ui::panels

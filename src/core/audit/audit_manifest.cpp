@@ -41,6 +41,7 @@ std::string SerializeAuditManifest(const AuditManifest& m) {
     j["last_known_raw_file_hash"] = m.last_known_raw_file_hash;
     j["last_known_canonical_model_hash"] = m.last_known_canonical_model_hash;
     j["event_store_hash"] = m.event_store_hash;
+    j["baseline_ids"] = m.baseline_ids;
     return j.dump(2) + "\n";
 }
 
@@ -68,6 +69,7 @@ bool ParseAuditManifest(const std::string& text, AuditManifest& out, std::string
     out.last_known_raw_file_hash = ReadOr<std::string>(j, "last_known_raw_file_hash", {});
     out.last_known_canonical_model_hash = ReadOr<std::string>(j, "last_known_canonical_model_hash", {});
     out.event_store_hash = ReadOr<std::string>(j, "event_store_hash", {});
+    out.baseline_ids = ReadOr<std::vector<std::string>>(j, "baseline_ids", {});
     return true;
 }
 

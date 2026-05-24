@@ -16,6 +16,8 @@ inline constexpr const char* kEventLogFileName = "transactions.af.jsonl";
 inline constexpr const char* kInitialSnapshotId = "snapshot_000000";
 inline constexpr const char* kSnapshotSacmFileName = "main.sacm";
 inline constexpr const char* kSnapshotMetadataFileName = "snapshot.af.json";
+inline constexpr const char* kBaselinesDirName = "baselines";
+inline constexpr const char* kBaselineFileNameSuffix = ".json";
 
 std::filesystem::path AfDir(const std::filesystem::path& project_root);
 std::filesystem::path ManifestPath(const std::filesystem::path& project_root);
@@ -25,5 +27,8 @@ std::filesystem::path SnapshotSacmPath(const std::filesystem::path& project_root
 std::filesystem::path SnapshotMetadataPath(const std::filesystem::path& project_root, const std::string& snapshot_id);
 std::filesystem::path AuditDir(const std::filesystem::path& project_root);
 std::filesystem::path EventLogPath(const std::filesystem::path& project_root);
+std::filesystem::path BaselinesDir(const std::filesystem::path& project_root);
+std::filesystem::path BaselineMetadataPath(const std::filesystem::path& project_root,
+                                           const std::string& baseline_id);
 
 } // namespace core::audit

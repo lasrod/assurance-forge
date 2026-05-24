@@ -5,6 +5,7 @@ add_library(af_core OBJECT
     app_state.cpp
     argument_package_projection.cpp
     assurance_tree.cpp
+    audit/audit_baseline.cpp
     audit/audit_event.cpp
     audit/audit_diff.cpp
     audit/audit_manifest.cpp
@@ -20,6 +21,7 @@ add_library(af_core OBJECT
     audit/history_highlights.cpp
     audit/history_reconstruction.cpp
     audit/replay_verifier.cpp
+    audit/timeline_model_builder.cpp
     commands/command_bus.cpp
     commands/element_commands.cpp
     confidence/confidence_store.cpp

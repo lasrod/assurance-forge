@@ -34,4 +34,13 @@ std::filesystem::path EventLogPath(const std::filesystem::path& project_root) {
     return AuditDir(project_root) / kEventLogFileName;
 }
 
+std::filesystem::path BaselinesDir(const std::filesystem::path& project_root) {
+    return AfDir(project_root) / kBaselinesDirName;
+}
+
+std::filesystem::path BaselineMetadataPath(const std::filesystem::path& project_root,
+                                           const std::string& baseline_id) {
+    return BaselinesDir(project_root) / (baseline_id + kBaselineFileNameSuffix);
+}
+
 } // namespace core::audit

@@ -82,4 +82,37 @@ AuditChangeSet ComputeChangeSet(const std::vector<AuditTransaction>& transaction
     return agg;
 }
 
+ElementHistorySummary SummarizeElementHistory(const std::string& element_id,
+                                              const std::vector<AuditTransaction>& transactions,
+                                              std::optional<std::uint64_t> baseline_sequence) {
+    ElementHistorySummary summary;
+    if (element_id.empty())
+        return summary;
+
+    for (const AuditTransaction& tx : transactions) {
+        const AuditChangeSet cs = ComputeChangeSet(tx);
+        const bool added = cs.added.find(element_id) != cs.added.end();
+        const bool modified = cs.modified.find(element_id) != cs.modified.end();
+        const bool deleted = cs.deleted.find(element_id) != cs.deleted.end();
+        if (!added && !modified && !deleted)
+            continue;
+
+        if (added && !summary.ever_seen) {
+            summary.first_sequence = tx.transaction_sequence;
+            summary.created_at = tx.timestamp;
+            summary.created_by = tx.author;
+        }
+        summary.ever_seen = true;
+        summary.exists = deleted ? false : (added || modified || summary.exists);
+        ++summary.change_count;
+        summary.last_sequence = tx.transaction_sequence;
+        summary.last_changed_at = tx.timestamp;
+        summary.last_changed_by = tx.author;
+
+        if (baseline_sequence.has_value() && tx.transaction_sequence > *baseline_sequence)
+            summary.changed_since_baseline = true;
+    }
+    return summary;
+}
+
 } // namespace core::audit
