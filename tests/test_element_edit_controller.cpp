@@ -1,3 +1,5 @@
+#include "app/app_events.h"
+#include "app/app_runtime_state.h"
 #include "app/controllers/element_edit_controller.h"
 
 #include "core/audit/audit_paths.h"
@@ -13,22 +15,24 @@
 #include <fstream>
 
 TEST(ElementEditControllerTest, AddTopGoalUpdatesModelAndEmitsEvents) {
-    app::AppEvents events;
-    app::controllers::ElementEditController controller(events);
-    parser::AssuranceCase model;
+    app::AppRuntimeState state;
+    state.app_state.loaded_case = parser::AssuranceCase{};
+    state.app_state.sacm_package = sacm::AssuranceCasePackage{};
 
     std::string selected_id;
     bool tree_dirty = false;
     bool document_dirty = false;
     std::string status;
-    events.Subscribe<app::TreeDirtyEvent>([&](const app::TreeDirtyEvent&) { tree_dirty = true; });
-    events.Subscribe<app::DocumentDirtyEvent>([&](const app::DocumentDirtyEvent&) { document_dirty = true; });
-    events.Subscribe<app::SelectionChangedEvent>(
+    state.events.Subscribe<app::TreeDirtyEvent>([&](const app::TreeDirtyEvent&) { tree_dirty = true; });
+    state.events.Subscribe<app::DocumentDirtyEvent>([&](const app::DocumentDirtyEvent&) { document_dirty = true; });
+    state.events.Subscribe<app::SelectionChangedEvent>(
         [&](const app::SelectionChangedEvent& event) { selected_id = event.element_id; });
-    events.Subscribe<app::StatusMessageEvent>([&](const app::StatusMessageEvent& event) { status = event.message; });
+    state.events.Subscribe<app::StatusMessageEvent>(
+        [&](const app::StatusMessageEvent& event) { status = event.message; });
 
-    ASSERT_TRUE(controller.AddTopGoal(model, nullptr));
+    ASSERT_TRUE(state.element_edit_controller->AddTopGoal(state));
 
+    const parser::AssuranceCase& model = state.app_state.loaded_case.value();
     ASSERT_EQ(model.elements.size(), 1u);
     EXPECT_EQ(model.elements.front().type, "claim");
     EXPECT_EQ(selected_id, model.elements.front().id);
@@ -38,17 +42,16 @@ TEST(ElementEditControllerTest, AddTopGoalUpdatesModelAndEmitsEvents) {
 }
 
 TEST(ElementEditControllerTest, AddChildWithoutSelectionEmitsStatusOnly) {
-    app::AppEvents events;
-    app::controllers::ElementEditController controller(events);
-    parser::AssuranceCase model;
+    app::AppRuntimeState state;
     bool tree_dirty = false;
     std::string status;
-    events.Subscribe<app::TreeDirtyEvent>([&](const app::TreeDirtyEvent&) { tree_dirty = true; });
-    events.Subscribe<app::StatusMessageEvent>([&](const app::StatusMessageEvent& event) { status = event.message; });
+    state.events.Subscribe<app::TreeDirtyEvent>([&](const app::TreeDirtyEvent&) { tree_dirty = true; });
+    state.events.Subscribe<app::StatusMessageEvent>(
+        [&](const app::StatusMessageEvent& event) { status = event.message; });
 
-    EXPECT_FALSE(controller.AddChildToSelected(model, nullptr, "", core::NewElementKind::Goal));
+    EXPECT_FALSE(state.element_edit_controller->AddChildToSelected(state, "", core::NewElementKind::Goal));
 
-    EXPECT_TRUE(model.elements.empty());
+    EXPECT_FALSE(state.app_state.loaded_case.has_value());
     EXPECT_FALSE(tree_dirty);
     EXPECT_EQ(status, "No element selected.");
 }
@@ -98,17 +101,17 @@ TEST(ElementEditControllerTest, CommitElementTextEditHandlesAliasedNewValueRefer
     ASSERT_TRUE(pkg.has_value());
     auto parsed = parser::parse_sacm_xml_string(kSacm);
     ASSERT_TRUE(parsed.has_value());
-    parser::AssuranceCase model = std::move(parsed.value());
-    sacm::AssuranceCasePackage package = std::move(pkg.value());
 
     auto bus = core::commands::CommandBus::Open(project, sacm_abs, error);
     ASSERT_TRUE(bus) << error;
 
-    app::AppEvents events;
-    app::controllers::ElementEditController controller(events);
-    controller.SetCommandBus(bus.get());
+    app::AppRuntimeState state;
+    state.app_state.loaded_case  = std::move(parsed.value());
+    state.app_state.sacm_package = std::move(pkg.value());
+    state.command_bus            = std::move(bus);
 
     // Locate the element and snapshot its original description.
+    parser::AssuranceCase& model = state.app_state.loaded_case.value();
     parser::SacmElement* elem = nullptr;
     for (auto& e : model.elements) {
         if (e.id == "G1") { elem = &e; break; }
@@ -126,8 +129,8 @@ TEST(ElementEditControllerTest, CommitElementTextEditHandlesAliasedNewValueRefer
     // Call the controller exactly the way the runtime does: `new_value` is
     // a reference to elem->description itself. This is the aliasing
     // scenario that produced the no-op bug.
-    const bool committed = controller.CommitElementTextEdit(
-        model, &package, "G1", "description", "en", original_value, elem->description);
+    const bool committed = state.element_edit_controller->CommitElementTextEdit(
+        state, "G1", "description", "en", original_value, elem->description);
     EXPECT_TRUE(committed);
 
     // The edit must persist in the live model.
@@ -136,7 +139,7 @@ TEST(ElementEditControllerTest, CommitElementTextEditHandlesAliasedNewValueRefer
 
     // The audit log must contain one UpdateElementText event with the
     // correct old/new values — not a no-op.
-    const auto& transactions = bus->Store().Transactions();
+    const auto& transactions = state.command_bus->Store().Transactions();
     ASSERT_FALSE(transactions.empty());
     const auto& tx = transactions.back();
     ASSERT_FALSE(tx.events.empty());
@@ -148,5 +151,8 @@ TEST(ElementEditControllerTest, CommitElementTextEditHandlesAliasedNewValueRefer
     EXPECT_EQ(ev.payload.at("old_value").get<std::string>(), "The system is safe.");
     EXPECT_EQ(ev.payload.at("new_value").get<std::string>(), "Edited by the user.");
 
+    // Release the bus before deleting the audit-store directory so file
+    // handles to the transaction log are closed (Windows).
+    state.command_bus.reset();
     fs::remove_all(root);
 }

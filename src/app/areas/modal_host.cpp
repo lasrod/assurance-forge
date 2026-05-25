@@ -196,10 +196,7 @@ void ModalHost::RenderRemoveConfirmModal() {
         if (ImGui::Button("Remove", ImVec2(button_width, 0))) {
             ImGui::CloseCurrentPopup();
             if (state_.app_state.loaded_case.has_value()) {
-                parser::AssuranceCase& ac = state_.app_state.loaded_case.value();
-                sacm::AssuranceCasePackage* pkg =
-                    state_.app_state.sacm_package.has_value() ? &state_.app_state.sacm_package.value() : nullptr;
-                state_.element_edit_controller->ConfirmPendingRemoval(ac, pkg);
+                state_.element_edit_controller->ConfirmPendingRemoval(state_);
             }
             ui::GetUiState().marked_for_removal.clear();
         }

@@ -2,13 +2,11 @@
 
 #include "app/app_events.h"
 #include "core/element_factory.h"
-#include "parser/xml_parser.h"
-#include "sacm/sacm_model.h"
 
 #include <string>
 #include <vector>
 
-namespace core::commands { class CommandBus; struct CommandResult; }
+namespace app { struct AppRuntimeState; }
 
 namespace app::controllers {
 
@@ -16,32 +14,30 @@ class ElementEditController {
 public:
     explicit ElementEditController(AppEvents& events);
 
-    // Optional: when set, mutations are dispatched through the audited
-    // command bus instead of calling the core mutators directly. The runtime
-    // wires this on project open and clears it on close.
-    void SetCommandBus(core::commands::CommandBus* bus) { command_bus_ = bus; }
-    core::commands::CommandBus* GetCommandBus() const { return command_bus_; }
+    // All mutating methods route through `app::commands::DispatchAuditedCommand`,
+    // which executes the underlying command via the project's audit bus when
+    // one is wired on `state.command_bus` and otherwise applies the command
+    // directly (no audit transaction). Methods early-return without dispatch
+    // when a precondition (selection, model presence, ...) is not met.
 
-    bool AddChildToSelected(parser::AssuranceCase& model,
-                            sacm::AssuranceCasePackage* package,
+    bool AddChildToSelected(AppRuntimeState& state,
                             const std::string& selected_id,
                             core::NewElementKind kind);
-    bool AddTopGoal(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package);
-    bool RemoveSelected(parser::AssuranceCase& model,
-                        sacm::AssuranceCasePackage* package,
+    bool AddTopGoal(AppRuntimeState& state);
+    bool RemoveSelected(AppRuntimeState& state,
                         const std::string& selected_id,
                         core::RemoveMode mode);
-    bool ConfirmPendingRemoval(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package);
+    bool ConfirmPendingRemoval(AppRuntimeState& state);
     void CancelPendingRemoval();
 
     // Commit a finished text-edit session as a single audited transaction.
     // `original_value` is the value the field held when the user first
-    // focused it; `new_value` is the value at deactivation. When a command
-    // bus is wired the panel-side mutation is reverted to `original_value`
-    // first so the command captures the correct pre-edit state in its audit
-    // payload. Returns true if an audit transaction was appended.
-    bool CommitElementTextEdit(parser::AssuranceCase& model,
-                               sacm::AssuranceCasePackage* package,
+    // focused it; `new_value` is the value at deactivation. The panel-side
+    // in-place mutation is reverted to `original_value` first so the command
+    // captures the correct pre-edit state in its audit payload. Returns true
+    // if a transaction was appended (or, in the no-bus case, if the model
+    // was updated successfully).
+    bool CommitElementTextEdit(AppRuntimeState& state,
                                const std::string& element_id,
                                const std::string& field_token,
                                const std::string& language,
@@ -55,18 +51,10 @@ public:
 
 private:
     AppEvents& events_;
-    core::commands::CommandBus* command_bus_ = nullptr;
     bool show_remove_confirm_ = false;
     std::string pending_remove_id_;
     core::RemoveMode pending_remove_mode_ = core::RemoveMode::NodeOnly;
     std::vector<std::string> pending_remove_ids_;
-
-    // Translate a CommandResult into an AutosaveFailedEvent: emits the
-    // error message when the SACM write or manifest update failed (sticky
-    // banner) and emits an empty string to clear the banner on plain
-    // success. No-op for command-apply rejections (those are surfaced via
-    // StatusMessageEvent at each call site).
-    void EmitAutosaveStatus(const core::commands::CommandResult& result);
 };
 
 } // namespace app::controllers

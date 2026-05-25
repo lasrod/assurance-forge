@@ -294,7 +294,6 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
                 impl_->command_bus = std::move(bus);
             }
         }
-        impl_->element_edit_controller->SetCommandBus(impl_->command_bus.get());
 
         // Audit replay verification (design §13). Best-effort: a mismatch is
         // surfaced as a warning, not an error — the loaded SACM remains the
@@ -383,11 +382,7 @@ bool AppRuntime::ReconcileAuditStore() {
 
     // Tear down the bus before mutating the audit store; the bus holds an
     // open handle to `transactions.af.jsonl` on Windows and rename would
-    // fail otherwise. Order matters: clear the controller's raw pointer
-    // FIRST so it can never observe a freed CommandBus through a stray
-    // callback that fires during the reset() destructor.
-    if (impl_->element_edit_controller)
-        impl_->element_edit_controller->SetCommandBus(nullptr);
+    // fail otherwise.
     impl_->command_bus.reset();
 
     core::ProjectFileEntry entry_copy = *active_entry;
