@@ -9,12 +9,15 @@
 // and the UI widget. These types are deliberately UI-free so that
 // `TimelineModelBuilder` and its tests do not need ImGui.
 //
-// Phase 1 scope (per Assurance Timeline Implementation Plan):
-//   - View modes: Baselines, Snapshots
+// Phase 2 scope (per Assurance Timeline Implementation Plan):
+//   - Unified rail: always emits InitialSnapshot, Baselines, Snapshots,
+//     Changes (one per transaction), and a synthetic Now marker.
 //   - Scopes: WholeCase, CurrentPackage
-//   - Point types in use: Now, Baseline, Snapshot
-// The remaining enumerators are reserved for later phases (Changes /
-// Compare / SelectedElement) and intentionally compile today so callers can
+// `TimelineViewMode` is retained for compatibility with the existing widget
+// dropdown but is no longer consulted by `BuildTimelineModel`. The remaining
+// scope enumerators and point types (Compare / SelectedElement /
+// ChangeGroup / PreviewRevision / CompareStart / CompareEnd) are reserved
+// for later phases and intentionally compile today so callers can
 // pattern-match exhaustively.
 namespace core::audit {
 
@@ -36,12 +39,18 @@ enum class TimelineScope {
     CurrentBaseline,
 };
 
+// Order matters: the builder's stable-sort comparator uses the underlying
+// integer value as the secondary key, so the kind priority at a shared
+// transaction sequence is InitialSnapshot < Baseline < Snapshot < Change.
+// `Now` is appended after sorting so its position relative to the others
+// is unaffected by its enum value.
 enum class TimelinePointType {
-    Now,
+    InitialSnapshot,
     Baseline,
     Snapshot,
-    // Reserved for later phases.
     Change,
+    Now,
+    // Reserved for later phases.
     ChangeGroup,
     PreviewRevision,
     CompareStart,
@@ -77,6 +86,11 @@ struct TimelineQuery {
     // the query so future scopes can use them without an API churn.
     std::optional<std::string>   package_id;
     std::optional<std::string>   package_gid;
+    // When non-empty, the builder tags the snapshot whose `snapshot_id`
+    // equals this value as `TimelinePointType::InitialSnapshot` (sorted
+    // first at its sequence) instead of `Snapshot`. Sourced from
+    // `AuditManifest::initial_snapshot_id`.
+    std::string                  initial_snapshot_id;
 };
 
 } // namespace core::audit

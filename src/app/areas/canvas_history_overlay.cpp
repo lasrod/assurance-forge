@@ -422,6 +422,20 @@ void RenderArgumentPackageCanvasWithTimeline(
     const std::vector<core::audit::SnapshotMetadata>& snapshots =
         GetCachedSnapshots(project.rootPath);
 
+    // Read the manifest so the unified timeline builder can flag the
+    // initial snapshot (sorts first at sequence 0, labelled "S0"). The
+    // manifest is small JSON — a per-frame read is cheap relative to the
+    // already-cached transactions/baselines/snapshots reads above and
+    // avoids threading a new cache helper through `audit_data_cache`.
+    std::string manifest_initial_snapshot_id;
+    {
+        core::audit::AuditManifest manifest;
+        std::string manifest_error;
+        if (core::audit::ReadAuditManifest(project.rootPath, manifest, manifest_error)) {
+            manifest_initial_snapshot_id = manifest.initial_snapshot_id;
+        }
+    }
+
     // Clamp + decide live-vs-preview.
     const std::uint64_t latest_seq =
         visible_transactions.empty() ? 0 : visible_transactions.back().transaction_sequence;
@@ -458,6 +472,7 @@ void RenderArgumentPackageCanvasWithTimeline(
         query.scope = tab.timeline.scope;
         query.package_id = argument_package.id;
         query.package_gid = argument_package.gid;
+        query.initial_snapshot_id = manifest_initial_snapshot_id;
         core::audit::TimelineModel model = core::audit::BuildTimelineModel(
             visible_transactions, baselines, snapshots, query);
 

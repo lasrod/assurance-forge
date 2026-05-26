@@ -100,11 +100,15 @@ TimelineModel BuildTimelineModel(const std::vector<AuditTransaction>& transactio
     model.has_audit_store = true;
     model.latest_sequence = transactions.empty() ? 0 : transactions.back().transaction_sequence;
 
-    // Always emit baselines.
+    // Baselines — labelled B0, B1, … in ascending-sequence order. Ties
+    // broken by stable id for determinism when two baselines share a
+    // sequence (rare but legal).
     std::vector<BaselineMetadata> sorted_baselines = baselines;
     std::sort(sorted_baselines.begin(), sorted_baselines.end(),
               [](const BaselineMetadata& a, const BaselineMetadata& b) {
-                  return a.transaction_sequence < b.transaction_sequence;
+                  if (a.transaction_sequence != b.transaction_sequence)
+                      return a.transaction_sequence < b.transaction_sequence;
+                  return a.baseline_id < b.baseline_id;
               });
     for (std::size_t i = 0; i < sorted_baselines.size(); ++i) {
         const BaselineMetadata& md = sorted_baselines[i];
@@ -118,33 +122,34 @@ TimelineModel BuildTimelineModel(const std::vector<AuditTransaction>& transactio
         model.points.push_back(std::move(p));
     }
 
-    // Snapshots only in the Snapshots view mode. (Phase 1: Changes/Compare/
-    // SelectedElement are placeholders.)
-    if (query.view_mode == TimelineViewMode::Snapshots) {
-        std::vector<SnapshotMetadata> sorted_snapshots = snapshots;
-        std::sort(sorted_snapshots.begin(), sorted_snapshots.end(),
-                  [](const SnapshotMetadata& a, const SnapshotMetadata& b) {
+    // Snapshots — always emitted now that the rail is unified. The
+    // snapshot whose id matches `query.initial_snapshot_id` is tagged
+    // `InitialSnapshot` (sorts first at its sequence) and gets the "S0"
+    // label; regular snapshots get S1, S2, … in ascending-sequence order.
+    std::vector<SnapshotMetadata> sorted_snapshots = snapshots;
+    std::sort(sorted_snapshots.begin(), sorted_snapshots.end(),
+              [](const SnapshotMetadata& a, const SnapshotMetadata& b) {
+                  if (a.transaction_sequence != b.transaction_sequence)
                       return a.transaction_sequence < b.transaction_sequence;
-                  });
-        for (std::size_t i = 0; i < sorted_snapshots.size(); ++i) {
-            const SnapshotMetadata& md = sorted_snapshots[i];
-            TimelinePoint p;
-            p.transaction_sequence = md.transaction_sequence;
-            p.type = TimelinePointType::Snapshot;
-            p.id = md.snapshot_id;
-            p.label = MakeSnapshotLabel(i);
-            p.tooltip = MakeSnapshotTooltip(md);
-            p.is_major = false;
-            model.points.push_back(std::move(p));
-        }
+                  return a.snapshot_id < b.snapshot_id;
+              });
+    std::size_t regular_idx = 1;
+    for (const SnapshotMetadata& md : sorted_snapshots) {
+        const bool is_initial =
+            !query.initial_snapshot_id.empty() && md.snapshot_id == query.initial_snapshot_id;
+        TimelinePoint p;
+        p.transaction_sequence = md.transaction_sequence;
+        p.type = is_initial ? TimelinePointType::InitialSnapshot : TimelinePointType::Snapshot;
+        p.id = md.snapshot_id;
+        p.label = is_initial ? std::string("S0") : MakeSnapshotLabel(regular_idx++);
+        p.tooltip = MakeSnapshotTooltip(md);
+        p.is_major = is_initial;
+        model.points.push_back(std::move(p));
     }
 
-    // In Changes mode, emit one marker per recorded transaction. Baselines
-    // remain emitted above (as major markers) so users can see where formal
-    // milestones fall amongst the change stream. Each Change point uses the
-    // transaction id (or a synthesized "tx-<seq>") as its stable id and a
-    // tooltip summarizing command_name / author / timestamp / event count.
-    if (query.view_mode == TimelineViewMode::Changes) {
+    // Changes — one marker per recorded transaction. Stable id is the
+    // transaction id (or synthesized "tx-<seq>" when missing).
+    {
         char id_buf[40];
         for (const AuditTransaction& tx : transactions) {
             TimelinePoint p;
@@ -166,15 +171,21 @@ TimelineModel BuildTimelineModel(const std::vector<AuditTransaction>& transactio
         }
     }
 
-    // Stable order: baselines before snapshots at the same sequence.
+    // Stable order: ascending sequence, then by kind priority
+    // (InitialSnapshot < Baseline < Snapshot < Change), then by stable id
+    // so equal-sequence ties (e.g. B0/B1 at the same baseline sequence)
+    // come out in a fully deterministic order.
     std::stable_sort(model.points.begin(), model.points.end(),
                      [](const TimelinePoint& a, const TimelinePoint& b) {
                          if (a.transaction_sequence != b.transaction_sequence)
                              return a.transaction_sequence < b.transaction_sequence;
-                         return static_cast<int>(a.type) < static_cast<int>(b.type);
+                         if (a.type != b.type)
+                             return static_cast<int>(a.type) < static_cast<int>(b.type);
+                         return a.id < b.id;
                      });
 
-    // Synthetic Now marker.
+    // Synthetic Now marker — always appended last regardless of its enum
+    // value so it renders to the right of every same-sequence marker.
     TimelinePoint now;
     now.transaction_sequence = model.latest_sequence;
     now.type = TimelinePointType::Now;
