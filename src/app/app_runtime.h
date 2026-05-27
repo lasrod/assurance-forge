@@ -158,6 +158,14 @@ private:
     void ExportGsnSvg();
     void RequestExit(bool& done);
 
+    // Undo the most recent in-force (i.e. not-itself-undone) audit
+    // transaction. Bounded by the most recent snapshot or baseline at
+    // or before the target sequence (Plan §5). Returns false (and emits
+    // a status message) when there is nothing to undo or the undo
+    // boundary has been reached.
+    bool Undo();
+    bool CanUndo() const;
+
     bool BeginProposalForReviewItem(const core::reviews::ReviewItem& item);
     bool BeginEditProposalForReviewItem(const core::reviews::ReviewItem& item);
     bool BeginEditProposalById(const std::string& proposal_id);

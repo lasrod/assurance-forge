@@ -1,5 +1,6 @@
 #include "core/audit/event_replayer.h"
 
+#include "core/audit/undo_resolver.h"
 #include "core/commands/element_commands.h"
 #include "core/commands/package_commands.h"
 #include "core/commands/proposal_commands.h"
@@ -12,6 +13,8 @@
 #include "core/terminology_package_service.h"
 
 #include <sstream>
+#include <unordered_set>
+#include <vector>
 
 namespace core::audit {
 
@@ -98,6 +101,16 @@ bool ApplyEvent(ReplayState& state,
                         ": " + err;
             return false;
         }
+        return true;
+    }
+
+    if (type == "Undo") {
+        // The `Undo` event is a marker that records what was cancelled.
+        // The replayer applies it as a no-op: the transactions it cancels
+        // are filtered out before this loop runs (see `ReplayFrom`), so
+        // by the time we reach an Undo event the model is already in the
+        // post-undo state. The marker remains in the log for audit and
+        // history-viewer rendering only.
         return true;
     }
 
@@ -535,8 +548,28 @@ std::expected<ReplayState, std::string> Replayer::ReplayFrom(
 
     ReplayState state{snapshot_model, snapshot_package};
 
+    // Pre-pass: compute the set of transactions cancelled by an active
+    // Undo event (see `undo_resolver.h`). We do this over the FULL log
+    // — not just the [snapshot, up_to_seq] window — so that an Undo
+    // emitted *after* `up_to_transaction_sequence` does not retroactively
+    // suppress an earlier transaction when the user navigates back to a
+    // past point. Honest audit semantics: at any historical point, only
+    // the undos that were already on the books at that point count.
+    std::unordered_set<std::uint64_t> skipped;
+    {
+        std::vector<AuditTransaction> in_window;
+        in_window.reserve(transactions.size());
+        for (const AuditTransaction& tx : transactions) {
+            if (tx.transaction_sequence <= up_to_transaction_sequence)
+                in_window.push_back(tx);
+        }
+        skipped = ComputeUndoSkipSet(in_window);
+    }
+
     for (const AuditTransaction& tx : transactions) {
         if (tx.transaction_sequence > up_to_transaction_sequence)
+            continue;
+        if (skipped.count(tx.transaction_sequence) != 0)
             continue;
         for (const AuditEvent& event : tx.events) {
             std::string err;

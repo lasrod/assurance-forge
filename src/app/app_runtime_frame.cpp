@@ -52,7 +52,16 @@ void AppRuntime::RenderFrame(bool& done) {
     menu_callbacks.begin_create_project_sacm_file = [this]() { BeginCreateProjectSacmFile(); };
     menu_callbacks.begin_create_project_evidence_register = [this]() { BeginCreateProjectEvidenceRegister(); };
     menu_callbacks.begin_create_project_j3377_cae_register = [this]() { BeginCreateProjectJ3377CaeRegister(); };
+    menu_callbacks.undo                                    = [this]() { Undo(); };
+    menu_callbacks.can_undo                                = [this]() { return CanUndo(); };
     const float menu_height = frame::RenderAppMenuBar(*impl_, done, menu_callbacks);
+
+    // Global Ctrl+Z shortcut — fires once per key chord even when the
+    // Edit menu isn't open. Matches the disabled-state guard the menu
+    // item uses so the shortcut and the menu agree on availability.
+    if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Z) && CanUndo()) {
+        Undo();
+    }
 
     {
         core::perf::ScopedTimer s("app.derived_views");

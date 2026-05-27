@@ -22,11 +22,14 @@ add_library(af_core OBJECT
     audit/history_reconstruction.cpp
     audit/replay_verifier.cpp
     audit/timeline_model_builder.cpp
+    audit/undo_boundary.cpp
+    audit/undo_resolver.cpp
     commands/command_bus.cpp
     commands/element_commands.cpp
     commands/package_commands.cpp
     commands/proposal_commands.cpp
     commands/terminology_commands.cpp
+    commands/undo_command.cpp
     confidence/confidence_store.cpp
     element_factory.cpp
     gsn_layout.cpp
