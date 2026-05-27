@@ -6,9 +6,36 @@
 
 namespace app::commands {
 
+namespace {
+
+// Phase 4.3 — single chokepoint read-only enforcement. When the active
+// canvas tab is scrubbed to a historical sequence, any mutating command
+// must be refused: the canvas the user is looking at is a reconstruction
+// of a past model, while `state.app_state.loaded_case` still points at
+// the LATEST model. Letting a command through would silently mutate the
+// live model from a view of historical data — exactly the data-loss
+// hazard the inspector read-only guard already prevents for text fields.
+bool IsActiveCanvasInHistoricalPreview(const AppRuntimeState& state) {
+    const std::string& active = state.workbench.active_argument_package_canvas_key;
+    if (active.empty()) return false;
+    for (const auto& tab : state.workbench.argument_package_canvas_tabs) {
+        if (tab.key == active) {
+            return tab.timeline.preview_sequence.has_value();
+        }
+    }
+    return false;
+}
+
+} // namespace
+
 DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state, core::commands::ICommand& command) {
     if (!state.app_state.sacm_package.has_value()) {
         return {false, "No SACM model loaded."};
+    }
+
+    if (IsActiveCanvasInHistoricalPreview(state)) {
+        return {false,
+                "Cannot edit while viewing history. Return to Latest to make changes."};
     }
 
     // No bus available (e.g. unit tests, or a SACM file opened outside of a
