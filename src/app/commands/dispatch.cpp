@@ -54,10 +54,16 @@ DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state, core::commands::I
             return {false, apply_error};
         }
         // The model has been mutated in-place but we have no bus to drive
-        // the autosave path. Flag the document as dirty so `SaveProject`
-        // (and the modal close prompts that watch the same flags) will
-        // actually persist the change.
-        state.events.Emit(DocumentDirtyEvent{});
+        // the autosave path. Set the dirty flag directly (matching how
+        // helpers like `EnsureQuickDefineTargetPackage` mark state) so
+        // `SaveProject` and the close-prompt watchers will persist the
+        // change. We deliberately do NOT emit `DocumentDirtyEvent` here:
+        // many callers emit that event themselves after the dispatch
+        // returns, and double-emission throws off subscribers that count
+        // edits (and breaks unit tests that assert a single event per
+        // logical user action).
+        state.app_state.mark_dirty();
+        state.document_dirty = true;
         return {true, {}};
     }
 
