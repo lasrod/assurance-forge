@@ -531,6 +531,83 @@ TEST(LayoutTest, Group2AttachmentNoOverlapWithSibling) {
         << " ev=(" << ev_node->position.x << "," << ev_node->position.y << ")";
 }
 
+TEST(LayoutTest, AdjacentSiblingsWithFacingGroup2AttachmentsDoNotOverlap) {
+    // Regression test: two adjacent siblings each with group2 attachments facing each other
+    // caused overlap when both had subtree_width >= 2. The right attachment of the left
+    // sibling and the left attachment of the right sibling were placed in nearly identical
+    // column slots because overhang was only added for subtree_width < 2.
+    //
+    // Structure: Top -> Strat -> {Left, Right}
+    //   Left  has 3 group1 children (subtree_width=3) + 2 contexts (left/right)
+    //   Right has 2 group1 children (subtree_width=2) + 1 context (left)
+    //
+    // Left's right context and Right's left context must not overlap.
+    const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="urn:test" id="T" name="T">
+  <argumentPackage id="AP" name="AP">
+    <claim id="Top" name="Top" assertionDeclaration="asserted"/>
+    <argumentReasoning id="Strat" name="Strat"/>
+    <claim id="Left" name="Left" assertionDeclaration="asserted"/>
+    <claim id="Right" name="Right" assertionDeclaration="asserted"/>
+    <claim id="L1" name="L1" assertionDeclaration="asserted"/>
+    <claim id="L2" name="L2" assertionDeclaration="asserted"/>
+    <claim id="L3" name="L3" assertionDeclaration="asserted"/>
+    <claim id="R1" name="R1" assertionDeclaration="asserted"/>
+    <claim id="R2" name="R2" assertionDeclaration="asserted"/>
+    <artifactReference id="CtxLeft1" name="CtxLeft1"/>
+    <artifactReference id="CtxLeft2" name="CtxLeft2"/>
+    <artifactReference id="CtxRight1" name="CtxRight1"/>
+    <assertedInference id="AI0">
+      <source ref="Left"/>
+      <source ref="Right"/>
+      <target ref="Top"/>
+      <reasoning ref="Strat"/>
+    </assertedInference>
+    <assertedInference id="AI1">
+      <source ref="L1"/>
+      <source ref="L2"/>
+      <source ref="L3"/>
+      <target ref="Left"/>
+    </assertedInference>
+    <assertedInference id="AI2">
+      <source ref="R1"/>
+      <source ref="R2"/>
+      <target ref="Right"/>
+    </assertedInference>
+    <assertedContext id="AC1">
+      <source ref="CtxLeft1"/>
+      <target ref="Left"/>
+    </assertedContext>
+    <assertedContext id="AC2">
+      <source ref="CtxLeft2"/>
+      <target ref="Left"/>
+    </assertedContext>
+    <assertedContext id="AC3">
+      <source ref="CtxRight1"/>
+      <target ref="Right"/>
+    </assertedContext>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    auto tree = build_tree(xml);
+    ASSERT_NE(tree.root, nullptr);
+
+    ui::gsn::LayoutEngine engine;
+    auto layout = engine.ComputeLayout(tree);
+
+    const ui::gsn::LayoutNode* ctx_left2 = find_layout_node(layout, "CtxLeft2");
+    const ui::gsn::LayoutNode* ctx_right1 = find_layout_node(layout, "CtxRight1");
+    ASSERT_NE(ctx_left2, nullptr) << "CtxLeft2 not found in layout";
+    ASSERT_NE(ctx_right1, nullptr) << "CtxRight1 not found in layout";
+
+    EXPECT_FALSE(rects_overlap(ctx_left2->position, ctx_left2->size, ctx_right1->position, ctx_right1->size))
+        << "Right attachment of Left sibling overlaps left attachment of Right sibling!"
+        << " CtxLeft2=(" << ctx_left2->position.x << "," << ctx_left2->position.y
+        << " " << ctx_left2->size.x << "x" << ctx_left2->size.y << ")"
+        << " CtxRight1=(" << ctx_right1->position.x << "," << ctx_right1->position.y
+        << " " << ctx_right1->size.x << "x" << ctx_right1->size.y << ")";
+}
+
 TEST(LayoutTest, AsymmetricOddChildrenUseCompactSpan) {
     ScopedImGuiFrame imgui_frame;
 

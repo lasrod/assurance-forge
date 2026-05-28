@@ -98,8 +98,8 @@ void ComputeSubtreeInfo(LayoutState& state, const std::string& node_id) {
     const int attachment_count = static_cast<int>(ExistingChildren(state, node->input->group2_attachments).size());
     const bool has_left_attachment = attachment_count > 0;
     const bool has_right_attachment = attachment_count >= 2;
-    const int own_left = (has_left_attachment && node->subtree_width < 2) ? 1 : 0;
-    const int own_right = (has_right_attachment && node->subtree_width < 2) ? 1 : 0;
+    const int own_left = (has_left_attachment && node->subtree_width < 3) ? 1 : 0;
+    const int own_right = (has_right_attachment && node->subtree_width < 3) ? 1 : 0;
 
     int child_left_overhang = 0;
     int child_right_overhang = 0;
