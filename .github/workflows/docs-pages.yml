@@ -51,8 +51,13 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
+          # clang-18 + libstdc++-13-dev are needed so libclang (used by
+          # clang-uml to parse our TUs) resolves the libstdc++ 13 headers
+          # that ship `std::expected`. Configuring CMake with clang (not
+          # gcc) keeps the emitted compile_commands.json clang-native, so
+          # clang-uml does not have to re-interpret gcc-only driver flags.
           sudo apt-get install -y \
-            ninja-build \
+            ninja-build clang-18 libstdc++-13-dev \
             xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev \
             libssl-dev libcurl4-openssl-dev
 
@@ -80,11 +85,21 @@ jobs:
 
       - name: Generate compile database
         run: |
+          # Use clang as the compiler so compile_commands.json contains
+          # clang-native invocations. clang-uml's libclang then parses
+          # the TUs with the exact same flags (including `-std=gnu++23`)
+          # the database carries, which avoids the GCC/clang flag
+          # translation that was dropping the C++23 standard request
+          # and breaking lookups of `std::expected`.
           cmake -S . -B build-docs -G Ninja \
+            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DHELLOIMGUI_DOWNLOAD_GLFW_IF_NEEDED=ON
 
       - name: Generate Mermaid class diagrams
+        # `add_compile_flags: [-std=c++23]` in .clang-uml supplies the
+        # C++ standard if any TU's database entry is missing it.
         run: clang-uml -g mermaid
 
       - name: Install docs dependencies
