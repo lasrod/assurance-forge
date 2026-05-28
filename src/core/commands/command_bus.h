@@ -24,9 +24,11 @@
 // — those live in `core::AppState` and are passed in by reference at execute
 // time. This avoids fragile pointer lifetimes across project reloads.
 //
-// Phase 2 scope: per-command transactions (no batching). Crash safety is
-// best-effort (non-atomic file writes); a tamper-detection check is performed
-// when the event store is reopened.
+// Phase 2 scope: per-command transactions (no batching). Writes are atomic
+// (temp file + fsync + rename) and the audit log is appended *before* the
+// SACM file is overwritten, so the log is the canonical record of intent.
+// A tamper / consistency check is performed when the event store is
+// reopened.
 namespace core::commands {
 
 class ICommand;
@@ -56,9 +58,15 @@ public:
                                             std::filesystem::path sacm_absolute_path,
                                             std::string& error);
 
-    // Execute one command. On failure, returns `{success=false, error}` with
-    // no audit-log mutation. On success, mutates `ctx.model` and `ctx.package`,
-    // writes the updated SACM XML to disk, and appends a transaction.
+    // Execute one command. On `Apply` failure or audit-log append failure
+    // returns `{success=false, error}` with no audit-log mutation. Once the
+    // transaction has been appended to the log it is considered committed:
+    // any subsequent failure (atomic SACM write, manifest cache update) is
+    // reported as `{success=true, error=<diagnostic>}` so callers do not
+    // roll back UI state that has already been mirrored on disk. The
+    // `transaction_id`, `transaction_sequence`, and post-state hashes are
+    // populated whenever `success` is true, including the partial-failure
+    // cases.
     CommandResult Execute(ICommand& command, CommandContext& ctx, const std::string& author);
 
     const audit::AuditManifest&        Manifest() const { return manifest_; }

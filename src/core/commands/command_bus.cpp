@@ -68,13 +68,25 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
         return result;
     }
 
+    // From this point on the transaction is committed in the audit log and
+    // the in-memory model has already been mutated. Any subsequent failure
+    // (SACM write, manifest write) is a soft warning: we return success
+    // so callers don't treat the command as failed and roll back UI
+    // state, but we populate `error` with a user-visible diagnostic.
+    // Crash recovery uses the audit log as the source of truth on next
+    // open and detects the SACM/manifest gap via the verifier.
+    result.transaction_id = tx.transaction_id;
+    result.transaction_sequence = tx.transaction_sequence;
+    result.raw_file_hash_after = raw_after;
+    result.canonical_model_hash_after = canonical_after;
+    result.success = true;
+
     // Step 2: write SACM atomically (temp file + fsync + rename). A crash
     // here leaves the audit log ahead of SACM by one transaction; on next
     // open the verifier detects the gap and offers non-destructive
     // remediation (Restore from audit replay).
     auto write = WriteTextFileAtomic(sacm_path_, xml);
     if (!write) {
-        result.success = false;
         result.error = "Autosave failed (audit log entry was committed): " + write.error();
         return result;
     }
@@ -90,16 +102,9 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
 
     std::string manifest_error;
     if (!audit::WriteAuditManifest(project_.rootPath, manifest_, manifest_error)) {
-        result.success = true;
         result.error = "Manifest update failed (audit log and SACM are consistent): " + manifest_error;
-    } else {
-        result.success = true;
     }
 
-    result.transaction_id = tx.transaction_id;
-    result.transaction_sequence = tx.transaction_sequence;
-    result.raw_file_hash_after = raw_after;
-    result.canonical_model_hash_after = canonical_after;
     return result;
 }
 

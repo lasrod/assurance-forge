@@ -18,6 +18,7 @@
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <string_view>
 
 namespace {
 

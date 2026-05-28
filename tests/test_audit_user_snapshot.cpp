@@ -34,7 +34,13 @@ void WriteSacm(const std::filesystem::path& path, const std::string& body) {
     out << body;
 }
 
-void WriteManifest(const std::filesystem::path& project_root, std::uint64_t latest_seq) {
+// Returns true on success; failure detail goes into `error`. ASSERT_* is
+// avoided here because gtest's fatal-assert macros inside a void helper
+// only return from the helper, leaving the caller to continue with
+// half-initialized state. The caller is expected to assert on the result.
+[[nodiscard]] bool WriteManifest(const std::filesystem::path& project_root,
+                                 std::uint64_t                latest_seq,
+                                 std::string&                 error) {
     core::audit::AuditManifest m;
     m.project_id = "test-project";
     m.created_at = "2025-01-01T00:00:00Z";
@@ -43,8 +49,7 @@ void WriteManifest(const std::filesystem::path& project_root, std::uint64_t late
     m.initial_snapshot_id = "snapshot_000000";
     m.latest_transaction_sequence = latest_seq;
     m.latest_event_sequence = latest_seq;
-    std::string err;
-    ASSERT_TRUE(core::audit::WriteAuditManifest(project_root, m, err)) << err;
+    return core::audit::WriteAuditManifest(project_root, m, error);
 }
 
 constexpr const char* kMinimalSacm =
@@ -54,7 +59,8 @@ constexpr const char* kMinimalSacm =
 
 TEST(CreateUserSnapshot, WritesSidecarAndCopiesSacm) {
     auto root = MakeTempProjectRoot("writes");
-    WriteManifest(root, 42);
+    std::string manifest_err;
+    ASSERT_TRUE(WriteManifest(root, 42, manifest_err)) << manifest_err;
     WriteSacm(root / "case.sacm.xml", kMinimalSacm);
 
     core::audit::SnapshotMetadata md;
@@ -85,7 +91,8 @@ TEST(CreateUserSnapshot, WritesSidecarAndCopiesSacm) {
 
 TEST(CreateUserSnapshot, RefusesDuplicateAtSameSequence) {
     auto root = MakeTempProjectRoot("dup");
-    WriteManifest(root, 5);
+    std::string manifest_err;
+    ASSERT_TRUE(WriteManifest(root, 5, manifest_err)) << manifest_err;
     WriteSacm(root / "case.sacm.xml", kMinimalSacm);
 
     core::audit::SnapshotMetadata md1;

@@ -38,15 +38,19 @@ bool AppRuntime::SaveProject() {
         }
     }
 
-    // Write SACM only when the in-memory model has unflushed mutations.
+    // Write SACM when the in-memory model has unflushed mutations.
     // Audited commands already wrote SACM atomically through CommandBus and
-    // left the audit manifest in sync; calling `app_state.save_project()`
-    // again would re-serialize the same bytes (the serializer is
-    // deterministic, so the on-disk hash stays valid) but does no useful
-    // work. The bypass paths (terminology / proposal / package-removal)
-    // are the reason this branch still has to fire when `document_dirty`
-    // is set without a corresponding bus call.
-    if (impl_->document_dirty) {
+    // left the audit manifest in sync, so for those flows `document_dirty`
+    // is false and re-saving would just rewrite identical bytes. The
+    // bypass paths (terminology / proposal / package-removal) set
+    // `document_dirty` so this branch fires. Other code paths that only
+    // call `app_state.mark_dirty()` without emitting `DocumentDirtyEvent`
+    // (e.g. the no-bus fallback in `DispatchAuditedCommand` before it
+    // started emitting the event, or any future direct mutation) still
+    // need their changes persisted, so `has_unsaved_changes` also forces
+    // a save.
+    const bool needs_sacm_save = impl_->document_dirty || impl_->app_state.has_unsaved_changes;
+    if (needs_sacm_save) {
         if (!impl_->app_state.save_project())
             return false;
         impl_->document_dirty = false;

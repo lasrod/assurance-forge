@@ -53,6 +53,11 @@ DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state, core::commands::I
         if (!command.Apply(ctx, unused_event, apply_error)) {
             return {false, apply_error};
         }
+        // The model has been mutated in-place but we have no bus to drive
+        // the autosave path. Flag the document as dirty so `SaveProject`
+        // (and the modal close prompts that watch the same flags) will
+        // actually persist the change.
+        state.events.Emit(DocumentDirtyEvent{});
         return {true, {}};
     }
 
