@@ -1,36 +1,40 @@
 #pragma once
 
-// clang-uml parse-time shim for std::expected / std::unexpected.
+// Parse-time shim for `std::expected` / `std::unexpected`, force-included
+// via `.clang-uml`'s `add_compile_flags: [-include, ...]` so it is
+// processed before any TU's normal #includes.
 //
-// clang-uml uses libclang to parse our translation units. On some
-// distributions (notably the Ubuntu Noble 24.04 PPA build of clang-uml
-// 0.6.2 used by the docs CI), libclang fails to resolve `std::expected`
-// from libstdc++ 13's `<expected>` header even when `-std=c++23` is
-// applied. The exact cause appears to be that the `__cplusplus > 202002L`
-// gate inside `<expected>` evaluates false during the libclang parse,
-// which leaves `std::expected` undeclared and breaks every diagram whose
-// TUs include `core/project_file_io.h` or `parser/xml_parser.h`.
+// Why: clang-uml's bundled libclang (Ubuntu 24.04 PPA build of 0.6.2,
+// against libclang 18.1.3) fails to declare `std::expected` from
+// libstdc++ 13's `<expected>` header. The header is gated on
+// `__cplusplus > 202002L && __cpp_concepts >= 202002L`, and at least one
+// of those checks evaluates false during the libclang parse even with
+// `-std=c++23`. Every diagram whose TUs transitively include
+// `core/project_file_io.h` or `parser/xml_parser.h` then fails to parse.
 //
-// This header is force-included via `.clang-uml`'s `add_compile_flags:
-// [-include, docs/clang-uml/expected_shim.h]`. The `__clanguml__` guard
-// keeps it a strict no-op during normal builds, so it can never affect
-// the production binary or test suite. The additional `__cplusplus`
-// guard makes it a no-op even during clang-uml parsing when libclang
-// has correctly applied `-std=c++23`, so libstdc++'s real `<expected>`
-// header (which only declares `std::expected` when
-// `__cplusplus > 202002L`) takes precedence and there is no
-// redeclaration conflict.
+// Strategy: pre-define libstdc++'s `<expected>` include guard
+// (`_GLIBCXX_EXPECTED`) so the real header becomes a no-op when later
+// included, and provide our own minimal declarations of `std::expected`
+// and `std::unexpected`. This is enough for libclang to resolve every
+// use of those types in our headers and bodies; clang-uml only cares
+// about signatures, not implementations.
+//
+// Safety: this file lives under `docs/clang-uml/` and is NEVER included
+// by the production build. It is only ever pulled in by the docs CI
+// (and by anyone running `clang-uml` locally). It is therefore safe to
+// declare the shim unconditionally — no guard macro can be wrong.
 
-#if defined(__clanguml__) && !(__cplusplus > 202002L)
+#ifndef _GLIBCXX_EXPECTED
+#define _GLIBCXX_EXPECTED 1
 
 namespace std {
 
 template <class E>
 class unexpected {
   public:
-    unexpected()                                = default;
-    unexpected(const unexpected&)               = default;
-    unexpected(unexpected&&)                    = default;
+    unexpected()                                       = default;
+    unexpected(const unexpected&)                      = default;
+    unexpected(unexpected&&)                           = default;
     template <class Err = E>
     constexpr explicit unexpected(Err&&) {}
     constexpr const E& error() const& noexcept;
@@ -52,16 +56,16 @@ class expected {
     template <class G>
     constexpr expected(const unexpected<G>&) {}
 
-    constexpr bool          has_value() const noexcept;
-    constexpr explicit      operator bool() const noexcept;
-    constexpr T&            value() &;
-    constexpr const T&      value() const&;
-    constexpr E&            error() & noexcept;
-    constexpr const E&      error() const& noexcept;
-    constexpr T*            operator->() noexcept;
-    constexpr const T*      operator->() const noexcept;
-    constexpr T&            operator*() & noexcept;
-    constexpr const T&      operator*() const& noexcept;
+    constexpr bool     has_value() const noexcept;
+    constexpr explicit operator bool() const noexcept;
+    constexpr T&       value() &;
+    constexpr const T& value() const&;
+    constexpr E&       error() & noexcept;
+    constexpr const E& error() const& noexcept;
+    constexpr T*       operator->() noexcept;
+    constexpr const T* operator->() const noexcept;
+    constexpr T&       operator*() & noexcept;
+    constexpr const T& operator*() const& noexcept;
 };
 
 template <class E>
@@ -77,13 +81,13 @@ class expected<void, E> {
     template <class G>
     constexpr expected(const unexpected<G>&) {}
 
-    constexpr bool          has_value() const noexcept;
-    constexpr explicit      operator bool() const noexcept;
-    constexpr void          value() const&;
-    constexpr E&            error() & noexcept;
-    constexpr const E&      error() const& noexcept;
+    constexpr bool     has_value() const noexcept;
+    constexpr explicit operator bool() const noexcept;
+    constexpr void     value() const&;
+    constexpr E&       error() & noexcept;
+    constexpr const E& error() const& noexcept;
 };
 
 } // namespace std
 
-#endif // __clanguml__ && pre-C++23
+#endif // _GLIBCXX_EXPECTED
