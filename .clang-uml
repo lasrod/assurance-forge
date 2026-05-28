@@ -12,8 +12,19 @@ package_type: directory
 # `core/project_file_io.h`. Appending `-std=c++23` here is harmless when
 # the database already specifies it (the later flag wins) and recovers
 # diagram generation when it does not.
+#
+# Additionally force-include `docs/clang-uml/expected_shim.h`, which
+# provides parse-time forward declarations of `std::expected` /
+# `std::unexpected` guarded on the `__clanguml__` macro. This is a
+# defence-in-depth measure: on CI we have observed clang-uml's libclang
+# failing to resolve `std::expected` even with `-std=c++23` set, because
+# libstdc++ 13's `<expected>` is gated on `__cplusplus > 202002L` and
+# that check sometimes evaluates false inside libclang. The shim is a
+# strict no-op during normal builds (guarded on `__clanguml__`).
 add_compile_flags:
   - -std=c++23
+  - -include
+  - docs/clang-uml/expected_shim.h
 
 diagrams:
   problem_system:
