@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <sstream>
+#include <string_view>
 #include <vector>
 
 namespace core::audit {

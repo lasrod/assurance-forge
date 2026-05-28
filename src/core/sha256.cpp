@@ -2,6 +2,8 @@
 
 #include "picosha2.h"
 
+#include <string_view>
+
 namespace core {
 
 std::string Sha256::HexDigest(const unsigned char* data, size_t size) {

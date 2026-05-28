@@ -4,6 +4,17 @@ generate_method_arguments: none
 generate_packages: true
 package_type: directory
 
+# Force C++23 when clang-uml's libclang parses translation units. The
+# compile database produced by CMake usually carries `-std=gnu++23`, but
+# clang-uml has been observed to drop or not honour that flag on some
+# bundled libclang builds, which causes `std::expected` (a C++23 feature)
+# to look undefined in headers like `parser/xml_parser.h` and
+# `core/project_file_io.h`. Appending `-std=c++23` here is harmless when
+# the database already specifies it (the later flag wins) and recovers
+# diagram generation when it does not.
+add_compile_flags:
+  - -std=c++23
+
 diagrams:
   problem_system:
     type: class

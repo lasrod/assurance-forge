@@ -10,6 +10,7 @@
 #include <iomanip>
 #include <random>
 #include <sstream>
+#include <string_view>
 
 namespace core::audit {
 
