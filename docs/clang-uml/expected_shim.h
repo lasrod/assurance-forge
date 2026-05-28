@@ -35,11 +35,21 @@ class unexpected {
     unexpected()                                       = default;
     unexpected(const unexpected&)                      = default;
     unexpected(unexpected&&)                           = default;
-    template <class Err = E>
-    constexpr explicit unexpected(Err&&) {}
+    // Non-templated single-arg constructor so CTAD on
+    // `std::unexpected("err")` deduces `E` directly from the argument
+    // via the deduction guide below. Real libstdc++ uses a templated
+    // forwarding constructor plus a separate guide; we collapse both
+    // into the simplest form libclang can reason about.
+    constexpr explicit unexpected(E) {}
     constexpr const E& error() const& noexcept;
     constexpr E&       error() & noexcept;
 };
+
+// CTAD deduction guide. Without this, `std::unexpected(const char*)`
+// cannot deduce `E` and every call site in `guidelines_parser.cpp`
+// fails to compile during the libclang parse.
+template <class E>
+unexpected(E) -> unexpected<E>;
 
 template <class T, class E>
 class expected {
