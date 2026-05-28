@@ -23,8 +23,12 @@ package_type: directory
 # strict no-op during normal builds (guarded on `__clanguml__`).
 add_compile_flags:
   - -std=c++23
+  # NOTE: `-include` is forwarded to libclang, which resolves the path
+  # relative to each TU's compile working directory (the
+  # `compilation_database_dir`, i.e. `build-docs/`) — NOT relative to
+  # the `.clang-uml` file. Use the path that is valid from build-docs.
   - -include
-  - docs/clang-uml/expected_shim.h
+  - ../docs/clang-uml/expected_shim.h
 
 diagrams:
   problem_system:
