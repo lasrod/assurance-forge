@@ -3,7 +3,33 @@ add_library(af_core OBJECT
     acp/acp_relationship_index.cpp
     acp/assurance_claim_point.cpp
     app_state.cpp
+    argument_package_projection.cpp
     assurance_tree.cpp
+    audit/audit_baseline.cpp
+    audit/audit_event.cpp
+    audit/audit_diff.cpp
+    audit/audit_manifest.cpp
+    audit/audit_paths.cpp
+    audit/audit_recovery.cpp
+    audit/audit_snapshot.cpp
+    audit/audit_store.cpp
+    audit/audit_transaction.cpp
+    audit/canonical_model_hash.cpp
+    audit/event_replayer.cpp
+    audit/event_scope.cpp
+    audit/event_store.cpp
+    audit/history_highlights.cpp
+    audit/history_reconstruction.cpp
+    audit/replay_verifier.cpp
+    audit/timeline_model_builder.cpp
+    audit/undo_boundary.cpp
+    audit/undo_resolver.cpp
+    commands/command_bus.cpp
+    commands/element_commands.cpp
+    commands/package_commands.cpp
+    commands/proposal_commands.cpp
+    commands/terminology_commands.cpp
+    commands/undo_command.cpp
     confidence/confidence_store.cpp
     element_factory.cpp
     gsn_layout.cpp
@@ -23,10 +49,12 @@ add_library(af_core OBJECT
     reviews/review_proposal_manager.cpp
     reviews/review_proposal_patch_service.cpp
     reviews/review_text_utils.cpp
+    sacm_argument_sync.cpp
     sacm_identity.cpp
     sha256.cpp
     string_utils.cpp
     terminology_category_service.cpp
+    terminology_context_projection.cpp
     terminology_context_service.cpp
     terminology_internal.cpp
     terminology_package_service.cpp

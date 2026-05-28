@@ -4,6 +4,8 @@
 #include "core/sacm_model.h"
 #include "ui/confidence_model.h"
 
+#include <cstdint>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -11,7 +13,13 @@
 
 namespace ui {
 
-enum class CenterView { GsnCanvas, CseRegister, EvidenceRegister, PackageDetails, TerminologyPackage };
+enum class CenterView {
+    GsnCanvas,
+    CseRegister,
+    EvidenceRegister,
+    PackageDetails,
+    TerminologyPackage,
+};
 
 enum class ProblemFilter {
     All,

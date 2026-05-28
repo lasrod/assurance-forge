@@ -369,7 +369,8 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
                                       UiState& ui_state,
                                       const parser::AssuranceCase* active_case,
                                       const ElementContextActions& actions,
-                                      const sacm::AssuranceCasePackage* terminology_package) {
+                                      const sacm::AssuranceCasePackage* terminology_package,
+                                      const CanvasOverlayButtons* overlay_buttons) {
     // Child region with clipping; we manage our own pan/zoom offset
     // so no ImGui scrollbars are needed.
     ImU32 canvas_bg = GetTheme().canvas_bg;
@@ -433,6 +434,14 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
             ImVec2 viewport_size = ImGui::GetWindowSize();
             renderer.CenterOnIds(ui_state.marked_for_removal, viewport_size);
             ui_state.center_on_marked = false;
+        }
+        // Per-renderer pending focus (used by the History Timeline to pan
+        // the historical canvas to whatever a transaction changed). Lives
+        // on the renderer instance so it doesn't bleed across the live
+        // canvas / historical canvas split.
+        if (renderer.HasPendingFocus()) {
+            ImVec2 viewport_size = ImGui::GetWindowSize();
+            renderer.ConsumePendingFocus(viewport_size);
         }
     }
 
@@ -510,6 +519,36 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
             ImVec2 lang_br(lx + lbw + DpiSize(2.0f), ly + lbh + DpiSize(2.0f));
             if (mouse_pos.x >= lang_tl.x && mouse_pos.x <= lang_br.x && mouse_pos.y >= lang_tl.y &&
                 mouse_pos.y <= lang_br.y) {
+                overlay_hovered = true;
+            }
+        }
+
+        // History overlay rects (left of zoom strip). Matches geometry in
+        // the render block below so node clicks under the overlay are
+        // suppressed. Two pieces: the Live pill (when set) and the
+        // timeline strip.
+        float live_pill_left = zoom_tl.x;
+        if (overlay_buttons && overlay_buttons->on_return_to_live) {
+            float h_pad = DpiSize(6.0f);
+            float h_pill_w = btn_sz + h_pad * 2.0f;
+            float h_pill_h = btn_sz + DpiSize(4.0f);
+            float h_pill_right = zoom_tl.x - DpiSize(6.0f);
+            float h_pill_left = h_pill_right - h_pill_w;
+            float h_pill_top = zy - DpiSize(2.0f);
+            float h_pill_bot = h_pill_top + h_pill_h;
+            if (mouse_pos.x >= h_pill_left && mouse_pos.x <= h_pill_right &&
+                mouse_pos.y >= h_pill_top && mouse_pos.y <= h_pill_bot) {
+                overlay_hovered = true;
+            }
+            live_pill_left = h_pill_left;
+        }
+        if (overlay_buttons && overlay_buttons->on_render_timeline_strip) {
+            float strip_left = ImGui::GetWindowPos().x + DpiSize(8.0f);
+            float strip_right = live_pill_left - DpiSize(6.0f);
+            float strip_top = zy - DpiSize(2.0f);
+            float strip_bot = zy + btn_sz + DpiSize(2.0f);
+            if (mouse_pos.x >= strip_left && mouse_pos.x <= strip_right &&
+                mouse_pos.y >= strip_top && mouse_pos.y <= strip_bot) {
                 overlay_hovered = true;
             }
         }
@@ -606,9 +645,68 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
         if (ImGui::Button("+##zoom_in", ImVec2(button_size, button_size))) {
             renderer.ZoomIn();
         }
-    }
 
-    // --- Custom scrollbars ---
+        // --- History overlay pill (left of zoom strip) ---
+        if (overlay_buttons && overlay_buttons->on_return_to_live) {
+            float h_pad = DpiSize(6.0f);
+            float h_pill_w = button_size + h_pad * 2.0f;
+            float h_pill_h = button_size + DpiSize(4.0f);
+            float h_pill_right = strip_tl.x - DpiSize(6.0f);
+            float h_pill_left = h_pill_right - h_pill_w;
+            float h_pill_top = buttons_y - DpiSize(2.0f);
+
+            const Theme& th_hist = GetTheme();
+            ImDrawList* fg_hist = ImGui::GetWindowDrawList();
+            fg_hist->AddRectFilled(ImVec2(h_pill_left, h_pill_top),
+                                   ImVec2(h_pill_left + h_pill_w, h_pill_top + h_pill_h),
+                                   WithAlpha(th_hist.surface_2, 0.85f), DpiSize(8.0f));
+            fg_hist->AddRect(ImVec2(h_pill_left, h_pill_top),
+                             ImVec2(h_pill_left + h_pill_w, h_pill_top + h_pill_h),
+                             th_hist.border, DpiSize(8.0f), 0, DpiSize(1.0f));
+
+            ImGui::SetCursorScreenPos(ImVec2(h_pill_left + h_pad, buttons_y));
+            if (ImGui::Button("Live##return_to_live", ImVec2(button_size, button_size)))
+                overlay_buttons->on_return_to_live();
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Return to live view");
+
+            // Shrink the strip rect remembered for the timeline so it doesn't
+            // overlap the Live pill.
+            strip_tl.x = std::min(strip_tl.x, h_pill_left - DpiSize(6.0f));
+        }
+
+        // --- Timeline strip (left of Live pill / zoom cluster) ---
+        if (overlay_buttons && overlay_buttons->on_render_timeline_strip) {
+            float strip_left = child_pos.x + DpiSize(8.0f);
+            float strip_right = strip_tl.x - DpiSize(6.0f);
+            float strip_top = buttons_y - DpiSize(2.0f);
+            float strip_bottom = buttons_y + button_size + DpiSize(2.0f);
+            if (strip_right - strip_left >= DpiSize(120.0f)) {
+                overlay_buttons->on_render_timeline_strip(
+                    ImVec2(strip_left, strip_top),
+                    ImVec2(strip_right, strip_bottom));
+            }
+        }
+
+        // --- Historical preview badge (top-left of canvas) ---
+        if (overlay_buttons && !overlay_buttons->historical_badge_text.empty()) {
+            const Theme& th_b = GetTheme();
+            const char* txt = overlay_buttons->historical_badge_text.c_str();
+            ImVec2 ts = ImGui::CalcTextSize(txt);
+            float pad_x = DpiSize(8.0f);
+            float pad_y = DpiSize(4.0f);
+            float bx = child_pos.x + DpiSize(8.0f);
+            float by = child_pos.y + DpiSize(8.0f);
+            ImDrawList* fg_b = ImGui::GetWindowDrawList();
+            fg_b->AddRectFilled(ImVec2(bx, by),
+                                ImVec2(bx + ts.x + pad_x * 2.0f, by + ts.y + pad_y * 2.0f),
+                                WithAlpha(th_b.accent, 0.85f), DpiSize(6.0f));
+            fg_b->AddRect(ImVec2(bx, by),
+                          ImVec2(bx + ts.x + pad_x * 2.0f, by + ts.y + pad_y * 2.0f),
+                          th_b.border, DpiSize(6.0f), 0, DpiSize(1.0f));
+            fg_b->AddText(ImVec2(bx + pad_x, by + pad_y), th_b.text_primary, txt);
+        }
+    }
     {
         ImVec2 content_min, content_max;
         renderer.GetContentBounds(content_min, content_max);

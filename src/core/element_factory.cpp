@@ -190,17 +190,25 @@ void MirrorEvidence(sacm::ArgumentPackage* ap, const parser::SacmElement& rel) {
 
 } // namespace
 
-bool AddChildElement(parser::AssuranceCase& ac,
-                     sacm::AssuranceCasePackage* pkg,
-                     const std::string& parent_id,
-                     NewElementKind kind,
-                     std::string& out_new_id,
-                     std::string& out_error) {
-    out_new_id.clear();
-    out_error.clear();
+namespace {
 
+// Shared installation logic: validate parent, then build the new element +
+// relationship using the supplied ids and install into both models. Both the
+// id-generating `AddChildElement` and the replay-only `AddChildElementWithIds`
+// route through here.
+bool InstallChildElement(parser::AssuranceCase& ac,
+                         sacm::AssuranceCasePackage* pkg,
+                         const std::string& parent_id,
+                         NewElementKind kind,
+                         const std::string& element_id,
+                         const std::string& relationship_id,
+                         std::string& out_error) {
     if (parent_id.empty()) {
         out_error = "No parent element selected.";
+        return false;
+    }
+    if (element_id.empty() || relationship_id.empty()) {
+        out_error = "Element and relationship ids must be non-empty.";
         return false;
     }
 
@@ -210,38 +218,25 @@ bool AddChildElement(parser::AssuranceCase& ac,
         return false;
     }
 
-    // Minimal validation: only Claim-like elements (claims, strategies) can be parents
-    // for structural / contextual children. Solutions and references are leaves.
     const std::string& ptype = parent->type;
     const bool parent_is_container = (ptype == "claim" || ptype == "argumentreasoning");
     if (!parent_is_container) {
         out_error = "Cannot add a child to a leaf element (" + ptype + ").";
         return false;
     }
-
-    // Strategy can only be added under a Claim (matches existing reasoning insertion model).
     if (kind == NewElementKind::Strategy && ptype != "claim") {
         out_error = "Strategy can only be added under a Claim.";
         return false;
     }
 
-    auto existing_ids = CollectIds(ac);
-
-    auto reserve_id = [&](const std::string& prefix) {
-        std::string id = GenerateUniqueId(existing_ids, prefix);
-        existing_ids.insert(id);
-        return id;
-    };
-
     sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, parent_id);
 
-    // Build the new element + its relationship.
     parser::SacmElement new_elem;
-    new_elem.id = reserve_id(ScopedPrefixFor(ap, kind));
+    new_elem.id = element_id;
     new_elem.name = DefaultNameFor(kind);
 
     parser::SacmElement rel;
-    rel.id = reserve_id(ScopedRelationshipPrefixFor(ap));
+    rel.id = relationship_id;
     rel.target_refs.push_back(parent_id);
 
     switch (kind) {
@@ -279,9 +274,6 @@ bool AddChildElement(parser::AssuranceCase& ac,
         break;
     }
 
-    out_new_id = new_elem.id;
-
-    // Mirror into sacm model first (uses a copy of new_elem before move).
     if (ap) {
         switch (kind) {
         case NewElementKind::Goal:
@@ -308,11 +300,99 @@ bool AddChildElement(parser::AssuranceCase& ac,
         }
     }
 
-    // Append to parser model (drives the tree/canvas rebuild).
     ac.elements.push_back(std::move(new_elem));
     ac.elements.push_back(std::move(rel));
-
     return true;
+}
+
+bool InstallTopGoal(parser::AssuranceCase& ac,
+                    sacm::AssuranceCasePackage* pkg,
+                    const std::string& element_id,
+                    std::string& out_error) {
+    if (element_id.empty()) {
+        out_error = "Element id must be non-empty.";
+        return false;
+    }
+    parser::SacmElement goal;
+    goal.id = element_id;
+    goal.type = "claim";
+    goal.name = DefaultNameFor(NewElementKind::Goal);
+
+    sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, goal.id);
+    if (ap)
+        MirrorClaim(ap, goal);
+
+    ac.elements.push_back(std::move(goal));
+    return true;
+}
+
+} // namespace
+
+bool AddChildElement(parser::AssuranceCase& ac,
+                     sacm::AssuranceCasePackage* pkg,
+                     const std::string& parent_id,
+                     NewElementKind kind,
+                     std::string& out_new_id,
+                     std::string& out_error) {
+    std::string rel_id;
+    return AddChildElement(ac, pkg, parent_id, kind, out_new_id, rel_id, out_error);
+}
+
+bool AddChildElement(parser::AssuranceCase& ac,
+                     sacm::AssuranceCasePackage* pkg,
+                     const std::string& parent_id,
+                     NewElementKind kind,
+                     std::string& out_new_id,
+                     std::string& out_new_relationship_id,
+                     std::string& out_error) {
+    out_new_id.clear();
+    out_new_relationship_id.clear();
+    out_error.clear();
+
+    if (parent_id.empty()) {
+        out_error = "No parent element selected.";
+        return false;
+    }
+    const parser::SacmElement* parent = FindElement(ac, parent_id);
+    if (!parent) {
+        out_error = "Selected element not found in model.";
+        return false;
+    }
+    const std::string& ptype = parent->type;
+    const bool parent_is_container = (ptype == "claim" || ptype == "argumentreasoning");
+    if (!parent_is_container) {
+        out_error = "Cannot add a child to a leaf element (" + ptype + ").";
+        return false;
+    }
+    if (kind == NewElementKind::Strategy && ptype != "claim") {
+        out_error = "Strategy can only be added under a Claim.";
+        return false;
+    }
+
+    auto existing_ids = CollectIds(ac);
+    sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, parent_id);
+
+    std::string element_id = GenerateUniqueId(existing_ids, ScopedPrefixFor(ap, kind));
+    existing_ids.insert(element_id);
+    std::string relationship_id = GenerateUniqueId(existing_ids, ScopedRelationshipPrefixFor(ap));
+
+    if (!InstallChildElement(ac, pkg, parent_id, kind, element_id, relationship_id, out_error))
+        return false;
+
+    out_new_id = std::move(element_id);
+    out_new_relationship_id = std::move(relationship_id);
+    return true;
+}
+
+bool AddChildElementWithIds(parser::AssuranceCase& ac,
+                            sacm::AssuranceCasePackage* pkg,
+                            const std::string& parent_id,
+                            NewElementKind kind,
+                            const std::string& element_id,
+                            const std::string& relationship_id,
+                            std::string& out_error) {
+    out_error.clear();
+    return InstallChildElement(ac, pkg, parent_id, kind, element_id, relationship_id, out_error);
 }
 
 bool AddTopGoal(parser::AssuranceCase& ac,
@@ -323,20 +403,19 @@ bool AddTopGoal(parser::AssuranceCase& ac,
     out_error.clear();
 
     auto existing_ids = CollectIds(ac);
-    parser::SacmElement goal;
-    goal.id = GenerateUniqueId(existing_ids, PrefixFor(NewElementKind::Goal));
-    goal.type = "claim";
-    goal.name = DefaultNameFor(NewElementKind::Goal);
-
-    out_new_id = goal.id;
-
-    sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, goal.id);
-    if (ap) {
-        MirrorClaim(ap, goal);
-    }
-
-    ac.elements.push_back(std::move(goal));
+    std::string id = GenerateUniqueId(existing_ids, PrefixFor(NewElementKind::Goal));
+    if (!InstallTopGoal(ac, pkg, id, out_error))
+        return false;
+    out_new_id = std::move(id);
     return true;
+}
+
+bool AddTopGoalWithId(parser::AssuranceCase& ac,
+                      sacm::AssuranceCasePackage* pkg,
+                      const std::string& element_id,
+                      std::string& out_error) {
+    out_error.clear();
+    return InstallTopGoal(ac, pkg, element_id, out_error);
 }
 
 // ===== Remove helpers (planner) ============================================
@@ -695,6 +774,169 @@ bool RemoveElement(parser::AssuranceCase& ac,
         }
     }
 
+    return true;
+}
+
+// ===== Text-field updates (Phase 1 audit) =====
+
+const char* ElementTextFieldToToken(ElementTextField field) {
+    switch (field) {
+    case ElementTextField::Name:        return "name";
+    case ElementTextField::Description: return "description";
+    case ElementTextField::Content:     return "content";
+    }
+    return "name";
+}
+
+bool ElementTextFieldFromToken(const std::string& token, ElementTextField& out) {
+    if (token == "name")        { out = ElementTextField::Name; return true; }
+    if (token == "description") { out = ElementTextField::Description; return true; }
+    if (token == "content")     { out = ElementTextField::Content; return true; }
+    return false;
+}
+
+namespace {
+
+// Read the current value of `field`/`language` on the parser element.
+std::string ReadParserField(const parser::SacmElement& elem,
+                            ElementTextField field,
+                            const std::string& language) {
+    auto from_map = [&](const std::map<std::string, std::string>& m, const std::string& scalar) {
+        auto it = m.find(language);
+        if (it != m.end())
+            return it->second;
+        return language == "en" ? scalar : std::string{};
+    };
+    switch (field) {
+    case ElementTextField::Name:        return from_map(elem.name_langs, elem.name);
+    case ElementTextField::Description: return from_map(elem.description_langs, elem.description);
+    case ElementTextField::Content:     return from_map(elem.content_langs, elem.content);
+    }
+    return {};
+}
+
+// Write `new_value` to `field`/`language` on the parser element. Updates the
+// canonical scalar too when language == "en".
+void WriteParserField(parser::SacmElement& elem,
+                      ElementTextField field,
+                      const std::string& language,
+                      const std::string& new_value) {
+    switch (field) {
+    case ElementTextField::Name:
+        elem.name_langs[language] = new_value;
+        if (language == "en")
+            elem.name = new_value;
+        return;
+    case ElementTextField::Description:
+        elem.description_langs[language] = new_value;
+        if (language == "en")
+            elem.description = new_value;
+        return;
+    case ElementTextField::Content:
+        elem.content_langs[language] = new_value;
+        if (language == "en")
+            elem.content = new_value;
+        return;
+    }
+}
+
+// Mirror the parser-side write onto every matching SACM container element.
+// Returns true if at least one SACM element was found and updated; false
+// indicates the parser-only state (acceptable — e.g., relationship or
+// terminology elements with no SACM-side text). Errors are not signalled
+// here because the parser write is the audit source of truth.
+template <typename Element>
+bool UpdateSacmTexts(Element& e,
+                     ElementTextField field,
+                     const std::string& language,
+                     const std::string& new_value) {
+    auto write_ml = [&](sacm::MultiLangText& ml, std::string& scalar) {
+        ml.texts[language] = new_value;
+        if (language == "en")
+            scalar = new_value;
+    };
+    switch (field) {
+    case ElementTextField::Name:
+        write_ml(e.name_ml, e.name);
+        return true;
+    case ElementTextField::Description:
+        write_ml(e.description_ml, e.description);
+        return true;
+    case ElementTextField::Content:
+        if constexpr (requires { e.content_ml; e.content; }) {
+            write_ml(e.content_ml, e.content);
+            return true;
+        }
+        return false;
+    }
+    return false;
+}
+
+bool UpdateSacmElementText(sacm::AssuranceCasePackage& pkg,
+                           const std::string& element_id,
+                           ElementTextField field,
+                           const std::string& language,
+                           const std::string& new_value) {
+    for (auto& ap : pkg.argumentPackages) {
+        for (auto& c : ap.claims)               if (c.id == element_id) return UpdateSacmTexts(c, field, language, new_value);
+        for (auto& ar : ap.argumentReasonings)  if (ar.id == element_id) return UpdateSacmTexts(ar, field, language, new_value);
+        for (auto& ar : ap.artifactReferences)  if (ar.id == element_id) return UpdateSacmTexts(ar, field, language, new_value);
+        for (auto& ai : ap.assertedInferences)  if (ai.id == element_id) return UpdateSacmTexts(ai, field, language, new_value);
+        for (auto& ac : ap.assertedContexts)    if (ac.id == element_id) return UpdateSacmTexts(ac, field, language, new_value);
+        for (auto& ae : ap.assertedEvidences)   if (ae.id == element_id) return UpdateSacmTexts(ae, field, language, new_value);
+    }
+    for (auto& artpkg : pkg.artifactPackages) {
+        for (auto& a : artpkg.artifacts)        if (a.id == element_id) return UpdateSacmTexts(a, field, language, new_value);
+    }
+    for (auto& tp : pkg.terminologyPackages) {
+        for (auto& e : tp.expressions)          if (e.id == element_id) return UpdateSacmTexts(e, field, language, new_value);
+    }
+    return false;
+}
+
+} // namespace
+
+bool SetElementTextField(parser::AssuranceCase& ac,
+                         sacm::AssuranceCasePackage* pkg,
+                         const std::string& element_id,
+                         ElementTextField field,
+                         const std::string& language,
+                         const std::string& new_value,
+                         std::string& out_old_value,
+                         std::string& out_error) {
+    out_old_value.clear();
+    out_error.clear();
+    if (element_id.empty()) {
+        out_error = "Element id is empty.";
+        return false;
+    }
+    if (language.empty()) {
+        out_error = "Language code is empty.";
+        return false;
+    }
+    parser::SacmElement* elem = nullptr;
+    for (auto& e : ac.elements) {
+        if (e.id == element_id) { elem = &e; break; }
+    }
+    if (!elem) {
+        out_error = "Element not found: " + element_id;
+        return false;
+    }
+    if (field == ElementTextField::Content) {
+        if (elem->type != "claim" && elem->type != "argumentreasoning") {
+            out_error = "Element " + element_id + " of type '" + elem->type +
+                        "' has no content field.";
+            return false;
+        }
+    }
+
+    out_old_value = ReadParserField(*elem, field, language);
+    if (out_old_value == new_value)
+        return true; // no-op
+
+    WriteParserField(*elem, field, language, new_value);
+    if (pkg)
+        UpdateSacmElementText(*pkg, element_id, field, language, new_value);
     return true;
 }
 

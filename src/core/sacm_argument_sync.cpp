@@ -1,4 +1,4 @@
-#include "app/sacm_argument_sync.h"
+#include "core/sacm_argument_sync.h"
 
 #include "core/string_utils.h"
 #include "core/terminology_package_service.h"
@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-namespace app {
+namespace core {
 namespace {
 
 void CopyCommonSacmFields(sacm::SacmElement& target, const parser::SacmElement& source) {
@@ -215,4 +215,4 @@ void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sa
     }
 }
 
-} // namespace app
+} // namespace core

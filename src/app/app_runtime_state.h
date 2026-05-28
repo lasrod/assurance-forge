@@ -4,6 +4,7 @@
 #include "ai/ai_task_runner.h"
 #include "ai/http_client.h"
 #include "ai/secret_store.h"
+#include "app/areas/baseline_modal.h"
 #include "app/app_events.h"
 #include "app/controllers/ai_review_controller.h"
 #include "app/controllers/acp_controller.h"
@@ -16,12 +17,17 @@
 #include "app/guideline_catalog.h"
 #include "core/app_state.h"
 #include "core/assurance_tree.h"
+#include "core/audit/replay_verifier.h"
 #include "core/problems/problems_manager.h"
 #include "core/terminology_package_service.h"
 #include "core/tree_editing.h"
 #include "sacm/sacm_package_tree.h"
+#include "ui/timeline/timeline_state.h"
+
+namespace core::commands { class CommandBus; }
 
 #include <filesystem>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <optional>
@@ -55,12 +61,38 @@ struct WorkbenchState {
         std::string package_gid;
         std::string title;
         std::filesystem::path source_file_path;
+        // History slider selection for this canvas tab. std::nullopt = LIVE
+        // (renders the current model). A value pins the canvas to the
+        // reconstructed state after applying transaction N.
+        //
+        // Kept alongside `timeline.preview_sequence` during the Phase 1
+        // transition; the Timeline widget is the authoritative source of
+        // the preview sequence and the controller mirrors its value here
+        // so existing consumers (transactions table, etc.) keep working
+        // until Phase 2 retires them.
+        std::optional<std::uint64_t> selected_transaction_sequence;
+        // Always-visible Assurance Timeline rail state for this tab.
+        ui::timeline::TimelineState timeline;
+        // Per-tab baseline creation modal state.
+        app::areas::BaselineModalState baseline_modal;
     };
 
     bool force_center_tab_selection = false;
     bool pending_focus_root = false;
     bool focus_review_tab = false;
     std::string focus_review_item_id;
+    bool focus_history_tab = false;
+    // When non-empty, the History panel scopes its transaction list to changes
+    // touching this element id. Cleared by the History panel's "Clear filter"
+    // control or when the user opens a different element history.
+    std::string history_filter_element_id;
+    // Free-text author substring filter applied to the History panel
+    // (case-insensitive match against AuditTransaction::author). Empty = no
+    // author filter.
+    std::string history_filter_author;
+    // Exact command_name filter applied to the History panel (matches
+    // AuditTransaction::command_name). Empty = no command filter.
+    std::string history_filter_command;
     bool show_gsn_tab = true;
     bool show_cse_tab = false;
     bool show_evidence_tab = false;
@@ -126,6 +158,7 @@ struct LayoutState {
 
 struct AppRuntimeState {
     AppRuntimeState();
+    ~AppRuntimeState();
 
     core::AppState app_state;
     AppEvents events;
@@ -145,6 +178,34 @@ struct AppRuntimeState {
     char reviewer_name_buf[128] = {};
 
     AiUiState ai;
+
+    // Audited command bus for the currently-open project's SACM working file.
+    // Constructed when a project's SacmArgument file is loaded; cleared when
+    // no project SACM file is active. Nullptr is the legacy direct-mutation
+    // fallback (e.g. when a SACM file is opened outside any project).
+    std::unique_ptr<core::commands::CommandBus> command_bus;
+
+    // Most recent audit replay verification result for the currently-loaded
+    // project SACM file. Populated immediately after the project file is
+    // opened; cleared on project close. When `ran && !success` the History
+    // Timeline area surfaces a warning banner offering to reconcile.
+    std::optional<core::audit::ReplayVerificationResult> last_audit_verification;
+
+    // Most recent autosave write failure surfaced from CommandBus::Execute
+    // (atomic SACM write or audit-manifest update). Populated via
+    // `AutosaveFailedEvent`; cleared when the user dismisses the banner or
+    // when the next audited command succeeds. While non-empty, the canvas
+    // shows a prominent banner so the user knows the on-disk SACM no longer
+    // reflects their latest committed change.
+    std::string last_autosave_error;
+
+    // When the user clicks "Reconcile" in the audit-divergence popup we
+    // cannot run the reconcile inline: it tears down the canvas tab
+    // currently being rendered (PerformOpenProjectFile clears the
+    // argument_package_canvas_tabs vector, invalidating the tab reference
+    // held by the in-flight render frame). Instead we set this flag and
+    // run ReconcileAuditStore() at the top of the next frame.
+    bool pending_reconcile_audit_store = false;
 
     bool tree_needs_rebuild = false;
     core::AssuranceTree current_tree;

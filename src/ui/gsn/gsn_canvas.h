@@ -9,6 +9,7 @@
 #include "ui/ui_state.h"
 
 #include <cstddef>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -89,11 +90,31 @@ void ShowGsnCanvasContent(UiState& ui_state,
                           const ElementContextActions& actions,
                           const sacm::AssuranceCasePackage* terminology_package = nullptr);
 
+// Optional set of in-canvas overlay buttons rendered next to the zoom strip.
+// The canvas keeps this layer-clean by carrying only primitives and callbacks;
+// owners (app layer) interpret the actions. Presence of a callback signals
+// that the corresponding affordance should be rendered.
+struct CanvasOverlayButtons {
+    // When set, the canvas reserves the bottom strip rect spanning from the
+    // canvas left edge to the left edge of the zoom cluster and invokes
+    // this callback with that rect (min, max) so the app layer can paint a
+    // widget (e.g. the Assurance Timeline rail) inside it.
+    std::function<void(ImVec2, ImVec2)> on_render_timeline_strip;
+    // Small "Live" pill rendered immediately to the left of the zoom strip
+    // when set, used to return to the live model from a historical preview.
+    std::function<void()>       on_return_to_live;
+    // When non-empty, the canvas paints a small badge at the top-left of the
+    // viewport (e.g. "Preview: Tx 42") so the user always knows the canvas
+    // is showing a historical reconstruction rather than the live model.
+    std::string historical_badge_text;
+};
+
 void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
                                       UiState& ui_state,
                                       const parser::AssuranceCase* active_case,
                                       const ElementContextActions& actions,
-                                      const sacm::AssuranceCasePackage* terminology_package = nullptr);
+                                      const sacm::AssuranceCasePackage* terminology_package = nullptr,
+                                      const CanvasOverlayButtons* overlay_buttons = nullptr);
 
 // Provide a simple setter so external code (app) can push elements to the
 // canvas renderer (legacy).

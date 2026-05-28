@@ -147,6 +147,18 @@ float RenderAppMenuBar(AppRuntimeState& state, bool& done, const AppMenuBarCallb
     }
 
     if (ImGui::BeginMenu(ui::Tr(ui::MessageId::EditMenu))) {
+        const bool can_undo = callbacks.can_undo && callbacks.can_undo();
+        if (!can_undo) ImGui::BeginDisabled();
+        if (ImGui::MenuItem(ui::Tr(ui::MessageId::Undo), "Ctrl+Z") && callbacks.undo) {
+            callbacks.undo();
+        }
+        if (!can_undo) {
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip("%s", ui::Tr(ui::MessageId::UndoBoundaryReachedHint));
+            }
+        }
+        ImGui::Separator();
         if (ImGui::MenuItem(ui::Tr(ui::MessageId::Preferences))) {
             state.modal_coordinator->show_preferences_window = true;
         }

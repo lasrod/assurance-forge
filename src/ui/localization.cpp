@@ -83,6 +83,8 @@ const Catalog kEnglishCatalog = {
     "GSN structure, SACM imports, evidence, and registers",
     "Prepare a Conformance Review",
     "Trace claims, evidence, and review outputs",
+    "Undo",
+    "Reached snapshot or baseline \u2014 restore from history to go further back.",
 };
 
 const Catalog kJapaneseCatalog = {
@@ -153,6 +155,8 @@ const Catalog kJapaneseCatalog = {
     "GSN 構造、SACM インポート、エビデンス、レジスターを学びます",
     "適合性レビューを準備する",
     "主張、エビデンス、レビュー出力を追跡します",
+    "元に戻す",
+    "スナップショットまたはベースラインに到達しました \u2014 さらに戻すには履歴から復元してください。",
 };
 
 Language g_currentLanguage = Language::English;

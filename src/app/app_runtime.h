@@ -140,6 +140,11 @@ private:
     void SeedRecommendedTerminologyCategories();
     bool OpenFirstProjectSacmFile();
     bool TryOpenProjectManifest(const std::string& selected_path);
+    // Reconcile the audit log when replay verification reports divergence.
+    // Backs up the current `.af/` artifacts, rebuilds the store from the
+    // currently-loaded SACM, reinstalls the command bus, and re-runs the
+    // verifier. Returns true on success.
+    bool ReconcileAuditStore();
     bool EnsureReviewItemStorage();
     bool EnsureConfidenceStorage();
     void RefreshSacmPackageTreeCache();
@@ -152,6 +157,14 @@ private:
     bool SaveProject();
     void ExportGsnSvg();
     void RequestExit(bool& done);
+
+    // Undo the most recent in-force (i.e. not-itself-undone) audit
+    // transaction. Bounded by the most recent snapshot or baseline at
+    // or before the target sequence (Plan §5). Returns false (and emits
+    // a status message) when there is nothing to undo or the undo
+    // boundary has been reached.
+    bool Undo();
+    bool CanUndo() const;
 
     bool BeginProposalForReviewItem(const core::reviews::ReviewItem& item);
     bool BeginEditProposalForReviewItem(const core::reviews::ReviewItem& item);

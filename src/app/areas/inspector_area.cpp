@@ -1,8 +1,12 @@
 #include "app/areas/inspector_area.h"
 
 #include "app/app_runtime_state.h"
+#include "app/areas/audit_data_cache.h"
 #include "app/confidence_problem_sync.h"
 #include "app/frame/app_layout_regions.h"
+#include "core/audit/audit_baseline.h"
+#include "core/audit/audit_diff.h"
+#include "core/audit/event_store.h"
 #include "core/confidence/confidence_store.h"
 #include "core/sacm_identity.h"
 #include "ui/panels/acp_panel.h"
@@ -10,6 +14,7 @@
 #include "ui/panels/relationship_panel.h"
 #include "ui/ui_state.h"
 
+#include <algorithm>
 #include <string>
 
 namespace app::areas {
@@ -160,7 +165,68 @@ void RenderInspectorArea(AppRuntimeState& state,
                 "Backed up invalid confidence file; new confidence storage will be saved with the project."});
             return true;
         };
-        if (ui::panels::ShowElementPanel(loaded_case, sacm_package, &terminology_callbacks, &confidence_callbacks)) {
+        ui::panels::ElementTextEditCallbacks text_edit_callbacks;
+        text_edit_callbacks.commit_text_edit = callbacks.commit_element_text_edit;
+
+        ui::panels::ElementHistoryCallbacks history_callbacks;
+        if (state.app_state.current_project.has_value()) {
+            const std::filesystem::path project_root = state.app_state.current_project.value().rootPath;
+            history_callbacks.model_for_element = [project_root](const std::string& element_id) {
+                ui::panels::ElementHistoryModel hm;
+                if (element_id.empty())
+                    return hm;
+                std::string err;
+                const std::vector<core::audit::AuditTransaction>& txs =
+                    GetCachedTransactions(project_root, err);
+                if (!err.empty() && txs.empty())
+                    return hm;
+                hm.available = true;
+
+                // Determine the latest baseline (if any) by transaction_sequence.
+                const std::vector<core::audit::BaselineMetadata>& baselines =
+                    GetCachedBaselines(project_root, nullptr);
+                std::optional<std::uint64_t> baseline_seq;
+                if (!baselines.empty()) {
+                    auto it = std::max_element(baselines.begin(), baselines.end(),
+                                               [](const core::audit::BaselineMetadata& a,
+                                                  const core::audit::BaselineMetadata& b) {
+                                                   return a.transaction_sequence < b.transaction_sequence;
+                                               });
+                    baseline_seq = it->transaction_sequence;
+                    hm.has_baseline = true;
+                    hm.baseline_label = it->name.empty() ? it->baseline_id : it->name;
+                }
+
+                const core::audit::ElementHistorySummary summary =
+                    core::audit::SummarizeElementHistory(element_id, txs, baseline_seq);
+                hm.ever_seen = summary.ever_seen;
+                hm.change_count = summary.change_count;
+                hm.last_sequence = summary.last_sequence;
+                hm.last_changed_at = summary.last_changed_at;
+                hm.last_changed_by = summary.last_changed_by;
+                hm.changed_since_baseline = summary.changed_since_baseline;
+                return hm;
+            };
+        }
+        if (callbacks.open_element_history) {
+            history_callbacks.open_element_history = callbacks.open_element_history;
+        }
+
+        // Detect historical preview on the active canvas tab — when the
+        // user is scrubbing the timeline the inspector must render its
+        // editable fields visually disabled.
+        bool inspector_read_only = false;
+        if (!state.workbench.active_argument_package_canvas_key.empty()) {
+            for (const auto& tab : state.workbench.argument_package_canvas_tabs) {
+                if (tab.key == state.workbench.active_argument_package_canvas_key) {
+                    inspector_read_only = tab.timeline.preview_sequence.has_value();
+                    break;
+                }
+            }
+        }
+
+        if (ui::panels::ShowElementPanel(loaded_case, sacm_package, &terminology_callbacks, &confidence_callbacks,
+                                          &text_edit_callbacks, &history_callbacks, inspector_read_only)) {
             if (state.confidence_controller && loaded_case) {
                 const bool confidence_changed = state.confidence_controller->RefreshStaleFlags(*loaded_case);
                 if (confidence_changed) {

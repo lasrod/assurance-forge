@@ -974,7 +974,11 @@ void RenderPerfOverlay(bool& open) {
         const int   cards   = 6;
         const float spacing = 6.0f;
         const float card_w  = std::max(64.0f, (avail - spacing * (cards - 1)) / cards);
-        const float card_h  = 72.0f;
+        // Card height scales with font so the label (~font height) + value
+        // (1.45x font) + paddings fit cleanly at any DPI.
+        const float pad_y_card = 6.0f;
+        const float card_h  =
+            std::max(72.0f, ImGui::GetFontSize() * (1.0f + 1.45f) + pad_y_card * 3.0f);
 
         // Driven by a small table so all six metrics use identical layout
         // and adding/removing a KPI is a one-line change.

@@ -17,6 +17,9 @@ bool AppRuntime::SaveProject() {
         return false;
     }
 
+    // Flush controllers that own their own persistence (review items,
+    // confidence assessments live in separate files outside SACM). These
+    // do not flow through CommandBus and never produce audit transactions.
     if (impl_->review_controller->IsDirty()) {
         core::AssuranceProject& project = impl_->app_state.current_project.value();
         std::string error;
@@ -35,22 +38,29 @@ bool AppRuntime::SaveProject() {
         }
     }
 
-    if (impl_->document_dirty) {
+    // Write SACM when the in-memory model has unflushed mutations.
+    // Audited commands already wrote SACM atomically through CommandBus and
+    // left the audit manifest in sync, so for those flows `document_dirty`
+    // is false and re-saving would just rewrite identical bytes. The
+    // bypass paths (terminology / proposal / package-removal) set
+    // `document_dirty` so this branch fires. Other code paths that only
+    // call `app_state.mark_dirty()` without emitting `DocumentDirtyEvent`
+    // (e.g. the no-bus fallback in `DispatchAuditedCommand` before it
+    // started emitting the event, or any future direct mutation) still
+    // need their changes persisted, so `has_unsaved_changes` also forces
+    // a save.
+    const bool needs_sacm_save = impl_->document_dirty || impl_->app_state.has_unsaved_changes;
+    if (needs_sacm_save) {
         if (!impl_->app_state.save_project())
             return false;
         impl_->document_dirty = false;
-        impl_->app_state.has_unsaved_changes =
-            impl_->review_controller->IsDirty() || impl_->confidence_controller->IsDirty();
-        return true;
     }
 
-    if (impl_->app_state.has_unsaved_changes) {
-        impl_->app_state.has_unsaved_changes = false;
-        impl_->app_state.status_message = "Project saved: " + impl_->app_state.current_project->name;
-        return true;
-    }
-
-    return impl_->app_state.save_project();
+    // Either we just flushed everything, or there was nothing to flush. In
+    // both cases the project is consistent on disk now.
+    impl_->app_state.has_unsaved_changes = false;
+    impl_->app_state.status_message = "Project saved: " + impl_->app_state.current_project->name;
+    return true;
 }
 
 void AppRuntime::ExportGsnSvg() {

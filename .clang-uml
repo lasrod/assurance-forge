@@ -4,6 +4,32 @@ generate_method_arguments: none
 generate_packages: true
 package_type: directory
 
+# Force C++23 when clang-uml's libclang parses translation units. The
+# compile database produced by CMake usually carries `-std=gnu++23`, but
+# clang-uml has been observed to drop or not honour that flag on some
+# bundled libclang builds, which causes `std::expected` (a C++23 feature)
+# to look undefined in headers like `parser/xml_parser.h` and
+# `core/project_file_io.h`. Appending `-std=c++23` here is harmless when
+# the database already specifies it (the later flag wins) and recovers
+# diagram generation when it does not.
+#
+# Additionally force-include `docs/clang-uml/expected_shim.h`, which
+# provides parse-time forward declarations of `std::expected` /
+# `std::unexpected` guarded on the `__clanguml__` macro. This is a
+# defence-in-depth measure: on CI we have observed clang-uml's libclang
+# failing to resolve `std::expected` even with `-std=c++23` set, because
+# libstdc++ 13's `<expected>` is gated on `__cplusplus > 202002L` and
+# that check sometimes evaluates false inside libclang. The shim is a
+# strict no-op during normal builds (guarded on `__clanguml__`).
+add_compile_flags:
+  - -std=c++23
+  # NOTE: `-include` is forwarded to libclang, which resolves the path
+  # relative to each TU's compile working directory (the
+  # `compilation_database_dir`, i.e. `build-docs/`) — NOT relative to
+  # the `.clang-uml` file. Use the path that is valid from build-docs.
+  - -include
+  - ../docs/clang-uml/expected_shim.h
+
 diagrams:
   problem_system:
     type: class

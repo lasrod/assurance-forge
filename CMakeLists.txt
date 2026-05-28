@@ -268,6 +268,24 @@ add_executable(tests
     tests/test_recent_projects.cpp
     tests/test_shared_utils.cpp
     tests/test_gsn_svg_exporter.cpp
+    tests/test_canonical_model_hash.cpp
+    tests/test_audit_manifest.cpp
+    tests/test_event_store_jsonl.cpp
+    tests/test_initial_snapshot.cpp
+    tests/test_command_bus.cpp
+    tests/test_event_replayer.cpp
+    tests/test_audit_diff.cpp
+    tests/test_event_scope.cpp
+    tests/test_history_highlights.cpp
+    tests/test_history_reconstruction.cpp
+    tests/test_reconcile_audit_store.cpp
+    tests/test_audit_recovery.cpp
+    tests/test_argument_package_projection.cpp
+    tests/test_canvas_history_overlay.cpp
+    tests/test_audit_baseline.cpp
+    tests/test_audit_user_snapshot.cpp
+    tests/test_timeline_model_builder.cpp
+    tests/test_undo_command.cpp
 )
 # Production sources are pulled in via the per-layer af_* OBJECT libraries
 # (see src/<layer>/CMakeLists.txt). The tests target intentionally links

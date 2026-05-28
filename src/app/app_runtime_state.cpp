@@ -2,9 +2,12 @@
 
 #include "ai/libcurl_http_client.h"
 #include "ai/openai_provider.h"
+#include "core/commands/command_bus.h"
 #include "ui/imgui_buffer_utils.h"
 
 namespace app {
+
+AppRuntimeState::~AppRuntimeState() = default;
 
 bool AppRuntimeState::IsProposalCanvasActive() const {
     return proposal_controller->IsCanvasActive();

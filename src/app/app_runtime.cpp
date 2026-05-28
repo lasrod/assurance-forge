@@ -5,6 +5,7 @@
 #include "app/actions/review_actions.h"
 #include "app/app_runtime_internal.h"
 #include "app/areas/ai_debug_area.h"
+#include "core/audit/audit_snapshot.h"
 #include "app/areas/argument_navigator_area.h"
 #include "app/areas/feedback_dock_area.h"
 #include "app/areas/inspector_area.h"
@@ -178,6 +179,8 @@ AppRuntime::~AppRuntime() = default;
 void AppRuntime::RegisterAppEventListeners() {
     impl_->events.Subscribe<StatusMessageEvent>(
         [this](const StatusMessageEvent& event) { impl_->app_state.status_message = event.message; });
+    impl_->events.Subscribe<AutosaveFailedEvent>(
+        [this](const AutosaveFailedEvent& event) { impl_->last_autosave_error = event.error; });
     impl_->events.Subscribe<TreeDirtyEvent>([this](const TreeDirtyEvent& event) {
         impl_->tree_needs_rebuild = event.dirty;
         impl_->tree_edit_index_valid = false;
@@ -524,6 +527,7 @@ areas::WorkbenchAreaCallbacks AppRuntime::MakeWorkbenchAreaCallbacks() {
         [this](const core::TerminologyCategoryRef& category_ref) { BeginEditTerminologyCategory(category_ref); },
         [this](const core::TerminologyCategoryRef& category_ref) { BeginDeleteTerminologyCategory(category_ref); },
         [this]() { SeedRecommendedTerminologyCategories(); },
+        [this]() { impl_->pending_reconcile_audit_store = true; },
     };
 }
 
@@ -585,10 +589,37 @@ bool AppRuntime::SetManualReviewOk(const std::string& element_id, bool manual_ok
 }
 
 void AppRuntime::RequestExit(bool& done) {
+    // Autosave on close: best-effort flush before exiting so the on-disk SACM
+    // matches the user's latest in-memory edits. CommandBus already autosaves
+    // per-transaction; SaveProject covers the remaining bypass paths (review
+    // controller, confidence controller, and any mutation that only sets
+    // document_dirty / has_unsaved_changes). If the flush fails, fall back to
+    // the legacy save-before-exit modal so the user can decide what to do
+    // instead of silently losing data.
     if (impl_->app_state.has_unsaved_changes) {
-        impl_->modal_coordinator->show_save_before_exit_modal = true;
-        return;
+        if (!SaveProject()) {
+            impl_->last_autosave_error =
+                "Auto-flush on close failed: " + impl_->app_state.status_message;
+            impl_->modal_coordinator->show_save_before_exit_modal = true;
+            return;
+        }
     }
+
+    // Take a close-time snapshot so the next session has a natural boundary
+    // for undo / history navigation at "this session's close." CreateUserSnapshot
+    // derives its id from the latest transaction sequence, so a session that
+    // produced no new transactions reuses the existing snapshot id and the call
+    // is naturally a no-op. Failures here are non-fatal — close still proceeds.
+    if (impl_->app_state.current_project.has_value()) {
+        core::audit::SnapshotMetadata snapshot;
+        std::string snapshot_error;
+        const std::string created_by =
+            impl_->reviewer_name.empty() ? std::string("system") : impl_->reviewer_name;
+        (void)core::audit::CreateUserSnapshot(impl_->app_state.current_project->rootPath,
+                                              "automatic close snapshot", created_by, snapshot,
+                                              snapshot_error);
+    }
+
     done = true;
 }
 

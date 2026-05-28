@@ -39,6 +39,14 @@ void RenderFeedbackDockArea(AppRuntimeState& state,
         }
         state.workbench.focus_review_tab = false;
 
+        if (ImGui::BeginTabItem("History",
+                                nullptr,
+                                state.workbench.focus_history_tab ? ImGuiTabItemFlags_SetSelected : 0)) {
+            RenderHistoryPanelContent(state, callbacks.history);
+            ImGui::EndTabItem();
+        }
+        state.workbench.focus_history_tab = false;
+
         if (ImGui::BeginTabItem("AI Debug")) {
             if (callbacks.render_ai_debug_content)
                 callbacks.render_ai_debug_content();

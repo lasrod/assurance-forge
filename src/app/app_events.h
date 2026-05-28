@@ -126,6 +126,17 @@ struct ModalRequestEvent {
     std::string message;
 };
 
+// Emitted when an autosave write (SACM file or audit manifest) fails after
+// an audited command has already been appended to the audit log. The
+// in-memory model and audit log are then ahead of the on-disk SACM — a
+// recoverable but user-visible state. The runtime stores the most recent
+// non-empty message in `AppRuntimeState::last_autosave_error` and the
+// canvas surfaces a sticky banner until the user dismisses it or the next
+// successful command clears it.
+struct AutosaveFailedEvent {
+    std::string error;
+};
+
 using AppEvent = std::variant<StatusMessageEvent,
                               TreeDirtyEvent,
                               DocumentDirtyEvent,
@@ -140,7 +151,8 @@ using AppEvent = std::variant<StatusMessageEvent,
                               CenterRequestEvent,
                               ProposalModeChangedEvent,
                               ProposalHighlightEvent,
-                              ModalRequestEvent>;
+                              ModalRequestEvent,
+                              AutosaveFailedEvent>;
 
 class AppEvents {
 public:

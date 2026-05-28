@@ -16,6 +16,7 @@ add_library(af_ui OBJECT
     panels/acp_panel.cpp
     panels/confidence_panel.cpp
     panels/element_panel.cpp
+    panels/history_timeline_panel.cpp
     panels/package_details_panel.cpp
     panels/preferences_panel.cpp
     panels/problems_panel.cpp
@@ -27,7 +28,9 @@ add_library(af_ui OBJECT
     panels/terminology_usages_panel.cpp
     panels/welcome_modal.cpp
     register_views.cpp
+    text_edit_session.cpp
     theme.cpp
+    timeline/timeline_widget.cpp
     tree_view.cpp
     ui_state.cpp
     widgets/splitter.cpp

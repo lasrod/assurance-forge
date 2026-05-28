@@ -77,6 +77,8 @@ enum class MessageId {
     WelcomeWalkthroughFundamentalsSubtitle,
     WelcomeWalkthroughConformanceTitle,
     WelcomeWalkthroughConformanceSubtitle,
+    Undo,
+    UndoBoundaryReachedHint,
     Count,
 };
 

@@ -1,12 +1,18 @@
 #include "app/app_runtime.h"
 #include "app/actions/terminology_actions.h"
+#include "app/app_events.h"
 #include "app/app_runtime_state.h"
+#include "app/commands/dispatch.h"
 #include "app/confidence_problem_sync.h"
 #include "app/native_file_dialogs.h"
 #include "app/proposal_ui_state.h"
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
 #include "core/acp/assurance_claim_point.h"
+#include "core/audit/replay_verifier.h"
+#include "core/audit/audit_store.h"
+#include "core/commands/command_bus.h"
+#include "core/commands/package_commands.h"
 #include "core/problems/problem_utils.h"
 #include "core/project_service.h"
 #include "core/reviews/review_item.h"
@@ -156,44 +162,6 @@ const sacm::ArgumentPackage* FirstArgumentPackage(const sacm::AssuranceCasePacka
     return package.argumentPackages.empty() ? nullptr : &package.argumentPackages.front();
 }
 
-bool RefreshVisibleTerminologyContextProjection(core::AppState& app_state) {
-    if (!app_state.loaded_case.has_value() || !app_state.sacm_package.has_value())
-        return false;
-
-    bool changed = false;
-    parser::AssuranceCase& model = app_state.loaded_case.value();
-    const sacm::AssuranceCasePackage& package = app_state.sacm_package.value();
-    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
-        for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
-            if (!core::IsVisibleTerminologyArtifactReference(package, argument_package, artifact_reference))
-                continue;
-            parser::SacmElement* element =
-                parser::FindElementByIdOrGid(model, artifact_reference.id, artifact_reference.gid);
-            if (!element)
-                continue;
-            const core::TerminologyTermReferenceResolution resolution =
-                core::ResolveTerminologyTermReference(package, artifact_reference.referencedArtifact);
-            const std::string previous_name = element->name;
-            const std::string previous_description = element->description;
-            if (!resolution.resolved || !resolution.term) {
-                element->description.clear();
-                element->description_langs.clear();
-            } else {
-                element->name = core::TermContextDisplayLabel(*resolution.term);
-                element->name_langs = resolution.term->name_ml.texts;
-                if (element->name_langs.empty() && !element->name.empty())
-                    element->name_langs["en"] = element->name;
-                element->description = resolution.term->description;
-                element->description_langs = resolution.term->description_ml.texts;
-                if (element->description_langs.empty() && !element->description.empty())
-                    element->description_langs["en"] = element->description;
-            }
-            changed = changed || element->name != previous_name || element->description != previous_description;
-        }
-    }
-    return changed;
-}
-
 } // namespace
 
 void AppRuntime::BeginCreateProject() {
@@ -309,6 +277,41 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
         ui_state.center_view = ui::CenterView::GsnCanvas;
         impl_->workbench.force_center_tab_selection = true;
         OpenFirstArgumentPackageCanvas();
+
+        // Construct the audited command bus over the project's audit store.
+        // `EnsureAuditStore` was already called in `AppState::open_project` /
+        // `create_project_sacm_file`, so the manifest and event log exist on
+        // disk. If construction fails, fall back to direct mutation (legacy
+        // behaviour) and surface a warning.
+        impl_->command_bus.reset();
+        if (impl_->app_state.current_project.has_value()) {
+            std::string bus_error;
+            auto bus = core::commands::CommandBus::Open(impl_->app_state.current_project.value(),
+                                                        ProjectFilePath(impl_->app_state, entry), bus_error);
+            if (!bus) {
+                SetStatus("Audit bus init failed: " + bus_error);
+            } else {
+                impl_->command_bus = std::move(bus);
+            }
+        }
+
+        // Audit replay verification (design §13). Best-effort: a mismatch is
+        // surfaced as a warning, not an error — the loaded SACM remains the
+        // user's working state.
+        impl_->last_audit_verification.reset();
+        if (impl_->app_state.current_project.has_value()) {
+            auto verification =
+                core::audit::VerifyProject(impl_->app_state.current_project.value());
+            if (verification.ran && !verification.success) {
+                std::string msg = "Audit replay verification failed — the recorded "
+                                  "history no longer reproduces the on-disk SACM. "
+                                  "Toggle 'Show history' on a canvas tab to reconcile.";
+                for (const auto& d : verification.diagnostics)
+                    msg += "\n  - " + d;
+                SetStatus(msg);
+            }
+            impl_->last_audit_verification = std::move(verification);
+        }
     } else if (entry.role == core::ProjectFileRole::EvidenceRegister) {
         impl_->workbench.show_evidence_tab = true;
         ui_state.center_view = ui::CenterView::EvidenceRegister;
@@ -341,6 +344,64 @@ void AppRuntime::ConfirmPendingProjectFileOpen(bool save_current) {
     impl_->project_controller->pending_open_project_file_entry.reset();
     impl_->project_controller->show_save_before_project_file_open_modal = false;
     PerformOpenProjectFile(entry);
+}
+
+bool AppRuntime::ReconcileAuditStore() {
+    if (!impl_->app_state.current_project.has_value()) {
+        SetStatus("Cannot reconcile audit log: no project is open.");
+        return false;
+    }
+    if (impl_->app_state.active_project_file_role != core::ProjectFileRole::SacmArgument) {
+        SetStatus("Cannot reconcile audit log: no SACM file is active.");
+        return false;
+    }
+
+    const core::AssuranceProject& project = impl_->app_state.current_project.value();
+    // Locate the currently-active project file entry so we can re-open it
+    // after the audit store has been rebuilt.
+    const core::ProjectFileEntry* active_entry = nullptr;
+    for (const auto& f : project.files) {
+        if (project.rootPath / f.relativePath == impl_->app_state.active_project_file_path) {
+            active_entry = &f;
+            break;
+        }
+    }
+    if (!active_entry) {
+        SetStatus("Cannot reconcile audit log: active SACM file is no longer listed in the project.");
+        return false;
+    }
+
+    // Persist any in-memory edits first; the new initial snapshot is built
+    // from the on-disk SACM bytes, so we want them to reflect live state.
+    if (impl_->document_dirty) {
+        if (!SaveProject()) {
+            SetStatus("Cannot reconcile audit log: failed to save current SACM file.");
+            return false;
+        }
+    }
+
+    // Tear down the bus before mutating the audit store; the bus holds an
+    // open handle to `transactions.af.jsonl` on Windows and rename would
+    // fail otherwise.
+    impl_->command_bus.reset();
+
+    core::ProjectFileEntry entry_copy = *active_entry;
+    core::audit::ReconcileAuditStoreResult result;
+    std::string error;
+    if (!core::audit::ReconcileAuditStore(project, entry_copy.relativePath, result, error)) {
+        SetStatus("Audit reconciliation failed: " + error);
+        // Best-effort: re-open the project so the user retains a working
+        // session against the original (now-restored) audit artifacts.
+        PerformOpenProjectFile(entry_copy);
+        return false;
+    }
+
+    SetStatus("Audit log reconciled. Previous artifacts backed up to " + result.backup_dir + ".");
+
+    // Re-open the SACM file: this reinstalls the command bus over the fresh
+    // event store and re-runs replay verification (which should now succeed).
+    PerformOpenProjectFile(entry_copy);
+    return true;
 }
 
 void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
@@ -563,114 +624,49 @@ void AppRuntime::RemoveProjectPackage(const core::ProjectFileEntry& entry, const
         return;
     }
 
-    sacm::AssuranceCasePackage& package = impl_->app_state.sacm_package.value();
     const std::string label = node.displayName.empty() ? node.id : node.displayName;
-    bool removed = false;
     std::string status_message;
+    std::string kind_label;
+    std::unique_ptr<core::commands::ICommand> command;
 
-    auto matches_node = [&](const sacm::SacmElement& element) {
-        return (!node.id.empty() && element.id == node.id) || (!node.gid.empty() && element.gid == node.gid);
-    };
+    switch (node.type) {
+    case sacm::SacmPackageNodeType::TerminologyPackage: {
+        command = std::make_unique<core::commands::RemoveTerminologyPackageCommand>(node.id, node.gid);
+        kind_label = "terminology package";
+        break;
+    }
+    case sacm::SacmPackageNodeType::ArgumentPackage: {
+        command = std::make_unique<core::commands::RemoveArgumentPackageCommand>(node.id, node.gid);
+        kind_label = "argument package";
+        break;
+    }
+    case sacm::SacmPackageNodeType::ArtifactPackage: {
+        command = std::make_unique<core::commands::RemoveArtifactPackageCommand>(node.id, node.gid);
+        kind_label = "artifact package";
+        break;
+    }
+    default:
+        SetStatus("Removing this package type is not supported yet.");
+        return;
+    }
+
+    const auto outcome = app::commands::DispatchAuditedCommand(*impl_, *command);
+    if (!outcome.success) {
+        SetStatus("Remove " + kind_label + " failed: " + outcome.error);
+        return;
+    }
 
     if (node.type == sacm::SacmPackageNodeType::TerminologyPackage) {
-        std::string error;
-        if (!core::DeleteTerminologyPackage(package, core::TerminologyPackageRef{node.id, node.gid}, error)) {
-            SetStatus("Remove terminology package failed: " + error);
-            return;
-        }
-        removed = true;
-        status_message = "Removed terminology package " + label + ".";
         if (impl_->terminology.selected_package_ref.id == node.id &&
             impl_->terminology.selected_package_ref.gid == node.gid) {
             impl_->terminology.selected_package_ref = core::TerminologyPackageRef{};
             impl_->workbench.show_terminology_package_tab = false;
         }
     } else if (node.type == sacm::SacmPackageNodeType::ArgumentPackage) {
-        auto& vec = package.argumentPackages;
-        const auto it = std::find_if(vec.begin(), vec.end(), matches_node);
-        if (it == vec.end()) {
-            SetStatus("Argument package was not found in the editable model.");
-            return;
-        }
-        // Capture identities of every element that lived inside the removed argument package so we
-        // can scrub matching parser projections (otherwise claims/reasonings linger as orphans in
-        // the main GSN tree) and so we can detect any ACPs that referenced this package as their
-        // separate confidence argument tree.
-        const std::string removed_argument_package_id = it->id;
-        std::unordered_set<std::string> removed_element_ids;
-        std::unordered_set<std::string> removed_element_gids;
-        auto record_identity = [&](const sacm::SacmElement& element) {
-            if (!element.id.empty())
-                removed_element_ids.insert(element.id);
-            if (!element.gid.empty())
-                removed_element_gids.insert(element.gid);
-        };
-        for (const sacm::Claim& claim : it->claims)
-            record_identity(claim);
-        for (const sacm::ArgumentReasoning& reasoning : it->argumentReasonings)
-            record_identity(reasoning);
-        for (const sacm::ArtifactReference& artifact_reference : it->artifactReferences)
-            record_identity(artifact_reference);
-        for (const sacm::AssertedInference& inference : it->assertedInferences)
-            record_identity(inference);
-        for (const sacm::AssertedContext& context : it->assertedContexts)
-            record_identity(context);
-        for (const sacm::AssertedEvidence& evidence : it->assertedEvidences)
-            record_identity(evidence);
-        const bool was_confidence_argument_package = core::acp::IsConfidenceArgumentPackage(*it);
-        vec.erase(it);
-
-        if (impl_->app_state.loaded_case.has_value()) {
-            parser::AssuranceCase& loaded = impl_->app_state.loaded_case.value();
-            // Drop parser projections of every element that lived in the removed argument package
-            // so they don't show up as orphans in the main GSN tree.
-            loaded.elements.erase(std::remove_if(loaded.elements.begin(),
-                                                 loaded.elements.end(),
-                                                 [&](const parser::SacmElement& element) {
-                                                     if (removed_element_ids.count(element.id) > 0)
-                                                         return true;
-                                                     if (!element.gid.empty() &&
-                                                         removed_element_gids.count(element.gid) > 0)
-                                                         return true;
-                                                     return false;
-                                                 }),
-                                  loaded.elements.end());
-            // If the removed package backed a separate confidence argument tree, clear the
-            // link on any ACPs that pointed to it. This makes the ACP "incomplete" again so
-            // that the GSN-canvas decorator surfaces an alert badge on the affected element.
-            if (was_confidence_argument_package) {
-                for (parser::AcpRecord& acp_record : loaded.acps) {
-                    if (acp_record.resolution_kind == "topGoalReference" &&
-                        acp_record.argument_package_id == removed_argument_package_id) {
-                        acp_record.argument_package_id.clear();
-                        acp_record.top_goal_id.clear();
-                    }
-                }
-            }
-        }
         impl_->tree_needs_rebuild = true;
-        removed = true;
-        status_message = "Removed argument package " + label + ".";
-    } else if (node.type == sacm::SacmPackageNodeType::ArtifactPackage) {
-        auto& vec = package.artifactPackages;
-        const auto it = std::find_if(vec.begin(), vec.end(), matches_node);
-        if (it == vec.end()) {
-            SetStatus("Artifact package was not found in the editable model.");
-            return;
-        }
-        vec.erase(it);
-        removed = true;
-        status_message = "Removed artifact package " + label + ".";
-    } else {
-        SetStatus("Removing this package type is not supported yet.");
-        return;
     }
 
-    if (!removed)
-        return;
-
-    impl_->app_state.mark_dirty();
-    impl_->document_dirty = true;
+    status_message = "Removed " + kind_label + " " + label + ".";
     impl_->sacm_package_tree_cache.erase(entry.relativePath.generic_string());
     SyncTerminologyProblems();
     SyncAcpProblems();
@@ -858,20 +854,12 @@ bool AppRuntime::OpenFirstProjectSacmFile() {
             continue;
         if (entry.state == core::ProjectFileState::Missing)
             continue;
-        if (impl_->app_state.open_project_file(entry)) {
-            SetConfidenceSource(*impl_, entry);
-            SyncConfidenceProblems();
-            impl_->tree_needs_rebuild = true;
-            impl_->workbench.argument_package_canvas_tabs.clear();
-            impl_->workbench.active_argument_package_canvas_key.clear();
-            impl_->workbench.pending_focus_root = false;
-            impl_->workbench.show_gsn_tab = true;
-            ui::UiState& ui_state = ui::GetUiState();
-            ui_state.center_view = ui::CenterView::GsnCanvas;
-            impl_->workbench.force_center_tab_selection = true;
-            OpenFirstArgumentPackageCanvas();
+        // Delegate to the same path used by explicit Open File so the audit
+        // command bus gets installed and history-timeline recording is
+        // active for any subsequent mutations.
+        PerformOpenProjectFile(entry);
+        if (impl_->app_state.loaded_case.has_value())
             return true;
-        }
     }
 
     SetStatus("Project opened, but no SACM file could be loaded.");

@@ -349,6 +349,32 @@ void GsnCanvas::Render(UiState& ui_state,
                     draw_list, node, node_min, node_max, zoom, element_acps->second, actions, ui_state);
                 ++frame_stats.acp_decorators_drawn;
             }
+            // History-timeline highlight overlay (read-only audit view).
+            if (!history_highlights_.empty()) {
+                auto hl_it = history_highlights_.find(node.id);
+                if (hl_it != history_highlights_.end()) {
+                    ImU32 color = 0;
+                    switch (hl_it->second) {
+                    case core::audit::HistoryHighlightKind::Added:
+                        color = ui::GetTheme().success;
+                        break;
+                    case core::audit::HistoryHighlightKind::Modified:
+                        color = ui::GetTheme().warning;
+                        break;
+                    case core::audit::HistoryHighlightKind::Deleted:
+                        color = ui::GetTheme().attention;
+                        break;
+                    }
+                    const float thickness = std::max(2.0f, 3.0f * zoom);
+                    const float pad = thickness * 0.5f + 1.0f;
+                    draw_list->AddRect(ImVec2(node_min.x - pad, node_min.y - pad),
+                                       ImVec2(node_max.x + pad, node_max.y + pad),
+                                       color,
+                                       4.0f * zoom,
+                                       0,
+                                       thickness);
+                }
+            }
             ++frame_stats.nodes_drawn;
         }
     } // gsn.nodes
@@ -437,6 +463,28 @@ bool GsnCanvas::CenterOnIds(const std::unordered_set<std::string>& ids, ImVec2 v
     view_offset_.x = cx * zoom_level_ - viewport_size.x * 0.5f;
     view_offset_.y = cy * zoom_level_ - viewport_size.y * 0.5f;
     return true;
+}
+
+bool GsnCanvas::ConsumePendingFocus(ImVec2 viewport_size) {
+    if (!has_pending_focus_)
+        return false;
+    bool applied = false;
+    if (!pending_focus_ids_.empty())
+        applied = CenterOnIds(pending_focus_ids_, viewport_size);
+    if (!applied && pending_focus_fit_all_fallback_) {
+        // Build a set of every node id currently in the layout and fit to
+        // that. Cheaper than adding a separate "fit all" code path.
+        std::unordered_set<std::string> all_ids;
+        all_ids.reserve(layout_nodes_.size());
+        for (const auto& node : layout_nodes_)
+            all_ids.insert(node.id);
+        if (!all_ids.empty())
+            applied = CenterOnIds(all_ids, viewport_size);
+    }
+    pending_focus_ids_.clear();
+    pending_focus_fit_all_fallback_ = false;
+    has_pending_focus_ = false;
+    return applied;
 }
 
 } // namespace ui::gsn

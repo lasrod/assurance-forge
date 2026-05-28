@@ -1,8 +1,10 @@
 #include "app/areas/workbench_area.h"
 
 #include "app/app_runtime_state.h"
+#include "app/areas/canvas_history_overlay.h"
 #include "app/frame/app_layout_regions.h"
 #include "app/frame/app_shell.h"
+#include "core/argument_package_projection.h"
 #include "core/perf/frame_profiler.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_adapter.h"
@@ -58,45 +60,13 @@ void AddElementIdentity(const ElementT& element,
 
 const sacm::ArgumentPackage* FindArgumentPackage(const sacm::AssuranceCasePackage& package,
                                                  const WorkbenchState::ArgumentPackageCanvasTab& tab) {
-    auto found = std::find_if(package.argumentPackages.begin(), package.argumentPackages.end(), [&](const auto& pkg) {
-        const bool id_matches = !tab.package_id.empty() && pkg.id == tab.package_id;
-        const bool gid_matches = !tab.package_gid.empty() && pkg.gid == tab.package_gid;
-        return id_matches || gid_matches;
-    });
-    return found == package.argumentPackages.end() ? nullptr : &*found;
+    return core::FindArgumentPackageByIdentity(package, tab.package_id, tab.package_gid);
 }
 
 parser::AssuranceCase BuildArgumentPackageProjection(const parser::AssuranceCase& source_model,
                                                      const sacm::ArgumentPackage& argument_package,
                                                      const std::string& fallback_name) {
-    std::unordered_set<std::string> element_ids;
-    std::unordered_set<std::string> element_gids;
-    for (const sacm::Claim& claim : argument_package.claims)
-        AddElementIdentity(claim, element_ids, element_gids);
-    for (const sacm::ArgumentReasoning& reasoning : argument_package.argumentReasonings)
-        AddElementIdentity(reasoning, element_ids, element_gids);
-    for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences)
-        AddElementIdentity(artifact_reference, element_ids, element_gids);
-    for (const sacm::AssertedInference& inference : argument_package.assertedInferences)
-        AddElementIdentity(inference, element_ids, element_gids);
-    for (const sacm::AssertedContext& context : argument_package.assertedContexts)
-        AddElementIdentity(context, element_ids, element_gids);
-    for (const sacm::AssertedEvidence& evidence : argument_package.assertedEvidences)
-        AddElementIdentity(evidence, element_ids, element_gids);
-
-    parser::AssuranceCase projection;
-    projection.id = argument_package.id.empty() ? source_model.id : argument_package.id;
-    projection.name = argument_package.name.empty() ? fallback_name : argument_package.name;
-    projection.description = argument_package.description;
-    for (const parser::SacmElement& element : source_model.elements) {
-        if (element_ids.count(element.id) > 0 || element_gids.count(element.gid) > 0)
-            projection.elements.push_back(element);
-    }
-    for (const parser::AcpRecord& acp : source_model.acps) {
-        if (element_ids.count(acp.target_id) > 0 || element_gids.count(acp.target_id) > 0)
-            projection.acps.push_back(acp);
-    }
-    return projection;
+    return core::BuildArgumentPackageProjection(source_model, argument_package, fallback_name);
 }
 
 ui::ElementContextActions MakeProposalContextActions(const WorkbenchAreaCallbacks& callbacks) {
@@ -184,7 +154,7 @@ void RenderGsnCanvasTab(AppRuntimeState& state, ui::UiState& ui_state, const Wor
 void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
                                     ui::UiState& ui_state,
                                     const WorkbenchAreaCallbacks& callbacks,
-                                    const WorkbenchState::ArgumentPackageCanvasTab& tab) {
+                                    WorkbenchState::ArgumentPackageCanvasTab& tab) {
     ui_state.center_view = ui::CenterView::GsnCanvas;
     if (!state.app_state.loaded_case.has_value() || !state.app_state.sacm_package.has_value()) {
         ImGui::TextDisabled("No SACM argument model is loaded.");
@@ -196,6 +166,19 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
         ImGui::TextDisabled("Argument package was not found in the loaded SACM model.");
         return;
     }
+
+    // Audit divergence banner (when this project has an audit store and the
+    // last replay didn't reproduce the SACM). Drawn before the toolbar so
+    // the warning is the first thing the user sees on any package canvas.
+    const bool has_audit_store = ProjectHasAuditStore(state);
+    if (has_audit_store)
+        RenderCanvasDivergenceBanner(state, callbacks);
+
+    // Autosave-failure banner (sticky until dismissed or a later command
+    // succeeds). Stacked above the divergence banner because an in-flight
+    // autosave failure is a fresher, more actionable signal than a stale
+    // replay-divergence verdict.
+    RenderCanvasAutosaveErrorBanner(state);
 
     ArgumentPackageTabCache& cache = g_argument_package_canvas_caches[tab.key];
     const std::uint64_t current_revision = state.app_state.case_revision;
@@ -231,11 +214,12 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
         renderer.SetTree(cache.visible_tree);
         cache.renderer_seeded = true;
     }
-    {
-        core::perf::ScopedTimer perf_scope("app.wb.show_canvas_content");
-        ui::gsn::ShowGsnCanvasContentWithRenderer(
-            renderer, ui_state, &cache.visible_case, actions, &state.app_state.sacm_package.value());
-    }
+
+    const sacm::AssuranceCasePackage* terminology_package =
+        state.app_state.sacm_package.has_value() ? &state.app_state.sacm_package.value() : nullptr;
+    RenderArgumentPackageCanvasWithTimeline(state, ui_state, callbacks, tab, *argument_package,
+                                            cache.visible_case, renderer, actions,
+                                            terminology_package);
 }
 
 void RenderTerminologyPackageTab(AppRuntimeState& state, const WorkbenchAreaCallbacks& callbacks) {
@@ -331,7 +315,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
 
         if (state.workbench.show_gsn_tab) {
             for (std::size_t index = 0; index < state.workbench.argument_package_canvas_tabs.size();) {
-                const auto& tab = state.workbench.argument_package_canvas_tabs[index];
+                auto& tab = state.workbench.argument_package_canvas_tabs[index];
                 bool open = true;
                 const bool select_tab = state.workbench.force_center_tab_selection &&
                                         state.workbench.active_argument_package_canvas_key == tab.key;
@@ -347,6 +331,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                     const bool removed_active = state.workbench.active_argument_package_canvas_key == tab.key;
                     g_argument_package_canvas_renderers.erase(tab.key);
                     g_argument_package_canvas_caches.erase(tab.key);
+                    ForgetCanvasHistoryTab(tab.key);
                     state.workbench.argument_package_canvas_tabs.erase(
                         state.workbench.argument_package_canvas_tabs.begin() + static_cast<std::ptrdiff_t>(index));
                     if (removed_active) {

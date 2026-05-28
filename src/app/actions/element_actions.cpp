@@ -21,11 +21,7 @@ bool ElementActions::AddChildToSelected(core::NewElementKind kind) {
         return false;
     }
     const std::string& selected_id = ui::GetUiState().selected_element_id;
-
-    parser::AssuranceCase& ac = state_.app_state.loaded_case.value();
-    sacm::AssuranceCasePackage* pkg =
-        state_.app_state.sacm_package.has_value() ? &state_.app_state.sacm_package.value() : nullptr;
-    return state_.element_edit_controller->AddChildToSelected(ac, pkg, selected_id, kind);
+    return state_.element_edit_controller->AddChildToSelected(state_, selected_id, kind);
 }
 
 bool ElementActions::AddTopGoal() {
@@ -33,11 +29,7 @@ bool ElementActions::AddTopGoal() {
         SetStatus(state_, "No assurance case loaded.");
         return false;
     }
-
-    parser::AssuranceCase& ac = state_.app_state.loaded_case.value();
-    sacm::AssuranceCasePackage* pkg =
-        state_.app_state.sacm_package.has_value() ? &state_.app_state.sacm_package.value() : nullptr;
-    return state_.element_edit_controller->AddTopGoal(ac, pkg);
+    return state_.element_edit_controller->AddTopGoal(state_);
 }
 
 bool ElementActions::AddAcpToSelectedElement() {
@@ -84,11 +76,7 @@ void ElementActions::RemoveSelected(core::RemoveMode mode) {
         return;
     }
     const std::string& selected_id = ui::GetUiState().selected_element_id;
-
-    parser::AssuranceCase& ac = state_.app_state.loaded_case.value();
-    sacm::AssuranceCasePackage* pkg =
-        state_.app_state.sacm_package.has_value() ? &state_.app_state.sacm_package.value() : nullptr;
-    if (!state_.element_edit_controller->RemoveSelected(ac, pkg, selected_id, mode))
+    if (!state_.element_edit_controller->RemoveSelected(state_, selected_id, mode))
         return;
 
     if (state_.element_edit_controller->ShouldShowRemoveConfirm()) {
