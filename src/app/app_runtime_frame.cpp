@@ -20,7 +20,7 @@
 #include "app/frame/app_shell.h"
 #include "core/perf/frame_profiler.h"
 #include "core/problems/problem_attention.h"
-#include "ui/localization.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 #include "ui/ui_state.h"
 
@@ -69,9 +69,10 @@ void AppRuntime::RenderFrame(bool& done) {
         ui::ApplyAppTheme(next);
     }
     if (ImGui::IsKeyPressed(ImGuiKey_F8, false)) {
-        ui::Language next = ui::CurrentLanguage() == ui::Language::English ? ui::Language::Japanese
-                                                                           : ui::Language::English;
-        ui::SetCurrentLanguage(next);
+        ui::i18n::Language next = ui::i18n::CurrentLanguage() == ui::i18n::Language::English
+                                      ? ui::i18n::Language::Japanese
+                                      : ui::i18n::Language::English;
+        ui::i18n::SetLanguage(next);
     }
 
     {

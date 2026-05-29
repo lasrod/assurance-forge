@@ -210,6 +210,31 @@ if(WIN32)
 endif()
 af_copy_sccg_data(assurance-forge)
 
+# --- Localization catalogs (optional regeneration) ---
+# The Japanese .mo is committed and bundled as an asset, so normal builds need
+# no gettext tools. This convenience target regenerates the .mo from the .po
+# using msgfmt when available, otherwise the dependency-free
+# tools/i18n/compile_po.py. It is not part of ALL.
+set(AF_JA_PO "${CMAKE_SOURCE_DIR}/assets/locale/ja/LC_MESSAGES/assurance_forge.po")
+set(AF_JA_MO "${CMAKE_SOURCE_DIR}/assets/locale/ja/LC_MESSAGES/assurance_forge.mo")
+find_program(MSGFMT_EXECUTABLE msgfmt)
+if(MSGFMT_EXECUTABLE)
+    add_custom_target(i18n_compile
+        COMMAND ${MSGFMT_EXECUTABLE} "${AF_JA_PO}" -o "${AF_JA_MO}"
+        COMMENT "Compiling i18n catalogs with msgfmt"
+        VERBATIM
+    )
+else()
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_custom_target(i18n_compile
+            COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/i18n/compile_po.py" "${AF_JA_PO}" "${AF_JA_MO}"
+            COMMENT "Compiling i18n catalogs with tools/i18n/compile_po.py"
+            VERBATIM
+        )
+    endif()
+endif()
+
 # --- Tests ---
 FetchContent_Declare(
     googletest

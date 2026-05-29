@@ -7,6 +7,7 @@
 #include "core/terminology_text_utils.h"
 #include "hello_imgui/hello_imgui.h"
 #include "imgui.h"
+#include "ui/i18n/localization.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/panels/preferences_panel.h"
 #include "ui/panels/welcome_modal.h"
@@ -71,7 +72,7 @@ void ModalHost::RenderPreferencesWindow() {
     model.reviewerNameBuffer = state_.reviewer_name_buf;
     model.reviewerNameBufferSize = sizeof(state_.reviewer_name_buf);
     model.theme = ui::GetCurrentAppTheme();
-    model.language = ui::CurrentLanguage();
+    model.language = ui::i18n::CurrentLanguage();
     if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams()) {
         model.showFps = runner_params->imGuiWindowParams.showStatus_Fps;
     }
@@ -126,7 +127,7 @@ void ModalHost::RenderPreferencesWindow() {
             state_.ai.task_runner.RunConnectionTest([service]() { return service->TestConnection(); });
     };
     callbacks.set_theme = [](ui::AppTheme theme) { ui::ApplyAppTheme(theme); };
-    callbacks.set_language = [](ui::Language language) { ui::SetCurrentLanguage(language); };
+    callbacks.set_language = [](ui::i18n::Language language) { ui::i18n::SetLanguage(language); };
     callbacks.set_show_fps = [](bool show_fps) {
         if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams()) {
             runner_params->imGuiWindowParams.showStatus_Fps = show_fps;

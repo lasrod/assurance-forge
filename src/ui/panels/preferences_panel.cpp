@@ -2,7 +2,7 @@
 
 #include "imgui.h"
 #include "ui/gsn/gsn_dpi.h"
-#include "ui/localization.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
 #include <algorithm>
@@ -49,36 +49,36 @@ void RenderConnectionStatus(const ai::AiConnectionStatus& status) {
 
 void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallbacks& callbacks) {
     if (!model.settings) {
-        ImGui::TextDisabled("%s", ui::Tr(ui::MessageId::AiSettingsUnavailable));
+        ImGui::TextDisabled("%s", AF_TR("AI settings are unavailable.").c_str());
         return;
     }
 
     ai::AiProviderSettings draft = *model.settings;
 
-    ImGui::TextUnformatted(ui::Tr(ui::MessageId::Ai));
+    ImGui::TextUnformatted(AF_TR("AI").c_str());
     ImGui::Separator();
 
     bool enabled = draft.enabled;
-    if (ImGui::Checkbox(ui::Tr(ui::MessageId::EnableAiSupport), &enabled)) {
+    if (ImGui::Checkbox(AF_TR("Enable AI support").c_str(), &enabled)) {
         draft.enabled = enabled;
         *model.settings = draft;
     }
 
-    ImGui::TextUnformatted(ui::Tr(ui::MessageId::Provider));
+    ImGui::TextUnformatted(AF_TR("Provider").c_str());
     ImGui::SetNextItemWidth(220.0f);
     ImGui::BeginDisabled();
     static char provider_name[] = "OpenAI";
     ImGui::InputText("##ai_provider", provider_name, sizeof(provider_name), ImGuiInputTextFlags_ReadOnly);
     ImGui::EndDisabled();
 
-    ImGui::TextUnformatted(ui::Tr(ui::MessageId::Model));
+    ImGui::TextUnformatted(AF_TR("Model").c_str());
     ImGui::SetNextItemWidth(280.0f);
     if (model.modelBuffer && model.modelBufferSize > 0 &&
         ImGui::InputText("##ai_model", model.modelBuffer, model.modelBufferSize)) {
         model.settings->model = model.modelBuffer;
     }
 
-    if (ImGui::Button(ui::Tr(ui::MessageId::SaveAiSettings))) {
+    if (ImGui::Button(AF_TR("Save AI Settings").c_str())) {
         if (model.modelBuffer && model.modelBufferSize > 0) {
             model.settings->model = model.modelBuffer;
         }
@@ -87,15 +87,15 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
     }
 
     ImGui::Spacing();
-    ImGui::TextUnformatted(ui::Tr(ui::MessageId::ApiKey));
+    ImGui::TextUnformatted(AF_TR("API Key").c_str());
     if (!model.secureStoreAvailable) {
         ImGui::TextColored(StatusColor(ai::ErrorStatus(ai::AiErrorCode::SecureStoreUnavailable, "")),
                            "%s",
-                           ui::Tr(ui::MessageId::SecureStorageUnavailable));
+                           AF_TR("Secure storage is unavailable on this platform.").c_str());
     } else if (model.keyStored) {
-        ImGui::TextDisabled("%s", ui::Tr(ui::MessageId::KeyStored));
+        ImGui::TextDisabled("%s", AF_TR("Key stored: ********").c_str());
     } else {
-        ImGui::TextDisabled("%s", ui::Tr(ui::MessageId::NoApiKeyStored));
+        ImGui::TextDisabled("%s", AF_TR("No API key stored.").c_str());
     }
 
     ImGuiInputTextFlags key_flags = ImGuiInputTextFlags_Password;
@@ -106,14 +106,14 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
 
     if (!model.secureStoreAvailable)
         ImGui::BeginDisabled();
-    if (ImGui::Button(model.keyStored ? ui::Tr(ui::MessageId::UpdateKey) : ui::Tr(ui::MessageId::SaveKey))) {
+    if (ImGui::Button((model.keyStored ? AF_TR("Update Key") : AF_TR("Save Key")).c_str())) {
         if (callbacks.save_api_key && model.apiKeyBuffer)
             callbacks.save_api_key(model.apiKeyBuffer);
     }
     ImGui::SameLine();
     if (!model.keyStored)
         ImGui::BeginDisabled();
-    if (ImGui::Button(ui::Tr(ui::MessageId::RemoveKey))) {
+    if (ImGui::Button(AF_TR("Remove Key").c_str())) {
         if (callbacks.remove_api_key)
             callbacks.remove_api_key();
     }
@@ -127,7 +127,7 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
         model.secureStoreAvailable && model.keyStored && model.settings->enabled && !model.testRunning;
     if (!can_test)
         ImGui::BeginDisabled();
-    if (ImGui::Button(ui::Tr(ui::MessageId::TestConnection))) {
+    if (ImGui::Button(AF_TR("Test Connection").c_str())) {
         if (callbacks.test_connection)
             callbacks.test_connection();
     }
@@ -137,15 +137,19 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
     RenderConnectionStatus(model.connectionStatus);
 
     ImGui::Spacing();
-    ImGui::TextWrapped("%s", ui::Tr(ui::MessageId::AiPrivacyNotice));
+    ImGui::TextWrapped(
+        "%s",
+        AF_TR("AI features may send selected safety case content and prompts to the configured AI provider. Assurance "
+              "Forge will not send project data automatically; data is sent only when you explicitly use an AI action.")
+            .c_str());
 }
 
 void RenderAppearanceSection(PreferencesPanelModel model, const PreferencesPanelCallbacks& callbacks) {
-    ImGui::TextUnformatted(ui::Tr(ui::MessageId::Appearance));
+    ImGui::TextUnformatted(AF_TR("Appearance").c_str());
     ImGui::Separator();
     const float combo_width = ui::gsn::DpiSize(220.0f);
 
-    ImGui::TextUnformatted(ui::Tr(ui::MessageId::Theme));
+    ImGui::TextUnformatted(AF_TR("Theme").c_str());
     ImGui::SetNextItemWidth(combo_width);
     if (ImGui::BeginCombo("##theme", ui::GetThemeDisplayName(model.theme))) {
         for (ui::AppTheme theme : ui::kAppThemes) {
@@ -160,13 +164,13 @@ void RenderAppearanceSection(PreferencesPanelModel model, const PreferencesPanel
         ImGui::EndCombo();
     }
 
-    ImGui::TextUnformatted(ui::Tr(ui::MessageId::Language));
+    ImGui::TextUnformatted(AF_TR("Language").c_str());
     ImGui::SetNextItemWidth(combo_width);
-    if (ImGui::BeginCombo("##language", ui::LanguageDisplayName(model.language))) {
-        const ui::Language languages[] = {ui::Language::English, ui::Language::Japanese};
-        for (ui::Language language : languages) {
+    if (ImGui::BeginCombo("##language", ui::i18n::LanguageDisplayName(model.language).c_str())) {
+        const ui::i18n::Language languages[] = {ui::i18n::Language::English, ui::i18n::Language::Japanese};
+        for (ui::i18n::Language language : languages) {
             const bool selected = model.language == language;
-            if (ImGui::Selectable(ui::LanguageDisplayName(language), selected)) {
+            if (ImGui::Selectable(ui::i18n::LanguageDisplayName(language).c_str(), selected)) {
                 if (callbacks.set_language)
                     callbacks.set_language(language);
             }
@@ -177,15 +181,15 @@ void RenderAppearanceSection(PreferencesPanelModel model, const PreferencesPanel
     }
 
     bool show_fps = model.showFps;
-    if (ImGui::Checkbox(ui::Tr(ui::MessageId::ShowFps), &show_fps)) {
+    if (ImGui::Checkbox(AF_TR("Show FPS").c_str(), &show_fps)) {
         if (callbacks.set_show_fps)
             callbacks.set_show_fps(show_fps);
     }
-    ImGui::TextColored(ui::CullRatioColor(0.8f), "%s", ui::Tr(ui::MessageId::PerfLegendHigh));
+    ImGui::TextColored(ui::CullRatioColor(0.8f), "%s", AF_TR("High culling").c_str());
     ImGui::SameLine();
-    ImGui::TextColored(ui::CullRatioColor(0.5f), "%s", ui::Tr(ui::MessageId::PerfLegendMedium));
+    ImGui::TextColored(ui::CullRatioColor(0.5f), "%s", AF_TR("Medium culling").c_str());
     ImGui::SameLine();
-    ImGui::TextColored(ui::CullRatioColor(0.0f), "%s", ui::Tr(ui::MessageId::PerfLegendLow));
+    ImGui::TextColored(ui::CullRatioColor(0.0f), "%s", AF_TR("Low culling").c_str());
 }
 
 void RenderReviewSection(PreferencesPanelModel model, const PreferencesPanelCallbacks& callbacks) {
@@ -216,7 +220,7 @@ void ShowPreferencesWindow(bool& open, PreferencesPanelModel model, const Prefer
 
     SyncModelBuffer(model);
     ImGui::SetNextWindowSize(ImVec2(560.0f, 0.0f), ImGuiCond_Appearing);
-    if (ImGui::Begin(ui::Tr(ui::MessageId::PreferencesTitle),
+    if (ImGui::Begin(AF_TR("Preferences").c_str(),
                      &open,
                      ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
         RenderAppearanceSection(model, callbacks);

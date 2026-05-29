@@ -9,7 +9,7 @@
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
-#include "ui/localization.h"
+#include "ui/i18n/localization.h"
 #include "ui/panels/package_details_panel.h"
 #include "ui/panels/terminology_package_panel.h"
 #include "ui/register_views.h"
@@ -306,7 +306,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::GsnCanvas)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
-            if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::GsnCanvas), nullptr, gsn_flags)) {
+            if (ImGui::BeginTabItem(AF_TR("GSN Canvas").c_str(), nullptr, gsn_flags)) {
                 state.workbench.active_argument_package_canvas_key.clear();
                 RenderGsnCanvasTab(state, ui_state, callbacks);
                 ImGui::EndTabItem();
@@ -349,7 +349,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::CseRegister)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
-            if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::CseRegister), nullptr, cse_flags)) {
+            if (ImGui::BeginTabItem(AF_TR("CSE Register").c_str(), nullptr, cse_flags)) {
                 ui_state.center_view = ui::CenterView::CseRegister;
                 if (state.app_state.active_project_file_role == core::ProjectFileRole::J3377CaeRegister) {
                     ImGui::TextWrapped("J3377 CAE register file: %s",
@@ -367,7 +367,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::EvidenceRegister)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
-            if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::EvidenceRegister), nullptr, evidence_flags)) {
+            if (ImGui::BeginTabItem(AF_TR("Evidence Register").c_str(), nullptr, evidence_flags)) {
                 ui_state.center_view = ui::CenterView::EvidenceRegister;
                 if (state.app_state.active_project_file_role == core::ProjectFileRole::EvidenceRegister) {
                     ImGui::TextWrapped("Evidence register file: %s",

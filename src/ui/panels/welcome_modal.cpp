@@ -4,7 +4,7 @@
 #include "imgui.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_dpi.h"
-#include "ui/localization.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
 #include <algorithm>
@@ -291,7 +291,7 @@ void ShowWelcomeModal(bool& is_open,
         ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeTitleToTaglineSpacing)));
 
         ImGui::PushStyleColor(ImGuiCol_Text, ToVec4(theme.text_secondary));
-        ImGui::TextUnformatted(ui::Tr(ui::MessageId::WelcomeTagline));
+        ImGui::TextUnformatted(AF_TR("Forge Confidence in Safety").c_str());
         ImGui::PopStyleColor();
         ImGui::EndGroup();
         ImGui::EndGroup();
@@ -310,41 +310,41 @@ void ShowWelcomeModal(bool& is_open,
             ImGui::TableNextRow();
 
             ImGui::TableNextColumn();
-            SectionTitle(ui::Tr(ui::MessageId::WelcomeStartSection));
+            SectionTitle(AF_TR("Start"));
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeSectionTopSpacing)));
             if (ActionLink("##create_empty",
-                           ui::Tr(ui::MessageId::WelcomeActionCreateEmptyTitle),
-                           ui::Tr(ui::MessageId::WelcomeActionCreateEmptySubtitle))) {
+                           AF_TR("Create Empty Assurance Project"),
+                           AF_TR("Start with a blank assurance project workspace"))) {
                 if (callbacks.create_empty_project)
                     callbacks.create_empty_project();
             }
             if (ActionLink("##create_template",
-                           ui::Tr(ui::MessageId::WelcomeActionCreateFromTemplateTitle),
-                           ui::Tr(ui::MessageId::WelcomeActionCreateFromTemplateSubtitle))) {
+                           AF_TR("Create Assurance Project from Template"),
+                           AF_TR("Create a project from a predefined assurance case template"))) {
                 if (callbacks.create_project_from_template)
                     callbacks.create_project_from_template();
                 show_template_not_implemented = true;
             }
             if (ActionLink("##open_project",
-                           ui::Tr(ui::MessageId::WelcomeActionOpenProjectTitle),
-                           ui::Tr(ui::MessageId::WelcomeActionOpenProjectSubtitle))) {
+                           AF_TR("Open Project"),
+                           AF_TR("Open an existing Assurance Forge project"))) {
                 if (callbacks.open_project)
                     callbacks.open_project();
             }
             if (ActionLink("##import_sacm",
-                           ui::Tr(ui::MessageId::WelcomeActionImportSacmTitle),
-                           ui::Tr(ui::MessageId::WelcomeActionImportSacmSubtitle))) {
+                           AF_TR("Import SACM"),
+                           AF_TR("Import a SACM XML assurance case"))) {
                 if (callbacks.import_sacm)
                     callbacks.import_sacm();
                 show_import_sacm_not_implemented = true;
             }
 
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeRecentSectionSpacing)));
-            SectionTitle(ui::Tr(ui::MessageId::WelcomeOpenRecentProjectsSection));
+            SectionTitle(AF_TR("Open Recent Projects"));
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeSectionTopSpacing)));
             if (recent.empty()) {
                 ImGui::PushStyleColor(ImGuiCol_Text, ToVec4(theme.text_muted));
-                ImGui::TextUnformatted(ui::Tr(ui::MessageId::WelcomeNoRecentProjects));
+                ImGui::TextUnformatted(AF_TR("No recent projects.").c_str());
                 ImGui::PopStyleColor();
             } else {
                 for (int i = 0; i < static_cast<int>(recent.size()); ++i) {
@@ -359,11 +359,11 @@ void ShowWelcomeModal(bool& is_open,
             }
 
             ImGui::TableNextColumn();
-            SectionTitle(ui::Tr(ui::MessageId::Walkthroughs));
+            SectionTitle(AF_TR("Walkthroughs"));
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeSectionTopSpacing)));
             if (WalkthroughCard("##walkthrough_get_started",
-                                ui::Tr(ui::MessageId::WelcomeWalkthroughGetStartedTitle),
-                                ui::Tr(ui::MessageId::WelcomeWalkthroughGetStartedSubtitle),
+                                AF_TR("Get started with Assurance Forge"),
+                                AF_TR("Create, inspect, and navigate a safety case"),
                                 kGetStartedProgress)) {
                 if (callbacks.walkthrough_get_started)
                     callbacks.walkthrough_get_started();
@@ -371,8 +371,8 @@ void ShowWelcomeModal(bool& is_open,
             }
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeWalkthroughCardSpacing)));
             if (WalkthroughCard("##walkthrough_fundamentals",
-                                ui::Tr(ui::MessageId::WelcomeWalkthroughFundamentalsTitle),
-                                ui::Tr(ui::MessageId::WelcomeWalkthroughFundamentalsSubtitle),
+                                AF_TR("Learn the Fundamentals"),
+                                AF_TR("GSN structure, SACM imports, evidence, and registers"),
                                 kFundamentalsProgress)) {
                 if (callbacks.walkthrough_fundamentals)
                     callbacks.walkthrough_fundamentals();
@@ -380,8 +380,8 @@ void ShowWelcomeModal(bool& is_open,
             }
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeWalkthroughCardSpacing)));
             if (WalkthroughCard("##walkthrough_conformance",
-                                ui::Tr(ui::MessageId::WelcomeWalkthroughConformanceTitle),
-                                ui::Tr(ui::MessageId::WelcomeWalkthroughConformanceSubtitle),
+                                AF_TR("Prepare a Conformance Review"),
+                                AF_TR("Trace claims, evidence, and review outputs"),
                                 kConformanceProgress)) {
                 if (callbacks.walkthrough_conformance)
                     callbacks.walkthrough_conformance();
@@ -402,39 +402,39 @@ void ShowWelcomeModal(bool& is_open,
         }
 
         if (ImGui::BeginPopupModal(kTemplatePopupId, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::TextUnformatted(ui::Tr(ui::MessageId::WelcomeActionCreateFromTemplateTitle));
+            ImGui::TextUnformatted(AF_TR("Create Assurance Project from Template").c_str());
             ImGui::Separator();
-            ImGui::TextUnformatted(ui::Tr(ui::MessageId::WelcomeActionCreateFromTemplateNotImplemented));
+            ImGui::TextUnformatted(AF_TR("Create Assurance Project from Template is not yet implemented.").c_str());
             ImGui::Spacing();
             const float button_width = Px(kNotImplementedPopupButtonWidth);
             ImGui::SetCursorPosX((ImGui::GetWindowWidth() - button_width) * 0.5f);
-            if (ImGui::Button(ui::Tr(ui::MessageId::Ok), ImVec2(button_width, 0.0f))) {
+            if (ImGui::Button(AF_TR("OK").c_str(), ImVec2(button_width, 0.0f))) {
                 ImGui::CloseCurrentPopup();
             }
             ImGui::EndPopup();
         }
 
         if (ImGui::BeginPopupModal(kImportSacmPopupId, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::TextUnformatted(ui::Tr(ui::MessageId::ImportSacm));
+            ImGui::TextUnformatted(AF_TR("Import SACM").c_str());
             ImGui::Separator();
-            ImGui::TextUnformatted(ui::Tr(ui::MessageId::ImportSacmNotImplemented));
+            ImGui::TextUnformatted(AF_TR("Import SACM is not yet implemented.").c_str());
             ImGui::Spacing();
             const float button_width = Px(kNotImplementedPopupButtonWidth);
             ImGui::SetCursorPosX((ImGui::GetWindowWidth() - button_width) * 0.5f);
-            if (ImGui::Button(ui::Tr(ui::MessageId::Ok), ImVec2(button_width, 0.0f))) {
+            if (ImGui::Button(AF_TR("OK").c_str(), ImVec2(button_width, 0.0f))) {
                 ImGui::CloseCurrentPopup();
             }
             ImGui::EndPopup();
         }
 
         if (ImGui::BeginPopupModal(kWalkthroughPopupId, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::TextUnformatted(ui::Tr(ui::MessageId::Walkthroughs));
+            ImGui::TextUnformatted(AF_TR("Walkthroughs").c_str());
             ImGui::Separator();
-            ImGui::TextUnformatted(ui::Tr(ui::MessageId::WalkthroughsNotImplemented));
+            ImGui::TextUnformatted(AF_TR("Walkthroughs are not yet implemented.").c_str());
             ImGui::Spacing();
             const float button_width = Px(kNotImplementedPopupButtonWidth);
             ImGui::SetCursorPosX((ImGui::GetWindowWidth() - button_width) * 0.5f);
-            if (ImGui::Button(ui::Tr(ui::MessageId::Ok), ImVec2(button_width, 0.0f))) {
+            if (ImGui::Button(AF_TR("OK").c_str(), ImVec2(button_width, 0.0f))) {
                 ImGui::CloseCurrentPopup();
             }
             ImGui::EndPopup();

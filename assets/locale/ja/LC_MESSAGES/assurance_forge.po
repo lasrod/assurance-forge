@@ -1,0 +1,199 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Assurance Forge\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: ja\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "File"
+msgstr "ファイル"
+
+msgid "Create Empty Assurance Project"
+msgstr "空の保証プロジェクトを作成"
+
+msgid "Open Project"
+msgstr "プロジェクトを開く"
+
+msgid "Save Project"
+msgstr "プロジェクトを保存"
+
+msgid "Export"
+msgstr "エクスポート"
+
+msgid "GSN SVG"
+msgstr "GSN SVG"
+
+msgid "Exit"
+msgstr "終了"
+
+msgid "Add"
+msgstr "追加"
+
+msgid "New GSN / SACM File"
+msgstr "新規 GSN / SACM ファイル"
+
+msgid "New Evidence Register"
+msgstr "新規エビデンス登録簿"
+
+msgid "New J3377 CAE Register"
+msgstr "新規 J3377 CAE 登録簿"
+
+msgid "Edit"
+msgstr "編集"
+
+msgid "Preferences..."
+msgstr "設定..."
+
+msgid "Preferences"
+msgstr "設定"
+
+msgid "View"
+msgstr "表示"
+
+msgid "GSN Canvas"
+msgstr "GSN キャンバス"
+
+msgid "CSE Register"
+msgstr "CSE 登録簿"
+
+msgid "Evidence Register"
+msgstr "エビデンス登録簿"
+
+msgid "Welcome Screen"
+msgstr "ウェルカム画面"
+
+msgid "Appearance"
+msgstr "外観"
+
+msgid "Theme"
+msgstr "テーマ"
+
+msgid "Language"
+msgstr "言語"
+
+msgid "Show FPS"
+msgstr "FPS を表示"
+
+msgid "High culling"
+msgstr "高カリング"
+
+msgid "Medium culling"
+msgstr "中カリング"
+
+msgid "Low culling"
+msgstr "低カリング"
+
+msgid "AI"
+msgstr "AI"
+
+msgid "AI settings are unavailable."
+msgstr "AI 設定を使用できません。"
+
+msgid "Enable AI support"
+msgstr "AI サポートを有効にする"
+
+msgid "Provider"
+msgstr "プロバイダー"
+
+msgid "Model"
+msgstr "モデル"
+
+msgid "Save AI Settings"
+msgstr "AI 設定を保存"
+
+msgid "API Key"
+msgstr "API キー"
+
+msgid "Secure storage is unavailable on this platform."
+msgstr "このプラットフォームでは安全な保存を使用できません。"
+
+msgid "Key stored: ********"
+msgstr "キー保存済み: ********"
+
+msgid "No API key stored."
+msgstr "保存済み API キーはありません。"
+
+msgid "Update Key"
+msgstr "キーを更新"
+
+msgid "Save Key"
+msgstr "キーを保存"
+
+msgid "Remove Key"
+msgstr "キーを削除"
+
+msgid "Test Connection"
+msgstr "接続をテスト"
+
+msgid "AI features may send selected safety case content and prompts to the configured AI provider. Assurance Forge will not send project data automatically; data is sent only when you explicitly use an AI action."
+msgstr ""
+
+msgid "OK"
+msgstr "OK"
+
+msgid "Walkthroughs"
+msgstr "ウォークスルー"
+
+msgid "Walkthroughs are not yet implemented."
+msgstr "ウォークスルーは未実装です。"
+
+msgid "Import SACM"
+msgstr "SACM をインポート"
+
+msgid "Import SACM is not yet implemented."
+msgstr "SACM のインポートは未実装です。"
+
+msgid "Forge Confidence in Safety"
+msgstr "安全への確信を鍛える"
+
+msgid "Start"
+msgstr "開始"
+
+msgid "Open Recent Projects"
+msgstr "最近のプロジェクトを開く"
+
+msgid "No recent projects."
+msgstr "最近のプロジェクトはありません。"
+
+msgid "Start with a blank assurance project workspace"
+msgstr "空の保証プロジェクトワークスペースから開始します"
+
+msgid "Create Assurance Project from Template"
+msgstr "テンプレートから保証プロジェクトを作成"
+
+msgid "Create a project from a predefined assurance case template"
+msgstr "定義済みの保証ケーステンプレートからプロジェクトを作成します"
+
+msgid "Create Assurance Project from Template is not yet implemented."
+msgstr "テンプレートから保証プロジェクトを作成は未実装です。"
+
+msgid "Open an existing Assurance Forge project"
+msgstr "既存の Assurance Forge プロジェクトを開きます"
+
+msgid "Import a SACM XML assurance case"
+msgstr "SACM XML 保証ケースをインポートします"
+
+msgid "Get started with Assurance Forge"
+msgstr "Assurance Forge の開始ガイド"
+
+msgid "Create, inspect, and navigate a safety case"
+msgstr "安全ケースの作成・確認・操作を行います"
+
+msgid "Learn the Fundamentals"
+msgstr "基本を学ぶ"
+
+msgid "GSN structure, SACM imports, evidence, and registers"
+msgstr "GSN 構造、SACM インポート、エビデンス、レジスターを学びます"
+
+msgid "Prepare a Conformance Review"
+msgstr "適合性レビューを準備する"
+
+msgid "Trace claims, evidence, and review outputs"
+msgstr "主張、エビデンス、レビュー出力を追跡します"
+
+msgid "Undo"
+msgstr "元に戻す"
+
+msgid "Reached snapshot or baseline — restore from history to go further back."
+msgstr "スナップショットまたはベースラインに到達しました — さらに戻すには履歴から復元してください。"

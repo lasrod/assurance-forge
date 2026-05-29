@@ -12,7 +12,8 @@ add_library(af_ui OBJECT
     gsn/gsn_node_text.cpp
     gsn/gsn_shapes.cpp
     gsn/gsn_terminology_card.cpp
-    localization.cpp
+    i18n/localization.cpp
+    i18n/mo_catalog.cpp
     panels/acp_panel.cpp
     panels/confidence_panel.cpp
     panels/element_panel.cpp
