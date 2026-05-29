@@ -21,10 +21,12 @@ void RenderLanguageMenu() {
         return;
 
     const ui::Language current = ui::CurrentLanguage();
-    if (ImGui::MenuItem(ui::Tr(ui::MessageId::English), "F8", current == ui::Language::English)) {
+    const char* english_shortcut = current == ui::Language::English ? nullptr : "F8";
+    if (ImGui::MenuItem(ui::Tr(ui::MessageId::English), english_shortcut, current == ui::Language::English)) {
         ui::SetCurrentLanguage(ui::Language::English);
     }
-    if (ImGui::MenuItem(ui::Tr(ui::MessageId::Japanese), "F8", current == ui::Language::Japanese)) {
+    const char* japanese_shortcut = current == ui::Language::Japanese ? nullptr : "F8";
+    if (ImGui::MenuItem(ui::Tr(ui::MessageId::Japanese), japanese_shortcut, current == ui::Language::Japanese)) {
         ui::SetCurrentLanguage(ui::Language::Japanese);
     }
 
