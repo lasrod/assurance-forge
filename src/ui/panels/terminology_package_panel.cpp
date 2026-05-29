@@ -155,8 +155,10 @@ void RenderIssueMarker(const std::vector<core::TerminologyTermIssue>& issues) {
     ImGui::TextColored(IssueColor(severity), "!");
     if (ImGui::IsItemHovered()) {
         ImGui::BeginTooltip();
+        // Issue messages are produced as English msgids in core/; translate
+        // at render time so they follow the current UI language.
         for (const auto& issue : issues)
-            ImGui::TextUnformatted(issue.message.c_str());
+            ImGui::TextUnformatted(AF_TR(issue.message).c_str());
         ImGui::EndTooltip();
     }
 }
@@ -356,7 +358,7 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
         ImGui::EndDisabled();
     if (!model.can_delete && !model.delete_block_reason.empty()) {
         ImGui::SameLine();
-        ImGui::TextDisabled("%s", model.delete_block_reason.c_str());
+        ImGui::TextDisabled("%s", AF_TR(model.delete_block_reason).c_str());
     }
 
     ImGui::Spacing();

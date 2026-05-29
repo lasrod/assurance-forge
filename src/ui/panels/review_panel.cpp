@@ -370,9 +370,12 @@ void DrawProblemItem(const core::ProblemItem& problem, const ReviewPanelCallback
     ImGui::SameLine();
     ImGui::TextWrapped("%s", problem.type.empty() ? AF_TR("Problem").c_str() : problem.type.c_str());
     ImGui::TextDisabled(AF_TR("Source: %s").c_str(), core::ToString(problem.source));
-    DrawSelectableMessageText("problem_message", problem.message, 3.5f);
+    // Translate defensively: validation messages from core/ are English msgids,
+    // user-typed text falls back to itself.
+    DrawSelectableMessageText("problem_message", AF_TR(problem.message), 3.5f);
     if (!problem.quick_fix_label.empty() && callbacks.quick_fix_problem) {
-        if (ImGui::Button(problem.quick_fix_label.c_str())) {
+        // quick_fix_label is set as an English msgid in app/; translate at render.
+        if (ImGui::Button(AF_TR(problem.quick_fix_label).c_str())) {
             callbacks.quick_fix_problem(problem);
         }
         ImGui::SameLine();

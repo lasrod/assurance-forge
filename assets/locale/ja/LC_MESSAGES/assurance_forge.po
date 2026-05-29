@@ -559,6 +559,9 @@ msgstr "ドラッグしてトランザクション履歴をスクラブします
 msgid "Duplicate term value and definition exist in this package."
 msgstr "このパッケージ内に同じ用語と定義の重複があります。"
 
+msgid "Duplicate term value and definition exist in this terminology package."
+msgstr "この用語パッケージ内に同じ用語と定義の重複があります。"
+
 msgid "Edit"
 msgstr "編集"
 
@@ -1066,6 +1069,12 @@ msgstr "既存の Assurance Forge プロジェクトを開きます"
 msgid "Open confidence argument tree"
 msgstr "信頼度引数ツリーを開く"
 
+msgid "Open duplicates"
+msgstr "重複を開く"
+
+msgid "Open glossary"
+msgstr "用語集を開く"
+
 msgid "Open in File Explorer"
 msgstr "ファイルエクスプローラーで開く"
 
@@ -1483,6 +1492,12 @@ msgstr "用語の使用箇所"
 msgid "Term has no category."
 msgstr "用語に分類がありません。"
 
+msgid "Term has no external reference/source."
+msgstr "用語に外部参照/出典がありません。"
+
+msgid "Term has no value."
+msgstr "用語に値がありません。"
+
 msgid "Term reference could not be resolved."
 msgstr "用語参照を解決できませんでした。"
 
@@ -1494,6 +1509,18 @@ msgstr "用語パッケージ"
 
 msgid "Terminology Packages"
 msgstr "用語パッケージ"
+
+msgid "Terminology package contains categories."
+msgstr "用語パッケージに分類が含まれています。"
+
+msgid "Terminology package contains terminology entries."
+msgstr "用語パッケージに用語項目が含まれています。"
+
+msgid "Terminology package contains terms."
+msgstr "用語パッケージに用語が含まれています。"
+
+msgid "Terminology package not found."
+msgstr "用語パッケージが見つかりません。"
 
 msgid "Terminology spans"
 msgstr "用語スパン"
@@ -1530,6 +1557,9 @@ msgstr "再生された監査履歴がディスク上の SACM を再現できま
 
 msgid "The selected proposal preview element no longer exists."
 msgstr "選択された提案プレビュー要素は既に存在しません。"
+
+msgid "The stored confidence assessment needs review because this element changed. Review the value and reactivate confidence if it is still valid."
+msgstr "この要素が変更されたため、保存された信頼度評価の確認が必要です。値を確認し、まだ有効であれば 信頼度を再アクティブ化してください。"
 
 msgid "Theme"
 msgstr "テーマ"
@@ -1740,6 +1770,12 @@ msgstr "主張 {0} 件 · 戦略 {1} 件 · エビデンス {2} 件 · 未展開
 
 msgid "{0} confidence assessment(s) were marked inactive because their target elements changed."
 msgstr "対象要素が変更されたため、{0} 件の信頼度評価が非アクティブとしてマークされました。"
+
+msgid "{0} has {1} visible meanings. Choose the intended terminology entry."
+msgstr "{0} には {1} 件の表示可能な意味があります。意図する用語項目を選択してください。"
+
+msgid "{0} looks like an undefined terminology entry."
+msgstr "{0} は未定義の用語項目のように見えます。"
 
 msgid "{0} problems · top {1}: {2}"
 msgstr "{0} 件の問題 · トップ {1}: {2}"

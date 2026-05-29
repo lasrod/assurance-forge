@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Build Commands
 
 **Windows** (run from Developer Command Prompt for VS 2022):
@@ -12,31 +10,9 @@ cmake --build --preset release
 cmake --build --preset debug
 ```
 
-**Linux** (install `xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev` first):
-```bash
-cmake -B build -DHELLOIMGUI_DOWNLOAD_GLFW_IF_NEEDED=ON -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-```
-
 **Run the app:**
 ```bash
-build\Release\assurance-forge.exe          # Windows
-./build/assurance-forge                    # Linux
-```
-
-## Test Commands
-
-```bash
-ctest --preset release                     # Windows (all tests)
-ctest --preset debug                       # Windows (debug build)
-ctest --test-dir build --output-on-failure # Linux / macOS
-
-build\Release\tests.exe                    # Run test binary directly (Windows)
-./build/tests                              # Linux / macOS
-
-# Run a single test by name (GoogleTest filter):
-build\Release\tests.exe --gtest_filter=TestSuiteName.TestName
-./build/tests --gtest_filter=TestSuiteName.TestName
+build\Release\assurance-forge.exe
 ```
 
 ## Architecture

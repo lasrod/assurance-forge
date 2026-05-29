@@ -662,6 +662,36 @@ TRANSLATIONS = {
 
     # ===== Misc =====
     "SCCG": "SCCG",
+
+    # ===== Terminology issue messages (set in core/, translated at display) =====
+    "Term has no value.": "用語に値がありません。",
+    "Duplicate term value and definition exist in this terminology package.":
+        "この用語パッケージ内に同じ用語と定義の重複があります。",
+    "Term has no external reference/source.": "用語に外部参照/出典がありません。",
+    # "Concrete term has no description." and "Term has no category." are already in dict.
+
+    # ===== Delete-block reasons from core/terminology_package_service =====
+    "Terminology package contains categories.": "用語パッケージに分類が含まれています。",
+    "Terminology package contains terms.": "用語パッケージに用語が含まれています。",
+    "Terminology package contains terminology entries.": "用語パッケージに用語項目が含まれています。",
+    "Terminology package not found.": "用語パッケージが見つかりません。",
+
+    # ===== Quick-fix labels stored in ProblemItem (translated at display) =====
+    "Open duplicates": "重複を開く",
+    "Open glossary": "用語集を開く",
+    # "Edit term", "Define term", "Open ACP" already in dict.
+
+    # ===== Dynamic problem messages (trf'd at sync time in app/) =====
+    "{0} looks like an undefined terminology entry.":
+        "{0} は未定義の用語項目のように見えます。",
+    "{0} has {1} visible meanings. Choose the intended terminology entry.":
+        "{0} には {1} 件の表示可能な意味があります。意図する用語項目を選択してください。",
+
+    # ===== Static problem messages (translated at display via AF_TR) =====
+    "The stored confidence assessment needs review because this element changed. Review the value "
+    "and reactivate confidence if it is still valid.":
+        "この要素が変更されたため、保存された信頼度評価の確認が必要です。値を確認し、まだ有効であれば "
+        "信頼度を再アクティブ化してください。",
 }
 
 

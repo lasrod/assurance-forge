@@ -176,7 +176,10 @@ bool DrawClickableCell(const char* id_suffix,
 void DrawProblemRow(const core::ProblemItem& problem, ui::UiState& ui_state, const ProblemsPanelCallbacks& callbacks) {
     const bool selected = ui_state.selected_problem_id == problem.id;
     const bool focus_this_row = selected && ui_state.problems_panel_focus_pending;
-    const std::string message = SingleLineMessage(problem.message);
+    // Problem messages can carry English msgids from core/ validation; translate
+    // defensively. tr() of an untranslatable (e.g. user-typed) string returns it
+    // unchanged, so this is safe for dynamic content too.
+    const std::string message = SingleLineMessage(AF_TR(problem.message));
     const bool review_problem = IsReviewSource(problem.source);
 
     ImGui::PushID(problem.id.c_str());
@@ -206,7 +209,7 @@ void DrawProblemRow(const core::ProblemItem& problem, ui::UiState& ui_state, con
     ImGui::TableSetColumnIndex(4);
     DrawClickableCell("message", message, problem, ui_state, callbacks);
     if (ImGui::IsItemHovered() && !problem.message.empty()) {
-        ImGui::SetTooltip("%s", problem.message.c_str());
+        ImGui::SetTooltip("%s", AF_TR(problem.message).c_str());
     }
 
     ImGui::TableSetColumnIndex(5);
@@ -218,7 +221,8 @@ void DrawProblemRow(const core::ProblemItem& problem, ui::UiState& ui_state, con
         if (ImGui::SmallButton(AF_TR("Open review").c_str()))
             callbacks.on_open_review(problem);
     } else if (!problem.quick_fix_label.empty() && callbacks.on_quick_fix) {
-        if (ImGui::SmallButton(problem.quick_fix_label.c_str()))
+        // quick_fix_label is set as an English msgid in app/; translate at render.
+        if (ImGui::SmallButton(AF_TR(problem.quick_fix_label).c_str()))
             callbacks.on_quick_fix(problem);
     } else {
         ImGui::TextUnformatted("-");

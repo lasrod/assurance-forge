@@ -425,10 +425,13 @@ bool ShowConfidencePanel(const ConfidencePanelModel& model, const ConfidencePane
 
     DrawFinalConfidence(model.expected_confidence, confidence.enabled);
     ImGui::Spacing();
+    // Translate the caller-supplied labels defensively: AF_TR on an
+    // already-translated string falls back to itself, so this is safe whether
+    // the caller passed an English msgid or a pre-translated label.
     const std::string method =
-        model.method_label.empty() ? AF_TR(MethodLabel(confidence.mode)) : model.method_label;
+        model.method_label.empty() ? AF_TR(MethodLabel(confidence.mode)) : AF_TR(model.method_label);
     ImGui::Text(AF_TR("Method: %s").c_str(), method.c_str());
-    const std::string status = model.status_label.empty() ? AF_TR("Active") : model.status_label;
+    const std::string status = model.status_label.empty() ? AF_TR("Active") : AF_TR(model.status_label);
     ImGui::Text(AF_TR("Status: %s").c_str(), status.c_str());
 
     if (model.stale) {

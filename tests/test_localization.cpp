@@ -75,9 +75,10 @@ void WriteMoFile(const std::filesystem::path& path,
 }
 
 std::filesystem::path MakeTempLocaleRoot() {
+    // Two samples so parallel ctest runs can't collide on a shared temp path.
     std::random_device rd;
-    const std::filesystem::path root =
-        std::filesystem::temp_directory_path() / ("af_i18n_" + std::to_string(rd()));
+    const std::filesystem::path root = std::filesystem::temp_directory_path() /
+                                       ("af_i18n_" + std::to_string(rd()) + "_" + std::to_string(rd()));
     return root;
 }
 

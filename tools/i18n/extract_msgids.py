@@ -2,7 +2,7 @@
 """Extract translatable msgids from Assurance Forge C++ source.
 
 Scans src/ for AF_TR("..."), AF_TR_CTX("ctx","msg"), and
-ui::i18n::tr/trc/trn/trf/trnf("...") calls. Handles single-line and
+ui::i18n::tr/trc/trn/trf/trcf/trnf("...") calls. Handles single-line and
 multi-line adjacent-string-literal concatenation. Outputs a sorted
 list of unique msgids to stdout.
 
