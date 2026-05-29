@@ -39,7 +39,8 @@ void RenderThemeMenu() {
 
     for (ui::AppTheme theme : ui::kAppThemes) {
         const bool selected = ui::GetCurrentAppTheme() == theme;
-        if (ImGui::MenuItem(ui::GetThemeDisplayName(theme), "F9", selected)) {
+        const char* shortcut = selected ? nullptr : "F9";
+        if (ImGui::MenuItem(ui::GetThemeDisplayName(theme), shortcut, selected)) {
             ui::ApplyAppTheme(theme);
         }
     }
