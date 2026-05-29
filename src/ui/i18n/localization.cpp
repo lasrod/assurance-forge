@@ -116,12 +116,18 @@ unsigned LanguageEpoch() {
 }
 
 std::string tr(std::string_view msgid) {
+    // English mode keeps no catalog (the source strings are the keys), so skip
+    // building a lookup key — this is the hot path for every AF_TR per frame.
+    if (!g_catalog_loaded)
+        return std::string(msgid);
     if (const std::string* hit = Lookup(std::string(msgid)); hit && !hit->empty())
         return *hit;
     return std::string(msgid);
 }
 
 std::string trc(std::string_view context, std::string_view msgid) {
+    if (!g_catalog_loaded)
+        return std::string(msgid);
     std::string key;
     key.reserve(context.size() + 1 + msgid.size());
     key.append(context);
@@ -133,6 +139,8 @@ std::string trc(std::string_view context, std::string_view msgid) {
 }
 
 std::string trn(std::string_view singular, std::string_view plural, int count) {
+    if (!g_catalog_loaded)
+        return std::string(count == 1 ? singular : plural);
     std::string key;
     key.reserve(singular.size() + 1 + plural.size());
     key.append(singular);

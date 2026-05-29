@@ -51,6 +51,9 @@ def extract_source(ex):
 
 _MSGID_RE = re.compile(r'^msgid "((?:[^"\\]|\\.)*)"', re.M)
 _MSGID_PLURAL_RE = re.compile(r'^msgid_plural "((?:[^"\\]|\\.)*)"', re.M)
+# A context entry is `msgctxt "ctx"` immediately followed by `msgid "id"`.
+_MSGCTXT_RE = re.compile(
+    r'^msgctxt "((?:[^"\\]|\\.)*)"\s*\nmsgid "((?:[^"\\]|\\.)*)"', re.M)
 
 
 def load_po_keys():
@@ -58,7 +61,8 @@ def load_po_keys():
     decode = lambda s: ast.literal_eval('"' + s + '"')
     plain = {decode(m) for m in _MSGID_RE.findall(po)}
     plural = {decode(m) for m in _MSGID_PLURAL_RE.findall(po)}
-    return plain, plural
+    ctx = {(decode(c), decode(m)) for c, m in _MSGCTXT_RE.findall(po)}
+    return plain, plural, ctx
 
 
 def read_mo(path):
@@ -87,8 +91,8 @@ def read_mo(path):
 
 
 def check_source_in_po(ex):
-    src_plain, _src_ctx, src_plural = extract_source(ex)
-    po_plain, po_plural = load_po_keys()
+    src_plain, src_ctx, src_plural = extract_source(ex)
+    po_plain, po_plural, po_ctx = load_po_keys()
 
     missing = sorted(s for s in src_plain if s not in po_plain)
     print(f"[1] source plain msgids: {len(src_plain)}  |  catalog plain: {len(po_plain)}")
@@ -98,7 +102,12 @@ def check_source_in_po(ex):
                       if sing not in po_plain or plur not in po_plural]
     for sing, plur in plural_missing:
         print("  MISSING plural pair: " + repr(sing) + " / " + repr(plur))
-    ok = not missing and not plural_missing
+    # Context-qualified msgids (AF_TR_CTX / trc / trcf) must exist as a
+    # matching msgctxt+msgid pair in the .po, or they render English at runtime.
+    ctx_missing = [(ctx, msgid) for ctx, msgid in sorted(src_ctx) if (ctx, msgid) not in po_ctx]
+    for ctx, msgid in ctx_missing:
+        print("  MISSING context entry: msgctxt " + repr(ctx) + " msgid " + repr(msgid))
+    ok = not missing and not plural_missing and not ctx_missing
     print(f"[1] {'OK' if ok else 'FAIL'}: all source msgids present in .po")
     return ok
 
