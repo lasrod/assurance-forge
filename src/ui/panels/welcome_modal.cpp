@@ -229,11 +229,12 @@ bool WalkthroughCard(std::string_view id, std::string_view title, std::string_vi
 void ShowWelcomeModal(bool& is_open,
                       const std::vector<RecentProjectEntry>& recent,
                       const WelcomeModalCallbacks& callbacks) {
-    if (is_open && !ImGui::IsPopupOpen(kWelcomePopupId)) {
-        ImGui::OpenPopup(kWelcomePopupId);
+    const std::string welcome_popup_id = AF_TR(kWelcomePopupId);
+    if (is_open && !ImGui::IsPopupOpen(welcome_popup_id.c_str())) {
+        ImGui::OpenPopup(welcome_popup_id.c_str());
     }
 
-    if (!is_open && !ImGui::IsPopupOpen(kWelcomePopupId)) {
+    if (!is_open && !ImGui::IsPopupOpen(welcome_popup_id.c_str())) {
         return;
     }
 
@@ -256,7 +257,7 @@ void ShowWelcomeModal(bool& is_open,
                         ImVec2(PxAtScale(kWelcomeItemSpacingX, welcome_layout_scale),
                                PxAtScale(kWelcomeItemSpacingY, welcome_layout_scale)));
 
-    if (ImGui::BeginPopupModal(kWelcomePopupId,
+    if (ImGui::BeginPopupModal(welcome_popup_id.c_str(),
                                &is_open,
                                ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
                                    ImGuiWindowFlags_NoSavedSettings)) {
@@ -443,7 +444,7 @@ void ShowWelcomeModal(bool& is_open,
         ImGui::EndPopup();
     }
 
-    if (!ImGui::IsPopupOpen(kWelcomePopupId)) {
+    if (!ImGui::IsPopupOpen(welcome_popup_id.c_str())) {
         is_open = false;
     }
 

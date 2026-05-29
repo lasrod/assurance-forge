@@ -1,5 +1,7 @@
 #include "ui/element_context_menu.h"
 
+#include "ui/i18n/localization.h"
+
 #include "imgui.h"
 
 #include <cstdio>
@@ -7,26 +9,26 @@
 namespace ui {
 
 void RenderAddElementMenu(const ElementContextActions& actions) {
-    if (ImGui::BeginMenu("Add")) {
+    if (ImGui::BeginMenu(AF_TR("Add").c_str())) {
         const bool can_add = static_cast<bool>(actions.add_child);
-        if (ImGui::MenuItem("Goal", nullptr, false, can_add))
+        if (ImGui::MenuItem(AF_TR("Goal").c_str(), nullptr, false, can_add))
             actions.add_child(core::NewElementKind::Goal);
-        if (ImGui::MenuItem("Strategy", nullptr, false, can_add))
+        if (ImGui::MenuItem(AF_TR("Strategy").c_str(), nullptr, false, can_add))
             actions.add_child(core::NewElementKind::Strategy);
-        if (ImGui::MenuItem("Solution", nullptr, false, can_add))
+        if (ImGui::MenuItem(AF_TR("Solution").c_str(), nullptr, false, can_add))
             actions.add_child(core::NewElementKind::Solution);
-        if (ImGui::MenuItem("Context", nullptr, false, can_add))
+        if (ImGui::MenuItem(AF_TR("Context").c_str(), nullptr, false, can_add))
             actions.add_child(core::NewElementKind::Context);
-        if (ImGui::MenuItem("Assumption", nullptr, false, can_add))
+        if (ImGui::MenuItem(AF_TR("Assumption").c_str(), nullptr, false, can_add))
             actions.add_child(core::NewElementKind::Assumption);
-        if (ImGui::MenuItem("Justification", nullptr, false, can_add))
+        if (ImGui::MenuItem(AF_TR("Justification").c_str(), nullptr, false, can_add))
             actions.add_child(core::NewElementKind::Justification);
         ImGui::Separator();
-        if (ImGui::MenuItem("ACP", nullptr, false, static_cast<bool>(actions.add_acp_to_selected_element)))
+        if (ImGui::MenuItem(AF_TR("ACP").c_str(), nullptr, false, static_cast<bool>(actions.add_acp_to_selected_element)))
             actions.add_acp_to_selected_element();
         ImGui::Separator();
-        if (ImGui::MenuItem("Challenge", nullptr, false, static_cast<bool>(actions.not_implemented))) {
-            actions.not_implemented("Challenge");
+        if (ImGui::MenuItem(AF_TR("Challenge").c_str(), nullptr, false, static_cast<bool>(actions.not_implemented))) {
+            actions.not_implemented(AF_TR("Challenge").c_str());
         }
         ImGui::EndMenu();
     }
@@ -40,9 +42,9 @@ void RenderAiReviewMenu(const ElementContextActions& actions) {
 void RenderRemoveSubmenu(const parser::AssuranceCase* active_case,
                          const std::string& selected_id,
                          const ElementContextActions& actions) {
-    if (ImGui::BeginMenu("Remove")) {
+    if (ImGui::BeginMenu(AF_TR("Remove").c_str())) {
         if (selected_id.empty()) {
-            ImGui::TextDisabled("No element selected.");
+            ImGui::TextDisabled("%s", AF_TR("No element selected.").c_str());
             ImGui::EndMenu();
             return;
         }
@@ -57,15 +59,13 @@ void RenderRemoveSubmenu(const parser::AssuranceCase* active_case,
         const int n_descendants = count_for(core::RemoveMode::NodeAndDescendants);
         const bool can_remove = static_cast<bool>(actions.remove_selected);
 
-        char label[96];
-
-        std::snprintf(label, sizeof(label), "This node only (%d)", n_only);
-        if (ImGui::MenuItem(label, nullptr, false, can_remove && n_only > 0)) {
+        const std::string node_only_label = ui::i18n::trf("This node only ({0})", n_only);
+        if (ImGui::MenuItem(node_only_label.c_str(), nullptr, false, can_remove && n_only > 0)) {
             actions.remove_selected(core::RemoveMode::NodeOnly);
         }
 
-        std::snprintf(label, sizeof(label), "Node and descendants (%d)", n_descendants);
-        if (ImGui::MenuItem(label, nullptr, false, can_remove && n_descendants > n_only)) {
+        const std::string descendants_label = ui::i18n::trf("Node and descendants ({0})", n_descendants);
+        if (ImGui::MenuItem(descendants_label.c_str(), nullptr, false, can_remove && n_descendants > n_only)) {
             actions.remove_selected(core::RemoveMode::NodeAndDescendants);
         }
 

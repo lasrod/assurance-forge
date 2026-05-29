@@ -1,5 +1,6 @@
 #include "ui/panels/project_explorer_panel.h"
 
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
 #include <array>
@@ -112,12 +113,12 @@ void RenderPackageChildren(const core::ProjectFileEntry& entry,
         }
     }
 
-    RenderPackageGroup("Argument Packages", argument_packages, entry, callbacks, parent_path);
-    RenderPackageGroup("Artifact Packages", artifact_packages, entry, callbacks, parent_path);
-    RenderPackageGroup("Terminology Packages", terminology_packages, entry, callbacks, parent_path);
-    RenderPackageGroup("Interfaces", interfaces, entry, callbacks, parent_path);
-    RenderPackageGroup("Bindings", bindings, entry, callbacks, parent_path);
-    RenderPackageGroup("Other Packages", other_packages, entry, callbacks, parent_path);
+    RenderPackageGroup(AF_TR("Argument Packages").c_str(), argument_packages, entry, callbacks, parent_path);
+    RenderPackageGroup(AF_TR("Artifact Packages").c_str(), artifact_packages, entry, callbacks, parent_path);
+    RenderPackageGroup(AF_TR("Terminology Packages").c_str(), terminology_packages, entry, callbacks, parent_path);
+    RenderPackageGroup(AF_TR("Interfaces").c_str(), interfaces, entry, callbacks, parent_path);
+    RenderPackageGroup(AF_TR("Bindings").c_str(), bindings, entry, callbacks, parent_path);
+    RenderPackageGroup(AF_TR("Other Packages").c_str(), other_packages, entry, callbacks, parent_path);
 }
 
 void RenderPackageNode(const core::ProjectFileEntry& entry,
@@ -140,7 +141,7 @@ void RenderPackageNode(const core::ProjectFileEntry& entry,
     }
     if (node.type == sacm::SacmPackageNodeType::AssuranceCasePackage && callbacks.add_terminology_package) {
         if (ImGui::BeginPopupContextItem("##package_context")) {
-            if (ImGui::MenuItem("Add Terminology Package")) {
+            if (ImGui::MenuItem(AF_TR("Add Terminology Package").c_str())) {
                 callbacks.add_terminology_package(entry, node);
             }
             ImGui::EndPopup();
@@ -151,7 +152,7 @@ void RenderPackageNode(const core::ProjectFileEntry& entry,
                                       node.type == sacm::SacmPackageNodeType::TerminologyPackage;
     if (is_removable_package && callbacks.remove_package) {
         if (ImGui::BeginPopupContextItem("##package_remove_context")) {
-            if (ImGui::MenuItem("Remove")) {
+            if (ImGui::MenuItem(AF_TR("Remove").c_str())) {
                 callbacks.remove_package(entry, node);
             }
             ImGui::EndPopup();
@@ -207,24 +208,25 @@ void RenderFile(const core::ProjectFileEntry& entry,
             ImGui::SameLine();
             ImGui::PushStyleColor(
                 ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(valid ? ui::GetTheme().success : ui::GetTheme().danger));
-            ImGui::TextUnformatted(valid ? "(Valid)" : "(Broken)");
+            ImGui::TextUnformatted((valid ? AF_TR("(Valid)") : AF_TR("(Broken)")).c_str());
             ImGui::PopStyleColor();
         }
     }
 
     if (has_package_tree && !tree_it->second.success) {
-        ImGui::TextDisabled("Package tree unavailable: %s", tree_it->second.error_message.c_str());
+        ImGui::TextDisabled(AF_TR("Package tree unavailable: %s").c_str(), tree_it->second.error_message.c_str());
     }
 
     if (wants_file_context_menu) {
         if (ImGui::BeginPopup("##file_context")) {
             // Use "Delete" for filesystem-backed exports so the destructive nature of the
             // operation is unambiguous. Proposals remain "Remove" to match the existing UX.
-            const char* remove_label = is_export ? "Delete" : "Remove";
-            if (callbacks.remove_file && (is_proposal || is_export) && ImGui::MenuItem(remove_label)) {
+            const std::string remove_label = is_export ? AF_TR("Delete") : AF_TR("Remove");
+            if (callbacks.remove_file && (is_proposal || is_export) && ImGui::MenuItem(remove_label.c_str())) {
                 callbacks.remove_file(entry);
             }
-            if (is_export && callbacks.reveal_in_file_explorer && ImGui::MenuItem("Open in File Explorer")) {
+            if (is_export && callbacks.reveal_in_file_explorer &&
+                ImGui::MenuItem(AF_TR("Open in File Explorer").c_str())) {
                 callbacks.reveal_in_file_explorer(entry);
             }
             ImGui::EndPopup();
@@ -244,7 +246,7 @@ void RenderFile(const core::ProjectFileEntry& entry,
 void RenderFolderContextMenu(std::string_view folder, const ProjectExplorerPanelCallbacks& callbacks) {
     if (folder == "arguments") {
         if (ImGui::BeginPopupContextItem("##arguments_context")) {
-            if (ImGui::MenuItem("Add New GSN / SACM File") && callbacks.add_sacm_file) {
+            if (ImGui::MenuItem(AF_TR("Add New GSN / SACM File").c_str()) && callbacks.add_sacm_file) {
                 callbacks.add_sacm_file();
             }
             ImGui::EndPopup();
@@ -254,10 +256,10 @@ void RenderFolderContextMenu(std::string_view folder, const ProjectExplorerPanel
 
     if (folder == "registers") {
         if (ImGui::BeginPopupContextItem("##registers_context")) {
-            if (ImGui::MenuItem("Add Evidence Register") && callbacks.add_evidence_register) {
+            if (ImGui::MenuItem(AF_TR("Add Evidence Register").c_str()) && callbacks.add_evidence_register) {
                 callbacks.add_evidence_register();
             }
-            if (ImGui::MenuItem("Add J3377 CAE Register") && callbacks.add_j3377_cae_register) {
+            if (ImGui::MenuItem(AF_TR("Add J3377 CAE Register").c_str()) && callbacks.add_j3377_cae_register) {
                 callbacks.add_j3377_cae_register();
             }
             ImGui::EndPopup();
@@ -285,7 +287,7 @@ void ShowProjectExplorerTree(const ProjectExplorerPanelModel& model, const Proje
             RenderFile(entry, model, callbacks);
         }
         if (!has_files) {
-            ImGui::TextDisabled("No files");
+            ImGui::TextDisabled("%s", AF_TR("No files").c_str());
         }
         ImGui::TreePop();
     }
@@ -301,13 +303,13 @@ void ShowProjectExplorerPanel(float width,
                               const ProjectExplorerPanelCallbacks& callbacks) {
     ImGui::SetNextWindowPos(ImVec2(0.0f, top_y));
     ImGui::SetNextWindowSize(ImVec2(width, height));
-    ImGui::Begin(kProjectExplorerTitle, nullptr, panel_flags);
+    ImGui::Begin(AF_TR(kProjectExplorerTitle).c_str(), nullptr, panel_flags);
 
     if (ImGui::BeginChild("ProjectExplorerTree", ImVec2(0, 0), false)) {
         if (model.project) {
             ShowProjectExplorerTree(model, callbacks);
         } else {
-            ImGui::TextDisabled("No project open.");
+            ImGui::TextDisabled("%s", AF_TR("No project open.").c_str());
         }
     }
     ImGui::EndChild();

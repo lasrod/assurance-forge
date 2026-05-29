@@ -2,6 +2,7 @@
 
 #include "core/string_utils.h"
 #include "imgui.h"
+#include "ui/i18n/localization.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/theme.h"
 
@@ -19,7 +20,7 @@ void DrawStatusBadge(const core::reviews::ReviewItem& item) {
     const bool resolved = item.status == core::reviews::ReviewItemStatus::Resolved;
     ImU32 color = resolved ? ui::GetTheme().success : ui::GetTheme().warning;
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(color));
-    ImGui::TextUnformatted(resolved ? "Resolved" : "Open");
+    ImGui::TextUnformatted((resolved ? AF_TR("Resolved") : AF_TR("Open")).c_str());
     ImGui::PopStyleColor();
 }
 
@@ -61,13 +62,13 @@ std::string GuidelineDisplayLabel(const ReviewGuidelineOption& option) {
 
 std::string FieldDisplayLabel(const std::string& field) {
     if (field == "name")
-        return "Name";
+        return AF_TR("Name");
     if (field == "content")
-        return "Content";
+        return AF_TR("Content");
     if (field == "description")
-        return "Description";
+        return AF_TR("Description");
     if (field.empty())
-        return "Text";
+        return AF_TR("Text");
     return field;
 }
 
@@ -107,7 +108,7 @@ void RenderProposalOriginalTextHoverCard(const std::vector<ProposalTextChangePre
                                    ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar |
                                    ImGuiWindowFlags_NoInputs;
     if (ImGui::Begin("Original Text##proposal_original_text_hover", nullptr, flags)) {
-        ImGui::TextUnformatted("Original text");
+        ImGui::TextUnformatted(AF_TR("Original text").c_str());
         ImGui::Separator();
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 380.0f);
         for (size_t index = 0; index < changes.size(); ++index) {
@@ -115,7 +116,7 @@ void RenderProposalOriginalTextHoverCard(const std::vector<ProposalTextChangePre
                 ImGui::Separator();
             ImGui::TextDisabled("%s", FieldDisplayLabel(changes[index].field).c_str());
             if (changes[index].old_value.empty()) {
-                ImGui::TextDisabled("(empty)");
+                ImGui::TextDisabled("%s", AF_TR("(empty)").c_str());
             } else {
                 ImGui::TextWrapped("%s", changes[index].old_value.c_str());
             }
@@ -133,15 +134,15 @@ const std::vector<ProposalTextChangePreview>* FindProposalTextChanges(const Revi
 
 void OpenGuidelineStub(const std::string& guideline_id, std::string& popup_guideline_id) {
     popup_guideline_id = guideline_id;
-    ImGui::OpenPopup("SCCG Guideline");
+    ImGui::OpenPopup(AF_TR("SCCG Guideline").c_str());
 }
 
 void DrawGuidelineStubPopup(const ReviewPanelModel& model, std::string& popup_guideline_id) {
-    if (!ImGui::BeginPopupModal("SCCG Guideline", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    if (!ImGui::BeginPopupModal(AF_TR("SCCG Guideline").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         return;
 
     if (popup_guideline_id == "__browse__") {
-        ImGui::TextUnformatted("Browse SCCG Guidelines");
+        ImGui::TextUnformatted(AF_TR("Browse SCCG Guidelines").c_str());
     } else if (!popup_guideline_id.empty()) {
         const ReviewGuidelineOption* option = FindGuidelineOption(model, popup_guideline_id);
         ImGui::TextUnformatted(popup_guideline_id.c_str());
@@ -150,9 +151,9 @@ void DrawGuidelineStubPopup(const ReviewPanelModel& model, std::string& popup_gu
         }
     }
     ImGui::Spacing();
-    ImGui::TextUnformatted("Not Implemented");
+    ImGui::TextUnformatted(AF_TR("Not Implemented").c_str());
     ImGui::Spacing();
-    if (ImGui::Button("Close")) {
+    if (ImGui::Button(AF_TR("Close").c_str())) {
         popup_guideline_id.clear();
         ImGui::CloseCurrentPopup();
     }
@@ -185,11 +186,11 @@ void DrawGuidelineTags(const ReviewPanelModel& model,
 
 void DrawSelectedGuidelineTags(std::vector<std::string>& selected_guideline_ids) {
     if (selected_guideline_ids.empty()) {
-        ImGui::TextDisabled("No SCCG guideline violations selected.");
+        ImGui::TextDisabled("%s", AF_TR("No SCCG guideline violations selected.").c_str());
         return;
     }
 
-    ImGui::TextDisabled("Selected");
+    ImGui::TextDisabled("%s", AF_TR("Selected").c_str());
     ImGui::SameLine();
     for (size_t index = 0; index < selected_guideline_ids.size();) {
         if (index > 0)
@@ -211,9 +212,9 @@ void DrawGuidelineSelector(const ReviewPanelModel& model,
                            char* filter_buffer,
                            size_t filter_buffer_size,
                            std::string& popup_guideline_id) {
-    ImGui::TextUnformatted("SCCG Guideline Violations");
+    ImGui::TextUnformatted(AF_TR("SCCG Guideline Violations").c_str());
     ImGui::SameLine();
-    if (ImGui::Button("Browse SCCG Guidelines")) {
+    if (ImGui::Button(AF_TR("Browse SCCG Guidelines").c_str())) {
         OpenGuidelineStub("__browse__", popup_guideline_id);
     }
 
@@ -223,14 +224,15 @@ void DrawGuidelineSelector(const ReviewPanelModel& model,
     if (!has_options)
         ImGui::BeginDisabled();
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::InputTextWithHint("##guideline_filter", "Filter SCCG IDs or titles", filter_buffer, filter_buffer_size);
+    ImGui::InputTextWithHint("##guideline_filter", AF_TR("Filter SCCG IDs or titles").c_str(), filter_buffer,
+                             filter_buffer_size);
 
     const float list_height = ImGui::GetTextLineHeightWithSpacing() * 6.0f;
     if (ImGui::BeginChild("##guideline_options", ImVec2(0.0f, list_height), true)) {
         if (!has_options) {
             ImGui::TextDisabled("%s",
-                                model.guideline_status.empty() ? "SCCG guidelines are not available."
-                                                               : model.guideline_status.c_str());
+                                model.guideline_status.empty() ? AF_TR("SCCG guidelines are not available.").c_str()
+                                                                : model.guideline_status.c_str());
         } else {
             const std::string filter(filter_buffer);
             const std::string lowered_filter = core::ToLower(filter);
@@ -248,12 +250,12 @@ void DrawGuidelineSelector(const ReviewPanelModel& model,
                 }
                 ++shown;
                 if (shown >= 80) {
-                    ImGui::TextDisabled("Keep filtering to narrow the remaining guidelines.");
+                    ImGui::TextDisabled("%s", AF_TR("Keep filtering to narrow the remaining guidelines.").c_str());
                     break;
                 }
             }
             if (shown == 0) {
-                ImGui::TextDisabled("No matching SCCG guideline IDs.");
+                ImGui::TextDisabled("%s", AF_TR("No matching SCCG guideline IDs.").c_str());
             }
         }
     }
@@ -267,10 +269,11 @@ void DrawProposalActions(const core::reviews::ReviewItem& item,
                          const ReviewPanelCallbacks& callbacks) {
     const bool is_active_draft = model.active_proposal_review_item_id == item.id;
     if (is_active_draft) {
-        ImGui::Text("Proposal draft: %d operation(s)", static_cast<int>(model.active_proposal_operation_count));
+        ImGui::Text(AF_TR("Proposal draft: %d operation(s)").c_str(),
+                    static_cast<int>(model.active_proposal_operation_count));
         if (!model.active_proposal_can_save)
             ImGui::BeginDisabled();
-        if (ImGui::Button("Save Proposal") && callbacks.save_proposal) {
+        if (ImGui::Button(AF_TR("Save Proposal").c_str()) && callbacks.save_proposal) {
             callbacks.save_proposal(item);
         }
         if (!model.active_proposal_can_save)
@@ -280,10 +283,10 @@ void DrawProposalActions(const core::reviews::ReviewItem& item,
 
     if (!item.proposal_id.has_value()) {
         if (item.status != core::reviews::ReviewItemStatus::Open) {
-            ImGui::TextDisabled("No proposal for resolved comment.");
+            ImGui::TextDisabled("%s", AF_TR("No proposal for resolved comment.").c_str());
             return;
         }
-        if (ImGui::Button("Create Proposed Change") && callbacks.create_proposed_change) {
+        if (ImGui::Button(AF_TR("Create Proposed Change").c_str()) && callbacks.create_proposed_change) {
             callbacks.create_proposed_change(item);
         }
         return;
@@ -302,26 +305,26 @@ void DrawProposalActions(const core::reviews::ReviewItem& item,
     const bool is_valid = validity.validity == core::reviews::ProposalValidity::Valid;
     ImU32 proposal_color = is_valid ? ui::GetTheme().success : ui::GetTheme().danger;
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(proposal_color));
-    ImGui::TextUnformatted(is_valid ? "Proposed change: Valid" : "Proposed change: Broken");
+    ImGui::TextUnformatted((is_valid ? AF_TR("Proposed change: Valid") : AF_TR("Proposed change: Broken")).c_str());
     ImGui::PopStyleColor();
     if (!is_valid && !validity.reason.empty()) {
-        ImGui::TextWrapped("Reason: %s", validity.reason.c_str());
+        ImGui::TextWrapped(AF_TR("Reason: %s").c_str(), validity.reason.c_str());
     }
 
     if (item.status == core::reviews::ReviewItemStatus::Open) {
-        if (ImGui::Button("Edit Proposal") && callbacks.edit_proposal)
+        if (ImGui::Button(AF_TR("Edit Proposal").c_str()) && callbacks.edit_proposal)
             callbacks.edit_proposal(item);
         ImGui::SameLine();
     }
     if (is_valid) {
-        if (ImGui::Button("View Proposal") && callbacks.preview_proposal)
+        if (ImGui::Button(AF_TR("View Proposal").c_str()) && callbacks.preview_proposal)
             callbacks.preview_proposal(item);
         ImGui::SameLine();
-        if (ImGui::Button("Apply Proposal") && callbacks.apply_proposal)
+        if (ImGui::Button(AF_TR("Apply Proposal").c_str()) && callbacks.apply_proposal)
             callbacks.apply_proposal(item);
         ImGui::SameLine();
     }
-    if (ImGui::Button("Delete Proposal") && callbacks.delete_proposal)
+    if (ImGui::Button(AF_TR("Delete Proposal").c_str()) && callbacks.delete_proposal)
         callbacks.delete_proposal(item);
 
     ImGui::EndGroup();
@@ -335,12 +338,12 @@ void DrawReviewItemActions(const core::reviews::ReviewItem& item,
                            const ReviewPanelCallbacks& callbacks) {
     DrawProposalActions(item, model, callbacks);
     if (item.status == core::reviews::ReviewItemStatus::Open) {
-        if (ImGui::Button("Resolve") && callbacks.resolve_review_item) {
+        if (ImGui::Button(AF_TR("Resolve").c_str()) && callbacks.resolve_review_item) {
             callbacks.resolve_review_item(item);
         }
         ImGui::SameLine();
     }
-    if (ImGui::Button("Delete") && callbacks.delete_review_item) {
+    if (ImGui::Button(AF_TR("Delete").c_str()) && callbacks.delete_review_item) {
         callbacks.delete_review_item(item);
     }
 }
@@ -365,8 +368,8 @@ void DrawSelectableMessageText(const char* id_suffix, const std::string& message
 void DrawProblemItem(const core::ProblemItem& problem, const ReviewPanelCallbacks& callbacks) {
     DrawProblemSeverityBadge(problem);
     ImGui::SameLine();
-    ImGui::TextWrapped("%s", problem.type.empty() ? "Problem" : problem.type.c_str());
-    ImGui::TextDisabled("Source: %s", core::ToString(problem.source));
+    ImGui::TextWrapped("%s", problem.type.empty() ? AF_TR("Problem").c_str() : problem.type.c_str());
+    ImGui::TextDisabled(AF_TR("Source: %s").c_str(), core::ToString(problem.source));
     DrawSelectableMessageText("problem_message", problem.message, 3.5f);
     if (!problem.quick_fix_label.empty() && callbacks.quick_fix_problem) {
         if (ImGui::Button(problem.quick_fix_label.c_str())) {
@@ -374,11 +377,11 @@ void DrawProblemItem(const core::ProblemItem& problem, const ReviewPanelCallback
         }
         ImGui::SameLine();
     }
-    if (ImGui::Button("Resolve") && callbacks.delete_problem) {
+    if (ImGui::Button((AF_TR("Resolve") + "##problem_resolve").c_str()) && callbacks.delete_problem) {
         callbacks.delete_problem(problem);
     }
     ImGui::SameLine();
-    if (ImGui::Button("Delete") && callbacks.delete_problem) {
+    if (ImGui::Button((AF_TR("Delete") + "##problem_delete").c_str()) && callbacks.delete_problem) {
         callbacks.delete_problem(problem);
     }
 }
@@ -386,35 +389,36 @@ void DrawProblemItem(const core::ProblemItem& problem, const ReviewPanelCallback
 } // namespace
 
 void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& callbacks) {
-    ImGui::TextUnformatted("Review");
+    ImGui::TextUnformatted(AF_TR("Review").c_str());
     ImGui::Separator();
 
     if (!model.has_project) {
-        ImGui::TextDisabled("Open or create a project to store review comments.");
+        ImGui::TextDisabled("%s", AF_TR("Open or create a project to store review comments.").c_str());
         return;
     }
 
     if (model.selected_element_id.empty()) {
-        ImGui::TextDisabled("Select an element to review.");
+        ImGui::TextDisabled("%s", AF_TR("Select an element to review.").c_str());
         return;
     }
 
-    ImGui::TextDisabled("Element %s", model.selected_element_id.c_str());
-    ImGui::Text("Review status: %s",
-                model.review_status_text.empty() ? "Not reviewed" : model.review_status_text.c_str());
+    ImGui::TextDisabled(AF_TR("Element %s").c_str(), model.selected_element_id.c_str());
+    const std::string review_status =
+        model.review_status_text.empty() ? AF_TR("Not reviewed") : model.review_status_text;
+    ImGui::Text(AF_TR("Review status: %s").c_str(), review_status.c_str());
     if (!model.review_status_detail.empty()) {
         ImGui::TextDisabled("%s", model.review_status_detail.c_str());
     }
     bool manual_ok = model.manual_review_ok;
-    if (ImGui::Checkbox("Manual review OK", &manual_ok) && callbacks.set_manual_review_ok) {
+    if (ImGui::Checkbox(AF_TR("Manual review OK").c_str(), &manual_ok) && callbacks.set_manual_review_ok) {
         callbacks.set_manual_review_ok(manual_ok);
     }
     bool ai_ok = model.ai_review_ok;
     ImGui::BeginDisabled();
-    ImGui::Checkbox("AI review OK", &ai_ok);
+    ImGui::Checkbox(AF_TR("AI review OK").c_str(), &ai_ok);
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("AI review OK is set by AI review outcomes.");
+        ImGui::SetTooltip("%s", AF_TR("AI review OK is set by AI review outcomes.").c_str());
     }
     ImGui::Spacing();
 
@@ -435,10 +439,10 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
     }
 
     ImGui::Separator();
-    ImGui::Text("Comments (%d)", static_cast<int>(model.review_items.size()));
+    ImGui::Text(AF_TR("Comments (%d)").c_str(), static_cast<int>(model.review_items.size()));
 
     if (model.review_items.empty() && model.problem_items.empty()) {
-        ImGui::TextDisabled("No review comments for this element.");
+        ImGui::TextDisabled("%s", AF_TR("No review comments for this element.").c_str());
     }
 
     for (const core::reviews::ReviewItem& item : model.review_items) {
@@ -450,11 +454,12 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
         if (focused_item) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(ui::GetTheme().accent));
         }
-        ImGui::TextWrapped("%s", item.title.empty() ? "Review comment" : item.title.c_str());
+        ImGui::TextWrapped("%s", item.title.empty() ? AF_TR("Review comment").c_str() : item.title.c_str());
         if (focused_item) {
             ImGui::PopStyleColor();
         }
-        ImGui::TextDisabled("Reviewed by %s", item.reviewer_name.empty() ? "not recorded" : item.reviewer_name.c_str());
+        const std::string reviewer = item.reviewer_name.empty() ? AF_TR("not recorded") : item.reviewer_name;
+        ImGui::TextDisabled(AF_TR("Reviewed by %s").c_str(), reviewer.c_str());
         DrawSelectableMessageText("review_message", item.message, 4.0f);
         DrawGuidelineTags(model, item.guideline_ids, popup_guideline_id);
         DrawReviewItemActions(item, model, callbacks);
@@ -466,7 +471,7 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
 
     if (!model.problem_items.empty()) {
         ImGui::Separator();
-        ImGui::Text("Other Problems (%d)", static_cast<int>(model.problem_items.size()));
+        ImGui::Text(AF_TR("Other Problems (%d)").c_str(), static_cast<int>(model.problem_items.size()));
         for (const core::ProblemItem& problem : model.problem_items) {
             ImGui::PushID(problem.id.c_str());
             ImGui::Separator();
@@ -476,17 +481,17 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
     }
 
     if (title_buf[0] == '\0')
-        CopyToBuffer(title_buf, sizeof(title_buf), "Review comment");
+        CopyToBuffer(title_buf, sizeof(title_buf), AF_TR("Review comment"));
 
     ImGui::Separator();
-    ImGui::TextUnformatted("New Comment");
+    ImGui::TextUnformatted(AF_TR("New Comment").c_str());
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::InputText("##review_title", title_buf, sizeof(title_buf));
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::InputTextMultiline(
         "##review_message", message_buf, sizeof(message_buf), ImVec2(-1.0f, ImGui::GetTextLineHeight() * 4.0f));
 
-    if (ImGui::Button("Add SCCG violation")) {
+    if (ImGui::Button(AF_TR("Add SCCG violation").c_str())) {
         show_guideline_selector = !show_guideline_selector;
     }
 
@@ -498,9 +503,9 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
     const bool can_add = title_buf[0] != '\0' && message_buf[0] != '\0';
     if (!can_add)
         ImGui::BeginDisabled();
-    if (ImGui::Button("Add Review Comment") && callbacks.add_review_item) {
+    if (ImGui::Button(AF_TR("Add Review Comment").c_str()) && callbacks.add_review_item) {
         callbacks.add_review_item(title_buf, message_buf, selected_guideline_ids);
-        CopyToBuffer(title_buf, sizeof(title_buf), "Review comment");
+        CopyToBuffer(title_buf, sizeof(title_buf), AF_TR("Review comment"));
         message_buf[0] = '\0';
         guideline_filter_buf[0] = '\0';
         selected_guideline_ids.clear();

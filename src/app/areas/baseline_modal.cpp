@@ -2,6 +2,7 @@
 
 #include "core/audit/audit_baseline.h"
 #include "core/string_utils.h"
+#include "ui/i18n/localization.h"
 
 #include "imgui.h"
 
@@ -47,11 +48,11 @@ void RenderBaselineModal(BaselineModalState& state,
     if (!ImGui::BeginPopupModal(kPopupId, nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         return;
 
-    ImGui::TextWrapped("Pin a named baseline to transaction sequence %llu.",
+    ImGui::TextWrapped(AF_TR("Pin a named baseline to transaction sequence %llu.").c_str(),
                        static_cast<unsigned long long>(state.at_sequence));
     ImGui::Spacing();
 
-    ImGui::TextUnformatted("Name");
+    ImGui::TextUnformatted(AF_TR("Name").c_str());
     if (state.want_focus) {
         ImGui::SetKeyboardFocusHere();
         state.want_focus = false;
@@ -60,7 +61,7 @@ void RenderBaselineModal(BaselineModalState& state,
     ImGui::InputText("##baseline_name", state.name_buf, sizeof(state.name_buf));
 
     ImGui::Spacing();
-    ImGui::TextUnformatted("Description (optional)");
+    ImGui::TextUnformatted(AF_TR("Description (optional)").c_str());
     ImGui::SetNextItemWidth(-FLT_MIN);
     ImGui::InputTextMultiline("##baseline_description",
                               state.description_buf, sizeof(state.description_buf),
@@ -83,7 +84,7 @@ void RenderBaselineModal(BaselineModalState& state,
     ImGui::SameLine();
 
     bool close_requested = false;
-    if (ImGui::Button("Cancel", ImVec2(button_width, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+    if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(button_width, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
         close_requested = true;
     }
     ImGui::SameLine();
@@ -91,7 +92,7 @@ void RenderBaselineModal(BaselineModalState& state,
     const std::string trimmed_name = core::TrimWhitespace(state.name_buf);
     const bool can_create = !trimmed_name.empty();
     if (!can_create) ImGui::BeginDisabled();
-    if (ImGui::Button("Create", ImVec2(button_width, 0.0f))) {
+    if (ImGui::Button(AF_TR("Create").c_str(), ImVec2(button_width, 0.0f))) {
         core::audit::CreateBaselineRequest req;
         req.name = trimmed_name;
         req.description = core::TrimWhitespace(state.description_buf);
@@ -103,12 +104,13 @@ void RenderBaselineModal(BaselineModalState& state,
         std::string err;
         if (core::audit::CreateBaseline(project_root, req, created, err)) {
             if (on_status) {
-                on_status("Baseline \"" + created.name + "\" created at sequence " +
-                          std::to_string(created.transaction_sequence) + ".");
+                on_status(ui::i18n::trf("Baseline \"{0}\" created at sequence {1}.",
+                                        created.name,
+                                        created.transaction_sequence));
             }
             close_requested = true;
         } else {
-            state.error_message = err.empty() ? std::string("Failed to create baseline.") : err;
+            state.error_message = err.empty() ? AF_TR("Failed to create baseline.") : err;
         }
     }
     if (!can_create) ImGui::EndDisabled();

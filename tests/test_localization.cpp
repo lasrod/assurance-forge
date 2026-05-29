@@ -143,12 +143,7 @@ TEST(LocalizationTest, JapaneseCatalogLoadsAndTranslates) {
 
 TEST(LocalizationTest, FallsBackToSourceForMissingTranslation) {
     InitRealCatalog(i18n::Language::Japanese);
-    // The AI privacy notice is intentionally untranslated; it must echo English.
-    const std::string privacy =
-        "AI features may send selected safety case content and prompts to the configured AI provider. Assurance Forge "
-        "will not send project data automatically; data is sent only when you explicitly use an AI action.";
-    EXPECT_EQ(i18n::tr(privacy), privacy);
-    // A string that is not in the catalog at all also echoes its source.
+    // A string that is not in the catalog at all echoes its source.
     EXPECT_EQ(i18n::tr("This string is not in any catalog"), "This string is not in any catalog");
 }
 

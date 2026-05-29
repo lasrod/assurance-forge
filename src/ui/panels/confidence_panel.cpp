@@ -3,6 +3,7 @@
 #include "imgui.h"
 #include "ui/confidence_model.h"
 #include "ui/gsn/gsn_canvas.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
 #include <algorithm>
@@ -42,14 +43,15 @@ void DrawOpinionSliderBar(const char* label, SubjectiveOpinion& opinion, Opinion
     value = ClampConfidenceValue(value);
 
     ImGui::PushID(label);
+    const std::string display_label = AF_TR(label);
     const float line_height = ImGui::GetTextLineHeight();
     const float available_width = ImGui::GetContentRegionAvail().x;
     const float value_width = ImGui::CalcTextSize("0.00").x;
-    const float label_width = ImGui::CalcTextSize(label).x;
+    const float label_width = ImGui::CalcTextSize(display_label.c_str()).x;
     const float bar_height = std::max(8.0f, line_height * 0.52f);
 
     ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted(label);
+    ImGui::TextUnformatted(display_label.c_str());
 
     const bool value_fits_on_label_line =
         label_width + ImGui::GetStyle().ItemSpacing.x + value_width <= available_width;
@@ -86,7 +88,7 @@ void DrawOpinionSliderBar(const char* label, SubjectiveOpinion& opinion, Opinion
     draw_list->AddCircleFilled(ImVec2(fill_x, (min.y + max.y) * 0.5f), active ? 4.0f : 3.0f, color, 18);
 
     if (hovered || active)
-        ImGui::SetTooltip("Drag to adjust %s", label);
+        ImGui::SetTooltip(AF_TR("Drag to adjust %s").c_str(), display_label.c_str());
 
     ImGui::PopID();
 }
@@ -113,11 +115,13 @@ void DrawModeSelector(ElementConfidence& confidence) {
     const float available = ImGui::GetContentRegionAvail().x;
     const float button_width = std::max(92.0f, (available - gap) * 0.5f);
 
-    if (DrawSegmentButton("Direct value", confidence.mode == ConfidenceInputMode::DirectValue, button_width)) {
+    if (DrawSegmentButton(AF_TR("Direct value").c_str(), confidence.mode == ConfidenceInputMode::DirectValue,
+                          button_width)) {
         confidence.mode = ConfidenceInputMode::DirectValue;
     }
     ImGui::SameLine();
-    if (DrawSegmentButton("Opinion triangle", confidence.mode == ConfidenceInputMode::OpinionTriangle, button_width)) {
+    if (DrawSegmentButton(AF_TR("Opinion triangle").c_str(), confidence.mode == ConfidenceInputMode::OpinionTriangle,
+                          button_width)) {
         confidence.mode = ConfidenceInputMode::OpinionTriangle;
     }
 }
@@ -142,7 +146,7 @@ void DrawProjectedConfidence(float value) {
     const Theme& theme = GetTheme();
     value = ClampConfidenceValue(value);
     ImGui::Spacing();
-    ImGui::TextUnformatted("Projected confidence");
+    ImGui::TextUnformatted(AF_TR("Projected confidence").c_str());
 
     if (ui::gsn::g_BoldFont)
         ImGui::PushFont(ui::gsn::g_BoldFont);
@@ -158,7 +162,7 @@ void DrawProjectedConfidence(float value) {
 void DrawFinalConfidence(float value, bool active) {
     const Theme& theme = GetTheme();
     value = ClampConfidenceValue(value);
-    ImGui::TextUnformatted("Confidence");
+    ImGui::TextUnformatted(AF_TR("Confidence").c_str());
     if (ui::gsn::g_BoldFont)
         ImGui::PushFont(ui::gsn::g_BoldFont);
     ImGui::PushStyleColor(
@@ -277,14 +281,16 @@ void DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
     const bool labels_fit = size.x >= 230.0f;
     DrawTextCentered(draw_list,
                      ImVec2(uncertainty.x, std::max(origin.y + 10.0f, uncertainty.y - 15.0f)),
-                     "Uncertainty",
+                     AF_TR("Uncertainty").c_str(),
                      theme.text_secondary);
     DrawTextCentered(draw_list,
                      ImVec2(disbelief.x + (labels_fit ? 22.0f : 12.0f), disbelief.y + 16.0f),
-                     "Disbelief",
+                     AF_TR("Disbelief").c_str(),
                      theme.text_secondary);
-    DrawTextCentered(
-        draw_list, ImVec2(belief.x - (labels_fit ? 16.0f : 8.0f), belief.y + 16.0f), "Belief", theme.text_secondary);
+    DrawTextCentered(draw_list,
+                     ImVec2(belief.x - (labels_fit ? 16.0f : 8.0f), belief.y + 16.0f),
+                     AF_TR("Belief").c_str(),
+                     theme.text_secondary);
 
     if (labels_fit) {
         const auto marker_position = [centroid](ImVec2 vertex) {
@@ -325,10 +331,12 @@ void DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
     DrawTextCentered(draw_list, help_center, "?", theme.text_primary);
 
     if (help_hovered) {
-        ImGui::SetTooltip("Jøsang's opinion triangle");
+        ImGui::SetTooltip("%s", AF_TR("Jøsang's opinion triangle").c_str());
     } else if (hovered || active) {
-        ImGui::SetTooltip(
-            "Belief %.2f\nDisbelief %.2f\nUncertainty %.2f", opinion.belief, opinion.disbelief, opinion.uncertainty);
+        ImGui::SetTooltip(AF_TR("Belief %.2f\nDisbelief %.2f\nUncertainty %.2f").c_str(),
+                          opinion.belief,
+                          opinion.disbelief,
+                          opinion.uncertainty);
     }
 
     ImGui::PopID();
@@ -336,7 +344,7 @@ void DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
 
 void DrawDirectMode(ElementConfidence& confidence) {
     confidence.direct_value = ClampConfidenceValue(confidence.direct_value);
-    ImGui::TextUnformatted("Confidence");
+    ImGui::TextUnformatted(AF_TR("Confidence").c_str());
     ImGui::SetNextItemWidth(-1.0f);
     if (ImGui::SliderFloat("##direct_confidence", &confidence.direct_value, 0.0f, 1.0f, "%.2f"))
         confidence.direct_value = ClampConfidenceValue(confidence.direct_value);
@@ -357,16 +365,17 @@ void DrawOpinionMode(ElementConfidence& confidence) {
     DrawOpinionSliderBar("Uncertainty", confidence.opinion, OpinionComponent::Uncertainty, theme.info);
 
     ImGui::Spacing();
-    const char* base_rate_tooltip = "Base rate controls how much unresolved uncertainty counts toward projected "
-                                    "confidence.\nProjected confidence = belief + base rate * uncertainty.";
-    ImGui::Text("Base rate %.2f", confidence.opinion.base_rate);
+    const std::string base_rate_tooltip =
+        AF_TR("Base rate controls how much unresolved uncertainty counts toward projected "
+              "confidence.\nProjected confidence = belief + base rate * uncertainty.");
+    ImGui::Text(AF_TR("Base rate %.2f").c_str(), confidence.opinion.base_rate);
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", base_rate_tooltip);
+        ImGui::SetTooltip("%s", base_rate_tooltip.c_str());
     ImGui::SetNextItemWidth(-1.0f);
     if (ImGui::SliderFloat("##base_rate", &confidence.opinion.base_rate, 0.0f, 1.0f, "%.2f"))
         confidence.opinion.base_rate = ClampConfidenceValue(confidence.opinion.base_rate);
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", base_rate_tooltip);
+        ImGui::SetTooltip("%s", base_rate_tooltip.c_str());
 
     DrawProjectedConfidence(confidence.opinion.ProjectedConfidence());
 }
@@ -381,7 +390,7 @@ bool ShowConfidencePanel(const ConfidencePanelModel& model, const ConfidencePane
 
     if (ui::gsn::g_BoldFont)
         ImGui::PushFont(ui::gsn::g_BoldFont);
-    ImGui::TextUnformatted("Confidence");
+    ImGui::TextUnformatted(AF_TR("Confidence").c_str());
     if (ui::gsn::g_BoldFont)
         ImGui::PopFont();
 
@@ -392,20 +401,21 @@ bool ShowConfidencePanel(const ConfidencePanelModel& model, const ConfidencePane
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.warning));
         ImGui::TextWrapped("%s", model.storage_warning.c_str());
         ImGui::PopStyleColor();
-        if (callbacks.backup_invalid_and_reset && ImGui::Button("Back up and start new confidence file"))
+        if (callbacks.backup_invalid_and_reset &&
+            ImGui::Button(AF_TR("Back up and start new confidence file").c_str()))
             changed = callbacks.backup_invalid_and_reset() || changed;
         return changed;
     }
 
     if (!model.has_assessment) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.text_secondary));
-        ImGui::TextWrapped("No confidence assessment stored for this element.");
+        ImGui::TextWrapped("%s", AF_TR("No confidence assessment stored for this element.").c_str());
         ImGui::PopStyleColor();
 
-        if (ImGui::Button("Add fixed confidence") && callbacks.add_confidence)
+        if (ImGui::Button(AF_TR("Add fixed confidence").c_str()) && callbacks.add_confidence)
             changed = callbacks.add_confidence(ConfidenceInputMode::DirectValue) || changed;
         ImGui::SameLine();
-        if (ImGui::Button("Add Jøsang confidence") && callbacks.add_confidence)
+        if (ImGui::Button(AF_TR("Add Jøsang confidence").c_str()) && callbacks.add_confidence)
             changed = callbacks.add_confidence(ConfidenceInputMode::OpinionTriangle) || changed;
         return changed;
     }
@@ -415,21 +425,26 @@ bool ShowConfidencePanel(const ConfidencePanelModel& model, const ConfidencePane
 
     DrawFinalConfidence(model.expected_confidence, confidence.enabled);
     ImGui::Spacing();
-    ImGui::Text("Method: %s", model.method_label.empty() ? MethodLabel(confidence.mode) : model.method_label.c_str());
-    ImGui::Text("Status: %s", model.status_label.empty() ? "Active" : model.status_label.c_str());
+    const std::string method =
+        model.method_label.empty() ? AF_TR(MethodLabel(confidence.mode)) : model.method_label;
+    ImGui::Text(AF_TR("Method: %s").c_str(), method.c_str());
+    const std::string status = model.status_label.empty() ? AF_TR("Active") : model.status_label;
+    ImGui::Text(AF_TR("Status: %s").c_str(), status.c_str());
 
     if (model.stale) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.warning));
         ImGui::TextWrapped(
-            "This confidence assessment may be stale because the element changed after the value was stored.");
+            "%s",
+            AF_TR("This confidence assessment may be stale because the element changed after the value was stored.")
+                .c_str());
         ImGui::PopStyleColor();
-        if (ImGui::Button("Mark as reviewed") && callbacks.mark_reviewed)
+        if (ImGui::Button(AF_TR("Mark as reviewed").c_str()) && callbacks.mark_reviewed)
             changed = callbacks.mark_reviewed() || changed;
     }
 
     bool enabled = confidence.enabled;
     bool active_toggled = false;
-    if (ImGui::Checkbox("Enable confidence for this element", &enabled)) {
+    if (ImGui::Checkbox(AF_TR("Enable confidence for this element").c_str(), &enabled)) {
         confidence.enabled = enabled;
         active_toggled = true;
         if (callbacks.set_active)
@@ -441,7 +456,7 @@ bool ShowConfidencePanel(const ConfidencePanelModel& model, const ConfidencePane
 
     ImGui::Separator();
     ImGui::Spacing();
-    ImGui::TextUnformatted("Mode");
+    ImGui::TextUnformatted(AF_TR("Mode").c_str());
     DrawModeSelector(confidence);
     ImGui::Spacing();
 

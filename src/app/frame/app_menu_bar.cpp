@@ -193,7 +193,7 @@ float RenderAppMenuBar(AppRuntimeState& state, bool& done, const AppMenuBarCallb
         }
 
         ImGui::Separator();
-        ImGui::MenuItem("Performance overlay", nullptr, &ui_state.show_perf_overlay);
+        ImGui::MenuItem(AF_TR("Performance overlay").c_str(), nullptr, &ui_state.show_perf_overlay);
 
         ImGui::EndMenu();
     }

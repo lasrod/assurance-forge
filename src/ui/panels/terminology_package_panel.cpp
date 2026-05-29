@@ -3,6 +3,7 @@
 #include "core/string_utils.h"
 #include "core/terminology_text_utils.h"
 #include "imgui.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
 #include <algorithm>
@@ -165,13 +166,13 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
             "##terms_table", 7, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
         return;
 
-    ImGui::TableSetupColumn("Term", ImGuiTableColumnFlags_WidthFixed, 130.0f);
-    ImGui::TableSetupColumn("Full Name / Display Name", ImGuiTableColumnFlags_WidthFixed, 190.0f);
-    ImGui::TableSetupColumn("Definition", ImGuiTableColumnFlags_WidthStretch, 1.0f);
-    ImGui::TableSetupColumn("Categories", ImGuiTableColumnFlags_WidthFixed, 140.0f);
-    ImGui::TableSetupColumn("External Reference", ImGuiTableColumnFlags_WidthFixed, 160.0f);
-    ImGui::TableSetupColumn("Origin", ImGuiTableColumnFlags_WidthFixed, 120.0f);
-    ImGui::TableSetupColumn("Used In", ImGuiTableColumnFlags_WidthFixed, 72.0f);
+    ImGui::TableSetupColumn(AF_TR("Term").c_str(), ImGuiTableColumnFlags_WidthFixed, 130.0f);
+    ImGui::TableSetupColumn(AF_TR("Full Name / Display Name").c_str(), ImGuiTableColumnFlags_WidthFixed, 190.0f);
+    ImGui::TableSetupColumn(AF_TR("Definition").c_str(), ImGuiTableColumnFlags_WidthStretch, 1.0f);
+    ImGui::TableSetupColumn(AF_TR("Categories").c_str(), ImGuiTableColumnFlags_WidthFixed, 140.0f);
+    ImGui::TableSetupColumn(AF_TR("External Reference").c_str(), ImGuiTableColumnFlags_WidthFixed, 160.0f);
+    ImGui::TableSetupColumn(AF_TR("Origin").c_str(), ImGuiTableColumnFlags_WidthFixed, 120.0f);
+    ImGui::TableSetupColumn(AF_TR("Used In").c_str(), ImGuiTableColumnFlags_WidthFixed, 72.0f);
     ImGui::TableHeadersRow();
 
     int visible_rows = 0;
@@ -193,7 +194,8 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
         ImGui::PushID(static_cast<int>(term_index));
         const ImGuiSelectableFlags selectable_flags =
             ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
-        if (ImGui::Selectable(term.value.empty() ? "<empty>" : term.value.c_str(), selected, selectable_flags) &&
+        if (ImGui::Selectable(term.value.empty() ? AF_TR("<empty>").c_str() : term.value.c_str(), selected,
+                              selectable_flags) &&
             callbacks.select_term) {
             callbacks.select_term(ref);
         }
@@ -219,7 +221,7 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
             if (ImGui::SmallButton(label.c_str()))
                 callbacks.find_term_usages(ref);
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Find usages");
+                ImGui::SetTooltip("%s", AF_TR("Find usages").c_str());
         } else {
             ImGui::Text("%d", usage_count);
         }
@@ -229,7 +231,7 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
     if (visible_rows == 0) {
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
-        ImGui::TextDisabled("No terms");
+        ImGui::TextDisabled("%s", AF_TR("No terms").c_str());
     }
 
     ImGui::EndTable();
@@ -238,9 +240,9 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
 std::string CategoryPreview(const TerminologyPackagePanelModel& model) {
     const std::string filter = model.category_filter_buffer ? model.category_filter_buffer : "";
     if (filter.empty())
-        return "All categories";
+        return AF_TR("All categories");
     if (filter == kUncategorizedFilter)
-        return "Uncategorized";
+        return AF_TR("Uncategorized");
     return core::CategoryDisplayName(*model.package, filter);
 }
 
@@ -249,10 +251,11 @@ void RenderCategoryFilter(const TerminologyPackagePanelModel& model,
     const std::string active_filter = model.category_filter_buffer ? model.category_filter_buffer : "";
     const std::string preview = CategoryPreview(model);
     ImGui::SetNextItemWidth(220.0f);
-    if (ImGui::BeginCombo("Category filter", preview.c_str())) {
-        if (ImGui::Selectable("All categories", active_filter.empty()) && callbacks.set_category_filter)
+    if (ImGui::BeginCombo(AF_TR("Category filter").c_str(), preview.c_str())) {
+        if (ImGui::Selectable(AF_TR("All categories").c_str(), active_filter.empty()) && callbacks.set_category_filter)
             callbacks.set_category_filter("");
-        if (ImGui::Selectable("Uncategorized", active_filter == kUncategorizedFilter) && callbacks.set_category_filter)
+        if (ImGui::Selectable(AF_TR("Uncategorized").c_str(), active_filter == kUncategorizedFilter) &&
+            callbacks.set_category_filter)
             callbacks.set_category_filter(kUncategorizedFilter);
         for (const auto& category : model.package->categories) {
             const core::TerminologyCategoryRef ref = RefFor(category);
@@ -274,10 +277,10 @@ void RenderCategoriesTable(const TerminologyPackagePanelModel& model,
             "##categories_table", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
         return;
 
-    ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 120.0f);
-    ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 180.0f);
-    ImGui::TableSetupColumn("Description", ImGuiTableColumnFlags_WidthStretch, 1.0f);
-    ImGui::TableSetupColumn("Used By", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+    ImGui::TableSetupColumn(AF_TR("ID").c_str(), ImGuiTableColumnFlags_WidthFixed, 120.0f);
+    ImGui::TableSetupColumn(AF_TR("Name").c_str(), ImGuiTableColumnFlags_WidthFixed, 180.0f);
+    ImGui::TableSetupColumn(AF_TR("Description").c_str(), ImGuiTableColumnFlags_WidthStretch, 1.0f);
+    ImGui::TableSetupColumn(AF_TR("Used By").c_str(), ImGuiTableColumnFlags_WidthFixed, 80.0f);
     ImGui::TableHeadersRow();
 
     for (const auto& category : model.package->categories) {
@@ -304,7 +307,7 @@ void RenderCategoriesTable(const TerminologyPackagePanelModel& model,
     if (model.package->categories.empty()) {
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
-        ImGui::TextDisabled("No categories");
+        ImGui::TextDisabled("%s", AF_TR("No categories").c_str());
     }
 
     ImGui::EndTable();
@@ -317,12 +320,12 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     ImGui::BeginChild("TerminologyPackagePanel", ImVec2(0, 0), false, ImGuiWindowFlags_None);
 
     if (!model.package) {
-        ImGui::TextDisabled("No terminology package selected.");
+        ImGui::TextDisabled("%s", AF_TR("No terminology package selected.").c_str());
         ImGui::EndChild();
         return;
     }
 
-    ImGui::TextUnformatted("Terminology Package");
+    ImGui::TextUnformatted(AF_TR("Terminology Package").c_str());
     ImGui::SameLine();
     ImGui::TextDisabled("%s", model.package->id.empty() ? model.package->gid.c_str() : model.package->id.c_str());
     if (!model.source_file_path.empty())
@@ -332,13 +335,14 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     ImGui::Spacing();
 
     ImGui::SetNextItemWidth(-1.0f);
-    if (ImGui::InputText("Package name", model.name_buffer, model.name_buffer_size) && callbacks.apply_changes) {
+    if (ImGui::InputText(AF_TR("Package name").c_str(), model.name_buffer, model.name_buffer_size) &&
+        callbacks.apply_changes) {
         callbacks.apply_changes();
     }
 
     ImGui::SetNextItemWidth(-1.0f);
-    if (ImGui::InputTextMultiline(
-            "Package description", model.description_buffer, model.description_buffer_size, ImVec2(-1.0f, 96.0f)) &&
+    if (ImGui::InputTextMultiline(AF_TR("Package description").c_str(), model.description_buffer,
+                                  model.description_buffer_size, ImVec2(-1.0f, 96.0f)) &&
         callbacks.apply_changes) {
         callbacks.apply_changes();
     }
@@ -346,7 +350,7 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     ImGui::Spacing();
     if (!model.can_delete)
         ImGui::BeginDisabled();
-    if (ImGui::Button("Delete Package") && callbacks.delete_package)
+    if (ImGui::Button(AF_TR("Delete Package").c_str()) && callbacks.delete_package)
         callbacks.delete_package();
     if (!model.can_delete)
         ImGui::EndDisabled();
@@ -356,69 +360,73 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     }
 
     ImGui::Spacing();
-    ImGui::SeparatorText("Terms");
-    if (ImGui::Button("Add Term") && callbacks.add_term)
+    ImGui::SeparatorText(AF_TR("Terms").c_str());
+    if (ImGui::Button(AF_TR("Add Term").c_str()) && callbacks.add_term)
         callbacks.add_term();
     ImGui::SameLine();
     if (callbacks.edit_term && (model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty()))
         ImGui::BeginDisabled();
-    if (ImGui::Button("Edit Term") && callbacks.edit_term)
+    if (ImGui::Button(AF_TR("Edit Term").c_str()) && callbacks.edit_term)
         callbacks.edit_term(model.selected_term_ref);
     if (callbacks.edit_term && (model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty()))
         ImGui::EndDisabled();
     ImGui::SameLine();
     if (callbacks.delete_term && (model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty()))
         ImGui::BeginDisabled();
-    if (ImGui::Button("Delete Term") && callbacks.delete_term)
+    if (ImGui::Button(AF_TR("Delete Term").c_str()) && callbacks.delete_term)
         callbacks.delete_term(model.selected_term_ref);
     if (callbacks.delete_term && (model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty()))
         ImGui::EndDisabled();
     ImGui::SameLine();
     if (callbacks.find_term_usages && (model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty()))
         ImGui::BeginDisabled();
-    if (ImGui::Button("Find Usages") && callbacks.find_term_usages)
+    if (ImGui::Button(AF_TR("Find Usages").c_str()) && callbacks.find_term_usages)
         callbacks.find_term_usages(model.selected_term_ref);
     if (callbacks.find_term_usages && (model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty()))
         ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::Button("Add Category##terms_add_category") && callbacks.add_category)
+    if (ImGui::Button((AF_TR("Add Category") + "##terms_add_category").c_str()) && callbacks.add_category)
         callbacks.add_category();
     ImGui::SameLine();
     RenderCategoryFilter(model, callbacks);
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::InputText("Search", model.search_buffer, model.search_buffer_size);
+    ImGui::InputText(AF_TR("Search").c_str(), model.search_buffer, model.search_buffer_size);
     ImGui::Spacing();
     RenderTermsTable(model, callbacks);
 
     if (!model.package->expressions.empty()) {
-        ImGui::TextDisabled("%d legacy expression entr%s are present and shown read-only by older tooling.",
-                            static_cast<int>(model.package->expressions.size()),
-                            model.package->expressions.size() == 1 ? "y" : "ies");
+        ImGui::TextDisabled(
+            "%s",
+            ui::i18n::trnf("{0} legacy expression entry is present and shown read-only by older tooling.",
+                           "{0} legacy expression entries are present and shown read-only by older tooling.",
+                           static_cast<int>(model.package->expressions.size()),
+                           static_cast<int>(model.package->expressions.size()))
+                .c_str());
     }
 
     ImGui::Spacing();
-    ImGui::SeparatorText("Categories");
-    if (ImGui::Button("Add Category##categories_add_category") && callbacks.add_category)
+    ImGui::SeparatorText(AF_TR("Categories").c_str());
+    if (ImGui::Button((AF_TR("Add Category") + "##categories_add_category").c_str()) && callbacks.add_category)
         callbacks.add_category();
     ImGui::SameLine();
     const bool has_selected_category =
         !model.selected_category_ref.id.empty() || !model.selected_category_ref.gid.empty();
     if (!has_selected_category)
         ImGui::BeginDisabled();
-    if (ImGui::Button("Edit Category") && callbacks.edit_category)
+    if (ImGui::Button(AF_TR("Edit Category").c_str()) && callbacks.edit_category)
         callbacks.edit_category(model.selected_category_ref);
     if (!has_selected_category)
         ImGui::EndDisabled();
     ImGui::SameLine();
     if (!has_selected_category)
         ImGui::BeginDisabled();
-    if (ImGui::Button("Delete Category") && callbacks.delete_category)
+    if (ImGui::Button(AF_TR("Delete Category").c_str()) && callbacks.delete_category)
         callbacks.delete_category(model.selected_category_ref);
     if (!has_selected_category)
         ImGui::EndDisabled();
     if (model.package->categories.empty() && callbacks.seed_recommended_categories) {
         ImGui::SameLine();
-        if (ImGui::Button("Add Recommended"))
+        if (ImGui::Button(AF_TR("Add Recommended").c_str()))
             callbacks.seed_recommended_categories();
     }
     ImGui::Spacing();

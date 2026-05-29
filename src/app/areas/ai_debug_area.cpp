@@ -4,6 +4,7 @@
 #include "app/actions/ai_review_actions.h"
 #include "app/app_runtime_state.h"
 #include "app/guideline_catalog.h"
+#include "ui/i18n/localization.h"
 #include "ui/ui_state.h"
 
 #include "imgui.h"
@@ -69,7 +70,7 @@ void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
     ImGui::BeginChild("##ai_debug_actions", ImVec2(left_width, panel_height), true);
     if (review_running)
         ImGui::BeginDisabled();
-    if (ImGui::Button("AI Review", ImVec2(-1.0f, 0.0f))) {
+    if (ImGui::Button(AF_TR("AI Review").c_str(), ImVec2(-1.0f, 0.0f))) {
         actions::AiReviewActions(state).BeginForSelection();
     }
     if (review_running)
@@ -83,11 +84,11 @@ void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
             const bool enabled = !review_running && loaded_case && selected_element && compatible;
             std::string tooltip = profile.description;
             if (!loaded_case)
-                tooltip = "Open an assurance case before running SCCG profile reviews.";
+                tooltip = AF_TR("Open an assurance case before running SCCG profile reviews.");
             else if (!selected_element)
-                tooltip = "Select a GSN/SACM element before running SCCG profile reviews.";
+                tooltip = AF_TR("Select a GSN/SACM element before running SCCG profile reviews.");
             else if (!compatible)
-                tooltip = profile.description + "\n\nThis profile does not apply to the selected element type.";
+                tooltip = profile.description + "\n\n" + AF_TR("This profile does not apply to the selected element type.");
 
             ImGui::PushID(profile.id.c_str());
             if (!enabled)
@@ -102,13 +103,13 @@ void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
         }
     } else if (!state.guideline_catalog_error.empty()) {
         ImGui::Separator();
-        ImGui::TextWrapped("SCCG profiles unavailable: %s", state.guideline_catalog_error.c_str());
+        ImGui::TextWrapped(AF_TR("SCCG profiles unavailable: %s").c_str(), state.guideline_catalog_error.c_str());
     }
     ImGui::EndChild();
 
     ImGui::SameLine();
     ImGui::BeginChild("##ai_debug_prompt_column", ImVec2(prompt_width, panel_height), false);
-    ImGui::TextUnformatted("Prompt");
+    ImGui::TextUnformatted(AF_TR("Prompt").c_str());
     std::string prompt = ai_review.PendingPrompt();
     const float send_row_height = ImGui::GetFrameHeightWithSpacing();
     const float prompt_height = std::max(80.0f, ImGui::GetContentRegionAvail().y - send_row_height);
@@ -121,7 +122,7 @@ void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
     const bool has_prompt = !ai_review.PendingPrompt().empty();
     if (!has_prompt || review_running)
         ImGui::BeginDisabled();
-    if (ImGui::Button(review_running ? "Sending..." : "Send")) {
+    if (ImGui::Button((review_running ? AF_TR("Sending...") : AF_TR("Send")).c_str())) {
         actions::AiReviewActions(state).StartPendingRequest();
     }
     if (!has_prompt || review_running)
@@ -130,17 +131,17 @@ void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
 
     ImGui::SameLine();
     ImGui::BeginChild("##ai_debug_response_column", ImVec2(0.0f, panel_height), false);
-    ImGui::TextUnformatted("Response");
+    ImGui::TextUnformatted(AF_TR("Response").c_str());
     if (review_running) {
         ImGui::SameLine();
-        ImGui::TextDisabled("waiting...");
+        ImGui::TextDisabled("%s", AF_TR("waiting...").c_str());
     }
     if (!ai_review.LastParseError().empty()) {
-        ImGui::TextWrapped("Parse error: %s", ai_review.LastParseError().c_str());
+        ImGui::TextWrapped(AF_TR("Parse error: %s").c_str(), ai_review.LastParseError().c_str());
     }
     std::string response = ai_review.LastRawResponse();
     if (response.empty())
-        response = "No response yet.";
+        response = AF_TR("No response yet.");
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::InputTextMultiline("##ai_debug_response", &response, ImVec2(-1.0f, -1.0f), ImGuiInputTextFlags_ReadOnly);
     ImGui::EndChild();

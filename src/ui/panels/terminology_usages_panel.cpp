@@ -1,6 +1,7 @@
 #include "ui/panels/terminology_usages_panel.h"
 
 #include "imgui.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
 #include <string>
@@ -80,7 +81,7 @@ void DrawUsageRow(std::size_t index,
         ImGui::SetTooltip("%s", usage.snippet.c_str());
 
     ImGui::TableSetColumnIndex(5);
-    if (ImGui::SmallButton("Go") && callbacks.activate_usage)
+    if (ImGui::SmallButton(AF_TR("Go").c_str()) && callbacks.activate_usage)
         callbacks.activate_usage(index);
 
     ImGui::PopID();
@@ -90,17 +91,17 @@ void DrawUsageRow(std::size_t index,
 
 void ShowTerminologyUsagesPanelContent(const TerminologyUsagesPanelModel& model,
                                        const TerminologyUsagesPanelCallbacks& callbacks) {
-    ImGui::TextUnformatted("Term Usages");
+    ImGui::TextUnformatted(AF_TR("Term Usages").c_str());
     ImGui::Separator();
 
     if (!model.has_search) {
-        ImGui::TextDisabled("Run Find usages from a term card or glossary row.");
+        ImGui::TextDisabled("%s", AF_TR("Run Find usages from a term card or glossary row.").c_str());
         return;
     }
 
     const std::string title = model.term_name.empty() || model.term_name == model.term_value
-                                  ? "Find usages: " + model.term_value
-                                  : "Find usages: " + model.term_value + "  " + model.term_name;
+                                  ? ui::i18n::trf("Find usages: {0}", model.term_value)
+                                  : ui::i18n::trf("Find usages: {0}  {1}", model.term_value, model.term_name);
     ImGui::TextUnformatted(title.c_str());
     if (!model.message.empty())
         ImGui::TextDisabled("%s", model.message.c_str());
@@ -111,11 +112,11 @@ void ShowTerminologyUsagesPanelContent(const TerminologyUsagesPanelModel& model,
 
     const auto* usages = model.usages;
     const int count = usages ? static_cast<int>(usages->size()) : 0;
-    ImGui::TextDisabled("%d usage%s found", count, count == 1 ? "" : "s");
+    ImGui::TextDisabled("%s", ui::i18n::trnf("{0} usage found", "{0} usages found", count, count).c_str());
     ImGui::Separator();
 
     if (!usages || usages->empty()) {
-        ImGui::TextDisabled("No usages found.");
+        ImGui::TextDisabled("%s", AF_TR("No usages found.").c_str());
         return;
     }
 
@@ -123,11 +124,11 @@ void ShowTerminologyUsagesPanelContent(const TerminologyUsagesPanelModel& model,
                                   ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
     if (ImGui::BeginTable("terminology_usages_table", 6, flags, ImVec2(0.0f, 0.0f))) {
         ImGui::TableSetupScrollFreeze(0, 1);
-        ImGui::TableSetupColumn("Element", ImGuiTableColumnFlags_WidthFixed, 150.0f);
-        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 96.0f);
-        ImGui::TableSetupColumn("Package", ImGuiTableColumnFlags_WidthFixed, 150.0f);
-        ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 120.0f);
-        ImGui::TableSetupColumn("Snippet", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+        ImGui::TableSetupColumn(AF_TR("Element").c_str(), ImGuiTableColumnFlags_WidthFixed, 150.0f);
+        ImGui::TableSetupColumn(AF_TR("Type").c_str(), ImGuiTableColumnFlags_WidthFixed, 96.0f);
+        ImGui::TableSetupColumn(AF_TR("Package").c_str(), ImGuiTableColumnFlags_WidthFixed, 150.0f);
+        ImGui::TableSetupColumn(AF_TR("Status").c_str(), ImGuiTableColumnFlags_WidthFixed, 120.0f);
+        ImGui::TableSetupColumn(AF_TR("Snippet").c_str(), ImGuiTableColumnFlags_WidthStretch, 1.0f);
         ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 48.0f);
         ImGui::TableHeadersRow();
 

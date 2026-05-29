@@ -5,6 +5,7 @@
 #include "hello_imgui/icons_font_awesome_4.h"
 #include "imgui.h"
 #include "imgui_stdlib.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 #include "ui/ui_state.h"
 
@@ -38,15 +39,15 @@ void UpsertIfAvailable(const AcpPanelCallbacks* callbacks, const parser::AcpReco
 std::string DisplayType(const parser::SacmElement& element) {
     if (element.type == "claim") {
         if (element.assertion_declaration == "assumed")
-            return "Assumption";
+            return AF_TR("Assumption");
         if (element.assertion_declaration == "justification")
-            return "Justification";
-        return "Goal";
+            return AF_TR("Justification");
+        return AF_TR("Goal");
     }
     if (element.type == "argumentreasoning")
-        return "Strategy";
+        return AF_TR("Strategy");
     if (element.type == "artifactreference")
-        return "Solution";
+        return AF_TR("Solution");
     return element.type;
 }
 
@@ -69,7 +70,7 @@ bool ElementIdLink(const parser::AssuranceCase& model,
         if (!element->name.empty())
             tooltip += ": " + element->name;
     } else {
-        tooltip = "Element not found in the active model.";
+        tooltip = AF_TR("Element not found in the active model.");
     }
     const Theme& theme = GetTheme();
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
@@ -93,7 +94,7 @@ void RenderTargetRow(const parser::AssuranceCase& model,
                      const AcpPanelCallbacks* callbacks) {
     const Theme& theme = GetTheme();
     ImGui::PushStyleColor(ImGuiCol_Text, theme.text_secondary);
-    ImGui::TextUnformatted("Target:");
+    ImGui::TextUnformatted(AF_TR("Target:").c_str());
     ImGui::PopStyleColor();
     ImGui::SameLine(0.0f, 6.0f);
 
@@ -135,14 +136,14 @@ void RenderTargetRow(const parser::AssuranceCase& model,
             ElementIdLink(model, found->child_id, callbacks);
             if (!found->reasoning_id.empty()) {
                 ImGui::SameLine(0.0f, 6.0f);
-                ImGui::TextDisabled("(via");
+                ImGui::TextDisabled("%s", AF_TR("(via").c_str());
                 ImGui::SameLine(0.0f, 4.0f);
                 ElementIdLink(model, found->reasoning_id, callbacks);
                 ImGui::SameLine(0.0f, 2.0f);
                 ImGui::TextDisabled(")");
             }
         } else {
-            ImGui::TextWrapped("Relationship %s", acp.target_id.c_str());
+            ImGui::TextWrapped(AF_TR("Relationship %s").c_str(), acp.target_id.c_str());
         }
         return;
     }
@@ -201,13 +202,13 @@ bool ShowAcpPanel(parser::AssuranceCase* model,
         return false;
 
     if (!model) {
-        ImGui::TextDisabled("No safety case loaded.");
+        ImGui::TextDisabled("%s", AF_TR("No safety case loaded.").c_str());
         return false;
     }
 
     parser::AcpRecord* selected = FindSelectedAcp(model, ui_state.selected_acp_id);
     if (!selected) {
-        ImGui::TextDisabled("ACP not found: %s", ui_state.selected_acp_id.c_str());
+        ImGui::TextDisabled(AF_TR("ACP not found: %s").c_str(), ui_state.selected_acp_id.c_str());
         return false;
     }
 
@@ -215,12 +216,12 @@ bool ShowAcpPanel(parser::AssuranceCase* model,
     parser::AcpRecord edited = *selected;
 
     ImGui::PushID(edited.id.c_str());
-    MetadataRow("ID:", edited.id);
+    MetadataRow(AF_TR("ID:").c_str(), edited.id);
 
     {
         const Theme& theme = GetTheme();
         ImGui::PushStyleColor(ImGuiCol_Text, theme.text_secondary);
-        ImGui::TextUnformatted("Name:");
+        ImGui::TextUnformatted(AF_TR("Name:").c_str());
         ImGui::PopStyleColor();
         ImGui::SameLine(0.0f, 6.0f);
         ImGui::SetNextItemWidth(-1.0f);
@@ -231,9 +232,9 @@ bool ShowAcpPanel(parser::AssuranceCase* model,
     RenderTargetRow(*model, edited, callbacks);
 
     ImGui::Spacing();
-    ImGui::TextUnformatted("Resolution mode");
+    ImGui::TextUnformatted(AF_TR("Resolution mode").c_str());
     ImGui::Separator();
-    if (ImGui::RadioButton("Incomplete",
+    if (ImGui::RadioButton(AF_TR("Incomplete").c_str(),
                            edited.resolution_kind != "text" && edited.resolution_kind != "topGoalReference")) {
         edited.resolution_kind = "none";
         edited.confidence_claim_id.clear();
@@ -241,13 +242,14 @@ bool ShowAcpPanel(parser::AssuranceCase* model,
         edited.top_goal_id.clear();
         UpsertIfAvailable(callbacks, edited, modified);
     }
-    if (ImGui::RadioButton("Text confidence argument", edited.resolution_kind == "text")) {
+    if (ImGui::RadioButton(AF_TR("Text confidence argument").c_str(), edited.resolution_kind == "text")) {
         edited.resolution_kind = "text";
         edited.argument_package_id.clear();
         edited.top_goal_id.clear();
         UpsertIfAvailable(callbacks, edited, modified);
     }
-    if (ImGui::RadioButton("Separate confidence argument tree", edited.resolution_kind == "topGoalReference")) {
+    if (ImGui::RadioButton(AF_TR("Separate confidence argument tree").c_str(),
+                           edited.resolution_kind == "topGoalReference")) {
         edited.resolution_kind = "topGoalReference";
         edited.confidence_claim_id.clear();
         UpsertIfAvailable(callbacks, edited, modified);
@@ -255,7 +257,7 @@ bool ShowAcpPanel(parser::AssuranceCase* model,
 
     if (edited.resolution_kind == "text") {
         ImGui::Spacing();
-        ImGui::TextUnformatted("Text confidence argument");
+        ImGui::TextUnformatted(AF_TR("Text confidence argument").c_str());
         ImGui::Separator();
         ImGui::SetNextItemWidth(-1);
         if (ImGui::InputTextMultiline("##acp_text",
@@ -268,51 +270,52 @@ bool ShowAcpPanel(parser::AssuranceCase* model,
             UpsertIfAvailable(callbacks, edited, modified);
         }
         if (!edited.confidence_claim_id.empty())
-            MetadataRow("Native claim:", edited.confidence_claim_id);
+            MetadataRow(AF_TR("Native claim:").c_str(), edited.confidence_claim_id);
     }
 
     if (edited.resolution_kind == "topGoalReference") {
         ImGui::Spacing();
-        ImGui::TextUnformatted("Confidence argument tree");
+        ImGui::TextUnformatted(AF_TR("Confidence argument tree").c_str());
         ImGui::Separator();
         const bool already_linked = !edited.argument_package_id.empty() && !edited.top_goal_id.empty();
 
         if (already_linked) {
             const Theme& theme = GetTheme();
             ImGui::PushStyleColor(ImGuiCol_Text, theme.text_secondary);
-            ImGui::TextUnformatted("Linked:");
+            ImGui::TextUnformatted(AF_TR("Linked:").c_str());
             ImGui::PopStyleColor();
             ImGui::SameLine(0.0f, 6.0f);
             ImGui::TextWrapped("%s / %s", edited.argument_package_id.c_str(), edited.top_goal_id.c_str());
-            if (ImGui::Button("Open confidence argument tree")) {
+            if (ImGui::Button(AF_TR("Open confidence argument tree").c_str())) {
                 if (callbacks && callbacks->open_confidence_argument_tree)
                     modified = callbacks->open_confidence_argument_tree(edited.id) || modified;
             }
             ImGui::SameLine();
-            if (ImGui::Button("Unlink")) {
+            if (ImGui::Button(AF_TR("Unlink").c_str())) {
                 edited.argument_package_id.clear();
                 edited.top_goal_id.clear();
                 UpsertIfAvailable(callbacks, edited, modified);
             }
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Detach this ACP from its current confidence argument tree.");
+                ImGui::SetTooltip("%s", AF_TR("Detach this ACP from its current confidence argument tree.").c_str());
         } else {
             std::vector<ConfidenceTopGoalOption> options;
             if (sacm_package)
                 options = CollectConfidenceTopGoals(*sacm_package);
 
-            if (ImGui::Button("Create new confidence argument tree")) {
+            if (ImGui::Button(AF_TR("Create new confidence argument tree").c_str())) {
                 if (callbacks && callbacks->create_confidence_argument_tree)
                     modified = callbacks->create_confidence_argument_tree(edited.id) || modified;
             }
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Create a new SACM argument package and link this ACP to its top goal.");
+                ImGui::SetTooltip("%s",
+                                  AF_TR("Create a new SACM argument package and link this ACP to its top goal.").c_str());
 
             ImGui::Spacing();
             if (options.empty()) {
-                ImGui::TextDisabled("No existing confidence argument trees available to link.");
+                ImGui::TextDisabled("%s", AF_TR("No existing confidence argument trees available to link.").c_str());
             } else {
-                ImGui::TextUnformatted("Or link to an existing confidence argument tree:");
+                ImGui::TextUnformatted(AF_TR("Or link to an existing confidence argument tree:").c_str());
                 static std::string s_selected_label;
                 // Resolve current selection against options each frame (the
                 // SACM package may have changed since the last render).
@@ -340,7 +343,7 @@ bool ShowAcpPanel(parser::AssuranceCase* model,
                     }
                     ImGui::EndCombo();
                 }
-                if (ImGui::Button("Link selected confidence argument tree")) {
+                if (ImGui::Button(AF_TR("Link selected confidence argument tree").c_str())) {
                     edited.argument_package_id = options[current].argument_package_id;
                     edited.top_goal_id = options[current].top_goal_id;
                     UpsertIfAvailable(callbacks, edited, modified);
@@ -350,12 +353,12 @@ bool ShowAcpPanel(parser::AssuranceCase* model,
     }
 
     ImGui::Spacing();
-    if (ImGui::Button("Delete ACP")) {
+    if (ImGui::Button(AF_TR("Delete ACP").c_str())) {
         if (callbacks && callbacks->remove_acp)
             modified = callbacks->remove_acp(edited.id) || modified;
     }
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Remove the SACM-backed ACP metadata from its target.");
+        ImGui::SetTooltip("%s", AF_TR("Remove the SACM-backed ACP metadata from its target.").c_str());
 
     ImGui::PopID();
     return modified;

@@ -16,6 +16,7 @@
 #include "core/audit/history_reconstruction.h"
 #include "core/audit/timeline_model_builder.h"
 #include "ui/element_context_menu.h"
+#include "ui/i18n/localization.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
@@ -180,9 +181,9 @@ void RenderHistoricalCanvas(CanvasHistoryState& tab_state,
                             const ui::gsn::CanvasOverlayButtons* overlay_buttons) {
     if (!tab_state.reconstruction.has_state) {
         if (!tab_state.reconstruction.error.empty())
-            ImGui::TextDisabled("Reconstruction failed: %s", tab_state.reconstruction.error.c_str());
+            ImGui::TextDisabled(AF_TR("Reconstruction failed: %s").c_str(), tab_state.reconstruction.error.c_str());
         else
-            ImGui::TextDisabled("No reconstructed model to display.");
+            ImGui::TextDisabled("%s", AF_TR("No reconstructed model to display.").c_str());
         return;
     }
     const bool sequence_changed = !tab_state.historical_seeded ||
@@ -285,19 +286,22 @@ void RenderCanvasDivergenceBanner(AppRuntimeState& state,
     ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(80, 50, 0, 255));
     ImGui::BeginChild("##audit_warning_banner",
                       ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 7.0f), true);
-    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "Audit log divergence detected");
+    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s", AF_TR("Audit log divergence detected").c_str());
     ImGui::TextWrapped(
-        "The replayed audit history does not reproduce the on-disk SACM. This usually means "
-        "edits were applied through a path that did not record transactions. Pinned historical "
-        "views may be inaccurate.");
+        "%s",
+        AF_TR("The replayed audit history does not reproduce the on-disk SACM. This usually means "
+              "edits were applied through a path that did not record transactions. Pinned historical "
+              "views may be inaccurate.")
+            .c_str());
     if (!v.replayed_canonical_hash.empty() && !v.on_disk_canonical_hash.empty()) {
-        ImGui::TextWrapped("replay=%s  on_disk=%s", v.replayed_canonical_hash.substr(0, 12).c_str(),
+        ImGui::TextWrapped(AF_TR("replay=%s  on_disk=%s").c_str(), v.replayed_canonical_hash.substr(0, 12).c_str(),
                            v.on_disk_canonical_hash.substr(0, 12).c_str());
     }
-    if (ImGui::Button("Reconcile audit log\u2026"))
+    if (ImGui::Button(AF_TR("Reconcile audit log\u2026").c_str()))
         ImGui::OpenPopup("Reconcile audit log##reconcile_confirm");
     ImGui::SameLine();
-    ImGui::TextWrapped("(archives current .af/ artifacts and rebuilds from the current SACM file)");
+    ImGui::TextWrapped("%s",
+                       AF_TR("(archives current .af/ artifacts and rebuilds from the current SACM file)").c_str());
 
     // Confirmation modal. The Reconcile action is destructive in the sense
     // that the app will no longer surface the current audit history through
@@ -312,20 +316,24 @@ void RenderCanvasDivergenceBanner(AppRuntimeState& state,
     ImGui::SetNextWindowSizeConstraints(ImVec2(popup_width, 0.0f), ImVec2(popup_width, FLT_MAX));
     if (ImGui::BeginPopupModal("Reconcile audit log##reconcile_confirm", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "This will rebuild the audit store.");
+        ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s", AF_TR("This will rebuild the audit store.").c_str());
         ImGui::Spacing();
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x);
         ImGui::TextWrapped(
-            "The current `.af/manifest.af.json`, `.af/snapshots/`, and `.af/audit/` will be moved "
-            "to a timestamped `.af/backup_<UTC>/` folder, and a fresh audit store will be initialized "
-            "from the current SACM file on disk.");
+            "%s",
+            AF_TR("The current `.af/manifest.af.json`, `.af/snapshots/`, and `.af/audit/` will be moved "
+                  "to a timestamped `.af/backup_<UTC>/` folder, and a fresh audit store will be initialized "
+                  "from the current SACM file on disk.")
+                .c_str());
         ImGui::Spacing();
         ImGui::TextWrapped(
-            "Your existing transaction history is preserved on disk under the backup folder, but the "
-            "application timeline will start over from a new initial snapshot. Pinned historical views "
-            "from before this operation will no longer be browsable in-app.");
+            "%s",
+            AF_TR("Your existing transaction history is preserved on disk under the backup folder, but the "
+                  "application timeline will start over from a new initial snapshot. Pinned historical views "
+                  "from before this operation will no longer be browsable in-app.")
+                .c_str());
         ImGui::Spacing();
-        ImGui::TextWrapped("Continue?");
+        ImGui::TextWrapped("%s", AF_TR("Continue?").c_str());
         ImGui::PopTextWrapPos();
         ImGui::Spacing();
 
@@ -336,14 +344,15 @@ void RenderCanvasDivergenceBanner(AppRuntimeState& state,
         if (avail > used)
             ImGui::Dummy(ImVec2(avail - used, 0.0f));
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(button_width, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(button_width, 0.0f)) ||
+            ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.20f, 0.20f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.80f, 0.25f, 0.25f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.55f, 0.15f, 0.15f, 1.0f));
-        if (ImGui::Button("Reconcile", ImVec2(button_width, 0.0f))) {
+        if (ImGui::Button(AF_TR("Reconcile").c_str(), ImVec2(button_width, 0.0f))) {
             if (callbacks.reconcile_audit_store)
                 callbacks.reconcile_audit_store();
             ImGui::CloseCurrentPopup();
@@ -362,12 +371,14 @@ void RenderCanvasAutosaveErrorBanner(AppRuntimeState& state) {
     ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(96, 16, 16, 255));
     ImGui::BeginChild("##autosave_error_banner",
                       ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 3.5f), true);
-    ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.55f, 1.0f), "Autosave write failed");
+    ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.55f, 1.0f), "%s", AF_TR("Autosave write failed").c_str());
     ImGui::TextWrapped("%s", state.last_autosave_error.c_str());
-    ImGui::TextWrapped("Your most recent change is recorded in the audit log but the on-disk SACM "
-                       "file may be out of date. Try a manual Save (File \xE2\x86\x92 Save) or "
-                       "verify free disk space, file permissions, and any external sync agent.");
-    if (ImGui::Button("Dismiss##autosave_error"))
+    ImGui::TextWrapped("%s",
+                       AF_TR("Your most recent change is recorded in the audit log but the on-disk SACM "
+                             "file may be out of date. Try a manual Save (File → Save) or "
+                             "verify free disk space, file permissions, and any external sync agent.")
+                           .c_str());
+    if (ImGui::Button((AF_TR("Dismiss") + "##autosave_error").c_str()))
         state.last_autosave_error.clear();
     ImGui::EndChild();
     ImGui::PopStyleColor();
@@ -460,8 +471,7 @@ void RenderArgumentPackageCanvasWithTimeline(
         overlay.on_return_to_live = [&tab]() {
             tab.timeline.preview_sequence.reset();
         };
-        overlay.historical_badge_text =
-            "Preview: Tx " + std::to_string(target_seq) + " (read-only)";
+        overlay.historical_badge_text = ui::i18n::trf("Preview: Tx {0} (read-only)", target_seq);
     }
 
     // Capture by reference; the canvas invokes this synchronously during
@@ -506,11 +516,9 @@ void RenderArgumentPackageCanvasWithTimeline(
                 if (core::audit::CreateUserSnapshot(project.rootPath, reason,
                                                     state.reviewer_name, created, err)) {
                     state.app_state.status_message =
-                        "Snapshot created at sequence " +
-                        std::to_string(created.transaction_sequence) + ".";
+                        ui::i18n::trf("Snapshot created at sequence {0}.", created.transaction_sequence);
                 } else {
-                    state.app_state.status_message =
-                        "Failed to create snapshot: " + err;
+                    state.app_state.status_message = ui::i18n::trf("Failed to create snapshot: {0}", err);
                 }
                 break;
             }

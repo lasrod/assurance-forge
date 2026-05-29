@@ -6,137 +6,762 @@ msgstr ""
 "Language: ja\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-msgid "File"
-msgstr "ファイル"
 
-msgid "Create Empty Assurance Project"
-msgstr "空の保証プロジェクトを作成"
+msgid "  Content: %s"
+msgstr "  内容: %s"
 
-msgid "Open Project"
-msgstr "プロジェクトを開く"
+msgid " (open a package canvas to preview)"
+msgstr " (プレビューするにはパッケージキャンバスを開いてください)"
 
-msgid "Save Project"
-msgstr "プロジェクトを保存"
+msgid " | Showing %zu of %zu (filtered)"
+msgstr " | %zu / %zu 件を表示 (フィルター適用)"
 
-msgid "Export"
-msgstr "エクスポート"
+msgid "% Frame"
+msgstr "% フレーム"
 
-msgid "GSN SVG"
-msgstr "GSN SVG"
+msgid "%d operation(s)"
+msgstr "%d 件の操作"
 
-msgid "Exit"
-msgstr "終了"
+msgid "%s\nClick to open the Review tab."
+msgstr "%s\nクリックしてレビュータブを開きます。"
 
-msgid "Add"
-msgstr "追加"
+msgid "%s has multiple meanings."
+msgstr "%s には複数の意味があります。"
 
-msgid "New GSN / SACM File"
-msgstr "新規 GSN / SACM ファイル"
+msgid "%s is not defined."
+msgstr "%s は定義されていません。"
 
-msgid "New Evidence Register"
-msgstr "新規エビデンス登録簿"
+msgid "%s is not implemented yet."
+msgstr "%s はまだ実装されていません。"
 
-msgid "New J3377 CAE Register"
-msgstr "新規 J3377 CAE 登録簿"
+msgid "%zu problem%s · top: %s\nClick to open the Problems panel."
+msgstr "%zu 件の問題%s · トップ: %s\nクリックして問題パネルを開きます。"
 
-msgid "Edit"
-msgstr "編集"
+msgid "(Broken)"
+msgstr "(破損)"
 
-msgid "Preferences..."
-msgstr "設定..."
+msgid "(Valid)"
+msgstr "(有効)"
 
-msgid "Preferences"
-msgstr "設定"
+msgid "(any command)"
+msgstr "(すべてのコマンド)"
 
-msgid "View"
-msgstr "表示"
+msgid "(archives current .af/ artifacts and rebuilds from the current SACM file)"
+msgstr "(現在の .af/ 成果物をアーカイブし、現在の SACM ファイルから再構築します)"
 
-msgid "GSN Canvas"
-msgstr "GSN キャンバス"
+msgid "(empty)"
+msgstr "(空)"
 
-msgid "CSE Register"
-msgstr "CSE 登録簿"
+msgid "(history & values frozen)"
+msgstr "(履歴と値が固定されています)"
 
-msgid "Evidence Register"
-msgstr "エビデンス登録簿"
+msgid "(live)"
+msgstr "(ライブ)"
 
-msgid "Welcome Screen"
-msgstr "ウェルカム画面"
+msgid "(no element changes)"
+msgstr "(要素の変更なし)"
 
-msgid "Appearance"
-msgstr "外観"
+msgid "(no message)"
+msgstr "(メッセージなし)"
 
-msgid "Theme"
-msgstr "テーマ"
+msgid "(unnamed)"
+msgstr "(名前なし)"
 
-msgid "Language"
-msgstr "言語"
+msgid "(via"
+msgstr "(経由"
 
-msgid "Show FPS"
-msgstr "FPS を表示"
+msgid "1 {0}: {1}"
+msgstr "1 件の{0}: {1}"
 
-msgid "High culling"
-msgstr "高カリング"
+msgid "<empty>"
+msgstr "<空>"
 
-msgid "Medium culling"
-msgstr "中カリング"
+msgid "A full editor for this SACM package type will be added in a later workflow."
+msgstr "この SACM パッケージ種別の完全なエディターは後のワークフローで追加されます。"
 
-msgid "Low culling"
-msgstr "低カリング"
+msgid "ACP"
+msgstr "ACP"
+
+msgid "ACP decorators"
+msgstr "ACP デコレーター"
+
+msgid "ACP is not supported for this relationship."
+msgstr "この関係では ACP はサポートされていません。"
+
+msgid "ACP not found: %s"
+msgstr "ACP が見つかりません: %s"
+
+msgid "ACP target:"
+msgstr "ACP 対象:"
+
+msgid "ACP:"
+msgstr "ACP:"
 
 msgid "AI"
 msgstr "AI"
 
+msgid "AI Debug"
+msgstr "AI デバッグ"
+
+msgid "AI Review"
+msgstr "AI レビュー"
+
+msgid "AI features may send selected safety case content and prompts to the configured AI provider. Assurance Forge will not send project data automatically; data is sent only when you explicitly use an AI action."
+msgstr "AI 機能は、選択した安全ケースの内容とプロンプトを構成された AI プロバイダーに送信することがあります。Assurance Forge はプロジェクトデータを自動的には送信しません。データは明示的に AI アクションを使用した場合のみ送信されます。"
+
+msgid "AI review OK"
+msgstr "AI レビュー OK"
+
+msgid "AI review OK is set by AI review outcomes."
+msgstr "AI レビュー OK は AI レビューの結果によって設定されます。"
+
+msgid "AI review in progress."
+msgstr "AI レビューを実行中です。"
+
+msgid "AI review is already running."
+msgstr "AI レビューは既に実行中です。"
+
 msgid "AI settings are unavailable."
 msgstr "AI 設定を使用できません。"
 
-msgid "Enable AI support"
-msgstr "AI サポートを有効にする"
-
-msgid "Provider"
-msgstr "プロバイダー"
-
-msgid "Model"
-msgstr "モデル"
-
-msgid "Save AI Settings"
-msgstr "AI 設定を保存"
+msgid "AI settings saved."
+msgstr "AI 設定を保存しました。"
 
 msgid "API Key"
 msgstr "API キー"
 
-msgid "Secure storage is unavailable on this platform."
-msgstr "このプラットフォームでは安全な保存を使用できません。"
+msgid "API key removed."
+msgstr "API キーを削除しました。"
 
-msgid "Key stored: ********"
-msgstr "キー保存済み: ********"
+msgid "API key saved securely."
+msgstr "API キーを安全に保存しました。"
 
-msgid "No API key stored."
-msgstr "保存済み API キーはありません。"
+msgid "Active"
+msgstr "アクティブ"
 
-msgid "Update Key"
-msgstr "キーを更新"
+msgid "Add"
+msgstr "追加"
 
-msgid "Save Key"
-msgstr "キーを保存"
+msgid "Add ACP"
+msgstr "ACP を追加"
 
-msgid "Remove Key"
-msgstr "キーを削除"
+msgid "Add ACP failed: {0}"
+msgstr "ACP の追加に失敗しました: {0}"
 
-msgid "Test Connection"
-msgstr "接続をテスト"
+msgid "Add Category"
+msgstr "分類を追加"
 
-msgid "AI features may send selected safety case content and prompts to the configured AI provider. Assurance Forge will not send project data automatically; data is sent only when you explicitly use an AI action."
-msgstr ""
+msgid "Add Evidence Register"
+msgstr "エビデンス登録簿を追加"
 
-msgid "OK"
-msgstr "OK"
+msgid "Add J3377 CAE Register"
+msgstr "J3377 CAE 登録簿を追加"
 
-msgid "Walkthroughs"
-msgstr "ウォークスルー"
+msgid "Add Jøsang confidence"
+msgstr "Jøsang 信頼度を追加"
 
-msgid "Walkthroughs are not yet implemented."
-msgstr "ウォークスルーは未実装です。"
+msgid "Add New GSN / SACM File"
+msgstr "新規 GSN / SACM ファイルを追加"
+
+msgid "Add New Top Goal"
+msgstr "新規トップゴールを追加"
+
+msgid "Add Recommended"
+msgstr "推奨を追加"
+
+msgid "Add Review Comment"
+msgstr "レビューコメントを追加"
+
+msgid "Add SCCG violation"
+msgstr "SCCG 違反を追加"
+
+msgid "Add Term"
+msgstr "用語を追加"
+
+msgid "Add Terminology Package"
+msgstr "用語パッケージを追加"
+
+msgid "Add Translation"
+msgstr "翻訳を追加"
+
+msgid "Add as context"
+msgstr "コンテキストとして追加"
+
+msgid "Add fixed confidence"
+msgstr "固定信頼度を追加"
+
+msgid "All"
+msgstr "すべて"
+
+msgid "All categories"
+msgstr "すべての分類"
+
+msgid "An audit log is created automatically the first time a model-mutating command is recorded for a SACM file in this project."
+msgstr "このプロジェクトの SACM ファイルに対してモデル変更コマンドが初めて記録されたとき、監査ログが自動的に作成されます。"
+
+msgid "Appearance"
+msgstr "外観"
+
+msgid "Apply Proposal"
+msgstr "提案を適用"
+
+msgid "Are you sure you want to overwrite it?"
+msgstr "本当に上書きしてもよろしいですか?"
+
+msgid "Argument Navigator"
+msgstr "引数ナビゲーター"
+
+msgid "Argument Packages"
+msgstr "引数パッケージ"
+
+msgid "Argument package was not found in the loaded SACM model."
+msgstr "読み込まれた SACM モデルに引数パッケージが見つかりませんでした。"
+
+msgid "Artifact Packages"
+msgstr "成果物パッケージ"
+
+msgid "Assessment Status"
+msgstr "評価ステータス"
+
+msgid "Assumption"
+msgstr "仮定"
+
+msgid "Assurance Case: %s"
+msgstr "保証ケース: %s"
+
+msgid "Assurance Claim Point"
+msgstr "保証主張点"
+
+msgid "Assurance Claim Points"
+msgstr "保証主張点"
+
+msgid "Assurance case"
+msgstr "保証ケース"
+
+msgid "Audit log divergence detected"
+msgstr "監査ログの不一致を検出しました"
+
+msgid "Audit store error: %s"
+msgstr "監査ストアのエラー: %s"
+
+msgid "Author"
+msgstr "作成者"
+
+msgid "Autosave write failed"
+msgstr "自動保存の書き込みに失敗しました"
+
+msgid "Available in a later release."
+msgstr "後のリリースで利用可能になります。"
+
+msgid "Back up and start new confidence file"
+msgstr "バックアップして新しい信頼度ファイルを開始"
+
+msgid "Backed up invalid confidence file; new confidence storage will be saved with the project."
+msgstr "無効な信頼度ファイルをバックアップしました。新しい信頼度ストレージはプロジェクトと共に保存されます。"
+
+msgid "Base rate %.2f"
+msgstr "基底率 %.2f"
+
+msgid "Base rate controls how much unresolved uncertainty counts toward projected confidence.\nProjected confidence = belief + base rate * uncertainty."
+msgstr "基底率は未解決の不確実性が投影信頼度にどれだけ寄与するかを制御します。\n投影信頼度 = 信念 + 基底率 * 不確実性。"
+
+msgid "Baseline \"{0}\" created at sequence {1}."
+msgstr "ベースライン \"{0}\" をシーケンス {1} で作成しました。"
+
+msgid "Belief"
+msgstr "信念"
+
+msgid "Belief %.2f\nDisbelief %.2f\nUncertainty %.2f"
+msgstr "信念 %.2f\n不信 %.2f\n不確実性 %.2f"
+
+msgid "Bindings"
+msgstr "バインディング"
+
+msgid "Blocked"
+msgstr "ブロック"
+
+msgid "Browse SCCG Guidelines"
+msgstr "SCCG ガイドラインを参照"
+
+msgid "Bucket"
+msgstr "バケット"
+
+msgid "Buckets (sorted by cost)"
+msgstr "バケット (コスト順)"
+
+msgid "CSE ID"
+msgstr "CSE ID"
+
+msgid "CSE Register"
+msgstr "CSE 登録簿"
+
+msgid "CSE Rows"
+msgstr "CSE 行"
+
+msgid "Cancel"
+msgstr "キャンセル"
+
+msgid "Canvas render stats"
+msgstr "キャンバス描画統計"
+
+msgid "Categories"
+msgstr "分類"
+
+msgid "Category description"
+msgstr "分類の説明"
+
+msgid "Category filter"
+msgstr "分類フィルター"
+
+msgid "Category name"
+msgstr "分類名"
+
+msgid "Category name is required."
+msgstr "分類名は必須です。"
+
+msgid "Category: %s"
+msgstr "分類: %s"
+
+msgid "Challenge"
+msgstr "チャレンジ"
+
+msgid "Changed since baseline"
+msgstr "ベースライン以降に変更"
+
+msgid "Changes"
+msgstr "変更"
+
+msgid "Changes are recorded in the proposal draft. Save it from the review panel."
+msgstr "変更は提案ドラフトに記録されています。レビューパネルから保存してください。"
+
+msgid "Choose a target TerminologyPackage."
+msgstr "対象の TerminologyPackage を選択してください。"
+
+msgid "Claim"
+msgstr "主張"
+
+msgid "Claim Criteria"
+msgstr "主張基準"
+
+msgid "Claim ID"
+msgstr "主張 ID"
+
+msgid "Claim Owner"
+msgstr "主張所有者"
+
+msgid "Claims"
+msgstr "主張"
+
+msgid "Clear all"
+msgstr "すべてクリア"
+
+msgid "Click to open in the Problems panel."
+msgstr "クリックして問題パネルで開きます。"
+
+msgid "Close"
+msgstr "閉じる"
+
+msgid "Command"
+msgstr "コマンド"
+
+msgid "Comments (%d)"
+msgstr "コメント (%d)"
+
+msgid "Compare to Baseline"
+msgstr "ベースラインと比較"
+
+msgid "Concrete term has no description."
+msgstr "具体的な用語に説明がありません。"
+
+msgid "Confidence"
+msgstr "信頼度"
+
+msgid "Confidence argument tree"
+msgstr "信頼度引数ツリー"
+
+msgid "Confidence argument tree is not linked."
+msgstr "信頼度引数ツリーがリンクされていません。"
+
+msgid "Confidence reset failed: {0}"
+msgstr "信頼度のリセットに失敗しました: {0}"
+
+msgid "Confidence save failed: {0}"
+msgstr "信頼度の保存に失敗しました: {0}"
+
+msgid "Confidence update failed: {0}"
+msgstr "信頼度の更新に失敗しました: {0}"
+
+msgid "Content"
+msgstr "内容"
+
+msgid "Content (%s)"
+msgstr "内容 (%s)"
+
+msgid "Context"
+msgstr "コンテキスト"
+
+msgid "Continue?"
+msgstr "続行しますか?"
+
+msgid "Controlled Environment"
+msgstr "管理環境"
+
+msgid "Copy report to clipboard"
+msgstr "レポートをクリップボードにコピー"
+
+msgid "Could not assign a SACM gid for confidence storage."
+msgstr "信頼度保存用の SACM gid を割り当てられませんでした。"
+
+msgid "Could not resolve this preview element for proposal edits."
+msgstr "提案編集のためのこのプレビュー要素を解決できませんでした。"
+
+msgid "Create"
+msgstr "作成"
+
+msgid "Create + Add as Context"
+msgstr "作成してコンテキストに追加"
+
+msgid "Create Assurance Project from Template"
+msgstr "テンプレートから保証プロジェクトを作成"
+
+msgid "Create Assurance Project from Template is not yet implemented."
+msgstr "テンプレートから保証プロジェクトを作成は未実装です。"
+
+msgid "Create Empty Assurance Project"
+msgstr "空の保証プロジェクトを作成"
+
+msgid "Create Proposed Change"
+msgstr "提案変更を作成"
+
+msgid "Create Term"
+msgstr "用語を作成"
+
+msgid "Create Terminology Package"
+msgstr "用語パッケージを作成"
+
+msgid "Create a new SACM argument package and link this ACP to its top goal."
+msgstr "新しい SACM 引数パッケージを作成し、この ACP をそのトップゴールにリンクします。"
+
+msgid "Create a project from a predefined assurance case template"
+msgstr "定義済みの保証ケーステンプレートからプロジェクトを作成します"
+
+msgid "Create baseline at current state"
+msgstr "現在の状態でベースラインを作成"
+
+msgid "Create new confidence argument tree"
+msgstr "新しい信頼度引数ツリーを作成"
+
+msgid "Create new meaning"
+msgstr "新しい意味を作成"
+
+msgid "Create snapshot at current state"
+msgstr "現在の状態でスナップショットを作成"
+
+msgid "Create, inspect, and navigate a safety case"
+msgstr "安全ケースの作成・確認・操作を行います"
+
+msgid "Define"
+msgstr "定義"
+
+msgid "Define term"
+msgstr "用語を定義"
+
+msgid "Define this term from the active terminology scope."
+msgstr "アクティブな用語スコープからこの用語を定義してください。"
+
+msgid "Definition"
+msgstr "定義"
+
+msgid "Delete"
+msgstr "削除"
+
+msgid "Delete ACP"
+msgstr "ACP を削除"
+
+msgid "Delete Both"
+msgstr "両方とも削除"
+
+msgid "Delete Category"
+msgstr "分類を削除"
+
+msgid "Delete Package"
+msgstr "パッケージを削除"
+
+msgid "Delete Proposal"
+msgstr "提案を削除"
+
+msgid "Delete Review Comment"
+msgstr "レビューコメントを削除"
+
+msgid "Delete Term"
+msgstr "用語を削除"
+
+msgid "Delete Terminology Package"
+msgstr "用語パッケージを削除"
+
+msgid "Delete this category?"
+msgstr "この分類を削除しますか?"
+
+msgid "Delete this review comment?"
+msgstr "このレビューコメントを削除しますか?"
+
+msgid "Delete this term?"
+msgstr "この用語を削除しますか?"
+
+msgid "Delete this terminology package?"
+msgstr "この用語パッケージを削除しますか?"
+
+msgid "Description"
+msgstr "説明"
+
+msgid "Description (%s)"
+msgstr "説明 (%s)"
+
+msgid "Description (optional)"
+msgstr "説明 (省略可)"
+
+msgid "Detach this ACP from its current confidence argument tree."
+msgstr "この ACP を現在の信頼度引数ツリーから切り離します。"
+
+msgid "Direct value"
+msgstr "直接値"
+
+msgid "Directory:"
+msgstr "ディレクトリ:"
+
+msgid "Disable individual cost contributors to measure their impact on FPS. Defaults match production behaviour."
+msgstr "個別のコスト要因を無効にして FPS への影響を計測します。デフォルトは本番動作と同じです。"
+
+msgid "Disable to uncap the frame rate (useful for measuring raw render cost)."
+msgstr "無効にするとフレームレートの上限を解除します (生の描画コスト計測に便利です)。"
+
+msgid "Disbelief"
+msgstr "不信"
+
+msgid "Discard Draft"
+msgstr "ドラフトを破棄"
+
+msgid "Dismiss"
+msgstr "閉じる"
+
+msgid "Don't Save"
+msgstr "保存しない"
+
+msgid "Drag to adjust %s"
+msgstr "%s を調整するにはドラッグしてください"
+
+msgid "Drag to scrub transaction history"
+msgstr "ドラッグしてトランザクション履歴をスクラブします"
+
+msgid "Duplicate term value and definition exist in this package."
+msgstr "このパッケージ内に同じ用語と定義の重複があります。"
+
+msgid "Edit"
+msgstr "編集"
+
+msgid "Edit Category"
+msgstr "分類を編集"
+
+msgid "Edit Proposal"
+msgstr "提案を編集"
+
+msgid "Edit Term"
+msgstr "用語を編集"
+
+msgid "Edit term"
+msgstr "用語を編集"
+
+msgid "Editable CAE register content will be implemented in a later workflow."
+msgstr "編集可能な CAE 登録簿の内容は後のワークフローで実装されます。"
+
+msgid "Editable evidence register content will be implemented in a later workflow."
+msgstr "編集可能なエビデンス登録簿の内容は後のワークフローで実装されます。"
+
+msgid "Edits are recorded in the proposal draft only."
+msgstr "編集は提案ドラフトにのみ記録されます。"
+
+msgid "Element"
+msgstr "要素"
+
+msgid "Element %s"
+msgstr "要素 %s"
+
+msgid "Element Properties"
+msgstr "要素プロパティ"
+
+msgid "Element not found in the active model."
+msgstr "アクティブモデルに要素が見つかりません。"
+
+msgid "Element not found: %s"
+msgstr "要素が見つかりません: %s"
+
+msgid "Eligible"
+msgstr "対象可"
+
+msgid "Enable AI support"
+msgstr "AI サポートを有効にする"
+
+msgid "Enable confidence for this element"
+msgstr "この要素の信頼度を有効化"
+
+msgid "Enter an API key before saving."
+msgstr "保存する前に API キーを入力してください。"
+
+msgid "Enter the name to use for review comments."
+msgstr "レビューコメントに使用する名前を入力してください。"
+
+msgid "Evidence"
+msgstr "エビデンス"
+
+msgid "Evidence Criteria"
+msgstr "エビデンス基準"
+
+msgid "Evidence ID"
+msgstr "エビデンス ID"
+
+msgid "Evidence Owner"
+msgstr "エビデンス所有者"
+
+msgid "Evidence Register"
+msgstr "エビデンス登録簿"
+
+msgid "Evidence Rows"
+msgstr "エビデンス行"
+
+msgid "Evidence register file: %s"
+msgstr "エビデンス登録簿ファイル: %s"
+
+msgid "Existing"
+msgstr "既存"
+
+msgid "Exit"
+msgstr "終了"
+
+msgid "Exit Preview"
+msgstr "プレビューを終了"
+
+msgid "Export"
+msgstr "エクスポート"
+
+msgid "External Reference"
+msgstr "外部参照"
+
+msgid "External changes detected"
+msgstr "外部の変更を検出しました"
+
+msgid "Failed to create baseline."
+msgstr "ベースラインの作成に失敗しました。"
+
+msgid "Failed to create snapshot: {0}"
+msgstr "スナップショットの作成に失敗しました: {0}"
+
+msgid "Feature toggles (A/B) & report"
+msgstr "機能切替 (A/B) とレポート"
+
+msgid "File"
+msgstr "ファイル"
+
+msgid "File already exists:\n%s"
+msgstr "ファイルは既に存在します:\n%s"
+
+msgid "File name"
+msgstr "ファイル名"
+
+msgid "Filter SCCG IDs or titles"
+msgstr "SCCG ID またはタイトルでフィルター"
+
+msgid "Filter:"
+msgstr "フィルター:"
+
+msgid "Find Usages"
+msgstr "使用箇所を検索"
+
+msgid "Find usages"
+msgstr "使用箇所を検索"
+
+msgid "Find usages: {0}"
+msgstr "使用箇所検索: {0}"
+
+msgid "Find usages: {0}  {1}"
+msgstr "使用箇所検索: {0}  {1}"
+
+msgid "Fix"
+msgstr "修正"
+
+msgid "Fixed value"
+msgstr "固定値"
+
+msgid "Forge Confidence in Safety"
+msgstr "安全への確信を鍛える"
+
+msgid "Frame interval (4s) —"
+msgstr "フレーム間隔 (4 秒) —"
+
+msgid "Freeze ACP rebuilds (not yet wired)"
+msgstr "ACP の再構築を凍結 (未接続)"
+
+msgid "Full Name / Display Name"
+msgstr "正式名 / 表示名"
+
+msgid "GID: %s"
+msgstr "GID: %s"
+
+msgid "GSN Canvas"
+msgstr "GSN キャンバス"
+
+msgid "GSN SVG"
+msgstr "GSN SVG"
+
+msgid "GSN structure, SACM imports, evidence, and registers"
+msgstr "GSN 構造、SACM インポート、エビデンス、レジスターを学びます"
+
+msgid "Get started with Assurance Forge"
+msgstr "Assurance Forge の開始ガイド"
+
+msgid "Go"
+msgstr "移動"
+
+msgid "Goal"
+msgstr "ゴール"
+
+msgid "Guideline"
+msgstr "ガイドライン"
+
+msgid "High culling"
+msgstr "高カリング"
+
+msgid "High-segment circles"
+msgstr "高セグメント円"
+
+msgid "Historical preview — fields are read-only. Return to latest to edit."
+msgstr "過去の表示 — フィールドは読み取り専用です。編集するには最新に戻ってください。"
+
+msgid "History"
+msgstr "履歴"
+
+msgid "Hits"
+msgstr "ヒット数"
+
+msgid "ID"
+msgstr "ID"
+
+msgid "ID:"
+msgstr "ID:"
+
+msgid "ID: %s"
+msgstr "ID: %s"
+
+msgid "Idling"
+msgstr "アイドリング"
+
+msgid "Idling feature is turned off — the main loop runs at full speed."
+msgstr "アイドリング機能はオフです — メインループはフルスピードで動作します。"
+
+msgid "Idling is enabled but not currently throttling — input is active."
+msgstr "アイドリングは有効ですが、現在スロットルしていません — 入力がアクティブです。"
+
+msgid "Ignore"
+msgstr "無視"
 
 msgid "Import SACM"
 msgstr "SACM をインポート"
@@ -144,56 +769,973 @@ msgstr "SACM をインポート"
 msgid "Import SACM is not yet implemented."
 msgstr "SACM のインポートは未実装です。"
 
-msgid "Forge Confidence in Safety"
-msgstr "安全への確信を鍛える"
-
-msgid "Start"
-msgstr "開始"
-
-msgid "Open Recent Projects"
-msgstr "最近のプロジェクトを開く"
-
-msgid "No recent projects."
-msgstr "最近のプロジェクトはありません。"
-
-msgid "Start with a blank assurance project workspace"
-msgstr "空の保証プロジェクトワークスペースから開始します"
-
-msgid "Create Assurance Project from Template"
-msgstr "テンプレートから保証プロジェクトを作成"
-
-msgid "Create a project from a predefined assurance case template"
-msgstr "定義済みの保証ケーステンプレートからプロジェクトを作成します"
-
-msgid "Create Assurance Project from Template is not yet implemented."
-msgstr "テンプレートから保証プロジェクトを作成は未実装です。"
-
-msgid "Open an existing Assurance Forge project"
-msgstr "既存の Assurance Forge プロジェクトを開きます"
-
 msgid "Import a SACM XML assurance case"
 msgstr "SACM XML 保証ケースをインポートします"
 
-msgid "Get started with Assurance Forge"
-msgstr "Assurance Forge の開始ガイド"
+msgid "Inactive"
+msgstr "非アクティブ"
 
-msgid "Create, inspect, and navigate a safety case"
-msgstr "安全ケースの作成・確認・操作を行います"
+msgid "Incomplete"
+msgstr "未完了"
+
+msgid "Info"
+msgstr "情報"
+
+msgid "Interfaces"
+msgstr "インターフェース"
+
+msgid "Interior shading"
+msgstr "内部シェーディング"
+
+msgid "J3377 CAE register file: %s"
+msgstr "J3377 CAE 登録簿ファイル: %s"
+
+msgid "Justification"
+msgstr "正当化"
+
+msgid "Jøsang opinion"
+msgstr "Jøsang 意見"
+
+msgid "Jøsang's opinion triangle"
+msgstr "Jøsang の意見三角形"
+
+msgid "Keep filtering to narrow the remaining guidelines."
+msgstr "残りのガイドラインを絞り込むには、さらにフィルターを続けてください。"
+
+msgid "Key stored: ********"
+msgstr "キー保存済み: ********"
+
+msgid "Language"
+msgstr "言語"
+
+msgid "Last changed"
+msgstr "最終変更"
+
+msgid "Later"
+msgstr "後で"
 
 msgid "Learn the Fundamentals"
 msgstr "基本を学ぶ"
 
-msgid "GSN structure, SACM imports, evidence, and registers"
-msgstr "GSN 構造、SACM インポート、エビデンス、レジスターを学びます"
+msgid "Link existing"
+msgstr "既存にリンク"
+
+msgid "Link selected confidence argument tree"
+msgstr "選択した信頼度引数ツリーをリンク"
+
+msgid "Linked:"
+msgstr "リンク済み:"
+
+msgid "Live"
+msgstr "ライブ"
+
+msgid "Live status from runnerParams.fpsIdling.\n%s"
+msgstr "runnerParams.fpsIdling のライブ状態。\n%s"
+
+msgid "Load"
+msgstr "読み込み"
+
+msgid "Load a SACM model before editing proposal drafts."
+msgstr "提案ドラフトを編集する前に SACM モデルを読み込んでください。"
+
+msgid "Low culling"
+msgstr "低カリング"
+
+msgid "Main loop is currently throttled because no input was detected."
+msgstr "入力が検出されないため、メインループは現在スロットルされています。"
+
+msgid "Manual review OK"
+msgstr "手動レビュー OK"
+
+msgid "Mark as reviewed"
+msgstr "レビュー済みとしてマーク"
+
+msgid "Mark review OK manually"
+msgstr "レビュー OK を手動で記録"
+
+msgid "Mark this element as manually reviewed OK."
+msgstr "この要素を手動でレビュー OK としてマークします。"
+
+msgid "Maturity"
+msgstr "成熟度"
+
+msgid "Medium culling"
+msgstr "中カリング"
+
+msgid "Message"
+msgstr "メッセージ"
+
+msgid "Method: %s"
+msgstr "方式: %s"
+
+msgid "Missing term"
+msgstr "用語が見つかりません"
+
+msgid "Mode"
+msgstr "モード"
+
+msgid "Model"
+msgstr "モデル"
+
+msgid "Name"
+msgstr "名前"
+
+msgid "Name (%s)"
+msgstr "名前 (%s)"
+
+msgid "Name:"
+msgstr "名前:"
+
+msgid "Name: %s"
+msgstr "名前: %s"
+
+msgid "Native claim:"
+msgstr "ネイティブ主張:"
+
+msgid "Native text confidence claim is missing."
+msgstr "ネイティブのテキスト信頼度主張がありません。"
+
+msgid "New"
+msgstr "新規"
+
+msgid "New Comment"
+msgstr "新しいコメント"
+
+msgid "New Evidence Register"
+msgstr "新規エビデンス登録簿"
+
+msgid "New GSN / SACM File"
+msgstr "新規 GSN / SACM ファイル"
+
+msgid "New J3377 CAE Register"
+msgstr "新規 J3377 CAE 登録簿"
+
+msgid "No"
+msgstr "いいえ"
+
+msgid "No API key stored."
+msgstr "保存済み API キーはありません。"
+
+msgid "No CSE rows were derived from direct claim-evidence relations."
+msgstr "直接の主張–エビデンス関係から CSE 行が導出されませんでした。"
+
+msgid "No SACM argument model is loaded."
+msgstr "SACM 引数モデルが読み込まれていません。"
+
+msgid "No SACM package selected."
+msgstr "SACM パッケージが選択されていません。"
+
+msgid "No SCCG guideline violations selected."
+msgstr "SCCG ガイドライン違反が選択されていません。"
+
+msgid "No TerminologyPackage is available."
+msgstr "利用可能な TerminologyPackage がありません。"
+
+msgid "No XML files found"
+msgstr "XML ファイルが見つかりません"
+
+msgid "No categories"
+msgstr "分類なし"
+
+msgid "No categories are available in this terminology package."
+msgstr "この用語パッケージには利用可能な分類がありません。"
+
+msgid "No confidence argument has been selected."
+msgstr "信頼度引数が選択されていません。"
+
+msgid "No confidence assessment stored for this element."
+msgstr "この要素に保存された信頼度評価はありません。"
+
+msgid "No element selected."
+msgstr "要素が選択されていません。"
+
+msgid "No evidence/work-product rows were derived from the model."
+msgstr "モデルからエビデンス/作業成果物の行が導出されませんでした。"
+
+msgid "No existing confidence argument trees available to link."
+msgstr "リンク可能な既存の信頼度引数ツリーはありません。"
+
+msgid "No files"
+msgstr "ファイルなし"
+
+msgid "No matching SCCG guideline IDs."
+msgstr "一致する SCCG ガイドライン ID がありません。"
+
+msgid "No problems found."
+msgstr "問題は見つかりませんでした。"
+
+msgid "No problems match the current filter."
+msgstr "現在のフィルターに一致する問題はありません。"
+
+msgid "No project is currently open."
+msgstr "現在開いているプロジェクトはありません。"
+
+msgid "No project open."
+msgstr "プロジェクトが開かれていません。"
+
+msgid "No proposal for resolved comment."
+msgstr "解決済みコメントに対する提案はありません。"
+
+msgid "No recent projects."
+msgstr "最近のプロジェクトはありません。"
+
+msgid "No reconstructed model to display."
+msgstr "表示する再構築モデルがありません。"
+
+msgid "No recorded changes for this element."
+msgstr "この要素に記録された変更はありません。"
+
+msgid "No relationship selected."
+msgstr "関係が選択されていません。"
+
+msgid "No response yet."
+msgstr "応答はまだありません。"
+
+msgid "No review comments for this element."
+msgstr "この要素のレビューコメントはありません。"
+
+msgid "No safety case loaded."
+msgstr "安全ケースが読み込まれていません。"
+
+msgid "No terminology package selected."
+msgstr "用語パッケージが選択されていません。"
+
+msgid "No terms"
+msgstr "用語なし"
+
+msgid "No transactions have been recorded yet."
+msgstr "トランザクションはまだ記録されていません。"
+
+msgid "No usages found."
+msgstr "使用箇所が見つかりません。"
+
+msgid "Node and descendants ({0})"
+msgstr "ノードとその子孫 ({0})"
+
+msgid "Node drop shadows"
+msgstr "ノードのドロップシャドウ"
+
+msgid "Not Implemented"
+msgstr "未実装"
+
+msgid "Not reviewed"
+msgstr "未レビュー"
+
+msgid "Notes"
+msgstr "メモ"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "Open"
+msgstr "オープン"
+
+msgid "Open ACP"
+msgstr "ACP を開く"
+
+msgid "Open Project"
+msgstr "プロジェクトを開く"
+
+msgid "Open Project File"
+msgstr "プロジェクトファイルを開く"
+
+msgid "Open Recent Projects"
+msgstr "最近のプロジェクトを開く"
+
+msgid "Open a SACM model and use any model-mutating action (add or remove a node) — each command will appear here."
+msgstr "SACM モデルを開いて、モデルを変更するアクション (ノードの追加または削除) を使用してください — 各コマンドがここに表示されます。"
+
+msgid "Open an assurance case before marking review status."
+msgstr "レビュー状態を記録する前に保証ケースを開いてください。"
+
+msgid "Open an assurance case before running SCCG profile reviews."
+msgstr "SCCG プロファイルレビューを実行する前に保証ケースを開いてください。"
+
+msgid "Open an existing Assurance Forge project"
+msgstr "既存の Assurance Forge プロジェクトを開きます"
+
+msgid "Open confidence argument tree"
+msgstr "信頼度引数ツリーを開く"
+
+msgid "Open in File Explorer"
+msgstr "ファイルエクスプローラーで開く"
+
+msgid "Open or create a project before marking review status."
+msgstr "レビュー状態を記録する前にプロジェクトを開くか作成してください。"
+
+msgid "Open or create a project before saving confidence."
+msgstr "信頼度を保存する前にプロジェクトを開くか作成してください。"
+
+msgid "Open or create a project to store review comments."
+msgstr "レビューコメントを保存するには、プロジェクトを開くか作成してください。"
+
+msgid "Open review"
+msgstr "レビューを開く"
+
+msgid "Open review comments or AI review failures for this element."
+msgstr "この要素のレビューコメントまたは AI レビュー失敗を開きます。"
+
+msgid "Open term"
+msgstr "用語を開く"
+
+msgid "Opinion triangle"
+msgstr "意見三角形"
+
+msgid "Or link to an existing confidence argument tree:"
+msgstr "または既存の信頼度引数ツリーにリンク:"
+
+msgid "Origin"
+msgstr "出典"
+
+msgid "Origin: %s"
+msgstr "出典: %s"
+
+msgid "Original text"
+msgstr "元のテキスト"
+
+msgid "Orphans (%d)"
+msgstr "孤立 (%d)"
+
+msgid "Other Packages"
+msgstr "その他のパッケージ"
+
+msgid "Other Problems (%d)"
+msgstr "その他の問題 (%d)"
+
+msgid "Overwrite File?"
+msgstr "ファイルを上書きしますか?"
+
+msgid "PROPOSAL CREATOR"
+msgstr "提案クリエーター"
+
+msgid "PROPOSAL PREVIEW"
+msgstr "提案プレビュー"
+
+msgid "Package"
+msgstr "パッケージ"
+
+msgid "Package Details"
+msgstr "パッケージの詳細"
+
+msgid "Package description"
+msgstr "パッケージの説明"
+
+msgid "Package name"
+msgstr "パッケージ名"
+
+msgid "Package tree unavailable: %s"
+msgstr "パッケージツリーを利用できません: %s"
+
+msgid "Parent location"
+msgstr "親の場所"
+
+msgid "Parse error: %s"
+msgstr "パースエラー: %s"
+
+msgid "Pause"
+msgstr "一時停止"
+
+msgid "Performance overlay"
+msgstr "パフォーマンスオーバーレイ"
+
+msgid "Pin a named baseline to transaction sequence %llu."
+msgstr "トランザクションシーケンス %llu に名前付きベースラインを固定します。"
+
+msgid "Preferences"
+msgstr "設定"
+
+msgid "Preferences..."
+msgstr "設定..."
 
 msgid "Prepare a Conformance Review"
 msgstr "適合性レビューを準備する"
 
+msgid "Preview: Tx {0} (read-only)"
+msgstr "プレビュー: Tx {0} (読み取り専用)"
+
+msgid "Problem"
+msgstr "問題"
+
+msgid "Problems"
+msgstr "問題"
+
+msgid "Project Explorer"
+msgstr "プロジェクトエクスプローラー"
+
+msgid "Project Loading Status"
+msgstr "プロジェクト読み込み状況"
+
+msgid "Project Summary"
+msgstr "プロジェクト概要"
+
+msgid "Project name"
+msgstr "プロジェクト名"
+
+msgid "Projected confidence"
+msgstr "投影信頼度"
+
+msgid "Prompt"
+msgstr "プロンプト"
+
+msgid "Proposal Creator"
+msgstr "提案クリエーター"
+
+msgid "Proposal draft: %d operation(s)"
+msgstr "提案ドラフト: %d 件の操作"
+
+msgid "Proposal: %s"
+msgstr "提案: %s"
+
+msgid "Proposed change: Broken"
+msgstr "提案変更: 破損"
+
+msgid "Proposed change: Valid"
+msgstr "提案変更: 有効"
+
+msgid "Provider"
+msgstr "プロバイダー"
+
+msgid "Raw bucket table"
+msgstr "生バケットテーブル"
+
+msgid "Reached snapshot or baseline — restore from history to go further back."
+msgstr "スナップショットまたはベースラインに到達しました — さらに戻すには履歴から復元してください。"
+
+msgid "Reason: %s"
+msgstr "理由: %s"
+
+msgid "Reasoning:"
+msgstr "推論:"
+
+msgid "Recency"
+msgstr "新しさ"
+
+msgid "Reconcile"
+msgstr "再構築"
+
+msgid "Reconcile audit log…"
+msgstr "監査ログを再構築…"
+
+msgid "Reconstruction failed: %s"
+msgstr "再構築に失敗しました: %s"
+
+msgid "Recorded proposal property change."
+msgstr "提案プロパティの変更を記録しました。"
+
+msgid "Reference: %s"
+msgstr "参照: %s"
+
+msgid "Relationship %s"
+msgstr "関係 %s"
+
+msgid "Relationship not found: %s"
+msgstr "関係が見つかりません: %s"
+
+msgid "Relationship {0} -> {1}"
+msgstr "関係 {0} -> {1}"
+
+msgid "Remove"
+msgstr "除去"
+
+msgid "Remove %s?"
+msgstr "%s を除去しますか?"
+
+msgid "Remove ACP"
+msgstr "ACP を除去"
+
+msgid "Remove Key"
+msgstr "キーを削除"
+
+msgid "Remove Subtree"
+msgstr "サブツリーを除去"
+
+msgid "Remove the SACM-backed ACP metadata from its target."
+msgstr "対象から SACM ベースの ACP メタデータを除去します。"
+
+msgid "Reset toggles"
+msgstr "切替をリセット"
+
+msgid "Resolution mode"
+msgstr "解決モード"
+
+msgid "Resolve"
+msgstr "解決"
+
+msgid "Resolved"
+msgstr "解決済み"
+
+msgid "Response"
+msgstr "応答"
+
+msgid "Resume"
+msgstr "再開"
+
+msgid "Return to latest"
+msgstr "最新に戻る"
+
+msgid "Return to live"
+msgstr "ライブに戻る"
+
+msgid "Return to live view"
+msgstr "ライブ表示に戻る"
+
+msgid "Review"
+msgstr "レビュー"
+
+msgid "Review comment"
+msgstr "レビューコメント"
+
+msgid "Review status: %s"
+msgstr "レビュー状態: %s"
+
+msgid "Reviewed by %s"
+msgstr "レビュー担当者: %s"
+
+msgid "Reviewer Name"
+msgstr "レビュー担当者名"
+
+msgid "Reviewer name is required for new reviews."
+msgstr "新しいレビューにはレビュー担当者名が必要です。"
+
+msgid "Reviewer name saved."
+msgstr "レビュー担当者名を保存しました。"
+
+msgid "Run Find usages from a term card or glossary row."
+msgstr "用語カードまたは用語表の行から使用箇所検索を実行してください。"
+
+msgid "SACM Viewer"
+msgstr "SACM ビューア"
+
+msgid "SACM relationship: %s"
+msgstr "SACM 関係: %s"
+
+msgid "SCCG Guideline"
+msgstr "SCCG ガイドライン"
+
+msgid "SCCG Guideline Violations"
+msgstr "SCCG ガイドライン違反"
+
+msgid "SCCG guidelines are not available."
+msgstr "SCCG ガイドラインは使用できません。"
+
+msgid "SCCG profiles unavailable."
+msgstr "SCCG プロファイルを使用できません。"
+
+msgid "SCCG profiles unavailable: %s"
+msgstr "SCCG プロファイルを使用できません: %s"
+
+msgid "Safety Case Owner"
+msgstr "安全ケース所有者"
+
+msgid "Sampling enabled"
+msgstr "サンプリングを有効化"
+
+msgid "Save"
+msgstr "保存"
+
+msgid "Save AI Settings"
+msgstr "AI 設定を保存"
+
+msgid "Save Key"
+msgstr "キーを保存"
+
+msgid "Save Project"
+msgstr "プロジェクトを保存"
+
+msgid "Save Proposal"
+msgstr "提案を保存"
+
+msgid "Save report to file"
+msgstr "レポートをファイルに保存"
+
+msgid "Saved: %s"
+msgstr "保存しました: %s"
+
+msgid "Search"
+msgstr "検索"
+
+msgid "Secure storage is unavailable on this platform."
+msgstr "このプラットフォームでは安全な保存を使用できません。"
+
+msgid "Select a GSN/SACM element before marking review status."
+msgstr "レビュー状態を記録する前に GSN/SACM 要素を選択してください。"
+
+msgid "Select a GSN/SACM element before running SCCG profile reviews."
+msgstr "SCCG プロファイルレビューを実行する前に GSN/SACM 要素を選択してください。"
+
+msgid "Select a proposal preview element to edit its proposed properties."
+msgstr "提案するプロパティを編集するには、提案プレビュー要素を選択してください。"
+
+msgid "Select an element to review."
+msgstr "レビューする要素を選択してください。"
+
+msgid "Select {0}"
+msgstr "{0} を選択"
+
+msgid "Selected"
+msgstr "選択済み"
+
+msgid "Selection glow"
+msgstr "選択時のグロー"
+
+msgid "Send"
+msgstr "送信"
+
+msgid "Sending..."
+msgstr "送信中..."
+
+msgid "Separate confidence argument tree"
+msgstr "個別の信頼度引数ツリー"
+
+msgid "Severity"
+msgstr "重大度"
+
+msgid "Show FPS"
+msgstr "FPS を表示"
+
+msgid "Snapshot created at sequence {0}."
+msgstr "スナップショットをシーケンス {0} で作成しました。"
+
+msgid "Snippet"
+msgstr "抜粋"
+
+msgid "Solution"
+msgstr "解"
+
+msgid "Source"
+msgstr "ソース"
+
+msgid "Source file: %s"
+msgstr "ソースファイル: %s"
+
+msgid "Source: %s"
+msgstr "ソース: %s"
+
+msgid "Sources:"
+msgstr "ソース:"
+
+msgid "Start"
+msgstr "開始"
+
+msgid "Start with a blank assurance project workspace"
+msgstr "空の保証プロジェクトワークスペースから開始します"
+
+msgid "Status: %s"
+msgstr "ステータス: %s"
+
+msgid "Store in"
+msgstr "保存先"
+
+msgid "Strategies"
+msgstr "戦略"
+
+msgid "Strategy"
+msgstr "戦略"
+
+msgid "Summary:"
+msgstr "要約:"
+
+msgid "Target element: %s"
+msgstr "対象要素: %s"
+
+msgid "Target:"
+msgstr "対象:"
+
+msgid "Target: %s"
+msgstr "対象: %s"
+
+msgid "Targets:"
+msgstr "ターゲット:"
+
+msgid "Term"
+msgstr "用語"
+
+msgid "Term Card"
+msgstr "用語カード"
+
+msgid "Term Usages"
+msgstr "用語の使用箇所"
+
+msgid "Term has no category."
+msgstr "用語に分類がありません。"
+
+msgid "Term reference could not be resolved."
+msgstr "用語参照を解決できませんでした。"
+
+msgid "Term value is required."
+msgstr "用語の値は必須です。"
+
+msgid "Terminology Package"
+msgstr "用語パッケージ"
+
+msgid "Terminology Packages"
+msgstr "用語パッケージ"
+
+msgid "Terminology spans"
+msgstr "用語スパン"
+
+msgid "Terminology suggestions"
+msgstr "用語の提案"
+
+msgid "Terms"
+msgstr "用語"
+
+msgid "Test Connection"
+msgstr "接続をテスト"
+
+msgid "Testing connection..."
+msgstr "接続をテスト中..."
+
+msgid "Text"
+msgstr "テキスト"
+
+msgid "Text confidence argument"
+msgstr "テキスト信頼度引数"
+
+msgid "Text confidence argument is empty."
+msgstr "テキスト信頼度引数が空です。"
+
+msgid "The attached proposal will also be deleted."
+msgstr "添付された提案も削除されます。"
+
+msgid "The current `.af/manifest.af.json`, `.af/snapshots/`, and `.af/audit/` will be moved to a timestamped `.af/backup_<UTC>/` folder, and a fresh audit store will be initialized from the current SACM file on disk."
+msgstr "現在の `.af/manifest.af.json`、`.af/snapshots/`、`.af/audit/` はタイムスタンプ付きの `.af/backup_<UTC>/` フォルダーに移動され、ディスク上の現在の SACM ファイルから新しい監査ストアが初期化されます。"
+
+msgid "The replayed audit history does not reproduce the on-disk SACM. This usually means edits were applied through a path that did not record transactions. Pinned historical views may be inaccurate."
+msgstr "再生された監査履歴がディスク上の SACM を再現できません。通常、これはトランザクションを記録しない経路で編集が適用されたことを意味します。固定された履歴ビューは正確でない可能性があります。"
+
+msgid "The selected proposal preview element no longer exists."
+msgstr "選択された提案プレビュー要素は既に存在しません。"
+
+msgid "Theme"
+msgstr "テーマ"
+
+msgid "This confidence assessment may be stale because the element changed after the value was stored."
+msgstr "この信頼度評価は古い可能性があります — 値が保存された後に要素が変更されました。"
+
+msgid "This frame: %.2f ms render across %zu buckets"
+msgstr "このフレーム: %.2f ms (%zu バケット)"
+
+msgid "This is a preview. The project model has not been changed."
+msgstr "これはプレビューです。プロジェクトモデルは変更されていません。"
+
+msgid "This node only ({0})"
+msgstr "このノードのみ ({0})"
+
+msgid "This profile does not apply to the selected element type."
+msgstr "このプロファイルは選択した要素の種別には適用されません。"
+
+msgid "This project does not have an audit store yet."
+msgstr "このプロジェクトにはまだ監査ストアがありません。"
+
+msgid "This will rebuild the audit store."
+msgstr "監査ストアを再構築します。"
+
+msgid "Time (ms)"
+msgstr "時間 (ms)"
+
+msgid "Timeline actions"
+msgstr "タイムラインの操作"
+
+msgid "Timestamp (UTC)"
+msgstr "タイムスタンプ (UTC)"
+
 msgid "Trace claims, evidence, and review outputs"
 msgstr "主張、エビデンス、レビュー出力を追跡します"
+
+msgid "Transaction"
+msgstr "トランザクション"
+
+msgid "Transactions: %zu   |   Current: Tx %llu / %llu"
+msgstr "トランザクション: %zu   |   現在: Tx %llu / %llu"
+
+msgid "Translation Language"
+msgstr "翻訳言語"
+
+msgid "Type"
+msgstr "種別"
+
+msgid "Type:"
+msgstr "種別:"
+
+msgid "Type: %s"
+msgstr "種別: %s"
+
+msgid "Uncategorized"
+msgstr "未分類"
+
+msgid "Uncertainty"
+msgstr "不確実性"
+
+msgid "Undeveloped"
+msgstr "未展開"
 
 msgid "Undo"
 msgstr "元に戻す"
 
-msgid "Reached snapshot or baseline — restore from history to go further back."
-msgstr "スナップショットまたはベースラインに到達しました — さらに戻すには履歴から復元してください。"
+msgid "Unlink"
+msgstr "リンク解除"
+
+msgid "Unnamed term"
+msgstr "名前なしの用語"
+
+msgid "Unresolved review"
+msgstr "未解決のレビュー"
+
+msgid "Unsaved Changes"
+msgstr "未保存の変更"
+
+msgid "Update Key"
+msgstr "キーを更新"
+
+msgid "Usage count: %d"
+msgstr "使用回数: %d"
+
+msgid "Use for this element"
+msgstr "この要素に使用"
+
+msgid "Used By"
+msgstr "使用元"
+
+msgid "Used By CSE Count"
+msgstr "CSE での使用回数"
+
+msgid "Used In"
+msgstr "使用先"
+
+msgid "VSync"
+msgstr "VSync"
+
+msgid "Validation"
+msgstr "検証"
+
+msgid "View"
+msgstr "表示"
+
+msgid "View Element History"
+msgstr "要素履歴を表示"
+
+msgid "View Proposal"
+msgstr "提案を表示"
+
+msgid "Walkthroughs"
+msgstr "ウォークスルー"
+
+msgid "Walkthroughs are not yet implemented."
+msgstr "ウォークスルーは未実装です。"
+
+msgid "Warnings"
+msgstr "警告"
+
+msgid "Welcome Screen"
+msgstr "ウェルカム画面"
+
+msgid "Welcome!"
+msgstr "ようこそ!"
+
+msgid "XML File:"
+msgstr "XML ファイル:"
+
+msgid "XML element: %s"
+msgstr "XML 要素: %s"
+
+msgid "Yes"
+msgstr "はい"
+
+msgid "Yes, Overwrite"
+msgstr "はい、上書きする"
+
+msgid "You have unsaved changes in the current SACM file. Save before opening %s?"
+msgstr "現在の SACM ファイルに未保存の変更があります。%s を開く前に保存しますか?"
+
+msgid "You have unsaved changes. Save before closing?"
+msgstr "未保存の変更があります。閉じる前に保存しますか?"
+
+msgid "Your existing transaction history is preserved on disk under the backup folder, but the application timeline will start over from a new initial snapshot. Pinned historical views from before this operation will no longer be browsable in-app."
+msgstr "既存のトランザクション履歴はバックアップフォルダー内のディスク上に保持されますが、アプリのタイムラインは新しい初期スナップショットからやり直しになります。この操作以前に固定された履歴ビューはアプリ内で閲覧できなくなります。"
+
+msgid "Your most recent change is recorded in the audit log but the on-disk SACM file may be out of date. Try a manual Save (File → Save) or verify free disk space, file permissions, and any external sync agent."
+msgstr "直近の変更は監査ログに記録されていますが、ディスク上の SACM ファイルが古い可能性があります。手動で保存 (ファイル → 保存) を試すか、空きディスク容量、ファイル権限、外部同期エージェントを確認してください。"
+
+msgid "author"
+msgstr "作成者"
+
+msgid "disabled"
+msgstr "無効"
+
+msgid "error"
+msgstr "エラー"
+
+msgid "frame interval (colored by FPS)"
+msgstr "フレーム間隔 (FPS で色分け)"
+
+msgid "hello_imgui FpsIdling: when the UI is quiet, throttle to %.0f FPS to save power.\nUncheck to keep the app running at full speed even when idle."
+msgstr "hello_imgui FpsIdling: UI が静かなときに %.0f FPS にスロットルして電力を節約します。\nアイドル時もフルスピードで動作させるにはオフにしてください。"
+
+msgid "info"
+msgstr "情報"
+
+msgid "not recorded"
+msgstr "未記録"
+
+msgid "problem"
+msgstr "問題"
+
+msgid "render cost only"
+msgstr "描画コストのみ"
+
+msgid "replay=%s  on_disk=%s"
+msgstr "再生=%s  ディスク=%s"
+
+msgid "the selected project file"
+msgstr "選択したプロジェクトファイル"
+
+msgid "this node and its attachments"
+msgstr "このノードとその付随要素"
+
+msgid "this node and its descendants"
+msgstr "このノードとその子孫"
+
+msgid "throttled"
+msgstr "スロットル中"
+
+msgid "unthrottled"
+msgstr "非スロットル"
+
+msgid "waiting..."
+msgstr "待機中..."
+
+msgid "warning"
+msgstr "警告"
+
+msgid "{0}  by {1}"
+msgstr "{0}  作業者 {1}"
+
+msgid "{0} confidence assessment(s) were marked inactive because their target elements changed."
+msgstr "対象要素が変更されたため、{0} 件の信頼度評価が非アクティブとしてマークされました。"
+
+msgid "{0} problems · top {1}: {2}"
+msgstr "{0} 件の問題 · トップ {1}: {2}"
+
+msgid "â PAUSED"
+msgstr "â 一時停止中"
+
+msgid "This category is assigned to {0} term. Remove those assignments before deleting it."
+msgid_plural "This category is assigned to {0} terms. Remove those assignments before deleting it."
+msgstr[0] "この分類は {0} 件の用語に割り当てられています。削除前にそれらの割り当てを除去してください。"
+
+msgid "This term value appears {0} time in the current SACM model."
+msgid_plural "This term value appears {0} times in the current SACM model."
+msgstr[0] "この用語値は現在の SACM モデルに {0} 回出現します。"
+
+msgid "{0} element will be deleted (highlighted in red)."
+msgid_plural "{0} elements will be deleted (highlighted in red)."
+msgstr[0] "{0} 個の要素が削除されます (赤でハイライト)。"
+
+msgid "{0} item"
+msgid_plural "{0} items"
+msgstr[0] "{0} 個"
+
+msgid "{0} usage found"
+msgid_plural "{0} usages found"
+msgstr[0] "{0} 件の使用箇所"
