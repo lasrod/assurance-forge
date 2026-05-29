@@ -21,10 +21,10 @@ void RenderLanguageMenu() {
         return;
 
     const ui::Language current = ui::CurrentLanguage();
-    if (ImGui::MenuItem(ui::Tr(ui::MessageId::English), nullptr, current == ui::Language::English)) {
+    if (ImGui::MenuItem(ui::Tr(ui::MessageId::English), "F8", current == ui::Language::English)) {
         ui::SetCurrentLanguage(ui::Language::English);
     }
-    if (ImGui::MenuItem(ui::Tr(ui::MessageId::Japanese), nullptr, current == ui::Language::Japanese)) {
+    if (ImGui::MenuItem(ui::Tr(ui::MessageId::Japanese), "F8", current == ui::Language::Japanese)) {
         ui::SetCurrentLanguage(ui::Language::Japanese);
     }
 
@@ -37,7 +37,7 @@ void RenderThemeMenu() {
 
     for (ui::AppTheme theme : ui::kAppThemes) {
         const bool selected = ui::GetCurrentAppTheme() == theme;
-        if (ImGui::MenuItem(ui::GetThemeDisplayName(theme), nullptr, selected)) {
+        if (ImGui::MenuItem(ui::GetThemeDisplayName(theme), "F9", selected)) {
             ui::ApplyAppTheme(theme);
         }
     }
