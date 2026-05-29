@@ -206,13 +206,13 @@ msgid "Are you sure you want to overwrite it?"
 msgstr "本当に上書きしてもよろしいですか?"
 
 msgid "Argument Navigator"
-msgstr "引数ナビゲーター"
+msgstr "論証ナビゲーター"
 
 msgid "Argument Packages"
-msgstr "引数パッケージ"
+msgstr "論証パッケージ"
 
 msgid "Argument package was not found in the loaded SACM model."
-msgstr "読み込まれた SACM モデルに引数パッケージが見つかりませんでした。"
+msgstr "読み込まれた SACM モデルに論証パッケージが見つかりませんでした。"
 
 msgid "Artifact Packages"
 msgstr "成果物パッケージ"
@@ -344,7 +344,7 @@ msgid "Claim ID"
 msgstr "主張 ID"
 
 msgid "Claim Owner"
-msgstr "主張所有者"
+msgstr "主張責任者"
 
 msgid "Claims"
 msgstr "主張"
@@ -374,10 +374,10 @@ msgid "Confidence"
 msgstr "信頼度"
 
 msgid "Confidence argument tree"
-msgstr "信頼度引数ツリー"
+msgstr "信頼度論証ツリー"
 
 msgid "Confidence argument tree is not linked."
-msgstr "信頼度引数ツリーがリンクされていません。"
+msgstr "信頼度論証ツリーがリンクされていません。"
 
 msgid "Confidence reset failed: {0}"
 msgstr "信頼度のリセットに失敗しました: {0}"
@@ -440,7 +440,7 @@ msgid "Create Terminology Package"
 msgstr "用語パッケージを作成"
 
 msgid "Create a new SACM argument package and link this ACP to its top goal."
-msgstr "新しい SACM 引数パッケージを作成し、この ACP をそのトップゴールにリンクします。"
+msgstr "新しい SACM 論証パッケージを作成し、この ACP をそのトップゴールにリンクします。"
 
 msgid "Create a project from a predefined assurance case template"
 msgstr "定義済みの保証ケーステンプレートからプロジェクトを作成します"
@@ -452,7 +452,7 @@ msgid "Create baseline at current state"
 msgstr "現在の状態でベースラインを作成"
 
 msgid "Create new confidence argument tree"
-msgstr "新しい信頼度引数ツリーを作成"
+msgstr "新しい信頼度論証ツリーを作成"
 
 msgid "Create new meaning"
 msgstr "新しい意味を作成"
@@ -527,7 +527,7 @@ msgid "Description (optional)"
 msgstr "説明 (省略可)"
 
 msgid "Detach this ACP from its current confidence argument tree."
-msgstr "この ACP を現在の信頼度引数ツリーから切り離します。"
+msgstr "この ACP を現在の信頼度論証ツリーから切り離します。"
 
 msgid "Direct value"
 msgstr "直接値"
@@ -605,7 +605,7 @@ msgid "Element not found: %s"
 msgstr "要素が見つかりません: %s"
 
 msgid "Eligible"
-msgstr "対象可"
+msgstr "適格"
 
 msgid "Enable AI support"
 msgstr "AI サポートを有効にする"
@@ -629,7 +629,7 @@ msgid "Evidence ID"
 msgstr "エビデンス ID"
 
 msgid "Evidence Owner"
-msgstr "エビデンス所有者"
+msgstr "エビデンス責任者"
 
 msgid "Evidence Register"
 msgstr "エビデンス登録簿"
@@ -722,7 +722,7 @@ msgid "GSN SVG"
 msgstr "GSN SVG"
 
 msgid "GSN structure, SACM imports, evidence, and registers"
-msgstr "GSN 構造、SACM インポート、エビデンス、レジスターを学びます"
+msgstr "GSN 構造、SACM インポート、エビデンス、登録簿を学びます"
 
 msgid "Get started with Assurance Forge"
 msgstr "Assurance Forge の開始ガイド"
@@ -833,7 +833,7 @@ msgid "Link existing"
 msgstr "既存にリンク"
 
 msgid "Link selected confidence argument tree"
-msgstr "選択した信頼度引数ツリーをリンク"
+msgstr "選択した信頼度論証ツリーをリンク"
 
 msgid "Linked:"
 msgstr "リンク済み:"
@@ -935,7 +935,7 @@ msgid "No CSE rows were derived from direct claim-evidence relations."
 msgstr "直接の主張–エビデンス関係から CSE 行が導出されませんでした。"
 
 msgid "No SACM argument model is loaded."
-msgstr "SACM 引数モデルが読み込まれていません。"
+msgstr "SACM 論証モデルが読み込まれていません。"
 
 msgid "No SACM package selected."
 msgstr "SACM パッケージが選択されていません。"
@@ -956,7 +956,7 @@ msgid "No categories are available in this terminology package."
 msgstr "この用語パッケージには利用可能な分類がありません。"
 
 msgid "No confidence argument has been selected."
-msgstr "信頼度引数が選択されていません。"
+msgstr "信頼度論証が選択されていません。"
 
 msgid "No confidence assessment stored for this element."
 msgstr "この要素に保存された信頼度評価はありません。"
@@ -968,7 +968,7 @@ msgid "No evidence/work-product rows were derived from the model."
 msgstr "モデルからエビデンス/作業成果物の行が導出されませんでした。"
 
 msgid "No existing confidence argument trees available to link."
-msgstr "リンク可能な既存の信頼度引数ツリーはありません。"
+msgstr "リンク可能な既存の信頼度論証ツリーはありません。"
 
 msgid "No files"
 msgstr "ファイルなし"
@@ -1070,7 +1070,7 @@ msgid "Open an existing Assurance Forge project"
 msgstr "既存の Assurance Forge プロジェクトを開きます"
 
 msgid "Open confidence argument tree"
-msgstr "信頼度引数ツリーを開く"
+msgstr "信頼度論証ツリーを開く"
 
 msgid "Open duplicates"
 msgstr "重複を開く"
@@ -1103,7 +1103,7 @@ msgid "Opinion triangle"
 msgstr "意見三角形"
 
 msgid "Or link to an existing confidence argument tree:"
-msgstr "または既存の信頼度引数ツリーにリンク:"
+msgstr "または既存の信頼度論証ツリーにリンク:"
 
 msgid "Origin"
 msgstr "出典"
@@ -1169,7 +1169,7 @@ msgid "Preferences"
 msgstr "設定"
 
 msgid "Preferences..."
-msgstr "設定..."
+msgstr "設定…"
 
 msgid "Prepare a Conformance Review"
 msgstr "適合性レビューを準備する"
@@ -1361,7 +1361,7 @@ msgid "SCCG profiles unavailable: %s"
 msgstr "SCCG プロファイルを使用できません: %s"
 
 msgid "Safety Case Owner"
-msgstr "安全ケース所有者"
+msgstr "安全ケース責任者"
 
 msgid "Sampling enabled"
 msgstr "サンプリングを有効化"
@@ -1421,10 +1421,10 @@ msgid "Send"
 msgstr "送信"
 
 msgid "Sending..."
-msgstr "送信中..."
+msgstr "送信中…"
 
 msgid "Separate confidence argument tree"
-msgstr "個別の信頼度引数ツリー"
+msgstr "個別の信頼度論証ツリー"
 
 msgid "Severity"
 msgstr "重大度"
@@ -1439,7 +1439,7 @@ msgid "Snippet"
 msgstr "抜粋"
 
 msgid "Solution"
-msgstr "解"
+msgstr "ソリューション"
 
 msgid "Source"
 msgstr "ソース"
@@ -1544,16 +1544,16 @@ msgid "Test Connection"
 msgstr "接続をテスト"
 
 msgid "Testing connection..."
-msgstr "接続をテスト中..."
+msgstr "接続をテスト中…"
 
 msgid "Text"
 msgstr "テキスト"
 
 msgid "Text confidence argument"
-msgstr "テキスト信頼度引数"
+msgstr "テキスト信頼度論証"
 
 msgid "Text confidence argument is empty."
-msgstr "テキスト信頼度引数が空です。"
+msgstr "テキスト信頼度論証が空です。"
 
 msgid "The attached proposal will also be deleted."
 msgstr "添付された提案も削除されます。"
@@ -1766,7 +1766,7 @@ msgid "unthrottled"
 msgstr "非スロットル"
 
 msgid "waiting..."
-msgstr "待機中..."
+msgstr "待機中…"
 
 msgid "warning"
 msgstr "警告"
