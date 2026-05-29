@@ -238,7 +238,7 @@ void ShowProblemsPanel(float x,
                        const ProblemsPanelCallbacks& callbacks) {
     ImGui::SetNextWindowPos(ImVec2(x, top_y));
     ImGui::SetNextWindowSize(ImVec2(width, height));
-    ImGui::Begin(AF_TR("Problems").c_str(), nullptr, panel_flags);
+    ImGui::Begin((AF_TR("Problems") + "###Problems").c_str(), nullptr, panel_flags);
 
     ShowProblemsPanelContent(model, callbacks);
 

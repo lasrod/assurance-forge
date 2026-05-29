@@ -74,13 +74,17 @@ std::string_view NthPluralForm(std::string_view forms, int index) {
 bool Initialize(const LocalizationConfig& config) {
     g_locale_directory = config.localeDirectory;
     g_domain = config.domain.empty() ? "assurance_forge" : config.domain;
-    g_language = config.language;
-    return LoadCatalogFor(g_language);
+    // Keep g_language truthful: if the catalog fails to load, the system is
+    // effectively English, so CurrentLanguage() must report English too.
+    const bool ok = LoadCatalogFor(config.language);
+    g_language = ok ? config.language : Language::English;
+    return ok;
 }
 
 bool SetLanguage(Language language) {
-    g_language = language;
-    return LoadCatalogFor(language);
+    const bool ok = LoadCatalogFor(language);
+    g_language = ok ? language : Language::English;
+    return ok;
 }
 
 Language CurrentLanguage() {

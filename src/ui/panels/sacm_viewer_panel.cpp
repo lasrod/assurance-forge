@@ -171,7 +171,7 @@ void ShowSacmViewerPanel(float width,
                          const SacmViewerPanelCallbacks& callbacks) {
     ImGui::SetNextWindowPos(ImVec2(0, top_y));
     ImGui::SetNextWindowSize(ImVec2(width, height));
-    ImGui::Begin(AF_TR("SACM Viewer").c_str(), nullptr, panel_flags);
+    ImGui::Begin((AF_TR("SACM Viewer") + "###SACM Viewer").c_str(), nullptr, panel_flags);
 
     ImGui::Text("%s", AF_TR("Directory:").c_str());
     ImGui::SetNextItemWidth(-1);

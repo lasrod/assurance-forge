@@ -100,7 +100,8 @@ def extract_from_file(path):
     msgids = []
     text = path.read_text(encoding="utf-8")
     for m in CALL_RE.finditer(text):
-        call_name = m.group(0)
+        # CALL_RE allows whitespace before "(", so normalise before suffix checks.
+        call_name = re.sub(r"\s+", "", m.group(0))
         open_paren = m.end() - 1
         inner, end = find_call_arg_block(text, open_paren)
         if inner is None:

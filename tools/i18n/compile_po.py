@@ -30,12 +30,15 @@ def parse_po(text):
     def flush():
         nonlocal ctxt, msgid, msgid_plural, plurals
         if msgid is not None:
-            key = msgid if ctxt is None else ctxt + "\x04" + msgid
+            # Context applies to plural keys too: the gettext key for a
+            # context+plural entry is "ctxt\x04singular\x00plural".
+            base_key = msgid if ctxt is None else ctxt + "\x04" + msgid
             if msgid_plural is not None:
                 forms = [plurals.get(i, "") for i in range(max(plurals) + 1)] if plurals else [""]
-                key = msgid + "\x00" + msgid_plural
+                key = base_key + "\x00" + msgid_plural
                 value = "\x00".join(forms)
             else:
+                key = base_key
                 value = plurals.get(0, "")
             # Keep the header (empty msgid); skip other untranslated entries.
             if msgid == "" or value != "":

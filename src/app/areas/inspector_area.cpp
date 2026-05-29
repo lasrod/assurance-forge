@@ -26,7 +26,7 @@ void RenderInspectorArea(AppRuntimeState& state,
                          const InspectorAreaCallbacks& callbacks) {
     ImGui::SetNextWindowPos(region.pos);
     ImGui::SetNextWindowSize(region.size);
-    ImGui::Begin(AF_TR("Element Properties").c_str(), nullptr, panel_flags);
+    ImGui::Begin((AF_TR("Element Properties") + "###Element Properties").c_str(), nullptr, panel_flags);
 
     if (state.proposal_controller->creator_active) {
         if (callbacks.render_proposal_element_editor)

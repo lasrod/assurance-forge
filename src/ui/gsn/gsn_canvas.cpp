@@ -824,7 +824,7 @@ void ShowGsnCanvasWindow() {
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
                                     ImGuiWindowFlags_NoBringToFrontOnFocus;
 
-    if (ImGui::Begin(AF_TR("GSN Canvas").c_str(), nullptr, window_flags)) {
+    if (ImGui::Begin((AF_TR("GSN Canvas") + "###GSN Canvas").c_str(), nullptr, window_flags)) {
         ElementContextActions actions{};
         ShowGsnCanvasContent(GetUiState(), nullptr, actions, nullptr);
     }

@@ -229,7 +229,9 @@ bool WalkthroughCard(std::string_view id, std::string_view title, std::string_vi
 void ShowWelcomeModal(bool& is_open,
                       const std::vector<RecentProjectEntry>& recent,
                       const WelcomeModalCallbacks& callbacks) {
-    const std::string welcome_popup_id = AF_TR(kWelcomePopupId);
+    // "<translated>###<english>" keeps the ImGui popup ID stable across
+    // language switches while letting the title bar show the translation.
+    const std::string welcome_popup_id = AF_TR(kWelcomePopupId) + "###" + kWelcomePopupId;
     if (is_open && !ImGui::IsPopupOpen(welcome_popup_id.c_str())) {
         ImGui::OpenPopup(welcome_popup_id.c_str());
     }
