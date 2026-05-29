@@ -20,6 +20,8 @@
 #include "app/frame/app_shell.h"
 #include "core/perf/frame_profiler.h"
 #include "core/problems/problem_attention.h"
+#include "ui/localization.h"
+#include "ui/theme.h"
 #include "ui/ui_state.h"
 
 #include <cstddef>
@@ -61,6 +63,15 @@ void AppRuntime::RenderFrame(bool& done) {
     // item uses so the shortcut and the menu agree on availability.
     if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Z) && CanUndo()) {
         Undo();
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_F9, false)) {
+        ui::AppTheme next = ui::GetCurrentAppTheme() == ui::AppTheme::Dark ? ui::AppTheme::Light : ui::AppTheme::Dark;
+        ui::ApplyAppTheme(next);
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_F8, false)) {
+        ui::Language next = ui::CurrentLanguage() == ui::Language::English ? ui::Language::Japanese
+                                                                           : ui::Language::English;
+        ui::SetCurrentLanguage(next);
     }
 
     {

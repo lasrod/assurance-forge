@@ -14,8 +14,10 @@ void DrawVerticalSplitter(const char* id,
                           bool subtract_delta,
                           float min_ratio,
                           float max_ratio,
+                          float hit_padding,
                           ImGuiWindowFlags panel_flags);
 
-float DrawHorizontalSplitter(const char* id, float x, float y, float width, float height, ImGuiWindowFlags panel_flags);
+float DrawHorizontalSplitter(
+    const char* id, float x, float y, float width, float height, float hit_padding, ImGuiWindowFlags panel_flags);
 
 } // namespace ui::widgets
