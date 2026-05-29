@@ -125,12 +125,13 @@ void RenderTermCategoryPicker(AppRuntimeState& state) {
 
 void RenderTermTextFields(AppRuntimeState& state) {
     ImGui::SetNextItemWidth(460.0f);
-    ImGui::InputText(AF_TR("Term").c_str(), state.terminology.term_value_buf, sizeof(state.terminology.term_value_buf));
+    ImGui::InputText((AF_TR("Term") + "##term_value").c_str(), state.terminology.term_value_buf,
+                     sizeof(state.terminology.term_value_buf));
     ImGui::SetNextItemWidth(460.0f);
-    ImGui::InputText(
-        AF_TR("Full Name / Display Name").c_str(), state.terminology.term_name_buf, sizeof(state.terminology.term_name_buf));
+    ImGui::InputText((AF_TR("Full Name / Display Name") + "##term_name").c_str(), state.terminology.term_name_buf,
+                     sizeof(state.terminology.term_name_buf));
     ImGui::SetNextItemWidth(460.0f);
-    ImGui::InputTextMultiline(AF_TR("Definition").c_str(),
+    ImGui::InputTextMultiline((AF_TR("Definition") + "##term_definition").c_str(),
                               state.terminology.term_definition_buf,
                               sizeof(state.terminology.term_definition_buf),
                               ImVec2(460.0f, 110.0f));
@@ -138,7 +139,7 @@ void RenderTermTextFields(AppRuntimeState& state) {
 
 void RenderTermExternalReferenceField(AppRuntimeState& state) {
     ImGui::SetNextItemWidth(460.0f);
-    ImGui::InputText(AF_TR("External Reference").c_str(),
+    ImGui::InputText((AF_TR("External Reference") + "##term_external_reference").c_str(),
                      state.terminology.term_external_reference_buf,
                      sizeof(state.terminology.term_external_reference_buf));
 }
@@ -223,11 +224,11 @@ void ModalHost::RenderCreateTerminologyPackageModal() {
                                nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::SetNextItemWidth(420.0f);
-        ImGui::InputText(AF_TR("Package name").c_str(),
+        ImGui::InputText((AF_TR("Package name") + "##new_package_name").c_str(),
                          state_.terminology.new_package_name_buf,
                          sizeof(state_.terminology.new_package_name_buf));
         ImGui::SetNextItemWidth(420.0f);
-        ImGui::InputTextMultiline(AF_TR("Package description").c_str(),
+        ImGui::InputTextMultiline((AF_TR("Package description") + "##new_package_description").c_str(),
                                   state_.terminology.new_package_description_buf,
                                   sizeof(state_.terminology.new_package_description_buf),
                                   ImVec2(420.0f, 96.0f));
@@ -294,8 +295,8 @@ void ModalHost::RenderTerminologyTermEditorModal() {
         RenderTermCategoryPicker(state_);
         RenderTermExternalReferenceField(state_);
         ImGui::SetNextItemWidth(460.0f);
-        ImGui::InputText(
-            AF_TR("Origin").c_str(), state_.terminology.term_origin_buf, sizeof(state_.terminology.term_origin_buf));
+        ImGui::InputText((AF_TR("Origin") + "##term_origin").c_str(), state_.terminology.term_origin_buf,
+                         sizeof(state_.terminology.term_origin_buf));
 
         const std::string value = TrimWhitespace(state_.terminology.term_value_buf);
         const std::string description = TrimWhitespace(state_.terminology.term_definition_buf);
@@ -460,11 +461,11 @@ void ModalHost::RenderTerminologyCategoryEditorModal() {
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::SetNextItemWidth(420.0f);
-        ImGui::InputText(AF_TR("Category name").c_str(),
+        ImGui::InputText((AF_TR("Category name") + "##category_name").c_str(),
                          state_.terminology.category_name_buf,
                          sizeof(state_.terminology.category_name_buf));
         ImGui::SetNextItemWidth(420.0f);
-        ImGui::InputTextMultiline(AF_TR("Category description").c_str(),
+        ImGui::InputTextMultiline((AF_TR("Category description") + "##category_description").c_str(),
                                   state_.terminology.category_description_buf,
                                   sizeof(state_.terminology.category_description_buf),
                                   ImVec2(420.0f, 96.0f));

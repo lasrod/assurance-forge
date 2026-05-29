@@ -18,7 +18,7 @@ void RenderFeedbackDockArea(AppRuntimeState& state,
     if (ImGui::BeginTabBar("##problems_review_tabs")) {
         ui::UiState& ui_state = ui::GetUiState();
         ImGuiTabItemFlags problems_flags = ui_state.problems_panel_open_pending ? ImGuiTabItemFlags_SetSelected : 0;
-        if (ImGui::BeginTabItem(AF_TR("Problems").c_str(), nullptr, problems_flags)) {
+        if (ImGui::BeginTabItem((AF_TR("Problems") + "###problems_tab").c_str(), nullptr, problems_flags)) {
             RenderProblemsAreaContent(state, callbacks.problems);
             ImGui::EndTabItem();
         }
@@ -26,21 +26,22 @@ void RenderFeedbackDockArea(AppRuntimeState& state,
 
         ImGuiTabItemFlags terminology_usage_flags =
             state.terminology.focus_usages_tab ? ImGuiTabItemFlags_SetSelected : 0;
-        if (ImGui::BeginTabItem(AF_TR("Term Usages").c_str(), nullptr, terminology_usage_flags)) {
+        if (ImGui::BeginTabItem((AF_TR("Term Usages") + "###term_usages_tab").c_str(), nullptr,
+                                terminology_usage_flags)) {
             RenderTermUsagesAreaContent(state, callbacks.term_usages);
             ImGui::EndTabItem();
         }
         state.terminology.focus_usages_tab = false;
 
         ImGuiTabItemFlags review_flags = state.workbench.focus_review_tab ? ImGuiTabItemFlags_SetSelected : 0;
-        if (ImGui::BeginTabItem(AF_TR("Review").c_str(), nullptr, review_flags)) {
+        if (ImGui::BeginTabItem((AF_TR("Review") + "###review_tab").c_str(), nullptr, review_flags)) {
             if (callbacks.render_review_content)
                 callbacks.render_review_content();
             ImGui::EndTabItem();
         }
         state.workbench.focus_review_tab = false;
 
-        if (ImGui::BeginTabItem(AF_TR("History").c_str(),
+        if (ImGui::BeginTabItem((AF_TR("History") + "###history_tab").c_str(),
                                 nullptr,
                                 state.workbench.focus_history_tab ? ImGuiTabItemFlags_SetSelected : 0)) {
             RenderHistoryPanelContent(state, callbacks.history);
@@ -48,7 +49,7 @@ void RenderFeedbackDockArea(AppRuntimeState& state,
         }
         state.workbench.focus_history_tab = false;
 
-        if (ImGui::BeginTabItem(AF_TR("AI Debug").c_str())) {
+        if (ImGui::BeginTabItem((AF_TR("AI Debug") + "###ai_debug_tab").c_str())) {
             if (callbacks.render_ai_debug_content)
                 callbacks.render_ai_debug_content();
             ImGui::EndTabItem();

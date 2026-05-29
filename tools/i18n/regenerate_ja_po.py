@@ -173,6 +173,7 @@ TRANSLATIONS = {
     "No element selected.": "要素が選択されていません。",
     "No safety case loaded.": "安全ケースが読み込まれていません。",
     "Historical preview — fields are read-only. Return to latest to edit.": "過去の表示 — フィールドは読み取り専用です。編集するには最新に戻ってください。",
+    "Proposal preview is active. Exit preview before editing element properties.": "提案プレビューが有効です。要素プロパティを編集する前にプレビューを終了してください。",
 
     # ===== History =====
     "History": "履歴",
@@ -355,6 +356,7 @@ TRANSLATIONS = {
     "Back up and start new confidence file": "バックアップして新しい信頼度ファイルを開始",
     "Method: %s": "方式: %s",
     "Status: %s": "ステータス: %s",
+    "Status": "ステータス",
     "Active": "アクティブ",
     "Inactive": "非アクティブ",
     "Fixed value": "固定値",
@@ -456,6 +458,7 @@ TRANSLATIONS = {
     "Delete this term?": "この用語を削除しますか?",
     "Add Category": "分類を追加",
     "Edit Category": "分類を編集",
+    "Create Category": "分類を作成",
     "Delete Category": "分類を削除",
     "Delete this category?": "この分類を削除しますか?",
     "Add Terminology Package": "用語パッケージを追加",
@@ -715,6 +718,11 @@ PLURAL_TRANSLATIONS = {
     ("{0} confidence assessment was marked inactive because its target element changed.",
      "{0} confidence assessments were marked inactive because their target elements changed."):
         ["対象要素が変更されたため、{0} 件の信頼度評価が非アクティブとしてマークされました。"],
+    ("{0} more candidate.", "{0} more candidates."):
+        ["他に {0} 件の候補"],
+    ("{0} legacy expression entry is present and shown read-only by older tooling.",
+     "{0} legacy expression entries are present and shown read-only by older tooling."):
+        ["{0} 件のレガシー表現項目があり、旧ツールにより読み取り専用で表示されます。"],
 }
 
 

@@ -217,6 +217,9 @@ af_copy_sccg_data(assurance-forge)
 # tools/i18n/compile_po.py. It is not part of ALL.
 set(AF_JA_PO "${CMAKE_SOURCE_DIR}/assets/locale/ja/LC_MESSAGES/assurance_forge.po")
 set(AF_JA_MO "${CMAKE_SOURCE_DIR}/assets/locale/ja/LC_MESSAGES/assurance_forge.mo")
+# Python is used both for the optional catalog compile fallback and for the
+# i18n_catalog_check CTest below, so look for it once up front.
+find_package(Python3 COMPONENTS Interpreter QUIET)
 find_program(MSGFMT_EXECUTABLE msgfmt)
 if(MSGFMT_EXECUTABLE)
     add_custom_target(i18n_compile
@@ -224,15 +227,12 @@ if(MSGFMT_EXECUTABLE)
         COMMENT "Compiling i18n catalogs with msgfmt"
         VERBATIM
     )
-else()
-    find_package(Python3 COMPONENTS Interpreter QUIET)
-    if(Python3_Interpreter_FOUND)
-        add_custom_target(i18n_compile
-            COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/i18n/compile_po.py" "${AF_JA_PO}" "${AF_JA_MO}"
-            COMMENT "Compiling i18n catalogs with tools/i18n/compile_po.py"
-            VERBATIM
-        )
-    endif()
+elseif(Python3_Interpreter_FOUND)
+    add_custom_target(i18n_compile
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/i18n/compile_po.py" "${AF_JA_PO}" "${AF_JA_MO}"
+        COMMENT "Compiling i18n catalogs with tools/i18n/compile_po.py"
+        VERBATIM
+    )
 endif()
 
 # --- Tests ---
@@ -341,3 +341,14 @@ add_test(
     "${AF_SCCG_DIST_DIR}/review_profiles.json"
     "$<TARGET_FILE_DIR:tests>/data/sccg/dist/review_profiles.json"
 )
+
+# Localization catalog consistency gate: fails if any source msgid is missing
+# from the .po, or if the committed .mo is out of sync with the .po. Registered
+# as a CTest test so it runs with `ctest` locally and in CI. Skipped only when
+# no Python interpreter is available.
+if(Python3_Interpreter_FOUND)
+    add_test(
+        NAME i18n_catalog_check
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/i18n/check_catalog.py"
+    )
+endif()

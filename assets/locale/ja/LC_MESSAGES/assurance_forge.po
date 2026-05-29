@@ -424,6 +424,9 @@ msgstr "テンプレートから保証プロジェクトを作成"
 msgid "Create Assurance Project from Template is not yet implemented."
 msgstr "テンプレートから保証プロジェクトを作成は未実装です。"
 
+msgid "Create Category"
+msgstr "分類を作成"
+
 msgid "Create Empty Assurance Project"
 msgstr "空の保証プロジェクトを作成"
 
@@ -1204,6 +1207,9 @@ msgstr "提案クリエーター"
 msgid "Proposal draft: %d operation(s)"
 msgstr "提案ドラフト: %d 件の操作"
 
+msgid "Proposal preview is active. Exit preview before editing element properties."
+msgstr "提案プレビューが有効です。要素プロパティを編集する前にプレビューを終了してください。"
+
 msgid "Proposal: %s"
 msgstr "提案: %s"
 
@@ -1452,6 +1458,9 @@ msgstr "開始"
 
 msgid "Start with a blank assurance project workspace"
 msgstr "空の保証プロジェクトワークスペースから開始します"
+
+msgid "Status"
+msgstr "ステータス"
 
 msgid "Status: %s"
 msgstr "ステータス: %s"
@@ -1799,6 +1808,14 @@ msgstr[0] "{0} 個の要素が削除されます (赤でハイライト)。"
 msgid "{0} item"
 msgid_plural "{0} items"
 msgstr[0] "{0} 個"
+
+msgid "{0} legacy expression entry is present and shown read-only by older tooling."
+msgid_plural "{0} legacy expression entries are present and shown read-only by older tooling."
+msgstr[0] "{0} 件のレガシー表現項目があり、旧ツールにより読み取り専用で表示されます。"
+
+msgid "{0} more candidate."
+msgid_plural "{0} more candidates."
+msgstr[0] "他に {0} 件の候補"
 
 msgid "{0} problem · top: {1}\nClick to open the Problems panel."
 msgid_plural "{0} problems · top: {1}\nClick to open the Problems panel."

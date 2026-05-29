@@ -253,7 +253,7 @@ void RenderCategoryFilter(const TerminologyPackagePanelModel& model,
     const std::string active_filter = model.category_filter_buffer ? model.category_filter_buffer : "";
     const std::string preview = CategoryPreview(model);
     ImGui::SetNextItemWidth(220.0f);
-    if (ImGui::BeginCombo(AF_TR("Category filter").c_str(), preview.c_str())) {
+    if (ImGui::BeginCombo((AF_TR("Category filter") + "##category_filter").c_str(), preview.c_str())) {
         if (ImGui::Selectable(AF_TR("All categories").c_str(), active_filter.empty()) && callbacks.set_category_filter)
             callbacks.set_category_filter("");
         if (ImGui::Selectable(AF_TR("Uncategorized").c_str(), active_filter == kUncategorizedFilter) &&
@@ -337,14 +337,15 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     ImGui::Spacing();
 
     ImGui::SetNextItemWidth(-1.0f);
-    if (ImGui::InputText(AF_TR("Package name").c_str(), model.name_buffer, model.name_buffer_size) &&
+    if (ImGui::InputText((AF_TR("Package name") + "##package_name").c_str(), model.name_buffer,
+                         model.name_buffer_size) &&
         callbacks.apply_changes) {
         callbacks.apply_changes();
     }
 
     ImGui::SetNextItemWidth(-1.0f);
-    if (ImGui::InputTextMultiline(AF_TR("Package description").c_str(), model.description_buffer,
-                                  model.description_buffer_size, ImVec2(-1.0f, 96.0f)) &&
+    if (ImGui::InputTextMultiline((AF_TR("Package description") + "##package_description").c_str(),
+                                  model.description_buffer, model.description_buffer_size, ImVec2(-1.0f, 96.0f)) &&
         callbacks.apply_changes) {
         callbacks.apply_changes();
     }
@@ -392,7 +393,7 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     ImGui::SameLine();
     RenderCategoryFilter(model, callbacks);
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::InputText(AF_TR("Search").c_str(), model.search_buffer, model.search_buffer_size);
+    ImGui::InputText((AF_TR("Search") + "##term_search").c_str(), model.search_buffer, model.search_buffer_size);
     ImGui::Spacing();
     RenderTermsTable(model, callbacks);
 

@@ -7,6 +7,8 @@
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
+#include <filesystem>
+
 namespace {
 
 constexpr const char* kLanguagePreference = "AssuranceForge.Language";

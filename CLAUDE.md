@@ -70,6 +70,7 @@ Every user-visible string goes through `ui::i18n`. Catalog source of truth: `too
 - Layer rule: `core/sacm/parser/ai` can't include `ui/i18n`. Store English msgids in data; the `ui/` panel translates at display with `AF_TR(field)`. `app/` may use `ui::i18n` directly for dynamic templating (`trf` at sync time).
 - After adding/removing strings: add (or remove) the entry in `regenerate_ja_po.py`, then `python tools/i18n/regenerate_ja_po.py && cmake --build --preset release`.
 - Caches that bake translations (e.g. `ProblemItem::message` built via `trf`) must refresh on language change. Use `ui::i18n::LanguageEpoch()` — see the existing hook in `AppRuntime::RenderFrame`.
+- CI enforces catalog consistency via the `i18n_catalog_check` CTest (runs `tools/i18n/check_catalog.py`): fails if a source msgid is missing from the `.po` or the committed `.mo` is out of sync. Run `python tools/i18n/check_catalog.py` before pushing.
 
 ## C++ Style
 

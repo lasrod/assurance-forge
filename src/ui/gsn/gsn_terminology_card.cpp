@@ -292,8 +292,9 @@ void RenderTerminologyCardContents(const TerminologyCardState& card_state,
             }
             ImGui::PopID();
             if (++shown >= 4 && static_cast<int>(card_state.candidates.size()) > shown) {
-                ImGui::TextDisabled(AF_TR("%d more candidate(s).").c_str(),
-                                    static_cast<int>(card_state.candidates.size()) - shown);
+                const int remaining = static_cast<int>(card_state.candidates.size()) - shown;
+                ImGui::TextDisabled(
+                    "%s", ui::i18n::trnf("{0} more candidate.", "{0} more candidates.", remaining, remaining).c_str());
                 break;
             }
         }

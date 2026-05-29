@@ -306,7 +306,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::GsnCanvas)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
-            if (ImGui::BeginTabItem(AF_TR("GSN Canvas").c_str(), nullptr, gsn_flags)) {
+            if (ImGui::BeginTabItem((AF_TR("GSN Canvas") + "###gsn_canvas_tab").c_str(), nullptr, gsn_flags)) {
                 state.workbench.active_argument_package_canvas_key.clear();
                 RenderGsnCanvasTab(state, ui_state, callbacks);
                 ImGui::EndTabItem();
@@ -349,7 +349,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::CseRegister)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
-            if (ImGui::BeginTabItem(AF_TR("CSE Register").c_str(), nullptr, cse_flags)) {
+            if (ImGui::BeginTabItem((AF_TR("CSE Register") + "###cse_register_tab").c_str(), nullptr, cse_flags)) {
                 ui_state.center_view = ui::CenterView::CseRegister;
                 if (state.app_state.active_project_file_role == core::ProjectFileRole::J3377CaeRegister) {
                     ImGui::TextWrapped(AF_TR("J3377 CAE register file: %s").c_str(),
@@ -368,7 +368,8 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::EvidenceRegister)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
-            if (ImGui::BeginTabItem(AF_TR("Evidence Register").c_str(), nullptr, evidence_flags)) {
+            if (ImGui::BeginTabItem((AF_TR("Evidence Register") + "###evidence_register_tab").c_str(), nullptr,
+                                    evidence_flags)) {
                 ui_state.center_view = ui::CenterView::EvidenceRegister;
                 if (state.app_state.active_project_file_role == core::ProjectFileRole::EvidenceRegister) {
                     ImGui::TextWrapped(AF_TR("Evidence register file: %s").c_str(),
@@ -388,7 +389,8 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::PackageDetails)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
-            if (ImGui::BeginTabItem(AF_TR("Package Details").c_str(), nullptr, package_flags)) {
+            if (ImGui::BeginTabItem((AF_TR("Package Details") + "###package_details_tab").c_str(), nullptr,
+                                    package_flags)) {
                 ui_state.center_view = ui::CenterView::PackageDetails;
                 ui::panels::ShowPackageDetailsPanel(state.selected_package_node ? &state.selected_package_node.value()
                                                                                 : nullptr,
@@ -402,7 +404,8 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                                                    ui_state.center_view == ui::CenterView::TerminologyPackage)
                                                       ? ImGuiTabItemFlags_SetSelected
                                                       : 0;
-            if (ImGui::BeginTabItem(AF_TR("Terminology Package").c_str(), nullptr, terminology_flags)) {
+            if (ImGui::BeginTabItem((AF_TR("Terminology Package") + "###terminology_package_tab").c_str(), nullptr,
+                                    terminology_flags)) {
                 ui_state.center_view = ui::CenterView::TerminologyPackage;
                 RenderTerminologyPackageTab(state, callbacks);
                 ImGui::EndTabItem();

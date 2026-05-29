@@ -1081,7 +1081,8 @@ void RenderPerfOverlay(bool& open) {
     // =================================================================
     // Section 4: Bucket tree
     // =================================================================
-    if (ImGui::CollapsingHeader(AF_TR("Buckets (sorted by cost)").c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader((AF_TR("Buckets (sorted by cost)") + "###buckets_header").c_str(),
+                                ImGuiTreeNodeFlags_DefaultOpen)) {
         bool enabled = core::perf::IsEnabled();
         if (ImGui::Checkbox(AF_TR("Sampling enabled").c_str(), &enabled))
             core::perf::SetEnabled(enabled);
@@ -1113,7 +1114,7 @@ void RenderPerfOverlay(bool& open) {
                 DrawTreeNodeRow(*n, total_ns, 1, bar_x_window, bar_w_uniform);
         }
 
-        if (ImGui::CollapsingHeader(AF_TR("Raw bucket table").c_str())) {
+        if (ImGui::CollapsingHeader((AF_TR("Raw bucket table") + "###raw_bucket_table_header").c_str())) {
             if (ImGui::BeginTable("perf_buckets_raw",
                                   4,
                                   ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |
@@ -1144,7 +1145,8 @@ void RenderPerfOverlay(bool& open) {
     // =================================================================
     // Section 5: Canvas render stats as chips
     // =================================================================
-    if (ImGui::CollapsingHeader(AF_TR("Canvas render stats").c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader((AF_TR("Canvas render stats") + "###canvas_render_stats_header").c_str(),
+                                ImGuiTreeNodeFlags_DefaultOpen)) {
         const ui::gsn::CanvasRenderStats& stats = s_snapshot.canvas_stats;
 
         DrawCullChip("Nodes", stats.nodes_drawn, stats.nodes_culled);
@@ -1175,7 +1177,8 @@ void RenderPerfOverlay(bool& open) {
     // =================================================================
     // Section 6: Feature toggles + actions
     // =================================================================
-    if (ImGui::CollapsingHeader(AF_TR("Feature toggles (A/B) & report").c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader((AF_TR("Feature toggles (A/B) & report") + "###feature_toggles_header").c_str(),
+                                ImGuiTreeNodeFlags_DefaultOpen)) {
         core::perf::PerfToggles& t = core::perf::GetPerfToggles();
         ImGui::TextWrapped("%s",
                            AF_TR("Disable individual cost contributors to measure their impact on FPS. "

@@ -71,7 +71,9 @@ void WriteMoFile(const std::filesystem::path& path,
     out.append(translations_blob);
 
     std::ofstream stream(path, std::ios::binary);
+    ASSERT_TRUE(stream) << "Failed to open " << path.string() << " for writing";
     stream.write(out.data(), static_cast<std::streamsize>(out.size()));
+    ASSERT_TRUE(stream.good()) << "Failed to write " << path.string();
 }
 
 std::filesystem::path MakeTempLocaleRoot() {

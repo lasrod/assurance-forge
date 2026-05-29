@@ -81,20 +81,27 @@ std::string_view NthPluralForm(std::string_view forms, int index) {
 bool Initialize(const LocalizationConfig& config) {
     g_locale_directory = config.localeDirectory;
     g_domain = config.domain.empty() ? "assurance_forge" : config.domain;
-    // Keep g_language truthful: if the catalog fails to load, the system is
-    // effectively English, so CurrentLanguage() must report English too.
+    // Force a load (don't early-out on the English default): the locale
+    // directory and domain were just set, and consumers expect the catalog to
+    // be ready after Initialize. Bump the epoch if the effective language
+    // changed so any consumer that captured it earlier refreshes.
+    const Language previous = g_language;
     const bool ok = LoadCatalogFor(config.language);
     g_language = ok ? config.language : Language::English;
+    if (g_language != previous)
+        ++g_language_epoch;
     return ok;
 }
 
 bool SetLanguage(Language language) {
+    // No-op when the requested language is already effective: avoids a
+    // redundant catalog reload (disk I/O + allocation) and never bumps the
+    // epoch, so consumers don't run spurious refresh work.
+    if (language == g_language)
+        return true;
     const Language previous = g_language;
     const bool ok = LoadCatalogFor(language);
     g_language = ok ? language : Language::English;
-    // Only bump the epoch when the effective language actually changes —
-    // SetLanguage(CurrentLanguage()) or a no-op fall-back must not trigger
-    // consumers' refresh work.
     if (g_language != previous)
         ++g_language_epoch;
     return ok;

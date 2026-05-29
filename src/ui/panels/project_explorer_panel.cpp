@@ -64,7 +64,10 @@ void RenderPackageNode(const core::ProjectFileEntry& entry,
                        const ProjectExplorerPanelCallbacks& callbacks,
                        const std::string& tree_path);
 
-void RenderPackageGroup(const char* label,
+// `id` is a stable English key used for the ImGui tree-node ID so open/close
+// state survives language switches; `label` is the translated display text.
+void RenderPackageGroup(const char* id,
+                        const std::string& label,
                         const std::vector<PackageNodeRenderEntry>& nodes,
                         const core::ProjectFileEntry& entry,
                         const ProjectExplorerPanelCallbacks& callbacks,
@@ -72,7 +75,7 @@ void RenderPackageGroup(const char* label,
     if (nodes.empty())
         return;
 
-    const bool open = ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen, "%s", label);
+    const bool open = ImGui::TreeNodeEx(id, ImGuiTreeNodeFlags_DefaultOpen, "%s", label.c_str());
     if (open) {
         for (const PackageNodeRenderEntry& entry_ref : nodes) {
             if (!entry_ref.node)
@@ -113,12 +116,13 @@ void RenderPackageChildren(const core::ProjectFileEntry& entry,
         }
     }
 
-    RenderPackageGroup(AF_TR("Argument Packages").c_str(), argument_packages, entry, callbacks, parent_path);
-    RenderPackageGroup(AF_TR("Artifact Packages").c_str(), artifact_packages, entry, callbacks, parent_path);
-    RenderPackageGroup(AF_TR("Terminology Packages").c_str(), terminology_packages, entry, callbacks, parent_path);
-    RenderPackageGroup(AF_TR("Interfaces").c_str(), interfaces, entry, callbacks, parent_path);
-    RenderPackageGroup(AF_TR("Bindings").c_str(), bindings, entry, callbacks, parent_path);
-    RenderPackageGroup(AF_TR("Other Packages").c_str(), other_packages, entry, callbacks, parent_path);
+    RenderPackageGroup("##grp_argument", AF_TR("Argument Packages"), argument_packages, entry, callbacks, parent_path);
+    RenderPackageGroup("##grp_artifact", AF_TR("Artifact Packages"), artifact_packages, entry, callbacks, parent_path);
+    RenderPackageGroup("##grp_terminology", AF_TR("Terminology Packages"), terminology_packages, entry, callbacks,
+                       parent_path);
+    RenderPackageGroup("##grp_interfaces", AF_TR("Interfaces"), interfaces, entry, callbacks, parent_path);
+    RenderPackageGroup("##grp_bindings", AF_TR("Bindings"), bindings, entry, callbacks, parent_path);
+    RenderPackageGroup("##grp_other", AF_TR("Other Packages"), other_packages, entry, callbacks, parent_path);
 }
 
 void RenderPackageNode(const core::ProjectFileEntry& entry,
