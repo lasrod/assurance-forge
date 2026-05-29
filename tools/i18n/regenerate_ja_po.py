@@ -639,6 +639,14 @@ TRANSLATIONS = {
     # ===== Window titles =====
     "Welcome!": "ようこそ!",
     "Argument Navigator": "引数ナビゲーター",
+
+    # ===== Themes =====
+    "Dark": "ダーク",
+    "Light": "ライト",
+
+    # ===== Welcome screen recent project stats =====
+    "{0} claims · {1} strategies · {2} evidence · {3} undeveloped":
+        "主張 {0} 件 · 戦略 {1} 件 · エビデンス {2} 件 · 未展開 {3} 件",
 }
 
 

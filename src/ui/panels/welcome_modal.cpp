@@ -53,8 +53,6 @@ constexpr const char* kWalkthroughPopupId = "Walkthroughs##not_implemented_popup
 constexpr const char* kImportSacmPopupId = "ImportSACM##not_implemented_popup";
 constexpr float kNotImplementedPopupButtonWidth = 110.0f;
 
-constexpr const char* kUtf8MiddleDot = "\xC2\xB7";
-
 constexpr int kWelcomeStyleVarCount = 2;
 
 struct ItemInteraction {
@@ -93,19 +91,8 @@ void DrawText(ImDrawList* draw_list, const ImVec2& pos, ImU32 color, std::string
 }
 
 std::string FormatRecentStats(const RecentProjectEntry& entry) {
-    constexpr int kRecentStatsBufferSize = 128;
-    char stats[kRecentStatsBufferSize];
-    std::snprintf(stats,
-                  sizeof(stats),
-                  "%d claims %s %d strategies %s %d evidence %s %d undeveloped",
-                  entry.claims,
-                  kUtf8MiddleDot,
-                  entry.strategies,
-                  kUtf8MiddleDot,
-                  entry.evidence,
-                  kUtf8MiddleDot,
-                  entry.undeveloped);
-    return std::string(stats);
+    return ui::i18n::trf("{0} claims · {1} strategies · {2} evidence · {3} undeveloped",
+                         entry.claims, entry.strategies, entry.evidence, entry.undeveloped);
 }
 
 void SectionTitle(std::string_view label) {

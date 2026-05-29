@@ -151,10 +151,10 @@ void RenderAppearanceSection(PreferencesPanelModel model, const PreferencesPanel
 
     ImGui::TextUnformatted(AF_TR("Theme").c_str());
     ImGui::SetNextItemWidth(combo_width);
-    if (ImGui::BeginCombo("##theme", ui::GetThemeDisplayName(model.theme))) {
+    if (ImGui::BeginCombo("##theme", AF_TR(ui::GetThemeDisplayName(model.theme)).c_str())) {
         for (ui::AppTheme theme : ui::kAppThemes) {
             const bool selected = model.theme == theme;
-            if (ImGui::Selectable(ui::GetThemeDisplayName(theme), selected)) {
+            if (ImGui::Selectable(AF_TR(ui::GetThemeDisplayName(theme)).c_str(), selected)) {
                 if (callbacks.set_theme)
                     callbacks.set_theme(theme);
             }

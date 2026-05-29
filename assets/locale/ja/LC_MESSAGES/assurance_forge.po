@@ -460,6 +460,9 @@ msgstr "現在の状態でスナップショットを作成"
 msgid "Create, inspect, and navigate a safety case"
 msgstr "安全ケースの作成・確認・操作を行います"
 
+msgid "Dark"
+msgstr "ダーク"
+
 msgid "Define"
 msgstr "定義"
 
@@ -816,6 +819,9 @@ msgstr "後で"
 
 msgid "Learn the Fundamentals"
 msgstr "基本を学ぶ"
+
+msgid "Light"
+msgstr "ライト"
 
 msgid "Link existing"
 msgstr "既存にリンク"
@@ -1710,6 +1716,9 @@ msgstr "警告"
 
 msgid "{0}  by {1}"
 msgstr "{0}  作業者 {1}"
+
+msgid "{0} claims · {1} strategies · {2} evidence · {3} undeveloped"
+msgstr "主張 {0} 件 · 戦略 {1} 件 · エビデンス {2} 件 · 未展開 {3} 件"
 
 msgid "{0} confidence assessment(s) were marked inactive because their target elements changed."
 msgstr "対象要素が変更されたため、{0} 件の信頼度評価が非アクティブとしてマークされました。"
