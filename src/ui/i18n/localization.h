@@ -26,6 +26,12 @@ bool SetLanguage(Language language);
 
 Language CurrentLanguage();
 
+// Monotonic counter that increments on every successful SetLanguage call.
+// Consumers can compare it across frames to detect language switches without
+// subscribing to callbacks — useful for re-translating cached strings (e.g.
+// problem messages that were trf'd at sync time).
+unsigned LanguageEpoch();
+
 // Returns the translation of msgid, or msgid itself when untranslated.
 std::string tr(std::string_view msgid);
 

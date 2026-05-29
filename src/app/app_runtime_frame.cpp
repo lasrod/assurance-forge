@@ -75,6 +75,18 @@ void AppRuntime::RenderFrame(bool& done) {
         ui::i18n::SetLanguage(next);
     }
 
+    // Re-sync caches that bake the current language into stored strings (e.g.
+    // terminology problem messages composed via trf at sync time). Covers all
+    // language-change paths: F8 above, menu, and the preferences combo.
+    {
+        static unsigned last_language_epoch = ui::i18n::LanguageEpoch();
+        const unsigned current_epoch = ui::i18n::LanguageEpoch();
+        if (current_epoch != last_language_epoch) {
+            SyncTerminologyProblems();
+            last_language_epoch = current_epoch;
+        }
+    }
+
     {
         core::perf::ScopedTimer s("app.derived_views");
         RebuildDerivedViewsIfNeeded();

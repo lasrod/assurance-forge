@@ -13,6 +13,7 @@ MoCatalog g_catalog;
 bool g_catalog_loaded = false;
 std::filesystem::path g_locale_directory;
 std::string g_domain = "assurance_forge";
+unsigned g_language_epoch = 0;
 
 std::filesystem::path CatalogPath(Language language) {
     return g_locale_directory / LanguageCode(language) / "LC_MESSAGES" / (g_domain + ".mo");
@@ -90,11 +91,16 @@ bool Initialize(const LocalizationConfig& config) {
 bool SetLanguage(Language language) {
     const bool ok = LoadCatalogFor(language);
     g_language = ok ? language : Language::English;
+    ++g_language_epoch;
     return ok;
 }
 
 Language CurrentLanguage() {
     return g_language;
+}
+
+unsigned LanguageEpoch() {
+    return g_language_epoch;
 }
 
 std::string tr(std::string_view msgid) {
