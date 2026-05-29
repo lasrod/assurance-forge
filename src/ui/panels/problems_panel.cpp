@@ -90,10 +90,24 @@ void DrawHeader(bool show_title) {
     }
 }
 
+// Translate filter labels through literal AF_TR calls so tools/i18n/extract_msgids.py
+// can discover them. spec.label remains the stable English ID suffix.
+std::string TranslateFilterLabel(ui::ProblemFilter filter, const char* fallback) {
+    switch (filter) {
+    case ui::ProblemFilter::All:        return AF_TR("All");
+    case ui::ProblemFilter::Validation: return AF_TR("Validation");
+    case ui::ProblemFilter::Review:     return AF_TR("Review");
+    case ui::ProblemFilter::Warnings:   return AF_TR("Warnings");
+    case ui::ProblemFilter::Info:       return AF_TR("Info");
+    }
+    return fallback;
+}
+
 void DrawFilterButton(const FilterButtonSpec& spec, int count, ui::ProblemFilter& active_filter) {
     const bool active = active_filter == spec.filter;
     const ui::Theme& theme = ui::GetTheme();
-    std::string label = AF_TR(spec.label) + " (" + std::to_string(count) + ")###filter_" + spec.label;
+    std::string label = TranslateFilterLabel(spec.filter, spec.label) + " (" + std::to_string(count) +
+                        ")###filter_" + spec.label;
 
     if (active) {
         ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::WithAlpha(theme.accent, 0.72f)));

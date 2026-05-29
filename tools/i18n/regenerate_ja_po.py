@@ -367,7 +367,6 @@ TRANSLATIONS = {
     "Confidence update failed: {0}": "信頼度の更新に失敗しました: {0}",
     "Confidence reset failed: {0}": "信頼度のリセットに失敗しました: {0}",
     "Backed up invalid confidence file; new confidence storage will be saved with the project.": "無効な信頼度ファイルをバックアップしました。新しい信頼度ストレージはプロジェクトと共に保存されます。",
-    "{0} confidence assessment(s) were marked inactive because their target elements changed.": "対象要素が変更されたため、{0} 件の信頼度評価が非アクティブとしてマークされました。",
 
     # ===== ACP panel & decorators =====
     "ACP": "ACP",
@@ -713,6 +712,9 @@ PLURAL_TRANSLATIONS = {
     ("{0} problem · top: {1}\nClick to open the Problems panel.",
      "{0} problems · top: {1}\nClick to open the Problems panel."):
         ["{0} 件の問題 · トップ: {1}\nクリックして問題パネルを開きます。"],
+    ("{0} confidence assessment was marked inactive because its target element changed.",
+     "{0} confidence assessments were marked inactive because their target elements changed."):
+        ["対象要素が変更されたため、{0} 件の信頼度評価が非アクティブとしてマークされました。"],
 }
 
 

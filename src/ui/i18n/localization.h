@@ -26,7 +26,8 @@ bool SetLanguage(Language language);
 
 Language CurrentLanguage();
 
-// Monotonic counter that increments on every successful SetLanguage call.
+// Monotonic counter that increments whenever the effective language changes
+// (including a fall-back to English when the requested catalog fails to load).
 // Consumers can compare it across frames to detect language switches without
 // subscribing to callbacks — useful for re-translating cached strings (e.g.
 // problem messages that were trf'd at sync time).

@@ -241,8 +241,10 @@ void RenderInspectorArea(AppRuntimeState& state,
                 }
                 if (confidence_changed && state.confidence_controller->LastInactivatedCount() > 0) {
                     const int count = state.confidence_controller->LastInactivatedCount();
-                    state.events.Emit(StatusMessageEvent{ui::i18n::trf(
-                        "{0} confidence assessment(s) were marked inactive because their target elements changed.",
+                    state.events.Emit(StatusMessageEvent{ui::i18n::trnf(
+                        "{0} confidence assessment was marked inactive because its target element changed.",
+                        "{0} confidence assessments were marked inactive because their target elements changed.",
+                        count,
                         count)});
                 }
             }

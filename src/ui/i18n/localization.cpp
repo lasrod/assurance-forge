@@ -89,9 +89,14 @@ bool Initialize(const LocalizationConfig& config) {
 }
 
 bool SetLanguage(Language language) {
+    const Language previous = g_language;
     const bool ok = LoadCatalogFor(language);
     g_language = ok ? language : Language::English;
-    ++g_language_epoch;
+    // Only bump the epoch when the effective language actually changes —
+    // SetLanguage(CurrentLanguage()) or a no-op fall-back must not trigger
+    // consumers' refresh work.
+    if (g_language != previous)
+        ++g_language_epoch;
     return ok;
 }
 

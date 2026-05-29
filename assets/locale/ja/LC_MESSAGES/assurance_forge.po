@@ -1768,9 +1768,6 @@ msgstr "{0}  作業者 {1}"
 msgid "{0} claims · {1} strategies · {2} evidence · {3} undeveloped"
 msgstr "主張 {0} 件 · 戦略 {1} 件 · エビデンス {2} 件 · 未展開 {3} 件"
 
-msgid "{0} confidence assessment(s) were marked inactive because their target elements changed."
-msgstr "対象要素が変更されたため、{0} 件の信頼度評価が非アクティブとしてマークされました。"
-
 msgid "{0} has {1} visible meanings. Choose the intended terminology entry."
 msgstr "{0} には {1} 件の表示可能な意味があります。意図する用語項目を選択してください。"
 
@@ -1790,6 +1787,10 @@ msgstr[0] "この分類は {0} 件の用語に割り当てられています。�
 msgid "This term value appears {0} time in the current SACM model."
 msgid_plural "This term value appears {0} times in the current SACM model."
 msgstr[0] "この用語値は現在の SACM モデルに {0} 回出現します。"
+
+msgid "{0} confidence assessment was marked inactive because its target element changed."
+msgid_plural "{0} confidence assessments were marked inactive because their target elements changed."
+msgstr[0] "対象要素が変更されたため、{0} 件の信頼度評価が非アクティブとしてマークされました。"
 
 msgid "{0} element will be deleted (highlighted in red)."
 msgid_plural "{0} elements will be deleted (highlighted in red)."
