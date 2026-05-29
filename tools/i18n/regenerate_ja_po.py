@@ -647,6 +647,20 @@ TRANSLATIONS = {
     # ===== Welcome screen recent project stats =====
     "{0} claims · {1} strategies · {2} evidence · {3} undeveloped":
         "主張 {0} 件 · 戦略 {1} 件 · エビデンス {2} 件 · 未展開 {3} 件",
+
+    # ===== Modal titles previously left English in ##id constants =====
+    "Create baseline": "ベースラインを作成",
+    "Reconcile audit log": "監査ログを再構築",
+
+    # ===== Preferences Review section =====
+    "Reviewer name": "レビュー担当者名",
+    "Save Reviewer Name": "レビュー担当者名を保存",
+
+    # ===== Performance overlay window =====
+    "Performance": "パフォーマンス",
+
+    # ===== Misc =====
+    "SCCG": "SCCG",
 }
 
 

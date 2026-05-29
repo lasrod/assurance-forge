@@ -298,7 +298,7 @@ void RenderCanvasDivergenceBanner(AppRuntimeState& state,
                            v.on_disk_canonical_hash.substr(0, 12).c_str());
     }
     if (ImGui::Button(AF_TR("Reconcile audit log\u2026").c_str()))
-        ImGui::OpenPopup("Reconcile audit log##reconcile_confirm");
+        ImGui::OpenPopup((AF_TR("Reconcile audit log") + "###reconcile_confirm").c_str());
     ImGui::SameLine();
     ImGui::TextWrapped("%s",
                        AF_TR("(archives current .af/ artifacts and rebuilds from the current SACM file)").c_str());
@@ -314,7 +314,7 @@ void RenderCanvasDivergenceBanner(AppRuntimeState& state,
     // font-size relative so it scales with DPI.
     const float popup_width = ImGui::GetFontSize() * 40.0f;
     ImGui::SetNextWindowSizeConstraints(ImVec2(popup_width, 0.0f), ImVec2(popup_width, FLT_MAX));
-    if (ImGui::BeginPopupModal("Reconcile audit log##reconcile_confirm", nullptr,
+    if (ImGui::BeginPopupModal((AF_TR("Reconcile audit log") + "###reconcile_confirm").c_str(), nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s", AF_TR("This will rebuild the audit store.").c_str());
         ImGui::Spacing();

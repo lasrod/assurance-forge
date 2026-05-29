@@ -219,7 +219,7 @@ void ModalHost::RenderCreateTerminologyPackageModal() {
         return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(AF_TR("Create Terminology Package").c_str(),
+    if (ImGui::BeginPopupModal((AF_TR("Create Terminology Package") + "###Create Terminology Package").c_str(),
                                nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::SetNextItemWidth(420.0f);
@@ -251,7 +251,7 @@ void ModalHost::RenderCreateTerminologyPackageModal() {
         }
         ImGui::EndPopup();
     } else if (state_.terminology.show_create_package_modal) {
-        ImGui::OpenPopup(AF_TR("Create Terminology Package").c_str());
+        ImGui::OpenPopup((AF_TR("Create Terminology Package") + "###Create Terminology Package").c_str());
     }
 }
 
@@ -260,7 +260,7 @@ void ModalHost::RenderDeleteTerminologyPackageModal() {
         return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(AF_TR("Delete Terminology Package").c_str(),
+    if (ImGui::BeginPopupModal((AF_TR("Delete Terminology Package") + "###Delete Terminology Package").c_str(),
                                nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextWrapped("%s", AF_TR("Delete this terminology package?").c_str());
@@ -277,7 +277,7 @@ void ModalHost::RenderDeleteTerminologyPackageModal() {
         }
         ImGui::EndPopup();
     } else if (state_.terminology.show_delete_package_modal) {
-        ImGui::OpenPopup(AF_TR("Delete Terminology Package").c_str());
+        ImGui::OpenPopup((AF_TR("Delete Terminology Package") + "###Delete Terminology Package").c_str());
     }
 }
 
@@ -285,7 +285,8 @@ void ModalHost::RenderTerminologyTermEditorModal() {
     if (!state_.terminology.show_term_editor_modal)
         return;
 
-    const std::string title = state_.terminology.editing_existing_term ? AF_TR("Edit Term") : AF_TR("Create Term");
+    const char* title_key = state_.terminology.editing_existing_term ? "Edit Term" : "Create Term";
+    const std::string title = AF_TR(title_key) + "###" + title_key;
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         RenderTermTextFields(state_);
@@ -339,7 +340,7 @@ void ModalHost::RenderQuickDefineTermModal() {
     }
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal((AF_TR("Create Term") + "##quick_define_term").c_str(),
+    if (ImGui::BeginPopupModal((AF_TR("Create Term") + "###quick_define_term").c_str(),
                                nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         RenderTermTextFields(state_);
@@ -411,7 +412,7 @@ void ModalHost::RenderQuickDefineTermModal() {
         }
         ImGui::EndPopup();
     } else if (state_.terminology.show_quick_define_term_modal) {
-        ImGui::OpenPopup((AF_TR("Create Term") + "##quick_define_term").c_str());
+        ImGui::OpenPopup((AF_TR("Create Term") + "###quick_define_term").c_str());
     }
 }
 
@@ -420,7 +421,7 @@ void ModalHost::RenderDeleteTerminologyTermModal() {
         return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(AF_TR("Delete Term").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal((AF_TR("Delete Term") + "###Delete Term").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextWrapped("%s", AF_TR("Delete this term?").c_str());
         if (state_.terminology.pending_delete_term_usage_count > 0) {
             ImGui::TextWrapped("%s",
@@ -443,7 +444,7 @@ void ModalHost::RenderDeleteTerminologyTermModal() {
         }
         ImGui::EndPopup();
     } else if (state_.terminology.show_delete_term_modal) {
-        ImGui::OpenPopup(AF_TR("Delete Term").c_str());
+        ImGui::OpenPopup((AF_TR("Delete Term") + "###Delete Term").c_str());
     }
 }
 
@@ -451,8 +452,8 @@ void ModalHost::RenderTerminologyCategoryEditorModal() {
     if (!state_.terminology.show_category_editor_modal)
         return;
 
-    const std::string title =
-        state_.terminology.editing_existing_category ? AF_TR("Edit Category") : AF_TR("Create Category");
+    const char* title_key = state_.terminology.editing_existing_category ? "Edit Category" : "Create Category";
+    const std::string title = AF_TR(title_key) + "###" + title_key;
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::SetNextItemWidth(420.0f);
@@ -496,7 +497,7 @@ void ModalHost::RenderDeleteTerminologyCategoryModal() {
         return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(AF_TR("Delete Category").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal((AF_TR("Delete Category") + "###Delete Category").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextWrapped("%s", AF_TR("Delete this category?").c_str());
         if (state_.terminology.pending_delete_category_term_count > 0) {
             ImGui::TextWrapped(
@@ -525,7 +526,7 @@ void ModalHost::RenderDeleteTerminologyCategoryModal() {
         }
         ImGui::EndPopup();
     } else if (state_.terminology.show_delete_category_modal) {
-        ImGui::OpenPopup(AF_TR("Delete Category").c_str());
+        ImGui::OpenPopup((AF_TR("Delete Category") + "###Delete Category").c_str());
     }
 }
 

@@ -846,7 +846,7 @@ void RenderPerfOverlay(bool& open) {
         PushFrameTime(live_wall_ms, live_render_ms);
 
     ImGui::SetNextWindowSize(ImVec2(620, 820), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Performance", &open)) {
+    if (!ImGui::Begin((AF_TR("Performance") + "###Performance").c_str(), &open)) {
         ImGui::End();
         return;
     }

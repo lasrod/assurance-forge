@@ -134,11 +134,11 @@ const std::vector<ProposalTextChangePreview>* FindProposalTextChanges(const Revi
 
 void OpenGuidelineStub(const std::string& guideline_id, std::string& popup_guideline_id) {
     popup_guideline_id = guideline_id;
-    ImGui::OpenPopup(AF_TR("SCCG Guideline").c_str());
+    ImGui::OpenPopup((AF_TR("SCCG Guideline") + "###SCCG Guideline").c_str());
 }
 
 void DrawGuidelineStubPopup(const ReviewPanelModel& model, std::string& popup_guideline_id) {
-    if (!ImGui::BeginPopupModal(AF_TR("SCCG Guideline").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    if (!ImGui::BeginPopupModal((AF_TR("SCCG Guideline") + "###SCCG Guideline").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         return;
 
     if (popup_guideline_id == "__browse__") {
@@ -166,7 +166,7 @@ void DrawGuidelineTags(const ReviewPanelModel& model,
     if (guideline_ids.empty())
         return;
 
-    ImGui::TextDisabled("SCCG");
+    ImGui::TextDisabled("%s", AF_TR("SCCG").c_str());
     ImGui::SameLine();
     for (size_t index = 0; index < guideline_ids.size(); ++index) {
         if (index > 0)

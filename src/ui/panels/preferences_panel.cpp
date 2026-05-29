@@ -193,10 +193,10 @@ void RenderAppearanceSection(PreferencesPanelModel model, const PreferencesPanel
 }
 
 void RenderReviewSection(PreferencesPanelModel model, const PreferencesPanelCallbacks& callbacks) {
-    ImGui::TextUnformatted("Review");
+    ImGui::TextUnformatted(AF_TR("Review").c_str());
     ImGui::Separator();
 
-    ImGui::TextUnformatted("Reviewer name");
+    ImGui::TextUnformatted(AF_TR("Reviewer name").c_str());
     ImGui::SetNextItemWidth(320.0f);
     if (model.reviewerNameBuffer && model.reviewerNameBufferSize > 0) {
         ImGui::InputText("##reviewer_name", model.reviewerNameBuffer, model.reviewerNameBufferSize);
@@ -205,7 +205,8 @@ void RenderReviewSection(PreferencesPanelModel model, const PreferencesPanelCall
     const bool can_save = model.reviewerNameBuffer && model.reviewerNameBuffer[0] != '\0';
     if (!can_save)
         ImGui::BeginDisabled();
-    if (ImGui::Button("Save Reviewer Name") && callbacks.save_reviewer_name && model.reviewerNameBuffer) {
+    if (ImGui::Button(AF_TR("Save Reviewer Name").c_str()) && callbacks.save_reviewer_name &&
+        model.reviewerNameBuffer) {
         callbacks.save_reviewer_name(model.reviewerNameBuffer);
     }
     if (!can_save)

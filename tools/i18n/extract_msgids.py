@@ -129,7 +129,11 @@ def main(argv):
     plain = set()
     ctx_pairs = set()  # (ctx, msgid)
     plural_pairs = set()  # (singular, plural)
-    for path in root.rglob("*.cpp"):
+    extensions = ("*.cpp", "*.h", "*.hpp", "*.cc", "*.cxx", "*.hh", "*.hxx")
+    paths = []
+    for pattern in extensions:
+        paths.extend(root.rglob(pattern))
+    for path in paths:
         for kind, a, b in extract_from_file(path):
             if kind == "plain":
                 plain.add(a)

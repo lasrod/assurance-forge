@@ -12,7 +12,8 @@ namespace app::areas {
 
 namespace {
 
-constexpr const char* kPopupId = "Create baseline##af_baseline_modal";
+constexpr const char* kPopupTitleKey = "Create baseline";
+constexpr const char* kPopupIdSuffix = "###af_baseline_modal";
 
 } // namespace
 
@@ -35,8 +36,9 @@ void RenderBaselineModal(BaselineModalState& state,
     if (!state.open) return;
 
     // Drive ImGui's modal popup lifecycle from the `open` flag.
-    if (!ImGui::IsPopupOpen(kPopupId))
-        ImGui::OpenPopup(kPopupId);
+    const std::string popup_id = AF_TR(kPopupTitleKey) + kPopupIdSuffix;
+    if (!ImGui::IsPopupOpen(popup_id.c_str()))
+        ImGui::OpenPopup(popup_id.c_str());
 
     ImVec2 viewport_center = ImGui::GetMainViewport()->GetCenter();
     ImGui::SetNextWindowPos(viewport_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
@@ -45,7 +47,7 @@ void RenderBaselineModal(BaselineModalState& state,
     // feedback loop that grows the popup horizontally every frame.
     ImGui::SetNextWindowSizeConstraints(ImVec2(480.0f, 0.0f), ImVec2(480.0f, FLT_MAX));
 
-    if (!ImGui::BeginPopupModal(kPopupId, nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    if (!ImGui::BeginPopupModal(popup_id.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         return;
 
     ImGui::TextWrapped(AF_TR("Pin a named baseline to transaction sequence %llu.").c_str(),

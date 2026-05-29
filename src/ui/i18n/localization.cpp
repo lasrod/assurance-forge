@@ -3,6 +3,7 @@
 #include "ui/i18n/mo_catalog.h"
 
 #include <cstdio>
+#include <set>
 
 namespace ui::i18n {
 namespace {
@@ -27,10 +28,15 @@ bool LoadCatalogFor(Language language) {
 
     const std::filesystem::path path = CatalogPath(language);
     if (!g_catalog.Load(path)) {
-        std::fprintf(stderr,
-                     "[i18n] Could not load translation catalog for language '%s' (%s). Falling back to English.\n",
-                     LanguageCode(language).c_str(),
-                     path.string().c_str());
+        // Warn at most once per unique catalog path per session so repeated
+        // SetLanguage failures don't flood stderr.
+        static std::set<std::filesystem::path> warned_paths;
+        if (warned_paths.insert(path).second) {
+            std::fprintf(stderr,
+                         "[i18n] Could not load translation catalog for language '%s' (%s). Falling back to English.\n",
+                         LanguageCode(language).c_str(),
+                         path.string().c_str());
+        }
         return false;
     }
     g_catalog_loaded = true;

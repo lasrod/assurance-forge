@@ -225,7 +225,7 @@ void ModalHost::RenderDeleteReviewItemConfirmModal() {
     auto cancel = [&]() { state_.review_controller->CancelDeleteReviewItem(); };
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(AF_TR("Delete Review Comment").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal((AF_TR("Delete Review Comment") + "###Delete Review Comment").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         const core::reviews::ReviewItem& item = state_.review_controller->PendingDeleteReviewItem();
         ImGui::TextWrapped("%s", AF_TR("Delete this review comment?").c_str());
         ImGui::TextWrapped("%s", AF_TR("The attached proposal will also be deleted.").c_str());
@@ -254,7 +254,7 @@ void ModalHost::RenderDeleteReviewItemConfirmModal() {
         }
         ImGui::EndPopup();
     } else if (state_.review_controller->ShouldShowDeleteConfirm()) {
-        ImGui::OpenPopup(AF_TR("Delete Review Comment").c_str());
+        ImGui::OpenPopup((AF_TR("Delete Review Comment") + "###Delete Review Comment").c_str());
     }
 }
 
@@ -287,7 +287,7 @@ void ModalHost::RenderCreateProjectModal() {
         return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(AF_TR("Create Empty Assurance Project").c_str(),
+    if (ImGui::BeginPopupModal((AF_TR("Create Empty Assurance Project") + "###Create Empty Assurance Project").c_str(),
                                nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted(AF_TR("Project name").c_str());
@@ -323,7 +323,7 @@ void ModalHost::RenderCreateProjectModal() {
         }
         ImGui::EndPopup();
     } else if (state_.project_controller->show_create_project_modal) {
-        ImGui::OpenPopup(AF_TR("Create Empty Assurance Project").c_str());
+        ImGui::OpenPopup((AF_TR("Create Empty Assurance Project") + "###Create Empty Assurance Project").c_str());
     }
 }
 
@@ -331,7 +331,8 @@ void ModalHost::RenderProjectFileNameModal() {
     if (!state_.project_controller->show_project_file_name_modal)
         return;
 
-    const std::string title = AF_TR(ProjectFileCreateTitle(state_.project_controller->pending_project_file_kind));
+    const char* title_key = ProjectFileCreateTitle(state_.project_controller->pending_project_file_kind);
+    const std::string title = AF_TR(title_key) + "###" + title_key;
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted(AF_TR("File name").c_str());
@@ -384,7 +385,7 @@ void ModalHost::RenderProjectLoadReportModal() {
         return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(AF_TR("Project Loading Status").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal((AF_TR("Project Loading Status") + "###Project Loading Status").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         for (const auto& step : report.steps) {
             const char* mark = "[OK]";
             if (step.status == core::ProjectLoadStepStatus::Failed)
@@ -411,7 +412,7 @@ void ModalHost::RenderProjectLoadReportModal() {
         }
         ImGui::EndPopup();
     } else if (report.showPopup) {
-        ImGui::OpenPopup(AF_TR("Project Loading Status").c_str());
+        ImGui::OpenPopup((AF_TR("Project Loading Status") + "###Project Loading Status").c_str());
     }
 }
 
@@ -420,7 +421,7 @@ void ModalHost::RenderSaveBeforeExitModal() {
         return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(AF_TR("Unsaved Changes").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal((AF_TR("Unsaved Changes") + "###Unsaved Changes").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextWrapped("%s", AF_TR("You have unsaved changes. Save before closing?").c_str());
         ImGui::Spacing();
 
@@ -451,7 +452,7 @@ void ModalHost::RenderSaveBeforeExitModal() {
         }
         ImGui::EndPopup();
     } else if (state_.modal_coordinator->show_save_before_exit_modal) {
-        ImGui::OpenPopup(AF_TR("Unsaved Changes").c_str());
+        ImGui::OpenPopup((AF_TR("Unsaved Changes") + "###Unsaved Changes").c_str());
     }
 }
 
@@ -465,7 +466,7 @@ void ModalHost::RenderSaveBeforeProjectFileOpenModal() {
             : AF_TR("the selected project file");
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(AF_TR("Open Project File").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal((AF_TR("Open Project File") + "###Open Project File").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextWrapped(AF_TR("You have unsaved changes in the current SACM file. Save before opening %s?").c_str(),
                            target.c_str());
         ImGui::Spacing();
@@ -489,7 +490,7 @@ void ModalHost::RenderSaveBeforeProjectFileOpenModal() {
         }
         ImGui::EndPopup();
     } else if (state_.project_controller->show_save_before_project_file_open_modal) {
-        ImGui::OpenPopup(AF_TR("Open Project File").c_str());
+        ImGui::OpenPopup((AF_TR("Open Project File") + "###Open Project File").c_str());
     }
 }
 
@@ -500,7 +501,7 @@ void ModalHost::RenderReviewerNamePromptModal() {
         return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(AF_TR("Reviewer Name").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal((AF_TR("Reviewer Name") + "###Reviewer Name").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextWrapped("%s", AF_TR("Enter the name to use for review comments.").c_str());
         ImGui::SetNextItemWidth(360.0f);
         ImGui::InputText("##startup_reviewer_name", state_.reviewer_name_buf, sizeof(state_.reviewer_name_buf));
@@ -524,7 +525,7 @@ void ModalHost::RenderReviewerNamePromptModal() {
         }
         ImGui::EndPopup();
     } else if (state_.modal_coordinator->show_reviewer_name_prompt) {
-        ImGui::OpenPopup(AF_TR("Reviewer Name").c_str());
+        ImGui::OpenPopup((AF_TR("Reviewer Name") + "###Reviewer Name").c_str());
     }
 }
 

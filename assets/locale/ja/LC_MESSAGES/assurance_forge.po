@@ -445,6 +445,9 @@ msgstr "新しい SACM 引数パッケージを作成し、この ACP をその�
 msgid "Create a project from a predefined assurance case template"
 msgstr "定義済みの保証ケーステンプレートからプロジェクトを作成します"
 
+msgid "Create baseline"
+msgstr "ベースラインを作成"
+
 msgid "Create baseline at current state"
 msgstr "現在の状態でベースラインを作成"
 
@@ -1141,6 +1144,9 @@ msgstr "パースエラー: %s"
 msgid "Pause"
 msgstr "一時停止"
 
+msgid "Performance"
+msgstr "パフォーマンス"
+
 msgid "Performance overlay"
 msgstr "パフォーマンスオーバーレイ"
 
@@ -1218,6 +1224,9 @@ msgstr "新しさ"
 
 msgid "Reconcile"
 msgstr "再構築"
+
+msgid "Reconcile audit log"
+msgstr "監査ログを再構築"
 
 msgid "Reconcile audit log…"
 msgstr "監査ログを再構築…"
@@ -1300,6 +1309,9 @@ msgstr "レビュー担当者: %s"
 msgid "Reviewer Name"
 msgstr "レビュー担当者名"
 
+msgid "Reviewer name"
+msgstr "レビュー担当者名"
+
 msgid "Reviewer name is required for new reviews."
 msgstr "新しいレビューにはレビュー担当者名が必要です。"
 
@@ -1314,6 +1326,9 @@ msgstr "SACM ビューア"
 
 msgid "SACM relationship: %s"
 msgstr "SACM 関係: %s"
+
+msgid "SCCG"
+msgstr "SCCG"
 
 msgid "SCCG Guideline"
 msgstr "SCCG ガイドライン"
@@ -1350,6 +1365,9 @@ msgstr "プロジェクトを保存"
 
 msgid "Save Proposal"
 msgstr "提案を保存"
+
+msgid "Save Reviewer Name"
+msgstr "レビュー担当者名を保存"
 
 msgid "Save report to file"
 msgstr "レポートをファイルに保存"
