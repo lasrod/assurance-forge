@@ -1,6 +1,7 @@
 #include "app/frame/app_shell.h"
 
 #include "app/app_runtime_state.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/widgets/splitter.h"
 
 #include <algorithm>
@@ -9,6 +10,7 @@ namespace app::frame {
 namespace {
 
 constexpr float kSplitterThickness = 4.0f;
+constexpr float kSplitterHitPadding = 6.0f;
 constexpr float kMinPanelRatio = 0.10f;
 constexpr float kMaxPanelRatio = 0.40f;
 constexpr float kMinLeftSectionHeight = 120.0f;
@@ -21,6 +23,7 @@ void RenderAppSplitters(AppRuntimeState& state,
                         float left_w,
                         float center_w,
                         float top_y,
+                        float hit_padding,
                         ImGuiWindowFlags panel_flags) {
     ui::widgets::DrawVerticalSplitter("##left_splitter",
                                       left_w,
@@ -32,6 +35,7 @@ void RenderAppSplitters(AppRuntimeState& state,
                                       false,
                                       kMinPanelRatio,
                                       kMaxPanelRatio,
+                                      hit_padding,
                                       panel_flags);
 
     const float center_x = left_w + kSplitterThickness;
@@ -45,6 +49,7 @@ void RenderAppSplitters(AppRuntimeState& state,
                                       true,
                                       kMinPanelRatio,
                                       kMaxPanelRatio,
+                                      hit_padding,
                                       panel_flags);
 
     const float available_h = content_h - kSplitterThickness;
@@ -66,7 +71,7 @@ void RenderAppSplitters(AppRuntimeState& state,
 
     const float splitter_y = top_y + available_h * state.layout.project_boundary_ratio;
     const float delta = ui::widgets::DrawHorizontalSplitter(
-        "##left_h_splitter_1", 0.0f, splitter_y, left_w, kSplitterThickness, panel_flags);
+        "##left_h_splitter_1", 0.0f, splitter_y, left_w, kSplitterThickness, hit_padding, panel_flags);
     if (delta != 0.0f) {
         state.layout.project_boundary_ratio += delta / available_h;
         clamp_boundaries();
@@ -84,7 +89,8 @@ void RenderAppSplitters(AppRuntimeState& state,
     const float center_panel_h = std::max(0.0f, available_h - state.layout.problems_panel_height);
     const float center_splitter_y = top_y + center_panel_h;
     const float delta_center = ui::widgets::DrawHorizontalSplitter(
-        "##center_problems_splitter", center_x, center_splitter_y, center_w, kSplitterThickness, panel_flags);
+        "##center_problems_splitter", center_x, center_splitter_y, center_w, kSplitterThickness, hit_padding,
+        panel_flags);
     if (delta_center != 0.0f) {
         state.layout.problems_panel_height -= delta_center;
         clamp_problems_height();
@@ -139,7 +145,8 @@ AppLayoutRegions RenderAppShell(AppRuntimeState& state, float menu_height, ImGui
     float right_w = display.x * state.layout.right_ratio;
     float center_w = display.x - left_w - right_w - kSplitterThickness * 2.0f;
 
-    RenderAppSplitters(state, display.x, content_h, left_w, center_w, menu_height, panel_flags);
+    const float hit_padding = ui::gsn::DpiSize(kSplitterHitPadding);
+    RenderAppSplitters(state, display.x, content_h, left_w, center_w, menu_height, hit_padding, panel_flags);
 
     left_w = display.x * state.layout.left_ratio;
     right_w = display.x * state.layout.right_ratio;
