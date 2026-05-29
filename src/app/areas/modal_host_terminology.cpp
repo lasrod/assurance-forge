@@ -285,8 +285,9 @@ void ModalHost::RenderTerminologyTermEditorModal() {
     if (!state_.terminology.show_term_editor_modal)
         return;
 
-    const char* title_key = state_.terminology.editing_existing_term ? "Edit Term" : "Create Term";
-    const std::string title = AF_TR(title_key) + "###" + title_key;
+    const bool editing_term = state_.terminology.editing_existing_term;
+    const char* title_key = editing_term ? "Edit Term" : "Create Term";
+    const std::string title = (editing_term ? AF_TR("Edit Term") : AF_TR("Create Term")) + "###" + title_key;
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         RenderTermTextFields(state_);
@@ -452,8 +453,10 @@ void ModalHost::RenderTerminologyCategoryEditorModal() {
     if (!state_.terminology.show_category_editor_modal)
         return;
 
-    const char* title_key = state_.terminology.editing_existing_category ? "Edit Category" : "Create Category";
-    const std::string title = AF_TR(title_key) + "###" + title_key;
+    const bool editing_category = state_.terminology.editing_existing_category;
+    const char* title_key = editing_category ? "Edit Category" : "Create Category";
+    const std::string title =
+        (editing_category ? AF_TR("Edit Category") : AF_TR("Create Category")) + "###" + title_key;
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::SetNextItemWidth(420.0f);

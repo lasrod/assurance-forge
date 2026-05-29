@@ -40,7 +40,7 @@ void RenderArgumentNavigatorArea(AppRuntimeState& state,
                                  const ArgumentNavigatorAreaCallbacks& callbacks) {
     ImGui::SetNextWindowPos(region.pos);
     ImGui::SetNextWindowSize(region.size);
-    ImGui::Begin((AF_TR(kArgumentNavigatorTitle) + "###" + kArgumentNavigatorTitle).c_str(), nullptr, panel_flags);
+    ImGui::Begin((AF_TR("Argument Navigator") + "###" + kArgumentNavigatorTitle).c_str(), nullptr, panel_flags);
 
     const bool proposal_canvas_active = state.IsProposalCanvasActive();
     ui::ElementContextActions actions = MakeNavigatorContextActions(state, callbacks);

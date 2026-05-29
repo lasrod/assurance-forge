@@ -34,9 +34,6 @@ msgstr "%s は定義されていません。"
 msgid "%s is not implemented yet."
 msgstr "%s はまだ実装されていません。"
 
-msgid "%zu problem%s · top: %s\nClick to open the Problems panel."
-msgstr "%zu 件の問題%s · トップ: %s\nクリックして問題パネルを開きます。"
-
 msgid "(Broken)"
 msgstr "(破損)"
 
@@ -919,6 +916,9 @@ msgstr "新規 GSN / SACM ファイル"
 msgid "New J3377 CAE Register"
 msgstr "新規 J3377 CAE 登録簿"
 
+msgid "New Project File"
+msgstr "新規プロジェクトファイル"
+
 msgid "No"
 msgstr "いいえ"
 
@@ -1744,8 +1744,8 @@ msgstr "対象要素が変更されたため、{0} 件の信頼度評価が非�
 msgid "{0} problems · top {1}: {2}"
 msgstr "{0} 件の問題 · トップ {1}: {2}"
 
-msgid "â PAUSED"
-msgstr "â 一時停止中"
+msgid "● PAUSED"
+msgstr "● 一時停止中"
 
 msgid "This category is assigned to {0} term. Remove those assignments before deleting it."
 msgid_plural "This category is assigned to {0} terms. Remove those assignments before deleting it."
@@ -1762,6 +1762,10 @@ msgstr[0] "{0} 個の要素が削除されます (赤でハイライト)。"
 msgid "{0} item"
 msgid_plural "{0} items"
 msgstr[0] "{0} 個"
+
+msgid "{0} problem · top: {1}\nClick to open the Problems panel."
+msgid_plural "{0} problems · top: {1}\nClick to open the Problems panel."
+msgstr[0] "{0} 件の問題 · トップ: {1}\nクリックして問題パネルを開きます。"
 
 msgid "{0} usage found"
 msgid_plural "{0} usages found"

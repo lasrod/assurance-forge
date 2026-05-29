@@ -303,7 +303,7 @@ void ShowProjectExplorerPanel(float width,
                               const ProjectExplorerPanelCallbacks& callbacks) {
     ImGui::SetNextWindowPos(ImVec2(0.0f, top_y));
     ImGui::SetNextWindowSize(ImVec2(width, height));
-    ImGui::Begin((AF_TR(kProjectExplorerTitle) + "###" + kProjectExplorerTitle).c_str(), nullptr, panel_flags);
+    ImGui::Begin((AF_TR("Project Explorer") + "###" + kProjectExplorerTitle).c_str(), nullptr, panel_flags);
 
     if (ImGui::BeginChild("ProjectExplorerTree", ImVec2(0, 0), false)) {
         if (model.project) {

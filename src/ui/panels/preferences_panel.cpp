@@ -221,7 +221,7 @@ void ShowPreferencesWindow(bool& open, PreferencesPanelModel model, const Prefer
 
     SyncModelBuffer(model);
     ImGui::SetNextWindowSize(ImVec2(560.0f, 0.0f), ImGuiCond_Appearing);
-    if (ImGui::Begin(AF_TR("Preferences").c_str(),
+    if (ImGui::Begin((AF_TR("Preferences") + "###Preferences").c_str(),
                      &open,
                      ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
         RenderAppearanceSection(model, callbacks);

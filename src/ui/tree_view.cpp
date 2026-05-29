@@ -244,10 +244,14 @@ static void RenderTreeNode(const core::TreeNode* node,
             dl->AddText(font, gf, ImVec2(center.x - ts.x * 0.5f, center.y - ts.y * 0.5f), IM_COL32_WHITE, glyph);
             if (badge_hovered) {
                 ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-                ImGui::SetTooltip(AF_TR("%zu problem%s · top: %s\nClick to open the Problems panel.").c_str(),
-                                  summary.problem_count,
-                                  summary.problem_count == 1 ? "" : "s",
-                                  summary.top_problem_message.c_str());
+                const int problem_count = static_cast<int>(summary.problem_count);
+                const std::string tooltip =
+                    ui::i18n::trnf("{0} problem · top: {1}\nClick to open the Problems panel.",
+                                   "{0} problems · top: {1}\nClick to open the Problems panel.",
+                                   problem_count,
+                                   problem_count,
+                                   summary.top_problem_message);
+                ImGui::SetTooltip("%s", tooltip.c_str());
             }
             if (badge_clicked) {
                 FocusProblemInPanel(state, summary.top_problem_id, node->id);

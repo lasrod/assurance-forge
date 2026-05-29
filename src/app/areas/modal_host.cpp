@@ -150,8 +150,10 @@ void ModalHost::RenderNotImplementedModal() {
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal("##not_implemented_modal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        // The feature name is stored as the English msgid; translate here so
+        // the modal always matches the current UI language.
         ImGui::Text(AF_TR("%s is not implemented yet.").c_str(),
-                    state_.modal_coordinator->not_implemented_feature.c_str());
+                    AF_TR(state_.modal_coordinator->not_implemented_feature.c_str()).c_str());
         ImGui::Spacing();
         ImGui::Spacing();
 

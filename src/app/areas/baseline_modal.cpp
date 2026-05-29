@@ -12,7 +12,6 @@ namespace app::areas {
 
 namespace {
 
-constexpr const char* kPopupTitleKey = "Create baseline";
 constexpr const char* kPopupIdSuffix = "###af_baseline_modal";
 
 } // namespace
@@ -36,7 +35,7 @@ void RenderBaselineModal(BaselineModalState& state,
     if (!state.open) return;
 
     // Drive ImGui's modal popup lifecycle from the `open` flag.
-    const std::string popup_id = AF_TR(kPopupTitleKey) + kPopupIdSuffix;
+    const std::string popup_id = AF_TR("Create baseline") + kPopupIdSuffix;
     if (!ImGui::IsPopupOpen(popup_id.c_str()))
         ImGui::OpenPopup(popup_id.c_str());
 

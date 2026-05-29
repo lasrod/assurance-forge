@@ -218,7 +218,7 @@ void ShowWelcomeModal(bool& is_open,
                       const WelcomeModalCallbacks& callbacks) {
     // "<translated>###<english>" keeps the ImGui popup ID stable across
     // language switches while letting the title bar show the translation.
-    const std::string welcome_popup_id = AF_TR(kWelcomePopupId) + "###" + kWelcomePopupId;
+    const std::string welcome_popup_id = AF_TR("Welcome!") + "###" + kWelcomePopupId;
     if (is_open && !ImGui::IsPopupOpen(welcome_popup_id.c_str())) {
         ImGui::OpenPopup(welcome_popup_id.c_str());
     }

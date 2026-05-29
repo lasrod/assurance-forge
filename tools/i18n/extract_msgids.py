@@ -79,10 +79,19 @@ def join_adjacent_literals(text):
             break
         between = text[last_end:m.start()] if last_end >= 0 else ""
         is_adjacent = current is not None and between.strip() == ""
+        raw = m.group(1)
         try:
-            value = ast.literal_eval('"' + m.group(1) + '"')
+            value = ast.literal_eval('"' + raw + '"')
+            # C++ \xNN literals are raw bytes, not Unicode code points. If the
+            # source used \x escapes, round-trip via latin-1 → utf-8 so the
+            # extracted msgid matches the actual UTF-8 string at runtime.
+            if "\\x" in raw:
+                try:
+                    value = value.encode("latin-1").decode("utf-8")
+                except UnicodeDecodeError:
+                    pass
         except Exception:
-            value = m.group(1)
+            value = raw
         if is_adjacent:
             current += value
         else:

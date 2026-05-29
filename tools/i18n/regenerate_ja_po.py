@@ -28,6 +28,8 @@ TRANSLATIONS = {
     "New GSN / SACM File": "新規 GSN / SACM ファイル",
     "New Evidence Register": "新規エビデンス登録簿",
     "New J3377 CAE Register": "新規 J3377 CAE 登録簿",
+    # ProjectFileCreateTitle fallback (unreachable in practice; here for completeness).
+    "New Project File": "新規プロジェクトファイル",
     "Edit": "編集",
     "Preferences...": "設定...",
     "Preferences": "設定",
@@ -298,7 +300,7 @@ TRANSLATIONS = {
     "Performance overlay": "パフォーマンスオーバーレイ",
     "(history & values frozen)": "(履歴と値が固定されています)",
     "(live)": "(ライブ)",
-    "\xe2\x97\x8f PAUSED": "\xe2\x97\x8f 一時停止中",
+    "● PAUSED": "● 一時停止中",
     "VSync": "VSync",
     "Disable to uncap the frame rate (useful for measuring raw render cost).": "無効にするとフレームレートの上限を解除します (生の描画コスト計測に便利です)。",
     "Idling": "アイドリング",
@@ -614,7 +616,6 @@ TRANSLATIONS = {
 
     # ===== Tree view / context menu =====
     "Orphans (%d)": "孤立 (%d)",
-    "%zu problem%s · top: %s\nClick to open the Problems panel.": "%zu 件の問題%s · トップ: %s\nクリックして問題パネルを開きます。",
     "Click to open in the Problems panel.": "クリックして問題パネルで開きます。",
     "(no message)": "(メッセージなし)",
     "error": "エラー",
@@ -679,6 +680,9 @@ PLURAL_TRANSLATIONS = {
         ["この分類は {0} 件の用語に割り当てられています。削除前にそれらの割り当てを除去してください。"],
     ("{0} usage found", "{0} usages found"):
         ["{0} 件の使用箇所"],
+    ("{0} problem · top: {1}\nClick to open the Problems panel.",
+     "{0} problems · top: {1}\nClick to open the Problems panel."):
+        ["{0} 件の問題 · トップ: {1}\nクリックして問題パネルを開きます。"],
 }
 
 

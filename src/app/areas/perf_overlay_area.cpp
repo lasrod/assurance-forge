@@ -891,7 +891,7 @@ void RenderPerfOverlay(bool& open) {
             ImGui::PopStyleColor(3);
         ImGui::SameLine();
         if (s_paused) {
-            ImGui::TextColored(ui::GetWarningColor(), "%s", AF_TR("\xe2\x97\x8f PAUSED").c_str());
+            ImGui::TextColored(ui::GetWarningColor(), "%s", AF_TR("● PAUSED").c_str());
             ImGui::SameLine();
             ImGui::TextDisabled("%s", AF_TR("(history & values frozen)").c_str());
         } else {

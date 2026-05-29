@@ -28,7 +28,9 @@ void RenderAddElementMenu(const ElementContextActions& actions) {
             actions.add_acp_to_selected_element();
         ImGui::Separator();
         if (ImGui::MenuItem(AF_TR("Challenge").c_str(), nullptr, false, static_cast<bool>(actions.not_implemented))) {
-            actions.not_implemented(AF_TR("Challenge").c_str());
+            // Pass the English msgid; the modal translates at render time so
+            // switching languages between click and render stays consistent.
+            actions.not_implemented("Challenge");
         }
         ImGui::EndMenu();
     }
