@@ -4,6 +4,7 @@
 #include "app/app_runtime_state.h"
 #include "app/commands/dispatch.h"
 #include "core/commands/terminology_commands.h"
+#include "core/ignored_terminology_store.h"
 #include "core/string_utils.h"
 #include "core/terminology_context_projection.h"
 #include "core/terminology_text_utils.h"
@@ -15,7 +16,10 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <cstddef>
 #include <filesystem>
+#include <fstream>
+#include <system_error>
 #include <utility>
 
 namespace app::actions::detail {
@@ -327,6 +331,39 @@ bool OpenTerminologyProblemTerm(AppRuntimeState& state,
     ui::GetUiState().center_view = ui::CenterView::TerminologyPackage;
     state.workbench.force_center_tab_selection = true;
     return true;
+}
+
+std::filesystem::path IgnoredTerminologyFilePath(const AppRuntimeState& state) {
+    if (!state.app_state.current_project.has_value())
+        return {};
+    return state.app_state.current_project->rootPath / "analysis" / "ignored-terminology.af.json";
+}
+
+void SaveIgnoredSuggestions(const AppRuntimeState& state) {
+    const std::filesystem::path path = IgnoredTerminologyFilePath(state);
+    if (path.empty())
+        return;
+
+    std::vector<core::terminology::IgnoredSuggestion> items;
+    items.reserve(state.terminology.ignored_suggestion_keys.size());
+    for (const std::string& key : state.terminology.ignored_suggestion_keys) {
+        core::terminology::IgnoredSuggestion item;
+        const std::size_t separator = key.find('\n');
+        if (separator == std::string::npos) {
+            item.term = key;
+        } else {
+            item.element_id = key.substr(0, separator);
+            item.term = key.substr(separator + 1);
+        }
+        items.push_back(std::move(item));
+    }
+
+    std::error_code ec;
+    std::filesystem::create_directories(path.parent_path(), ec);
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    if (!out)
+        return;
+    out << core::terminology::SerializeIgnoredSuggestions(items);
 }
 
 } // namespace app::actions::detail

@@ -31,6 +31,13 @@ struct TerminologyPackagePanelModel {
     std::vector<core::TerminologyCategoryUsageSummary> category_usage_summaries;
 };
 
+// A persisted terminology-ignore decision shown in the panel's "Ignored terms"
+// section so the user can review and restore (un-ignore) it.
+struct IgnoredTerminologyEntry {
+    std::string element_id;
+    std::string term;
+};
+
 struct TerminologyPackagePanelCallbacks {
     std::function<void()> apply_changes;
     std::function<void()> delete_package;
@@ -45,6 +52,10 @@ struct TerminologyPackagePanelCallbacks {
     std::function<void(const core::TerminologyCategoryRef&)> edit_category;
     std::function<void(const core::TerminologyCategoryRef&)> delete_category;
     std::function<void()> seed_recommended_categories;
+    // Ignored-terms management. list returns the project's persisted ignores;
+    // restore un-ignores a single (element, term) entry.
+    std::function<std::vector<IgnoredTerminologyEntry>()> list_ignored_terms;
+    std::function<void(const std::string& element_id, const std::string& term)> restore_ignored_term;
 };
 
 void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model, const TerminologyPackagePanelCallbacks& callbacks);
