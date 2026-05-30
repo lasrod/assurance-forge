@@ -73,6 +73,16 @@ void AppRuntime::RenderFrame(bool& done) {
                                       ? ui::i18n::Language::Japanese
                                       : ui::i18n::Language::English;
         ui::i18n::SetLanguage(next);
+
+        // Keep the GSN canvas / tree secondary-language view in sync with the UI
+        // language, but only when the model actually carries translations for the
+        // active secondary language. Switching the UI to the secondary language
+        // shows the translated element labels; switching back to English shows
+        // the primary labels.
+        ui::UiState& ui_state = ui::GetUiState();
+        if (ui_state.model_has_translations) {
+            ui_state.show_secondary_language = ui::i18n::LanguageCode(next) == ui_state.active_secondary_lang;
+        }
     }
 
     // Re-sync caches that bake the current language into stored strings (e.g.
