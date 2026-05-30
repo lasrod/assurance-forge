@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Internal-review / CI gate for the translation catalog. Two checks:
+"""Internal-review / CI gate for the translation catalog. Three checks:
 
   1. Every msgid used in source (AF_TR / trf / trn / ...) exists in the .po.
      A miss means that string silently renders English in Japanese mode.
-  2. The committed .mo is in sync with the .po (logical message maps match).
+  2. No msgid contains printf conversion specifiers (%s, %d, etc.); those
+     must use positional {0}/{1} placeholders via trf/trnf instead.
+  3. The committed .mo is in sync with the .po (logical message maps match).
      A mismatch means someone edited the .po without recompiling the .mo, so
      the runtime catalog is stale.
 
-Exits non-zero (and prints the offending entries) when either check fails, so
+Exits non-zero (and prints the offending entries) when any check fails, so
 it works as a CTest test / CI step. Pure stdlib, no build artifacts needed.
 
 Usage: python tools/i18n/check_catalog.py
@@ -132,7 +134,7 @@ def check_no_printf_in_msgids(ex):
     for s in offenders:
         print("  printf specifier in msgid (use trf/trnf with {0}): " + repr(s))
     ok = not offenders
-    print(f"[3] {'OK' if ok else 'FAIL'}: no printf specifiers in translated msgids")
+    print(f"[2] {'OK' if ok else 'FAIL'}: no printf specifiers in translated msgids")
     return ok
 
 
@@ -153,7 +155,7 @@ def check_mo_matches_po(compile_po):
     for k in changed:
         print("  translation differs between .po and .mo: " + repr(k))
     ok = not only_po and not only_mo and not changed
-    print(f"[2] {'OK' if ok else 'FAIL'}: committed .mo matches .po ({len(actual)} entries)")
+    print(f"[3] {'OK' if ok else 'FAIL'}: committed .mo matches .po ({len(actual)} entries)")
     return ok
 
 

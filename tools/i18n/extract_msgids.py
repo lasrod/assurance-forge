@@ -11,7 +11,6 @@ Usage:
 """
 
 import ast
-import os
 import re
 import sys
 from pathlib import Path
@@ -66,7 +65,6 @@ def join_adjacent_literals(text):
     separates them.
     """
     results = []
-    i = 0
     current = None  # accumulated string, or None
     last_end = -1
     pos = 0
