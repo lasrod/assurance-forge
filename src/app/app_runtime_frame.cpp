@@ -87,6 +87,22 @@ void AppRuntime::RenderFrame(bool& done) {
         }
     }
 
+    // Re-layout the GSN canvas (and refresh derived views like the argument
+    // navigator) when the canvas language toggle changes. Translated labels
+    // can be much longer/shorter than the primary, so node sizes computed
+    // off the primary label would clip or under-fill after a toggle.
+    {
+        ui::UiState& ui_state = ui::GetUiState();
+        static bool last_show_secondary = ui_state.show_secondary_language;
+        static std::string last_secondary_lang = ui_state.active_secondary_lang;
+        if (ui_state.show_secondary_language != last_show_secondary ||
+            ui_state.active_secondary_lang != last_secondary_lang) {
+            impl_->tree_needs_rebuild = true;
+            last_show_secondary = ui_state.show_secondary_language;
+            last_secondary_lang = ui_state.active_secondary_lang;
+        }
+    }
+
     {
         core::perf::ScopedTimer s("app.derived_views");
         RebuildDerivedViewsIfNeeded();

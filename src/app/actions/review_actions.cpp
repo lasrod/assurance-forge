@@ -18,7 +18,8 @@ namespace {
 void RestoreBaseCanvas(AppRuntimeState& state) {
     ClearProposalHighlightState(ui::GetUiState());
     if (state.app_state.loaded_case.has_value()) {
-        state.current_tree = ui::gsn::BuildAssuranceTree(state.app_state.loaded_case.value());
+        state.current_tree = ui::gsn::BuildAssuranceTree(state.app_state.loaded_case.value(),
+                                                         ui::GetUiState().active_secondary_lang);
         ui::gsn::SetCanvasTree(state.current_tree);
     } else {
         state.tree_needs_rebuild = true;

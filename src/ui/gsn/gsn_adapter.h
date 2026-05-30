@@ -12,6 +12,6 @@ namespace ui::gsn {
 std::vector<CanvasElement> ConvertFromAssuranceCase(const parser::AssuranceCase& ac);
 
 // Build an AssuranceTree from a parsed assurance case.
-core::AssuranceTree BuildAssuranceTree(const parser::AssuranceCase& ac);
+core::AssuranceTree BuildAssuranceTree(const parser::AssuranceCase& ac, const std::string& secondary_language = "ja");
 
 } // namespace ui::gsn

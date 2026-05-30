@@ -166,7 +166,7 @@ static void ProcessEvidence(const parser::SacmElement& relationship,
 
 // ===== Build the assurance tree from a parsed SACM case =====
 
-AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac) {
+AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::string& secondary_language) {
     AssuranceTree tree;
 
     std::unordered_map<std::string, const parser::SacmElement*> element_by_id;
@@ -195,7 +195,7 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac) {
 
         // Build secondary language label (for language toggle)
         {
-            std::string sec_lang = "ja";
+            const std::string& sec_lang = secondary_language;
             std::string sec_detail;
             if (uses_content) {
                 auto cit = element.content_langs.find(sec_lang);
