@@ -782,11 +782,18 @@ void TerminologyActions::LoadIgnoredSuggestions() {
     if (path.empty())
         return;
     std::error_code ec;
-    if (!std::filesystem::exists(path, ec))
+    const bool file_exists = std::filesystem::exists(path, ec);
+    if (ec) {
+        SetStatus(state_, "Ignored terminology list could not be loaded: " + ec.message());
+        return;
+    }
+    if (!file_exists)
         return;
     std::ifstream in(path, std::ios::binary);
-    if (!in)
+    if (!in) {
+        SetStatus(state_, "Ignored terminology list could not be loaded: could not open file.");
         return;
+    }
     std::ostringstream buffer;
     buffer << in.rdbuf();
 
