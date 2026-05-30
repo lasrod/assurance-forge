@@ -3,6 +3,7 @@
 #include "app/actions/ai_review_actions.h"
 #include "app/app_runtime_state.h"
 #include "app/guideline_catalog.h"
+#include "ui/i18n/localization.h"
 #include "ui/ui_state.h"
 
 #include "imgui.h"
@@ -62,31 +63,31 @@ void AppRuntime::RenderAiReviewContextMenuForSelected() {
     const core::TreeNode* selected_node = FindTreeNode(impl_->current_tree, ui_state.selected_element_id);
     const bool review_running = impl_->ai.review_controller->IsReviewRunning();
 
-    if (!ImGui::BeginMenu("AI Review"))
+    if (!ImGui::BeginMenu(AF_TR("AI Review").c_str()))
         return;
 
     const bool has_project = impl_->app_state.current_project.has_value();
     const bool manual_ok_enabled = !review_running && has_project && loaded_case && selected_element;
     std::string manual_ok_tooltip;
     if (review_running)
-        manual_ok_tooltip = "AI review is already running.";
+        manual_ok_tooltip = AF_TR("AI review is already running.");
     else if (!has_project)
-        manual_ok_tooltip = "Open or create a project before marking review status.";
+        manual_ok_tooltip = AF_TR("Open or create a project before marking review status.");
     else if (!loaded_case)
-        manual_ok_tooltip = "Open an assurance case before marking review status.";
+        manual_ok_tooltip = AF_TR("Open an assurance case before marking review status.");
     else if (!selected_element)
-        manual_ok_tooltip = "Select a GSN/SACM element before marking review status.";
+        manual_ok_tooltip = AF_TR("Select a GSN/SACM element before marking review status.");
     else
-        manual_ok_tooltip = "Mark this element as manually reviewed OK.";
+        manual_ok_tooltip = AF_TR("Mark this element as manually reviewed OK.");
 
-    if (ImGui::MenuItem("Mark review OK manually", nullptr, false, manual_ok_enabled)) {
+    if (ImGui::MenuItem(AF_TR("Mark review OK manually").c_str(), nullptr, false, manual_ok_enabled)) {
         SetManualReviewOk(ui_state.selected_element_id, true);
     }
     DrawTooltipIfHovered(manual_ok_tooltip);
     ImGui::Separator();
 
     if (!impl_->guideline_catalog.has_value()) {
-        ImGui::TextDisabled("SCCG profiles unavailable.");
+        ImGui::TextDisabled("%s", AF_TR("SCCG profiles unavailable.").c_str());
         if (!impl_->guideline_catalog_error.empty() && ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", impl_->guideline_catalog_error.c_str());
         ImGui::EndMenu();
@@ -99,13 +100,13 @@ void AppRuntime::RenderAiReviewContextMenuForSelected() {
         const bool enabled = !review_running && loaded_case && selected_element && compatible;
         std::string tooltip = profile.description;
         if (review_running)
-            tooltip = "AI review is already running.";
+            tooltip = AF_TR("AI review is already running.");
         else if (!loaded_case)
-            tooltip = "Open an assurance case before running SCCG profile reviews.";
+            tooltip = AF_TR("Open an assurance case before running SCCG profile reviews.");
         else if (!selected_element)
-            tooltip = "Select a GSN/SACM element before running SCCG profile reviews.";
+            tooltip = AF_TR("Select a GSN/SACM element before running SCCG profile reviews.");
         else if (!compatible)
-            tooltip = profile.description + "\n\nThis profile does not apply to the selected element type.";
+            tooltip = profile.description + "\n\n" + AF_TR("This profile does not apply to the selected element type.");
 
         ImGui::PushID(profile.id.c_str());
         if (ImGui::MenuItem(profile.display_name.c_str(), nullptr, false, enabled)) {

@@ -1,6 +1,7 @@
 #include "ui/register_views.h"
 
 #include "imgui.h"
+#include "ui/i18n/localization.h"
 
 #include <algorithm>
 #include <cfloat>
@@ -253,7 +254,7 @@ size_t GetEvidenceRegisterRowCount() {
 
 void ShowCseRegisterView() {
     if (g_cse_rows.empty()) {
-        ImGui::TextDisabled("No CSE rows were derived from direct claim-evidence relations.");
+        ImGui::TextDisabled("%s", AF_TR("No CSE rows were derived from direct claim-evidence relations.").c_str());
         return;
     }
 
@@ -265,18 +266,18 @@ void ShowCseRegisterView() {
     }
 
     ImGui::TableSetupScrollFreeze(2, 1);
-    ImGui::TableSetupColumn("CSE ID");
-    ImGui::TableSetupColumn("Claim ID");
-    ImGui::TableSetupColumn("Claim");
-    ImGui::TableSetupColumn("Evidence ID");
-    ImGui::TableSetupColumn("Evidence");
-    ImGui::TableSetupColumn("Claim Owner");
-    ImGui::TableSetupColumn("Evidence Owner");
-    ImGui::TableSetupColumn("Safety Case Owner");
-    ImGui::TableSetupColumn("Claim Criteria");
-    ImGui::TableSetupColumn("Evidence Criteria");
-    ImGui::TableSetupColumn("Assessment Status");
-    ImGui::TableSetupColumn("Notes");
+    ImGui::TableSetupColumn(AF_TR("CSE ID").c_str());
+    ImGui::TableSetupColumn(AF_TR("Claim ID").c_str());
+    ImGui::TableSetupColumn(AF_TR("Claim").c_str());
+    ImGui::TableSetupColumn(AF_TR("Evidence ID").c_str());
+    ImGui::TableSetupColumn(AF_TR("Evidence").c_str());
+    ImGui::TableSetupColumn(AF_TR("Claim Owner").c_str());
+    ImGui::TableSetupColumn(AF_TR("Evidence Owner").c_str());
+    ImGui::TableSetupColumn(AF_TR("Safety Case Owner").c_str());
+    ImGui::TableSetupColumn(AF_TR("Claim Criteria").c_str());
+    ImGui::TableSetupColumn(AF_TR("Evidence Criteria").c_str());
+    ImGui::TableSetupColumn(AF_TR("Assessment Status").c_str());
+    ImGui::TableSetupColumn(AF_TR("Notes").c_str());
     ImGui::TableHeadersRow();
 
     for (auto& row : g_cse_rows) {
@@ -337,7 +338,7 @@ void ShowCseRegisterView() {
 
 void ShowEvidenceRegisterView() {
     if (g_evidence_rows.empty()) {
-        ImGui::TextDisabled("No evidence/work-product rows were derived from the model.");
+        ImGui::TextDisabled("%s", AF_TR("No evidence/work-product rows were derived from the model.").c_str());
         return;
     }
 
@@ -349,15 +350,15 @@ void ShowEvidenceRegisterView() {
     }
 
     ImGui::TableSetupScrollFreeze(2, 1);
-    ImGui::TableSetupColumn("Evidence ID");
-    ImGui::TableSetupColumn("Evidence");
-    ImGui::TableSetupColumn("Evidence Owner");
-    ImGui::TableSetupColumn("Type");
-    ImGui::TableSetupColumn("Recency");
-    ImGui::TableSetupColumn("Maturity");
-    ImGui::TableSetupColumn("Controlled Environment");
-    ImGui::TableSetupColumn("Used By CSE Count");
-    ImGui::TableSetupColumn("Notes");
+    ImGui::TableSetupColumn(AF_TR("Evidence ID").c_str());
+    ImGui::TableSetupColumn(AF_TR("Evidence").c_str());
+    ImGui::TableSetupColumn(AF_TR("Evidence Owner").c_str());
+    ImGui::TableSetupColumn(AF_TR("Type").c_str());
+    ImGui::TableSetupColumn(AF_TR("Recency").c_str());
+    ImGui::TableSetupColumn(AF_TR("Maturity").c_str());
+    ImGui::TableSetupColumn(AF_TR("Controlled Environment").c_str());
+    ImGui::TableSetupColumn(AF_TR("Used By CSE Count").c_str());
+    ImGui::TableSetupColumn(AF_TR("Notes").c_str());
     ImGui::TableHeadersRow();
 
     for (auto& row : g_evidence_rows) {

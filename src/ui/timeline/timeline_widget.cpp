@@ -1,6 +1,7 @@
 #include "ui/timeline/timeline_widget.h"
 
 #include "ui/gsn/gsn_dpi.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
 #include "imgui.h"
@@ -190,17 +191,17 @@ TimelineAction RenderTimelineWidget(TimelineState& state,
             ImGui::OpenPopup("##tl_actions_popup");
         }
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Timeline actions");
+            ImGui::SetTooltip("%s", AF_TR("Timeline actions").c_str());
         if (ImGui::BeginPopup("##tl_actions_popup")) {
-            if (ImGui::MenuItem("Create baseline at current state")) {
+            if (ImGui::MenuItem(AF_TR("Create baseline at current state").c_str())) {
                 action.type = TimelineActionType::CreateBaseline;
             }
-            if (ImGui::MenuItem("Create snapshot at current state")) {
+            if (ImGui::MenuItem(AF_TR("Create snapshot at current state").c_str())) {
                 action.type = TimelineActionType::CreateSnapshot;
             }
             if (state.preview_sequence.has_value()) {
                 ImGui::Separator();
-                if (ImGui::MenuItem("Return to latest")) {
+                if (ImGui::MenuItem(AF_TR("Return to latest").c_str())) {
                     action.type = TimelineActionType::ReturnToLatest;
                 }
             }

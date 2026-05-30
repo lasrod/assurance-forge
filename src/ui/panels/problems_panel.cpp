@@ -1,5 +1,6 @@
 ﻿#include "ui/panels/problems_panel.h"
 
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
 #include <algorithm>
@@ -84,15 +85,29 @@ ImVec4 SeverityColor(core::ProblemSeverity severity) {
 
 void DrawHeader(bool show_title) {
     if (show_title) {
-        ImGui::TextUnformatted("Problems");
+        ImGui::TextUnformatted(AF_TR("Problems").c_str());
         ImGui::Separator();
     }
+}
+
+// Translate filter labels through literal AF_TR calls so tools/i18n/extract_msgids.py
+// can discover them. spec.label remains the stable English ID suffix.
+std::string TranslateFilterLabel(ui::ProblemFilter filter, const char* fallback) {
+    switch (filter) {
+    case ui::ProblemFilter::All:        return AF_TR("All");
+    case ui::ProblemFilter::Validation: return AF_TR("Validation");
+    case ui::ProblemFilter::Review:     return AF_TR("Review");
+    case ui::ProblemFilter::Warnings:   return AF_TR("Warnings");
+    case ui::ProblemFilter::Info:       return AF_TR("Info");
+    }
+    return fallback;
 }
 
 void DrawFilterButton(const FilterButtonSpec& spec, int count, ui::ProblemFilter& active_filter) {
     const bool active = active_filter == spec.filter;
     const ui::Theme& theme = ui::GetTheme();
-    std::string label = std::string(spec.label) + " (" + std::to_string(count) + ")###filter_" + spec.label;
+    std::string label = TranslateFilterLabel(spec.filter, spec.label) + " (" + std::to_string(count) +
+                        ")###filter_" + spec.label;
 
     if (active) {
         ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::WithAlpha(theme.accent, 0.72f)));
@@ -175,7 +190,10 @@ bool DrawClickableCell(const char* id_suffix,
 void DrawProblemRow(const core::ProblemItem& problem, ui::UiState& ui_state, const ProblemsPanelCallbacks& callbacks) {
     const bool selected = ui_state.selected_problem_id == problem.id;
     const bool focus_this_row = selected && ui_state.problems_panel_focus_pending;
-    const std::string message = SingleLineMessage(problem.message);
+    // Problem messages can carry English msgids from core/ validation; translate
+    // defensively. tr() of an untranslatable (e.g. user-typed) string returns it
+    // unchanged, so this is safe for dynamic content too.
+    const std::string message = SingleLineMessage(AF_TR(problem.message));
     const bool review_problem = IsReviewSource(problem.source);
 
     ImGui::PushID(problem.id.c_str());
@@ -205,7 +223,7 @@ void DrawProblemRow(const core::ProblemItem& problem, ui::UiState& ui_state, con
     ImGui::TableSetColumnIndex(4);
     DrawClickableCell("message", message, problem, ui_state, callbacks);
     if (ImGui::IsItemHovered() && !problem.message.empty()) {
-        ImGui::SetTooltip("%s", problem.message.c_str());
+        ImGui::SetTooltip("%s", AF_TR(problem.message).c_str());
     }
 
     ImGui::TableSetColumnIndex(5);
@@ -214,10 +232,11 @@ void DrawProblemRow(const core::ProblemItem& problem, ui::UiState& ui_state, con
 
     ImGui::TableSetColumnIndex(6);
     if (review_problem && callbacks.on_open_review) {
-        if (ImGui::SmallButton("Open review"))
+        if (ImGui::SmallButton(AF_TR("Open review").c_str()))
             callbacks.on_open_review(problem);
     } else if (!problem.quick_fix_label.empty() && callbacks.on_quick_fix) {
-        if (ImGui::SmallButton(problem.quick_fix_label.c_str()))
+        // quick_fix_label is set as an English msgid in app/; translate at render.
+        if (ImGui::SmallButton(AF_TR(problem.quick_fix_label).c_str()))
             callbacks.on_quick_fix(problem);
     } else {
         ImGui::TextUnformatted("-");
@@ -237,7 +256,7 @@ void ShowProblemsPanel(float x,
                        const ProblemsPanelCallbacks& callbacks) {
     ImGui::SetNextWindowPos(ImVec2(x, top_y));
     ImGui::SetNextWindowSize(ImVec2(width, height));
-    ImGui::Begin("Problems", nullptr, panel_flags);
+    ImGui::Begin((AF_TR("Problems") + "###Problems").c_str(), nullptr, panel_flags);
 
     ShowProblemsPanelContent(model, callbacks);
 
@@ -253,13 +272,13 @@ void ShowProblemsPanelContent(ProblemsPanelModel model, const ProblemsPanelCallb
     ImGui::Separator();
 
     if (problems.empty()) {
-        ImGui::TextDisabled("No problems found.");
+        ImGui::TextDisabled("%s", AF_TR("No problems found.").c_str());
         return;
     }
 
     int visible_count = CountMatches(problems, model.ui_state.active_problem_filter);
     if (visible_count == 0) {
-        ImGui::TextDisabled("No problems match the current filter.");
+        ImGui::TextDisabled("%s", AF_TR("No problems match the current filter.").c_str());
         return;
     }
 
@@ -268,13 +287,13 @@ void ShowProblemsPanelContent(ProblemsPanelModel model, const ProblemsPanelCallb
 
     if (ImGui::BeginTable("problems_table", 7, flags, ImVec2(0.0f, 0.0f))) {
         ImGui::TableSetupScrollFreeze(0, 1);
-        ImGui::TableSetupColumn("Severity", ImGuiTableColumnFlags_WidthFixed, 86.0f);
-        ImGui::TableSetupColumn("Source", ImGuiTableColumnFlags_WidthFixed, 128.0f);
-        ImGui::TableSetupColumn("Element", ImGuiTableColumnFlags_WidthFixed, 88.0f);
-        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 96.0f);
-        ImGui::TableSetupColumn("Message", ImGuiTableColumnFlags_WidthStretch, 1.0f);
-        ImGui::TableSetupColumn("Guideline", ImGuiTableColumnFlags_WidthFixed, 116.0f);
-        ImGui::TableSetupColumn("Fix", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+        ImGui::TableSetupColumn(AF_TR("Severity").c_str(), ImGuiTableColumnFlags_WidthFixed, 86.0f);
+        ImGui::TableSetupColumn(AF_TR("Source").c_str(), ImGuiTableColumnFlags_WidthFixed, 128.0f);
+        ImGui::TableSetupColumn(AF_TR("Element").c_str(), ImGuiTableColumnFlags_WidthFixed, 88.0f);
+        ImGui::TableSetupColumn(AF_TR("Type").c_str(), ImGuiTableColumnFlags_WidthFixed, 96.0f);
+        ImGui::TableSetupColumn(AF_TR("Message").c_str(), ImGuiTableColumnFlags_WidthStretch, 1.0f);
+        ImGui::TableSetupColumn(AF_TR("Guideline").c_str(), ImGuiTableColumnFlags_WidthFixed, 116.0f);
+        ImGui::TableSetupColumn(AF_TR("Fix").c_str(), ImGuiTableColumnFlags_WidthFixed, 120.0f);
         ImGui::TableHeadersRow();
 
         for (const auto& problem : problems) {

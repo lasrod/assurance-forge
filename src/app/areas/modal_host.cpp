@@ -7,6 +7,7 @@
 #include "core/terminology_text_utils.h"
 #include "hello_imgui/hello_imgui.h"
 #include "imgui.h"
+#include "ui/i18n/localization.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/panels/preferences_panel.h"
 #include "ui/panels/welcome_modal.h"
@@ -71,7 +72,7 @@ void ModalHost::RenderPreferencesWindow() {
     model.reviewerNameBuffer = state_.reviewer_name_buf;
     model.reviewerNameBufferSize = sizeof(state_.reviewer_name_buf);
     model.theme = ui::GetCurrentAppTheme();
-    model.language = ui::CurrentLanguage();
+    model.language = ui::i18n::CurrentLanguage();
     if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams()) {
         model.showFps = runner_params->imGuiWindowParams.showStatus_Fps;
     }
@@ -87,32 +88,32 @@ void ModalHost::RenderPreferencesWindow() {
             return;
         }
         CopyToBuffer(state_.ai.model_buf, sizeof(state_.ai.model_buf), state_.ai.settings.model);
-        state_.ai.connection_status = ai::SuccessStatus("AI settings saved.");
+        state_.ai.connection_status = ai::SuccessStatus(AF_TR("AI settings saved."));
     };
     callbacks.save_api_key = [this](const char* api_key) {
         if (!api_key || api_key[0] == '\0') {
             state_.ai.connection_status =
-                ai::ErrorStatus(ai::AiErrorCode::MissingApiKey, "Enter an API key before saving.");
+                ai::ErrorStatus(ai::AiErrorCode::MissingApiKey, AF_TR("Enter an API key before saving."));
             return;
         }
         ai::SecretStoreResult result = state_.ai.service->SaveApiKey(api_key);
         std::memset(state_.ai.api_key_buf, 0, sizeof(state_.ai.api_key_buf));
         state_.RefreshStoredAiKeyState();
-        state_.ai.connection_status = result.success ? ai::SuccessStatus("API key saved securely.")
+        state_.ai.connection_status = result.success ? ai::SuccessStatus(AF_TR("API key saved securely."))
                                                      : ai::ErrorStatus(result.errorCode, result.errorMessage);
     };
     callbacks.remove_api_key = [this]() {
         ai::SecretStoreResult result = state_.ai.service->DeleteApiKey();
         std::memset(state_.ai.api_key_buf, 0, sizeof(state_.ai.api_key_buf));
         state_.RefreshStoredAiKeyState();
-        state_.ai.connection_status = result.success ? ai::SuccessStatus("API key removed.")
+        state_.ai.connection_status = result.success ? ai::SuccessStatus(AF_TR("API key removed."))
                                                      : ai::ErrorStatus(result.errorCode, result.errorMessage);
     };
     callbacks.test_connection = [this]() {
         if (state_.ai.test_task && state_.ai.test_task->IsRunning())
             return;
         state_.ai.connection_status =
-            ai::MakeStatus(ai::AiTaskState::Running, ai::AiErrorCode::None, "Testing connection...");
+            ai::MakeStatus(ai::AiTaskState::Running, ai::AiErrorCode::None, AF_TR("Testing connection..."));
         state_.ai.settings.model = state_.ai.model_buf;
         if (state_.ai.settings.model.empty())
             state_.ai.settings.model = ai::kDefaultOpenAiModel;
@@ -126,7 +127,7 @@ void ModalHost::RenderPreferencesWindow() {
             state_.ai.task_runner.RunConnectionTest([service]() { return service->TestConnection(); });
     };
     callbacks.set_theme = [](ui::AppTheme theme) { ui::ApplyAppTheme(theme); };
-    callbacks.set_language = [](ui::Language language) { ui::SetCurrentLanguage(language); };
+    callbacks.set_language = [](ui::i18n::Language language) { ui::i18n::SetLanguage(language); };
     callbacks.set_show_fps = [](bool show_fps) {
         if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams()) {
             runner_params->imGuiWindowParams.showStatus_Fps = show_fps;
@@ -136,8 +137,8 @@ void ModalHost::RenderPreferencesWindow() {
         state_.reviewer_name = TrimWhitespace(reviewer_name ? reviewer_name : "");
         CopyToBuffer(state_.reviewer_name_buf, sizeof(state_.reviewer_name_buf), state_.reviewer_name);
         state_.modal_coordinator->show_reviewer_name_prompt = state_.reviewer_name.empty();
-        callbacks_.set_status(state_.reviewer_name.empty() ? "Reviewer name is required for new reviews."
-                                                           : "Reviewer name saved.");
+        callbacks_.set_status(state_.reviewer_name.empty() ? AF_TR("Reviewer name is required for new reviews.")
+                                                           : AF_TR("Reviewer name saved."));
     };
 
     ui::panels::ShowPreferencesWindow(state_.modal_coordinator->show_preferences_window, model, callbacks);
@@ -149,7 +150,12 @@ void ModalHost::RenderNotImplementedModal() {
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal("##not_implemented_modal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("%s is not implemented yet.", state_.modal_coordinator->not_implemented_feature.c_str());
+        // The feature name is stored as the English msgid; translate here so
+        // the modal always matches the current UI language.
+        ImGui::TextUnformatted(
+            ui::i18n::trf("{0} is not implemented yet.",
+                          AF_TR(state_.modal_coordinator->not_implemented_feature.c_str()))
+                .c_str());
         ImGui::Spacing();
         ImGui::Spacing();
 
@@ -157,7 +163,7 @@ void ModalHost::RenderNotImplementedModal() {
         float modal_width = ImGui::GetWindowWidth();
         float center_x = (modal_width - button_width) * 0.5f;
         ImGui::SetCursorPosX(center_x);
-        if (ImGui::Button("OK", ImVec2(button_width, 0))) {
+        if (ImGui::Button(AF_TR("OK").c_str(), ImVec2(button_width, 0))) {
             state_.modal_coordinator->show_not_implemented_modal = false;
             ImGui::CloseCurrentPopup();
         }
@@ -179,11 +185,16 @@ void ModalHost::RenderRemoveConfirmModal() {
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal("##remove_confirm_modal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         const int n = static_cast<int>(state_.element_edit_controller->PendingRemoveIds().size());
-        const char* mode_label = state_.element_edit_controller->PendingRemoveMode() == core::RemoveMode::NodeOnly
-                                     ? "this node and its attachments"
-                                     : "this node and its descendants";
-        ImGui::Text("Remove %s?", mode_label);
-        ImGui::Text("%d element%s will be deleted (highlighted in red).", n, n == 1 ? "" : "s");
+        const std::string mode_label =
+            state_.element_edit_controller->PendingRemoveMode() == core::RemoveMode::NodeOnly
+                ? AF_TR("this node and its attachments")
+                : AF_TR("this node and its descendants");
+        ImGui::TextUnformatted(ui::i18n::trf("Remove {0}?", mode_label).c_str());
+        ImGui::TextUnformatted(ui::i18n::trnf("{0} element will be deleted (highlighted in red).",
+                                              "{0} elements will be deleted (highlighted in red).",
+                                              n,
+                                              n)
+                                   .c_str());
         ImGui::Spacing();
         ImGui::Spacing();
 
@@ -193,7 +204,7 @@ void ModalHost::RenderRemoveConfirmModal() {
         const float center_x = (ImGui::GetWindowWidth() - total_width) * 0.5f;
         ImGui::SetCursorPosX(center_x);
 
-        if (ImGui::Button("Remove", ImVec2(button_width, 0))) {
+        if (ImGui::Button(AF_TR("Remove").c_str(), ImVec2(button_width, 0))) {
             ImGui::CloseCurrentPopup();
             if (state_.app_state.loaded_case.has_value()) {
                 state_.element_edit_controller->ConfirmPendingRemoval(state_);
@@ -201,7 +212,7 @@ void ModalHost::RenderRemoveConfirmModal() {
             ui::GetUiState().marked_for_removal.clear();
         }
         ImGui::SameLine(0.0f, spacing);
-        if (ImGui::Button("Cancel", ImVec2(button_width, 0))) {
+        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(button_width, 0))) {
             cancel();
             ImGui::CloseCurrentPopup();
         }
@@ -218,12 +229,12 @@ void ModalHost::RenderDeleteReviewItemConfirmModal() {
     auto cancel = [&]() { state_.review_controller->CancelDeleteReviewItem(); };
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal("Delete Review Comment", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal((AF_TR("Delete Review Comment") + "###Delete Review Comment").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         const core::reviews::ReviewItem& item = state_.review_controller->PendingDeleteReviewItem();
-        ImGui::TextWrapped("Delete this review comment?");
-        ImGui::TextWrapped("The attached proposal will also be deleted.");
+        ImGui::TextWrapped("%s", AF_TR("Delete this review comment?").c_str());
+        ImGui::TextWrapped("%s", AF_TR("The attached proposal will also be deleted.").c_str());
         if (item.proposal_id.has_value()) {
-            ImGui::TextDisabled("Proposal: %s", item.proposal_id->c_str());
+            ImGui::TextDisabled("%s", ui::i18n::trf("Proposal: {0}", *item.proposal_id).c_str());
         }
         ImGui::Spacing();
         ImGui::Spacing();
@@ -234,20 +245,20 @@ void ModalHost::RenderDeleteReviewItemConfirmModal() {
         const float center_x = (ImGui::GetWindowWidth() - total_width) * 0.5f;
         ImGui::SetCursorPosX(center_x);
 
-        if (ImGui::Button("Delete Both", ImVec2(button_width, 0))) {
+        if (ImGui::Button(AF_TR("Delete Both").c_str(), ImVec2(button_width, 0))) {
             core::reviews::ReviewItem pending = state_.review_controller->PendingDeleteReviewItem();
             cancel();
             ImGui::CloseCurrentPopup();
             callbacks_.delete_review_item(pending);
         }
         ImGui::SameLine(0.0f, spacing);
-        if (ImGui::Button("Cancel", ImVec2(button_width, 0))) {
+        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(button_width, 0))) {
             cancel();
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
     } else if (state_.review_controller->ShouldShowDeleteConfirm()) {
-        ImGui::OpenPopup("Delete Review Comment");
+        ImGui::OpenPopup((AF_TR("Delete Review Comment") + "###Delete Review Comment").c_str());
     }
 }
 
@@ -280,19 +291,21 @@ void ModalHost::RenderCreateProjectModal() {
         return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal("Create Empty Assurance Project", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("Project name");
+    if (ImGui::BeginPopupModal((AF_TR("Create Empty Assurance Project") + "###Create Empty Assurance Project").c_str(),
+                               nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted(AF_TR("Project name").c_str());
         ImGui::SetNextItemWidth(420.0f);
         ImGui::InputText("##project_name",
                          state_.project_controller->project_name_buf,
                          sizeof(state_.project_controller->project_name_buf));
 
-        ImGui::TextUnformatted("Parent location");
+        ImGui::TextUnformatted(AF_TR("Parent location").c_str());
         ImGui::TextDisabled("%s", state_.project_controller->project_parent_buf);
 
         ImGui::Spacing();
 
-        if (ImGui::Button("Create", ImVec2(110.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Create").c_str(), ImVec2(110.0f, 0.0f))) {
             if (state_.app_state.create_empty_project(state_.project_controller->project_name_buf,
                                                       state_.project_controller->project_parent_buf)) {
                 state_.document_dirty = false;
@@ -308,13 +321,13 @@ void ModalHost::RenderCreateProjectModal() {
             }
         }
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(110.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(110.0f, 0.0f))) {
             state_.project_controller->show_create_project_modal = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
     } else if (state_.project_controller->show_create_project_modal) {
-        ImGui::OpenPopup("Create Empty Assurance Project");
+        ImGui::OpenPopup((AF_TR("Create Empty Assurance Project") + "###Create Empty Assurance Project").c_str());
     }
 }
 
@@ -322,17 +335,18 @@ void ModalHost::RenderProjectFileNameModal() {
     if (!state_.project_controller->show_project_file_name_modal)
         return;
 
-    const char* title = ProjectFileCreateTitle(state_.project_controller->pending_project_file_kind);
+    const char* title_key = ProjectFileCreateTitle(state_.project_controller->pending_project_file_kind);
+    const std::string title = AF_TR(title_key) + "###" + title_key;
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("File name");
+    if (ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted(AF_TR("File name").c_str());
         ImGui::SetNextItemWidth(420.0f);
         ImGui::InputText("##project_file_name",
                          state_.project_controller->project_file_name_buf,
                          sizeof(state_.project_controller->project_file_name_buf));
         ImGui::Spacing();
 
-        if (ImGui::Button("Create", ImVec2(110.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Create").c_str(), ImVec2(110.0f, 0.0f))) {
             bool created = false;
             if (state_.project_controller->pending_project_file_kind == ProjectFileCreateKind::Sacm) {
                 created = state_.app_state.create_project_sacm_file(state_.project_controller->project_file_name_buf);
@@ -359,13 +373,13 @@ void ModalHost::RenderProjectFileNameModal() {
             }
         }
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(110.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(110.0f, 0.0f))) {
             state_.project_controller->show_project_file_name_modal = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
     } else if (state_.project_controller->show_project_file_name_modal) {
-        ImGui::OpenPopup(title);
+        ImGui::OpenPopup(title.c_str());
     }
 }
 
@@ -375,7 +389,7 @@ void ModalHost::RenderProjectLoadReportModal() {
         return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal("Project Loading Status", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal((AF_TR("Project Loading Status") + "###Project Loading Status").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         for (const auto& step : report.steps) {
             const char* mark = "[OK]";
             if (step.status == core::ProjectLoadStepStatus::Failed)
@@ -390,19 +404,19 @@ void ModalHost::RenderProjectLoadReportModal() {
         }
         if (!report.warnings.empty()) {
             ImGui::Separator();
-            ImGui::TextUnformatted("External changes detected");
+            ImGui::TextUnformatted(AF_TR("External changes detected").c_str());
             for (const auto& warning : report.warnings) {
                 ImGui::BulletText("%s", warning.c_str());
             }
         }
         ImGui::Spacing();
-        if (ImGui::Button("OK", ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("OK").c_str(), ImVec2(100.0f, 0.0f))) {
             report.showPopup = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
     } else if (report.showPopup) {
-        ImGui::OpenPopup("Project Loading Status");
+        ImGui::OpenPopup((AF_TR("Project Loading Status") + "###Project Loading Status").c_str());
     }
 }
 
@@ -411,11 +425,11 @@ void ModalHost::RenderSaveBeforeExitModal() {
         return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal("Unsaved Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextWrapped("You have unsaved changes. Save before closing?");
+    if (ImGui::BeginPopupModal((AF_TR("Unsaved Changes") + "###Unsaved Changes").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped("%s", AF_TR("You have unsaved changes. Save before closing?").c_str());
         ImGui::Spacing();
 
-        if (ImGui::Button("Save", ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Save").c_str(), ImVec2(100.0f, 0.0f))) {
             bool saved = false;
             if (state_.app_state.current_project.has_value()) {
                 saved = callbacks_.save_project();
@@ -430,19 +444,19 @@ void ModalHost::RenderSaveBeforeExitModal() {
             }
         }
         ImGui::SameLine();
-        if (ImGui::Button("Don't Save", ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Don't Save").c_str(), ImVec2(100.0f, 0.0f))) {
             state_.modal_coordinator->show_save_before_exit_modal = false;
             done_ = true;
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(100.0f, 0.0f))) {
             state_.modal_coordinator->CancelClose();
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
     } else if (state_.modal_coordinator->show_save_before_exit_modal) {
-        ImGui::OpenPopup("Unsaved Changes");
+        ImGui::OpenPopup((AF_TR("Unsaved Changes") + "###Unsaved Changes").c_str());
     }
 }
 
@@ -453,34 +467,36 @@ void ModalHost::RenderSaveBeforeProjectFileOpenModal() {
     const std::string target =
         state_.project_controller->pending_open_project_file_entry.has_value()
             ? state_.project_controller->pending_open_project_file_entry->relativePath.generic_string()
-            : std::string{"the selected project file"};
+            : AF_TR("the selected project file");
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal("Open Project File", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextWrapped("You have unsaved changes in the current SACM file. Save before opening %s?",
-                           target.c_str());
+    if (ImGui::BeginPopupModal((AF_TR("Open Project File") + "###Open Project File").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped(
+            "%s",
+            ui::i18n::trf("You have unsaved changes in the current SACM file. Save before opening {0}?", target)
+                .c_str());
         ImGui::Spacing();
 
-        if (ImGui::Button("Save", ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Save").c_str(), ImVec2(100.0f, 0.0f))) {
             callbacks_.confirm_pending_project_file_open(true);
             if (!state_.project_controller->show_save_before_project_file_open_modal)
                 ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Don't Save", ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Don't Save").c_str(), ImVec2(100.0f, 0.0f))) {
             callbacks_.confirm_pending_project_file_open(false);
             if (!state_.project_controller->show_save_before_project_file_open_modal)
                 ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(100.0f, 0.0f))) {
             state_.project_controller->pending_open_project_file_entry.reset();
             state_.project_controller->show_save_before_project_file_open_modal = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
     } else if (state_.project_controller->show_save_before_project_file_open_modal) {
-        ImGui::OpenPopup("Open Project File");
+        ImGui::OpenPopup((AF_TR("Open Project File") + "###Open Project File").c_str());
     }
 }
 
@@ -491,8 +507,8 @@ void ModalHost::RenderReviewerNamePromptModal() {
         return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal("Reviewer Name", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextWrapped("Enter the name to use for review comments.");
+    if (ImGui::BeginPopupModal((AF_TR("Reviewer Name") + "###Reviewer Name").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped("%s", AF_TR("Enter the name to use for review comments.").c_str());
         ImGui::SetNextItemWidth(360.0f);
         ImGui::InputText("##startup_reviewer_name", state_.reviewer_name_buf, sizeof(state_.reviewer_name_buf));
         ImGui::Spacing();
@@ -500,7 +516,7 @@ void ModalHost::RenderReviewerNamePromptModal() {
         const std::string draft = TrimWhitespace(state_.reviewer_name_buf);
         if (draft.empty())
             ImGui::BeginDisabled();
-        if (ImGui::Button("Save", ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Save").c_str(), ImVec2(100.0f, 0.0f))) {
             state_.reviewer_name = draft;
             CopyToBuffer(state_.reviewer_name_buf, sizeof(state_.reviewer_name_buf), state_.reviewer_name);
             state_.modal_coordinator->show_reviewer_name_prompt = false;
@@ -509,13 +525,13 @@ void ModalHost::RenderReviewerNamePromptModal() {
         if (draft.empty())
             ImGui::EndDisabled();
         ImGui::SameLine();
-        if (ImGui::Button("Later", ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Later").c_str(), ImVec2(100.0f, 0.0f))) {
             state_.modal_coordinator->show_reviewer_name_prompt = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
     } else if (state_.modal_coordinator->show_reviewer_name_prompt) {
-        ImGui::OpenPopup("Reviewer Name");
+        ImGui::OpenPopup((AF_TR("Reviewer Name") + "###Reviewer Name").c_str());
     }
 }
 

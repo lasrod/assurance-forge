@@ -9,6 +9,7 @@
 #include "ui/gsn/gsn_node_text.h"
 #include "ui/gsn/gsn_shapes.h"
 #include "ui/gsn/gsn_terminology_card.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 #include "ui/ui_state.h"
 
@@ -80,13 +81,13 @@ static ImU32 DimmedProposalInk(ImU32 fill_color) {
 
 static std::string ProposalFieldDisplayLabel(const std::string& field) {
     if (field == "name")
-        return "Name";
+        return AF_TR("Name");
     if (field == "content")
-        return "Content";
+        return AF_TR("Content");
     if (field == "description")
-        return "Description";
+        return AF_TR("Description");
     if (field.empty())
-        return "Text";
+        return AF_TR("Text");
     return field;
 }
 
@@ -126,7 +127,7 @@ static void RenderProposalOriginalTextCard(const std::vector<ProposalTextChangeP
                                    ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar |
                                    ImGuiWindowFlags_NoInputs;
     if (ImGui::Begin("Original Text##proposal_original_text_node_hover", nullptr, flags)) {
-        ImGui::TextUnformatted("Original text");
+        ImGui::TextUnformatted(AF_TR("Original text").c_str());
         ImGui::Separator();
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + DpiSize(380.0f));
         for (size_t index = 0; index < changes.size(); ++index) {
@@ -134,7 +135,7 @@ static void RenderProposalOriginalTextCard(const std::vector<ProposalTextChangeP
                 ImGui::Separator();
             ImGui::TextDisabled("%s", ProposalFieldDisplayLabel(changes[index].field).c_str());
             if (changes[index].old_value.empty()) {
-                ImGui::TextDisabled("(empty)");
+                ImGui::TextDisabled("%s", AF_TR("(empty)").c_str());
             } else {
                 ImGui::TextWrapped("%s", changes[index].old_value.c_str());
             }
@@ -562,7 +563,7 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
         ImGui::BeginPopupContextWindow("##gsn_canvas_background_context",
                                        ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems)) {
         const bool can_add_top_goal = static_cast<bool>(actions.add_top_goal);
-        if (ImGui::MenuItem("Add New Top Goal", nullptr, false, can_add_top_goal)) {
+        if (ImGui::MenuItem(AF_TR("Add New Top Goal").c_str(), nullptr, false, can_add_top_goal)) {
             actions.add_top_goal();
         }
         ImGui::EndPopup();
@@ -665,10 +666,10 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
                              th_hist.border, DpiSize(8.0f), 0, DpiSize(1.0f));
 
             ImGui::SetCursorScreenPos(ImVec2(h_pill_left + h_pad, buttons_y));
-            if (ImGui::Button("Live##return_to_live", ImVec2(button_size, button_size)))
+            if (ImGui::Button((AF_TR("Live") + "##return_to_live").c_str(), ImVec2(button_size, button_size)))
                 overlay_buttons->on_return_to_live();
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Return to live view");
+                ImGui::SetTooltip("%s", AF_TR("Return to live view").c_str());
 
             // Shrink the strip rect remembered for the timeline so it doesn't
             // overlap the Live pill.
@@ -823,7 +824,7 @@ void ShowGsnCanvasWindow() {
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
                                     ImGuiWindowFlags_NoBringToFrontOnFocus;
 
-    if (ImGui::Begin("GSN Canvas", nullptr, window_flags)) {
+    if (ImGui::Begin((AF_TR("GSN Canvas") + "###GSN Canvas").c_str(), nullptr, window_flags)) {
         ElementContextActions actions{};
         ShowGsnCanvasContent(GetUiState(), nullptr, actions, nullptr);
     }

@@ -9,7 +9,7 @@
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
-#include "ui/localization.h"
+#include "ui/i18n/localization.h"
 #include "ui/panels/package_details_panel.h"
 #include "ui/panels/terminology_package_panel.h"
 #include "ui/register_views.h"
@@ -102,24 +102,25 @@ void RenderProposalBanner(AppRuntimeState& state, const WorkbenchAreaCallbacks& 
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(banner_bg));
     ImGui::BeginChild("##proposal_preview_banner", ImVec2(0.0f, banner_h), true, ImGuiWindowFlags_NoScrollbar);
     auto& proposals = *state.proposal_controller;
-    ImGui::TextUnformatted(proposals.creator_active ? "PROPOSAL CREATOR" : "PROPOSAL PREVIEW");
+    ImGui::TextUnformatted((proposals.creator_active ? AF_TR("PROPOSAL CREATOR") : AF_TR("PROPOSAL PREVIEW")).c_str());
     if (proposals.creator_active) {
-        ImGui::TextDisabled("Changes are recorded in the proposal draft. Save it from the review panel.");
+        ImGui::TextDisabled("%s", AF_TR("Changes are recorded in the proposal draft. Save it from the review panel.").c_str());
     } else {
-        ImGui::TextDisabled("This is a preview. The project model has not been changed.");
+        ImGui::TextDisabled("%s", AF_TR("This is a preview. The project model has not been changed.").c_str());
     }
     ImGui::SameLine();
     if (proposals.creator_active) {
-        ImGui::TextDisabled("%d operation(s)", static_cast<int>(proposals.ActiveOperationCount()));
+        const int op_count = static_cast<int>(proposals.ActiveOperationCount());
+        ImGui::TextDisabled("%s", ui::i18n::trnf("{0} operation", "{0} operations", op_count, op_count).c_str());
         ImGui::SameLine();
     } else if (!proposals.preview_id.empty()) {
-        if (ImGui::Button("Edit Proposal") && callbacks.edit_proposal_by_id) {
+        if (ImGui::Button(AF_TR("Edit Proposal").c_str()) && callbacks.edit_proposal_by_id) {
             callbacks.edit_proposal_by_id(proposals.preview_id);
         }
         ImGui::SameLine();
     }
-    const char* exit_label = proposals.creator_active ? "Discard Draft" : "Exit Preview";
-    if (ImGui::Button(exit_label)) {
+    const std::string exit_label = proposals.creator_active ? AF_TR("Discard Draft") : AF_TR("Exit Preview");
+    if (ImGui::Button(exit_label.c_str())) {
         const bool was_creator = proposals.creator_active;
         if (callbacks.exit_proposal_canvas)
             callbacks.exit_proposal_canvas(was_creator);
@@ -157,13 +158,13 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
                                     WorkbenchState::ArgumentPackageCanvasTab& tab) {
     ui_state.center_view = ui::CenterView::GsnCanvas;
     if (!state.app_state.loaded_case.has_value() || !state.app_state.sacm_package.has_value()) {
-        ImGui::TextDisabled("No SACM argument model is loaded.");
+        ImGui::TextDisabled("%s", AF_TR("No SACM argument model is loaded.").c_str());
         return;
     }
 
     const sacm::ArgumentPackage* argument_package = FindArgumentPackage(state.app_state.sacm_package.value(), tab);
     if (!argument_package) {
-        ImGui::TextDisabled("Argument package was not found in the loaded SACM model.");
+        ImGui::TextDisabled("%s", AF_TR("Argument package was not found in the loaded SACM model.").c_str());
         return;
     }
 
@@ -306,7 +307,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::GsnCanvas)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
-            if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::GsnCanvas), nullptr, gsn_flags)) {
+            if (ImGui::BeginTabItem((AF_TR("GSN Canvas") + "###gsn_canvas_tab").c_str(), nullptr, gsn_flags)) {
                 state.workbench.active_argument_package_canvas_key.clear();
                 RenderGsnCanvasTab(state, ui_state, callbacks);
                 ImGui::EndTabItem();
@@ -349,12 +350,16 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::CseRegister)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
-            if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::CseRegister), nullptr, cse_flags)) {
+            if (ImGui::BeginTabItem((AF_TR("CSE Register") + "###cse_register_tab").c_str(), nullptr, cse_flags)) {
                 ui_state.center_view = ui::CenterView::CseRegister;
                 if (state.app_state.active_project_file_role == core::ProjectFileRole::J3377CaeRegister) {
-                    ImGui::TextWrapped("J3377 CAE register file: %s",
-                                       state.app_state.active_project_file_path.string().c_str());
-                    ImGui::TextDisabled("Editable CAE register content will be implemented in a later workflow.");
+                    ImGui::TextWrapped(
+                        "%s",
+                        ui::i18n::trf("J3377 CAE register file: {0}",
+                                      state.app_state.active_project_file_path.string())
+                            .c_str());
+                    ImGui::TextDisabled(
+                        "%s", AF_TR("Editable CAE register content will be implemented in a later workflow.").c_str());
                     ImGui::Separator();
                 }
                 ui::ShowCseRegisterView();
@@ -367,12 +372,18 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::EvidenceRegister)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
-            if (ImGui::BeginTabItem(ui::Tr(ui::MessageId::EvidenceRegister), nullptr, evidence_flags)) {
+            if (ImGui::BeginTabItem((AF_TR("Evidence Register") + "###evidence_register_tab").c_str(), nullptr,
+                                    evidence_flags)) {
                 ui_state.center_view = ui::CenterView::EvidenceRegister;
                 if (state.app_state.active_project_file_role == core::ProjectFileRole::EvidenceRegister) {
-                    ImGui::TextWrapped("Evidence register file: %s",
-                                       state.app_state.active_project_file_path.string().c_str());
-                    ImGui::TextDisabled("Editable evidence register content will be implemented in a later workflow.");
+                    ImGui::TextWrapped(
+                        "%s",
+                        ui::i18n::trf("Evidence register file: {0}",
+                                      state.app_state.active_project_file_path.string())
+                            .c_str());
+                    ImGui::TextDisabled(
+                        "%s",
+                        AF_TR("Editable evidence register content will be implemented in a later workflow.").c_str());
                     ImGui::Separator();
                 }
                 ui::ShowEvidenceRegisterView();
@@ -385,7 +396,8 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::PackageDetails)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
-            if (ImGui::BeginTabItem("Package Details", nullptr, package_flags)) {
+            if (ImGui::BeginTabItem((AF_TR("Package Details") + "###package_details_tab").c_str(), nullptr,
+                                    package_flags)) {
                 ui_state.center_view = ui::CenterView::PackageDetails;
                 ui::panels::ShowPackageDetailsPanel(state.selected_package_node ? &state.selected_package_node.value()
                                                                                 : nullptr,
@@ -399,7 +411,8 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                                                    ui_state.center_view == ui::CenterView::TerminologyPackage)
                                                       ? ImGuiTabItemFlags_SetSelected
                                                       : 0;
-            if (ImGui::BeginTabItem("Terminology Package", nullptr, terminology_flags)) {
+            if (ImGui::BeginTabItem((AF_TR("Terminology Package") + "###terminology_package_tab").c_str(), nullptr,
+                                    terminology_flags)) {
                 ui_state.center_view = ui::CenterView::TerminologyPackage;
                 RenderTerminologyPackageTab(state, callbacks);
                 ImGui::EndTabItem();

@@ -4,8 +4,10 @@
 #include "app/app_ui_bootstrap.h"
 #include "GLFW/glfw3.h"
 #include "hello_imgui/hello_imgui.h"
-#include "ui/localization.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
+
+#include <filesystem>
 
 namespace {
 
@@ -49,12 +51,21 @@ int main(int, char**) {
         ui::ApplyAppTheme(ui::ParseAppTheme(loaded_theme_name != nullptr ? loaded_theme_name : ""));
     };
     params.callbacks.PostInit = [&runtime]() {
-        ui::SetCurrentLanguage(ui::ParseLanguageCode(HelloImGui::LoadUserPref(kLanguagePreference)));
+        ui::i18n::LocalizationConfig localization_config;
+        // AssetFileFullPath resolves files, not directories, so derive the
+        // locale directory from a bundled asset that is guaranteed to exist.
+        const std::string assets_anchor = HelloImGui::AssetFileFullPath("fonts/NotoSansJP-Regular.otf", false);
+        if (!assets_anchor.empty()) {
+            localization_config.localeDirectory =
+                std::filesystem::path(assets_anchor).parent_path().parent_path() / "locale";
+        }
+        localization_config.language = ui::i18n::ParseLanguageCode(HelloImGui::LoadUserPref(kLanguagePreference));
+        ui::i18n::Initialize(localization_config);
         runtime.LoadRecentProjectsPreference(HelloImGui::LoadUserPref(kRecentProjectsPreference));
         runtime.LoadReviewerNamePreference(HelloImGui::LoadUserPref(kReviewerNamePreference));
     };
     params.callbacks.BeforeExit = [&runtime]() {
-        HelloImGui::SaveUserPref(kLanguagePreference, ui::LanguageCode(ui::CurrentLanguage()));
+        HelloImGui::SaveUserPref(kLanguagePreference, ui::i18n::LanguageCode(ui::i18n::CurrentLanguage()));
         HelloImGui::SaveUserPref(kRecentProjectsPreference, runtime.RecentProjectsPreferenceJson());
         HelloImGui::SaveUserPref(kReviewerNamePreference, runtime.ReviewerNamePreference());
     };

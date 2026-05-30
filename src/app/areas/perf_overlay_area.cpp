@@ -2,6 +2,7 @@
 
 #include "core/perf/frame_profiler.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
 #include <hello_imgui/hello_imgui.h>
@@ -845,7 +846,7 @@ void RenderPerfOverlay(bool& open) {
         PushFrameTime(live_wall_ms, live_render_ms);
 
     ImGui::SetNextWindowSize(ImVec2(620, 820), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Performance", &open)) {
+    if (!ImGui::Begin((AF_TR("Performance") + "###Performance").c_str(), &open)) {
         ImGui::End();
         return;
     }
@@ -884,17 +885,17 @@ void RenderPerfOverlay(bool& open) {
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ui::ShadeColor(base, 0.15f));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, ui::ShadeColor(base, -0.10f));
         }
-        if (ImGui::Button(was_paused ? "Resume" : "Pause"))
+        if (ImGui::Button((was_paused ? AF_TR("Resume") : AF_TR("Pause")).c_str()))
             s_paused = !s_paused;
         if (was_paused)
             ImGui::PopStyleColor(3);
         ImGui::SameLine();
         if (s_paused) {
-            ImGui::TextColored(ui::GetWarningColor(), "\xe2\x97\x8f PAUSED");
+            ImGui::TextColored(ui::GetWarningColor(), "%s", AF_TR("● PAUSED").c_str());
             ImGui::SameLine();
-            ImGui::TextDisabled("(history & values frozen)");
+            ImGui::TextDisabled("%s", AF_TR("(history & values frozen)").c_str());
         } else {
-            ImGui::TextDisabled("(live)");
+            ImGui::TextDisabled("%s", AF_TR("(live)").c_str());
         }
 
         // VSync toggle — flips runnerParams.fpsIdling.vsyncToMonitor, which
@@ -904,10 +905,12 @@ void RenderPerfOverlay(bool& open) {
             ImGui::Dummy(ImVec2(12.0f, 0.0f));
             ImGui::SameLine();
             bool vsync = rp->fpsIdling.vsyncToMonitor;
-            if (ImGui::Checkbox("VSync", &vsync))
+            if (ImGui::Checkbox(AF_TR("VSync").c_str(), &vsync))
                 rp->fpsIdling.vsyncToMonitor = vsync;
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Disable to uncap the frame rate (useful for measuring raw render cost).");
+                ImGui::SetTooltip("%s",
+                                  AF_TR("Disable to uncap the frame rate (useful for measuring raw render cost).")
+                                      .c_str());
 
             // Idling control + live indicator. hello_imgui's FpsIdling throttles
             // the main loop to fpsIdle (default 9 FPS) when the UI is quiet,
@@ -917,12 +920,15 @@ void RenderPerfOverlay(bool& open) {
             ImGui::Dummy(ImVec2(12.0f, 0.0f));
             ImGui::SameLine();
             bool idling_enabled = rp->fpsIdling.enableIdling;
-            if (ImGui::Checkbox("Idling", &idling_enabled))
+            if (ImGui::Checkbox(AF_TR("Idling").c_str(), &idling_enabled))
                 rp->fpsIdling.enableIdling = idling_enabled;
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("hello_imgui FpsIdling: when the UI is quiet, throttle to %.0f FPS to save power.\n"
-                                  "Uncheck to keep the app running at full speed even when idle.",
-                                  rp->fpsIdling.fpsIdle);
+                ImGui::SetTooltip(
+                    "%s",
+                    ui::i18n::trf("hello_imgui FpsIdling: when the UI is quiet, throttle to {0:.0f} FPS to save "
+                                  "power.\nUncheck to keep the app running at full speed even when idle.",
+                                  rp->fpsIdling.fpsIdle)
+                        .c_str());
             }
 
             // Live "currently idling" indicator — auto-set, not user-clickable.
@@ -933,24 +939,24 @@ void RenderPerfOverlay(bool& open) {
             ImGui::SameLine();
             const ui::Theme& th_top = ui::GetTheme();
             ImU32 dot_col;
-            const char* status_label;
+            std::string status_label;
             ImVec4 status_text_col;
-            const char* tooltip_extra;
+            std::string tooltip_extra;
             if (!rp->fpsIdling.enableIdling) {
                 dot_col = ui::WithAlpha(th_top.text_muted, 0.5f);
-                status_label = "disabled";
+                status_label = AF_TR("disabled");
                 status_text_col = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
-                tooltip_extra = "Idling feature is turned off — the main loop runs at full speed.";
+                tooltip_extra = AF_TR("Idling feature is turned off — the main loop runs at full speed.");
             } else if (rp->fpsIdling.isIdling) {
                 dot_col = ui::WithAlpha(th_top.warning, 1.0f);
-                status_label = "throttled";
+                status_label = AF_TR("throttled");
                 status_text_col = ui::GetWarningColor();
-                tooltip_extra = "Main loop is currently throttled because no input was detected.";
+                tooltip_extra = AF_TR("Main loop is currently throttled because no input was detected.");
             } else {
                 dot_col = ui::WithAlpha(th_top.success, 0.9f);
-                status_label = "unthrottled";
+                status_label = AF_TR("unthrottled");
                 status_text_col = ImGui::ColorConvertU32ToFloat4(th_top.text_secondary);
-                tooltip_extra = "Idling is enabled but not currently throttling — input is active.";
+                tooltip_extra = AF_TR("Idling is enabled but not currently throttling — input is active.");
             }
             const float r = ImGui::GetTextLineHeight() * 0.30f;
             const ImVec2 cp = ImGui::GetCursorScreenPos();
@@ -959,9 +965,10 @@ void RenderPerfOverlay(bool& open) {
                 ImVec2(cp.x + r + 2.0f, cp.y + line_h * 0.5f + 1.0f), r, dot_col);
             ImGui::Dummy(ImVec2(r * 2.0f + 6.0f, line_h));
             ImGui::SameLine();
-            ImGui::TextColored(status_text_col, "%s", status_label);
+            ImGui::TextColored(status_text_col, "%s", status_label.c_str());
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Live status from runnerParams.fpsIdling.\n%s", tooltip_extra);
+                ImGui::SetTooltip(
+                    "%s", ui::i18n::trf("Live status from runnerParams.fpsIdling.\n{0}", tooltip_extra).c_str());
         }
     }
     ImGui::Spacing();
@@ -1013,7 +1020,7 @@ void RenderPerfOverlay(bool& open) {
     // =================================================================
     {
         const ui::Theme& th_legend = ui::GetTheme();
-        ImGui::TextUnformatted("Frame interval (4s) —");
+        ImGui::TextUnformatted(AF_TR("Frame interval (4s) —").c_str());
         ImGui::SameLine(0.0f, 6.0f);
         // Wall-clock swatch — drawn as a gradient (green/warning/danger) to
         // signal that the trace itself is color-coded by FPS thresholds, not
@@ -1036,7 +1043,7 @@ void RenderPerfOverlay(bool& open) {
             ImGui::Dummy(ImVec2(sw_w + 2.0f, h_line));
         }
         ImGui::SameLine(0.0f, 4.0f);
-        ImGui::TextDisabled("frame interval (colored by FPS)");
+        ImGui::TextDisabled("%s", AF_TR("frame interval (colored by FPS)").c_str());
         ImGui::SameLine(0.0f, 10.0f);
         // Render-cost swatch
         {
@@ -1050,7 +1057,7 @@ void RenderPerfOverlay(bool& open) {
             ImGui::Dummy(ImVec2(16.0f, h_line));
         }
         ImGui::SameLine(0.0f, 4.0f);
-        ImGui::TextDisabled("render cost only");
+        ImGui::TextDisabled("%s", AF_TR("render cost only").c_str());
     }
     DrawFrameTimeGraph(h, avg_ms, spikes.threshold_ms, 130.0f);
 
@@ -1067,7 +1074,8 @@ void RenderPerfOverlay(bool& open) {
 
     {
         const auto groups = GroupBySubsystem(samples);
-        ImGui::Text("This frame: %.2f ms render across %zu buckets", render_ms, samples.size());
+        ImGui::TextUnformatted(
+            ui::i18n::trf("This frame: {0:.2f} ms render across {1} buckets", render_ms, samples.size()).c_str());
         DrawSubsystemStackedBar(groups, total_ns, 28.0f);
     }
 
@@ -1076,9 +1084,10 @@ void RenderPerfOverlay(bool& open) {
     // =================================================================
     // Section 4: Bucket tree
     // =================================================================
-    if (ImGui::CollapsingHeader("Buckets (sorted by cost)", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader((AF_TR("Buckets (sorted by cost)") + "###buckets_header").c_str(),
+                                ImGuiTreeNodeFlags_DefaultOpen)) {
         bool enabled = core::perf::IsEnabled();
-        if (ImGui::Checkbox("Sampling enabled", &enabled))
+        if (ImGui::Checkbox(AF_TR("Sampling enabled").c_str(), &enabled))
             core::perf::SetEnabled(enabled);
 
         BucketNode tree = BuildBucketTree(samples);
@@ -1108,15 +1117,15 @@ void RenderPerfOverlay(bool& open) {
                 DrawTreeNodeRow(*n, total_ns, 1, bar_x_window, bar_w_uniform);
         }
 
-        if (ImGui::CollapsingHeader("Raw bucket table")) {
+        if (ImGui::CollapsingHeader((AF_TR("Raw bucket table") + "###raw_bucket_table_header").c_str())) {
             if (ImGui::BeginTable("perf_buckets_raw",
                                   4,
                                   ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |
                                       ImGuiTableFlags_SizingStretchProp)) {
-                ImGui::TableSetupColumn("Bucket", ImGuiTableColumnFlags_WidthStretch, 0.50f);
-                ImGui::TableSetupColumn("Time (ms)", ImGuiTableColumnFlags_WidthStretch, 0.18f);
-                ImGui::TableSetupColumn("% Frame", ImGuiTableColumnFlags_WidthStretch, 0.14f);
-                ImGui::TableSetupColumn("Hits", ImGuiTableColumnFlags_WidthStretch, 0.18f);
+                ImGui::TableSetupColumn(AF_TR("Bucket").c_str(), ImGuiTableColumnFlags_WidthStretch, 0.50f);
+                ImGui::TableSetupColumn(AF_TR("Time (ms)").c_str(), ImGuiTableColumnFlags_WidthStretch, 0.18f);
+                ImGui::TableSetupColumn(AF_TR("% Frame").c_str(), ImGuiTableColumnFlags_WidthStretch, 0.14f);
+                ImGui::TableSetupColumn(AF_TR("Hits").c_str(), ImGuiTableColumnFlags_WidthStretch, 0.18f);
                 ImGui::TableHeadersRow();
                 for (const auto& s : sorted) {
                     ImGui::TableNextRow();
@@ -1139,7 +1148,8 @@ void RenderPerfOverlay(bool& open) {
     // =================================================================
     // Section 5: Canvas render stats as chips
     // =================================================================
-    if (ImGui::CollapsingHeader("Canvas render stats", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader((AF_TR("Canvas render stats") + "###canvas_render_stats_header").c_str(),
+                                ImGuiTreeNodeFlags_DefaultOpen)) {
         const ui::gsn::CanvasRenderStats& stats = s_snapshot.canvas_stats;
 
         DrawCullChip("Nodes", stats.nodes_drawn, stats.nodes_culled);
@@ -1170,33 +1180,36 @@ void RenderPerfOverlay(bool& open) {
     // =================================================================
     // Section 6: Feature toggles + actions
     // =================================================================
-    if (ImGui::CollapsingHeader("Feature toggles (A/B) & report", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader((AF_TR("Feature toggles (A/B) & report") + "###feature_toggles_header").c_str(),
+                                ImGuiTreeNodeFlags_DefaultOpen)) {
         core::perf::PerfToggles& t = core::perf::GetPerfToggles();
-        ImGui::TextWrapped("Disable individual cost contributors to measure their impact on FPS. "
-                           "Defaults match production behaviour.");
-        ImGui::Checkbox("Node drop shadows", &t.node_shadows);
+        ImGui::TextWrapped("%s",
+                           AF_TR("Disable individual cost contributors to measure their impact on FPS. "
+                                 "Defaults match production behaviour.")
+                               .c_str());
+        ImGui::Checkbox(AF_TR("Node drop shadows").c_str(), &t.node_shadows);
         ImGui::SameLine();
-        ImGui::Checkbox("Interior shading", &t.node_interior_shading);
+        ImGui::Checkbox(AF_TR("Interior shading").c_str(), &t.node_interior_shading);
         ImGui::SameLine();
-        ImGui::Checkbox("Selection glow", &t.selection_glow);
-        ImGui::Checkbox("Terminology spans", &t.terminology_spans);
+        ImGui::Checkbox(AF_TR("Selection glow").c_str(), &t.selection_glow);
+        ImGui::Checkbox(AF_TR("Terminology spans").c_str(), &t.terminology_spans);
         ImGui::SameLine();
-        ImGui::Checkbox("ACP decorators", &t.acp_decorators);
+        ImGui::Checkbox(AF_TR("ACP decorators").c_str(), &t.acp_decorators);
         ImGui::SameLine();
-        ImGui::Checkbox("High-segment circles", &t.high_segment_circles);
-        ImGui::Checkbox("Freeze ACP rebuilds (not yet wired)", &t.freeze_acp_builds);
+        ImGui::Checkbox(AF_TR("High-segment circles").c_str(), &t.high_segment_circles);
+        ImGui::Checkbox(AF_TR("Freeze ACP rebuilds (not yet wired)").c_str(), &t.freeze_acp_builds);
 
         ImGui::Separator();
 
         static std::string last_saved_path;
-        if (ImGui::Button("Copy report to clipboard")) {
+        if (ImGui::Button(AF_TR("Copy report to clipboard").c_str())) {
             const ui::gsn::CanvasRenderStats& stats = s_snapshot.canvas_stats;
             const std::string report =
                 BuildReport(total_ms, avg_ms, max_ms, fps, sorted, total_ns, stats, core::perf::GetPerfToggles());
             ImGui::SetClipboardText(report.c_str());
         }
         ImGui::SameLine();
-        if (ImGui::Button("Save report to file")) {
+        if (ImGui::Button(AF_TR("Save report to file").c_str())) {
             const ui::gsn::CanvasRenderStats& stats = s_snapshot.canvas_stats;
             const std::string report =
                 BuildReport(total_ms, avg_ms, max_ms, fps, sorted, total_ns, stats, core::perf::GetPerfToggles());
@@ -1224,11 +1237,11 @@ void RenderPerfOverlay(bool& open) {
             }
         }
         ImGui::SameLine();
-        if (ImGui::Button("Reset toggles")) {
+        if (ImGui::Button(AF_TR("Reset toggles").c_str())) {
             t = core::perf::PerfToggles{};
         }
         if (!last_saved_path.empty()) {
-            ImGui::TextDisabled("Saved: %s", last_saved_path.c_str());
+            ImGui::TextDisabled("%s", ui::i18n::trf("Saved: {0}", last_saved_path).c_str());
         }
     }
 

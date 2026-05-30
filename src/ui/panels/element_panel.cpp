@@ -4,12 +4,14 @@
 #include "imgui.h"
 #include "imgui_stdlib.h"
 #include "ui/gsn/gsn_canvas.h"
+#include "ui/i18n/localization.h"
 #include "ui/panels/confidence_panel.h"
 #include "ui/text_edit_session.h"
 #include "ui/theme.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <string>
 #include <unordered_set>
@@ -184,8 +186,8 @@ static void RenderMetadataRow(const char* label, const std::string& value) {
 }
 
 static void RenderElementMetadata(const parser::SacmElement& elem) {
-    RenderMetadataRow("ID", elem.id);
-    RenderMetadataRow("Type", elem.type);
+    RenderMetadataRow(AF_TR("ID").c_str(), elem.id);
+    RenderMetadataRow(AF_TR("Type").c_str(), elem.type);
     ImGui::Spacing();
 }
 
@@ -272,59 +274,61 @@ void RenderTerminologySuggestions(const sacm::AssuranceCasePackage* sacm_pkg,
         return;
 
     ImGui::Spacing();
-    ImGui::TextUnformatted("Terminology suggestions");
+    ImGui::TextUnformatted(AF_TR("Terminology suggestions").c_str());
     ImGui::Separator();
     for (const TerminologySuggestion& suggestion : suggestions) {
         ImGui::PushID(suggestion.text.c_str());
         if (suggestion.kind == TerminologySuggestion::Kind::AmbiguousTerm) {
-            ImGui::TextColored(ui::GetWarningColor(), "%s has multiple meanings.", suggestion.text.c_str());
+            ImGui::TextColored(ui::GetWarningColor(), "%s",
+                               ui::i18n::trf("{0} has multiple meanings.", suggestion.text).c_str());
             int candidate_index = 0;
             for (const auto& candidate : suggestion.candidates) {
                 ImGui::PushID(candidate_index++);
                 const std::string term_name =
-                    candidate.term && !candidate.term->name.empty() ? candidate.term->name : "Unnamed term";
+                    candidate.term && !candidate.term->name.empty() ? candidate.term->name : AF_TR("Unnamed term");
                 ImGui::BulletText("%s", term_name.c_str());
                 if (callbacks && callbacks->use_term_for_element) {
                     ImGui::SameLine();
-                    if (ImGui::SmallButton("Use for this element")) {
+                    if (ImGui::SmallButton(AF_TR("Use for this element").c_str())) {
                         callbacks->use_term_for_element(element_id, candidate.package_ref, candidate.term_ref);
                     }
                 }
                 ImGui::PopID();
             }
             if (callbacks && callbacks->define_term) {
-                if (ImGui::Button("Create new meaning"))
+                if (ImGui::Button(AF_TR("Create new meaning").c_str()))
                     callbacks->define_term(element_id, suggestion.text);
             }
             ImGui::PopID();
             continue;
         }
 
-        ImGui::TextColored(ui::GetWarningColor(), "%s is not defined.", suggestion.text.c_str());
+        ImGui::TextColored(ui::GetWarningColor(), "%s",
+                           ui::i18n::trf("{0} is not defined.", suggestion.text).c_str());
         if (callbacks && callbacks->define_term) {
-            if (ImGui::Button("Define"))
+            if (ImGui::Button(AF_TR("Define").c_str()))
                 callbacks->define_term(element_id, suggestion.text);
         } else {
             ImGui::BeginDisabled();
-            ImGui::Button("Define");
+            ImGui::Button(AF_TR("Define").c_str());
             ImGui::EndDisabled();
         }
         ImGui::SameLine();
         if (callbacks && callbacks->link_existing_term) {
-            if (ImGui::Button("Link existing"))
+            if (ImGui::Button(AF_TR("Link existing").c_str()))
                 callbacks->link_existing_term(element_id, suggestion.text);
         } else {
             ImGui::BeginDisabled();
-            ImGui::Button("Link existing");
+            ImGui::Button(AF_TR("Link existing").c_str());
             ImGui::EndDisabled();
         }
         ImGui::SameLine();
         if (callbacks && callbacks->ignore_term) {
-            if (ImGui::Button("Ignore"))
+            if (ImGui::Button(AF_TR("Ignore").c_str()))
                 callbacks->ignore_term(element_id, suggestion.text);
         } else {
             ImGui::BeginDisabled();
-            ImGui::Button("Ignore");
+            ImGui::Button(AF_TR("Ignore").c_str());
             ImGui::EndDisabled();
         }
         ImGui::PopID();
@@ -339,7 +343,7 @@ bool RenderReviewAttentionNotice(const ui::UiState& state,
         return false;
     const core::ElementBadgeSummary& summary = summary_it->second;
 
-    const char* label = "Unresolved review";
+    const std::string label = AF_TR("Unresolved review");
     const ui::Theme& theme = ui::GetTheme();
     const ImVec4 button_color = ImGui::ColorConvertU32ToFloat4(ui::WithAlpha(theme.attention, 0.86f));
     const ImVec4 button_hover = ImGui::ColorConvertU32ToFloat4(theme.warning);
@@ -347,7 +351,7 @@ bool RenderReviewAttentionNotice(const ui::UiState& state,
     ImGui::PushStyleColor(ImGuiCol_Button, button_color);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, button_hover);
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, button_active);
-    if (ImGui::SmallButton(label) && terminology_callbacks && terminology_callbacks->focus_review_tab) {
+    if (ImGui::SmallButton(label.c_str()) && terminology_callbacks && terminology_callbacks->focus_review_tab) {
         terminology_callbacks->focus_review_tab();
     }
     ImGui::PopStyleColor(3);
@@ -358,9 +362,9 @@ bool RenderReviewAttentionNotice(const ui::UiState& state,
         // would be misleading here.
         const std::string& review_msg = summary.top_review_problem_message;
         if (review_msg.empty()) {
-            ImGui::SetTooltip("Open review comments or AI review failures for this element.");
+            ImGui::SetTooltip("%s", AF_TR("Open review comments or AI review failures for this element.").c_str());
         } else {
-            ImGui::SetTooltip("%s\nClick to open the Review tab.", review_msg.c_str());
+            ImGui::SetTooltip("%s", ui::i18n::trf("{0}\nClick to open the Review tab.", review_msg).c_str());
         }
     }
     return true;
@@ -379,19 +383,19 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     bool modified = false;
 
     if (state.selected_element_id.empty()) {
-        ImGui::TextDisabled("No element selected.");
+        ImGui::TextDisabled("%s", AF_TR("No element selected.").c_str());
         return false;
     }
 
     if (!ac) {
-        ImGui::TextDisabled("No safety case loaded.");
+        ImGui::TextDisabled("%s", AF_TR("No safety case loaded.").c_str());
         return false;
     }
 
     // Find the element by ID
     parser::SacmElement* elem = find_parser_element(ac, state.selected_element_id);
     if (!elem) {
-        ImGui::TextDisabled("Element not found: %s", state.selected_element_id.c_str());
+        ImGui::TextDisabled("%s", ui::i18n::trf("Element not found: {0}", state.selected_element_id).c_str());
         return false;
     }
 
@@ -410,8 +414,8 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     if (read_only) {
         ImGui::PushStyleColor(ImGuiCol_Text,
                               ImGui::ColorConvertU32ToFloat4(ui::GetTheme().text_secondary));
-        ImGui::TextWrapped(
-            "Historical preview — fields are read-only. Return to latest to edit.");
+        ImGui::TextWrapped("%s",
+                           AF_TR("Historical preview — fields are read-only. Return to latest to edit.").c_str());
         ImGui::PopStyleColor();
         ImGui::Spacing();
         ImGui::BeginDisabled(true);
@@ -427,7 +431,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     };
 
     // Name (editable)
-    ImGui::Text("Name");
+    ImGui::Text("%s", AF_TR("Name").c_str());
     ImGui::Separator();
     {
         ImGuiID widget_id = 0;
@@ -439,7 +443,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     }
     // Secondary language name (only show if this field has the secondary language)
     if (elem->name_langs.count(sec_lang)) {
-        ImGui::Text("Name (%s)", sec_lang.c_str());
+        ImGui::TextUnformatted(ui::i18n::trf("Name ({0})", sec_lang).c_str());
         if (ui::gsn::g_BoldFont)
             ImGui::PushFont(ui::gsn::g_BoldFont);
         std::string sec_name = elem->name_langs.at(sec_lang);
@@ -458,7 +462,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     bool has_content = (elem->type == "claim" || elem->type == "argumentreasoning");
     bool supports_undeveloped = has_content;
     if (has_content) {
-        ImGui::Text("Content");
+        ImGui::Text("%s", AF_TR("Content").c_str());
         ImGui::Separator();
         {
             ImGuiID widget_id = 0;
@@ -471,7 +475,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
         RenderTerminologySuggestions(sacm_pkg, elem->id, elem->content, terminology_callbacks);
         // Secondary language content (only show if this field has the secondary language)
         if (elem->content_langs.count(sec_lang)) {
-            ImGui::Text("Content (%s)", sec_lang.c_str());
+            ImGui::TextUnformatted(ui::i18n::trf("Content ({0})", sec_lang).c_str());
             std::string sec_content = elem->content_langs.at(sec_lang);
             ImGuiID widget_id = 0;
             if (EditableTextField("content_sec", sec_content, -1.0f, &widget_id)) {
@@ -485,7 +489,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
 
     if (supports_undeveloped) {
         bool undeveloped = elem->undeveloped;
-        if (ImGui::Checkbox("Undeveloped", &undeveloped)) {
+        if (ImGui::Checkbox(AF_TR("Undeveloped").c_str(), &undeveloped)) {
             elem->undeveloped = undeveloped;
             modified = true;
         }
@@ -493,7 +497,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     }
 
     // Description (editable)
-    ImGui::Text("Description");
+    ImGui::Text("%s", AF_TR("Description").c_str());
     ImGui::Separator();
     {
         ImGuiID widget_id = 0;
@@ -507,7 +511,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
         RenderTerminologySuggestions(sacm_pkg, elem->id, elem->description, terminology_callbacks);
     // Secondary language description (only show if this field has the secondary language)
     if (elem->description_langs.count(sec_lang)) {
-        ImGui::Text("Description (%s)", sec_lang.c_str());
+        ImGui::TextUnformatted(ui::i18n::trf("Description ({0})", sec_lang).c_str());
         std::string sec_desc = elem->description_langs.at(sec_lang);
         ImGuiID widget_id = 0;
         if (EditableTextField("description_sec", sec_desc, -1.0f, &widget_id)) {
@@ -525,7 +529,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
         UiState& mut_state = GetUiState();
 
         // Language selector dropdown
-        ImGui::Text("Translation Language");
+        ImGui::Text("%s", AF_TR("Translation Language").c_str());
         int current_lang_idx = 0;
         for (int i = 0; i < kLangCount; ++i) {
             if (mut_state.active_secondary_lang == kLangCodes[i]) {
@@ -533,8 +537,14 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
                 break;
             }
         }
+        std::array<std::string, kLangCount> lang_label_storage;
+        std::array<const char*, kLangCount> lang_label_ptrs;
+        for (int i = 0; i < kLangCount; ++i) {
+            lang_label_storage[i] = AF_TR(kLangLabels[i]);
+            lang_label_ptrs[i] = lang_label_storage[i].c_str();
+        }
         ImGui::SetNextItemWidth(-1);
-        if (ImGui::Combo("##trans_lang", &current_lang_idx, kLangLabels, kLangCount)) {
+        if (ImGui::Combo("##trans_lang", &current_lang_idx, lang_label_ptrs.data(), kLangCount)) {
             mut_state.active_secondary_lang = kLangCodes[current_lang_idx];
         }
 
@@ -542,7 +552,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
 
         // Checkbox to enable/disable translation for this element
         bool has_trans = element_has_secondary(*elem, mut_state.active_secondary_lang);
-        if (ImGui::Checkbox("Add Translation", &has_trans)) {
+        if (ImGui::Checkbox(AF_TR("Add Translation").c_str(), &has_trans)) {
             if (has_trans) {
                 // Enable: insert empty entries so the fields appear
                 elem->name_langs[mut_state.active_secondary_lang] = "";
@@ -606,34 +616,35 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
         ElementHistoryModel hm = history_callbacks->model_for_element(elem->id);
         if (hm.available) {
             ImGui::Spacing();
-            ImGui::Text("History");
+            ImGui::Text("%s", AF_TR("History").c_str());
             ImGui::Separator();
             if (!hm.ever_seen) {
-                ImGui::TextDisabled("No recorded changes for this element.");
+                ImGui::TextDisabled("%s", AF_TR("No recorded changes for this element.").c_str());
             } else {
                 const std::string last_changed_value =
                     hm.last_changed_at.empty()
                         ? std::string("-")
-                        : (hm.last_changed_by.empty() ? hm.last_changed_at
-                                                      : hm.last_changed_at + "  by " + hm.last_changed_by);
-                RenderMetadataRow("Last changed", last_changed_value);
-                RenderMetadataRow("Changes", std::to_string(hm.change_count));
+                        : (hm.last_changed_by.empty()
+                               ? hm.last_changed_at
+                               : ui::i18n::trf("{0}  by {1}", hm.last_changed_at, hm.last_changed_by));
+                RenderMetadataRow(AF_TR("Last changed").c_str(), last_changed_value);
+                RenderMetadataRow(AF_TR("Changes").c_str(), std::to_string(hm.change_count));
                 if (hm.has_baseline) {
                     const std::string baseline_value =
-                        std::string(hm.changed_since_baseline ? "Yes" : "No") +
+                        (hm.changed_since_baseline ? AF_TR("Yes") : AF_TR("No")) +
                         (hm.baseline_label.empty() ? "" : "  (" + hm.baseline_label + ")");
-                    RenderMetadataRow("Changed since baseline", baseline_value);
+                    RenderMetadataRow(AF_TR("Changed since baseline").c_str(), baseline_value);
                 }
             }
             ImGui::Spacing();
-            if (ImGui::SmallButton("View Element History") && history_callbacks->open_element_history)
+            if (ImGui::SmallButton(AF_TR("View Element History").c_str()) && history_callbacks->open_element_history)
                 history_callbacks->open_element_history(elem->id);
             ImGui::SameLine();
             ImGui::BeginDisabled(true);
-            ImGui::SmallButton("Compare to Baseline");
+            ImGui::SmallButton(AF_TR("Compare to Baseline").c_str());
             ImGui::EndDisabled();
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-                ImGui::SetTooltip("Available in a later release.");
+                ImGui::SetTooltip("%s", AF_TR("Available in a later release.").c_str());
         }
     }
 

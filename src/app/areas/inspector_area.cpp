@@ -9,6 +9,7 @@
 #include "core/audit/event_store.h"
 #include "core/confidence/confidence_store.h"
 #include "core/sacm_identity.h"
+#include "ui/i18n/localization.h"
 #include "ui/panels/acp_panel.h"
 #include "ui/panels/element_panel.h"
 #include "ui/panels/relationship_panel.h"
@@ -25,13 +26,14 @@ void RenderInspectorArea(AppRuntimeState& state,
                          const InspectorAreaCallbacks& callbacks) {
     ImGui::SetNextWindowPos(region.pos);
     ImGui::SetNextWindowSize(region.size);
-    ImGui::Begin("Element Properties", nullptr, panel_flags);
+    ImGui::Begin((AF_TR("Element Properties") + "###Element Properties").c_str(), nullptr, panel_flags);
 
     if (state.proposal_controller->creator_active) {
         if (callbacks.render_proposal_element_editor)
             callbacks.render_proposal_element_editor();
     } else if (state.proposal_controller->preview_active) {
-        ImGui::TextWrapped("Proposal preview is active. Exit preview before editing element properties.");
+        ImGui::TextWrapped(
+            "%s", AF_TR("Proposal preview is active. Exit preview before editing element properties.").c_str());
     } else {
         parser::AssuranceCase* loaded_case =
             state.app_state.loaded_case.has_value() ? &state.app_state.loaded_case.value() : nullptr;
@@ -100,10 +102,11 @@ void RenderInspectorArea(AppRuntimeState& state,
                 model.stale = assessment->stale;
                 model.expected_confidence = static_cast<float>(assessment->derived.expectedConfidence);
                 model.method_label = assessment->method == core::confidence::ConfidenceMethod::JosangOpinion
-                                         ? "Jøsang opinion"
-                                         : "Fixed value";
-                model.status_label =
-                    assessment->status == core::confidence::ConfidenceStatus::Inactive ? "Inactive" : "Active";
+                                         ? AF_TR("Jøsang opinion")
+                                         : AF_TR("Fixed value");
+                model.status_label = assessment->status == core::confidence::ConfidenceStatus::Inactive
+                                         ? AF_TR("Inactive")
+                                         : AF_TR("Active");
             }
             return model;
         };
@@ -112,27 +115,28 @@ void RenderInspectorArea(AppRuntimeState& state,
             if (!state.confidence_controller)
                 return false;
             if (!state.app_state.current_project.has_value()) {
-                state.events.Emit(StatusMessageEvent{"Open or create a project before saving confidence."});
+                state.events.Emit(StatusMessageEvent{AF_TR("Open or create a project before saving confidence.")});
                 return false;
             }
             bool generated_gid = false;
             if (element.gid.empty()) {
                 if (!loaded_case || !sacm_package) {
-                    state.events.Emit(StatusMessageEvent{"Could not assign a SACM gid for confidence storage."});
+                    state.events.Emit(
+                        StatusMessageEvent{AF_TR("Could not assign a SACM gid for confidence storage.")});
                     return false;
                 }
                 std::string error;
                 const core::EnsureGidResult gid_result =
                     core::EnsureElementGid(*loaded_case, sacm_package, element, error);
                 if (gid_result == core::EnsureGidResult::Failed) {
-                    state.events.Emit(StatusMessageEvent{"Confidence save failed: " + error});
+                    state.events.Emit(StatusMessageEvent{ui::i18n::trf("Confidence save failed: {0}", error)});
                     return false;
                 }
                 generated_gid = gid_result == core::EnsureGidResult::Generated;
             }
             std::string error;
             if (!state.confidence_controller->UpsertElementConfidence(element, confidence, error)) {
-                state.events.Emit(StatusMessageEvent{"Confidence save failed: " + error});
+                state.events.Emit(StatusMessageEvent{ui::i18n::trf("Confidence save failed: {0}", error)});
                 return generated_gid;
             }
             return generated_gid;
@@ -142,7 +146,7 @@ void RenderInspectorArea(AppRuntimeState& state,
                 return false;
             std::string error;
             if (!state.confidence_controller->SetElementConfidenceActive(element, active, error) && !error.empty())
-                state.events.Emit(StatusMessageEvent{"Confidence update failed: " + error});
+                state.events.Emit(StatusMessageEvent{ui::i18n::trf("Confidence update failed: {0}", error)});
             return false;
         };
         confidence_callbacks.mark_reviewed = [&](parser::SacmElement& element) {
@@ -150,7 +154,7 @@ void RenderInspectorArea(AppRuntimeState& state,
                 return false;
             std::string error;
             if (!state.confidence_controller->MarkElementReviewed(element, error) && !error.empty())
-                state.events.Emit(StatusMessageEvent{"Confidence update failed: " + error});
+                state.events.Emit(StatusMessageEvent{ui::i18n::trf("Confidence update failed: {0}", error)});
             return false;
         };
         confidence_callbacks.backup_invalid_and_reset = [&]() {
@@ -158,11 +162,11 @@ void RenderInspectorArea(AppRuntimeState& state,
                 return false;
             std::string error;
             if (!state.confidence_controller->BackupInvalidAndStartNew(error)) {
-                state.events.Emit(StatusMessageEvent{"Confidence reset failed: " + error});
+                state.events.Emit(StatusMessageEvent{ui::i18n::trf("Confidence reset failed: {0}", error)});
                 return false;
             }
             state.events.Emit(StatusMessageEvent{
-                "Backed up invalid confidence file; new confidence storage will be saved with the project."});
+                AF_TR("Backed up invalid confidence file; new confidence storage will be saved with the project.")});
             return true;
         };
         ui::panels::ElementTextEditCallbacks text_edit_callbacks;
@@ -237,9 +241,11 @@ void RenderInspectorArea(AppRuntimeState& state,
                 }
                 if (confidence_changed && state.confidence_controller->LastInactivatedCount() > 0) {
                     const int count = state.confidence_controller->LastInactivatedCount();
-                    state.events.Emit(StatusMessageEvent{
-                        std::to_string(count) +
-                        " confidence assessment(s) were marked inactive because their target elements changed."});
+                    state.events.Emit(StatusMessageEvent{ui::i18n::trnf(
+                        "{0} confidence assessment was marked inactive because its target element changed.",
+                        "{0} confidence assessments were marked inactive because their target elements changed.",
+                        count,
+                        count)});
                 }
             }
             if (callbacks.mark_element_modified)

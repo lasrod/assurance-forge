@@ -1,6 +1,7 @@
 #include "ui/gsn/gsn_acp_decorator.h"
 
 #include "ui/gsn/gsn_dpi.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
 #include <algorithm>
@@ -17,17 +18,17 @@ std::string EdgeKey(const std::string& parent_id, const std::string& child_id) {
 std::string AcpIncompleteReason(const parser::AcpRecord& acp) {
     if (acp.resolution_kind == "text") {
         if (acp.text.empty())
-            return "Text confidence argument is empty.";
+            return AF_TR("Text confidence argument is empty.");
         if (acp.confidence_claim_id.empty())
-            return "Native text confidence claim is missing.";
+            return AF_TR("Native text confidence claim is missing.");
         return {};
     }
     if (acp.resolution_kind == "topGoalReference") {
         if (acp.argument_package_id.empty() || acp.top_goal_id.empty())
-            return "Confidence argument tree is not linked.";
+            return AF_TR("Confidence argument tree is not linked.");
         return {};
     }
-    return "No confidence argument has been selected.";
+    return AF_TR("No confidence argument has been selected.");
 }
 
 bool AcpRecordIsComplete(const parser::AcpRecord& acp) {
@@ -175,7 +176,7 @@ void DrawAcpRelationshipDecorator(ImDrawList* draw_list,
             ui_state.selected_relationship_edge_key.clear();
             ImGui::TextUnformatted(acp_id.c_str());
             ImGui::Separator();
-            if (ImGui::MenuItem("Remove ACP", nullptr, false, static_cast<bool>(actions.remove_acp))) {
+            if (ImGui::MenuItem(AF_TR("Remove ACP").c_str(), nullptr, false, static_cast<bool>(actions.remove_acp))) {
                 actions.remove_acp(acp_id);
             }
         }
@@ -183,13 +184,14 @@ void DrawAcpRelationshipDecorator(ImDrawList* draw_list,
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup)) {
         ImGui::BeginTooltip();
-        ImGui::TextUnformatted(acps.size() == 1 ? "Assurance Claim Point" : "Assurance Claim Points");
+        ImGui::TextUnformatted(
+            (acps.size() == 1 ? AF_TR("Assurance Claim Point") : AF_TR("Assurance Claim Points")).c_str());
         ImGui::Separator();
-        ImGui::Text("Target: %s", target.summary.c_str());
-        ImGui::Text("SACM relationship: %s", target.relationship_id.c_str());
+        ImGui::TextUnformatted(ui::i18n::trf("Target: {0}", target.summary).c_str());
+        ImGui::TextUnformatted(ui::i18n::trf("SACM relationship: {0}", target.relationship_id).c_str());
         for (const parser::AcpRecord& acp : acps) {
             ImGui::Text("%s", AcpDisplayLabel(acp).c_str());
-            ImGui::TextDisabled("%s", AcpModeDescription(acp));
+            ImGui::TextDisabled("%s", AF_TR(AcpModeDescription(acp)).c_str());
             const std::string reason = AcpIncompleteReason(acp);
             if (!reason.empty())
                 ImGui::TextDisabled("%s", reason.c_str());
@@ -261,19 +263,20 @@ void DrawAcpElementDecorator(ImDrawList* draw_list,
         ui_state.selected_relationship_edge_key.clear();
         ImGui::TextUnformatted(acp_id.c_str());
         ImGui::Separator();
-        if (ImGui::MenuItem("Remove ACP", nullptr, false, static_cast<bool>(actions.remove_acp))) {
+        if (ImGui::MenuItem(AF_TR("Remove ACP").c_str(), nullptr, false, static_cast<bool>(actions.remove_acp))) {
             actions.remove_acp(acp_id);
         }
         ImGui::EndPopup();
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup)) {
         ImGui::BeginTooltip();
-        ImGui::TextUnformatted(acps.size() == 1 ? "Assurance Claim Point" : "Assurance Claim Points");
+        ImGui::TextUnformatted(
+            (acps.size() == 1 ? AF_TR("Assurance Claim Point") : AF_TR("Assurance Claim Points")).c_str());
         ImGui::Separator();
-        ImGui::Text("Target element: %s", node.id.c_str());
+        ImGui::TextUnformatted(ui::i18n::trf("Target element: {0}", node.id).c_str());
         for (const parser::AcpRecord& acp : acps) {
             ImGui::Text("%s", AcpDisplayLabel(acp).c_str());
-            ImGui::TextDisabled("%s", AcpModeDescription(acp));
+            ImGui::TextDisabled("%s", AF_TR(AcpModeDescription(acp)).c_str());
             const std::string reason = AcpIncompleteReason(acp);
             if (!reason.empty())
                 ImGui::TextDisabled("%s", reason.c_str());
@@ -313,13 +316,14 @@ bool RenderAcpRelationshipContextMenu(const core::acp::AcpRelationshipTarget* ta
 
     if (ImGui::BeginPopup(popup_id.c_str())) {
         consumed_context_click = true;
-        const std::string summary = target ? target->summary : "Relationship " + parent_id + " -> " + child_id;
+        const std::string summary =
+            target ? target->summary : ui::i18n::trf("Relationship {0} -> {1}", parent_id, child_id);
         ImGui::TextUnformatted(summary.c_str());
         ImGui::Separator();
         const bool has_existing_acp = acps && !acps->empty();
         if (has_existing_acp) {
             for (const parser::AcpRecord& acp : *acps) {
-                const std::string label = "Select " + acp.id;
+                const std::string label = ui::i18n::trf("Select {0}", acp.id);
                 if (ImGui::MenuItem(label.c_str())) {
                     ui_state.selected_acp_id = acp.id;
                     ui_state.selected_element_id.clear();
@@ -334,14 +338,15 @@ bool RenderAcpRelationshipContextMenu(const core::acp::AcpRelationshipTarget* ta
         const bool can_warn_for_blocked_acp =
             (!target || !target->eligible_for_acp) && static_cast<bool>(actions.set_status);
         if (ImGui::MenuItem(
-                "Add ACP", nullptr, false, !has_existing_acp && (can_create_acp || can_warn_for_blocked_acp))) {
+                AF_TR("Add ACP").c_str(), nullptr, false,
+                !has_existing_acp && (can_create_acp || can_warn_for_blocked_acp))) {
             if (can_create_acp) {
                 actions.add_acp_to_relationship(target->relationship_id);
             } else if (actions.set_status) {
                 const std::string blocked_reason = target && !target->blocked_reason.empty()
                                                        ? target->blocked_reason
-                                                       : "ACP is not supported for this relationship.";
-                actions.set_status("Add ACP failed: " + blocked_reason);
+                                                       : AF_TR("ACP is not supported for this relationship.");
+                actions.set_status(ui::i18n::trf("Add ACP failed: {0}", blocked_reason));
             }
         }
         ImGui::EndPopup();

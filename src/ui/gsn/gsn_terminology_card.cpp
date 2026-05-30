@@ -6,6 +6,7 @@
 #include "core/terminology_scope_service.h"
 #include "ui/gsn/gsn_dpi.h"
 #include "ui/gsn/gsn_node_text.h" // kTextPadding, kFullLabelZoom
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
 #include <algorithm>
@@ -217,8 +218,8 @@ std::string JoinCategoryNames(const sacm::TerminologyPackage& package, const std
 
 std::string CandidateSummary(const sacm::TerminologyPackage* package, const sacm::Term* term) {
     if (!term)
-        return "Missing term";
-    std::string result = term->value.empty() ? "Term" : term->value;
+        return AF_TR("Missing term");
+    std::string result = term->value.empty() ? AF_TR("Term") : term->value;
     if (!term->name.empty() && core::TrimWhitespace(term->name) != core::TrimWhitespace(term->value))
         result += " - " + term->name;
     if (package && !term->category_refs.empty()) {
@@ -234,7 +235,7 @@ void RenderTermDetails(const sacm::AssuranceCasePackage* package,
                        const sacm::Term* term,
                        const TerminologyCardState& card_state) {
     if (!term) {
-        ImGui::TextColored(GetErrorColor(), "Term reference could not be resolved.");
+        ImGui::TextColored(GetErrorColor(), "%s", AF_TR("Term reference could not be resolved.").c_str());
         return;
     }
 
@@ -248,14 +249,16 @@ void RenderTermDetails(const sacm::AssuranceCasePackage* package,
     if (terminology_package && !term->category_refs.empty()) {
         const std::string categories = JoinCategoryNames(*terminology_package, term->category_refs);
         if (!categories.empty())
-            ImGui::TextDisabled("Category: %s", categories.c_str());
+            ImGui::TextDisabled("%s", ui::i18n::trf("Category: {0}", categories).c_str());
     }
     if (!term->externalReference.empty())
-        ImGui::TextDisabled("Reference: %s", term->externalReference.c_str());
+        ImGui::TextDisabled("%s", ui::i18n::trf("Reference: {0}", term->externalReference).c_str());
     if (!term->origin.empty())
-        ImGui::TextDisabled("Origin: %s", term->origin.c_str());
+        ImGui::TextDisabled("%s", ui::i18n::trf("Origin: {0}", term->origin).c_str());
     if (package)
-        ImGui::TextDisabled("Usage count: %d", core::CountTerminologyTermUsage(*package, *term));
+        ImGui::TextDisabled("%s", ui::i18n::trf("Usage count: {0}",
+                                                core::CountTerminologyTermUsage(*package, *term))
+                                      .c_str());
 }
 
 void RenderTerminologyCardContents(const TerminologyCardState& card_state,
@@ -264,10 +267,10 @@ void RenderTerminologyCardContents(const TerminologyCardState& card_state,
                                    bool interactive) {
     ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + DpiSize(320.0f));
     if (card_state.kind == TerminologyCardKind::Undefined) {
-        ImGui::TextColored(GetWarningColor(), "%s is not defined.", card_state.text.c_str());
-        ImGui::TextWrapped("Define this term from the active terminology scope.");
+        ImGui::TextColored(GetWarningColor(), "%s", ui::i18n::trf("{0} is not defined.", card_state.text).c_str());
+        ImGui::TextWrapped("%s", AF_TR("Define this term from the active terminology scope.").c_str());
         if (interactive && actions.define_terminology_term) {
-            if (ImGui::Button("Define term", ImVec2(120.0f, 0.0f)))
+            if (ImGui::Button(AF_TR("Define term").c_str(), ImVec2(120.0f, 0.0f)))
                 actions.define_terminology_term(card_state.element_id, card_state.text);
         }
         ImGui::PopTextWrapPos();
@@ -275,7 +278,8 @@ void RenderTerminologyCardContents(const TerminologyCardState& card_state,
     }
 
     if (card_state.kind == TerminologyCardKind::Ambiguous) {
-        ImGui::TextColored(GetWarningColor(), "%s has multiple meanings.", card_state.text.c_str());
+        ImGui::TextColored(GetWarningColor(), "%s",
+                           ui::i18n::trf("{0} has multiple meanings.", card_state.text).c_str());
         int shown = 0;
         for (const auto& candidate : card_state.candidates) {
             ImGui::PushID(shown);
@@ -284,19 +288,21 @@ void RenderTerminologyCardContents(const TerminologyCardState& card_state,
                 ResolveCardTerm(package, candidate.package_ref, candidate.term_ref, &candidate_package);
             ImGui::BulletText("%s", CandidateSummary(candidate_package, candidate_term).c_str());
             if (interactive && actions.add_terminology_term_as_context && candidate_term) {
-                if (ImGui::SmallButton("Use for this element")) {
+                if (ImGui::SmallButton(AF_TR("Use for this element").c_str())) {
                     actions.add_terminology_term_as_context(
                         card_state.element_id, candidate.package_ref, candidate.term_ref);
                 }
             }
             ImGui::PopID();
             if (++shown >= 4 && static_cast<int>(card_state.candidates.size()) > shown) {
-                ImGui::TextDisabled("%d more candidate(s).", static_cast<int>(card_state.candidates.size()) - shown);
+                const int remaining = static_cast<int>(card_state.candidates.size()) - shown;
+                ImGui::TextDisabled(
+                    "%s", ui::i18n::trnf("{0} more candidate.", "{0} more candidates.", remaining, remaining).c_str());
                 break;
             }
         }
         if (interactive) {
-            if (actions.define_terminology_term && ImGui::Button("Create new meaning", ImVec2(165.0f, 0.0f)))
+            if (actions.define_terminology_term && ImGui::Button(AF_TR("Create new meaning").c_str(), ImVec2(165.0f, 0.0f)))
                 actions.define_terminology_term(card_state.element_id, card_state.text);
         }
         ImGui::PopTextWrapPos();
@@ -309,17 +315,18 @@ void RenderTerminologyCardContents(const TerminologyCardState& card_state,
     RenderTermDetails(package, terminology_package, term, card_state);
     if (interactive && term) {
         ImGui::Spacing();
-        if (actions.open_terminology_term && ImGui::Button("Open term", ImVec2(100.0f, 0.0f)))
+        if (actions.open_terminology_term && ImGui::Button(AF_TR("Open term").c_str(), ImVec2(100.0f, 0.0f)))
             actions.open_terminology_term(card_state.package_ref, card_state.term_ref);
         ImGui::SameLine();
-        if (actions.edit_terminology_term && ImGui::Button("Edit term", ImVec2(95.0f, 0.0f)))
+        if (actions.edit_terminology_term && ImGui::Button(AF_TR("Edit term").c_str(), ImVec2(95.0f, 0.0f)))
             actions.edit_terminology_term(card_state.package_ref, card_state.term_ref);
-        if (actions.add_visible_terminology_term_context && ImGui::Button("Add as context", ImVec2(130.0f, 0.0f))) {
+        if (actions.add_visible_terminology_term_context &&
+            ImGui::Button(AF_TR("Add as context").c_str(), ImVec2(130.0f, 0.0f))) {
             actions.add_visible_terminology_term_context(
                 card_state.element_id, card_state.package_ref, card_state.term_ref);
         }
         ImGui::SameLine();
-        if (actions.find_terminology_usages && ImGui::Button("Find usages", ImVec2(120.0f, 0.0f)))
+        if (actions.find_terminology_usages && ImGui::Button(AF_TR("Find usages").c_str(), ImVec2(120.0f, 0.0f)))
             actions.find_terminology_usages(card_state.package_ref, card_state.term_ref);
     }
     ImGui::PopTextWrapPos();
@@ -423,7 +430,7 @@ void RenderPinnedTerminologyCard(TerminologyCardState& card_state,
     bool open = true;
     const ImGuiWindowFlags flags =
         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking;
-    if (ImGui::Begin("Term Card##gsn_term_card", &open, flags)) {
+    if (ImGui::Begin((AF_TR("Term Card") + "##gsn_term_card").c_str(), &open, flags)) {
         card_state.card_hovered_this_frame =
             ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup | ImGuiHoveredFlags_ChildWindows);
         RenderTerminologyCardContents(card_state, terminology_package, actions, true);

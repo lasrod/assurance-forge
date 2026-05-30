@@ -7,6 +7,7 @@
 #include "parser/model_utils.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_model.h"
+#include "ui/i18n/localization.h"
 
 #include <nlohmann/json.hpp>
 
@@ -168,8 +169,12 @@ std::optional<core::ProblemItem> BuildTerminologyOccurrenceProblem(const core::T
         problem.source = core::ProblemSource::ModelValidation;
         problem.element_id = occurrence.element_id;
         problem.type = "TerminologyAmbiguity";
-        problem.message = occurrence.text + " has " + std::to_string(occurrence.resolution.candidates.size()) +
-                          " visible meanings. Choose the intended terminology entry.";
+        // Translate at sync time. Terminology problems are re-synced when the
+        // model or terminology changes, so this picks up the current UI language.
+        problem.message =
+            ui::i18n::trf("{0} has {1} visible meanings. Choose the intended terminology entry.",
+                          occurrence.text,
+                          occurrence.resolution.candidates.size());
         problem.quick_fix_label = "Open glossary";
         problem.quick_fix_payload = occurrence.text;
         return problem;
@@ -182,7 +187,7 @@ std::optional<core::ProblemItem> BuildTerminologyOccurrenceProblem(const core::T
         problem.source = core::ProblemSource::ModelValidation;
         problem.element_id = occurrence.element_id;
         problem.type = "TerminologyUndefinedAcronym";
-        problem.message = occurrence.text + " looks like an undefined terminology entry.";
+        problem.message = ui::i18n::trf("{0} looks like an undefined terminology entry.", occurrence.text);
         problem.quick_fix_label = "Define term";
         problem.quick_fix_payload = occurrence.text;
         return problem;

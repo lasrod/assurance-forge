@@ -20,7 +20,7 @@
 #include "app/frame/app_shell.h"
 #include "core/perf/frame_profiler.h"
 #include "core/problems/problem_attention.h"
-#include "ui/localization.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 #include "ui/ui_state.h"
 
@@ -69,9 +69,22 @@ void AppRuntime::RenderFrame(bool& done) {
         ui::ApplyAppTheme(next);
     }
     if (ImGui::IsKeyPressed(ImGuiKey_F8, false)) {
-        ui::Language next = ui::CurrentLanguage() == ui::Language::English ? ui::Language::Japanese
-                                                                           : ui::Language::English;
-        ui::SetCurrentLanguage(next);
+        ui::i18n::Language next = ui::i18n::CurrentLanguage() == ui::i18n::Language::English
+                                      ? ui::i18n::Language::Japanese
+                                      : ui::i18n::Language::English;
+        ui::i18n::SetLanguage(next);
+    }
+
+    // Re-sync caches that bake the current language into stored strings (e.g.
+    // terminology problem messages composed via trf at sync time). Covers all
+    // language-change paths: F8 above, menu, and the preferences combo.
+    {
+        static unsigned last_language_epoch = ui::i18n::LanguageEpoch();
+        const unsigned current_epoch = ui::i18n::LanguageEpoch();
+        if (current_epoch != last_language_epoch) {
+            SyncTerminologyProblems();
+            last_language_epoch = current_epoch;
+        }
     }
 
     {

@@ -1,6 +1,7 @@
 #include "ui/tree_view.h"
 
 #include "hello_imgui/icons_font_awesome_4.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
 #include "imgui.h"
@@ -243,10 +244,14 @@ static void RenderTreeNode(const core::TreeNode* node,
             dl->AddText(font, gf, ImVec2(center.x - ts.x * 0.5f, center.y - ts.y * 0.5f), IM_COL32_WHITE, glyph);
             if (badge_hovered) {
                 ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-                ImGui::SetTooltip("%zu problem%s · top: %s\nClick to open the Problems panel.",
-                                  summary.problem_count,
-                                  summary.problem_count == 1 ? "" : "s",
-                                  summary.top_problem_message.c_str());
+                const int problem_count = static_cast<int>(summary.problem_count);
+                const std::string tooltip =
+                    ui::i18n::trnf("{0} problem · top: {1}\nClick to open the Problems panel.",
+                                   "{0} problems · top: {1}\nClick to open the Problems panel.",
+                                   problem_count,
+                                   problem_count,
+                                   summary.top_problem_message);
+                ImGui::SetTooltip("%s", tooltip.c_str());
             }
             if (badge_clicked) {
                 FocusProblemInPanel(state, summary.top_problem_id, node->id);
@@ -273,7 +278,7 @@ void ShowTreeViewPanel(const core::AssuranceTree* tree,
                        const ElementContextActions& actions,
                        const TreeEditActions* tree_edit_actions) {
     if (!tree || !tree->root) {
-        ImGui::TextDisabled("No safety case loaded.");
+        ImGui::TextDisabled("%s", AF_TR("No safety case loaded.").c_str());
         return;
     }
 
@@ -297,8 +302,8 @@ void ShowTreeViewPanel(const core::AssuranceTree* tree,
                 ImGui::TableNextRow();
                 ImGui::TableSetColumnIndex(0);
                 ImGui::Separator();
-                if (ImGui::TreeNodeEx(
-                        "##orphans", ImGuiTreeNodeFlags_SpanAllColumns, "Orphans (%d)", (int)tree->orphans.size())) {
+                if (ImGui::TreeNodeEx("##orphans", ImGuiTreeNodeFlags_SpanAllColumns, "%s",
+                                      ui::i18n::trf("Orphans ({0})", (int)tree->orphans.size()).c_str())) {
                     for (const auto* orphan : tree->orphans) {
                         RenderTreeNode(orphan, active_case, state, actions, tree_edit_actions);
                     }

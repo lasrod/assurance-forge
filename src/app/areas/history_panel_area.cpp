@@ -4,6 +4,7 @@
 #include "app/areas/audit_data_cache.h"
 #include "core/audit/audit_diff.h"
 #include "core/audit/event_store.h"
+#include "ui/i18n/localization.h"
 #include "ui/panels/history_timeline_panel.h"
 
 #include "imgui.h"
@@ -55,7 +56,7 @@ bool ContainsCaseInsensitive(const std::string& haystack, const std::string& nee
 
 void RenderHistoryPanelContent(AppRuntimeState& state, const HistoryPanelAreaCallbacks& /*callbacks*/) {
     if (!state.app_state.current_project.has_value()) {
-        ImGui::TextDisabled("No project is currently open.");
+        ImGui::TextDisabled("%s", AF_TR("No project is currently open.").c_str());
         return;
     }
 
@@ -66,7 +67,8 @@ void RenderHistoryPanelContent(AppRuntimeState& state, const HistoryPanelAreaCal
         GetCachedTransactions(project.rootPath, error);
     const bool has_audit = error.empty();
     if (!has_audit) {
-        ImGui::TextColored(ImVec4(0.95f, 0.55f, 0.45f, 1.0f), "Audit store error: %s", error.c_str());
+        ImGui::TextColored(ImVec4(0.95f, 0.55f, 0.45f, 1.0f), "%s",
+                           ui::i18n::trf("Audit store error: {0}", error).c_str());
     }
 
     WorkbenchState::ArgumentPackageCanvasTab* active_tab = FindActiveCanvasTab(state);
@@ -89,18 +91,19 @@ void RenderHistoryPanelContent(AppRuntimeState& state, const HistoryPanelAreaCal
         ImGui::PushID("##history_filter_bar");
         char author_buf[128];
         std::snprintf(author_buf, sizeof(author_buf), "%s", state.workbench.history_filter_author.c_str());
-        ImGui::Text("Filter:");
+        ImGui::Text("%s", AF_TR("Filter:").c_str());
         ImGui::SameLine();
         ImGui::SetNextItemWidth(160.0f);
-        if (ImGui::InputTextWithHint("##author", "author", author_buf, sizeof(author_buf)))
+        if (ImGui::InputTextWithHint("##author", AF_TR("author").c_str(), author_buf, sizeof(author_buf)))
             state.workbench.history_filter_author = author_buf;
         ImGui::SameLine();
         ImGui::SetNextItemWidth(180.0f);
-        const char* current_cmd =
-            state.workbench.history_filter_command.empty() ? "(any command)"
-                                                            : state.workbench.history_filter_command.c_str();
+        const std::string any_command = AF_TR("(any command)");
+        const char* current_cmd = state.workbench.history_filter_command.empty()
+                                      ? any_command.c_str()
+                                      : state.workbench.history_filter_command.c_str();
         if (ImGui::BeginCombo("##command", current_cmd)) {
-            if (ImGui::Selectable("(any command)", state.workbench.history_filter_command.empty()))
+            if (ImGui::Selectable(any_command.c_str(), state.workbench.history_filter_command.empty()))
                 state.workbench.history_filter_command.clear();
             for (const std::string& cmd : command_names) {
                 const bool selected = (state.workbench.history_filter_command == cmd);
@@ -116,7 +119,7 @@ void RenderHistoryPanelContent(AppRuntimeState& state, const HistoryPanelAreaCal
                                        !state.workbench.history_filter_element_id.empty();
         ImGui::SameLine();
         ImGui::BeginDisabled(!any_filter_active);
-        if (ImGui::SmallButton("Clear all")) {
+        if (ImGui::SmallButton(AF_TR("Clear all").c_str())) {
             state.workbench.history_filter_author.clear();
             state.workbench.history_filter_command.clear();
             state.workbench.history_filter_element_id.clear();
@@ -156,25 +159,27 @@ void RenderHistoryPanelContent(AppRuntimeState& state, const HistoryPanelAreaCal
     if (has_audit && !transactions.empty()) {
         const std::uint64_t latest_seq = transactions.back().transaction_sequence;
         const std::uint64_t current = selected_seq.value_or(latest_seq);
-        ImGui::Text("Transactions: %zu   |   Current: Tx %llu / %llu",
-                    transactions.size(),
-                    static_cast<unsigned long long>(current),
-                    static_cast<unsigned long long>(latest_seq));
+        ImGui::TextUnformatted(ui::i18n::trf("Transactions: {0}   |   Current: Tx {1} / {2}",
+                                             transactions.size(),
+                                             static_cast<unsigned long long>(current),
+                                             static_cast<unsigned long long>(latest_seq))
+                                   .c_str());
         ImGui::SameLine();
         ImGui::BeginDisabled(!selected_seq.has_value());
-        if (ImGui::SmallButton("Return to live"))
+        if (ImGui::SmallButton(AF_TR("Return to live").c_str()))
             SetPreviewSequenceOnActiveTab(state, std::nullopt);
         ImGui::EndDisabled();
         if (!active_tab) {
             ImGui::SameLine();
-            ImGui::TextDisabled(" (open a package canvas to preview)");
+            ImGui::TextDisabled("%s", AF_TR(" (open a package canvas to preview)").c_str());
         }
         if (filter_active) {
             ImGui::SameLine();
-            ImGui::TextColored(ImVec4(0.7f, 0.85f, 1.0f, 1.0f),
-                               " | Showing %zu of %zu (filtered)",
-                               filtered_transactions.size(),
-                               transactions.size());
+            ImGui::TextColored(ImVec4(0.7f, 0.85f, 1.0f, 1.0f), "%s",
+                               ui::i18n::trf(" | Showing {0} of {1} (filtered)",
+                                             filtered_transactions.size(),
+                                             transactions.size())
+                                   .c_str());
         }
         ImGui::Separator();
     }

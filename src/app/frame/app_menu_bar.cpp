@@ -3,7 +3,7 @@
 #include "app/app_runtime_state.h"
 #include "app/frame/app_shell.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
-#include "ui/localization.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 #include "ui/ui_state.h"
 
@@ -17,30 +17,34 @@ namespace app::frame {
 namespace {
 
 void RenderLanguageMenu() {
-    if (!ImGui::BeginMenu(ui::Tr(ui::MessageId::Language)))
+    if (!ImGui::BeginMenu(AF_TR("Language").c_str()))
         return;
 
-    const ui::Language current = ui::CurrentLanguage();
-    const char* english_shortcut = current == ui::Language::English ? nullptr : "F8";
-    if (ImGui::MenuItem(ui::Tr(ui::MessageId::English), english_shortcut, current == ui::Language::English)) {
-        ui::SetCurrentLanguage(ui::Language::English);
+    const ui::i18n::Language current = ui::i18n::CurrentLanguage();
+    const char* english_shortcut = current == ui::i18n::Language::English ? nullptr : "F8";
+    if (ImGui::MenuItem(ui::i18n::LanguageDisplayName(ui::i18n::Language::English).c_str(),
+                        english_shortcut,
+                        current == ui::i18n::Language::English)) {
+        ui::i18n::SetLanguage(ui::i18n::Language::English);
     }
-    const char* japanese_shortcut = current == ui::Language::Japanese ? nullptr : "F8";
-    if (ImGui::MenuItem(ui::Tr(ui::MessageId::Japanese), japanese_shortcut, current == ui::Language::Japanese)) {
-        ui::SetCurrentLanguage(ui::Language::Japanese);
+    const char* japanese_shortcut = current == ui::i18n::Language::Japanese ? nullptr : "F8";
+    if (ImGui::MenuItem(ui::i18n::LanguageDisplayName(ui::i18n::Language::Japanese).c_str(),
+                        japanese_shortcut,
+                        current == ui::i18n::Language::Japanese)) {
+        ui::i18n::SetLanguage(ui::i18n::Language::Japanese);
     }
 
     ImGui::EndMenu();
 }
 
 void RenderThemeMenu() {
-    if (!ImGui::BeginMenu(ui::Tr(ui::MessageId::Theme)))
+    if (!ImGui::BeginMenu(AF_TR("Theme").c_str()))
         return;
 
     for (ui::AppTheme theme : ui::kAppThemes) {
         const bool selected = ui::GetCurrentAppTheme() == theme;
         const char* shortcut = selected ? nullptr : "F9";
-        if (ImGui::MenuItem(ui::GetThemeDisplayName(theme), shortcut, selected)) {
+        if (ImGui::MenuItem(AF_TR(ui::GetThemeDisplayName(theme)).c_str(), shortcut, selected)) {
             ui::ApplyAppTheme(theme);
         }
     }
@@ -95,25 +99,25 @@ float RenderAppMenuBar(AppRuntimeState& state, bool& done, const AppMenuBarCallb
         return 0.0f;
     }
 
-    if (ImGui::BeginMenu(ui::Tr(ui::MessageId::FileMenu))) {
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::CreateEmptyProject)) && callbacks.begin_create_project) {
+    if (ImGui::BeginMenu(AF_TR("File").c_str())) {
+        if (ImGui::MenuItem(AF_TR("Create Empty Assurance Project").c_str()) && callbacks.begin_create_project) {
             callbacks.begin_create_project();
         }
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::OpenProject)) && callbacks.begin_open_project) {
+        if (ImGui::MenuItem(AF_TR("Open Project").c_str()) && callbacks.begin_open_project) {
             callbacks.begin_open_project();
         }
         ImGui::Separator();
         bool has_project = state.app_state.current_project.has_value();
         if (!has_project)
             ImGui::BeginDisabled();
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::SaveProject)) && callbacks.save_project) {
+        if (ImGui::MenuItem(AF_TR("Save Project").c_str()) && callbacks.save_project) {
             callbacks.save_project();
         }
-        if (ImGui::BeginMenu(ui::Tr(ui::MessageId::ExportMenu))) {
+        if (ImGui::BeginMenu(AF_TR("Export").c_str())) {
             bool can_export_gsn_svg = has_project && state.app_state.loaded_case.has_value();
             if (!can_export_gsn_svg)
                 ImGui::BeginDisabled();
-            if (ImGui::MenuItem(ui::Tr(ui::MessageId::ExportGsnSvg)) && callbacks.export_gsn_svg) {
+            if (ImGui::MenuItem(AF_TR("GSN SVG").c_str()) && callbacks.export_gsn_svg) {
                 callbacks.export_gsn_svg();
             }
             if (!can_export_gsn_svg)
@@ -123,24 +127,24 @@ float RenderAppMenuBar(AppRuntimeState& state, bool& done, const AppMenuBarCallb
         if (!has_project)
             ImGui::EndDisabled();
         ImGui::Separator();
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::Exit)) && callbacks.request_exit) {
+        if (ImGui::MenuItem(AF_TR("Exit").c_str()) && callbacks.request_exit) {
             callbacks.request_exit(done);
         }
         ImGui::EndMenu();
     }
 
-    if (ImGui::BeginMenu(ui::Tr(ui::MessageId::AddMenu))) {
+    if (ImGui::BeginMenu(AF_TR("Add").c_str())) {
         bool has_project = state.app_state.current_project.has_value();
         if (!has_project)
             ImGui::BeginDisabled();
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::NewGsnSacmFile)) && callbacks.begin_create_project_sacm_file) {
+        if (ImGui::MenuItem(AF_TR("New GSN / SACM File").c_str()) && callbacks.begin_create_project_sacm_file) {
             callbacks.begin_create_project_sacm_file();
         }
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::NewEvidenceRegister)) &&
+        if (ImGui::MenuItem(AF_TR("New Evidence Register").c_str()) &&
             callbacks.begin_create_project_evidence_register) {
             callbacks.begin_create_project_evidence_register();
         }
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::NewJ3377CaeRegister)) &&
+        if (ImGui::MenuItem(AF_TR("New J3377 CAE Register").c_str()) &&
             callbacks.begin_create_project_j3377_cae_register) {
             callbacks.begin_create_project_j3377_cae_register();
         }
@@ -149,46 +153,47 @@ float RenderAppMenuBar(AppRuntimeState& state, bool& done, const AppMenuBarCallb
         ImGui::EndMenu();
     }
 
-    if (ImGui::BeginMenu(ui::Tr(ui::MessageId::EditMenu))) {
+    if (ImGui::BeginMenu(AF_TR("Edit").c_str())) {
         const bool can_undo = callbacks.can_undo && callbacks.can_undo();
         if (!can_undo) ImGui::BeginDisabled();
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::Undo), "Ctrl+Z") && callbacks.undo) {
+        if (ImGui::MenuItem(AF_TR("Undo").c_str(), "Ctrl+Z") && callbacks.undo) {
             callbacks.undo();
         }
         if (!can_undo) {
             ImGui::EndDisabled();
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                ImGui::SetTooltip("%s", ui::Tr(ui::MessageId::UndoBoundaryReachedHint));
+                ImGui::SetTooltip(
+                    "%s", AF_TR("Reached snapshot or baseline — restore from history to go further back.").c_str());
             }
         }
         ImGui::Separator();
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::Preferences))) {
+        if (ImGui::MenuItem(AF_TR("Preferences...").c_str())) {
             state.modal_coordinator->show_preferences_window = true;
         }
         ImGui::EndMenu();
     }
 
-    if (ImGui::BeginMenu(ui::Tr(ui::MessageId::ViewMenu))) {
+    if (ImGui::BeginMenu(AF_TR("View").c_str())) {
         ui::UiState& ui_state = ui::GetUiState();
-        ImGui::MenuItem(ui::Tr(ui::MessageId::GsnCanvas), nullptr, &state.workbench.show_gsn_tab);
-        ImGui::MenuItem(ui::Tr(ui::MessageId::CseRegister), nullptr, &state.workbench.show_cse_tab);
-        ImGui::MenuItem(ui::Tr(ui::MessageId::EvidenceRegister), nullptr, &state.workbench.show_evidence_tab);
+        ImGui::MenuItem(AF_TR("GSN Canvas").c_str(), nullptr, &state.workbench.show_gsn_tab);
+        ImGui::MenuItem(AF_TR("CSE Register").c_str(), nullptr, &state.workbench.show_cse_tab);
+        ImGui::MenuItem(AF_TR("Evidence Register").c_str(), nullptr, &state.workbench.show_evidence_tab);
         NormalizeCenterViewSelection(state, ui_state.center_view);
 
         ImGui::Separator();
-        if (ImGui::BeginMenu(ui::Tr(ui::MessageId::Appearance))) {
+        if (ImGui::BeginMenu(AF_TR("Appearance").c_str())) {
             RenderThemeMenu();
             RenderLanguageMenu();
             ImGui::EndMenu();
         }
 
         ImGui::Separator();
-        if (ImGui::MenuItem(ui::Tr(ui::MessageId::WelcomeScreen))) {
+        if (ImGui::MenuItem(AF_TR("Welcome Screen").c_str())) {
             state.project_controller->show_startup_project_window = true;
         }
 
         ImGui::Separator();
-        ImGui::MenuItem("Performance overlay", nullptr, &ui_state.show_perf_overlay);
+        ImGui::MenuItem(AF_TR("Performance overlay").c_str(), nullptr, &ui_state.show_perf_overlay);
 
         ImGui::EndMenu();
     }

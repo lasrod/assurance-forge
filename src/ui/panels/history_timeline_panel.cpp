@@ -1,6 +1,7 @@
 #include "ui/panels/history_timeline_panel.h"
 
 #include "core/audit/audit_diff.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
 #include "imgui.h"
@@ -28,22 +29,24 @@ std::string SummarizeTransaction(const core::audit::AuditTransaction& tx) {
         summary += "-" + std::to_string(cs.deleted.size());
     }
     if (summary.empty())
-        summary = "(no element changes)";
+        summary = AF_TR("(no element changes)");
     return summary;
 }
 
 void RenderEmptyState(const HistoryTimelinePanelModel& model) {
     if (!model.has_audit_store) {
-        ImGui::TextDisabled("This project does not have an audit store yet.");
-        ImGui::TextWrapped(
-            "An audit log is created automatically the first time a model-mutating command "
-            "is recorded for a SACM file in this project.");
+        ImGui::TextDisabled("%s", AF_TR("This project does not have an audit store yet.").c_str());
+        ImGui::TextWrapped("%s",
+                           AF_TR("An audit log is created automatically the first time a model-mutating command "
+                                 "is recorded for a SACM file in this project.")
+                               .c_str());
         return;
     }
-    ImGui::TextDisabled("No transactions have been recorded yet.");
-    ImGui::TextWrapped(
-        "Open a SACM model and use any model-mutating action (add or remove a node) — "
-        "each command will appear here.");
+    ImGui::TextDisabled("%s", AF_TR("No transactions have been recorded yet.").c_str());
+    ImGui::TextWrapped("%s",
+                       AF_TR("Open a SACM model and use any model-mutating action (add or remove a node) — "
+                             "each command will appear here.")
+                           .c_str());
 }
 
 // Compact int slider modeled on `DrawOpinionSliderBar` in confidence_panel.cpp.
@@ -62,11 +65,11 @@ void DrawTransactionSliderBar(int& value, int min_v, int max_v,
     char value_text[48];
     std::snprintf(value_text, sizeof(value_text), "%d / %d", value, max_v);
     const float value_width = ImGui::CalcTextSize(value_text).x;
-    const char* label = "Transaction";
-    const float label_width = ImGui::CalcTextSize(label).x;
+    const std::string label = AF_TR("Transaction");
+    const float label_width = ImGui::CalcTextSize(label.c_str()).x;
 
     ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted(label);
+    ImGui::TextUnformatted(label.c_str());
     const bool value_fits_on_label_line =
         label_width + ImGui::GetStyle().ItemSpacing.x + value_width <= available_width;
     if (value_fits_on_label_line) {
@@ -116,7 +119,7 @@ void DrawTransactionSliderBar(int& value, int min_v, int max_v,
                                18);
 
     if (hovered || active)
-        ImGui::SetTooltip("Drag to scrub transaction history");
+        ImGui::SetTooltip("%s", AF_TR("Drag to scrub transaction history").c_str());
 
     ImGui::PopID();
 }
@@ -153,10 +156,10 @@ void ShowHistoryTimelineTransactions(const HistoryTimelinePanelModel& model,
     if (ImGui::BeginTable("##history_transactions", 5, table_flags)) {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("#", ImGuiTableColumnFlags_WidthFixed, 40.0f);
-        ImGui::TableSetupColumn("Timestamp (UTC)", ImGuiTableColumnFlags_WidthFixed, 180.0f);
-        ImGui::TableSetupColumn("Author", ImGuiTableColumnFlags_WidthFixed, 100.0f);
-        ImGui::TableSetupColumn("Command", ImGuiTableColumnFlags_WidthFixed, 180.0f);
-        ImGui::TableSetupColumn("Changes", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn(AF_TR("Timestamp (UTC)").c_str(), ImGuiTableColumnFlags_WidthFixed, 180.0f);
+        ImGui::TableSetupColumn(AF_TR("Author").c_str(), ImGuiTableColumnFlags_WidthFixed, 100.0f);
+        ImGui::TableSetupColumn(AF_TR("Command").c_str(), ImGuiTableColumnFlags_WidthFixed, 180.0f);
+        ImGui::TableSetupColumn(AF_TR("Changes").c_str(), ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableHeadersRow();
 
         // Iterate newest-first so the most recent activity is on top.

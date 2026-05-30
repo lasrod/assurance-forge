@@ -1,5 +1,6 @@
 #include "ui/panels/sacm_viewer_panel.h"
 
+#include "ui/i18n/localization.h"
 #include "ui/register_views.h"
 #include "ui/theme.h"
 
@@ -54,10 +55,10 @@ void SummaryMetric(const char* label, int value) {
 }
 
 void ShowFileSelector(SacmViewerPanelModel& model) {
-    ImGui::Text("XML File:");
+    ImGui::Text("%s", AF_TR("XML File:").c_str());
     ImGui::SetNextItemWidth(-1);
     if (model.xml_files.empty()) {
-        ImGui::TextDisabled("No XML files found");
+        ImGui::TextDisabled("%s", AF_TR("No XML files found").c_str());
         return;
     }
 
@@ -92,22 +93,22 @@ void ShowFileSelector(SacmViewerPanelModel& model) {
 
 void ShowOverwriteModal(SacmViewerPanelModel& model) {
     if (model.show_overwrite_confirm) {
-        ImGui::OpenPopup("Overwrite File?");
+        ImGui::OpenPopup((AF_TR("Overwrite File?") + "###Overwrite File?").c_str());
         model.show_overwrite_confirm = false;
     }
 
-    if (ImGui::BeginPopupModal("Overwrite File?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("File already exists:\n%s", model.file_path_buf);
+    if (ImGui::BeginPopupModal((AF_TR("Overwrite File?") + "###Overwrite File?").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted(ui::i18n::trf("File already exists:\n{0}", model.file_path_buf).c_str());
         ImGui::Separator();
-        ImGui::Text("Are you sure you want to overwrite it?");
+        ImGui::Text("%s", AF_TR("Are you sure you want to overwrite it?").c_str());
         ImGui::Spacing();
 
-        if (ImGui::Button("Yes, Overwrite", ImVec2(kOverwriteButtonWidth, 0))) {
+        if (ImGui::Button(AF_TR("Yes, Overwrite").c_str(), ImVec2(kOverwriteButtonWidth, 0))) {
             model.app_state.save_file(model.file_path_buf);
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(kOverwriteButtonWidth, 0))) {
+        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(kOverwriteButtonWidth, 0))) {
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
@@ -116,21 +117,21 @@ void ShowOverwriteModal(SacmViewerPanelModel& model) {
 
 void ShowProjectSummary(const parser::AssuranceCase& ac) {
     if (ImGui::BeginChild("ProjectSummary", ImVec2(0, kSummaryStripHeight), true, ImGuiWindowFlags_NoScrollbar)) {
-        ImGui::Text("Project Summary");
+        ImGui::Text("%s", AF_TR("Project Summary").c_str());
         if (ImGui::BeginTable("ProjectSummaryMetrics", 5, ImGuiTableFlags_SizingStretchSame)) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            SummaryMetric("Claims", CountElementsOfType(ac, "claim"));
+            SummaryMetric(AF_TR("Claims").c_str(), CountElementsOfType(ac, "claim"));
             ImGui::TableNextColumn();
-            SummaryMetric("Strategies", CountElementsOfType(ac, "argumentreasoning"));
+            SummaryMetric(AF_TR("Strategies").c_str(), CountElementsOfType(ac, "argumentreasoning"));
             ImGui::TableNextColumn();
-            SummaryMetric("Evidence",
+            SummaryMetric(AF_TR("Evidence").c_str(),
                           CountElementsOfType(ac, "artifact", "artifactreference") +
                               CountElementsOfType(ac, "expression"));
             ImGui::TableNextColumn();
-            SummaryMetric("CSE Rows", static_cast<int>(ui::GetCseRegisterRowCount()));
+            SummaryMetric(AF_TR("CSE Rows").c_str(), static_cast<int>(ui::GetCseRegisterRowCount()));
             ImGui::TableNextColumn();
-            SummaryMetric("Evidence Rows", static_cast<int>(ui::GetEvidenceRegisterRowCount()));
+            SummaryMetric(AF_TR("Evidence Rows").c_str(), static_cast<int>(ui::GetEvidenceRegisterRowCount()));
             ImGui::EndTable();
         }
     }
@@ -138,7 +139,7 @@ void ShowProjectSummary(const parser::AssuranceCase& ac) {
 }
 
 void ShowElementList(const parser::AssuranceCase& ac) {
-    ImGui::Text("Assurance Case: %s", ac.name.c_str());
+    ImGui::TextUnformatted(ui::i18n::trf("Assurance Case: {0}", ac.name).c_str());
     ImGui::Separator();
 
     if (ImGui::BeginChild("ElementList", ImVec2(0, 0), true)) {
@@ -151,7 +152,7 @@ void ShowElementList(const parser::AssuranceCase& ac) {
             ImGui::Text("%s: %s", elem.id.c_str(), elem.name.c_str());
 
             if (!elem.content.empty()) {
-                ImGui::TextWrapped("  Content: %s", elem.content.c_str());
+                ImGui::TextWrapped("%s", ui::i18n::trf("  Content: {0}", elem.content).c_str());
             }
 
             ImGui::PopID();
@@ -170,9 +171,9 @@ void ShowSacmViewerPanel(float width,
                          const SacmViewerPanelCallbacks& callbacks) {
     ImGui::SetNextWindowPos(ImVec2(0, top_y));
     ImGui::SetNextWindowSize(ImVec2(width, height));
-    ImGui::Begin("SACM Viewer", nullptr, panel_flags);
+    ImGui::Begin((AF_TR("SACM Viewer") + "###SACM Viewer").c_str(), nullptr, panel_flags);
 
-    ImGui::Text("Directory:");
+    ImGui::Text("%s", AF_TR("Directory:").c_str());
     ImGui::SetNextItemWidth(-1);
     if (ImGui::InputText(
             "##dirpath", model.dir_path_buf, model.dir_path_buf_size, ImGuiInputTextFlags_EnterReturnsTrue)) {
@@ -182,7 +183,7 @@ void ShowSacmViewerPanel(float width,
 
     ShowFileSelector(model);
 
-    if (ImGui::Button("Load")) {
+    if (ImGui::Button(AF_TR("Load").c_str())) {
         if (model.app_state.load_file(model.file_path_buf)) {
             if (callbacks.on_load_success)
                 callbacks.on_load_success();
@@ -196,7 +197,7 @@ void ShowSacmViewerPanel(float width,
     bool can_save = model.app_state.sacm_package.has_value();
     if (!can_save)
         ImGui::BeginDisabled();
-    if (ImGui::Button("Save")) {
+    if (ImGui::Button(AF_TR("Save").c_str())) {
         FILE* file = std::fopen(model.file_path_buf, "r");
         if (file) {
             std::fclose(file);

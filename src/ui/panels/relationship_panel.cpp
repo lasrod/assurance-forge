@@ -2,6 +2,7 @@
 
 #include "core/acp/acp_relationship_index.h"
 #include "imgui.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 #include "ui/ui_state.h"
 
@@ -72,11 +73,11 @@ const core::acp::AcpRelationshipTarget* FindSelectedTarget(const std::vector<cor
 void ShowRelationshipPanel(parser::AssuranceCase* model, const RelationshipPanelCallbacks* callbacks) {
     UiState& ui_state = GetUiState();
     if (ui_state.selected_relationship_id.empty()) {
-        ImGui::TextDisabled("No relationship selected.");
+        ImGui::TextDisabled("%s", AF_TR("No relationship selected.").c_str());
         return;
     }
     if (!model) {
-        ImGui::TextDisabled("No safety case loaded.");
+        ImGui::TextDisabled("%s", AF_TR("No safety case loaded.").c_str());
         return;
     }
 
@@ -84,20 +85,22 @@ void ShowRelationshipPanel(parser::AssuranceCase* model, const RelationshipPanel
     const core::acp::AcpRelationshipTarget* selected_target = FindSelectedTarget(targets, ui_state);
     const parser::SacmElement* relationship = FindElement(*model, ui_state.selected_relationship_id);
     if (!selected_target || !relationship) {
-        ImGui::TextDisabled("Relationship not found: %s", ui_state.selected_relationship_id.c_str());
+        ImGui::TextDisabled("%s",
+                            ui::i18n::trf("Relationship not found: {0}", ui_state.selected_relationship_id).c_str());
         return;
     }
 
     const parser::AcpRecord* existing_acp = FindRelationshipAcp(*model, selected_target->relationship_id);
 
-    MetadataRow("ID:", selected_target->relationship_id);
-    MetadataRow("Type:", relationship->type);
-    MetadataRow("Summary:", selected_target->summary);
-    MetadataRow("Sources:", JoinRefs(relationship->source_refs));
-    MetadataRow("Targets:", JoinRefs(relationship->target_refs));
+    MetadataRow(AF_TR("ID:").c_str(), selected_target->relationship_id);
+    MetadataRow(AF_TR("Type:").c_str(), relationship->type);
+    MetadataRow(AF_TR("Summary:").c_str(), selected_target->summary);
+    MetadataRow(AF_TR("Sources:").c_str(), JoinRefs(relationship->source_refs));
+    MetadataRow(AF_TR("Targets:").c_str(), JoinRefs(relationship->target_refs));
     if (!relationship->reasoning_ref.empty())
-        MetadataRow("Reasoning:", relationship->reasoning_ref);
-    MetadataRow("ACP target:", selected_target->eligible_for_acp ? "Eligible" : "Blocked");
+        MetadataRow(AF_TR("Reasoning:").c_str(), relationship->reasoning_ref);
+    MetadataRow(AF_TR("ACP target:").c_str(),
+                selected_target->eligible_for_acp ? AF_TR("Eligible") : AF_TR("Blocked"));
     if (!selected_target->eligible_for_acp) {
         ImGui::Spacing();
         ImGui::TextWrapped("%s", selected_target->blocked_reason.c_str());
@@ -106,8 +109,8 @@ void ShowRelationshipPanel(parser::AssuranceCase* model, const RelationshipPanel
     ImGui::Spacing();
     ImGui::Separator();
     if (existing_acp) {
-        MetadataRow("ACP:", existing_acp->id);
-        if (ImGui::Button("Open ACP")) {
+        MetadataRow(AF_TR("ACP:").c_str(), existing_acp->id);
+        if (ImGui::Button(AF_TR("Open ACP").c_str())) {
             ui_state.selected_acp_id = existing_acp->id;
             ui_state.selected_relationship_id.clear();
             ui_state.selected_relationship_edge_key.clear();
@@ -119,7 +122,7 @@ void ShowRelationshipPanel(parser::AssuranceCase* model, const RelationshipPanel
         const bool can_add = selected_target->eligible_for_acp && callbacks && callbacks->add_acp;
         if (!can_add)
             ImGui::BeginDisabled();
-        if (ImGui::Button("Add ACP")) {
+        if (ImGui::Button(AF_TR("Add ACP").c_str())) {
             callbacks->add_acp(selected_target->relationship_id);
         }
         if (!can_add)

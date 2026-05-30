@@ -2,6 +2,7 @@
 
 #include "ui/gsn/gsn_canvas.h" // for g_BoldFont
 #include "ui/gsn/gsn_dpi.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
 #include <algorithm>
@@ -128,15 +129,16 @@ void DrawProblemBadge(ImDrawList* draw_list,
     }
 
     if (IsMouseHoveringBadge(badge)) {
+        const std::string severity = AF_TR(SeverityLabel(summary.highest_severity));
+        const std::string message =
+            summary.top_problem_message.empty() ? AF_TR("(no message)") : summary.top_problem_message;
         std::string tooltip;
         if (summary.problem_count > 1) {
-            tooltip = std::to_string(summary.problem_count) + " problems";
-            tooltip += std::string{" · top "} + SeverityLabel(summary.highest_severity) + ": ";
+            tooltip = ui::i18n::trf("{0} problems · top {1}: {2}", summary.problem_count, severity, message);
         } else {
-            tooltip = std::string{"1 "} + SeverityLabel(summary.highest_severity) + ": ";
+            tooltip = ui::i18n::trf("1 {0}: {1}", severity, message);
         }
-        tooltip += summary.top_problem_message.empty() ? std::string{"(no message)"} : summary.top_problem_message;
-        tooltip += "\nClick to open in the Problems panel.";
+        tooltip += "\n" + AF_TR("Click to open in the Problems panel.");
         ImGui::SetTooltip("%s", tooltip.c_str());
     }
 }
@@ -146,7 +148,7 @@ void DrawAiSpinnerBadge(ImDrawList* draw_list, const BadgeRect& badge, float zoo
     DrawBadgeShell(draw_list, badge, theme.accent, zoom);
     DrawSpinnerGlyph(draw_list, badge, InkOn(theme.accent), zoom);
     if (IsMouseHoveringBadge(badge)) {
-        ImGui::SetTooltip("AI review in progress.");
+        ImGui::SetTooltip("%s", AF_TR("AI review in progress.").c_str());
     }
 }
 

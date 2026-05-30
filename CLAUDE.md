@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Build Commands
 
 **Windows** (run from Developer Command Prompt for VS 2022):
@@ -12,31 +10,9 @@ cmake --build --preset release
 cmake --build --preset debug
 ```
 
-**Linux** (install `xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev` first):
-```bash
-cmake -B build -DHELLOIMGUI_DOWNLOAD_GLFW_IF_NEEDED=ON -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-```
-
 **Run the app:**
 ```bash
-build\Release\assurance-forge.exe          # Windows
-./build/assurance-forge                    # Linux
-```
-
-## Test Commands
-
-```bash
-ctest --preset release                     # Windows (all tests)
-ctest --preset debug                       # Windows (debug build)
-ctest --test-dir build --output-on-failure # Linux / macOS
-
-build\Release\tests.exe                    # Run test binary directly (Windows)
-./build/tests                              # Linux / macOS
-
-# Run a single test by name (GoogleTest filter):
-build\Release\tests.exe --gtest_filter=TestSuiteName.TestName
-./build/tests --gtest_filter=TestSuiteName.TestName
+build\Release\assurance-forge.exe
 ```
 
 ## Architecture
@@ -83,6 +59,19 @@ Safety Case Core Guidelines live in `external/safety-case-core-guidelines` (git 
 ### HelloImGui Scope
 
 HelloImGui provides the platform runner, window/event loop, DPI scaling, and preferences persistence. Assurance Forge keeps its own `NoDefaultWindow` layout and does not use HelloImGui's docking layouts, status bars, logging windows, or theme tweak windows. The two valid app themes are `Dark` and `Light` (defined in `ui::AppTheme`). Domain colors must flow through `ui::GetTheme()` or semantic color helpers — not local hardcoded `ImVec4` values.
+
+## UI Localization
+
+Every user-visible string goes through `ui::i18n`. Catalog source of truth: `tools/i18n/regenerate_ja_po.py`.
+
+- Wrap with `AF_TR("literal")`, `ui::i18n::trf("{0}/{1}", a, b)` for dynamic, `trn`/`trnf` for plurals. Always a literal — `AF_TR(var)` is invisible to the extractor.
+- Use real UTF-8 in source (`"● PAUSED"`, not `"\xe2\x97\x8f PAUSED"`).
+- Window/popup titles double as ImGui IDs — translate visible part, keep ID stable: `(AF_TR("Title") + "###" + kStableEnglishId).c_str()`.
+- Layer rule: `core/sacm/parser/ai` can't include `ui/i18n`. Store English msgids in data; the `ui/` panel translates at display with `AF_TR(field)`. `app/` may use `ui::i18n` directly for dynamic templating (`trf` at sync time).
+- After adding/removing strings: add (or remove) the entry in `regenerate_ja_po.py`, then `python tools/i18n/regenerate_ja_po.py && cmake --build --preset release`.
+- Caches that bake translations (e.g. `ProblemItem::message` built via `trf`) must refresh on language change. Use `ui::i18n::LanguageEpoch()` — see the existing hook in `AppRuntime::RenderFrame`.
+- For runtime-formatted text use `trf("Name: {0}", value)` / `trnf(...)` with positional placeholders — never `AF_TR("Name: %s")` as a printf format string (translators can't manage `%`-specifiers or reorder them). Pass the result to ImGui as `"%s"` or `TextUnformatted`.
+- CI enforces catalog consistency via the `i18n_catalog_check` CTest (runs `tools/i18n/check_catalog.py`): fails if a source msgid is missing from the `.po`, the committed `.mo` is out of sync, or a translated msgid contains a printf specifier (`%s`/`%d`/…). Run `python tools/i18n/check_catalog.py` before pushing.
 
 ## C++ Style
 

@@ -4,6 +4,7 @@
 #include "core/reviews/review_proposal.h"
 #include "imgui.h"
 #include "parser/model_utils.h"
+#include "ui/i18n/localization.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/ui_state.h"
 
@@ -141,19 +142,19 @@ void RenderProposalElementEditor(AppRuntimeState& state, const ProposalEditorAre
     if (!proposals.creator_active)
         return;
 
-    ImGui::TextUnformatted("Proposal Creator");
-    ImGui::TextDisabled("Edits are recorded in the proposal draft only.");
+    ImGui::TextUnformatted(AF_TR("Proposal Creator").c_str());
+    ImGui::TextDisabled("%s", AF_TR("Edits are recorded in the proposal draft only.").c_str());
     ImGui::Separator();
 
     const std::string selected_id = ui::GetUiState().selected_element_id;
     if (selected_id.empty()) {
-        ImGui::TextWrapped("Select a proposal preview element to edit its proposed properties.");
+        ImGui::TextWrapped("%s", AF_TR("Select a proposal preview element to edit its proposed properties.").c_str());
         return;
     }
 
     const parser::SacmElement* element = parser::FindElementById(proposals.preview_model, selected_id);
     if (!element) {
-        ImGui::TextWrapped("The selected proposal preview element no longer exists.");
+        ImGui::TextWrapped("%s", AF_TR("The selected proposal preview element no longer exists.").c_str());
         return;
     }
 
@@ -171,7 +172,7 @@ void RenderProposalElementEditor(AppRuntimeState& state, const ProposalEditorAre
     std::optional<core::reviews::ElementRef> ref =
         ProposalRefForPreviewId(selected_id, proposals.creator_generated_ids);
     if (!ref.has_value()) {
-        ImGui::TextWrapped("Could not resolve this preview element for proposal edits.");
+        ImGui::TextWrapped("%s", AF_TR("Could not resolve this preview element for proposal edits.").c_str());
         return;
     }
 
@@ -187,14 +188,16 @@ void RenderProposalElementEditor(AppRuntimeState& state, const ProposalEditorAre
         }
     }
 
-    ImGui::TextDisabled("%s  %s", ref->existing_id.has_value() ? "Existing" : "New", selected_id.c_str());
-    if (ImGui::Button("Remove")) {
+    ImGui::TextDisabled("%s  %s",
+                        (ref->existing_id.has_value() ? AF_TR("Existing") : AF_TR("New")).c_str(),
+                        selected_id.c_str());
+    if (ImGui::Button(AF_TR("Remove").c_str())) {
         if (callbacks.remove_selected)
             callbacks.remove_selected(core::RemoveMode::NodeOnly);
         return;
     }
     ImGui::SameLine();
-    if (ImGui::Button("Remove Subtree")) {
+    if (ImGui::Button(AF_TR("Remove Subtree").c_str())) {
         if (callbacks.remove_selected)
             callbacks.remove_selected(core::RemoveMode::NodeAndDescendants);
         return;
@@ -203,19 +206,21 @@ void RenderProposalElementEditor(AppRuntimeState& state, const ProposalEditorAre
 
     ImGui::PushID(editor_key.c_str());
     ImGui::SetNextItemWidth(-1.0f);
-    const bool name_changed = ImGui::InputText("Name", name_buf, sizeof(name_buf));
+    const bool name_changed = ImGui::InputText((AF_TR("Name") + "##proposal_name").c_str(), name_buf, sizeof(name_buf));
     ImGui::SetNextItemWidth(-1.0f);
     const bool text_changed =
-        ImGui::InputTextMultiline("Text", text_buf, sizeof(text_buf), ImVec2(-1.0f, ImGui::GetTextLineHeight() * 5.0f));
+        ImGui::InputTextMultiline((AF_TR("Text") + "##proposal_text").c_str(), text_buf, sizeof(text_buf),
+                                  ImVec2(-1.0f, ImGui::GetTextLineHeight() * 5.0f));
     bool undeveloped_value = element_snapshot.undeveloped;
-    const bool undeveloped_changed = ImGui::Checkbox("Undeveloped", &undeveloped_value);
+    const bool undeveloped_changed =
+        ImGui::Checkbox((AF_TR("Undeveloped") + "##proposal_undeveloped").c_str(), &undeveloped_value);
     ImGui::PopID();
 
     if (!name_changed && !text_changed && !undeveloped_changed)
         return;
 
     if (!state.app_state.loaded_case.has_value()) {
-        SetStatus(callbacks, "Load a SACM model before editing proposal drafts.");
+        SetStatus(callbacks, AF_TR("Load a SACM model before editing proposal drafts."));
         return;
     }
 
@@ -241,7 +246,7 @@ void RenderProposalElementEditor(AppRuntimeState& state, const ProposalEditorAre
     }
 
     if (callbacks.refresh_preview && callbacks.refresh_preview()) {
-        SetStatus(callbacks, "Recorded proposal property change.");
+        SetStatus(callbacks, AF_TR("Recorded proposal property change."));
     }
 }
 
