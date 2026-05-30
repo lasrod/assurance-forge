@@ -339,10 +339,11 @@ std::filesystem::path IgnoredTerminologyFilePath(const AppRuntimeState& state) {
     return state.app_state.current_project->rootPath / "analysis" / "ignored-terminology.af.json";
 }
 
-void SaveIgnoredSuggestions(const AppRuntimeState& state) {
+SaveIgnoredSuggestionsResult SaveIgnoredSuggestions(const AppRuntimeState& state) {
+    SaveIgnoredSuggestionsResult result;
     const std::filesystem::path path = IgnoredTerminologyFilePath(state);
     if (path.empty())
-        return;
+        return result;
 
     std::vector<core::terminology::IgnoredSuggestion> items;
     items.reserve(state.terminology.ignored_suggestion_keys.size());
@@ -360,10 +361,25 @@ void SaveIgnoredSuggestions(const AppRuntimeState& state) {
 
     std::error_code ec;
     std::filesystem::create_directories(path.parent_path(), ec);
+    if (ec) {
+        result.success = false;
+        result.error = "Could not create ignored-terminology directory: " + ec.message();
+        return result;
+    }
     std::ofstream out(path, std::ios::binary | std::ios::trunc);
-    if (!out)
-        return;
+    if (!out) {
+        result.success = false;
+        result.error = "Could not open ignored-terminology file for writing.";
+        return result;
+    }
     out << core::terminology::SerializeIgnoredSuggestions(items);
+    out.flush();
+    if (!out) {
+        result.success = false;
+        result.error = "Failed to write ignored-terminology file.";
+        return result;
+    }
+    return result;
 }
 
 } // namespace app::actions::detail

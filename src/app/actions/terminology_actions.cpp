@@ -725,7 +725,13 @@ void TerminologyActions::HandleProblemQuickFix(const core::ProblemItem& problem)
 void TerminologyActions::IgnoreSuggestion(const std::string& element_id, const std::string& term_value) {
     const std::string trimmed_term = TrimWhitespace(term_value);
     state_.terminology.ignored_suggestion_keys.insert(TerminologySuggestionKey(element_id, trimmed_term));
-    detail::SaveIgnoredSuggestions(state_);
+    const auto save_result = detail::SaveIgnoredSuggestions(state_);
+    if (!save_result.success) {
+        SetStatus(state_,
+                  "Ignored terminology suggestion " + trimmed_term +
+                      " for this session, but could not persist: " + save_result.error);
+        return;
+    }
     SetStatus(state_, "Ignored terminology suggestion " + trimmed_term + ".");
 }
 
@@ -738,7 +744,13 @@ void TerminologyActions::RestoreSuggestion(const std::string& element_id, const 
     const std::string trimmed_term = TrimWhitespace(term_value);
     if (state_.terminology.ignored_suggestion_keys.erase(TerminologySuggestionKey(element_id, trimmed_term)) == 0)
         return;
-    detail::SaveIgnoredSuggestions(state_);
+    const auto save_result = detail::SaveIgnoredSuggestions(state_);
+    if (!save_result.success) {
+        SetStatus(state_,
+                  "Restored terminology suggestion " + trimmed_term +
+                      " for this session, but could not persist: " + save_result.error);
+        return;
+    }
     SetStatus(state_, "Restored terminology suggestion " + trimmed_term + ".");
 }
 
