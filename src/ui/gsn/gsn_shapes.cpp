@@ -141,7 +141,7 @@ void DrawParallelogram(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_rig
 }
 
 void DrawStadium(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color, float zoom) {
-    float rounding = (bottom_right.y - top_left.y) * 0.5f;
+    float rounding = DpiSize(kContextRounding) * zoom;
     float outline = DpiSize(kOutlineThickness) * zoom;
     if (ShouldDrawShadows(zoom)) {
         DrawRectShadow(draw_list, top_left, bottom_right, rounding, zoom);
