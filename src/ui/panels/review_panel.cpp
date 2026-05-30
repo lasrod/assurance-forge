@@ -269,8 +269,10 @@ void DrawProposalActions(const core::reviews::ReviewItem& item,
                          const ReviewPanelCallbacks& callbacks) {
     const bool is_active_draft = model.active_proposal_review_item_id == item.id;
     if (is_active_draft) {
-        ImGui::Text(AF_TR("Proposal draft: %d operation(s)").c_str(),
-                    static_cast<int>(model.active_proposal_operation_count));
+        const int op_count = static_cast<int>(model.active_proposal_operation_count);
+        ImGui::TextUnformatted(
+            ui::i18n::trnf("Proposal draft: {0} operation", "Proposal draft: {0} operations", op_count, op_count)
+                .c_str());
         if (!model.active_proposal_can_save)
             ImGui::BeginDisabled();
         if (ImGui::Button(AF_TR("Save Proposal").c_str()) && callbacks.save_proposal) {
@@ -308,7 +310,7 @@ void DrawProposalActions(const core::reviews::ReviewItem& item,
     ImGui::TextUnformatted((is_valid ? AF_TR("Proposed change: Valid") : AF_TR("Proposed change: Broken")).c_str());
     ImGui::PopStyleColor();
     if (!is_valid && !validity.reason.empty()) {
-        ImGui::TextWrapped(AF_TR("Reason: %s").c_str(), validity.reason.c_str());
+        ImGui::TextWrapped("%s", ui::i18n::trf("Reason: {0}", validity.reason).c_str());
     }
 
     if (item.status == core::reviews::ReviewItemStatus::Open) {
@@ -369,7 +371,7 @@ void DrawProblemItem(const core::ProblemItem& problem, const ReviewPanelCallback
     DrawProblemSeverityBadge(problem);
     ImGui::SameLine();
     ImGui::TextWrapped("%s", problem.type.empty() ? AF_TR("Problem").c_str() : problem.type.c_str());
-    ImGui::TextDisabled(AF_TR("Source: %s").c_str(), core::ToString(problem.source));
+    ImGui::TextDisabled("%s", ui::i18n::trf("Source: {0}", core::ToString(problem.source)).c_str());
     // Translate defensively: validation messages from core/ are English msgids,
     // user-typed text falls back to itself.
     DrawSelectableMessageText("problem_message", AF_TR(problem.message), 3.5f);
@@ -405,10 +407,10 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
         return;
     }
 
-    ImGui::TextDisabled(AF_TR("Element %s").c_str(), model.selected_element_id.c_str());
+    ImGui::TextDisabled("%s", ui::i18n::trf("Element {0}", model.selected_element_id).c_str());
     const std::string review_status =
         model.review_status_text.empty() ? AF_TR("Not reviewed") : model.review_status_text;
-    ImGui::Text(AF_TR("Review status: %s").c_str(), review_status.c_str());
+    ImGui::TextUnformatted(ui::i18n::trf("Review status: {0}", review_status).c_str());
     if (!model.review_status_detail.empty()) {
         ImGui::TextDisabled("%s", model.review_status_detail.c_str());
     }
@@ -442,7 +444,7 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
     }
 
     ImGui::Separator();
-    ImGui::Text(AF_TR("Comments (%d)").c_str(), static_cast<int>(model.review_items.size()));
+    ImGui::TextUnformatted(ui::i18n::trf("Comments ({0})", static_cast<int>(model.review_items.size())).c_str());
 
     if (model.review_items.empty() && model.problem_items.empty()) {
         ImGui::TextDisabled("%s", AF_TR("No review comments for this element.").c_str());
@@ -462,7 +464,7 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
             ImGui::PopStyleColor();
         }
         const std::string reviewer = item.reviewer_name.empty() ? AF_TR("not recorded") : item.reviewer_name;
-        ImGui::TextDisabled(AF_TR("Reviewed by %s").c_str(), reviewer.c_str());
+        ImGui::TextDisabled("%s", ui::i18n::trf("Reviewed by {0}", reviewer).c_str());
         DrawSelectableMessageText("review_message", item.message, 4.0f);
         DrawGuidelineTags(model, item.guideline_ids, popup_guideline_id);
         DrawReviewItemActions(item, model, callbacks);
@@ -474,7 +476,8 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
 
     if (!model.problem_items.empty()) {
         ImGui::Separator();
-        ImGui::Text(AF_TR("Other Problems (%d)").c_str(), static_cast<int>(model.problem_items.size()));
+        ImGui::TextUnformatted(
+            ui::i18n::trf("Other Problems ({0})", static_cast<int>(model.problem_items.size())).c_str());
         for (const core::ProblemItem& problem : model.problem_items) {
             ImGui::PushID(problem.id.c_str());
             ImGui::Separator();

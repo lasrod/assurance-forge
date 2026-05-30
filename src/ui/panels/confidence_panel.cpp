@@ -88,7 +88,7 @@ void DrawOpinionSliderBar(const char* label, SubjectiveOpinion& opinion, Opinion
     draw_list->AddCircleFilled(ImVec2(fill_x, (min.y + max.y) * 0.5f), active ? 4.0f : 3.0f, color, 18);
 
     if (hovered || active)
-        ImGui::SetTooltip(AF_TR("Drag to adjust %s").c_str(), display_label.c_str());
+        ImGui::SetTooltip("%s", ui::i18n::trf("Drag to adjust {0}", display_label).c_str());
 
     ImGui::PopID();
 }
@@ -333,10 +333,12 @@ void DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
     if (help_hovered) {
         ImGui::SetTooltip("%s", AF_TR("Jøsang's opinion triangle").c_str());
     } else if (hovered || active) {
-        ImGui::SetTooltip(AF_TR("Belief %.2f\nDisbelief %.2f\nUncertainty %.2f").c_str(),
-                          opinion.belief,
-                          opinion.disbelief,
-                          opinion.uncertainty);
+        ImGui::SetTooltip("%s",
+                          ui::i18n::trf("Belief {0:.2f}\nDisbelief {1:.2f}\nUncertainty {2:.2f}",
+                                        opinion.belief,
+                                        opinion.disbelief,
+                                        opinion.uncertainty)
+                              .c_str());
     }
 
     ImGui::PopID();
@@ -368,7 +370,7 @@ void DrawOpinionMode(ElementConfidence& confidence) {
     const std::string base_rate_tooltip =
         AF_TR("Base rate controls how much unresolved uncertainty counts toward projected "
               "confidence.\nProjected confidence = belief + base rate * uncertainty.");
-    ImGui::Text(AF_TR("Base rate %.2f").c_str(), confidence.opinion.base_rate);
+    ImGui::TextUnformatted(ui::i18n::trf("Base rate {0:.2f}", confidence.opinion.base_rate).c_str());
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", base_rate_tooltip.c_str());
     ImGui::SetNextItemWidth(-1.0f);
@@ -430,9 +432,9 @@ bool ShowConfidencePanel(const ConfidencePanelModel& model, const ConfidencePane
     // the caller passed an English msgid or a pre-translated label.
     const std::string method =
         model.method_label.empty() ? AF_TR(MethodLabel(confidence.mode)) : AF_TR(model.method_label);
-    ImGui::Text(AF_TR("Method: %s").c_str(), method.c_str());
+    ImGui::TextUnformatted(ui::i18n::trf("Method: {0}", method).c_str());
     const std::string status = model.status_label.empty() ? AF_TR("Active") : AF_TR(model.status_label);
-    ImGui::Text(AF_TR("Status: %s").c_str(), status.c_str());
+    ImGui::TextUnformatted(ui::i18n::trf("Status: {0}", status).c_str());
 
     if (model.stale) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.warning));

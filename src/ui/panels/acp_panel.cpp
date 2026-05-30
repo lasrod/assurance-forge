@@ -143,7 +143,7 @@ void RenderTargetRow(const parser::AssuranceCase& model,
                 ImGui::TextDisabled(")");
             }
         } else {
-            ImGui::TextWrapped(AF_TR("Relationship %s").c_str(), acp.target_id.c_str());
+            ImGui::TextWrapped("%s", ui::i18n::trf("Relationship {0}", acp.target_id).c_str());
         }
         return;
     }
@@ -208,7 +208,7 @@ bool ShowAcpPanel(parser::AssuranceCase* model,
 
     parser::AcpRecord* selected = FindSelectedAcp(model, ui_state.selected_acp_id);
     if (!selected) {
-        ImGui::TextDisabled(AF_TR("ACP not found: %s").c_str(), ui_state.selected_acp_id.c_str());
+        ImGui::TextDisabled("%s", ui::i18n::trf("ACP not found: {0}", ui_state.selected_acp_id).c_str());
         return false;
     }
 

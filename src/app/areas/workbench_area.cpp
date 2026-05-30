@@ -110,7 +110,8 @@ void RenderProposalBanner(AppRuntimeState& state, const WorkbenchAreaCallbacks& 
     }
     ImGui::SameLine();
     if (proposals.creator_active) {
-        ImGui::TextDisabled(AF_TR("%d operation(s)").c_str(), static_cast<int>(proposals.ActiveOperationCount()));
+        const int op_count = static_cast<int>(proposals.ActiveOperationCount());
+        ImGui::TextDisabled("%s", ui::i18n::trnf("{0} operation", "{0} operations", op_count, op_count).c_str());
         ImGui::SameLine();
     } else if (!proposals.preview_id.empty()) {
         if (ImGui::Button(AF_TR("Edit Proposal").c_str()) && callbacks.edit_proposal_by_id) {
@@ -352,8 +353,11 @@ void RenderWorkbenchArea(AppRuntimeState& state,
             if (ImGui::BeginTabItem((AF_TR("CSE Register") + "###cse_register_tab").c_str(), nullptr, cse_flags)) {
                 ui_state.center_view = ui::CenterView::CseRegister;
                 if (state.app_state.active_project_file_role == core::ProjectFileRole::J3377CaeRegister) {
-                    ImGui::TextWrapped(AF_TR("J3377 CAE register file: %s").c_str(),
-                                       state.app_state.active_project_file_path.string().c_str());
+                    ImGui::TextWrapped(
+                        "%s",
+                        ui::i18n::trf("J3377 CAE register file: {0}",
+                                      state.app_state.active_project_file_path.string())
+                            .c_str());
                     ImGui::TextDisabled(
                         "%s", AF_TR("Editable CAE register content will be implemented in a later workflow.").c_str());
                     ImGui::Separator();
@@ -372,8 +376,11 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                                     evidence_flags)) {
                 ui_state.center_view = ui::CenterView::EvidenceRegister;
                 if (state.app_state.active_project_file_role == core::ProjectFileRole::EvidenceRegister) {
-                    ImGui::TextWrapped(AF_TR("Evidence register file: %s").c_str(),
-                                       state.app_state.active_project_file_path.string().c_str());
+                    ImGui::TextWrapped(
+                        "%s",
+                        ui::i18n::trf("Evidence register file: {0}",
+                                      state.app_state.active_project_file_path.string())
+                            .c_str());
                     ImGui::TextDisabled(
                         "%s",
                         AF_TR("Editable evidence register content will be implemented in a later workflow.").c_str());

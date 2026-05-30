@@ -103,7 +103,8 @@ void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
         }
     } else if (!state.guideline_catalog_error.empty()) {
         ImGui::Separator();
-        ImGui::TextWrapped(AF_TR("SCCG profiles unavailable: %s").c_str(), state.guideline_catalog_error.c_str());
+        ImGui::TextWrapped("%s",
+                           ui::i18n::trf("SCCG profiles unavailable: {0}", state.guideline_catalog_error).c_str());
     }
     ImGui::EndChild();
 
@@ -137,7 +138,7 @@ void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
         ImGui::TextDisabled("%s", AF_TR("waiting...").c_str());
     }
     if (!ai_review.LastParseError().empty()) {
-        ImGui::TextWrapped(AF_TR("Parse error: %s").c_str(), ai_review.LastParseError().c_str());
+        ImGui::TextWrapped("%s", ui::i18n::trf("Parse error: {0}", ai_review.LastParseError()).c_str());
     }
     std::string response = ai_review.LastRawResponse();
     if (response.empty())

@@ -112,6 +112,30 @@ def check_source_in_po(ex):
     return ok
 
 
+# A real printf conversion spec (e.g. %s %d %zu %llu %.2f), but NOT "% Frame"
+# (percent-space, which is a literal percent in a non-format label).
+_PRINTF_RE = re.compile(r'%[-+0#]*[0-9]*\.?[0-9]*(?:hh|h|ll|l|z|j|t|L)?[sdiuxXofeEgGc]')
+
+
+def check_no_printf_in_msgids(ex):
+    """AF_TR / trc / trn msgids must not contain printf conversion specifiers.
+    Those strings are passed to ImGui as format strings only via trf/trnf with
+    positional {0}/{1} placeholders; a %s/%d in an AF_TR msgid means a call site
+    is (mis)using a translated string as a printf format, which is fragile for
+    translators and blocks placeholder reordering."""
+    plain, ctx, plural = extract_source(ex)
+    offenders = sorted(s for s in plain if _PRINTF_RE.search(s))
+    offenders += sorted(f"{c}|{m}" for c, m in ctx if _PRINTF_RE.search(m))
+    for sing, plur in sorted(plural):
+        if _PRINTF_RE.search(sing) or _PRINTF_RE.search(plur):
+            offenders.append(f"{sing} | {plur}")
+    for s in offenders:
+        print("  printf specifier in msgid (use trf/trnf with {0}): " + repr(s))
+    ok = not offenders
+    print(f"[3] {'OK' if ok else 'FAIL'}: no printf specifiers in translated msgids")
+    return ok
+
+
 def check_mo_matches_po(compile_po):
     expected = compile_po.parse_po(PO_PATH.read_text(encoding="utf-8"))
     actual = read_mo(MO_PATH)
@@ -137,8 +161,9 @@ def main():
     ex = load_module("ex", "tools/i18n/extract_msgids.py")
     compile_po = load_module("compile_po", "tools/i18n/compile_po.py")
     ok1 = check_source_in_po(ex)
-    ok2 = check_mo_matches_po(compile_po)
-    return 0 if (ok1 and ok2) else 1
+    ok2 = check_no_printf_in_msgids(ex)
+    ok3 = check_mo_matches_po(compile_po)
+    return 0 if (ok1 and ok2 and ok3) else 1
 
 
 if __name__ == "__main__":

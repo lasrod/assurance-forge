@@ -187,8 +187,8 @@ void DrawAcpRelationshipDecorator(ImDrawList* draw_list,
         ImGui::TextUnformatted(
             (acps.size() == 1 ? AF_TR("Assurance Claim Point") : AF_TR("Assurance Claim Points")).c_str());
         ImGui::Separator();
-        ImGui::Text(AF_TR("Target: %s").c_str(), target.summary.c_str());
-        ImGui::Text(AF_TR("SACM relationship: %s").c_str(), target.relationship_id.c_str());
+        ImGui::TextUnformatted(ui::i18n::trf("Target: {0}", target.summary).c_str());
+        ImGui::TextUnformatted(ui::i18n::trf("SACM relationship: {0}", target.relationship_id).c_str());
         for (const parser::AcpRecord& acp : acps) {
             ImGui::Text("%s", AcpDisplayLabel(acp).c_str());
             ImGui::TextDisabled("%s", AF_TR(AcpModeDescription(acp)).c_str());
@@ -273,7 +273,7 @@ void DrawAcpElementDecorator(ImDrawList* draw_list,
         ImGui::TextUnformatted(
             (acps.size() == 1 ? AF_TR("Assurance Claim Point") : AF_TR("Assurance Claim Points")).c_str());
         ImGui::Separator();
-        ImGui::Text(AF_TR("Target element: %s").c_str(), node.id.c_str());
+        ImGui::TextUnformatted(ui::i18n::trf("Target element: {0}", node.id).c_str());
         for (const parser::AcpRecord& acp : acps) {
             ImGui::Text("%s", AcpDisplayLabel(acp).c_str());
             ImGui::TextDisabled("%s", AF_TR(AcpModeDescription(acp)).c_str());

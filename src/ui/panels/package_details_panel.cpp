@@ -15,20 +15,21 @@ void ShowPackageDetailsPanel(const sacm::SacmPackageTreeNode* package_node,
     ImGui::TextUnformatted(sacm::SacmPackageNodeTypeToDisplayString(package_node->type));
     ImGui::Separator();
 
-    ImGui::Text(AF_TR("Name: %s").c_str(),
-                package_node->displayName.empty() ? AF_TR("(unnamed)").c_str() : package_node->displayName.c_str());
-    ImGui::Text(AF_TR("Type: %s").c_str(), sacm::SacmPackageNodeTypeToString(package_node->type));
+    const std::string display_name =
+        package_node->displayName.empty() ? AF_TR("(unnamed)") : package_node->displayName;
+    ImGui::TextUnformatted(ui::i18n::trf("Name: {0}", display_name).c_str());
+    ImGui::TextUnformatted(ui::i18n::trf("Type: {0}", sacm::SacmPackageNodeTypeToString(package_node->type)).c_str());
     if (!package_node->xmlLocalName.empty()) {
-        ImGui::Text(AF_TR("XML element: %s").c_str(), package_node->xmlLocalName.c_str());
+        ImGui::TextUnformatted(ui::i18n::trf("XML element: {0}", package_node->xmlLocalName).c_str());
     }
     if (!package_node->id.empty()) {
-        ImGui::Text(AF_TR("ID: %s").c_str(), package_node->id.c_str());
+        ImGui::TextUnformatted(ui::i18n::trf("ID: {0}", package_node->id).c_str());
     }
     if (!package_node->gid.empty()) {
-        ImGui::Text(AF_TR("GID: %s").c_str(), package_node->gid.c_str());
+        ImGui::TextUnformatted(ui::i18n::trf("GID: {0}", package_node->gid).c_str());
     }
     if (!source_file_path.empty()) {
-        ImGui::TextWrapped(AF_TR("Source file: %s").c_str(), source_file_path.string().c_str());
+        ImGui::TextWrapped("%s", ui::i18n::trf("Source file: {0}", source_file_path.string()).c_str());
     }
 
     if (!package_node->description.empty()) {

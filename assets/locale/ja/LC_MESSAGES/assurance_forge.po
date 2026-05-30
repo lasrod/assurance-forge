@@ -7,32 +7,17 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 
 
-msgid "  Content: %s"
-msgstr "  内容: %s"
+msgid "  Content: {0}"
+msgstr "  内容: {0}"
 
 msgid " (open a package canvas to preview)"
 msgstr " (プレビューするにはパッケージキャンバスを開いてください)"
 
-msgid " | Showing %zu of %zu (filtered)"
-msgstr " | %zu / %zu 件を表示 (フィルター適用)"
+msgid " | Showing {0} of {1} (filtered)"
+msgstr " | {0} / {1} 件を表示 (フィルター適用)"
 
 msgid "% Frame"
 msgstr "% フレーム"
-
-msgid "%d operation(s)"
-msgstr "%d 件の操作"
-
-msgid "%s\nClick to open the Review tab."
-msgstr "%s\nクリックしてレビュータブを開きます。"
-
-msgid "%s has multiple meanings."
-msgstr "%s には複数の意味があります。"
-
-msgid "%s is not defined."
-msgstr "%s は定義されていません。"
-
-msgid "%s is not implemented yet."
-msgstr "%s はまだ実装されていません。"
 
 msgid "(Broken)"
 msgstr "(破損)"
@@ -85,8 +70,8 @@ msgstr "ACP デコレーター"
 msgid "ACP is not supported for this relationship."
 msgstr "この関係では ACP はサポートされていません。"
 
-msgid "ACP not found: %s"
-msgstr "ACP が見つかりません: %s"
+msgid "ACP not found: {0}"
+msgstr "ACP が見つかりません: {0}"
 
 msgid "ACP target:"
 msgstr "ACP 対象:"
@@ -223,8 +208,8 @@ msgstr "評価ステータス"
 msgid "Assumption"
 msgstr "仮定"
 
-msgid "Assurance Case: %s"
-msgstr "保証ケース: %s"
+msgid "Assurance Case: {0}"
+msgstr "保証ケース: {0}"
 
 msgid "Assurance Claim Point"
 msgstr "保証主張点"
@@ -238,8 +223,8 @@ msgstr "保証ケース"
 msgid "Audit log divergence detected"
 msgstr "監査ログの不一致を検出しました"
 
-msgid "Audit store error: %s"
-msgstr "監査ストアのエラー: %s"
+msgid "Audit store error: {0}"
+msgstr "監査ストアのエラー: {0}"
 
 msgid "Author"
 msgstr "作成者"
@@ -256,11 +241,11 @@ msgstr "バックアップして新しい信頼度ファイルを開始"
 msgid "Backed up invalid confidence file; new confidence storage will be saved with the project."
 msgstr "無効な信頼度ファイルをバックアップしました。新しい信頼度ストレージはプロジェクトと共に保存されます。"
 
-msgid "Base rate %.2f"
-msgstr "基底率 %.2f"
-
 msgid "Base rate controls how much unresolved uncertainty counts toward projected confidence.\nProjected confidence = belief + base rate * uncertainty."
 msgstr "基底率は未解決の不確実性が投影信頼度にどれだけ寄与するかを制御します。\n投影信頼度 = 信念 + 基底率 * 不確実性。"
+
+msgid "Base rate {0:.2f}"
+msgstr "基底率 {0:.2f}"
 
 msgid "Baseline \"{0}\" created at sequence {1}."
 msgstr "ベースライン \"{0}\" をシーケンス {1} で作成しました。"
@@ -268,8 +253,8 @@ msgstr "ベースライン \"{0}\" をシーケンス {1} で作成しました�
 msgid "Belief"
 msgstr "信念"
 
-msgid "Belief %.2f\nDisbelief %.2f\nUncertainty %.2f"
-msgstr "信念 %.2f\n不信 %.2f\n不確実性 %.2f"
+msgid "Belief {0:.2f}\nDisbelief {1:.2f}\nUncertainty {2:.2f}"
+msgstr "信念 {0:.2f}\n不信 {1:.2f}\n不確実性 {2:.2f}"
 
 msgid "Bindings"
 msgstr "バインディング"
@@ -316,8 +301,8 @@ msgstr "分類名"
 msgid "Category name is required."
 msgstr "分類名は必須です。"
 
-msgid "Category: %s"
-msgstr "分類: %s"
+msgid "Category: {0}"
+msgstr "分類: {0}"
 
 msgid "Challenge"
 msgstr "チャレンジ"
@@ -361,8 +346,8 @@ msgstr "閉じる"
 msgid "Command"
 msgstr "コマンド"
 
-msgid "Comments (%d)"
-msgstr "コメント (%d)"
+msgid "Comments ({0})"
+msgstr "コメント ({0})"
 
 msgid "Compare to Baseline"
 msgstr "ベースラインと比較"
@@ -391,8 +376,8 @@ msgstr "信頼度の更新に失敗しました: {0}"
 msgid "Content"
 msgstr "内容"
 
-msgid "Content (%s)"
-msgstr "内容 (%s)"
+msgid "Content ({0})"
+msgstr "内容 ({0})"
 
 msgid "Context"
 msgstr "コンテキスト"
@@ -520,11 +505,11 @@ msgstr "この用語パッケージを削除しますか?"
 msgid "Description"
 msgstr "説明"
 
-msgid "Description (%s)"
-msgstr "説明 (%s)"
-
 msgid "Description (optional)"
 msgstr "説明 (省略可)"
+
+msgid "Description ({0})"
+msgstr "説明 ({0})"
 
 msgid "Detach this ACP from its current confidence argument tree."
 msgstr "この ACP を現在の信頼度論証ツリーから切り離します。"
@@ -553,8 +538,8 @@ msgstr "閉じる"
 msgid "Don't Save"
 msgstr "保存しない"
 
-msgid "Drag to adjust %s"
-msgstr "%s を調整するにはドラッグしてください"
+msgid "Drag to adjust {0}"
+msgstr "{0} を調整するにはドラッグしてください"
 
 msgid "Drag to scrub transaction history"
 msgstr "ドラッグしてトランザクション履歴をスクラブします"
@@ -592,17 +577,17 @@ msgstr "編集は提案ドラフトにのみ記録されます。"
 msgid "Element"
 msgstr "要素"
 
-msgid "Element %s"
-msgstr "要素 %s"
-
 msgid "Element Properties"
 msgstr "要素プロパティ"
 
 msgid "Element not found in the active model."
 msgstr "アクティブモデルに要素が見つかりません。"
 
-msgid "Element not found: %s"
-msgstr "要素が見つかりません: %s"
+msgid "Element not found: {0}"
+msgstr "要素が見つかりません: {0}"
+
+msgid "Element {0}"
+msgstr "要素 {0}"
 
 msgid "Eligible"
 msgstr "適格"
@@ -637,8 +622,8 @@ msgstr "エビデンス登録簿"
 msgid "Evidence Rows"
 msgstr "エビデンス行"
 
-msgid "Evidence register file: %s"
-msgstr "エビデンス登録簿ファイル: %s"
+msgid "Evidence register file: {0}"
+msgstr "エビデンス登録簿ファイル: {0}"
 
 msgid "Existing"
 msgstr "既存"
@@ -670,8 +655,8 @@ msgstr "機能切替 (A/B) とレポート"
 msgid "File"
 msgstr "ファイル"
 
-msgid "File already exists:\n%s"
-msgstr "ファイルは既に存在します:\n%s"
+msgid "File already exists:\n{0}"
+msgstr "ファイルは既に存在します:\n{0}"
 
 msgid "File name"
 msgstr "ファイル名"
@@ -712,8 +697,8 @@ msgstr "ACP の再構築を凍結 (未接続)"
 msgid "Full Name / Display Name"
 msgstr "正式名 / 表示名"
 
-msgid "GID: %s"
-msgstr "GID: %s"
+msgid "GID: {0}"
+msgstr "GID: {0}"
 
 msgid "GSN Canvas"
 msgstr "GSN キャンバス"
@@ -757,8 +742,8 @@ msgstr "ID"
 msgid "ID:"
 msgstr "ID:"
 
-msgid "ID: %s"
-msgstr "ID: %s"
+msgid "ID: {0}"
+msgstr "ID: {0}"
 
 msgid "Idling"
 msgstr "アイドリング"
@@ -796,8 +781,8 @@ msgstr "インターフェース"
 msgid "Interior shading"
 msgstr "内部シェーディング"
 
-msgid "J3377 CAE register file: %s"
-msgstr "J3377 CAE 登録簿ファイル: %s"
+msgid "J3377 CAE register file: {0}"
+msgstr "J3377 CAE 登録簿ファイル: {0}"
 
 msgid "Justification"
 msgstr "正当化"
@@ -841,8 +826,8 @@ msgstr "リンク済み:"
 msgid "Live"
 msgstr "ライブ"
 
-msgid "Live status from runnerParams.fpsIdling.\n%s"
-msgstr "runnerParams.fpsIdling のライブ状態。\n%s"
+msgid "Live status from runnerParams.fpsIdling.\n{0}"
+msgstr "runnerParams.fpsIdling のライブ状態。\n{0}"
 
 msgid "Load"
 msgstr "読み込み"
@@ -877,8 +862,8 @@ msgstr "中カリング"
 msgid "Message"
 msgstr "メッセージ"
 
-msgid "Method: %s"
-msgstr "方式: %s"
+msgid "Method: {0}"
+msgstr "方式: {0}"
 
 msgid "Missing term"
 msgstr "用語が見つかりません"
@@ -892,14 +877,14 @@ msgstr "モデル"
 msgid "Name"
 msgstr "名前"
 
-msgid "Name (%s)"
-msgstr "名前 (%s)"
+msgid "Name ({0})"
+msgstr "名前 ({0})"
 
 msgid "Name:"
 msgstr "名前:"
 
-msgid "Name: %s"
-msgstr "名前: %s"
+msgid "Name: {0}"
+msgstr "名前: {0}"
 
 msgid "Native claim:"
 msgstr "ネイティブ主張:"
@@ -1108,20 +1093,20 @@ msgstr "または既存の信頼度論証ツリーにリンク:"
 msgid "Origin"
 msgstr "出典"
 
-msgid "Origin: %s"
-msgstr "出典: %s"
+msgid "Origin: {0}"
+msgstr "出典: {0}"
 
 msgid "Original text"
 msgstr "元のテキスト"
 
-msgid "Orphans (%d)"
-msgstr "孤立 (%d)"
+msgid "Orphans ({0})"
+msgstr "孤立 ({0})"
 
 msgid "Other Packages"
 msgstr "その他のパッケージ"
 
-msgid "Other Problems (%d)"
-msgstr "その他の問題 (%d)"
+msgid "Other Problems ({0})"
+msgstr "その他の問題 ({0})"
 
 msgid "Overwrite File?"
 msgstr "ファイルを上書きしますか?"
@@ -1144,14 +1129,14 @@ msgstr "パッケージの説明"
 msgid "Package name"
 msgstr "パッケージ名"
 
-msgid "Package tree unavailable: %s"
-msgstr "パッケージツリーを利用できません: %s"
+msgid "Package tree unavailable: {0}"
+msgstr "パッケージツリーを利用できません: {0}"
 
 msgid "Parent location"
 msgstr "親の場所"
 
-msgid "Parse error: %s"
-msgstr "パースエラー: %s"
+msgid "Parse error: {0}"
+msgstr "パースエラー: {0}"
 
 msgid "Pause"
 msgstr "一時停止"
@@ -1162,8 +1147,8 @@ msgstr "パフォーマンス"
 msgid "Performance overlay"
 msgstr "パフォーマンスオーバーレイ"
 
-msgid "Pin a named baseline to transaction sequence %llu."
-msgstr "トランザクションシーケンス %llu に名前付きベースラインを固定します。"
+msgid "Pin a named baseline to transaction sequence {0}."
+msgstr "トランザクションシーケンス {0} に名前付きベースラインを固定します。"
 
 msgid "Preferences"
 msgstr "設定"
@@ -1204,14 +1189,11 @@ msgstr "プロンプト"
 msgid "Proposal Creator"
 msgstr "提案クリエーター"
 
-msgid "Proposal draft: %d operation(s)"
-msgstr "提案ドラフト: %d 件の操作"
-
 msgid "Proposal preview is active. Exit preview before editing element properties."
 msgstr "提案プレビューが有効です。要素プロパティを編集する前にプレビューを終了してください。"
 
-msgid "Proposal: %s"
-msgstr "提案: %s"
+msgid "Proposal: {0}"
+msgstr "提案: {0}"
 
 msgid "Proposed change: Broken"
 msgstr "提案変更: 破損"
@@ -1228,8 +1210,8 @@ msgstr "生バケットテーブル"
 msgid "Reached snapshot or baseline — restore from history to go further back."
 msgstr "スナップショットまたはベースラインに到達しました — さらに戻すには履歴から復元してください。"
 
-msgid "Reason: %s"
-msgstr "理由: %s"
+msgid "Reason: {0}"
+msgstr "理由: {0}"
 
 msgid "Reasoning:"
 msgstr "推論:"
@@ -1246,29 +1228,26 @@ msgstr "監査ログを再構築"
 msgid "Reconcile audit log…"
 msgstr "監査ログを再構築…"
 
-msgid "Reconstruction failed: %s"
-msgstr "再構築に失敗しました: %s"
+msgid "Reconstruction failed: {0}"
+msgstr "再構築に失敗しました: {0}"
 
 msgid "Recorded proposal property change."
 msgstr "提案プロパティの変更を記録しました。"
 
-msgid "Reference: %s"
-msgstr "参照: %s"
+msgid "Reference: {0}"
+msgstr "参照: {0}"
 
-msgid "Relationship %s"
-msgstr "関係 %s"
+msgid "Relationship not found: {0}"
+msgstr "関係が見つかりません: {0}"
 
-msgid "Relationship not found: %s"
-msgstr "関係が見つかりません: %s"
+msgid "Relationship {0}"
+msgstr "関係 {0}"
 
 msgid "Relationship {0} -> {1}"
 msgstr "関係 {0} -> {1}"
 
 msgid "Remove"
 msgstr "除去"
-
-msgid "Remove %s?"
-msgstr "%s を除去しますか?"
 
 msgid "Remove ACP"
 msgstr "ACP を除去"
@@ -1281,6 +1260,9 @@ msgstr "サブツリーを除去"
 
 msgid "Remove the SACM-backed ACP metadata from its target."
 msgstr "対象から SACM ベースの ACP メタデータを除去します。"
+
+msgid "Remove {0}?"
+msgstr "{0} を除去しますか?"
 
 msgid "Reset toggles"
 msgstr "切替をリセット"
@@ -1315,11 +1297,11 @@ msgstr "レビュー"
 msgid "Review comment"
 msgstr "レビューコメント"
 
-msgid "Review status: %s"
-msgstr "レビュー状態: %s"
+msgid "Review status: {0}"
+msgstr "レビュー状態: {0}"
 
-msgid "Reviewed by %s"
-msgstr "レビュー担当者: %s"
+msgid "Reviewed by {0}"
+msgstr "レビュー担当者: {0}"
 
 msgid "Reviewer Name"
 msgstr "レビュー担当者名"
@@ -1339,8 +1321,8 @@ msgstr "用語カードまたは用語表の行から使用箇所検索を実行
 msgid "SACM Viewer"
 msgstr "SACM ビューア"
 
-msgid "SACM relationship: %s"
-msgstr "SACM 関係: %s"
+msgid "SACM relationship: {0}"
+msgstr "SACM 関係: {0}"
 
 msgid "SCCG"
 msgstr "SCCG"
@@ -1357,8 +1339,8 @@ msgstr "SCCG ガイドラインは使用できません。"
 msgid "SCCG profiles unavailable."
 msgstr "SCCG プロファイルを使用できません。"
 
-msgid "SCCG profiles unavailable: %s"
-msgstr "SCCG プロファイルを使用できません: %s"
+msgid "SCCG profiles unavailable: {0}"
+msgstr "SCCG プロファイルを使用できません: {0}"
 
 msgid "Safety Case Owner"
 msgstr "安全ケース責任者"
@@ -1387,8 +1369,8 @@ msgstr "レビュー担当者名を保存"
 msgid "Save report to file"
 msgstr "レポートをファイルに保存"
 
-msgid "Saved: %s"
-msgstr "保存しました: %s"
+msgid "Saved: {0}"
+msgstr "保存しました: {0}"
 
 msgid "Search"
 msgstr "検索"
@@ -1444,11 +1426,11 @@ msgstr "ソリューション"
 msgid "Source"
 msgstr "ソース"
 
-msgid "Source file: %s"
-msgstr "ソースファイル: %s"
+msgid "Source file: {0}"
+msgstr "ソースファイル: {0}"
 
-msgid "Source: %s"
-msgstr "ソース: %s"
+msgid "Source: {0}"
+msgstr "ソース: {0}"
 
 msgid "Sources:"
 msgstr "ソース:"
@@ -1462,8 +1444,8 @@ msgstr "空の保証プロジェクトワークスペースから開始します
 msgid "Status"
 msgstr "ステータス"
 
-msgid "Status: %s"
-msgstr "ステータス: %s"
+msgid "Status: {0}"
+msgstr "ステータス: {0}"
 
 msgid "Store in"
 msgstr "保存先"
@@ -1477,14 +1459,14 @@ msgstr "戦略"
 msgid "Summary:"
 msgstr "要約:"
 
-msgid "Target element: %s"
-msgstr "対象要素: %s"
+msgid "Target element: {0}"
+msgstr "対象要素: {0}"
 
 msgid "Target:"
 msgstr "対象:"
 
-msgid "Target: %s"
-msgstr "対象: %s"
+msgid "Target: {0}"
+msgstr "対象: {0}"
 
 msgid "Targets:"
 msgstr "ターゲット:"
@@ -1576,8 +1558,8 @@ msgstr "テーマ"
 msgid "This confidence assessment may be stale because the element changed after the value was stored."
 msgstr "この信頼度評価は古い可能性があります — 値が保存された後に要素が変更されました。"
 
-msgid "This frame: %.2f ms render across %zu buckets"
-msgstr "このフレーム: %.2f ms (%zu バケット)"
+msgid "This frame: {0:.2f} ms render across {1} buckets"
+msgstr "このフレーム: {0:.2f} ms ({1} バケット)"
 
 msgid "This is a preview. The project model has not been changed."
 msgstr "これはプレビューです。プロジェクトモデルは変更されていません。"
@@ -1609,8 +1591,8 @@ msgstr "主張、エビデンス、レビュー出力を追跡します"
 msgid "Transaction"
 msgstr "トランザクション"
 
-msgid "Transactions: %zu   |   Current: Tx %llu / %llu"
-msgstr "トランザクション: %zu   |   現在: Tx %llu / %llu"
+msgid "Transactions: {0}   |   Current: Tx {1} / {2}"
+msgstr "トランザクション: {0}   |   現在: Tx {1} / {2}"
 
 msgid "Translation Language"
 msgstr "翻訳言語"
@@ -1621,8 +1603,8 @@ msgstr "種別"
 msgid "Type:"
 msgstr "種別:"
 
-msgid "Type: %s"
-msgstr "種別: %s"
+msgid "Type: {0}"
+msgstr "種別: {0}"
 
 msgid "Uncategorized"
 msgstr "未分類"
@@ -1651,8 +1633,8 @@ msgstr "未保存の変更"
 msgid "Update Key"
 msgstr "キーを更新"
 
-msgid "Usage count: %d"
-msgstr "使用回数: %d"
+msgid "Usage count: {0}"
+msgstr "使用回数: {0}"
 
 msgid "Use for this element"
 msgstr "この要素に使用"
@@ -1699,8 +1681,8 @@ msgstr "ようこそ!"
 msgid "XML File:"
 msgstr "XML ファイル:"
 
-msgid "XML element: %s"
-msgstr "XML 要素: %s"
+msgid "XML element: {0}"
+msgstr "XML 要素: {0}"
 
 msgid "Yes"
 msgstr "はい"
@@ -1708,8 +1690,8 @@ msgstr "はい"
 msgid "Yes, Overwrite"
 msgstr "はい、上書きする"
 
-msgid "You have unsaved changes in the current SACM file. Save before opening %s?"
-msgstr "現在の SACM ファイルに未保存の変更があります。%s を開く前に保存しますか?"
+msgid "You have unsaved changes in the current SACM file. Save before opening {0}?"
+msgstr "現在の SACM ファイルに未保存の変更があります。{0} を開く前に保存しますか?"
 
 msgid "You have unsaved changes. Save before closing?"
 msgstr "未保存の変更があります。閉じる前に保存しますか?"
@@ -1732,8 +1714,8 @@ msgstr "エラー"
 msgid "frame interval (colored by FPS)"
 msgstr "フレーム間隔 (FPS で色分け)"
 
-msgid "hello_imgui FpsIdling: when the UI is quiet, throttle to %.0f FPS to save power.\nUncheck to keep the app running at full speed even when idle."
-msgstr "hello_imgui FpsIdling: UI が静かなときに %.0f FPS にスロットルして電力を節約します。\nアイドル時もフルスピードで動作させるにはオフにしてください。"
+msgid "hello_imgui FpsIdling: when the UI is quiet, throttle to {0:.0f} FPS to save power.\nUncheck to keep the app running at full speed even when idle."
+msgstr "hello_imgui FpsIdling: UI が静かなときに {0:.0f} FPS にスロットルして電力を節約します。\nアイドル時もフルスピードで動作させるにはオフにしてください。"
 
 msgid "info"
 msgstr "情報"
@@ -1747,8 +1729,8 @@ msgstr "問題"
 msgid "render cost only"
 msgstr "描画コストのみ"
 
-msgid "replay=%s  on_disk=%s"
-msgstr "再生=%s  ディスク=%s"
+msgid "replay={0}  on_disk={1}"
+msgstr "再生={0}  ディスク={1}"
 
 msgid "the selected project file"
 msgstr "選択したプロジェクトファイル"
@@ -1771,14 +1753,26 @@ msgstr "待機中…"
 msgid "warning"
 msgstr "警告"
 
+msgid "{0}\nClick to open the Review tab."
+msgstr "{0}\nクリックしてレビュータブを開きます。"
+
 msgid "{0}  by {1}"
 msgstr "{0}  作業者 {1}"
 
 msgid "{0} claims · {1} strategies · {2} evidence · {3} undeveloped"
 msgstr "主張 {0} 件 · 戦略 {1} 件 · エビデンス {2} 件 · 未展開 {3} 件"
 
+msgid "{0} has multiple meanings."
+msgstr "{0} には複数の意味があります。"
+
 msgid "{0} has {1} visible meanings. Choose the intended terminology entry."
 msgstr "{0} には {1} 件の表示可能な意味があります。意図する用語項目を選択してください。"
+
+msgid "{0} is not defined."
+msgstr "{0} は定義されていません。"
+
+msgid "{0} is not implemented yet."
+msgstr "{0} はまだ実装されていません。"
 
 msgid "{0} looks like an undefined terminology entry."
 msgstr "{0} は未定義の用語項目のように見えます。"
@@ -1788,6 +1782,10 @@ msgstr "{0} 件の問題 · トップ {1}: {2}"
 
 msgid "● PAUSED"
 msgstr "● 一時停止中"
+
+msgid "Proposal draft: {0} operation"
+msgid_plural "Proposal draft: {0} operations"
+msgstr[0] "提案ドラフト: {0} 件の操作"
 
 msgid "This category is assigned to {0} term. Remove those assignments before deleting it."
 msgid_plural "This category is assigned to {0} terms. Remove those assignments before deleting it."
@@ -1816,6 +1814,10 @@ msgstr[0] "{0} 件のレガシー表現項目があり、旧ツールにより�
 msgid "{0} more candidate."
 msgid_plural "{0} more candidates."
 msgstr[0] "他に {0} 件の候補"
+
+msgid "{0} operation"
+msgid_plural "{0} operations"
+msgstr[0] "{0} 件の操作"
 
 msgid "{0} problem · top: {1}\nClick to open the Problems panel."
 msgid_plural "{0} problems · top: {1}\nClick to open the Problems panel."

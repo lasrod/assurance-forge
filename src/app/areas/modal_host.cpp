@@ -152,8 +152,10 @@ void ModalHost::RenderNotImplementedModal() {
     if (ImGui::BeginPopupModal("##not_implemented_modal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         // The feature name is stored as the English msgid; translate here so
         // the modal always matches the current UI language.
-        ImGui::Text(AF_TR("%s is not implemented yet.").c_str(),
-                    AF_TR(state_.modal_coordinator->not_implemented_feature.c_str()).c_str());
+        ImGui::TextUnformatted(
+            ui::i18n::trf("{0} is not implemented yet.",
+                          AF_TR(state_.modal_coordinator->not_implemented_feature.c_str()))
+                .c_str());
         ImGui::Spacing();
         ImGui::Spacing();
 
@@ -187,7 +189,7 @@ void ModalHost::RenderRemoveConfirmModal() {
             state_.element_edit_controller->PendingRemoveMode() == core::RemoveMode::NodeOnly
                 ? AF_TR("this node and its attachments")
                 : AF_TR("this node and its descendants");
-        ImGui::Text(AF_TR("Remove %s?").c_str(), mode_label.c_str());
+        ImGui::TextUnformatted(ui::i18n::trf("Remove {0}?", mode_label).c_str());
         ImGui::TextUnformatted(ui::i18n::trnf("{0} element will be deleted (highlighted in red).",
                                               "{0} elements will be deleted (highlighted in red).",
                                               n,
@@ -232,7 +234,7 @@ void ModalHost::RenderDeleteReviewItemConfirmModal() {
         ImGui::TextWrapped("%s", AF_TR("Delete this review comment?").c_str());
         ImGui::TextWrapped("%s", AF_TR("The attached proposal will also be deleted.").c_str());
         if (item.proposal_id.has_value()) {
-            ImGui::TextDisabled(AF_TR("Proposal: %s").c_str(), item.proposal_id->c_str());
+            ImGui::TextDisabled("%s", ui::i18n::trf("Proposal: {0}", *item.proposal_id).c_str());
         }
         ImGui::Spacing();
         ImGui::Spacing();
@@ -469,8 +471,10 @@ void ModalHost::RenderSaveBeforeProjectFileOpenModal() {
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal((AF_TR("Open Project File") + "###Open Project File").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextWrapped(AF_TR("You have unsaved changes in the current SACM file. Save before opening %s?").c_str(),
-                           target.c_str());
+        ImGui::TextWrapped(
+            "%s",
+            ui::i18n::trf("You have unsaved changes in the current SACM file. Save before opening {0}?", target)
+                .c_str());
         ImGui::Spacing();
 
         if (ImGui::Button(AF_TR("Save").c_str(), ImVec2(100.0f, 0.0f))) {

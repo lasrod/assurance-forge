@@ -181,7 +181,8 @@ void RenderHistoricalCanvas(CanvasHistoryState& tab_state,
                             const ui::gsn::CanvasOverlayButtons* overlay_buttons) {
     if (!tab_state.reconstruction.has_state) {
         if (!tab_state.reconstruction.error.empty())
-            ImGui::TextDisabled(AF_TR("Reconstruction failed: %s").c_str(), tab_state.reconstruction.error.c_str());
+            ImGui::TextDisabled("%s",
+                                ui::i18n::trf("Reconstruction failed: {0}", tab_state.reconstruction.error).c_str());
         else
             ImGui::TextDisabled("%s", AF_TR("No reconstructed model to display.").c_str());
         return;
@@ -294,8 +295,11 @@ void RenderCanvasDivergenceBanner(AppRuntimeState& state,
               "views may be inaccurate.")
             .c_str());
     if (!v.replayed_canonical_hash.empty() && !v.on_disk_canonical_hash.empty()) {
-        ImGui::TextWrapped(AF_TR("replay=%s  on_disk=%s").c_str(), v.replayed_canonical_hash.substr(0, 12).c_str(),
-                           v.on_disk_canonical_hash.substr(0, 12).c_str());
+        ImGui::TextWrapped("%s",
+                           ui::i18n::trf("replay={0}  on_disk={1}",
+                                         v.replayed_canonical_hash.substr(0, 12),
+                                         v.on_disk_canonical_hash.substr(0, 12))
+                               .c_str());
     }
     if (ImGui::Button(AF_TR("Reconcile audit log\u2026").c_str()))
         ImGui::OpenPopup((AF_TR("Reconcile audit log") + "###reconcile_confirm").c_str());

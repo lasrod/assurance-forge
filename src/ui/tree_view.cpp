@@ -302,8 +302,8 @@ void ShowTreeViewPanel(const core::AssuranceTree* tree,
                 ImGui::TableNextRow();
                 ImGui::TableSetColumnIndex(0);
                 ImGui::Separator();
-                if (ImGui::TreeNodeEx("##orphans", ImGuiTreeNodeFlags_SpanAllColumns, AF_TR("Orphans (%d)").c_str(),
-                                      (int)tree->orphans.size())) {
+                if (ImGui::TreeNodeEx("##orphans", ImGuiTreeNodeFlags_SpanAllColumns, "%s",
+                                      ui::i18n::trf("Orphans ({0})", (int)tree->orphans.size()).c_str())) {
                     for (const auto* orphan : tree->orphans) {
                         RenderTreeNode(orphan, active_case, state, actions, tree_edit_actions);
                     }

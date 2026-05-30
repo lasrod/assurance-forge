@@ -67,7 +67,8 @@ void RenderHistoryPanelContent(AppRuntimeState& state, const HistoryPanelAreaCal
         GetCachedTransactions(project.rootPath, error);
     const bool has_audit = error.empty();
     if (!has_audit) {
-        ImGui::TextColored(ImVec4(0.95f, 0.55f, 0.45f, 1.0f), AF_TR("Audit store error: %s").c_str(), error.c_str());
+        ImGui::TextColored(ImVec4(0.95f, 0.55f, 0.45f, 1.0f), "%s",
+                           ui::i18n::trf("Audit store error: {0}", error).c_str());
     }
 
     WorkbenchState::ArgumentPackageCanvasTab* active_tab = FindActiveCanvasTab(state);
@@ -158,10 +159,11 @@ void RenderHistoryPanelContent(AppRuntimeState& state, const HistoryPanelAreaCal
     if (has_audit && !transactions.empty()) {
         const std::uint64_t latest_seq = transactions.back().transaction_sequence;
         const std::uint64_t current = selected_seq.value_or(latest_seq);
-        ImGui::Text(AF_TR("Transactions: %zu   |   Current: Tx %llu / %llu").c_str(),
-                    transactions.size(),
-                    static_cast<unsigned long long>(current),
-                    static_cast<unsigned long long>(latest_seq));
+        ImGui::TextUnformatted(ui::i18n::trf("Transactions: {0}   |   Current: Tx {1} / {2}",
+                                             transactions.size(),
+                                             static_cast<unsigned long long>(current),
+                                             static_cast<unsigned long long>(latest_seq))
+                                   .c_str());
         ImGui::SameLine();
         ImGui::BeginDisabled(!selected_seq.has_value());
         if (ImGui::SmallButton(AF_TR("Return to live").c_str()))
@@ -173,10 +175,11 @@ void RenderHistoryPanelContent(AppRuntimeState& state, const HistoryPanelAreaCal
         }
         if (filter_active) {
             ImGui::SameLine();
-            ImGui::TextColored(ImVec4(0.7f, 0.85f, 1.0f, 1.0f),
-                               AF_TR(" | Showing %zu of %zu (filtered)").c_str(),
-                               filtered_transactions.size(),
-                               transactions.size());
+            ImGui::TextColored(ImVec4(0.7f, 0.85f, 1.0f, 1.0f), "%s",
+                               ui::i18n::trf(" | Showing {0} of {1} (filtered)",
+                                             filtered_transactions.size(),
+                                             transactions.size())
+                                   .c_str());
         }
         ImGui::Separator();
     }

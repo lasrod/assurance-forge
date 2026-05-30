@@ -249,14 +249,16 @@ void RenderTermDetails(const sacm::AssuranceCasePackage* package,
     if (terminology_package && !term->category_refs.empty()) {
         const std::string categories = JoinCategoryNames(*terminology_package, term->category_refs);
         if (!categories.empty())
-            ImGui::TextDisabled(AF_TR("Category: %s").c_str(), categories.c_str());
+            ImGui::TextDisabled("%s", ui::i18n::trf("Category: {0}", categories).c_str());
     }
     if (!term->externalReference.empty())
-        ImGui::TextDisabled(AF_TR("Reference: %s").c_str(), term->externalReference.c_str());
+        ImGui::TextDisabled("%s", ui::i18n::trf("Reference: {0}", term->externalReference).c_str());
     if (!term->origin.empty())
-        ImGui::TextDisabled(AF_TR("Origin: %s").c_str(), term->origin.c_str());
+        ImGui::TextDisabled("%s", ui::i18n::trf("Origin: {0}", term->origin).c_str());
     if (package)
-        ImGui::TextDisabled(AF_TR("Usage count: %d").c_str(), core::CountTerminologyTermUsage(*package, *term));
+        ImGui::TextDisabled("%s", ui::i18n::trf("Usage count: {0}",
+                                                core::CountTerminologyTermUsage(*package, *term))
+                                      .c_str());
 }
 
 void RenderTerminologyCardContents(const TerminologyCardState& card_state,
@@ -265,7 +267,7 @@ void RenderTerminologyCardContents(const TerminologyCardState& card_state,
                                    bool interactive) {
     ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + DpiSize(320.0f));
     if (card_state.kind == TerminologyCardKind::Undefined) {
-        ImGui::TextColored(GetWarningColor(), AF_TR("%s is not defined.").c_str(), card_state.text.c_str());
+        ImGui::TextColored(GetWarningColor(), "%s", ui::i18n::trf("{0} is not defined.", card_state.text).c_str());
         ImGui::TextWrapped("%s", AF_TR("Define this term from the active terminology scope.").c_str());
         if (interactive && actions.define_terminology_term) {
             if (ImGui::Button(AF_TR("Define term").c_str(), ImVec2(120.0f, 0.0f)))
@@ -276,7 +278,8 @@ void RenderTerminologyCardContents(const TerminologyCardState& card_state,
     }
 
     if (card_state.kind == TerminologyCardKind::Ambiguous) {
-        ImGui::TextColored(GetWarningColor(), AF_TR("%s has multiple meanings.").c_str(), card_state.text.c_str());
+        ImGui::TextColored(GetWarningColor(), "%s",
+                           ui::i18n::trf("{0} has multiple meanings.", card_state.text).c_str());
         int shown = 0;
         for (const auto& candidate : card_state.candidates) {
             ImGui::PushID(shown);

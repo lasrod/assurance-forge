@@ -218,7 +218,7 @@ void RenderFile(const core::ProjectFileEntry& entry,
     }
 
     if (has_package_tree && !tree_it->second.success) {
-        ImGui::TextDisabled(AF_TR("Package tree unavailable: %s").c_str(), tree_it->second.error_message.c_str());
+        ImGui::TextDisabled("%s", ui::i18n::trf("Package tree unavailable: {0}", tree_it->second.error_message).c_str());
     }
 
     if (wants_file_context_menu) {

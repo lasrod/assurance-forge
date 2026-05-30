@@ -279,8 +279,8 @@ void RenderTerminologySuggestions(const sacm::AssuranceCasePackage* sacm_pkg,
     for (const TerminologySuggestion& suggestion : suggestions) {
         ImGui::PushID(suggestion.text.c_str());
         if (suggestion.kind == TerminologySuggestion::Kind::AmbiguousTerm) {
-            ImGui::TextColored(ui::GetWarningColor(), AF_TR("%s has multiple meanings.").c_str(),
-                               suggestion.text.c_str());
+            ImGui::TextColored(ui::GetWarningColor(), "%s",
+                               ui::i18n::trf("{0} has multiple meanings.", suggestion.text).c_str());
             int candidate_index = 0;
             for (const auto& candidate : suggestion.candidates) {
                 ImGui::PushID(candidate_index++);
@@ -303,7 +303,8 @@ void RenderTerminologySuggestions(const sacm::AssuranceCasePackage* sacm_pkg,
             continue;
         }
 
-        ImGui::TextColored(ui::GetWarningColor(), AF_TR("%s is not defined.").c_str(), suggestion.text.c_str());
+        ImGui::TextColored(ui::GetWarningColor(), "%s",
+                           ui::i18n::trf("{0} is not defined.", suggestion.text).c_str());
         if (callbacks && callbacks->define_term) {
             if (ImGui::Button(AF_TR("Define").c_str()))
                 callbacks->define_term(element_id, suggestion.text);
@@ -363,7 +364,7 @@ bool RenderReviewAttentionNotice(const ui::UiState& state,
         if (review_msg.empty()) {
             ImGui::SetTooltip("%s", AF_TR("Open review comments or AI review failures for this element.").c_str());
         } else {
-            ImGui::SetTooltip(AF_TR("%s\nClick to open the Review tab.").c_str(), review_msg.c_str());
+            ImGui::SetTooltip("%s", ui::i18n::trf("{0}\nClick to open the Review tab.", review_msg).c_str());
         }
     }
     return true;
@@ -394,7 +395,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     // Find the element by ID
     parser::SacmElement* elem = find_parser_element(ac, state.selected_element_id);
     if (!elem) {
-        ImGui::TextDisabled(AF_TR("Element not found: %s").c_str(), state.selected_element_id.c_str());
+        ImGui::TextDisabled("%s", ui::i18n::trf("Element not found: {0}", state.selected_element_id).c_str());
         return false;
     }
 
@@ -442,7 +443,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     }
     // Secondary language name (only show if this field has the secondary language)
     if (elem->name_langs.count(sec_lang)) {
-        ImGui::Text(AF_TR("Name (%s)").c_str(), sec_lang.c_str());
+        ImGui::TextUnformatted(ui::i18n::trf("Name ({0})", sec_lang).c_str());
         if (ui::gsn::g_BoldFont)
             ImGui::PushFont(ui::gsn::g_BoldFont);
         std::string sec_name = elem->name_langs.at(sec_lang);
@@ -474,7 +475,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
         RenderTerminologySuggestions(sacm_pkg, elem->id, elem->content, terminology_callbacks);
         // Secondary language content (only show if this field has the secondary language)
         if (elem->content_langs.count(sec_lang)) {
-            ImGui::Text(AF_TR("Content (%s)").c_str(), sec_lang.c_str());
+            ImGui::TextUnformatted(ui::i18n::trf("Content ({0})", sec_lang).c_str());
             std::string sec_content = elem->content_langs.at(sec_lang);
             ImGuiID widget_id = 0;
             if (EditableTextField("content_sec", sec_content, -1.0f, &widget_id)) {
@@ -510,7 +511,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
         RenderTerminologySuggestions(sacm_pkg, elem->id, elem->description, terminology_callbacks);
     // Secondary language description (only show if this field has the secondary language)
     if (elem->description_langs.count(sec_lang)) {
-        ImGui::Text(AF_TR("Description (%s)").c_str(), sec_lang.c_str());
+        ImGui::TextUnformatted(ui::i18n::trf("Description ({0})", sec_lang).c_str());
         std::string sec_desc = elem->description_langs.at(sec_lang);
         ImGuiID widget_id = 0;
         if (EditableTextField("description_sec", sec_desc, -1.0f, &widget_id)) {

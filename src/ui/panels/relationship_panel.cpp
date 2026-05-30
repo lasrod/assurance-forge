@@ -85,7 +85,8 @@ void ShowRelationshipPanel(parser::AssuranceCase* model, const RelationshipPanel
     const core::acp::AcpRelationshipTarget* selected_target = FindSelectedTarget(targets, ui_state);
     const parser::SacmElement* relationship = FindElement(*model, ui_state.selected_relationship_id);
     if (!selected_target || !relationship) {
-        ImGui::TextDisabled(AF_TR("Relationship not found: %s").c_str(), ui_state.selected_relationship_id.c_str());
+        ImGui::TextDisabled("%s",
+                            ui::i18n::trf("Relationship not found: {0}", ui_state.selected_relationship_id).c_str());
         return;
     }
 

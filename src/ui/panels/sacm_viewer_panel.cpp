@@ -98,7 +98,7 @@ void ShowOverwriteModal(SacmViewerPanelModel& model) {
     }
 
     if (ImGui::BeginPopupModal((AF_TR("Overwrite File?") + "###Overwrite File?").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text(AF_TR("File already exists:\n%s").c_str(), model.file_path_buf);
+        ImGui::TextUnformatted(ui::i18n::trf("File already exists:\n{0}", model.file_path_buf).c_str());
         ImGui::Separator();
         ImGui::Text("%s", AF_TR("Are you sure you want to overwrite it?").c_str());
         ImGui::Spacing();
@@ -139,7 +139,7 @@ void ShowProjectSummary(const parser::AssuranceCase& ac) {
 }
 
 void ShowElementList(const parser::AssuranceCase& ac) {
-    ImGui::Text(AF_TR("Assurance Case: %s").c_str(), ac.name.c_str());
+    ImGui::TextUnformatted(ui::i18n::trf("Assurance Case: {0}", ac.name).c_str());
     ImGui::Separator();
 
     if (ImGui::BeginChild("ElementList", ImVec2(0, 0), true)) {
@@ -152,7 +152,7 @@ void ShowElementList(const parser::AssuranceCase& ac) {
             ImGui::Text("%s: %s", elem.id.c_str(), elem.name.c_str());
 
             if (!elem.content.empty()) {
-                ImGui::TextWrapped(AF_TR("  Content: %s").c_str(), elem.content.c_str());
+                ImGui::TextWrapped("%s", ui::i18n::trf("  Content: {0}", elem.content).c_str());
             }
 
             ImGui::PopID();

@@ -924,10 +924,11 @@ void RenderPerfOverlay(bool& open) {
                 rp->fpsIdling.enableIdling = idling_enabled;
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip(
-                    AF_TR("hello_imgui FpsIdling: when the UI is quiet, throttle to %.0f FPS to save power.\n"
-                          "Uncheck to keep the app running at full speed even when idle.")
-                        .c_str(),
-                    rp->fpsIdling.fpsIdle);
+                    "%s",
+                    ui::i18n::trf("hello_imgui FpsIdling: when the UI is quiet, throttle to {0:.0f} FPS to save "
+                                  "power.\nUncheck to keep the app running at full speed even when idle.",
+                                  rp->fpsIdling.fpsIdle)
+                        .c_str());
             }
 
             // Live "currently idling" indicator — auto-set, not user-clickable.
@@ -966,7 +967,8 @@ void RenderPerfOverlay(bool& open) {
             ImGui::SameLine();
             ImGui::TextColored(status_text_col, "%s", status_label.c_str());
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(AF_TR("Live status from runnerParams.fpsIdling.\n%s").c_str(), tooltip_extra.c_str());
+                ImGui::SetTooltip(
+                    "%s", ui::i18n::trf("Live status from runnerParams.fpsIdling.\n{0}", tooltip_extra).c_str());
         }
     }
     ImGui::Spacing();
@@ -1072,7 +1074,8 @@ void RenderPerfOverlay(bool& open) {
 
     {
         const auto groups = GroupBySubsystem(samples);
-        ImGui::Text(AF_TR("This frame: %.2f ms render across %zu buckets").c_str(), render_ms, samples.size());
+        ImGui::TextUnformatted(
+            ui::i18n::trf("This frame: {0:.2f} ms render across {1} buckets", render_ms, samples.size()).c_str());
         DrawSubsystemStackedBar(groups, total_ns, 28.0f);
     }
 
@@ -1238,7 +1241,7 @@ void RenderPerfOverlay(bool& open) {
             t = core::perf::PerfToggles{};
         }
         if (!last_saved_path.empty()) {
-            ImGui::TextDisabled(AF_TR("Saved: %s").c_str(), last_saved_path.c_str());
+            ImGui::TextDisabled("%s", ui::i18n::trf("Saved: {0}", last_saved_path).c_str());
         }
     }
 

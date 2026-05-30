@@ -49,8 +49,10 @@ void RenderBaselineModal(BaselineModalState& state,
     if (!ImGui::BeginPopupModal(popup_id.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         return;
 
-    ImGui::TextWrapped(AF_TR("Pin a named baseline to transaction sequence %llu.").c_str(),
-                       static_cast<unsigned long long>(state.at_sequence));
+    ImGui::TextWrapped("%s",
+                       ui::i18n::trf("Pin a named baseline to transaction sequence {0}.",
+                                     static_cast<unsigned long long>(state.at_sequence))
+                           .c_str());
     ImGui::Spacing();
 
     ImGui::TextUnformatted(AF_TR("Name").c_str());
