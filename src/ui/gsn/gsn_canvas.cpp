@@ -836,7 +836,7 @@ void SetCanvasElements(const std::vector<CanvasElement>& elements) {
 }
 
 void SetCanvasTree(const core::AssuranceTree& tree) {
-    GlobalRenderer().SetTree(tree);
+    GlobalRenderer().SetTree(tree, GetUiState().selected_element_id);
 }
 
 CanvasRenderStats GetLastCanvasRenderStats() {

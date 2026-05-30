@@ -212,7 +212,7 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
     renderer.SetCaseRevision(state.app_state.case_revision);
     if (!cache.renderer_seeded) {
         core::perf::ScopedTimer perf_scope("app.wb.set_tree");
-        renderer.SetTree(cache.visible_tree);
+        renderer.SetTree(cache.visible_tree, ui_state.selected_element_id);
         cache.renderer_seeded = true;
     }
 

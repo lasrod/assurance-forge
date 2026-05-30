@@ -44,10 +44,33 @@ void GsnCanvas::RebuildNodeLookup() {
     }
 }
 
-void GsnCanvas::SetTree(const core::AssuranceTree& tree) {
+void GsnCanvas::SetTree(const core::AssuranceTree& tree, const std::string& anchor_node_id) {
+    // Capture the anchor node's center in layout space before the recompute
+    // so we can shift the view to keep it visually fixed afterwards.
+    std::optional<ImVec2> anchor_before;
+    if (!anchor_node_id.empty()) {
+        auto it = node_by_id_.find(anchor_node_id);
+        if (it != node_by_id_.end() && it->second != nullptr) {
+            const LayoutNode& n = *it->second;
+            anchor_before = ImVec2(n.position.x + n.size.x * 0.5f, n.position.y + n.size.y * 0.5f);
+        }
+    }
+
     LayoutEngine le;
     layout_nodes_ = le.ComputeLayout(tree);
     RebuildNodeLookup();
+
+    if (anchor_before.has_value()) {
+        auto it = node_by_id_.find(anchor_node_id);
+        if (it != node_by_id_.end() && it->second != nullptr) {
+            const LayoutNode& n = *it->second;
+            ImVec2 anchor_after(n.position.x + n.size.x * 0.5f, n.position.y + n.size.y * 0.5f);
+            // Keep `screen = canvas_origin - view_offset_ + pos*zoom` constant
+            // for the anchor by absorbing the layout-space delta into view_offset_.
+            view_offset_.x += (anchor_after.x - anchor_before->x) * zoom_level_;
+            view_offset_.y += (anchor_after.y - anchor_before->y) * zoom_level_;
+        }
+    }
 }
 
 void GsnCanvas::SetElements(const std::vector<CanvasElement>& elements) {
