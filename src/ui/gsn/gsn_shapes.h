@@ -8,12 +8,13 @@ namespace ui::gsn {
 
 // Geometry constants shared with text-layout code in `gsn_canvas.cpp`.
 inline constexpr float kClaimRounding = 8.0f;      // corner rounding for rectangular Claim nodes
+inline constexpr float kContextRounding = 24.0f;   // corner rounding for Context/Assumption/Justification nodes
 inline constexpr float kParallelogramSkew = 0.15f; // fraction of width used for skew inset
 
 // Parallelogram (Strategy) shape with inward-skewed top/bottom edges.
 void DrawParallelogram(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color, float zoom);
 
-// Stadium / capsule shape (Context, Assumption, Justification).
+// Rounded rectangle with a softer corner radius (Context, Assumption, Justification).
 void DrawStadium(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color, float zoom);
 
 // Filled circle centered in the bounding box (Solution, Evidence).

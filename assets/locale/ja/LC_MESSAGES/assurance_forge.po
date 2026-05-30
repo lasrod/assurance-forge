@@ -757,6 +757,9 @@ msgstr "アイドリングは有効ですが、現在スロットルしていま
 msgid "Ignore"
 msgstr "無視"
 
+msgid "Ignored terms"
+msgstr "無視された用語"
+
 msgid "Import SACM"
 msgstr "SACM をインポート"
 
@@ -957,6 +960,9 @@ msgstr "リンク可能な既存の信頼度論証ツリーはありません。
 
 msgid "No files"
 msgstr "ファイルなし"
+
+msgid "No ignored terms."
+msgstr "無視された用語はありません。"
 
 msgid "No matching SCCG guideline IDs."
 msgstr "一致する SCCG ガイドライン ID がありません。"
@@ -1278,6 +1284,9 @@ msgstr "解決済み"
 
 msgid "Response"
 msgstr "応答"
+
+msgid "Restore"
+msgstr "復元"
 
 msgid "Resume"
 msgstr "再開"

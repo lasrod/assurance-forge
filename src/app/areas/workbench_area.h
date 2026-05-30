@@ -4,9 +4,11 @@
 #include "core/terminology_package_service.h"
 #include "imgui.h"
 #include "ui/element_context_menu.h"
+#include "ui/panels/terminology_package_panel.h"
 
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace app {
 struct AppRuntimeState;
@@ -47,6 +49,9 @@ struct WorkbenchAreaCallbacks {
     std::function<void(const core::TerminologyCategoryRef&)> edit_terminology_category;
     std::function<void(const core::TerminologyCategoryRef&)> delete_terminology_category;
     std::function<void()> seed_recommended_terminology_categories;
+    // Ignored-terms management for the terminology panel's "Ignored terms" section.
+    std::function<std::vector<ui::panels::IgnoredTerminologyEntry>()> list_ignored_terms;
+    std::function<void(const std::string& element_id, const std::string& term)> restore_ignored_term;
     // Invoked by the History Timeline area when the user clicks the
     // "Reconcile audit log" button on the divergence warning banner.
     std::function<void()> reconcile_audit_store;

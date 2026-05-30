@@ -5,6 +5,7 @@
 #include "app/app_runtime_state.h"
 #include "app/commands/dispatch.h"
 #include "core/commands/terminology_commands.h"
+#include "core/ignored_terminology_store.h"
 #include "core/string_utils.h"
 #include "core/terminology_text_utils.h"
 #include "parser/model_utils.h"
@@ -15,7 +16,11 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <cstddef>
 #include <filesystem>
+#include <fstream>
+#include <sstream>
+#include <system_error>
 #include <utility>
 
 namespace app::actions {
@@ -720,12 +725,86 @@ void TerminologyActions::HandleProblemQuickFix(const core::ProblemItem& problem)
 void TerminologyActions::IgnoreSuggestion(const std::string& element_id, const std::string& term_value) {
     const std::string trimmed_term = TrimWhitespace(term_value);
     state_.terminology.ignored_suggestion_keys.insert(TerminologySuggestionKey(element_id, trimmed_term));
-    SetStatus(state_, "Ignored terminology suggestion " + trimmed_term + " for this session.");
+    const auto save_result = detail::SaveIgnoredSuggestions(state_);
+    if (!save_result.success) {
+        SetStatus(state_,
+                  "Ignored terminology suggestion " + trimmed_term +
+                      " for this session, but could not persist: " + save_result.error);
+        return;
+    }
+    SetStatus(state_, "Ignored terminology suggestion " + trimmed_term + ".");
 }
 
 bool TerminologyActions::IsSuggestionIgnored(const std::string& element_id, const std::string& term_value) const {
     const std::string key = TerminologySuggestionKey(element_id, TrimWhitespace(term_value));
     return state_.terminology.ignored_suggestion_keys.count(key) > 0;
+}
+
+void TerminologyActions::RestoreSuggestion(const std::string& element_id, const std::string& term_value) {
+    const std::string trimmed_term = TrimWhitespace(term_value);
+    if (state_.terminology.ignored_suggestion_keys.erase(TerminologySuggestionKey(element_id, trimmed_term)) == 0)
+        return;
+    const auto save_result = detail::SaveIgnoredSuggestions(state_);
+    if (!save_result.success) {
+        SetStatus(state_,
+                  "Restored terminology suggestion " + trimmed_term +
+                      " for this session, but could not persist: " + save_result.error);
+        return;
+    }
+    SetStatus(state_, "Restored terminology suggestion " + trimmed_term + ".");
+}
+
+std::vector<IgnoredSuggestionView> TerminologyActions::ListIgnoredSuggestions() const {
+    std::vector<IgnoredSuggestionView> views;
+    views.reserve(state_.terminology.ignored_suggestion_keys.size());
+    for (const std::string& key : state_.terminology.ignored_suggestion_keys) {
+        IgnoredSuggestionView view;
+        const std::size_t separator = key.find('\n');
+        if (separator == std::string::npos) {
+            view.term = key;
+        } else {
+            view.element_id = key.substr(0, separator);
+            view.term = key.substr(separator + 1);
+        }
+        views.push_back(std::move(view));
+    }
+    std::sort(views.begin(), views.end(), [](const IgnoredSuggestionView& a, const IgnoredSuggestionView& b) {
+        if (a.term != b.term)
+            return a.term < b.term;
+        return a.element_id < b.element_id;
+    });
+    return views;
+}
+
+void TerminologyActions::LoadIgnoredSuggestions() {
+    state_.terminology.ignored_suggestion_keys.clear();
+    const std::filesystem::path path = detail::IgnoredTerminologyFilePath(state_);
+    if (path.empty())
+        return;
+    std::error_code ec;
+    const bool file_exists = std::filesystem::exists(path, ec);
+    if (ec) {
+        SetStatus(state_, "Ignored terminology list could not be loaded: " + ec.message());
+        return;
+    }
+    if (!file_exists)
+        return;
+    std::ifstream in(path, std::ios::binary);
+    if (!in) {
+        SetStatus(state_, "Ignored terminology list could not be loaded: could not open file.");
+        return;
+    }
+    std::ostringstream buffer;
+    buffer << in.rdbuf();
+
+    std::vector<core::terminology::IgnoredSuggestion> items;
+    std::string error;
+    if (!core::terminology::ParseIgnoredSuggestions(buffer.str(), items, error)) {
+        SetStatus(state_, "Ignored terminology list could not be loaded: " + error);
+        return;
+    }
+    for (const core::terminology::IgnoredSuggestion& item : items)
+        state_.terminology.ignored_suggestion_keys.insert(TerminologySuggestionKey(item.element_id, item.term));
 }
 
 } // namespace app::actions

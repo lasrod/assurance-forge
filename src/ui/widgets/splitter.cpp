@@ -65,15 +65,20 @@ void DrawVerticalSplitter(const char* id,
 
     ImGui::Begin(id, nullptr, panel_flags | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar);
     ImGui::InvisibleButton("##splitter_btn", ImVec2(width, height));
-    bool item_active = ImGui::IsItemActive();
+
+    // The extended hit zone is tested against raw mouse coordinates, which bypasses ImGui's normal
+    // popup/modal input blocking. When any popup is open (welcome screen, preferences, menus, ...)
+    // the splitter sits behind it and must not react to the mouse.
+    const bool blocked = ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
+    bool item_active = !blocked && ImGui::IsItemActive();
 
     ImVec2 wp = ImGui::GetWindowPos();
     ImVec2 ws = ImGui::GetWindowSize();
     ImVec2 ext_min(wp.x - hit_padding, wp.y);
     ImVec2 ext_max(wp.x + ws.x + hit_padding, wp.y + ws.y);
 
-    bool extended_drag = TrackExtendedDrag(item_active, ext_min, ext_max, ImGuiMouseButton_Left);
-    bool hovered = item_active || extended_drag || ImGui::IsMouseHoveringRect(ext_min, ext_max, false);
+    bool extended_drag = !blocked && TrackExtendedDrag(item_active, ext_min, ext_max, ImGuiMouseButton_Left);
+    bool hovered = item_active || extended_drag || (!blocked && ImGui::IsMouseHoveringRect(ext_min, ext_max, false));
 
     if (hovered) {
         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
@@ -110,15 +115,18 @@ float DrawHorizontalSplitter(
     float delta_y = 0.0f;
     ImGui::Begin(id, nullptr, panel_flags | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar);
     ImGui::InvisibleButton("##splitter_btn", ImVec2(width, height));
-    bool item_active = ImGui::IsItemActive();
+
+    // See DrawVerticalSplitter: ignore the mouse while a popup/modal is covering the splitter.
+    const bool blocked = ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
+    bool item_active = !blocked && ImGui::IsItemActive();
 
     ImVec2 wp = ImGui::GetWindowPos();
     ImVec2 ws = ImGui::GetWindowSize();
     ImVec2 ext_min(wp.x, wp.y - hit_padding);
     ImVec2 ext_max(wp.x + ws.x, wp.y + ws.y + hit_padding);
 
-    bool extended_drag = TrackExtendedDrag(item_active, ext_min, ext_max, ImGuiMouseButton_Left);
-    bool hovered = item_active || extended_drag || ImGui::IsMouseHoveringRect(ext_min, ext_max, false);
+    bool extended_drag = !blocked && TrackExtendedDrag(item_active, ext_min, ext_max, ImGuiMouseButton_Left);
+    bool hovered = item_active || extended_drag || (!blocked && ImGui::IsMouseHoveringRect(ext_min, ext_max, false));
 
     if (hovered) {
         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);

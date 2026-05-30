@@ -216,21 +216,36 @@ void RenderReviewSection(PreferencesPanelModel model, const PreferencesPanelCall
 } // namespace
 
 void ShowPreferencesWindow(bool& open, PreferencesPanelModel model, const PreferencesPanelCallbacks& callbacks) {
-    if (!open)
+    // "<translated>###<english>" keeps the ImGui popup ID stable across language switches.
+    const std::string preferences_popup_id = AF_TR("Preferences") + "###Preferences";
+
+    // Drive the popup from the caller-owned `open` flag. Opening it as a modal (rather than a
+    // plain window) dims and blocks the windows behind it, so background controls such as the
+    // layout splitters can't be interacted with while Preferences is up.
+    if (open && !ImGui::IsPopupOpen(preferences_popup_id.c_str())) {
+        ImGui::OpenPopup(preferences_popup_id.c_str());
+    }
+    if (!open && !ImGui::IsPopupOpen(preferences_popup_id.c_str())) {
         return;
+    }
 
     SyncModelBuffer(model);
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSize(ImVec2(560.0f, 0.0f), ImGuiCond_Appearing);
-    if (ImGui::Begin((AF_TR("Preferences") + "###Preferences").c_str(),
-                     &open,
-                     ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
+    if (ImGui::BeginPopupModal(preferences_popup_id.c_str(),
+                               &open,
+                               ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
         RenderAppearanceSection(model, callbacks);
         ImGui::Spacing();
         RenderReviewSection(model, callbacks);
         ImGui::Spacing();
         RenderAiSection(model, callbacks);
+        ImGui::EndPopup();
     }
-    ImGui::End();
+
+    if (!ImGui::IsPopupOpen(preferences_popup_id.c_str())) {
+        open = false;
+    }
 }
 
 } // namespace ui::panels

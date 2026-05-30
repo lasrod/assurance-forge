@@ -233,8 +233,10 @@ void ShowWelcomeModal(bool& is_open,
     };
 
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    const ImVec2 viewport_pos = viewport->WorkPos;
-    const ImVec2 viewport_size = viewport->WorkSize;
+    // Use the full viewport (not the work area) so the welcome screen covers the whole window,
+    // including the main menu bar, rather than starting just below it.
+    const ImVec2 viewport_pos = viewport->Pos;
+    const ImVec2 viewport_size = viewport->Size;
     const float welcome_layout_scale = DefaultUiScale() * kWelcomeBodyFontScale;
     ImGui::SetNextWindowPos(viewport_pos, ImGuiCond_Always, ImVec2(kWelcomeWindowAnchor, kWelcomeWindowAnchor));
     ImGui::SetNextWindowSize(viewport_size, ImGuiCond_Always);

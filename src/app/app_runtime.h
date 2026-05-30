@@ -22,6 +22,9 @@ struct WorkbenchAreaCallbacks;
 namespace frame {
 struct AppLayoutRegion;
 }
+namespace actions {
+struct IgnoredSuggestionView;
+}
 struct AppRuntimeState;
 
 class AppRuntime {
@@ -127,6 +130,8 @@ private:
     void BeginLinkExistingTerminologyTerm(const std::string& element_id, const std::string& term_value);
     void IgnoreTerminologySuggestion(const std::string& element_id, const std::string& term_value);
     bool IsTerminologySuggestionIgnored(const std::string& element_id, const std::string& term_value) const;
+    void RestoreTerminologySuggestion(const std::string& element_id, const std::string& term_value);
+    std::vector<actions::IgnoredSuggestionView> ListIgnoredTerminologySuggestions() const;
     void ConfirmQuickDefineTerminologyTerm(bool add_as_context);
     void BeginDeleteTerminologyTerm(const core::TerminologyTermRef& term_ref);
     void ConfirmDeleteTerminologyTerm();
@@ -147,6 +152,9 @@ private:
     bool ReconcileAuditStore();
     bool EnsureReviewItemStorage();
     bool EnsureConfidenceStorage();
+    // Clears + reloads the current project's persisted terminology-ignore set, then
+    // re-syncs terminology problems. Safe to call when no project is open.
+    void EnsureTerminologyIgnoreStorage();
     void RefreshSacmPackageTreeCache();
     void SyncReviewProblems();
     void SyncTerminologyProblems();

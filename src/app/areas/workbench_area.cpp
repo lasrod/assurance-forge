@@ -212,7 +212,7 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
     renderer.SetCaseRevision(state.app_state.case_revision);
     if (!cache.renderer_seeded) {
         core::perf::ScopedTimer perf_scope("app.wb.set_tree");
-        renderer.SetTree(cache.visible_tree);
+        renderer.SetTree(cache.visible_tree, ui_state.selected_element_id);
         cache.renderer_seeded = true;
     }
 
@@ -269,6 +269,8 @@ void RenderTerminologyPackageTab(AppRuntimeState& state, const WorkbenchAreaCall
     package_callbacks.edit_category = callbacks.edit_terminology_category;
     package_callbacks.delete_category = callbacks.delete_terminology_category;
     package_callbacks.seed_recommended_categories = callbacks.seed_recommended_terminology_categories;
+    package_callbacks.list_ignored_terms = callbacks.list_ignored_terms;
+    package_callbacks.restore_ignored_term = callbacks.restore_ignored_term;
     ui::panels::ShowTerminologyPackagePanel(model, package_callbacks);
 }
 

@@ -22,6 +22,23 @@ inline void SetStatus(AppRuntimeState& state, const std::string& message) {
 
 std::string TerminologySuggestionKey(const std::string& element_id, const std::string& term_value);
 
+// Absolute path to the per-project sidecar storing ignored terminology suggestions
+// (empty when no project is open). Serializes app-private state outside the SACM XML.
+std::filesystem::path IgnoredTerminologyFilePath(const AppRuntimeState& state);
+
+// Result of persisting ignored-suggestion state to the project sidecar.
+// `success` is true when there was nothing to do (no project open) or the
+// file was written successfully. On failure, `error` contains a
+// human-readable description suitable for display in the status bar.
+struct SaveIgnoredSuggestionsResult {
+    bool success = true;
+    std::string error;
+};
+
+// Persists the current in-memory ignore set (state.terminology.ignored_suggestion_keys)
+// to the project sidecar. No-op (success=true) when no project is open.
+SaveIgnoredSuggestionsResult SaveIgnoredSuggestions(const AppRuntimeState& state);
+
 void CopyTerminologyPackageToEditor(AppRuntimeState& state, const sacm::TerminologyPackage& package);
 void ClearTermEditorBuffers(AppRuntimeState& state);
 void CopyTermToEditor(AppRuntimeState& state, const sacm::Term& term);

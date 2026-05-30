@@ -7,10 +7,17 @@
 
 #include <cstddef>
 #include <string>
+#include <vector>
 
 namespace app { struct AppRuntimeState; }
 
 namespace app::actions {
+
+// A persisted terminology-ignore decision surfaced to the UI for review/restore.
+struct IgnoredSuggestionView {
+    std::string element_id;
+    std::string term;
+};
 
 class TerminologyActions {
 public:
@@ -52,6 +59,11 @@ public:
     void HandleProblemQuickFix(const core::ProblemItem& problem);
     void IgnoreSuggestion(const std::string& element_id, const std::string& term_value);
     bool IsSuggestionIgnored(const std::string& element_id, const std::string& term_value) const;
+    void RestoreSuggestion(const std::string& element_id, const std::string& term_value);
+    std::vector<IgnoredSuggestionView> ListIgnoredSuggestions() const;
+    // Clears the in-memory ignore set and reloads it from the current project's
+    // sidecar file (no-op clear when no project is open).
+    void LoadIgnoredSuggestions();
 
 private:
     AppRuntimeState& state_;

@@ -3,6 +3,7 @@
 #include "app/actions/element_actions.h"
 #include "app/actions/proposal_actions.h"
 #include "app/actions/review_actions.h"
+#include "app/actions/terminology_actions.h"
 #include "app/app_runtime_internal.h"
 #include "app/areas/ai_debug_area.h"
 #include "core/audit/audit_snapshot.h"
@@ -527,6 +528,15 @@ areas::WorkbenchAreaCallbacks AppRuntime::MakeWorkbenchAreaCallbacks() {
         [this](const core::TerminologyCategoryRef& category_ref) { BeginEditTerminologyCategory(category_ref); },
         [this](const core::TerminologyCategoryRef& category_ref) { BeginDeleteTerminologyCategory(category_ref); },
         [this]() { SeedRecommendedTerminologyCategories(); },
+        [this]() {
+            std::vector<ui::panels::IgnoredTerminologyEntry> entries;
+            for (const actions::IgnoredSuggestionView& view : ListIgnoredTerminologySuggestions())
+                entries.push_back(ui::panels::IgnoredTerminologyEntry{view.element_id, view.term});
+            return entries;
+        },
+        [this](const std::string& element_id, const std::string& term) {
+            RestoreTerminologySuggestion(element_id, term);
+        },
         [this]() { impl_->pending_reconcile_audit_store = true; },
     };
 }

@@ -749,6 +749,20 @@ bool AppRuntime::IsTerminologySuggestionIgnored(const std::string& element_id, c
     return actions::TerminologyActions(*impl_).IsSuggestionIgnored(element_id, term_value);
 }
 
+void AppRuntime::RestoreTerminologySuggestion(const std::string& element_id, const std::string& term_value) {
+    actions::TerminologyActions(*impl_).RestoreSuggestion(element_id, term_value);
+    SyncTerminologyProblems();
+}
+
+std::vector<actions::IgnoredSuggestionView> AppRuntime::ListIgnoredTerminologySuggestions() const {
+    return actions::TerminologyActions(*impl_).ListIgnoredSuggestions();
+}
+
+void AppRuntime::EnsureTerminologyIgnoreStorage() {
+    actions::TerminologyActions(*impl_).LoadIgnoredSuggestions();
+    SyncTerminologyProblems();
+}
+
 void AppRuntime::HandleProblemQuickFix(const core::ProblemItem& problem) {
     if (problem.type.rfind("Acp", 0) == 0) {
         if (problem.quick_fix_payload.empty()) {
@@ -846,6 +860,11 @@ void AppRuntime::RefreshSacmPackageTreeCache() {
 }
 
 bool AppRuntime::OpenFirstProjectSacmFile() {
+    // Load this project's persisted terminology-ignore decisions before any SACM
+    // file is opened and terminology problems are first synced. Runs for both the
+    // open-project and create-project flows (both reach OpenFirstProjectSacmFile).
+    EnsureTerminologyIgnoreStorage();
+
     if (!impl_->app_state.current_project.has_value())
         return false;
 

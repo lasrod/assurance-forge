@@ -435,6 +435,29 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     ImGui::Spacing();
     RenderCategoriesTable(model, callbacks);
 
+    if (callbacks.list_ignored_terms) {
+        ImGui::Spacing();
+        ImGui::SeparatorText(AF_TR("Ignored terms").c_str());
+        const std::vector<IgnoredTerminologyEntry> ignored = callbacks.list_ignored_terms();
+        if (ignored.empty()) {
+            ImGui::TextDisabled("%s", AF_TR("No ignored terms.").c_str());
+        } else {
+            for (std::size_t index = 0; index < ignored.size(); ++index) {
+                const IgnoredTerminologyEntry& entry = ignored[index];
+                ImGui::PushID(static_cast<int>(index));
+                if (ImGui::Button(AF_TR("Restore").c_str()) && callbacks.restore_ignored_term)
+                    callbacks.restore_ignored_term(entry.element_id, entry.term);
+                ImGui::SameLine();
+                ImGui::TextUnformatted(entry.term.c_str());
+                if (!entry.element_id.empty()) {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("%s", entry.element_id.c_str());
+                }
+                ImGui::PopID();
+            }
+        }
+    }
+
     ImGui::EndChild();
 }
 

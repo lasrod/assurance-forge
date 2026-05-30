@@ -129,10 +129,15 @@ void DrawParallelogram(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_rig
     draw_list->AddConvexPolyFilled(corners, 4, fill_color);
     if (ShouldDrawShading(zoom)) {
         ImU32 hl = WithAlpha(ShadeColor(fill_color, 0.30f), 0.55f);
+        // Keep the band's bottom edge on the parallelogram's slanted sides: at
+        // fraction `band_frac` down, the left side has moved right by
+        // skew*(1-band_frac) and the right side has moved left by skew*band_frac.
+        const float band_frac = 0.18f;
+        float band_y = top_left.y + (bottom_right.y - top_left.y) * band_frac;
         ImVec2 hl_pts[4] = {corners[0],
                             corners[1],
-                            ImVec2(corners[1].x - skew * 0.15f, corners[1].y + (bottom_right.y - top_left.y) * 0.18f),
-                            ImVec2(corners[0].x - skew * 0.15f, corners[0].y + (bottom_right.y - top_left.y) * 0.18f)};
+                            ImVec2(bottom_right.x - skew * band_frac, band_y),
+                            ImVec2(top_left.x + skew * (1.0f - band_frac), band_y)};
         draw_list->AddConvexPolyFilled(hl_pts, 4, hl);
         if (auto* stats = CurrentRenderStats())
             ++stats->interior_shading_drawn;
@@ -141,7 +146,7 @@ void DrawParallelogram(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_rig
 }
 
 void DrawStadium(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color, float zoom) {
-    float rounding = (bottom_right.y - top_left.y) * 0.5f;
+    float rounding = DpiSize(kContextRounding) * zoom;
     float outline = DpiSize(kOutlineThickness) * zoom;
     if (ShouldDrawShadows(zoom)) {
         DrawRectShadow(draw_list, top_left, bottom_right, rounding, zoom);

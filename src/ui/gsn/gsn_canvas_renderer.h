@@ -57,8 +57,11 @@ extern CanvasRenderStats g_last_render_stats_snapshot;
 class GsnCanvas {
 public:
     GsnCanvas();
-    // Set elements from tree (new — spec-compliant layout)
-    void SetTree(const core::AssuranceTree& tree);
+    // Set elements from tree (new — spec-compliant layout).
+    // If `anchor_node_id` is non-empty and refers to a node present both
+    // before and after the layout recompute, the view offset is shifted so
+    // that this node stays visually fixed on screen across the reflow.
+    void SetTree(const core::AssuranceTree& tree, const std::string& anchor_node_id = {});
     // Set the monotonic revision counter of the underlying assurance case.
     // Used by Render() to invalidate per-frame caches (e.g. ACP relationship
     // targets) when the model has actually changed. Call next to SetTree().
