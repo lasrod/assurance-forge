@@ -200,12 +200,12 @@ void AppRuntime::RegisterAppEventListeners() {
     impl_->events.Subscribe<ReviewItemsDirtyEvent>([this](const ReviewItemsDirtyEvent& event) {
         if (event.mark_app_dirty)
             impl_->app_state.mark_dirty();
-        SyncReviewProblems();
+        impl_->problems_dirty.review = true;
     });
     impl_->events.Subscribe<ConfidenceDirtyEvent>([this](const ConfidenceDirtyEvent& event) {
         if (event.mark_app_dirty)
             impl_->app_state.mark_dirty();
-        SyncConfidenceProblems();
+        impl_->problems_dirty.confidence = true;
     });
     impl_->events.Subscribe<SelectionChangedEvent>([](const SelectionChangedEvent& event) {
         ui::UiState& ui_state = ui::GetUiState();
@@ -424,9 +424,9 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     ui::gsn::SetCanvasTree(impl_->current_tree);
     ui::RebuildRegisterViews(&ac);
     ui::GetUiState().model_has_translations = ui::ModelHasTranslations(ac);
-    SyncTerminologyProblems();
-    SyncAcpProblems();
-    SyncTranslationReviewProblems();
+    impl_->problems_dirty.terminology = true;
+    impl_->problems_dirty.acp = true;
+    impl_->problems_dirty.translation = true;
 
     if (impl_->workbench.pending_focus_root && impl_->current_tree.root) {
         ui::UiState& ui_state = ui::GetUiState();
@@ -542,6 +542,30 @@ areas::WorkbenchAreaCallbacks AppRuntime::MakeWorkbenchAreaCallbacks() {
         },
         [this]() { impl_->pending_reconcile_audit_store = true; },
     };
+}
+
+void AppRuntime::RefreshDirtyProblems() {
+    ProblemSyncDirty& dirty = impl_->problems_dirty;
+    if (dirty.review) {
+        SyncReviewProblems();
+        dirty.review = false;
+    }
+    if (dirty.terminology) {
+        SyncTerminologyProblems();
+        dirty.terminology = false;
+    }
+    if (dirty.confidence) {
+        SyncConfidenceProblems();
+        dirty.confidence = false;
+    }
+    if (dirty.acp) {
+        SyncAcpProblems();
+        dirty.acp = false;
+    }
+    if (dirty.translation) {
+        SyncTranslationReviewProblems();
+        dirty.translation = false;
+    }
 }
 
 void AppRuntime::SyncReviewProblems() {

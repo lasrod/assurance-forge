@@ -29,14 +29,6 @@ void EnsureAiGuidelineCatalogLoaded(AppRuntimeState& state) {
     state.guideline_catalog_load_attempted = true;
 }
 
-const core::TreeNode* FindTreeNode(const core::AssuranceTree& tree, const std::string& element_id) {
-    for (const auto& node : tree.nodes) {
-        if (node && node->id == element_id)
-            return node.get();
-    }
-    return nullptr;
-}
-
 void DrawTooltipIfHovered(const std::string& text) {
     if (!text.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         ImGui::SetTooltip("%s", text.c_str());
@@ -60,7 +52,7 @@ void AppRuntime::RenderAiReviewContextMenuForSelected() {
     const parser::SacmElement* selected_element = loaded_case && !ui_state.selected_element_id.empty()
                                                       ? ai::FindSacmElement(*loaded_case, ui_state.selected_element_id)
                                                       : nullptr;
-    const core::TreeNode* selected_node = FindTreeNode(impl_->current_tree, ui_state.selected_element_id);
+    const core::TreeNode* selected_node = core::FindTreeNode(impl_->current_tree, ui_state.selected_element_id);
     const bool review_running = impl_->ai.review_controller->IsReviewRunning();
 
     if (!ImGui::BeginMenu(AF_TR("AI Review").c_str()))

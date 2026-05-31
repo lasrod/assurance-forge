@@ -67,14 +67,6 @@ std::vector<std::string> GuidelineIds(const std::vector<const parser::Guideline*
     return ids;
 }
 
-const core::TreeNode* FindTreeNode(const core::AssuranceTree& tree, const std::string& element_id) {
-    for (const auto& node : tree.nodes) {
-        if (node && node->id == element_id)
-            return node.get();
-    }
-    return nullptr;
-}
-
 void EmitReviewVisualEvent(AppEvents& events,
                            ElementReviewVisualEventKind kind,
                            const std::string& element_id,
@@ -348,7 +340,7 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
 
     if (guideline_selection.review_profile &&
         !ai::IsReviewProfileCompatibleWithElement(
-            *guideline_selection.review_profile, *selected_element, FindTreeNode(current_tree, selected_element_id))) {
+            *guideline_selection.review_profile, *selected_element, core::FindTreeNode(current_tree, selected_element_id))) {
         const std::string message = "SCCG review profile '" + guideline_selection.review_profile->display_name +
                                     "' does not apply to the selected element type.";
         problems_manager_.AddOrUpdateProblem(
