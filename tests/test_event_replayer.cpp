@@ -8,6 +8,7 @@
 #include "core/audit/replay_verifier.h"
 #include "core/commands/command_bus.h"
 #include "core/commands/element_commands.h"
+#include "core/commands/terminology_commands.h"
 #include "core/element_factory.h"
 #include "core/project_model.h"
 #include "parser/xml_parser.h"
@@ -390,6 +391,42 @@ TEST(UpdateElementTextCommand, NoOpWhenValueUnchangedStillAppendsAuditEvent) {
     EXPECT_TRUE(edit.WasNoOp());
     EXPECT_EQ(edit.OldValue(), "The system is safe.");
     EXPECT_EQ(result.transaction_sequence, 1u);
+}
+
+TEST(EventReplayer, ReplaysTerminologyCommandChainToMatchLiveState) {
+    // Intent: the replayer reproduces terminology mutations (package/term/
+    // association events), so replaying the log yields the same SACM state as
+    // the live edits. This exercises the replayer's terminology event handlers.
+    auto f = MakeFixture("replay_terminology");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+
+    core::commands::CommandContext ctx{f.model, f.package};
+
+    core::commands::CreateTerminologyPackageCommand create_package("Terms", "Shared definitions.");
+    ASSERT_TRUE(bus->Execute(create_package, ctx, "tester").success);
+    const core::TerminologyPackageRef package_ref = create_package.GeneratedRef();
+
+    core::TerminologyTermDraft draft;
+    draft.value = "ODD";
+    draft.name = "Operational Design Domain";
+    core::commands::CreateTerminologyTermCommand create_term(package_ref, draft);
+    ASSERT_TRUE(bus->Execute(create_term, ctx, "tester").success);
+
+    core::commands::AssociateTerminologyTermWithElementCommand associate(
+        "G1", package_ref, create_term.GeneratedRef());
+    ASSERT_TRUE(bus->Execute(associate, ctx, "tester").success);
+
+    auto snapshot = LoadSnapshotState(f.project.rootPath, core::audit::kInitialSnapshotId);
+    auto replayed = core::audit::Replayer::ReplayFrom(
+        snapshot.model, snapshot.package, bus->Store().Transactions(),
+        std::numeric_limits<std::uint64_t>::max());
+    ASSERT_TRUE(replayed.has_value()) << (replayed.has_value() ? "" : replayed.error());
+
+    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package),
+              core::audit::CanonicalModelHash(f.package));
 }
 
 TEST(UpdateElementTextCommand, RejectsContentFieldOnNonClaimElement) {

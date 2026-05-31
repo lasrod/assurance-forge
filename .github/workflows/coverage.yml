@@ -44,6 +44,15 @@ jobs:
       - name: Run tests
         run: ctest --test-dir build-coverage --output-on-failure --no-tests=error
 
+      - name: Generate coverage report (logic scope, headline)
+        run: |
+          mkdir -p coverage_logic
+          gcovr -r . build-coverage \
+            --config gcovr-logic.cfg \
+            --gcov-executable gcov-14 \
+            --html-details coverage_logic/index.html \
+            --print-summary
+
       - name: Generate coverage report (full src/)
         run: |
           mkdir -p coverage_full
@@ -79,5 +88,6 @@ jobs:
         with:
           name: coverage-reports
           path: |
+            coverage_logic/
             coverage_full/
             coverage_core/

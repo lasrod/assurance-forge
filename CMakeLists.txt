@@ -271,6 +271,13 @@ add_executable(tests
     tests/test_sha256.cpp
     tests/test_app_events.cpp
     tests/test_acp_problem_sync.cpp
+    tests/test_terminology_problem_sync.cpp
+    tests/test_sacm_argument_sync.cpp
+    tests/test_terminology_context_projection.cpp
+    tests/test_terminology_commands.cpp
+    tests/test_package_commands.cpp
+    tests/test_sacm_identity.cpp
+    tests/test_project_model.cpp
     tests/test_confidence_problem_sync.cpp
     tests/test_ai_review_controller.cpp
     tests/test_review_problem_sync.cpp
