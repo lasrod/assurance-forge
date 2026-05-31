@@ -73,46 +73,69 @@ int ComputeChildrenSpan(const LayoutState& state,
     return span;
 }
 
-void ComputeSubtreeInfo(LayoutState& state, const std::string& node_id) {
-    WorkNode* node = FindNode(state, node_id);
-    if (!node || !node->input)
-        return;
-    if (node->visit_state == 1) {
-        state.cycle_seen = true;
-        return;
+// Iterative post-order walk: children must be sized before a parent's subtree width and
+// overhang are computed. An explicit stack is used instead of recursion so that very deep
+// argument chains (thousands of links) cannot overflow the call stack.
+void ComputeSubtreeInfo(LayoutState& state, const std::string& root_id) {
+    struct Frame {
+        std::string node_id;
+        bool ready; // false: discover children; true: finalize after children are sized.
+    };
+    std::vector<Frame> stack;
+    stack.push_back({root_id, false});
+
+    while (!stack.empty()) {
+        const Frame frame = stack.back();
+        stack.pop_back();
+
+        WorkNode* node = FindNode(state, frame.node_id);
+        if (!node || !node->input)
+            continue;
+
+        if (!frame.ready) {
+            if (node->visit_state == 1) {
+                state.cycle_seen = true;
+                continue;
+            }
+            if (node->visit_state == 2)
+                continue;
+
+            node->visit_state = 1;
+            // Re-visit this node once its children have been processed.
+            stack.push_back({frame.node_id, true});
+            const std::vector<std::string> children = ExistingChildren(state, node->input->group1_children);
+            for (const std::string& child_id : children)
+                stack.push_back({child_id, false});
+            continue;
+        }
+
+        const std::vector<std::string> children = ExistingChildren(state, node->input->group1_children);
+        if (children.empty()) {
+            node->subtree_width = 1;
+        } else {
+            node->subtree_width =
+                std::max(1, ComputeChildrenSpan(state, children, 0, static_cast<int>(children.size())));
+        }
+
+        const int attachment_count = static_cast<int>(ExistingChildren(state, node->input->group2_attachments).size());
+        const bool has_left_attachment = attachment_count > 0;
+        const bool has_right_attachment = attachment_count >= 2;
+        const int own_left = (has_left_attachment && node->subtree_width < 3) ? 1 : 0;
+        const int own_right = (has_right_attachment && node->subtree_width < 3) ? 1 : 0;
+
+        int child_left_overhang = 0;
+        int child_right_overhang = 0;
+        if (!children.empty()) {
+            const WorkNode* first = FindNode(state, children.front());
+            const WorkNode* last = FindNode(state, children.back());
+            child_left_overhang = first ? first->left_overhang : 0;
+            child_right_overhang = last ? last->right_overhang : 0;
+        }
+
+        node->left_overhang = std::max(own_left, child_left_overhang);
+        node->right_overhang = std::max(own_right, child_right_overhang);
+        node->visit_state = 2;
     }
-    if (node->visit_state == 2)
-        return;
-
-    node->visit_state = 1;
-    const std::vector<std::string> children = ExistingChildren(state, node->input->group1_children);
-    for (const std::string& child_id : children)
-        ComputeSubtreeInfo(state, child_id);
-
-    if (children.empty()) {
-        node->subtree_width = 1;
-    } else {
-        node->subtree_width = std::max(1, ComputeChildrenSpan(state, children, 0, static_cast<int>(children.size())));
-    }
-
-    const int attachment_count = static_cast<int>(ExistingChildren(state, node->input->group2_attachments).size());
-    const bool has_left_attachment = attachment_count > 0;
-    const bool has_right_attachment = attachment_count >= 2;
-    const int own_left = (has_left_attachment && node->subtree_width < 3) ? 1 : 0;
-    const int own_right = (has_right_attachment && node->subtree_width < 3) ? 1 : 0;
-
-    int child_left_overhang = 0;
-    int child_right_overhang = 0;
-    if (!children.empty()) {
-        const WorkNode* first = FindNode(state, children.front());
-        const WorkNode* last = FindNode(state, children.back());
-        child_left_overhang = first ? first->left_overhang : 0;
-        child_right_overhang = last ? last->right_overhang : 0;
-    }
-
-    node->left_overhang = std::max(own_left, child_left_overhang);
-    node->right_overhang = std::max(own_right, child_right_overhang);
-    node->visit_state = 2;
 }
 
 std::pair<std::vector<int>, std::vector<int>> DistributeAttachmentSides(int count) {
@@ -142,46 +165,74 @@ void PlaceGroup2Attachments(LayoutState& state, const WorkNode& node, double col
     }
 }
 
-void AssignGridPositions(LayoutState& state, const std::string& node_id, double column, int row) {
-    WorkNode* node = FindNode(state, node_id);
-    if (!node || !node->input)
-        return;
-    if (node->placement_state == 1) {
-        state.cycle_seen = true;
-        return;
-    }
-    if (node->placement_state == 2)
-        return;
+// Iterative pre-order walk producing the same placement order as a depth-first recursion
+// (node, then each child's full subtree in order). An explicit stack avoids overflowing the
+// call stack on deep argument chains. A node stays placement_state == 1 while its descendants
+// are placed so back-references are still reported as cycles, matching the recursive version.
+void AssignGridPositions(LayoutState& state, const std::string& root_id, double root_column, int root_row) {
+    struct Frame {
+        std::string node_id;
+        double column;
+        int row;
+        bool finalize; // true: mark the node fully placed after its subtree is done.
+    };
+    std::vector<Frame> stack;
+    stack.push_back({root_id, root_column, root_row, false});
 
-    node->placement_state = 1;
-    state.placements.push_back({node_id, column, row, false, false, 0});
-    PlaceGroup2Attachments(state, *node, column, row);
+    while (!stack.empty()) {
+        const Frame frame = stack.back();
+        stack.pop_back();
 
-    const std::vector<std::string> children = ExistingChildren(state, node->input->group1_children);
-    if (children.empty()) {
-        node->placement_state = 2;
-        return;
-    }
-
-    const int child_row = row + 1;
-    const double total_width =
-        static_cast<double>(std::max(1, ComputeChildrenSpan(state, children, 0, static_cast<int>(children.size()))));
-    double cursor = column - total_width / 2.0;
-    for (int i = 0; i < static_cast<int>(children.size()); ++i) {
-        const WorkNode* child = FindNode(state, children[i]);
-        if (!child)
+        WorkNode* node = FindNode(state, frame.node_id);
+        if (!node || !node->input)
             continue;
-        if (i > 0) {
-            const WorkNode* previous = FindNode(state, children[i - 1]);
-            if (previous)
-                cursor += static_cast<double>(previous->right_overhang + child->left_overhang);
-        }
-        const double child_col = cursor + static_cast<double>(child->subtree_width) / 2.0;
-        AssignGridPositions(state, children[i], child_col, child_row);
-        cursor += static_cast<double>(child->subtree_width);
-    }
 
-    node->placement_state = 2;
+        if (frame.finalize) {
+            node->placement_state = 2;
+            continue;
+        }
+
+        if (node->placement_state == 1) {
+            state.cycle_seen = true;
+            continue;
+        }
+        if (node->placement_state == 2)
+            continue;
+
+        node->placement_state = 1;
+        state.placements.push_back({frame.node_id, frame.column, frame.row, false, false, 0});
+        PlaceGroup2Attachments(state, *node, frame.column, frame.row);
+
+        // Finalize after the whole subtree is placed (keeps placement_state == 1 during the walk).
+        stack.push_back({frame.node_id, frame.column, frame.row, true});
+
+        const std::vector<std::string> children = ExistingChildren(state, node->input->group1_children);
+        if (children.empty())
+            continue;
+
+        const int child_row = frame.row + 1;
+        const double total_width =
+            static_cast<double>(std::max(1, ComputeChildrenSpan(state, children, 0, static_cast<int>(children.size()))));
+        double cursor = frame.column - total_width / 2.0;
+        std::vector<Frame> child_frames;
+        child_frames.reserve(children.size());
+        for (int i = 0; i < static_cast<int>(children.size()); ++i) {
+            const WorkNode* child = FindNode(state, children[i]);
+            if (!child)
+                continue;
+            if (i > 0) {
+                const WorkNode* previous = FindNode(state, children[i - 1]);
+                if (previous)
+                    cursor += static_cast<double>(previous->right_overhang + child->left_overhang);
+            }
+            const double child_col = cursor + static_cast<double>(child->subtree_width) / 2.0;
+            child_frames.push_back({children[i], child_col, child_row, false});
+            cursor += static_cast<double>(child->subtree_width);
+        }
+        // Push in reverse so children are processed (and placed) left-to-right.
+        for (auto it = child_frames.rbegin(); it != child_frames.rend(); ++it)
+            stack.push_back(*it);
+    }
 }
 
 GsnLayoutSize SizeFor(const std::unordered_map<std::string, GsnLayoutSize>& sizes,

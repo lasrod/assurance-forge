@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cstring>
 #include <string>
+#include <vector>
 
 namespace ui {
 
@@ -96,11 +97,13 @@ static std::string PayloadElementId(const ImGuiPayload* payload) {
     return std::string(begin, end);
 }
 
-static void RenderTreeNode(const core::TreeNode* node,
-                           const parser::AssuranceCase* active_case,
-                           UiState& state,
-                           const ElementContextActions& actions,
-                           const TreeEditActions* tree_edit_actions) {
+// Renders one tree row. Returns true when the node is open and has children, meaning the caller
+// should render its children and then emit a matching ImGui::TreePop.
+static bool RenderSingleTreeNode(const core::TreeNode* node,
+                                 const parser::AssuranceCase* active_case,
+                                 UiState& state,
+                                 const ElementContextActions& actions,
+                                 const TreeEditActions* tree_edit_actions) {
     ImGui::TableNextRow();
     ImGui::TableSetColumnIndex(0);
 
@@ -262,16 +265,41 @@ static void RenderTreeNode(const core::TreeNode* node,
         }
     }
 
-    if (has_children && open) {
-        // Group1 children (structural)
-        for (const auto* child : node->group1_children) {
-            RenderTreeNode(child, active_case, state, actions, tree_edit_actions);
+    // The caller renders children (then calls TreePop) when the node is open and has children.
+    return has_children && open;
+}
+
+// Iterative depth-first walk of the tree. A recursive renderer would overflow the call stack on
+// very deep argument chains (the tree is expanded by default), silently terminating the app. An
+// explicit work stack is used instead; a null entry is a sentinel that emits the matching
+// ImGui::TreePop once a subtree's children have all been rendered.
+static void RenderTreeNode(const core::TreeNode* root,
+                           const parser::AssuranceCase* active_case,
+                           UiState& state,
+                           const ElementContextActions& actions,
+                           const TreeEditActions* tree_edit_actions) {
+    std::vector<const core::TreeNode*> stack;
+    stack.push_back(root);
+
+    while (!stack.empty()) {
+        const core::TreeNode* node = stack.back();
+        stack.pop_back();
+
+        if (node == nullptr) {
+            ImGui::TreePop();
+            continue;
         }
-        // Group2 attachments (contextual)
-        for (const auto* attachment : node->group2_attachments) {
-            RenderTreeNode(attachment, active_case, state, actions, tree_edit_actions);
-        }
-        ImGui::TreePop();
+
+        if (!RenderSingleTreeNode(node, active_case, state, actions, tree_edit_actions))
+            continue;
+
+        // Render group1 children (structural) then group2 attachments (contextual), then TreePop.
+        // Push in reverse so they render in the original order; the null sentinel runs last.
+        stack.push_back(nullptr);
+        for (auto it = node->group2_attachments.rbegin(); it != node->group2_attachments.rend(); ++it)
+            stack.push_back(*it);
+        for (auto it = node->group1_children.rbegin(); it != node->group1_children.rend(); ++it)
+            stack.push_back(*it);
     }
 }
 

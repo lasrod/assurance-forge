@@ -1,8 +1,31 @@
 ﻿#include "parser/xml_parser.h"
 
 #include <gtest/gtest.h>
+#include <string>
 
 using namespace parser;
+
+// A pathologically deep document previously recursed by XML nesting depth during element
+// extraction, overflowing the call stack. Extraction is now iterative, so it must parse without
+// crashing and preserve document (pre-order) element ordering.
+TEST(XmlParserTest, DeeplyNestedXmlDoesNotOverflowStack) {
+    constexpr int kDepth = 20000;
+    std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="TEST" name="Test">
+<argumentPackage id="AP1" name="Args">)";
+    for (int i = 0; i < kDepth; ++i)
+        xml += "<claim id=\"G" + std::to_string(i) + "\" name=\"Goal\">";
+    for (int i = 0; i < kDepth; ++i)
+        xml += "</claim>";
+    xml += "</argumentPackage></sacm:AssuranceCasePackage>";
+
+    auto result = parse_sacm_xml_string(xml);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result.value().elements.size(), static_cast<size_t>(kDepth));
+    // Pre-order: the outermost claim is emitted first, the innermost last.
+    EXPECT_EQ(result.value().elements.front().id, "G0");
+    EXPECT_EQ(result.value().elements.back().id, "G" + std::to_string(kDepth - 1));
+}
 
 // Test parsing a minimal valid SACM XML
 TEST(XmlParserTest, ParseMinimalValidXml) {

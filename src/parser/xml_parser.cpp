@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 namespace parser {
 
@@ -207,7 +208,17 @@ static void extract_content(pugi::xml_node child, SacmElement& element) {
 }
 
 void extract_elements_recursive(pugi::xml_node node, AssuranceCase& assurance_case) {
-    for (pugi::xml_node child : node.children()) {
+    // Iterative depth-first (pre-order) traversal mirroring the previous recursion, using an
+    // explicit stack so deeply nested documents cannot overflow the call stack. Children are
+    // pushed in reverse so they are visited in document order.
+    std::vector<pugi::xml_node> pending;
+    for (pugi::xml_node child = node.last_child(); child; child = child.previous_sibling())
+        pending.push_back(child);
+
+    while (!pending.empty()) {
+        pugi::xml_node child = pending.back();
+        pending.pop_back();
+
         std::string local_name = get_local_name(child.name());
 
         if (local_name.empty())
@@ -288,7 +299,9 @@ void extract_elements_recursive(pugi::xml_node node, AssuranceCase& assurance_ca
             assurance_case.elements.push_back(element);
         }
 
-        extract_elements_recursive(child, assurance_case);
+        // Descend into this node's children (reverse push keeps document order on pop).
+        for (pugi::xml_node grandchild = child.last_child(); grandchild; grandchild = grandchild.previous_sibling())
+            pending.push_back(grandchild);
     }
 }
 

@@ -4,6 +4,7 @@
 #include "parser/xml_parser.h"
 #include "ui/gsn/gsn_dpi.h"
 #include "ui/gsn/gsn_layout.h"
+#include "ui/tree_view.h"
 
 #include <algorithm>
 #include <gtest/gtest.h>
@@ -659,4 +660,94 @@ TEST(LayoutTest, UndevelopedFlagPropagatesToLayoutNode) {
     ASSERT_EQ(layout.size(), 1u);
     EXPECT_EQ(layout[0].id, "Top");
     EXPECT_TRUE(layout[0].undeveloped);
+}
+
+// Builds a deep parent->child chain via AssertedInference relationships (source = child,
+// target = parent), i.e. the structure that produces a very deep AssuranceTree.
+static std::string make_deep_chain_xml(int chain_length) {
+    std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="urn:test" id="T" name="T">
+  <argumentPackage id="AP" name="AP">
+)";
+    for (int i = 0; i < chain_length; ++i)
+        xml += "    <claim id=\"cl_" + std::to_string(i) + "\" name=\"C" + std::to_string(i) +
+               "\" assertionDeclaration=\"asserted\"/>\n";
+    for (int i = 0; i + 1 < chain_length; ++i)
+        xml += "    <assertedInference id=\"inf_" + std::to_string(i) + "\" name=\"I" + std::to_string(i) +
+               "\">\n      <source ref=\"cl_" + std::to_string(i + 1) + "\"/>\n      <target ref=\"cl_" +
+               std::to_string(i) + "\"/>\n    </assertedInference>\n";
+    xml += "  </argumentPackage>\n</sacm:AssuranceCasePackage>";
+    return xml;
+}
+
+TEST(LayoutTest, DeepRelationshipChainThroughRealLayoutPath) {
+    // Reproduce the real app path: a deep chain built into an AssuranceTree and laid out through
+    // ui::gsn::LayoutEngine::ComputeLayout(tree) - exactly what RebuildDerivedViewsIfNeeded runs.
+    constexpr int kChainLength = 12000;
+    const std::string xml = make_deep_chain_xml(kChainLength);
+
+    ScopedImGuiFrame imgui_frame;
+    AssuranceTree tree = AssuranceTree::Build(*parse_sacm_xml_string(xml));
+    ASSERT_NE(tree.root, nullptr);
+
+    ui::gsn::LayoutEngine engine;
+    const std::vector<ui::gsn::LayoutNode> layout = engine.ComputeLayout(tree);
+    EXPECT_EQ(layout.size(), static_cast<size_t>(kChainLength));
+}
+
+TEST(LayoutTest, DeepChainTreeViewRendersWithoutStackOverflow) {
+    // The tree-view panel renders the (default-expanded) hierarchy every frame. A recursive
+    // renderer overflowed the call stack on a deep chain, silently terminating the app while the
+    // project was still "loading". Rendering is now iterative, so it must render without crashing.
+    constexpr int kChainLength = 12000;
+    const std::string xml = make_deep_chain_xml(kChainLength);
+
+    ScopedImGuiFrame imgui_frame;
+    AssuranceTree tree = AssuranceTree::Build(*parse_sacm_xml_string(xml));
+    ASSERT_NE(tree.root, nullptr);
+
+    ImGui::SetNextWindowSize(ImVec2(400.0f, 600.0f));
+    ImGui::Begin("##tree_view_test");
+    ui::ElementContextActions actions;
+    ui::ShowTreeViewPanel(&tree, nullptr, ui::GetUiState(), actions, nullptr);
+    ImGui::End();
+
+    SUCCEED();
+}
+
+TEST(LayoutTest, DeepLinearChainDoesNotOverflowStack) {
+    // A long parent->child chain previously recursed once per link in the layout traversal,
+    // overflowing the call stack (~10k deep on Windows) and silently terminating the app. The
+    // traversal is now iterative, so a very deep chain must lay out without crashing.
+    constexpr int kChainLength = 20000;
+
+    GsnLayoutInput input;
+    input.nodes.reserve(kChainLength);
+    for (int i = 0; i < kChainLength; ++i) {
+        GsnLayoutInputNode node;
+        node.id = "n" + std::to_string(i);
+        node.role = NodeRole::Claim;
+        if (i > 0)
+            node.parent_id = "n" + std::to_string(i - 1);
+        if (i + 1 < kChainLength)
+            node.group1_children.push_back("n" + std::to_string(i + 1));
+        input.nodes.push_back(std::move(node));
+    }
+    input.roots = {"n0"};
+
+    const std::unordered_map<std::string, GsnLayoutSize> sizes;
+    const GsnLayoutGraphResult layout = LayoutGsnGraph(input, sizes);
+
+    EXPECT_EQ(layout.nodes.size(), static_cast<size_t>(kChainLength));
+    EXPECT_TRUE(layout.warnings.empty());
+
+    const auto first = std::find_if(
+        layout.nodes.begin(), layout.nodes.end(), [](const GsnLayoutNode& n) { return n.id == "n0"; });
+    const std::string last_id = "n" + std::to_string(kChainLength - 1);
+    const auto last = std::find_if(
+        layout.nodes.begin(), layout.nodes.end(), [&](const GsnLayoutNode& n) { return n.id == last_id; });
+    ASSERT_NE(first, layout.nodes.end());
+    ASSERT_NE(last, layout.nodes.end());
+    // The chain descends one row per link, so the last node must sit far below the first.
+    EXPECT_GT(last->y, first->y);
 }

@@ -25,6 +25,8 @@
 #include "ui/ui_state.h"
 
 #include <cstddef>
+#include <exception>
+#include <new>
 #include <string>
 
 namespace app {
@@ -116,7 +118,25 @@ void AppRuntime::RenderFrame(bool& done) {
 
     {
         core::perf::ScopedTimer s("app.derived_views");
-        RebuildDerivedViewsIfNeeded();
+        // Building the tree / GSN layout for a very large case can exhaust memory. Catch it here
+        // so an allocation failure reports to the user and drops the case instead of escaping the
+        // frame callback and terminating the process. (Deep recursion no longer overflows the
+        // stack - the layout and parser traversals are iterative.)
+        try {
+            RebuildDerivedViewsIfNeeded();
+        } catch (const std::bad_alloc&) {
+            impl_->app_state.loaded_case.reset();
+            impl_->app_state.sacm_package.reset();
+            impl_->app_state.status_message =
+                "Error: ran out of memory while building the view for this file. It may be too large to display.";
+            impl_->tree_needs_rebuild = true;
+        } catch (const std::exception& error) {
+            impl_->app_state.loaded_case.reset();
+            impl_->app_state.sacm_package.reset();
+            impl_->app_state.status_message =
+                std::string("Error: failed to build the view for this file (") + error.what() + ").";
+            impl_->tree_needs_rebuild = true;
+        }
     }
     {
         core::perf::ScopedTimer s("app.proposal_preview_refresh");
