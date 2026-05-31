@@ -477,38 +477,48 @@ std::vector<std::string> CurrentSiblingOrder(const TreeNode* parent, ElementGrou
 }
 
 void ApplyDisplayOrderToChildren(TreeNode* node, const TreeDisplayOrder& display_order) {
-    if (!node)
-        return;
+    // Iterative depth-first walk (the per-node sort is independent of visit order). An explicit
+    // stack avoids overflowing the call stack on very deep argument trees.
+    std::vector<TreeNode*> stack;
+    if (node)
+        stack.push_back(node);
 
-    auto apply_to_group = [&](std::vector<TreeNode*>& children) {
-        auto found = display_order.children_by_parent.find(node->id);
-        if (found == display_order.children_by_parent.end())
-            return;
+    while (!stack.empty()) {
+        TreeNode* current = stack.back();
+        stack.pop_back();
+        if (!current)
+            continue;
 
-        std::unordered_map<std::string, size_t> position_by_id;
-        for (size_t index = 0; index < found->second.size(); ++index)
-            position_by_id.emplace(found->second[index], index);
+        auto apply_to_group = [&](std::vector<TreeNode*>& children) {
+            auto found = display_order.children_by_parent.find(current->id);
+            if (found == display_order.children_by_parent.end())
+                return;
 
-        std::stable_sort(children.begin(), children.end(), [&](const TreeNode* lhs, const TreeNode* rhs) {
-            const auto lhs_position = position_by_id.find(lhs->id);
-            const auto rhs_position = position_by_id.find(rhs->id);
-            const bool lhs_known = lhs_position != position_by_id.end();
-            const bool rhs_known = rhs_position != position_by_id.end();
-            if (lhs_known && rhs_known)
-                return lhs_position->second < rhs_position->second;
-            if (lhs_known != rhs_known)
-                return lhs_known;
-            return false;
-        });
-    };
+            std::unordered_map<std::string, size_t> position_by_id;
+            for (size_t index = 0; index < found->second.size(); ++index)
+                position_by_id.emplace(found->second[index], index);
 
-    apply_to_group(node->group1_children);
-    apply_to_group(node->group2_attachments);
+            std::stable_sort(children.begin(), children.end(), [&](const TreeNode* lhs, const TreeNode* rhs) {
+                const auto lhs_position = position_by_id.find(lhs->id);
+                const auto rhs_position = position_by_id.find(rhs->id);
+                const bool lhs_known = lhs_position != position_by_id.end();
+                const bool rhs_known = rhs_position != position_by_id.end();
+                if (lhs_known && rhs_known)
+                    return lhs_position->second < rhs_position->second;
+                if (lhs_known != rhs_known)
+                    return lhs_known;
+                return false;
+            });
+        };
 
-    for (TreeNode* child : node->group1_children)
-        ApplyDisplayOrderToChildren(child, display_order);
-    for (TreeNode* attachment : node->group2_attachments)
-        ApplyDisplayOrderToChildren(attachment, display_order);
+        apply_to_group(current->group1_children);
+        apply_to_group(current->group2_attachments);
+
+        for (TreeNode* child : current->group1_children)
+            stack.push_back(child);
+        for (TreeNode* attachment : current->group2_attachments)
+            stack.push_back(attachment);
+    }
 }
 
 } // namespace

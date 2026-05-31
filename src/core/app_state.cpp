@@ -10,6 +10,9 @@
 #include "sacm/sacm_serializer.h"
 
 #include <algorithm>
+#include <exception>
+#include <new>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace core {
@@ -88,12 +91,42 @@ void HideTerminologyArtifactReferences(parser::AssuranceCase& model, const sacm:
 }
 
 void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model, const sacm::AssuranceCasePackage& package) {
+    // Index elements by id and gid once so each artifact reference is an O(1) lookup instead of a
+    // linear scan of every element (the loop below is otherwise O(references * elements)). The
+    // index records the first occurrence per key and a lookup prefers the lowest matching index,
+    // reproducing parser::FindElementByIdOrGid's "first element matching id or gid" behaviour.
+    const std::size_t none = model.elements.size();
+    std::unordered_map<std::string, std::size_t> first_index_by_id;
+    std::unordered_map<std::string, std::size_t> first_index_by_gid;
+    first_index_by_id.reserve(model.elements.size());
+    first_index_by_gid.reserve(model.elements.size());
+    for (std::size_t i = 0; i < model.elements.size(); ++i) {
+        const parser::SacmElement& element = model.elements[i];
+        if (!element.id.empty())
+            first_index_by_id.emplace(element.id, i);
+        if (!element.gid.empty())
+            first_index_by_gid.emplace(element.gid, i);
+    }
+    const auto find_element = [&](const std::string& id, const std::string& gid) -> parser::SacmElement* {
+        std::size_t best = none;
+        if (!id.empty()) {
+            const auto it = first_index_by_id.find(id);
+            if (it != first_index_by_id.end())
+                best = it->second;
+        }
+        if (!gid.empty()) {
+            const auto it = first_index_by_gid.find(gid);
+            if (it != first_index_by_gid.end())
+                best = std::min(best, it->second);
+        }
+        return best == none ? nullptr : &model.elements[best];
+    };
+
     for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
         for (const sacm::ArtifactReference& artifact_reference : argument_package.artifactReferences) {
             if (!IsVisibleTerminologyArtifactReference(package, argument_package, artifact_reference))
                 continue;
-            parser::SacmElement* element =
-                parser::FindElementByIdOrGid(model, artifact_reference.id, artifact_reference.gid);
+            parser::SacmElement* element = find_element(artifact_reference.id, artifact_reference.gid);
             if (!element)
                 continue;
             const TerminologyTermReferenceResolution resolution =
@@ -119,42 +152,60 @@ void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model, const
 } // namespace
 
 bool AppState::load_file(const std::string& file_path) {
-    auto result = parser::parse_sacm_xml(file_path);
+    try {
+        auto result = parser::parse_sacm_xml(file_path);
 
-    if (!result) {
+        if (!result) {
+            loaded_file_path.clear();
+            has_unsaved_changes = false;
+            loaded_case.reset();
+            sacm_package.reset();
+            status_message = "Error: " + std::move(result.error());
+            return false;
+        }
+
+        active_project_file_role = ProjectFileRole::Unknown;
+        active_project_file_path.clear();
+        loaded_file_path = std::filesystem::path(file_path);
+        has_unsaved_changes = false;
+        loaded_case = std::move(*result);
+        ++case_revision;
+        status_message =
+            "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
+
+        // Also populate the SACM domain model for save support
+        sacm_package.reset();
+        if (auto sacm_result = sacm::parse_sacm(file_path)) {
+            sacm_package = std::move(*sacm_result);
+            HideTerminologyArtifactReferences(loaded_case.value(), sacm_package.value());
+            RefreshVisibleTerminologyContextDisplay(loaded_case.value(), sacm_package.value());
+            status_message =
+                "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
+        } else {
+            status_message =
+                "Loaded with warning: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size())
+                + " elements), but save support is unavailable (SACM parse failed: " + std::string(sacm_result.error())
+                + ")";
+        }
+
+        return true;
+    } catch (const std::bad_alloc&) {
         loaded_file_path.clear();
         has_unsaved_changes = false;
         loaded_case.reset();
         sacm_package.reset();
-        status_message = "Error: " + std::move(result.error());
+        ++case_revision;
+        status_message = "Error: ran out of memory while loading this file. It may be too large to open.";
+        return false;
+    } catch (const std::exception& error) {
+        loaded_file_path.clear();
+        has_unsaved_changes = false;
+        loaded_case.reset();
+        sacm_package.reset();
+        ++case_revision;
+        status_message = std::string("Error: failed to load this file (") + error.what() + ").";
         return false;
     }
-
-    active_project_file_role = ProjectFileRole::Unknown;
-    active_project_file_path.clear();
-    loaded_file_path = std::filesystem::path(file_path);
-    has_unsaved_changes = false;
-    loaded_case = std::move(*result);
-    ++case_revision;
-    status_message =
-        "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
-
-    // Also populate the SACM domain model for save support
-    sacm_package.reset();
-    if (auto sacm_result = sacm::parse_sacm(file_path)) {
-        sacm_package = std::move(*sacm_result);
-        HideTerminologyArtifactReferences(loaded_case.value(), sacm_package.value());
-        RefreshVisibleTerminologyContextDisplay(loaded_case.value(), sacm_package.value());
-        status_message =
-            "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
-    } else {
-        status_message =
-            "Loaded with warning: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size())
-            + " elements), but save support is unavailable (SACM parse failed: " + std::string(sacm_result.error())
-            + ")";
-    }
-
-    return true;
 }
 
 bool AppState::save_file(const std::string& file_path) {
