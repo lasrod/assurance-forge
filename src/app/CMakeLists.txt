@@ -54,5 +54,6 @@ add_library(af_app OBJECT
     recent_projects.cpp
     review_problem_sync.cpp
     terminology_problem_sync.cpp
+    translation_review_sync.cpp
 )
 target_link_libraries(af_app PUBLIC af_common hello_imgui)

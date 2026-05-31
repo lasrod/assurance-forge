@@ -853,6 +853,9 @@ msgstr "レビュー済みとしてマーク"
 msgid "Mark review OK manually"
 msgstr "レビュー OK を手動で記録"
 
+msgid "Mark reviewed"
+msgstr "レビュー済みにする"
+
 msgid "Mark this element as manually reviewed OK."
 msgstr "この要素を手動でレビュー OK としてマークします。"
 
@@ -1306,6 +1309,9 @@ msgstr "レビュー"
 msgid "Review comment"
 msgstr "レビューコメント"
 
+msgid "Review element"
+msgstr "要素を確認"
+
 msgid "Review status: {0}"
 msgstr "レビュー状態: {0}"
 
@@ -1539,6 +1545,12 @@ msgstr "接続をテスト中…"
 
 msgid "Text"
 msgstr "テキスト"
+
+msgid "Text changed — review the secondary-language translation for consistency."
+msgstr "テキストが変更されました — 第二言語の翻訳の整合性を確認してください。"
+
+msgid "Text changed — update both languages, then mark reviewed."
+msgstr "テキストが変更されました — 両方の言語を更新してから、レビュー済みにしてください。"
 
 msgid "Text confidence argument"
 msgstr "テキスト信頼度論証"

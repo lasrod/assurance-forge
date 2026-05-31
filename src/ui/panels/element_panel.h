@@ -23,6 +23,15 @@ struct ElementTerminologyAssistCallbacks {
     std::function<void()> focus_review_tab;
 };
 
+// Secondary-language translation review. When the user edits the text of an
+// element that carries a translation, the other language may no longer match, so
+// the element is flagged until the user reviews both and accepts. The panel
+// renders a warning + "Mark reviewed" button driven by these callbacks.
+struct ElementTranslationReviewCallbacks {
+    std::function<bool(const std::string& element_id)> is_pending;
+    std::function<void(const std::string& element_id)> accept;
+};
+
 struct ElementConfidenceAssistCallbacks {
     std::function<ConfidencePanelModel(const parser::SacmElement& element)> model_for_element;
     std::function<bool(parser::SacmElement& element, const ui::ElementConfidence& confidence)> save_confidence;
@@ -82,6 +91,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
                       const ElementConfidenceAssistCallbacks* confidence_callbacks = nullptr,
                       const ElementTextEditCallbacks* text_edit_callbacks = nullptr,
                       const ElementHistoryCallbacks* history_callbacks = nullptr,
+                      const ElementTranslationReviewCallbacks* translation_review_callbacks = nullptr,
                       bool read_only = false);
 
 } // namespace ui::panels

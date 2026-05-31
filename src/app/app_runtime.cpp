@@ -426,6 +426,7 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     ui::GetUiState().model_has_translations = ui::ModelHasTranslations(ac);
     SyncTerminologyProblems();
     SyncAcpProblems();
+    SyncTranslationReviewProblems();
 
     if (impl_->workbench.pending_focus_root && impl_->current_tree.root) {
         ui::UiState& ui_state = ui::GetUiState();

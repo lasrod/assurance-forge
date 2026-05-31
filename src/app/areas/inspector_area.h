@@ -30,6 +30,8 @@ struct InspectorAreaCallbacks {
                        const std::string& new_value)>
         commit_element_text_edit;
     std::function<void(const std::string& element_id)> open_element_history;
+    std::function<bool(const std::string& element_id)> is_translation_review_pending;
+    std::function<void(const std::string& element_id)> accept_translation_review;
 };
 
 void RenderInspectorArea(AppRuntimeState& state,

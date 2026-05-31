@@ -8,6 +8,9 @@
 #include "app/proposal_ui_state.h"
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
+#include "app/translation_review_sync.h"
+#include "core/translation_review_store.h"
+#include "core/element_factory.h"
 #include "core/acp/assurance_claim_point.h"
 #include "core/audit/replay_verifier.h"
 #include "core/audit/audit_store.h"
@@ -29,9 +32,12 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <set>
+#include <sstream>
 #include <string>
 #include <unordered_set>
+#include <vector>
 
 namespace app {
 namespace {
@@ -763,6 +769,98 @@ void AppRuntime::EnsureTerminologyIgnoreStorage() {
     SyncTerminologyProblems();
 }
 
+namespace {
+
+std::filesystem::path TranslationReviewFilePath(const AppRuntimeState& state) {
+    if (!state.app_state.current_project.has_value())
+        return {};
+    return state.app_state.current_project->rootPath / "analysis" / "translation-review.af.json";
+}
+
+void SaveTranslationReviewSidecar(const AppRuntimeState& state) {
+    const std::filesystem::path path = TranslationReviewFilePath(state);
+    if (path.empty())
+        return; // No project open — translation review is not persisted.
+
+    std::vector<std::string> ids(state.translation_review_pending_ids.begin(),
+                                 state.translation_review_pending_ids.end());
+    std::sort(ids.begin(), ids.end());
+
+    std::error_code ec;
+    std::filesystem::create_directories(path.parent_path(), ec);
+    if (ec)
+        return;
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    if (!out)
+        return;
+    out << core::translation::SerializeTranslationReview(ids);
+}
+
+void LoadTranslationReviewSidecar(AppRuntimeState& state) {
+    state.translation_review_pending_ids.clear();
+    const std::filesystem::path path = TranslationReviewFilePath(state);
+    if (path.empty())
+        return;
+    std::ifstream in(path, std::ios::binary);
+    if (!in)
+        return;
+    std::stringstream buffer;
+    buffer << in.rdbuf();
+    std::vector<std::string> ids;
+    std::string error;
+    if (!core::translation::ParseTranslationReview(buffer.str(), ids, error))
+        return;
+    for (std::string& id : ids)
+        state.translation_review_pending_ids.insert(std::move(id));
+}
+
+} // namespace
+
+void AppRuntime::SyncTranslationReviewProblems() {
+    const parser::AssuranceCase* model =
+        impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
+    bool pending_changed = false;
+    app::SyncTranslationReviewProblems(impl_->problems_manager, model, impl_->translation_review_pending_ids,
+                                       pending_changed);
+    if (pending_changed)
+        SaveTranslationReviewSidecar(*impl_);
+}
+
+void AppRuntime::MarkTranslationReviewPending(const std::string& element_id) {
+    if (element_id.empty() || !impl_->app_state.loaded_case.has_value())
+        return;
+    const parser::AssuranceCase& ac = impl_->app_state.loaded_case.value();
+    const parser::SacmElement* elem = nullptr;
+    for (const parser::SacmElement& e : ac.elements) {
+        if (e.id == element_id) {
+            elem = &e;
+            break;
+        }
+    }
+    if (!elem || !core::ElementHasSecondaryTranslation(*elem))
+        return;
+    if (impl_->translation_review_pending_ids.insert(element_id).second) {
+        SaveTranslationReviewSidecar(*impl_);
+        SyncTranslationReviewProblems();
+    }
+}
+
+void AppRuntime::AcceptTranslationReview(const std::string& element_id) {
+    if (impl_->translation_review_pending_ids.erase(element_id) > 0) {
+        SaveTranslationReviewSidecar(*impl_);
+        SyncTranslationReviewProblems();
+    }
+}
+
+bool AppRuntime::IsTranslationReviewPending(const std::string& element_id) const {
+    return impl_->translation_review_pending_ids.count(element_id) > 0;
+}
+
+void AppRuntime::EnsureTranslationReviewStorage() {
+    LoadTranslationReviewSidecar(*impl_);
+    SyncTranslationReviewProblems();
+}
+
 void AppRuntime::HandleProblemQuickFix(const core::ProblemItem& problem) {
     if (problem.type.rfind("Acp", 0) == 0) {
         if (problem.quick_fix_payload.empty()) {
@@ -777,6 +875,13 @@ void AppRuntime::HandleProblemQuickFix(const core::ProblemItem& problem) {
         ui_state.center_view = ui::CenterView::GsnCanvas;
         impl_->workbench.force_center_tab_selection = true;
         SetStatus("Opened " + problem.quick_fix_payload);
+        return;
+    }
+    if (problem.type == "TranslationReviewNeeded") {
+        if (!problem.element_id.empty()) {
+            impl_->events.Emit(SelectionChangedEvent{problem.element_id, true});
+            impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
+        }
         return;
     }
     actions::TerminologyActions(*impl_).HandleProblemQuickFix(problem);
@@ -864,6 +969,9 @@ bool AppRuntime::OpenFirstProjectSacmFile() {
     // file is opened and terminology problems are first synced. Runs for both the
     // open-project and create-project flows (both reach OpenFirstProjectSacmFile).
     EnsureTerminologyIgnoreStorage();
+    // Restore the persisted "translation review needed" flags for the same reason:
+    // before SACM files are opened and problems are first synced.
+    EnsureTranslationReviewStorage();
 
     if (!impl_->app_state.current_project.has_value())
         return false;

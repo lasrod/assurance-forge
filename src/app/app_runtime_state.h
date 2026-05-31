@@ -219,6 +219,12 @@ struct AppRuntimeState {
     TerminologyUiState terminology;
     LayoutState layout;
 
+    // Element IDs flagged for secondary-language translation review: the user
+    // edited the text of an element that has a translation, so the other
+    // language may be out of sync until they review and accept. Persisted to a
+    // project sidecar so the warning survives reload.
+    std::unordered_set<std::string> translation_review_pending_ids;
+
     bool IsProposalCanvasActive() const;
 
     void LoadAiSettingsState();

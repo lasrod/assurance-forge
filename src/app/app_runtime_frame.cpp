@@ -93,6 +93,7 @@ void AppRuntime::RenderFrame(bool& done) {
         const unsigned current_epoch = ui::i18n::LanguageEpoch();
         if (current_epoch != last_language_epoch) {
             SyncTerminologyProblems();
+            SyncTranslationReviewProblems();
             last_language_epoch = current_epoch;
         }
     }
@@ -216,6 +217,9 @@ void AppRuntime::RenderFrame(bool& done) {
     review_panel_callbacks.quick_fix_problem = [this](const core::ProblemItem& problem) {
         HandleProblemQuickFix(problem);
     };
+    review_panel_callbacks.accept_translation_review = [this](const std::string& element_id) {
+        AcceptTranslationReview(element_id);
+    };
     review_panel_callbacks.set_manual_review_ok = [this](const std::string& element_id, bool manual_ok) {
         return SetManualReviewOk(element_id, manual_ok);
     };
@@ -297,13 +301,19 @@ void AppRuntime::RenderFrame(bool& done) {
                 return;
             const bool committed = impl_->element_edit_controller->CommitElementTextEdit(
                 *impl_, element_id, field_token, language, original_value, new_value);
-            if (committed)
+            if (committed) {
+                // A text edit on a translated element may have desynced the other
+                // language; flag it for review until the user confirms both match.
+                MarkTranslationReviewPending(element_id);
                 impl_->events.Emit(TreeDirtyEvent{});
+            }
         },
         [this](const std::string& element_id) {
             impl_->workbench.history_filter_element_id = element_id;
             impl_->workbench.focus_history_tab = true;
         },
+        [this](const std::string& element_id) { return IsTranslationReviewPending(element_id); },
+        [this](const std::string& element_id) { AcceptTranslationReview(element_id); },
     };
     {
         core::perf::ScopedTimer s("app.area.inspector");

@@ -127,4 +127,10 @@ bool SetElementTextField(parser::AssuranceCase& ac,
                          std::string& out_old_value,
                          std::string& out_error);
 
+// Returns true if the element carries a secondary-language translation, i.e. any
+// of its name/description/content localized maps has a non-"en" entry with
+// non-empty text. Used to decide whether editing the element should flag it for
+// translation review.
+bool ElementHasSecondaryTranslation(const parser::SacmElement& element);
+
 } // namespace core
