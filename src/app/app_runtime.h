@@ -156,6 +156,11 @@ private:
     // re-syncs terminology problems. Safe to call when no project is open.
     void EnsureTerminologyIgnoreStorage();
     void RefreshSacmPackageTreeCache();
+    // Runs the per-source SyncXProblems() for each flag set in
+    // AppRuntimeState::problems_dirty, then clears the flags. Called once per
+    // frame so the ~dozens of model-mutation sites only have to mark a source
+    // dirty rather than invoke the heavyweight sync inline.
+    void RefreshDirtyProblems();
     void SyncReviewProblems();
     void SyncTerminologyProblems();
     void SyncConfidenceProblems();

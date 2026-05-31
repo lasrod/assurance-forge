@@ -271,7 +271,9 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
     ui::UiState& ui_state = ui::GetUiState();
     if (entry.role == core::ProjectFileRole::SacmArgument) {
         SetConfidenceSource(*impl_, entry);
-        SyncConfidenceProblems();
+        // Fully repopulate every problem source for the freshly opened file on
+        // the next frame (RefreshDirtyProblems runs after the tree rebuild).
+        impl_->problems_dirty.MarkAll();
         impl_->proposal_controller->ClearActiveState();
         ClearProposalHighlightState(ui_state);
         impl_->document_dirty = false;
@@ -601,12 +603,12 @@ void AppRuntime::BeginAddTerminologyPackage(const core::ProjectFileEntry& entry,
 
 void AppRuntime::ConfirmAddTerminologyPackage() {
     if (actions::TerminologyActions(*impl_).ConfirmAddPackage())
-        SyncTerminologyProblems();
+        impl_->problems_dirty.terminology = true;
 }
 
 void AppRuntime::ApplyTerminologyPackageEdits() {
     if (actions::TerminologyActions(*impl_).ApplyPackageEdits())
-        SyncTerminologyProblems();
+        impl_->problems_dirty.terminology = true;
 }
 
 void AppRuntime::BeginDeleteTerminologyPackage() {
@@ -615,7 +617,7 @@ void AppRuntime::BeginDeleteTerminologyPackage() {
 
 void AppRuntime::ConfirmDeleteTerminologyPackage() {
     if (actions::TerminologyActions(*impl_).ConfirmDeletePackage())
-        SyncTerminologyProblems();
+        impl_->problems_dirty.terminology = true;
 }
 
 void AppRuntime::RemoveProjectPackage(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
@@ -674,8 +676,8 @@ void AppRuntime::RemoveProjectPackage(const core::ProjectFileEntry& entry, const
 
     status_message = "Removed " + kind_label + " " + label + ".";
     impl_->sacm_package_tree_cache.erase(entry.relativePath.generic_string());
-    SyncTerminologyProblems();
-    SyncAcpProblems();
+    impl_->problems_dirty.terminology = true;
+    impl_->problems_dirty.acp = true;
     SetStatus(status_message);
 }
 
@@ -693,7 +695,7 @@ void AppRuntime::BeginEditTerminologyTerm(const core::TerminologyTermRef& term_r
 
 void AppRuntime::ConfirmTerminologyTermEdit() {
     if (actions::TerminologyActions(*impl_).ConfirmTermEdit())
-        SyncTerminologyProblems();
+        impl_->problems_dirty.terminology = true;
 }
 
 void AppRuntime::OpenTerminologyTermFromCanvas(const core::TerminologyPackageRef& package_ref,
@@ -710,14 +712,14 @@ void AppRuntime::AddTerminologyTermAsContextFromCanvas(const std::string& elemen
                                                        const core::TerminologyPackageRef& package_ref,
                                                        const core::TerminologyTermRef& term_ref) {
     if (actions::TerminologyActions(*impl_).AddTermAsContextFromCanvas(element_id, package_ref, term_ref))
-        SyncTerminologyProblems();
+        impl_->problems_dirty.terminology = true;
 }
 
 void AppRuntime::AddVisibleTerminologyTermContextFromCanvas(const std::string& element_id,
                                                             const core::TerminologyPackageRef& package_ref,
                                                             const core::TerminologyTermRef& term_ref) {
     if (actions::TerminologyActions(*impl_).AddVisibleTermContextFromCanvas(element_id, package_ref, term_ref))
-        SyncTerminologyProblems();
+        impl_->problems_dirty.terminology = true;
 }
 
 void AppRuntime::FindTerminologyUsagesFromCanvas(const core::TerminologyPackageRef& package_ref,
@@ -748,7 +750,7 @@ void AppRuntime::BeginLinkExistingTerminologyTerm(const std::string& element_id,
 
 void AppRuntime::IgnoreTerminologySuggestion(const std::string& element_id, const std::string& term_value) {
     actions::TerminologyActions(*impl_).IgnoreSuggestion(element_id, term_value);
-    SyncTerminologyProblems();
+    impl_->problems_dirty.terminology = true;
 }
 
 bool AppRuntime::IsTerminologySuggestionIgnored(const std::string& element_id, const std::string& term_value) const {
@@ -757,7 +759,7 @@ bool AppRuntime::IsTerminologySuggestionIgnored(const std::string& element_id, c
 
 void AppRuntime::RestoreTerminologySuggestion(const std::string& element_id, const std::string& term_value) {
     actions::TerminologyActions(*impl_).RestoreSuggestion(element_id, term_value);
-    SyncTerminologyProblems();
+    impl_->problems_dirty.terminology = true;
 }
 
 std::vector<actions::IgnoredSuggestionView> AppRuntime::ListIgnoredTerminologySuggestions() const {
@@ -766,7 +768,7 @@ std::vector<actions::IgnoredSuggestionView> AppRuntime::ListIgnoredTerminologySu
 
 void AppRuntime::EnsureTerminologyIgnoreStorage() {
     actions::TerminologyActions(*impl_).LoadIgnoredSuggestions();
-    SyncTerminologyProblems();
+    impl_->problems_dirty.terminology = true;
 }
 
 namespace {
@@ -841,14 +843,14 @@ void AppRuntime::MarkTranslationReviewPending(const std::string& element_id) {
         return;
     if (impl_->translation_review_pending_ids.insert(element_id).second) {
         SaveTranslationReviewSidecar(*impl_);
-        SyncTranslationReviewProblems();
+        impl_->problems_dirty.translation = true;
     }
 }
 
 void AppRuntime::AcceptTranslationReview(const std::string& element_id) {
     if (impl_->translation_review_pending_ids.erase(element_id) > 0) {
         SaveTranslationReviewSidecar(*impl_);
-        SyncTranslationReviewProblems();
+        impl_->problems_dirty.translation = true;
     }
 }
 
@@ -858,7 +860,7 @@ bool AppRuntime::IsTranslationReviewPending(const std::string& element_id) const
 
 void AppRuntime::EnsureTranslationReviewStorage() {
     LoadTranslationReviewSidecar(*impl_);
-    SyncTranslationReviewProblems();
+    impl_->problems_dirty.translation = true;
 }
 
 void AppRuntime::HandleProblemQuickFix(const core::ProblemItem& problem) {
@@ -889,7 +891,7 @@ void AppRuntime::HandleProblemQuickFix(const core::ProblemItem& problem) {
 
 void AppRuntime::ConfirmQuickDefineTerminologyTerm(bool add_as_context) {
     if (actions::TerminologyActions(*impl_).ConfirmQuickDefineTerm(add_as_context))
-        SyncTerminologyProblems();
+        impl_->problems_dirty.terminology = true;
 }
 
 void AppRuntime::BeginDeleteTerminologyTerm(const core::TerminologyTermRef& term_ref) {
@@ -898,7 +900,7 @@ void AppRuntime::BeginDeleteTerminologyTerm(const core::TerminologyTermRef& term
 
 void AppRuntime::ConfirmDeleteTerminologyTerm() {
     if (actions::TerminologyActions(*impl_).ConfirmDeleteTerm())
-        SyncTerminologyProblems();
+        impl_->problems_dirty.terminology = true;
 }
 
 void AppRuntime::SelectTerminologyCategory(const core::TerminologyCategoryRef& category_ref) {
@@ -996,7 +998,7 @@ bool AppRuntime::OpenFirstProjectSacmFile() {
 bool AppRuntime::EnsureReviewItemStorage() {
     if (!impl_->app_state.current_project.has_value()) {
         impl_->review_controller->ClearStorage();
-        SyncReviewProblems();
+        impl_->problems_dirty.review = true;
         return false;
     }
 
@@ -1008,11 +1010,11 @@ bool AppRuntime::EnsureReviewItemStorage() {
 
     std::string error;
     if (impl_->review_controller->ConfigureStorage(review_path, error)) {
-        SyncReviewProblems();
+        impl_->problems_dirty.review = true;
         return true;
     }
 
-    SyncReviewProblems();
+    impl_->problems_dirty.review = true;
     SetStatus("Review items could not be loaded: " + error);
     return false;
 }
@@ -1020,7 +1022,7 @@ bool AppRuntime::EnsureReviewItemStorage() {
 bool AppRuntime::EnsureConfidenceStorage() {
     if (!impl_->app_state.current_project.has_value()) {
         impl_->confidence_controller->ClearStorage();
-        SyncConfidenceProblems();
+        impl_->problems_dirty.confidence = true;
         return false;
     }
 
@@ -1031,11 +1033,11 @@ bool AppRuntime::EnsureConfidenceStorage() {
 
     std::string error;
     if (impl_->confidence_controller->ConfigureStorage(confidence_path, project.id, error)) {
-        SyncConfidenceProblems();
+        impl_->problems_dirty.confidence = true;
         return true;
     }
 
-    SyncConfidenceProblems();
+    impl_->problems_dirty.confidence = true;
     SetStatus("Confidence assessments could not be loaded: " + error);
     return false;
 }

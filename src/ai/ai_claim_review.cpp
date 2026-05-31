@@ -35,14 +35,6 @@ AiReviewElement MakeReviewElement(const parser::SacmElement& element, const std:
     return review_element;
 }
 
-const core::TreeNode* FindTreeNode(const core::AssuranceTree& tree, const std::string& element_id) {
-    for (const auto& node : tree.nodes) {
-        if (node && node->id == element_id)
-            return node.get();
-    }
-    return nullptr;
-}
-
 void AddChildIfPresent(const parser::AssuranceCase& assurance_case,
                        const core::TreeNode* child_node,
                        std::vector<AiReviewElement>& children) {
@@ -374,7 +366,7 @@ bool BuildAiReviewPayload(const parser::AssuranceCase& assurance_case,
     AiReviewPayload payload;
     payload.selected = MakeReviewElement(*selected, "selected");
 
-    const core::TreeNode* selected_node = FindTreeNode(tree, selected_element_id);
+    const core::TreeNode* selected_node = core::FindTreeNode(tree, selected_element_id);
     if (selected_node && selected_node->parent) {
         const parser::SacmElement* parent = FindSacmElement(assurance_case, selected_node->parent->id);
         if (parent)
@@ -408,7 +400,7 @@ bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
         return false;
     }
 
-    const core::TreeNode* selected_node = FindTreeNode(tree, selected_element_id);
+    const core::TreeNode* selected_node = core::FindTreeNode(tree, selected_element_id);
     AddPackage(out_packages, "SEL", ElementDataToJson(*selected, "selected", selected_node));
 
     if (selected_node && selected_node->parent) {

@@ -32,14 +32,6 @@ void EnsureGuidelineCatalogLoaded(::app::AppRuntimeState& state) {
     state.guideline_catalog_load_attempted = true;
 }
 
-const core::TreeNode* FindTreeNode(const core::AssuranceTree& tree, const std::string& element_id) {
-    for (const auto& node : tree.nodes) {
-        if (node && node->id == element_id)
-            return node.get();
-    }
-    return nullptr;
-}
-
 void DrawTooltipIfHovered(const std::string& text) {
     if (!text.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         ImGui::SetTooltip("%s", text.c_str());
@@ -58,7 +50,7 @@ void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
     const parser::SacmElement* selected_element = loaded_case && !ui_state.selected_element_id.empty()
                                                       ? ai::FindSacmElement(*loaded_case, ui_state.selected_element_id)
                                                       : nullptr;
-    const core::TreeNode* selected_node = FindTreeNode(state.current_tree, ui_state.selected_element_id);
+    const core::TreeNode* selected_node = core::FindTreeNode(state.current_tree, ui_state.selected_element_id);
 
     const ImVec2 available = ImGui::GetContentRegionAvail();
     const float spacing = ImGui::GetStyle().ItemSpacing.x;

@@ -156,6 +156,24 @@ struct LayoutState {
     float problems_panel_height = 220.0f;
 };
 
+// Per-source "problems need re-syncing" flags. Setting a flag is cheap; the
+// matching SyncXProblems() runs at most once per frame in
+// AppRuntime::RefreshDirtyProblems(). This mirrors the tree-refresh pattern
+// (TreeDirtyEvent -> tree_needs_rebuild -> RebuildDerivedViewsIfNeeded): code
+// that changes the model marks the affected source dirty instead of calling the
+// heavyweight sync inline.
+struct ProblemSyncDirty {
+    bool review = false;
+    bool terminology = false;
+    bool confidence = false;
+    bool acp = false;
+    bool translation = false;
+
+    void MarkAll() {
+        review = terminology = confidence = acp = translation = true;
+    }
+};
+
 struct AppRuntimeState {
     AppRuntimeState();
     ~AppRuntimeState();
@@ -208,6 +226,7 @@ struct AppRuntimeState {
     bool pending_reconcile_audit_store = false;
 
     bool tree_needs_rebuild = false;
+    ProblemSyncDirty problems_dirty;
     core::AssuranceTree current_tree;
     core::TreeDisplayOrder tree_display_order;
     core::TreeEditIndex tree_edit_index;

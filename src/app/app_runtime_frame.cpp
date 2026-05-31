@@ -94,8 +94,8 @@ void AppRuntime::RenderFrame(bool& done) {
         static unsigned last_language_epoch = ui::i18n::LanguageEpoch();
         const unsigned current_epoch = ui::i18n::LanguageEpoch();
         if (current_epoch != last_language_epoch) {
-            SyncTerminologyProblems();
-            SyncTranslationReviewProblems();
+            impl_->problems_dirty.terminology = true;
+            impl_->problems_dirty.translation = true;
             last_language_epoch = current_epoch;
         }
     }
@@ -145,6 +145,11 @@ void AppRuntime::RenderFrame(bool& done) {
     {
         core::perf::ScopedTimer s("app.ai_poll");
         PollAiReviewTask();
+    }
+
+    {
+        core::perf::ScopedTimer s("app.problem_sync");
+        RefreshDirtyProblems();
     }
 
     {

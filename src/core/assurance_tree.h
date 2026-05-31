@@ -45,4 +45,9 @@ public:
     std::vector<std::unique_ptr<TreeNode>> nodes; // owns all nodes
 };
 
+// Returns the node with the given element id, or nullptr if none. `nodes` owns
+// every node in the tree (root, orphans, children, attachments), so a flat scan
+// covers the whole tree.
+const TreeNode* FindTreeNode(const AssuranceTree& tree, const std::string& id);
+
 } // namespace core

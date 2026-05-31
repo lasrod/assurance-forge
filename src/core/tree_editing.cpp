@@ -20,32 +20,6 @@ const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const
     return nullptr;
 }
 
-const TreeNode* FindTreeNode(const TreeNode* node, const std::string& id) {
-    if (!node)
-        return nullptr;
-    if (node->id == id)
-        return node;
-    for (const TreeNode* child : node->group1_children) {
-        if (const TreeNode* found = FindTreeNode(child, id))
-            return found;
-    }
-    for (const TreeNode* attachment : node->group2_attachments) {
-        if (const TreeNode* found = FindTreeNode(attachment, id))
-            return found;
-    }
-    return nullptr;
-}
-
-const TreeNode* FindTreeNode(const AssuranceTree& tree, const std::string& id) {
-    if (const TreeNode* found = FindTreeNode(tree.root, id))
-        return found;
-    for (const TreeNode* orphan : tree.orphans) {
-        if (const TreeNode* found = FindTreeNode(orphan, id))
-            return found;
-    }
-    return nullptr;
-}
-
 bool IsDescendant(const TreeNode* root, const std::string& potential_descendant) {
     if (!root)
         return false;

@@ -261,4 +261,12 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
     return tree;
 }
 
+const TreeNode* FindTreeNode(const AssuranceTree& tree, const std::string& id) {
+    for (const std::unique_ptr<TreeNode>& node : tree.nodes) {
+        if (node && node->id == id)
+            return node.get();
+    }
+    return nullptr;
+}
+
 } // namespace core
