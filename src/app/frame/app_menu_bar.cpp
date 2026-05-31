@@ -78,7 +78,7 @@ void RenderMenuBarStats() {
                             ImGui::CalcTextSize(edges_text).x;
 
     // The whole stats readout (FPS + node/edge counts) doubles as a button:
-    // clicking it opens the Performance panel. Requirements:
+    // clicking it opens the Performance overlay. Requirements:
     //   * Looks like a plain status label when not hovered.
     //   * Vertically centered in the menu bar (drawn manually, so we must add
     //     the centering offset ImGui normally applies to menu-bar text).
@@ -99,7 +99,7 @@ void RenderMenuBarStats() {
     const bool hovered = ImGui::IsItemHovered();
     if (hovered) {
         ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-        ImGui::SetTooltip("%s", AF_TR("Open Performance panel").c_str());
+        ImGui::SetTooltip("%s", AF_TR("Open Performance overlay").c_str());
     }
     if (ImGui::IsItemClicked())
         ui_state.show_perf_overlay = true;

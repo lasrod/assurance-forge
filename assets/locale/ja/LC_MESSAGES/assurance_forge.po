@@ -1042,8 +1042,8 @@ msgstr "オープン"
 msgid "Open ACP"
 msgstr "ACP を開く"
 
-msgid "Open Performance panel"
-msgstr "パフォーマンスパネルを開く"
+msgid "Open Performance overlay"
+msgstr "パフォーマンスオーバーレイを開く"
 
 msgid "Open Project"
 msgstr "プロジェクトを開く"
