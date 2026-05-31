@@ -172,6 +172,10 @@ void RenderInspectorArea(AppRuntimeState& state,
         ui::panels::ElementTextEditCallbacks text_edit_callbacks;
         text_edit_callbacks.commit_text_edit = callbacks.commit_element_text_edit;
 
+        ui::panels::ElementTranslationReviewCallbacks translation_review_callbacks;
+        translation_review_callbacks.is_pending = callbacks.is_translation_review_pending;
+        translation_review_callbacks.accept = callbacks.accept_translation_review;
+
         ui::panels::ElementHistoryCallbacks history_callbacks;
         if (state.app_state.current_project.has_value()) {
             const std::filesystem::path project_root = state.app_state.current_project.value().rootPath;
@@ -230,7 +234,8 @@ void RenderInspectorArea(AppRuntimeState& state,
         }
 
         if (ui::panels::ShowElementPanel(loaded_case, sacm_package, &terminology_callbacks, &confidence_callbacks,
-                                          &text_edit_callbacks, &history_callbacks, inspector_read_only)) {
+                                          &text_edit_callbacks, &history_callbacks, &translation_review_callbacks,
+                                          inspector_read_only)) {
             if (state.confidence_controller && loaded_case) {
                 const bool confidence_changed = state.confidence_controller->RefreshStaleFlags(*loaded_case);
                 if (confidence_changed) {

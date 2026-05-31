@@ -370,6 +370,23 @@ bool RenderReviewAttentionNotice(const ui::UiState& state,
     return true;
 }
 
+// Renders the secondary-language translation-review warning + accept button when
+// the element is flagged. Returns true if anything was drawn.
+bool RenderTranslationReviewNotice(const std::string& element_id,
+                                   const ElementTranslationReviewCallbacks* callbacks,
+                                   bool read_only) {
+    if (!callbacks || !callbacks->is_pending || !callbacks->is_pending(element_id))
+        return false;
+
+    ImGui::TextColored(ui::GetWarningColor(), "%s",
+                       AF_TR("Text changed — update both languages, then mark reviewed.").c_str());
+    ImGui::BeginDisabled(read_only || !callbacks->accept);
+    if (ImGui::SmallButton(AF_TR("Mark reviewed").c_str()) && callbacks->accept)
+        callbacks->accept(element_id);
+    ImGui::EndDisabled();
+    return true;
+}
+
 } // namespace
 
 bool ShowElementPanel(parser::AssuranceCase* ac,
@@ -378,6 +395,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
                       const ElementConfidenceAssistCallbacks* confidence_callbacks,
                       const ElementTextEditCallbacks* text_edit_callbacks,
                       const ElementHistoryCallbacks* history_callbacks,
+                      const ElementTranslationReviewCallbacks* translation_review_callbacks,
                       bool read_only) {
     const UiState& state = GetUiState();
     bool modified = false;
@@ -408,6 +426,10 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     RenderElementMetadata(*elem);
 
     if (RenderReviewAttentionNotice(state, elem->id, terminology_callbacks)) {
+        ImGui::Spacing();
+    }
+
+    if (RenderTranslationReviewNotice(elem->id, translation_review_callbacks, read_only)) {
         ImGui::Spacing();
     }
 

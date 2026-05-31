@@ -41,6 +41,8 @@ struct ArgumentPackageTabCache {
     std::string argument_package_id;
     std::string argument_package_gid;
     std::string tab_title;
+    bool show_secondary_language = false;
+    std::string secondary_language;
     parser::AssuranceCase visible_case;
     core::AssuranceTree visible_tree;
     bool renderer_seeded = false;
@@ -183,9 +185,12 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
 
     ArgumentPackageTabCache& cache = g_argument_package_canvas_caches[tab.key];
     const std::uint64_t current_revision = state.app_state.case_revision;
+    const ui::UiState& ui_state_for_lang = ui::GetUiState();
     const bool inputs_match = cache.valid && cache.case_revision == current_revision &&
                               cache.argument_package_id == argument_package->id &&
-                              cache.argument_package_gid == argument_package->gid && cache.tab_title == tab.title;
+                              cache.argument_package_gid == argument_package->gid && cache.tab_title == tab.title &&
+                              cache.show_secondary_language == ui_state_for_lang.show_secondary_language &&
+                              cache.secondary_language == ui_state_for_lang.active_secondary_lang;
 
     if (!inputs_match) {
         {
@@ -195,13 +200,15 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
         }
         {
             core::perf::ScopedTimer perf_scope("app.wb.build_assurance_tree");
-            cache.visible_tree = ui::gsn::BuildAssuranceTree(cache.visible_case);
+            cache.visible_tree = ui::gsn::BuildAssuranceTree(cache.visible_case, ui_state_for_lang.active_secondary_lang);
             core::ApplyTreeDisplayOrder(cache.visible_tree, state.tree_display_order);
         }
         cache.case_revision = current_revision;
         cache.argument_package_id = argument_package->id;
         cache.argument_package_gid = argument_package->gid;
         cache.tab_title = tab.title;
+        cache.show_secondary_language = ui_state_for_lang.show_secondary_language;
+        cache.secondary_language = ui_state_for_lang.active_secondary_lang;
         cache.renderer_seeded = false;
         cache.valid = true;
     }

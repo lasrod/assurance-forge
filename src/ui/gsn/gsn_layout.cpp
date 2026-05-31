@@ -3,6 +3,7 @@
 #include "core/gsn_layout.h"
 #include "ui/gsn/gsn_canvas.h" // for g_BoldFont
 #include "ui/gsn/gsn_dpi.h"
+#include "ui/ui_state.h"
 
 #include <algorithm>
 #include <cmath>
@@ -188,6 +189,11 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
         input.orphans.push_back(orphan->id);
 
     std::unordered_map<std::string, core::GsnLayoutSize> node_sizes;
+    // Size each node from the label that is actually rendered. Translated
+    // text can be much longer/shorter than the primary, so measuring the
+    // primary label would clip or under-fill the node when the canvas
+    // language toggle is active.
+    const ui::UiState& ui_state = ui::GetUiState();
     for (const auto& owned_node : tree.nodes) {
         const core::TreeNode& tree_node = *owned_node;
         core::GsnLayoutInputNode node;
@@ -203,7 +209,9 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
         for (const core::TreeNode* attachment : tree_node.group2_attachments)
             node.group2_attachments.push_back(attachment->id);
 
-        const ImVec2 node_size = ComputeNodeSize(tree_node.label, tree_node.role);
+        const bool use_secondary = ui_state.show_secondary_language && !tree_node.label_secondary.empty();
+        const std::string& active_label = use_secondary ? tree_node.label_secondary : tree_node.label;
+        const ImVec2 node_size = ComputeNodeSize(active_label, tree_node.role);
         node_sizes[node.id] = {node_size.x, node_size.y};
         input.nodes.push_back(std::move(node));
     }

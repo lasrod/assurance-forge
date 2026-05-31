@@ -35,8 +35,10 @@ struct TreeNode {
 
 class AssuranceTree {
 public:
-    // Build a tree from a parsed assurance case
-    static AssuranceTree Build(const parser::AssuranceCase& ac);
+    // Build a tree from a parsed assurance case. `secondary_language` selects which
+    // translation entry (key into name_langs/description_langs/content_langs) is
+    // used to populate TreeNode::label_secondary.
+    static AssuranceTree Build(const parser::AssuranceCase& ac, const std::string& secondary_language = "ja");
 
     TreeNode* root = nullptr;
     std::vector<TreeNode*> orphans;               // nodes not connected by any relationship

@@ -279,6 +279,14 @@ void RenderReviewPanelContent(AppRuntimeState& state, const ReviewPanelAreaCallb
             callbacks.quick_fix_problem(problem);
     };
     panel_callbacks.delete_problem = [&state, &callbacks](const core::ProblemItem& problem) {
+        // Translation-review problems are rebuilt from the persisted pending set,
+        // so simply removing the manager entry would let them reappear on the
+        // next sync. Clear the underlying flag instead (same as "Mark reviewed").
+        if (problem.type == "TranslationReviewNeeded" && callbacks.accept_translation_review) {
+            callbacks.accept_translation_review(problem.element_id);
+            SetStatus(callbacks, "Problem resolved.");
+            return;
+        }
         state.problems_manager.RemoveProblem(problem.id);
         SetStatus(callbacks, "Problem deleted.");
     };

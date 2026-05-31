@@ -73,6 +73,16 @@ void AppRuntime::RenderFrame(bool& done) {
                                       ? ui::i18n::Language::Japanese
                                       : ui::i18n::Language::English;
         ui::i18n::SetLanguage(next);
+
+        // Keep the GSN canvas / tree secondary-language view in sync with the UI
+        // language, but only when the model actually carries translations for the
+        // active secondary language. Switching the UI to the secondary language
+        // shows the translated element labels; switching back to English shows
+        // the primary labels.
+        ui::UiState& ui_state = ui::GetUiState();
+        if (ui_state.model_has_translations) {
+            ui_state.show_secondary_language = ui::i18n::LanguageCode(next) == ui_state.active_secondary_lang;
+        }
     }
 
     // Re-sync caches that bake the current language into stored strings (e.g.
@@ -83,7 +93,24 @@ void AppRuntime::RenderFrame(bool& done) {
         const unsigned current_epoch = ui::i18n::LanguageEpoch();
         if (current_epoch != last_language_epoch) {
             SyncTerminologyProblems();
+            SyncTranslationReviewProblems();
             last_language_epoch = current_epoch;
+        }
+    }
+
+    // Re-layout the GSN canvas (and refresh derived views like the argument
+    // navigator) when the canvas language toggle changes. Translated labels
+    // can be much longer/shorter than the primary, so node sizes computed
+    // off the primary label would clip or under-fill after a toggle.
+    {
+        ui::UiState& ui_state = ui::GetUiState();
+        static bool last_show_secondary = ui_state.show_secondary_language;
+        static std::string last_secondary_lang = ui_state.active_secondary_lang;
+        if (ui_state.show_secondary_language != last_show_secondary ||
+            ui_state.active_secondary_lang != last_secondary_lang) {
+            impl_->tree_needs_rebuild = true;
+            last_show_secondary = ui_state.show_secondary_language;
+            last_secondary_lang = ui_state.active_secondary_lang;
         }
     }
 
@@ -190,6 +217,9 @@ void AppRuntime::RenderFrame(bool& done) {
     review_panel_callbacks.quick_fix_problem = [this](const core::ProblemItem& problem) {
         HandleProblemQuickFix(problem);
     };
+    review_panel_callbacks.accept_translation_review = [this](const std::string& element_id) {
+        AcceptTranslationReview(element_id);
+    };
     review_panel_callbacks.set_manual_review_ok = [this](const std::string& element_id, bool manual_ok) {
         return SetManualReviewOk(element_id, manual_ok);
     };
@@ -271,13 +301,19 @@ void AppRuntime::RenderFrame(bool& done) {
                 return;
             const bool committed = impl_->element_edit_controller->CommitElementTextEdit(
                 *impl_, element_id, field_token, language, original_value, new_value);
-            if (committed)
+            if (committed) {
+                // A text edit on a translated element may have desynced the other
+                // language; flag it for review until the user confirms both match.
+                MarkTranslationReviewPending(element_id);
                 impl_->events.Emit(TreeDirtyEvent{});
+            }
         },
         [this](const std::string& element_id) {
             impl_->workbench.history_filter_element_id = element_id;
             impl_->workbench.focus_history_tab = true;
         },
+        [this](const std::string& element_id) { return IsTranslationReviewPending(element_id); },
+        [this](const std::string& element_id) { AcceptTranslationReview(element_id); },
     };
     {
         core::perf::ScopedTimer s("app.area.inspector");

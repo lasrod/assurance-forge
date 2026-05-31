@@ -168,7 +168,7 @@ void RefreshReconstruction(ReconstructionCache& cache,
     }
     cache.element_count = state->model.elements.size();
     cache.canonical_hash = core::audit::CanonicalModelHash(state->package);
-    cache.tree = ui::gsn::BuildAssuranceTree(state->model);
+    cache.tree = ui::gsn::BuildAssuranceTree(state->model, ui::GetUiState().active_secondary_lang);
     cache.state = std::move(*state);
     cache.has_state = true;
     cache.valid = true;

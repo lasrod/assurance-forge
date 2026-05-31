@@ -47,6 +47,7 @@ add_library(af_core OBJECT
     reviews/review_item_manager.cpp
     reviews/review_proposal.cpp
     reviews/review_proposal_factory.cpp
+    translation_review_store.cpp
     reviews/review_proposal_manager.cpp
     reviews/review_proposal_patch_service.cpp
     reviews/review_text_utils.cpp

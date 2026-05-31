@@ -940,4 +940,16 @@ bool SetElementTextField(parser::AssuranceCase& ac,
     return true;
 }
 
+bool ElementHasSecondaryTranslation(const parser::SacmElement& element) {
+    const std::map<std::string, std::string>* maps[] = {
+        &element.name_langs, &element.description_langs, &element.content_langs};
+    for (const std::map<std::string, std::string>* langs : maps) {
+        for (const auto& [lang, text] : *langs) {
+            if (lang != "en" && !text.empty())
+                return true;
+        }
+    }
+    return false;
+}
+
 } // namespace core

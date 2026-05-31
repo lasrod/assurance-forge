@@ -73,23 +73,59 @@ void RenderMenuBarStats() {
     std::snprintf(edges_text, sizeof(edges_text), "E %d/%d", stats.edges_drawn, edge_total);
 
     const char* sep = "  ";
-    const float total_width = ImGui::CalcTextSize(fps_text).x + ImGui::CalcTextSize(sep).x +
-                              ImGui::CalcTextSize(nodes_text).x + ImGui::CalcTextSize(sep).x +
-                              ImGui::CalcTextSize(edges_text).x;
+    const float sep_w = ImGui::CalcTextSize(sep).x;
+    const float content_w = ImGui::CalcTextSize(fps_text).x + sep_w + ImGui::CalcTextSize(nodes_text).x + sep_w +
+                            ImGui::CalcTextSize(edges_text).x;
 
-    const float right_x = ImGui::GetWindowContentRegionMax().x - total_width;
+    // The whole stats readout (FPS + node/edge counts) doubles as a button:
+    // clicking it opens the Performance overlay. Requirements:
+    //   * Looks like a plain status label when not hovered.
+    //   * Vertically centered in the menu bar (drawn manually, so we must add
+    //     the centering offset ImGui normally applies to menu-bar text).
+    //   * Fixed width so it does not jiggle as the numbers change — sized from
+    //     a worst-case template, with the live text right-aligned inside it.
+    const float pad_x = 8.0f;
+    const float button_w = ImGui::CalcTextSize("FPS: 999.9  N 9999/9999  E 9999/9999").x + pad_x * 2.0f;
+    const float bar_h = ImGui::GetFrameHeight();
+
+    const float right_x = ImGui::GetWindowContentRegionMax().x - button_w;
     ImGui::SameLine();
     ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), right_x));
 
-    ImGui::TextUnformatted(fps_text);
-    ImGui::SameLine(0.0f, 0.0f);
-    ImGui::TextUnformatted(sep);
-    ImGui::SameLine(0.0f, 0.0f);
-    ImGui::TextColored(ui::CullRatioColor(node_ratio), "%s", nodes_text);
-    ImGui::SameLine(0.0f, 0.0f);
-    ImGui::TextUnformatted(sep);
-    ImGui::SameLine(0.0f, 0.0f);
-    ImGui::TextColored(ui::CullRatioColor(edge_ratio), "%s", edges_text);
+    ui::UiState& ui_state = ui::GetUiState();
+    const ImVec2 p0 = ImGui::GetCursorScreenPos();
+
+    ImGui::InvisibleButton("##fps_open_perf", ImVec2(button_w, bar_h));
+    const bool hovered = ImGui::IsItemHovered();
+    if (hovered) {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        ImGui::SetTooltip("%s", AF_TR("Open Performance overlay").c_str());
+    }
+    if (ImGui::IsItemClicked())
+        ui_state.show_perf_overlay = true;
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    if (hovered) {
+        const ui::Theme& th = ui::GetTheme();
+        dl->AddRectFilled(ImVec2(p0.x, p0.y + 2.0f),
+                          ImVec2(p0.x + button_w, p0.y + bar_h - 2.0f),
+                          ui::WithAlpha(th.accent, 0.18f),
+                          4.0f);
+        dl->AddRect(ImVec2(p0.x, p0.y + 2.0f),
+                    ImVec2(p0.x + button_w, p0.y + bar_h - 2.0f),
+                    ui::WithAlpha(th.accent, 0.9f),
+                    4.0f);
+    }
+
+    // Right-align the live text inside the fixed-width button and center it
+    // vertically, then draw the three segments left-to-right.
+    const float text_y = p0.y + (bar_h - ImGui::GetTextLineHeight()) * 0.5f;
+    float x = p0.x + button_w - pad_x - content_w;
+    dl->AddText(ImVec2(x, text_y), ImGui::GetColorU32(ImGuiCol_Text), fps_text);
+    x += ImGui::CalcTextSize(fps_text).x + sep_w;
+    dl->AddText(ImVec2(x, text_y), ImGui::ColorConvertFloat4ToU32(ui::CullRatioColor(node_ratio)), nodes_text);
+    x += ImGui::CalcTextSize(nodes_text).x + sep_w;
+    dl->AddText(ImVec2(x, text_y), ImGui::ColorConvertFloat4ToU32(ui::CullRatioColor(edge_ratio)), edges_text);
 }
 
 } // namespace

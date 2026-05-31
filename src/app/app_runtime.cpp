@@ -416,7 +416,8 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     const sacm::AssuranceCasePackage* sacm_package =
         impl_->app_state.sacm_package ? &*impl_->app_state.sacm_package : nullptr;
     const std::optional<parser::AssuranceCase> filtered_case = FilterConfidencePackageElementsFromMainTree(ac, sacm_package);
-    impl_->current_tree = ui::gsn::BuildAssuranceTree(filtered_case ? *filtered_case : ac);
+    impl_->current_tree = ui::gsn::BuildAssuranceTree(filtered_case ? *filtered_case : ac,
+                                                      ui::GetUiState().active_secondary_lang);
     core::ApplyTreeDisplayOrder(impl_->current_tree, impl_->tree_display_order);
     impl_->tree_edit_index = core::BuildTreeEditIndex(ac);
     impl_->tree_edit_index_valid = true;
@@ -425,6 +426,7 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     ui::GetUiState().model_has_translations = ui::ModelHasTranslations(ac);
     SyncTerminologyProblems();
     SyncAcpProblems();
+    SyncTranslationReviewProblems();
 
     if (impl_->workbench.pending_focus_root && impl_->current_tree.root) {
         ui::UiState& ui_state = ui::GetUiState();
@@ -480,7 +482,8 @@ areas::WorkbenchAreaCallbacks AppRuntime::MakeWorkbenchAreaCallbacks() {
             impl_->proposal_controller->ClearActiveState();
             ClearProposalHighlightState(ui::GetUiState());
             if (impl_->app_state.loaded_case.has_value()) {
-                impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->app_state.loaded_case.value());
+                impl_->current_tree = ui::gsn::BuildAssuranceTree(impl_->app_state.loaded_case.value(),
+                                                                  ui::GetUiState().active_secondary_lang);
                 ui::gsn::SetCanvasTree(impl_->current_tree);
             } else {
                 impl_->tree_needs_rebuild = true;

@@ -160,7 +160,20 @@ private:
     void SyncTerminologyProblems();
     void SyncConfidenceProblems();
     void SyncAcpProblems();
+    void SyncTranslationReviewProblems();
     void HandleProblemQuickFix(const core::ProblemItem& problem);
+
+    // Flags `element_id` for secondary-language translation review when the
+    // element carries a translation. Called after a committed text edit. No-op
+    // for elements without a secondary translation.
+    void MarkTranslationReviewPending(const std::string& element_id);
+    // Clears the translation-review flag for `element_id` (user pressed "Mark
+    // reviewed") and re-syncs problems.
+    void AcceptTranslationReview(const std::string& element_id);
+    bool IsTranslationReviewPending(const std::string& element_id) const;
+    // Clears + reloads the current project's persisted translation-review set,
+    // then re-syncs. Safe to call when no project is open.
+    void EnsureTranslationReviewStorage();
     void TouchCurrentProjectRecent();
     bool SaveProject();
     void ExportGsnSvg();

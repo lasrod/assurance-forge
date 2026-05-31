@@ -171,6 +171,10 @@ TRANSLATIONS = {
     "{0} is not defined.": "{0} は定義されていません。",
     "Create new meaning": "新しい意味を作成",
     "Unresolved review": "未解決のレビュー",
+    "Text changed — update both languages, then mark reviewed.": "テキストが変更されました — 両方の言語を更新してから、レビュー済みにしてください。",
+    "Mark reviewed": "レビュー済みにする",
+    "Review element": "要素を確認",
+    "Text changed — review the secondary-language translation for consistency.": "テキストが変更されました — 第二言語の翻訳の整合性を確認してください。",
     "Open review comments or AI review failures for this element.": "この要素のレビューコメントまたは AI レビュー失敗を開きます。",
     "{0}\nClick to open the Review tab.": "{0}\nクリックしてレビュータブを開きます。",
     "No element selected.": "要素が選択されていません。",
@@ -302,6 +306,7 @@ TRANSLATIONS = {
 
     # ===== Performance overlay =====
     "Performance overlay": "パフォーマンスオーバーレイ",
+    "Open Performance overlay": "パフォーマンスオーバーレイを開く",
     "(history & values frozen)": "(履歴と値が固定されています)",
     "(live)": "(ライブ)",
     "● PAUSED": "● 一時停止中",

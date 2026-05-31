@@ -32,8 +32,8 @@ std::vector<CanvasElement> ConvertFromAssuranceCase(const parser::AssuranceCase&
     return out;
 }
 
-core::AssuranceTree BuildAssuranceTree(const parser::AssuranceCase& ac) {
-    return core::AssuranceTree::Build(ac);
+core::AssuranceTree BuildAssuranceTree(const parser::AssuranceCase& ac, const std::string& secondary_language) {
+    return core::AssuranceTree::Build(ac, secondary_language);
 }
 
 } // namespace ui::gsn

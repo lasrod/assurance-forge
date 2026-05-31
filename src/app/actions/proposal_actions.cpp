@@ -80,7 +80,7 @@ bool ProposalActions::RefreshCreatorPreview() {
                                     state_.app_state.loaded_case.value(),
                                     proposals.draft,
                                     proposals.creator_generated_ids);
-    state_.current_tree = ui::gsn::BuildAssuranceTree(proposals.preview_model);
+    state_.current_tree = ui::gsn::BuildAssuranceTree(proposals.preview_model, ui_state.active_secondary_lang);
     ui::gsn::SetCanvasTree(state_.current_tree);
     return true;
 }
@@ -262,7 +262,7 @@ bool ProposalActions::PreviewById(const std::string& proposal_id) {
     ui::UiState& preview_ui_state = ui::GetUiState();
     ApplyProposalPreviewVisualState(
         preview_ui_state, proposals.preview_model, state_.app_state.loaded_case.value(), *proposal, generated_ids);
-    state_.current_tree = ui::gsn::BuildAssuranceTree(proposals.preview_model);
+    state_.current_tree = ui::gsn::BuildAssuranceTree(proposals.preview_model, preview_ui_state.active_secondary_lang);
     ui::gsn::SetCanvasTree(state_.current_tree);
     preview_ui_state.center_view = ui::CenterView::GsnCanvas;
     preview_ui_state.selected_element_id = proposal->anchor_element_id;
@@ -457,7 +457,8 @@ void ProposalActions::CancelActive() {
     ClearProposalHighlightState(ui::GetUiState());
 
     if (state_.app_state.loaded_case.has_value()) {
-        state_.current_tree = ui::gsn::BuildAssuranceTree(state_.app_state.loaded_case.value());
+        state_.current_tree = ui::gsn::BuildAssuranceTree(state_.app_state.loaded_case.value(),
+                                                          ui::GetUiState().active_secondary_lang);
         ui::gsn::SetCanvasTree(state_.current_tree);
     } else {
         state_.tree_needs_rebuild = true;
