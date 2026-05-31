@@ -306,6 +306,7 @@ TRANSLATIONS = {
 
     # ===== Performance overlay =====
     "Performance overlay": "パフォーマンスオーバーレイ",
+    "Open Performance panel": "パフォーマンスパネルを開く",
     "(history & values frozen)": "(履歴と値が固定されています)",
     "(live)": "(ライブ)",
     "● PAUSED": "● 一時停止中",
