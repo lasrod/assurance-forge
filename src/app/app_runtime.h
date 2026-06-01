@@ -156,6 +156,11 @@ private:
     // re-syncs terminology problems. Safe to call when no project is open.
     void EnsureTerminologyIgnoreStorage();
     void RefreshSacmPackageTreeCache();
+    // Commit any in-progress inspector text edit as an audited transaction
+    // before the SACM is written through a save/close path. Pulls the pending
+    // edits from ui::TextEditSession and routes them through the element-edit
+    // controller. Safe to call when nothing is pending or no project is open.
+    void FlushPendingTextEdits();
     // Runs the per-source SyncXProblems() for each flag set in
     // AppRuntimeState::problems_dirty, then clears the flags. Called once per
     // frame so the ~dozens of model-mutation sites only have to mark a source

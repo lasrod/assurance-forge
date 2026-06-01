@@ -445,10 +445,11 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
 
     auto commit_if_finished = [&](ImGuiID id, const std::string& current_value,
                                   const char* field_token, const std::string& language) {
-        std::string original;
-        if (TextEditSession::TryCommit(id, current_value, original) && text_edit_callbacks &&
-            text_edit_callbacks->commit_text_edit) {
-            text_edit_callbacks->commit_text_edit(elem->id, field_token, language, original, current_value);
+        ui::PendingTextEdit commit;
+        if (TextEditSession::Track(id, current_value, elem->id, field_token, language, commit) &&
+            text_edit_callbacks && text_edit_callbacks->commit_text_edit) {
+            text_edit_callbacks->commit_text_edit(commit.element_id, commit.field_token, commit.language,
+                                                  commit.original_value, commit.new_value);
         }
     };
 

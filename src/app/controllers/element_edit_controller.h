@@ -2,6 +2,7 @@
 
 #include "app/app_events.h"
 #include "core/element_factory.h"
+#include "ui/text_edit_session.h"
 
 #include <string>
 #include <vector>
@@ -43,6 +44,15 @@ public:
                                const std::string& language,
                                const std::string& original_value,
                                const std::string& new_value);
+
+    // Commit every still-open text edit as an audited transaction. Called at
+    // forced-flush points (save / close) so a live keystroke edit that never
+    // saw ImGui's deactivation transition — and is therefore already in the
+    // model but not yet in the audit log — becomes a real transaction instead
+    // of reaching the SACM through an un-audited save (which the replay
+    // verifier would later report as "Audit log divergence detected").
+    // Returns the number of edits committed.
+    int FlushPendingTextEdits(AppRuntimeState& state, const std::vector<ui::PendingTextEdit>& pending);
 
     bool ShouldShowRemoveConfirm() const;
     const std::string& PendingRemoveId() const;

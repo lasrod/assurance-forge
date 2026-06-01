@@ -626,6 +626,16 @@ bool AppRuntime::SetManualReviewOk(const std::string& element_id, bool manual_ok
 }
 
 void AppRuntime::RequestExit(bool& done) {
+    // Commit any in-progress inspector text edit as an audited transaction
+    // before anything else. A focused field that never saw ImGui's
+    // deactivation transition (the user closed the window mid-edit, or
+    // navigated away programmatically) has already mutated the model; if it
+    // only reached disk via the un-audited SaveProject path below it would be
+    // flagged as an audit-log divergence on the next open. Doing it here also
+    // ensures the edit is persisted even when nothing else marked the project
+    // dirty.
+    FlushPendingTextEdits();
+
     // Autosave on close: best-effort flush before exiting so the on-disk SACM
     // matches the user's latest in-memory edits. CommandBus already autosaves
     // per-transaction; SaveProject covers the remaining bypass paths (review
