@@ -5,14 +5,17 @@
 #include "core/audit/audit_paths.h"
 #include "core/audit/audit_store.h"
 #include "core/audit/event_store.h"
+#include "core/audit/replay_verifier.h"
 #include "core/commands/command_bus.h"
 #include "core/project_model.h"
 #include "sacm/sacm_parser.h"
+#include "ui/text_edit_session.h"
 
 #include <gtest/gtest.h>
 
 #include <filesystem>
 #include <fstream>
+#include <vector>
 
 TEST(ElementEditControllerTest, AddTopGoalUpdatesModelAndEmitsEvents) {
     app::AppRuntimeState state;
@@ -154,5 +157,99 @@ TEST(ElementEditControllerTest, CommitElementTextEditHandlesAliasedNewValueRefer
     // Release the bus before deleting the audit-store directory so file
     // handles to the transaction log are closed (Windows).
     state.command_bus.reset();
+    fs::remove_all(root);
+}
+
+// Regression: a focused inspector field that never saw ImGui's deactivation
+// transition (window closed mid-edit, or programmatic navigation away) leaves
+// the typed value in the model but with no audit transaction. Previously the
+// un-audited SaveProject path wrote that value to the SACM, and the next open
+// reported "Audit log divergence detected". FlushPendingTextEdits must turn
+// the pending edit into an audited transaction so replay still matches disk.
+TEST(ElementEditControllerTest, FlushPendingTextEditsCommitsUncommittedEditWithoutDivergence) {
+    namespace fs = std::filesystem;
+    constexpr const char* kSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    const fs::path root = fs::temp_directory_path() /
+                          ("af_flush_pending_" +
+                           std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
+    fs::remove_all(root);
+    fs::create_directories(root);
+    const fs::path sacm_rel = "argument.sacm";
+    {
+        std::ofstream out(root / sacm_rel, std::ios::binary);
+        out << kSacm;
+    }
+
+    core::AssuranceProject project;
+    project.id = "p";
+    project.name = "Project";
+    project.rootPath = root;
+    core::ProjectFileEntry entry;
+    entry.id = "f1";
+    entry.relativePath = sacm_rel;
+    entry.role = core::ProjectFileRole::SacmArgument;
+    project.files.push_back(entry);
+
+    core::audit::EnsureAuditStoreResult ensure;
+    std::string error;
+    ASSERT_TRUE(core::audit::EnsureAuditStore(project, sacm_rel, ensure, error)) << error;
+
+    const fs::path sacm_abs = root / sacm_rel;
+    auto pkg = sacm::parse_sacm(sacm_abs.string());
+    ASSERT_TRUE(pkg.has_value());
+    auto parsed = parser::parse_sacm_xml_string(kSacm);
+    ASSERT_TRUE(parsed.has_value());
+
+    auto bus = core::commands::CommandBus::Open(project, sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+
+    app::AppRuntimeState state;
+    state.app_state.loaded_case  = std::move(parsed.value());
+    state.app_state.sacm_package = std::move(pkg.value());
+    state.command_bus            = std::move(bus);
+
+    parser::AssuranceCase& model = state.app_state.loaded_case.value();
+    parser::SacmElement* elem = nullptr;
+    for (auto& e : model.elements) {
+        if (e.id == "G1") { elem = &e; break; }
+    }
+    ASSERT_NE(elem, nullptr);
+    const std::string original_value = elem->description;
+
+    // Simulate the live, uncommitted keystroke edit: ImGui's per-keystroke
+    // binding wrote the new value into the model, but the deactivation commit
+    // never fired (no audit transaction yet).
+    elem->description = "Edited but never deactivated.";
+    elem->description_langs["en"] = elem->description;
+
+    // The forced-flush path hands the controller the still-open edit.
+    std::vector<ui::PendingTextEdit> pending;
+    pending.push_back(ui::PendingTextEdit{"G1", "description", "en", original_value, elem->description});
+    const int committed = state.element_edit_controller->FlushPendingTextEdits(state, pending);
+    EXPECT_EQ(committed, 1);
+
+    // The audit log now carries the edit as a real transaction.
+    const auto& transactions = state.command_bus->Store().Transactions();
+    ASSERT_FALSE(transactions.empty());
+    const auto& ev = transactions.back().events.back();
+    EXPECT_EQ(ev.event_type, "UpdateElementText");
+    EXPECT_EQ(ev.payload.at("element_id").get<std::string>(), "G1");
+    EXPECT_EQ(ev.payload.at("old_value").get<std::string>(), original_value);
+    EXPECT_EQ(ev.payload.at("new_value").get<std::string>(), "Edited but never deactivated.");
+
+    // Replay (snapshot + log) must now match the SACM the command bus wrote to
+    // disk — i.e., no divergence.
+    state.command_bus.reset();
+    const core::audit::ReplayVerificationResult result = core::audit::VerifyProject(project);
+    EXPECT_TRUE(result.ran);
+    EXPECT_TRUE(result.success) << core::audit::ToString(result.cause);
+    EXPECT_EQ(result.cause, core::audit::DivergenceCause::None);
+
     fs::remove_all(root);
 }

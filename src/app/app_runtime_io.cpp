@@ -4,14 +4,30 @@
 #include "core/problems/problem_utils.h"
 #include "core/project_service.h"
 #include "export/gsn_svg_exporter.h"
+#include "ui/text_edit_session.h"
 
 #include <filesystem>
 #include <string>
 #include <system_error>
+#include <vector>
 
 namespace app {
 
+void AppRuntime::FlushPendingTextEdits() {
+    std::vector<ui::PendingTextEdit> pending = ui::TextEditSession::CollectPendingEdits();
+    if (pending.empty())
+        return;
+    if (!impl_->app_state.loaded_case.has_value() || !impl_->app_state.sacm_package.has_value())
+        return;
+    impl_->element_edit_controller->FlushPendingTextEdits(*impl_, pending);
+}
+
 bool AppRuntime::SaveProject() {
+    // Commit any in-progress inspector edit first. The model already holds the
+    // typed value; without this the un-audited SACM write below would persist
+    // it with no matching audit transaction, diverging the replay log.
+    FlushPendingTextEdits();
+
     if (!impl_->app_state.current_project.has_value()) {
         impl_->app_state.status_message = "Create or open a project first.";
         return false;

@@ -216,6 +216,22 @@ bool ElementEditController::CommitElementTextEdit(AppRuntimeState& state,
     return true;
 }
 
+int ElementEditController::FlushPendingTextEdits(AppRuntimeState& state,
+                                                 const std::vector<ui::PendingTextEdit>& pending) {
+    int committed = 0;
+    for (const ui::PendingTextEdit& edit : pending) {
+        if (edit.element_id.empty() || edit.language.empty())
+            continue;
+        if (edit.original_value == edit.new_value)
+            continue;
+        if (CommitElementTextEdit(state, edit.element_id, edit.field_token, edit.language,
+                                  edit.original_value, edit.new_value)) {
+            ++committed;
+        }
+    }
+    return committed;
+}
+
 bool ElementEditController::ShouldShowRemoveConfirm() const {
     return show_remove_confirm_;
 }
