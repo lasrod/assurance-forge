@@ -17,6 +17,10 @@ std::string             NewElementKindToToken(NewElementKind kind);
 bool                    NewElementKindFromToken(const std::string& token, NewElementKind& out);
 std::string             RemoveModeToToken(RemoveMode mode);
 bool                    RemoveModeFromToken(const std::string& token, RemoveMode& out);
+std::string             ChallengeSourceTypeToToken(ChallengeSourceType type);
+bool                    ChallengeSourceTypeFromToken(const std::string& token, ChallengeSourceType& out);
+std::string             ArgumentTargetKindToToken(ArgumentTarget::Kind kind);
+bool                    ArgumentTargetKindFromToken(const std::string& token, ArgumentTarget::Kind& out);
 
 // Add a new top-level Goal (root claim). The id is assigned by the underlying
 // `core::AddTopGoal` mutator and captured into the event payload on success.
@@ -48,6 +52,29 @@ private:
     NewElementKind kind_;
     std::string    generated_id_;
     std::string    generated_relationship_id_;
+};
+
+// Create a GSN v3 dialectic challenge (counter argument / counter evidence)
+// against an element or relationship target. Creates the counter element plus a
+// counter relationship (isCounter=true) via `core::AddChallenge`, capturing the
+// generated ids for deterministic replay.
+class CreateChallengeCommand final : public ICommand {
+public:
+    CreateChallengeCommand(ArgumentTarget target, ChallengeSourceType source_type, bool create_as_undeveloped)
+        : target_(std::move(target)), source_type_(source_type), create_as_undeveloped_(create_as_undeveloped) {}
+
+    std::string Name() const override { return "CreateChallenge"; }
+    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+    const std::string& GeneratedId() const { return generated_id_; }
+    const std::string& GeneratedRelationshipId() const { return generated_relationship_id_; }
+
+private:
+    ArgumentTarget      target_;
+    ChallengeSourceType source_type_;
+    bool                create_as_undeveloped_;
+    std::string         generated_id_;
+    std::string         generated_relationship_id_;
 };
 
 // Remove an element (and optionally its descendants) from the case.

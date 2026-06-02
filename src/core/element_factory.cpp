@@ -92,6 +92,19 @@ std::string ScopedRelationshipPrefixFor(const sacm::ArgumentPackage* package) {
     return acp_prefix.empty() ? std::string("R") : acp_prefix + "_R";
 }
 
+const char* ChallengePrefixFor(ChallengeSourceType type) {
+    // TODO(gsn-dialectic): nesting-aware prefixes (CCG/CCSn, CCCG/CCCSn, ...) for
+    // counter-challenges. Plan 1 uses flat numbering (Option A).
+    return type == ChallengeSourceType::CounterArgument ? "CG" : "CSn";
+}
+
+std::string ScopedChallengePrefixFor(const sacm::ArgumentPackage* package, ChallengeSourceType type) {
+    const std::string acp_prefix = AcpPrefixForPackage(package);
+    if (acp_prefix.empty())
+        return ChallengePrefixFor(type);
+    return acp_prefix + "_" + ChallengePrefixFor(type);
+}
+
 const parser::SacmElement* FindElement(const parser::AssuranceCase& ac, const std::string& id) {
     for (const auto& e : ac.elements) {
         if (e.id == id)
@@ -134,6 +147,7 @@ void MirrorClaim(sacm::ArgumentPackage* ap, const parser::SacmElement& src) {
     c.name = src.name;
     c.name_ml.set("en", src.name);
     c.assertionDeclaration = src.assertion_declaration;
+    c.undeveloped = src.undeveloped;
     ap->claims.push_back(std::move(c));
 }
 
@@ -165,6 +179,7 @@ void MirrorInference(sacm::ArgumentPackage* ap, const parser::SacmElement& rel) 
     ai.sources = rel.source_refs;
     ai.targets = rel.target_refs;
     ai.reasoning = rel.reasoning_ref;
+    ai.isCounter = rel.is_counter;
     ap->assertedInferences.push_back(std::move(ai));
 }
 
@@ -185,6 +200,7 @@ void MirrorEvidence(sacm::ArgumentPackage* ap, const parser::SacmElement& rel) {
     ae.id = rel.id;
     ae.sources = rel.source_refs;
     ae.targets = rel.target_refs;
+    ae.isCounter = rel.is_counter;
     ap->assertedEvidences.push_back(std::move(ae));
 }
 
@@ -326,6 +342,82 @@ bool InstallTopGoal(parser::AssuranceCase& ac,
     return true;
 }
 
+// Shared installation logic for a dialectic challenge. Builds the counter
+// element + counter relationship from the supplied ids and installs them into
+// both models. Routed through by id-generating `AddChallenge` and replay-only
+// `AddChallengeWithIds`.
+bool InstallChallenge(parser::AssuranceCase& ac,
+                      sacm::AssuranceCasePackage* pkg,
+                      const ArgumentTarget& target,
+                      ChallengeSourceType source_type,
+                      bool create_as_undeveloped,
+                      const std::string& element_id,
+                      const std::string& relationship_id,
+                      std::string& out_error) {
+    if (target.id.empty()) {
+        out_error = "No challenge target supplied.";
+        return false;
+    }
+    if (element_id.empty() || relationship_id.empty()) {
+        out_error = "Element and relationship ids must be non-empty.";
+        return false;
+    }
+
+    const parser::SacmElement* target_elem = FindElement(ac, target.id);
+    if (!target_elem) {
+        out_error = "Challenge target not found in model.";
+        return false;
+    }
+
+    // The counter element joins the argument package owning the target. When the
+    // target is a relationship (which FindOwningArgumentPackage does not index),
+    // anchor on the element the relationship points at.
+    std::string anchor_id = target.id;
+    if (target.kind == ArgumentTarget::Kind::Relationship && !target_elem->target_refs.empty()) {
+        anchor_id = target_elem->target_refs.front();
+    }
+    sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, anchor_id);
+
+    parser::SacmElement new_elem;
+    new_elem.id = element_id;
+    new_elem.name = "";
+
+    parser::SacmElement rel;
+    rel.id = relationship_id;
+    rel.is_counter = true;
+    rel.source_refs.push_back(element_id);
+    rel.target_refs.push_back(target.id);
+
+    switch (source_type) {
+    case ChallengeSourceType::CounterArgument:
+        new_elem.type = "claim";
+        new_elem.undeveloped = create_as_undeveloped;
+        rel.type = "assertedinference";
+        break;
+    case ChallengeSourceType::CounterEvidence:
+        new_elem.type = "artifactreference";
+        rel.type = "assertedevidence";
+        break;
+    }
+
+    if (ap) {
+        switch (source_type) {
+        case ChallengeSourceType::CounterArgument:
+            MirrorClaim(ap, new_elem);
+            MirrorInference(ap, rel);
+            break;
+        case ChallengeSourceType::CounterEvidence:
+            MirrorArtifactReference(ap, new_elem);
+            MirrorEvidence(ap, rel);
+            break;
+        }
+    }
+
+    ac.elements.push_back(std::move(new_elem));
+    ac.elements.push_back(std::move(rel));
+    return true;
+}
+
 } // namespace
 
 bool AddChildElement(parser::AssuranceCase& ac,
@@ -393,6 +485,60 @@ bool AddChildElementWithIds(parser::AssuranceCase& ac,
                             std::string& out_error) {
     out_error.clear();
     return InstallChildElement(ac, pkg, parent_id, kind, element_id, relationship_id, out_error);
+}
+
+bool AddChallenge(parser::AssuranceCase& ac,
+                  sacm::AssuranceCasePackage* pkg,
+                  const ArgumentTarget& target,
+                  ChallengeSourceType source_type,
+                  bool create_as_undeveloped,
+                  std::string& out_new_id,
+                  std::string& out_new_relationship_id,
+                  std::string& out_error) {
+    out_new_id.clear();
+    out_new_relationship_id.clear();
+    out_error.clear();
+
+    if (target.id.empty()) {
+        out_error = "No challenge target supplied.";
+        return false;
+    }
+    const parser::SacmElement* target_elem = FindElement(ac, target.id);
+    if (!target_elem) {
+        out_error = "Challenge target not found in model.";
+        return false;
+    }
+
+    std::string anchor_id = target.id;
+    if (target.kind == ArgumentTarget::Kind::Relationship && !target_elem->target_refs.empty()) {
+        anchor_id = target_elem->target_refs.front();
+    }
+
+    auto existing_ids = CollectIds(ac);
+    sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, anchor_id);
+
+    std::string element_id = GenerateUniqueId(existing_ids, ScopedChallengePrefixFor(ap, source_type));
+    existing_ids.insert(element_id);
+    std::string relationship_id = GenerateUniqueId(existing_ids, ScopedRelationshipPrefixFor(ap));
+
+    if (!InstallChallenge(ac, pkg, target, source_type, create_as_undeveloped, element_id, relationship_id, out_error))
+        return false;
+
+    out_new_id = std::move(element_id);
+    out_new_relationship_id = std::move(relationship_id);
+    return true;
+}
+
+bool AddChallengeWithIds(parser::AssuranceCase& ac,
+                         sacm::AssuranceCasePackage* pkg,
+                         const ArgumentTarget& target,
+                         ChallengeSourceType source_type,
+                         bool create_as_undeveloped,
+                         const std::string& element_id,
+                         const std::string& relationship_id,
+                         std::string& out_error) {
+    out_error.clear();
+    return InstallChallenge(ac, pkg, target, source_type, create_as_undeveloped, element_id, relationship_id, out_error);
 }
 
 bool AddTopGoal(parser::AssuranceCase& ac,
@@ -494,6 +640,11 @@ std::string FindFirstExistingTarget(const std::vector<std::string>& target_refs,
 TreeIndex BuildTreeIndex(const parser::AssuranceCase& ac, const std::unordered_set<std::string>& node_ids) {
     TreeIndex idx;
     for (const auto& e : ac.elements) {
+        // Counter (dialectic challenge) relationships are not structural support:
+        // the counter source must not be wired as a child of its target, or
+        // removing the target would cascade into the challenge.
+        if (e.is_counter)
+            continue;
         const std::string target = FindFirstExistingTarget(e.target_refs, node_ids);
         if (target.empty())
             continue;

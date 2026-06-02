@@ -32,6 +32,34 @@ bool ElementActions::AddTopGoal() {
     return state_.element_edit_controller->AddTopGoal(state_);
 }
 
+bool ElementActions::AddChallengeToSelectedElement(core::ChallengeSourceType source_type) {
+    if (!state_.app_state.loaded_case.has_value()) {
+        SetStatus(state_, "No assurance case loaded.");
+        return false;
+    }
+    const std::string& selected_id = ui::GetUiState().selected_element_id;
+    if (selected_id.empty()) {
+        SetStatus(state_, "No element selected.");
+        return false;
+    }
+    core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, selected_id};
+    return state_.element_edit_controller->AddChallenge(state_, target, source_type);
+}
+
+bool ElementActions::AddChallengeToRelationship(const std::string& relationship_id,
+                                                core::ChallengeSourceType source_type) {
+    if (!state_.app_state.loaded_case.has_value()) {
+        SetStatus(state_, "No assurance case loaded.");
+        return false;
+    }
+    if (relationship_id.empty()) {
+        SetStatus(state_, "No relationship selected.");
+        return false;
+    }
+    core::ArgumentTarget target{core::ArgumentTarget::Kind::Relationship, relationship_id};
+    return state_.element_edit_controller->AddChallenge(state_, target, source_type);
+}
+
 bool ElementActions::AddAcpToSelectedElement() {
     if (!state_.app_state.loaded_case.has_value()) {
         SetStatus(state_, "No assurance case loaded.");

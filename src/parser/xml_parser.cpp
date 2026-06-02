@@ -264,6 +264,7 @@ void extract_elements_recursive(pugi::xml_node node, AssuranceCase& assurance_ca
                                            local_name == "assertedevidence";
 
             if (is_relationship_element) {
+                element.is_counter = read_bool_attr(child, "isCounter", false);
                 for (pugi::xml_node ref_child : child.children()) {
                     std::string ref_local_name = get_local_name(ref_child.name());
                     if (ref_local_name == "source") {

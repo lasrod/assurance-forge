@@ -225,6 +225,13 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
     options.vertical_spacing = DpiSize(kVSpacing);
     options.side_stack_gap = DpiSize(kSideGap);
 
+    // Index tree nodes by id so challenge metadata (not carried through the pure
+    // layout graph) can be copied onto the laid-out nodes below.
+    std::unordered_map<std::string, const core::TreeNode*> tree_node_by_id;
+    tree_node_by_id.reserve(tree.nodes.size());
+    for (const auto& owned_node : tree.nodes)
+        tree_node_by_id[owned_node->id] = owned_node.get();
+
     const core::GsnLayoutGraphResult layout = core::LayoutGsnGraph(input, node_sizes, options);
     result.reserve(layout.nodes.size());
     for (const core::GsnLayoutNode& placed_node : layout.nodes) {
@@ -241,6 +248,11 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& t
         layout_node.is_left_side = placed_node.is_left_side;
         layout_node.side_stack_index = placed_node.side_stack_index;
         layout_node.position = ImVec2(static_cast<float>(placed_node.x), static_cast<float>(placed_node.y));
+        if (auto it = tree_node_by_id.find(placed_node.id); it != tree_node_by_id.end() && it->second) {
+            layout_node.is_counter_source = it->second->is_counter_source;
+            layout_node.challenge_target_id = it->second->challenge_target_id;
+            layout_node.challenge_target_is_relationship = it->second->challenge_target_is_relationship;
+        }
         result.push_back(layout_node);
     }
 

@@ -204,6 +204,30 @@ void GsnCanvas::Render(UiState& ui_state,
         return PickRelationshipEdge(layout_nodes_, node_by_id_, origin, zoom, viewport_min, viewport_max);
     }();
 
+    // First pass: record the screen-space midpoint of every structural/contextual
+    // relationship edge, keyed by relationship id. A dialectic challenge that
+    // targets a relationship anchors its arrow at this midpoint (the same point
+    // the ACP decorator uses), rather than at an element body.
+    std::unordered_map<std::string, ImVec2> relationship_midpoint;
+    for (const auto& child_node : layout_nodes_) {
+        if (child_node.parent_id.empty() || child_node.is_counter_source)
+            continue;
+        auto parent_it = node_by_id_.find(child_node.parent_id);
+        if (parent_it == node_by_id_.end())
+            continue;
+        const LayoutNode& parent_node = *parent_it->second;
+        const std::string edge_key = EdgeKey(parent_node.id, child_node.id);
+        const auto target_it = acp_target_by_edge.find(edge_key);
+        if (target_it == acp_target_by_edge.end() || !target_it->second)
+            continue;
+        ImVec2 a, b;
+        if (child_node.group == ElementGroup::Group2)
+            ComputeGroup2Endpoints(parent_node, child_node, origin, zoom, a, b);
+        else
+            ComputeGroup1Endpoints(parent_node, child_node, origin, zoom, a, b);
+        relationship_midpoint[target_it->second->relationship_id] = ImVec2((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
+    }
+
     // Draw edges first (beneath nodes)
     {
         core::perf::ScopedTimer perf_scope_edges("gsn.edges");
@@ -215,6 +239,30 @@ void GsnCanvas::Render(UiState& ui_state,
             if (parent_it == node_by_id_.end())
                 continue;
             const LayoutNode& parent_node = *parent_it->second;
+
+            // Dialectic challenge: dashed open-arrow edge to the target (the
+            // anchor element body, or a relationship midpoint). Handled before
+            // the structural/contextual edge logic so it does not also draw a
+            // support edge or ACP decorator.
+            if (child_node.is_counter_source) {
+                ImVec2 parent_bottom, child_top;
+                ComputeGroup1Endpoints(parent_node, child_node, origin, zoom, parent_bottom, child_top);
+                ImVec2 to = parent_bottom;
+                if (child_node.challenge_target_is_relationship) {
+                    const auto mid_it = relationship_midpoint.find(child_node.challenge_target_id);
+                    if (mid_it != relationship_midpoint.end())
+                        to = mid_it->second;
+                }
+                ImVec2 edge_min, edge_max;
+                ComputeChallengeEdgeBounds(child_top, to, zoom, edge_min, edge_max);
+                if (!RectsIntersect(edge_min, edge_max, cull_min, cull_max)) {
+                    ++frame_stats.edges_culled;
+                    continue;
+                }
+                DrawChallengeEdge(draw_list, child_top, to, zoom);
+                ++frame_stats.edges_drawn;
+                continue;
+            }
 
             if (child_node.group == ElementGroup::Group2) {
                 ImVec2 parent_side, attachment_edge;

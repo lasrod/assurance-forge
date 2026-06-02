@@ -40,6 +40,34 @@ bool RemoveModeFromToken(const std::string& token, RemoveMode& out) {
     return false;
 }
 
+std::string ChallengeSourceTypeToToken(ChallengeSourceType type) {
+    switch (type) {
+    case ChallengeSourceType::CounterArgument: return "CounterArgument";
+    case ChallengeSourceType::CounterEvidence: return "CounterEvidence";
+    }
+    return "CounterArgument";
+}
+
+bool ChallengeSourceTypeFromToken(const std::string& token, ChallengeSourceType& out) {
+    if (token == "CounterArgument") { out = ChallengeSourceType::CounterArgument; return true; }
+    if (token == "CounterEvidence") { out = ChallengeSourceType::CounterEvidence; return true; }
+    return false;
+}
+
+std::string ArgumentTargetKindToToken(ArgumentTarget::Kind kind) {
+    switch (kind) {
+    case ArgumentTarget::Kind::Element:      return "Element";
+    case ArgumentTarget::Kind::Relationship: return "Relationship";
+    }
+    return "Element";
+}
+
+bool ArgumentTargetKindFromToken(const std::string& token, ArgumentTarget::Kind& out) {
+    if (token == "Element")      { out = ArgumentTarget::Kind::Element; return true; }
+    if (token == "Relationship") { out = ArgumentTarget::Kind::Relationship; return true; }
+    return false;
+}
+
 bool CreateTopGoalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
     if (!core::AddTopGoal(ctx.model, &ctx.package, generated_id_, out_error))
         return false;
@@ -63,6 +91,26 @@ bool CreateChildElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& ou
     out_event.payload = nlohmann::ordered_json::object();
     out_event.payload["parent_id"] = parent_id_;
     out_event.payload["kind"] = NewElementKindToToken(kind_);
+    out_event.payload["generated_id"] = generated_id_;
+    out_event.payload["generated_relationship_id"] = generated_relationship_id_;
+    return true;
+}
+
+bool CreateChallengeCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
+    if (target_.id.empty()) {
+        out_error = "CreateChallengeCommand requires a target id";
+        return false;
+    }
+    if (!core::AddChallenge(ctx.model, &ctx.package, target_, source_type_, create_as_undeveloped_,
+                            generated_id_, generated_relationship_id_, out_error))
+        return false;
+
+    out_event.event_type = "CreateChallenge";
+    out_event.payload = nlohmann::ordered_json::object();
+    out_event.payload["target_id"] = target_.id;
+    out_event.payload["target_kind"] = ArgumentTargetKindToToken(target_.kind);
+    out_event.payload["source_type"] = ChallengeSourceTypeToToken(source_type_);
+    out_event.payload["create_as_undeveloped"] = create_as_undeveloped_;
     out_event.payload["generated_id"] = generated_id_;
     out_event.payload["generated_relationship_id"] = generated_relationship_id_;
     return true;

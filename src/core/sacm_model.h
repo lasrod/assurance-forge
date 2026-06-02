@@ -35,6 +35,7 @@ struct SacmElement {
     std::vector<std::string> meta_claim_refs; // ids from <metaClaim ref="..."/>
     std::string reasoning_ref;                // from reasoning attribute (assertedinference)
     std::string assertion_declaration;        // from assertionDeclaration attribute
+    bool is_counter = false;                  // from isCounter attribute (GSN dialectic challenge)
 };
 
 struct AcpRecord {

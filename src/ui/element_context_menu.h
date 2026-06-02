@@ -18,6 +18,12 @@ struct ElementContextActions {
     std::function<void(core::RemoveMode)> remove_selected;
     std::function<void()> render_ai_review_menu;
     std::function<void(const char*)> not_implemented;
+    // GSN v3 dialectic challenges. The no-arg variants challenge the selected
+    // element; the relationship variants challenge a specific relationship id.
+    std::function<void()> add_counter_argument;
+    std::function<void()> add_counter_evidence;
+    std::function<void(const std::string& relationship_id)> add_counter_argument_to_relationship;
+    std::function<void(const std::string& relationship_id)> add_counter_evidence_to_relationship;
     std::function<void(const core::TerminologyPackageRef&, const core::TerminologyTermRef&)> open_terminology_term;
     std::function<void(const core::TerminologyPackageRef&, const core::TerminologyTermRef&)> edit_terminology_term;
     std::function<void(const std::string& element_id, const std::string& term_value)> define_terminology_term;

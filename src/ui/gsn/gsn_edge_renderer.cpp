@@ -28,6 +28,11 @@ ImU32 Group1EdgeColor() {
 ImU32 Group2EdgeColor() {
     return GetTheme().edge_group2;
 }
+// Dialectic challenge edges read as adversarial; use the attention color so the
+// counter relationship is visually distinct from supporting/contextual edges.
+ImU32 ChallengeEdgeColor() {
+    return GetTheme().attention;
+}
 
 void ExpandRectToInclude(ImVec2 point, ImVec2& out_min, ImVec2& out_max) {
     out_min.x = std::min(out_min.x, point.x);
@@ -329,6 +334,35 @@ void DrawGroup1EdgeHighlight(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2
     draw_list->AddLine(parent_bottom, stub_start, color, thickness);
     draw_list->AddBezierCubic(stub_start, ctrl_1, ctrl_2, stub_end, color, thickness);
     draw_list->AddLine(stub_end, child_top, color, thickness);
+}
+
+// Draw a dialectic "Challenges" edge: a dashed straight line from the counter
+// source to the target anchor, ending in a hollow (open) arrowhead at the target.
+void DrawChallengeEdge(ImDrawList* draw_list, ImVec2 from, ImVec2 to, float zoom) {
+    float scale = DpiScale() * zoom;
+    float scaled_edge_width = kDashedEdgeWidth * scale;
+    float scaled_dash = kDashLength * scale;
+    float scaled_gap = kDashGap * scale;
+
+    ImU32 col = ChallengeEdgeColor();
+    DrawDashedLine(draw_list, from, to, col, scaled_edge_width, scaled_dash, scaled_gap);
+    DrawHollowArrow(draw_list, to, to.x - from.x, to.y - from.y, col, kArrowSize * scale, kArrowOutlineWidth * scale);
+}
+
+void ComputeChallengeEdgeBounds(ImVec2 from, ImVec2 to, float zoom, ImVec2& out_min, ImVec2& out_max) {
+    float scale = DpiScale() * zoom;
+    float scaled_edge_width = kDashedEdgeWidth * scale;
+    float scaled_arrow = kArrowSize * scale;
+
+    out_min = from;
+    out_max = from;
+    ExpandRectToInclude(to, out_min, out_max);
+
+    float pad = std::max(scaled_edge_width, scaled_arrow) + 1.0f;
+    out_min.x -= pad;
+    out_min.y -= pad;
+    out_max.x += pad;
+    out_max.y += pad;
 }
 
 void DrawGroup2EdgeHighlight(

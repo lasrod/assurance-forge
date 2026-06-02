@@ -58,4 +58,12 @@ void DrawGroup1EdgeHighlight(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2
 void DrawGroup2EdgeHighlight(
     ImDrawList* draw_list, ImVec2 parent_side, ImVec2 attachment_edge, bool is_left_side, float zoom);
 
+// Draw a GSN v3 dialectic "Challenges" edge: a dashed straight line from the
+// counter source (`from`) to the challenged target anchor (`to`), with a hollow
+// (open) arrowhead at `to` pointing at the target.
+void DrawChallengeEdge(ImDrawList* draw_list, ImVec2 from, ImVec2 to, float zoom);
+
+// Compute an AABB (with padding) covering everything DrawChallengeEdge would draw.
+void ComputeChallengeEdgeBounds(ImVec2 from, ImVec2 to, float zoom, ImVec2& out_min, ImVec2& out_max);
+
 } // namespace ui::gsn

@@ -27,6 +27,16 @@ struct TreeNode {
     std::vector<TreeNode*> group2_attachments; // contextual side attachments
     TreeNode* parent = nullptr;
 
+    // GSN v3 dialectic: when true, this node is the source of a Challenges
+    // relationship (a counter argument / counter evidence). Its connecting edge
+    // renders as a dashed open-arrow challenge edge rather than ordinary support.
+    bool is_counter_source = false;
+    // Id of the challenged target. When `challenge_target_is_relationship`, the
+    // target is a relationship element (no tree node) and the edge anchors to
+    // that relationship's midpoint; otherwise it is the parent element body.
+    std::string challenge_target_id;
+    bool challenge_target_is_relationship = false;
+
     // Layout scratch fields (filled by layout engine)
     int subtree_width = 1;
     int left_overhang = 0;  // extra columns Group2 extends beyond left edge

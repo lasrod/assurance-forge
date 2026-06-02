@@ -162,6 +162,62 @@ static void ProcessEvidence(const parser::SacmElement& relationship,
     wired_ids.insert(target_node->id);
 }
 
+// Resolve the element node a challenge edge should hang off / anchor near.
+// `target_id` is the challenged entity: it may be an element (returned directly)
+// or a relationship, in which case we follow the relationship's own target one
+// or more hops until we reach an element node. Returns nullptr if unresolved.
+static TreeNode* ResolveChallengeAnchorElement(const std::string& target_id,
+                                               const std::unordered_map<std::string, TreeNode*>& node_by_id,
+                                               const std::unordered_map<std::string, std::string>& rel_first_target) {
+    std::string current = target_id;
+    for (int hop = 0; hop < 8; ++hop) {
+        auto node_it = node_by_id.find(current);
+        if (node_it != node_by_id.end())
+            return node_it->second; // reached an element node
+        auto rel_it = rel_first_target.find(current);
+        if (rel_it == rel_first_target.end() || rel_it->second.empty())
+            return nullptr; // dangling or unknown
+        current = rel_it->second;
+    }
+    return nullptr;
+}
+
+// Process a counter (dialectic challenge) relationship. The counter source
+// (a CG goal / CSn solution) is wired as a Group1 child of the anchor element so
+// the layout engine positions it, but flagged so the renderer draws a dashed
+// open-arrow challenge edge to the real target (element body or relationship
+// midpoint) instead of an ordinary support edge.
+static void ProcessChallenge(const parser::SacmElement& relationship,
+                             const std::unordered_map<std::string, TreeNode*>& node_by_id,
+                             const std::unordered_map<std::string, std::string>& rel_first_target,
+                             std::unordered_set<std::string>& wired_ids) {
+    if (relationship.source_refs.empty() || relationship.target_refs.empty())
+        return;
+
+    TreeNode* source_node = FindFirstNode(relationship.source_refs, node_by_id);
+    if (!source_node)
+        return;
+
+    const std::string& target_id = relationship.target_refs.front();
+    const bool target_is_relationship = node_by_id.find(target_id) == node_by_id.end();
+    TreeNode* anchor = ResolveChallengeAnchorElement(target_id, node_by_id, rel_first_target);
+    if (!anchor)
+        return; // cannot place — leave the counter node as an orphan
+
+    // Counter evidence sources are artifactreferences; give them the Solution
+    // role so they render as a Solution rather than a generic node (mirrors
+    // ProcessEvidence). Counter argument sources are claims (already classified).
+    if (relationship.type == "assertedevidence") {
+        source_node->role = NodeRole::Solution;
+        source_node->group = ElementGroup::Group1;
+    }
+
+    source_node->is_counter_source = true;
+    source_node->challenge_target_id = target_id;
+    source_node->challenge_target_is_relationship = target_is_relationship;
+    WireGroup1Child(source_node, anchor, wired_ids);
+}
+
 } // namespace
 
 // ===== Build the assurance tree from a parsed SACM case =====
@@ -228,10 +284,24 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
         tree.nodes.push_back(std::move(node));
     }
 
+    // Map each relationship id to its first target ref, so a challenge that
+    // targets a relationship can resolve a nearby element to anchor against.
+    std::unordered_map<std::string, std::string> rel_first_target;
+    for (const auto& element : ac.elements) {
+        if (is_relationship(element.type) && !element.id.empty() && !element.target_refs.empty())
+            rel_first_target[element.id] = element.target_refs.front();
+    }
+
     // Step 2: Wire the tree using relationship elements
     for (const auto& element : ac.elements) {
         if (!is_relationship(element.type))
             continue;
+
+        // Counter relationships are dialectic challenges, not structural support.
+        if (element.is_counter) {
+            ProcessChallenge(element, node_by_id, rel_first_target, wired_ids);
+            continue;
+        }
 
         if (element.type == "assertedinference") {
             ProcessInference(element, node_by_id, wired_ids);
