@@ -190,6 +190,7 @@ LayoutNode ConvertPlacedNode(const core::GsnLayoutNode& placed, const core::Tree
     ln.parent_id = placed.parent_id;
     ln.is_left_side = placed.is_left_side;
     ln.side_stack_index = placed.side_stack_index;
+    ln.child_edge_drop = placed.child_edge_drop;
     ln.position = ImVec2(static_cast<float>(placed.x), static_cast<float>(placed.y));
     if (tn) {
         ln.is_counter_source = tn->is_counter_source;
@@ -197,8 +198,6 @@ LayoutNode ConvertPlacedNode(const core::GsnLayoutNode& placed, const core::Tree
         ln.challenge_target_is_relationship = tn->challenge_target_is_relationship;
         ln.challenge_relationship_id = tn->challenge_relationship_id;
         ln.challenge_anchor_id = tn->challenge_anchor_id;
-        ln.challenge_rel_a = tn->challenge_rel_a;
-        ln.challenge_rel_b = tn->challenge_rel_b;
     }
     return ln;
 }

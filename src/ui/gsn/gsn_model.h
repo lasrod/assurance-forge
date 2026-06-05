@@ -35,19 +35,22 @@ struct LayoutNode {
     std::string parent_id;
     int side_stack_index = 0; // for Group2: 0-based index in stack on same side
     bool is_left_side = true; // for Group2: which side of parent
+    // Straight-down distance (content px) for edges to this node's children
+    // before they curve out — clears a tall side challenge tree.
+    double child_edge_drop = 0.0;
 
     // GSN v3 dialectic: when true, this node is a counter argument / counter
-    // evidence whose connecting edge renders as a dashed open-arrow challenge
-    // edge. The arrow points at `challenge_target_id` — the parent node body
-    // when `challenge_target_is_relationship` is false, otherwise the midpoint
-    // of the target relationship's edge.
+    // evidence drawn with a dashed open-arrow challenge edge to its target.
+    // The arrow points at `challenge_target_id` — that element's border when
+    // `challenge_target_is_relationship` is false, otherwise the midpoint of the
+    // target relationship's edge.
     bool is_counter_source = false;
     std::string challenge_target_id;
     bool challenge_target_is_relationship = false;
+    // This counter's own Challenges relationship id (lets the dashed arrow itself
+    // be challenged) and the host element it is laid out beside/below.
     std::string challenge_relationship_id;
     std::string challenge_anchor_id;
-    std::string challenge_rel_a;
-    std::string challenge_rel_b;
 };
 
 } // namespace ui::gsn

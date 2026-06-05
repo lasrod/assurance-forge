@@ -102,10 +102,7 @@ bool ElementEditController::AddChallenge(AppRuntimeState& state,
     (void)model;
     (void)package;
 
-    // Counter arguments are created undeveloped by default; counter evidence is
-    // an artifact reference with no undeveloped semantics.
-    const bool create_as_undeveloped = (source_type == core::ChallengeSourceType::CounterArgument);
-    core::commands::CreateChallengeCommand cmd(target, source_type, create_as_undeveloped);
+    core::commands::CreateChallengeCommand cmd(target, source_type);
     const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
     if (!outcome.success) {
         events_.Emit(StatusMessageEvent{"Add challenge failed: " + outcome.error});

@@ -8,20 +8,21 @@
 
 // Contour-based tidy-tree layout.
 //
-// Each node owns a *contour* — its left/right silhouette per row — expressed
-// relative to the node's own centre. Sub-items (structural children, Group2
-// attachments, and dialectic challenge clusters) are slid against the running
-// contour until they nearly touch, so everything sits as close as possible and
-// the diagram only grows where there is real content. This replaces the older
-// column-grid model, whose single per-side "overhang" pushed challenges out
-// beyond a node's entire subtree width.
+// Each node owns a *contour* — its left/right silhouette per row, relative to the
+// node's own centre. Sibling subtrees (and root trees) are slid against each
+// other's contour until they nearly touch, so the diagram only grows where there
+// is real content.
 //
-// Placement of challenges (see ChallengeSide, decided in the tree builder):
-//   * Side (Left/Right): the challenge root sits at the host's row and grows
-//     downward, hugging the host subtree's contour on that side.
-//   * Below: the challenge root is folded in as an extra structural child of the
-//     host, so it grows straight down beneath it (used for context/assumption/
-//     justification references).
+// Side content (Group2 context attachments and dialectic challenges) sits in a
+// fixed lane immediately beside the node. To make room for it without stretching
+// sideways, a node's structural children are pushed DOWN to start below the
+// deepest side content (see ChildStartOffset) — so a tall challenge tree simply
+// lengthens the parent→child line instead of forcing the argument wide.
+//
+// Challenge placement (ChallengeSide is decided in the tree builder):
+//   * Left / Right: the challenge sits in that side lane beside the host.
+//   * Below: the challenge is the host's structural child (used when challenging
+//     a context/assumption/justification — it hangs directly beneath it).
 
 namespace core {
 namespace {
@@ -672,6 +673,17 @@ GsnLayoutGraphResult LayoutGsnGraph(const GsnLayoutInput& input,
         } else {
             out.y = row_y[static_cast<std::size_t>(nl.row)] + std::max(0.0, (row_height - nl.height) * 0.5);
         }
+
+        // Straight-down distance for this node's child edges: reach the bottom of
+        // the side margins (one row above the children) before curving, so the
+        // lines stay under the node and clear any side challenge tree.
+        const int child_row = nl.row + ChildStartOffset(state, nl);
+        if (child_row > nl.row + 1 && child_row <= max_row) {
+            const double node_bottom = out.y + out.height;
+            const double curve_start_y = row_y[static_cast<std::size_t>(child_row)] - options.vertical_spacing;
+            out.child_edge_drop = std::max(0.0, curve_start_y - node_bottom);
+        }
+
         result.nodes.push_back(std::move(out));
     }
 

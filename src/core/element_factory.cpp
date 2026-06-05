@@ -350,7 +350,6 @@ bool InstallChallenge(parser::AssuranceCase& ac,
                       sacm::AssuranceCasePackage* pkg,
                       const ArgumentTarget& target,
                       ChallengeSourceType source_type,
-                      bool create_as_undeveloped,
                       const std::string& element_id,
                       const std::string& relationship_id,
                       std::string& out_error) {
@@ -391,7 +390,6 @@ bool InstallChallenge(parser::AssuranceCase& ac,
     switch (source_type) {
     case ChallengeSourceType::CounterArgument:
         new_elem.type = "claim";
-        new_elem.undeveloped = create_as_undeveloped;
         rel.type = "assertedinference";
         break;
     case ChallengeSourceType::CounterEvidence:
@@ -491,7 +489,6 @@ bool AddChallenge(parser::AssuranceCase& ac,
                   sacm::AssuranceCasePackage* pkg,
                   const ArgumentTarget& target,
                   ChallengeSourceType source_type,
-                  bool create_as_undeveloped,
                   std::string& out_new_id,
                   std::string& out_new_relationship_id,
                   std::string& out_error) {
@@ -521,7 +518,7 @@ bool AddChallenge(parser::AssuranceCase& ac,
     existing_ids.insert(element_id);
     std::string relationship_id = GenerateUniqueId(existing_ids, ScopedRelationshipPrefixFor(ap));
 
-    if (!InstallChallenge(ac, pkg, target, source_type, create_as_undeveloped, element_id, relationship_id, out_error))
+    if (!InstallChallenge(ac, pkg, target, source_type, element_id, relationship_id, out_error))
         return false;
 
     out_new_id = std::move(element_id);
@@ -533,12 +530,11 @@ bool AddChallengeWithIds(parser::AssuranceCase& ac,
                          sacm::AssuranceCasePackage* pkg,
                          const ArgumentTarget& target,
                          ChallengeSourceType source_type,
-                         bool create_as_undeveloped,
                          const std::string& element_id,
                          const std::string& relationship_id,
                          std::string& out_error) {
     out_error.clear();
-    return InstallChallenge(ac, pkg, target, source_type, create_as_undeveloped, element_id, relationship_id, out_error);
+    return InstallChallenge(ac, pkg, target, source_type, element_id, relationship_id, out_error);
 }
 
 bool AddTopGoal(parser::AssuranceCase& ac,

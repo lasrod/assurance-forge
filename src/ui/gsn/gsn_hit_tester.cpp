@@ -41,18 +41,11 @@ float DistanceSqPointToBezier(ImVec2 point, ImVec2 p0, ImVec2 p1, ImVec2 p2, ImV
     return best;
 }
 
-float DistanceSqToGroup1Edge(ImVec2 point, ImVec2 parent_bottom, ImVec2 child_top, float zoom) {
-    const float scale = DpiScale() * zoom;
-    const float scaled_stub = kStubLength * scale;
-    const ImVec2 stub_start(parent_bottom.x, parent_bottom.y + scaled_stub);
-    const ImVec2 stub_end(child_top.x, child_top.y - scaled_stub);
-    const float vertical_span = fabsf(stub_end.y - stub_start.y);
-    const ImVec2 ctrl_1(stub_start.x, stub_start.y + vertical_span * kVerticalControlPct);
-    const ImVec2 ctrl_2(stub_end.x, stub_end.y - vertical_span * kVerticalControlPct);
-
-    float best = DistanceSqPointToSegment(point, parent_bottom, stub_start);
-    best = std::min(best, DistanceSqPointToBezier(point, stub_start, ctrl_1, ctrl_2, stub_end));
-    best = std::min(best, DistanceSqPointToSegment(point, stub_end, child_top));
+float DistanceSqToGroup1Edge(ImVec2 point, ImVec2 parent_bottom, ImVec2 child_top, float zoom, float straight_drop) {
+    const Group1EdgePath p = ComputeGroup1Path(parent_bottom, child_top, zoom, straight_drop);
+    float best = DistanceSqPointToSegment(point, p.parent_bottom, p.stub_start);
+    best = std::min(best, DistanceSqPointToBezier(point, p.stub_start, p.ctrl_1, p.ctrl_2, p.stub_end));
+    best = std::min(best, DistanceSqPointToSegment(point, p.stub_end, p.child_top));
     return best;
 }
 
@@ -146,8 +139,9 @@ std::string PickRelationshipEdge(const std::vector<LayoutNode>& layout_nodes,
         } else {
             ImVec2 parent_bottom, child_top;
             ComputeGroup1Endpoints(parent_node, child_node, origin, zoom, parent_bottom, child_top);
+            const float straight_drop = static_cast<float>(parent_node.child_edge_drop) * zoom;
             ImVec2 edge_min, edge_max;
-            ComputeGroup1EdgeBounds(parent_bottom, child_top, zoom, edge_min, edge_max);
+            ComputeGroup1EdgeBounds(parent_bottom, child_top, zoom, edge_min, edge_max, straight_drop);
             edge_min.x -= tolerance;
             edge_min.y -= tolerance;
             edge_max.x += tolerance;
@@ -156,7 +150,7 @@ std::string PickRelationshipEdge(const std::vector<LayoutNode>& layout_nodes,
                 mouse.x > edge_max.x || mouse.y < edge_min.y || mouse.y > edge_max.y) {
                 continue;
             }
-            distance_sq = DistanceSqToGroup1Edge(mouse, parent_bottom, child_top, zoom);
+            distance_sq = DistanceSqToGroup1Edge(mouse, parent_bottom, child_top, zoom, straight_drop);
         }
 
         if (distance_sq <= best_distance_sq) {

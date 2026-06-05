@@ -205,7 +205,7 @@ static ChallengeSide OutwardSideForHost(const TreeNode* host) {
 static void ProcessChallenge(const parser::SacmElement& relationship,
                              const std::unordered_map<std::string, TreeNode*>& node_by_id,
                              const std::unordered_map<std::string, std::string>& rel_first_target,
-                             const std::unordered_map<std::string, std::pair<std::string, std::string>>& rel_endpoints,
+                             const std::unordered_map<std::string, std::string>& rel_source,
                              std::unordered_set<std::string>& wired_ids) {
     if (relationship.source_refs.empty() || relationship.target_refs.empty())
         return;
@@ -223,17 +223,15 @@ static void ProcessChallenge(const parser::SacmElement& relationship,
     // so the counter sits below the context, not below the parent claim).
     TreeNode* anchor = nullptr;
     if (target_is_relationship) {
-        const auto it = rel_endpoints.find(target_id);
-        if (it != rel_endpoints.end()) {
-            source_node->challenge_rel_a = it->second.first;
-            source_node->challenge_rel_b = it->second.second;
-            anchor = FindFirstNode({it->second.first}, node_by_id); // the relationship source
+        const auto src_it = rel_source.find(target_id);
+        if (src_it != rel_source.end()) {
+            const auto node_it = node_by_id.find(src_it->second);
+            if (node_it != node_by_id.end())
+                anchor = node_it->second;
         }
-        if (!anchor)
-            anchor = ResolveChallengeAnchorElement(target_id, node_by_id, rel_first_target);
-    } else {
-        anchor = ResolveChallengeAnchorElement(target_id, node_by_id, rel_first_target);
     }
+    if (!anchor)
+        anchor = ResolveChallengeAnchorElement(target_id, node_by_id, rel_first_target);
     if (!anchor)
         return; // cannot place — leave the counter node as an orphan
 
@@ -318,25 +316,18 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
         tree.nodes.push_back(std::move(node));
     }
 
-    // Map each relationship id to its first target ref, so a challenge that
-    // targets a relationship can resolve a nearby element to anchor against.
+    // Per-relationship lookups used to host a challenge that targets a
+    // relationship: its first target ref (to resolve a nearby anchor element) and
+    // its source element (the context/solution/sub-claim the challenge hangs off).
     std::unordered_map<std::string, std::string> rel_first_target;
-    // Map each relationship id to its (source element, target element) endpoints
-    // that exist as nodes, used to derive a challenged arrow's orientation.
-    std::unordered_map<std::string, std::pair<std::string, std::string>> rel_endpoints;
-    // Map each relationship id to its type, so a challenge to a relationship can
-    // tell a (horizontal) context arrow from a (vertical) support arrow.
-    std::unordered_map<std::string, std::string> rel_type;
+    std::unordered_map<std::string, std::string> rel_source;
     for (const auto& element : ac.elements) {
         if (!is_relationship(element.type) || element.id.empty())
             continue;
-        rel_type[element.id] = element.type;
         if (!element.target_refs.empty())
             rel_first_target[element.id] = element.target_refs.front();
-        const TreeNode* a = FindFirstNode(element.source_refs, node_by_id);
-        const TreeNode* b = FindFirstNode(element.target_refs, node_by_id);
-        if (a && b)
-            rel_endpoints[element.id] = {a->id, b->id};
+        if (const TreeNode* source = FindFirstNode(element.source_refs, node_by_id))
+            rel_source[element.id] = source->id;
     }
 
     // Step 2: Wire the tree using relationship elements
@@ -346,7 +337,7 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
 
         // Counter relationships are dialectic challenges, not structural support.
         if (element.is_counter) {
-            ProcessChallenge(element, node_by_id, rel_first_target, rel_endpoints, wired_ids);
+            ProcessChallenge(element, node_by_id, rel_first_target, rel_source, wired_ids);
             continue;
         }
 
@@ -359,30 +350,24 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
         }
     }
 
-    // Step 2.5: Decide where each counter cluster sits relative to its host.
-    // Done after all wiring so a host's structural parent/siblings are known
-    // (the outward-side heuristic needs them).
+    // Step 2.5: Decide where each counter cluster sits relative to its host (the
+    // anchor element). Done after all wiring so the host's structural parent and
+    // siblings are known (the outward-side heuristic needs them).
+    //
+    // A Group2 host (Context/Assumption/Justification) → directly below it; any
+    // Group1 host (Goal/Strategy/Solution) → out to its freer side. For a
+    // relationship challenge the anchor is the relationship's source, so a
+    // challenged InContextOf naturally hosts on its context and drops below it.
     for (const auto& owned_node : tree.nodes) {
         TreeNode* counter = owned_node.get();
         if (!counter->is_counter_source)
             continue;
-        if (counter->challenge_target_is_relationship) {
-            const auto type_it = rel_type.find(counter->challenge_target_id);
-            const bool is_context = type_it != rel_type.end() && type_it->second == "assertedcontext";
-            const auto anchor_it = node_by_id.find(counter->challenge_anchor_id);
-            const TreeNode* anchor = anchor_it != node_by_id.end() ? anchor_it->second : nullptr;
-            counter->challenge_side = is_context ? ChallengeSide::Below : OutwardSideForHost(anchor);
-        } else {
-            const auto target_it = node_by_id.find(counter->challenge_target_id);
-            const TreeNode* target = target_it != node_by_id.end() ? target_it->second : nullptr;
-            // Group2 references (Context/Assumption/Justification, attached via
-            // InContextOf) → directly below the reference. Group1 nodes
-            // (Goal/Strategy/Solution, in the structural flow) → outward side.
-            const bool group2_target = target && (target->role == NodeRole::Context ||
-                                                   target->role == NodeRole::Assumption ||
-                                                   target->role == NodeRole::Justification);
-            counter->challenge_side = group2_target ? ChallengeSide::Below : OutwardSideForHost(target);
-        }
+        const auto anchor_it = node_by_id.find(counter->challenge_anchor_id);
+        const TreeNode* anchor = anchor_it != node_by_id.end() ? anchor_it->second : nullptr;
+        const bool group2_host = anchor && (anchor->role == NodeRole::Context ||
+                                            anchor->role == NodeRole::Assumption ||
+                                            anchor->role == NodeRole::Justification);
+        counter->challenge_side = group2_host ? ChallengeSide::Below : OutwardSideForHost(anchor);
     }
 
     // Step 3: Find root (first parentless Claim). Counter sources are parentless

@@ -67,6 +67,10 @@ struct GsnLayoutNode {
     double height = 0.0;
     int side_stack_index = 0;
     bool is_left_side = true;
+    // Distance (content px) the edges from this node to its structural children
+    // should run straight down before curving — large when children are pushed
+    // below a tall side challenge tree, so the lines clear the side margin.
+    double child_edge_drop = 0.0;
 };
 
 struct GsnLayoutGraphResult {

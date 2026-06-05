@@ -328,13 +328,14 @@ void GsnCanvas::Render(UiState& ui_state,
             } else {
                 ImVec2 parent_bottom, child_top;
                 ComputeGroup1Endpoints(parent_node, child_node, origin, zoom, parent_bottom, child_top);
+                const float straight_drop = static_cast<float>(parent_node.child_edge_drop) * zoom;
                 ImVec2 edge_min, edge_max;
-                ComputeGroup1EdgeBounds(parent_bottom, child_top, zoom, edge_min, edge_max);
+                ComputeGroup1EdgeBounds(parent_bottom, child_top, zoom, edge_min, edge_max, straight_drop);
                 if (!RectsIntersect(edge_min, edge_max, cull_min, cull_max)) {
                     ++frame_stats.edges_culled;
                     continue;
                 }
-                DrawGroup1Edge(draw_list, parent_bottom, child_top, zoom);
+                DrawGroup1Edge(draw_list, parent_bottom, child_top, zoom, straight_drop);
                 const std::string edge_key = EdgeKey(parent_node.id, child_node.id);
                 const auto target_it = acp_target_by_edge.find(edge_key);
                 const core::acp::AcpRelationshipTarget* acp_target =
@@ -346,7 +347,7 @@ void GsnCanvas::Render(UiState& ui_state,
                         edge_acps = &acp_it->second;
                 }
                 if (RelationshipEdgeSelected(ui_state, acp_target, edge_key))
-                    DrawGroup1EdgeHighlight(draw_list, parent_bottom, child_top, zoom);
+                    DrawGroup1EdgeHighlight(draw_list, parent_bottom, child_top, zoom, straight_drop);
                 frame_stats.relationship_context_menu_active =
                     RenderAcpRelationshipContextMenu(acp_target,
                                                      edge_acps,

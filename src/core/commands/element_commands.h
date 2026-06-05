@@ -60,8 +60,8 @@ private:
 // generated ids for deterministic replay.
 class CreateChallengeCommand final : public ICommand {
 public:
-    CreateChallengeCommand(ArgumentTarget target, ChallengeSourceType source_type, bool create_as_undeveloped)
-        : target_(std::move(target)), source_type_(source_type), create_as_undeveloped_(create_as_undeveloped) {}
+    CreateChallengeCommand(ArgumentTarget target, ChallengeSourceType source_type)
+        : target_(std::move(target)), source_type_(source_type) {}
 
     std::string Name() const override { return "CreateChallenge"; }
     bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
@@ -72,7 +72,6 @@ public:
 private:
     ArgumentTarget      target_;
     ChallengeSourceType source_type_;
-    bool                create_as_undeveloped_;
     std::string         generated_id_;
     std::string         generated_relationship_id_;
 };

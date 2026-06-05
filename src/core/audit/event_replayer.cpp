@@ -107,13 +107,10 @@ bool ApplyEvent(ReplayState& state,
                         FormatLocation(tx_seq, event.event_sequence, type);
             return false;
         }
-        bool create_as_undeveloped = true;
-        if (auto it = payload.find("create_as_undeveloped"); it != payload.end() && it->is_boolean())
-            create_as_undeveloped = it->get<bool>();
         core::ArgumentTarget target{target_kind, target_id};
         std::string err;
-        if (!core::AddChallengeWithIds(state.model, &state.package, target, source_type, create_as_undeveloped,
-                                       element_id, relationship_id, err)) {
+        if (!core::AddChallengeWithIds(state.model, &state.package, target, source_type, element_id, relationship_id,
+                                       err)) {
             out_error = "AddChallengeWithIds failed at " +
                         FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;

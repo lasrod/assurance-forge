@@ -43,14 +43,12 @@ enum class ChallengeSourceType {
 // (claim for CounterArgument, artifactreference for CounterEvidence) plus a
 // counter relationship (isCounter=true) whose source is the new element and
 // whose target is `target.id`. Updates both the parser model and the sacm
-// package. Counter arguments are created undeveloped when `create_as_undeveloped`.
-// Writes the new element + relationship ids on success; on failure writes a
-// human-readable reason into out_error and leaves the models unchanged.
+// package. Writes the new element + relationship ids on success; on failure
+// writes a human-readable reason into out_error and leaves the models unchanged.
 bool AddChallenge(parser::AssuranceCase& ac,
                   sacm::AssuranceCasePackage* pkg,
                   const ArgumentTarget& target,
                   ChallengeSourceType source_type,
-                  bool create_as_undeveloped,
                   std::string& out_new_id,
                   std::string& out_new_relationship_id,
                   std::string& out_error);
@@ -61,7 +59,6 @@ bool AddChallengeWithIds(parser::AssuranceCase& ac,
                          sacm::AssuranceCasePackage* pkg,
                          const ArgumentTarget& target,
                          ChallengeSourceType source_type,
-                         bool create_as_undeveloped,
                          const std::string& element_id,
                          const std::string& relationship_id,
                          std::string& out_error);

@@ -37,22 +37,37 @@ void ComputeGroup2Endpoints(const LayoutNode& parent,
                             ImVec2& out_parent_side,
                             ImVec2& out_attachment_edge);
 
+// The five-point screen-space path of a Group1 (structural) edge. `straight_drop`
+// (screen px) is how far the edge runs straight down from the parent before the
+// Bezier curves out to the child — used to clear a tall side challenge tree.
+struct Group1EdgePath {
+    ImVec2 parent_bottom;
+    ImVec2 stub_start;
+    ImVec2 ctrl_1;
+    ImVec2 ctrl_2;
+    ImVec2 stub_end;
+    ImVec2 child_top;
+};
+Group1EdgePath ComputeGroup1Path(ImVec2 parent_bottom, ImVec2 child_top, float zoom, float straight_drop = 0.0f);
+
 // Compute an AABB (with padding) covering everything DrawGroup1Edge would draw.
-void ComputeGroup1EdgeBounds(ImVec2 parent_bottom, ImVec2 child_top, float zoom, ImVec2& out_min, ImVec2& out_max);
+void ComputeGroup1EdgeBounds(
+    ImVec2 parent_bottom, ImVec2 child_top, float zoom, ImVec2& out_min, ImVec2& out_max, float straight_drop = 0.0f);
 
 // Compute an AABB (with padding) covering everything DrawGroup2Edge would draw.
 void ComputeGroup2EdgeBounds(
     ImVec2 parent_side, ImVec2 attachment_edge, bool is_left_side, float zoom, ImVec2& out_min, ImVec2& out_max);
 
 // Draw a Group1 structural edge between two node anchor points.
-void DrawGroup1Edge(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 child_top, float zoom);
+void DrawGroup1Edge(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 child_top, float zoom, float straight_drop = 0.0f);
 
 // Draw a Group2 contextual edge between a parent side and an attachment side.
 void DrawGroup2Edge(ImDrawList* draw_list, ImVec2 parent_side, ImVec2 attachment_edge, bool is_left_side, float zoom);
 
 // Draw a thick, semi-transparent highlight along the Group1 edge path
 // (used to mark the currently-selected relationship).
-void DrawGroup1EdgeHighlight(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 child_top, float zoom);
+void DrawGroup1EdgeHighlight(
+    ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 child_top, float zoom, float straight_drop = 0.0f);
 
 // Draw a thick, semi-transparent highlight along the Group2 edge path.
 void DrawGroup2EdgeHighlight(

@@ -101,8 +101,8 @@ bool CreateChallengeCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_e
         out_error = "CreateChallengeCommand requires a target id";
         return false;
     }
-    if (!core::AddChallenge(ctx.model, &ctx.package, target_, source_type_, create_as_undeveloped_,
-                            generated_id_, generated_relationship_id_, out_error))
+    if (!core::AddChallenge(ctx.model, &ctx.package, target_, source_type_, generated_id_, generated_relationship_id_,
+                            out_error))
         return false;
 
     out_event.event_type = "CreateChallenge";
@@ -110,7 +110,6 @@ bool CreateChallengeCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_e
     out_event.payload["target_id"] = target_.id;
     out_event.payload["target_kind"] = ArgumentTargetKindToToken(target_.kind);
     out_event.payload["source_type"] = ChallengeSourceTypeToToken(source_type_);
-    out_event.payload["create_as_undeveloped"] = create_as_undeveloped_;
     out_event.payload["generated_id"] = generated_id_;
     out_event.payload["generated_relationship_id"] = generated_relationship_id_;
     return true;

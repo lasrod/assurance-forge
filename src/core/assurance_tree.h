@@ -50,14 +50,9 @@ struct TreeNode {
     // How/where this counter's cluster is placed relative to its host (the
     // challenged element, or the anchor element for a relationship target).
     ChallengeSide challenge_side = ChallengeSide::Right;
-    // Element the cluster is placed near (the target element, or, for a
-    // relationship target, the element it was resolved to). Used by layout.
+    // Host element the cluster is placed beside/below: the challenged element, or
+    // (for a relationship target) the relationship's source element.
     std::string challenge_anchor_id;
-    // For a relationship target: the two element endpoints of the challenged
-    // relationship, used to derive the arrow orientation so the counter can be
-    // placed perpendicular to it. Empty for element targets.
-    std::string challenge_rel_a;
-    std::string challenge_rel_b;
 
     // Layout scratch fields (filled by layout engine)
     int subtree_width = 1;
