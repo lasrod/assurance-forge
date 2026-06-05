@@ -196,6 +196,22 @@ static ChallengeSide OutwardSideForHost(const TreeNode* host) {
     return (index * 2 < siblings.size()) ? ChallengeSide::Left : ChallengeSide::Right;
 }
 
+// The side lane a Group2 attachment lives in, relative to its host. Mirrors the
+// layout engine's even split of attachments across the two lanes (first half on
+// the left), so a challenge to an assumption/justification can be placed on that
+// same outward side — beside it, away from the host — rather than below it.
+static ChallengeSide AttachmentLaneSide(const TreeNode* attachment) {
+    if (!attachment || !attachment->parent)
+        return ChallengeSide::Right;
+    const std::vector<TreeNode*>& siblings = attachment->parent->group2_attachments;
+    const auto it = std::find(siblings.begin(), siblings.end(), attachment);
+    if (it == siblings.end())
+        return ChallengeSide::Right;
+    const int index = static_cast<int>(std::distance(siblings.begin(), it));
+    const int left_count = (static_cast<int>(siblings.size()) + 1) / 2;
+    return (index < left_count) ? ChallengeSide::Left : ChallengeSide::Right;
+}
+
 // Process a counter (dialectic challenge) relationship. The counter source
 // (a CG goal / CSn solution) becomes the root of its own layout cluster: it is
 // NOT wired into the anchor's children, so it can carry its own sub-argument
@@ -352,11 +368,15 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
 
     // Step 2.5: Decide where each counter cluster sits relative to its host (the
     // anchor element). Done after all wiring so the host's structural parent and
-    // siblings are known (the outward-side heuristic needs them).
+    // siblings are known (the side heuristics need them).
     //
-    // A Group2 host (Context/Assumption/Justification) → directly below it; any
-    // Group1 host (Goal/Strategy/Solution) → out to its freer side. For a
-    // relationship challenge the anchor is the relationship's source, so a
+    //   * Context host (a reference) → directly below it (it grows downward).
+    //   * Assumption/Justification host (a side-attached assertion) → beside it,
+    //     on its own outward lane side, so it never collides with the host claim's
+    //     own side challenge.
+    //   * Group1 host (Goal/Strategy/Solution) → out to its freer side.
+    //
+    // For a relationship challenge the anchor is the relationship's source, so a
     // challenged InContextOf naturally hosts on its context and drops below it.
     for (const auto& owned_node : tree.nodes) {
         TreeNode* counter = owned_node.get();
@@ -364,10 +384,12 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
             continue;
         const auto anchor_it = node_by_id.find(counter->challenge_anchor_id);
         const TreeNode* anchor = anchor_it != node_by_id.end() ? anchor_it->second : nullptr;
-        const bool group2_host = anchor && (anchor->role == NodeRole::Context ||
-                                            anchor->role == NodeRole::Assumption ||
-                                            anchor->role == NodeRole::Justification);
-        counter->challenge_side = group2_host ? ChallengeSide::Below : OutwardSideForHost(anchor);
+        if (anchor && anchor->role == NodeRole::Context)
+            counter->challenge_side = ChallengeSide::Below;
+        else if (anchor && (anchor->role == NodeRole::Assumption || anchor->role == NodeRole::Justification))
+            counter->challenge_side = AttachmentLaneSide(anchor);
+        else
+            counter->challenge_side = OutwardSideForHost(anchor);
     }
 
     // Step 3: Find root (first parentless Claim). Counter sources are parentless

@@ -37,6 +37,40 @@ void AddClaim(MiniCase& mini_case, const std::string& id) {
     mini_case.package.argumentPackages.front().claims.push_back(claim);
 }
 
+void AddAssumption(MiniCase& mini_case, const std::string& id) {
+    parser::SacmElement element;
+    element.id = id;
+    element.type = "claim";
+    element.name = id;
+    element.assertion_declaration = "assumed";
+    mini_case.model.elements.push_back(element);
+
+    if (mini_case.package.argumentPackages.empty())
+        mini_case.package.argumentPackages.emplace_back();
+    sacm::Claim claim;
+    claim.id = id;
+    claim.name = id;
+    claim.assertionDeclaration = "assumed";
+    mini_case.package.argumentPackages.front().claims.push_back(claim);
+}
+
+void AddContextLink(MiniCase& mini_case, const std::string& id, const std::string& target, const std::string& source) {
+    parser::SacmElement relationship;
+    relationship.id = id;
+    relationship.type = "assertedcontext";
+    relationship.target_refs.push_back(target);
+    relationship.source_refs.push_back(source);
+    mini_case.model.elements.push_back(relationship);
+
+    if (mini_case.package.argumentPackages.empty())
+        mini_case.package.argumentPackages.emplace_back();
+    sacm::AssertedContext asserted_context;
+    asserted_context.id = id;
+    asserted_context.targets.push_back(target);
+    asserted_context.sources.push_back(source);
+    mini_case.package.argumentPackages.front().assertedContexts.push_back(asserted_context);
+}
+
 void AddArtifactReference(MiniCase& mini_case, const std::string& id) {
     parser::SacmElement element;
     element.id = id;
@@ -604,6 +638,65 @@ TEST(DialecticChallengeLayout, InContextOfRelationshipChallengeSitsBelowContext)
     ExpectNoOverlaps(layout);
 }
 
+TEST(DialecticChallengeLayout, AssumptionChallengePlacedToSide) {
+    ScopedImGuiFrame frame;
+    // An assumption is a side-attached assertion (claim-type), not a reference, so
+    // challenging it places the counter BESIDE the assumption (on its outward lane
+    // side), not below it.
+    MiniCase mini;
+    AddClaim(mini, "G1");
+    AddAssumption(mini, "A1");
+    AddContextLink(mini, "AC1", "G1", "A1");
+    std::string cg, rel, err;
+    core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, "A1"};
+    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument,
+                                   cg, rel, err))
+        << err;
+
+    const auto layout = LayoutOf(mini.model);
+    const ui::gsn::LayoutNode* a1 = FindLayout(layout, "A1");
+    const ui::gsn::LayoutNode* counter = FindLayout(layout, cg);
+    ASSERT_NE(a1, nullptr);
+    ASSERT_NE(counter, nullptr);
+
+    // Beside the assumption (left or right), roughly on the same row — not below.
+    const bool to_right = counter->position.x >= a1->position.x + a1->size.x - 1.0f;
+    const bool to_left = counter->position.x + counter->size.x <= a1->position.x + 1.0f;
+    EXPECT_TRUE(to_right || to_left) << "counter to an assumption should sit beside it";
+    EXPECT_LT(counter->position.y, a1->position.y + a1->size.y) << "counter should not be placed below the assumption";
+    ExpectNoOverlaps(layout);
+}
+
+TEST(DialecticChallengeLayout, ChallengesToGoalAndAssumptionDoNotOverlap) {
+    ScopedImGuiFrame frame;
+    // Regression: challenging both a goal and its assumption used to drop both
+    // counters into the same side lane at the same row, overlapping exactly.
+    MiniCase mini;
+    AddClaim(mini, "G1");
+    AddAssumption(mini, "A1");
+    AddContextLink(mini, "AC1", "G1", "A1");
+
+    std::string cg_goal, rel_goal, err;
+    core::ArgumentTarget goal_target{core::ArgumentTarget::Kind::Element, "G1"};
+    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, goal_target,
+                                   core::ChallengeSourceType::CounterArgument, cg_goal, rel_goal, err))
+        << err;
+    std::string cg_assumption, rel_assumption, err2;
+    core::ArgumentTarget assumption_target{core::ArgumentTarget::Kind::Element, "A1"};
+    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, assumption_target,
+                                   core::ChallengeSourceType::CounterArgument, cg_assumption, rel_assumption, err2))
+        << err2;
+
+    const auto layout = LayoutOf(mini.model);
+    const ui::gsn::LayoutNode* goal_counter = FindLayout(layout, cg_goal);
+    const ui::gsn::LayoutNode* assumption_counter = FindLayout(layout, cg_assumption);
+    ASSERT_NE(goal_counter, nullptr);
+    ASSERT_NE(assumption_counter, nullptr);
+    EXPECT_FALSE(InteriorsOverlap(*goal_counter, *assumption_counter))
+        << "the goal's counter and the assumption's counter must not overlap";
+    ExpectNoOverlaps(layout);
+}
+
 TEST(DialecticChallengeLayout, DevelopedChallengeOnNodePushesChildrenDown) {
     ScopedImGuiFrame frame;
     // A developed challenge on a strategy stays next to the strategy, and the
@@ -722,6 +815,124 @@ TEST(DialecticChallengeLayout, ContextChallengeTreePushesArgumentDown) {
     // far to the side.
     EXPECT_NEAR(counter->position.x + counter->size.x * 0.5f, cx->position.x + cx->size.x * 0.5f, 60.0f);
     ExpectNoOverlaps(layout);
+}
+
+TEST(DialecticChallengeLayout, ChallengedAssumptionStaysSubstackedBelowContext) {
+    ScopedImGuiFrame frame;
+    // C1, A1, C2 put C1+A1 in the same (left) lane. Challenging A1 must NOT pull it
+    // out beside C1 — attachments always substack, so A1 stays below C1 and its
+    // counter sits beside A1.
+    MiniCase mini;
+    AddClaim(mini, "G1");
+    AddArtifactReference(mini, "C1");
+    AddAssumption(mini, "A1");
+    AddArtifactReference(mini, "C2");
+    AddContextLink(mini, "AC1", "G1", "C1");
+    AddContextLink(mini, "AC2", "G1", "A1");
+    AddContextLink(mini, "AC3", "G1", "C2");
+    std::string cg, rg, e;
+    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "A1"},
+                                   core::ChallengeSourceType::CounterArgument, cg, rg, e))
+        << e;
+
+    const auto layout = LayoutOf(mini.model);
+    const ui::gsn::LayoutNode* c1 = FindLayout(layout, "C1");
+    const ui::gsn::LayoutNode* a1 = FindLayout(layout, "A1");
+    const ui::gsn::LayoutNode* counter = FindLayout(layout, cg);
+    ASSERT_NE(c1, nullptr);
+    ASSERT_NE(a1, nullptr);
+    ASSERT_NE(counter, nullptr);
+
+    // A1 sits directly below C1 (same column), not beside it.
+    EXPECT_GT(a1->position.y, c1->position.y + c1->size.y - 1.0f) << "A1 should stay substacked below C1";
+    EXPECT_NEAR(a1->position.x, c1->position.x, 1.0f) << "A1 should share C1's column, not move to its own";
+    // The counter sits beside A1.
+    const bool to_right = counter->position.x >= a1->position.x + a1->size.x - 1.0f;
+    const bool to_left = counter->position.x + counter->size.x <= a1->position.x + 1.0f;
+    EXPECT_TRUE(to_right || to_left) << "the assumption's counter should sit beside it";
+    ExpectNoOverlaps(layout);
+}
+
+TEST(DialecticChallengeLayout, ChallengesToTwoSameSideAssumptionsDoNotOverlap) {
+    ScopedImGuiFrame frame;
+    // Three assumptions put two on the same lane; challenging both used to drop
+    // their counters onto the same spot (shared lane centre). Each challenged
+    // attachment now gets its own column.
+    MiniCase mini;
+    AddClaim(mini, "G1");
+    AddAssumption(mini, "A1");
+    AddAssumption(mini, "A2");
+    AddAssumption(mini, "A3");
+    AddContextLink(mini, "AC1", "G1", "A1");
+    AddContextLink(mini, "AC2", "G1", "A2");
+    AddContextLink(mini, "AC3", "G1", "A3");
+    std::string a, b, ra, rb, e;
+    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "A1"},
+                                   core::ChallengeSourceType::CounterArgument, a, ra, e))
+        << e;
+    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "A2"},
+                                   core::ChallengeSourceType::CounterArgument, b, rb, e))
+        << e;
+    ExpectNoOverlaps(LayoutOf(mini.model));
+}
+
+TEST(DialecticChallengeLayout, ChallengesToTwoSameSideContextsDoNotOverlap) {
+    ScopedImGuiFrame frame;
+    // Same hazard for contexts: two contexts in one lane, each challenged below,
+    // used to drop their counters onto the same spot.
+    MiniCase mini;
+    AddClaim(mini, "G1");
+    AddArtifactReference(mini, "C1");
+    AddArtifactReference(mini, "C2");
+    AddArtifactReference(mini, "C3");
+    AddContextLink(mini, "AC1", "G1", "C1");
+    AddContextLink(mini, "AC2", "G1", "C2");
+    AddContextLink(mini, "AC3", "G1", "C3");
+    std::string a, b, ra, rb, e;
+    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "C1"},
+                                   core::ChallengeSourceType::CounterArgument, a, ra, e))
+        << e;
+    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "C2"},
+                                   core::ChallengeSourceType::CounterArgument, b, rb, e))
+        << e;
+    ExpectNoOverlaps(LayoutOf(mini.model));
+}
+
+TEST(DialecticChallengeLayout, GoalAndSameSideAssumptionChallengesDoNotOverlap) {
+    ScopedImGuiFrame frame;
+    // A sub-goal whose outward side is the same lane as its assumption: the goal's
+    // own counter and the assumption's counter must share the lane without
+    // overlapping (separate columns).
+    MiniCase mini;
+    AddClaim(mini, "G0");
+    AddClaim(mini, "G1");
+    AddInference(mini, "INF1", "G0", "G1");
+    AddAssumption(mini, "A1");
+    AddContextLink(mini, "AC1", "G1", "A1");
+    std::string cg, cga, rg, rga, e;
+    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "G1"},
+                                   core::ChallengeSourceType::CounterArgument, cg, rg, e))
+        << e;
+    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "A1"},
+                                   core::ChallengeSourceType::CounterArgument, cga, rga, e))
+        << e;
+    ExpectNoOverlaps(LayoutOf(mini.model));
+}
+
+TEST(DialecticChallengeLayout, TwoChallengesToSameNodeDoNotOverlap) {
+    ScopedImGuiFrame frame;
+    // Two counters against the same node land on the same side; each gets its own
+    // column instead of stacking onto the same point.
+    MiniCase mini;
+    AddClaim(mini, "G1");
+    std::string a, b, ra, rb, e;
+    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "G1"},
+                                   core::ChallengeSourceType::CounterArgument, a, ra, e))
+        << e;
+    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "G1"},
+                                   core::ChallengeSourceType::CounterArgument, b, rb, e))
+        << e;
+    ExpectNoOverlaps(LayoutOf(mini.model));
 }
 
 TEST(DialecticChallengeLayout, DevelopedChallengeStaysClear) {

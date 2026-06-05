@@ -118,10 +118,6 @@ double GlobalMin(const Contour& c) {
     return m;
 }
 
-double ContourWidth(const Contour& c) {
-    return c.empty() ? 0.0 : (GlobalMax(c) - GlobalMin(c));
-}
-
 const Contour& ContourOf(LayoutState& state, const std::string& id, double gap);
 
 // Centre offset to place `item` immediately to the right of `base` with `gap`
@@ -210,7 +206,7 @@ int SideDepth(LayoutState& state, const NodeLayout& node) {
         for (const std::string& id : challenges)
             if (const NodeLayout* n = Find(state, id))
                 ch_h = std::max(ch_h, n->subtree_height);
-        const int ch_offset = contexts.empty() ? 0 : 1; // challenges drop below the context stack
+        const int ch_offset = 0; // a host challenge sits beside the node, in its own column at the node's row
         int depth = 0;
         if (ctx_h > 0)
             depth = std::max(depth, ctx_h - 1);
@@ -298,22 +294,15 @@ void AssignRows(LayoutState& state, const std::string& root_id) {
         const int child_start = ChildStartOffset(state, *node);
         for (const std::string& child : ExistingIds(state, node->input->group1_children))
             stack.push_back({child, frame.row + child_start});
-        const std::vector<std::string> attachments = ExistingIds(state, node->input->group2_attachments);
-        for (const std::string& att : attachments)
+        for (const std::string& att : ExistingIds(state, node->input->group2_attachments))
             stack.push_back({att, frame.row}); // contexts beside the host, at its row
-        const auto [left_indices, right_indices] = DistributeAttachmentSides(static_cast<int>(attachments.size()));
-        const bool left_has_context = !left_indices.empty();
-        const bool right_has_context = !right_indices.empty();
         for (const ChallengeChild& cc : node->input->challenge_children) {
             if (!Find(state, cc.root_id))
                 continue;
-            int row = frame.row;
-            if (cc.side == ChallengeSide::Below)
-                row = frame.row + child_start; // a context's challenge, as its structural child
-            else if (cc.side == ChallengeSide::Left && left_has_context)
-                row = frame.row + 1; // a side challenge drops just below the context stack
-            else if (cc.side == ChallengeSide::Right && right_has_context)
-                row = frame.row + 1;
+            // Below: a context's own challenge, as its structural child (pushed
+            // below the context's side margins). Left/Right: a side challenge sits
+            // beside the host in its own column, at the host's row.
+            const int row = (cc.side == ChallengeSide::Below) ? frame.row + child_start : frame.row;
             stack.push_back({cc.root_id, row});
         }
     }
@@ -321,11 +310,11 @@ void AssignRows(LayoutState& state, const std::string& root_id) {
 
 // ===== Contour layout (post-order) =====
 
-// Place a vertical column of Group2 attachments at a fixed lane centre x beside
-// the node. Contexts share the x and are sub-stacked within the host's row by the
-// y pass; a challenged context keeps its challenge as a structural child, so it
-// hangs directly below at the same x (no horizontal collision, because the main
-// subtree is pushed below the side margins).
+// Place a vertically-substacked column of Group2 attachments at a fixed lane
+// centre x beside the node. They share the x and are sub-stacked within the host's
+// row by the y pass (so an assumption sits below a context). A challenge to an
+// individual attachment is positioned relative to that attachment (beside it at
+// its substacked y, or below it), not here.
 void PlaceContextColumn(LayoutState& state,
                         const NodeLayout& host,
                         const std::vector<std::string>& column,
@@ -373,6 +362,69 @@ const Contour& ContourOf(LayoutState& state, const std::string& id, double gap) 
 
     node->contour = std::move(c);
     return node->contour;
+}
+
+// Place one side's content (Group2 attachments + the host's own side challenges)
+// in columns beside the node, packed outward from the node's edge. Plain
+// attachments (no challenge of their own) share a single vertically-substacked
+// column nearest the node; every attachment that carries a challenge, and every
+// challenge to the host itself, gets its OWN column further out — so challenge
+// clusters in the same lane never overlap. The main subtree is pushed below all
+// of it via ChildStartOffset.
+void PlaceSideLane(LayoutState& state,
+                   const NodeLayout& host,
+                   const std::vector<std::string>& attachments,
+                   const std::vector<std::string>& host_challenges,
+                   double gap,
+                   bool is_left) {
+    double edge = host.width * 0.5 + gap; // distance from host centre to the inner edge of the next column
+
+    // Reserve the next outward slot for a column whose contour spans [cmin, cmax]
+    // (relative to the placed item's own centre) and return the offset to apply to
+    // that item's centre so its contour sits exactly in the slot. A column's
+    // contour can be asymmetric (e.g. an assumption with its own challenge hanging
+    // to one side), so we align by contour edges, not by box centre.
+    auto reserve_slot = [&](double cmin, double cmax) {
+        const double width = cmax - cmin;
+        const double offset = is_left ? (-edge - cmax) : (edge - cmin);
+        edge += width + gap;
+        return offset;
+    };
+    auto contour_bounds = [&](const std::string& id) -> std::pair<double, double> {
+        const Contour& c = ContourOf(state, id, gap);
+        if (!c.empty())
+            return {GlobalMin(c), GlobalMax(c)};
+        const NodeLayout* n = Find(state, id);
+        const double half = n ? n->width * 0.5 : 0.0;
+        return {-half, half};
+    };
+
+    // 1. All attachments (contexts, assumptions, justifications) share ONE
+    //    vertically-substacked column nearest the node — they always stack, so an
+    //    assumption sits below a context rather than beside it. Each attachment's
+    //    own challenge extends outward (beside) or downward (below) within that
+    //    attachment's contour, so size the column to the combined extent.
+    if (!attachments.empty()) {
+        double cmin = 0.0;
+        double cmax = 0.0;
+        for (const std::string& id : attachments) {
+            const auto [a, b] = contour_bounds(id);
+            cmin = std::min(cmin, a);
+            cmax = std::max(cmax, b);
+        }
+        PlaceContextColumn(state, host, attachments, reserve_slot(cmin, cmax), is_left);
+    }
+
+    // 2. The host's own challenges each get a column further out.
+    for (const std::string& id : host_challenges) {
+        NodeLayout* n = Find(state, id);
+        if (!n)
+            continue;
+        const auto [cmin, cmax] = contour_bounds(id);
+        n->layout_parent = host.input->id;
+        n->offset = reserve_slot(cmin, cmax);
+        n->is_left_side = is_left;
+    }
 }
 
 // Post-order: compute each node's sub-item offsets (relative to the node centre).
@@ -437,40 +489,18 @@ void ComputeOffsets(LayoutState& state, const std::string& root_id, double gap) 
             }
         }
 
-        // 2. Side items: each side has ONE lane at a fixed x beside the node box.
-        //    The main subtree is pushed BELOW these margins (see ChildStartOffset
-        //    in AssignRows), so side content never collides with the subtree and
-        //    needs no sideways stretching — it just sits next to the node.
+        // 2. Side content beside the node, in columns packed outward. Plain
+        //    attachments share one substacked column; each challenged attachment
+        //    and each challenge to the host gets its own column so their clusters
+        //    never overlap. The main subtree is pushed BELOW these margins (see
+        //    ChildStartOffset in AssignRows).
         const bool has_left = !items.plain_g2_left.empty() || !items.left_items.empty();
         const bool has_right = !items.plain_g2_right.empty() || !items.right_items.empty();
         if (!has_left && !has_right)
             continue;
 
-        auto lane_width = [&](const std::vector<std::string>& a, const std::vector<std::string>& b) {
-            double w = 0.0;
-            for (const std::string& id : a)
-                w = std::max(w, ContourWidth(ContourOf(state, id, gap)));
-            for (const std::string& id : b)
-                w = std::max(w, ContourWidth(ContourOf(state, id, gap)));
-            return w;
-        };
-        const double left_lane_w = lane_width(items.plain_g2_left, items.left_items);
-        const double right_lane_w = lane_width(items.plain_g2_right, items.right_items);
-        const double left_lane_centre = -node->width * 0.5 - gap - left_lane_w * 0.5;
-        const double right_lane_centre = node->width * 0.5 + gap + right_lane_w * 0.5;
-
-        PlaceContextColumn(state, *node, items.plain_g2_left, left_lane_centre, /*is_left=*/true);
-        for (const std::string& id : items.left_items)
-            if (NodeLayout* item = Find(state, id)) {
-                item->layout_parent = node->input->id;
-                item->offset = left_lane_centre;
-            }
-        PlaceContextColumn(state, *node, items.plain_g2_right, right_lane_centre, /*is_left=*/false);
-        for (const std::string& id : items.right_items)
-            if (NodeLayout* item = Find(state, id)) {
-                item->layout_parent = node->input->id;
-                item->offset = right_lane_centre;
-            }
+        PlaceSideLane(state, *node, items.plain_g2_left, items.left_items, gap, /*is_left=*/true);
+        PlaceSideLane(state, *node, items.plain_g2_right, items.right_items, gap, /*is_left=*/false);
     }
 }
 
@@ -603,34 +633,52 @@ GsnLayoutGraphResult LayoutGsnGraph(const GsnLayoutInput& input,
         return nl.layout_parent + "|" + std::to_string(nl.row) + (nl.is_left_side ? "|L" : "|R");
     };
 
-    // Plain Group2 stacked in stack_index order per key.
-    std::vector<const NodeLayout*> g2_nodes;
+    // Build the side substacks. Each Group2 attachment is one entry; a LEAF
+    // below-challenge is interleaved right after the context it hangs from, so
+    // multiple same-lane context challenges stack vertically instead of landing on
+    // the same spot. (Developed/tree challenges keep their row-based placement.)
+    struct StackEntry {
+        const NodeLayout* nl = nullptr;
+        std::string key;     // shared by a context and its interleaved below-challenge
+        int height_row = 0;  // row whose stack height this entry contributes to
+        int order_primary = 0;   // context stack index
+        int order_secondary = 0; // 0 = the context, 1 = its below-challenge
+    };
+    std::unordered_map<std::string, int> stack_member_row; // substack member id -> row driving its y
+    std::unordered_map<std::string, std::string> stack_member_key;
+    std::vector<StackEntry> entries;
     for (const auto& [id, nl] : state.nodes) {
         if (!abs_center.count(id))
             continue;
-        if (nl.is_group2_plain)
-            g2_nodes.push_back(&nl);
+        if (nl.is_group2_plain) {
+            entries.push_back({&nl, stack_key(nl), nl.row, nl.stack_index, 0});
+            continue;
+        }
+        const NodeLayout* parent = nl.layout_parent.empty() ? nullptr : Find(state, nl.layout_parent);
+        const auto lc = layout_children.find(id);
+        const bool is_leaf = lc == layout_children.end() || lc->second.empty();
+        if (parent && parent->input && parent->is_group2_plain && nl.row > parent->row && is_leaf)
+            entries.push_back({&nl, stack_key(*parent), parent->row, parent->stack_index, 1});
         else
             row_max_height[static_cast<std::size_t>(nl.row)] =
                 std::max(row_max_height[static_cast<std::size_t>(nl.row)], nl.height);
     }
-    std::sort(g2_nodes.begin(), g2_nodes.end(), [&](const NodeLayout* a, const NodeLayout* b) {
-        if (a->layout_parent != b->layout_parent)
-            return a->layout_parent < b->layout_parent;
-        if (a->row != b->row)
-            return a->row < b->row;
-        if (a->is_left_side != b->is_left_side)
-            return a->is_left_side && !b->is_left_side;
-        return a->stack_index < b->stack_index;
+    std::sort(entries.begin(), entries.end(), [](const StackEntry& a, const StackEntry& b) {
+        if (a.key != b.key)
+            return a.key < b.key;
+        if (a.order_primary != b.order_primary)
+            return a.order_primary < b.order_primary;
+        return a.order_secondary < b.order_secondary;
     });
-    for (const NodeLayout* nl : g2_nodes) {
-        const std::string key = stack_key(*nl);
-        double& height = g2_stack_height[key];
+    for (const StackEntry& e : entries) {
+        double& height = g2_stack_height[e.key];
         if (height > 0.0)
             height += options.side_stack_gap;
-        g2_stack_offset[nl->input->id] = height;
-        height += nl->height;
-        double& row_h = row_g2_stack_height[nl->row];
+        g2_stack_offset[e.nl->input->id] = height;
+        stack_member_row[e.nl->input->id] = e.height_row;
+        stack_member_key[e.nl->input->id] = e.key;
+        height += e.nl->height;
+        double& row_h = row_g2_stack_height[e.height_row];
         row_h = std::max(row_h, height);
     }
 
@@ -665,11 +713,25 @@ GsnLayoutGraphResult LayoutGsnGraph(const GsnLayoutInput& input,
         out.is_left_side = nl.is_left_side;
         out.x = center_it->second - nl.width * 0.5;
 
-        if (nl.is_group2_plain) {
-            const std::string key = stack_key(nl);
-            const double stack_height = g2_stack_height[key];
-            out.y = row_y[static_cast<std::size_t>(nl.row)] + std::max(0.0, (row_height - stack_height) * 0.5) +
-                    g2_stack_offset[nl.input->id];
+        // The y of a substack member (a Group2 attachment or an interleaved leaf
+        // below-challenge): centre its substack in the driving row, then offset to
+        // its slot within the stack.
+        auto member_y = [&](const std::string& member_id) {
+            const int r = stack_member_row[member_id];
+            const double rh = row_heights[static_cast<std::size_t>(r)];
+            const double stack_height = g2_stack_height[stack_member_key[member_id]];
+            return row_y[static_cast<std::size_t>(r)] + std::max(0.0, (rh - stack_height) * 0.5) +
+                   g2_stack_offset[member_id];
+        };
+
+        const NodeLayout* parent = nl.layout_parent.empty() ? nullptr : Find(state, nl.layout_parent);
+        if (g2_stack_offset.count(nl.input->id)) {
+            out.y = member_y(nl.input->id);
+        } else if (parent && parent->input && parent->is_group2_plain && parent->row == nl.row &&
+                   g2_stack_offset.count(parent->input->id)) {
+            // A challenge sitting beside a substacked attachment tracks that
+            // attachment's y, so challenges to different attachments never collide.
+            out.y = member_y(parent->input->id) + std::max(0.0, (parent->height - nl.height) * 0.5);
         } else {
             out.y = row_y[static_cast<std::size_t>(nl.row)] + std::max(0.0, (row_height - nl.height) * 0.5);
         }
