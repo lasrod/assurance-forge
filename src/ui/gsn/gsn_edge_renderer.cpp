@@ -349,6 +349,11 @@ void DrawChallengeEdge(ImDrawList* draw_list, ImVec2 from, ImVec2 to, float zoom
     DrawHollowArrow(draw_list, to, to.x - from.x, to.y - from.y, col, kArrowSize * scale, kArrowOutlineWidth * scale);
 }
 
+void DrawChallengeEdgeHighlight(ImDrawList* draw_list, ImVec2 from, ImVec2 to, float zoom) {
+    const float scale = DpiScale() * zoom;
+    draw_list->AddLine(from, to, WithAlpha(GetTheme().accent, 0.78f), std::max(3.0f, 4.5f * scale));
+}
+
 void ComputeChallengeEdgeBounds(ImVec2 from, ImVec2 to, float zoom, ImVec2& out_min, ImVec2& out_max) {
     float scale = DpiScale() * zoom;
     float scaled_edge_width = kDashedEdgeWidth * scale;

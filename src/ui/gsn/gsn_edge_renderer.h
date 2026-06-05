@@ -66,4 +66,7 @@ void DrawChallengeEdge(ImDrawList* draw_list, ImVec2 from, ImVec2 to, float zoom
 // Compute an AABB (with padding) covering everything DrawChallengeEdge would draw.
 void ComputeChallengeEdgeBounds(ImVec2 from, ImVec2 to, float zoom, ImVec2& out_min, ImVec2& out_max);
 
+// Thick, semi-transparent highlight along a challenge edge (hover/selection cue).
+void DrawChallengeEdgeHighlight(ImDrawList* draw_list, ImVec2 from, ImVec2 to, float zoom);
+
 } // namespace ui::gsn

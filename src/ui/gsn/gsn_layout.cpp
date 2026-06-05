@@ -174,88 +174,121 @@ static ElementRole to_ui_role(core::NodeRole r) {
     }
 }
 
+// ===== Tree → layout conversion helpers =====
+
+namespace {
+
+LayoutNode ConvertPlacedNode(const core::GsnLayoutNode& placed, const core::TreeNode* tn) {
+    LayoutNode ln;
+    ln.id = placed.id;
+    ln.role = to_ui_role(placed.role);
+    ln.group = (placed.group == core::ElementGroup::Group1) ? ElementGroup::Group1 : ElementGroup::Group2;
+    ln.label = placed.label;
+    ln.label_secondary = placed.label_secondary;
+    ln.undeveloped = placed.undeveloped;
+    ln.size = ImVec2(static_cast<float>(placed.width), static_cast<float>(placed.height));
+    ln.parent_id = placed.parent_id;
+    ln.is_left_side = placed.is_left_side;
+    ln.side_stack_index = placed.side_stack_index;
+    ln.position = ImVec2(static_cast<float>(placed.x), static_cast<float>(placed.y));
+    if (tn) {
+        ln.is_counter_source = tn->is_counter_source;
+        ln.challenge_target_id = tn->challenge_target_id;
+        ln.challenge_target_is_relationship = tn->challenge_target_is_relationship;
+        ln.challenge_relationship_id = tn->challenge_relationship_id;
+        ln.challenge_anchor_id = tn->challenge_anchor_id;
+        ln.challenge_rel_a = tn->challenge_rel_a;
+        ln.challenge_rel_b = tn->challenge_rel_b;
+    }
+    return ln;
+}
+
+core::GsnLayoutInputNode MakeInputNode(const core::TreeNode& tn) {
+    core::GsnLayoutInputNode node;
+    node.id = tn.id;
+    node.role = tn.role;
+    node.group = tn.group;
+    node.label = tn.label;
+    node.label_secondary = tn.label_secondary;
+    node.undeveloped = tn.undeveloped;
+    // Counters are cluster roots reached only via their host's challenge_children,
+    // so they never carry a structural parent in the layout input.
+    node.parent_id = (tn.parent && !tn.is_counter_source) ? tn.parent->id : "";
+    for (const core::TreeNode* child : tn.group1_children)
+        node.group1_children.push_back(child->id);
+    for (const core::TreeNode* attachment : tn.group2_attachments)
+        node.group2_attachments.push_back(attachment->id);
+    return node;
+}
+
+} // namespace
+
 // ===== Main tree-based layout =====
+//
+// A single LayoutGsnGraph pass lays out the structural tree AND every dialectic
+// challenge cluster. Each counter is attached to its host node's
+// `challenge_children` with a side (Left/Right/Below); the engine reserves space
+// for it in the host's footprint, so challenges never overlap the argument.
 std::vector<LayoutNode> LayoutEngine::ComputeLayout(const core::AssuranceTree& tree) {
     std::vector<LayoutNode> result;
-    if (!tree.root)
+    if (tree.nodes.empty())
         return result;
-
-    const float node_width = DpiSize(kNodeWidth);
-    const float node_height = DpiSize(kNodeHeight);
-
-    core::GsnLayoutInput input;
-    input.roots.push_back(tree.root->id);
-    for (const core::TreeNode* orphan : tree.orphans)
-        input.orphans.push_back(orphan->id);
-
-    std::unordered_map<std::string, core::GsnLayoutSize> node_sizes;
-    // Size each node from the label that is actually rendered. Translated
-    // text can be much longer/shorter than the primary, so measuring the
-    // primary label would clip or under-fill the node when the canvas
-    // language toggle is active.
-    const ui::UiState& ui_state = ui::GetUiState();
-    for (const auto& owned_node : tree.nodes) {
-        const core::TreeNode& tree_node = *owned_node;
-        core::GsnLayoutInputNode node;
-        node.id = tree_node.id;
-        node.role = tree_node.role;
-        node.group = tree_node.group;
-        node.label = tree_node.label;
-        node.label_secondary = tree_node.label_secondary;
-        node.undeveloped = tree_node.undeveloped;
-        node.parent_id = tree_node.parent ? tree_node.parent->id : "";
-        for (const core::TreeNode* child : tree_node.group1_children)
-            node.group1_children.push_back(child->id);
-        for (const core::TreeNode* attachment : tree_node.group2_attachments)
-            node.group2_attachments.push_back(attachment->id);
-
-        const bool use_secondary = ui_state.show_secondary_language && !tree_node.label_secondary.empty();
-        const std::string& active_label = use_secondary ? tree_node.label_secondary : tree_node.label;
-        const ImVec2 node_size = ComputeNodeSize(active_label, tree_node.role);
-        node_sizes[node.id] = {node_size.x, node_size.y};
-        input.nodes.push_back(std::move(node));
-    }
 
     core::GsnLayoutOptions options;
     options.margin_x = DpiSize(kLeftMargin);
     options.margin_y = DpiSize(kTopMargin);
-    options.base_node_width = node_width;
-    options.default_node_height = node_height;
+    options.base_node_width = DpiSize(kNodeWidth);
+    options.default_node_height = DpiSize(kNodeHeight);
     options.horizontal_spacing = DpiSize(kHSpacing);
     options.vertical_spacing = DpiSize(kVSpacing);
     options.side_stack_gap = DpiSize(kSideGap);
 
-    // Index tree nodes by id so challenge metadata (not carried through the pure
-    // layout graph) can be copied onto the laid-out nodes below.
+    // Size every node from the label that is actually rendered, index nodes by
+    // id, and build one layout-input node per tree node.
+    const ui::UiState& ui_state = ui::GetUiState();
+    std::unordered_map<std::string, core::GsnLayoutSize> node_sizes;
     std::unordered_map<std::string, const core::TreeNode*> tree_node_by_id;
+    std::unordered_map<std::string, std::size_t> input_index_by_id;
+    node_sizes.reserve(tree.nodes.size());
     tree_node_by_id.reserve(tree.nodes.size());
-    for (const auto& owned_node : tree.nodes)
-        tree_node_by_id[owned_node->id] = owned_node.get();
+
+    core::GsnLayoutInput input;
+    input.nodes.reserve(tree.nodes.size());
+    for (const auto& owned_node : tree.nodes) {
+        const core::TreeNode& tree_node = *owned_node;
+        tree_node_by_id[tree_node.id] = &tree_node;
+        const bool use_secondary = ui_state.show_secondary_language && !tree_node.label_secondary.empty();
+        const std::string& active_label = use_secondary ? tree_node.label_secondary : tree_node.label;
+        const ImVec2 node_size = ComputeNodeSize(active_label, tree_node.role);
+        node_sizes[tree_node.id] = {node_size.x, node_size.y};
+        input_index_by_id[tree_node.id] = input.nodes.size();
+        input.nodes.push_back(MakeInputNode(tree_node));
+    }
+
+    // Roots / orphans exclude counters (they are reached via their host).
+    if (tree.root)
+        input.roots.push_back(tree.root->id);
+    for (const core::TreeNode* orphan : tree.orphans)
+        if (!orphan->is_counter_source)
+            input.orphans.push_back(orphan->id);
+
+    // Attach each counter to its host's challenge_children with its placement.
+    for (const auto& owned_node : tree.nodes) {
+        const core::TreeNode& counter = *owned_node;
+        if (!counter.is_counter_source || counter.challenge_anchor_id.empty())
+            continue;
+        const auto host_it = input_index_by_id.find(counter.challenge_anchor_id);
+        if (host_it == input_index_by_id.end())
+            continue;
+        input.nodes[host_it->second].challenge_children.push_back({counter.id, counter.challenge_side});
+    }
 
     const core::GsnLayoutGraphResult layout = core::LayoutGsnGraph(input, node_sizes, options);
     result.reserve(layout.nodes.size());
-    for (const core::GsnLayoutNode& placed_node : layout.nodes) {
-        LayoutNode layout_node;
-        layout_node.id = placed_node.id;
-        layout_node.role = to_ui_role(placed_node.role);
-        layout_node.group =
-            (placed_node.group == core::ElementGroup::Group1) ? ElementGroup::Group1 : ElementGroup::Group2;
-        layout_node.label = placed_node.label;
-        layout_node.label_secondary = placed_node.label_secondary;
-        layout_node.undeveloped = placed_node.undeveloped;
-        layout_node.size = ImVec2(static_cast<float>(placed_node.width), static_cast<float>(placed_node.height));
-        layout_node.parent_id = placed_node.parent_id;
-        layout_node.is_left_side = placed_node.is_left_side;
-        layout_node.side_stack_index = placed_node.side_stack_index;
-        layout_node.position = ImVec2(static_cast<float>(placed_node.x), static_cast<float>(placed_node.y));
-        if (auto it = tree_node_by_id.find(placed_node.id); it != tree_node_by_id.end() && it->second) {
-            layout_node.is_counter_source = it->second->is_counter_source;
-            layout_node.challenge_target_id = it->second->challenge_target_id;
-            layout_node.challenge_target_is_relationship = it->second->challenge_target_is_relationship;
-        }
-        result.push_back(layout_node);
+    for (const core::GsnLayoutNode& placed : layout.nodes) {
+        const auto it = tree_node_by_id.find(placed.id);
+        result.push_back(ConvertPlacedNode(placed, it != tree_node_by_id.end() ? it->second : nullptr));
     }
-
     return result;
 }
 

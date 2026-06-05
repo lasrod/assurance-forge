@@ -1,141 +1,78 @@
 #include "core/gsn_layout.h"
 
 #include <algorithm>
+#include <map>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
+
+// Contour-based tidy-tree layout.
+//
+// Each node owns a *contour* — its left/right silhouette per row — expressed
+// relative to the node's own centre. Sub-items (structural children, Group2
+// attachments, and dialectic challenge clusters) are slid against the running
+// contour until they nearly touch, so everything sits as close as possible and
+// the diagram only grows where there is real content. This replaces the older
+// column-grid model, whose single per-side "overhang" pushed challenges out
+// beyond a node's entire subtree width.
+//
+// Placement of challenges (see ChallengeSide, decided in the tree builder):
+//   * Side (Left/Right): the challenge root sits at the host's row and grows
+//     downward, hugging the host subtree's contour on that side.
+//   * Below: the challenge root is folded in as an extra structural child of the
+//     host, so it grows straight down beneath it (used for context/assumption/
+//     justification references).
 
 namespace core {
 namespace {
 
-struct WorkNode {
-    const GsnLayoutInputNode* input = nullptr;
-    int subtree_width = 1;
-    int left_overhang = 0;
-    int right_overhang = 0;
-    int visit_state = 0;
-    int placement_state = 0;
-};
+using Contour = std::map<int, std::pair<double, double>>; // row -> {minX, maxX}, relative to node centre
 
-struct Placement {
-    std::string node_id;
-    double column = 0.0;
+struct NodeLayout {
+    const GsnLayoutInputNode* input = nullptr;
+    double width = 1.0;
+    double height = 1.0;
     int row = 0;
-    bool is_group2 = false;
-    bool is_left_side = true;
+    bool reachable = false;
+    int visit_state = 0; // post-order: 0 unseen, 1 in-progress, 2 done
+
+    // Number of rows this node's whole laid-out subtree spans (incl. side margins
+    // and the push-down of structural children below them). Computed bottom-up.
+    int subtree_height = 1;
+    int height_state = 0; // 0 unseen, 1 in-progress, 2 done
+
+    // Position: centre x relative to this node's layout-parent centre.
+    std::string layout_parent; // empty => a root/orphan; `offset` is then the absolute base centre
+    double offset = 0.0;
+    Contour contour;            // relative to this node's own centre (built lazily)
+    bool contour_built = false; // memoization guard for ContourOf
+
+    // Group2 vertical-stack bookkeeping (plain context/assumption/justification).
+    bool is_group2_plain = false;
+    bool is_left_side = false;
     int stack_index = 0;
 };
 
 struct LayoutState {
-    std::unordered_map<std::string, WorkNode> nodes;
-    std::vector<Placement> placements;
+    std::unordered_map<std::string, NodeLayout> nodes;
     bool cycle_seen = false;
 };
 
-const WorkNode* FindNode(const LayoutState& state, const std::string& id) {
+NodeLayout* Find(LayoutState& state, const std::string& id) {
     auto it = state.nodes.find(id);
-    if (it == state.nodes.end())
-        return nullptr;
-    return &it->second;
+    return it == state.nodes.end() ? nullptr : &it->second;
 }
-
-WorkNode* FindNode(LayoutState& state, const std::string& id) {
+const NodeLayout* Find(const LayoutState& state, const std::string& id) {
     auto it = state.nodes.find(id);
-    if (it == state.nodes.end())
-        return nullptr;
-    return &it->second;
+    return it == state.nodes.end() ? nullptr : &it->second;
 }
 
-std::vector<std::string> ExistingChildren(const LayoutState& state, const std::vector<std::string>& ids) {
-    std::vector<std::string> children;
-    for (const std::string& id : ids) {
-        if (FindNode(state, id))
-            children.push_back(id);
-    }
-    return children;
-}
-
-int ComputeChildrenSpan(const LayoutState& state,
-                        const std::vector<std::string>& children,
-                        int start_index,
-                        int end_index) {
-    int span = 0;
-    for (int i = start_index; i < end_index; ++i) {
-        const WorkNode* child = FindNode(state, children[i]);
-        if (!child)
-            continue;
-        span += child->subtree_width;
-        if (i > start_index) {
-            const WorkNode* previous = FindNode(state, children[i - 1]);
-            if (previous)
-                span += previous->right_overhang + child->left_overhang;
-        }
-    }
-    return span;
-}
-
-// Iterative post-order walk: children must be sized before a parent's subtree width and
-// overhang are computed. An explicit stack is used instead of recursion so that very deep
-// argument chains (thousands of links) cannot overflow the call stack.
-void ComputeSubtreeInfo(LayoutState& state, const std::string& root_id) {
-    struct Frame {
-        std::string node_id;
-        bool ready; // false: discover children; true: finalize after children are sized.
-    };
-    std::vector<Frame> stack;
-    stack.push_back({root_id, false});
-
-    while (!stack.empty()) {
-        const Frame frame = stack.back();
-        stack.pop_back();
-
-        WorkNode* node = FindNode(state, frame.node_id);
-        if (!node || !node->input)
-            continue;
-
-        if (!frame.ready) {
-            if (node->visit_state == 1) {
-                state.cycle_seen = true;
-                continue;
-            }
-            if (node->visit_state == 2)
-                continue;
-
-            node->visit_state = 1;
-            // Re-visit this node once its children have been processed.
-            stack.push_back({frame.node_id, true});
-            const std::vector<std::string> children = ExistingChildren(state, node->input->group1_children);
-            for (const std::string& child_id : children)
-                stack.push_back({child_id, false});
-            continue;
-        }
-
-        const std::vector<std::string> children = ExistingChildren(state, node->input->group1_children);
-        if (children.empty()) {
-            node->subtree_width = 1;
-        } else {
-            node->subtree_width =
-                std::max(1, ComputeChildrenSpan(state, children, 0, static_cast<int>(children.size())));
-        }
-
-        const int attachment_count = static_cast<int>(ExistingChildren(state, node->input->group2_attachments).size());
-        const bool has_left_attachment = attachment_count > 0;
-        const bool has_right_attachment = attachment_count >= 2;
-        const int own_left = (has_left_attachment && node->subtree_width < 3) ? 1 : 0;
-        const int own_right = (has_right_attachment && node->subtree_width < 3) ? 1 : 0;
-
-        int child_left_overhang = 0;
-        int child_right_overhang = 0;
-        if (!children.empty()) {
-            const WorkNode* first = FindNode(state, children.front());
-            const WorkNode* last = FindNode(state, children.back());
-            child_left_overhang = first ? first->left_overhang : 0;
-            child_right_overhang = last ? last->right_overhang : 0;
-        }
-
-        node->left_overhang = std::max(own_left, child_left_overhang);
-        node->right_overhang = std::max(own_right, child_right_overhang);
-        node->visit_state = 2;
-    }
+std::vector<std::string> ExistingIds(const LayoutState& state, const std::vector<std::string>& ids) {
+    std::vector<std::string> out;
+    for (const std::string& id : ids)
+        if (Find(state, id))
+            out.push_back(id);
+    return out;
 }
 
 std::pair<std::vector<int>, std::vector<int>> DistributeAttachmentSides(int count) {
@@ -151,87 +88,388 @@ std::pair<std::vector<int>, std::vector<int>> DistributeAttachmentSides(int coun
     return {left_indices, right_indices};
 }
 
-void PlaceGroup2Attachments(LayoutState& state, const WorkNode& node, double column, int row) {
-    const std::vector<std::string> attachments = ExistingChildren(state, node.input->group2_attachments);
-    if (attachments.empty())
-        return;
+// ===== Contour operations =====
 
-    auto [left_indices, right_indices] = DistributeAttachmentSides(static_cast<int>(attachments.size()));
-    for (int stack_pos = 0; stack_pos < static_cast<int>(left_indices.size()); ++stack_pos) {
-        state.placements.push_back({attachments[left_indices[stack_pos]], column - 1.0, row, true, true, stack_pos});
-    }
-    for (int stack_pos = 0; stack_pos < static_cast<int>(right_indices.size()); ++stack_pos) {
-        state.placements.push_back({attachments[right_indices[stack_pos]], column + 1.0, row, true, false, stack_pos});
+void MergeInto(Contour& dst, const Contour& src, double dx) {
+    for (const auto& [row, span] : src) {
+        const double lo = span.first + dx;
+        const double hi = span.second + dx;
+        auto it = dst.find(row);
+        if (it == dst.end())
+            dst[row] = {lo, hi};
+        else {
+            it->second.first = std::min(it->second.first, lo);
+            it->second.second = std::max(it->second.second, hi);
+        }
     }
 }
 
-// Iterative pre-order walk producing the same placement order as a depth-first recursion
-// (node, then each child's full subtree in order). An explicit stack avoids overflowing the
-// call stack on deep argument chains. A node stays placement_state == 1 while its descendants
-// are placed so back-references are still reported as cycles, matching the recursive version.
-void AssignGridPositions(LayoutState& state, const std::string& root_id, double root_column, int root_row) {
-    struct Frame {
-        std::string node_id;
-        double column;
-        int row;
-        bool finalize; // true: mark the node fully placed after its subtree is done.
-    };
-    std::vector<Frame> stack;
-    stack.push_back({root_id, root_column, root_row, false});
+double GlobalMax(const Contour& c) {
+    double m = -1e18;
+    for (const auto& [row, span] : c)
+        m = std::max(m, span.second);
+    return m;
+}
+double GlobalMin(const Contour& c) {
+    double m = 1e18;
+    for (const auto& [row, span] : c)
+        m = std::min(m, span.first);
+    return m;
+}
 
+double ContourWidth(const Contour& c) {
+    return c.empty() ? 0.0 : (GlobalMax(c) - GlobalMin(c));
+}
+
+const Contour& ContourOf(LayoutState& state, const std::string& id, double gap);
+
+// Centre offset to place `item` immediately to the right of `base` with `gap`
+// clearance, hugging the base contour row by row.
+double ShiftRightOf(const Contour& base, const Contour& item, double gap) {
+    if (base.empty())
+        return 0.0;
+    double shift = -1e18;
+    bool shared = false;
+    for (const auto& [row, span] : item) {
+        auto it = base.find(row);
+        if (it == base.end())
+            continue;
+        shift = std::max(shift, it->second.second + gap - span.first);
+        shared = true;
+    }
+    if (!shared)
+        shift = GlobalMax(base) + gap - GlobalMin(item);
+    return shift;
+}
+
+// ===== Sub-item categorisation =====
+
+struct SubItems {
+    std::vector<std::string> structural;   // Group1 children + Below challenge roots (a context's
+                                           // below-challenge is its structural child → hangs under it)
+    std::vector<std::string> left_items;   // Left side challenges to this node
+    std::vector<std::string> right_items;  // Right side challenges to this node
+    std::vector<std::string> plain_g2_left;  // all Group2 attachments assigned to the left lane
+    std::vector<std::string> plain_g2_right; // all Group2 attachments assigned to the right lane
+};
+
+SubItems Categorize(LayoutState& state, const NodeLayout& node) {
+    SubItems items;
+    items.structural = ExistingIds(state, node.input->group1_children);
+    for (const ChallengeChild& cc : node.input->challenge_children) {
+        if (cc.side == ChallengeSide::Below && Find(state, cc.root_id))
+            items.structural.push_back(cc.root_id);
+    }
+
+    // All Group2 attachments live in a side lane (stacked). A context that is
+    // itself challenged keeps its challenge as a structural child, so it hangs
+    // directly below the context within the lane — no separate "band".
+    const std::vector<std::string> attachments = ExistingIds(state, node.input->group2_attachments);
+    const auto [left_indices, right_indices] = DistributeAttachmentSides(static_cast<int>(attachments.size()));
+    for (int idx : left_indices)
+        items.plain_g2_left.push_back(attachments[idx]);
+    for (int idx : right_indices)
+        items.plain_g2_right.push_back(attachments[idx]);
+
+    for (const ChallengeChild& cc : node.input->challenge_children) {
+        if (!Find(state, cc.root_id))
+            continue;
+        if (cc.side == ChallengeSide::Left)
+            items.left_items.push_back(cc.root_id);
+        else if (cc.side == ChallengeSide::Right)
+            items.right_items.push_back(cc.root_id);
+    }
+    return items;
+}
+
+// Every node referenced as a sub-item, for post-order discovery.
+std::vector<std::string> AllSubItems(LayoutState& state, const NodeLayout& node) {
+    SubItems items = Categorize(state, node);
+    std::vector<std::string> all = items.structural;
+    all.insert(all.end(), items.left_items.begin(), items.left_items.end());
+    all.insert(all.end(), items.right_items.begin(), items.right_items.end());
+    all.insert(all.end(), items.plain_g2_left.begin(), items.plain_g2_left.end());
+    all.insert(all.end(), items.plain_g2_right.begin(), items.plain_g2_right.end());
+    return all;
+}
+
+// ===== Side-margin depth & subtree heights =====
+
+// Deepest row below a node's own row reached by its side content (contexts at
+// offset 0, side challenges just below same-side contexts). Uses sub-item
+// subtree heights, so call only after ComputeHeights has run for them.
+int SideDepth(LayoutState& state, const NodeLayout& node) {
+    const SubItems items = Categorize(state, node);
+    auto side_of = [&](const std::vector<std::string>& contexts, const std::vector<std::string>& challenges) {
+        int ctx_h = 0;
+        for (const std::string& id : contexts)
+            if (const NodeLayout* n = Find(state, id))
+                ctx_h = std::max(ctx_h, n->subtree_height);
+        int ch_h = 0;
+        for (const std::string& id : challenges)
+            if (const NodeLayout* n = Find(state, id))
+                ch_h = std::max(ch_h, n->subtree_height);
+        const int ch_offset = contexts.empty() ? 0 : 1; // challenges drop below the context stack
+        int depth = 0;
+        if (ctx_h > 0)
+            depth = std::max(depth, ctx_h - 1);
+        if (ch_h > 0)
+            depth = std::max(depth, ch_offset + ch_h - 1);
+        return depth;
+    };
+    return std::max(side_of(items.plain_g2_left, items.left_items),
+                    side_of(items.plain_g2_right, items.right_items));
+}
+
+// Row offset (below the node's row) where the node's structural children begin.
+// Pushed below the side margins so a side challenge tree never has to stretch
+// sideways past the main subtree.
+int ChildStartOffset(LayoutState& state, const NodeLayout& node) {
+    return std::max(1, SideDepth(state, node) + 1);
+}
+
+// Compute subtree_height for every node in a tree (iterative post-order).
+void ComputeHeights(LayoutState& state, const std::string& root_id) {
+    struct Frame {
+        std::string id;
+        bool ready;
+    };
+    std::vector<Frame> stack{{root_id, false}};
     while (!stack.empty()) {
         const Frame frame = stack.back();
         stack.pop_back();
-
-        WorkNode* node = FindNode(state, frame.node_id);
-        if (!node || !node->input)
+        NodeLayout* node = Find(state, frame.id);
+        if (!node)
             continue;
-
-        if (frame.finalize) {
-            node->placement_state = 2;
+        if (!frame.ready) {
+            if (node->height_state == 1) {
+                state.cycle_seen = true;
+                continue;
+            }
+            if (node->height_state == 2)
+                continue;
+            node->height_state = 1;
+            stack.push_back({frame.id, true});
+            for (const std::string& sub : AllSubItems(state, *node))
+                stack.push_back({sub, false});
             continue;
         }
+        if (node->height_state == 2)
+            continue;
 
-        if (node->placement_state == 1) {
+        const SubItems items = Categorize(state, *node);
+        const int side_depth = SideDepth(state, *node);
+        const int child_start = std::max(1, side_depth + 1);
+        int max_child_h = 0;
+        for (const std::string& id : items.structural)
+            if (const NodeLayout* c = Find(state, id))
+                max_child_h = std::max(max_child_h, c->subtree_height);
+        const int structural_depth = (max_child_h > 0) ? (child_start + max_child_h - 1) : 0;
+        node->subtree_height = 1 + std::max(side_depth, structural_depth);
+        node->height_state = 2;
+    }
+}
+
+// ===== Row assignment (top-down) =====
+
+void AssignRows(LayoutState& state, const std::string& root_id) {
+    struct Frame {
+        std::string id;
+        int row;
+    };
+    std::vector<Frame> stack{{root_id, 0}};
+    while (!stack.empty()) {
+        const Frame frame = stack.back();
+        stack.pop_back();
+        NodeLayout* node = Find(state, frame.id);
+        if (!node)
+            continue;
+        if (node->reachable) {
             state.cycle_seen = true;
             continue;
         }
-        if (node->placement_state == 2)
-            continue;
+        node->reachable = true;
+        node->row = frame.row;
 
-        node->placement_state = 1;
-        state.placements.push_back({frame.node_id, frame.column, frame.row, false, false, 0});
-        PlaceGroup2Attachments(state, *node, frame.column, frame.row);
-
-        // Finalize after the whole subtree is placed (keeps placement_state == 1 during the walk).
-        stack.push_back({frame.node_id, frame.column, frame.row, true});
-
-        const std::vector<std::string> children = ExistingChildren(state, node->input->group1_children);
-        if (children.empty())
-            continue;
-
-        const int child_row = frame.row + 1;
-        const double total_width =
-            static_cast<double>(std::max(1, ComputeChildrenSpan(state, children, 0, static_cast<int>(children.size()))));
-        double cursor = frame.column - total_width / 2.0;
-        std::vector<Frame> child_frames;
-        child_frames.reserve(children.size());
-        for (int i = 0; i < static_cast<int>(children.size()); ++i) {
-            const WorkNode* child = FindNode(state, children[i]);
-            if (!child)
+        // Structural children (and Below challenges, which are a context's own
+        // structural child) start below the node's side margins, lengthening the
+        // connecting line when a side challenge is a deep tree.
+        const int child_start = ChildStartOffset(state, *node);
+        for (const std::string& child : ExistingIds(state, node->input->group1_children))
+            stack.push_back({child, frame.row + child_start});
+        const std::vector<std::string> attachments = ExistingIds(state, node->input->group2_attachments);
+        for (const std::string& att : attachments)
+            stack.push_back({att, frame.row}); // contexts beside the host, at its row
+        const auto [left_indices, right_indices] = DistributeAttachmentSides(static_cast<int>(attachments.size()));
+        const bool left_has_context = !left_indices.empty();
+        const bool right_has_context = !right_indices.empty();
+        for (const ChallengeChild& cc : node->input->challenge_children) {
+            if (!Find(state, cc.root_id))
                 continue;
-            if (i > 0) {
-                const WorkNode* previous = FindNode(state, children[i - 1]);
-                if (previous)
-                    cursor += static_cast<double>(previous->right_overhang + child->left_overhang);
-            }
-            const double child_col = cursor + static_cast<double>(child->subtree_width) / 2.0;
-            child_frames.push_back({children[i], child_col, child_row, false});
-            cursor += static_cast<double>(child->subtree_width);
+            int row = frame.row;
+            if (cc.side == ChallengeSide::Below)
+                row = frame.row + child_start; // a context's challenge, as its structural child
+            else if (cc.side == ChallengeSide::Left && left_has_context)
+                row = frame.row + 1; // a side challenge drops just below the context stack
+            else if (cc.side == ChallengeSide::Right && right_has_context)
+                row = frame.row + 1;
+            stack.push_back({cc.root_id, row});
         }
-        // Push in reverse so children are processed (and placed) left-to-right.
-        for (auto it = child_frames.rbegin(); it != child_frames.rend(); ++it)
-            stack.push_back(*it);
+    }
+}
+
+// ===== Contour layout (post-order) =====
+
+// Place a vertical column of Group2 attachments at a fixed lane centre x beside
+// the node. Contexts share the x and are sub-stacked within the host's row by the
+// y pass; a challenged context keeps its challenge as a structural child, so it
+// hangs directly below at the same x (no horizontal collision, because the main
+// subtree is pushed below the side margins).
+void PlaceContextColumn(LayoutState& state,
+                        const NodeLayout& host,
+                        const std::vector<std::string>& column,
+                        double lane_centre_x,
+                        bool is_left) {
+    int stack_index = 0;
+    for (const std::string& id : column) {
+        NodeLayout* a = Find(state, id);
+        if (!a)
+            continue;
+        a->layout_parent = host.input->id;
+        a->offset = lane_centre_x;
+        a->is_group2_plain = true;
+        a->is_left_side = is_left;
+        a->stack_index = stack_index++;
+    }
+}
+
+// Lazily build (and memoize) a node's contour relative to its own centre, from
+// its already-positioned sub-items. Only nodes that participate in a horizontal
+// packing comparison (multi-child parents, side-item hosts, sibling roots) ever
+// get here, so a deep single-child chain builds no contours at all.
+const Contour& ContourOf(LayoutState& state, const std::string& id, double gap) {
+    static const Contour kEmpty;
+    NodeLayout* node = Find(state, id);
+    if (!node || !node->input)
+        return kEmpty;
+    if (node->contour_built)
+        return node->contour;
+    node->contour_built = true; // set first so a cycle returns the (empty) in-progress contour
+
+    Contour c;
+    c[node->row] = {-node->width * 0.5, node->width * 0.5};
+    const SubItems items = Categorize(state, *node);
+    auto merge_all = [&](const std::vector<std::string>& ids) {
+        for (const std::string& sub_id : ids)
+            if (const NodeLayout* sub = Find(state, sub_id))
+                MergeInto(c, ContourOf(state, sub_id, gap), sub->offset);
+    };
+    merge_all(items.structural);
+    merge_all(items.left_items);
+    merge_all(items.right_items);
+    merge_all(items.plain_g2_left);
+    merge_all(items.plain_g2_right);
+
+    node->contour = std::move(c);
+    return node->contour;
+}
+
+// Post-order: compute each node's sub-item offsets (relative to the node centre).
+// Contours are pulled on demand via ContourOf, so the common single-child path is
+// O(1) per node.
+void ComputeOffsets(LayoutState& state, const std::string& root_id, double gap) {
+    struct Frame {
+        std::string id;
+        bool ready;
+    };
+    std::vector<Frame> stack{{root_id, false}};
+    while (!stack.empty()) {
+        const Frame frame = stack.back();
+        stack.pop_back();
+        NodeLayout* node = Find(state, frame.id);
+        if (!node)
+            continue;
+
+        if (!frame.ready) {
+            if (node->visit_state == 1) {
+                state.cycle_seen = true;
+                continue;
+            }
+            if (node->visit_state == 2)
+                continue;
+            node->visit_state = 1;
+            stack.push_back({frame.id, true});
+            for (const std::string& sub : AllSubItems(state, *node))
+                stack.push_back({sub, false});
+            continue;
+        }
+        if (node->visit_state == 2)
+            continue;
+        node->visit_state = 2;
+
+        const SubItems items = Categorize(state, *node);
+
+        // 1. Structural children offsets (centred under the node).
+        if (items.structural.size() == 1) {
+            if (NodeLayout* child = Find(state, items.structural.front())) {
+                child->layout_parent = node->input->id;
+                child->offset = 0.0;
+            }
+        } else if (items.structural.size() > 1) {
+            Contour running;
+            std::vector<double> centres;
+            centres.reserve(items.structural.size());
+            for (const std::string& child_id : items.structural) {
+                const double centre = running.empty() ? 0.0 : ShiftRightOf(running, ContourOf(state, child_id, gap), gap);
+                centres.push_back(centre);
+                MergeInto(running, ContourOf(state, child_id, gap), centre);
+            }
+            const double children_mid = (centres.front() + centres.back()) * 0.5;
+            std::size_t ci = 0;
+            for (const std::string& child_id : items.structural) {
+                NodeLayout* child = Find(state, child_id);
+                const double centre = centres[ci++];
+                if (!child)
+                    continue;
+                child->layout_parent = node->input->id;
+                child->offset = centre - children_mid;
+            }
+        }
+
+        // 2. Side items: each side has ONE lane at a fixed x beside the node box.
+        //    The main subtree is pushed BELOW these margins (see ChildStartOffset
+        //    in AssignRows), so side content never collides with the subtree and
+        //    needs no sideways stretching — it just sits next to the node.
+        const bool has_left = !items.plain_g2_left.empty() || !items.left_items.empty();
+        const bool has_right = !items.plain_g2_right.empty() || !items.right_items.empty();
+        if (!has_left && !has_right)
+            continue;
+
+        auto lane_width = [&](const std::vector<std::string>& a, const std::vector<std::string>& b) {
+            double w = 0.0;
+            for (const std::string& id : a)
+                w = std::max(w, ContourWidth(ContourOf(state, id, gap)));
+            for (const std::string& id : b)
+                w = std::max(w, ContourWidth(ContourOf(state, id, gap)));
+            return w;
+        };
+        const double left_lane_w = lane_width(items.plain_g2_left, items.left_items);
+        const double right_lane_w = lane_width(items.plain_g2_right, items.right_items);
+        const double left_lane_centre = -node->width * 0.5 - gap - left_lane_w * 0.5;
+        const double right_lane_centre = node->width * 0.5 + gap + right_lane_w * 0.5;
+
+        PlaceContextColumn(state, *node, items.plain_g2_left, left_lane_centre, /*is_left=*/true);
+        for (const std::string& id : items.left_items)
+            if (NodeLayout* item = Find(state, id)) {
+                item->layout_parent = node->input->id;
+                item->offset = left_lane_centre;
+            }
+        PlaceContextColumn(state, *node, items.plain_g2_right, right_lane_centre, /*is_left=*/false);
+        for (const std::string& id : items.right_items)
+            if (NodeLayout* item = Find(state, id)) {
+                item->layout_parent = node->input->id;
+                item->offset = right_lane_centre;
+            }
     }
 }
 
@@ -244,28 +482,19 @@ GsnLayoutSize SizeFor(const std::unordered_map<std::string, GsnLayoutSize>& size
     return {options.base_node_width, options.default_node_height};
 }
 
-std::string StackKey(const LayoutState& state, const Placement& placement) {
-    const WorkNode* node = FindNode(state, placement.node_id);
-    const std::string parent_id = node && node->input ? node->input->parent_id : "";
-    return parent_id + "|" + std::to_string(placement.row) + (placement.is_left_side ? "|L" : "|R");
-}
-
 void ShiftIntoPositiveCoordinates(std::vector<GsnLayoutNode>& nodes, const GsnLayoutOptions& options) {
     if (nodes.empty())
         return;
-
     double min_x = nodes.front().x;
     double min_y = nodes.front().y;
     for (const GsnLayoutNode& node : nodes) {
         min_x = std::min(min_x, node.x);
         min_y = std::min(min_y, node.y);
     }
-
     const double dx = min_x < options.margin_x ? options.margin_x - min_x : 0.0;
     const double dy = min_y < options.margin_y ? options.margin_y - min_y : 0.0;
     if (dx == 0.0 && dy == 0.0)
         return;
-
     for (GsnLayoutNode& node : nodes) {
         node.x += dx;
         node.y += dy;
@@ -285,8 +514,12 @@ GsnLayoutGraphResult LayoutGsnGraph(const GsnLayoutInput& input,
             result.warnings.push_back("Layout skipped a node with an empty id.");
             continue;
         }
-        auto inserted = state.nodes.emplace(node.id, WorkNode{&node});
-        if (!inserted.second)
+        NodeLayout nl;
+        nl.input = &node;
+        const GsnLayoutSize size = SizeFor(node_sizes, options, node.id);
+        nl.width = size.width;
+        nl.height = size.height;
+        if (!state.nodes.emplace(node.id, nl).second)
             result.warnings.push_back("Layout skipped duplicate node id '" + node.id + "'.");
     }
 
@@ -294,100 +527,152 @@ GsnLayoutGraphResult LayoutGsnGraph(const GsnLayoutInput& input,
     if (roots.empty() && !input.nodes.empty())
         roots.push_back(input.nodes.front().id);
 
-    std::unordered_set<std::string> scheduled_roots;
-    double next_root_column = 0.0;
-    auto schedule_root = [&](const std::string& root_id) {
-        WorkNode* root = FindNode(state, root_id);
-        if (!root || scheduled_roots.count(root_id) > 0)
-            return;
-        ComputeSubtreeInfo(state, root_id);
-        const double root_column = next_root_column + static_cast<double>(std::max(1, root->subtree_width)) / 2.0;
-        AssignGridPositions(state, root_id, root_column, 0);
-        next_root_column += static_cast<double>(std::max(1, root->subtree_width)) + 1.0;
-        scheduled_roots.insert(root_id);
-    };
+    const double gap = options.horizontal_spacing;
 
-    for (const std::string& root_id : roots)
-        schedule_root(root_id);
-    for (const std::string& orphan_id : input.orphans)
-        schedule_root(orphan_id);
+    // Assign rows and compute each tree's contour.
+    std::vector<std::string> ordered_roots;
+    auto schedule = [&](const std::string& id) {
+        NodeLayout* node = Find(state, id);
+        if (!node || node->reachable) // already laid out as part of another tree
+            return;
+        ComputeHeights(state, id);    // subtree heights drive the children push-down
+        AssignRows(state, id);        // marks this whole tree reachable
+        ComputeOffsets(state, id, gap);
+        ordered_roots.push_back(id);
+    };
+    for (const std::string& id : roots)
+        schedule(id);
+    for (const std::string& id : input.orphans)
+        schedule(id);
+    // Defensive: lay out any still-unreached node as its own root.
+    for (const GsnLayoutInputNode& node : input.nodes)
+        schedule(node.id);
+
+    // Pack the roots/orphans left -> right by contour and set their base centres.
+    Contour forest;
+    for (std::size_t i = 0; i < ordered_roots.size(); ++i) {
+        NodeLayout* root = Find(state, ordered_roots[i]);
+        if (!root)
+            continue;
+        const double centre = forest.empty() ? 0.0 : ShiftRightOf(forest, ContourOf(state, ordered_roots[i], gap), gap);
+        root->layout_parent.clear();
+        root->offset = centre;
+        if (i + 1 < ordered_roots.size()) // contour only needed to pack the next root
+            MergeInto(forest, ContourOf(state, ordered_roots[i], gap), centre);
+    }
 
     if (state.cycle_seen)
         result.warnings.push_back("Layout detected a cycle and used a best-effort traversal.");
 
-    int max_row = 0;
-    for (const Placement& placement : state.placements)
-        max_row = std::max(max_row, placement.row);
+    // Accumulate absolute centre x by walking the layout-parent tree.
+    std::unordered_map<std::string, std::vector<std::string>> layout_children;
+    for (const auto& [id, nl] : state.nodes)
+        if (!nl.layout_parent.empty())
+            layout_children[nl.layout_parent].push_back(id);
 
-    std::unordered_map<std::string, GsnLayoutSize> resolved_sizes;
-    std::unordered_map<std::string, double> group2_stack_offsets;
-    std::unordered_map<std::string, double> group2_stack_heights;
-    std::unordered_map<int, double> row_group2_stack_height;
-    std::vector<double> row_max_height(static_cast<size_t>(max_row + 1), options.default_node_height);
-    double max_node_width = options.base_node_width;
-
-    for (const Placement& placement : state.placements) {
-        const GsnLayoutSize size = SizeFor(node_sizes, options, placement.node_id);
-        resolved_sizes[placement.node_id] = size;
-        max_node_width = std::max(max_node_width, size.width);
-        if (!placement.is_group2) {
-            row_max_height[static_cast<size_t>(placement.row)] =
-                std::max(row_max_height[static_cast<size_t>(placement.row)], size.height);
-        } else {
-            const std::string key = StackKey(state, placement);
-            double& stack_height = group2_stack_heights[key];
-            if (stack_height > 0.0)
-                stack_height += options.side_stack_gap;
-            group2_stack_offsets[placement.node_id] = stack_height;
-            stack_height += size.height;
-
-            double& row_stack_height = row_group2_stack_height[placement.row];
-            row_stack_height = std::max(row_stack_height, stack_height);
+    std::unordered_map<std::string, double> abs_center;
+    std::vector<std::string> queue = ordered_roots;
+    for (const std::string& id : ordered_roots)
+        if (const NodeLayout* r = Find(state, id))
+            abs_center[id] = r->offset;
+    for (std::size_t head = 0; head < queue.size(); ++head) {
+        const std::string id = queue[head];
+        const double base = abs_center[id];
+        for (const std::string& child : layout_children[id]) {
+            const NodeLayout* c = Find(state, child);
+            if (!c)
+                continue;
+            abs_center[child] = base + c->offset;
+            queue.push_back(child);
         }
     }
 
-    std::vector<double> row_y(static_cast<size_t>(max_row + 1), 0.0);
-    std::vector<double> row_heights(static_cast<size_t>(max_row + 1), options.default_node_height);
+    // ===== Rows -> y, with Group2 vertical stacking, then emit nodes =====
+    int max_row = 0;
+    for (const auto& [id, nl] : state.nodes)
+        if (abs_center.count(id))
+            max_row = std::max(max_row, nl.row);
+
+    std::vector<double> row_max_height(static_cast<std::size_t>(max_row + 1), options.default_node_height);
+    std::unordered_map<std::string, double> g2_stack_height; // key -> running height
+    std::unordered_map<std::string, double> g2_stack_offset; // node id -> y offset within stack
+    std::unordered_map<int, double> row_g2_stack_height;
+
+    auto stack_key = [](const NodeLayout& nl) {
+        return nl.layout_parent + "|" + std::to_string(nl.row) + (nl.is_left_side ? "|L" : "|R");
+    };
+
+    // Plain Group2 stacked in stack_index order per key.
+    std::vector<const NodeLayout*> g2_nodes;
+    for (const auto& [id, nl] : state.nodes) {
+        if (!abs_center.count(id))
+            continue;
+        if (nl.is_group2_plain)
+            g2_nodes.push_back(&nl);
+        else
+            row_max_height[static_cast<std::size_t>(nl.row)] =
+                std::max(row_max_height[static_cast<std::size_t>(nl.row)], nl.height);
+    }
+    std::sort(g2_nodes.begin(), g2_nodes.end(), [&](const NodeLayout* a, const NodeLayout* b) {
+        if (a->layout_parent != b->layout_parent)
+            return a->layout_parent < b->layout_parent;
+        if (a->row != b->row)
+            return a->row < b->row;
+        if (a->is_left_side != b->is_left_side)
+            return a->is_left_side && !b->is_left_side;
+        return a->stack_index < b->stack_index;
+    });
+    for (const NodeLayout* nl : g2_nodes) {
+        const std::string key = stack_key(*nl);
+        double& height = g2_stack_height[key];
+        if (height > 0.0)
+            height += options.side_stack_gap;
+        g2_stack_offset[nl->input->id] = height;
+        height += nl->height;
+        double& row_h = row_g2_stack_height[nl->row];
+        row_h = std::max(row_h, height);
+    }
+
+    std::vector<double> row_y(static_cast<std::size_t>(max_row + 1), 0.0);
+    std::vector<double> row_heights(static_cast<std::size_t>(max_row + 1), options.default_node_height);
     double cumulative_y = options.margin_y;
     for (int row = 0; row <= max_row; ++row) {
-        row_y[static_cast<size_t>(row)] = cumulative_y;
-        const auto stack_it = row_group2_stack_height.find(row);
-        const double group2_height = stack_it != row_group2_stack_height.end() ? stack_it->second : 0.0;
-        row_heights[static_cast<size_t>(row)] = std::max(row_max_height[static_cast<size_t>(row)], group2_height);
-        cumulative_y += row_heights[static_cast<size_t>(row)] + options.vertical_spacing;
+        row_y[static_cast<std::size_t>(row)] = cumulative_y;
+        const auto it = row_g2_stack_height.find(row);
+        const double g2h = it != row_g2_stack_height.end() ? it->second : 0.0;
+        row_heights[static_cast<std::size_t>(row)] = std::max(row_max_height[static_cast<std::size_t>(row)], g2h);
+        cumulative_y += row_heights[static_cast<std::size_t>(row)] + options.vertical_spacing;
     }
 
-    const double column_unit = max_node_width + options.horizontal_spacing;
-    for (const Placement& placement : state.placements) {
-        const WorkNode* work_node = FindNode(state, placement.node_id);
-        if (!work_node || !work_node->input)
+    for (const auto& [id, nl] : state.nodes) {
+        auto center_it = abs_center.find(id);
+        if (center_it == abs_center.end() || !nl.input)
             continue;
-        const GsnLayoutSize size = SizeFor(resolved_sizes, options, placement.node_id);
-        const double row_height = row_heights[static_cast<size_t>(placement.row)];
+        const double row_height = row_heights[static_cast<std::size_t>(nl.row)];
 
-        GsnLayoutNode node;
-        node.id = work_node->input->id;
-        node.role = work_node->input->role;
-        node.group = work_node->input->group;
-        node.label = work_node->input->label;
-        node.label_secondary = work_node->input->label_secondary;
-        node.undeveloped = work_node->input->undeveloped;
-        node.parent_id = work_node->input->parent_id;
-        node.width = size.width;
-        node.height = size.height;
-        node.side_stack_index = placement.stack_index;
-        node.is_left_side = placement.is_left_side;
-        node.x = options.margin_x + placement.column * column_unit + (max_node_width - node.width) * 0.5;
-        node.y = row_y[static_cast<size_t>(placement.row)] + std::max(0.0, (row_height - node.height) * 0.5);
+        GsnLayoutNode out;
+        out.id = nl.input->id;
+        out.role = nl.input->role;
+        out.group = nl.input->group;
+        out.label = nl.input->label;
+        out.label_secondary = nl.input->label_secondary;
+        out.undeveloped = nl.input->undeveloped;
+        out.parent_id = nl.input->parent_id;
+        out.width = nl.width;
+        out.height = nl.height;
+        out.side_stack_index = nl.stack_index;
+        out.is_left_side = nl.is_left_side;
+        out.x = center_it->second - nl.width * 0.5;
 
-        if (placement.is_group2) {
-            const std::string stack_key = StackKey(state, placement);
-            const double stack_height = group2_stack_heights[stack_key];
-            node.y = row_y[static_cast<size_t>(placement.row)] + std::max(0.0, (row_height - stack_height) * 0.5) +
-                     group2_stack_offsets[placement.node_id];
+        if (nl.is_group2_plain) {
+            const std::string key = stack_key(nl);
+            const double stack_height = g2_stack_height[key];
+            out.y = row_y[static_cast<std::size_t>(nl.row)] + std::max(0.0, (row_height - stack_height) * 0.5) +
+                    g2_stack_offset[nl.input->id];
+        } else {
+            out.y = row_y[static_cast<std::size_t>(nl.row)] + std::max(0.0, (row_height - nl.height) * 0.5);
         }
-
-        result.nodes.push_back(std::move(node));
+        result.nodes.push_back(std::move(out));
     }
 
     ShiftIntoPositiveCoordinates(result.nodes, options);

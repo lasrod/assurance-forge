@@ -221,6 +221,13 @@ void DrawGsnNode(const GsnNode& node,
         } else {
             DrawRoundedRect(draw_list, top_left, bottom_right, fill_color, zoom);
         }
+
+        // GSN v3 dialectic counter elements: a dashed border + warning badge
+        // (color-independent cues) mark a raised challenge to be resolved.
+        if (node.is_counter) {
+            const bool circular = (node.type == "Solution" || node.type == "Evidence");
+            DrawCounterChallengeDecoration(draw_list, top_left, bottom_right, circular, zoom);
+        }
     }
 
     // Draw label text

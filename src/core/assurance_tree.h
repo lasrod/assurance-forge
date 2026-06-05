@@ -15,6 +15,13 @@ enum class ElementGroup {
 
 enum class NodeRole { Claim, Strategy, Solution, Context, Assumption, Justification, Other };
 
+// Where a dialectic challenge cluster is placed relative to its host node.
+enum class ChallengeSide {
+    Left,  // beside the host, to the left; the cluster grows downward
+    Right, // beside the host, to the right; the cluster grows downward
+    Below, // directly below the host (used for challenges to references)
+};
+
 struct TreeNode {
     std::string id;
     std::string label;
@@ -28,14 +35,29 @@ struct TreeNode {
     TreeNode* parent = nullptr;
 
     // GSN v3 dialectic: when true, this node is the source of a Challenges
-    // relationship (a counter argument / counter evidence). Its connecting edge
-    // renders as a dashed open-arrow challenge edge rather than ordinary support.
+    // relationship (a counter argument / counter evidence) and the root of its
+    // own layout cluster (it is not wired into the anchor's children, so it can
+    // carry its own sub-argument). Its connecting edge renders as a dashed
+    // open-arrow challenge edge rather than ordinary support.
     bool is_counter_source = false;
     // Id of the challenged target. When `challenge_target_is_relationship`, the
-    // target is a relationship element (no tree node) and the edge anchors to
-    // that relationship's midpoint; otherwise it is the parent element body.
+    // target is a relationship element (no tree node); otherwise it is an element.
     std::string challenge_target_id;
     bool challenge_target_is_relationship = false;
+    // Id of this counter's own Challenges relationship (the dashed arrow). Lets
+    // the arrow itself be challenged (challenge-of-a-challenge).
+    std::string challenge_relationship_id;
+    // How/where this counter's cluster is placed relative to its host (the
+    // challenged element, or the anchor element for a relationship target).
+    ChallengeSide challenge_side = ChallengeSide::Right;
+    // Element the cluster is placed near (the target element, or, for a
+    // relationship target, the element it was resolved to). Used by layout.
+    std::string challenge_anchor_id;
+    // For a relationship target: the two element endpoints of the challenged
+    // relationship, used to derive the arrow orientation so the counter can be
+    // placed perpendicular to it. Empty for element targets.
+    std::string challenge_rel_a;
+    std::string challenge_rel_b;
 
     // Layout scratch fields (filled by layout engine)
     int subtree_width = 1;

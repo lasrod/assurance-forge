@@ -44,6 +44,10 @@ struct LayoutNode {
     bool is_counter_source = false;
     std::string challenge_target_id;
     bool challenge_target_is_relationship = false;
+    std::string challenge_relationship_id;
+    std::string challenge_anchor_id;
+    std::string challenge_rel_a;
+    std::string challenge_rel_b;
 };
 
 } // namespace ui::gsn
