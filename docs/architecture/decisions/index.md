@@ -1,0 +1,48 @@
+# Architecture Decisions
+
+This section records the significant architectural decisions made for Assurance
+Forge as **Architecture Decision Records (ADRs)**.
+
+An ADR captures a single decision: the context that forced it, the choice that
+was made, and the consequences accepted as a result. It documents *why* the
+codebase looks the way it does — the reasoning that the source code and the
+current-state architecture docs cannot express on their own.
+
+We use the lightweight [Michael Nygard
+format](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions):
+**Title, Status, Context, Decision, Consequences**.
+
+## Lifecycle
+
+An ADR moves through these statuses:
+
+| Status | Meaning |
+| --- | --- |
+| `Proposed` | Under discussion; not yet agreed. |
+| `Accepted` | Agreed and in effect. |
+| `Superseded` | Replaced by a later ADR. Note it as `Superseded by ADR-NNNN`. |
+| `Deprecated` | No longer relevant, but kept for the historical record. |
+
+ADRs are **append-only**. Once an ADR is `Accepted`, do not rewrite it. To change
+a decision, write a *new* ADR that supersedes it and update the old ADR's status
+to point at the replacement. This keeps the decision history intact.
+
+## Adding an ADR
+
+1. Copy [`adr-template.md`](adr-template.md).
+2. Name it with the next number and a kebab-case title, e.g.
+   `0006-use-x-for-y.md`.
+3. Fill in Context, Decision, and Consequences. Set the status (usually
+   `Proposed` while in review, `Accepted` once merged).
+4. Add it to the table below and to the `Architecture → Decisions (ADRs)` nav in
+   `mkdocs.yml`.
+
+## Records
+
+| ADR | Title | Status |
+| --- | --- | --- |
+| [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
+| [0002](0002-layered-architecture-with-build-time-gates.md) | Layered architecture with build-time gates | Accepted |
+| [0003](0003-sacm-xml-as-source-of-truth.md) | SACM XML as the source of truth | Accepted |
+| [0004](0004-mkdocs-material-documentation-site.md) | MkDocs Material documentation site | Accepted |
+| [0005](0005-provider-agnostic-ai-with-user-consent.md) | Provider-agnostic AI with explicit user consent | Accepted |

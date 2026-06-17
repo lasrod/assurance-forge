@@ -42,6 +42,16 @@ When contributing, aim to:
 
 ---
 
+### Architecture Decisions
+
+Significant or hard-to-reverse architectural changes should be accompanied by an
+Architecture Decision Record (ADR) in [`docs/architecture/decisions/`](docs/architecture/decisions/index.md).
+Copy [`adr-template.md`](docs/architecture/decisions/adr-template.md), take the
+next number, and capture the context, the decision, and the consequences. This
+keeps the *why* behind the architecture discoverable alongside the *what*.
+
+---
+
 ### Scope Awareness
 
 Assurance Forge is not a general-purpose diagram editor.

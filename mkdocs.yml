@@ -71,6 +71,14 @@ nav:
       - Controllers: architecture/controllers.md
       - Project Storage: architecture/project-storage.md
       - Review and AI: architecture/review-ai.md
+      - Decisions (ADRs):
+          - Overview: architecture/decisions/index.md
+          - ADR Template: architecture/decisions/adr-template.md
+          - 0001 Record architecture decisions: architecture/decisions/0001-record-architecture-decisions.md
+          - 0002 Layered architecture with build-time gates: architecture/decisions/0002-layered-architecture-with-build-time-gates.md
+          - 0003 SACM XML as the source of truth: architecture/decisions/0003-sacm-xml-as-source-of-truth.md
+          - 0004 MkDocs Material documentation site: architecture/decisions/0004-mkdocs-material-documentation-site.md
+          - 0005 Provider-agnostic AI with explicit user consent: architecture/decisions/0005-provider-agnostic-ai-with-user-consent.md
       - Generated Class Diagrams: architecture/generated-class-diagrams.md
   - Developer Guide:
       - Overview: developer-guide/index.md

@@ -2,6 +2,11 @@
 
 Assurance Forge is a C++ Dear ImGui desktop application for loading, editing, reviewing, and saving SACM assurance cases.
 
+!!! tip "Why is it built this way?"
+    The pages in this section describe the *current* component layout and data
+    flow. For the *reasoning* behind the major architectural choices — and the
+    trade-offs accepted — see the [Architecture Decision Records](decisions/index.md).
+
 The application keeps three model shapes in use:
 
 | Model | Owner | Purpose |
