@@ -910,6 +910,97 @@ TEST(DialecticChallengeLayout, ContextAvoidsHostChallengeLane) {
     ExpectNoOverlaps(layout);
 }
 
+TEST(DialecticChallengeLayout, TallChallengeSitsAloneOppositeContexts) {
+    ScopedImGuiFrame frame;
+    // Height-balanced lanes: a tall challenge cluster (challenge + a two-deep
+    // child chain, height 3) opposite exactly 3 single-row contexts. The contexts
+    // should fill the free lane until its height matches the challenge — i.e. all
+    // three land on the side opposite the (alone) challenge.
+    MiniCase mini;
+    AddClaim(mini, "G1");
+    for (int i = 1; i <= 3; ++i) {
+        const std::string c = "C" + std::to_string(i);
+        AddArtifactReference(mini, c);
+        AddContextLink(mini, "CTX" + std::to_string(i), "G1", c);
+    }
+    std::string cg, rel, err;
+    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "G1"},
+                                   core::ChallengeSourceType::CounterArgument, cg, rel, err))
+        << err;
+    std::string child1, child2, r1, r2, e1, e2;
+    ASSERT_TRUE(core::AddChildElement(mini.model, &mini.package, cg, core::NewElementKind::Goal, child1, r1, e1)) << e1;
+    ASSERT_TRUE(core::AddChildElement(mini.model, &mini.package, child1, core::NewElementKind::Goal, child2, r2, e2))
+        << e2;
+
+    const auto layout = LayoutOf(mini.model);
+    const ui::gsn::LayoutNode* g1 = FindLayout(layout, "G1");
+    const ui::gsn::LayoutNode* counter = FindLayout(layout, cg);
+    ASSERT_NE(g1, nullptr);
+    ASSERT_NE(counter, nullptr);
+    const float g1_cx = g1->position.x + g1->size.x * 0.5f;
+    const float counter_cx = counter->position.x + counter->size.x * 0.5f;
+
+    for (int i = 1; i <= 3; ++i) {
+        const ui::gsn::LayoutNode* c = FindLayout(layout, "C" + std::to_string(i));
+        ASSERT_NE(c, nullptr);
+        const float c_cx = c->position.x + c->size.x * 0.5f;
+        EXPECT_LT((c_cx - g1_cx) * (counter_cx - g1_cx), 0.0f)
+            << "C" << i << " should sit opposite the tall challenge cluster";
+    }
+    ExpectNoOverlaps(layout);
+}
+
+TEST(DialecticChallengeLayout, HeightBalancedContextsUseBothLanes) {
+    ScopedImGuiFrame frame;
+    // When the contexts out-height the challenge, the balancer fills the free lane
+    // first and only then doubles up on the challenge's lane. With a height-2
+    // challenge and 4 contexts, contexts end up on BOTH sides; the one sharing the
+    // challenge's lane stacks ABOVE the challenge (at the host row) in one column,
+    // so the challenge edge stays clear.
+    MiniCase mini;
+    AddClaim(mini, "G1");
+    for (int i = 1; i <= 4; ++i) {
+        const std::string c = "C" + std::to_string(i);
+        AddArtifactReference(mini, c);
+        AddContextLink(mini, "CTX" + std::to_string(i), "G1", c);
+    }
+    std::string cg, rel, err;
+    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "G1"},
+                                   core::ChallengeSourceType::CounterArgument, cg, rel, err))
+        << err;
+    std::string child, rc, ec;
+    ASSERT_TRUE(core::AddChildElement(mini.model, &mini.package, cg, core::NewElementKind::Goal, child, rc, ec)) << ec;
+
+    const auto layout = LayoutOf(mini.model);
+    const ui::gsn::LayoutNode* g1 = FindLayout(layout, "G1");
+    const ui::gsn::LayoutNode* counter = FindLayout(layout, cg);
+    ASSERT_NE(g1, nullptr);
+    ASSERT_NE(counter, nullptr);
+    const float g1_cx = g1->position.x + g1->size.x * 0.5f;
+    const float counter_cx = counter->position.x + counter->size.x * 0.5f;
+
+    int left_contexts = 0;
+    int right_contexts = 0;
+    for (int i = 1; i <= 4; ++i) {
+        const ui::gsn::LayoutNode* c = FindLayout(layout, "C" + std::to_string(i));
+        ASSERT_NE(c, nullptr);
+        const float c_cx = c->position.x + c->size.x * 0.5f;
+        if (c_cx < g1_cx)
+            ++left_contexts;
+        else
+            ++right_contexts;
+        // A context sharing the challenge's lane must sit above it (host row), so
+        // the challenge edge fanning up to the host never crosses the context.
+        const bool same_side_as_challenge = (c_cx - g1_cx) * (counter_cx - g1_cx) > 0.0f;
+        if (same_side_as_challenge)
+            EXPECT_LT(c->position.y, counter->position.y)
+                << "C" << i << " shares the challenge lane and must stack above the challenge";
+    }
+    EXPECT_GT(left_contexts, 0) << "contexts should be balanced across both lanes";
+    EXPECT_GT(right_contexts, 0) << "contexts should be balanced across both lanes";
+    ExpectNoOverlaps(layout);
+}
+
 TEST(DialecticChallengeLayout, ChallengesToTwoSameSideContextsDoNotOverlap) {
     ScopedImGuiFrame frame;
     // Same hazard for contexts: two contexts in one lane, each challenged below,

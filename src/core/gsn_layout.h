@@ -19,7 +19,7 @@ struct GsnLayoutSize {
 // root of its own sub-argument, which lives in the input as ordinary nodes).
 struct ChallengeChild {
     std::string root_id;
-    ChallengeSide side = ChallengeSide::Right;
+    ChallengeSide side = ChallengeSide::Side;
 };
 
 struct GsnLayoutInputNode {
