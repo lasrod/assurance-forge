@@ -153,29 +153,53 @@ struct SubItems {
 SubItems Categorize(LayoutState& state, const NodeLayout& node) {
     SubItems items;
     items.structural = ExistingIds(state, node.input->group1_children);
+
+    // Collect the host's own side challenges first, so we know which lanes are
+    // occupied before distributing the Group2 attachments. A Below challenge is a
+    // context's own challenge and hangs as its structural child, not in a lane.
+    bool has_left_challenge = false;
+    bool has_right_challenge = false;
     for (const ChallengeChild& cc : node.input->challenge_children) {
-        if (cc.side == ChallengeSide::Below && Find(state, cc.root_id))
+        if (!Find(state, cc.root_id))
+            continue;
+        switch (cc.side) {
+        case ChallengeSide::Below:
             items.structural.push_back(cc.root_id);
+            break;
+        case ChallengeSide::Left:
+            items.left_items.push_back(cc.root_id);
+            has_left_challenge = true;
+            break;
+        case ChallengeSide::Right:
+            items.right_items.push_back(cc.root_id);
+            has_right_challenge = true;
+            break;
+        }
     }
 
-    // All Group2 attachments live in a side lane (stacked). A context that is
-    // itself challenged keeps its challenge as a structural child, so it hangs
-    // directly below the context within the lane — no separate "band".
+    // All Group2 attachments live in a side lane (stacked). A challenge to the host
+    // sits OUTSIDE the attachment column in the same lane, so its challenge edge to
+    // the host would cross any attachment placed between them. When challenges
+    // occupy exactly one lane, steer every attachment to the other (free) lane so a
+    // context never overlaps a challenge edge. With challenges on both lanes (or
+    // neither) fall back to the balanced left/right split.
     const std::vector<std::string> attachments = ExistingIds(state, node.input->group2_attachments);
-    const auto [left_indices, right_indices] = DistributeAttachmentSides(static_cast<int>(attachments.size()));
+    std::vector<int> left_indices;
+    std::vector<int> right_indices;
+    if (!attachments.empty() && has_left_challenge != has_right_challenge) {
+        std::vector<int>& free_lane = has_left_challenge ? right_indices : left_indices;
+        for (int i = 0; i < static_cast<int>(attachments.size()); ++i)
+            free_lane.push_back(i);
+    } else {
+        const auto split = DistributeAttachmentSides(static_cast<int>(attachments.size()));
+        left_indices = split.first;
+        right_indices = split.second;
+    }
     for (int idx : left_indices)
         items.plain_g2_left.push_back(attachments[idx]);
     for (int idx : right_indices)
         items.plain_g2_right.push_back(attachments[idx]);
 
-    for (const ChallengeChild& cc : node.input->challenge_children) {
-        if (!Find(state, cc.root_id))
-            continue;
-        if (cc.side == ChallengeSide::Left)
-            items.left_items.push_back(cc.root_id);
-        else if (cc.side == ChallengeSide::Right)
-            items.right_items.push_back(cc.root_id);
-    }
     return items;
 }
 

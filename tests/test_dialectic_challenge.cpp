@@ -876,6 +876,40 @@ TEST(DialecticChallengeLayout, ChallengesToTwoSameSideAssumptionsDoNotOverlap) {
     ExpectNoOverlaps(LayoutOf(mini.model));
 }
 
+TEST(DialecticChallengeLayout, ContextAvoidsHostChallengeLane) {
+    ScopedImGuiFrame frame;
+    // Regression: a node challenged on one side, with a context attached to the
+    // SAME node, used to drop the context into the challenge's lane — between the
+    // challenge cluster and the host — so the context overlapped the challenge
+    // edge. The context must move to the opposite (free) lane.
+    MiniCase mini;
+    AddClaim(mini, "G1");
+    AddStrategy(mini, "S1");
+    AddInference(mini, "INF_S", "G1", "", "S1"); // strategy under the root goal
+    AddArtifactReference(mini, "C13");
+    AddContextLink(mini, "CTX", "S1", "C13"); // context attached to the strategy
+    std::string cg, rel, err;
+    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "S1"},
+                                   core::ChallengeSourceType::CounterArgument, cg, rel, err))
+        << err;
+
+    const auto layout = LayoutOf(mini.model);
+    const ui::gsn::LayoutNode* s1 = FindLayout(layout, "S1");
+    const ui::gsn::LayoutNode* c13 = FindLayout(layout, "C13");
+    const ui::gsn::LayoutNode* counter = FindLayout(layout, cg);
+    ASSERT_NE(s1, nullptr);
+    ASSERT_NE(c13, nullptr);
+    ASSERT_NE(counter, nullptr);
+
+    // The context and the challenge sit on opposite sides of the host.
+    const float s1_cx = s1->position.x + s1->size.x * 0.5f;
+    const float c13_cx = c13->position.x + c13->size.x * 0.5f;
+    const float counter_cx = counter->position.x + counter->size.x * 0.5f;
+    EXPECT_LT((c13_cx - s1_cx) * (counter_cx - s1_cx), 0.0f)
+        << "context and challenge should be on opposite sides of the host";
+    ExpectNoOverlaps(layout);
+}
+
 TEST(DialecticChallengeLayout, ChallengesToTwoSameSideContextsDoNotOverlap) {
     ScopedImGuiFrame frame;
     // Same hazard for contexts: two contexts in one lane, each challenged below,
