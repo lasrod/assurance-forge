@@ -248,6 +248,7 @@ void GsnCanvas::Render(UiState& ui_state,
     // targets a relationship anchors its arrow at this midpoint (the same point
     // the ACP decorator uses), rather than at an element body.
     std::unordered_map<std::string, ImVec2> relationship_midpoint;
+    std::unordered_map<std::string, bool> relationship_midpoint_primary; // chosen edge is the primary one
     for (const auto& child_node : layout_nodes_) {
         if (child_node.parent_id.empty() || child_node.is_counter_source)
             continue;
@@ -264,7 +265,19 @@ void GsnCanvas::Render(UiState& ui_state,
             ComputeGroup2Endpoints(parent_node, child_node, origin, zoom, a, b);
         else
             ComputeGroup1Endpoints(parent_node, child_node, origin, zoom, a, b);
-        relationship_midpoint[target_it->second->relationship_id] = ImVec2((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
+        // A relationship rendered as several edges (e.g. an inference with a
+        // reasoning strategy: parent->strategy plus strategy->child) maps every
+        // edge to the SAME relationship id. Anchor a relationship-targeted
+        // challenge deterministically: keep the first edge seen, but let the
+        // primary edge (the labelled relationship edge, not a strategy-child edge)
+        // win so the arrow lands on a stable point regardless of iteration order.
+        const std::string& rel_id = target_it->second->relationship_id;
+        const bool primary = !target_it->second->strategy_child_edge;
+        const bool seen = relationship_midpoint.count(rel_id) != 0;
+        if (!seen || (primary && !relationship_midpoint_primary[rel_id])) {
+            relationship_midpoint[rel_id] = ImVec2((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
+            relationship_midpoint_primary[rel_id] = primary;
+        }
     }
 
     // Draw edges first (beneath nodes)

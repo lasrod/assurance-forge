@@ -254,14 +254,14 @@ void DrawUndevelopedMarker(
 // Draw dashes along a (optionally closed) polyline with a continuous on/off
 // phase carried across segment boundaries, so curves approximated by many short
 // segments still dash evenly.
-void DrawDashedPath(ImDrawList* draw_list,
-                    const ImVec2* points,
-                    int count,
-                    bool closed,
-                    ImU32 color,
-                    float thickness,
-                    float dash_on,
-                    float dash_off) {
+static void DrawDashedPath(ImDrawList* draw_list,
+                           const ImVec2* points,
+                           int count,
+                           bool closed,
+                           ImU32 color,
+                           float thickness,
+                           float dash_on,
+                           float dash_off) {
     if (count < 2 || dash_on <= 0.0f || dash_off <= 0.0f)
         return;
     const int segments = closed ? count : count - 1;
@@ -299,7 +299,7 @@ void DrawDashedPath(ImDrawList* draw_list,
 // Warning "!" badge: a filled triangle with a dark exclamation mark, pinned over
 // the node's top-left corner. The triangle shape is the primary (color-blind
 // safe) cue; its amber fill is only a secondary aid for color-sighted users.
-void DrawCounterWarningBadge(ImDrawList* draw_list, ImVec2 top_left, float zoom) {
+static void DrawCounterWarningBadge(ImDrawList* draw_list, ImVec2 top_left, float zoom) {
     const float scale = DpiScale() * zoom;
     const float size = 20.0f * scale; // triangle base width / height
     const float half = size * 0.5f;

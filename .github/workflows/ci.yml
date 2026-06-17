@@ -18,7 +18,9 @@ jobs:
         include:
           - name: Windows
             os: windows-latest
-            configure: cmake -B build -G "Visual Studio 17 2022" -A x64
+            # Let CMake pick the newest Visual Studio installed on the runner
+            # rather than pinning a version — windows-latest's VS rolls forward.
+            configure: cmake -B build -A x64
             build: cmake --build build --config Debug
             test: ctest --test-dir build -C Debug --output-on-failure --no-tests=error
           - name: Linux
