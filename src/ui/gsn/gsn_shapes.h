@@ -30,4 +30,13 @@ void DrawUndevelopedMarker(
 // Pulsing outline drawn around nodes that are inside the active review scope.
 void DrawReviewScopeHighlight(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, float zoom, bool primary);
 
+// Mark a GSN v3 dialectic counter element (counter argument / counter evidence)
+// as a raised challenge that needs resolving. Uses color-independent cues so it
+// is distinguishable regardless of color vision: a bold dashed border hugging
+// the shape plus a warning ("!") badge pinned to the node's top-left corner.
+// `circular` traces the dashed border around the inscribed circle for round
+// Solution/Evidence shapes, otherwise around the rounded rectangle.
+void DrawCounterChallengeDecoration(
+    ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, bool circular, float zoom);
+
 } // namespace ui::gsn

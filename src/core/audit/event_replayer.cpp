@@ -83,6 +83,41 @@ bool ApplyEvent(ReplayState& state,
         return true;
     }
 
+    if (type == "CreateChallenge") {
+        std::string target_id, target_kind_token, source_type_token, element_id, relationship_id;
+        if (!require_string("target_id", target_id))
+            return false;
+        if (!require_string("target_kind", target_kind_token))
+            return false;
+        if (!require_string("source_type", source_type_token))
+            return false;
+        if (!require_string("generated_id", element_id))
+            return false;
+        if (!require_string("generated_relationship_id", relationship_id))
+            return false;
+        core::ArgumentTarget::Kind target_kind;
+        if (!commands::ArgumentTargetKindFromToken(target_kind_token, target_kind)) {
+            out_error = "Unknown target kind token '" + target_kind_token + "' at " +
+                        FormatLocation(tx_seq, event.event_sequence, type);
+            return false;
+        }
+        core::ChallengeSourceType source_type;
+        if (!commands::ChallengeSourceTypeFromToken(source_type_token, source_type)) {
+            out_error = "Unknown source type token '" + source_type_token + "' at " +
+                        FormatLocation(tx_seq, event.event_sequence, type);
+            return false;
+        }
+        core::ArgumentTarget target{target_kind, target_id};
+        std::string err;
+        if (!core::AddChallengeWithIds(state.model, &state.package, target, source_type, element_id, relationship_id,
+                                       err)) {
+            out_error = "AddChallengeWithIds failed at " +
+                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+            return false;
+        }
+        return true;
+    }
+
     if (type == "RemoveElement") {
         std::string element_id, mode_token;
         if (!require_string("element_id", element_id))

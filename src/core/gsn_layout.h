@@ -13,6 +13,15 @@ struct GsnLayoutSize {
     double height = 0.0;
 };
 
+// ChallengeSide (Left/Right/Below) is defined in core/assurance_tree.h.
+
+// A challenge cluster hosted by a node: `root_id` is the counter element (the
+// root of its own sub-argument, which lives in the input as ordinary nodes).
+struct ChallengeChild {
+    std::string root_id;
+    ChallengeSide side = ChallengeSide::Side;
+};
+
 struct GsnLayoutInputNode {
     std::string id;
     NodeRole role = NodeRole::Other;
@@ -23,6 +32,9 @@ struct GsnLayoutInputNode {
     std::string parent_id;
     std::vector<std::string> group1_children;
     std::vector<std::string> group2_attachments;
+    // Dialectic challenge clusters hosted by this node. Their roots and
+    // descendants appear in GsnLayoutInput::nodes but are reachable only here.
+    std::vector<ChallengeChild> challenge_children;
 };
 
 struct GsnLayoutInput {
@@ -55,6 +67,10 @@ struct GsnLayoutNode {
     double height = 0.0;
     int side_stack_index = 0;
     bool is_left_side = true;
+    // Distance (content px) the edges from this node to its structural children
+    // should run straight down before curving — large when children are pushed
+    // below a tall side challenge tree, so the lines clear the side margin.
+    double child_edge_drop = 0.0;
 };
 
 struct GsnLayoutGraphResult {

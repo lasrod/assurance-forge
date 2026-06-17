@@ -411,6 +411,8 @@ TRANSLATIONS = {
     "Remove ACP": "ACP を除去",
     "Select {0}": "{0} を選択",
     "Add ACP": "ACP を追加",
+    "Add Counter Argument": "反論を追加",
+    "Add Counter Evidence": "反証を追加",
     "ACP is not supported for this relationship.": "この関係では ACP はサポートされていません。",
     "Add ACP failed: {0}": "ACP の追加に失敗しました: {0}",
     "Eligible": "適格",

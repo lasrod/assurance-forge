@@ -53,6 +53,12 @@ public:
     bool AddAcpToSelectedElement();
     bool AddAcpToRelationship(const std::string& relationship_id);
     bool RemoveAcp(const std::string& acp_id);
+
+    // GSN v3 dialectic challenges against the selected element or a relationship.
+    bool AddCounterArgumentToSelected();
+    bool AddCounterEvidenceToSelected();
+    bool AddCounterArgumentToRelationship(const std::string& relationship_id);
+    bool AddCounterEvidenceToRelationship(const std::string& relationship_id);
     bool RemoveProjectFile(const core::ProjectFileEntry& entry);
     bool RevealProjectFileInExplorer(const core::ProjectFileEntry& entry);
     void OpenArgumentPackageCanvas(const std::string& package_id,

@@ -349,6 +349,16 @@ bool RenderAcpRelationshipContextMenu(const core::acp::AcpRelationshipTarget* ta
                 actions.set_status(ui::i18n::trf("Add ACP failed: {0}", blocked_reason));
             }
         }
+        // GSN v3 dialectic: challenge the relationship itself (not its endpoints).
+        if (target) {
+            ImGui::Separator();
+            if (ImGui::MenuItem(AF_TR("Add Counter Argument").c_str(), nullptr, false,
+                                static_cast<bool>(actions.add_counter_argument_to_relationship)))
+                actions.add_counter_argument_to_relationship(target->relationship_id);
+            if (ImGui::MenuItem(AF_TR("Add Counter Evidence").c_str(), nullptr, false,
+                                static_cast<bool>(actions.add_counter_evidence_to_relationship)))
+                actions.add_counter_evidence_to_relationship(target->relationship_id);
+        }
         ImGui::EndPopup();
     }
     return consumed_context_click;

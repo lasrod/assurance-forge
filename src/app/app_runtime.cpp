@@ -155,6 +155,14 @@ ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
     actions.focus_problem = [](const std::string& problem_id, const std::string& element_id) {
         ui::FocusProblemInPanel(ui::GetUiState(), problem_id, element_id);
     };
+    actions.add_counter_argument = [&runtime]() { runtime.AddCounterArgumentToSelected(); };
+    actions.add_counter_evidence = [&runtime]() { runtime.AddCounterEvidenceToSelected(); };
+    actions.add_counter_argument_to_relationship = [&runtime](const std::string& relationship_id) {
+        runtime.AddCounterArgumentToRelationship(relationship_id);
+    };
+    actions.add_counter_evidence_to_relationship = [&runtime](const std::string& relationship_id) {
+        runtime.AddCounterEvidenceToRelationship(relationship_id);
+    };
     return actions;
 }
 
@@ -301,6 +309,24 @@ bool AppRuntime::AddAcpToRelationship(const std::string& relationship_id) {
 
 bool AppRuntime::RemoveAcp(const std::string& acp_id) {
     return actions::ElementActions(*impl_).RemoveAcp(acp_id);
+}
+
+bool AppRuntime::AddCounterArgumentToSelected() {
+    return actions::ElementActions(*impl_).AddChallengeToSelectedElement(core::ChallengeSourceType::CounterArgument);
+}
+
+bool AppRuntime::AddCounterEvidenceToSelected() {
+    return actions::ElementActions(*impl_).AddChallengeToSelectedElement(core::ChallengeSourceType::CounterEvidence);
+}
+
+bool AppRuntime::AddCounterArgumentToRelationship(const std::string& relationship_id) {
+    return actions::ElementActions(*impl_).AddChallengeToRelationship(relationship_id,
+                                                                      core::ChallengeSourceType::CounterArgument);
+}
+
+bool AppRuntime::AddCounterEvidenceToRelationship(const std::string& relationship_id) {
+    return actions::ElementActions(*impl_).AddChallengeToRelationship(relationship_id,
+                                                                      core::ChallengeSourceType::CounterEvidence);
 }
 
 void AppRuntime::RemoveSelected(core::RemoveMode mode) {

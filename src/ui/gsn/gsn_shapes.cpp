@@ -251,6 +251,112 @@ void DrawUndevelopedMarker(
     draw_list->AddText(font, font_size, text_pos, und_ink, und);
 }
 
+// Draw dashes along a (optionally closed) polyline with a continuous on/off
+// phase carried across segment boundaries, so curves approximated by many short
+// segments still dash evenly.
+static void DrawDashedPath(ImDrawList* draw_list,
+                           const ImVec2* points,
+                           int count,
+                           bool closed,
+                           ImU32 color,
+                           float thickness,
+                           float dash_on,
+                           float dash_off) {
+    if (count < 2 || dash_on <= 0.0f || dash_off <= 0.0f)
+        return;
+    const int segments = closed ? count : count - 1;
+    float phase = 0.0f; // distance already drawn into the current span
+    bool on = true;
+    for (int i = 0; i < segments; ++i) {
+        const ImVec2 a = points[i];
+        const ImVec2 b = points[(i + 1) % count];
+        const float dx = b.x - a.x;
+        const float dy = b.y - a.y;
+        const float len = std::sqrt(dx * dx + dy * dy);
+        if (len < 1e-4f)
+            continue;
+        const float ux = dx / len;
+        const float uy = dy / len;
+        float pos = 0.0f;
+        while (pos < len) {
+            const float span = (on ? dash_on : dash_off) - phase;
+            const float step = std::min(span, len - pos);
+            if (on) {
+                const ImVec2 p0(a.x + ux * pos, a.y + uy * pos);
+                const ImVec2 p1(a.x + ux * (pos + step), a.y + uy * (pos + step));
+                draw_list->AddLine(p0, p1, color, thickness);
+            }
+            pos += step;
+            phase += step;
+            if (phase >= (on ? dash_on : dash_off) - 1e-4f) {
+                on = !on;
+                phase = 0.0f;
+            }
+        }
+    }
+}
+
+// Warning "!" badge: a filled triangle with a dark exclamation mark, pinned over
+// the node's top-left corner. The triangle shape is the primary (color-blind
+// safe) cue; its amber fill is only a secondary aid for color-sighted users.
+static void DrawCounterWarningBadge(ImDrawList* draw_list, ImVec2 top_left, float zoom) {
+    const float scale = DpiScale() * zoom;
+    const float size = 20.0f * scale; // triangle base width / height
+    const float half = size * 0.5f;
+    // Sit the badge so it straddles the node's top-left corner.
+    const ImVec2 center(top_left.x + half * 0.35f, top_left.y - half * 0.15f);
+
+    const ImVec2 apex(center.x, center.y - half);
+    const ImVec2 base_left(center.x - half, center.y + half * 0.72f);
+    const ImVec2 base_right(center.x + half, center.y + half * 0.72f);
+
+    const ImU32 fill = GetTheme().warning;
+    const ImU32 ink = InkOn(fill);
+    draw_list->AddTriangleFilled(apex, base_left, base_right, fill);
+    draw_list->AddTriangle(apex, base_left, base_right, OutlineColor(), std::max(1.0f, 1.4f * scale));
+
+    // Exclamation mark: a short stem with a dot beneath it.
+    const ImVec2 stem_top(center.x, center.y - half * 0.30f);
+    const ImVec2 stem_bottom(center.x, center.y + half * 0.18f);
+    draw_list->AddLine(stem_top, stem_bottom, ink, std::max(1.5f, 2.0f * scale));
+    draw_list->AddCircleFilled(ImVec2(center.x, center.y + half * 0.42f), std::max(1.0f, 1.5f * scale), ink);
+}
+
+void DrawCounterChallengeDecoration(
+    ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, bool circular, float zoom) {
+    const float scale = DpiScale() * zoom;
+    // The dash pattern + extra thickness carry the meaning independent of color;
+    // amber is a secondary cue for color-sighted reviewers.
+    const ImU32 color = GetTheme().warning;
+    const float thickness = std::max(2.0f, 2.4f * scale);
+    const float dash_on = 6.0f * scale;
+    const float dash_off = 4.0f * scale;
+    const float pad = 2.0f * scale; // sit just outside the shape's hairline outline
+
+    if (circular) {
+        const float w = bottom_right.x - top_left.x;
+        const float h = bottom_right.y - top_left.y;
+        const ImVec2 center((top_left.x + bottom_right.x) * 0.5f, (top_left.y + bottom_right.y) * 0.5f);
+        const float radius = std::min(w, h) * 0.5f + pad;
+        ImVec2 ring[kCircleSegments];
+        for (int i = 0; i < kCircleSegments; ++i) {
+            const float t = (static_cast<float>(i) / static_cast<float>(kCircleSegments)) * 2.0f * 3.14159265f;
+            ring[i] = ImVec2(center.x + std::cos(t) * radius, center.y + std::sin(t) * radius);
+        }
+        DrawDashedPath(draw_list, ring, kCircleSegments, /*closed=*/true, color, thickness, dash_on, dash_off);
+    } else {
+        const ImVec2 corners[4] = {
+            ImVec2(top_left.x - pad, top_left.y - pad),
+            ImVec2(bottom_right.x + pad, top_left.y - pad),
+            ImVec2(bottom_right.x + pad, bottom_right.y + pad),
+            ImVec2(top_left.x - pad, bottom_right.y + pad),
+        };
+        DrawDashedPath(draw_list, corners, 4, /*closed=*/true, color, thickness, dash_on, dash_off);
+    }
+
+    DrawCounterWarningBadge(draw_list, top_left, zoom);
+}
+
 void DrawReviewScopeHighlight(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, float zoom, bool primary) {
     const Theme& theme = GetTheme();
     float scale = DpiScale() * zoom;

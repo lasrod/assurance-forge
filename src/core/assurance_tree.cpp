@@ -162,6 +162,80 @@ static void ProcessEvidence(const parser::SacmElement& relationship,
     wired_ids.insert(target_node->id);
 }
 
+// Resolve the element node a challenge edge should hang off / anchor near.
+// `target_id` is the challenged entity: it may be an element (returned directly)
+// or a relationship, in which case we follow the relationship's own target one
+// or more hops until we reach an element node. Returns nullptr if unresolved.
+static TreeNode* ResolveChallengeAnchorElement(const std::string& target_id,
+                                               const std::unordered_map<std::string, TreeNode*>& node_by_id,
+                                               const std::unordered_map<std::string, std::string>& rel_first_target) {
+    std::string current = target_id;
+    for (int hop = 0; hop < 8; ++hop) {
+        auto node_it = node_by_id.find(current);
+        if (node_it != node_by_id.end())
+            return node_it->second; // reached an element node
+        auto rel_it = rel_first_target.find(current);
+        if (rel_it == rel_first_target.end() || rel_it->second.empty())
+            return nullptr; // dangling or unknown
+        current = rel_it->second;
+    }
+    return nullptr;
+}
+
+// Process a counter (dialectic challenge) relationship. The counter source
+// (a CG goal / CSn solution) becomes the root of its own layout cluster: it is
+// NOT wired into the anchor's children, so it can carry its own sub-argument
+// (strategies, solutions, context, ...). It is flagged with the data the layout
+// engine needs to position the cluster relative to the target and the renderer
+// needs to draw the dashed open-arrow challenge edge.
+static void ProcessChallenge(const parser::SacmElement& relationship,
+                             const std::unordered_map<std::string, TreeNode*>& node_by_id,
+                             const std::unordered_map<std::string, std::string>& rel_first_target,
+                             const std::unordered_map<std::string, std::string>& rel_source,
+                             std::unordered_set<std::string>& wired_ids) {
+    if (relationship.source_refs.empty() || relationship.target_refs.empty())
+        return;
+
+    TreeNode* source_node = FindFirstNode(relationship.source_refs, node_by_id);
+    if (!source_node)
+        return;
+
+    const std::string& target_id = relationship.target_refs.front();
+    const bool target_is_relationship = node_by_id.find(target_id) == node_by_id.end();
+
+    // Anchor: for an element target, the target itself. For a relationship target,
+    // host on the relationship's SOURCE node — the context/solution/sub-claim the
+    // relationship points to (e.g. challenging "InContextOf: C1 -> G1" hosts on C1,
+    // so the counter sits below the context, not below the parent claim).
+    TreeNode* anchor = nullptr;
+    if (target_is_relationship) {
+        const auto src_it = rel_source.find(target_id);
+        if (src_it != rel_source.end()) {
+            const auto node_it = node_by_id.find(src_it->second);
+            if (node_it != node_by_id.end())
+                anchor = node_it->second;
+        }
+    }
+    if (!anchor)
+        anchor = ResolveChallengeAnchorElement(target_id, node_by_id, rel_first_target);
+    if (!anchor)
+        return; // cannot place — leave the counter node as an orphan
+
+    // Counter evidence sources are artifactreferences; give them the Solution
+    // role so they render as a Solution rather than a generic node. Counter
+    // argument sources are claims (already classified as Claim).
+    if (relationship.type == "assertedevidence")
+        source_node->role = NodeRole::Solution;
+
+    source_node->is_counter_source = true;
+    source_node->challenge_target_id = target_id;
+    source_node->challenge_target_is_relationship = target_is_relationship;
+    source_node->challenge_relationship_id = relationship.id;
+    source_node->challenge_anchor_id = anchor->id;
+    // The counter is a cluster root: leave its parent null so it is laid out as
+    // its own subtree and positioned by the layout's counter-placement pass.
+}
+
 } // namespace
 
 // ===== Build the assurance tree from a parsed SACM case =====
@@ -228,10 +302,30 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
         tree.nodes.push_back(std::move(node));
     }
 
+    // Per-relationship lookups used to host a challenge that targets a
+    // relationship: its first target ref (to resolve a nearby anchor element) and
+    // its source element (the context/solution/sub-claim the challenge hangs off).
+    std::unordered_map<std::string, std::string> rel_first_target;
+    std::unordered_map<std::string, std::string> rel_source;
+    for (const auto& element : ac.elements) {
+        if (!is_relationship(element.type) || element.id.empty())
+            continue;
+        if (!element.target_refs.empty())
+            rel_first_target[element.id] = element.target_refs.front();
+        if (const TreeNode* source = FindFirstNode(element.source_refs, node_by_id))
+            rel_source[element.id] = source->id;
+    }
+
     // Step 2: Wire the tree using relationship elements
     for (const auto& element : ac.elements) {
         if (!is_relationship(element.type))
             continue;
+
+        // Counter relationships are dialectic challenges, not structural support.
+        if (element.is_counter) {
+            ProcessChallenge(element, node_by_id, rel_first_target, rel_source, wired_ids);
+            continue;
+        }
 
         if (element.type == "assertedinference") {
             ProcessInference(element, node_by_id, wired_ids);
@@ -242,9 +336,31 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
         }
     }
 
-    // Step 3: Find root (first parentless Claim)
+    // Step 2.5: Decide where each counter cluster sits relative to its host (the
+    // anchor element). Done after all wiring so the host's role is known.
+    //
+    //   * Context host (a reference) → directly below it (it grows downward).
+    //   * Everything else (Goal/Strategy/Solution, Assumption/Justification) →
+    //     beside it in a side lane. The layout engine picks left vs right by
+    //     balancing the two lanes' heights (and keeps an attachment's own
+    //     challenge on the attachment's outward side, away from the host).
+    //
+    // For a relationship challenge the anchor is the relationship's source, so a
+    // challenged InContextOf naturally hosts on its context and drops below it.
+    for (const auto& owned_node : tree.nodes) {
+        TreeNode* counter = owned_node.get();
+        if (!counter->is_counter_source)
+            continue;
+        const auto anchor_it = node_by_id.find(counter->challenge_anchor_id);
+        const TreeNode* anchor = anchor_it != node_by_id.end() ? anchor_it->second : nullptr;
+        counter->challenge_side =
+            (anchor && anchor->role == NodeRole::Context) ? ChallengeSide::Below : ChallengeSide::Side;
+    }
+
+    // Step 3: Find root (first parentless Claim). Counter sources are parentless
+    // cluster roots, not the argument root, so they are never chosen here.
     for (const auto& node : tree.nodes) {
-        if (node->parent == nullptr && node->role == NodeRole::Claim) {
+        if (node->parent == nullptr && node->role == NodeRole::Claim && !node->is_counter_source) {
             if (tree.root == nullptr) {
                 tree.root = node.get();
             }

@@ -88,6 +88,35 @@ bool ElementEditController::AddTopGoal(AppRuntimeState& state) {
     return true;
 }
 
+bool ElementEditController::AddChallenge(AppRuntimeState& state,
+                                         const core::ArgumentTarget& target,
+                                         core::ChallengeSourceType source_type) {
+    if (target.id.empty()) {
+        events_.Emit(StatusMessageEvent{"No challenge target selected."});
+        return false;
+    }
+    parser::AssuranceCase*      model   = nullptr;
+    sacm::AssuranceCasePackage* package = nullptr;
+    if (!TryGetWorkingModel(state, "Add challenge", events_, model, package))
+        return false;
+    (void)model;
+    (void)package;
+
+    core::commands::CreateChallengeCommand cmd(target, source_type);
+    const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Add challenge failed: " + outcome.error});
+        return false;
+    }
+
+    const std::string& new_id = cmd.GeneratedId();
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(SelectionChangedEvent{new_id, true});
+    events_.Emit(DocumentDirtyEvent{});
+    events_.Emit(StatusMessageEvent{"Added " + new_id});
+    return true;
+}
+
 bool ElementEditController::RemoveSelected(AppRuntimeState& state,
                                            const std::string& selected_id,
                                            core::RemoveMode mode) {

@@ -27,11 +27,12 @@ void RenderAddElementMenu(const ElementContextActions& actions) {
         if (ImGui::MenuItem(AF_TR("ACP").c_str(), nullptr, false, static_cast<bool>(actions.add_acp_to_selected_element)))
             actions.add_acp_to_selected_element();
         ImGui::Separator();
-        if (ImGui::MenuItem(AF_TR("Challenge").c_str(), nullptr, false, static_cast<bool>(actions.not_implemented))) {
-            // Pass the English msgid; the modal translates at render time so
-            // switching languages between click and render stays consistent.
-            actions.not_implemented("Challenge");
-        }
+        if (ImGui::MenuItem(AF_TR("Add Counter Argument").c_str(), nullptr, false,
+                            static_cast<bool>(actions.add_counter_argument)))
+            actions.add_counter_argument();
+        if (ImGui::MenuItem(AF_TR("Add Counter Evidence").c_str(), nullptr, false,
+                            static_cast<bool>(actions.add_counter_evidence)))
+            actions.add_counter_evidence();
         ImGui::EndMenu();
     }
 }

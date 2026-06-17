@@ -28,6 +28,11 @@ ImU32 Group1EdgeColor() {
 ImU32 Group2EdgeColor() {
     return GetTheme().edge_group2;
 }
+// Dialectic challenge edges read as adversarial; use the attention color so the
+// counter relationship is visually distinct from supporting/contextual edges.
+ImU32 ChallengeEdgeColor() {
+    return GetTheme().attention;
+}
 
 void ExpandRectToInclude(ImVec2 point, ImVec2& out_min, ImVec2& out_max) {
     out_min.x = std::min(out_min.x, point.x);
@@ -190,46 +195,57 @@ void ComputeGroup1Endpoints(
     out_end = ImVec2(origin.x + (child.position.x + child.size.x * 0.5f) * zoom, origin.y + child.position.y * zoom);
 }
 
-// Draw a Group1 (structural) edge: straight stubs -> solid Bezier -> solid arrowhead.
-void DrawGroup1Edge(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 child_top, float zoom) {
-    float scale = DpiScale() * zoom;
-    float scaled_stub = kStubLength * scale;
-    float scaled_edge_width = kSolidEdgeWidth * scale;
-    float scaled_arrow = kArrowSize * scale;
+// Build the five-point Group1 edge path. The straight run from the parent is the
+// larger of the default stub and `straight_drop` (clamped so a curve segment
+// remains before the child), keeping the line under the parent until it clears a
+// tall side challenge tree, then curving out to the child.
+Group1EdgePath ComputeGroup1Path(ImVec2 parent_bottom, ImVec2 child_top, float zoom, float straight_drop) {
+    const float scale = DpiScale() * zoom;
+    const float scaled_stub = kStubLength * scale;
 
-    ImVec2 stub_start(parent_bottom.x, parent_bottom.y + scaled_stub);
-    ImVec2 stub_end(child_top.x, child_top.y - scaled_stub);
+    const float span = child_top.y - parent_bottom.y;
+    const float max_top = std::max(scaled_stub, span - scaled_stub);
+    const float top_stub = std::min(std::max(scaled_stub, straight_drop), max_top);
 
-    float vertical_span = fabsf(stub_end.y - stub_start.y);
-    ImVec2 ctrl_1(stub_start.x, stub_start.y + vertical_span * kVerticalControlPct);
-    ImVec2 ctrl_2(stub_end.x, stub_end.y - vertical_span * kVerticalControlPct);
-
-    ImU32 col = Group1EdgeColor();
-    draw_list->AddLine(parent_bottom, stub_start, col, scaled_edge_width);
-    DrawSolidBezier(draw_list, stub_start, ctrl_1, ctrl_2, stub_end, col, scaled_edge_width);
-    draw_list->AddLine(stub_end, child_top, col, scaled_edge_width);
-    DrawSolidArrow(draw_list, child_top, 0.0f, 1.0f, col, scaled_arrow);
+    Group1EdgePath path;
+    path.parent_bottom = parent_bottom;
+    path.child_top = child_top;
+    path.stub_start = ImVec2(parent_bottom.x, parent_bottom.y + top_stub);
+    path.stub_end = ImVec2(child_top.x, child_top.y - scaled_stub);
+    const float vertical_span = std::max(0.0f, path.stub_end.y - path.stub_start.y);
+    path.ctrl_1 = ImVec2(path.stub_start.x, path.stub_start.y + vertical_span * kVerticalControlPct);
+    path.ctrl_2 = ImVec2(path.stub_end.x, path.stub_end.y - vertical_span * kVerticalControlPct);
+    return path;
 }
 
-void ComputeGroup1EdgeBounds(ImVec2 parent_bottom, ImVec2 child_top, float zoom, ImVec2& out_min, ImVec2& out_max) {
+// Draw a Group1 (structural) edge: straight stub -> solid Bezier -> solid arrowhead.
+void DrawGroup1Edge(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 child_top, float zoom, float straight_drop) {
+    const float scale = DpiScale() * zoom;
+    const float scaled_edge_width = kSolidEdgeWidth * scale;
+    const float scaled_arrow = kArrowSize * scale;
+    const Group1EdgePath p = ComputeGroup1Path(parent_bottom, child_top, zoom, straight_drop);
+
+    ImU32 col = Group1EdgeColor();
+    draw_list->AddLine(p.parent_bottom, p.stub_start, col, scaled_edge_width);
+    DrawSolidBezier(draw_list, p.stub_start, p.ctrl_1, p.ctrl_2, p.stub_end, col, scaled_edge_width);
+    draw_list->AddLine(p.stub_end, p.child_top, col, scaled_edge_width);
+    DrawSolidArrow(draw_list, p.child_top, 0.0f, 1.0f, col, scaled_arrow);
+}
+
+void ComputeGroup1EdgeBounds(
+    ImVec2 parent_bottom, ImVec2 child_top, float zoom, ImVec2& out_min, ImVec2& out_max, float straight_drop) {
     float scale = DpiScale() * zoom;
-    float scaled_stub = kStubLength * scale;
     float scaled_edge_width = kSolidEdgeWidth * scale;
     float scaled_arrow = kArrowSize * scale;
-
-    ImVec2 stub_start(parent_bottom.x, parent_bottom.y + scaled_stub);
-    ImVec2 stub_end(child_top.x, child_top.y - scaled_stub);
-    float vertical_span = fabsf(stub_end.y - stub_start.y);
-    ImVec2 ctrl_1(stub_start.x, stub_start.y + vertical_span * kVerticalControlPct);
-    ImVec2 ctrl_2(stub_end.x, stub_end.y - vertical_span * kVerticalControlPct);
+    const Group1EdgePath p = ComputeGroup1Path(parent_bottom, child_top, zoom, straight_drop);
 
     out_min = parent_bottom;
     out_max = parent_bottom;
-    ExpandRectToInclude(child_top, out_min, out_max);
-    ExpandRectToInclude(stub_start, out_min, out_max);
-    ExpandRectToInclude(stub_end, out_min, out_max);
-    ExpandRectToInclude(ctrl_1, out_min, out_max);
-    ExpandRectToInclude(ctrl_2, out_min, out_max);
+    ExpandRectToInclude(p.child_top, out_min, out_max);
+    ExpandRectToInclude(p.stub_start, out_min, out_max);
+    ExpandRectToInclude(p.stub_end, out_min, out_max);
+    ExpandRectToInclude(p.ctrl_1, out_min, out_max);
+    ExpandRectToInclude(p.ctrl_2, out_min, out_max);
 
     float pad = std::max(scaled_edge_width, scaled_arrow) + 1.0f;
     out_min.x -= pad;
@@ -314,21 +330,50 @@ void ComputeGroup2EdgeBounds(
     out_max.y += pad;
 }
 
-void DrawGroup1EdgeHighlight(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 child_top, float zoom) {
-    float scale = DpiScale() * zoom;
-    float scaled_stub = kStubLength * scale;
-    float thickness = 5.0f * scale;
-
-    ImVec2 stub_start(parent_bottom.x, parent_bottom.y + scaled_stub);
-    ImVec2 stub_end(child_top.x, child_top.y - scaled_stub);
-    float vertical_span = fabsf(stub_end.y - stub_start.y);
-    ImVec2 ctrl_1(stub_start.x, stub_start.y + vertical_span * kVerticalControlPct);
-    ImVec2 ctrl_2(stub_end.x, stub_end.y - vertical_span * kVerticalControlPct);
+void DrawGroup1EdgeHighlight(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 child_top, float zoom,
+                             float straight_drop) {
+    const float scale = DpiScale() * zoom;
+    const float thickness = 5.0f * scale;
+    const Group1EdgePath p = ComputeGroup1Path(parent_bottom, child_top, zoom, straight_drop);
 
     ImU32 color = WithAlpha(GetTheme().accent, 0.82f);
-    draw_list->AddLine(parent_bottom, stub_start, color, thickness);
-    draw_list->AddBezierCubic(stub_start, ctrl_1, ctrl_2, stub_end, color, thickness);
-    draw_list->AddLine(stub_end, child_top, color, thickness);
+    draw_list->AddLine(p.parent_bottom, p.stub_start, color, thickness);
+    draw_list->AddBezierCubic(p.stub_start, p.ctrl_1, p.ctrl_2, p.stub_end, color, thickness);
+    draw_list->AddLine(p.stub_end, p.child_top, color, thickness);
+}
+
+// Draw a dialectic "Challenges" edge: a dashed straight line from the counter
+// source to the target anchor, ending in a hollow (open) arrowhead at the target.
+void DrawChallengeEdge(ImDrawList* draw_list, ImVec2 from, ImVec2 to, float zoom) {
+    float scale = DpiScale() * zoom;
+    float scaled_edge_width = kDashedEdgeWidth * scale;
+    float scaled_dash = kDashLength * scale;
+    float scaled_gap = kDashGap * scale;
+
+    ImU32 col = ChallengeEdgeColor();
+    DrawDashedLine(draw_list, from, to, col, scaled_edge_width, scaled_dash, scaled_gap);
+    DrawHollowArrow(draw_list, to, to.x - from.x, to.y - from.y, col, kArrowSize * scale, kArrowOutlineWidth * scale);
+}
+
+void DrawChallengeEdgeHighlight(ImDrawList* draw_list, ImVec2 from, ImVec2 to, float zoom) {
+    const float scale = DpiScale() * zoom;
+    draw_list->AddLine(from, to, WithAlpha(GetTheme().accent, 0.78f), std::max(3.0f, 4.5f * scale));
+}
+
+void ComputeChallengeEdgeBounds(ImVec2 from, ImVec2 to, float zoom, ImVec2& out_min, ImVec2& out_max) {
+    float scale = DpiScale() * zoom;
+    float scaled_edge_width = kDashedEdgeWidth * scale;
+    float scaled_arrow = kArrowSize * scale;
+
+    out_min = from;
+    out_max = from;
+    ExpandRectToInclude(to, out_min, out_max);
+
+    float pad = std::max(scaled_edge_width, scaled_arrow) + 1.0f;
+    out_min.x -= pad;
+    out_min.y -= pad;
+    out_max.x += pad;
+    out_max.y += pad;
 }
 
 void DrawGroup2EdgeHighlight(

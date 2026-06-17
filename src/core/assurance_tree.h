@@ -15,6 +15,13 @@ enum class ElementGroup {
 
 enum class NodeRole { Claim, Strategy, Solution, Context, Assumption, Justification, Other };
 
+// Where a dialectic challenge cluster is placed relative to its host node.
+enum class ChallengeSide {
+    Side,  // beside the host in a side lane; the layout picks left vs right by
+           // balancing the lane heights, and the cluster grows downward
+    Below, // directly below the host (used for challenges to references)
+};
+
 struct TreeNode {
     std::string id;
     std::string label;
@@ -26,6 +33,26 @@ struct TreeNode {
     std::vector<TreeNode*> group1_children;    // structural children (row below)
     std::vector<TreeNode*> group2_attachments; // contextual side attachments
     TreeNode* parent = nullptr;
+
+    // GSN v3 dialectic: when true, this node is the source of a Challenges
+    // relationship (a counter argument / counter evidence) and the root of its
+    // own layout cluster (it is not wired into the anchor's children, so it can
+    // carry its own sub-argument). Its connecting edge renders as a dashed
+    // open-arrow challenge edge rather than ordinary support.
+    bool is_counter_source = false;
+    // Id of the challenged target. When `challenge_target_is_relationship`, the
+    // target is a relationship element (no tree node); otherwise it is an element.
+    std::string challenge_target_id;
+    bool challenge_target_is_relationship = false;
+    // Id of this counter's own Challenges relationship (the dashed arrow). Lets
+    // the arrow itself be challenged (challenge-of-a-challenge).
+    std::string challenge_relationship_id;
+    // How/where this counter's cluster is placed relative to its host (the
+    // challenged element, or the anchor element for a relationship target).
+    ChallengeSide challenge_side = ChallengeSide::Side;
+    // Host element the cluster is placed beside/below: the challenged element, or
+    // (for a relationship target) the relationship's source element.
+    std::string challenge_anchor_id;
 
     // Layout scratch fields (filled by layout engine)
     int subtree_width = 1;

@@ -9,6 +9,7 @@
 #include "ui/gsn/gsn_edge_renderer.h"
 #include "ui/gsn/gsn_hit_tester.h"
 #include "ui/gsn/gsn_layout.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
 #include <algorithm>
@@ -28,6 +29,44 @@ static constexpr float kCullMarginPx = 120.0f; // screen-space culling margin ar
 
 // EdgeKey, RectsIntersect, RelationshipEdgeSelected, PointInsideNode, and
 // PickRelationshipEdge are implemented in `ui/gsn/gsn_hit_tester.{h,cpp}`.
+
+// Squared distance from point `p` to segment [a,b]. Used to hit-test the
+// dashed challenge edges (which are not part of the structural edge picker).
+static float DistanceSqPointSegment(ImVec2 p, ImVec2 a, ImVec2 b) {
+    const float vx = b.x - a.x;
+    const float vy = b.y - a.y;
+    const float wx = p.x - a.x;
+    const float wy = p.y - a.y;
+    const float c1 = vx * wx + vy * wy;
+    if (c1 <= 0.0f)
+        return wx * wx + wy * wy;
+    const float c2 = vx * vx + vy * vy;
+    if (c2 <= c1) {
+        const float dx = p.x - b.x;
+        const float dy = p.y - b.y;
+        return dx * dx + dy * dy;
+    }
+    const float t = c1 / c2;
+    const float px = a.x + t * vx;
+    const float py = a.y + t * vy;
+    return (p.x - px) * (p.x - px) + (p.y - py) * (p.y - py);
+}
+
+// Point on the border of rectangle [mn,mx] along the ray from its center toward
+// `toward`. Used to anchor challenge edges to a node's edge rather than center.
+static ImVec2 RectBorderToward(ImVec2 mn, ImVec2 mx, ImVec2 toward) {
+    const ImVec2 c((mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f);
+    const float dx = toward.x - c.x;
+    const float dy = toward.y - c.y;
+    if (std::fabs(dx) < 1e-3f && std::fabs(dy) < 1e-3f)
+        return c;
+    const float hx = (mx.x - mn.x) * 0.5f;
+    const float hy = (mx.y - mn.y) * 0.5f;
+    const float tx = (std::fabs(dx) > 1e-3f) ? hx / std::fabs(dx) : FLT_MAX;
+    const float ty = (std::fabs(dy) > 1e-3f) ? hy / std::fabs(dy) : FLT_MAX;
+    const float t = std::min(tx, ty);
+    return ImVec2(c.x + dx * t, c.y + dy * t);
+}
 
 // ===== Zoom constants =====
 static constexpr float kZoomMin = 0.25f; // minimum zoom level (25%)
@@ -204,11 +243,50 @@ void GsnCanvas::Render(UiState& ui_state,
         return PickRelationshipEdge(layout_nodes_, node_by_id_, origin, zoom, viewport_min, viewport_max);
     }();
 
+    // First pass: record the screen-space midpoint of every structural/contextual
+    // relationship edge, keyed by relationship id. A dialectic challenge that
+    // targets a relationship anchors its arrow at this midpoint (the same point
+    // the ACP decorator uses), rather than at an element body.
+    std::unordered_map<std::string, ImVec2> relationship_midpoint;
+    std::unordered_map<std::string, bool> relationship_midpoint_primary; // chosen edge is the primary one
+    for (const auto& child_node : layout_nodes_) {
+        if (child_node.parent_id.empty() || child_node.is_counter_source)
+            continue;
+        auto parent_it = node_by_id_.find(child_node.parent_id);
+        if (parent_it == node_by_id_.end())
+            continue;
+        const LayoutNode& parent_node = *parent_it->second;
+        const std::string edge_key = EdgeKey(parent_node.id, child_node.id);
+        const auto target_it = acp_target_by_edge.find(edge_key);
+        if (target_it == acp_target_by_edge.end() || !target_it->second)
+            continue;
+        ImVec2 a, b;
+        if (child_node.group == ElementGroup::Group2)
+            ComputeGroup2Endpoints(parent_node, child_node, origin, zoom, a, b);
+        else
+            ComputeGroup1Endpoints(parent_node, child_node, origin, zoom, a, b);
+        // A relationship rendered as several edges (e.g. an inference with a
+        // reasoning strategy: parent->strategy plus strategy->child) maps every
+        // edge to the SAME relationship id. Anchor a relationship-targeted
+        // challenge deterministically: keep the first edge seen, but let the
+        // primary edge (the labelled relationship edge, not a strategy-child edge)
+        // win so the arrow lands on a stable point regardless of iteration order.
+        const std::string& rel_id = target_it->second->relationship_id;
+        const bool primary = !target_it->second->strategy_child_edge;
+        const bool seen = relationship_midpoint.count(rel_id) != 0;
+        if (!seen || (primary && !relationship_midpoint_primary[rel_id])) {
+            relationship_midpoint[rel_id] = ImVec2((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
+            relationship_midpoint_primary[rel_id] = primary;
+        }
+    }
+
     // Draw edges first (beneath nodes)
     {
         core::perf::ScopedTimer perf_scope_edges("gsn.edges");
         for (const auto& child_node : layout_nodes_) {
-            if (child_node.parent_id.empty())
+            // Counters are cluster roots with no structural parent; their dashed
+            // challenge edge is drawn by the dedicated pass below, not here.
+            if (child_node.parent_id.empty() || child_node.is_counter_source)
                 continue;
 
             auto parent_it = node_by_id_.find(child_node.parent_id);
@@ -263,13 +341,14 @@ void GsnCanvas::Render(UiState& ui_state,
             } else {
                 ImVec2 parent_bottom, child_top;
                 ComputeGroup1Endpoints(parent_node, child_node, origin, zoom, parent_bottom, child_top);
+                const float straight_drop = static_cast<float>(parent_node.child_edge_drop) * zoom;
                 ImVec2 edge_min, edge_max;
-                ComputeGroup1EdgeBounds(parent_bottom, child_top, zoom, edge_min, edge_max);
+                ComputeGroup1EdgeBounds(parent_bottom, child_top, zoom, edge_min, edge_max, straight_drop);
                 if (!RectsIntersect(edge_min, edge_max, cull_min, cull_max)) {
                     ++frame_stats.edges_culled;
                     continue;
                 }
-                DrawGroup1Edge(draw_list, parent_bottom, child_top, zoom);
+                DrawGroup1Edge(draw_list, parent_bottom, child_top, zoom, straight_drop);
                 const std::string edge_key = EdgeKey(parent_node.id, child_node.id);
                 const auto target_it = acp_target_by_edge.find(edge_key);
                 const core::acp::AcpRelationshipTarget* acp_target =
@@ -281,7 +360,7 @@ void GsnCanvas::Render(UiState& ui_state,
                         edge_acps = &acp_it->second;
                 }
                 if (RelationshipEdgeSelected(ui_state, acp_target, edge_key))
-                    DrawGroup1EdgeHighlight(draw_list, parent_bottom, child_top, zoom);
+                    DrawGroup1EdgeHighlight(draw_list, parent_bottom, child_top, zoom, straight_drop);
                 frame_stats.relationship_context_menu_active =
                     RenderAcpRelationshipContextMenu(acp_target,
                                                      edge_acps,
@@ -306,6 +385,84 @@ void GsnCanvas::Render(UiState& ui_state,
             }
         }
     } // gsn.edges
+
+    // Dialectic challenge edges: a dashed open-arrow from each counter element's
+    // border to its target (an element border, or a relationship midpoint). Drawn
+    // after support/contextual edges so the relationship midpoints are known, but
+    // still beneath the nodes.
+    {
+        core::perf::ScopedTimer perf_scope_challenge("gsn.challenge_edges");
+        for (const auto& counter : layout_nodes_) {
+            if (!counter.is_counter_source)
+                continue;
+            ImVec2 c_min(origin.x + counter.position.x * zoom, origin.y + counter.position.y * zoom);
+            ImVec2 c_max(c_min.x + counter.size.x * zoom, c_min.y + counter.size.y * zoom);
+            const ImVec2 c_center((c_min.x + c_max.x) * 0.5f, (c_min.y + c_max.y) * 0.5f);
+
+            ImVec2 to;
+            bool have_to = false;
+            if (counter.challenge_target_is_relationship) {
+                const auto mid_it = relationship_midpoint.find(counter.challenge_target_id);
+                if (mid_it != relationship_midpoint.end()) {
+                    to = mid_it->second;
+                    have_to = true;
+                }
+            } else {
+                const auto it = node_by_id_.find(counter.challenge_target_id);
+                if (it != node_by_id_.end() && it->second) {
+                    const LayoutNode& t = *it->second;
+                    ImVec2 t_min(origin.x + t.position.x * zoom, origin.y + t.position.y * zoom);
+                    ImVec2 t_max(t_min.x + t.size.x * zoom, t_min.y + t.size.y * zoom);
+                    to = RectBorderToward(t_min, t_max, c_center);
+                    have_to = true;
+                }
+            }
+            if (!have_to)
+                continue;
+
+            const ImVec2 from = RectBorderToward(c_min, c_max, to);
+
+            // Record the arrow midpoint so a challenge-of-a-challenge can anchor.
+            if (!counter.challenge_relationship_id.empty())
+                relationship_midpoint[counter.challenge_relationship_id] =
+                    ImVec2((from.x + to.x) * 0.5f, (from.y + to.y) * 0.5f);
+
+            ImVec2 edge_min, edge_max;
+            ComputeChallengeEdgeBounds(from, to, zoom, edge_min, edge_max);
+            if (!RectsIntersect(edge_min, edge_max, cull_min, cull_max)) {
+                ++frame_stats.edges_culled;
+                continue;
+            }
+
+            // The challenge arrow is itself a relationship that can be challenged:
+            // hit-test it and offer the counter actions on right-click.
+            const float pick = DpiSize(7.0f);
+            const bool hovered =
+                !overlay_hovered && DistanceSqPointSegment(ImGui::GetIO().MousePos, from, to) <= pick * pick;
+            if (hovered)
+                DrawChallengeEdgeHighlight(draw_list, from, to, zoom);
+            DrawChallengeEdge(draw_list, from, to, zoom);
+
+            const std::string popup_id = "gsn_challenge_edge##" + counter.challenge_relationship_id;
+            if (hovered && !counter.challenge_relationship_id.empty() &&
+                ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                ImGui::OpenPopup(popup_id.c_str());
+            }
+            if (ImGui::BeginPopup(popup_id.c_str())) {
+                frame_stats.relationship_context_menu_active = true;
+                ImGui::TextUnformatted(AF_TR("Challenge").c_str());
+                ImGui::Separator();
+                if (ImGui::MenuItem(AF_TR("Add Counter Argument").c_str(), nullptr, false,
+                                    static_cast<bool>(actions.add_counter_argument_to_relationship)))
+                    actions.add_counter_argument_to_relationship(counter.challenge_relationship_id);
+                if (ImGui::MenuItem(AF_TR("Add Counter Evidence").c_str(), nullptr, false,
+                                    static_cast<bool>(actions.add_counter_evidence_to_relationship)))
+                    actions.add_counter_evidence_to_relationship(counter.challenge_relationship_id);
+                ImGui::EndPopup();
+            }
+            ++frame_stats.edges_drawn;
+        }
+    } // gsn.challenge_edges
 
     // Draw nodes on top of edges
     {
@@ -351,6 +508,7 @@ void GsnCanvas::Render(UiState& ui_state,
             gsn_node.label = node.label;
             gsn_node.label_secondary = node.label_secondary;
             gsn_node.undeveloped = node.undeveloped;
+            gsn_node.is_counter = node.is_counter_source;
             {
                 core::perf::ScopedTimer perf_scope("gsn.node.draw");
                 DrawGsnNode(gsn_node,

@@ -25,6 +25,13 @@ public:
                             const std::string& selected_id,
                             core::NewElementKind kind);
     bool AddTopGoal(AppRuntimeState& state);
+
+    // Create a GSN v3 dialectic challenge (counter argument / counter evidence)
+    // against `target` (an element or a relationship). Selects the new counter
+    // node so the user can immediately edit its text in the element panel.
+    bool AddChallenge(AppRuntimeState& state,
+                      const core::ArgumentTarget& target,
+                      core::ChallengeSourceType source_type);
     bool RemoveSelected(AppRuntimeState& state,
                         const std::string& selected_id,
                         core::RemoveMode mode);
