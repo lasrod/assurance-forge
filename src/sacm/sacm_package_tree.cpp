@@ -1,5 +1,7 @@
 #include "sacm/sacm_package_tree.h"
 
+#include "sacm/pattern_keys.h"
+
 #include <algorithm>
 #include <cctype>
 #include <pugixml.hpp>
@@ -107,6 +109,19 @@ std::string fallback_display_name(pugi::xml_node node, const std::string& xml_lo
     return xml_local_name;
 }
 
+// True when `xml_node` carries the `assuranceforge.view.kind = gsn-pattern`
+// tagged value (a direct `<taggedValue key=.. value=../>` child).
+bool has_pattern_view_kind(pugi::xml_node xml_node) {
+    for (auto child : xml_node.children()) {
+        if (normalized_local_name(child.name()) != "taggedvalue")
+            continue;
+        if (pattern_keys::kViewKind == child.attribute("key").as_string() &&
+            pattern_keys::kViewKindPatternValue == child.attribute("value").as_string())
+            return true;
+    }
+    return false;
+}
+
 SacmPackageTreeNode parse_package_node(pugi::xml_node xml_node) {
     const std::string lower = normalized_local_name(xml_node.name());
     SacmPackageTreeNode node;
@@ -116,6 +131,9 @@ SacmPackageTreeNode parse_package_node(pugi::xml_node xml_node) {
     node.displayName = fallback_display_name(xml_node, node.xmlLocalName);
     node.description = read_description(xml_node);
     node.type = classify_package_node(lower);
+    node.isAbstract = xml_node.attribute("isAbstract").as_bool(false);
+    node.isPattern = node.type == SacmPackageNodeType::ArgumentPackage && node.isAbstract &&
+                     has_pattern_view_kind(xml_node);
 
     for (auto child : xml_node.children()) {
         const std::string child_lower = normalized_local_name(child.name());

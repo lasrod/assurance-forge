@@ -10,6 +10,20 @@ static void expect_base_eq(const sacm::SacmElement& a, const sacm::SacmElement& 
     EXPECT_EQ(a.id, b.id) << ctx << " id mismatch";
     EXPECT_EQ(a.name, b.name) << ctx << " name mismatch";
     EXPECT_EQ(a.description, b.description) << ctx << " description mismatch";
+
+    // SACMElement attributes (clause 8.2). Required for GSN pattern round-trip
+    // (ADR-0006): patterns ride on gid / isAbstract / abstractForm + tagged
+    // values, so these must survive parse -> serialize -> parse unchanged.
+    EXPECT_EQ(a.gid, b.gid) << ctx << " gid mismatch";
+    EXPECT_EQ(a.isAbstract, b.isAbstract) << ctx << " isAbstract mismatch";
+    EXPECT_EQ(a.abstractForm, b.abstractForm) << ctx << " abstractForm mismatch";
+
+    ASSERT_EQ(a.taggedValues.size(), b.taggedValues.size()) << ctx << " taggedValues size mismatch";
+    for (size_t i = 0; i < a.taggedValues.size(); ++i) {
+        const std::string tctx = ctx + ".taggedValue[" + std::to_string(i) + "]";
+        EXPECT_EQ(a.taggedValues[i].key, b.taggedValues[i].key) << tctx << " key mismatch";
+        EXPECT_EQ(a.taggedValues[i].value, b.taggedValues[i].value) << tctx << " value mismatch";
+    }
 }
 
 static void
@@ -151,6 +165,10 @@ TEST(SacmRoundTrip, SanitizedStrictFile) {
 
 TEST(SacmRoundTrip, UpdatedV2File) {
     round_trip_file(test_data_path("fixture_roundtrip_open_autonomy_updated_v2.sacm.xml"));
+}
+
+TEST(SacmRoundTrip, GsnPatternFile) {
+    round_trip_file(test_data_path("fixture_roundtrip_pattern.sacm.xml"));
 }
 
 // ===== Parse correctness tests =====

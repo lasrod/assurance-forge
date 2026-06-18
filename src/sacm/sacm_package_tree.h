@@ -30,6 +30,14 @@ struct SacmPackageTreeNode {
     std::string description;
     std::string xmlLocalName;
     SacmPackageNodeType type = SacmPackageNodeType::UnknownPackage;
+    // SACMElement.isAbstract (clause 8.2). True for pattern/template packages
+    // and any element owned by them.
+    bool isAbstract = false;
+    // True when this node is a GSN pattern definition: an abstract
+    // ArgumentPackage carrying the `assuranceforge.view.kind = gsn-pattern`
+    // tagged value (see sacm/pattern_keys.h and ADR-0006). Lets the project
+    // explorer split patterns into their own group.
+    bool isPattern = false;
     std::vector<SacmPackageTreeNode> children;
 };
 

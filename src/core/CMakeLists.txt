@@ -34,6 +34,7 @@ add_library(af_core OBJECT
     element_factory.cpp
     gsn_layout.cpp
     ignored_terminology_store.cpp
+    pattern_model.cpp
     perf/frame_profiler.cpp
     problems/problem_attention.cpp
     problems/problem_item.cpp

@@ -321,6 +321,7 @@ add_executable(tests
     tests/test_timeline_model_builder.cpp
     tests/test_undo_command.cpp
     tests/test_dialectic_challenge.cpp
+    tests/test_pattern_model.cpp
 )
 # Production sources are pulled in via the per-layer af_* OBJECT libraries
 # (see src/<layer>/CMakeLists.txt). The tests target intentionally links

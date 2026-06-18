@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="PATTERN_SAMPLE" name="Pattern Sample Project">
+  <description>
+    <content lang="en">A project containing a single GSN argument pattern</content>
+  </description>
+  <argumentPackage id="PAT1" name="Hazard Decomposition" isAbstract="true" gid="11111111-1111-4111-8111-111111111111">
+    <description>
+      <content lang="en">Decompose a safety goal over identified hazards.</content>
+    </description>
+    <taggedValue key="assuranceforge.view.kind" value="gsn-pattern" />
+    <taggedValue key="assuranceforge.gsn.pattern.identifier" value="HAZ-DECOMP" />
+    <taggedValue key="assuranceforge.gsn.pattern.intent" value="Argue safety by decomposition over hazards." />
+    <taggedValue key="assuranceforge.gsn.pattern.applicability" value="Use when a hazard log is available." />
+    <claim id="G1" name="Top Goal" content="The system is acceptably safe" isAbstract="true" gid="22222222-2222-4222-8222-222222222222">
+      <taggedValue key="assuranceforge.gsn.pattern.uninstantiated" value="true" />
+    </claim>
+    <claim id="G2" name="Hazard Goal" content="Hazard {hazard} is mitigated" isAbstract="true" undeveloped="true" gid="33333333-3333-4333-8333-333333333333">
+      <taggedValue key="assuranceforge.gsn.pattern.uninstantiated" value="true" />
+    </claim>
+    <argumentReasoning id="S1" name="Strategy" content="Argue over each identified hazard" isAbstract="true" gid="44444444-4444-4444-8444-444444444444" />
+    <artifactReference id="Sn1" name="Solution" isAbstract="true" gid="55555555-5555-4555-8555-555555555555" />
+    <assertedInference id="R1" isAbstract="true">
+      <source href="#S1" />
+      <target href="#G1" />
+    </assertedInference>
+    <assertedInference id="R2" isAbstract="true">
+      <source href="#G2" />
+      <target href="#S1" />
+      <taggedValue key="assuranceforge.gsn.pattern.operator" value="multiplicity" />
+      <taggedValue key="assuranceforge.gsn.pattern.cardinality.minimum" value="1" />
+      <taggedValue key="assuranceforge.gsn.pattern.cardinality.maximum" value="unbounded" />
+      <taggedValue key="assuranceforge.gsn.pattern.cardinality.display" value="1..*" />
+    </assertedInference>
+    <assertedInference id="R3" isAbstract="true">
+      <source href="#Sn1" />
+      <target href="#G2" />
+      <taggedValue key="assuranceforge.gsn.pattern.operator" value="optional" />
+    </assertedInference>
+    <assertedInference id="R4" isAbstract="true">
+      <source href="#Sn1" />
+      <target href="#G2" />
+      <taggedValue key="assuranceforge.gsn.pattern.choice.group" value="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" />
+    </assertedInference>
+    <assertedInference id="R5" isAbstract="true">
+      <source href="#G1" />
+      <target href="#G2" />
+      <taggedValue key="assuranceforge.gsn.pattern.choice.group" value="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" />
+    </assertedInference>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
