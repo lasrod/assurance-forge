@@ -127,6 +127,12 @@ PatternBound PatternBoundFromToken(const std::string& token);
 // valid; otherwise writes a human-readable reason into out_error.
 bool ValidateCardinality(const PatternCardinality& cardinality, std::string& out_error);
 
+// Parse a user-entered cardinality expression into a structured cardinality,
+// preserving the original text as the display expression. "lo..hi" splits into
+// bounds; a single token (e.g. "n", "3", "*") sets both bounds to that token.
+// Each side is interpreted by PatternBoundFromToken.
+PatternCardinality ParseCardinalityExpression(const std::string& expression);
+
 // ----- Relationship abstraction -----
 
 enum class PatternRelationOperator {
@@ -151,6 +157,16 @@ PatternRelationshipData ReadPatternRelationshipData(const sacm::AssertedRelation
 // Writes `data` onto `relationship`'s tagged values, removing any pattern
 // operator/cardinality/choice tagged values that no longer apply.
 void WritePatternRelationshipData(sacm::AssertedRelationship& relationship, const PatternRelationshipData& data);
+
+// Find the asserted relationship with id `relationship_id` anywhere in `package`
+// and apply `data` to it (optionality / multiplicity + cardinality). When the
+// operator is Multiplicity the cardinality is validated first. Returns false
+// with `out_error` when the relationship is not found or the cardinality is
+// invalid; the package is left unchanged in that case.
+bool SetRelationshipPatternData(sacm::AssuranceCasePackage& package,
+                                const std::string& relationship_id,
+                                const PatternRelationshipData& data,
+                                std::string& out_error);
 
 // ----- Choice groups -----
 

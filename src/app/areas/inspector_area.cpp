@@ -3,6 +3,7 @@
 #include "app/app_runtime_state.h"
 #include "app/areas/audit_data_cache.h"
 #include "app/confidence_problem_sync.h"
+#include "app/controllers/element_edit_controller.h"
 #include "app/frame/app_layout_regions.h"
 #include "core/audit/audit_baseline.h"
 #include "core/audit/audit_diff.h"
@@ -66,13 +67,27 @@ void RenderInspectorArea(AppRuntimeState& state,
             return;
         }
         if (!ui::GetUiState().selected_relationship_id.empty()) {
+            // Pattern mode when the active argument-package canvas projects a
+            // pattern definition (ADR-0007), gating the Pattern Abstraction editor.
+            bool pattern_mode = false;
+            for (const auto& tab : state.workbench.argument_package_canvas_tabs) {
+                if (tab.key == state.workbench.active_argument_package_canvas_key) {
+                    pattern_mode = tab.is_pattern;
+                    break;
+                }
+            }
             ui::panels::RelationshipPanelCallbacks relationship_callbacks;
             relationship_callbacks.add_acp = [&](const std::string& relationship_id) {
                 return state.acp_controller && loaded_case &&
                        state.acp_controller->AddRelationshipAcp(*loaded_case, sacm_package, relationship_id);
             };
             relationship_callbacks.open_acp = [](const std::string&) {};
-            ui::panels::ShowRelationshipPanel(loaded_case, &relationship_callbacks);
+            relationship_callbacks.set_pattern = [&](const std::string& relationship_id,
+                                                     const core::PatternRelationshipData& data) {
+                if (state.element_edit_controller)
+                    state.element_edit_controller->SetRelationshipPattern(state, relationship_id, data);
+            };
+            ui::panels::ShowRelationshipPanel(loaded_case, sacm_package, pattern_mode, &relationship_callbacks);
             ImGui::End();
             return;
         }

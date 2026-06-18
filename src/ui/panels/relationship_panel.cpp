@@ -1,12 +1,16 @@
 #include "ui/panels/relationship_panel.h"
 
 #include "core/acp/acp_relationship_index.h"
+#include "core/pattern_model.h"
 #include "imgui.h"
+#include "sacm/sacm_model.h"
 #include "ui/i18n/localization.h"
+#include "ui/imgui_buffer_utils.h"
 #include "ui/theme.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -68,9 +72,86 @@ const core::acp::AcpRelationshipTarget* FindSelectedTarget(const std::vector<cor
     return found == targets.end() ? nullptr : &*found;
 }
 
+const sacm::AssertedRelationship* FindSacmRelationship(const sacm::AssuranceCasePackage& package,
+                                                       const std::string& relationship_id) {
+    for (const sacm::ArgumentPackage& ap : package.argumentPackages) {
+        for (const sacm::AssertedInference& ai : ap.assertedInferences)
+            if (ai.id == relationship_id) return &ai;
+        for (const sacm::AssertedContext& acx : ap.assertedContexts)
+            if (acx.id == relationship_id) return &acx;
+        for (const sacm::AssertedEvidence& ae : ap.assertedEvidences)
+            if (ae.id == relationship_id) return &ae;
+    }
+    return nullptr;
+}
+
+// Pattern Abstraction editor: operator radio (None / Optional / Multiplicity)
+// and, for multiplicity, a cardinality expression field. Each change is applied
+// as one audited command via `callbacks->set_pattern` (ADR-0006).
+void RenderPatternAbstractionSection(const std::string& relationship_id,
+                                     const sacm::AssuranceCasePackage* sacm_package,
+                                     const RelationshipPanelCallbacks* callbacks,
+                                     UiState& ui_state) {
+    if (!sacm_package || !callbacks || !callbacks->set_pattern)
+        return;
+    const sacm::AssertedRelationship* relationship = FindSacmRelationship(*sacm_package, relationship_id);
+    if (!relationship)
+        return;
+    const core::PatternRelationshipData data = core::ReadPatternRelationshipData(*relationship);
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::TextUnformatted(AF_TR("Pattern Abstraction").c_str());
+
+    int op = static_cast<int>(data.relationOperator); // None=0, Optional=1, Multiplicity=2
+    bool changed = false;
+    changed |= ImGui::RadioButton((AF_TR("None") + "##rel_op_none").c_str(), &op, 0);
+    ImGui::SameLine();
+    changed |= ImGui::RadioButton((AF_TR("Optional") + "##rel_op_optional").c_str(), &op, 1);
+    ImGui::SameLine();
+    changed |= ImGui::RadioButton((AF_TR("Multiplicity") + "##rel_op_multiplicity").c_str(), &op, 2);
+
+    if (changed) {
+        core::PatternRelationshipData updated = data;
+        updated.relationOperator = static_cast<core::PatternRelationOperator>(op);
+        if (updated.relationOperator == core::PatternRelationOperator::Multiplicity) {
+            if (!updated.multiplicity.has_value())
+                updated.multiplicity = core::ParseCardinalityExpression("1..*");
+        } else {
+            updated.multiplicity.reset();
+        }
+        callbacks->set_pattern(relationship_id, updated);
+        ui_state.pattern_cardinality_edit_rel_id.clear(); // force buffer reload next frame
+    }
+
+    if (data.relationOperator == core::PatternRelationOperator::Multiplicity) {
+        if (ui_state.pattern_cardinality_edit_rel_id != relationship_id) {
+            ui_state.pattern_cardinality_edit_rel_id = relationship_id;
+            const std::string display =
+                data.multiplicity.has_value() ? data.multiplicity->displayExpression : std::string("1..*");
+            CopyToBuffer(ui_state.pattern_cardinality_buf, sizeof(ui_state.pattern_cardinality_buf), display);
+        }
+        ImGui::SetNextItemWidth(160.0f);
+        ImGui::InputText((AF_TR("Cardinality") + "##rel_cardinality").c_str(),
+                         ui_state.pattern_cardinality_buf,
+                         sizeof(ui_state.pattern_cardinality_buf));
+        ImGui::SameLine();
+        if (ImGui::Button((AF_TR("Apply") + "##rel_cardinality_apply").c_str())) {
+            core::PatternRelationshipData updated = data;
+            updated.relationOperator = core::PatternRelationOperator::Multiplicity;
+            updated.multiplicity = core::ParseCardinalityExpression(ui_state.pattern_cardinality_buf);
+            callbacks->set_pattern(relationship_id, updated);
+        }
+        ImGui::TextDisabled("%s", AF_TR("Examples: 1..*, 0..1, 2..5, n").c_str());
+    }
+}
+
 } // namespace
 
-void ShowRelationshipPanel(parser::AssuranceCase* model, const RelationshipPanelCallbacks* callbacks) {
+void ShowRelationshipPanel(parser::AssuranceCase* model,
+                           const sacm::AssuranceCasePackage* sacm_package,
+                           bool pattern_mode,
+                           const RelationshipPanelCallbacks* callbacks) {
     UiState& ui_state = GetUiState();
     if (ui_state.selected_relationship_id.empty()) {
         ImGui::TextDisabled("%s", AF_TR("No relationship selected.").c_str());
@@ -128,6 +209,9 @@ void ShowRelationshipPanel(parser::AssuranceCase* model, const RelationshipPanel
         if (!can_add)
             ImGui::EndDisabled();
     }
+
+    if (pattern_mode)
+        RenderPatternAbstractionSection(selected_target->relationship_id, sacm_package, callbacks, ui_state);
 }
 
 } // namespace ui::panels

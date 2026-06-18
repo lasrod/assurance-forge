@@ -179,6 +179,33 @@ PatternBound PatternBoundFromToken(const std::string& token) {
     return bound;
 }
 
+namespace {
+
+std::string TrimAscii(const std::string& s) {
+    const auto not_space = [](unsigned char c) { return std::isspace(c) == 0; };
+    auto begin = std::find_if(s.begin(), s.end(), not_space);
+    auto end = std::find_if(s.rbegin(), s.rend(), not_space).base();
+    return (begin < end) ? std::string(begin, end) : std::string();
+}
+
+} // namespace
+
+PatternCardinality ParseCardinalityExpression(const std::string& expression) {
+    PatternCardinality cardinality;
+    cardinality.displayExpression = expression;
+    const std::string trimmed = TrimAscii(expression);
+    const std::size_t sep = trimmed.find("..");
+    if (sep != std::string::npos) {
+        cardinality.minimum = PatternBoundFromToken(TrimAscii(trimmed.substr(0, sep)));
+        cardinality.maximum = PatternBoundFromToken(TrimAscii(trimmed.substr(sep + 2)));
+    } else {
+        const PatternBound bound = PatternBoundFromToken(trimmed);
+        cardinality.minimum = bound;
+        cardinality.maximum = bound;
+    }
+    return cardinality;
+}
+
 bool ValidateCardinality(const PatternCardinality& cardinality, std::string& out_error) {
     const PatternBound& lo = cardinality.minimum;
     const PatternBound& hi = cardinality.maximum;
@@ -256,6 +283,27 @@ void WritePatternRelationshipData(sacm::AssertedRelationship& relationship, cons
         SetTaggedValue(relationship, keys::kChoiceGroup, *data.choiceGroupId);
     else
         RemoveTaggedValue(relationship, keys::kChoiceGroup);
+}
+
+bool SetRelationshipPatternData(sacm::AssuranceCasePackage& package,
+                                const std::string& relationship_id,
+                                const PatternRelationshipData& data,
+                                std::string& out_error) {
+    out_error.clear();
+    if (data.relationOperator == PatternRelationOperator::Multiplicity && data.multiplicity.has_value()) {
+        if (!ValidateCardinality(*data.multiplicity, out_error))
+            return false;
+    }
+    for (auto& ap : package.argumentPackages) {
+        for (auto& ai : ap.assertedInferences)
+            if (ai.id == relationship_id) { WritePatternRelationshipData(ai, data); return true; }
+        for (auto& acx : ap.assertedContexts)
+            if (acx.id == relationship_id) { WritePatternRelationshipData(acx, data); return true; }
+        for (auto& ae : ap.assertedEvidences)
+            if (ae.id == relationship_id) { WritePatternRelationshipData(ae, data); return true; }
+    }
+    out_error = "Relationship not found: " + relationship_id;
+    return false;
 }
 
 // ----- Choice groups -----

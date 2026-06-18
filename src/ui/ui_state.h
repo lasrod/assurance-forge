@@ -82,6 +82,12 @@ struct UiState {
     // Set to true when the canvas should fit-to-view the marked_for_removal set.
     bool center_on_marked = false;
 
+    // Relationship panel multiplicity-cardinality editor buffer (ADR-0006). The
+    // buffer is (re)loaded from the selected relationship's stored display
+    // expression whenever the selection changes to a different relationship.
+    std::string pattern_cardinality_edit_rel_id;
+    char pattern_cardinality_buf[64] = {};
+
     // Active center panel view
     CenterView center_view = CenterView::GsnCanvas;
 

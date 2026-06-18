@@ -23,6 +23,12 @@ struct SacmElement {
     std::string content;
     std::string description;
     bool undeveloped = false;
+    // GSN pattern "uninstantiated" decorator (ADR-0006). Projected from the
+    // `assuranceforge.gsn.pattern.uninstantiated` tagged value at parse time;
+    // drives the bottom-centre decorator in Pattern View. Distinct from
+    // SACMElement.isAbstract (every pattern entity is abstract; only selected
+    // ones visibly carry this decorator).
+    bool uninstantiated = false;
 
     // Multi-language maps: lang code -> text (e.g. "en" -> "...", "ja" -> "...")
     std::map<std::string, std::string> name_langs;

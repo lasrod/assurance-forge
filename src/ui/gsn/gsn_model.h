@@ -30,6 +30,7 @@ struct LayoutNode {
     std::string label;
     std::string label_secondary;
     bool undeveloped = false;
+    bool uninstantiated = false;
     ImVec2 position;
     ImVec2 size;
     std::string parent_id;

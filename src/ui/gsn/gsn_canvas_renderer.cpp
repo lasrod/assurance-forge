@@ -1,9 +1,12 @@
 ﻿#include "ui/gsn/gsn_canvas_renderer.h"
 
 #include "core/acp/acp_relationship_index.h"
+#include "core/pattern_model.h"
 #include "core/perf/frame_profiler.h"
 #include "core/terminology_scope_service.h"
+#include "sacm/sacm_model.h"
 #include "ui/gsn/gsn_acp_decorator.h"
+#include "ui/gsn/gsn_shapes.h"
 #include "ui/gsn/gsn_canvas.h" // for DrawGsnNode
 #include "ui/gsn/gsn_dpi.h"
 #include "ui/gsn/gsn_edge_renderer.h"
@@ -238,6 +241,41 @@ void GsnCanvas::Render(UiState& ui_state,
         core::perf::ScopedTimer perf_scope("gsn.acp.element_lookup");
         return BuildElementAcpLookup(active_case);
     }();
+    // GSN pattern relationship operators (optionality / multiplicity) read from
+    // the SACM package, keyed by relationship id. Only relationships that carry
+    // an operator are recorded, so the map is empty for ordinary arguments and
+    // the edge loop pays nothing (ADR-0006).
+    std::unordered_map<std::string, core::PatternRelationshipData> pattern_op_by_relationship;
+    if (terminology_package) {
+        core::perf::ScopedTimer perf_scope("gsn.pattern.relationship_lookup");
+        const auto record = [&](const sacm::AssertedRelationship& relationship) {
+            core::PatternRelationshipData data = core::ReadPatternRelationshipData(relationship);
+            if (data.relationOperator != core::PatternRelationOperator::None)
+                pattern_op_by_relationship[relationship.id] = std::move(data);
+        };
+        for (const sacm::ArgumentPackage& ap : terminology_package->argumentPackages) {
+            for (const sacm::AssertedInference& ai : ap.assertedInferences)
+                record(ai);
+            for (const sacm::AssertedContext& acx : ap.assertedContexts)
+                record(acx);
+            for (const sacm::AssertedEvidence& ae : ap.assertedEvidences)
+                record(ae);
+        }
+    }
+    // Draw the operator ball + cardinality label at an edge midpoint when its
+    // relationship carries a pattern operator.
+    const auto draw_pattern_operator = [&](const core::acp::AcpRelationshipTarget* acp_target, ImVec2 midpoint) {
+        if (!acp_target)
+            return;
+        const auto it = pattern_op_by_relationship.find(acp_target->relationship_id);
+        if (it == pattern_op_by_relationship.end())
+            return;
+        const bool filled = it->second.relationOperator == core::PatternRelationOperator::Multiplicity;
+        std::string label;
+        if (filled && it->second.multiplicity.has_value())
+            label = it->second.multiplicity->displayExpression;
+        DrawRelationshipOperatorDecorator(draw_list, midpoint, zoom, filled, label.c_str());
+    };
     const std::string picked_edge_key = [&]() {
         core::perf::ScopedTimer perf_scope("gsn.pick_edge");
         return PickRelationshipEdge(layout_nodes_, node_by_id_, origin, zoom, viewport_min, viewport_max);
@@ -337,6 +375,9 @@ void GsnCanvas::Render(UiState& ui_state,
                         actions,
                         ui_state);
                 }
+                draw_pattern_operator(
+                    acp_target,
+                    ImVec2((parent_side.x + attachment_edge.x) * 0.5f, (parent_side.y + attachment_edge.y) * 0.5f));
                 ++frame_stats.edges_drawn;
             } else {
                 ImVec2 parent_bottom, child_top;
@@ -381,6 +422,8 @@ void GsnCanvas::Render(UiState& ui_state,
                         actions,
                         ui_state);
                 }
+                draw_pattern_operator(
+                    acp_target, ImVec2((parent_bottom.x + child_top.x) * 0.5f, (parent_bottom.y + child_top.y) * 0.5f));
                 ++frame_stats.edges_drawn;
             }
         }
@@ -508,6 +551,7 @@ void GsnCanvas::Render(UiState& ui_state,
             gsn_node.label = node.label;
             gsn_node.label_secondary = node.label_secondary;
             gsn_node.undeveloped = node.undeveloped;
+            gsn_node.uninstantiated = node.uninstantiated;
             gsn_node.is_counter = node.is_counter_source;
             {
                 core::perf::ScopedTimer perf_scope("gsn.node.draw");

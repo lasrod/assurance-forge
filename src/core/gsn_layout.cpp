@@ -848,6 +848,7 @@ GsnLayoutGraphResult LayoutGsnGraph(const GsnLayoutInput& input,
         out.label = nl.input->label;
         out.label_secondary = nl.input->label_secondary;
         out.undeveloped = nl.input->undeveloped;
+        out.uninstantiated = nl.input->uninstantiated;
         out.parent_id = nl.input->parent_id;
         out.width = nl.width;
         out.height = nl.height;

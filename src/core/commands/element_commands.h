@@ -24,14 +24,20 @@ bool                    ArgumentTargetKindFromToken(const std::string& token, Ar
 
 // Add a new top-level Goal (root claim). The id is assigned by the underlying
 // `core::AddTopGoal` mutator and captured into the event payload on success.
+// `target_package_id` selects which argument package receives the goal (the
+// active canvas's package, e.g. a pattern); empty routes to the first package.
 class CreateTopGoalCommand final : public ICommand {
 public:
+    explicit CreateTopGoalCommand(std::string target_package_id = {})
+        : target_package_id_(std::move(target_package_id)) {}
+
     std::string Name() const override { return "CreateTopGoal"; }
     bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
     const std::string& GeneratedId() const { return generated_id_; }
 
 private:
+    std::string target_package_id_;
     std::string generated_id_;
 };
 

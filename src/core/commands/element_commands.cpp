@@ -69,12 +69,13 @@ bool ArgumentTargetKindFromToken(const std::string& token, ArgumentTarget::Kind&
 }
 
 bool CreateTopGoalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
-    if (!core::AddTopGoal(ctx.model, &ctx.package, generated_id_, out_error))
+    if (!core::AddTopGoal(ctx.model, &ctx.package, target_package_id_, generated_id_, out_error))
         return false;
 
     out_event.event_type = "CreateTopGoal";
     out_event.payload = nlohmann::ordered_json::object();
     out_event.payload["generated_id"] = generated_id_;
+    out_event.payload["target_package_id"] = target_package_id_;
     return true;
 }
 

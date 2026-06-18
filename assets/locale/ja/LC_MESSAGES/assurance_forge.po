@@ -193,6 +193,9 @@ msgstr "このプロジェクトの SACM ファイルに対してモデル変更
 msgid "Appearance"
 msgstr "外観"
 
+msgid "Apply"
+msgstr "適用"
+
 msgid "Apply Proposal"
 msgstr "提案を適用"
 
@@ -297,6 +300,9 @@ msgstr "キャンセル"
 
 msgid "Canvas render stats"
 msgstr "キャンバス描画統計"
+
+msgid "Cardinality"
+msgstr "多重度値"
 
 msgid "Categories"
 msgstr "分類"
@@ -640,6 +646,9 @@ msgstr "エビデンス行"
 msgid "Evidence register file: {0}"
 msgstr "エビデンス登録簿ファイル: {0}"
 
+msgid "Examples: 1..*, 0..1, 2..5, n"
+msgstr "例: 1..*, 0..1, 2..5, n"
+
 msgid "Existing"
 msgstr "既存"
 
@@ -862,6 +871,12 @@ msgstr "入力が検出されないため、メインループは現在スロッ
 msgid "Manual review OK"
 msgstr "手動レビュー OK"
 
+msgid "Mark as Undeveloped"
+msgstr "未展開としてマーク"
+
+msgid "Mark as Uninstantiated"
+msgstr "未インスタンス化としてマーク"
+
 msgid "Mark as reviewed"
 msgstr "レビュー済みとしてマーク"
 
@@ -894,6 +909,9 @@ msgstr "モード"
 
 msgid "Model"
 msgstr "モデル"
+
+msgid "Multiplicity"
+msgstr "多重度"
 
 msgid "Name"
 msgstr "名前"
@@ -1039,6 +1057,9 @@ msgstr "ノードとその子孫 ({0})"
 msgid "Node drop shadows"
 msgstr "ノードのドロップシャドウ"
 
+msgid "None"
+msgstr "なし"
+
 msgid "Not Implemented"
 msgstr "未実装"
 
@@ -1114,6 +1135,9 @@ msgstr "用語を開く"
 msgid "Opinion triangle"
 msgstr "意見三角形"
 
+msgid "Optional"
+msgstr "オプション"
+
 msgid "Or link to an existing confidence argument tree:"
 msgstr "または既存の信頼度論証ツリーにリンク:"
 
@@ -1167,6 +1191,9 @@ msgstr "パースエラー: {0}"
 
 msgid "Pattern"
 msgstr "パターン"
+
+msgid "Pattern Abstraction"
+msgstr "パターン抽象化"
 
 msgid "Pattern identifier"
 msgstr "パターン識別子"

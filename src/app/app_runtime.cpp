@@ -168,6 +168,9 @@ ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
         actions.add_counter_evidence_to_relationship = [&runtime](const std::string& relationship_id) {
             runtime.AddCounterEvidenceToRelationship(relationship_id);
         };
+    } else { // Pattern mode: element abstraction toggles instead of dialectic.
+        actions.toggle_uninstantiated = [&runtime]() { runtime.ToggleUninstantiatedOnSelected(); };
+        actions.toggle_undeveloped = [&runtime]() { runtime.ToggleUndevelopedOnSelected(); };
     }
     return actions;
 }
@@ -335,6 +338,14 @@ bool AppRuntime::AddCounterArgumentToSelected() {
 
 bool AppRuntime::AddCounterEvidenceToSelected() {
     return actions::ElementActions(*impl_).AddChallengeToSelectedElement(core::ChallengeSourceType::CounterEvidence);
+}
+
+bool AppRuntime::ToggleUninstantiatedOnSelected() {
+    return actions::ElementActions(*impl_).ToggleUninstantiatedOnSelected();
+}
+
+bool AppRuntime::ToggleUndevelopedOnSelected() {
+    return actions::ElementActions(*impl_).ToggleUndevelopedOnSelected();
 }
 
 bool AppRuntime::AddCounterArgumentToRelationship(const std::string& relationship_id) {

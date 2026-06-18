@@ -2,6 +2,7 @@
 
 #include "app/app_events.h"
 #include "core/element_factory.h"
+#include "core/pattern_model.h"
 #include "ui/text_edit_session.h"
 
 #include <string>
@@ -32,6 +33,18 @@ public:
     bool AddChallenge(AppRuntimeState& state,
                       const core::ArgumentTarget& target,
                       core::ChallengeSourceType source_type);
+    // Set the GSN pattern uninstantiated decorator / the undeveloped flag on an
+    // element as a single audited transaction (ADR-0006). `value` is the target
+    // state, so the caller toggles by passing the negation of the current value.
+    bool SetUninstantiated(AppRuntimeState& state, const std::string& element_id, bool value);
+    bool SetUndeveloped(AppRuntimeState& state, const std::string& element_id, bool value);
+
+    // Set the pattern abstraction (optionality / multiplicity + cardinality) on a
+    // relationship as one audited transaction (ADR-0006).
+    bool SetRelationshipPattern(AppRuntimeState& state,
+                                const std::string& relationship_id,
+                                const core::PatternRelationshipData& data);
+
     bool RemoveSelected(AppRuntimeState& state,
                         const std::string& selected_id,
                         core::RemoveMode mode);

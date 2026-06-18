@@ -97,15 +97,21 @@ bool AddChildElementWithIds(parser::AssuranceCase& ac,
                             std::string& out_error);
 
 // Add a new top-level Goal (root claim) without creating a relationship.
-// Useful for starting a fresh argument from the canvas background.
+// Useful for starting a fresh argument from the canvas background. The goal is
+// added to the argument package identified by `target_package_id` (id or gid);
+// this routes top goals to the active canvas's package — e.g. a pattern — rather
+// than always the first package. Pass an empty id to use the first/main package.
 bool AddTopGoal(parser::AssuranceCase& ac,
                 sacm::AssuranceCasePackage* pkg,
+                const std::string& target_package_id,
                 std::string& out_new_id,
                 std::string& out_error);
 
-// Replay-only entrypoint: install a top-level goal with the supplied id.
+// Replay-only entrypoint: install a top-level goal with the supplied id into the
+// package identified by `target_package_id` (empty = first/main package).
 bool AddTopGoalWithId(parser::AssuranceCase& ac,
                       sacm::AssuranceCasePackage* pkg,
+                      const std::string& target_package_id,
                       const std::string& element_id,
                       std::string& out_error);
 
@@ -171,6 +177,27 @@ bool SetElementTextField(parser::AssuranceCase& ac,
                          const std::string& new_value,
                          std::string& out_old_value,
                          std::string& out_error);
+
+// Set the GSN pattern "uninstantiated" decorator on the element with id
+// `element_id` in both the parser model (drives the canvas) and the SACM package
+// (drives save, via the namespaced tagged value). The decorator may apply to any
+// core GSN element type. Returns false with `out_error` if the element is not
+// found; the parser write is the source of truth, so a missing SACM-side element
+// is tolerated.
+bool SetElementUninstantiated(parser::AssuranceCase& ac,
+                              sacm::AssuranceCasePackage* pkg,
+                              const std::string& element_id,
+                              bool value,
+                              std::string& out_error);
+
+// Set the "undeveloped" flag on the element with id `element_id` in both models.
+// Only claims (Goals) and argument reasonings (Strategies) may be undeveloped;
+// any other element type returns false with `out_error`.
+bool SetElementUndeveloped(parser::AssuranceCase& ac,
+                           sacm::AssuranceCasePackage* pkg,
+                           const std::string& element_id,
+                           bool value,
+                           std::string& out_error);
 
 // Returns true if the element carries a secondary-language translation, i.e. any
 // of its name/description/content localized maps has a non-"en" entry with

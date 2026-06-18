@@ -258,6 +258,7 @@ void DrawGsnNode(const GsnNode& node,
     HandleTerminologySpanInteractions(
         terminology_regions, terminology_card_state, terminology_package, actions, overlay_hovered);
     DrawUndevelopedMarker(draw_list, node, top_left, bottom_right, zoom);
+    DrawUninstantiatedMarker(draw_list, node, top_left, bottom_right, zoom);
 
     // Invisible button for hit-testing.
     // SetNextItemAllowOverlap lets overlay buttons (zoom/language) receive clicks
@@ -286,6 +287,19 @@ void DrawGsnNode(const GsnNode& node,
         ui_state.selected_relationship_edge_key.clear();
         RenderAddElementMenu(actions);
         RenderRemoveSubmenu(active_case, ui_state.selected_element_id, actions);
+        // Pattern element abstraction (ADR-0006): toggles shown only in Pattern
+        // mode. Undeveloped applies only to goals (claim) and strategies
+        // (argumentreasoning).
+        if (actions.editor_mode == core::GsnEditorMode::Pattern) {
+            ImGui::Separator();
+            if (actions.toggle_uninstantiated &&
+                ImGui::MenuItem(AF_TR("Mark as Uninstantiated").c_str(), nullptr, node.uninstantiated))
+                actions.toggle_uninstantiated();
+            const bool supports_undeveloped = node.type == "claim" || node.type == "argumentreasoning";
+            if (supports_undeveloped && actions.toggle_undeveloped &&
+                ImGui::MenuItem(AF_TR("Mark as Undeveloped").c_str(), nullptr, node.undeveloped))
+                actions.toggle_undeveloped();
+        }
         ImGui::Separator();
         RenderAiReviewMenu(actions);
         ImGui::EndPopup();

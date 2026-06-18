@@ -23,6 +23,11 @@ public:
     // the relationship identified by `relationship_id`.
     bool AddChallengeToSelectedElement(core::ChallengeSourceType source_type);
     bool AddChallengeToRelationship(const std::string& relationship_id, core::ChallengeSourceType source_type);
+
+    // GSN pattern element abstraction (ADR-0006): flip the uninstantiated /
+    // undeveloped state of the currently selected element as one audited edit.
+    bool ToggleUninstantiatedOnSelected();
+    bool ToggleUndevelopedOnSelected();
     bool AddAcpToSelectedElement();
     bool AddAcpToRelationship(const std::string& relationship_id);
     bool RemoveAcp(const std::string& acp_id);

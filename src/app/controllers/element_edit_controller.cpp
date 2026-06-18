@@ -3,6 +3,7 @@
 #include "app/app_runtime_state.h"
 #include "app/commands/dispatch.h"
 #include "core/commands/element_commands.h"
+#include "core/commands/pattern_commands.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_model.h"
 
@@ -30,6 +31,20 @@ bool TryGetWorkingModel(AppRuntimeState& state,
     out_model   = &state.app_state.loaded_case.value();
     out_package = &state.app_state.sacm_package.value();
     return true;
+}
+
+// Argument-package id of the active canvas tab (empty for the main whole-case
+// GSN canvas). New top goals are routed into this package so adding a goal on a
+// pattern canvas lands in the pattern, not the first package.
+std::string ActiveArgumentPackageId(const AppRuntimeState& state) {
+    const std::string& key = state.workbench.active_argument_package_canvas_key;
+    if (key.empty())
+        return {};
+    for (const auto& tab : state.workbench.argument_package_canvas_tabs) {
+        if (tab.key == key)
+            return !tab.package_id.empty() ? tab.package_id : tab.package_gid;
+    }
+    return {};
 }
 
 } // namespace
@@ -73,7 +88,7 @@ bool ElementEditController::AddTopGoal(AppRuntimeState& state) {
     (void)model;
     (void)package;
 
-    core::commands::CreateTopGoalCommand cmd;
+    core::commands::CreateTopGoalCommand cmd(ActiveArgumentPackageId(state));
     const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
     if (!outcome.success) {
         events_.Emit(StatusMessageEvent{"Add failed: " + outcome.error});
@@ -114,6 +129,79 @@ bool ElementEditController::AddChallenge(AppRuntimeState& state,
     events_.Emit(SelectionChangedEvent{new_id, true});
     events_.Emit(DocumentDirtyEvent{});
     events_.Emit(StatusMessageEvent{"Added " + new_id});
+    return true;
+}
+
+bool ElementEditController::SetUninstantiated(AppRuntimeState& state, const std::string& element_id, bool value) {
+    if (element_id.empty()) {
+        events_.Emit(StatusMessageEvent{"No element selected."});
+        return false;
+    }
+    parser::AssuranceCase*      model   = nullptr;
+    sacm::AssuranceCasePackage* package = nullptr;
+    if (!TryGetWorkingModel(state, "Set uninstantiated", events_, model, package))
+        return false;
+    (void)model;
+    (void)package;
+
+    core::commands::SetUninstantiatedCommand cmd(element_id, value);
+    const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Set uninstantiated failed: " + outcome.error});
+        return false;
+    }
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(DocumentDirtyEvent{});
+    events_.Emit(StatusMessageEvent{value ? "Marked uninstantiated" : "Cleared uninstantiated"});
+    return true;
+}
+
+bool ElementEditController::SetUndeveloped(AppRuntimeState& state, const std::string& element_id, bool value) {
+    if (element_id.empty()) {
+        events_.Emit(StatusMessageEvent{"No element selected."});
+        return false;
+    }
+    parser::AssuranceCase*      model   = nullptr;
+    sacm::AssuranceCasePackage* package = nullptr;
+    if (!TryGetWorkingModel(state, "Set undeveloped", events_, model, package))
+        return false;
+    (void)model;
+    (void)package;
+
+    core::commands::SetUndevelopedCommand cmd(element_id, value);
+    const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Set undeveloped failed: " + outcome.error});
+        return false;
+    }
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(DocumentDirtyEvent{});
+    events_.Emit(StatusMessageEvent{value ? "Marked undeveloped" : "Cleared undeveloped"});
+    return true;
+}
+
+bool ElementEditController::SetRelationshipPattern(AppRuntimeState& state,
+                                                   const std::string& relationship_id,
+                                                   const core::PatternRelationshipData& data) {
+    if (relationship_id.empty()) {
+        events_.Emit(StatusMessageEvent{"No relationship selected."});
+        return false;
+    }
+    parser::AssuranceCase*      model   = nullptr;
+    sacm::AssuranceCasePackage* package = nullptr;
+    if (!TryGetWorkingModel(state, "Set relationship pattern", events_, model, package))
+        return false;
+    (void)model;
+    (void)package;
+
+    core::commands::SetRelationshipPatternCommand cmd(relationship_id, data);
+    const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Set relationship pattern failed: " + outcome.error});
+        return false;
+    }
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(DocumentDirtyEvent{});
     return true;
 }
 

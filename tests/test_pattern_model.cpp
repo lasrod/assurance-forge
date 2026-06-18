@@ -1,6 +1,8 @@
 #include "core/pattern_model.h"
 #include "core/commands/pattern_commands.h"
 #include "core/element_factory.h"
+#include "core/assurance_tree.h"
+#include "parser/xml_parser.h"
 #include "sacm/pattern_keys.h"
 #include "sacm/sacm_package_tree.h"
 
@@ -153,6 +155,82 @@ TEST(PatternRelationshipData, OptionalClearsCardinality) {
     EXPECT_EQ(read.relationOperator, core::PatternRelationOperator::Optional);
     EXPECT_FALSE(read.multiplicity.has_value());
     EXPECT_FALSE(core::HasTaggedValue(rel, keys::kCardinalityMinimum));
+}
+
+TEST(PatternRelationshipData, ParseCardinalityExpression) {
+    using Kind = core::PatternBound::Kind;
+
+    const core::PatternCardinality range = core::ParseCardinalityExpression("1..*");
+    EXPECT_EQ(range.minimum.kind, Kind::Integer);
+    EXPECT_EQ(range.minimum.integerValue, 1);
+    EXPECT_EQ(range.maximum.kind, Kind::Unbounded);
+    EXPECT_EQ(range.displayExpression, "1..*");
+
+    const core::PatternCardinality spaced = core::ParseCardinalityExpression(" 2 .. 5 ");
+    EXPECT_EQ(spaced.minimum.integerValue, 2);
+    EXPECT_EQ(spaced.maximum.integerValue, 5);
+
+    const core::PatternCardinality single = core::ParseCardinalityExpression("n");
+    EXPECT_EQ(single.minimum.kind, Kind::Parameter);
+    EXPECT_EQ(single.maximum.kind, Kind::Parameter);
+    EXPECT_EQ(single.minimum.parameterName, "n");
+}
+
+TEST(PatternRelationshipData, SetRelationshipPatternDataValidatesAndWrites) {
+    sacm::AssuranceCasePackage pkg;
+    sacm::ArgumentPackage ap;
+    ap.id = "AP1";
+    sacm::AssertedInference rel;
+    rel.id = "R1";
+    ap.assertedInferences.push_back(rel);
+    pkg.argumentPackages.push_back(ap);
+
+    core::PatternRelationshipData data;
+    data.relationOperator = core::PatternRelationOperator::Multiplicity;
+    data.multiplicity = core::ParseCardinalityExpression("1..*");
+
+    std::string err;
+    ASSERT_TRUE(core::SetRelationshipPatternData(pkg, "R1", data, err)) << err;
+    const core::PatternRelationshipData read =
+        core::ReadPatternRelationshipData(pkg.argumentPackages[0].assertedInferences[0]);
+    EXPECT_EQ(read.relationOperator, core::PatternRelationOperator::Multiplicity);
+    ASSERT_TRUE(read.multiplicity.has_value());
+    EXPECT_EQ(read.multiplicity->displayExpression, "1..*");
+
+    // Invalid cardinality (min > max) is rejected and leaves the model unchanged.
+    core::PatternRelationshipData bad;
+    bad.relationOperator = core::PatternRelationOperator::Multiplicity;
+    bad.multiplicity = core::ParseCardinalityExpression("5..2");
+    EXPECT_FALSE(core::SetRelationshipPatternData(pkg, "R1", bad, err));
+
+    // Unknown relationship id is reported.
+    EXPECT_FALSE(core::SetRelationshipPatternData(pkg, "missing", data, err));
+}
+
+TEST(PatternRelationshipData, CommandRecordsPayloadAndReplaysViaTokens) {
+    sacm::AssuranceCasePackage pkg;
+    parser::AssuranceCase ac;
+    sacm::ArgumentPackage ap;
+    ap.id = "AP1";
+    sacm::AssertedContext rel;
+    rel.id = "R1";
+    ap.assertedContexts.push_back(rel);
+    pkg.argumentPackages.push_back(ap);
+    core::commands::CommandContext ctx{ac, pkg};
+
+    core::PatternRelationshipData data;
+    data.relationOperator = core::PatternRelationOperator::Optional;
+    core::commands::SetRelationshipPatternCommand cmd("R1", data);
+    core::audit::AuditEvent event;
+    std::string err;
+    ASSERT_TRUE(cmd.Apply(ctx, event, err)) << err;
+    EXPECT_EQ(event.event_type, "SetRelationshipPattern");
+    EXPECT_EQ(event.payload.at("operator").get<std::string>(), "optional");
+
+    core::PatternRelationOperator op;
+    ASSERT_TRUE(core::commands::RelationOperatorFromToken("multiplicity", op));
+    EXPECT_EQ(op, core::PatternRelationOperator::Multiplicity);
+    EXPECT_EQ(core::commands::RelationOperatorToToken(core::PatternRelationOperator::Optional), "optional");
 }
 
 TEST(PatternRelationshipData, ChoiceGroupMembership) {
@@ -334,4 +412,84 @@ TEST(PatternChallengeGuard, AllowsChallengeInNormalArgument) {
     EXPECT_TRUE(core::AddChallenge(
         ac, &pkg, target, core::ChallengeSourceType::CounterArgument, new_id, new_rel, err))
         << err;
+}
+
+// ===== Element abstraction: uninstantiated / undeveloped (ADR-0006) =====
+
+TEST(PatternElementAbstractionMutator, SetUninstantiatedUpdatesBothModels) {
+    sacm::AssuranceCasePackage pkg;
+    parser::AssuranceCase ac;
+    BuildSingleClaimModel(/*as_pattern=*/true, pkg, ac);
+
+    std::string err;
+    ASSERT_TRUE(core::SetElementUninstantiated(ac, &pkg, "G1", true, err)) << err;
+    EXPECT_TRUE(ac.elements[0].uninstantiated);
+    EXPECT_TRUE(core::IsElementUninstantiated(pkg.argumentPackages[0].claims[0]));
+
+    ASSERT_TRUE(core::SetElementUninstantiated(ac, &pkg, "G1", false, err)) << err;
+    EXPECT_FALSE(ac.elements[0].uninstantiated);
+    EXPECT_FALSE(core::IsElementUninstantiated(pkg.argumentPackages[0].claims[0]));
+}
+
+TEST(PatternElementAbstractionMutator, UndevelopedRestrictedToGoalsAndStrategies) {
+    sacm::AssuranceCasePackage pkg;
+    sacm::ArgumentPackage ap;
+    ap.id = "AP1";
+    sacm::ArtifactReference sn;
+    sn.id = "Sn1";
+    ap.artifactReferences.push_back(sn);
+    pkg.argumentPackages.push_back(ap);
+
+    parser::AssuranceCase ac;
+    parser::SacmElement element;
+    element.id = "Sn1";
+    element.type = "artifactreference";
+    ac.elements.push_back(element);
+
+    std::string err;
+    EXPECT_FALSE(core::SetElementUndeveloped(ac, &pkg, "Sn1", true, err));
+    EXPECT_FALSE(err.empty());
+    // Uninstantiated, by contrast, is valid on any core element type.
+    EXPECT_TRUE(core::SetElementUninstantiated(ac, &pkg, "Sn1", true, err)) << err;
+}
+
+TEST(PatternElementAbstractionMutator, CommandSetsFlagAndRecordsPayload) {
+    sacm::AssuranceCasePackage pkg;
+    parser::AssuranceCase ac;
+    BuildSingleClaimModel(/*as_pattern=*/true, pkg, ac);
+    core::commands::CommandContext ctx{ac, pkg};
+
+    core::commands::SetUninstantiatedCommand cmd("G1", true);
+    core::audit::AuditEvent event;
+    std::string err;
+    ASSERT_TRUE(cmd.Apply(ctx, event, err)) << err;
+    EXPECT_EQ(event.event_type, "SetUninstantiated");
+    EXPECT_EQ(event.payload.at("element_id").get<std::string>(), "G1");
+    EXPECT_TRUE(event.payload.at("value").get<bool>());
+    EXPECT_TRUE(core::IsElementUninstantiated(pkg.argumentPackages[0].claims[0]));
+}
+
+TEST(PatternElementAbstractionRender, UninstantiatedParsesAndPropagatesToTree) {
+    const char* xml = R"(<?xml version="1.0"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="P" name="P">
+  <argumentPackage id="PAT1" name="Pattern" isAbstract="true">
+    <taggedValue key="assuranceforge.view.kind" value="gsn-pattern" />
+    <claim id="G1" name="Top" content="goal">
+      <taggedValue key="assuranceforge.gsn.pattern.uninstantiated" value="true" />
+    </claim>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    const auto parsed = parser::parse_sacm_xml_string(xml);
+    ASSERT_TRUE(parsed.has_value());
+    const parser::SacmElement* g1 = nullptr;
+    for (const parser::SacmElement& e : parsed->elements)
+        if (e.id == "G1") g1 = &e;
+    ASSERT_NE(g1, nullptr);
+    EXPECT_TRUE(g1->uninstantiated);
+
+    const core::AssuranceTree tree = core::AssuranceTree::Build(*parsed);
+    const core::TreeNode* node = core::FindTreeNode(tree, "G1");
+    ASSERT_NE(node, nullptr);
+    EXPECT_TRUE(node->uninstantiated);
 }

@@ -27,6 +27,19 @@ void DrawRoundedRect(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right
 void DrawUndevelopedMarker(
     ImDrawList* draw_list, const GsnNode& node, ImVec2 top_left, ImVec2 bottom_right, float zoom);
 
+// GSN pattern uninstantiated decorator: a hollow triangle at the bottom centre
+// of the element. When the node is also undeveloped the triangle is nested into
+// the undeveloped diamond as the GSN v3 combined symbol (ADR-0006).
+void DrawUninstantiatedMarker(
+    ImDrawList* draw_list, const GsnNode& node, ImVec2 top_left, ImVec2 bottom_right, float zoom);
+
+// GSN pattern relationship operator decorator drawn on a relationship edge at
+// `center`: a hollow ball for optionality (`filled` false) or a solid ball for
+// multiplicity (`filled` true), with an optional cardinality label drawn beside
+// it (e.g. "1..*"). `label` may be null/empty (no label). (ADR-0006)
+void DrawRelationshipOperatorDecorator(
+    ImDrawList* draw_list, ImVec2 center, float zoom, bool filled, const char* label);
+
 // Pulsing outline drawn around nodes that are inside the active review scope.
 void DrawReviewScopeHighlight(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, float zoom, bool primary);
 

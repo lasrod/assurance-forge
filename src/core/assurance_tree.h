@@ -27,6 +27,7 @@ struct TreeNode {
     std::string label;
     std::string label_secondary; // secondary language label for toggle
     bool undeveloped = false;
+    bool uninstantiated = false; // GSN pattern uninstantiated decorator (ADR-0006)
     NodeRole role = NodeRole::Other;
     ElementGroup group = ElementGroup::Group1;
 

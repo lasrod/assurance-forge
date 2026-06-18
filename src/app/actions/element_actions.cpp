@@ -46,6 +46,40 @@ bool ElementActions::AddChallengeToSelectedElement(core::ChallengeSourceType sou
     return state_.element_edit_controller->AddChallenge(state_, target, source_type);
 }
 
+bool ElementActions::ToggleUninstantiatedOnSelected() {
+    if (!state_.app_state.loaded_case.has_value()) {
+        SetStatus(state_, "No assurance case loaded.");
+        return false;
+    }
+    const std::string& selected_id = ui::GetUiState().selected_element_id;
+    if (selected_id.empty()) {
+        SetStatus(state_, "No element selected.");
+        return false;
+    }
+    bool current = false;
+    for (const parser::SacmElement& e : state_.app_state.loaded_case->elements) {
+        if (e.id == selected_id) { current = e.uninstantiated; break; }
+    }
+    return state_.element_edit_controller->SetUninstantiated(state_, selected_id, !current);
+}
+
+bool ElementActions::ToggleUndevelopedOnSelected() {
+    if (!state_.app_state.loaded_case.has_value()) {
+        SetStatus(state_, "No assurance case loaded.");
+        return false;
+    }
+    const std::string& selected_id = ui::GetUiState().selected_element_id;
+    if (selected_id.empty()) {
+        SetStatus(state_, "No element selected.");
+        return false;
+    }
+    bool current = false;
+    for (const parser::SacmElement& e : state_.app_state.loaded_case->elements) {
+        if (e.id == selected_id) { current = e.undeveloped; break; }
+    }
+    return state_.element_edit_controller->SetUndeveloped(state_, selected_id, !current);
+}
+
 bool ElementActions::AddChallengeToRelationship(const std::string& relationship_id,
                                                 core::ChallengeSourceType source_type) {
     if (!state_.app_state.loaded_case.has_value()) {

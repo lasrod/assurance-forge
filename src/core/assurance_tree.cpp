@@ -255,6 +255,7 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
         auto node = std::make_unique<TreeNode>();
         node->id = element.id.empty() ? element.name : element.id;
         node->undeveloped = element.undeveloped;
+        node->uninstantiated = element.uninstantiated;
 
         // Build label: "ID: Name\nDetail"
         // Per SACM spec: Claim (11.11) and ArgumentReasoning (11.12) carry their primary

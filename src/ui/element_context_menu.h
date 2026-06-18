@@ -23,6 +23,10 @@ struct ElementContextActions {
     // element; the relationship variants challenge a specific relationship id.
     std::function<void()> add_counter_argument;
     std::function<void()> add_counter_evidence;
+    // GSN pattern element abstraction (Pattern mode only): toggle the
+    // uninstantiated decorator / undeveloped flag on the selected element.
+    std::function<void()> toggle_uninstantiated;
+    std::function<void()> toggle_undeveloped;
     std::function<void(const std::string& relationship_id)> add_counter_argument_to_relationship;
     std::function<void(const std::string& relationship_id)> add_counter_evidence_to_relationship;
     std::function<void(const core::TerminologyPackageRef&, const core::TerminologyTermRef&)> open_terminology_term;

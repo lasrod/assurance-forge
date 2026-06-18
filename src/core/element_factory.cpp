@@ -140,6 +140,18 @@ sacm::ArgumentPackage* FindOwningArgumentPackage(sacm::AssuranceCasePackage* pkg
     return &pkg->argumentPackages.front();
 }
 
+// Find an argument package by id (preferred) or gid. Returns nullptr when
+// `package_id` is empty or no package matches.
+sacm::ArgumentPackage* FindArgumentPackageById(sacm::AssuranceCasePackage* pkg, const std::string& package_id) {
+    if (!pkg || package_id.empty())
+        return nullptr;
+    for (auto& ap : pkg->argumentPackages) {
+        if ((!ap.id.empty() && ap.id == package_id) || (!ap.gid.empty() && ap.gid == package_id))
+            return &ap;
+    }
+    return nullptr;
+}
+
 void MirrorClaim(sacm::ArgumentPackage* ap, const parser::SacmElement& src) {
     if (!ap)
         return;
@@ -325,6 +337,7 @@ bool InstallChildElement(parser::AssuranceCase& ac,
 bool InstallTopGoal(parser::AssuranceCase& ac,
                     sacm::AssuranceCasePackage* pkg,
                     const std::string& element_id,
+                    const std::string& target_package_id,
                     std::string& out_error) {
     if (element_id.empty()) {
         out_error = "Element id must be non-empty.";
@@ -335,7 +348,12 @@ bool InstallTopGoal(parser::AssuranceCase& ac,
     goal.type = "claim";
     goal.name = DefaultNameFor(NewElementKind::Goal);
 
-    sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, goal.id);
+    // A new top goal has no parent to locate its owning package, so route it to
+    // the explicitly requested package (the active canvas's argument package,
+    // e.g. a pattern). Fall back to the first/main package when unspecified.
+    sacm::ArgumentPackage* ap = FindArgumentPackageById(pkg, target_package_id);
+    if (!ap)
+        ap = FindOwningArgumentPackage(pkg, goal.id);
     if (ap)
         MirrorClaim(ap, goal);
 
@@ -548,6 +566,7 @@ bool AddChallengeWithIds(parser::AssuranceCase& ac,
 
 bool AddTopGoal(parser::AssuranceCase& ac,
                 sacm::AssuranceCasePackage* pkg,
+                const std::string& target_package_id,
                 std::string& out_new_id,
                 std::string& out_error) {
     out_new_id.clear();
@@ -555,7 +574,7 @@ bool AddTopGoal(parser::AssuranceCase& ac,
 
     auto existing_ids = CollectIds(ac);
     std::string id = GenerateUniqueId(existing_ids, PrefixFor(NewElementKind::Goal));
-    if (!InstallTopGoal(ac, pkg, id, out_error))
+    if (!InstallTopGoal(ac, pkg, id, target_package_id, out_error))
         return false;
     out_new_id = std::move(id);
     return true;
@@ -563,10 +582,11 @@ bool AddTopGoal(parser::AssuranceCase& ac,
 
 bool AddTopGoalWithId(parser::AssuranceCase& ac,
                       sacm::AssuranceCasePackage* pkg,
+                      const std::string& target_package_id,
                       const std::string& element_id,
                       std::string& out_error) {
     out_error.clear();
-    return InstallTopGoal(ac, pkg, element_id, out_error);
+    return InstallTopGoal(ac, pkg, element_id, target_package_id, out_error);
 }
 
 // ===== Remove helpers (planner) ============================================
@@ -1093,6 +1113,62 @@ bool SetElementTextField(parser::AssuranceCase& ac,
     WriteParserField(*elem, field, language, new_value);
     if (pkg)
         UpdateSacmElementText(*pkg, element_id, field, language, new_value);
+    return true;
+}
+
+bool SetElementUninstantiated(parser::AssuranceCase& ac,
+                              sacm::AssuranceCasePackage* pkg,
+                              const std::string& element_id,
+                              bool value,
+                              std::string& out_error) {
+    out_error.clear();
+    parser::SacmElement* elem = nullptr;
+    for (auto& e : ac.elements) {
+        if (e.id == element_id) { elem = &e; break; }
+    }
+    if (!elem) {
+        out_error = "Element not found: " + element_id;
+        return false;
+    }
+    elem->uninstantiated = value;
+    if (pkg) {
+        for (auto& ap : pkg->argumentPackages) {
+            for (auto& c : ap.claims)              if (c.id == element_id)  { SetElementUninstantiated(c, value);   return true; }
+            for (auto& ar : ap.argumentReasonings) if (ar.id == element_id) { SetElementUninstantiated(ar, value);  return true; }
+            for (auto& ar : ap.artifactReferences) if (ar.id == element_id) { SetElementUninstantiated(ar, value);  return true; }
+            for (auto& ai : ap.assertedInferences) if (ai.id == element_id) { SetElementUninstantiated(ai, value);  return true; }
+            for (auto& acx : ap.assertedContexts)  if (acx.id == element_id) { SetElementUninstantiated(acx, value); return true; }
+            for (auto& ae : ap.assertedEvidences)  if (ae.id == element_id) { SetElementUninstantiated(ae, value);  return true; }
+        }
+    }
+    return true;
+}
+
+bool SetElementUndeveloped(parser::AssuranceCase& ac,
+                           sacm::AssuranceCasePackage* pkg,
+                           const std::string& element_id,
+                           bool value,
+                           std::string& out_error) {
+    out_error.clear();
+    parser::SacmElement* elem = nullptr;
+    for (auto& e : ac.elements) {
+        if (e.id == element_id) { elem = &e; break; }
+    }
+    if (!elem) {
+        out_error = "Element not found: " + element_id;
+        return false;
+    }
+    if (elem->type != "claim" && elem->type != "argumentreasoning") {
+        out_error = "Undeveloped applies only to goals and strategies.";
+        return false;
+    }
+    elem->undeveloped = value;
+    if (pkg) {
+        for (auto& ap : pkg->argumentPackages) {
+            for (auto& c : ap.claims)              if (c.id == element_id)  { c.undeveloped = value;  return true; }
+            for (auto& ar : ap.argumentReasonings) if (ar.id == element_id) { ar.undeveloped = value; return true; }
+        }
+    }
     return true;
 }
 

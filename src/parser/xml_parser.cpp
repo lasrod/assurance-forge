@@ -240,6 +240,13 @@ void extract_elements_recursive(pugi::xml_node node, AssuranceCase& assurance_ca
             if (local_name == "claim" || local_name == "argumentreasoning") {
                 element.undeveloped = read_bool_attr(child, "undeveloped", false);
             }
+            // The GSN pattern "uninstantiated" decorator may apply to any core
+            // element type, so it is read for every element (ADR-0006). The key
+            // is the literal from sacm/pattern_keys.h (kUninstantiated); the
+            // parser layer cannot include sacm headers, so — like the ACP keys
+            // above — it is hardcoded here against that canonical source.
+            element.uninstantiated =
+                tagged_value(child, "assuranceforge.gsn.pattern.uninstantiated") == "true";
 
             if (local_name == "expression") {
                 element.content = child.attribute("value").as_string();

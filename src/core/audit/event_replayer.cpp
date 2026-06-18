@@ -50,8 +50,13 @@ bool ApplyEvent(ReplayState& state,
         std::string element_id;
         if (!require_string("generated_id", element_id))
             return false;
+        // Optional: events recorded before pattern support carry no target
+        // package, in which case the goal goes to the first/main package.
+        std::string target_package_id;
+        if (auto it = payload.find("target_package_id"); it != payload.end() && it->is_string())
+            target_package_id = it->get<std::string>();
         std::string err;
-        if (!core::AddTopGoalWithId(state.model, &state.package, element_id, err)) {
+        if (!core::AddTopGoalWithId(state.model, &state.package, target_package_id, element_id, err)) {
             out_error = "AddTopGoalWithId failed at " + FormatLocation(tx_seq, event.event_sequence, type) +
                         ": " + err;
             return false;
@@ -226,6 +231,65 @@ bool ApplyEvent(ReplayState& state,
         if (!result.success) {
             out_error = "CreatePatternPackageWithIds failed at " +
                         FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
+            return false;
+        }
+        return true;
+    }
+
+    if (type == "SetUninstantiated" || type == "SetUndeveloped") {
+        std::string element_id;
+        if (!require_string("element_id", element_id))
+            return false;
+        auto value_it = payload.find("value");
+        if (value_it == payload.end() || !value_it->is_boolean()) {
+            out_error = "Missing or non-boolean payload field 'value' at " +
+                        FormatLocation(tx_seq, event.event_sequence, type);
+            return false;
+        }
+        const bool value = value_it->get<bool>();
+        std::string err;
+        const bool ok = (type == "SetUninstantiated")
+                            ? core::SetElementUninstantiated(state.model, &state.package, element_id, value, err)
+                            : core::SetElementUndeveloped(state.model, &state.package, element_id, value, err);
+        if (!ok) {
+            out_error = type + " failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+            return false;
+        }
+        return true;
+    }
+
+    if (type == "SetRelationshipPattern") {
+        std::string relationship_id, operator_token;
+        if (!require_string("relationship_id", relationship_id))
+            return false;
+        if (!require_string("operator", operator_token))
+            return false;
+        core::PatternRelationOperator op;
+        if (!commands::RelationOperatorFromToken(operator_token, op)) {
+            out_error = "Unknown relationship operator token '" + operator_token + "' at " +
+                        FormatLocation(tx_seq, event.event_sequence, type);
+            return false;
+        }
+        core::PatternRelationshipData data;
+        data.relationOperator = op;
+        if (op == core::PatternRelationOperator::Multiplicity) {
+            std::string card_min, card_max, card_display;
+            if (!require_string("cardinality_min", card_min))
+                return false;
+            if (!require_string("cardinality_max", card_max))
+                return false;
+            if (!require_string("cardinality_display", card_display))
+                return false;
+            core::PatternCardinality cardinality;
+            cardinality.minimum = core::PatternBoundFromToken(card_min);
+            cardinality.maximum = core::PatternBoundFromToken(card_max);
+            cardinality.displayExpression = card_display;
+            data.multiplicity = cardinality;
+        }
+        std::string err;
+        if (!core::SetRelationshipPatternData(state.package, relationship_id, data, err)) {
+            out_error = "SetRelationshipPatternData failed at " +
+                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;

@@ -65,6 +65,10 @@ public:
     // argument-package canvas projects a pattern definition, else Argument
     // (ADR-0007). Drives dialectic gating in the context menu.
     core::GsnEditorMode CurrentEditorMode() const;
+
+    // GSN pattern element abstraction toggles for the selected element (ADR-0006).
+    bool ToggleUninstantiatedOnSelected();
+    bool ToggleUndevelopedOnSelected();
     bool RemoveProjectFile(const core::ProjectFileEntry& entry);
     bool RevealProjectFileInExplorer(const core::ProjectFileEntry& entry);
     void OpenArgumentPackageCanvas(const std::string& package_id,

@@ -228,7 +228,10 @@ void DrawUndevelopedMarker(
     draw_list->AddConvexPolyFilled(diamond, 4, und_fill);
     draw_list->AddPolyline(diamond, 4, OutlineColor(), ImDrawFlags_Closed, DpiSize(kOutlineThickness) * zoom);
 
-    if (zoom < kUndLabelZoom)
+    // When the element is also uninstantiated the diamond and the uninstantiated
+    // triangle are overlaid into the GSN combined symbol; drop the "UND" label so
+    // the combined glyph stays legible (GSN v3 §1:3.3).
+    if (zoom < kUndLabelZoom || node.uninstantiated)
         return;
 
     const char* und = "UND";
@@ -249,6 +252,63 @@ void DrawUndevelopedMarker(
     ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, und);
     ImVec2 text_pos(center.x - text_size.x * 0.5f, center.y - text_size.y * 0.5f);
     draw_list->AddText(font, font_size, text_pos, und_ink, und);
+}
+
+void DrawUninstantiatedMarker(
+    ImDrawList* draw_list, const GsnNode& node, ImVec2 top_left, ImVec2 bottom_right, float zoom) {
+    if (!node.uninstantiated)
+        return;
+
+    const float radius = DpiSize(kUndDiamondRadius) * zoom;
+    const float gap = DpiSize(kUndGap) * zoom;
+    // Same bottom-centre anchor as the undeveloped diamond so the two overlay
+    // into the GSN combined symbol when both flags are set (GSN v3 §1:3.3).
+    const ImVec2 center((top_left.x + bottom_right.x) * 0.5f, bottom_right.y + gap + radius);
+
+    const bool combined = node.undeveloped;
+    // When combined, the diamond is already drawn; nest a smaller outline-only
+    // triangle inside it. Otherwise draw a filled hollow triangle on its own.
+    const float r = combined ? radius * 0.72f : radius;
+    const ImVec2 triangle[3] = {ImVec2(center.x, center.y - r),
+                                ImVec2(center.x + r, center.y + r),
+                                ImVec2(center.x - r, center.y + r)};
+
+    if (!combined) {
+        if (ShouldDrawShadows(zoom)) {
+            DrawPolyShadow(draw_list, triangle, 3, zoom);
+            if (auto* stats = CurrentRenderStats())
+                ++stats->shadows_drawn;
+        }
+        const ImU32 fill = IM_COL32(245, 247, 252, 255); // near-white for high contrast
+        draw_list->AddConvexPolyFilled(triangle, 3, fill);
+    }
+    draw_list->AddPolyline(triangle, 3, OutlineColor(), ImDrawFlags_Closed, DpiSize(kOutlineThickness) * zoom);
+}
+
+void DrawRelationshipOperatorDecorator(
+    ImDrawList* draw_list, ImVec2 center, float zoom, bool filled, const char* label) {
+    const float radius = DpiSize(7.0f) * zoom;
+    const ImU32 outline = WithAlpha(GetTheme().border_strong, 0.95f);
+    const int segments = CircleSegmentsForZoom(zoom);
+    // Solid ball = multiplicity; hollow ball = optionality (GSN v3 §1:3.2).
+    const ImU32 fill = filled ? GetTheme().border_strong : IM_COL32(245, 247, 252, 255);
+    draw_list->AddCircleFilled(center, radius, fill, segments);
+    draw_list->AddCircle(center, radius, outline, segments, DpiSize(kOutlineThickness) * zoom * 1.5f);
+
+    if (label && label[0] != '\0') {
+        ImFont* font = ImGui::GetFont();
+        const float font_size = ImGui::GetFontSize() * std::clamp(zoom, 0.6f, 1.4f);
+        const ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, label);
+        // Place the cardinality just to the right of the ball, vertically centred.
+        const ImVec2 text_pos(center.x + radius + DpiSize(4.0f) * zoom, center.y - text_size.y * 0.5f);
+        // Subtle plate behind the text so it stays legible over edges.
+        const ImVec2 pad(DpiSize(3.0f) * zoom, DpiSize(1.0f) * zoom);
+        draw_list->AddRectFilled(ImVec2(text_pos.x - pad.x, text_pos.y - pad.y),
+                                 ImVec2(text_pos.x + text_size.x + pad.x, text_pos.y + text_size.y + pad.y),
+                                 WithAlpha(GetTheme().surface_1, 0.85f),
+                                 DpiSize(3.0f) * zoom);
+        draw_list->AddText(font, font_size, text_pos, GetTheme().text_primary, label);
+    }
 }
 
 // Draw dashes along a (optionally closed) polyline with a continuous on/off

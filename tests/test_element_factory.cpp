@@ -89,11 +89,33 @@ TEST(ElementFactoryAdd, AddTopGoalCreatesClaimInParserAndSacm) {
 
     std::string new_id;
     std::string err;
-    ASSERT_TRUE(core::AddTopGoal(ac, &pkg, new_id, err)) << err;
+    ASSERT_TRUE(core::AddTopGoal(ac, &pkg, /*target_package_id=*/"", new_id, err)) << err;
     ASSERT_FALSE(new_id.empty());
 
     EXPECT_TRUE(ParserHasId(ac, new_id));
     EXPECT_TRUE(SacmHasClaim(pkg, new_id));
+}
+
+TEST(ElementFactoryAdd, AddTopGoalRoutesToRequestedPackage) {
+    parser::AssuranceCase ac;
+    sacm::AssuranceCasePackage pkg;
+    sacm::ArgumentPackage first;
+    first.id = "AP_FIRST";
+    sacm::ArgumentPackage pattern;
+    pattern.id = "PAT1";
+    pkg.argumentPackages.push_back(first);
+    pkg.argumentPackages.push_back(pattern);
+
+    std::string new_id;
+    std::string err;
+    ASSERT_TRUE(core::AddTopGoal(ac, &pkg, /*target_package_id=*/"PAT1", new_id, err)) << err;
+
+    const auto has_claim = [&](const sacm::ArgumentPackage& ap) {
+        return std::any_of(ap.claims.begin(), ap.claims.end(),
+                           [&](const sacm::Claim& c) { return c.id == new_id; });
+    };
+    EXPECT_FALSE(has_claim(pkg.argumentPackages[0])) << "goal must not land in the first package";
+    EXPECT_TRUE(has_claim(pkg.argumentPackages[1])) << "goal must land in the targeted pattern package";
 }
 
 TEST(ElementFactoryAdd, AddContextCreatesArtifactReferenceAndAssertedContext) {
