@@ -2,6 +2,7 @@
 
 #include "app/app_events.h"
 #include "core/element_factory.h"
+#include "core/gsn_editor_mode.h"
 #include "core/problems/problem_item.h"
 #include "core/project_model.h"
 #include "core/reviews/review_item.h"
@@ -59,6 +60,11 @@ public:
     bool AddCounterEvidenceToSelected();
     bool AddCounterArgumentToRelationship(const std::string& relationship_id);
     bool AddCounterEvidenceToRelationship(const std::string& relationship_id);
+
+    // Editor mode of the active GSN canvas tab: Pattern when the active
+    // argument-package canvas projects a pattern definition, else Argument
+    // (ADR-0007). Drives dialectic gating in the context menu.
+    core::GsnEditorMode CurrentEditorMode() const;
     bool RemoveProjectFile(const core::ProjectFileEntry& entry);
     bool RevealProjectFileInExplorer(const core::ProjectFileEntry& entry);
     void OpenArgumentPackageCanvas(const std::string& package_id,
@@ -108,6 +114,8 @@ private:
     void OpenProjectPackageNode(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node);
     void BeginAddTerminologyPackage(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& parent_node);
     void ConfirmAddTerminologyPackage();
+    void BeginAddPattern(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& parent_node);
+    void ConfirmAddPattern();
     void ApplyTerminologyPackageEdits();
     void BeginDeleteTerminologyPackage();
     void ConfirmDeleteTerminologyPackage();

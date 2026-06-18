@@ -1,6 +1,7 @@
 #include "core/element_factory.h"
 
 #include "core/acp/assurance_claim_point.h"
+#include "core/pattern_model.h"
 
 #include <algorithm>
 #include <cctype>
@@ -376,6 +377,14 @@ bool InstallChallenge(parser::AssuranceCase& ac,
         anchor_id = target_elem->target_refs.front();
     }
     sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, anchor_id);
+
+    // Dialectic challenges are forbidden inside a GSN pattern definition
+    // (ADR-0006/0007). Reject at the command layer so replay and programmatic
+    // callers are guarded even though Pattern View hides the UI actions.
+    if (ap && IsPatternPackage(*ap)) {
+        out_error = "Challenges cannot be added inside a GSN pattern.";
+        return false;
+    }
 
     parser::SacmElement new_elem;
     new_elem.id = element_id;

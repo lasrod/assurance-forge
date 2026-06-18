@@ -1,5 +1,6 @@
 #include "app/app_runtime.h"
 #include "app/actions/terminology_actions.h"
+#include "app/actions/terminology_actions_internal.h"
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
 #include "app/commands/dispatch.h"
@@ -16,7 +17,10 @@
 #include "core/audit/audit_store.h"
 #include "core/commands/command_bus.h"
 #include "core/commands/package_commands.h"
+#include "core/commands/pattern_commands.h"
+#include "core/pattern_model.h"
 #include "core/problems/problem_utils.h"
+#include "core/string_utils.h"
 #include "core/project_service.h"
 #include "core/reviews/review_item.h"
 #include "core/terminology_package_service.h"
@@ -553,6 +557,20 @@ void AppRuntime::OpenArgumentPackageCanvas(const std::string& package_id,
     if (source_file_path.empty())
         source_file_path = impl_->app_state.active_project_file_path;
 
+    // A pattern definition is an abstract pattern ArgumentPackage (ADR-0006);
+    // classify the package so the canvas opens in Pattern editor mode.
+    bool is_pattern = false;
+    if (impl_->app_state.sacm_package.has_value()) {
+        for (const sacm::ArgumentPackage& ap : impl_->app_state.sacm_package->argumentPackages) {
+            const bool match = (!package_id.empty() && ap.id == package_id) ||
+                               (!package_gid.empty() && ap.gid == package_gid);
+            if (match) {
+                is_pattern = core::IsPatternPackage(ap);
+                break;
+            }
+        }
+    }
+
     const std::string key = ArgumentPackageCanvasKey(source_file_path, package_id, package_gid);
     auto& tabs = impl_->workbench.argument_package_canvas_tabs;
     auto found = std::find_if(tabs.begin(), tabs.end(), [&](const auto& tab) { return tab.key == key; });
@@ -563,9 +581,12 @@ void AppRuntime::OpenArgumentPackageCanvas(const std::string& package_id,
         tab.package_gid = package_gid;
         tab.title = display_name.empty() ? (package_id.empty() ? "Argument Package" : package_id) : display_name;
         tab.source_file_path = source_file_path;
+        tab.is_pattern = is_pattern;
         tabs.push_back(std::move(tab));
-    } else if (!display_name.empty()) {
-        found->title = display_name;
+    } else {
+        found->is_pattern = is_pattern;
+        if (!display_name.empty())
+            found->title = display_name;
     }
 
     impl_->workbench.active_argument_package_canvas_key = key;
@@ -604,6 +625,62 @@ void AppRuntime::BeginAddTerminologyPackage(const core::ProjectFileEntry& entry,
 void AppRuntime::ConfirmAddTerminologyPackage() {
     if (actions::TerminologyActions(*impl_).ConfirmAddPackage())
         impl_->problems_dirty.terminology = true;
+}
+
+void AppRuntime::BeginAddPattern(const core::ProjectFileEntry& entry,
+                                 const sacm::SacmPackageTreeNode& /*parent_node*/) {
+    if (!CanSwitchProjectSacmFile(impl_->app_state, entry)) {
+        SetStatus("Save the current SACM file before adding a pattern.");
+        return;
+    }
+    impl_->pattern.pending_parent_entry = entry;
+    ui::CopyToBuffer(impl_->pattern.name_buf, sizeof(impl_->pattern.name_buf), "");
+    ui::CopyToBuffer(impl_->pattern.identifier_buf, sizeof(impl_->pattern.identifier_buf), "");
+    ui::CopyToBuffer(impl_->pattern.description_buf, sizeof(impl_->pattern.description_buf), "");
+    impl_->pattern.identifier_user_edited = false;
+    impl_->pattern.show_create_pattern_modal = true;
+}
+
+void AppRuntime::ConfirmAddPattern() {
+    if (!impl_->pattern.pending_parent_entry.has_value()) {
+        impl_->pattern.show_create_pattern_modal = false;
+        return;
+    }
+
+    const core::ProjectFileEntry entry = impl_->pattern.pending_parent_entry.value();
+    if (!CanSwitchProjectSacmFile(impl_->app_state, entry)) {
+        SetStatus("Save the current SACM file before adding a pattern.");
+        return;
+    }
+    if (!EnsureProjectSacmFileOpen(*impl_, entry, false))
+        return;
+    if (!impl_->app_state.sacm_package.has_value()) {
+        SetStatus("Could not load an editable SACM package model.");
+        return;
+    }
+
+    const std::string name = core::TrimWhitespace(impl_->pattern.name_buf);
+    const std::string identifier = core::TrimWhitespace(impl_->pattern.identifier_buf);
+    const std::string description = core::TrimWhitespace(impl_->pattern.description_buf);
+
+    core::commands::CreatePatternCommand command(name, identifier, description);
+    const auto outcome = app::commands::DispatchAuditedCommand(*impl_, command);
+    if (!outcome.success) {
+        SetStatus("Pattern create failed: " + outcome.error);
+        return;
+    }
+
+    app::actions::detail::InvalidateSacmPackageTreeCache(*impl_, entry.relativePath);
+    impl_->pattern.show_create_pattern_modal = false;
+    impl_->pattern.pending_parent_entry.reset();
+    impl_->tree_needs_rebuild = true;
+
+    // Open the new pattern on the canvas for immediate feedback. The dedicated
+    // Pattern View (mode-gated editing) arrives in Milestone C; until then the
+    // pattern opens like any argument package.
+    OpenArgumentPackageCanvas(
+        command.GeneratedId(), command.GeneratedGid(), name.empty() ? command.GeneratedId() : name, "");
+    SetStatus("Added pattern " + command.GeneratedId() + ".");
 }
 
 void AppRuntime::ApplyTerminologyPackageEdits() {

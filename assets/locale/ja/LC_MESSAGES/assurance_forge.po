@@ -154,6 +154,9 @@ msgstr "新規 GSN / SACM ファイルを追加"
 msgid "Add New Top Goal"
 msgstr "新規トップゴールを追加"
 
+msgid "Add Pattern..."
+msgstr "パターンを追加..."
+
 msgid "Add Recommended"
 msgstr "推奨を追加"
 
@@ -204,6 +207,9 @@ msgstr "論証パッケージ"
 
 msgid "Argument package was not found in the loaded SACM model."
 msgstr "読み込まれた SACM モデルに論証パッケージが見つかりませんでした。"
+
+msgid "Argument pattern definition"
+msgstr "アーギュメントパターン定義"
 
 msgid "Artifact Packages"
 msgstr "成果物パッケージ"
@@ -420,6 +426,9 @@ msgstr "分類を作成"
 
 msgid "Create Empty Assurance Project"
 msgstr "空の保証プロジェクトを作成"
+
+msgid "Create Pattern"
+msgstr "パターンを作成"
 
 msgid "Create Proposed Change"
 msgstr "提案変更を作成"
@@ -1155,6 +1164,21 @@ msgstr "親の場所"
 
 msgid "Parse error: {0}"
 msgstr "パースエラー: {0}"
+
+msgid "Pattern"
+msgstr "パターン"
+
+msgid "Pattern identifier"
+msgstr "パターン識別子"
+
+msgid "Pattern name"
+msgstr "パターン名"
+
+msgid "Pattern: {0}"
+msgstr "パターン: {0}"
+
+msgid "Patterns"
+msgstr "パターン"
 
 msgid "Pause"
 msgstr "一時停止"

@@ -80,6 +80,7 @@ nav:
           - 0004 MkDocs Material documentation site: architecture/decisions/0004-mkdocs-material-documentation-site.md
           - 0005 Provider-agnostic AI with explicit user consent: architecture/decisions/0005-provider-agnostic-ai-with-user-consent.md
           - 0006 GSN patterns as abstract ArgumentPackages: architecture/decisions/0006-gsn-patterns-as-abstract-argument-packages.md
+          - 0007 Single GSN canvas with an editor mode: architecture/decisions/0007-single-gsn-canvas-with-editor-mode.md
       - Generated Class Diagrams: architecture/generated-class-diagrams.md
   - Developer Guide:
       - Overview: developer-guide/index.md

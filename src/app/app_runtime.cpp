@@ -155,15 +155,33 @@ ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
     actions.focus_problem = [](const std::string& problem_id, const std::string& element_id) {
         ui::FocusProblemInPanel(ui::GetUiState(), problem_id, element_id);
     };
-    actions.add_counter_argument = [&runtime]() { runtime.AddCounterArgumentToSelected(); };
-    actions.add_counter_evidence = [&runtime]() { runtime.AddCounterEvidenceToSelected(); };
-    actions.add_counter_argument_to_relationship = [&runtime](const std::string& relationship_id) {
-        runtime.AddCounterArgumentToRelationship(relationship_id);
-    };
-    actions.add_counter_evidence_to_relationship = [&runtime](const std::string& relationship_id) {
-        runtime.AddCounterEvidenceToRelationship(relationship_id);
-    };
+    // Dialectic (challenge) actions exist only in Argument mode (ADR-0007). In
+    // Pattern mode the callbacks are left unset so the menu items are absent and
+    // any stray invocation is a no-op; the command layer rejects them too.
+    actions.editor_mode = runtime.CurrentEditorMode();
+    if (actions.editor_mode == core::GsnEditorMode::Argument) {
+        actions.add_counter_argument = [&runtime]() { runtime.AddCounterArgumentToSelected(); };
+        actions.add_counter_evidence = [&runtime]() { runtime.AddCounterEvidenceToSelected(); };
+        actions.add_counter_argument_to_relationship = [&runtime](const std::string& relationship_id) {
+            runtime.AddCounterArgumentToRelationship(relationship_id);
+        };
+        actions.add_counter_evidence_to_relationship = [&runtime](const std::string& relationship_id) {
+            runtime.AddCounterEvidenceToRelationship(relationship_id);
+        };
+    }
     return actions;
+}
+
+core::GsnEditorMode AppRuntime::CurrentEditorMode() const {
+    const auto& tabs = impl_->workbench.argument_package_canvas_tabs;
+    const std::string& active_key = impl_->workbench.active_argument_package_canvas_key;
+    if (active_key.empty())
+        return core::GsnEditorMode::Argument;
+    for (const WorkbenchState::ArgumentPackageCanvasTab& tab : tabs) {
+        if (tab.key == active_key)
+            return tab.is_pattern ? core::GsnEditorMode::Pattern : core::GsnEditorMode::Argument;
+    }
+    return core::GsnEditorMode::Argument;
 }
 
 AppRuntime::AppRuntime() : impl_(std::make_unique<AppRuntimeState>()) {

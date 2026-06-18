@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/element_factory.h"
+#include "core/gsn_editor_mode.h"
 #include "core/terminology_package_service.h"
 #include "core/sacm_model.h"
 
@@ -40,6 +41,12 @@ struct ElementContextActions {
     // highest-severity problem id and its element id; the runtime opens the
     // Problems panel and selects the matching row.
     std::function<void(const std::string& problem_id, const std::string& element_id)> focus_problem;
+
+    // Editing mode of the canvas these actions drive (ADR-0007). In Pattern mode
+    // dialectic actions (counter argument/evidence) are hidden; the command
+    // layer also rejects them as a backstop. Kept last so the positional
+    // aggregate initializers of the leading callbacks stay valid.
+    core::GsnEditorMode editor_mode = core::GsnEditorMode::Argument;
 };
 
 void RenderAddElementMenu(const ElementContextActions& actions);

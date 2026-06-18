@@ -1,5 +1,6 @@
 #include "core/pattern_model.h"
 
+#include "core/terminology_internal.h"
 #include "sacm/pattern_keys.h"
 
 #include <algorithm>
@@ -69,6 +70,69 @@ bool IsPatternPackage(const sacm::ArgumentPackage& package) {
         return false;
     const std::optional<std::string> view_kind = GetTaggedValue(package, keys::kViewKind);
     return view_kind.has_value() && keys::kViewKindPatternValue == *view_kind;
+}
+
+bool IsPatternIdentifierUnique(const sacm::AssuranceCasePackage& package,
+                               const std::string& identifier,
+                               const std::string& exclude_package_id) {
+    if (identifier.empty())
+        return true;
+    for (const sacm::ArgumentPackage& candidate : package.argumentPackages) {
+        if (!candidate.id.empty() && candidate.id == exclude_package_id)
+            continue;
+        if (!IsPatternPackage(candidate))
+            continue;
+        const std::optional<std::string> existing = GetTaggedValue(candidate, keys::kPatternIdentifier);
+        if (existing.has_value() && *existing == identifier)
+            return false;
+    }
+    return true;
+}
+
+PatternCreateResult CreatePatternPackageWithIds(sacm::AssuranceCasePackage& package,
+                                                const std::string& name,
+                                                const std::string& identifier,
+                                                const std::string& description,
+                                                const std::string& forced_id,
+                                                const std::string& forced_gid) {
+    PatternCreateResult result;
+    if (name.empty()) {
+        result.error = "Pattern name is required.";
+        return result;
+    }
+    if (identifier.empty()) {
+        result.error = "Pattern identifier is required.";
+        return result;
+    }
+    if (!IsPatternIdentifierUnique(package, identifier)) {
+        result.error = "Pattern identifier '" + identifier + "' is already used by another pattern.";
+        return result;
+    }
+
+    sacm::ArgumentPackage pattern;
+    pattern.id = forced_id.empty() ? core::detail::GenerateUniqueId(package, "PAT") : forced_id;
+    pattern.gid = forced_gid.empty() ? core::detail::GenerateUniqueGid(package, pattern.id) : forced_gid;
+    pattern.isAbstract = true;
+    pattern.name = name;
+    pattern.name_ml.set("en", name);
+    pattern.description = description;
+    if (!description.empty())
+        pattern.description_ml.set("en", description);
+    SetTaggedValue(pattern, keys::kViewKind, std::string(keys::kViewKindPatternValue));
+    SetTaggedValue(pattern, keys::kPatternIdentifier, identifier);
+
+    result.package_id = pattern.id;
+    result.package_gid = pattern.gid;
+    package.argumentPackages.push_back(std::move(pattern));
+    result.success = true;
+    return result;
+}
+
+PatternCreateResult CreatePatternPackage(sacm::AssuranceCasePackage& package,
+                                         const std::string& name,
+                                         const std::string& identifier,
+                                         const std::string& description) {
+    return CreatePatternPackageWithIds(package, name, identifier, description, {}, {});
 }
 
 // ----- Element abstraction -----

@@ -61,6 +61,10 @@ struct WorkbenchState {
         std::string package_gid;
         std::string title;
         std::filesystem::path source_file_path;
+        // True when this canvas projects a GSN pattern definition (an abstract
+        // pattern ArgumentPackage). Drives the Pattern View title/badge and the
+        // Pattern editor mode (ADR-0007).
+        bool is_pattern = false;
         // History slider selection for this canvas tab. std::nullopt = LIVE
         // (renders the current model). A value pins the canvas to the
         // reconstructed state after applying transaction N.
@@ -147,6 +151,18 @@ struct TerminologyUiState {
     char term_origin_buf[512] = {};
     char category_name_buf[256] = {};
     char category_description_buf[2048] = {};
+};
+
+// Transient state for the "Add Pattern..." creation modal (Milestone B).
+struct PatternUiState {
+    bool show_create_pattern_modal = false;
+    std::optional<core::ProjectFileEntry> pending_parent_entry;
+    char name_buf[256] = {};
+    char identifier_buf[128] = {};
+    char description_buf[2048] = {};
+    // Once the user edits the identifier by hand we stop auto-deriving it from
+    // the name so we do not clobber their input.
+    bool identifier_user_edited = false;
 };
 
 struct LayoutState {
@@ -236,6 +252,7 @@ struct AppRuntimeState {
     std::optional<sacm::SacmPackageTreeNode> selected_package_node;
     std::filesystem::path selected_package_file_path;
     TerminologyUiState terminology;
+    PatternUiState pattern;
     LayoutState layout;
 
     // Element IDs flagged for secondary-language translation review: the user

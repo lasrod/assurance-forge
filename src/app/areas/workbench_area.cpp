@@ -84,6 +84,30 @@ ui::ElementContextActions MakeProposalContextActions(const WorkbenchAreaCallback
     };
 }
 
+// Visible tab label for an argument-package canvas. Pattern definitions get a
+// "Pattern: <name>" prefix so they are not mistaken for concrete arguments
+// (ADR-0007). The stable ImGui id after "###" is unchanged so tab focus and
+// per-tab state survive the relabelling.
+std::string ArgumentPackageCanvasTabLabel(const WorkbenchState::ArgumentPackageCanvasTab& tab) {
+    const std::string visible = tab.is_pattern ? ui::i18n::trf("Pattern: {0}", tab.title) : tab.title;
+    return visible + "###argument_package_canvas_" + std::to_string(std::hash<std::string>{}(tab.key));
+}
+
+// Small coloured "Pattern" badge drawn at the top of a Pattern View canvas so
+// the editing mode is visible near the title.
+void RenderPatternViewBadge() {
+    const ImU32 accent = ui::GetTheme().accent;
+    ImGui::PushStyleColor(ImGuiCol_Button, accent);
+    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 255));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+    ImGui::SmallButton(AF_TR("Pattern").c_str());
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor(2);
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", AF_TR("Argument pattern definition").c_str());
+    ImGui::Separator();
+}
+
 ui::ElementContextActions MakeCanvasContextActions(const WorkbenchAreaCallbacks& callbacks) {
     ui::ElementContextActions actions =
         callbacks.make_element_context_actions ? callbacks.make_element_context_actions() : ui::ElementContextActions{};
@@ -169,6 +193,9 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
         ImGui::TextDisabled("%s", AF_TR("Argument package was not found in the loaded SACM model.").c_str());
         return;
     }
+
+    if (tab.is_pattern)
+        RenderPatternViewBadge();
 
     // Audit divergence banner (when this project has an audit store and the
     // last replay didn't reproduce the SACM). Drawn before the toolbar so
@@ -304,8 +331,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 return t.key == state.workbench.active_argument_package_canvas_key;
             });
             if (it != tabs.end()) {
-                const std::string target_label =
-                    it->title + "###argument_package_canvas_" + std::to_string(std::hash<std::string>{}(it->key));
+                const std::string target_label = ArgumentPackageCanvasTabLabel(*it);
                 if (ImGuiTabBar* tb = ImGui::GetCurrentTabBar())
                     ImGui::TabBarQueueFocus(tb, target_label.c_str());
             }
@@ -330,8 +356,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 const bool select_tab = state.workbench.force_center_tab_selection &&
                                         state.workbench.active_argument_package_canvas_key == tab.key;
                 const ImGuiTabItemFlags tab_flags = select_tab ? ImGuiTabItemFlags_SetSelected : 0;
-                const std::string tab_label =
-                    tab.title + "###argument_package_canvas_" + std::to_string(std::hash<std::string>{}(tab.key));
+                const std::string tab_label = ArgumentPackageCanvasTabLabel(tab);
                 if (ImGui::BeginTabItem(tab_label.c_str(), &open, tab_flags)) {
                     state.workbench.active_argument_package_canvas_key = tab.key;
                     RenderArgumentPackageCanvasTab(state, ui_state, callbacks, tab);

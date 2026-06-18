@@ -27,6 +27,7 @@ add_library(af_core OBJECT
     commands/command_bus.cpp
     commands/element_commands.cpp
     commands/package_commands.cpp
+    commands/pattern_commands.cpp
     commands/proposal_commands.cpp
     commands/terminology_commands.cpp
     commands/undo_command.cpp

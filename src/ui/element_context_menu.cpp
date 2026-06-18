@@ -26,13 +26,17 @@ void RenderAddElementMenu(const ElementContextActions& actions) {
         ImGui::Separator();
         if (ImGui::MenuItem(AF_TR("ACP").c_str(), nullptr, false, static_cast<bool>(actions.add_acp_to_selected_element)))
             actions.add_acp_to_selected_element();
-        ImGui::Separator();
-        if (ImGui::MenuItem(AF_TR("Add Counter Argument").c_str(), nullptr, false,
-                            static_cast<bool>(actions.add_counter_argument)))
-            actions.add_counter_argument();
-        if (ImGui::MenuItem(AF_TR("Add Counter Evidence").c_str(), nullptr, false,
-                            static_cast<bool>(actions.add_counter_evidence)))
-            actions.add_counter_evidence();
+        // Dialectic (challenge) actions are hidden entirely in Pattern mode
+        // (ADR-0007): a pattern must not carry counter/defeated state.
+        if (actions.editor_mode == core::GsnEditorMode::Argument) {
+            ImGui::Separator();
+            if (ImGui::MenuItem(AF_TR("Add Counter Argument").c_str(), nullptr, false,
+                                static_cast<bool>(actions.add_counter_argument)))
+                actions.add_counter_argument();
+            if (ImGui::MenuItem(AF_TR("Add Counter Evidence").c_str(), nullptr, false,
+                                static_cast<bool>(actions.add_counter_evidence)))
+                actions.add_counter_evidence();
+        }
         ImGui::EndMenu();
     }
 }

@@ -25,6 +25,7 @@ struct ProjectExplorerAreaCallbacks {
     std::function<void(const core::ProjectFileEntry&)> reveal_in_file_explorer;
     std::function<void(const core::ProjectFileEntry&, const sacm::SacmPackageTreeNode&)> open_package_node;
     std::function<void(const core::ProjectFileEntry&, const sacm::SacmPackageTreeNode&)> add_terminology_package;
+    std::function<void(const core::ProjectFileEntry&, const sacm::SacmPackageTreeNode&)> add_pattern;
     std::function<void(const core::ProjectFileEntry&, const sacm::SacmPackageTreeNode&)> remove_package;
 };
 

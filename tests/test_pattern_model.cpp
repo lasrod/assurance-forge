@@ -1,4 +1,6 @@
 #include "core/pattern_model.h"
+#include "core/commands/pattern_commands.h"
+#include "core/element_factory.h"
 #include "sacm/pattern_keys.h"
 #include "sacm/sacm_package_tree.h"
 
@@ -214,4 +216,122 @@ TEST(PatternDefinition, RoundTripThroughPackage) {
 
     // Empty sections must not leave stale tagged values behind.
     EXPECT_FALSE(core::HasTaggedValue(pkg, keys::kMotivation));
+}
+
+// ===== Pattern package creation =====
+
+TEST(PatternCreate, ProducesAbstractClassifiedPackage) {
+    sacm::AssuranceCasePackage package;
+    const core::PatternCreateResult result =
+        core::CreatePatternPackage(package, "Hazard Decomposition", "HAZ-DECOMP", "Decompose over hazards");
+    ASSERT_TRUE(result.success) << result.error;
+    ASSERT_EQ(package.argumentPackages.size(), 1u);
+
+    const sacm::ArgumentPackage& pkg = package.argumentPackages[0];
+    EXPECT_EQ(pkg.id, result.package_id);
+    EXPECT_EQ(pkg.gid, result.package_gid);
+    EXPECT_FALSE(pkg.id.empty());
+    EXPECT_FALSE(pkg.gid.empty());
+    EXPECT_TRUE(pkg.isAbstract);
+    EXPECT_TRUE(core::IsPatternPackage(pkg));
+    EXPECT_EQ(core::GetTaggedValue(pkg, keys::kPatternIdentifier), std::optional<std::string>("HAZ-DECOMP"));
+}
+
+TEST(PatternCreate, RequiresNameAndIdentifier) {
+    sacm::AssuranceCasePackage package;
+    EXPECT_FALSE(core::CreatePatternPackage(package, "", "ID", "").success);
+    EXPECT_FALSE(core::CreatePatternPackage(package, "Name", "", "").success);
+    EXPECT_TRUE(package.argumentPackages.empty());
+}
+
+TEST(PatternCreate, RejectsDuplicateIdentifier) {
+    sacm::AssuranceCasePackage package;
+    ASSERT_TRUE(core::CreatePatternPackage(package, "First", "DUP", "").success);
+    const core::PatternCreateResult second = core::CreatePatternPackage(package, "Second", "DUP", "");
+    EXPECT_FALSE(second.success);
+    EXPECT_EQ(package.argumentPackages.size(), 1u);
+
+    // A non-pattern argument package must not block the identifier.
+    EXPECT_TRUE(core::IsPatternIdentifierUnique(package, "FRESH"));
+}
+
+TEST(PatternCreate, CommandMutatesModelAndCapturesPayload) {
+    parser::AssuranceCase model;
+    sacm::AssuranceCasePackage package;
+    core::commands::CommandContext ctx{model, package};
+
+    core::commands::CreatePatternCommand command("Hazard Decomposition", "HAZ-DECOMP", "Decompose over hazards");
+    core::audit::AuditEvent event;
+    std::string error;
+    ASSERT_TRUE(command.Apply(ctx, event, error)) << error;
+
+    ASSERT_EQ(package.argumentPackages.size(), 1u);
+    EXPECT_EQ(event.event_type, "CreatePattern");
+    EXPECT_EQ(event.payload.at("identifier").get<std::string>(), "HAZ-DECOMP");
+    EXPECT_EQ(event.payload.at("generated_id").get<std::string>(), command.GeneratedId());
+    EXPECT_EQ(event.payload.at("generated_gid").get<std::string>(), command.GeneratedGid());
+    EXPECT_TRUE(core::IsPatternPackage(package.argumentPackages[0]));
+}
+
+TEST(PatternCreate, WithIdsForcesIdentitiesForReplay) {
+    sacm::AssuranceCasePackage package;
+    const core::PatternCreateResult result = core::CreatePatternPackageWithIds(
+        package, "Pattern", "ID", "", "FORCED_ID", "forced-gid-0000-0000-000000000000");
+    ASSERT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.package_id, "FORCED_ID");
+    EXPECT_EQ(result.package_gid, "forced-gid-0000-0000-000000000000");
+    EXPECT_EQ(package.argumentPackages[0].id, "FORCED_ID");
+}
+
+// ===== Dialectic guard (ADR-0007) =====
+
+namespace {
+
+// Build a one-claim argument package (optionally a pattern) plus the matching
+// parser projection, ready for an AddChallenge call against claim "G1".
+void BuildSingleClaimModel(bool as_pattern, sacm::AssuranceCasePackage& pkg, parser::AssuranceCase& ac) {
+    sacm::ArgumentPackage ap;
+    ap.id = "AP1";
+    if (as_pattern) {
+        ap.isAbstract = true;
+        core::SetTaggedValue(ap, keys::kViewKind, std::string(keys::kViewKindPatternValue));
+    }
+    sacm::Claim g1;
+    g1.id = "G1";
+    g1.content = "Goal";
+    ap.claims.push_back(g1);
+    pkg.argumentPackages.push_back(ap);
+
+    parser::SacmElement element;
+    element.id = "G1";
+    element.type = "claim";
+    ac.elements.push_back(element);
+}
+
+} // namespace
+
+TEST(PatternChallengeGuard, RejectsChallengeInsidePattern) {
+    sacm::AssuranceCasePackage pkg;
+    parser::AssuranceCase ac;
+    BuildSingleClaimModel(/*as_pattern=*/true, pkg, ac);
+
+    const core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, "G1"};
+    std::string new_id, new_rel, err;
+    EXPECT_FALSE(core::AddChallenge(
+        ac, &pkg, target, core::ChallengeSourceType::CounterArgument, new_id, new_rel, err));
+    EXPECT_FALSE(err.empty());
+    // The model is left untouched: no counter element/relationship added.
+    EXPECT_EQ(ac.elements.size(), 1u);
+}
+
+TEST(PatternChallengeGuard, AllowsChallengeInNormalArgument) {
+    sacm::AssuranceCasePackage pkg;
+    parser::AssuranceCase ac;
+    BuildSingleClaimModel(/*as_pattern=*/false, pkg, ac);
+
+    const core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, "G1"};
+    std::string new_id, new_rel, err;
+    EXPECT_TRUE(core::AddChallenge(
+        ac, &pkg, target, core::ChallengeSourceType::CounterArgument, new_id, new_rel, err))
+        << err;
 }

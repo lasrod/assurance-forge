@@ -3,9 +3,11 @@
 #include "core/audit/undo_resolver.h"
 #include "core/commands/element_commands.h"
 #include "core/commands/package_commands.h"
+#include "core/commands/pattern_commands.h"
 #include "core/commands/proposal_commands.h"
 #include "core/commands/terminology_commands.h"
 #include "core/element_factory.h"
+#include "core/pattern_model.h"
 #include "core/reviews/review_proposal.h"
 #include "core/reviews/review_proposal_patch_service.h"
 #include "core/sacm_argument_sync.h"
@@ -201,6 +203,28 @@ bool ApplyEvent(ReplayState& state,
             state.package, name, description, generated_id, generated_gid);
         if (!result.success) {
             out_error = "CreateTerminologyPackageWithIds failed at " +
+                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
+            return false;
+        }
+        return true;
+    }
+
+    if (type == "CreatePattern") {
+        std::string name, identifier, description, generated_id, generated_gid;
+        if (!require_string("name", name))
+            return false;
+        if (!require_string("identifier", identifier))
+            return false;
+        if (!require_string("description", description))
+            return false;
+        if (!require_string("generated_id", generated_id))
+            return false;
+        if (!require_string("generated_gid", generated_gid))
+            return false;
+        const core::PatternCreateResult result = core::CreatePatternPackageWithIds(
+            state.package, name, identifier, description, generated_id, generated_gid);
+        if (!result.success) {
+            out_error = "CreatePatternPackageWithIds failed at " +
                         FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
             return false;
         }

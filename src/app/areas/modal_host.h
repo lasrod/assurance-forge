@@ -23,6 +23,7 @@ struct ModalHostCallbacks {
     std::function<void(const std::string&)> set_status;
     std::function<bool(const core::reviews::ReviewItem&)> delete_review_item;
     std::function<void()> confirm_add_terminology_package;
+    std::function<void()> confirm_add_pattern;
     std::function<void()> confirm_delete_terminology_package;
     std::function<void()> confirm_terminology_term_edit;
     std::function<void(bool)> confirm_quick_define_terminology_term;

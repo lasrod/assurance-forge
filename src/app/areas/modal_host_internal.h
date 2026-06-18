@@ -32,6 +32,7 @@ private:
     void RenderSaveBeforeExitModal();
     void RenderSaveBeforeProjectFileOpenModal();
     void RenderCreateTerminologyPackageModal();
+    void RenderCreatePatternModal();
     void RenderDeleteTerminologyPackageModal();
     void RenderTerminologyTermEditorModal();
     void RenderQuickDefineTermModal();

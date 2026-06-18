@@ -46,6 +46,43 @@ bool RemoveTaggedValue(sacm::SacmElement& element, std::string_view key);
 // the name or tree location alone (ADR-0006).
 bool IsPatternPackage(const sacm::ArgumentPackage& package);
 
+// True when no pattern package in `package` already uses `identifier`. The
+// package whose id equals `exclude_package_id` is ignored (so a rename can keep
+// its own identifier). Empty identifier is treated as not-unique-friendly: it
+// returns true (the caller validates non-empty separately).
+bool IsPatternIdentifierUnique(const sacm::AssuranceCasePackage& package,
+                               const std::string& identifier,
+                               const std::string& exclude_package_id = {});
+
+// ----- Pattern package creation -----
+
+struct PatternCreateResult {
+    bool success = false;
+    std::string package_id;
+    std::string package_gid;
+    std::string error;
+};
+
+// Create an abstract ArgumentPackage classified as a GSN pattern (ADR-0006):
+// isAbstract = true, `view.kind = gsn-pattern`, and the supplied identifier.
+// `name` and `identifier` are required; `identifier` must be unique among
+// existing pattern packages. The created package is appended to
+// `package.argumentPackages` and its assigned (id, gid) are returned.
+PatternCreateResult CreatePatternPackage(sacm::AssuranceCasePackage& package,
+                                         const std::string& name,
+                                         const std::string& identifier,
+                                         const std::string& description);
+
+// Replay-friendly variant: forces the (id, gid) when non-empty instead of
+// generating them. Used by the audit replayer and the command Apply method so
+// recorded history reproduces the exact identities.
+PatternCreateResult CreatePatternPackageWithIds(sacm::AssuranceCasePackage& package,
+                                                const std::string& name,
+                                                const std::string& identifier,
+                                                const std::string& description,
+                                                const std::string& forced_id,
+                                                const std::string& forced_gid);
+
 // ----- Element abstraction (uninstantiated decorator) -----
 
 bool IsElementUninstantiated(const sacm::SacmElement& element);

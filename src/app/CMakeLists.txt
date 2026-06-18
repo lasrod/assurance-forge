@@ -26,6 +26,7 @@ add_library(af_app OBJECT
     areas/history_panel_area.cpp
     areas/inspector_area.cpp
     areas/modal_host.cpp
+    areas/modal_host_pattern.cpp
     areas/modal_host_terminology.cpp
     areas/perf_overlay_area.cpp
     areas/problems_area.cpp

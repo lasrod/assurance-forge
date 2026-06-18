@@ -47,6 +47,7 @@ MakeProjectExplorerPanelCallbacks(const ProjectExplorerAreaCallbacks& callbacks)
         callbacks.reveal_in_file_explorer,
         callbacks.open_package_node,
         callbacks.add_terminology_package,
+        callbacks.add_pattern,
         callbacks.remove_package,
     };
 }

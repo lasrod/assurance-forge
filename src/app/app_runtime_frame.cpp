@@ -175,6 +175,9 @@ void AppRuntime::RenderFrame(bool& done) {
             BeginAddTerminologyPackage(entry, node);
         },
         [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
+            BeginAddPattern(entry, node);
+        },
+        [this](const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
             RemoveProjectPackage(entry, node);
         },
     };
@@ -363,6 +366,7 @@ void AppRuntime::RenderFrame(bool& done) {
         return DeleteReviewItem(item);
     };
     modal_callbacks.confirm_add_terminology_package = [this]() { ConfirmAddTerminologyPackage(); };
+    modal_callbacks.confirm_add_pattern = [this]() { ConfirmAddPattern(); };
     modal_callbacks.confirm_delete_terminology_package = [this]() { ConfirmDeleteTerminologyPackage(); };
     modal_callbacks.confirm_terminology_term_edit = [this]() { ConfirmTerminologyTermEdit(); };
     modal_callbacks.confirm_quick_define_terminology_term = [this](bool add_as_context) {

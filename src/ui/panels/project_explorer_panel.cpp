@@ -92,6 +92,7 @@ void RenderPackageChildren(const core::ProjectFileEntry& entry,
                            const ProjectExplorerPanelCallbacks& callbacks,
                            const std::string& parent_path) {
     std::vector<PackageNodeRenderEntry> argument_packages;
+    std::vector<PackageNodeRenderEntry> pattern_packages;
     std::vector<PackageNodeRenderEntry> artifact_packages;
     std::vector<PackageNodeRenderEntry> terminology_packages;
     std::vector<PackageNodeRenderEntry> interfaces;
@@ -102,7 +103,13 @@ void RenderPackageChildren(const core::ProjectFileEntry& entry,
         const auto& child = node.children[child_index];
         PackageNodeRenderEntry child_entry{&child, child_index};
         if (child.type == sacm::SacmPackageNodeType::ArgumentPackage) {
-            argument_packages.push_back(child_entry);
+            // GSN pattern definitions are abstract ArgumentPackages (ADR-0006);
+            // surface them in their own group rather than alongside concrete
+            // argument packages.
+            if (child.isPattern)
+                pattern_packages.push_back(child_entry);
+            else
+                argument_packages.push_back(child_entry);
         } else if (child.type == sacm::SacmPackageNodeType::ArtifactPackage) {
             artifact_packages.push_back(child_entry);
         } else if (child.type == sacm::SacmPackageNodeType::TerminologyPackage) {
@@ -117,6 +124,7 @@ void RenderPackageChildren(const core::ProjectFileEntry& entry,
     }
 
     RenderPackageGroup("##grp_argument", AF_TR("Argument Packages"), argument_packages, entry, callbacks, parent_path);
+    RenderPackageGroup("##grp_patterns", AF_TR("Patterns"), pattern_packages, entry, callbacks, parent_path);
     RenderPackageGroup("##grp_artifact", AF_TR("Artifact Packages"), artifact_packages, entry, callbacks, parent_path);
     RenderPackageGroup("##grp_terminology", AF_TR("Terminology Packages"), terminology_packages, entry, callbacks,
                        parent_path);
@@ -143,10 +151,14 @@ void RenderPackageNode(const core::ProjectFileEntry& entry,
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen() && callbacks.open_package_node) {
         callbacks.open_package_node(entry, node);
     }
-    if (node.type == sacm::SacmPackageNodeType::AssuranceCasePackage && callbacks.add_terminology_package) {
+    if (node.type == sacm::SacmPackageNodeType::AssuranceCasePackage &&
+        (callbacks.add_terminology_package || callbacks.add_pattern)) {
         if (ImGui::BeginPopupContextItem("##package_context")) {
-            if (ImGui::MenuItem(AF_TR("Add Terminology Package").c_str())) {
+            if (callbacks.add_terminology_package && ImGui::MenuItem(AF_TR("Add Terminology Package").c_str())) {
                 callbacks.add_terminology_package(entry, node);
+            }
+            if (callbacks.add_pattern && ImGui::MenuItem(AF_TR("Add Pattern...").c_str())) {
+                callbacks.add_pattern(entry, node);
             }
             ImGui::EndPopup();
         }

@@ -31,6 +31,7 @@ void ModalHost::Render() {
     RenderProjectFileNameModal();
     RenderProjectLoadReportModal();
     RenderCreateTerminologyPackageModal();
+    RenderCreatePatternModal();
     RenderDeleteTerminologyPackageModal();
     RenderTerminologyTermEditorModal();
     RenderQuickDefineTermModal();
