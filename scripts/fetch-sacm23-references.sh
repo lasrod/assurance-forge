@@ -42,6 +42,10 @@ mkdir -p "$DEST"
 fetch_one() {
   local url="$1"
   local out="$2"
+  if [ -s "$out" ]; then
+    echo "exists, skipping: $out"
+    return
+  fi
   if command -v curl >/dev/null 2>&1; then
     curl -L --fail --show-error --output "$out" "$url"
   elif command -v wget >/dev/null 2>&1; then

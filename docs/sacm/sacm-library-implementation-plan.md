@@ -215,17 +215,21 @@ Exit criteria:
 
 Start with this editable vertical slice:
 
+Requirement IDs below are the canonical rows of `docs/sacm/sacm-conformance-matrix.md`:
+
 ```text
 SACM23-LIB-001: neutral library boundary and no Assurance Forge API leakage
 SACM23-CMD-001: command/mutation result shape for SACM-native edits
-SACM23-CMD-002: create empty SACM 2.3 document
-SACM23-PKG-001: create/save/load minimal AssuranceCasePackage
-SACM23-ARG-001: create/save/load minimal ArgumentPackage and Claim
-SACM23-CMD-003: preview and apply Claim deletion
-SACM23-CMD-004: preview and apply ArgumentPackage deletion
+SACM23-CMD-002: create SACM 2.3 document containing an AssuranceCasePackage
+SACM23-CMD-003: create ArgumentPackage and Claim, preserved through save/load
+SACM23-CMD-004: delete previews with affected elements and diagnostics
+SACM23-CMD-005: delete apply with explicit policies, valid-or-unchanged
+SACM23-CMD-006: mutation results carry audit/undo-ready metadata
 SACM23-XMI-001: strict SACM 2.3 root and namespace behavior for the slice
 SACM23-VAL-001: structured diagnostics
-SACM23-RT-001: semantic import -> export -> import equivalence
+SACM23-VAL-002: mutations leave the document valid or fail unchanged
+SACM23-RT-002: created document saves, reloads, and semantically matches
+SACM23-CLI-001: CLI smoke workflow (version/validate/round-trip)
 ```
 
 Do not integrate full UI layout in this slice. A small Assurance Forge adapter smoke test may follow only after the library tests pass.
