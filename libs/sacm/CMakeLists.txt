@@ -101,6 +101,8 @@ if(SACM_BUILD_TESTS)
         tests/test_packages.cpp
         tests/test_terminology.cpp
         tests/test_argumentation.cpp
+        tests/test_artifact.cpp
+        tests/test_metamodel_coverage.cpp
     )
     target_link_libraries(sacm_tests PRIVATE sacm::sacm GTest::gtest_main)
     target_compile_definitions(sacm_tests PRIVATE

@@ -240,6 +240,154 @@ CheckOutcome check_create_claim(const model::Document& document, const CreateCla
     return outcome;
 }
 
+// ----------------------------------------------------------------- artifact
+
+bool kind_is_simple_artifact_asset(model::ElementKind kind) {
+    switch (kind) {
+        case model::ElementKind::Artifact:
+        case model::ElementKind::Activity:
+        case model::ElementKind::Event:
+        case model::ElementKind::Participant:
+        case model::ElementKind::Technique:
+        case model::ElementKind::Resource:
+        case model::ElementKind::Property:
+            return true;
+        default:
+            return false;
+    }
+}
+
+CheckOutcome check_create_artifact(const model::Document& document, const ElementId& parent_id,
+                                   const std::optional<ElementId>& requested_id,
+                                   model::ElementKind kind, std::string_view name,
+                                   const Operation& op) {
+    CheckOutcome outcome;
+    std::unordered_set<ElementId> claimed;
+    const SACMElement* parent = document.find(parent_id);
+    if (parent == nullptr) {
+        outcome.diagnostics.push_back(
+            make_error(validation::codes::kCmdTargetNotFound, "SACM23-ART-001", op, {parent_id},
+                       std::format("parent '{}' not found", parent_id.value())));
+        return outcome;
+    }
+    bool parent_ok = false;
+    if (kind == model::ElementKind::ArtifactPackage) {
+        parent_ok = dynamic_cast<const model::AssuranceCasePackage*>(parent) != nullptr ||
+                    dynamic_cast<const model::ArtifactPackage*>(parent) != nullptr;
+    } else if (kind == model::ElementKind::Property) {
+        parent_ok = dynamic_cast<const model::ArtifactAsset*>(parent) != nullptr;
+    } else {
+        parent_ok = dynamic_cast<const model::ArtifactPackage*>(parent) != nullptr;
+    }
+    if (!parent_ok) {
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kCmdInvalidParent, "SACM23-ART-001", op, {parent_id},
+            std::format("a {} cannot be created inside a {}", metadata::kind_name(kind),
+                        metadata::kind_name(parent->kind()))));
+        return outcome;
+    }
+    const ElementId id = plan_id(document, requested_id, kind, op, claimed, outcome);
+    if (!outcome.ok()) {
+        return outcome;
+    }
+    outcome.effects.push_back(ChangeRecord{
+        .id = id,
+        .kind = kind,
+        .change = ChangeRecord::Change::Created,
+        .parent = parent_id,
+        .property = std::nullopt,
+        .before = std::nullopt,
+        .after = std::format("{} \"{}\"", metadata::kind_name(kind), name),
+    });
+    return outcome;
+}
+
+void attach_artifact(model::Document& document, const ElementId& parent_id,
+                     std::unique_ptr<model::ArtifactElement> element) {
+    model::ArtifactElement* raw = element.get();
+    auto* parent = const_cast<SACMElement*>(document.find(parent_id));
+    if (raw->kind() == model::ElementKind::Property) {
+        auto* asset = dynamic_cast<model::ArtifactAsset*>(parent);
+        Access::set_parent(*raw, asset);
+        Access::properties(*asset).push_back(std::unique_ptr<model::Property>(
+            static_cast<model::Property*>(element.release())));
+    } else if (auto* pkg = dynamic_cast<model::ArtifactPackage*>(parent)) {
+        Access::set_parent(*raw, pkg);
+        Access::artifact_elements(*pkg).push_back(std::move(element));
+    } else {
+        auto* acp = static_cast<model::AssuranceCasePackage*>(parent);
+        Access::set_parent(*raw, acp);
+        Access::artifact_packages(*acp).push_back(std::unique_ptr<model::ArtifactPackage>(
+            static_cast<model::ArtifactPackage*>(element.release())));
+    }
+    index_subtree(document, *raw);
+}
+
+void perform_create_artifact_package(model::Document& document,
+                                     const CreateArtifactPackage& create,
+                                     const std::vector<ChangeRecord>& effects) {
+    const ChangeRecord& record = effects.front();
+    auto package = std::make_unique<model::ArtifactPackage>(record.id);
+    Access::name(*package) = model::LangString{.lang = "", .content = create.name};
+    advance_id_counter(document, record.kind, record.id);
+    attach_artifact(document, create.parent, std::move(package));
+}
+
+void perform_create_artifact_asset(model::Document& document, const CreateArtifactAsset& create,
+                                   const std::vector<ChangeRecord>& effects) {
+    const ChangeRecord& record = effects.front();
+    std::unique_ptr<model::ArtifactAsset> asset;
+    switch (create.kind) {
+        case model::ElementKind::Artifact: {
+            auto artifact = std::make_unique<model::Artifact>(record.id);
+            Access::version(*artifact) = create.version;
+            Access::date(*artifact) = create.date;
+            asset = std::move(artifact);
+            break;
+        }
+        case model::ElementKind::Activity: {
+            auto activity = std::make_unique<model::Activity>(record.id);
+            Access::start_time(*activity) = create.start_time;
+            Access::end_time(*activity) = create.end_time;
+            asset = std::move(activity);
+            break;
+        }
+        case model::ElementKind::Event: {
+            auto event = std::make_unique<model::Event>(record.id);
+            Access::date(*event) = create.date;
+            asset = std::move(event);
+            break;
+        }
+        case model::ElementKind::Participant:
+            asset = std::make_unique<model::Participant>(record.id);
+            break;
+        case model::ElementKind::Technique:
+            asset = std::make_unique<model::Technique>(record.id);
+            break;
+        case model::ElementKind::Resource:
+            asset = std::make_unique<model::Resource>(record.id);
+            break;
+        default:
+            asset = std::make_unique<model::Property>(record.id);
+            break;
+    }
+    Access::name(*asset) = model::LangString{.lang = "", .content = create.name};
+    advance_id_counter(document, create.kind, record.id);
+    attach_artifact(document, create.parent, std::move(asset));
+}
+
+void perform_create_artifact_relationship(model::Document& document,
+                                          const CreateArtifactAssetRelationship& create,
+                                          const std::vector<ChangeRecord>& effects) {
+    const ChangeRecord& record = effects.front();
+    auto relationship = std::make_unique<model::ArtifactAssetRelationship>(record.id);
+    Access::name(*relationship) = model::LangString{.lang = "", .content = create.name};
+    Access::sources(*relationship) = create.sources;
+    Access::targets(*relationship) = create.targets;
+    advance_id_counter(document, record.kind, record.id);
+    attach_artifact(document, create.parent, std::move(relationship));
+}
+
 // ------------------------------------------------------------ argumentation
 
 // Checks that `parent` is an ArgumentPackage; plans a single Created effect.
@@ -1129,6 +1277,54 @@ CheckOutcome check(const model::Document& document, const Operation& operation) 
                 return check_create_argument_package(document, op, operation);
             } else if constexpr (std::is_same_v<T, CreateClaim>) {
                 return check_create_claim(document, op, operation);
+            } else if constexpr (std::is_same_v<T, CreateArtifactPackage>) {
+                return check_create_artifact(document, op.parent, op.id,
+                                             model::ElementKind::ArtifactPackage, op.name,
+                                             operation);
+            } else if constexpr (std::is_same_v<T, CreateArtifactAsset>) {
+                CheckOutcome outcome;
+                if (!kind_is_simple_artifact_asset(op.kind)) {
+                    outcome.diagnostics.push_back(make_error(
+                        validation::codes::kCmdInvalidParent, "SACM23-ART-001", operation, {},
+                        std::format("{} is not an artifact asset kind",
+                                    metadata::kind_name(op.kind))));
+                    return outcome;
+                }
+                return check_create_artifact(document, op.parent, op.id, op.kind, op.name,
+                                             operation);
+            } else if constexpr (std::is_same_v<T, CreateArtifactAssetRelationship>) {
+                CheckOutcome outcome = check_create_artifact(
+                    document, op.parent, op.id, model::ElementKind::ArtifactAssetRelationship,
+                    op.name, operation);
+                if (!outcome.ok()) {
+                    return outcome;
+                }
+                if (op.sources.empty() || op.targets.empty()) {
+                    outcome.effects.clear();
+                    outcome.diagnostics.push_back(make_error(
+                        validation::codes::kMultiplicityViolation, "SACM23-ART-001", operation, {},
+                        "an artifact asset relationship needs at least one source and one "
+                        "target"));
+                    return outcome;
+                }
+                const auto is_artifact_asset = [](const SACMElement& element) {
+                    return dynamic_cast<const model::ArtifactAsset*>(&element) != nullptr;
+                };
+                for (const ElementId& source : op.sources) {
+                    if (!require_target(document, source, "source", is_artifact_asset, operation,
+                                        outcome)) {
+                        outcome.effects.clear();
+                        return outcome;
+                    }
+                }
+                for (const ElementId& target : op.targets) {
+                    if (!require_target(document, target, "target", is_artifact_asset, operation,
+                                        outcome)) {
+                        outcome.effects.clear();
+                        return outcome;
+                    }
+                }
+                return outcome;
             } else if constexpr (std::is_same_v<T, CreateArgumentReasoning>) {
                 CheckOutcome outcome = check_create_argument_asset(
                     document, op.parent, op.id, model::ElementKind::ArgumentReasoning, op.name,
@@ -1207,6 +1403,12 @@ void perform(model::Document& document, const Operation& operation,
                 perform_create_argument_package(document, op, effects);
             } else if constexpr (std::is_same_v<T, CreateClaim>) {
                 perform_create_claim(document, op, effects);
+            } else if constexpr (std::is_same_v<T, CreateArtifactPackage>) {
+                perform_create_artifact_package(document, op, effects);
+            } else if constexpr (std::is_same_v<T, CreateArtifactAsset>) {
+                perform_create_artifact_asset(document, op, effects);
+            } else if constexpr (std::is_same_v<T, CreateArtifactAssetRelationship>) {
+                perform_create_artifact_relationship(document, op, effects);
             } else if constexpr (std::is_same_v<T, CreateArgumentReasoning>) {
                 perform_create_argument_reasoning(document, op, effects);
             } else if constexpr (std::is_same_v<T, CreateArtifactReference>) {

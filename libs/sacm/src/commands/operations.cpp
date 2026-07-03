@@ -12,6 +12,12 @@ std::string_view operation_name(const Operation& operation) {
                 return "CreateArgumentPackage";
             } else if constexpr (std::is_same_v<T, CreateClaim>) {
                 return "CreateClaim";
+            } else if constexpr (std::is_same_v<T, CreateArtifactPackage>) {
+                return "CreateArtifactPackage";
+            } else if constexpr (std::is_same_v<T, CreateArtifactAsset>) {
+                return "CreateArtifactAsset";
+            } else if constexpr (std::is_same_v<T, CreateArtifactAssetRelationship>) {
+                return "CreateArtifactAssetRelationship";
             } else if constexpr (std::is_same_v<T, CreateArgumentReasoning>) {
                 return "CreateArgumentReasoning";
             } else if constexpr (std::is_same_v<T, CreateArtifactReference>) {

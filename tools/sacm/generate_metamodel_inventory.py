@@ -111,6 +111,11 @@ ATTRIBUTE_RENAMES = {
     # model spells it `occurece`.
     ("Event", "occurece"): "date",
 }
+MISSING_ABSTRACT = {
+    # Clause 11.3 marks ArgumentationElement abstract; the machine-readable
+    # model does not.
+    "ArgumentationElement",
+}
 
 
 def resolve_type_name(prop: ET.Element, by_id: dict[str, ET.Element]) -> str:
@@ -196,7 +201,8 @@ def parse_model(path: Path) -> tuple[dict[str, Clazz], list[Enum]]:
                 clazz = Clazz(
                     name=name,
                     package=pkg_name,
-                    is_abstract=pe.attrib.get("isAbstract") == "true",
+                    is_abstract=pe.attrib.get("isAbstract") == "true"
+                    or name in MISSING_ABSTRACT,
                     doc=read_documentation(pe),
                 )
                 for general_name in MISSING_GENERALIZATIONS.get(name, []):
@@ -309,6 +315,7 @@ def emit(classes: dict[str, Clazz], enums: list[Enum], output: Path, source_name
     push("- Clause 12.14: class is `ArtifactAssetRelationship` with superclass `ArtifactAsset`; the machine-readable model names it `ArtifactAssertedRelationship` and omits the generalization.")
     push("- Clause 12.9: `Event`'s attribute is `date: date[0..1]`; the machine-readable model spells it `occurece`.")
     push("- Clauses 12.7/12.8/12.9 type `date`, `startTime`, `endTime`, and Artifact `date` as `date`; the machine-readable model references an undefined MagicDraw datatype id for them.")
+    push("- Clause 11.3 marks `ArgumentationElement` abstract; the machine-readable model does not.")
     push("")
     push("## Package summary")
     push("")

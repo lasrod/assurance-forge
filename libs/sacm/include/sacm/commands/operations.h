@@ -42,6 +42,38 @@ struct CreateClaim {
     std::string language;  // language tag for name/description; may be empty
 };
 
+// Create an ArtifactPackage inside an AssuranceCasePackage or (nested)
+// inside another ArtifactPackage (clause 12.2).
+struct CreateArtifactPackage {
+    model::ElementId parent;
+    std::optional<model::ElementId> id;
+    std::string name;
+};
+
+// Create an artifact asset (clauses 12.7-12.13): Artifact, Activity, Event,
+// Participant, Technique, Resource, or Property. Provenance fields apply
+// where the kind defines them and are ignored otherwise. A Property is
+// created inside another ArtifactAsset; the rest inside an ArtifactPackage.
+struct CreateArtifactAsset {
+    model::ElementId parent;
+    metadata::ElementKind kind = metadata::ElementKind::Artifact;
+    std::optional<model::ElementId> id;
+    std::string name;
+    std::string version;
+    std::string date;
+    std::string start_time;
+    std::string end_time;
+};
+
+// Create an ArtifactAssetRelationship linking artifact assets (clause 12.14).
+struct CreateArtifactAssetRelationship {
+    model::ElementId parent;
+    std::optional<model::ElementId> id;
+    std::string name;
+    std::vector<model::ElementId> sources;
+    std::vector<model::ElementId> targets;
+};
+
 // Create an ArgumentReasoning inside an ArgumentPackage (clause 11.12).
 struct CreateArgumentReasoning {
     model::ElementId parent;
@@ -162,6 +194,7 @@ using Operation =
     std::variant<CreateAssuranceCasePackage, CreateArgumentPackage, CreateClaim,
                  CreateArgumentReasoning, CreateArtifactReference, CreateAssertedRelationship,
                  CreateTerminologyPackage, CreateCategory, CreateTerm, CreateExpression,
+                 CreateArtifactPackage, CreateArtifactAsset, CreateArtifactAssetRelationship,
                  SetCitation, SetName, SetDescription, SetAssertionDeclaration, AddMetaClaim,
                  AddTaggedValue, DeleteElement>;
 

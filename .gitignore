@@ -2,6 +2,7 @@
 build/
 build-coverage/
 build-docs/
+build-sacm-standalone/
 out/
 cmake-build-*/
 

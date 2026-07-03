@@ -19,6 +19,7 @@ Where ptc/22-03-13 disagrees with the normative specification text (formal/23-05
 - Clause 12.14: class is `ArtifactAssetRelationship` with superclass `ArtifactAsset`; the machine-readable model names it `ArtifactAssertedRelationship` and omits the generalization.
 - Clause 12.9: `Event`'s attribute is `date: date[0..1]`; the machine-readable model spells it `occurece`.
 - Clauses 12.7/12.8/12.9 type `date`, `startTime`, `endTime`, and Artifact `date` as `date`; the machine-readable model references an undefined MagicDraw datatype id for them.
+- Clause 11.3 marks `ArgumentationElement` abstract; the machine-readable model does not.
 
 ## Package summary
 
@@ -27,7 +28,7 @@ Where ptc/22-03-13 disagrees with the normative specification text (formal/23-05
 | Base | 12 | 5 | 0 |
 | AssuranceCase | 3 | 0 | 0 |
 | Terminology | 10 | 3 | 0 |
-| Argumentation | 16 | 3 | 1 |
+| Argumentation | 16 | 4 | 1 |
 | Artifact | 13 | 1 | 0 |
 
 ## Package `Base`
@@ -287,7 +288,7 @@ Generalization chain: ArgumentAsset -> ArgumentationElement -> ArtifactElement -
 | --- | --- | --- | --- |
 | structure | ArgumentPackage | 0..1 | no |
 
-### ArgumentationElement
+### ArgumentationElement (abstract)
 
 Generalization chain: ArtifactElement -> ModelElement -> SACMElement -> Element
 
@@ -463,7 +464,6 @@ Effective containment for each concrete class, including roles inherited from ab
 | ArgumentPackageBinding | Argumentation | `argumentElement`: ArgumentationElement; `description`: Description; `implementationConstraint`: ImplementationConstraint; `note`: Note; `taggedValue`: TaggedValue; `name`: LangString |
 | ArgumentPackageInterface | Argumentation | `argumentElement`: ArgumentationElement; `description`: Description; `implementationConstraint`: ImplementationConstraint; `note`: Note; `taggedValue`: TaggedValue; `name`: LangString |
 | ArgumentReasoning | Argumentation | `description`: Description; `implementationConstraint`: ImplementationConstraint; `note`: Note; `taggedValue`: TaggedValue; `name`: LangString |
-| ArgumentationElement | Argumentation | `description`: Description; `implementationConstraint`: ImplementationConstraint; `note`: Note; `taggedValue`: TaggedValue; `name`: LangString |
 | ArtifactReference | Argumentation | `description`: Description; `implementationConstraint`: ImplementationConstraint; `note`: Note; `taggedValue`: TaggedValue; `name`: LangString |
 | AssertedArtifactContext | Argumentation | `description`: Description; `implementationConstraint`: ImplementationConstraint; `note`: Note; `taggedValue`: TaggedValue; `name`: LangString |
 | AssertedArtifactSupport | Argumentation | `description`: Description; `implementationConstraint`: ImplementationConstraint; `note`: Note; `taggedValue`: TaggedValue; `name`: LangString |

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">
+  <name content="Artifact Case"/>
+  <artifactPackage xmi:id="artpkg_1">
+    <name content="Evidence Package"/>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="artifact_report" version="2.1" date="2026-02-01">
+      <name content="Verification Report"/>
+      <property xmi:id="prop_confidentiality">
+        <name content="confidentiality: internal"/>
+      </property>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Activity" xmi:id="activity_review" startTime="2026-01-10" endTime="2026-01-20">
+      <name content="Independent Review"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Event" xmi:id="event_release" date="2026-02-02">
+      <name content="Report Released"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Participant" xmi:id="participant_assessor">
+      <name content="Independent Assessor"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Technique" xmi:id="technique_stpa">
+      <name content="STPA"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Resource" xmi:id="resource_lab">
+      <name content="HIL Lab"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:ArtifactAssetRelationship" xmi:id="rel_produced" source="activity_review" target="artifact_report">
+      <name content="producedBy"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:ArtifactAssertedRelationship" xmi:id="rel_alias" source="event_release" target="artifact_report">
+      <name content="ptc/22-03-13 alias spelling"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:ArtifactGroup" xmi:id="group_evidence" artifactElement="artifact_report activity_review">
+      <name content="Review Evidence"/>
+    </artifactElement>
+  </artifactPackage>
+</sacm:AssuranceCasePackage>
