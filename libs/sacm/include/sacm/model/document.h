@@ -1,0 +1,84 @@
+#pragma once
+
+#include "sacm/commands/mutation.h"
+#include "sacm/commands/operations.h"
+#include "sacm/model/assurance_case.h"
+#include "sacm/model/element.h"
+
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <memory>
+#include <optional>
+#include <unordered_map>
+#include <vector>
+
+namespace sacm::model {
+
+// A loaded or created SACM 2.3 document: the source of truth for one
+// assurance case interchange unit.
+//
+// Ownership: the document owns its root packages; containment owns children.
+// References between elements are stored as ElementIds and resolved through
+// the document's index.
+//
+// Mutation: exclusively through preview/apply. Public mutations either
+// succeed and leave the document valid for the supported slice, or fail
+// leaving it unchanged with diagnostics (SACM23-VAL-002). Navigation is
+// const-only.
+class Document {
+  public:
+    Document();
+    ~Document();
+    Document(Document&&) noexcept;
+    Document& operator=(Document&&) noexcept;
+    Document(const Document&) = delete;
+    Document& operator=(const Document&) = delete;
+
+    // Strict interchange roots (AssuranceCasePackages, clause 2.4).
+    const std::vector<std::unique_ptr<AssuranceCasePackage>>& roots() const { return roots_; }
+
+    // Roots of other kinds accepted by tolerant loads (bare ArgumentPackage/
+    // ArtifactPackage/TerminologyPackage interchange units, clauses 2.2/2.3).
+    const std::vector<std::unique_ptr<SACMElement>>& other_roots() const { return other_roots_; }
+
+    // Element lookup by id; nullptr when absent.
+    const SACMElement* find(const ElementId& id) const;
+
+    template <typename T>
+    const T* find_as(const ElementId& id) const {
+        return dynamic_cast<const T*>(find(id));
+    }
+
+    bool contains(const ElementId& id) const { return find(id) != nullptr; }
+
+    // Number of elements in the document (all kinds, including utility
+    // elements).
+    std::size_t element_count() const { return index_.size(); }
+
+    // Visits every element (roots and descendants) in document order.
+    void for_each_element(const std::function<void(const SACMElement&)>& fn) const;
+
+    // Monotonic revision; bumped by every successful apply.
+    std::uint64_t revision() const { return revision_; }
+
+    // Computes what applying `operation` would do, without mutating.
+    commands::OperationPreview preview(const commands::Operation& operation) const;
+
+    // Applies `operation` atomically. When `expected_revision` is given
+    // (from a preview) and the document has changed since, fails with
+    // SACM-CMD-003 and no mutation.
+    commands::MutationResult apply(const commands::Operation& operation,
+                                   std::optional<std::uint64_t> expected_revision = {});
+
+  private:
+    friend struct sacm::detail::Access;
+
+    std::vector<std::unique_ptr<AssuranceCasePackage>> roots_;
+    std::vector<std::unique_ptr<SACMElement>> other_roots_;
+    std::unordered_map<ElementId, SACMElement*> index_;
+    std::map<ElementKind, std::uint64_t> id_counters_;
+    std::uint64_t revision_ = 0;
+};
+
+}  // namespace sacm::model

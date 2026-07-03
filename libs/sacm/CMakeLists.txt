@@ -29,7 +29,17 @@ endif()
 
 add_library(sacm STATIC
     src/version.cpp
+    src/metadata/element_kind.cpp
+    src/model/argumentation.cpp
+    src/model/document.cpp
+    src/model/element.cpp
+    src/model/lang_string.cpp
+    src/model/traverse.cpp
+    src/commands/commands.cpp
+    src/commands/mutation.cpp
+    src/commands/operations.cpp
     src/validation/diagnostic.cpp
+    src/validation/validate.cpp
 )
 add_library(sacm::sacm ALIAS sacm)
 target_compile_features(sacm PUBLIC cxx_std_23)
@@ -37,6 +47,8 @@ target_include_directories(sacm PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+# Internal headers (model/access.h, model/traverse.h, commands/commands.h).
+target_include_directories(sacm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_definitions(sacm PUBLIC SACM_STANDARD_VERSION="2.3")
 
 # pugixml: reuse the in-tree target when the parent provides it, else the
@@ -75,6 +87,8 @@ if(SACM_BUILD_TESTS)
     enable_testing()
     add_executable(sacm_tests
         tests/test_version.cpp
+        tests/test_document_commands.cpp
+        tests/test_delete_preview.cpp
     )
     target_link_libraries(sacm_tests PRIVATE sacm::sacm GTest::gtest_main)
     target_compile_definitions(sacm_tests PRIVATE

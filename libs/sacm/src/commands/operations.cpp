@@ -1,0 +1,24 @@
+#include "sacm/commands/operations.h"
+
+namespace sacm::commands {
+
+std::string_view operation_name(const Operation& operation) {
+    return std::visit(
+        [](const auto& op) -> std::string_view {
+            using T = std::decay_t<decltype(op)>;
+            if constexpr (std::is_same_v<T, CreateAssuranceCasePackage>) {
+                return "CreateAssuranceCasePackage";
+            } else if constexpr (std::is_same_v<T, CreateArgumentPackage>) {
+                return "CreateArgumentPackage";
+            } else if constexpr (std::is_same_v<T, CreateClaim>) {
+                return "CreateClaim";
+            } else if constexpr (std::is_same_v<T, SetCitation>) {
+                return "SetCitation";
+            } else {
+                return "DeleteElement";
+            }
+        },
+        operation);
+}
+
+}  // namespace sacm::commands
