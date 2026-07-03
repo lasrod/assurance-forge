@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">
+  <name content="Category Reference Wrong Type"/>
+  <terminologyPackage xmi:id="termpkg_1">
+    <name content="Vocabulary"/>
+    <terminologyElement xsi:type="sacm:Term" xmi:id="term_1" value="term" category="term_2">
+      <name content="Term with non-category ref"/>
+    </terminologyElement>
+    <terminologyElement xsi:type="sacm:Term" xmi:id="term_2" value="other">
+      <name content="Other Term"/>
+    </terminologyElement>
+  </terminologyPackage>
+</sacm:AssuranceCasePackage>

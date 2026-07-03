@@ -99,6 +99,7 @@ if(SACM_BUILD_TESTS)
         tests/test_base_model.cpp
         tests/test_repo_fixture_interop.cpp
         tests/test_packages.cpp
+        tests/test_terminology.cpp
     )
     target_link_libraries(sacm_tests PRIVATE sacm::sacm GTest::gtest_main)
     target_compile_definitions(sacm_tests PRIVATE

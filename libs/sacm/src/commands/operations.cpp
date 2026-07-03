@@ -12,6 +12,14 @@ std::string_view operation_name(const Operation& operation) {
                 return "CreateArgumentPackage";
             } else if constexpr (std::is_same_v<T, CreateClaim>) {
                 return "CreateClaim";
+            } else if constexpr (std::is_same_v<T, CreateTerminologyPackage>) {
+                return "CreateTerminologyPackage";
+            } else if constexpr (std::is_same_v<T, CreateCategory>) {
+                return "CreateCategory";
+            } else if constexpr (std::is_same_v<T, CreateTerm>) {
+                return "CreateTerm";
+            } else if constexpr (std::is_same_v<T, CreateExpression>) {
+                return "CreateExpression";
             } else if constexpr (std::is_same_v<T, SetCitation>) {
                 return "SetCitation";
             } else if constexpr (std::is_same_v<T, SetName>) {

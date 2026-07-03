@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">
+  <name content="Terminology Case"/>
+  <terminologyPackage xmi:id="termpkg_1">
+    <name content="Vocabulary"/>
+    <terminologyElement xsi:type="sacm:Category" xmi:id="cat_standards" category="cat_iso">
+      <name content="Standards"/>
+    </terminologyElement>
+    <terminologyElement xsi:type="sacm:Category" xmi:id="cat_iso">
+      <name content="ISO Standards"/>
+    </terminologyElement>
+    <terminologyElement xsi:type="sacm:Term" xmi:id="term_iso26262" value="ISO 26262" externalReference="https://www.iso.org/standard/68383.html" category="cat_iso">
+      <name content="ISO 26262"/>
+    </terminologyElement>
+    <terminologyElement xsi:type="sacm:Term" xmi:id="term_hazard" value="hazard">
+      <name content="Hazard"/>
+    </terminologyElement>
+    <terminologyElement xsi:type="sacm:Expression" xmi:id="expr_1" value="{hazard} per {ISO 26262}" element="term_hazard term_iso26262">
+      <name content="Hazard per ISO 26262"/>
+    </terminologyElement>
+    <terminologyElement xsi:type="sacm:TerminologyGroup" xmi:id="group_1" terminologyElement="term_iso26262 term_hazard">
+      <name content="Core Terms"/>
+    </terminologyElement>
+  </terminologyPackage>
+  <argumentPackage xmi:id="argpkg_1">
+    <name content="Argument"/>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_1">
+      <name content="Structured Claim"/>
+      <description xmi:id="description_1">
+        <content>
+          <value xsi:type="sacm:ExpressionLangString" lang="en" expression="expr_1"/>
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>

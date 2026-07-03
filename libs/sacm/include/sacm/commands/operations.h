@@ -40,6 +40,39 @@ struct CreateClaim {
     std::string language;  // language tag for name/description; may be empty
 };
 
+// Create a TerminologyPackage inside an AssuranceCasePackage or (nested)
+// inside another TerminologyPackage.
+struct CreateTerminologyPackage {
+    model::ElementId parent;
+    std::optional<model::ElementId> id;
+    std::string name;
+};
+
+// Create a Category inside a TerminologyPackage (clause 10.8).
+struct CreateCategory {
+    model::ElementId parent;
+    std::optional<model::ElementId> id;
+    std::string name;
+};
+
+// Create a Term inside a TerminologyPackage (clause 10.7).
+struct CreateTerm {
+    model::ElementId parent;
+    std::optional<model::ElementId> id;
+    std::string name;
+    std::string value;
+    std::string external_reference;
+    std::optional<model::ElementId> origin;
+};
+
+// Create an Expression inside a TerminologyPackage (clause 10.10).
+struct CreateExpression {
+    model::ElementId parent;
+    std::optional<model::ElementId> id;
+    std::string name;
+    std::string value;
+};
+
 // Set or clear an element's citation (clause 8.2): `cited` present sets
 // citedElement and isCitation=true; absent clears both.
 struct SetCitation {
@@ -81,8 +114,10 @@ struct DeleteElement {
         CrossPackageReferencePolicy::RejectIfExternalReferencesExist;
 };
 
-using Operation = std::variant<CreateAssuranceCasePackage, CreateArgumentPackage, CreateClaim,
-                               SetCitation, SetName, SetDescription, AddTaggedValue, DeleteElement>;
+using Operation =
+    std::variant<CreateAssuranceCasePackage, CreateArgumentPackage, CreateClaim,
+                 CreateTerminologyPackage, CreateCategory, CreateTerm, CreateExpression,
+                 SetCitation, SetName, SetDescription, AddTaggedValue, DeleteElement>;
 
 // Stable operation name ("CreateClaim", "DeleteElement", ...) used in
 // previews, results, and diagnostics.

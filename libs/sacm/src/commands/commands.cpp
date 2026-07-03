@@ -21,6 +21,7 @@ using validation::Diagnostic;
 using validation::Severity;
 
 void advance_id_counter(model::Document& document, model::ElementKind kind, const ElementId& id);
+void index_subtree(model::Document& document, SACMElement& root);
 
 Diagnostic make_error(std::string_view code, std::string_view requirement, const Operation& op,
                       std::vector<ElementId> affected, std::string message) {
@@ -237,6 +238,125 @@ CheckOutcome check_create_claim(const model::Document& document, const CreateCla
         });
     }
     return outcome;
+}
+
+// ------------------------------------------------------------- terminology
+
+// Shared check for creating a terminology element under a parent.
+CheckOutcome check_create_terminology(const model::Document& document, const ElementId& parent_id,
+                                      const std::optional<ElementId>& requested_id,
+                                      model::ElementKind kind, bool parent_may_be_acp,
+                                      std::string_view name, const Operation& op) {
+    CheckOutcome outcome;
+    std::unordered_set<ElementId> claimed;
+    const SACMElement* parent = document.find(parent_id);
+    if (parent == nullptr) {
+        outcome.diagnostics.push_back(
+            make_error(validation::codes::kCmdTargetNotFound, "SACM23-TERM-001", op, {parent_id},
+                       std::format("parent '{}' not found", parent_id.value())));
+        return outcome;
+    }
+    const bool parent_is_terminology_package =
+        dynamic_cast<const model::TerminologyPackage*>(parent) != nullptr;
+    const bool parent_is_acp =
+        parent_may_be_acp && dynamic_cast<const model::AssuranceCasePackage*>(parent) != nullptr;
+    if (!parent_is_terminology_package && !parent_is_acp) {
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kCmdInvalidParent, "SACM23-TERM-001", op, {parent_id},
+            std::format("a {} cannot be created inside a {}", metadata::kind_name(kind),
+                        metadata::kind_name(parent->kind()))));
+        return outcome;
+    }
+    const ElementId id = plan_id(document, requested_id, kind, op, claimed, outcome);
+    if (!outcome.ok()) {
+        return outcome;
+    }
+    outcome.effects.push_back(ChangeRecord{
+        .id = id,
+        .kind = kind,
+        .change = ChangeRecord::Change::Created,
+        .parent = parent_id,
+        .property = std::nullopt,
+        .before = std::nullopt,
+        .after = std::format("{} \"{}\"", metadata::kind_name(kind), name),
+    });
+    return outcome;
+}
+
+CheckOutcome check_create_term(const model::Document& document, const CreateTerm& create,
+                               const Operation& op) {
+    CheckOutcome outcome = check_create_terminology(document, create.parent, create.id,
+                                                    model::ElementKind::Term,
+                                                    /*parent_may_be_acp=*/false, create.name, op);
+    if (!outcome.ok()) {
+        return outcome;
+    }
+    if (create.origin.has_value() && document.find(*create.origin) == nullptr) {
+        outcome.effects.clear();
+        outcome.diagnostics.push_back(
+            make_error(validation::codes::kCmdTargetNotFound, "SACM23-TERM-001", op,
+                       {*create.origin},
+                       std::format("origin '{}' not found", create.origin->value())));
+    }
+    return outcome;
+}
+
+// Attaches a freshly built terminology element to its parent.
+void attach_terminology(model::Document& document, const ElementId& parent_id,
+                        std::unique_ptr<model::TerminologyElement> element) {
+    model::TerminologyElement* raw = element.get();
+    auto* parent = const_cast<SACMElement*>(document.find(parent_id));
+    if (auto* pkg = dynamic_cast<model::TerminologyPackage*>(parent)) {
+        Access::set_parent(*raw, pkg);
+        Access::terminology_elements(*pkg).push_back(std::move(element));
+    } else {
+        auto* acp = static_cast<model::AssuranceCasePackage*>(parent);
+        Access::set_parent(*raw, acp);
+        Access::terminology_packages(*acp).push_back(std::unique_ptr<model::TerminologyPackage>(
+            static_cast<model::TerminologyPackage*>(element.release())));
+    }
+    index_subtree(document, *raw);
+}
+
+void perform_create_terminology_package(model::Document& document,
+                                        const CreateTerminologyPackage& create,
+                                        const std::vector<ChangeRecord>& effects) {
+    const ChangeRecord& record = effects.front();
+    auto package = std::make_unique<model::TerminologyPackage>(record.id);
+    Access::name(*package) = model::LangString{.lang = "", .content = create.name};
+    advance_id_counter(document, record.kind, record.id);
+    attach_terminology(document, create.parent, std::move(package));
+}
+
+void perform_create_category(model::Document& document, const CreateCategory& create,
+                             const std::vector<ChangeRecord>& effects) {
+    const ChangeRecord& record = effects.front();
+    auto category = std::make_unique<model::Category>(record.id);
+    Access::name(*category) = model::LangString{.lang = "", .content = create.name};
+    advance_id_counter(document, record.kind, record.id);
+    attach_terminology(document, create.parent, std::move(category));
+}
+
+void perform_create_term(model::Document& document, const CreateTerm& create,
+                         const std::vector<ChangeRecord>& effects) {
+    const ChangeRecord& record = effects.front();
+    auto term = std::make_unique<model::Term>(record.id);
+    Access::name(*term) = model::LangString{.lang = "", .content = create.name};
+    Access::value(*term) = create.value;
+    Access::external_reference(*term) = create.external_reference;
+    Access::origin(*term) = create.origin;
+    advance_id_counter(document, record.kind, record.id);
+    attach_terminology(document, create.parent, std::move(term));
+}
+
+void perform_create_expression(model::Document& document, const CreateExpression& create,
+                               const std::vector<ChangeRecord>& effects) {
+    const ChangeRecord& record = effects.front();
+    auto expression = std::make_unique<model::Expression>(record.id);
+    Access::name(*expression) = model::LangString{.lang = "", .content = create.name};
+    Access::value(*expression) = create.value;
+    advance_id_counter(document, record.kind, record.id);
+    attach_terminology(document, create.parent, std::move(expression));
 }
 
 // ---------------------------------------------------------------- setters
@@ -765,6 +885,20 @@ CheckOutcome check(const model::Document& document, const Operation& operation) 
                 return check_create_argument_package(document, op, operation);
             } else if constexpr (std::is_same_v<T, CreateClaim>) {
                 return check_create_claim(document, op, operation);
+            } else if constexpr (std::is_same_v<T, CreateTerminologyPackage>) {
+                return check_create_terminology(document, op.parent, op.id,
+                                                model::ElementKind::TerminologyPackage,
+                                                /*parent_may_be_acp=*/true, op.name, operation);
+            } else if constexpr (std::is_same_v<T, CreateCategory>) {
+                return check_create_terminology(document, op.parent, op.id,
+                                                model::ElementKind::Category,
+                                                /*parent_may_be_acp=*/false, op.name, operation);
+            } else if constexpr (std::is_same_v<T, CreateTerm>) {
+                return check_create_term(document, op, operation);
+            } else if constexpr (std::is_same_v<T, CreateExpression>) {
+                return check_create_terminology(document, op.parent, op.id,
+                                                model::ElementKind::Expression,
+                                                /*parent_may_be_acp=*/false, op.name, operation);
             } else if constexpr (std::is_same_v<T, SetCitation>) {
                 return check_set_citation(document, op, operation);
             } else if constexpr (std::is_same_v<T, SetName>) {
@@ -791,6 +925,14 @@ void perform(model::Document& document, const Operation& operation,
                 perform_create_argument_package(document, op, effects);
             } else if constexpr (std::is_same_v<T, CreateClaim>) {
                 perform_create_claim(document, op, effects);
+            } else if constexpr (std::is_same_v<T, CreateTerminologyPackage>) {
+                perform_create_terminology_package(document, op, effects);
+            } else if constexpr (std::is_same_v<T, CreateCategory>) {
+                perform_create_category(document, op, effects);
+            } else if constexpr (std::is_same_v<T, CreateTerm>) {
+                perform_create_term(document, op, effects);
+            } else if constexpr (std::is_same_v<T, CreateExpression>) {
+                perform_create_expression(document, op, effects);
             } else if constexpr (std::is_same_v<T, SetCitation>) {
                 perform_set_citation(document, op);
             } else if constexpr (std::is_same_v<T, SetName>) {
