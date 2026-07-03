@@ -69,6 +69,11 @@ public:
     // GSN pattern element abstraction toggles for the selected element (ADR-0006).
     bool ToggleUninstantiatedOnSelected();
     bool ToggleUndevelopedOnSelected();
+
+    // GSN pattern choice groups (ADR-0006).
+    bool CreateChoiceGroup(const std::string& source_element_id);
+    bool RemoveChoiceGroup(const std::string& group_id);
+    bool SetChoiceCardinality(const std::string& group_id, const std::string& cardinality_expression);
     bool RemoveProjectFile(const core::ProjectFileEntry& entry);
     bool RevealProjectFileInExplorer(const core::ProjectFileEntry& entry);
     void OpenArgumentPackageCanvas(const std::string& package_id,

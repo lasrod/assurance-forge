@@ -311,6 +311,37 @@ void DrawRelationshipOperatorDecorator(
     }
 }
 
+float DrawChoiceDiamond(ImDrawList* draw_list, ImVec2 center, float zoom, bool hovered, const char* label) {
+    const float radius = DpiSize(11.0f) * zoom;
+    const ImVec2 diamond[4] = {ImVec2(center.x, center.y - radius),
+                               ImVec2(center.x + radius, center.y),
+                               ImVec2(center.x, center.y + radius),
+                               ImVec2(center.x - radius, center.y)};
+    if (ShouldDrawShadows(zoom)) {
+        DrawPolyShadow(draw_list, diamond, 4, zoom);
+        if (auto* stats = CurrentRenderStats())
+            ++stats->shadows_drawn;
+    }
+    // Solid diamond (GSN v3 §1:3.2). Brighten on hover.
+    const ImU32 fill = hovered ? GetTheme().accent : GetTheme().border_strong;
+    draw_list->AddConvexPolyFilled(diamond, 4, fill);
+    draw_list->AddPolyline(diamond, 4, OutlineColor(), ImDrawFlags_Closed, DpiSize(kOutlineThickness) * zoom * 1.5f);
+
+    if (label && label[0] != '\0') {
+        ImFont* font = ImGui::GetFont();
+        const float font_size = ImGui::GetFontSize() * std::clamp(zoom, 0.6f, 1.4f);
+        const ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, label);
+        const ImVec2 text_pos(center.x + radius + DpiSize(4.0f) * zoom, center.y - text_size.y * 0.5f);
+        const ImVec2 pad(DpiSize(3.0f) * zoom, DpiSize(1.0f) * zoom);
+        draw_list->AddRectFilled(ImVec2(text_pos.x - pad.x, text_pos.y - pad.y),
+                                 ImVec2(text_pos.x + text_size.x + pad.x, text_pos.y + text_size.y + pad.y),
+                                 WithAlpha(GetTheme().surface_1, 0.85f),
+                                 DpiSize(3.0f) * zoom);
+        draw_list->AddText(font, font_size, text_pos, GetTheme().text_primary, label);
+    }
+    return radius;
+}
+
 // Draw dashes along a (optionally closed) polyline with a continuous on/off
 // phase carried across segment boundaries, so curves approximated by many short
 // segments still dash evenly.

@@ -248,6 +248,120 @@ TEST(PatternRelationshipData, ChoiceGroupMembership) {
 
 // ===== Choice groups =====
 
+namespace {
+
+// Build a package with source goal G1 and `count` SupportedBy (assertedinference)
+// relationships R1..Rn from G1 to S1..Sn.
+sacm::AssuranceCasePackage MakeChoiceModel(int count) {
+    sacm::AssuranceCasePackage pkg;
+    sacm::ArgumentPackage ap;
+    ap.id = "AP1";
+    for (int i = 1; i <= count; ++i) {
+        sacm::AssertedInference rel;
+        rel.id = "R" + std::to_string(i);
+        rel.sources.push_back("G1");
+        rel.targets.push_back("S" + std::to_string(i));
+        ap.assertedInferences.push_back(rel);
+    }
+    pkg.argumentPackages.push_back(ap);
+    return pkg;
+}
+
+} // namespace
+
+TEST(PatternChoiceGroupModel, CreateAndReconstruct) {
+    sacm::AssuranceCasePackage pkg = MakeChoiceModel(3);
+    const core::ChoiceGroupCreateResult result = core::CreateChoiceGroupFromRelationships(
+        pkg, {"R1", "R2", "R3"}, core::ParseCardinalityExpression("1..3"));
+    ASSERT_TRUE(result.success) << result.error;
+
+    const std::vector<core::PatternChoiceGroup> groups = core::ReconstructChoiceGroups(pkg);
+    ASSERT_EQ(groups.size(), 1u);
+    EXPECT_EQ(groups[0].id, result.group_id);
+    EXPECT_EQ(groups[0].sourceElement, "G1");
+    EXPECT_EQ(groups[0].relationshipType, "assertedinference");
+    EXPECT_EQ(groups[0].alternatives.size(), 3u);
+    EXPECT_EQ(groups[0].cardinality.displayExpression, "1..3");
+}
+
+TEST(PatternChoiceGroupModel, RejectsInvalidGroups) {
+    sacm::AssuranceCasePackage pkg = MakeChoiceModel(2);
+    pkg.argumentPackages[0].assertedInferences[1].sources[0] = "G2"; // different source
+
+    const core::ChoiceGroupCreateResult mixed_source = core::CreateChoiceGroupFromRelationships(
+        pkg, {"R1", "R2"}, core::ParseCardinalityExpression("1..2"));
+    EXPECT_FALSE(mixed_source.success);
+
+    const core::ChoiceGroupCreateResult too_few = core::CreateChoiceGroupFromRelationships(
+        pkg, {"R1"}, core::ParseCardinalityExpression("1..1"));
+    EXPECT_FALSE(too_few.success);
+}
+
+TEST(PatternChoiceGroupModel, GatherCandidates) {
+    sacm::AssuranceCasePackage pkg = MakeChoiceModel(2);
+    std::string type;
+    const std::vector<std::string> ids = core::GatherChoiceCandidateRelationships(pkg, "G1", type);
+    EXPECT_EQ(ids.size(), 2u);
+    EXPECT_EQ(type, "assertedinference");
+
+    std::string other_type;
+    EXPECT_TRUE(core::GatherChoiceCandidateRelationships(pkg, "ZZ", other_type).empty());
+}
+
+TEST(PatternChoiceGroupModel, RemoveAndSetCardinality) {
+    sacm::AssuranceCasePackage pkg = MakeChoiceModel(2);
+    const core::ChoiceGroupCreateResult result = core::CreateChoiceGroupFromRelationships(
+        pkg, {"R1", "R2"}, core::ParseCardinalityExpression("1..2"));
+    ASSERT_TRUE(result.success) << result.error;
+
+    std::string err;
+    ASSERT_TRUE(core::SetChoiceCardinality(pkg, result.group_id, core::ParseCardinalityExpression("2..2"), err)) << err;
+    EXPECT_EQ(core::ReconstructChoiceGroups(pkg)[0].cardinality.displayExpression, "2..2");
+
+    ASSERT_TRUE(core::RemoveChoiceGroup(pkg, result.group_id, err)) << err;
+    EXPECT_TRUE(core::ReconstructChoiceGroups(pkg).empty());
+    EXPECT_FALSE(core::RemoveChoiceGroup(pkg, result.group_id, err));
+}
+
+TEST(PatternChoiceGroupModel, CombinesWithMultiplicity) {
+    sacm::AssuranceCasePackage pkg = MakeChoiceModel(2);
+    core::PatternRelationshipData multiplicity;
+    multiplicity.relationOperator = core::PatternRelationOperator::Multiplicity;
+    multiplicity.multiplicity = core::ParseCardinalityExpression("1..*");
+    std::string err;
+    ASSERT_TRUE(core::SetRelationshipPatternData(pkg, "R1", multiplicity, err)) << err;
+
+    const core::ChoiceGroupCreateResult result = core::CreateChoiceGroupFromRelationships(
+        pkg, {"R1", "R2"}, core::ParseCardinalityExpression("1..2"));
+    ASSERT_TRUE(result.success) << result.error;
+
+    // R1 carries BOTH multiplicity and choice-group membership (GSN v3 §2:8).
+    const core::PatternRelationshipData read =
+        core::ReadPatternRelationshipData(pkg.argumentPackages[0].assertedInferences[0]);
+    EXPECT_EQ(read.relationOperator, core::PatternRelationOperator::Multiplicity);
+    ASSERT_TRUE(read.choiceGroupId.has_value());
+    EXPECT_EQ(*read.choiceGroupId, result.group_id);
+}
+
+TEST(PatternChoiceGroupModel, CommandGathersDefaultsCardinalityAndRecordsMembers) {
+    sacm::AssuranceCasePackage pkg = MakeChoiceModel(3);
+    parser::AssuranceCase ac;
+    core::commands::CommandContext ctx{ac, pkg};
+
+    // Empty cardinality -> command defaults to "1..n" over the gathered members.
+    core::commands::CreateChoiceGroupCommand cmd("G1", core::PatternCardinality{});
+    core::audit::AuditEvent event;
+    std::string err;
+    ASSERT_TRUE(cmd.Apply(ctx, event, err)) << err;
+    EXPECT_EQ(event.event_type, "CreateChoiceGroup");
+    EXPECT_EQ(event.payload.at("member_ids").size(), 3u);
+    EXPECT_EQ(event.payload.at("cardinality_display").get<std::string>(), "1..3");
+
+    const std::vector<core::PatternChoiceGroup> groups = core::ReconstructChoiceGroups(pkg);
+    ASSERT_EQ(groups.size(), 1u);
+    EXPECT_EQ(groups[0].cardinality.displayExpression, "1..3");
+}
+
 TEST(PatternChoiceGroup, Invariants) {
     std::string err;
 

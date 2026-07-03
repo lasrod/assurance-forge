@@ -28,6 +28,11 @@ public:
     // undeveloped state of the currently selected element as one audited edit.
     bool ToggleUninstantiatedOnSelected();
     bool ToggleUndevelopedOnSelected();
+
+    // GSN pattern choice groups (ADR-0006).
+    bool CreateChoiceGroup(const std::string& source_element_id);
+    bool RemoveChoiceGroup(const std::string& group_id);
+    bool SetChoiceCardinality(const std::string& group_id, const std::string& cardinality_expression);
     bool AddAcpToSelectedElement();
     bool AddAcpToRelationship(const std::string& relationship_id);
     bool RemoveAcp(const std::string& acp_id);

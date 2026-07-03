@@ -91,4 +91,65 @@ bool SetRelationshipPatternCommand::Apply(CommandContext& ctx, audit::AuditEvent
     return true;
 }
 
+namespace {
+
+void WriteCardinalityPayload(nlohmann::ordered_json& payload, const core::PatternCardinality& cardinality) {
+    payload["cardinality_min"] = core::PatternBoundToToken(cardinality.minimum);
+    payload["cardinality_max"] = core::PatternBoundToToken(cardinality.maximum);
+    payload["cardinality_display"] = cardinality.displayExpression;
+}
+
+} // namespace
+
+bool CreateChoiceGroupCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
+    std::string relationship_type;
+    const std::vector<std::string> members =
+        core::GatherChoiceCandidateRelationships(ctx.package, source_element_id_, relationship_type);
+    if (members.size() < 2) {
+        out_error = "Need at least two same-type SupportedBy alternatives under this element to form a choice.";
+        return false;
+    }
+    // Default cardinality is "1 of n" (1..<count>) when the caller supplied none.
+    core::PatternCardinality cardinality = cardinality_;
+    if (cardinality.displayExpression.empty())
+        cardinality = core::ParseCardinalityExpression("1.." + std::to_string(members.size()));
+
+    const core::ChoiceGroupCreateResult result =
+        core::CreateChoiceGroupFromRelationships(ctx.package, members, cardinality);
+    if (!result.success) {
+        out_error = result.error;
+        return false;
+    }
+    generated_group_id_ = result.group_id;
+
+    out_event.event_type = "CreateChoiceGroup";
+    out_event.payload = nlohmann::ordered_json::object();
+    out_event.payload["source_element_id"] = source_element_id_;
+    out_event.payload["group_id"] = generated_group_id_;
+    out_event.payload["member_ids"] = members;
+    WriteCardinalityPayload(out_event.payload, cardinality);
+    return true;
+}
+
+bool RemoveChoiceGroupCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
+    if (!core::RemoveChoiceGroup(ctx.package, group_id_, out_error))
+        return false;
+
+    out_event.event_type = "RemoveChoiceGroup";
+    out_event.payload = nlohmann::ordered_json::object();
+    out_event.payload["group_id"] = group_id_;
+    return true;
+}
+
+bool SetChoiceCardinalityCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
+    if (!core::SetChoiceCardinality(ctx.package, group_id_, cardinality_, out_error))
+        return false;
+
+    out_event.event_type = "SetChoiceCardinality";
+    out_event.payload = nlohmann::ordered_json::object();
+    out_event.payload["group_id"] = group_id_;
+    WriteCardinalityPayload(out_event.payload, cardinality_);
+    return true;
+}
+
 } // namespace core::commands

@@ -88,6 +88,11 @@ struct UiState {
     std::string pattern_cardinality_edit_rel_id;
     char pattern_cardinality_buf[64] = {};
 
+    // Choice-diamond cardinality editor buffer (ADR-0006), reloaded when the
+    // active choice popup targets a different group.
+    std::string choice_cardinality_edit_group_id;
+    char choice_cardinality_buf[64] = {};
+
     // Active center panel view
     CenterView center_view = CenterView::GsnCanvas;
 

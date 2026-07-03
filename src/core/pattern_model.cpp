@@ -1,10 +1,12 @@
 #include "core/pattern_model.h"
 
+#include "core/sacm_identity.h"
 #include "core/terminology_internal.h"
 #include "sacm/pattern_keys.h"
 
 #include <algorithm>
 #include <cctype>
+#include <map>
 
 namespace core {
 namespace {
@@ -23,6 +25,32 @@ void SetOrClearTaggedValue(sacm::SacmElement& element, std::string_view key, con
         RemoveTaggedValue(element, key);
     else
         SetTaggedValue(element, key, value);
+}
+
+// Visit every asserted relationship in the package with its XML local-name type.
+template <typename Fn>
+void ForEachRelationship(sacm::AssuranceCasePackage& package, Fn&& fn) {
+    for (sacm::ArgumentPackage& ap : package.argumentPackages) {
+        for (sacm::AssertedInference& ai : ap.assertedInferences)
+            fn(static_cast<sacm::AssertedRelationship&>(ai), std::string_view("assertedinference"));
+        for (sacm::AssertedContext& acx : ap.assertedContexts)
+            fn(static_cast<sacm::AssertedRelationship&>(acx), std::string_view("assertedcontext"));
+        for (sacm::AssertedEvidence& ae : ap.assertedEvidences)
+            fn(static_cast<sacm::AssertedRelationship&>(ae), std::string_view("assertedevidence"));
+    }
+}
+
+void WriteChoiceCardinality(sacm::AssertedRelationship& relationship, const PatternCardinality& cardinality) {
+    SetTaggedValue(relationship, keys::kChoiceCardinalityMinimum, PatternBoundToToken(cardinality.minimum));
+    SetTaggedValue(relationship, keys::kChoiceCardinalityMaximum, PatternBoundToToken(cardinality.maximum));
+    SetOrClearTaggedValue(relationship, keys::kChoiceCardinalityDisplay, cardinality.displayExpression);
+}
+
+void ClearChoiceTags(sacm::AssertedRelationship& relationship) {
+    RemoveTaggedValue(relationship, keys::kChoiceGroup);
+    RemoveTaggedValue(relationship, keys::kChoiceCardinalityMinimum);
+    RemoveTaggedValue(relationship, keys::kChoiceCardinalityMaximum);
+    RemoveTaggedValue(relationship, keys::kChoiceCardinalityDisplay);
 }
 
 } // namespace
@@ -328,6 +356,171 @@ bool ValidateChoiceGroup(const PatternChoiceGroup& group, std::string& out_error
         return false;
     }
     return ValidateCardinality(group.cardinality, out_error);
+}
+
+std::vector<PatternChoiceGroup> ReconstructChoiceGroups(const sacm::AssuranceCasePackage& package) {
+    std::map<std::string, PatternChoiceGroup> groups;
+    const auto visit = [&](const sacm::AssertedRelationship& relationship, std::string_view type) {
+        const std::optional<std::string> group_id = GetTaggedValue(relationship, keys::kChoiceGroup);
+        if (!group_id)
+            return;
+        PatternChoiceGroup& group = groups[*group_id];
+        if (group.id.empty()) {
+            group.id = *group_id;
+            group.sourceElement = relationship.sources.empty() ? std::string() : relationship.sources.front();
+            group.relationshipType = std::string(type);
+            PatternCardinality cardinality;
+            if (const std::optional<std::string> lo = GetTaggedValue(relationship, keys::kChoiceCardinalityMinimum))
+                cardinality.minimum = PatternBoundFromToken(*lo);
+            if (const std::optional<std::string> hi = GetTaggedValue(relationship, keys::kChoiceCardinalityMaximum))
+                cardinality.maximum = PatternBoundFromToken(*hi);
+            if (const std::optional<std::string> disp = GetTaggedValue(relationship, keys::kChoiceCardinalityDisplay))
+                cardinality.displayExpression = *disp;
+            group.cardinality = cardinality;
+        }
+        group.alternatives.push_back(relationship.id);
+    };
+    for (const sacm::ArgumentPackage& ap : package.argumentPackages) {
+        for (const sacm::AssertedInference& ai : ap.assertedInferences)
+            visit(ai, "assertedinference");
+        for (const sacm::AssertedContext& acx : ap.assertedContexts)
+            visit(acx, "assertedcontext");
+        for (const sacm::AssertedEvidence& ae : ap.assertedEvidences)
+            visit(ae, "assertedevidence");
+    }
+    std::vector<PatternChoiceGroup> result;
+    result.reserve(groups.size());
+    for (auto& [id, group] : groups)
+        result.push_back(std::move(group));
+    return result;
+}
+
+std::vector<std::string> GatherChoiceCandidateRelationships(const sacm::AssuranceCasePackage& package,
+                                                            const std::string& source_element_id,
+                                                            std::string& out_relationship_type) {
+    out_relationship_type.clear();
+    if (source_element_id.empty())
+        return {};
+    // Only structural (SupportedBy) relationships are choice alternatives.
+    std::map<std::string, std::vector<std::string>> by_type;
+    const auto consider = [&](const sacm::AssertedRelationship& relationship, std::string_view type) {
+        if (relationship.sources.empty() || relationship.sources.front() != source_element_id)
+            return;
+        if (GetTaggedValue(relationship, keys::kChoiceGroup).has_value())
+            return;
+        by_type[std::string(type)].push_back(relationship.id);
+    };
+    for (const sacm::ArgumentPackage& ap : package.argumentPackages) {
+        for (const sacm::AssertedInference& ai : ap.assertedInferences)
+            consider(ai, "assertedinference");
+        for (const sacm::AssertedEvidence& ae : ap.assertedEvidences)
+            consider(ae, "assertedevidence");
+    }
+    const std::vector<std::string>* best = nullptr;
+    for (const auto& [type, ids] : by_type) {
+        if (ids.size() >= 2 && (best == nullptr || ids.size() > best->size())) {
+            best = &ids;
+            out_relationship_type = type;
+        }
+    }
+    if (best == nullptr) {
+        out_relationship_type.clear();
+        return {};
+    }
+    return *best;
+}
+
+ChoiceGroupCreateResult CreateChoiceGroupFromRelationships(sacm::AssuranceCasePackage& package,
+                                                           const std::vector<std::string>& relationship_ids,
+                                                           const PatternCardinality& cardinality,
+                                                           const std::string& forced_group_id) {
+    ChoiceGroupCreateResult result;
+    if (relationship_ids.size() < 2) {
+        result.error = "A choice group needs at least two alternatives.";
+        return result;
+    }
+    std::string source;
+    std::string type;
+    std::vector<sacm::AssertedRelationship*> members;
+    for (const std::string& id : relationship_ids) {
+        sacm::AssertedRelationship* found = nullptr;
+        std::string found_type;
+        ForEachRelationship(package, [&](sacm::AssertedRelationship& relationship, std::string_view t) {
+            if (found == nullptr && relationship.id == id) {
+                found = &relationship;
+                found_type = std::string(t);
+            }
+        });
+        if (found == nullptr) {
+            result.error = "Relationship not found: " + id;
+            return result;
+        }
+        if (GetTaggedValue(*found, keys::kChoiceGroup).has_value()) {
+            result.error = "Relationship is already in a choice group: " + id;
+            return result;
+        }
+        const std::string member_source = found->sources.empty() ? std::string() : found->sources.front();
+        if (members.empty()) {
+            source = member_source;
+            type = found_type;
+        } else if (member_source != source) {
+            result.error = "Choice alternatives must share a source element.";
+            return result;
+        } else if (found_type != type) {
+            result.error = "Choice alternatives must share a relationship type.";
+            return result;
+        }
+        members.push_back(found);
+    }
+    if (!ValidateCardinality(cardinality, result.error))
+        return result;
+
+    const std::string group_id = forced_group_id.empty() ? GenerateSacmGid() : forced_group_id;
+    for (sacm::AssertedRelationship* member : members) {
+        SetTaggedValue(*member, keys::kChoiceGroup, group_id);
+        WriteChoiceCardinality(*member, cardinality);
+    }
+    result.success = true;
+    result.group_id = group_id;
+    return result;
+}
+
+bool RemoveChoiceGroup(sacm::AssuranceCasePackage& package, const std::string& group_id, std::string& out_error) {
+    out_error.clear();
+    bool any = false;
+    ForEachRelationship(package, [&](sacm::AssertedRelationship& relationship, std::string_view) {
+        const std::optional<std::string> id = GetTaggedValue(relationship, keys::kChoiceGroup);
+        if (id.has_value() && *id == group_id) {
+            ClearChoiceTags(relationship);
+            any = true;
+        }
+    });
+    if (!any) {
+        out_error = "Choice group not found: " + group_id;
+        return false;
+    }
+    return true;
+}
+
+bool SetChoiceCardinality(sacm::AssuranceCasePackage& package,
+                          const std::string& group_id,
+                          const PatternCardinality& cardinality,
+                          std::string& out_error) {
+    if (!ValidateCardinality(cardinality, out_error))
+        return false;
+    bool any = false;
+    ForEachRelationship(package, [&](sacm::AssertedRelationship& relationship, std::string_view) {
+        const std::optional<std::string> id = GetTaggedValue(relationship, keys::kChoiceGroup);
+        if (id.has_value() && *id == group_id) {
+            WriteChoiceCardinality(relationship, cardinality);
+            any = true;
+        }
+    });
+    if (!any) {
+        out_error = "Choice group not found: " + group_id;
+        return false;
+    }
+    return true;
 }
 
 // ----- Pattern definition metadata -----

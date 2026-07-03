@@ -13,6 +13,7 @@
 #include "ui/gsn/gsn_hit_tester.h"
 #include "ui/gsn/gsn_layout.h"
 #include "ui/i18n/localization.h"
+#include "ui/imgui_buffer_utils.h"
 #include "ui/theme.h"
 
 #include <algorithm>
@@ -603,6 +604,61 @@ void GsnCanvas::Render(UiState& ui_state,
             ++frame_stats.nodes_drawn;
         }
     } // gsn.nodes
+
+    // GSN pattern choice groups: one shared solid diamond per group on the
+    // source element's trunk (ADR-0006). Drawn after nodes so the diamond and
+    // its popup sit on top. Only meaningful in Pattern mode.
+    if (terminology_package && actions.editor_mode == core::GsnEditorMode::Pattern) {
+        core::perf::ScopedTimer perf_scope("gsn.pattern.choice_groups");
+        const std::vector<core::PatternChoiceGroup> choice_groups =
+            core::ReconstructChoiceGroups(*terminology_package);
+        for (const core::PatternChoiceGroup& group : choice_groups) {
+            const auto src_it = node_by_id_.find(group.sourceElement);
+            if (src_it == node_by_id_.end() || src_it->second == nullptr)
+                continue;
+            const LayoutNode& src = *src_it->second;
+            const float diamond_radius = DpiSize(11.0f) * zoom;
+            const ImVec2 fork(origin.x + (src.position.x + src.size.x * 0.5f) * zoom,
+                              origin.y + (src.position.y + src.size.y) * zoom + DpiSize(18.0f) * zoom);
+
+            std::string label = group.cardinality.displayExpression;
+            if (label.empty())
+                label = "1.." + std::to_string(group.alternatives.size());
+
+            // Invisible button makes the diamond a real item: it owns hover, the
+            // right-click context popup, and suppresses the background popup.
+            ImGui::SetCursorScreenPos(ImVec2(fork.x - diamond_radius, fork.y - diamond_radius));
+            ImGui::SetNextItemAllowOverlap();
+            ImGui::InvisibleButton(("##choice_btn_" + group.id).c_str(),
+                                   ImVec2(diamond_radius * 2.0f, diamond_radius * 2.0f));
+            const bool hovered = ImGui::IsItemHovered();
+            DrawChoiceDiamond(draw_list, fork, zoom, hovered, label.c_str());
+
+            const std::string popup_id = "gsn_choice_group##" + group.id;
+            if (ImGui::BeginPopupContextItem(popup_id.c_str())) {
+                ImGui::TextDisabled("%s", AF_TR("Choice Group").c_str());
+                if (ui_state.choice_cardinality_edit_group_id != group.id) {
+                    ui_state.choice_cardinality_edit_group_id = group.id;
+                    ui::CopyToBuffer(ui_state.choice_cardinality_buf, sizeof(ui_state.choice_cardinality_buf), label);
+                }
+                ImGui::SetNextItemWidth(120.0f);
+                ImGui::InputText((AF_TR("Cardinality") + "##choice_card").c_str(),
+                                 ui_state.choice_cardinality_buf,
+                                 sizeof(ui_state.choice_cardinality_buf));
+                ImGui::SameLine();
+                if (ImGui::Button((AF_TR("Apply") + "##choice_card_apply").c_str())) {
+                    if (actions.set_choice_cardinality)
+                        actions.set_choice_cardinality(group.id, ui_state.choice_cardinality_buf);
+                    ImGui::CloseCurrentPopup();
+                }
+                if (ImGui::MenuItem(AF_TR("Remove Choice Group").c_str(), nullptr, false,
+                                    static_cast<bool>(actions.remove_choice_group))) {
+                    actions.remove_choice_group(group.id);
+                }
+                ImGui::EndPopup();
+            }
+        }
+    }
 
     RenderPinnedTerminologyCard(terminology_card_state_, terminology_package, actions);
     if (terminology_card_state_.pinned && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&

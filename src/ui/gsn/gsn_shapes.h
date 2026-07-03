@@ -40,6 +40,12 @@ void DrawUninstantiatedMarker(
 void DrawRelationshipOperatorDecorator(
     ImDrawList* draw_list, ImVec2 center, float zoom, bool filled, const char* label);
 
+// GSN pattern choice decorator: a solid diamond centred at `center` (the shared
+// fork point on the source's trunk) with an optional cardinality label (e.g.
+// "1..3"). `hovered` brightens the diamond. Returns the diamond's half-size
+// (radius in screen px) so the caller can hit-test it. (ADR-0006)
+float DrawChoiceDiamond(ImDrawList* draw_list, ImVec2 center, float zoom, bool hovered, const char* label);
+
 // Pulsing outline drawn around nodes that are inside the active review scope.
 void DrawReviewScopeHighlight(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, float zoom, bool primary);
 

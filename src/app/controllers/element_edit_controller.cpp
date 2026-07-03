@@ -205,6 +205,78 @@ bool ElementEditController::SetRelationshipPattern(AppRuntimeState& state,
     return true;
 }
 
+bool ElementEditController::CreateChoiceGroup(AppRuntimeState& state, const std::string& source_element_id) {
+    if (source_element_id.empty()) {
+        events_.Emit(StatusMessageEvent{"No element selected."});
+        return false;
+    }
+    parser::AssuranceCase*      model   = nullptr;
+    sacm::AssuranceCasePackage* package = nullptr;
+    if (!TryGetWorkingModel(state, "Create choice group", events_, model, package))
+        return false;
+    (void)model;
+    (void)package;
+
+    // Empty cardinality lets the command default to "1..n" once it knows the
+    // number of alternatives.
+    core::commands::CreateChoiceGroupCommand cmd(source_element_id, core::PatternCardinality{});
+    const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Create choice group failed: " + outcome.error});
+        return false;
+    }
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(DocumentDirtyEvent{});
+    events_.Emit(StatusMessageEvent{"Created choice group"});
+    return true;
+}
+
+bool ElementEditController::RemoveChoiceGroup(AppRuntimeState& state, const std::string& group_id) {
+    if (group_id.empty())
+        return false;
+    parser::AssuranceCase*      model   = nullptr;
+    sacm::AssuranceCasePackage* package = nullptr;
+    if (!TryGetWorkingModel(state, "Remove choice group", events_, model, package))
+        return false;
+    (void)model;
+    (void)package;
+
+    core::commands::RemoveChoiceGroupCommand cmd(group_id);
+    const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Remove choice group failed: " + outcome.error});
+        return false;
+    }
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(DocumentDirtyEvent{});
+    events_.Emit(StatusMessageEvent{"Removed choice group"});
+    return true;
+}
+
+bool ElementEditController::SetChoiceCardinality(AppRuntimeState& state,
+                                                 const std::string& group_id,
+                                                 const std::string& cardinality_expression) {
+    if (group_id.empty())
+        return false;
+    parser::AssuranceCase*      model   = nullptr;
+    sacm::AssuranceCasePackage* package = nullptr;
+    if (!TryGetWorkingModel(state, "Set choice cardinality", events_, model, package))
+        return false;
+    (void)model;
+    (void)package;
+
+    core::commands::SetChoiceCardinalityCommand cmd(group_id,
+                                                    core::ParseCardinalityExpression(cardinality_expression));
+    const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Set choice cardinality failed: " + outcome.error});
+        return false;
+    }
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(DocumentDirtyEvent{});
+    return true;
+}
+
 bool ElementEditController::RemoveSelected(AppRuntimeState& state,
                                            const std::string& selected_id,
                                            core::RemoveMode mode) {

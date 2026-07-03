@@ -168,9 +168,18 @@ ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
         actions.add_counter_evidence_to_relationship = [&runtime](const std::string& relationship_id) {
             runtime.AddCounterEvidenceToRelationship(relationship_id);
         };
-    } else { // Pattern mode: element abstraction toggles instead of dialectic.
+    } else { // Pattern mode: element abstraction + choice groups instead of dialectic.
         actions.toggle_uninstantiated = [&runtime]() { runtime.ToggleUninstantiatedOnSelected(); };
         actions.toggle_undeveloped = [&runtime]() { runtime.ToggleUndevelopedOnSelected(); };
+        actions.create_choice_group = [&runtime](const std::string& source_element_id) {
+            runtime.CreateChoiceGroup(source_element_id);
+        };
+        actions.remove_choice_group = [&runtime](const std::string& group_id) {
+            runtime.RemoveChoiceGroup(group_id);
+        };
+        actions.set_choice_cardinality = [&runtime](const std::string& group_id, const std::string& expression) {
+            runtime.SetChoiceCardinality(group_id, expression);
+        };
     }
     return actions;
 }
@@ -346,6 +355,18 @@ bool AppRuntime::ToggleUninstantiatedOnSelected() {
 
 bool AppRuntime::ToggleUndevelopedOnSelected() {
     return actions::ElementActions(*impl_).ToggleUndevelopedOnSelected();
+}
+
+bool AppRuntime::CreateChoiceGroup(const std::string& source_element_id) {
+    return actions::ElementActions(*impl_).CreateChoiceGroup(source_element_id);
+}
+
+bool AppRuntime::RemoveChoiceGroup(const std::string& group_id) {
+    return actions::ElementActions(*impl_).RemoveChoiceGroup(group_id);
+}
+
+bool AppRuntime::SetChoiceCardinality(const std::string& group_id, const std::string& cardinality_expression) {
+    return actions::ElementActions(*impl_).SetChoiceCardinality(group_id, cardinality_expression);
 }
 
 bool AppRuntime::AddCounterArgumentToRelationship(const std::string& relationship_id) {

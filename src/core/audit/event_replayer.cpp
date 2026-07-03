@@ -295,6 +295,75 @@ bool ApplyEvent(ReplayState& state,
         return true;
     }
 
+    if (type == "CreateChoiceGroup") {
+        std::string group_id, card_min, card_max, card_display;
+        if (!require_string("group_id", group_id))
+            return false;
+        if (!require_string("cardinality_min", card_min))
+            return false;
+        if (!require_string("cardinality_max", card_max))
+            return false;
+        if (!require_string("cardinality_display", card_display))
+            return false;
+        auto members_it = payload.find("member_ids");
+        if (members_it == payload.end() || !members_it->is_array()) {
+            out_error = "Missing or non-array payload field 'member_ids' at " +
+                        FormatLocation(tx_seq, event.event_sequence, type);
+            return false;
+        }
+        std::vector<std::string> member_ids;
+        for (const auto& entry : *members_it)
+            member_ids.push_back(entry.get<std::string>());
+        core::PatternCardinality cardinality;
+        cardinality.minimum = core::PatternBoundFromToken(card_min);
+        cardinality.maximum = core::PatternBoundFromToken(card_max);
+        cardinality.displayExpression = card_display;
+        const core::ChoiceGroupCreateResult result =
+            core::CreateChoiceGroupFromRelationships(state.package, member_ids, cardinality, group_id);
+        if (!result.success) {
+            out_error = "CreateChoiceGroupFromRelationships failed at " +
+                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
+            return false;
+        }
+        return true;
+    }
+
+    if (type == "RemoveChoiceGroup") {
+        std::string group_id;
+        if (!require_string("group_id", group_id))
+            return false;
+        std::string err;
+        if (!core::RemoveChoiceGroup(state.package, group_id, err)) {
+            out_error =
+                "RemoveChoiceGroup failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+            return false;
+        }
+        return true;
+    }
+
+    if (type == "SetChoiceCardinality") {
+        std::string group_id, card_min, card_max, card_display;
+        if (!require_string("group_id", group_id))
+            return false;
+        if (!require_string("cardinality_min", card_min))
+            return false;
+        if (!require_string("cardinality_max", card_max))
+            return false;
+        if (!require_string("cardinality_display", card_display))
+            return false;
+        core::PatternCardinality cardinality;
+        cardinality.minimum = core::PatternBoundFromToken(card_min);
+        cardinality.maximum = core::PatternBoundFromToken(card_max);
+        cardinality.displayExpression = card_display;
+        std::string err;
+        if (!core::SetChoiceCardinality(state.package, group_id, cardinality, err)) {
+            out_error =
+                "SetChoiceCardinality failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+            return false;
+        }
+        return true;
+    }
+
     if (type == "UpdateTerminologyPackage") {
         std::string id, gid, name, description;
         if (!require_identity(id, gid))

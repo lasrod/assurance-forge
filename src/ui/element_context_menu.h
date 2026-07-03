@@ -27,6 +27,12 @@ struct ElementContextActions {
     // uninstantiated decorator / undeveloped flag on the selected element.
     std::function<void()> toggle_uninstantiated;
     std::function<void()> toggle_undeveloped;
+    // GSN pattern choice groups (Pattern mode only). `create_choice_group`
+    // groups the source element's eligible alternatives; the diamond popup
+    // removes a group or edits its cardinality (a "lo..hi" expression).
+    std::function<void(const std::string& source_element_id)> create_choice_group;
+    std::function<void(const std::string& group_id)> remove_choice_group;
+    std::function<void(const std::string& group_id, const std::string& cardinality_expression)> set_choice_cardinality;
     std::function<void(const std::string& relationship_id)> add_counter_argument_to_relationship;
     std::function<void(const std::string& relationship_id)> add_counter_evidence_to_relationship;
     std::function<void(const core::TerminologyPackageRef&, const core::TerminologyTermRef&)> open_terminology_term;

@@ -299,6 +299,9 @@ void DrawGsnNode(const GsnNode& node,
             if (supports_undeveloped && actions.toggle_undeveloped &&
                 ImGui::MenuItem(AF_TR("Mark as Undeveloped").c_str(), nullptr, node.undeveloped))
                 actions.toggle_undeveloped();
+            if (actions.create_choice_group &&
+                ImGui::MenuItem(AF_TR("Create Choice Group").c_str()))
+                actions.create_choice_group(node.id);
         }
         ImGui::Separator();
         RenderAiReviewMenu(actions);

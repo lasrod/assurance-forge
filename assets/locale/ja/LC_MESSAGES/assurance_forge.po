@@ -334,6 +334,9 @@ msgstr "変更"
 msgid "Changes are recorded in the proposal draft. Save it from the review panel."
 msgstr "変更は提案ドラフトに記録されています。レビューパネルから保存してください。"
 
+msgid "Choice Group"
+msgstr "選択グループ"
+
 msgid "Choose a target TerminologyPackage."
 msgstr "対象の TerminologyPackage を選択してください。"
 
@@ -429,6 +432,9 @@ msgstr "テンプレートから保証プロジェクトを作成は未実装で
 
 msgid "Create Category"
 msgstr "分類を作成"
+
+msgid "Create Choice Group"
+msgstr "選択グループを作成"
 
 msgid "Create Empty Assurance Project"
 msgstr "空の保証プロジェクトを作成"
@@ -1320,6 +1326,9 @@ msgstr "除去"
 
 msgid "Remove ACP"
 msgstr "ACP を除去"
+
+msgid "Remove Choice Group"
+msgstr "選択グループを削除"
 
 msgid "Remove Key"
 msgstr "キーを削除"

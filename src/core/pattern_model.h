@@ -190,6 +190,48 @@ struct PatternChoiceGroup {
 // valid; otherwise writes a human-readable reason into out_error.
 bool ValidateChoiceGroup(const PatternChoiceGroup& group, std::string& out_error);
 
+// Reconstruct every choice group present in `package` from the member
+// relationships' tagged values (the group is never a SACM element — ADR-0006).
+// Source element, relationship type, and cardinality are taken from the group's
+// members.
+std::vector<PatternChoiceGroup> ReconstructChoiceGroups(const sacm::AssuranceCasePackage& package);
+
+// Gather the relationship ids that are candidates for a new choice group rooted
+// at `source_element_id`: its structural (SupportedBy) child relationships of a
+// single dominant type, when at least two such relationships exist and none is
+// already in a choice group. Writes the shared relationship type to
+// `out_relationship_type`. Returns an empty vector when no eligible set exists.
+std::vector<std::string> GatherChoiceCandidateRelationships(const sacm::AssuranceCasePackage& package,
+                                                            const std::string& source_element_id,
+                                                            std::string& out_relationship_type);
+
+struct ChoiceGroupCreateResult {
+    bool success = false;
+    std::string group_id;
+    std::string error;
+};
+
+// Group `relationship_ids` into a choice group: validates they exist, number at
+// least two, share one source element and one relationship type, and that none
+// already belongs to a choice group; then writes the group id + cardinality
+// tagged values onto each member. `forced_group_id` (when non-empty) is used
+// instead of generating one, for deterministic replay.
+ChoiceGroupCreateResult CreateChoiceGroupFromRelationships(sacm::AssuranceCasePackage& package,
+                                                           const std::vector<std::string>& relationship_ids,
+                                                           const PatternCardinality& cardinality,
+                                                           const std::string& forced_group_id = {});
+
+// Remove the choice group `group_id` by clearing the group/cardinality tagged
+// values from its member relationships; the relationships themselves remain.
+// Returns false with out_error when no member carries the group id.
+bool RemoveChoiceGroup(sacm::AssuranceCasePackage& package, const std::string& group_id, std::string& out_error);
+
+// Update the cardinality of an existing choice group on every member.
+bool SetChoiceCardinality(sacm::AssuranceCasePackage& package,
+                          const std::string& group_id,
+                          const PatternCardinality& cardinality,
+                          std::string& out_error);
+
 // ----- Pattern definition metadata -----
 
 // The GSN-standard pattern-definition sections. Name maps to

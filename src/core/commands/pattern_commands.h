@@ -85,4 +85,49 @@ private:
 std::string RelationOperatorToToken(core::PatternRelationOperator op);
 bool RelationOperatorFromToken(const std::string& token, core::PatternRelationOperator& out);
 
+// Create a GSN choice group over the eligible structural alternatives of
+// `source_element_id` (its same-type SupportedBy children). The member ids and
+// generated group id are captured for deterministic replay (ADR-0006).
+class CreateChoiceGroupCommand final : public ICommand {
+public:
+    CreateChoiceGroupCommand(std::string source_element_id, core::PatternCardinality cardinality)
+        : source_element_id_(std::move(source_element_id)), cardinality_(std::move(cardinality)) {}
+
+    std::string Name() const override { return "CreateChoiceGroup"; }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+    const std::string& GeneratedGroupId() const { return generated_group_id_; }
+
+private:
+    std::string source_element_id_;
+    core::PatternCardinality cardinality_;
+    std::string generated_group_id_;
+};
+
+// Remove a choice group (members keep their ordinary relationships).
+class RemoveChoiceGroupCommand final : public ICommand {
+public:
+    explicit RemoveChoiceGroupCommand(std::string group_id) : group_id_(std::move(group_id)) {}
+
+    std::string Name() const override { return "RemoveChoiceGroup"; }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+private:
+    std::string group_id_;
+};
+
+// Change the cardinality of an existing choice group.
+class SetChoiceCardinalityCommand final : public ICommand {
+public:
+    SetChoiceCardinalityCommand(std::string group_id, core::PatternCardinality cardinality)
+        : group_id_(std::move(group_id)), cardinality_(std::move(cardinality)) {}
+
+    std::string Name() const override { return "SetChoiceCardinality"; }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+private:
+    std::string group_id_;
+    core::PatternCardinality cardinality_;
+};
+
 } // namespace core::commands

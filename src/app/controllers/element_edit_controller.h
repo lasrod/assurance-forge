@@ -45,6 +45,15 @@ public:
                                 const std::string& relationship_id,
                                 const core::PatternRelationshipData& data);
 
+    // GSN choice groups (ADR-0006), each one undoable transaction. Create groups
+    // the eligible alternatives under `source_element_id`; the cardinality
+    // expression is "lo..hi" (empty in Create defaults to "1..n").
+    bool CreateChoiceGroup(AppRuntimeState& state, const std::string& source_element_id);
+    bool RemoveChoiceGroup(AppRuntimeState& state, const std::string& group_id);
+    bool SetChoiceCardinality(AppRuntimeState& state,
+                              const std::string& group_id,
+                              const std::string& cardinality_expression);
+
     bool RemoveSelected(AppRuntimeState& state,
                         const std::string& selected_id,
                         core::RemoveMode mode);

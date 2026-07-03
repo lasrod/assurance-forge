@@ -80,6 +80,30 @@ bool ElementActions::ToggleUndevelopedOnSelected() {
     return state_.element_edit_controller->SetUndeveloped(state_, selected_id, !current);
 }
 
+bool ElementActions::CreateChoiceGroup(const std::string& source_element_id) {
+    if (!state_.app_state.loaded_case.has_value()) {
+        SetStatus(state_, "No assurance case loaded.");
+        return false;
+    }
+    return state_.element_edit_controller->CreateChoiceGroup(state_, source_element_id);
+}
+
+bool ElementActions::RemoveChoiceGroup(const std::string& group_id) {
+    if (!state_.app_state.loaded_case.has_value()) {
+        SetStatus(state_, "No assurance case loaded.");
+        return false;
+    }
+    return state_.element_edit_controller->RemoveChoiceGroup(state_, group_id);
+}
+
+bool ElementActions::SetChoiceCardinality(const std::string& group_id, const std::string& cardinality_expression) {
+    if (!state_.app_state.loaded_case.has_value()) {
+        SetStatus(state_, "No assurance case loaded.");
+        return false;
+    }
+    return state_.element_edit_controller->SetChoiceCardinality(state_, group_id, cardinality_expression);
+}
+
 bool ElementActions::AddChallengeToRelationship(const std::string& relationship_id,
                                                 core::ChallengeSourceType source_type) {
     if (!state_.app_state.loaded_case.has_value()) {
