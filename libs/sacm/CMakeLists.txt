@@ -1,0 +1,94 @@
+# --------------------------------------------------------------------
+# sacm — independent, editable OMG SACM 2.3 library (C++23).
+#
+# This library owns SACM model state, SACM-native editing with previews,
+# XMI import/export, validation, identity, and semantic comparison. It
+# must stay free of Assurance Forge dependencies: no src/** includes, no
+# ImGui/UI/app/AI types, strict SACM terminology only (enforced by
+# cmake/check_layer_gates.cmake in the parent build).
+#
+# Builds in-tree (add_subdirectory from the Assurance Forge root) and
+# standalone (cmake -S libs/sacm -B <build>).
+# --------------------------------------------------------------------
+cmake_minimum_required(VERSION 3.21)
+project(sacm VERSION 0.1.0 LANGUAGES CXX)
+
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(SACM_STANDALONE ON)
+else()
+    set(SACM_STANDALONE OFF)
+endif()
+
+if(SACM_STANDALONE)
+    set(CMAKE_CXX_STANDARD 23)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    if(MSVC)
+        add_compile_options(/FS /utf-8 /MP)
+    endif()
+endif()
+
+add_library(sacm STATIC
+    src/version.cpp
+    src/validation/diagnostic.cpp
+)
+add_library(sacm::sacm ALIAS sacm)
+target_compile_features(sacm PUBLIC cxx_std_23)
+target_include_directories(sacm PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+target_compile_definitions(sacm PUBLIC SACM_STANDARD_VERSION="2.3")
+
+# pugixml: reuse the in-tree target when the parent provides it, else the
+# sibling submodule, else FetchContent (fully standalone checkout).
+if(NOT TARGET pugixml)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../external/pugixml/CMakeLists.txt")
+        add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../external/pugixml" pugixml EXCLUDE_FROM_ALL)
+    else()
+        include(FetchContent)
+        FetchContent_Declare(
+            pugixml
+            URL https://github.com/zeux/pugixml/releases/download/v1.14/pugixml-1.14.tar.gz
+            DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+        )
+        FetchContent_MakeAvailable(pugixml)
+    endif()
+endif()
+# PRIVATE: pugixml must never appear in public sacm headers.
+target_link_libraries(sacm PRIVATE pugixml)
+
+add_executable(sacm_cli tools/sacm_cli.cpp)
+target_link_libraries(sacm_cli PRIVATE sacm::sacm)
+
+option(SACM_BUILD_TESTS "Build SACM library tests" ON)
+if(SACM_BUILD_TESTS)
+    if(NOT TARGET GTest::gtest_main)
+        include(FetchContent)
+        set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+        FetchContent_Declare(
+            googletest
+            GIT_REPOSITORY https://github.com/google/googletest.git
+            GIT_TAG v1.16.0
+        )
+        FetchContent_MakeAvailable(googletest)
+    endif()
+    enable_testing()
+    add_executable(sacm_tests
+        tests/test_version.cpp
+    )
+    target_link_libraries(sacm_tests PRIVATE sacm::sacm GTest::gtest_main)
+    target_compile_definitions(sacm_tests PRIVATE
+        SACM_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data"
+    )
+    if(DEFINED SACM_REPO_FIXTURES_DIR)
+        target_compile_definitions(sacm_tests PRIVATE
+            SACM_REPO_FIXTURES_DIR="${SACM_REPO_FIXTURES_DIR}"
+        )
+    endif()
+    include(GoogleTest)
+    gtest_discover_tests(sacm_tests
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        DISCOVERY_MODE PRE_TEST
+    )
+    add_test(NAME SacmCliVersionSmoke COMMAND sacm_cli version)
+endif()
