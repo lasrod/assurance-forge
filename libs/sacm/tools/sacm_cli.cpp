@@ -26,11 +26,13 @@ int print_usage(std::ostream& out) {
            "  version                          print library and SACM standard versions\n"
            "  validate <file> [--strict] [--json]\n"
            "                                   load a SACM XMI file and report diagnostics\n"
-           "  roundtrip <file> [--strict]      load -> strict save -> reload -> semantic compare\n"
-           "  export <in> [-o <out>] [--strict]\n"
-           "                                   load and emit deterministic strict SACM 2.3 XMI\n"
+           "  roundtrip <file> [--strict] [--compat]\n"
+           "                                   load -> save -> reload -> semantic compare\n"
+           "  export <in> [-o <out>] [--strict] [--compat]\n"
+           "                                   load and emit deterministic SACM 2.3 XMI\n"
            "\n"
-           "Loading is tolerant by default; --strict enforces strict SACM 2.3 on load.\n";
+           "Loading is tolerant by default; --strict enforces strict SACM 2.3 on load.\n"
+           "Saving is strict by default; --compat re-emits preserved compatibility content.\n";
     return kExitUsage;
 }
 
@@ -89,6 +91,7 @@ struct CommonArgs {
     std::string file;
     std::string output;
     bool strict = false;
+    bool compat_save = false;
     bool json = false;
     bool ok = false;
 };
@@ -101,6 +104,8 @@ CommonArgs parse_args(int argc, char** argv) {
             args.strict = true;
         } else if (arg == "--tolerant") {
             args.strict = false;
+        } else if (arg == "--compat") {
+            args.compat_save = true;
         } else if (arg == "--json") {
             args.json = true;
         } else if (arg == "-o" && i + 1 < argc) {
@@ -117,6 +122,11 @@ CommonArgs parse_args(int argc, char** argv) {
         std::cerr << "error: missing input file\n";
     }
     return args;
+}
+
+sacm::io::SaveOptions save_options(const CommonArgs& args) {
+    return sacm::io::SaveOptions{
+        .mode = args.compat_save ? sacm::io::Mode::Tolerant : sacm::io::Mode::Strict};
 }
 
 sacm::io::LoadOptions load_options(const CommonArgs& args) {
@@ -154,7 +164,7 @@ int run_roundtrip(const CommonArgs& args) {
         std::cout << "ROUNDTRIP FAILED (load) " << args.file << "\n";
         return kExitErrors;
     }
-    const sacm::io::SaveResult saved = sacm::io::save_xmi_string(*first.document);
+    const sacm::io::SaveResult saved = sacm::io::save_xmi_string(*first.document, save_options(args));
     if (!saved.ok) {
         print_diagnostics(saved.diagnostics, false);
         std::cout << "ROUNDTRIP FAILED (save) " << args.file << "\n";
@@ -187,7 +197,7 @@ int run_export(const CommonArgs& args) {
     if (!loaded.document.has_value() || sacm::validation::has_errors(loaded.diagnostics)) {
         return kExitErrors;
     }
-    const sacm::io::SaveResult saved = sacm::io::save_xmi_string(*loaded.document);
+    const sacm::io::SaveResult saved = sacm::io::save_xmi_string(*loaded.document, save_options(args));
     if (!saved.ok) {
         print_diagnostics(saved.diagnostics, false);
         return kExitErrors;

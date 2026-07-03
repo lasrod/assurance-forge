@@ -42,6 +42,11 @@ class SACMElement {
     // Containment parent; nullptr for document roots.
     const SACMElement* parent() const { return parent_; }
 
+    // Raw XML of unknown (vendor-extension) child elements kept by tolerant
+    // loads. Never silently dropped: strict save refuses documents carrying
+    // preserved content (SACM-XMI-006); compatibility save re-emits it.
+    const std::vector<std::string>& preserved_content() const { return preserved_content_; }
+
   protected:
     SACMElement(ElementKind kind, ElementId id) : kind_(kind), id_(std::move(id)) {}
 
@@ -55,6 +60,7 @@ class SACMElement {
     bool is_abstract_ = false;
     std::optional<ElementId> cited_element_;
     std::optional<ElementId> abstract_form_;
+    std::vector<std::string> preserved_content_;
     SACMElement* parent_ = nullptr;
 };
 

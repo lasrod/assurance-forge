@@ -1,0 +1,208 @@
+#include "sacm/compare/semantic_compare.h"
+#include "sacm/io/xmi.h"
+#include "sacm/model/document.h"
+#include "sacm/validation/codes.h"
+#include "sacm/validation/validate.h"
+
+#include <gtest/gtest.h>
+
+#include <algorithm>
+#include <filesystem>
+
+namespace {
+
+using sacm::commands::AddTaggedValue;
+using sacm::commands::CreateArgumentPackage;
+using sacm::commands::CreateAssuranceCasePackage;
+using sacm::commands::CreateClaim;
+using sacm::commands::SetDescription;
+using sacm::commands::SetName;
+using sacm::io::LoadOptions;
+using sacm::io::LoadResult;
+using sacm::io::Mode;
+using sacm::io::SaveOptions;
+using sacm::model::Document;
+using sacm::model::ElementId;
+
+std::filesystem::path fixture(std::string_view name) {
+    return std::filesystem::path(SACM_TEST_DATA_DIR) / "sacm23" / name;
+}
+
+bool has_code(const std::vector<sacm::validation::Diagnostic>& diagnostics,
+              std::string_view code) {
+    return std::ranges::any_of(diagnostics, [&](const auto& diagnostic) {
+        return diagnostic.code == code;
+    });
+}
+
+TEST(Sacm23BaseModel, SACM23_BASE_001_InheritedMetadataRoundTrips) {
+    const LoadResult first = sacm::io::load_xmi_file(fixture("base-metadata-valid.sacm.xmi"),
+                                                     LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(first.ok) << (first.diagnostics.empty() ? "" : first.diagnostics.front().message);
+    const auto& document = *first.document;
+
+    // gid, multilang description, note, tagged value on the package.
+    const auto& acp = *document.roots().front();
+    EXPECT_EQ(acp.gid(), "urn:example:case-1");
+    ASSERT_EQ(acp.descriptions().size(), 1u);
+    EXPECT_EQ(*acp.description().find("ja"), "基本メタデータ付きのケース。");
+    ASSERT_EQ(acp.notes().size(), 1u);
+    EXPECT_EQ(acp.notes().front()->content().primary(), "A reviewer note.");
+    ASSERT_EQ(acp.tagged_values().size(), 1u);
+    EXPECT_EQ(acp.tagged_values().front()->key().primary(), "reviewStatus");
+    EXPECT_EQ(acp.tagged_values().front()->content().primary(), "approved");
+
+    // Abstraction and citation flags with implementation constraint.
+    const auto* pattern = document.find_as<sacm::model::Claim>(ElementId{"claim_pattern"});
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_TRUE(pattern->is_abstract());
+    ASSERT_EQ(pattern->implementation_constraints().size(), 1u);
+    const auto* concrete = document.find_as<sacm::model::Claim>(ElementId{"claim_concrete"});
+    ASSERT_NE(concrete, nullptr);
+    EXPECT_TRUE(concrete->is_citation());
+    ASSERT_TRUE(concrete->cited_element().has_value());
+    EXPECT_EQ(concrete->cited_element()->value(), "claim_pattern");
+
+    // Full validation is clean, and everything survives a round-trip.
+    EXPECT_TRUE(sacm::validation::validate(document).empty());
+    const auto saved = sacm::io::save_xmi_string(document);
+    ASSERT_TRUE(saved.ok);
+    const LoadResult second = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(second.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(document, *second.document).empty());
+}
+
+TEST(Sacm23BaseModel, SACM23_BASE_002_CitationWithoutFlagIsInvalid) {
+    const LoadResult result = sacm::io::load_xmi_file(
+        fixture("invalid/citation-flag-invalid.sacm.xmi"), LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(result.document.has_value());
+    const auto diagnostics = sacm::validation::validate(*result.document);
+    EXPECT_TRUE(has_code(diagnostics, sacm::validation::codes::kCitationInvalid));
+}
+
+TEST(Sacm23BaseModel, SACM23_BASE_002_ImplementationConstraintRequiresAbstract) {
+    Document document;
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"})
+                    .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateArgumentPackage{
+                        .parent = ElementId{"acp_1"}, .id = ElementId{"argpkg_1"}, .name = "Arg"})
+                    .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateClaim{.parent = ElementId{"argpkg_1"},
+                                       .id = ElementId{"claim_1"},
+                                       .name = "C"})
+                    .applied);
+    // Build the invalid state via a fixture-load instead: commands cannot
+    // create implementation constraints yet, so exercise the validator on
+    // the abstract-pattern fixture with the flag flipped through XML.
+    constexpr std::string_view kXml = R"(<?xml version="1.0"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:id="acp_1">
+  <name content="Case"/>
+  <argumentPackage xmi:id="argpkg_1">
+    <name content="Arg"/>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_1">
+      <name content="Not abstract"/>
+      <implementationConstraint xmi:id="ic_1">
+        <content><value lang="en" content="constraint"/></content>
+      </implementationConstraint>
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+    const LoadResult loaded = sacm::io::load_xmi_string(kXml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(loaded.ok);
+    const auto diagnostics = sacm::validation::validate(*loaded.document);
+    EXPECT_TRUE(has_code(diagnostics, sacm::validation::codes::kCitationInvalid));
+}
+
+TEST(Sacm23BaseModel, SACM23_BASE_001_MultiLanguageNameMapsToTaggedValue) {
+    // Legacy multi-language names keep one LangString name (clause 8.6) and
+    // preserve the remaining languages via TaggedValue "sacm.import.name".
+    constexpr std::string_view kXml = R"(<?xml version="1.0"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="acp_1">
+  <name>
+    <content lang="en">Open Autonomy Safety Case</content>
+    <content lang="ja">オープン自律安全ケース</content>
+  </name>
+</sacm:AssuranceCasePackage>)";
+    const LoadResult loaded = sacm::io::load_xmi_string(kXml);
+    ASSERT_TRUE(loaded.ok);
+    const auto& acp = *loaded.document->roots().front();
+    EXPECT_EQ(acp.name().lang, "en");
+    EXPECT_EQ(acp.name().content, "Open Autonomy Safety Case");
+    ASSERT_EQ(acp.tagged_values().size(), 1u);
+    EXPECT_EQ(acp.tagged_values().front()->key().primary(), "sacm.import.name");
+    EXPECT_EQ(*acp.tagged_values().front()->content().find("ja"), "オープン自律安全ケース");
+
+    // Stable through a strict round-trip (TaggedValue is standard SACM).
+    const auto saved = sacm::io::save_xmi_string(*loaded.document);
+    ASSERT_TRUE(saved.ok);
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(*loaded.document, *reloaded.document).empty());
+}
+
+TEST(Sacm23BaseModel, SACM23_COMPAT_001_VendorContentPreservedAndStrictSaveRefuses) {
+    const LoadResult loaded = sacm::io::load_xmi_file(fixture("vendor-extension-valid.sacm.xmi"));
+    ASSERT_TRUE(loaded.ok);
+    const auto& acp = *loaded.document->roots().front();
+    ASSERT_EQ(acp.preserved_content().size(), 1u);
+    EXPECT_NE(acp.preserved_content().front().find("vendorMetadata"), std::string::npos);
+
+    // Strict save refuses rather than silently dropping.
+    const auto strict = sacm::io::save_xmi_string(*loaded.document);
+    EXPECT_FALSE(strict.ok);
+    EXPECT_TRUE(has_code(strict.diagnostics, sacm::validation::codes::kXmiStrictSaveRefused));
+
+    // Compatibility save re-emits the fragment and stays semantically stable.
+    const auto compat =
+        sacm::io::save_xmi_string(*loaded.document, SaveOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(compat.ok);
+    EXPECT_NE(compat.xml.find("vendorMetadata"), std::string::npos);
+    const LoadResult reloaded = sacm::io::load_xmi_string(compat.xml);
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(*loaded.document, *reloaded.document).empty());
+}
+
+TEST(Sacm23BaseModel, SACM23_BASE_001_SetNameSetDescriptionAddTaggedValue) {
+    Document document;
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"})
+                    .applied);
+    ASSERT_TRUE(document
+                    .apply(SetName{.element = ElementId{"acp_1"},
+                                   .name = "Renamed Case",
+                                   .language = "en"})
+                    .applied);
+    ASSERT_TRUE(document
+                    .apply(SetDescription{.element = ElementId{"acp_1"},
+                                          .text = "A description.",
+                                          .language = "en"})
+                    .applied);
+    ASSERT_TRUE(document
+                    .apply(SetDescription{.element = ElementId{"acp_1"},
+                                          .text = "説明。",
+                                          .language = "ja"})
+                    .applied);
+    ASSERT_TRUE(document
+                    .apply(AddTaggedValue{.element = ElementId{"acp_1"},
+                                          .key = "reviewStatus",
+                                          .value = "approved"})
+                    .applied);
+
+    const auto& acp = *document.roots().front();
+    EXPECT_EQ(acp.name().content, "Renamed Case");
+    ASSERT_EQ(acp.descriptions().size(), 1u);
+    EXPECT_EQ(*acp.description().find("en"), "A description.");
+    EXPECT_EQ(*acp.description().find("ja"), "説明。");
+    ASSERT_EQ(acp.tagged_values().size(), 1u);
+    EXPECT_TRUE(sacm::validation::validate(document).empty());
+
+    // Round-trips through strict save.
+    const auto saved = sacm::io::save_xmi_string(document);
+    ASSERT_TRUE(saved.ok);
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
+}
+
+}  // namespace

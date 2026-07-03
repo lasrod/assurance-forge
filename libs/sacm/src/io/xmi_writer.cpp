@@ -325,6 +325,19 @@ void write_containment_children(pugi::xml_node node, const SACMElement& element)
     }
 }
 
+// Compat-mode re-emission of preserved unknown content (set only while
+// saving in tolerant/compatibility mode).
+thread_local bool g_emit_preserved_content = false;
+
+void write_preserved_content(pugi::xml_node node, const SACMElement& element) {
+    if (!g_emit_preserved_content) {
+        return;
+    }
+    for (const std::string& fragment : element.preserved_content()) {
+        node.append_buffer(fragment.data(), fragment.size());
+    }
+}
+
 void write_element(pugi::xml_node parent, const SACMElement& element, std::string_view node_name,
                    std::optional<ElementKind> declared_kind) {
     pugi::xml_node node = parent.append_child(std::string(node_name).c_str());
@@ -339,6 +352,7 @@ void write_element(pugi::xml_node parent, const SACMElement& element, std::strin
         write_model_element_children(node, *model_element);
     }
     write_containment_children(node, element);
+    write_preserved_content(node, element);
 }
 
 void write_root(pugi::xml_node parent, const SACMElement& element, bool declare_namespaces) {
@@ -355,6 +369,7 @@ void write_root(pugi::xml_node parent, const SACMElement& element, bool declare_
         write_model_element_children(node, *model_element);
     }
     write_containment_children(node, element);
+    write_preserved_content(node, element);
 }
 
 struct StringWriter final : pugi::xml_writer {
@@ -368,8 +383,32 @@ struct StringWriter final : pugi::xml_writer {
 
 SaveResult save_xmi_string(const model::Document& document, const SaveOptions& options) {
     SaveResult result;
-    (void)options;  // Strict and tolerant save coincide until preserved
-                    // compatibility content exists (slice 4+).
+
+    // Strict save must not emit compatibility-only content — and must not
+    // silently drop it either: refuse with SACM-XMI-006 (settled decision
+    // #9/#10). Compatibility save re-emits preserved fragments verbatim.
+    if (options.mode == Mode::Strict) {
+        std::vector<model::ElementId> carriers;
+        document.for_each_element([&carriers](const SACMElement& element) {
+            if (!element.preserved_content().empty()) {
+                carriers.push_back(element.id());
+            }
+        });
+        if (!carriers.empty()) {
+            result.diagnostics.push_back(validation::Diagnostic{
+                .code = std::string(validation::codes::kXmiStrictSaveRefused),
+                .severity = validation::Severity::Error,
+                .requirement_id = "SACM23-XMI-004",
+                .operation = "",
+                .affected = std::move(carriers),
+                .location = std::nullopt,
+                .message = "document carries preserved compatibility content; save in "
+                           "compatibility mode or remove the preserved content",
+            });
+            return result;
+        }
+    }
+    g_emit_preserved_content = options.mode != Mode::Strict;
 
     pugi::xml_document xml;
     pugi::xml_node declaration = xml.append_child(pugi::node_declaration);

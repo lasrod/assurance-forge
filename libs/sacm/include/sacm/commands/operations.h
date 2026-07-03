@@ -47,6 +47,30 @@ struct SetCitation {
     std::optional<model::ElementId> cited;
 };
 
+// Set a ModelElement's name (clause 8.6: LangString[1]).
+struct SetName {
+    model::ElementId element;
+    std::string name;
+    std::string language;  // may be empty
+};
+
+// Set the description text for one language, creating the Description when
+// absent (clause 8.9). Empty text removes that language entry.
+struct SetDescription {
+    model::ElementId element;
+    std::string text;
+    std::string language;  // may be empty
+};
+
+// Attach a TaggedValue key/value pair (clause 8.12 extension mechanism).
+struct AddTaggedValue {
+    model::ElementId element;
+    std::optional<model::ElementId> id;
+    std::string key;
+    std::string value;
+    std::string language;  // may be empty
+};
+
 // Delete any element by ID. Destructive consequences are governed by the
 // explicit policies; defaults reject rather than cascade.
 struct DeleteElement {
@@ -58,7 +82,7 @@ struct DeleteElement {
 };
 
 using Operation = std::variant<CreateAssuranceCasePackage, CreateArgumentPackage, CreateClaim,
-                               SetCitation, DeleteElement>;
+                               SetCitation, SetName, SetDescription, AddTaggedValue, DeleteElement>;
 
 // Stable operation name ("CreateClaim", "DeleteElement", ...) used in
 // previews, results, and diagnostics.

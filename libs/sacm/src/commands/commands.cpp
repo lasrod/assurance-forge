@@ -20,6 +20,8 @@ using sacm::detail::Access;
 using validation::Diagnostic;
 using validation::Severity;
 
+void advance_id_counter(model::Document& document, model::ElementKind kind, const ElementId& id);
+
 Diagnostic make_error(std::string_view code, std::string_view requirement, const Operation& op,
                       std::vector<ElementId> affected, std::string message) {
     return Diagnostic{
@@ -272,6 +274,158 @@ void perform_set_citation(model::Document& document, const SetCitation& set) {
     auto* element = const_cast<SACMElement*>(document.find(set.element));
     Access::cited_element(*element) = set.cited;
     Access::is_citation(*element) = set.cited.has_value();
+}
+
+// Shared check for setters targeting a ModelElement.
+CheckOutcome check_model_element_target(const model::Document& document,
+                                        const model::ElementId& target,
+                                        std::string_view requirement, const Operation& op,
+                                        std::optional<std::string> property,
+                                        std::optional<std::string> before,
+                                        std::optional<std::string> after) {
+    CheckOutcome outcome;
+    const SACMElement* element = document.find(target);
+    if (element == nullptr) {
+        outcome.diagnostics.push_back(
+            make_error(validation::codes::kCmdTargetNotFound, requirement, op, {target},
+                       std::format("element '{}' not found", target.value())));
+        return outcome;
+    }
+    if (dynamic_cast<const model::ModelElement*>(element) == nullptr) {
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kCmdInvalidParent, requirement, op, {target},
+            std::format("a {} carries no name/description/taggedValue metadata",
+                        metadata::kind_name(element->kind()))));
+        return outcome;
+    }
+    outcome.effects.push_back(ChangeRecord{
+        .id = target,
+        .kind = element->kind(),
+        .change = ChangeRecord::Change::Modified,
+        .parent = std::nullopt,
+        .property = std::move(property),
+        .before = std::move(before),
+        .after = std::move(after),
+    });
+    return outcome;
+}
+
+CheckOutcome check_set_name(const model::Document& document, const SetName& set,
+                            const Operation& op) {
+    std::optional<std::string> before;
+    if (const auto* element = document.find_as<model::ModelElement>(set.element)) {
+        before = element->name().content;
+    }
+    return check_model_element_target(document, set.element, "SACM23-BASE-001", op, "name",
+                                      std::move(before), set.name);
+}
+
+void perform_set_name(model::Document& document, const SetName& set) {
+    auto* element =
+        const_cast<model::ModelElement*>(document.find_as<model::ModelElement>(set.element));
+    Access::name(*element) =
+        model::LangString{.lang = set.language, .content = set.name, .expression_ref = {}};
+}
+
+CheckOutcome check_set_description(const model::Document& document, const SetDescription& set,
+                                   const Operation& op) {
+    CheckOutcome outcome = check_model_element_target(document, set.element, "SACM23-BASE-001", op,
+                                                      "description", std::nullopt, set.text);
+    if (!outcome.ok()) {
+        return outcome;
+    }
+    // Creating the Description element is an extra effect when absent.
+    const auto* element = document.find_as<model::ModelElement>(set.element);
+    if (element->descriptions().empty() && !set.text.empty()) {
+        std::unordered_set<ElementId> claimed;
+        outcome.effects.push_back(ChangeRecord{
+            .id = peek_generated_id(document, model::ElementKind::Description, claimed),
+            .kind = model::ElementKind::Description,
+            .change = ChangeRecord::Change::Created,
+            .parent = set.element,
+            .property = std::nullopt,
+            .before = std::nullopt,
+            .after = set.text,
+        });
+    }
+    return outcome;
+}
+
+void perform_set_description(model::Document& document, const SetDescription& set,
+                             const std::vector<ChangeRecord>& effects) {
+    auto* element =
+        const_cast<model::ModelElement*>(document.find_as<model::ModelElement>(set.element));
+    if (element->descriptions().empty()) {
+        if (set.text.empty()) {
+            return;
+        }
+        const ChangeRecord& created = effects.back();
+        auto description = std::make_unique<model::Description>(created.id);
+        Access::content(*description).set(set.language, set.text);
+        Access::set_parent(*description, element);
+        advance_id_counter(document, model::ElementKind::Description, created.id);
+        model::Description* raw = description.get();
+        Access::descriptions(*element).push_back(std::move(description));
+        Access::index(document)[raw->id()] = raw;
+        return;
+    }
+    model::MultiLangString& content = Access::content(*Access::descriptions(*element).front());
+    if (set.text.empty()) {
+        std::erase_if(content.values, [&set](const model::LangString& entry) {
+            return entry.lang == set.language;
+        });
+    } else {
+        content.set(set.language, set.text);
+    }
+}
+
+CheckOutcome check_add_tagged_value(const model::Document& document, const AddTaggedValue& add,
+                                    const Operation& op) {
+    CheckOutcome outcome;
+    const SACMElement* element = document.find(add.element);
+    if (element == nullptr) {
+        outcome.diagnostics.push_back(
+            make_error(validation::codes::kCmdTargetNotFound, "SACM23-BASE-001", op,
+                       {add.element}, std::format("element '{}' not found", add.element.value())));
+        return outcome;
+    }
+    if (dynamic_cast<const model::ModelElement*>(element) == nullptr) {
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kCmdInvalidParent, "SACM23-BASE-001", op, {add.element},
+            std::format("a {} cannot carry tagged values", metadata::kind_name(element->kind()))));
+        return outcome;
+    }
+    std::unordered_set<ElementId> claimed;
+    const ElementId id =
+        plan_id(document, add.id, model::ElementKind::TaggedValue, op, claimed, outcome);
+    if (!outcome.ok()) {
+        return outcome;
+    }
+    outcome.effects.push_back(ChangeRecord{
+        .id = id,
+        .kind = model::ElementKind::TaggedValue,
+        .change = ChangeRecord::Change::Created,
+        .parent = add.element,
+        .property = std::nullopt,
+        .before = std::nullopt,
+        .after = std::format("{}={}", add.key, add.value),
+    });
+    return outcome;
+}
+
+void perform_add_tagged_value(model::Document& document, const AddTaggedValue& add,
+                              const std::vector<ChangeRecord>& effects) {
+    const ChangeRecord& record = effects.front();
+    auto* element =
+        const_cast<model::ModelElement*>(document.find_as<model::ModelElement>(add.element));
+    auto tagged = std::make_unique<model::TaggedValue>(record.id);
+    Access::key(*tagged).set(add.language, add.key);
+    Access::content(*tagged).set(add.language, add.value);
+    Access::set_parent(*tagged, element);
+    advance_id_counter(document, model::ElementKind::TaggedValue, record.id);
+    model::TaggedValue* raw = tagged.get();
+    Access::tagged_values(*element).push_back(std::move(tagged));
+    Access::index(document)[raw->id()] = raw;
 }
 
 // ---------------------------------------------------------------- delete
@@ -613,6 +767,12 @@ CheckOutcome check(const model::Document& document, const Operation& operation) 
                 return check_create_claim(document, op, operation);
             } else if constexpr (std::is_same_v<T, SetCitation>) {
                 return check_set_citation(document, op, operation);
+            } else if constexpr (std::is_same_v<T, SetName>) {
+                return check_set_name(document, op, operation);
+            } else if constexpr (std::is_same_v<T, SetDescription>) {
+                return check_set_description(document, op, operation);
+            } else if constexpr (std::is_same_v<T, AddTaggedValue>) {
+                return check_add_tagged_value(document, op, operation);
             } else {
                 return check_delete(document, op, operation);
             }
@@ -633,6 +793,12 @@ void perform(model::Document& document, const Operation& operation,
                 perform_create_claim(document, op, effects);
             } else if constexpr (std::is_same_v<T, SetCitation>) {
                 perform_set_citation(document, op);
+            } else if constexpr (std::is_same_v<T, SetName>) {
+                perform_set_name(document, op);
+            } else if constexpr (std::is_same_v<T, SetDescription>) {
+                perform_set_description(document, op, effects);
+            } else if constexpr (std::is_same_v<T, AddTaggedValue>) {
+                perform_add_tagged_value(document, op, effects);
             } else {
                 perform_delete(document, op, effects);
             }

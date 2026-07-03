@@ -108,6 +108,16 @@ std::map<std::string, std::string> attribute_snapshot(const SACMElement& element
             snapshot["externalReference"] = term->external_reference();
         }
     }
+    if (!element.preserved_content().empty()) {
+        std::vector<std::string> fragments = element.preserved_content();
+        std::ranges::sort(fragments);
+        std::string joined;
+        for (const std::string& fragment : fragments) {
+            joined += fragment;
+            joined.push_back('\x1f');
+        }
+        snapshot["preservedContent"] = std::move(joined);
+    }
     return snapshot;
 }
 

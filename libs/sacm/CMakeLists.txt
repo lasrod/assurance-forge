@@ -96,6 +96,8 @@ if(SACM_BUILD_TESTS)
         tests/test_delete_preview.cpp
         tests/test_xmi_io.cpp
         tests/test_roundtrip.cpp
+        tests/test_base_model.cpp
+        tests/test_repo_fixture_interop.cpp
     )
     target_link_libraries(sacm_tests PRIVATE sacm::sacm GTest::gtest_main)
     target_compile_definitions(sacm_tests PRIVATE

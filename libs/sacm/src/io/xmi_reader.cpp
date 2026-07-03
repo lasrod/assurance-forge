@@ -31,6 +31,17 @@ std::string_view local_name(std::string_view qualified) {
     return colon == std::string_view::npos ? qualified : qualified.substr(colon + 1);
 }
 
+std::string node_to_string(const pugi::xml_node& node) {
+    struct Writer final : pugi::xml_writer {
+        std::string output;
+        void write(const void* data, size_t size) override {
+            output.append(static_cast<const char*>(data), size);
+        }
+    } writer;
+    node.print(writer, "  ", pugi::format_raw);
+    return writer.output;
+}
+
 std::string_view prefix_of(std::string_view qualified) {
     const std::size_t colon = qualified.find(':');
     return colon == std::string_view::npos ? std::string_view{} : qualified.substr(0, colon);
@@ -571,7 +582,37 @@ void read_model_element_children(Reader& reader, model::ModelElement& element,
         }
         const std::string_view role = local_name(child.name());
         if (role == "name") {
-            Access::name(element) = read_lang_string(reader, child);
+            // Strict shape: <name lang content/>. Legacy multi-language
+            // shape: <name><content lang>text</content>...</name> — the
+            // first entry becomes the name (clause 8.6: LangString[1]); the
+            // rest are kept losslessly in a TaggedValue with the reserved
+            // key "sacm.import.name" (clause 8.12 extension mechanism).
+            model::MultiLangString values;
+            for (const pugi::xml_node& entry : child.children()) {
+                if (entry.type() == pugi::node_element &&
+                    (local_name(entry.name()) == "content" ||
+                     local_name(entry.name()) == "value")) {
+                    values.values.push_back(read_lang_string(reader, entry));
+                }
+            }
+            if (values.values.empty()) {
+                Access::name(element) = read_lang_string(reader, child);
+            } else {
+                Access::name(element) = values.values.front();
+                if (values.values.size() > 1) {
+                    auto overflow = std::make_unique<model::TaggedValue>(
+                        reader.generate_id(ElementKind::TaggedValue));
+                    Access::key(*overflow).set("", "sacm.import.name");
+                    Access::content(*overflow).values.assign(values.values.begin() + 1,
+                                                             values.values.end());
+                    Access::set_parent(*overflow, &element);
+                    Access::tagged_values(element).push_back(std::move(overflow));
+                    reader.report(validation::codes::kXmiUnknownElement, Severity::Info,
+                                  "SACM23-BASE-001", child, {element.id()},
+                                  "multi-language name mapped to TaggedValue 'sacm.import.name' "
+                                  "(clause 8.6 allows one name LangString)");
+                }
+            }
         } else if (role == "description") {
             Access::descriptions(element).push_back(
                 read_utility<model::Description>(reader, ElementKind::Description, child));
@@ -1109,10 +1150,21 @@ void populate(Reader& reader, SACMElement& element, const pugi::xml_node& node) 
             }
             continue;
         }
-        reader.report(validation::codes::kXmiUnknownElement, reader.mode_severity(),
-                      "SACM23-XMI-003", child, {element.id()},
-                      std::format("unknown element '{}' under {}", child.name(),
-                                  metadata::kind_name(element.kind())));
+        if (reader.strict()) {
+            reader.report(validation::codes::kXmiUnknownElement, Severity::Error,
+                          "SACM23-XMI-003", child, {element.id()},
+                          std::format("unknown element '{}' under {}", child.name(),
+                                      metadata::kind_name(element.kind())));
+        } else {
+            // Never silently dropped: preserved verbatim; compat save
+            // re-emits it, strict save refuses (SACM-XMI-006).
+            Access::preserved_content(element).push_back(node_to_string(child));
+            reader.report(validation::codes::kXmiUnknownElement, Severity::Warning,
+                          "SACM23-COMPAT-001", child, {element.id()},
+                          std::format("unknown element '{}' under {} preserved as "
+                                      "compatibility content",
+                                      child.name(), metadata::kind_name(element.kind())));
+        }
     }
 
     reader.pop_scope();
