@@ -240,6 +240,250 @@ CheckOutcome check_create_claim(const model::Document& document, const CreateCla
     return outcome;
 }
 
+// ------------------------------------------------------------ argumentation
+
+// Checks that `parent` is an ArgumentPackage; plans a single Created effect.
+CheckOutcome check_create_argument_asset(const model::Document& document,
+                                         const ElementId& parent_id,
+                                         const std::optional<ElementId>& requested_id,
+                                         model::ElementKind kind, std::string_view name,
+                                         const Operation& op) {
+    CheckOutcome outcome;
+    std::unordered_set<ElementId> claimed;
+    const SACMElement* parent = document.find(parent_id);
+    if (parent == nullptr) {
+        outcome.diagnostics.push_back(
+            make_error(validation::codes::kCmdTargetNotFound, "SACM23-ARG-001", op, {parent_id},
+                       std::format("parent '{}' not found", parent_id.value())));
+        return outcome;
+    }
+    if (dynamic_cast<const model::ArgumentPackage*>(parent) == nullptr) {
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kCmdInvalidParent, "SACM23-ARG-001", op, {parent_id},
+            std::format("a {} cannot be created inside a {}", metadata::kind_name(kind),
+                        metadata::kind_name(parent->kind()))));
+        return outcome;
+    }
+    const ElementId id = plan_id(document, requested_id, kind, op, claimed, outcome);
+    if (!outcome.ok()) {
+        return outcome;
+    }
+    outcome.effects.push_back(ChangeRecord{
+        .id = id,
+        .kind = kind,
+        .change = ChangeRecord::Change::Created,
+        .parent = parent_id,
+        .property = std::nullopt,
+        .before = std::nullopt,
+        .after = std::format("{} \"{}\"", metadata::kind_name(kind), name),
+    });
+    return outcome;
+}
+
+// Requires `target` to exist and satisfy `predicate`; appends a diagnostic
+// otherwise.
+template <typename Predicate>
+bool require_target(const model::Document& document, const ElementId& target,
+                    std::string_view what, Predicate predicate, const Operation& op,
+                    CheckOutcome& outcome) {
+    const SACMElement* element = document.find(target);
+    if (element == nullptr) {
+        outcome.diagnostics.push_back(
+            make_error(validation::codes::kCmdTargetNotFound, "SACM23-ARG-002", op, {target},
+                       std::format("{} '{}' not found", what, target.value())));
+        return false;
+    }
+    if (!predicate(*element)) {
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kRefWrongType, "SACM23-ARG-002", op, {target},
+            std::format("{} '{}' is a {}, which is not a legal target kind", what, target.value(),
+                        metadata::kind_name(element->kind()))));
+        return false;
+    }
+    return true;
+}
+
+CheckOutcome check_create_asserted_relationship(const model::Document& document,
+                                                const CreateAssertedRelationship& create,
+                                                const Operation& op) {
+    CheckOutcome outcome;
+    if (!metadata::is_asserted_relationship_kind(create.kind)) {
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kCmdInvalidParent, "SACM23-ARG-001", op, {},
+            std::format("{} is not an asserted relationship kind",
+                        metadata::kind_name(create.kind))));
+        return outcome;
+    }
+    outcome = check_create_argument_asset(document, create.parent, create.id, create.kind,
+                                          create.name, op);
+    if (!outcome.ok()) {
+        return outcome;
+    }
+    if (create.sources.empty() || create.targets.empty()) {
+        outcome.effects.clear();
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kMultiplicityViolation, "SACM23-ARG-002", op, {},
+            "an asserted relationship needs at least one source and one target"));
+        return outcome;
+    }
+    const auto is_argument_asset = [](const SACMElement& element) {
+        return dynamic_cast<const model::ArgumentAsset*>(&element) != nullptr;
+    };
+    for (const ElementId& source : create.sources) {
+        if (!require_target(document, source, "source", is_argument_asset, op, outcome)) {
+            outcome.effects.clear();
+            return outcome;
+        }
+    }
+    for (const ElementId& target : create.targets) {
+        if (!require_target(document, target, "target", is_argument_asset, op, outcome)) {
+            outcome.effects.clear();
+            return outcome;
+        }
+    }
+    if (create.reasoning.has_value() &&
+        !require_target(document, *create.reasoning, "reasoning",
+                        [](const SACMElement& element) {
+                            return element.kind() == model::ElementKind::ArgumentReasoning;
+                        },
+                        op, outcome)) {
+        outcome.effects.clear();
+        return outcome;
+    }
+    return outcome;
+}
+
+void perform_create_argument_reasoning(model::Document& document,
+                                       const CreateArgumentReasoning& create,
+                                       const std::vector<ChangeRecord>& effects) {
+    const ChangeRecord& record = effects.front();
+    auto reasoning = std::make_unique<model::ArgumentReasoning>(record.id);
+    Access::name(*reasoning) = model::LangString{.lang = "", .content = create.name};
+    Access::structure(*reasoning) = create.structure;
+    advance_id_counter(document, record.kind, record.id);
+    model::ArgumentReasoning* raw = reasoning.get();
+    auto* parent =
+        const_cast<model::ArgumentPackage*>(document.find_as<model::ArgumentPackage>(create.parent));
+    Access::set_parent(*raw, parent);
+    Access::argument_elements(*parent).push_back(std::move(reasoning));
+    index_subtree(document, *raw);
+}
+
+void perform_create_artifact_reference(model::Document& document,
+                                       const CreateArtifactReference& create,
+                                       const std::vector<ChangeRecord>& effects) {
+    const ChangeRecord& record = effects.front();
+    auto reference = std::make_unique<model::ArtifactReference>(record.id);
+    Access::name(*reference) = model::LangString{.lang = "", .content = create.name};
+    Access::referenced_artifact_elements(*reference) = create.referenced_artifact_elements;
+    advance_id_counter(document, record.kind, record.id);
+    model::ArtifactReference* raw = reference.get();
+    auto* parent =
+        const_cast<model::ArgumentPackage*>(document.find_as<model::ArgumentPackage>(create.parent));
+    Access::set_parent(*raw, parent);
+    Access::argument_elements(*parent).push_back(std::move(reference));
+    index_subtree(document, *raw);
+}
+
+void perform_create_asserted_relationship(model::Document& document,
+                                          const CreateAssertedRelationship& create,
+                                          const std::vector<ChangeRecord>& effects) {
+    const ChangeRecord& record = effects.front();
+    std::unique_ptr<model::AssertedRelationship> relationship;
+    switch (create.kind) {
+        case model::ElementKind::AssertedInference:
+            relationship = std::make_unique<model::AssertedInference>(record.id);
+            break;
+        case model::ElementKind::AssertedEvidence:
+            relationship = std::make_unique<model::AssertedEvidence>(record.id);
+            break;
+        case model::ElementKind::AssertedContext:
+            relationship = std::make_unique<model::AssertedContext>(record.id);
+            break;
+        case model::ElementKind::AssertedArtifactSupport:
+            relationship = std::make_unique<model::AssertedArtifactSupport>(record.id);
+            break;
+        default:
+            relationship = std::make_unique<model::AssertedArtifactContext>(record.id);
+            break;
+    }
+    Access::name(*relationship) = model::LangString{.lang = "", .content = create.name};
+    Access::sources(*relationship) = create.sources;
+    Access::targets(*relationship) = create.targets;
+    Access::reasoning(*relationship) = create.reasoning;
+    Access::is_counter(*relationship) = create.is_counter;
+    advance_id_counter(document, create.kind, record.id);
+    model::AssertedRelationship* raw = relationship.get();
+    auto* parent =
+        const_cast<model::ArgumentPackage*>(document.find_as<model::ArgumentPackage>(create.parent));
+    Access::set_parent(*raw, parent);
+    Access::argument_elements(*parent).push_back(std::move(relationship));
+    index_subtree(document, *raw);
+}
+
+CheckOutcome check_set_assertion_declaration(const model::Document& document,
+                                             const SetAssertionDeclaration& set,
+                                             const Operation& op) {
+    CheckOutcome outcome;
+    const auto* assertion = document.find_as<model::Assertion>(set.element);
+    if (assertion == nullptr) {
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kCmdTargetNotFound, "SACM23-ARG-001", op, {set.element},
+            std::format("'{}' is not an Assertion", set.element.value())));
+        return outcome;
+    }
+    outcome.effects.push_back(ChangeRecord{
+        .id = set.element,
+        .kind = assertion->kind(),
+        .change = ChangeRecord::Change::Modified,
+        .parent = std::nullopt,
+        .property = "assertionDeclaration",
+        .before = std::string(model::assertion_declaration_name(assertion->assertion_declaration())),
+        .after = std::string(model::assertion_declaration_name(set.declaration)),
+    });
+    return outcome;
+}
+
+void perform_set_assertion_declaration(model::Document& document,
+                                       const SetAssertionDeclaration& set) {
+    auto* assertion = const_cast<model::Assertion*>(document.find_as<model::Assertion>(set.element));
+    Access::assertion_declaration(*assertion) = set.declaration;
+}
+
+CheckOutcome check_add_meta_claim(const model::Document& document, const AddMetaClaim& add,
+                                  const Operation& op) {
+    CheckOutcome outcome;
+    const auto* assertion = document.find_as<model::Assertion>(add.element);
+    if (assertion == nullptr) {
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kCmdTargetNotFound, "SACM23-ARG-001", op, {add.element},
+            std::format("'{}' is not an Assertion", add.element.value())));
+        return outcome;
+    }
+    if (!require_target(document, add.meta_claim, "metaClaim",
+                        [](const SACMElement& element) {
+                            return element.kind() == model::ElementKind::Claim;
+                        },
+                        op, outcome)) {
+        return outcome;
+    }
+    outcome.effects.push_back(ChangeRecord{
+        .id = add.element,
+        .kind = assertion->kind(),
+        .change = ChangeRecord::Change::Modified,
+        .parent = std::nullopt,
+        .property = "metaClaim",
+        .before = std::nullopt,
+        .after = add.meta_claim.value(),
+    });
+    return outcome;
+}
+
+void perform_add_meta_claim(model::Document& document, const AddMetaClaim& add) {
+    auto* assertion = const_cast<model::Assertion*>(document.find_as<model::Assertion>(add.element));
+    Access::meta_claims(*assertion).push_back(add.meta_claim);
+}
+
 // ------------------------------------------------------------- terminology
 
 // Shared check for creating a terminology element under a parent.
@@ -885,6 +1129,44 @@ CheckOutcome check(const model::Document& document, const Operation& operation) 
                 return check_create_argument_package(document, op, operation);
             } else if constexpr (std::is_same_v<T, CreateClaim>) {
                 return check_create_claim(document, op, operation);
+            } else if constexpr (std::is_same_v<T, CreateArgumentReasoning>) {
+                CheckOutcome outcome = check_create_argument_asset(
+                    document, op.parent, op.id, model::ElementKind::ArgumentReasoning, op.name,
+                    operation);
+                if (outcome.ok() && op.structure.has_value() &&
+                    !require_target(document, *op.structure, "structure",
+                                    [](const SACMElement& element) {
+                                        return dynamic_cast<const model::ArgumentPackage*>(
+                                                   &element) != nullptr;
+                                    },
+                                    operation, outcome)) {
+                    outcome.effects.clear();
+                }
+                return outcome;
+            } else if constexpr (std::is_same_v<T, CreateArtifactReference>) {
+                CheckOutcome outcome = check_create_argument_asset(
+                    document, op.parent, op.id, model::ElementKind::ArtifactReference, op.name,
+                    operation);
+                if (outcome.ok()) {
+                    for (const ElementId& referenced : op.referenced_artifact_elements) {
+                        if (!require_target(document, referenced, "referencedArtifactElement",
+                                            [](const SACMElement& element) {
+                                                return dynamic_cast<const model::ArtifactElement*>(
+                                                           &element) != nullptr;
+                                            },
+                                            operation, outcome)) {
+                            outcome.effects.clear();
+                            break;
+                        }
+                    }
+                }
+                return outcome;
+            } else if constexpr (std::is_same_v<T, CreateAssertedRelationship>) {
+                return check_create_asserted_relationship(document, op, operation);
+            } else if constexpr (std::is_same_v<T, SetAssertionDeclaration>) {
+                return check_set_assertion_declaration(document, op, operation);
+            } else if constexpr (std::is_same_v<T, AddMetaClaim>) {
+                return check_add_meta_claim(document, op, operation);
             } else if constexpr (std::is_same_v<T, CreateTerminologyPackage>) {
                 return check_create_terminology(document, op.parent, op.id,
                                                 model::ElementKind::TerminologyPackage,
@@ -925,6 +1207,16 @@ void perform(model::Document& document, const Operation& operation,
                 perform_create_argument_package(document, op, effects);
             } else if constexpr (std::is_same_v<T, CreateClaim>) {
                 perform_create_claim(document, op, effects);
+            } else if constexpr (std::is_same_v<T, CreateArgumentReasoning>) {
+                perform_create_argument_reasoning(document, op, effects);
+            } else if constexpr (std::is_same_v<T, CreateArtifactReference>) {
+                perform_create_artifact_reference(document, op, effects);
+            } else if constexpr (std::is_same_v<T, CreateAssertedRelationship>) {
+                perform_create_asserted_relationship(document, op, effects);
+            } else if constexpr (std::is_same_v<T, SetAssertionDeclaration>) {
+                perform_set_assertion_declaration(document, op);
+            } else if constexpr (std::is_same_v<T, AddMetaClaim>) {
+                perform_add_meta_claim(document, op);
             } else if constexpr (std::is_same_v<T, CreateTerminologyPackage>) {
                 perform_create_terminology_package(document, op, effects);
             } else if constexpr (std::is_same_v<T, CreateCategory>) {

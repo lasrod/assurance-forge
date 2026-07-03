@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">
+  <name content="Full Argumentation Case"/>
+  <artifactPackage xmi:id="artpkg_1">
+    <name content="Evidence"/>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="artifact_fmea" version="1.2" date="2026-01-15">
+      <name content="Brake FMEA"/>
+    </artifactElement>
+  </artifactPackage>
+  <argumentPackage xmi:id="argpkg_1">
+    <name content="Braking Argument"/>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_top" assertionDeclaration="needsSupport">
+      <name content="Braking is acceptably safe"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_sub1" assertionDeclaration="assumed">
+      <name content="Hardware failures are controlled"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_sub2" assertionDeclaration="axiomatic">
+      <name content="Software is verified"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_counter" assertionDeclaration="defeated">
+      <name content="Braking distance exceeds the limit in rain"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_meta">
+      <name content="The inference is sufficiently strong"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_context">
+      <name content="Operational design domain: urban roads"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArgumentReasoning" xmi:id="ar_decompose" structure="argpkg_detail">
+      <name content="Decomposition over failure classes"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ev_fmea" referencedArtifactElement="artifact_fmea">
+      <name content="FMEA Reference"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="inf_1" reasoning="ar_decompose" source="claim_sub1 claim_sub2" target="claim_top" metaClaim="claim_meta">
+      <name content="Main inference"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_rel_1" source="ev_fmea" target="claim_sub1"/>
+    <argumentElement xsi:type="sacm:AssertedContext" xmi:id="ctx_1" source="claim_context" target="claim_top"/>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="counter_1" isCounter="true" source="claim_counter" target="claim_top"/>
+    <argumentElement xsi:type="sacm:AssertedArtifactSupport" xmi:id="support_1" source="ev_fmea" target="claim_sub2"/>
+    <argumentElement xsi:type="sacm:AssertedArtifactContext" xmi:id="actx_1" source="ev_fmea" target="claim_context"/>
+    <argumentElement xsi:type="sacm:ArgumentGroup" xmi:id="group_core" argumentElement="claim_top claim_sub1 claim_sub2">
+      <name content="Core Claims"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArgumentPackage" xmi:id="argpkg_detail">
+      <name content="Detailed Reasoning"/>
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>

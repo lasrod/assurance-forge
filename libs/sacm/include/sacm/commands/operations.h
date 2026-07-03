@@ -1,6 +1,8 @@
 #pragma once
 
 #include "sacm/commands/policies.h"
+#include "sacm/metadata/element_kind.h"
+#include "sacm/model/argumentation.h"
 #include "sacm/model/element_id.h"
 #include "sacm/model/lang_string.h"
 
@@ -38,6 +40,48 @@ struct CreateClaim {
     std::string name;
     std::string description;
     std::string language;  // language tag for name/description; may be empty
+};
+
+// Create an ArgumentReasoning inside an ArgumentPackage (clause 11.12).
+struct CreateArgumentReasoning {
+    model::ElementId parent;
+    std::optional<model::ElementId> id;
+    std::string name;
+    std::optional<model::ElementId> structure;  // detailing ArgumentPackage
+};
+
+// Create an ArtifactReference inside an ArgumentPackage (clause 11.9).
+struct CreateArtifactReference {
+    model::ElementId parent;
+    std::optional<model::ElementId> id;
+    std::string name;
+    std::vector<model::ElementId> referenced_artifact_elements;
+};
+
+// Create one of the five asserted relationships (clauses 11.14-11.18).
+// `kind` must be AssertedInference/Evidence/Context/ArtifactSupport/
+// ArtifactContext; sources and targets reference ArgumentAssets.
+struct CreateAssertedRelationship {
+    model::ElementId parent;
+    metadata::ElementKind kind;
+    std::optional<model::ElementId> id;
+    std::string name;
+    std::vector<model::ElementId> sources;
+    std::vector<model::ElementId> targets;
+    std::optional<model::ElementId> reasoning;
+    bool is_counter = false;
+};
+
+// Set an Assertion's assertionDeclaration (clause 11.10).
+struct SetAssertionDeclaration {
+    model::ElementId element;
+    model::AssertionDeclaration declaration = model::AssertionDeclaration::Asserted;
+};
+
+// Attach a meta-claim (a Claim about an Assertion, clause 11.6).
+struct AddMetaClaim {
+    model::ElementId element;
+    model::ElementId meta_claim;
 };
 
 // Create a TerminologyPackage inside an AssuranceCasePackage or (nested)
@@ -116,8 +160,10 @@ struct DeleteElement {
 
 using Operation =
     std::variant<CreateAssuranceCasePackage, CreateArgumentPackage, CreateClaim,
+                 CreateArgumentReasoning, CreateArtifactReference, CreateAssertedRelationship,
                  CreateTerminologyPackage, CreateCategory, CreateTerm, CreateExpression,
-                 SetCitation, SetName, SetDescription, AddTaggedValue, DeleteElement>;
+                 SetCitation, SetName, SetDescription, SetAssertionDeclaration, AddMetaClaim,
+                 AddTaggedValue, DeleteElement>;
 
 // Stable operation name ("CreateClaim", "DeleteElement", ...) used in
 // previews, results, and diagnostics.
