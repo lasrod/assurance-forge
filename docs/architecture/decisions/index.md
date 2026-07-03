@@ -46,3 +46,4 @@ to point at the replacement. This keeps the decision history intact.
 | [0003](0003-sacm-xml-as-source-of-truth.md) | SACM XML as the source of truth | Accepted |
 | [0004](0004-mkdocs-material-documentation-site.md) | MkDocs Material documentation site | Accepted |
 | [0005](0005-provider-agnostic-ai-with-user-consent.md) | Provider-agnostic AI with explicit user consent | Accepted |
+| [0006](0006-sacm-23-independent-library.md) | SACM 2.3 as an independent reusable library | Proposed |
