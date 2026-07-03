@@ -30,6 +30,7 @@ endif()
 add_library(sacm STATIC
     src/version.cpp
     src/metadata/element_kind.cpp
+    src/metadata/namespaces.cpp
     src/model/argumentation.cpp
     src/model/document.cpp
     src/model/element.cpp
@@ -38,6 +39,10 @@ add_library(sacm STATIC
     src/commands/commands.cpp
     src/commands/mutation.cpp
     src/commands/operations.cpp
+    src/compare/semantic_compare.cpp
+    src/io/name_tables.cpp
+    src/io/xmi_reader.cpp
+    src/io/xmi_writer.cpp
     src/validation/diagnostic.cpp
     src/validation/validate.cpp
 )
@@ -89,6 +94,8 @@ if(SACM_BUILD_TESTS)
         tests/test_version.cpp
         tests/test_document_commands.cpp
         tests/test_delete_preview.cpp
+        tests/test_xmi_io.cpp
+        tests/test_roundtrip.cpp
     )
     target_link_libraries(sacm_tests PRIVATE sacm::sacm GTest::gtest_main)
     target_compile_definitions(sacm_tests PRIVATE

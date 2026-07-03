@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:Claim xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="claim_1">
+  <name content="A claim is not an interchange package"/>
+</sacm:Claim>

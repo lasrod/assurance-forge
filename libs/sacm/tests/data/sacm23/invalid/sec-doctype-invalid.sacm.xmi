@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE sacm [
+  <!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmi:id="acp_1">
+  <name content="&xxe;"/>
+</sacm:AssuranceCasePackage>
