@@ -13,6 +13,7 @@
 #include "imgui.h"
 
 #include <algorithm>
+#include <cmath>
 #include <gtest/gtest.h>
 
 namespace {
