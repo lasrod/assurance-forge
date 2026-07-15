@@ -32,6 +32,7 @@ add_library(sacm STATIC
     src/metadata/element_kind.cpp
     src/metadata/namespaces.cpp
     src/model/argumentation.cpp
+    src/model/artifact.cpp
     src/model/document.cpp
     src/model/element.cpp
     src/model/lang_string.cpp

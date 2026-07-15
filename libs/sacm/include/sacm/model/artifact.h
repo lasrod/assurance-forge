@@ -10,6 +10,11 @@ class Property;
 // contained Properties.
 class ArtifactAsset : public ArtifactElement {
   public:
+    // Defined out of line in artifact.cpp so the vector of unique_ptr<Property>
+    // is destroyed where Property is complete (Property is itself an
+    // ArtifactAsset, so it can only be forward-declared here).
+    ~ArtifactAsset() override;
+
     const std::vector<std::unique_ptr<Property>>& properties() const { return properties_; }
 
   protected:
