@@ -44,8 +44,9 @@ TEST(Sacm23Artifact, SACM23_ART_001_FullArtifactFixtureRoundTrips) {
     EXPECT_EQ(activity->start_time(), "2026-01-10");
     EXPECT_EQ(activity->end_time(), "2026-01-20");
 
-    EXPECT_EQ(document.find_as<sacm::model::Event>(ElementId{"event_release"})->date(),
-              "2026-02-02");
+    const auto* event = document.find_as<sacm::model::Event>(ElementId{"event_release"});
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->date(), "2026-02-02");
     EXPECT_NE(document.find_as<sacm::model::Participant>(ElementId{"participant_assessor"}),
               nullptr);
     EXPECT_NE(document.find_as<sacm::model::Technique>(ElementId{"technique_stpa"}), nullptr);

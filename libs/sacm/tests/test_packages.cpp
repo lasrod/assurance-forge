@@ -114,9 +114,10 @@ TEST(Sacm23Packages, SACM23_PKG_003_RecursiveDeletePreviewListsNestedContent) {
 }
 
 TEST(Sacm23Packages, SACM23_PKG_003_CrossPackageReferencePoliciesAreExplicit) {
-    const LoadResult loaded = load_nested_fixture();
+    LoadResult loaded = load_nested_fixture();
     ASSERT_TRUE(loaded.ok);
-    Document document = std::move(*const_cast<LoadResult&>(loaded).document);
+    ASSERT_TRUE(loaded.document.has_value());
+    Document document = std::move(*loaded.document);
 
     // ctx_1 lives in argpkg_b and targets claim_a in argpkg_a: deleting
     // claim_a is a cross-package effect and must be explicit.

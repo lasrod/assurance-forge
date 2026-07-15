@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cctype>
 #include <format>
+#include <type_traits>
 #include <unordered_set>
 
 namespace sacm::commands::detail {

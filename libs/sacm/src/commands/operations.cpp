@@ -1,5 +1,7 @@
 #include "sacm/commands/operations.h"
 
+#include <type_traits>
+
 namespace sacm::commands {
 
 std::string_view operation_name(const Operation& operation) {

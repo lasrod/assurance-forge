@@ -49,11 +49,13 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_FullArgumentationFixtureRoundTrips) {
     const auto& document = *first.document;
 
     // Assertion declarations.
-    EXPECT_EQ(document.find_as<sacm::model::Claim>(ElementId{"claim_top"})->assertion_declaration(),
-              AssertionDeclaration::NeedsSupport);
-    EXPECT_EQ(
-        document.find_as<sacm::model::Claim>(ElementId{"claim_counter"})->assertion_declaration(),
-        AssertionDeclaration::Defeated);
+    const auto* claim_top = document.find_as<sacm::model::Claim>(ElementId{"claim_top"});
+    ASSERT_NE(claim_top, nullptr);
+    EXPECT_EQ(claim_top->assertion_declaration(), AssertionDeclaration::NeedsSupport);
+    const auto* claim_counter =
+        document.find_as<sacm::model::Claim>(ElementId{"claim_counter"});
+    ASSERT_NE(claim_counter, nullptr);
+    EXPECT_EQ(claim_counter->assertion_declaration(), AssertionDeclaration::Defeated);
 
     // Inference with reasoning, multiple sources, and a meta-claim.
     const auto* inference = document.find_as<sacm::model::AssertedInference>(ElementId{"inf_1"});
