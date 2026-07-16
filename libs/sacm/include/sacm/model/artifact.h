@@ -18,7 +18,11 @@ class ArtifactAsset : public ArtifactElement {
     const std::vector<std::unique_ptr<Property>>& properties() const { return properties_; }
 
   protected:
-    using ArtifactElement::ArtifactElement;
+    // Declared here and defined in artifact.cpp rather than inheriting
+    // ArtifactElement's constructors: an inheriting constructor instantiates
+    // the properties_ vector's destructor for its exception-cleanup path
+    // inside this class body, where Property is still incomplete.
+    ArtifactAsset(ElementKind kind, ElementId id);
 
   private:
     friend struct sacm::detail::Access;
