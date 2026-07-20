@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">
+  <name content="Created Case" />
+  <argumentPackage xmi:id="argpkg_1">
+    <name content="Main Argument" />
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_top">
+      <name lang="en" content="Top Claim" />
+      <description xmi:id="description_1">
+        <content>
+          <value lang="en" content="The system is acceptably safe." />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>

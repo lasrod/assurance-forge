@@ -130,6 +130,19 @@ endif()
 # --- pugixml ---
 add_subdirectory(external/pugixml)
 
+# --- GoogleTest (fetched before libs/sacm so the library reuses it) ---
+FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG v1.16.0
+)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
+# --- SACM 2.3 library (independent; see libs/sacm/README.md) ---
+set(SACM_REPO_FIXTURES_DIR ${CMAKE_SOURCE_DIR})
+add_subdirectory(libs/sacm)
+
 set(AF_SCCG_DIST_DIR "${CMAKE_SOURCE_DIR}/external/safety-case-core-guidelines/dist")
 set(AF_SCCG_REQUIRED_DIST_FILES
     review_profiles.json
@@ -191,9 +204,10 @@ include(${CMAKE_SOURCE_DIR}/cmake/check_layer_gates.cmake)
 add_custom_target(check_layer_gates ALL
     COMMAND ${CMAKE_COMMAND}
         -DAF_SOURCE_DIR=${CMAKE_SOURCE_DIR}/src
+        -DAF_LIBS_SACM_DIR=${CMAKE_SOURCE_DIR}/libs/sacm
         -P ${CMAKE_SOURCE_DIR}/cmake/check_layer_gates.cmake
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMENT "Checking src/ layer gates"
+    COMMENT "Checking src/ layer gates and libs/sacm independence"
     VERBATIM
 )
 
@@ -236,14 +250,7 @@ elseif(Python3_Interpreter_FOUND)
 endif()
 
 # --- Tests ---
-FetchContent_Declare(
-    googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG v1.16.0
-)
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
-
+# GoogleTest is fetched earlier (before libs/sacm).
 include(CTest)
 add_executable(tests
     tests/test_xml_parser.cpp
@@ -361,4 +368,21 @@ if(Python3_Interpreter_FOUND)
         NAME i18n_catalog_check
         COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/i18n/check_catalog.py"
     )
+
+    # SACM conformance matrix gate: fails if a `verified` row is not backed by
+    # an ID-bearing test, if a test names a requirement the matrix does not
+    # define, or if a row cites a path that no longer exists. The matrix is the
+    # canonical source of requirement IDs, so drift there degrades every
+    # compliance claim built on it.
+    add_test(
+        NAME sacm_matrix_check
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/sacm/check_conformance_matrix.py"
+    )
+else()
+    # These are compliance gates, not conveniences. A silently absent gate reads
+    # as a passing one, so say so loudly rather than skipping in silence.
+    message(WARNING
+        "Python3 not found: the i18n_catalog_check and sacm_matrix_check gates "
+        "will NOT run. CI installs Python explicitly; a local build without it "
+        "cannot verify the translation catalog or the SACM conformance matrix.")
 endif()

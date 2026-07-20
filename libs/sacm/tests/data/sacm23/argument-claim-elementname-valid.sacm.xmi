@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SACM:AssuranceCasePackage xmlns:SACM="http://example.org/sacm/2.3" id="acp_vehicle" name="VehicleCase">
+  <description>
+    <content lang="en">Assurance case in legacy element-name style.</content>
+    <content lang="ja">レガシー形式の保証ケース。</content>
+  </description>
+  <argumentPackage id="argpkg_1" name="Braking">
+    <Claim id="cl_top" name="TopClaim">
+      <description><content lang="en">The braking function is acceptably safe.</content></description>
+    </Claim>
+    <Claim id="cl_sub" name="SubClaim" content="Sub claim statement."/>
+    <ArgumentReasoning id="ar_1" name="Reasoning"/>
+    <ArtifactReference id="ev_1" name="FMEA"/>
+    <AssertedInference id="inf_1" reasoning="ar_1">
+      <source ref="cl_sub"/>
+      <target ref="cl_top"/>
+    </AssertedInference>
+    <AssertedEvidence id="ae_1">
+      <source href="#ev_1"/>
+      <target ref="cl_sub"/>
+    </AssertedEvidence>
+  </argumentPackage>
+</SACM:AssuranceCasePackage>

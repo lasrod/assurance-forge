@@ -2,13 +2,15 @@
 build/
 build-coverage/
 build-docs/
+build-sacm-standalone/
 out/
 cmake-build-*/
 
 # IDE
 .vs/
 .vscode/
-.claude/
+.claude/*
+!.claude/agents/
 *.user
 *.suo
 *.sln
@@ -33,6 +35,9 @@ cmake_test_discovery_*.json
 
 # FetchContent downloads
 _deps/
+
+# OMG SACM reference artifacts (fetch with: bash scripts/fetch-sacm23-references.sh)
+third_party/
 
 # OS
 .DS_Store

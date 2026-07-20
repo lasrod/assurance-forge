@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmlns:S="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0">
+  <S:AssuranceCasePackage xmi:id="acp_1">
+    <name content="Wrapped Case"/>
+    <argumentPackage xmi:id="argpkg_1">
+      <name content="Argument"/>
+      <argumentElement xsi:type="S:Claim" xmi:id="claim_top">
+        <name lang="en" content="Top"/>
+      </argumentElement>
+      <argumentElement xsi:type="S:Claim" xmi:id="claim_sub">
+        <name lang="en" content="Sub"/>
+      </argumentElement>
+      <argumentElement xsi:type="S:ArgumentReasoning" xmi:id="ar_1">
+        <name content="Decomposition"/>
+      </argumentElement>
+      <argumentElement xsi:type="S:AssertedInference" xmi:id="inf_1" reasoning="ar_1" source="claim_sub" target="claim_top"/>
+    </argumentPackage>
+  </S:AssuranceCasePackage>
+</xmi:XMI>

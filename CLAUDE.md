@@ -83,6 +83,33 @@ Every user-visible string goes through `ui::i18n`. Catalog source of truth: `too
 - Do not reformat files under `external/`.
 - Prefer result structs or `bool` + error string for recoverable errors.
 
+## SACM 2.3 library conformance (`libs/sacm`)
+
+`libs/sacm` is an independent, reusable SACM 2.3 library; Assurance Forge is (to
+become) one of its clients. Its compliance claims live in
+`docs/sacm/sacm-conformance-matrix.md`, which is the canonical source of
+requirement IDs — test names embed them.
+
+- **Any change under `libs/sacm/include/` or `libs/sacm/src/` requires a matrix
+  update or a verification record.** A behavioural change that leaves the matrix
+  untouched silently invalidates whatever the matrix claims.
+- **A row reaches `verified` only with a test whose name embeds its requirement
+  ID** (e.g. `SACM23_XMI_004_...`) and a `sacm-conformance-verifier` pass
+  recorded under `docs/sacm/verification/`. Prose evidence and "manual" steps do
+  not count.
+- Run `python tools/sacm/check_conformance_matrix.py` before pushing. CI enforces
+  it via the `sacm_matrix_check` CTest, which fails on matrix rot: a verified row
+  with no ID-bearing test, a test naming a requirement that does not exist, or a
+  cited path that has moved.
+- The library must stay independent — no Assurance Forge headers, no ImGui, no
+  GSN/layout vocabulary in its public API. `cmake/check_layer_gates.cmake`
+  enforces this at configure time.
+- **SACM 2.3 does not determine an instance-document namespace URI** (the
+  normative MOF model declares no `nsURI`). Ours is a project choice, and the EMF
+  reference implementation uses a different one per package. Import accepts both
+  dialects; strict export normalizes to our pin. Do not treat the pinned URI as
+  normative.
+
 ## Key Constraints
 
 - **Keep `core` small.** Add to it only when behavior is reusable domain logic with no UI, file-dialog, or provider dependency. Do not add helpers there for a single `ui` or `app` caller.

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1" gid="urn:example:case-1">
+  <name lang="en" content="Base Metadata Case"/>
+  <description xmi:id="description_acp">
+    <content>
+      <value lang="en" content="Case with full base metadata."/>
+      <value lang="ja" content="基本メタデータ付きのケース。"/>
+    </content>
+  </description>
+  <note xmi:id="note_acp">
+    <content>
+      <value lang="en" content="A reviewer note."/>
+    </content>
+  </note>
+  <taggedValue xmi:id="tv_acp">
+    <key>
+      <value content="reviewStatus"/>
+    </key>
+    <content>
+      <value content="approved"/>
+    </content>
+  </taggedValue>
+  <argumentPackage xmi:id="argpkg_1">
+    <name content="Argument"/>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_pattern" isAbstract="true">
+      <name content="Pattern Claim"/>
+      <implementationConstraint xmi:id="ic_1">
+        <content>
+          <value lang="en" content="Instantiate X before use."/>
+        </content>
+      </implementationConstraint>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_concrete" isCitation="true" citedElement="claim_pattern">
+      <name content="Concrete Claim"/>
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>

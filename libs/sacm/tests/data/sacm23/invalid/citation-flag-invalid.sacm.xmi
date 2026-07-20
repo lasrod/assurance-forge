@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">
+  <name content="Citation Constraint Violation"/>
+  <argumentPackage xmi:id="argpkg_1">
+    <name content="Argument"/>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_target">
+      <name content="Target"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_bad" citedElement="claim_target">
+      <name content="citedElement without isCitation"/>
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>

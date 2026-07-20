@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Shape of a real EMF-produced SACM file (reduced from a public example):
+     no xmi:id anywhere, references by containment path, per-package
+     namespaces, the `argumentationElement` role spelling, and GSN types
+     layered on SACM via xsi:type. -->
+<assuranceCase_:AssuranceCasePackage xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:assuranceCase_="http://omg.sacm/2.3/assurancecase" xmlns:base_="http://omg.sacm/2.3/base" xmlns:gsn_="http://acwg.org/3.0/gsn">
+  <name lang="English" content="EMF GSN Example"/>
+  <argumentPackage xsi:type="gsn_:Module">
+    <name lang="English" content="Module"/>
+    <argumentationElement xsi:type="gsn_:Goal">
+      <name lang="English" content="G1"/>
+      <description>
+        <content>
+          <value lang="English" content="Control system is acceptably safe"/>
+        </content>
+      </description>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Goal">
+      <name lang="English" content="G2"/>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Strategy">
+      <name lang="English" content="S1"/>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Solution">
+      <name lang="English" content="Sn1"/>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:SupportedBy" source="//@argumentPackage.0/@argumentationElement.1" target="//@argumentPackage.0/@argumentationElement.0"/>
+    <argumentationElement xsi:type="gsn_:SupportedBy" source="//@argumentPackage.0/@argumentationElement.3" target="//@argumentPackage.0/@argumentationElement.1"/>
+  </argumentPackage>
+</assuranceCase_:AssuranceCasePackage>

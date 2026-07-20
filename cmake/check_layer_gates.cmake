@@ -84,6 +84,62 @@ foreach(layer IN LISTS _AF_LAYERS)
     endforeach()
 endforeach()
 
+# --------------------------------------------------------------------
+# libs/sacm independence gate (SACM23-LIB-001).
+#
+# The SACM library must never include Assurance Forge headers or the
+# app's third-party UI stack. Scans quoted AND angle-bracket includes.
+# pugixml is a private implementation detail: allowed in src/tests/tools,
+# forbidden in public headers under include/.
+# --------------------------------------------------------------------
+if(NOT DEFINED AF_LIBS_SACM_DIR)
+    set(AF_LIBS_SACM_DIR "${CMAKE_CURRENT_LIST_DIR}/../libs/sacm")
+endif()
+get_filename_component(AF_LIBS_SACM_DIR "${AF_LIBS_SACM_DIR}" ABSOLUTE)
+
+if(IS_DIRECTORY "${AF_LIBS_SACM_DIR}")
+    # Assurance Forge layer prefixes plus legacy app SACM headers (sacm/sacm_*;
+    # the library's own headers use sacm/<area>/... and sacm/version.h).
+    set(_SACM_FORBIDDEN_PREFIXES
+        "app/" "ui/" "ai/" "core/" "export/" "parser/" "sacm/sacm_"
+    )
+    # App third-party surface the library must not touch.
+    set(_SACM_FORBIDDEN_THIRDPARTY
+        "hello_imgui" "imgui" "nlohmann" "yaml-cpp" "curl/" "nfd" "picosha2"
+    )
+    file(GLOB_RECURSE _sacm_sources
+        "${AF_LIBS_SACM_DIR}/include/*.h"
+        "${AF_LIBS_SACM_DIR}/include/*.hpp"
+        "${AF_LIBS_SACM_DIR}/src/*.h"
+        "${AF_LIBS_SACM_DIR}/src/*.hpp"
+        "${AF_LIBS_SACM_DIR}/src/*.cpp"
+        "${AF_LIBS_SACM_DIR}/src/*.cc"
+        "${AF_LIBS_SACM_DIR}/tests/*.cpp"
+        "${AF_LIBS_SACM_DIR}/tests/*.h"
+        "${AF_LIBS_SACM_DIR}/tools/*.cpp"
+    )
+    foreach(source IN LISTS _sacm_sources)
+        file(RELATIVE_PATH rel "${AF_LIBS_SACM_DIR}" "${source}")
+        string(REPLACE "\\" "/" rel "${rel}")
+        file(STRINGS "${source}" include_lines REGEX "^[ \t]*#[ \t]*include[ \t]+[\"<]")
+        foreach(line IN LISTS include_lines)
+            if(line MATCHES "include[ \t]+[\"<]([a-zA-Z0-9_/.+-]+)[\">]")
+                set(header "${CMAKE_MATCH_1}")
+                foreach(bad IN LISTS _SACM_FORBIDDEN_PREFIXES _SACM_FORBIDDEN_THIRDPARTY)
+                    string(LENGTH "${bad}" bad_len)
+                    string(SUBSTRING "${header}" 0 ${bad_len} prefix)
+                    if(prefix STREQUAL bad)
+                        list(APPEND _AF_VIOLATIONS "libs/sacm/${rel} includes \"${header}\" (SACM library independence)")
+                    endif()
+                endforeach()
+                if(rel MATCHES "^include/" AND header MATCHES "^pugixml")
+                    list(APPEND _AF_VIOLATIONS "libs/sacm/${rel} includes \"${header}\" (pugixml must not leak into public SACM headers)")
+                endif()
+            endif()
+        endforeach()
+    endforeach()
+endif()
+
 list(LENGTH _AF_VIOLATIONS n)
 if(n GREATER 0)
     message(STATUS "Layer-gate violations (${n}):")
@@ -93,4 +149,4 @@ if(n GREATER 0)
     message(FATAL_ERROR "Layer-gate check failed: ${n} forbidden include(s). Move the code or add an explicit allow-list entry in cmake/check_layer_gates.cmake.")
 endif()
 
-message(STATUS "Layer-gate check passed (${AF_SOURCE_DIR}).")
+message(STATUS "Layer-gate check passed (${AF_SOURCE_DIR}; libs/sacm independence).")
