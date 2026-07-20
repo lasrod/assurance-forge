@@ -40,8 +40,8 @@ std::string canonical_multi_lang(const model::MultiLangString& value) {
 // only non-default values appear in the snapshot.
 std::map<std::string, std::string> attribute_snapshot(const SACMElement& element) {
     std::map<std::string, std::string> snapshot;
-    if (!element.gid().empty()) {
-        snapshot["gid"] = element.gid();
+    if (element.gid().has_value()) {
+        snapshot["gid"] = *element.gid();
     }
     if (element.is_citation()) {
         snapshot["isCitation"] = "true";

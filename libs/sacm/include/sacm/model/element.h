@@ -33,7 +33,10 @@ class SACMElement {
 
     ElementKind kind() const { return kind_; }
     const ElementId& id() const { return id_; }
-    const std::string& gid() const { return gid_; }
+    // clause 8.2: gid is String[0..1]. Optional rather than empty-means-absent
+    // so an explicit gid="" and an absent gid stay distinguishable through a
+    // round-trip; collapsing them would silently rewrite the document.
+    const std::optional<std::string>& gid() const { return gid_; }
     bool is_citation() const { return is_citation_; }
     bool is_abstract() const { return is_abstract_; }
     const std::optional<ElementId>& cited_element() const { return cited_element_; }
@@ -55,7 +58,7 @@ class SACMElement {
 
     ElementKind kind_;
     ElementId id_;
-    std::string gid_;
+    std::optional<std::string> gid_;
     bool is_citation_ = false;
     bool is_abstract_ = false;
     std::optional<ElementId> cited_element_;

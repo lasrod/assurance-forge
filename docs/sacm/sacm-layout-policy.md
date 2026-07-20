@@ -64,6 +64,27 @@ explicit compatibility/vendor-extension mode
 
 Strict export should remain clean SACM 2.3 XMI.
 
+## SACM 2.4 changes the fallback, not the decision
+
+Draft SACM 2.4 adds `SACMView` / `SACMDiagram` (§15.3), built on OMG Diagram
+Definition/Interchange. **This policy survives**: `SACMView` is an *optional*
+compliance point, the mandatory one is Packaging, and strict export at the
+mandatory point still needs no diagram data. Layout stays out of the library and
+out of strict output.
+
+What changes is the third option above. Once `SACMDiagram` exists, a
+vendor-extension encoding is the wrong target — the standard-aligned one is
+`SACMDiagram` + `SACMDiagramElement`. Worth knowing what SACM actually
+standardises there: that a diagram exists, which model elements each diagram
+element denotes, and an opaque rendered `representation` (e.g. SVG). It defines
+**no geometry** — coordinates come from DD/DI.
+
+Practical consequence, and the only thing to act on now: keep the deterministic
+layout module's output expressible as (element reference → geometry or rendered
+representation) pairs, because that is the shape `SACMDiagramElement` takes.
+No code change is warranted while 2.4 remains unpublished and every RTF issue is
+still open — see `docs/sacm/sacm-2.4-watch.md`.
+
 ## Testing implication
 
 SACM library tests should not assert visual layout. Assurance Forge adapter/UI tests may assert deterministic layout separately, but those tests do not prove SACM conformance.

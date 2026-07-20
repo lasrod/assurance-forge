@@ -71,8 +71,8 @@ std::string qualified_class_name_for_expression_lang_string() {
 
 void write_common_attributes(pugi::xml_node node, const SACMElement& element) {
     node.append_attribute("xmi:id") = element.id().value().c_str();
-    if (!element.gid().empty()) {
-        node.append_attribute("gid") = element.gid().c_str();
+    if (element.gid().has_value()) {
+        node.append_attribute("gid") = element.gid()->c_str();
     }
     if (element.is_citation()) {
         node.append_attribute("isCitation") = "true";

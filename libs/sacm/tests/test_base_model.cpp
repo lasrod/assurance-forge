@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <format>
 
 namespace {
 
@@ -162,6 +163,40 @@ TEST(Sacm23BaseModel, SACM23_COMPAT_001_VendorContentPreservedAndStrictSaveRefus
     const LoadResult reloaded = sacm::io::load_xmi_string(compat.xml);
     ASSERT_TRUE(reloaded.ok);
     EXPECT_TRUE(sacm::compare::semantic_compare(*loaded.document, *reloaded.document).empty());
+}
+
+// Clause 8.2 makes gid String[0..1], so an explicit gid="" and an absent gid
+// are different documents. Modelling gid as a plain string with
+// empty-means-absent silently rewrote the first into the second on save, which
+// is exactly the kind of quiet edit the source-of-truth rule forbids.
+TEST(Sacm23BaseModel, SACM23_BASE_001_EmptyGidIsDistinctFromAbsentGid) {
+    const auto load = [](std::string_view gid_attribute) {
+        return sacm::io::load_xmi_string(std::format(
+            R"(<?xml version="1.0" encoding="UTF-8"?>)"
+            R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+            R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:version="2.0" )"
+            R"(xmi:id="acp_1"{}/>)",
+            gid_attribute));
+    };
+
+    const LoadResult absent = load("");
+    ASSERT_TRUE(absent.ok);
+    EXPECT_FALSE(absent.document->roots().front()->gid().has_value());
+
+    const LoadResult empty = load(R"( gid="")");
+    ASSERT_TRUE(empty.ok);
+    ASSERT_TRUE(empty.document->roots().front()->gid().has_value())
+        << "an explicit empty gid was read as absent";
+    EXPECT_EQ(*empty.document->roots().front()->gid(), "");
+
+    // The distinction must survive export, not just import.
+    const sacm::io::SaveResult saved_absent = sacm::io::save_xmi_string(*absent.document);
+    const sacm::io::SaveResult saved_empty = sacm::io::save_xmi_string(*empty.document);
+    ASSERT_TRUE(saved_absent.ok);
+    ASSERT_TRUE(saved_empty.ok);
+    EXPECT_EQ(saved_absent.xml.find("gid="), std::string::npos);
+    EXPECT_NE(saved_empty.xml.find(R"(gid="")"), std::string::npos)
+        << "an explicit empty gid was dropped on save";
 }
 
 // LangString identity is an explicit, tested scope exclusion rather than an

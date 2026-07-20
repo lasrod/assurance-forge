@@ -14,7 +14,7 @@ namespace sacm::detail {
 struct Access {
     // --- SACMElement ---
     static void set_id(model::SACMElement& e, model::ElementId id) { e.id_ = std::move(id); }
-    static std::string& gid(model::SACMElement& e) { return e.gid_; }
+    static std::optional<std::string>& gid(model::SACMElement& e) { return e.gid_; }
     static bool& is_citation(model::SACMElement& e) { return e.is_citation_; }
     static bool& is_abstract(model::SACMElement& e) { return e.is_abstract_; }
     static std::optional<model::ElementId>& cited_element(model::SACMElement& e) {
