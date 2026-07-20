@@ -145,35 +145,55 @@ TEST(Sacm23Terminology, SACM23_TERM_001_RejectsTermOutsideTerminologyPackage) {
 }
 
 // Legacy Assurance Forge files write a TerminologyPackage's contents with the
-// concrete class name as the element -- <expression id=.. value=..> -- instead
-// of the canonical <terminologyElement xsi:type="sacm:Expression">. The library
-// treated `expression` as a reference role, so those elements were dropped
-// entirely and a whole terminology package vanished with no error (issue #201,
-// found by the Phase 9 Stage 3 comparison). Tolerant mode must read them.
+// concrete class name as the element -- <expression id=.. value=..>, and
+// likewise <term> and <category> -- instead of the canonical
+// <terminologyElement xsi:type="sacm:Expression">. The library treated these as
+// reference roles, so the elements were dropped entirely and a whole terminology
+// package vanished with no error (issue #201, found by the Phase 9 Stage 3
+// comparison). Tolerant mode must read all three concrete forms.
 TEST(Sacm23Terminology, SACM23_TERM_001_LegacyTerminologyShorthandIsRead) {
     constexpr std::string_view kXml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:version="2.0" xmi:id="acp_1">
   <name content="Case"/>
   <terminologyPackage id="TP1" name="Terminology">
+    <category id="CAT_STANDARDS" name="Standards"/>
+    <term id="TERM_ISO" value="ISO 26262" category="CAT_STANDARDS"/>
     <expression id="TERM_SAFE" value="System operates without causing harm"/>
-    <expression id="TERM_TEST" value="Verification through testing"/>
   </terminologyPackage>
 </sacm:AssuranceCasePackage>)";
 
     const LoadResult loaded = sacm::io::load_xmi_string(kXml);
     ASSERT_TRUE(loaded.ok);
 
-    // Both shorthand expressions are present as real Expression elements, with
-    // their value carried through -- not dropped, not preserved as opaque blobs.
-    const auto* safe = loaded.document->find_as<sacm::model::Expression>(ElementId{"TERM_SAFE"});
-    ASSERT_NE(safe, nullptr) << "terminology shorthand <expression> was dropped";
-    EXPECT_EQ(safe->value(), "System operates without causing harm");
-    EXPECT_NE(loaded.document->find_as<sacm::model::Expression>(ElementId{"TERM_TEST"}), nullptr);
+    // All three shorthand kinds resolve to their real element types with values
+    // carried through -- not dropped, not preserved as opaque blobs.
+    const auto* expression =
+        loaded.document->find_as<sacm::model::Expression>(ElementId{"TERM_SAFE"});
+    ASSERT_NE(expression, nullptr) << "shorthand <expression> was dropped";
+    EXPECT_EQ(expression->value(), "System operates without causing harm");
+
+    const auto* term = loaded.document->find_as<sacm::model::Term>(ElementId{"TERM_ISO"});
+    ASSERT_NE(term, nullptr) << "shorthand <term> was dropped";
+    EXPECT_EQ(term->value(), "ISO 26262");
+    ASSERT_EQ(term->categories().size(), 1u);
+    EXPECT_EQ(term->categories().front().value(), "CAT_STANDARDS");
+
+    const auto* category =
+        loaded.document->find_as<sacm::model::Category>(ElementId{"CAT_STANDARDS"});
+    ASSERT_NE(category, nullptr) << "shorthand <category> was dropped";
+
+    // All three are contained in the package, not scattered elsewhere.
+    const auto* package =
+        loaded.document->find_as<sacm::model::TerminologyPackage>(ElementId{"TP1"});
+    ASSERT_NE(package, nullptr);
+    EXPECT_EQ(package->terminology_elements().size(), 3u);
 
     // It re-exports as canonical SACM and round-trips.
     const sacm::io::SaveResult saved = sacm::io::save_xmi_string(*loaded.document);
     ASSERT_TRUE(saved.ok);
     EXPECT_NE(saved.xml.find(R"(xsi:type="sacm:Expression")"), std::string::npos);
+    EXPECT_NE(saved.xml.find(R"(xsi:type="sacm:Term")"), std::string::npos);
+    EXPECT_NE(saved.xml.find(R"(xsi:type="sacm:Category")"), std::string::npos);
     const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml);
     ASSERT_TRUE(reloaded.ok);
     EXPECT_TRUE(sacm::compare::semantic_compare(*loaded.document, *reloaded.document).empty());

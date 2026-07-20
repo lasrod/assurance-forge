@@ -23,13 +23,18 @@ Down from 98 once the terminology-expression shorthand was read (#201, fixed).
 legacy parser is not** — there are no outstanding projection bugs. They clear
 when Stage 4 makes the library the source of truth.
 
-| Fixture | undeveloped | description |
-|---|---:|---:|
-| `tests/data/fixture_roundtrip_sanitized_strict.sacm.xml` | 34 | — |
-| `tests/data/fixture_roundtrip_sample.sacm.xml` | — | 4 |
-| `tests/data/fixture_roundtrip_core_argument.sacm.xml` | 1 | — |
+The baseline JSON (`tests/data/sacm_parallel_load_baseline.json`) keys by the
+diff's coarse *category* — here always `field`, meaning a per-element field value
+differs. The "which fields" column below is not stored in the baseline; it is the
+human breakdown of what those `field` diffs actually are.
 
-35 undeveloped + 4 description = 39.
+| Fixture | `field` (baseline count) | which fields |
+|---|---:|---|
+| `tests/data/fixture_roundtrip_sanitized_strict.sacm.xml` | 34 | `undeveloped` (all 34) |
+| `tests/data/fixture_roundtrip_sample.sacm.xml` | 4 | `description` (all 4) |
+| `tests/data/fixture_roundtrip_core_argument.sacm.xml` | 1 | `undeveloped` |
+
+Total 39 `field` diffs = 35 `undeveloped` + 4 `description`.
 
 ## The causes
 
