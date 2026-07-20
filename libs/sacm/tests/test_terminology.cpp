@@ -144,4 +144,44 @@ TEST(Sacm23Terminology, SACM23_TERM_001_RejectsTermOutsideTerminologyPackage) {
     EXPECT_EQ(result.diagnostics.front().code, sacm::validation::codes::kCmdInvalidParent);
 }
 
+// Legacy Assurance Forge files write a TerminologyPackage's contents with the
+// concrete class name as the element -- <expression id=.. value=..> -- instead
+// of the canonical <terminologyElement xsi:type="sacm:Expression">. The library
+// treated `expression` as a reference role, so those elements were dropped
+// entirely and a whole terminology package vanished with no error (issue #201,
+// found by the Phase 9 Stage 3 comparison). Tolerant mode must read them.
+TEST(Sacm23Terminology, SACM23_TERM_001_LegacyTerminologyShorthandIsRead) {
+    constexpr std::string_view kXml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:version="2.0" xmi:id="acp_1">
+  <name content="Case"/>
+  <terminologyPackage id="TP1" name="Terminology">
+    <expression id="TERM_SAFE" value="System operates without causing harm"/>
+    <expression id="TERM_TEST" value="Verification through testing"/>
+  </terminologyPackage>
+</sacm:AssuranceCasePackage>)";
+
+    const LoadResult loaded = sacm::io::load_xmi_string(kXml);
+    ASSERT_TRUE(loaded.ok);
+
+    // Both shorthand expressions are present as real Expression elements, with
+    // their value carried through -- not dropped, not preserved as opaque blobs.
+    const auto* safe = loaded.document->find_as<sacm::model::Expression>(ElementId{"TERM_SAFE"});
+    ASSERT_NE(safe, nullptr) << "terminology shorthand <expression> was dropped";
+    EXPECT_EQ(safe->value(), "System operates without causing harm");
+    EXPECT_NE(loaded.document->find_as<sacm::model::Expression>(ElementId{"TERM_TEST"}), nullptr);
+
+    // It re-exports as canonical SACM and round-trips.
+    const sacm::io::SaveResult saved = sacm::io::save_xmi_string(*loaded.document);
+    ASSERT_TRUE(saved.ok);
+    EXPECT_NE(saved.xml.find(R"(xsi:type="sacm:Expression")"), std::string::npos);
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml);
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(*loaded.document, *reloaded.document).empty());
+
+    // Strict mode must still reject the shorthand -- it is a legacy form, not
+    // SACM 2.3.
+    const LoadResult strict = sacm::io::load_xmi_string(kXml, LoadOptions{.mode = Mode::Strict});
+    EXPECT_FALSE(strict.ok);
+}
+
 }  // namespace
