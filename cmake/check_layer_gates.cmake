@@ -29,6 +29,7 @@ get_filename_component(AF_SOURCE_DIR "${AF_SOURCE_DIR}" ABSOLUTE)
 # Forbidden include prefixes per layer. Format: LAYER -> list of forbidden prefixes.
 set(_AF_FORBIDDEN_parser "sacm/;ai/;export/;ui/;app/")
 set(_AF_FORBIDDEN_sacm   "ai/;export/;ui/;app/")
+set(_AF_FORBIDDEN_sacm_adapter "ai/;export/;ui/;app/")
 set(_AF_FORBIDDEN_core   "ai/;export/;ui/;app/")
 set(_AF_FORBIDDEN_ai     "export/;ui/;app/")
 set(_AF_FORBIDDEN_export "ai/;ui/;app/")
@@ -43,7 +44,7 @@ set(_AF_ALLOWLIST
     "ui:ui/panels/welcome_modal.h=app/"
 )
 
-set(_AF_LAYERS parser sacm core ai export ui)
+set(_AF_LAYERS parser sacm sacm_adapter core ai export ui)
 set(_AF_VIOLATIONS "")
 
 foreach(layer IN LISTS _AF_LAYERS)

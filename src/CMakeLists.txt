@@ -2,7 +2,7 @@
 # Assurance-Forge source tree
 #
 # Each top-level src/ subdirectory is a thin CMake OBJECT library:
-#   af_parser, af_sacm, af_core, af_ai, af_export, af_ui, af_app
+#   af_parser, af_sacm, af_sacm_adapter, af_core, af_ai, af_export, af_ui, af_app
 #
 # All libraries depend on `af_common` (INTERFACE) which carries the
 # include dirs and the third-party link surface. This keeps per-layer
@@ -28,6 +28,7 @@ target_link_libraries(af_common INTERFACE
 
 add_subdirectory(parser)
 add_subdirectory(sacm)
+add_subdirectory(sacm_adapter)
 add_subdirectory(core)
 add_subdirectory(ai)
 add_subdirectory(export)
