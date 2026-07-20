@@ -70,8 +70,18 @@ std::map<BaselineKey, std::size_t> load_baseline() {
         return baseline;
     }
     std::ifstream stream(path);
+    if (!stream) {
+        ADD_FAILURE() << "baseline exists but could not be opened: " << path.string();
+        return baseline;
+    }
     nlohmann::json json;
-    stream >> json;
+    try {
+        stream >> json;
+    } catch (const nlohmann::json::exception& error) {
+        ADD_FAILURE() << "baseline is not valid JSON (" << path.string()
+                      << "): " << error.what();
+        return baseline;
+    }
     for (const auto& [fixture, categories] : json.items()) {
         for (const auto& [category, count] : categories.items()) {
             baseline[BaselineKey{fixture, category}] = count.get<std::size_t>();
@@ -103,8 +113,17 @@ TEST(SacmLibraryParallelLoad, SACM23_INT_001_ProjectionMatchesLegacyWithinBaseli
         ASSERT_TRUE(legacy.has_value()) << relative << ": legacy parse failed: " << legacy.error();
 
         const sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
-        ASSERT_TRUE(loaded.ok) << relative << ": library load failed";
-        ASSERT_NE(loaded.document, nullptr);
+        if (!loaded.ok || loaded.document == nullptr) {
+            // The whole point of this test is to be diagnosable from CI logs, so
+            // surface why the library declined the file rather than a bare flag.
+            std::string detail;
+            for (const sacm_adapter::LoadDiagnostic& diagnostic : loaded.diagnostics) {
+                detail += "\n    " + diagnostic.severity + " " + diagnostic.code + ": " +
+                          diagnostic.message;
+            }
+            FAIL() << relative << ": library load failed (namespace '" << loaded.source_namespace
+                   << "', version " << loaded.source_version << ")" << detail;
+        }
 
         const core::AssuranceCase projected = sacm_adapter::project_case(*loaded.document);
         const std::vector<sacm_adapter::ProjectionDifference> differences =
