@@ -27,6 +27,7 @@ Every `sacm::validation::Diagnostic` carries: `code`, `severity`
 | SACM-XMI-005 | Error (strict) | Containment role has an abstract declared type and the child carries no `xsi:type`. |
 | SACM-XMI-006 | Error | Strict save refused: document contains preserved unknown content or compatibility-only data. |
 | SACM-XMI-007 | Warning | External (cross-document) `href` reference is not supported; kept as opaque text in compatibility mode only. |
+| SACM-XMI-008 | Warning | Document declares a SACM revision other than 2.3; loaded in compatibility mode. Distinct from SACM-XMI-002, which means the namespace itself is unrecognized. |
 
 ## Identity and references
 

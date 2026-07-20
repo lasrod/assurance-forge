@@ -3,6 +3,7 @@ name: sacm-metamodel-cartographer
 description: Builds class, attribute, association, enumeration, and namespace inventories from the normative SACM 2.3 machine-readable model.
 model: inherit
 memory: project
+tools: Read, Grep, Glob, Bash
 color: cyan
 ---
 

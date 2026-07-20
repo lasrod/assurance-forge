@@ -3,6 +3,7 @@ name: sacm-interop-researcher
 description: Researches SACM-adjacent tools, public examples, XMI variations, and interoperability corpus candidates for the SACM 2.3 library.
 model: inherit
 memory: project
+tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 color: brown
 ---
 

@@ -28,6 +28,55 @@ using sacm::io::LoadResult;
 using sacm::io::Mode;
 using sacm::metadata::ElementKind;
 using sacm::model::AssertionDeclaration;
+
+// Assurance Forge encodes two product-critical GSN v3 concepts in SACM: a
+// Challenge is a relationship with isCounter=true (SACM-native, clause 11.13),
+// and an Assurance Claim Point is a vendor TaggedValue keyed
+// "assuranceForge.acp" (clause 8.12 extension mechanism). Neither has a GSN
+// metamodel representation -- v2.2 predates GSN v3 and its OCL even forbids
+// isCounter -- so the library is the only thing keeping them intact. Phase 9
+// migrates the app onto this library, so losing either here would silently
+// drop dialectic argumentation and confidence data from every saved case.
+TEST(Sacm23Argumentation, SACM23_ARG_001_ChallengeAndAcpEncodingsSurviveStrictRoundTrip) {
+    const std::string xml =
+        R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+        R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+        R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">
+  <argumentPackage xmi:id="ap_1">
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G1"><name content="G1"/></argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G2"><name content="G2"/></argumentElement>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="R1" source="G2" target="G1" isCounter="true">
+      <taggedValue xmi:id="TV1">
+        <key><value content="assuranceForge.acp"/></key>
+        <value content="ACP1"/>
+      </taggedValue>
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    const LoadResult loaded = sacm::io::load_xmi_string(xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
+                                                          : loaded.diagnostics.front().message);
+
+    // Challenge: isCounter is SACM-native and must survive as model state.
+    const auto* relationship =
+        loaded.document->find_as<sacm::model::AssertedRelationship>(sacm::model::ElementId{"R1"});
+    ASSERT_NE(relationship, nullptr);
+    EXPECT_TRUE(relationship->is_counter()) << "Challenge (isCounter) was lost on import";
+
+    // Both must still be there after a strict save -- a vendor TaggedValue is a
+    // standard extension point, so strict mode must not refuse or drop it.
+    const sacm::io::SaveResult saved = sacm::io::save_xmi_string(*loaded.document);
+    ASSERT_TRUE(saved.ok) << "strict save refused a document using standard extension points";
+    EXPECT_NE(saved.xml.find("isCounter=\"true\""), std::string::npos);
+    EXPECT_NE(saved.xml.find("assuranceForge.acp"), std::string::npos)
+        << "ACP TaggedValue was dropped on strict save";
+
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml);
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(*loaded.document, *reloaded.document).empty());
+}
 using sacm::model::Document;
 using sacm::model::ElementId;
 

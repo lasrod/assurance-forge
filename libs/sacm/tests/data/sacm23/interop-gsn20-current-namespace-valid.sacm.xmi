@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The CURRENT GSN metamodel namespace, http://scsc.acwg.gsn/2.0 (GSN
+     Metamodel Specification v2.2, SCSC ACWG, July 2021, CC-BY-4.0). Note the
+     version numbering is inverted: this supersedes http://acwg.org/3.0/gsn.
+     Structure authored from the specification's Figure 2, not copied from any
+     tool output. Exercises the two Away* types that exist only in this
+     revision, plus a Context that has no concrete SACM equivalent. -->
+<assuranceCase_:AssuranceCasePackage xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:assuranceCase_="http://omg.sacm/2.3/assurancecase" xmlns:gsn_="http://scsc.acwg.gsn/2.0">
+  <name lang="English" content="GSN 2.0 Namespace Example"/>
+  <argumentPackage xsi:type="gsn_:Module">
+    <name lang="English" content="Module"/>
+    <argumentationElement xsi:type="gsn_:Goal">
+      <name lang="English" content="G1"/>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:AwayAssumption">
+      <name lang="English" content="AA1"/>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:AwayJustification">
+      <name lang="English" content="AJ1"/>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Solution">
+      <name lang="English" content="Sn1"/>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Context">
+      <name lang="English" content="C1"/>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:SupportedBy" source="//@argumentPackage.0/@argumentationElement.0" target="//@argumentPackage.0/@argumentationElement.3"/>
+  </argumentPackage>
+</assuranceCase_:AssuranceCasePackage>

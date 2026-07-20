@@ -119,5 +119,28 @@ if(SACM_BUILD_TESTS)
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         DISCOVERY_MODE PRE_TEST
     )
+    # CLI smoke workflows (SACM23-CLI-001). These cover the round-trip and
+    # validate paths that were previously only exercised by hand, so the
+    # requirement rests on CI rather than on someone remembering to run it.
+    set(SACM_CLI_FIXTURES "${CMAKE_CURRENT_SOURCE_DIR}/tests/data/sacm23")
     add_test(NAME SacmCliVersionSmoke COMMAND sacm_cli version)
+    add_test(NAME SacmCliRoundtripStrict
+             COMMAND sacm_cli roundtrip "${SACM_CLI_FIXTURES}/package-minimal-valid.sacm.xmi"
+                     --strict)
+    # Two tests, because CTest cannot assert both cleanly in one: setting
+    # PASS_REGULAR_EXPRESSION makes the regex decide pass/fail and ignores the
+    # exit code, so combining it with WILL_FAIL inverts the result backwards.
+    #
+    # (a) invalid input exits non-zero -- a CLI that reports success on a broken
+    #     file is worse than no CLI.
+    add_test(NAME SacmCliValidateRejectsDuplicateIds
+             COMMAND sacm_cli validate "${SACM_CLI_FIXTURES}/invalid/ids-duplicate-invalid.sacm.xmi")
+    set_tests_properties(SacmCliValidateRejectsDuplicateIds PROPERTIES WILL_FAIL TRUE)
+    # (b) it fails for the *right reason*. Without this, the test above passes
+    #     just as happily on a misspelled fixture path, which is the defect it
+    #     is supposed to rule out.
+    add_test(NAME SacmCliValidateReportsDuplicateIdDiagnostic
+             COMMAND sacm_cli validate "${SACM_CLI_FIXTURES}/invalid/ids-duplicate-invalid.sacm.xmi")
+    set_tests_properties(SacmCliValidateReportsDuplicateIdDiagnostic PROPERTIES
+        PASS_REGULAR_EXPRESSION "SACM-ID-001")
 endif()

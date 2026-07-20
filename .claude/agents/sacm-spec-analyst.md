@@ -3,6 +3,7 @@ name: sacm-spec-analyst
 description: Extracts SACM 2.3 normative requirements and compliance obligations into traceable implementation and editing slices.
 model: inherit
 memory: project
+tools: Read, Grep, Glob, Bash
 color: green
 ---
 

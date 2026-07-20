@@ -301,8 +301,45 @@ def emit(classes: dict[str, Clazz], enums: list[Enum], output: Path, source_name
     push("- Strict export namespace: `http://www.omg.org/spec/SACM/20220301` (OMG version URI for SACM 2.3), prefix `sacm`.")
     push("- XMI namespace: `http://www.omg.org/spec/XMI/20131001`, prefix `xmi`; `xmi:version=\"2.0\"`.")
     push("- XSI namespace: `http://www.w3.org/2001/XMLSchema-instance`, prefix `xsi` (declared only when `xsi:type` is emitted).")
-    push("- Import accepts (tolerant mode): any namespace URI containing `/spec/SACM/`, plus `http://example.org/sacm/2.3` (repo fixtures); other URIs load with a warning in tolerant mode and an error in strict mode.")
+    push("- Import accepts (tolerant mode): any namespace URI containing `/spec/SACM/`, the `http://omg.sacm/` reference-implementation family, plus `http://example.org/sacm/2.3` (repo fixtures); other URIs load with a warning in tolerant mode and an error in strict mode.")
     push("- Top interchange objects (Clause 2): `AssuranceCasePackage` (Assurance Case Model compliance point, mandatory), `ArgumentPackage` (Argumentation), `ArtifactPackage` (Artifact).")
+    push("")
+    push("### The pinned export namespace is a choice, not a normative value")
+    push("")
+    push(
+        "This is worth stating plainly because it limits what any SACM 2.3 "
+        "conformance claim can mean. Under XMI 2.5.1 an instance document's "
+        "namespace derives from the `org.omg.xmi.nsURI` tag on the MOF package; "
+        "SACM's normative model carries no such tag, and no `URI=` attribute "
+        "appears on any package in `ptc/22-03-13`. Nothing in the specification "
+        "determines the namespace, so **every SACM 2.3 producer necessarily "
+        "invents one, and no two need agree.**"
+    )
+    push("")
+    push(
+        "The EMF reference implementation "
+        "([github.com/wrwei/SACM](https://github.com/wrwei/SACM), Apache-2.0) "
+        "demonstrates the divergence: it declares one namespace *per metamodel "
+        "package* rather than one per document."
+    )
+    push("")
+    push("| Package | `nsURI` | `nsPrefix` |")
+    push("|---|---|---|")
+    for pkg, prefix in (
+        ("base", "base_"),
+        ("assurancecase", "assuranceCase_"),
+        ("argumentation", "argumentation_"),
+        ("artifact", "artifact_"),
+        ("terminology", "terminology_"),
+    ):
+        push(f"| {pkg} | `http://omg.sacm/2.2/{pkg}` | `{prefix}` |")
+    push("")
+    push(
+        "The library therefore accepts that family on import (tolerant mode) and "
+        "normalizes to the single pinned URI on strict export. Treat the pin as "
+        "this project's canonical form, not as a conformance requirement, and do "
+        "not report a file as non-conformant solely because its namespace differs."
+    )
     push("")
     push("## Known machine-readable model defects (normalized here)")
     push("")

@@ -169,4 +169,96 @@ bool kind_is_argument_asset(ElementKind kind) {
     }
 }
 
+namespace {
+
+// GSN (Goal Structuring Notation) as published alongside the SACM reference
+// implementation. Every row below is the class's declared `eSuperTypes` in
+// gsn.ecore, not a guess from the name.
+//
+// ChoiceNode, Context, and AwayContext specialize `ArgumentAsset`, which is
+// abstract in SACM: there is no concrete SACM class they can become, so they
+// carry no kind and must be preserved rather than coerced into a Claim.
+// Beware the version numbering: `scsc.acwg.gsn/2.0` is the CURRENT metamodel
+// (GSN Metamodel Specification v2.2, SCSC ACWG, July 2021, CC-BY-4.0), while
+// `acwg.org/3.0/gsn` is the older one despite the higher number.
+constexpr std::string_view kGsnNamespaces[] = {
+    "http://scsc.acwg.gsn/2.0",
+    "http://acwg.org/3.0/gsn",
+    "http://org.eclipse.acme/1.0/gsn",
+};
+
+struct GsnType {
+    std::string_view name;
+    std::optional<ElementKind> kind;
+    bool reverse_endpoints = false;
+};
+
+constexpr GsnType kGsnTypes[] = {
+    {"Module", ElementKind::ArgumentPackage},
+    {"ContractModule", ElementKind::ArgumentPackageBinding},
+    {"Strategy", ElementKind::ArgumentReasoning},
+    {"Goal", ElementKind::Claim},
+    {"Justification", ElementKind::Claim},
+    {"Assumption", ElementKind::Claim},
+    {"AwayGoal", ElementKind::Claim},
+    // Present only in the current (scsc.acwg.gsn/2.0) metamodel.
+    {"AwayAssumption", ElementKind::Claim},
+    {"AwayJustification", ElementKind::Claim},
+    {"Solution", ElementKind::ArtifactReference},
+    {"AwaySolution", ElementKind::ArtifactReference},
+    {"ModuleReference", ElementKind::ArtifactReference},
+    {"ContractModuleReference", ElementKind::ArtifactReference},
+    // The two relationship mappings run in the opposite direction to their
+    // SACM supertypes -- see ExtensionType::reverse_endpoints. The ACWG's own
+    // GSN-to-SACM transformation swaps the same two:
+    // "the +source and +target attributes of GSN SupportedBy and SACM
+    //  AssertedInference are reversed."
+    {"SupportedBy", ElementKind::AssertedInference, /*reverse_endpoints=*/true},
+    {"InContextOf", ElementKind::AssertedContext, /*reverse_endpoints=*/true},
+    // Abstract SACM supertype (ArgumentAsset) -- no concrete equivalent, so
+    // these are preserved rather than coerced.
+    //
+    // Context is deliberate, not an oversight. GSN Metamodel v2.2 section 2.1:
+    // "context elements may be either of type Axiomatic Claim or of type
+    // ArtifactReference. The type of the Context element is determined by the
+    // nature of its content" -- a human judgement about meaning, with no
+    // property to switch on. (The `refersToExternalMaterial` flag that older
+    // tooling used for this was dropped from the current metamodel.) Choosing
+    // one mechanically would be reinterpreting the argument.
+    //
+    // Choice carries no attributes at all; v2.2 models it as an ArgumentAsset
+    // purely "to enable its connection to multiple SupportedBy relationships".
+    // Its "m of n" cardinality is a GSN v3 concept with no metamodel yet.
+    //
+    // AwayContext is contested: both published ecores declare ArgumentAsset,
+    // while the v2.2 prose and the ACWG transformation rules say
+    // ArtifactReference. Preserved until the project settles it, because
+    // guessing here would silently retype evidence.
+    {"ChoiceNode", std::nullopt},  // spelled Choice in scsc.acwg.gsn/2.0
+    {"Choice", std::nullopt},
+    {"Context", std::nullopt},
+    {"AwayContext", std::nullopt},
+};
+
+}  // namespace
+
+bool is_sacm_extension_namespace(std::string_view namespace_uri) {
+    return std::ranges::any_of(kGsnNamespaces, [&](std::string_view known) {
+        return namespace_uri == known;
+    });
+}
+
+std::optional<ExtensionType> resolve_extension_type(std::string_view namespace_uri,
+                                                    std::string_view type_name) {
+    if (!is_sacm_extension_namespace(namespace_uri)) {
+        return std::nullopt;
+    }
+    for (const GsnType& known : kGsnTypes) {
+        if (known.name == type_name) {
+            return ExtensionType{namespace_uri, known.name, known.kind, known.reverse_endpoints};
+        }
+    }
+    return std::nullopt;
+}
+
 }  // namespace sacm::io::detail

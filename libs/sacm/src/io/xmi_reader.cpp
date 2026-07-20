@@ -31,6 +31,20 @@ std::string_view local_name(std::string_view qualified) {
     return colon == std::string_view::npos ? qualified : qualified.substr(colon + 1);
 }
 
+// Containment role names as emitted by the EMF-based SACM tooling
+// (github.com/wrwei/SACM and everything generated from it), mapped to the
+// normative spelling from ptc/22-03-13. The ecosystem consistently uses
+// `<owner>Element` where the normative model uses `<owner-stem>Element`; a file
+// using these spellings is otherwise well-formed SACM, so treating them as
+// unknown would silently move the entire argument into preserved content while
+// still reporting the document valid.
+std::string_view normalize_role(std::string_view role) {
+    if (role == "argumentationElement") {
+        return "argumentElement";
+    }
+    return role;
+}
+
 std::string node_to_string(const pugi::xml_node& node) {
     struct Writer final : pugi::xml_writer {
         std::string output;
@@ -55,6 +69,8 @@ struct Reader {
     // Innermost-first stack of xmlns scopes (prefix -> URI; "" = default ns).
     std::vector<std::unordered_map<std::string, std::string>> ns_scopes;
     std::string source_namespace;
+    metadata::namespaces::StandardVersion source_version =
+        metadata::namespaces::StandardVersion::Unknown;
     std::uint64_t generated_counter = 0;
     std::unordered_set<std::string> used_ids;
 
@@ -164,6 +180,146 @@ bool is_external_href(std::string_view value) {
 
 bool parse_bool(std::string_view value) { return value == "true" || value == "1"; }
 
+// --- EMF positional-reference normalization -------------------------------
+//
+// EMF-produced SACM omits xmi:id entirely and refers between elements by
+// containment path instead: source="//@argumentPackage.0/@argumentationElement.18"
+// means "the 19th argumentationElement of the 1st argumentPackage". Since such
+// files carry no ids at all, these paths are the *only* way their references
+// work -- without resolving them every asserted relationship dangles and the
+// argument structure is lost even though every element parses.
+//
+// Rather than thread a second reference form through the reader, we normalize
+// the DOM first: give each path-addressed element a deterministic id and
+// rewrite the paths to it. The reader then sees an ordinary id-based document.
+
+bool looks_like_emf_path(std::string_view value) { return value.starts_with("//@"); }
+
+// Deterministic, XML-name-safe id for an EMF containment path: each run of
+// path punctuation becomes a single underscore, so
+// "//@argumentPackage.0/@argumentationElement.18" gives
+// "emf_argumentPackage_0_argumentationElement_18".
+std::string id_from_emf_path(std::string_view path) {
+    std::string id = "emf";
+    bool pending_separator = true;
+    for (const char c : path) {
+        if (c == '/' || c == '@' || c == '.') {
+            pending_separator = true;
+            continue;
+        }
+        if (pending_separator) {
+            id.push_back('_');
+            pending_separator = false;
+        }
+        id.push_back(c);
+    }
+    return id;
+}
+
+bool document_uses_emf_paths(const pugi::xml_node& node) {
+    for (const pugi::xml_attribute& attr : node.attributes()) {
+        if (looks_like_emf_path(attr.value())) {
+            return true;
+        }
+    }
+    for (const pugi::xml_node& child : node.children()) {
+        if (child.type() == pugi::node_element && document_uses_emf_paths(child)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Assigns xmi:id to every element reachable by an EMF path, recording the
+// mapping. `path` is the EMF path of `node` itself ("/" for the root object).
+void assign_emf_path_ids(pugi::xml_node node, const std::string& path,
+                         std::unordered_map<std::string, std::string>& path_to_id,
+                         const std::unordered_set<std::string>& existing_ids) {
+    std::unordered_map<std::string, int> next_index_by_role;
+    for (pugi::xml_node child : node.children()) {
+        if (child.type() != pugi::node_element) {
+            continue;
+        }
+        // Index by the raw feature name, which is what the path spells.
+        const std::string role(local_name(child.name()));
+        const int index = next_index_by_role[role]++;
+        const std::string child_path = std::format("{}/@{}.{}", path, role, index);
+
+        pugi::xml_attribute id_attr = find_attr_local(child, "id");
+        std::string id = id_attr ? std::string(id_attr.value()) : std::string{};
+        if (id.empty()) {
+            id = id_from_emf_path(child_path);
+            // Never shadow an id the document already uses.
+            if (!existing_ids.contains(id)) {
+                child.append_attribute("xmi:id") = id.c_str();
+            }
+        }
+        path_to_id.emplace(child_path, id);
+        assign_emf_path_ids(child, child_path, path_to_id, existing_ids);
+    }
+}
+
+void collect_existing_ids(const pugi::xml_node& node, std::unordered_set<std::string>& out) {
+    if (const pugi::xml_attribute id = find_attr_local(node, "id")) {
+        out.insert(id.value());
+    }
+    for (const pugi::xml_node& child : node.children()) {
+        if (child.type() == pugi::node_element) {
+            collect_existing_ids(child, out);
+        }
+    }
+}
+
+// Rewrites EMF paths in attribute values to the ids assigned above. Values may
+// be space-separated lists (the IDREFS form), so each token is mapped
+// independently and unmapped tokens are left alone for the reader to diagnose.
+void rewrite_emf_paths(pugi::xml_node node,
+                       const std::unordered_map<std::string, std::string>& path_to_id) {
+    for (pugi::xml_attribute attr : node.attributes()) {
+        const std::string value = attr.value();
+        if (value.find("//@") == std::string::npos) {
+            continue;
+        }
+        std::string rewritten;
+        std::size_t start = 0;
+        while (start <= value.size()) {
+            const std::size_t end = value.find(' ', start);
+            const std::string token =
+                value.substr(start, end == std::string::npos ? std::string::npos : end - start);
+            if (!token.empty()) {
+                const auto found = path_to_id.find(token);
+                if (!rewritten.empty()) {
+                    rewritten.push_back(' ');
+                }
+                rewritten += found != path_to_id.end() ? found->second : token;
+            }
+            if (end == std::string::npos) {
+                break;
+            }
+            start = end + 1;
+        }
+        attr.set_value(rewritten.c_str());
+    }
+    for (pugi::xml_node child : node.children()) {
+        if (child.type() == pugi::node_element) {
+            rewrite_emf_paths(child, path_to_id);
+        }
+    }
+}
+
+// No-op unless the document actually uses EMF paths, so ordinary id-based
+// files are untouched.
+void normalize_emf_references(pugi::xml_node root) {
+    if (!document_uses_emf_paths(root)) {
+        return;
+    }
+    std::unordered_set<std::string> existing_ids;
+    collect_existing_ids(root, existing_ids);
+    std::unordered_map<std::string, std::string> path_to_id;
+    assign_emf_path_ids(root, "/", path_to_id, existing_ids);
+    rewrite_emf_paths(root, path_to_id);
+}
+
 // xsi:type="sacm:Claim" -> class name, validating the prefix namespace.
 std::optional<std::string> read_xsi_type(Reader& reader, const pugi::xml_node& node) {
     for (const pugi::xml_attribute& attr : node.attributes()) {
@@ -182,6 +338,43 @@ std::optional<std::string> read_xsi_type(Reader& reader, const pugi::xml_node& n
         const std::string_view type_prefix = prefix_of(value);
         const std::string type_ns = reader.resolve_prefix(type_prefix);
         if (!type_ns.empty() && !metadata::namespaces::is_accepted_sacm_namespace(type_ns)) {
+            // A metamodel that specializes SACM (GSN and friends) types its
+            // elements in its own namespace; the element still *is* the SACM
+            // class it inherits from, so resolve to that rather than treating
+            // the whole subtree as foreign.
+            if (const std::optional<detail::ExtensionType> extension =
+                    detail::resolve_extension_type(type_ns, local_name(value))) {
+                if (!extension->sacm_kind.has_value()) {
+                    // Known extension type whose SACM supertype is abstract:
+                    // there is nothing concrete to become. Preserve it rather
+                    // than silently coercing it into an unrelated class.
+                    reader.report(
+                        validation::codes::kXmiUnknownElement, Severity::Warning, "SACM23-COMPAT-002",
+                        node, {},
+                        std::format("xsi:type '{}' extends an abstract SACM class and has no "
+                                    "concrete equivalent; preserved as compatibility content",
+                                    value));
+                    return std::nullopt;
+                }
+                reader.report(validation::codes::kXmiUnknownElement, Severity::Info,
+                              "SACM23-COMPAT-001", node, {},
+                              std::format("xsi:type '{}' resolved to its SACM supertype '{}'", value,
+                                          metadata::kind_name(*extension->sacm_kind)));
+                return std::string(metadata::kind_name(*extension->sacm_kind));
+            }
+            // Distinguish "we know this metamodel but not this type" from
+            // "we do not know this metamodel at all". Both end up preserved,
+            // but only the first means our extension table is out of date, and
+            // a reader cannot act on the difference if both say the same thing.
+            if (detail::is_sacm_extension_namespace(type_ns)) {
+                reader.report(
+                    validation::codes::kXmiUnknownElement, reader.mode_severity(),
+                    "SACM23-COMPAT-002", node, {},
+                    std::format("xsi:type '{}' is an unrecognized type in the known SACM-extension "
+                                "namespace '{}'; preserved as compatibility content",
+                                value, type_ns));
+                return std::nullopt;
+            }
             reader.report(validation::codes::kXmiUnknownNamespace, reader.mode_severity(),
                           "SACM23-XMI-002", node, {},
                           std::format("xsi:type '{}' resolves to non-SACM namespace '{}'", value,
@@ -314,6 +507,18 @@ std::unique_ptr<SACMElement> read_element(Reader& reader, ElementKind kind,
 
 model::LangString read_lang_string(Reader& reader, const pugi::xml_node& node) {
     model::LangString value;
+    // LangString is modelled as a value type: it generalizes Element (not
+    // SACMElement), carries no gid, and nothing in SACM 2.3 references one --
+    // every appearance in the metamodel is a containment role. So an xmi:id
+    // here cannot be the target of any reference and is not preserved. Say so
+    // rather than dropping it silently: external tooling may still anchor to
+    // it, and unannounced loss is what the compliance policy forbids.
+    if (const pugi::xml_attribute id = find_attr_local(node, "id")) {
+        reader.report(validation::codes::kXmiUnknownElement, Severity::Info, "SACM23-XMI-001", node,
+                      {}, std::format("LangString xmi:id '{}' is not preserved: LangString is a "
+                                      "value type and nothing in SACM 2.3 can reference one",
+                                      id.value()));
+    }
     value.lang = node.attribute("lang").value();
     if (const pugi::xml_attribute content = node.attribute("content")) {
         value.content = content.value();
@@ -580,7 +785,7 @@ void read_model_element_children(Reader& reader, model::ModelElement& element,
         if (child.type() != pugi::node_element) {
             continue;
         }
-        const std::string_view role = local_name(child.name());
+        const std::string_view role = normalize_role(local_name(child.name()));
         if (role == "name") {
             // Strict shape: <name lang content/>. Legacy multi-language
             // shape: <name><content lang>text</content>...</name> — the
@@ -687,7 +892,7 @@ void read_claim_content_tolerance(Reader& reader, model::ModelElement& element,
         if (child.type() != pugi::node_element) {
             continue;
         }
-        const std::string_view role = local_name(child.name());
+        const std::string_view role = normalize_role(local_name(child.name()));
         if (role == "content" || role == "statement") {
             model::LangString value = read_lang_string(reader, child);
             if (!value.content.empty() || value.expression_ref.has_value()) {
@@ -721,7 +926,7 @@ void read_reference_children(Reader& reader, SACMElement& element, const pugi::x
         if (child.type() != pugi::node_element) {
             continue;
         }
-        const std::string_view role = local_name(child.name());
+        const std::string_view role = normalize_role(local_name(child.name()));
         if (role == "citedElement") {
             set_ref(Access::cited_element(element), child);
             continue;
@@ -872,6 +1077,23 @@ void read_reference_children(Reader& reader, SACMElement& element, const pugi::x
     }
 }
 
+// True when this node is typed by a SACM-extension relationship whose endpoint
+// direction is inverted relative to the SACM class it specializes.
+bool extension_reverses_endpoints(Reader& reader, const pugi::xml_node& node) {
+    for (const pugi::xml_attribute& attr : node.attributes()) {
+        const std::string_view name = attr.name();
+        if (local_name(name) != "type" || name.starts_with("xmlns")) {
+            continue;
+        }
+        const std::string_view value = attr.value();
+        const std::string type_ns = reader.resolve_prefix(prefix_of(value));
+        const std::optional<detail::ExtensionType> extension =
+            detail::resolve_extension_type(type_ns, local_name(value));
+        return extension.has_value() && extension->reverse_endpoints;
+    }
+    return false;
+}
+
 void read_reference_attributes(Reader& reader, SACMElement& element, const pugi::xml_node& node) {
     const auto idrefs_attr = [&](std::string_view name, std::vector<ElementId>& out) {
         if (const pugi::xml_attribute attr = node.attribute(std::string(name).c_str())) {
@@ -885,9 +1107,19 @@ void read_reference_attributes(Reader& reader, SACMElement& element, const pugi:
     };
 
     if (auto* rel = dynamic_cast<model::AssertedRelationship*>(&element)) {
-        idrefs_attr("source", Access::sources(*rel));
-        idrefs_attr("target", Access::targets(*rel));
+        // A GSN SupportedBy/InContextOf stores its endpoints in the same slots
+        // as the SACM relationship it specializes but means them the other way
+        // round, so importing without the swap would reverse the direction of
+        // every inference in the argument.
+        const bool reversed = extension_reverses_endpoints(reader, node);
+        idrefs_attr(reversed ? "target" : "source", Access::sources(*rel));
+        idrefs_attr(reversed ? "source" : "target", Access::targets(*rel));
         ref_attr("reasoning", Access::reasoning(*rel));
+        if (reversed) {
+            reader.report(validation::codes::kXmiUnknownElement, Severity::Info,
+                          "SACM23-COMPAT-002", node, {element.id()},
+                          "GSN relationship endpoints swapped to SACM source/target direction");
+        }
     }
     if (auto* assertion = dynamic_cast<model::Assertion*>(&element)) {
         idrefs_attr("metaClaim", Access::meta_claims(*assertion));
@@ -1095,7 +1327,7 @@ void populate(Reader& reader, SACMElement& element, const pugi::xml_node& node) 
         if (child.type() != pugi::node_element) {
             continue;
         }
-        const std::string_view role = local_name(child.name());
+        const std::string_view role = normalize_role(local_name(child.name()));
         if (is_common_role(role) || is_reference_role(element, role)) {
             continue;
         }
@@ -1175,6 +1407,18 @@ void check_root_namespace(Reader& reader, const pugi::xml_node& root) {
     const std::string_view root_prefix = prefix_of(root.name());
     const std::string uri = reader.resolve_prefix(root_prefix);
     reader.source_namespace = uri;
+    reader.source_version = metadata::namespaces::detect_standard_version(uri);
+    // A pre-2.3 document that happens to parse is not a 2.3 document. Say which
+    // revision was detected, so a caller can decide rather than discovering it
+    // later from a subtly wrong model.
+    if (reader.source_version != metadata::namespaces::StandardVersion::V2_3 && !uri.empty()) {
+        reader.report(
+            validation::codes::kXmiOlderStandardVersion, Severity::Warning, "SACM23-COMPAT-001",
+            root, {},
+            std::format("document declares SACM {} (namespace '{}'); this library implements 2.3 "
+                        "and loaded it in compatibility mode",
+                        metadata::namespaces::standard_version_name(reader.source_version), uri));
+    }
     if (uri.empty()) {
         if (reader.strict()) {
             reader.report(validation::codes::kXmiUnknownNamespace, Severity::Error,
@@ -1307,6 +1551,11 @@ LoadResult load_impl(std::string_view xml, std::string source_file, const LoadOp
         return result;
     }
 
+    // EMF-produced files address elements by containment path instead of id;
+    // rewrite those to ids so the reader sees an ordinary document. No-op for
+    // files that do not use them.
+    normalize_emf_references(parsed.document_element());
+
     const pugi::xml_node root = parsed.document_element();
     if (!root) {
         result.diagnostics.push_back(Diagnostic{
@@ -1357,6 +1606,7 @@ LoadResult load_impl(std::string_view xml, std::string source_file, const LoadOp
 
     result.diagnostics = std::move(reader.diagnostics);
     result.source_namespace = std::move(reader.source_namespace);
+    result.source_version = reader.source_version;
     result.ok = !validation::has_errors(result.diagnostics);
     if (result.ok || !document.roots().empty() || !document.other_roots().empty()) {
         result.document = std::move(document);

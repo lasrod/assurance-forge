@@ -368,4 +368,21 @@ if(Python3_Interpreter_FOUND)
         NAME i18n_catalog_check
         COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/i18n/check_catalog.py"
     )
+
+    # SACM conformance matrix gate: fails if a `verified` row is not backed by
+    # an ID-bearing test, if a test names a requirement the matrix does not
+    # define, or if a row cites a path that no longer exists. The matrix is the
+    # canonical source of requirement IDs, so drift there degrades every
+    # compliance claim built on it.
+    add_test(
+        NAME sacm_matrix_check
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/sacm/check_conformance_matrix.py"
+    )
+else()
+    # These are compliance gates, not conveniences. A silently absent gate reads
+    # as a passing one, so say so loudly rather than skipping in silence.
+    message(WARNING
+        "Python3 not found: the i18n_catalog_check and sacm_matrix_check gates "
+        "will NOT run. CI installs Python explicitly; a local build without it "
+        "cannot verify the translation catalog or the SACM conformance matrix.")
 endif()

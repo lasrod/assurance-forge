@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmlns:base_="http://omg.sacm/2.2/base" xmlns:assuranceCase_="http://omg.sacm/2.2/assurancecase" xmlns:argumentation_="http://omg.sacm/2.2/argumentation" xmlns:artifact_="http://omg.sacm/2.2/artifact" xmlns:terminology_="http://omg.sacm/2.2/terminology" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0">
+  <assuranceCase_:AssuranceCasePackage xmi:id="acp_1">
+    <name content="Reference Dialect Case"/>
+    <argumentPackage xmi:id="argpkg_1">
+      <name content="Argument"/>
+      <argumentElement xsi:type="argumentation_:Claim" xmi:id="claim_top">
+        <name lang="en" content="Top"/>
+      </argumentElement>
+      <argumentElement xsi:type="argumentation_:Claim" xmi:id="claim_sub">
+        <name lang="en" content="Sub"/>
+      </argumentElement>
+      <argumentElement xsi:type="argumentation_:AssertedInference" xmi:id="inf_1" source="claim_sub" target="claim_top"/>
+    </argumentPackage>
+  </assuranceCase_:AssuranceCasePackage>
+</xmi:XMI>

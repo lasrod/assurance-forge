@@ -18,6 +18,11 @@ inline constexpr std::string_view kXmiMissingId = "SACM-XMI-004";
 inline constexpr std::string_view kXmiMissingType = "SACM-XMI-005";
 inline constexpr std::string_view kXmiStrictSaveRefused = "SACM-XMI-006";
 inline constexpr std::string_view kXmiExternalReference = "SACM-XMI-007";
+// The document declares a SACM revision other than 2.3. Distinct from
+// SACM-XMI-002: the namespace is recognized, it is simply an older revision.
+// Conflating the two would make "we do not know this namespace" and "this is
+// SACM 2.2" indistinguishable to a caller.
+inline constexpr std::string_view kXmiOlderStandardVersion = "SACM-XMI-008";
 
 // Identity and references.
 inline constexpr std::string_view kIdDuplicate = "SACM-ID-001";

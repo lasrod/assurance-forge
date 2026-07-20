@@ -164,6 +164,36 @@ TEST(Sacm23BaseModel, SACM23_COMPAT_001_VendorContentPreservedAndStrictSaveRefus
     EXPECT_TRUE(sacm::compare::semantic_compare(*loaded.document, *reloaded.document).empty());
 }
 
+// LangString identity is an explicit, tested scope exclusion rather than an
+// oversight. LangString generalizes Element (not SACMElement) and every one of
+// its appearances in the SACM 2.3 metamodel is a containment role, so no
+// reference can target one and dropping the id cannot break the model. What is
+// not acceptable is dropping it in silence, so the reader announces it.
+TEST(Sacm23BaseModel, SACM23_XMI_001_LangStringIdIsNotPreservedButIsReported) {
+    const std::string xml =
+        R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+        R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:version="2.0" xmi:id="acp_1">
+  <name xmi:id="ls_name_1" lang="en" content="Case"/>
+</sacm:AssuranceCasePackage>)";
+
+    const LoadResult loaded = sacm::io::load_xmi_string(xml);
+    ASSERT_TRUE(loaded.ok);
+
+    const bool reported = std::ranges::any_of(loaded.diagnostics, [](const auto& diagnostic) {
+        return diagnostic.message.find("ls_name_1") != std::string::npos &&
+               diagnostic.message.find("not preserved") != std::string::npos;
+    });
+    EXPECT_TRUE(reported) << "LangString id was dropped without a diagnostic";
+
+    // The id really is absent from the round-tripped output -- this documents
+    // the exclusion, it does not claim preservation.
+    const sacm::io::SaveResult saved = sacm::io::save_xmi_string(*loaded.document);
+    ASSERT_TRUE(saved.ok);
+    EXPECT_EQ(saved.xml.find("ls_name_1"), std::string::npos);
+    EXPECT_NE(saved.xml.find("acp_1"), std::string::npos);
+}
+
 TEST(Sacm23BaseModel, SACM23_BASE_001_SetNameSetDescriptionAddTaggedValue) {
     Document document;
     ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"})

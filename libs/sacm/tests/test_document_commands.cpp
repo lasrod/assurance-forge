@@ -5,6 +5,12 @@
 
 #include <gtest/gtest.h>
 
+#include <set>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
+
 namespace {
 
 using sacm::commands::CreateArgumentPackage;
@@ -13,6 +19,49 @@ using sacm::commands::CreateClaim;
 using sacm::commands::MutationResult;
 using sacm::model::Document;
 using sacm::model::ElementId;
+
+// Every operation the public variant exposes must carry a stable, SACM-native
+// name. Iterating the variant rather than a hand-listed set means an operation
+// added later is covered automatically instead of silently escaping the check.
+template <std::size_t... I>
+std::vector<std::string_view> all_operation_names(std::index_sequence<I...>) {
+    return {sacm::commands::operation_name(
+        sacm::commands::Operation{std::in_place_index<I>,
+                                  std::variant_alternative_t<I, sacm::commands::Operation>{}})...};
+}
+
+TEST(Sacm23Commands, SACM23_CMD_001_OperationsAreSacmNativeWithStructuredResults) {
+    constexpr std::size_t kOperationCount = std::variant_size_v<sacm::commands::Operation>;
+    const std::vector<std::string_view> names =
+        all_operation_names(std::make_index_sequence<kOperationCount>{});
+    ASSERT_EQ(names.size(), kOperationCount);
+
+    // GSN/UI vocabulary must not appear in the SACM-native command surface;
+    // Goal/Strategy/Solution belong to the Assurance Forge adapter, not here.
+    for (const std::string_view name : names) {
+        EXPECT_FALSE(name.empty()) << "operation_name returned an empty name";
+        for (const std::string_view banned :
+             {"Goal", "Strategy", "Solution", "Node", "Canvas", "Tree", "Layout"}) {
+            EXPECT_EQ(name.find(banned), std::string_view::npos)
+                << "operation " << name << " leaks GSN/UI terminology: " << banned;
+        }
+    }
+    // Names are the stable identity used in previews, results, and diagnostics,
+    // so they must be distinct.
+    const std::set<std::string_view> unique(names.begin(), names.end());
+    EXPECT_EQ(unique.size(), names.size()) << "operation_name is not injective";
+
+    // Structured mutation results: a create reports the operation and a change
+    // record naming what was created, not just a success flag.
+    Document document;
+    const MutationResult result = document.apply(
+        CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "Case"});
+    ASSERT_TRUE(result.applied);
+    EXPECT_EQ(result.operation, "CreateAssuranceCasePackage");
+    ASSERT_FALSE(result.changes.empty());
+    EXPECT_EQ(result.created_ids().size(), 1u);
+    EXPECT_EQ(result.created_ids().front().value(), "acp_1");
+}
 
 TEST(Sacm23Commands, SACM23_CMD_002_CreatesDocumentWithAssuranceCasePackage) {
     Document document;

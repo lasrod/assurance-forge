@@ -355,10 +355,11 @@ void write_element(pugi::xml_node parent, const SACMElement& element, std::strin
     write_preserved_content(node, element);
 }
 
-void write_root(pugi::xml_node parent, const SACMElement& element, bool declare_namespaces) {
+void write_root(pugi::xml_node parent, const SACMElement& element, bool declare_namespaces,
+                std::string_view sacm_namespace) {
     pugi::xml_node node = parent.append_child(qualified_class_name(element.kind()).c_str());
     if (declare_namespaces) {
-        node.append_attribute("xmlns:sacm") = std::string(ns::kSacm).c_str();
+        node.append_attribute("xmlns:sacm") = std::string(sacm_namespace).c_str();
         node.append_attribute("xmlns:xmi") = std::string(ns::kXmi).c_str();
         node.append_attribute("xmlns:xsi") = std::string(ns::kXsi).c_str();
         node.append_attribute("xmi:version") = std::string(ns::kXmiVersion).c_str();
@@ -410,6 +411,11 @@ SaveResult save_xmi_string(const model::Document& document, const SaveOptions& o
     }
     g_emit_preserved_content = options.mode != Mode::Strict;
 
+    // An empty override means the pinned default. SACM 2.3 determines no
+    // instance namespace, so this is a project choice a caller may override.
+    const std::string_view sacm_namespace =
+        options.namespace_uri.empty() ? ns::kSacm : std::string_view(options.namespace_uri);
+
     pugi::xml_document xml;
     pugi::xml_node declaration = xml.append_child(pugi::node_declaration);
     declaration.append_attribute("version") = "1.0";
@@ -418,21 +424,21 @@ SaveResult save_xmi_string(const model::Document& document, const SaveOptions& o
     const std::size_t root_count = document.roots().size() + document.other_roots().size();
     if (root_count == 1) {
         if (!document.roots().empty()) {
-            write_root(xml, *document.roots().front(), true);
+            write_root(xml, *document.roots().front(), true, sacm_namespace);
         } else {
-            write_root(xml, *document.other_roots().front(), true);
+            write_root(xml, *document.other_roots().front(), true, sacm_namespace);
         }
     } else {
         pugi::xml_node wrapper = xml.append_child("xmi:XMI");
-        wrapper.append_attribute("xmlns:sacm") = std::string(ns::kSacm).c_str();
+        wrapper.append_attribute("xmlns:sacm") = std::string(sacm_namespace).c_str();
         wrapper.append_attribute("xmlns:xmi") = std::string(ns::kXmi).c_str();
         wrapper.append_attribute("xmlns:xsi") = std::string(ns::kXsi).c_str();
         wrapper.append_attribute("xmi:version") = std::string(ns::kXmiVersion).c_str();
         for (const auto& root : document.roots()) {
-            write_root(wrapper, *root, false);
+            write_root(wrapper, *root, false, sacm_namespace);
         }
         for (const auto& root : document.other_roots()) {
-            write_root(wrapper, *root, false);
+            write_root(wrapper, *root, false, sacm_namespace);
         }
     }
 

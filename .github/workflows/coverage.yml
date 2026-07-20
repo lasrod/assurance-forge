@@ -83,6 +83,19 @@ jobs:
             --html-details coverage_core/index.html \
             --print-summary
 
+      # The SACM library is measured on its own: it is the surface every
+      # conformance claim rests on, and a combined number would let a library
+      # regression hide behind application coverage. No threshold yet --
+      # establish the baseline from this report first, then gate on it.
+      - name: Generate coverage report (SACM library scope)
+        run: |
+          mkdir -p coverage_sacm
+          gcovr -r . build-coverage \
+            --config gcovr-sacm.cfg \
+            --gcov-executable gcov-14 \
+            --html-details coverage_sacm/index.html \
+            --print-summary
+
       - name: Upload coverage HTML reports
         uses: actions/upload-artifact@v6
         with:
@@ -91,3 +104,4 @@ jobs:
             coverage_logic/
             coverage_full/
             coverage_core/
+            coverage_sacm/
