@@ -7,6 +7,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Cancel superseded runs: when a PR branch gets a new push, the in-progress run
+# for the previous commit is no longer interesting. main pushes are keyed by SHA
+# so they never cancel each other.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     name: ${{ matrix.name }}
@@ -20,19 +27,24 @@ jobs:
             os: windows-latest
             # Let CMake pick the newest Visual Studio installed on the runner
             # rather than pinning a version — windows-latest's VS rolls forward.
+            # No ccache: MSVC caching needs embedded debug info (/Z7) and is
+            # fragile to set up blind; left for a follow-up.
             configure: cmake -B build -A x64
             build: cmake --build build --config Debug
             test: ctest --test-dir build -C Debug --output-on-failure --no-tests=error
+            use_ccache: false
           - name: Linux
             os: ubuntu-latest
-            configure: cmake -B build -DHELLOIMGUI_DOWNLOAD_GLFW_IF_NEEDED=ON -DCMAKE_BUILD_TYPE=Debug
+            configure: cmake -B build -DHELLOIMGUI_DOWNLOAD_GLFW_IF_NEEDED=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
             build: cmake --build build
             test: ctest --test-dir build --output-on-failure --no-tests=error
+            use_ccache: true
           - name: macOS
             os: macos-latest
-            configure: cmake -B build -DCMAKE_BUILD_TYPE=Debug
+            configure: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
             build: cmake --build build
             test: ctest --test-dir build --output-on-failure --no-tests=error
+            use_ccache: true
 
     steps:
       - name: Checkout (with submodules)
@@ -53,6 +65,17 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      # Caches compiled objects across runs, including the FetchContent
+      # dependencies (curl, hello_imgui, yaml-cpp, googletest) which are pinned
+      # and rarely change — that rebuild is most of the build time. AppleClang
+      # and GCC cache reliably; the cache is keyed per OS by the action.
+      - name: Set up ccache
+        if: matrix.use_ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ matrix.name }}
+          max-size: 500M
 
       - name: Configure CMake
         run: ${{ matrix.configure }}

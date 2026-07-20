@@ -10,6 +10,10 @@ on:
       - .github/workflows/docs-pages.yml
   workflow_dispatch:
 
+concurrency:
+  group: docs-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-docs:
     name: Build docs (strict)
