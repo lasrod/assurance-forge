@@ -264,6 +264,9 @@ constexpr std::string_view kKnownAttributes[] = {
     "name", "description", "key",
     // Alias the reader accepts for referencedArtifactElement.
     "referencedArtifact",
+    // Legacy GSN shorthand normalized to assertionDeclaration=needsSupport on
+    // read; recognized rather than preserved as opaque vendor content.
+    "undeveloped",
     // XMI serialization infrastructure.
     "id", "idref", "type", "href", "ref", "uuid", "label",
     // ptc/22-03-13 spells Event.date as `occurece`; accept both misspellings.

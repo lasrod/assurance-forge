@@ -217,7 +217,7 @@ add_custom_target(check_layer_gates ALL
 # is linked in via the per-layer af_* targets.
 hello_imgui_add_app(assurance-forge src/app/main.cpp)
 target_link_libraries(assurance-forge PRIVATE
-    af_app af_ui af_ai af_export af_core af_sacm af_parser
+    af_app af_ui af_ai af_export af_core af_sacm_adapter af_sacm af_parser
 )
 if(WIN32)
     target_link_libraries(assurance-forge PRIVATE bcrypt advapi32 ole32 shell32 dwmapi)
@@ -253,6 +253,7 @@ endif()
 # GoogleTest is fetched earlier (before libs/sacm).
 include(CTest)
 add_executable(tests
+    tests/test_sacm_library_parallel_load.cpp
     tests/test_xml_parser.cpp
     tests/test_assurance_tree.cpp
     tests/test_layout.cpp
@@ -332,10 +333,11 @@ add_executable(tests
 # Production sources are pulled in via the per-layer af_* OBJECT libraries
 # (see src/<layer>/CMakeLists.txt). The tests target intentionally links
 # everything so any production header is reachable from tests.
+target_compile_definitions(tests PRIVATE AF_REPO_ROOT="${CMAKE_SOURCE_DIR}")
 target_link_libraries(tests PRIVATE
     GTest::gtest_main
     hello_imgui
-    af_app af_ui af_ai af_export af_core af_sacm af_parser
+    af_app af_ui af_ai af_export af_core af_sacm_adapter af_sacm af_parser
 )
 if(WIN32)
     target_link_libraries(tests PRIVATE bcrypt advapi32 dwmapi)

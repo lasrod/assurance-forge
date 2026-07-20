@@ -1261,6 +1261,21 @@ void read_kind_specific_attributes(Reader& reader, SACMElement& element,
                                           attr.value()));
             }
         }
+        // Legacy GSN shorthand: an `undeveloped="true"` attribute is the
+        // pre-SACM way Assurance Forge marked a goal as not yet argued. GSN's
+        // own transformation maps undeveloped to assertionDeclaration =
+        // needsSupport (docs/sacm/sacm-gsn-mapping.md), so normalize to that
+        // rather than carrying a non-SACM boolean. Only when the declaration is
+        // still the default `asserted` -- an explicit assumed/axiomatic/defeated
+        // is more specific and must win.
+        if (parse_bool(node.attribute("undeveloped").value()) &&
+            assertion->assertion_declaration() == model::AssertionDeclaration::Asserted) {
+            Access::assertion_declaration(*assertion) = model::AssertionDeclaration::NeedsSupport;
+            reader.report(validation::codes::kXmiUnknownElement, Severity::Info, "SACM23-COMPAT-001",
+                          node, {element.id()},
+                          "legacy undeveloped=\"true\" normalized to assertionDeclaration="
+                          "needsSupport");
+        }
     }
     if (auto* rel = dynamic_cast<model::AssertedRelationship*>(&element)) {
         if (const pugi::xml_attribute attr = node.attribute("isCounter")) {
