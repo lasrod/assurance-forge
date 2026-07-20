@@ -109,6 +109,9 @@ if(SACM_BUILD_TESTS)
     target_compile_definitions(sacm_tests PRIVATE
         SACM_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data"
     )
+    # Tests live inside the library and may assert on internal tables, e.g. the
+    # losslessness attribute table in src/io/name_tables.h.
+    target_include_directories(sacm_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     if(DEFINED SACM_REPO_FIXTURES_DIR)
         target_compile_definitions(sacm_tests PRIVATE
             SACM_REPO_FIXTURES_DIR="${SACM_REPO_FIXTURES_DIR}"

@@ -8,6 +8,7 @@
 #include "sacm/metadata/element_kind.h"
 
 #include <optional>
+#include <span>
 #include <string_view>
 
 namespace sacm::io::detail {
@@ -59,6 +60,21 @@ std::optional<ExtensionType> resolve_extension_type(std::string_view namespace_u
 
 // True when the URI belongs to a metamodel known to specialize SACM.
 bool is_sacm_extension_namespace(std::string_view namespace_uri);
+
+// True when `name` is an attribute the SACM 2.3 serialization can legitimately
+// carry: an attribute or association end from the normative model, an XMI
+// infrastructure attribute, or a known machine-readable-model misspelling.
+//
+// Losslessness gate: an unprefixed attribute outside this set is something the
+// reader would otherwise ignore in silence. Preserving and reporting it turns
+// silent data loss into a diagnostic. The check is name-based, not per-class,
+// so an attribute that is valid SACM but wrong for its element still passes --
+// that is a validation concern, not a loss one.
+bool is_known_sacm_attribute(std::string_view name);
+
+// Every attribute and association-end name the check accepts, for the drift
+// test that holds it against the normative inventory.
+std::span<const std::string_view> known_sacm_attributes();
 
 // Kind classification against the abstract containment-end types.
 bool kind_is_argumentation_element(ElementKind kind);

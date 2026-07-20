@@ -143,6 +143,45 @@ TEST(Sacm23BaseModel, SACM23_BASE_001_MultiLanguageNameMapsToTaggedValue) {
     EXPECT_TRUE(sacm::compare::semantic_compare(*loaded.document, *reloaded.document).empty());
 }
 
+// The losslessness gate. Round-trip testing structurally cannot catch data lost
+// at import -- anything dropped on the way in is absent from both sides of the
+// comparison, which is exactly how the vendor-attribute defect survived every
+// existing test. An unprefixed attribute the serialization does not define is
+// therefore preserved and reported rather than quietly ignored.
+TEST(Sacm23BaseModel, SACM23_XMI_003_UnknownUnprefixedAttributeIsPreservedNotIgnored) {
+    constexpr std::string_view kXml =
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+        R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:version="2.0" xmi:id="acp_1" )"
+        R"(confidenceScore="0.87"><name content="Case"/></sacm:AssuranceCasePackage>)";
+
+    const LoadResult loaded = sacm::io::load_xmi_string(kXml);
+    ASSERT_TRUE(loaded.ok);
+    const auto& acp = *loaded.document->roots().front();
+    ASSERT_EQ(acp.preserved_attributes().size(), 1u)
+        << "an attribute the reader does not understand was dropped without trace";
+    EXPECT_NE(acp.preserved_attributes().front().find("confidenceScore"), std::string::npos);
+
+    // Strict save refuses; compatibility save round-trips it.
+    EXPECT_FALSE(sacm::io::save_xmi_string(*loaded.document).ok);
+    const auto compat =
+        sacm::io::save_xmi_string(*loaded.document, SaveOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(compat.ok);
+    EXPECT_NE(compat.xml.find(R"(confidenceScore="0.87")"), std::string::npos);
+
+    // Attributes the serialization *does* define must not trip the gate --
+    // otherwise every real document would look like it carried vendor content.
+    constexpr std::string_view kKnown =
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+        R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:version="2.0" xmi:id="acp_1" )"
+        R"(gid="urn:x" isCitation="false"><name content="Case"/></sacm:AssuranceCasePackage>)";
+    const LoadResult clean = sacm::io::load_xmi_string(kKnown);
+    ASSERT_TRUE(clean.ok);
+    EXPECT_TRUE(clean.document->roots().front()->preserved_attributes().empty())
+        << "a normative attribute was misreported as unknown";
+}
+
 // Vendor-extension *attributes* were silently discarded: no diagnostic, nothing
 // in preserved content, and strict save therefore succeeded while dropping
 // them. Unknown child elements were handled correctly all along, so the two

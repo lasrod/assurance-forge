@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <span>
 #include <cctype>
 #include <string>
 #include <utility>
@@ -241,6 +242,41 @@ constexpr GsnType kGsnTypes[] = {
 };
 
 }  // namespace
+
+namespace {
+
+// Attributes and association ends from the normative model (asserted against
+// docs/sacm/sacm-2.3-metamodel-inventory.md by the drift test), plus the
+// serialization-level names XMI adds and the two misspellings the
+// machine-readable model carries for Event.date.
+constexpr std::string_view kKnownAttributes[] = {
+    // Attributes from the normative model.
+    "assertionDeclaration", "content", "date", "endTime", "externalReference", "gid",
+    "isAbstract", "isCitation", "isCounter", "lang", "value", "version", "startTime",
+    // Association ends, which serialize as idref-style attributes.
+    "abstractForm", "argumentElement", "artifactElement", "category", "citedElement",
+    "element", "expression", "implements", "interface", "metaClaim", "origin",
+    "participantPackage", "reasoning", "referencedArtifactElement", "source", "structure",
+    "target", "terminologyElement",
+    // Tolerant-mode shorthands the reader accepts in place of a child element:
+    // `name="x"` and `description="x"` for the LangString forms, `key` for a
+    // TaggedValue key.
+    "name", "description", "key",
+    // Alias the reader accepts for referencedArtifactElement.
+    "referencedArtifact",
+    // XMI serialization infrastructure.
+    "id", "idref", "type", "href", "ref", "uuid", "label",
+    // ptc/22-03-13 spells Event.date as `occurece`; accept both misspellings.
+    "occurece", "occurence",
+};
+
+}  // namespace
+
+std::span<const std::string_view> known_sacm_attributes() { return kKnownAttributes; }
+
+bool is_known_sacm_attribute(std::string_view name) {
+    return std::ranges::find(kKnownAttributes, name) != std::ranges::end(kKnownAttributes);
+}
 
 bool is_sacm_extension_namespace(std::string_view namespace_uri) {
     return std::ranges::any_of(kGsnNamespaces, [&](std::string_view known) {

@@ -5,6 +5,8 @@
 
 #include "sacm/metadata/element_kind.h"
 
+#include "io/name_tables.h"
+
 #include <gtest/gtest.h>
 
 #include <filesystem>
@@ -85,6 +87,57 @@ TEST(Sacm23Metamodel, SACM23_LIB_001_ElementKindsMatchNormativeInventory) {
     for (const std::string& kind_name : library_kinds) {
         EXPECT_TRUE(inventory_classes.contains(kind_name))
             << "library kind not present in the normative inventory: " << kind_name;
+    }
+#endif
+}
+
+// The losslessness gate rejects unprefixed attributes outside a fixed table, so
+// that table must not fall behind the normative model: a name added to the
+// inventory but not the table would make valid SACM look like vendor content.
+// The reverse direction is deliberately not checked -- the table also holds
+// XMI infrastructure names and tolerant-mode shorthands that the inventory,
+// which describes the model rather than the serialization, never mentions.
+TEST(Sacm23Metamodel, SACM23_XMI_003_KnownAttributesCoverTheNormativeInventory) {
+#ifndef SACM_REPO_FIXTURES_DIR
+    GTEST_SKIP() << "repository inventory unavailable in standalone builds";
+#else
+    const std::filesystem::path inventory_path = std::filesystem::path(SACM_REPO_FIXTURES_DIR) /
+                                                 "docs" / "sacm" /
+                                                 "sacm-2.3-metamodel-inventory.md";
+    if (!std::filesystem::exists(inventory_path)) {
+        GTEST_SKIP() << "inventory not found: " << inventory_path.string();
+    }
+    std::ifstream stream(inventory_path);
+    std::string line;
+    std::set<std::string> inventory_names;
+    // Attribute and reference-end tables both start with a lowerCamelCase name;
+    // containment roles are child elements, not attributes, so they are skipped.
+    enum class Section { None, Attribute, Reference } section = Section::None;
+    const std::regex row(R"(^\| ([a-z][A-Za-z]*) \|)");
+    while (std::getline(stream, line)) {
+        if (line.starts_with("| Attribute")) {
+            section = Section::Attribute;
+            continue;
+        }
+        if (line.starts_with("| Reference end")) {
+            section = Section::Reference;
+            continue;
+        }
+        if (line.starts_with("| Containment role") || line.starts_with("#")) {
+            section = Section::None;
+            continue;
+        }
+        std::smatch match;
+        if (section != Section::None && std::regex_search(line, match, row)) {
+            inventory_names.insert(match[1]);
+        }
+    }
+    ASSERT_FALSE(inventory_names.empty()) << "no attribute names parsed from the inventory";
+
+    for (const std::string& name : inventory_names) {
+        EXPECT_TRUE(sacm::io::detail::is_known_sacm_attribute(name))
+            << "normative attribute/association end missing from the losslessness table: " << name
+            << " -- valid SACM would be reported as unknown content";
     }
 #endif
 }

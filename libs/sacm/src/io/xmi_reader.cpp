@@ -1103,9 +1103,32 @@ void capture_vendor_attributes(Reader& reader, SACMElement& element,
                                const pugi::xml_node& node) {
     for (const pugi::xml_attribute& attr : node.attributes()) {
         const std::string_view name = attr.name();
+        if (name.starts_with("xmlns")) {
+            continue;
+        }
         const std::string_view attr_prefix = prefix_of(name);
-        if (attr_prefix.empty() || name.starts_with("xmlns")) {
-            continue;  // unprefixed attributes are SACM's own vocabulary
+        if (attr_prefix.empty()) {
+            // Losslessness gate: an unprefixed attribute the serialization does
+            // not define is one the reader silently ignores. Preserve and
+            // report it rather than dropping it without a trace.
+            if (detail::is_known_sacm_attribute(name)) {
+                continue;
+            }
+            if (reader.strict()) {
+                reader.report(validation::codes::kXmiUnknownElement, Severity::Error,
+                              "SACM23-XMI-003", node, {element.id()},
+                              std::format("unknown attribute '{}' on {}", name,
+                                          metadata::kind_name(element.kind())));
+                continue;
+            }
+            Access::preserved_attributes(element).push_back(
+                std::format(R"({}="{}")", name, attr.value()));
+            reader.report(validation::codes::kXmiUnknownElement, Severity::Warning,
+                          "SACM23-COMPAT-001", node, {element.id()},
+                          std::format("unknown attribute '{}' on {} preserved as compatibility "
+                                      "content",
+                                      name, metadata::kind_name(element.kind())));
+            continue;
         }
         const std::string attr_ns = reader.resolve_prefix(attr_prefix);
         if (attr_ns.empty() || metadata::namespaces::is_xmi_namespace(attr_ns) ||
