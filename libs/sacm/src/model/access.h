@@ -24,6 +24,9 @@ struct Access {
         return e.abstract_form_;
     }
     static void set_parent(model::SACMElement& e, model::SACMElement* parent) { e.parent_ = parent; }
+    static std::vector<std::string>& preserved_attributes(model::SACMElement& e) {
+        return e.preserved_attributes_;
+    }
     static std::vector<std::string>& preserved_content(model::SACMElement& e) {
         return e.preserved_content_;
     }

@@ -329,6 +329,24 @@ void write_containment_children(pugi::xml_node node, const SACMElement& element)
 // saving in tolerant/compatibility mode).
 thread_local bool g_emit_preserved_content = false;
 
+// Re-emits vendor attributes as `name="value"` on the element. pugixml has no
+// raw-attribute API, so the fragment is split back into name and value.
+void write_preserved_attributes(pugi::xml_node node, const SACMElement& element) {
+    if (!g_emit_preserved_content) {
+        return;
+    }
+    for (const std::string& fragment : element.preserved_attributes()) {
+        const std::size_t equals = fragment.find('=');
+        if (equals == std::string::npos || fragment.size() < equals + 3) {
+            continue;
+        }
+        const std::string name = fragment.substr(0, equals);
+        // Strip the surrounding quotes captured with the value.
+        const std::string value = fragment.substr(equals + 2, fragment.size() - equals - 3);
+        node.append_attribute(name.c_str()) = value.c_str();
+    }
+}
+
 void write_preserved_content(pugi::xml_node node, const SACMElement& element) {
     if (!g_emit_preserved_content) {
         return;
@@ -352,6 +370,7 @@ void write_element(pugi::xml_node parent, const SACMElement& element, std::strin
         write_model_element_children(node, *model_element);
     }
     write_containment_children(node, element);
+    write_preserved_attributes(node, element);
     write_preserved_content(node, element);
 }
 
@@ -370,6 +389,7 @@ void write_root(pugi::xml_node parent, const SACMElement& element, bool declare_
         write_model_element_children(node, *model_element);
     }
     write_containment_children(node, element);
+    write_preserved_attributes(node, element);
     write_preserved_content(node, element);
 }
 
@@ -391,7 +411,8 @@ SaveResult save_xmi_string(const model::Document& document, const SaveOptions& o
     if (options.mode == Mode::Strict) {
         std::vector<model::ElementId> carriers;
         document.for_each_element([&carriers](const SACMElement& element) {
-            if (!element.preserved_content().empty()) {
+            if (!element.preserved_content().empty() ||
+                !element.preserved_attributes().empty()) {
                 carriers.push_back(element.id());
             }
         });

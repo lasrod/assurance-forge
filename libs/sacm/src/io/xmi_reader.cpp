@@ -1094,7 +1094,45 @@ bool extension_reverses_endpoints(Reader& reader, const pugi::xml_node& node) {
     return false;
 }
 
+// Vendor-extension attributes are attributes whose prefix resolves to a
+// namespace that is neither SACM nor the XMI/XSI infrastructure. They carry
+// real information, so tolerant loads keep them and strict save refuses,
+// exactly as for unknown child elements. Without this they vanished with no
+// diagnostic and strict save reported success — a silent edit to the document.
+void capture_vendor_attributes(Reader& reader, SACMElement& element,
+                               const pugi::xml_node& node) {
+    for (const pugi::xml_attribute& attr : node.attributes()) {
+        const std::string_view name = attr.name();
+        const std::string_view attr_prefix = prefix_of(name);
+        if (attr_prefix.empty() || name.starts_with("xmlns")) {
+            continue;  // unprefixed attributes are SACM's own vocabulary
+        }
+        const std::string attr_ns = reader.resolve_prefix(attr_prefix);
+        if (attr_ns.empty() || metadata::namespaces::is_xmi_namespace(attr_ns) ||
+            attr_ns == metadata::namespaces::kXsi ||
+            metadata::namespaces::is_accepted_sacm_namespace(attr_ns) ||
+            detail::is_sacm_extension_namespace(attr_ns)) {
+            continue;
+        }
+        if (reader.strict()) {
+            reader.report(validation::codes::kXmiUnknownElement, Severity::Error,
+                          "SACM23-XMI-003", node, {element.id()},
+                          std::format("unknown attribute '{}' from foreign namespace '{}'",
+                                      name, attr_ns));
+            continue;
+        }
+        Access::preserved_attributes(element).push_back(
+            std::format(R"({}="{}")", name, attr.value()));
+        reader.report(validation::codes::kXmiUnknownElement, Severity::Warning,
+                      "SACM23-COMPAT-001", node, {element.id()},
+                      std::format("attribute '{}' from foreign namespace '{}' preserved as "
+                                  "compatibility content",
+                                  name, attr_ns));
+    }
+}
+
 void read_reference_attributes(Reader& reader, SACMElement& element, const pugi::xml_node& node) {
+    capture_vendor_attributes(reader, element, node);
     const auto idrefs_attr = [&](std::string_view name, std::vector<ElementId>& out) {
         if (const pugi::xml_attribute attr = node.attribute(std::string(name).c_str())) {
             append_idrefs(out, attr.value());

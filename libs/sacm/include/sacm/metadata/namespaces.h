@@ -24,6 +24,10 @@ inline constexpr std::string_view kSacmPrefix = "sacm";
 inline constexpr std::string_view kEmfReferencePrefix = "http://omg.sacm/";
 
 inline constexpr std::string_view kXmi = "http://www.omg.org/spec/XMI/20131001";
+// Real files use several XMI namespace URIs -- EMF-based tooling emits the
+// older "http://www.omg.org/XMI". They are all the XMI infrastructure
+// namespace, so xmi:id and xmi:version must be recognized under any of them.
+bool is_xmi_namespace(std::string_view uri);
 inline constexpr std::string_view kXmiPrefix = "xmi";
 inline constexpr std::string_view kXmiVersion = "2.0";
 

@@ -143,6 +143,39 @@ TEST(Sacm23BaseModel, SACM23_BASE_001_MultiLanguageNameMapsToTaggedValue) {
     EXPECT_TRUE(sacm::compare::semantic_compare(*loaded.document, *reloaded.document).empty());
 }
 
+// Vendor-extension *attributes* were silently discarded: no diagnostic, nothing
+// in preserved content, and strict save therefore succeeded while dropping
+// them. Unknown child elements were handled correctly all along, so the two
+// paths must now behave the same -- preserve, diagnose, refuse strict save.
+TEST(Sacm23BaseModel, SACM23_COMPAT_001_VendorAttributesPreservedAndStrictSaveRefuses) {
+    constexpr std::string_view kXml =
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+        R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+        R"(xmlns:acme="http://acme.example/sacm" xmi:version="2.0" xmi:id="acp_1" )"
+        R"(acme:owner="alice"><name content="Case"/></sacm:AssuranceCasePackage>)";
+
+    const LoadResult loaded = sacm::io::load_xmi_string(kXml);
+    ASSERT_TRUE(loaded.ok);
+    const auto& acp = *loaded.document->roots().front();
+    ASSERT_EQ(acp.preserved_attributes().size(), 1u) << "vendor attribute was dropped";
+    EXPECT_NE(acp.preserved_attributes().front().find("acme:owner"), std::string::npos);
+
+    // Strict save refuses rather than silently dropping it.
+    const auto strict = sacm::io::save_xmi_string(*loaded.document);
+    EXPECT_FALSE(strict.ok) << "strict save succeeded while discarding a vendor attribute";
+    EXPECT_TRUE(has_code(strict.diagnostics, sacm::validation::codes::kXmiStrictSaveRefused));
+
+    // Compatibility save re-emits it verbatim and stays semantically stable.
+    const auto compat =
+        sacm::io::save_xmi_string(*loaded.document, SaveOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(compat.ok);
+    EXPECT_NE(compat.xml.find(R"(acme:owner="alice")"), std::string::npos);
+    const LoadResult reloaded = sacm::io::load_xmi_string(compat.xml);
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(*loaded.document, *reloaded.document).empty());
+}
+
 TEST(Sacm23BaseModel, SACM23_COMPAT_001_VendorContentPreservedAndStrictSaveRefuses) {
     const LoadResult loaded = sacm::io::load_xmi_file(fixture("vendor-extension-valid.sacm.xmi"));
     ASSERT_TRUE(loaded.ok);

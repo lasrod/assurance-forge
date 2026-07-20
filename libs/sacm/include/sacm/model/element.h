@@ -50,6 +50,14 @@ class SACMElement {
     // preserved content (SACM-XMI-006); compatibility save re-emits it.
     const std::vector<std::string>& preserved_content() const { return preserved_content_; }
 
+    // Vendor-extension attributes (those in a foreign namespace) kept by
+    // tolerant loads, as `name="value"` fragments. Held separately from
+    // preserved_content because an attribute cannot be re-emitted as a child
+    // element, but governed by the same rule: never silently dropped.
+    const std::vector<std::string>& preserved_attributes() const {
+        return preserved_attributes_;
+    }
+
   protected:
     SACMElement(ElementKind kind, ElementId id) : kind_(kind), id_(std::move(id)) {}
 
@@ -64,6 +72,7 @@ class SACMElement {
     std::optional<ElementId> cited_element_;
     std::optional<ElementId> abstract_form_;
     std::vector<std::string> preserved_content_;
+    std::vector<std::string> preserved_attributes_;
     SACMElement* parent_ = nullptr;
 };
 

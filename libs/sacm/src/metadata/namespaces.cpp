@@ -2,6 +2,13 @@
 
 namespace sacm::metadata::namespaces {
 
+bool is_xmi_namespace(std::string_view uri) {
+    // Matches http://www.omg.org/spec/XMI/<date> and the older
+    // http://www.omg.org/XMI, without matching a SACM namespace.
+    return uri == kXmi || uri == "http://www.omg.org/XMI" ||
+           uri.find("/spec/XMI/") != std::string_view::npos;
+}
+
 std::string_view standard_version_name(StandardVersion version) {
     switch (version) {
         case StandardVersion::V2_0:
