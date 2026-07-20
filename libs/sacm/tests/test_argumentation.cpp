@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <format>
 
 namespace {
 
@@ -28,6 +29,48 @@ using sacm::io::LoadResult;
 using sacm::io::Mode;
 using sacm::metadata::ElementKind;
 using sacm::model::AssertionDeclaration;
+
+// GSN "undeveloped" and SACM "needsSupport" are the same concept — a goal not
+// yet argued. GSN's own transformation maps one to the other. Assurance Forge
+// historically wrote a separate `undeveloped="true"` attribute; the library
+// unifies that onto the SACM-native declaration so the concept survives without
+// a non-standard boolean, and so strict export stays clean.
+TEST(Sacm23Argumentation, SACM23_ARG_001_LegacyUndevelopedNormalizesToNeedsSupport) {
+    const auto load = [](std::string_view claim_attrs) {
+        return sacm::io::load_xmi_string(std::format(
+            R"(<?xml version="1.0" encoding="UTF-8"?>)"
+            R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+            R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+            R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">)"
+            R"(<argumentPackage xmi:id="ap_1">)"
+            R"(<argumentElement xsi:type="sacm:Claim" xmi:id="G1" {}><name content="G1"/>)"
+            R"(</argumentElement></argumentPackage></sacm:AssuranceCasePackage>)",
+            claim_attrs));
+    };
+
+    const auto declaration_of = [](const LoadResult& result) {
+        return result.document->find_as<sacm::model::Claim>(sacm::model::ElementId{"G1"})
+            ->assertion_declaration();
+    };
+
+    // Legacy undeveloped attribute -> needsSupport.
+    const LoadResult legacy = load(R"(undeveloped="true")");
+    ASSERT_TRUE(legacy.ok);
+    EXPECT_EQ(declaration_of(legacy), AssertionDeclaration::NeedsSupport);
+    // It normalizes rather than being kept as opaque vendor content, so strict
+    // save does not refuse.
+    EXPECT_TRUE(sacm::io::save_xmi_string(*legacy.document).ok);
+
+    // A file already using the SACM-native form is unchanged.
+    const LoadResult native = load(R"(assertionDeclaration="needsSupport")");
+    ASSERT_TRUE(native.ok);
+    EXPECT_EQ(declaration_of(native), AssertionDeclaration::NeedsSupport);
+
+    // An explicit, more specific declaration wins over the legacy boolean.
+    const LoadResult specific = load(R"(undeveloped="true" assertionDeclaration="assumed")");
+    ASSERT_TRUE(specific.ok);
+    EXPECT_EQ(declaration_of(specific), AssertionDeclaration::Assumed);
+}
 
 // Assurance Forge encodes two product-critical GSN v3 concepts in SACM: a
 // Challenge is a relationship with isCounter=true (SACM-native, clause 11.13),

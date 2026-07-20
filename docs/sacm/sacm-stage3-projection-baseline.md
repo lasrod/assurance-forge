@@ -53,21 +53,27 @@ without fixing this would silently drop terminology from existing projects.
 containment shorthand, as it already does for other legacy spellings. Tracked
 separately; not fixed here because Stage 3 is a measurement slice.
 
-### 2. `undeveloped` means different things in each model (6)
+### 2. `undeveloped` — the library reading is correct (6, decided)
 
-The legacy parser reads a GSN `undeveloped="true"` XML attribute. The projection
-derives it from SACM `assertionDeclaration = needsSupport`, per
-`docs/sacm/sacm-gsn-mapping.md`.
+The legacy parser reads only a separate GSN `undeveloped="true"` attribute and
+**ignores `assertionDeclaration` entirely**. The affected fixtures already use
+the SACM-native `assertionDeclaration="needsSupport"` with no boolean, so the
+legacy parser reports them as developed while the projection — correctly —
+reports them as undeveloped.
 
-These are genuinely different sources for the same idea, and the fixtures show
-they disagree: claims carrying `assertionDeclaration="needsSupport"` without the
-GSN attribute project as undeveloped but do not render as undeveloped today.
+**Decided (2026-07-20): adopt the SACM reading.** GSN v3 and the ACWG
+transformation map `undeveloped` to `assertionDeclaration = needsSupport`, so
+`needsSupport` *is* the undeveloped state; the legacy dual representation was
+redundant and could drift. The library now also normalizes a legacy
+`undeveloped="true"` attribute onto `needsSupport` on tolerant read
+(`SACM23_ARG_001_LegacyUndevelopedNormalizesToNeedsSupport`), so older files that
+used the boolean keep working and no non-standard attribute is carried.
 
-**This needs a product decision, not a code fix.** Adopting the SACM reading
-would change which goals display the undeveloped diamond in existing projects —
-a visible change to a safety argument's appearance. Options: keep the GSN
-attribute as the source, adopt the SACM declaration, or treat either as
-sufficient. Recorded rather than decided.
+These six differences stay in the baseline because they are the *legacy parser*
+being wrong, not the library — they resolve when the application switches to the
+library (Stage 4), exactly like the description differences below. The visible
+effect is that more goals correctly show the undeveloped diamond, which is the
+intended alignment, not a regression.
 
 ### 3. The library reads descriptions the legacy parser misses (3)
 
@@ -98,9 +104,12 @@ substantive.
 
 ## What Stage 4 needs
 
-1. Fix cause 1 in the library reader — it is real data loss.
-2. Decide cause 2 as a product question.
+1. Fix cause 1 in the library reader — it is real data loss (#201).
+2. Cause 2 is decided: the library reading is adopted; it resolves on migration.
 3. Cause 3 resolves on migration.
 
-When the baseline reaches zero, `SACM23-INT-001` can move from `implemented`
-toward `verified` and the library can become the source of truth.
+So the only outstanding *fix* is #201. Once its expressions are read, the
+baseline drops by 59 to 39, and the remaining 39 (undeveloped + descriptions)
+are all cases where the library is already correct and the legacy parser is not
+— they clear when Stage 4 makes the library the source of truth. At that point
+`SACM23-INT-001` can move from `implemented` toward `verified`.
