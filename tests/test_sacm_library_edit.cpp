@@ -358,17 +358,32 @@ TEST(SacmLibraryEdit, SACM23_INT_001_ChallengeReproducesLegacyStructure) {
     }
 }
 
-// Strategy has no like-for-like library mapping yet: a bare strategy inference
-// would have no source (SACM source [1..*]). The seam reports it unsupported
-// rather than producing invalid structure. (Justification is now supported via
-// axiomatic + a gsn.role tag -- see AddChildReproducesLegacyStructure.)
-TEST(SacmLibraryEdit, SACM23_INT_001_AddChildStrategyUnsupported) {
+// A Strategy is added before its sub-goals, so it is created as a standalone
+// ArgumentReasoning (with a strategyTarget tag naming its goal) and no inference
+// yet -- the inference would be source-less, which SACM's source [1..*] forbids.
+// The inference is materialized on the first sub-goal (a following increment).
+TEST(SacmLibraryEdit, SACM23_INT_001_AddChildStrategyCreatesPendingReasoning) {
     sacm_adapter::LoadOutcome loaded = load_fixture();
     ASSERT_NE(loaded.document, nullptr);
-    const sacm_adapter::AddChildOutcome added =
-        sacm_adapter::apply_add_child(*loaded.document, "G1", sacm_adapter::ChildKind::Strategy);
-    EXPECT_FALSE(added.supported);
-    EXPECT_FALSE(added.applied);
+
+    const sacm_adapter::AddChildOutcome added = sacm_adapter::apply_add_child(
+        *loaded.document, "G1", sacm_adapter::ChildKind::Strategy, "STRAT1");
+    ASSERT_TRUE(added.supported);
+    ASSERT_TRUE(added.applied)
+        << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    EXPECT_EQ(added.new_element_id, "STRAT1");
+    EXPECT_TRUE(added.new_relationship_id.empty()) << "no inference until the first sub-goal";
+
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    const core::SacmElement* strategy = find_element(after, "STRAT1");
+    ASSERT_NE(strategy, nullptr);
+    EXPECT_EQ(strategy->type, "argumentreasoning");
+    // No relationship references it yet.
+    for (const core::SacmElement& element : after.elements) {
+        EXPECT_EQ(std::find(element.source_refs.begin(), element.source_refs.end(), "STRAT1"),
+                  element.source_refs.end());
+        EXPECT_NE(element.reasoning_ref, "STRAT1");
+    }
 }
 
 // The GSN Justification round-trips: adding one stores axiomatic + the gsn.role

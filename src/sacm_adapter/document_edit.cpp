@@ -259,6 +259,33 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
     }
     const sacm::model::ElementId package_id = package->id();
 
+    // A Strategy is added before it has any sub-goals; its AssertedInference
+    // would have no source (SACM source [1..*]), so create only the
+    // ArgumentReasoning and record the goal it will support in a vendor tag
+    // (app-defer). The inference is materialized when the first sub-goal gives it
+    // a source -- a following increment (extending an existing inference's
+    // sources for the second and later sub-goals needs a new library op).
+    if (kind == ChildKind::Strategy) {
+        const sacm::commands::MutationResult created_strategy =
+            doc.apply(sacm::commands::CreateArgumentReasoning{.parent = package_id,
+                                                              .id = to_optional_id(element_id)});
+        if (!created_strategy.applied || created_strategy.created_ids().empty()) {
+            return failed_child(created_strategy);
+        }
+        const sacm::model::ElementId strategy_id = created_strategy.created_ids().front();
+        const sacm::commands::MutationResult tagged = doc.apply(sacm::commands::AddTaggedValue{
+            .element = strategy_id, .key = kGsnStrategyTargetTagKey, .value = parent_id});
+        if (!tagged.applied) {
+            rollback_element(doc, strategy_id);
+            return failed_child(tagged);
+        }
+        AddChildOutcome outcome;
+        outcome.supported = true;
+        outcome.applied = true;
+        outcome.new_element_id = strategy_id.value();
+        return outcome;  // no relationship yet -- materialized on the first sub-goal
+    }
+
     const std::optional<ChildPlan> plan = plan_child(kind, package_id, to_optional_id(element_id));
     if (!plan.has_value()) {
         return unsupported_child();
