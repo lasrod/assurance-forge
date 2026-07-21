@@ -148,4 +148,24 @@ struct AcpOutcome {
 // wider `RelationshipEligibleForAcp` rules, both later slices.
 AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id);
 
+// Result of deleting an element.
+struct DeleteOutcome {
+    bool supported = true;
+    bool applied = false;
+    std::vector<LoadDiagnostic> diagnostics;
+};
+
+// Deletes a single element and the relationships that reference it, the
+// primitive `core::RemoveElement` composes. Uses the library's
+// DeleteReferencingRelationships policy so no relationship is left dangling --
+// matching the legacy helper, which drops relationships that become empty.
+//
+// This is the single-element building block. For a *leaf* it reproduces
+// `RemoveElement` in either mode (they coincide when there are no children).
+// Cascading a whole subtree (composing this over the removal plan) and the
+// NodeOnly *reparent* case (which needs a relationship-retarget operation the
+// library does not yet expose) are later slices; see
+// docs/sacm/sacm-gsn-metamodel-gaps.md.
+DeleteOutcome apply_delete_element(LibraryDocument& document, const std::string& element_id);
+
 } // namespace sacm_adapter

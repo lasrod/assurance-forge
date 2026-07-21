@@ -204,6 +204,14 @@ hid:
   SACM tool can read. The library only accepts the enumerated literals, so the
   migration must choose the standards-correct `axiomatic` and accept that it is a
   deliberate change from the legacy encoding.
+- **GSN "delete node, reparent children" has no SACM operation.** Deleting a GSN
+  node while keeping its subtree (the NodeOnly mode) means re-pointing the
+  children's `SupportedBy` relationships at the deleted node's parent. SACM's
+  editing model has no retarget/move on an `AssertedRelationship` -- a
+  relationship's `source`/`target` are set at creation. A SACM-native tool can
+  only delete-and-recreate the relationships (new ids, losing any per-relationship
+  metadata) or the standard must add a retarget operation. Deleting a node *with*
+  its descendants, by contrast, composes cleanly from per-element deletes.
 
 ## Submitting this
 

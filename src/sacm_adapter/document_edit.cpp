@@ -421,4 +421,27 @@ AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id
     return outcome;
 }
 
+DeleteOutcome apply_delete_element(LibraryDocument& document, const std::string& element_id) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+
+    const sacm::commands::MutationResult result = doc.apply(sacm::commands::DeleteElement{
+        .target = sacm::model::ElementId(element_id),
+        // Match the legacy helper, which drops relationships that become empty
+        // rather than rejecting a referenced target.
+        .reference_policy = sacm::commands::ReferenceDeletePolicy::DeleteReferencingRelationships,
+    });
+
+    DeleteOutcome outcome;
+    outcome.supported = true;
+    outcome.applied = result.applied;
+    for (const sacm::validation::Diagnostic& diagnostic : result.diagnostics) {
+        outcome.diagnostics.push_back(LoadDiagnostic{
+            .code = diagnostic.code,
+            .severity = std::string(sacm::validation::severity_name(diagnostic.severity)),
+            .message = diagnostic.message,
+        });
+    }
+    return outcome;
+}
+
 } // namespace sacm_adapter

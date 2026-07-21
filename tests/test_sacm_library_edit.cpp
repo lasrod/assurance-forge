@@ -27,8 +27,10 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -98,6 +100,15 @@ struct ChildShape {
 // the legacy parser leaves a new Goal's empty. Treat them as the same state.
 std::string normalize_assertion(const std::string& assertion) {
     return (assertion.empty() || assertion == "asserted") ? "asserted" : assertion;
+}
+
+std::vector<std::string> sorted_element_ids(const core::AssuranceCase& assurance_case) {
+    std::vector<std::string> ids;
+    for (const core::SacmElement& element : assurance_case.elements) {
+        ids.push_back(element.id);
+    }
+    std::sort(ids.begin(), ids.end());
+    return ids;
 }
 
 const core::AcpRecord* find_acp(const core::AssuranceCase& assurance_case, const std::string& id) {
@@ -450,6 +461,53 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpRefusesIneligibleTargets) {
         sacm_adapter::apply_add_acp(*loaded.document, "R1");
     EXPECT_FALSE(on_relationship.supported);
     EXPECT_FALSE(on_relationship.applied);
+}
+
+// SACM23-INT-001, edit slice: deleting a leaf element through the library
+// (DeleteElement with reference cleanup) must leave the same set of elements the
+// legacy RemoveElement does. A leaf is used because there the two removal modes
+// coincide -- no children to reparent or cascade -- so the outcome is
+// unambiguous. Ids are preserved by deletion, so the remaining sets compare
+// directly.
+TEST(SacmLibraryEdit, SACM23_INT_001_DeleteLeafReproducesLegacyRemoval) {
+    const std::filesystem::path path =
+        repo_root() / "tests" / "data" / "fixture_acp_parity.sacm.xml";
+    ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
+
+    // Library path: delete the leaf sub-goal G2 (source of R1, no children).
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+    const core::AssuranceCase before = sacm_adapter::project_case(*loaded.document);
+    ASSERT_NE(find_element(before, "G2"), nullptr);  // vacuity: the leaf and its
+    ASSERT_NE(find_element(before, "R1"), nullptr);  // relationship start present
+
+    const sacm_adapter::DeleteOutcome deleted =
+        sacm_adapter::apply_delete_element(*loaded.document, "G2");
+    ASSERT_TRUE(deleted.supported);
+    ASSERT_TRUE(deleted.applied)
+        << (deleted.diagnostics.empty() ? "" : deleted.diagnostics.front().message);
+
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    // G2 and the now-empty relationship R1 are both gone; G1 remains.
+    EXPECT_EQ(find_element(after, "G2"), nullptr);
+    EXPECT_EQ(find_element(after, "R1"), nullptr);
+    ASSERT_NE(find_element(after, "G1"), nullptr);
+
+    // Legacy path: the same removal.
+    const auto legacy_case = parser::parse_sacm_xml(path.string());
+    ASSERT_TRUE(legacy_case.has_value()) << legacy_case.error();
+    const auto legacy_package = sacm::parse_sacm(path.string());
+    ASSERT_TRUE(legacy_package.has_value()) << legacy_package.error();
+    core::AssuranceCase legacy = *legacy_case;
+    sacm::AssuranceCasePackage package = *legacy_package;
+    std::string error;
+    ASSERT_TRUE(core::RemoveElement(legacy, &package, "G2",
+                                    core::RemoveMode::NodeAndDescendants, error))
+        << error;
+
+    // The two paths leave the same set of elements.
+    EXPECT_EQ(sorted_element_ids(after), sorted_element_ids(legacy));
 }
 
 // A rename targeting an id the document does not contain must fail cleanly: the
