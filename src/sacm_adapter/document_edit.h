@@ -67,4 +67,46 @@ struct EditOutcome {
 EditOutcome apply_text_edit(LibraryDocument& document, const std::string& element_id,
                             TextField field, const std::string& language, const std::string& value);
 
+// The kind of child element to add, mirroring core::NewElementKind. Each maps
+// to a new element plus an asserted relationship linking it to the parent.
+enum class ChildKind {
+    Goal,          // Claim   <- AssertedInference
+    Strategy,      // not wired: bare strategy inference has no source (see below)
+    Solution,      // ArtifactReference <- AssertedEvidence
+    Context,       // ArtifactReference <- AssertedContext
+    Assumption,    // Claim (assumed)   <- AssertedContext
+    Justification, // not wired: see below
+};
+
+// Result of adding a child element through the library. Reports the ids the
+// library generated (they will not match the legacy id generator, so callers
+// comparing against a legacy edit must compare structure, not ids).
+struct AddChildOutcome {
+    bool supported = true;
+    bool applied = false;
+    std::string new_element_id;
+    std::string new_relationship_id;
+    std::vector<LoadDiagnostic> diagnostics;
+};
+
+// Adds a child element under `parent_id`, mirroring `core::AddChildElement`:
+// creates the element in the parent's owning ArgumentPackage and an asserted
+// relationship whose target is the parent (conclusion) and whose source is the
+// new element (premise) -- except a Strategy, whose ArgumentReasoning attaches
+// through the inference's `reasoning` end rather than a source.
+//
+// Two kinds report `supported == false` for now:
+//   * Strategy -- its AssertedInference is created before any sub-goal exists,
+//     so it would have no source, which SACM's source [1..*] forbids. The
+//     legacy app produced that invalid transient state; representing a bare
+//     strategy in valid SACM is an open decision.
+//   * Justification -- the standards-correct GSN mapping is
+//     `assertionDeclaration = axiomatic` (docs/sacm/sacm-gsn-mapping.md), which
+//     deliberately diverges from the legacy app's non-standard "justification"
+//     literal, so it is not a like-for-like reproduction.
+// The parent must be a claim-like container in an ArgumentPackage; otherwise
+// the outcome reports unsupported.
+AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& parent_id,
+                                ChildKind kind);
+
 } // namespace sacm_adapter

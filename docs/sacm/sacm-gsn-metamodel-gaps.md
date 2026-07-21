@@ -180,6 +180,31 @@ experiment. Both encodings survive a strict SACM 2.3 round-trip in `libs/sacm`
 The ACP row is the interoperability argument in miniature: with no standard
 representation, every vendor invents an incompatible one.
 
+## Editing-time findings (Phase 9 library migration)
+
+Routing Assurance Forge's edit operations through `libs/sacm` (the library that
+enforces SACM 2.3 structurally) surfaced two tensions the legacy in-memory model
+hid:
+
+- **A bare Strategy is invalid SACM.** GSN editing adds a Strategy *before* the
+  sub-goals it will organise, so at creation the strategy's `AssertedInference`
+  has a `reasoning` and a `target` but **no source**. SACM `AssertedRelationship`
+  types `source : SACMElement[1..*]` (clause 11.13), so that intermediate state
+  is not a conformant instance — the library rightly refuses it, whereas the
+  legacy model tolerated it. This is the *editing* counterpart to row 3: not only
+  can a Strategy not be *defeated*, an unfinished Strategy cannot be *represented*
+  at all. GSN's incremental construction workflow and SACM's minimum-cardinality
+  invariant are in direct conflict; a conformant tool must either defer
+  materialising the inference until its first source exists, or the standard must
+  admit an incomplete-inference state.
+- **GSN Justification has no `AssertionDeclaration`.** The pure-SACM mapping for a
+  Justification is `assertionDeclaration = axiomatic` (see
+  `sacm-gsn-mapping.md`); SACM 2.3 has no `justification` literal. Assurance
+  Forge historically wrote a non-standard `justification` value, which no other
+  SACM tool can read. The library only accepts the enumerated literals, so the
+  migration must choose the standards-correct `axiomatic` and accept that it is a
+  deliberate change from the legacy encoding.
+
 ## Submitting this
 
 - **SCSC ACWG** — chair Jane Fenn (BAE Systems), `jane.fenn@scsc.uk`; the named

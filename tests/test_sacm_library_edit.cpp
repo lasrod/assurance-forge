@@ -78,6 +78,44 @@ core::AssuranceCase legacy_edit(const std::string& element_id, core::ElementText
     return edited;
 }
 
+// A normalized description of an add-child result, comparable across the two
+// paths. The library and legacy id generators differ, so ids are never
+// compared directly: link fields record *whether* the relationship points at
+// the new element, not its id.
+struct ChildShape {
+    std::string element_type;
+    std::string element_assertion;  // "" and "asserted" both normalize to "asserted"
+    std::string relationship_type;
+    bool targets_parent = false;
+    bool source_is_new_element = false;
+    bool reasoning_is_new_element = false;
+    friend bool operator==(const ChildShape&, const ChildShape&) = default;
+};
+
+// The projection stamps a claim's default AssertionDeclaration as "asserted";
+// the legacy parser leaves a new Goal's empty. Treat them as the same state.
+std::string normalize_assertion(const std::string& assertion) {
+    return (assertion.empty() || assertion == "asserted") ? "asserted" : assertion;
+}
+
+ChildShape describe_child(const core::AssuranceCase& assurance_case, const std::string& parent_id,
+                          const std::string& element_id, const std::string& relationship_id) {
+    ChildShape shape;
+    const core::SacmElement* element = find_element(assurance_case, element_id);
+    const core::SacmElement* relationship = find_element(assurance_case, relationship_id);
+    if (element == nullptr || relationship == nullptr) {
+        return shape;
+    }
+    shape.element_type = element->type;
+    shape.element_assertion = normalize_assertion(element->assertion_declaration);
+    shape.relationship_type = relationship->type;
+    shape.targets_parent = (relationship->target_refs == std::vector<std::string>{parent_id});
+    shape.source_is_new_element =
+        (relationship->source_refs == std::vector<std::string>{element_id});
+    shape.reasoning_is_new_element = (relationship->reasoning_ref == element_id);
+    return shape;
+}
+
 } // namespace
 
 // SACM23-INT-001, edit slice: the library's SetName operation, projected back
@@ -163,6 +201,95 @@ TEST(SacmLibraryEdit, SACM23_INT_001_ContentEditUnsupportedForRelationship) {
         *loaded.document, "R1", sacm_adapter::TextField::Content, "en", "not applicable");
     EXPECT_FALSE(edit.supported);
     EXPECT_FALSE(edit.applied);
+}
+
+// SACM23-INT-001, edit slice: adding a child element through the library
+// (create element + create asserted relationship) must produce the same
+// structure the legacy AddChildElement does -- same element kind, assertion,
+// relationship kind, and link direction (target = parent; source, or reasoning
+// for a Strategy, = the new element). Ids differ between the two generators, so
+// the comparison is structural.
+TEST(SacmLibraryEdit, SACM23_INT_001_AddChildReproducesLegacyStructure) {
+    struct Scenario {
+        sacm_adapter::ChildKind library_kind;
+        core::NewElementKind legacy_kind;
+        ChildShape expected;
+    };
+    const std::vector<Scenario> scenarios = {
+        {sacm_adapter::ChildKind::Goal, core::NewElementKind::Goal,
+         {"claim", "asserted", "assertedinference", true, true, false}},
+        {sacm_adapter::ChildKind::Solution, core::NewElementKind::Solution,
+         {"artifactreference", "asserted", "assertedevidence", true, true, false}},
+        {sacm_adapter::ChildKind::Context, core::NewElementKind::Context,
+         {"artifactreference", "asserted", "assertedcontext", true, true, false}},
+        {sacm_adapter::ChildKind::Assumption, core::NewElementKind::Assumption,
+         {"claim", "assumed", "assertedcontext", true, true, false}},
+    };
+
+    for (const Scenario& scenario : scenarios) {
+        SCOPED_TRACE(scenario.expected.element_type + " / " + scenario.expected.relationship_type);
+
+        // Library path.
+        sacm_adapter::LoadOutcome loaded = load_fixture();
+        ASSERT_NE(loaded.document, nullptr);
+        const sacm_adapter::AddChildOutcome added =
+            sacm_adapter::apply_add_child(*loaded.document, "G1", scenario.library_kind);
+        ASSERT_TRUE(added.supported);
+        ASSERT_TRUE(added.applied)
+            << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+        const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+        const ChildShape library_shape =
+            describe_child(after, "G1", added.new_element_id, added.new_relationship_id);
+
+        // Legacy path.
+        const auto legacy_case = parser::parse_sacm_xml(fixture_path().string());
+        ASSERT_TRUE(legacy_case.has_value()) << legacy_case.error();
+        const auto legacy_package = sacm::parse_sacm(fixture_path().string());
+        ASSERT_TRUE(legacy_package.has_value()) << legacy_package.error();
+        core::AssuranceCase legacy = *legacy_case;
+        sacm::AssuranceCasePackage package = *legacy_package;
+        std::string legacy_element_id;
+        std::string legacy_relationship_id;
+        std::string error;
+        ASSERT_TRUE(core::AddChildElement(legacy, &package, "G1", scenario.legacy_kind,
+                                          legacy_element_id, legacy_relationship_id, error))
+            << error;
+        const ChildShape legacy_shape =
+            describe_child(legacy, "G1", legacy_element_id, legacy_relationship_id);
+
+        // Both match the expected structure, and each other.
+        EXPECT_EQ(library_shape, scenario.expected);
+        EXPECT_EQ(legacy_shape, scenario.expected);
+        EXPECT_EQ(library_shape, legacy_shape);
+    }
+}
+
+// Strategy and Justification have no like-for-like library mapping yet: a bare
+// strategy inference would have no source (SACM source [1..*]), and the
+// standards-correct Justification value is axiomatic rather than the legacy
+// "justification" literal. The seam reports them unsupported rather than
+// silently producing invalid or divergent structure.
+TEST(SacmLibraryEdit, SACM23_INT_001_AddChildStrategyAndJustificationUnsupported) {
+    for (const sacm_adapter::ChildKind kind :
+         {sacm_adapter::ChildKind::Strategy, sacm_adapter::ChildKind::Justification}) {
+        sacm_adapter::LoadOutcome loaded = load_fixture();
+        ASSERT_NE(loaded.document, nullptr);
+        const sacm_adapter::AddChildOutcome added =
+            sacm_adapter::apply_add_child(*loaded.document, "G1", kind);
+        EXPECT_FALSE(added.supported);
+        EXPECT_FALSE(added.applied);
+    }
+}
+
+// Adding a child under an id that is not a claim-like container in an argument
+// package must fail cleanly rather than create a dangling element.
+TEST(SacmLibraryEdit, SACM23_INT_001_AddChildUnderMissingParentUnsupported) {
+    sacm_adapter::LoadOutcome loaded = load_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::AddChildOutcome added =
+        sacm_adapter::apply_add_child(*loaded.document, "NO_SUCH_ID", sacm_adapter::ChildKind::Goal);
+    EXPECT_FALSE(added.supported);
+    EXPECT_FALSE(added.applied);
 }
 
 // A rename targeting an id the document does not contain must fail cleanly: the
