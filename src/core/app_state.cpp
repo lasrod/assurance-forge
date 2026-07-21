@@ -189,22 +189,23 @@ bool AppState::load_file(const std::string& file_path) {
         has_unsaved_changes = false;
         loaded_case = std::move(*projected);
         ++case_revision;
-        status_message = "Loaded: " + loaded_case->name + " (" +
-                         std::to_string(loaded_case->elements.size()) + " elements)" + load_note;
 
-        // Also populate the SACM domain model for save support
+        // Also populate the SACM domain model for save support. `load_note` (the
+        // legacy-parser-fallback warning) is appended to every branch, or a
+        // library load gap would go silent whenever sacm::parse_sacm succeeds.
+        const std::string summary =
+            "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
         sacm_package.reset();
         if (auto sacm_result = sacm::parse_sacm(file_path)) {
             sacm_package = std::move(*sacm_result);
             HideTerminologyArtifactReferences(loaded_case.value(), sacm_package.value());
             RefreshVisibleTerminologyContextDisplay(loaded_case.value(), sacm_package.value());
-            status_message =
-                "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
+            status_message = summary + load_note;
         } else {
-            status_message =
-                "Loaded with warning: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size())
-                + " elements), but save support is unavailable (SACM parse failed: " + std::string(sacm_result.error())
-                + ")";
+            status_message = "Loaded with warning: " + loaded_case->name + " (" +
+                             std::to_string(loaded_case->elements.size()) +
+                             " elements), but save support is unavailable (SACM parse failed: " +
+                             std::string(sacm_result.error()) + ")" + load_note;
         }
 
         return true;
