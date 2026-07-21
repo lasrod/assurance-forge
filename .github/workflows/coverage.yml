@@ -1,11 +1,21 @@
 name: Coverage
 
+# Coverage is an informational report with no threshold gate, so it does not
+# need to run on every PR commit — that was ~18 minutes in the PR feedback loop
+# for a report nothing blocks on. It runs after merge (push to main), on a
+# weekly cadence to catch slow drift, and on demand.
 on:
   push:
     branches:
       - main
-  pull_request:
+  schedule:
+    # Mondays 06:00 UTC.
+    - cron: '0 6 * * 1'
   workflow_dispatch:
+
+concurrency:
+  group: coverage-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   coverage:
