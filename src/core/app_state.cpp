@@ -8,11 +8,15 @@
 #include "parser/model_utils.h"
 #include "sacm/sacm_parser.h"
 #include "sacm/sacm_serializer.h"
+#include "sacm_adapter/case_projection.h"
+#include "sacm_adapter/library_load.h"
 
 #include <algorithm>
 #include <exception>
+#include <expected>
 #include <new>
 #include <unordered_map>
+#include <utility>
 #include <unordered_set>
 
 namespace core {
@@ -153,25 +157,40 @@ void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model, const
 
 bool AppState::load_file(const std::string& file_path) {
     try {
-        auto result = parser::parse_sacm_xml(file_path);
-
-        if (!result) {
-            loaded_file_path.clear();
-            has_unsaved_changes = false;
-            loaded_case.reset();
-            sacm_package.reset();
-            status_message = "Error: " + std::move(result.error());
-            return false;
+        // The SACM library is the load source of truth (Phase 9 Stage 4): the
+        // projected POD model is what the UI renders. If the library cannot load
+        // the file we fall back to the legacy parser so opening never breaks on
+        // a library gap -- and say so, so the gap is visible rather than silent.
+        library_document.reset();
+        sacm_adapter::LoadOutcome outcome = sacm_adapter::load_document(file_path);
+        std::optional<parser::AssuranceCase> projected;
+        std::string load_note;
+        if (outcome.ok && outcome.document != nullptr) {
+            library_document = std::move(outcome.document);
+            projected = sacm_adapter::project_case(*library_document);
+        } else {
+            std::expected<parser::AssuranceCase, std::string> legacy =
+                parser::parse_sacm_xml(file_path);
+            if (!legacy) {
+                loaded_file_path.clear();
+                has_unsaved_changes = false;
+                loaded_case.reset();
+                sacm_package.reset();
+                status_message = "Error: " + std::move(legacy.error());
+                return false;
+            }
+            projected = std::move(*legacy);
+            load_note = " (loaded via legacy parser; the SACM library could not read this file)";
         }
 
         active_project_file_role = ProjectFileRole::Unknown;
         active_project_file_path.clear();
         loaded_file_path = std::filesystem::path(file_path);
         has_unsaved_changes = false;
-        loaded_case = std::move(*result);
+        loaded_case = std::move(*projected);
         ++case_revision;
-        status_message =
-            "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
+        status_message = "Loaded: " + loaded_case->name + " (" +
+                         std::to_string(loaded_case->elements.size()) + " elements)" + load_note;
 
         // Also populate the SACM domain model for save support
         sacm_package.reset();
@@ -194,6 +213,7 @@ bool AppState::load_file(const std::string& file_path) {
         has_unsaved_changes = false;
         loaded_case.reset();
         sacm_package.reset();
+        library_document.reset();
         ++case_revision;
         status_message = "Error: ran out of memory while loading this file. It may be too large to open.";
         return false;
@@ -202,6 +222,7 @@ bool AppState::load_file(const std::string& file_path) {
         has_unsaved_changes = false;
         loaded_case.reset();
         sacm_package.reset();
+        library_document.reset();
         ++case_revision;
         status_message = std::string("Error: failed to load this file (") + error.what() + ").";
         return false;
@@ -392,6 +413,10 @@ bool AppState::open_project_file(const ProjectFileEntry& entry) {
     const bool previous_has_unsaved_changes = has_unsaved_changes;
     const auto previous_loaded_case = loaded_case;
     const auto previous_sacm_package = sacm_package;
+    // The library document is move-only, so it is moved out and restored on
+    // failure rather than copied.
+    std::unique_ptr<sacm_adapter::LibraryDocument> previous_library_document =
+        std::move(library_document);
 
     if (!load_file(project_file_path.string())) {
         active_project_file_role = previous_active_project_file_role;
@@ -400,6 +425,7 @@ bool AppState::open_project_file(const ProjectFileEntry& entry) {
         has_unsaved_changes = previous_has_unsaved_changes;
         loaded_case = previous_loaded_case;
         sacm_package = previous_sacm_package;
+        library_document = std::move(previous_library_document);
         ++case_revision;
         return false;
     }

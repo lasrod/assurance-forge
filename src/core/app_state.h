@@ -3,9 +3,11 @@
 #include "core/project_model.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_model.h"
+#include "sacm_adapter/library_load.h"
 
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <string>
 
@@ -16,8 +18,14 @@ struct AppState {
     // Currently loaded assurance case (if any)
     std::optional<parser::AssuranceCase> loaded_case;
 
-    // SACM domain model (populated on load, used for save)
+    // SACM domain model (populated on load, still used for save, editing and
+    // terminology display until later Phase 9 stages retire it).
     std::optional<sacm::AssuranceCasePackage> sacm_package;
+
+    // The library-owned SACM document. As of Phase 9 Stage 4 this is the load
+    // source of truth: `loaded_case` is projected from it. Null when the file
+    // was loaded through the legacy parser fallback (a library load gap).
+    std::unique_ptr<sacm_adapter::LibraryDocument> library_document;
 
     // Currently open Assurance Forge project (if any)
     std::optional<AssuranceProject> current_project;
