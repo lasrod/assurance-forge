@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cctype>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace sacm_adapter {
@@ -256,6 +257,21 @@ const sacm::model::AssuranceCasePackage* root_package(const LibraryDocument& doc
     return source.roots().empty() ? nullptr : source.roots().front().get();
 }
 
+void collect_argument_package_shells(const sacm::model::AssuranceCasePackage& case_package,
+                                     std::vector<ArgumentPackageShell>& out) {
+    for (const auto& argument_package : case_package.argument_packages()) {
+        ArgumentPackageShell shell;
+        copy_common_legacy_fields(shell.identity, *argument_package);
+        for (const auto& element : argument_package->argument_elements()) {
+            shell.element_ids.push_back(element->id().value());
+        }
+        out.push_back(std::move(shell));
+    }
+    for (const auto& nested : case_package.assurance_case_packages()) {
+        collect_argument_package_shells(*nested, out);
+    }
+}
+
 } // namespace
 
 std::vector<sacm::TerminologyPackage> project_terminology_packages(const LibraryDocument& document) {
@@ -301,6 +317,85 @@ std::vector<sacm::TerminologyPackage> project_terminology_packages(const Library
     return result;
 }
 
+namespace {
+
+// Indexes every legacy element in the package by id so a library element's tags
+// can be attached to its counterpart in one pass.
+void index_by_id(sacm::SacmElement& element,
+                 std::unordered_map<std::string, sacm::SacmElement*>& by_id) {
+    if (!element.id.empty()) {
+        by_id[element.id] = &element;
+    }
+}
+
+void index_terminology_package(sacm::TerminologyPackage& tp,
+                               std::unordered_map<std::string, sacm::SacmElement*>& by_id) {
+    index_by_id(tp, by_id);
+    for (sacm::Category& c : tp.categories) index_by_id(c, by_id);
+    for (sacm::Expression& e : tp.expressions) index_by_id(e, by_id);
+    for (sacm::Term& t : tp.terms) index_by_id(t, by_id);
+}
+
+} // namespace
+
+void copy_library_tags_onto_package(const LibraryDocument& document,
+                                    sacm::AssuranceCasePackage& package) {
+    std::unordered_map<std::string, sacm::SacmElement*> by_id;
+    // ArtifactReference is indexed separately (by concrete type) so the
+    // referencedArtifact the POD drops can be restored -- terminology detection
+    // relies on it.
+    std::unordered_map<std::string, sacm::ArtifactReference*> artifact_refs_by_id;
+    index_by_id(package, by_id);
+    for (sacm::TerminologyPackage& tp : package.terminologyPackages) index_terminology_package(tp, by_id);
+    for (sacm::ArtifactPackage& ap : package.artifactPackages) {
+        index_by_id(ap, by_id);
+        for (sacm::Artifact& a : ap.artifacts) index_by_id(a, by_id);
+    }
+    for (sacm::ArgumentPackage& ap : package.argumentPackages) {
+        index_by_id(ap, by_id);
+        for (sacm::Claim& c : ap.claims) index_by_id(c, by_id);
+        for (sacm::ArgumentReasoning& r : ap.argumentReasonings) index_by_id(r, by_id);
+        for (sacm::ArtifactReference& r : ap.artifactReferences) {
+            index_by_id(r, by_id);
+            if (!r.id.empty()) artifact_refs_by_id[r.id] = &r;
+        }
+        for (sacm::AssertedInference& r : ap.assertedInferences) index_by_id(r, by_id);
+        for (sacm::AssertedContext& r : ap.assertedContexts) index_by_id(r, by_id);
+        for (sacm::AssertedEvidence& r : ap.assertedEvidences) index_by_id(r, by_id);
+        for (sacm::TerminologyPackage& tp : ap.terminologyPackages) index_terminology_package(tp, by_id);
+    }
+
+    const sacm::model::Document& source = LibraryDocumentAccess::document(document);
+    source.for_each_element([&](const sacm::model::SACMElement& element) {
+        const std::string id = element.id().value();
+        // Restore referencedArtifact on artifact references (dropped by the POD).
+        if (const auto* library_ref =
+                dynamic_cast<const sacm::model::ArtifactReference*>(&element)) {
+            const auto it = artifact_refs_by_id.find(id);
+            if (it != artifact_refs_by_id.end() && !library_ref->referenced_artifact_elements().empty()) {
+                it->second->referencedArtifact =
+                    library_ref->referenced_artifact_elements().front().value();
+            }
+        }
+        // Restore vendor TaggedValues (ACP, confidence-package, GSN-role).
+        const auto* model_element = dynamic_cast<const sacm::model::ModelElement*>(&element);
+        if (model_element == nullptr || model_element->tagged_values().empty()) {
+            return;
+        }
+        const auto it = by_id.find(id);
+        if (it == by_id.end()) {
+            return;
+        }
+        for (const auto& tag : model_element->tagged_values()) {
+            it->second->taggedValues.push_back(sacm::TaggedValue{
+                .id = tag->id().value(),
+                .key = std::string(tag->key().primary()),
+                .value = std::string(tag->content().primary()),
+            });
+        }
+    });
+}
+
 std::vector<sacm::ArtifactPackage> project_artifact_packages(const LibraryDocument& document) {
     std::vector<sacm::ArtifactPackage> result;
     const sacm::model::AssuranceCasePackage* root = root_package(document);
@@ -320,6 +415,15 @@ std::vector<sacm::ArtifactPackage> project_artifact_packages(const LibraryDocume
             }
         }
         result.push_back(std::move(projected));
+    }
+    return result;
+}
+
+std::vector<ArgumentPackageShell> project_argument_package_shells(const LibraryDocument& document) {
+    std::vector<ArgumentPackageShell> result;
+    const sacm::model::AssuranceCasePackage* root = root_package(document);
+    if (root != nullptr) {
+        collect_argument_package_shells(*root, result);
     }
     return result;
 }

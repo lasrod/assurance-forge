@@ -32,6 +32,20 @@ namespace core {
 
 sacm::AssuranceCasePackage project_library_package(const sacm_adapter::LibraryDocument& document);
 
+// The faithful projection the application derives `sacm_package` from at load.
+// A library-XMI file cannot be read into a complete package by the legacy parser
+// (it reads as near-empty), so the app must reconstruct the package from the
+// library instead. Unlike the audit projection (project_library_package) -- which
+// may collapse multiple argument packages as long as it does so consistently on
+// both audit sides -- this preserves the argument-package structure (one
+// sacm::ArgumentPackage per library package, with identity and purpose tags) and
+// carries the fields the POD drops: vendor TaggedValues (ACP, confidence-package,
+// GSN-role) and each artifact reference's referencedArtifact (terminology
+// detection). Kept separate from the audit projection so the audit canonical
+// hash is unchanged.
+sacm::AssuranceCasePackage project_library_package_with_tags(
+    const sacm_adapter::LibraryDocument& document);
+
 // Phase 9 Stage 6: the canonical model hash computed by loading the model
 // through the library and projecting it back to a package before hashing. Every
 // audit canonical-hash site routes through this so all sides -- the manifest

@@ -35,4 +35,30 @@ core::AssuranceCase project_case(const LibraryDocument& document);
 std::vector<sacm::TerminologyPackage> project_terminology_packages(const LibraryDocument& document);
 std::vector<sacm::ArtifactPackage> project_artifact_packages(const LibraryDocument& document);
 
+// Copies each library element's vendor TaggedValues onto the matching (by id)
+// element of `package`, and restores each artifact reference's referencedArtifact
+// (also dropped by the POD). The POD projection that builds `package` drops both,
+// but the application stores ACP, confidence-package, and GSN-role data as tags
+// on the legacy package and detects terminology via referencedArtifact, so a
+// library-derived `sacm_package` must carry them or those features break after
+// loading a library-XMI file (which the legacy parser reads as near-empty).
+// Additive: existing tags on `package` are kept.
+void copy_library_tags_onto_package(const LibraryDocument& document,
+                                    sacm::AssuranceCasePackage& package);
+
+// The per-argument-package grouping the faithful `sacm_package` projection needs.
+// `project_case` flattens every package into one element list, which would
+// collapse multiple argument packages -- ACP confidence arguments each live in
+// their own package (see core::acp::IsConfidenceArgumentPackage) -- into a single
+// unnamed package on load, losing the package identity and its purpose tag. Each
+// shell carries a package's identity (id/gid/name/description, empty element
+// lists) plus the ids of its argument elements in document order, so the caller
+// can rebuild one sacm::ArgumentPackage per library package. Recurses into nested
+// assurance case packages.
+struct ArgumentPackageShell {
+    sacm::ArgumentPackage identity;
+    std::vector<std::string> element_ids;
+};
+std::vector<ArgumentPackageShell> project_argument_package_shells(const LibraryDocument& document);
+
 } // namespace sacm_adapter
