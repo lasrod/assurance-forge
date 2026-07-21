@@ -105,6 +105,28 @@ because reporting them would be noise:
 Excluding these took the count from roughly 400 to 98, and the remainder are all
 substantive.
 
+## Stage 4 slice 1: full-field comparison
+
+Stage 3 compared 7 fields; Stage 4 needs the projection proven equivalent across
+*every* POD field before rendering depends on it, so `diff_cases` now compares
+content, gid, assertion_declaration, reasoning_ref, meta_claim_refs, and the
+name/description/content language maps too.
+
+Closing the obvious gaps took the full-field count from ~2,500 to **419**:
+
+- Language-map `"en"` defaulting (the legacy parser keys an untagged language as
+  `en`) cleared ~800 `name_langs` and most `description_langs` differences.
+- `assertion_declaration` is normalized empty-≡-`asserted` (the library makes the
+  clause-11.10 default explicit; same meaning), clearing ~394.
+- Term/Expression `value` now populates `content`.
+
+The remaining 419 are two groups:
+
+| Group | Count | Meaning |
+|---|---:|---|
+| **content / content_langs** | 376 | The goal *statement*. AF stores it in a `content=` attribute (a two-field model: content=statement, description=note); SACM stores the statement in the Description. **Decided: adopt the SACM model (statement = Description).** Implementing it needs the library reader to separate statement from note, so the statement's Description is primary — the next slice. Until then the projection does not surface it. |
+| undeveloped / description(+langs) | 43 | The library is more correct than the legacy parser (needsSupport→undeveloped; descriptions legacy misses). Accepted; clear on migration. |
+
 ## What Stage 4 needs
 
 The terminology-expression fix (#201) closed the only projection *bug*. The
