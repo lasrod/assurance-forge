@@ -89,6 +89,7 @@ struct ChildShape {
     bool targets_parent = false;
     bool source_is_new_element = false;
     bool reasoning_is_new_element = false;
+    bool is_counter = false;
     friend bool operator==(const ChildShape&, const ChildShape&) = default;
 };
 
@@ -113,6 +114,7 @@ ChildShape describe_child(const core::AssuranceCase& assurance_case, const std::
     shape.source_is_new_element =
         (relationship->source_refs == std::vector<std::string>{element_id});
     shape.reasoning_is_new_element = (relationship->reasoning_ref == element_id);
+    shape.is_counter = relationship->is_counter;
     return shape;
 }
 
@@ -258,6 +260,72 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildReproducesLegacyStructure) {
             describe_child(legacy, "G1", legacy_element_id, legacy_relationship_id);
 
         // Both match the expected structure, and each other.
+        EXPECT_EQ(library_shape, scenario.expected);
+        EXPECT_EQ(legacy_shape, scenario.expected);
+        EXPECT_EQ(library_shape, legacy_shape);
+    }
+}
+
+// SACM23-INT-001, edit slice: a dialectic challenge through the library
+// (create counter element + create isCounter relationship) must produce the
+// same structure the legacy AddChallenge does -- counter element kind, counter
+// relationship kind, isCounter, and a source at the counter element / target at
+// the challenged element. Covers both source types and a challenge whose target
+// is itself a relationship (challenging an inference).
+TEST(SacmLibraryEdit, SACM23_INT_001_ChallengeReproducesLegacyStructure) {
+    struct Scenario {
+        std::string target_id;
+        core::ArgumentTarget::Kind target_kind;
+        sacm_adapter::ChallengeSource library_source;
+        core::ChallengeSourceType legacy_source;
+        ChildShape expected;  // targets_parent means "targets the challenged id"
+    };
+    const std::vector<Scenario> scenarios = {
+        {"G1", core::ArgumentTarget::Kind::Element, sacm_adapter::ChallengeSource::CounterArgument,
+         core::ChallengeSourceType::CounterArgument,
+         {"claim", "asserted", "assertedinference", true, true, false, true}},
+        {"G1", core::ArgumentTarget::Kind::Element, sacm_adapter::ChallengeSource::CounterEvidence,
+         core::ChallengeSourceType::CounterEvidence,
+         {"artifactreference", "asserted", "assertedevidence", true, true, false, true}},
+        {"R1", core::ArgumentTarget::Kind::Relationship,
+         sacm_adapter::ChallengeSource::CounterArgument, core::ChallengeSourceType::CounterArgument,
+         {"claim", "asserted", "assertedinference", true, true, false, true}},
+    };
+
+    for (const Scenario& scenario : scenarios) {
+        SCOPED_TRACE(scenario.target_id + " <- " + scenario.expected.relationship_type);
+
+        // Library path.
+        sacm_adapter::LoadOutcome loaded = load_fixture();
+        ASSERT_NE(loaded.document, nullptr);
+        const sacm_adapter::AddChildOutcome added =
+            sacm_adapter::apply_challenge(*loaded.document, scenario.target_id,
+                                          scenario.library_source);
+        ASSERT_TRUE(added.supported);
+        ASSERT_TRUE(added.applied)
+            << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+        const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+        const ChildShape library_shape =
+            describe_child(after, scenario.target_id, added.new_element_id,
+                           added.new_relationship_id);
+
+        // Legacy path.
+        const auto legacy_case = parser::parse_sacm_xml(fixture_path().string());
+        ASSERT_TRUE(legacy_case.has_value()) << legacy_case.error();
+        const auto legacy_package = sacm::parse_sacm(fixture_path().string());
+        ASSERT_TRUE(legacy_package.has_value()) << legacy_package.error();
+        core::AssuranceCase legacy = *legacy_case;
+        sacm::AssuranceCasePackage package = *legacy_package;
+        const core::ArgumentTarget target{.kind = scenario.target_kind, .id = scenario.target_id};
+        std::string legacy_element_id;
+        std::string legacy_relationship_id;
+        std::string error;
+        ASSERT_TRUE(core::AddChallenge(legacy, &package, target, scenario.legacy_source,
+                                       legacy_element_id, legacy_relationship_id, error))
+            << error;
+        const ChildShape legacy_shape =
+            describe_child(legacy, scenario.target_id, legacy_element_id, legacy_relationship_id);
+
         EXPECT_EQ(library_shape, scenario.expected);
         EXPECT_EQ(legacy_shape, scenario.expected);
         EXPECT_EQ(library_shape, legacy_shape);

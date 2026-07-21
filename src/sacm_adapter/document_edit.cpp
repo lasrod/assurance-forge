@@ -261,4 +261,57 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
     return outcome;
 }
 
+AddChildOutcome apply_challenge(LibraryDocument& document, const std::string& target_id,
+                                ChallengeSource source) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId target(target_id);
+
+    // The counter element joins the target's owning ArgumentPackage. Unlike the
+    // legacy helper, which cannot index a relationship, the library gives every
+    // contained element (relationships included) a parent, so this resolves
+    // uniformly whether the target is an element or a relationship.
+    const sacm::model::ArgumentPackage* package = owning_argument_package(doc.find(target));
+    if (package == nullptr) {
+        return unsupported_child();
+    }
+    const sacm::model::ElementId package_id = package->id();
+
+    sacm::commands::Operation create_counter;
+    sacm::metadata::ElementKind relationship_kind = sacm::metadata::ElementKind::AssertedInference;
+    switch (source) {
+    case ChallengeSource::CounterArgument:
+        create_counter = sacm::commands::CreateClaim{.parent = package_id};
+        relationship_kind = sacm::metadata::ElementKind::AssertedInference;
+        break;
+    case ChallengeSource::CounterEvidence:
+        create_counter = sacm::commands::CreateArtifactReference{.parent = package_id};
+        relationship_kind = sacm::metadata::ElementKind::AssertedEvidence;
+        break;
+    }
+
+    const sacm::commands::MutationResult created = doc.apply(create_counter);
+    if (!created.applied || created.created_ids().empty()) {
+        return failed_child(created);
+    }
+    const sacm::model::ElementId counter_id = created.created_ids().front();
+
+    const sacm::commands::MutationResult linked = doc.apply(sacm::commands::CreateAssertedRelationship{
+        .parent = package_id,
+        .kind = relationship_kind,
+        .sources = {counter_id},
+        .targets = {target},
+        .is_counter = true,
+    });
+    if (!linked.applied || linked.created_ids().empty()) {
+        return failed_child(linked);
+    }
+
+    AddChildOutcome outcome;
+    outcome.supported = true;
+    outcome.applied = true;
+    outcome.new_element_id = counter_id.value();
+    outcome.new_relationship_id = linked.created_ids().front().value();
+    return outcome;
+}
+
 } // namespace sacm_adapter

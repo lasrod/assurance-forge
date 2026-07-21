@@ -109,4 +109,20 @@ struct AddChildOutcome {
 AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& parent_id,
                                 ChildKind kind);
 
+// The source of a dialectic challenge, mirroring core::ChallengeSourceType.
+enum class ChallengeSource {
+    CounterArgument, // Claim             <- AssertedInference (isCounter)
+    CounterEvidence, // ArtifactReference <- AssertedEvidence   (isCounter)
+};
+
+// Adds a dialectic challenge against `target_id`, mirroring
+// `core::AddChallenge`: creates a counter element in the target's owning
+// ArgumentPackage and a counter relationship (`isCounter = true`) whose source
+// is the counter element and whose target is the challenged element. The target
+// may itself be a relationship (challenging an inference) -- SACM allows it
+// because an AssertedRelationship is a SACMElement. Reuses AddChildOutcome: the
+// result is likewise a new element plus a new relationship.
+AddChildOutcome apply_challenge(LibraryDocument& document, const std::string& target_id,
+                                ChallengeSource source);
+
 } // namespace sacm_adapter
