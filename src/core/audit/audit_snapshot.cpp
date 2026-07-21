@@ -3,6 +3,7 @@
 #include "core/audit/audit_manifest.h"
 #include "core/audit/audit_paths.h"
 #include "core/audit/canonical_model_hash.h"
+#include "core/library_package_projection.h"
 #include "core/project_file_io.h"
 #include "core/sha256.h"
 #include "core/time_utils.h"
@@ -141,9 +142,9 @@ bool CreateInitialSnapshot(const std::filesystem::path& project_root,
     const std::string raw_hash = Sha256::HexDigest(*bytes);
 
     std::string canonical_hash;
-    auto parsed = sacm::parse_sacm(source_sacm_absolute_path.string());
-    if (parsed) {
-        canonical_hash = CanonicalModelHash(*parsed);
+    auto library_hash = core::library_canonical_hash_from_file(source_sacm_absolute_path);
+    if (library_hash) {
+        canonical_hash = *library_hash;
     } else {
         // If we cannot parse, the snapshot still serves as a byte-faithful
         // backup; record only the raw hash and let the caller surface a
@@ -229,11 +230,8 @@ bool CreateUserSnapshot(const std::filesystem::path& project_root,
     const std::string raw_hash = Sha256::HexDigest(*bytes);
 
     std::string canonical_hash;
-    auto parsed = sacm::parse_sacm(sacm_path.string());
-    if (parsed) {
-        canonical_hash = CanonicalModelHash(*parsed);
-    } else {
-        canonical_hash.clear();
+    if (auto library_hash = core::library_canonical_hash_from_file(sacm_path)) {
+        canonical_hash = *library_hash;
     }
 
     SnapshotMetadata metadata;

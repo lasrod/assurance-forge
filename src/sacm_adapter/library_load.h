@@ -69,4 +69,18 @@ LoadOutcome load_document(const std::filesystem::path& path);
 // replaced -- so existing handles stay valid.
 bool reload_document(LibraryDocument& document, std::string_view xml);
 
+// Result of serializing a library document to SACM XMI.
+struct SaveOutcome {
+    bool ok = false;
+    std::string xml;
+    std::vector<LoadDiagnostic> diagnostics;
+};
+
+// Serializes `document` to SACM XMI. Phase 9 Stage 6 (library-backed save) uses
+// tolerant mode so preserved vendor/compatibility content (e.g. layout carried
+// on import) survives -- round-trip integrity is a hard project constraint.
+// Strict mode is the clean SACM 2.3 export and refuses such content
+// (SACM-XMI-006); use it only for an explicit "export strict" action.
+SaveOutcome save_document(const LibraryDocument& document, bool tolerant = true);
+
 } // namespace sacm_adapter

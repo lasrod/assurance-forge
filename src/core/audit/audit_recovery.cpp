@@ -5,6 +5,7 @@
 #include "core/audit/canonical_model_hash.h"
 #include "core/audit/event_replayer.h"
 #include "core/audit/event_store.h"
+#include "core/library_package_projection.h"
 #include "core/project_file_io.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_parser.h"
@@ -86,20 +87,26 @@ bool RestoreSacmFromAudit(const AssuranceProject& project,
     const std::filesystem::path sacm_abs = project.rootPath / sacm_relative_path;
     std::string pre_restore_canonical;
     if (std::filesystem::exists(sacm_abs)) {
-        if (auto pkg = sacm::parse_sacm(sacm_abs.string()); pkg)
-            pre_restore_canonical = CanonicalModelHash(*pkg);
+        if (auto library_hash = core::library_canonical_hash_from_file(sacm_abs))
+            pre_restore_canonical = *library_hash;
     }
 
     // Serialize the replayed package and write it atomically. The
     // canonical hash is taken from a reparse of the serialized bytes for
-    // round-trip stability (mirrors VerifyProject).
-    const std::string xml = sacm::serialize_sacm(replayed->package);
-    auto reparsed = sacm::parse_sacm_string(xml);
-    if (!reparsed) {
-        error = "Failed to reparse restored SACM for hashing: " + reparsed.error();
+    // round-trip stability (mirrors VerifyProject). Phase 9 Stage 6: write
+    // library SACM XMI so the restored file matches the live save format. The
+    // legacy fallback keeps recovery robust if the library round-trip fails --
+    // the restored file is then legacy XML, which the audit still reads through
+    // the library and verifies consistently; the format difference is benign.
+    // (Recovery replays legacy events, so there is no unknown content to lose.)
+    std::optional<std::string> library_xml = core::library_xmi_from_package(replayed->package);
+    const std::string xml = library_xml.value_or(sacm::serialize_sacm(replayed->package));
+    auto library_hash = core::library_canonical_hash_from_xml(xml);
+    if (!library_hash) {
+        error = "Failed to load restored SACM through the library for hashing";
         return false;
     }
-    const std::string restored_canonical = CanonicalModelHash(*reparsed);
+    const std::string restored_canonical = *library_hash;
     const std::string restored_raw = Sha256::HexDigest(xml);
 
     auto write = WriteTextFileAtomic(sacm_abs, xml);

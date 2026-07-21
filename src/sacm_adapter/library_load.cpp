@@ -61,4 +61,24 @@ bool reload_document(LibraryDocument& document, std::string_view xml) {
     return true;
 }
 
+SaveOutcome save_document(const LibraryDocument& document, bool tolerant) {
+    sacm::io::SaveOptions options;
+    options.mode = tolerant ? sacm::io::Mode::Tolerant : sacm::io::Mode::Strict;
+    sacm::io::SaveResult result =
+        sacm::io::save_xmi_string(LibraryDocumentAccess::document(document), options);
+
+    SaveOutcome outcome;
+    outcome.ok = result.ok;
+    outcome.xml = std::move(result.xml);
+    outcome.diagnostics.reserve(result.diagnostics.size());
+    for (const sacm::validation::Diagnostic& diagnostic : result.diagnostics) {
+        outcome.diagnostics.push_back(LoadDiagnostic{
+            .code = diagnostic.code,
+            .severity = std::string(sacm::validation::severity_name(diagnostic.severity)),
+            .message = diagnostic.message,
+        });
+    }
+    return outcome;
+}
+
 } // namespace sacm_adapter

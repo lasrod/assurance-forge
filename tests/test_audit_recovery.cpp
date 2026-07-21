@@ -3,6 +3,8 @@
 #include "core/audit/audit_recovery.h"
 #include "core/audit/audit_store.h"
 #include "core/audit/canonical_model_hash.h"
+#include "core/library_package_projection.h"
+#include "sacm_adapter/library_load.h"
 #include "core/audit/event_store.h"
 #include "core/audit/replay_verifier.h"
 #include "core/commands/command_bus.h"
@@ -88,10 +90,11 @@ TEST(AuditRecovery, RestoreSacmFromAuditRewritesDivergedFile) {
     core::audit::RestoreSacmFromAuditResult result;
     ASSERT_TRUE(core::audit::RestoreSacmFromAudit(project, sacm_rel, "alice", result, err)) << err;
 
-    // After restore the file should round-trip to the snapshot canonical hash.
-    auto restored_pkg = sacm::parse_sacm((root / sacm_rel).string());
-    ASSERT_TRUE(restored_pkg) << restored_pkg.error();
-    EXPECT_EQ(core::audit::CanonicalModelHash(*restored_pkg), result.restored_canonical_hash);
+    // After restore the file should round-trip to the snapshot canonical hash
+    // via the same library derivation the audit uses (Phase 9 Stage 6).
+    auto restored_hash = core::library_canonical_hash_from_file(root / sacm_rel);
+    ASSERT_TRUE(restored_hash.has_value());
+    EXPECT_EQ(*restored_hash, result.restored_canonical_hash);
     EXPECT_FALSE(result.pre_restore_on_disk_canonical_hash.empty());
     EXPECT_NE(result.pre_restore_on_disk_canonical_hash, result.restored_canonical_hash);
     EXPECT_GT(result.transaction_sequence, 0u);
@@ -165,11 +168,14 @@ TEST(AuditRecovery, RestoreSacmFromAuditPreservesPriorTransactionsOnReplay) {
 
     // The restored on-disk SACM must reflect the audited edit, not the
     // tampered text and not the original snapshot.
-    auto restored = sacm::parse_sacm((root / sacm_rel).string());
-    ASSERT_TRUE(restored) << restored.error();
-    // Walk into the package to find G1 description.
+    // Phase 9 Stage 6: the restored file is library XMI, so read it back through
+    // the library and project it to walk the package.
+    auto restored_loaded = sacm_adapter::load_document(root / sacm_rel);
+    ASSERT_TRUE(restored_loaded.ok);
+    ASSERT_NE(restored_loaded.document, nullptr);
+    const sacm::AssuranceCasePackage restored = core::project_library_package(*restored_loaded.document);
     bool found = false;
-    for (const auto& ap : restored->argumentPackages) {
+    for (const auto& ap : restored.argumentPackages) {
         for (const auto& claim : ap.claims) {
             if (claim.id == "G1") {
                 EXPECT_EQ(claim.description, "Audited edit.");

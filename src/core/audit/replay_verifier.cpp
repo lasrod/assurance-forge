@@ -5,6 +5,7 @@
 #include "core/audit/canonical_model_hash.h"
 #include "core/audit/event_replayer.h"
 #include "core/audit/event_store.h"
+#include "core/library_package_projection.h"
 #include "core/project_file_io.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_parser.h"
@@ -100,7 +101,8 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
             return result;
         }
     }
-    result.snapshot_canonical_hash = CanonicalModelHash(snapshot_package);
+    result.snapshot_canonical_hash =
+        core::library_canonical_hash(snapshot_package).value_or(CanonicalModelHash(snapshot_package));
 
     std::unique_ptr<EventStore> store;
     {
@@ -124,37 +126,34 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
         result.diagnostics.emplace_back("Replay failed: " + replayed.error());
         return result;
     }
-    // CanonicalModelHash is currently not invariant under serialize/reparse
-    // (some transient parser-side fields are dropped on round-trip). To make
-    // verifier comparisons meaningful against the on-disk SACM and against
-    // the manifest hash (which itself reflects an in-memory mutation
-    // post-write), we normalize the replayed package by serializing it and
-    // re-parsing. The resulting hash is what a user would get after closing
-    // and reopening the project.
+    // Phase 9 Stage 6: normalize the replayed package by hashing it through the
+    // library, the same derivation the on-disk read and the manifest cache use,
+    // so all three converge regardless of the projection-vs-legacy baseline.
+    // (CanonicalModelHash is not invariant under a plain serialize/reparse, so
+    // both sides must go through the identical library projection.)
     {
-        const std::string xml = sacm::serialize_sacm(replayed->package);
-        auto reparsed = sacm::parse_sacm_string(xml);
-        if (!reparsed) {
+        auto library_hash = core::library_canonical_hash(replayed->package);
+        if (!library_hash) {
             result.success = false;
             result.ran = true;
             result.cause = DivergenceCause::ReplayFailed;
-            result.diagnostics.emplace_back("Failed to reparse replayed SACM for normalization: " +
-                                            reparsed.error());
+            result.diagnostics.emplace_back(
+                "Failed to load replayed SACM through the library for normalization");
             return result;
         }
-        result.replayed_canonical_hash = CanonicalModelHash(*reparsed);
+        result.replayed_canonical_hash = *library_hash;
     }
 
     // Compare against the materialized SACM on disk, if available.
     const std::filesystem::path on_disk_sacm = project.rootPath / manifest.current_sacm;
     bool on_disk_present = std::filesystem::exists(on_disk_sacm);
     if (on_disk_present) {
-        auto disk_pkg = sacm::parse_sacm(on_disk_sacm.string());
-        if (!disk_pkg) {
-            result.diagnostics.emplace_back("Failed to parse on-disk SACM for comparison: " +
-                                            disk_pkg.error());
+        auto disk_hash = core::library_canonical_hash_from_file(on_disk_sacm);
+        if (!disk_hash) {
+            result.diagnostics.emplace_back(
+                "Failed to load on-disk SACM through the library for comparison");
         } else {
-            result.on_disk_canonical_hash = CanonicalModelHash(*disk_pkg);
+            result.on_disk_canonical_hash = *disk_hash;
         }
     }
 
