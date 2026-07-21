@@ -198,7 +198,19 @@ bool AppState::load_file(const std::string& file_path) {
         const std::string summary =
             "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
         sacm_package.reset();
-        if (auto sacm_result = sacm::parse_sacm(file_path)) {
+        if (library_document != nullptr) {
+            // The library is the load source of truth, so derive the legacy
+            // package from it rather than re-parsing the file. This is required
+            // for correctness since Phase 9 Stage 6: saved files are library XMI,
+            // which `sacm::parse_sacm` reads as a near-empty package -- breaking
+            // terminology display, ACP, and (on re-save) losing data. The
+            // tag-carrying projection preserves ACP/confidence/GSN-role tags.
+            sacm_package = core::project_library_package_with_tags(*library_document);
+            HideTerminologyArtifactReferences(loaded_case.value(), sacm_package.value());
+            RefreshVisibleTerminologyContextDisplay(loaded_case.value(), sacm_package.value());
+            status_message = summary + load_note;
+        } else if (auto sacm_result = sacm::parse_sacm(file_path)) {
+            // Legacy-parser fallback path (the library could not read the file).
             sacm_package = std::move(*sacm_result);
             HideTerminologyArtifactReferences(loaded_case.value(), sacm_package.value());
             RefreshVisibleTerminologyContextDisplay(loaded_case.value(), sacm_package.value());

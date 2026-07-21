@@ -1,6 +1,8 @@
 #include "core/app_state.h"
 #include "core/assurance_tree.h"
 #include "core/terminology_package_service.h"
+#include "core/acp/assurance_claim_point.h"
+#include "sacm_adapter/library_load.h"
 
 #include <chrono>
 #include <filesystem>
@@ -326,4 +328,103 @@ TEST(AppStateTest, LoadFileKeepsBrokenVisibleTerminologyContextRepairable) {
     ASSERT_NE(tree.root, nullptr);
     ASSERT_EQ(tree.root->group2_attachments.size(), 1u);
     EXPECT_EQ(tree.root->group2_attachments.front()->id, "TERM_BROKEN");
+}
+
+// Regression (Phase 9 Stage 6, #208): saved files are library XMI, which the
+// legacy sacm::parse_sacm reads as a near-empty package. Deriving sacm_package
+// from the library instead must reconstruct it fully -- including vendor tags
+// (ACP) -- or terminology display, ACP, and re-save (data loss) break.
+TEST(AppStateTest, LoadFileFromLibraryXmiPopulatesSacmPackageWithTags) {
+    TempDir temp(MakeTempDir());
+
+    // Save fixture_acp_parity as library XMI (the format Stage 6 writes).
+    const std::filesystem::path src =
+        std::filesystem::path(AF_REPO_ROOT) / "tests" / "data" / "fixture_acp_parity.sacm.xml";
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(src);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::SaveOutcome saved = sacm_adapter::save_document(*loaded.document);
+    ASSERT_TRUE(saved.ok);
+    const std::filesystem::path xmi = temp.path / "reloaded.sacm";
+    {
+        std::ofstream out(xmi, std::ios::binary);
+        out << saved.xml;
+    }
+
+    // Reload it through the application's load path.
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(xmi.string())) << state.status_message;
+
+    ASSERT_TRUE(state.sacm_package.has_value());
+    ASSERT_FALSE(state.sacm_package->argumentPackages.empty());
+    std::size_t claims = 0;
+    std::size_t tags = 0;
+    for (const sacm::ArgumentPackage& ap : state.sacm_package->argumentPackages) {
+        claims += ap.claims.size();
+        for (const sacm::Claim& claim : ap.claims) {
+            tags += claim.taggedValues.size();
+        }
+        for (const sacm::AssertedInference& inference : ap.assertedInferences) {
+            tags += inference.taggedValues.size();
+        }
+    }
+    EXPECT_EQ(claims, 2u) << "sacm_package lost its claims (near-empty regression)";
+    EXPECT_GT(tags, 0u) << "ACP tags dropped from the library-derived sacm_package";
+
+    // The ACPs also survive in the rendered model.
+    ASSERT_TRUE(state.loaded_case.has_value());
+    EXPECT_EQ(state.loaded_case->acps.size(), 2u);
+}
+
+// Regression: ACP confidence arguments live in their own argument package. The
+// POD projection flattens every package into one element list, so a library-XMI
+// reload must NOT collapse multiple argument packages into one (which would drop
+// the confidence package's identity and its purpose tag). A two-package document
+// round-tripped through save + reload must come back as two argument packages,
+// with the confidence marker intact.
+TEST(AppStateTest, LoadFileFromLibraryXmiPreservesMultipleArgumentPackages) {
+    TempDir temp(MakeTempDir());
+    const std::filesystem::path source_path = temp.path / "two_packages.sacm";
+    std::ofstream(source_path) << R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" id="CASE" name="Case">
+  <argumentPackage id="MAIN" name="Main Argument">
+    <claim id="G1" name="Top Goal" content="The system is acceptably safe."/>
+  </argumentPackage>
+  <argumentPackage id="CONF" name="Confidence Argument">
+    <taggedValue id="TV1" key="assuranceForge.argumentPackage.purpose" value="confidence"/>
+    <claim id="CG1" name="Confidence Goal" content="Confidence is sufficient."/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    // Load through the library, then save as library XMI (the Stage 6 format).
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(source_path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::SaveOutcome saved = sacm_adapter::save_document(*loaded.document);
+    ASSERT_TRUE(saved.ok);
+    const std::filesystem::path xmi = temp.path / "reloaded.sacm";
+    {
+        std::ofstream out(xmi, std::ios::binary);
+        out << saved.xml;
+    }
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(xmi.string())) << state.status_message;
+    ASSERT_TRUE(state.sacm_package.has_value());
+
+    ASSERT_EQ(state.sacm_package->argumentPackages.size(), 2u)
+        << "argument packages collapsed on reload";
+    const sacm::ArgumentPackage* main_pkg = nullptr;
+    const sacm::ArgumentPackage* conf_pkg = nullptr;
+    for (const sacm::ArgumentPackage& ap : state.sacm_package->argumentPackages) {
+        if (ap.id == "MAIN") main_pkg = &ap;
+        if (ap.id == "CONF") conf_pkg = &ap;
+    }
+    ASSERT_NE(main_pkg, nullptr) << "MAIN argument package lost";
+    ASSERT_NE(conf_pkg, nullptr) << "CONF argument package lost";
+    EXPECT_EQ(main_pkg->claims.size(), 1u);
+    EXPECT_EQ(conf_pkg->claims.size(), 1u);
+    EXPECT_TRUE(core::acp::IsConfidenceArgumentPackage(*conf_pkg))
+        << "confidence purpose tag dropped from its package on reload";
+    EXPECT_FALSE(core::acp::IsConfidenceArgumentPackage(*main_pkg));
 }

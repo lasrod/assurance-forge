@@ -6,6 +6,8 @@
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/library_load.h"
 
+#include <unordered_map>
+
 namespace core {
 
 sacm::AssuranceCasePackage project_library_package(const sacm_adapter::LibraryDocument& document) {
@@ -25,6 +27,60 @@ sacm::AssuranceCasePackage project_library_package(const sacm_adapter::LibraryDo
     // and audit coverage is not reduced.
     package.terminologyPackages = sacm_adapter::project_terminology_packages(document);
     package.artifactPackages = sacm_adapter::project_artifact_packages(document);
+    return package;
+}
+
+sacm::AssuranceCasePackage project_library_package_with_tags(
+    const sacm_adapter::LibraryDocument& document) {
+    // Unlike the audit projection (project_library_package), which may collapse
+    // packages as long as it does so consistently on both audit sides, the
+    // application's sacm_package must faithfully preserve the argument-package
+    // structure: ACP confidence arguments live in their own package, so a
+    // collapse would merge them into the main package and drop their purpose tag
+    // on reload. Rebuild one sacm::ArgumentPackage per library package.
+    const core::AssuranceCase flat = sacm_adapter::project_case(document);
+
+    sacm::AssuranceCasePackage package;
+    package.id = flat.id;
+    package.name = flat.name;
+    package.description = flat.description;
+    package.terminologyPackages = sacm_adapter::project_terminology_packages(document);
+    package.artifactPackages = sacm_adapter::project_artifact_packages(document);
+
+    std::unordered_map<std::string, const core::SacmElement*> element_by_id;
+    for (const core::SacmElement& element : flat.elements) {
+        element_by_id[element.id] = &element;
+    }
+
+    std::vector<sacm_adapter::ArgumentPackageShell> shells =
+        sacm_adapter::project_argument_package_shells(document);
+    for (sacm_adapter::ArgumentPackageShell& shell : shells) {
+        core::AssuranceCase filtered;
+        for (const std::string& element_id : shell.element_ids) {
+            const auto it = element_by_id.find(element_id);
+            if (it != element_by_id.end()) {
+                filtered.elements.push_back(*it->second);
+            }
+        }
+        sacm::AssuranceCasePackage temp;
+        // Terminology packages let RebuildSacm classify terminology artifact
+        // references. The target argument package starts fresh (identity only,
+        // empty element lists), so RebuildSacm's hidden-term preservation
+        // branches are no-ops -- it simply converts the filtered POD elements.
+        temp.terminologyPackages = package.terminologyPackages;
+        temp.argumentPackages.push_back(std::move(shell.identity));
+        RebuildSacmArgumentPackageFromParser(filtered, temp);
+        package.argumentPackages.push_back(std::move(temp.argumentPackages.front()));
+    }
+    if (package.argumentPackages.empty()) {
+        // No argument packages in the library (unusual); fall back to the flat
+        // rebuild so a single package is still produced.
+        RebuildSacmArgumentPackageFromParser(flat, package);
+    }
+
+    // Restore the fields the POD drops: vendor TaggedValues (ACP, confidence
+    // purpose, GSN role) and each artifact reference's referencedArtifact.
+    sacm_adapter::copy_library_tags_onto_package(document, package);
     return package;
 }
 
