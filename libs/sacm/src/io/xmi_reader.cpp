@@ -1359,7 +1359,29 @@ bool is_common_role(std::string_view role) {
     return false;
 }
 
+// Legacy Assurance Forge terminology shorthand: a TerminologyPackage/Group's
+// contained elements are written with their concrete class name as the element
+// name -- <expression id=.. value=..>, <term>, <category> -- instead of the
+// canonical <terminologyElement xsi:type="sacm:Expression">. The same names are
+// also genuine *reference attributes* elsewhere (a Term's origin, a Category's
+// category), but those are read as attributes; as child elements of a
+// terminology container they are contained elements. Recognizing them is what
+// keeps a whole TerminologyPackage from being silently dropped.
+bool is_terminology_shorthand_child(const SACMElement& element, std::string_view role) {
+    if (dynamic_cast<const model::TerminologyPackage*>(&element) == nullptr &&
+        dynamic_cast<const model::TerminologyGroup*>(&element) == nullptr) {
+        return false;
+    }
+    return role == "expression" || role == "term" || role == "category";
+}
+
 bool is_reference_role(const SACMElement& element, std::string_view role) {
+    // A terminology container's concrete-named children are contained elements,
+    // not references, even though some of the same names are reference ends on
+    // other element kinds.
+    if (is_terminology_shorthand_child(element, role)) {
+        return false;
+    }
     if (role == "source" || role == "target" || role == "reasoning" || role == "metaClaim" ||
         role == "interface" || role == "implements" || role == "participantPackage" ||
         role == "structure" || role == "referencedArtifactElement" ||

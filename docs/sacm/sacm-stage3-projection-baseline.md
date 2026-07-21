@@ -16,42 +16,45 @@ Baseline: `tests/data/sacm_parallel_load_baseline.json`
 The test fails on any *new* difference and on any baseline entry that no longer
 occurs, so the list can only shrink and cannot be padded.
 
-## Current state: 98 differences across 6 fixtures
+## Current state: 39 differences across 3 fixtures
 
-| Fixture | element-missing | field |
-|---|---:|---:|
-| `data/oasc-ja.xml` | 19 | — |
-| `data/open-autonomy-safety-case.sacm.xml` | 19 | — |
-| `tests/data/fixture_roundtrip_open_autonomy.sacm.xml` | 19 | — |
-| `tests/data/fixture_roundtrip_sample.sacm.xml` | 2 | 4 |
-| `tests/data/fixture_roundtrip_sanitized_strict.sacm.xml` | — | 34 |
-| `tests/data/fixture_roundtrip_core_argument.sacm.xml` | — | 1 |
+Down from 98 once the terminology-expression shorthand was read (#201, fixed).
+**Every remaining difference is a case where the library is correct and the
+legacy parser is not** — there are no outstanding projection bugs. They clear
+when Stage 4 makes the library the source of truth.
 
-## The three causes
+The baseline JSON (`tests/data/sacm_parallel_load_baseline.json`) keys by the
+diff's coarse *category* — here always `field`, meaning a per-element field value
+differs. The "which fields" column below is not stored in the baseline; it is the
+human breakdown of what those `field` diffs actually are.
 
-### 1. Terminology expressions are dropped by the library (59 of 98)
+| Fixture | `field` (baseline count) | which fields |
+|---|---:|---|
+| `tests/data/fixture_roundtrip_sanitized_strict.sacm.xml` | 34 | `undeveloped` (all 34) |
+| `tests/data/fixture_roundtrip_sample.sacm.xml` | 4 | `description` (all 4) |
+| `tests/data/fixture_roundtrip_core_argument.sacm.xml` | 1 | `undeveloped` |
 
-**This is a data-loss defect, and the most important finding of Stage 3.**
+Total 39 `field` diffs = 35 `undeveloped` + 4 `description`.
 
-Assurance Forge's own files write terminology expressions as a containment
-shorthand:
+## The causes
+
+### 1. Terminology expressions dropped by the library — FIXED (#201)
+
+This was the most important finding of Stage 3, and it is now closed.
+
+Assurance Forge's own files write terminology contents with the concrete class
+name as the element:
 
 ```xml
 <expression id="TERM_SAFE" value="System operates without causing harm" />
 ```
 
-The library treats `expression` as a **reference role** — in SACM 2.3 an
-`Expression` is contained in a `TerminologyPackage` under the
-`terminologyElement` role, and `expression` names the association *to* one. So
-these elements are not read at all: they are absent from the library document
-entirely, not merely absent from the projection.
-
-Every `TERM_*` entry in the table above is one lost expression. Migrating
-without fixing this would silently drop terminology from existing projects.
-
-**Action: fix in the library reader** — tolerant mode should accept the
-containment shorthand, as it already does for other legacy spellings. Tracked
-separately; not fixed here because Stage 3 is a measurement slice.
+instead of the canonical `<terminologyElement xsi:type="sacm:Expression">`. The
+library treated `expression` as a reference role, so 59 expressions across four
+fixtures were dropped entirely — a whole terminology package could vanish with
+no error. The reader now recognizes the shorthand under a terminology container
+in tolerant mode (strict still rejects it), test
+`SACM23_TERM_001_LegacyTerminologyShorthandIsRead`. The count fell from 98 to 39.
 
 ### 2. `undeveloped` — the library reading is correct (6, decided)
 
@@ -104,12 +107,12 @@ substantive.
 
 ## What Stage 4 needs
 
-1. Fix cause 1 in the library reader — it is real data loss (#201).
-2. Cause 2 is decided: the library reading is adopted; it resolves on migration.
-3. Cause 3 resolves on migration.
+The terminology-expression fix (#201) closed the only projection *bug*. The
+remaining 39 differences are all cases where the library is correct and the
+legacy parser is not — 35 `needsSupport` claims the legacy parser fails to mark
+undeveloped, and 4 descriptions it misses. There is nothing left to *fix* in the
+projection; these resolve when Stage 4 makes the library the source of truth and
+the legacy parser is retired as the comparison oracle.
 
-So the only outstanding *fix* is #201. Once its expressions are read, the
-baseline drops by 59 to 39, and the remaining 39 (undeveloped + descriptions)
-are all cases where the library is already correct and the legacy parser is not
-— they clear when Stage 4 makes the library the source of truth. At that point
-`SACM23-INT-001` can move from `implemented` toward `verified`.
+At that point the baseline reaches zero and `SACM23-INT-001` can move from
+`implemented` toward `verified`.

@@ -1,18 +1,8 @@
 {
-  "data/oasc-ja.xml": {
-    "element-missing": 19
-  },
-  "data/open-autonomy-safety-case.sacm.xml": {
-    "element-missing": 19
-  },
   "tests/data/fixture_roundtrip_core_argument.sacm.xml": {
     "field": 1
   },
-  "tests/data/fixture_roundtrip_open_autonomy.sacm.xml": {
-    "element-missing": 19
-  },
   "tests/data/fixture_roundtrip_sample.sacm.xml": {
-    "element-missing": 2,
     "field": 4
   },
   "tests/data/fixture_roundtrip_sanitized_strict.sacm.xml": {
