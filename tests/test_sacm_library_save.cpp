@@ -118,3 +118,33 @@ TEST(SacmLibrarySave, SACM23_INT_002_LibraryPackageHashIsStableUnderXmiRoundTrip
     const std::string hash_after = core::audit::CanonicalModelHash(core::project_library_package(reloaded));
     EXPECT_EQ(hash_before, hash_after) << "projection hash must be stable across an XMI round-trip";
 }
+
+// Terminology (and artifact) packages are covered by the canonical hash, so the
+// library->package projection must capture them -- otherwise wiring the audit
+// readers onto it would drop terminology from the hash and open a tamper-
+// detection blind spot. This uses a fixture rich in terminology.
+TEST(SacmLibrarySave, SACM23_INT_002_LibraryPackageProjectionCapturesTerminology) {
+    const std::filesystem::path path =
+        repo_root() / "tests" / "data" / "fixture_roundtrip_open_autonomy.sacm.xml";
+    ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm::AssuranceCasePackage package = core::project_library_package(*loaded.document);
+    ASSERT_FALSE(package.terminologyPackages.empty()) << "terminology dropped from the projection";
+    std::size_t term_count = 0;
+    for (const sacm::TerminologyPackage& tp : package.terminologyPackages) {
+        term_count += tp.terms.size() + tp.expressions.size() + tp.categories.size();
+    }
+    EXPECT_GT(term_count, 0u) << "no terminology elements captured";
+
+    // And the terminology survives the XMI round-trip stably.
+    const std::string hash_before = core::audit::CanonicalModelHash(package);
+    const sacm_adapter::SaveOutcome saved = sacm_adapter::save_document(*loaded.document);
+    ASSERT_TRUE(saved.ok) << (saved.diagnostics.empty() ? "" : saved.diagnostics.front().message);
+    sacm_adapter::LibraryDocument reloaded;
+    ASSERT_TRUE(sacm_adapter::reload_document(reloaded, saved.xml));
+    EXPECT_EQ(hash_before, core::audit::CanonicalModelHash(core::project_library_package(reloaded)));
+}

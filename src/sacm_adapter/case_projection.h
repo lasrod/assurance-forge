@@ -14,11 +14,25 @@
 // as the library, not this projection, is what gets serialized.
 
 #include "core/sacm_model.h"
+#include "sacm/sacm_model.h"
+
+#include <vector>
 
 namespace sacm_adapter {
 
 class LibraryDocument;
 
 core::AssuranceCase project_case(const LibraryDocument& document);
+
+// Phase 9 Stage 6: projects the library document's terminology and artifact
+// packages into the legacy structs the audit's canonical hash covers. The flat
+// `project_case` POD deliberately omits these container elements; the
+// library-backed package projection (`core::project_library_package`) needs
+// them so audit coverage is not reduced when the audit readers move onto the
+// library. Placement mirrors the library model (both at the case-package
+// level); consistency between the audit's two sides is what matters, not the
+// original nesting.
+std::vector<sacm::TerminologyPackage> project_terminology_packages(const LibraryDocument& document);
+std::vector<sacm::ArtifactPackage> project_artifact_packages(const LibraryDocument& document);
 
 } // namespace sacm_adapter

@@ -18,6 +18,11 @@ sacm::AssuranceCasePackage project_library_package(const sacm_adapter::LibraryDo
     package.name = projected.name;
     package.description = projected.description;
     RebuildSacmArgumentPackageFromParser(projected, package);
+    // Attach terminology and artifact packages after the argument rebuild
+    // (which only touches argumentPackages) so the canonical hash covers them
+    // and audit coverage is not reduced.
+    package.terminologyPackages = sacm_adapter::project_terminology_packages(document);
+    package.artifactPackages = sacm_adapter::project_artifact_packages(document);
     return package;
 }
 

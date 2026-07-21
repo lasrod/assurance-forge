@@ -3,8 +3,10 @@
 #include "sacm_adapter/library_document_access.h"
 
 #include "sacm/model/argumentation.h"
+#include "sacm/model/artifact.h"
 #include "sacm/model/assurance_case.h"
 #include "sacm/model/element.h"
+#include "sacm/model/terminology.h"
 
 #include <algorithm>
 #include <cctype>
@@ -220,6 +222,106 @@ core::AssuranceCase project_case(const LibraryDocument& document) {
     });
 
     return projected;
+}
+
+namespace {
+
+// Copies the identity/name/description a legacy SacmElement shares with a
+// library element, for the terminology/artifact projection.
+void copy_common_legacy_fields(sacm::SacmElement& target, const sacm::model::SACMElement& source) {
+    target.id = source.id().value();
+    target.gid = source.gid().value_or("");
+    const auto* model_element = dynamic_cast<const sacm::model::ModelElement*>(&source);
+    if (model_element == nullptr) {
+        return;
+    }
+    target.name = model_element->name().content;
+    if (!target.name.empty()) {
+        const std::string& lang = model_element->name().lang;
+        target.name_ml.texts[lang.empty() ? "en" : lang] = target.name;
+    }
+    const sacm::model::MultiLangString& description = model_element->description();
+    if (!description.empty()) {
+        target.description = description.primary();
+        for (const sacm::model::LangString& entry : description.values) {
+            if (!entry.content.empty()) {
+                target.description_ml.texts[entry.lang.empty() ? "en" : entry.lang] = entry.content;
+            }
+        }
+    }
+}
+
+const sacm::model::AssuranceCasePackage* root_package(const LibraryDocument& document) {
+    const sacm::model::Document& source = LibraryDocumentAccess::document(document);
+    return source.roots().empty() ? nullptr : source.roots().front().get();
+}
+
+} // namespace
+
+std::vector<sacm::TerminologyPackage> project_terminology_packages(const LibraryDocument& document) {
+    std::vector<sacm::TerminologyPackage> result;
+    const sacm::model::AssuranceCasePackage* root = root_package(document);
+    if (root == nullptr) {
+        return result;
+    }
+    for (const auto& terminology_package : root->terminology_packages()) {
+        sacm::TerminologyPackage projected;
+        copy_common_legacy_fields(projected, *terminology_package);
+        for (const auto& element : terminology_package->terminology_elements()) {
+            // Term is-a Expression, so test it first.
+            if (const auto* term = dynamic_cast<const sacm::model::Term*>(element.get())) {
+                sacm::Term projected_term;
+                copy_common_legacy_fields(projected_term, *term);
+                projected_term.value = term->value();
+                projected_term.externalReference = term->external_reference();
+                if (term->origin().has_value()) {
+                    projected_term.origin = term->origin()->value();
+                }
+                for (const sacm::model::ElementId& category : term->categories()) {
+                    projected_term.category_refs.push_back(category.value());
+                }
+                projected.terms.push_back(std::move(projected_term));
+            } else if (const auto* expression =
+                           dynamic_cast<const sacm::model::Expression*>(element.get())) {
+                sacm::Expression projected_expression;
+                copy_common_legacy_fields(projected_expression, *expression);
+                projected_expression.value = expression->value();
+                projected.expressions.push_back(std::move(projected_expression));
+            } else if (const auto* category =
+                           dynamic_cast<const sacm::model::Category*>(element.get())) {
+                sacm::Category projected_category;
+                copy_common_legacy_fields(projected_category, *category);
+                projected.categories.push_back(std::move(projected_category));
+            }
+            // TerminologyGroup and other terminology elements have no legacy
+            // struct; the canonical hash does not cover them.
+        }
+        result.push_back(std::move(projected));
+    }
+    return result;
+}
+
+std::vector<sacm::ArtifactPackage> project_artifact_packages(const LibraryDocument& document) {
+    std::vector<sacm::ArtifactPackage> result;
+    const sacm::model::AssuranceCasePackage* root = root_package(document);
+    if (root == nullptr) {
+        return result;
+    }
+    for (const auto& artifact_package : root->artifact_packages()) {
+        sacm::ArtifactPackage projected;
+        copy_common_legacy_fields(projected, *artifact_package);
+        for (const auto& element : artifact_package->artifact_elements()) {
+            if (const auto* artifact = dynamic_cast<const sacm::model::Artifact*>(element.get())) {
+                sacm::Artifact projected_artifact;
+                copy_common_legacy_fields(projected_artifact, *artifact);
+                projected_artifact.version = artifact->version();
+                projected_artifact.date = artifact->date();
+                projected.artifacts.push_back(std::move(projected_artifact));
+            }
+        }
+        result.push_back(std::move(projected));
+    }
+    return result;
 }
 
 } // namespace sacm_adapter
