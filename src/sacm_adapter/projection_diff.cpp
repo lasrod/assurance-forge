@@ -37,11 +37,33 @@ void compare_lang_map(std::vector<ProjectionDifference>& out, const std::string&
     if (legacy == projected) {
         return;
     }
+    // Report the first concrete divergence -- an entry on one side only, or a
+    // value mismatch -- so counts alone (which can be equal) do not make the
+    // message uninformative in CI logs.
+    std::string detail;
+    for (const auto& [lang, text] : legacy) {
+        const auto found = projected.find(lang);
+        if (found == projected.end()) {
+            detail = std::format("'{}' only in legacy", lang);
+            break;
+        }
+        if (found->second != text) {
+            detail = std::format("'{}': legacy '{}' vs projected '{}'", lang, text, found->second);
+            break;
+        }
+    }
+    if (detail.empty()) {
+        for (const auto& [lang, text] : projected) {
+            if (!legacy.contains(lang)) {
+                detail = std::format("'{}' only in projected", lang);
+                break;
+            }
+        }
+    }
     out.push_back(ProjectionDifference{
         .category = "field",
         .path = std::format("{}.{}", id, field),
-        .message = std::format("legacy {} entries vs projected {} entries", legacy.size(),
-                               projected.size()),
+        .message = detail,
     });
 }
 

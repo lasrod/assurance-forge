@@ -8,8 +8,8 @@
 
 #include <algorithm>
 #include <cctype>
-#include <set>
 #include <string>
+#include <unordered_set>
 
 namespace sacm_adapter {
 
@@ -63,7 +63,7 @@ std::string tagged_value_for(const sacm::model::ModelElement& element, const std
 
 void collect_acps(const sacm::model::ModelElement& element, std::string_view target_kind,
                   std::vector<core::AcpRecord>& out) {
-    std::set<std::string> seen;
+    std::unordered_set<std::string> seen;
     for (const auto& tag : element.tagged_values()) {
         if (tag->key().primary() != "assuranceForge.acp") {
             continue;

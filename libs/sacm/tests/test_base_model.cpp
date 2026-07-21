@@ -244,7 +244,7 @@ TEST(Sacm23BaseModel, SACM23_COMPAT_001_VendorContentPreservedAndStrictSaveRefus
 // otherwise description() returns the note and the statement is buried.
 TEST(Sacm23BaseModel, SACM23_XMI_001_LegacyContentStatementIsThePrimaryDescription) {
     constexpr std::string_view kXml = R"(<?xml version="1.0" encoding="UTF-8"?>
-<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:version="2.0" xmi:id="acp_1">
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">
   <argumentPackage xmi:id="ap_1">
     <argumentElement xsi:type="sacm:Claim" xmi:id="G1" content="The system is safe">
       <name content="Top Goal"/>

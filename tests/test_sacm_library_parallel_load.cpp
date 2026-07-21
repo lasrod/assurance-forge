@@ -102,8 +102,8 @@ std::map<std::string, std::size_t> count_by_category(
 } // namespace
 
 // ACP synthesis parity. No repo fixture carries Assurance Claim Points, so the
-// baseline test above never exercises them. This loads a fixture that does
-// through both the legacy parser and the library projection and asserts the
+// baseline test above never exercises them. This loads a fixture that does carry
+// ACPs through both the legacy parser and the library projection and asserts the
 // synthesized ACP records match exactly -- ACP support is a hard requirement of
 // the migration, so a projection that dropped or mis-synthesized them must fail.
 TEST(SacmLibraryParallelLoad, SACM23_INT_001_ProjectionSynthesizesAcpsLikeLegacy) {
