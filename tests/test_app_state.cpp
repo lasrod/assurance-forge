@@ -97,6 +97,67 @@ TEST(AppStateTest, LoadFileHidesTerminologyArtifactReferencesButKeepsEvidenceSol
     EXPECT_EQ(state.sacm_package->argumentPackages.front().assertedContexts.size(), 1u);
 }
 
+// Phase 9 Stage 4: load_file builds loaded_case by projecting the SACM library
+// document, not by running the legacy parser. This proves the library path is
+// taken (the document is retained) and that the projection renders the claim,
+// including the statement surfacing in `content` (slice 1b: statement =
+// Description).
+TEST(AppStateTest, LoadFileUsesTheLibraryDocumentAsTheSourceOfTruth) {
+    TempDir temp(MakeTempDir());
+    const std::filesystem::path sacm_path = temp.path / "case.sacm";
+    std::ofstream(sacm_path) << R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" id="CASE" name="Case">
+  <argumentPackage id="AP" name="Argument">
+    <claim id="G1" name="Top Goal" content="The system is acceptably safe."/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(sacm_path.string())) << state.status_message;
+
+    // The library document is retained -- loaded_case is projected from it, not
+    // parsed by the legacy fallback.
+    ASSERT_NE(state.library_document, nullptr)
+        << "load fell back to the legacy parser: " << state.status_message;
+    ASSERT_TRUE(state.loaded_case.has_value());
+
+    const parser::SacmElement* goal = FindElement(state.loaded_case.value(), "G1");
+    ASSERT_NE(goal, nullptr);
+    EXPECT_EQ(goal->name, "Top Goal");
+    // The statement, stored in the library as the Description, surfaces in the
+    // POD content field.
+    EXPECT_EQ(goal->content, "The system is acceptably safe.");
+}
+
+// When the library cannot read a file, load_file falls back to the legacy
+// parser and must keep that visible in the status message -- otherwise a
+// library gap goes silent whenever the save-support parse then succeeds. A
+// DOCTYPE triggers the library's XXE rejection while the legacy parser still
+// reads the file.
+TEST(AppStateTest, LoadFileFallbackToLegacyParserStaysVisibleInStatus) {
+    TempDir temp(MakeTempDir());
+    const std::filesystem::path sacm_path = temp.path / "doctype.sacm";
+    std::ofstream(sacm_path) << R"(<?xml version="1.0"?>
+<!DOCTYPE AssuranceCasePackage>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" id="D" name="Doctype Case">
+  <argumentPackage id="AP" name="AP">
+    <claim id="G1" name="Goal"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(sacm_path.string())) << state.status_message;
+
+    // The library rejected it (XXE), so the fallback loaded it and no library
+    // document is retained.
+    EXPECT_EQ(state.library_document, nullptr);
+    ASSERT_TRUE(state.loaded_case.has_value());
+    EXPECT_NE(FindElement(state.loaded_case.value(), "G1"), nullptr);
+    // The fallback is not silent, even though save-support parsing succeeded.
+    EXPECT_NE(state.status_message.find("legacy parser"), std::string::npos)
+        << "fallback note was dropped: " << state.status_message;
+}
+
 TEST(AppStateTest, OpenProjectSacmFilePreservesActiveProjectFile) {
     TempDir temp(MakeTempDir());
     std::filesystem::create_directories(temp.path / "arguments");
