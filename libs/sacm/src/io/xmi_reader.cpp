@@ -1673,6 +1673,15 @@ LoadResult load_impl(std::string_view xml, std::string source_file, const LoadOp
         return result;
     }
 
+    // Pre-reserve every explicit xmi:id in the document before any parsing, so
+    // generate_id() never mints an id that already appears elsewhere -- even
+    // later in document order. Generated ids can be persisted (e.g. on a
+    // TaggedValue that had no id when first read) and reappear on a re-load;
+    // without this pre-pass, minting "generated_49" for an id-less element
+    // encountered earlier would collide with a later element already carrying
+    // "generated_49", producing a spurious SACM-ID-001 duplicate on round-trip.
+    collect_existing_ids(root, reader.used_ids);
+
     model::Document document;
     reader.push_scope(root);
     if (local_name(root.name()) == "XMI") {
