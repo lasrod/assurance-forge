@@ -292,6 +292,48 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildReproducesLegacyStructure) {
     }
 }
 
+// SACM23-INT-001, edit slice: adding a top goal through the library (a Claim in
+// the first ArgumentPackage, no relationship) must reproduce the legacy
+// core::AddTopGoal structure. The caller-supplied id is used verbatim, which the
+// library-primary audit replay needs.
+TEST(SacmLibraryEdit, SACM23_INT_001_AddTopGoalReproducesLegacyStructure) {
+    // Library path.
+    sacm_adapter::LoadOutcome loaded = load_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::AddChildOutcome added =
+        sacm_adapter::apply_add_top_goal(*loaded.document, "TG1");
+    ASSERT_TRUE(added.supported);
+    ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    EXPECT_EQ(added.new_element_id, "TG1");
+    EXPECT_TRUE(added.new_relationship_id.empty()) << "a top goal has no incoming relationship";
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    const core::SacmElement* library_goal = find_element(after, "TG1");
+    ASSERT_NE(library_goal, nullptr);
+
+    // Legacy path.
+    const auto legacy_case = parser::parse_sacm_xml(fixture_path().string());
+    ASSERT_TRUE(legacy_case.has_value()) << legacy_case.error();
+    const auto legacy_package = sacm::parse_sacm(fixture_path().string());
+    ASSERT_TRUE(legacy_package.has_value()) << legacy_package.error();
+    core::AssuranceCase legacy = *legacy_case;
+    sacm::AssuranceCasePackage package = *legacy_package;
+    std::string error;
+    ASSERT_TRUE(core::AddTopGoalWithId(legacy, &package, "TG1", error)) << error;
+    const core::SacmElement* legacy_goal = find_element(legacy, "TG1");
+    ASSERT_NE(legacy_goal, nullptr);
+
+    // Same kind and (empty) name, and no relationship references it in either.
+    EXPECT_EQ(library_goal->type, "claim");
+    EXPECT_EQ(library_goal->type, legacy_goal->type);
+    EXPECT_EQ(library_goal->name, legacy_goal->name);
+    for (const core::SacmElement& element : after.elements) {
+        EXPECT_EQ(std::find(element.source_refs.begin(), element.source_refs.end(), "TG1"),
+                  element.source_refs.end());
+        EXPECT_EQ(std::find(element.target_refs.begin(), element.target_refs.end(), "TG1"),
+                  element.target_refs.end());
+    }
+}
+
 // SACM23-INT-001, edit slice: a dialectic challenge through the library
 // (create counter element + create isCounter relationship) must produce the
 // same structure the legacy AddChallenge does -- counter element kind, counter

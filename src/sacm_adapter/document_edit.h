@@ -115,6 +115,15 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
                                 ChildKind kind, const std::string& element_id = {},
                                 const std::string& relationship_id = {});
 
+// Adds a top goal, mirroring `core::AddTopGoal`: creates a Claim with no parent
+// relationship in the document's first ArgumentPackage (mirroring
+// `core::FindOwningArgumentPackage`'s fallback for an element with no owning
+// relationship). Reuses AddChildOutcome; `new_relationship_id` is always empty
+// (a top goal has no incoming relationship). When `element_id` is non-empty it
+// is used verbatim (id-deterministic replay); empty means the library generates
+// it. Reports `supported == false` only if the document has no ArgumentPackage.
+AddChildOutcome apply_add_top_goal(LibraryDocument& document, const std::string& element_id = {});
+
 // The source of a dialectic challenge, mirroring core::ChallengeSourceType.
 enum class ChallengeSource {
     CounterArgument, // Claim             <- AssertedInference (isCounter)

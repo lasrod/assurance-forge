@@ -142,6 +142,17 @@ const sacm::model::ArgumentPackage* owning_argument_package(
     return nullptr;
 }
 
+// The argument package a top goal is created in: the root's first, mirroring
+// core::FindOwningArgumentPackage's fallback for an element with no owning
+// relationship. Null if the document has no argument package.
+const sacm::model::ArgumentPackage* first_argument_package(const sacm::model::Document& doc) {
+    if (doc.roots().empty()) {
+        return nullptr;
+    }
+    const auto& packages = doc.roots().front()->argument_packages();
+    return packages.empty() ? nullptr : packages.front().get();
+}
+
 AddChildOutcome unsupported_child() {
     return AddChildOutcome{.supported = false};
 }
@@ -343,6 +354,24 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
     outcome.new_element_id = created_id.value();
     outcome.new_relationship_id = linked.created_ids().front().value();
     return outcome;
+}
+
+AddChildOutcome apply_add_top_goal(LibraryDocument& document, const std::string& element_id) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ArgumentPackage* package = first_argument_package(doc);
+    if (package == nullptr) {
+        return unsupported_child();
+    }
+    const sacm::commands::MutationResult created = doc.apply(
+        sacm::commands::CreateClaim{.parent = package->id(), .id = to_optional_id(element_id)});
+    if (!created.applied || created.created_ids().empty()) {
+        return failed_child(created);
+    }
+    AddChildOutcome outcome;
+    outcome.supported = true;
+    outcome.applied = true;
+    outcome.new_element_id = created.created_ids().front().value();
+    return outcome;  // a top goal has no parent, so no relationship
 }
 
 AddChildOutcome apply_challenge(LibraryDocument& document, const std::string& target_id,
