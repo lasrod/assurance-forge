@@ -93,6 +93,36 @@ TEST(Sacm23Validation, SACM23_XMI_003_ReportsDuplicateIds) {
     EXPECT_TRUE(has_code(result.diagnostics, sacm::validation::codes::kIdDuplicate));
 }
 
+// A generated id ("generated_N") minted for an id-less element on a prior load
+// can be persisted (e.g. onto a TaggedValue) and reappear as an explicit id on a
+// later load. The reader must not manufacture a spurious duplicate by minting the
+// same "generated_N" again for an id-less element it encounters first. Here the
+// id-less <description> is parsed before the taggedValue that already carries
+// "generated_1"; without pre-reserving every explicit id, the description would
+// be minted "generated_1" and collide (SACM-ID-001). Regression for a real
+// round-trip failure: a project's ACP/purpose TaggedValues carried persisted
+// generated ids and the re-load reported them as duplicates.
+TEST(Sacm23Validation, SACM23_XMI_003_GeneratedIdDoesNotCollideWithPersistedExplicitId) {
+    const std::string xml =
+        R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301"
+    xmlns:xmi="http://www.omg.org/spec/XMI/20131001"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:id="CASE">
+  <argumentPackage xmi:id="AP">
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G1">
+      <description>
+        <content lang="en" content="a claim with an id-less description" />
+      </description>
+      <taggedValue xmi:id="generated_1" key="assuranceForge.example" value="v" />
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+    const LoadResult result = sacm::io::load_xmi_string(xml, LoadOptions{.mode = Mode::Strict});
+    EXPECT_TRUE(result.ok) << "load failed; a persisted generated id collided with a freshly minted one";
+    EXPECT_FALSE(has_code(result.diagnostics, sacm::validation::codes::kIdDuplicate))
+        << "reader minted 'generated_1' for the id-less description, duplicating the persisted tag id";
+}
+
 TEST(Sacm23Validation, SACM23_XMI_001_RejectsNonPackageRoot) {
     const LoadResult result = sacm::io::load_xmi_file(fixture("invalid/root-invalid.sacm.xmi"));
     EXPECT_FALSE(result.ok);
