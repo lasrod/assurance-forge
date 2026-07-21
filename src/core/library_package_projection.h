@@ -44,4 +44,13 @@ std::optional<std::string> library_canonical_hash_from_xml(std::string_view xml)
 std::optional<std::string> library_canonical_hash(const sacm::AssuranceCasePackage& package);
 std::optional<std::string> library_canonical_hash_from_file(const std::filesystem::path& path);
 
+// Phase 9 Stage 6: serializes a legacy package to library SACM XMI, by loading
+// it through the library and saving it back out (tolerant mode, so preserved
+// vendor/compatibility content survives). This is what the save sites write so
+// the library becomes the serialization source of truth; the audit readers,
+// already routed through the library (library_canonical_hash*), read the XMI
+// and converge. Returns nullopt if the round-trip through the library fails, so
+// callers can fall back to the legacy serialization.
+std::optional<std::string> library_xmi_from_package(const sacm::AssuranceCasePackage& package);
+
 } // namespace core

@@ -48,4 +48,16 @@ std::optional<std::string> library_canonical_hash_from_file(const std::filesyste
     return core::audit::CanonicalModelHash(project_library_package(*loaded.document));
 }
 
+std::optional<std::string> library_xmi_from_package(const sacm::AssuranceCasePackage& package) {
+    sacm_adapter::LibraryDocument document;
+    if (!sacm_adapter::reload_document(document, sacm::serialize_sacm(package))) {
+        return std::nullopt;
+    }
+    sacm_adapter::SaveOutcome saved = sacm_adapter::save_document(document);
+    if (!saved.ok) {
+        return std::nullopt;
+    }
+    return std::move(saved.xml);
+}
+
 } // namespace core

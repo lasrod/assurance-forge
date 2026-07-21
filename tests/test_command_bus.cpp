@@ -13,6 +13,7 @@
 #include "sacm/sacm_parser.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/library_load.h"
+#include "core/library_package_projection.h"
 
 #include <gtest/gtest.h>
 
@@ -204,12 +205,15 @@ TEST(CommandBus, AppendsTransactionAndUpdatesManifestOnCreateChildElement) {
     EXPECT_EQ(manifest.last_known_canonical_model_hash, result.canonical_model_hash_after);
     EXPECT_FALSE(manifest.event_store_hash.empty());
 
-    // The on-disk SACM contains the new element (via re-parse): the strategy
-    // we just added should appear in the first argument package.
-    auto reparsed = sacm::parse_sacm(f.sacm_abs.string());
-    ASSERT_TRUE(reparsed.has_value()) << reparsed.error();
-    ASSERT_FALSE(reparsed.value().argumentPackages.empty());
-    const auto& ap = reparsed.value().argumentPackages.front();
+    // The on-disk SACM contains the new element: the strategy we just added
+    // should appear in the first argument package. Phase 9 Stage 6: the file is
+    // now library XMI, so read it back through the library and project it.
+    sacm_adapter::LoadOutcome reparsed = sacm_adapter::load_document(f.sacm_abs);
+    ASSERT_TRUE(reparsed.ok);
+    ASSERT_NE(reparsed.document, nullptr);
+    const sacm::AssuranceCasePackage on_disk = core::project_library_package(*reparsed.document);
+    ASSERT_FALSE(on_disk.argumentPackages.empty());
+    const auto& ap = on_disk.argumentPackages.front();
     bool found = false;
     for (const auto& reasoning : ap.argumentReasonings) {
         if (reasoning.id == cmd.GeneratedId()) { found = true; break; }

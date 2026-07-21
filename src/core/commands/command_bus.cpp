@@ -42,8 +42,13 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     }
 
     // Serialize once so the bytes we write, the bytes we hash, and the
-    // bytes we (notionally) re-parse for the canonical hash are identical.
-    const std::string xml = sacm::serialize_sacm(ctx.package);
+    // bytes we re-derive the canonical hash from are identical. Phase 9 Stage
+    // 6: the library is now the serialization source of truth, so we write
+    // library SACM XMI (falling back to the legacy serialization only if the
+    // library round-trip fails). The audit readers are already routed through
+    // the library, so they read this back and converge.
+    const std::string xml =
+        core::library_xmi_from_package(ctx.package).value_or(sacm::serialize_sacm(ctx.package));
     const std::string raw_after = Sha256::HexDigest(xml);
 
     // Phase 9 Stage 6: derive the canonical hash through the library so this

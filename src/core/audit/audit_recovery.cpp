@@ -93,8 +93,10 @@ bool RestoreSacmFromAudit(const AssuranceProject& project,
 
     // Serialize the replayed package and write it atomically. The
     // canonical hash is taken from a reparse of the serialized bytes for
-    // round-trip stability (mirrors VerifyProject).
-    const std::string xml = sacm::serialize_sacm(replayed->package);
+    // round-trip stability (mirrors VerifyProject). Phase 9 Stage 6: write
+    // library SACM XMI so the restored file matches the live save format.
+    const std::string xml = core::library_xmi_from_package(replayed->package)
+                                .value_or(sacm::serialize_sacm(replayed->package));
     auto library_hash = core::library_canonical_hash_from_xml(xml);
     if (!library_hash) {
         error = "Failed to load restored SACM through the library for hashing";
