@@ -75,17 +75,36 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
         }
     }
 
+    // Statement = Description (clause 8.9). Only claim-like elements carry a
+    // statement; the POD's `content` field holds it (the GSN node's fallback
+    // label and the inspector's statement view). Artifacts, references and
+    // relationships legitimately have a `<description>` that is a note, not a
+    // statement, so they must keep `content` empty as the legacy parser does.
+    if (element.kind() == sacm::metadata::ElementKind::Claim ||
+        element.kind() == sacm::metadata::ElementKind::ArgumentReasoning) {
+        const auto* model_element = static_cast<const sacm::model::ModelElement*>(&element);
+        const auto& descriptions = model_element->descriptions();
+        if (!descriptions.empty()) {
+            const sacm::model::MultiLangString& statement = descriptions.front()->content();
+            projected.content = statement.primary();
+            fill_lang_map(projected.content_langs, statement);
+            // The statement is the primary Description; a second Description is
+            // the secondary note the POD keeps in its `description` field.
+            const sacm::model::MultiLangString& note =
+                descriptions.size() > 1 ? descriptions[1]->content() : statement;
+            projected.description = note.primary();
+            projected.description_langs.clear();
+            fill_lang_map(projected.description_langs, note);
+        }
+    }
+
     // Terms and Expressions carry their text in `value`, which the POD renders
-    // as `content`. The claim/goal statement -- which the legacy POD keeps in a
-    // separate `content` field -- is NOT surfaced here yet: adopting the SACM
-    // "statement = Description" model needs the reader to separate statement
-    // from note, tracked as the next slice.
+    // as `content`.
     if (const auto* expression = dynamic_cast<const sacm::model::Expression*>(&element)) {
         projected.content = expression->value();
+        projected.content_langs["en"] = projected.content;
     } else if (const auto* term = dynamic_cast<const sacm::model::Term*>(&element)) {
         projected.content = term->value();
-    }
-    if (!projected.content.empty()) {
         projected.content_langs["en"] = projected.content;
     }
 

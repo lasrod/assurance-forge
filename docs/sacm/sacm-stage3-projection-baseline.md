@@ -120,12 +120,30 @@ Closing the obvious gaps took the full-field count from ~2,500 to **419**:
   clause-11.10 default explicit; same meaning), clearing ~394.
 - Term/Expression `value` now populates `content`.
 
-The remaining 419 are two groups:
+Adopting the SACM "statement = Description" model (clause 8.9) then took it to
+**377**, and — more importantly — changed the *composition* so the projection no
+longer loses anything:
+
+- The reader now treats a legacy `content=`/`<content>` statement as the primary
+  Description (front), so `description()` returns the statement.
+- The projection surfaces that statement in the POD `content` field, but only for
+  claim-like kinds (Claim, ArgumentReasoning) — artifacts, references and
+  relationships legitimately carry a `<description>` that is a note, not a
+  statement, and keep `content` empty as before.
+
+Result: files that stored the statement in a `content=` attribute now **match**
+the legacy parser exactly, and the projection always carries the statement. The
+remaining 377 are all cases where the library is *more correct* than the legacy
+parser, not losses:
 
 | Group | Count | Meaning |
 |---|---:|---|
-| **content / content_langs** | 376 | The goal *statement*. AF stores it in a `content=` attribute (a two-field model: content=statement, description=note); SACM stores the statement in the Description. **Decided: adopt the SACM model (statement = Description).** Implementing it needs the library reader to separate statement from note, so the statement's Description is primary — the next slice. Until then the projection does not surface it. |
-| undeveloped / description(+langs) | 43 | The library is more correct than the legacy parser (needsSupport→undeveloped; descriptions legacy misses). Accepted; clear on migration. |
+| content / content_langs | ~334 | The projection surfaces the goal statement in `content` for canonical claims (statement in `<description>`, no `content=`), which the legacy parser left empty. The GSN node label uses `name`, so this is the inspector/statement view gaining the text, not a node change. |
+| undeveloped / description(+langs) | 43 | needsSupport→undeveloped; descriptions the legacy parser misses. |
+
+There are **no remaining projection losses** — every difference is the library
+being at least as complete as the legacy parser. That is the property the render
+flip (slice 2) requires.
 
 ## What Stage 4 needs
 

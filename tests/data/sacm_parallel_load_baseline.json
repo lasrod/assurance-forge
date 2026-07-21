@@ -1,20 +1,11 @@
 {
-  "data/oasc-ja.xml": {
-    "field": 122
-  },
-  "data/open-autonomy-safety-case.sacm.xml": {
-    "field": 122
-  },
   "tests/data/fixture_roundtrip_core_argument.sacm.xml": {
-    "field": 1
-  },
-  "tests/data/fixture_roundtrip_open_autonomy.sacm.xml": {
-    "field": 122
+    "field": 11
   },
   "tests/data/fixture_roundtrip_sample.sacm.xml": {
-    "field": 18
+    "field": 8
   },
   "tests/data/fixture_roundtrip_sanitized_strict.sacm.xml": {
-    "field": 34
+    "field": 358
   }
 }
