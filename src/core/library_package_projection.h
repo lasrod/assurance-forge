@@ -19,6 +19,11 @@
 
 #include "sacm/sacm_model.h"
 
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <string_view>
+
 namespace sacm_adapter {
 class LibraryDocument;
 }
@@ -26,5 +31,17 @@ class LibraryDocument;
 namespace core {
 
 sacm::AssuranceCasePackage project_library_package(const sacm_adapter::LibraryDocument& document);
+
+// Phase 9 Stage 6: the canonical model hash computed by loading the model
+// through the library and projecting it back to a package before hashing. Every
+// audit canonical-hash site routes through this so all sides -- the manifest
+// cache, the replayed model, the on-disk model, and snapshots -- derive the
+// hash identically and therefore converge, independent of the projection-vs-
+// legacy baseline (the on-disk / replayed reader coupling that a naive
+// library-backed save would break). Returns nullopt when the input cannot be
+// loaded through the library, so callers keep their existing failure handling.
+std::optional<std::string> library_canonical_hash_from_xml(std::string_view xml);
+std::optional<std::string> library_canonical_hash(const sacm::AssuranceCasePackage& package);
+std::optional<std::string> library_canonical_hash_from_file(const std::filesystem::path& path);
 
 } // namespace core

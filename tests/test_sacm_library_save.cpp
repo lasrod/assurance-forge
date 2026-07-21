@@ -43,7 +43,7 @@ const std::vector<std::string>& fixtures() {
 
 // Serializing to XMI (tolerant) and loading back must preserve the projected
 // case exactly, for every fixture the library reads.
-TEST(SacmLibrarySave, SACM23_INT_002_XmiSaveRoundTripsTheProjection) {
+TEST(SacmLibrarySave, SACM23_INT_001_XmiSaveRoundTripsTheProjection) {
     for (const std::string& relative : fixtures()) {
         SCOPED_TRACE(relative);
         const std::filesystem::path path = repo_root() / relative;
@@ -73,7 +73,7 @@ TEST(SacmLibrarySave, SACM23_INT_002_XmiSaveRoundTripsTheProjection) {
 
 // ACPs are vendor TaggedValues (clause 8.12); a library-backed save must not
 // drop them, or the migration would lose a must-support feature.
-TEST(SacmLibrarySave, SACM23_INT_002_XmiSavePreservesAcps) {
+TEST(SacmLibrarySave, SACM23_INT_001_XmiSavePreservesAcps) {
     const std::filesystem::path path = repo_root() / "tests" / "data" / "fixture_acp_parity.sacm.xml";
     ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
 
@@ -94,7 +94,7 @@ TEST(SacmLibrarySave, SACM23_INT_002_XmiSavePreservesAcps) {
 // content and, crucially, produce a canonical hash that is STABLE across an XMI
 // save/load. That stability is what makes the audit's on-disk and replayed sides
 // converge once both route through this projection (Approach B).
-TEST(SacmLibrarySave, SACM23_INT_002_LibraryPackageHashIsStableUnderXmiRoundTrip) {
+TEST(SacmLibrarySave, SACM23_INT_001_LibraryPackageHashIsStableUnderXmiRoundTrip) {
     // Argument-only fixtures: terminology/artifact projection is a following
     // increment, so restrict the content assertion to fixtures without them.
     const std::filesystem::path path = repo_root() / "tests" / "data" / "fixture_acp_parity.sacm.xml";
@@ -123,7 +123,7 @@ TEST(SacmLibrarySave, SACM23_INT_002_LibraryPackageHashIsStableUnderXmiRoundTrip
 // library->package projection must capture them -- otherwise wiring the audit
 // readers onto it would drop terminology from the hash and open a tamper-
 // detection blind spot. This uses a fixture rich in terminology.
-TEST(SacmLibrarySave, SACM23_INT_002_LibraryPackageProjectionCapturesTerminology) {
+TEST(SacmLibrarySave, SACM23_INT_001_LibraryPackageProjectionCapturesTerminology) {
     const std::filesystem::path path =
         repo_root() / "tests" / "data" / "fixture_roundtrip_open_autonomy.sacm.xml";
     ASSERT_TRUE(std::filesystem::exists(path)) << path.string();

@@ -2,6 +2,7 @@
 
 #include "core/audit/audit_paths.h"
 #include "core/audit/canonical_model_hash.h"
+#include "core/library_package_projection.h"
 #include "core/project_file_io.h"
 #include "core/sha256.h"
 #include "sacm_adapter/library_load.h"
@@ -45,9 +46,13 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     const std::string xml = sacm::serialize_sacm(ctx.package);
     const std::string raw_after = Sha256::HexDigest(xml);
 
+    // Phase 9 Stage 6: derive the canonical hash through the library so this
+    // manifest cache converges with the verifier's replayed and on-disk hashes,
+    // which are also library-derived. Fall back to the legacy hash only if the
+    // library cannot read our own serialization (a bug, not an expected path).
     std::string canonical_after;
-    if (auto reparsed = sacm::parse_sacm_string(xml); reparsed) {
-        canonical_after = audit::CanonicalModelHash(*reparsed);
+    if (auto library_hash = core::library_canonical_hash_from_xml(xml)) {
+        canonical_after = *library_hash;
     } else {
         canonical_after = audit::CanonicalModelHash(ctx.package);
     }

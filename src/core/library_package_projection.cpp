@@ -1,6 +1,8 @@
 #include "core/library_package_projection.h"
 
+#include "core/audit/canonical_model_hash.h"
 #include "core/sacm_argument_sync.h"
+#include "sacm/sacm_serializer.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/library_load.h"
 
@@ -24,6 +26,26 @@ sacm::AssuranceCasePackage project_library_package(const sacm_adapter::LibraryDo
     package.terminologyPackages = sacm_adapter::project_terminology_packages(document);
     package.artifactPackages = sacm_adapter::project_artifact_packages(document);
     return package;
+}
+
+std::optional<std::string> library_canonical_hash_from_xml(std::string_view xml) {
+    sacm_adapter::LibraryDocument document;
+    if (!sacm_adapter::reload_document(document, xml)) {
+        return std::nullopt;
+    }
+    return core::audit::CanonicalModelHash(project_library_package(document));
+}
+
+std::optional<std::string> library_canonical_hash(const sacm::AssuranceCasePackage& package) {
+    return library_canonical_hash_from_xml(sacm::serialize_sacm(package));
+}
+
+std::optional<std::string> library_canonical_hash_from_file(const std::filesystem::path& path) {
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    if (!loaded.ok || loaded.document == nullptr) {
+        return std::nullopt;
+    }
+    return core::audit::CanonicalModelHash(project_library_package(*loaded.document));
 }
 
 } // namespace core

@@ -3,6 +3,7 @@
 #include "core/audit/audit_snapshot.h"
 #include "core/audit/audit_store.h"
 #include "core/audit/canonical_model_hash.h"
+#include "core/library_package_projection.h"
 #include "core/project_model.h"
 #include "sacm/sacm_parser.h"
 
@@ -75,12 +76,14 @@ TEST(InitialSnapshot, EnsureAuditStoreCreatesManifestSnapshotAndEmptyLog) {
     EXPECT_EQ(ReadAllBytes(root / sacm_rel),
               ReadAllBytes(core::audit::SnapshotSacmPath(root, core::audit::kInitialSnapshotId)));
 
-    // Manifest canonical hash matches recomputed hash from the snapshot.
+    // Manifest canonical hash matches the hash recomputed from the snapshot
+    // through the same library derivation the audit uses (Phase 9 Stage 6).
     core::audit::AuditManifest manifest;
     ASSERT_TRUE(core::audit::ReadAuditManifest(root, manifest, error)) << error;
-    auto parsed = sacm::parse_sacm(core::audit::SnapshotSacmPath(root, core::audit::kInitialSnapshotId).string());
-    ASSERT_TRUE(parsed) << parsed.error();
-    EXPECT_EQ(manifest.last_known_canonical_model_hash, core::audit::CanonicalModelHash(*parsed));
+    auto expected = core::library_canonical_hash_from_file(
+        core::audit::SnapshotSacmPath(root, core::audit::kInitialSnapshotId));
+    ASSERT_TRUE(expected.has_value());
+    EXPECT_EQ(manifest.last_known_canonical_model_hash, *expected);
     EXPECT_FALSE(manifest.last_known_raw_file_hash.empty());
 
     std::filesystem::remove_all(root);

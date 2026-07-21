@@ -2,6 +2,7 @@
 #include "core/audit/audit_paths.h"
 #include "core/audit/audit_store.h"
 #include "core/audit/canonical_model_hash.h"
+#include "core/library_package_projection.h"
 #include "core/project_model.h"
 #include "sacm/sacm_parser.h"
 
@@ -96,13 +97,12 @@ TEST(ReconcileAuditStore, RebuildsManifestSnapshotAndEmptyLogFromCurrentSacm) {
     EXPECT_TRUE(std::filesystem::exists(core::audit::ManifestPath(root)));
     EXPECT_EQ(std::filesystem::file_size(core::audit::EventLogPath(root)), 0u);
 
-    auto live = sacm::parse_sacm((root / sacm_rel).string());
-    ASSERT_TRUE(live) << live.error();
-    const std::string live_hash = core::audit::CanonicalModelHash(*live);
+    auto live_hash = core::library_canonical_hash_from_file(root / sacm_rel);
+    ASSERT_TRUE(live_hash.has_value());
 
     core::audit::AuditManifest manifest;
     ASSERT_TRUE(core::audit::ReadAuditManifest(root, manifest, error)) << error;
-    EXPECT_EQ(manifest.last_known_canonical_model_hash, live_hash);
+    EXPECT_EQ(manifest.last_known_canonical_model_hash, *live_hash);
     EXPECT_EQ(manifest.latest_transaction_sequence, 0u);
     EXPECT_EQ(manifest.latest_event_sequence, 0u);
 
