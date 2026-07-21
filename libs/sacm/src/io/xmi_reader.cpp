@@ -907,7 +907,12 @@ void read_claim_content_tolerance(Reader& reader, model::ModelElement& element,
         std::make_unique<model::Description>(reader.generate_id(ElementKind::Description));
     Access::content(*holder) = std::move(collected);
     Access::set_parent(*holder, &element);
-    Access::descriptions(element).push_back(std::move(holder));
+    // A legacy `content=`/`<content>` statement is the element's primary text
+    // (clause 8.9: the Description provides the content of a Claim), so it goes
+    // to the *front*. A `<description>` child already read is a secondary note
+    // and stays after it, so description() returns the statement.
+    std::vector<std::unique_ptr<model::Description>>& descriptions = Access::descriptions(element);
+    descriptions.insert(descriptions.begin(), std::move(holder));
 }
 
 void read_reference_children(Reader& reader, SACMElement& element, const pugi::xml_node& node) {

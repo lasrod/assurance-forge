@@ -237,6 +237,41 @@ TEST(Sacm23BaseModel, SACM23_COMPAT_001_VendorContentPreservedAndStrictSaveRefus
     EXPECT_TRUE(sacm::compare::semantic_compare(*loaded.document, *reloaded.document).empty());
 }
 
+// Legacy Assurance Forge files split a claim's text across a `content=`
+// attribute (the statement) and a `<description>` child (a secondary note).
+// SACM has one Description that provides the claim's content (clause 8.9), so
+// the statement must be the primary Description and the note secondary --
+// otherwise description() returns the note and the statement is buried.
+TEST(Sacm23BaseModel, SACM23_XMI_001_LegacyContentStatementIsThePrimaryDescription) {
+    constexpr std::string_view kXml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">
+  <argumentPackage xmi:id="ap_1">
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G1" content="The system is safe">
+      <name content="Top Goal"/>
+      <description><content><value lang="en" content="A secondary note"/></content></description>
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    const LoadResult loaded = sacm::io::load_xmi_string(kXml);
+    ASSERT_TRUE(loaded.ok);
+    const auto* claim = loaded.document->find_as<sacm::model::Claim>(ElementId{"G1"});
+    ASSERT_NE(claim, nullptr);
+
+    // Both texts are kept, and the statement is primary.
+    ASSERT_EQ(claim->descriptions().size(), 2u) << "the note was lost";
+    EXPECT_EQ(claim->description().primary(), "The system is safe")
+        << "the content= statement must be the primary Description";
+    EXPECT_EQ(claim->descriptions()[1]->content().primary(), "A secondary note");
+
+    // Both survive a round-trip.
+    const sacm::io::SaveResult saved = sacm::io::save_xmi_string(*loaded.document);
+    ASSERT_TRUE(saved.ok);
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml);
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(*loaded.document, *reloaded.document).empty());
+}
+
 // Clause 8.2 makes gid String[0..1], so an explicit gid="" and an absent gid
 // are different documents. Modelling gid as a plain string with
 // empty-means-absent silently rewrote the first into the second on save, which

@@ -98,12 +98,55 @@ because reporting them would be noise:
 - **Utility elements** (`Description`, `Note`, `TaggedValue`,
   `ImplementationConstraint`). These are metadata carried *on* elements, not
   elements in their own right.
-- **Assurance Claim Points.** Synthesized by the application from vendor
-  TaggedValues rather than read from SACM, so they are not part of this
-  projection. See `docs/sacm/sacm-gsn-metamodel-gaps.md`.
+- **Assurance Claim Points are now synthesized** by the projection from the same
+  `assuranceForge.acp` vendor TaggedValues the app uses, matching the legacy
+  parser's `extract_acps`. No repo fixture carries ACPs, so a dedicated fixture
+  (`tests/data/fixture_acp_parity.sacm.xml`) exercises the synthesis in
+  `SACM23_INT_001_ProjectionSynthesizesAcpsLikeLegacy`. ACP support was a hard
+  requirement of the migration.
 
 Excluding these took the count from roughly 400 to 98, and the remainder are all
 substantive.
+
+## Stage 4 slice 1: full-field comparison
+
+Stage 3 compared 7 fields; Stage 4 needs the projection proven equivalent across
+*every* POD field before rendering depends on it, so `diff_cases` now compares
+content, gid, assertion_declaration, reasoning_ref, meta_claim_refs, and the
+name/description/content language maps too.
+
+Closing the obvious gaps took the full-field count from ~2,500 to **419**:
+
+- Language-map `"en"` defaulting (the legacy parser keys an untagged language as
+  `en`) cleared ~800 `name_langs` and most `description_langs` differences.
+- `assertion_declaration` is normalized empty-≡-`asserted` (the library makes the
+  clause-11.10 default explicit; same meaning), clearing ~394.
+- Term/Expression `value` now populates `content`.
+
+Adopting the SACM "statement = Description" model (clause 8.9) then took it to
+**377**, and — more importantly — changed the *composition* so the projection no
+longer loses anything:
+
+- The reader now treats a legacy `content=`/`<content>` statement as the primary
+  Description (front), so `description()` returns the statement.
+- The projection surfaces that statement in the POD `content` field, but only for
+  claim-like kinds (Claim, ArgumentReasoning) — artifacts, references and
+  relationships legitimately carry a `<description>` that is a note, not a
+  statement, and keep `content` empty as before.
+
+Result: files that stored the statement in a `content=` attribute now **match**
+the legacy parser exactly, and the projection always carries the statement. The
+remaining 377 are all cases where the library is *more correct* than the legacy
+parser, not losses:
+
+| Group | Count | Meaning |
+|---|---:|---|
+| content / content_langs | ~334 | The projection surfaces the goal statement in `content` for canonical claims (statement in `<description>`, no `content=`), which the legacy parser left empty. The GSN node label uses `name`, so this is the inspector/statement view gaining the text, not a node change. |
+| undeveloped / description(+langs) | 43 | needsSupport→undeveloped; descriptions the legacy parser misses. |
+
+There are **no remaining projection losses** — every difference is the library
+being at least as complete as the legacy parser. That is the property the render
+flip (slice 2) requires.
 
 ## What Stage 4 needs
 
