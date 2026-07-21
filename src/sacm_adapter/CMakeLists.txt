@@ -11,6 +11,7 @@ add_library(af_sacm_adapter OBJECT
     library_load.cpp
     case_projection.cpp
     projection_diff.cpp
+    document_edit.cpp
 )
 
 target_include_directories(af_sacm_adapter PUBLIC ${CMAKE_SOURCE_DIR}/src)

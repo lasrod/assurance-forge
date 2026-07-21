@@ -16,6 +16,10 @@ const sacm::model::Document& LibraryDocumentAccess::document(const LibraryDocume
     return wrapper.impl_->document;
 }
 
+sacm::model::Document& LibraryDocumentAccess::mutable_document(LibraryDocument& wrapper) {
+    return wrapper.impl_->document;
+}
+
 void LibraryDocumentAccess::set_document(LibraryDocument& wrapper,
                                          sacm::model::Document&& document) {
     wrapper.impl_->document = std::move(document);
