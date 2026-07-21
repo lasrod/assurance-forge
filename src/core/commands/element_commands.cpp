@@ -1,8 +1,29 @@
 #include "core/commands/element_commands.h"
 
+#include "sacm_adapter/document_edit.h"
+
 #include <algorithm>
 
 namespace core::commands {
+
+namespace {
+
+// Maps the app text field to the adapter's field enum for the Phase 9 Stage 5
+// shadow-apply. Kept local: the adapter sits below core and cannot see
+// core::ElementTextField.
+sacm_adapter::TextField ToAdapterTextField(ElementTextField field) {
+    switch (field) {
+    case ElementTextField::Name:
+        return sacm_adapter::TextField::Name;
+    case ElementTextField::Description:
+        return sacm_adapter::TextField::Description;
+    case ElementTextField::Content:
+        return sacm_adapter::TextField::Content;
+    }
+    return sacm_adapter::TextField::Name;
+}
+
+} // namespace
 
 std::string NewElementKindToToken(NewElementKind kind) {
     switch (kind) {
@@ -158,6 +179,16 @@ bool UpdateElementTextCommand::Apply(CommandContext& ctx, audit::AuditEvent& out
         return false;
 
     was_no_op_ = (old_value_ == new_value_);
+
+    // Phase 9 Stage 5: route the same edit through the library-owned document.
+    // The legacy models above stay authoritative (save/hash/replay); this only
+    // keeps the library document current. If the mapping does not yet cover
+    // this (field, kind), leave `library_synced` false so the bus re-derives.
+    if (ctx.library_document != nullptr) {
+        const sacm_adapter::EditOutcome edit = sacm_adapter::apply_text_edit(
+            *ctx.library_document, element_id_, ToAdapterTextField(field_), language_, new_value_);
+        ctx.library_synced = edit.supported && edit.applied;
+    }
 
     out_event.event_type = "UpdateElementText";
     out_event.payload = nlohmann::ordered_json::object();

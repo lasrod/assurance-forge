@@ -72,7 +72,8 @@ DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state, core::commands::I
     }
 
     core::commands::CommandContext ctx{state.app_state.loaded_case.value(),
-                                       state.app_state.sacm_package.value()};
+                                       state.app_state.sacm_package.value(),
+                                       state.app_state.library_document.get()};
     const auto result = state.command_bus->Execute(command, ctx, {});
 
     // Mirror ElementEditController::EmitAutosaveStatus semantics: a non-empty

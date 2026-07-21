@@ -29,6 +29,10 @@
 // SACM file is overwritten, so the log is the canonical record of intent.
 // A tamper / consistency check is performed when the event store is
 // reopened.
+namespace sacm_adapter {
+class LibraryDocument;
+}
+
 namespace core::commands {
 
 class ICommand;
@@ -36,6 +40,14 @@ class ICommand;
 struct CommandContext {
     parser::AssuranceCase&        model;
     sacm::AssuranceCasePackage&   package;
+
+    // Phase 9 Stage 5: the library-owned document (null when the file was
+    // loaded through the legacy-parser fallback). A command that routes its
+    // edit through a library operation mutates this and sets `library_synced`;
+    // the bus re-derives it from the authoritative package for any command
+    // that did not, so it never drifts. See src/sacm_adapter/document_edit.h.
+    sacm_adapter::LibraryDocument* library_document = nullptr;
+    bool                          library_synced = false;
 };
 
 struct CommandResult {

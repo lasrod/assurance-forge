@@ -4,12 +4,15 @@
 #include "core/audit/audit_store.h"
 #include "core/audit/canonical_model_hash.h"
 #include "core/audit/event_store.h"
+#include "core/audit/audit_event.h"
 #include "core/commands/command_bus.h"
 #include "core/commands/element_commands.h"
 #include "core/element_factory.h"
 #include "core/project_model.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_parser.h"
+#include "sacm_adapter/case_projection.h"
+#include "sacm_adapter/library_load.h"
 
 #include <gtest/gtest.h>
 
@@ -77,7 +80,79 @@ ProjectFixture MakeFixture(const std::string& tag) {
     return f;
 }
 
+const core::SacmElement* FindProjected(const core::AssuranceCase& assurance_case,
+                                       const std::string& id) {
+    for (const core::SacmElement& element : assurance_case.elements) {
+        if (element.id == id) {
+            return &element;
+        }
+    }
+    return nullptr;
+}
+
+std::size_t ClaimCount(const core::AssuranceCase& assurance_case) {
+    std::size_t count = 0;
+    for (const core::SacmElement& element : assurance_case.elements) {
+        if (element.type == "claim") {
+            ++count;
+        }
+    }
+    return count;
+}
+
 } // namespace
+
+// Phase 9 Stage 5: a text edit command routes the same edit through the
+// library-owned document. The command reports it synced, and the projected
+// library document reflects the new value -- proving the edit executed as a
+// library operation, not just on the legacy models.
+TEST(CommandBus, SACM23_INT_001_UpdateElementTextShadowAppliesToLibraryDocument) {
+    auto f = MakeFixture("shadow_text");
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+
+    core::commands::UpdateElementTextCommand cmd("G1", core::ElementTextField::Name, "en",
+                                                 "Renamed Goal");
+    core::commands::CommandContext ctx{f.model, f.package, loaded.document.get()};
+    core::audit::AuditEvent event;
+    std::string error;
+    ASSERT_TRUE(cmd.Apply(ctx, event, error)) << error;
+
+    EXPECT_TRUE(ctx.library_synced) << "the text edit should route through the library";
+    const core::AssuranceCase projected = sacm_adapter::project_case(*loaded.document);
+    const core::SacmElement* g1 = FindProjected(projected, "G1");
+    ASSERT_NE(g1, nullptr);
+    EXPECT_EQ(g1->name, "Renamed Goal");
+}
+
+// A command with no library seam yet (CreateTopGoal) leaves `library_synced`
+// false; the bus must re-derive the library document from the authoritative
+// package so it still reflects the edit rather than drifting stale.
+TEST(CommandBus, SACM23_INT_001_UncoveredCommandRederivesLibraryDocument) {
+    auto f = MakeFixture("rederive");
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+    ASSERT_EQ(ClaimCount(sacm_adapter::project_case(*loaded.document)), 1u);  // just G1
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+
+    core::commands::CreateTopGoalCommand cmd;
+    core::commands::CommandContext ctx{f.model, f.package, loaded.document.get()};
+    const auto result = bus->Execute(cmd, ctx, "tester");
+    ASSERT_TRUE(result.success) << result.error;
+
+    EXPECT_FALSE(ctx.library_synced) << "CreateTopGoal has no library seam yet";
+    // Re-derived from the authoritative package: the new top goal is present.
+    const core::AssuranceCase projected = sacm_adapter::project_case(*loaded.document);
+    EXPECT_EQ(ClaimCount(projected), 2u);
+    EXPECT_NE(FindProjected(projected, cmd.GeneratedId()), nullptr);
+}
 
 TEST(CommandBus, AppendsTransactionAndUpdatesManifestOnCreateChildElement) {
     auto f = MakeFixture("create_child");

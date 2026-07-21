@@ -52,4 +52,13 @@ LoadOutcome load_document(const std::filesystem::path& path) {
     return outcome;
 }
 
+bool reload_document(LibraryDocument& document, std::string_view xml) {
+    sacm::io::LoadResult result = sacm::io::load_xmi_string(xml);
+    if (!result.ok || !result.document.has_value()) {
+        return false;
+    }
+    LibraryDocumentAccess::set_document(document, std::move(*result.document));
+    return true;
+}
+
 } // namespace sacm_adapter
