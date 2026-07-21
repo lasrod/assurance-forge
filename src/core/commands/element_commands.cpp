@@ -184,7 +184,11 @@ bool UpdateElementTextCommand::Apply(CommandContext& ctx, audit::AuditEvent& out
     // The legacy models above stay authoritative (save/hash/replay); this only
     // keeps the library document current. If the mapping does not yet cover
     // this (field, kind), leave `library_synced` false so the bus re-derives.
-    if (ctx.library_document != nullptr) {
+    //
+    // Skip a no-op edit: SetElementTextField leaves the legacy model unchanged
+    // for old == new, but a library apply could still rewrite the stored
+    // language tag, and marking it synced would suppress the bus re-derive.
+    if (ctx.library_document != nullptr && !was_no_op_) {
         const sacm_adapter::EditOutcome edit = sacm_adapter::apply_text_edit(
             *ctx.library_document, element_id_, ToAdapterTextField(field_), language_, new_value_);
         ctx.library_synced = edit.supported && edit.applied;

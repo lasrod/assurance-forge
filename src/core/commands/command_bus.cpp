@@ -90,7 +90,12 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     // neither the audit log nor the saved package, so the tamper chain is
     // unaffected.
     if (ctx.library_document != nullptr && !ctx.library_synced) {
-        sacm_adapter::reload_document(*ctx.library_document, xml);
+        if (!sacm_adapter::reload_document(*ctx.library_document, xml)) {
+            // Soft warning: the edit is committed and the saved package is
+            // authoritative, but the library-backed view could not be
+            // re-derived, so surface it rather than let it drift silently.
+            result.error = "Library view re-derive failed (edit committed).";
+        }
     }
 
     // Step 2: write SACM atomically (temp file + fsync + rename). A crash

@@ -127,6 +127,29 @@ TEST(CommandBus, SACM23_INT_001_UpdateElementTextShadowAppliesToLibraryDocument)
     EXPECT_EQ(g1->name, "Renamed Goal");
 }
 
+// A no-op text edit (new value equals current) must not mark the command
+// library-synced: SetElementTextField leaves the legacy model unchanged, and a
+// library apply could still rewrite the stored language tag, so the edit is left
+// to the bus re-derive net rather than shadow-applied.
+TEST(CommandBus, SACM23_INT_001_NoOpTextEditDoesNotMarkLibrarySynced) {
+    auto f = MakeFixture("noop_text");
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+
+    // "Top goal" is already G1's name, so this edit is a no-op.
+    core::commands::UpdateElementTextCommand cmd("G1", core::ElementTextField::Name, "en",
+                                                 "Top goal");
+    core::commands::CommandContext ctx{f.model, f.package, loaded.document.get()};
+    core::audit::AuditEvent event;
+    std::string error;
+    ASSERT_TRUE(cmd.Apply(ctx, event, error)) << error;
+
+    EXPECT_TRUE(cmd.WasNoOp());
+    EXPECT_FALSE(ctx.library_synced) << "a no-op must not suppress the re-derive net";
+}
+
 // A command with no library seam yet (CreateTopGoal) leaves `library_synced`
 // false; the bus must re-derive the library document from the authoritative
 // package so it still reflects the edit rather than drifting stale.

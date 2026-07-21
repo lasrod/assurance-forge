@@ -53,16 +53,12 @@ bool content_maps_to_description(sacm::metadata::ElementKind kind) {
            kind == sacm::metadata::ElementKind::ArgumentReasoning;
 }
 
-// The library language whose entry a primary-language edit must overwrite.
-// A legacy `content=` statement is stored lang-less (set("", ...)); editing it
-// under "en" must overwrite that entry in place, not append a parallel "en"
-// one that `primary()` would never return. So for a primary edit we target the
-// front Description's existing language; other languages target themselves.
-std::string effective_description_language(const sacm::model::ModelElement& element,
-                                           const std::string& app_language) {
-    if (app_language != kPrimaryLanguage) {
-        return app_language;
-    }
+// The library language a primary-language content edit must overwrite. A legacy
+// `content=` statement is stored lang-less (set("", ...)); editing it under the
+// primary language must overwrite that entry in place, not append a parallel
+// "en" one that `primary()` would never return. So we target the front
+// Description's existing language.
+std::string primary_description_language(const sacm::model::ModelElement& element) {
     if (!element.descriptions().empty()) {
         const std::vector<sacm::model::LangString>& values =
             element.descriptions().front()->content().values;
@@ -100,6 +96,14 @@ EditOutcome apply_text_edit(LibraryDocument& document, const std::string& elemen
         return applied_outcome(doc.apply(operation));
     }
     case TextField::Content: {
+        // Non-primary languages accumulate a per-language content map the POD
+        // keeps flat but the library stores as extra Description LangStrings;
+        // that multi-language mapping is a later slice. Under a non-primary
+        // language, leave it unsupported so the command bus re-derives from the
+        // authoritative package instead (matching the legacy edit exactly).
+        if (language != kPrimaryLanguage) {
+            return unsupported_outcome();
+        }
         const auto* element = doc.find_as<sacm::model::ModelElement>(id);
         if (element == nullptr || !content_maps_to_description(element->kind())) {
             return unsupported_outcome();
@@ -107,7 +111,7 @@ EditOutcome apply_text_edit(LibraryDocument& document, const std::string& elemen
         const sacm::commands::Operation operation = sacm::commands::SetDescription{
             .element = id,
             .text = value,
-            .language = effective_description_language(*element, language),
+            .language = primary_description_language(*element),
         };
         return applied_outcome(doc.apply(operation));
     }
@@ -203,6 +207,16 @@ std::optional<ChildPlan> plan_child(ChildKind kind, const sacm::model::ElementId
     return std::nullopt;
 }
 
+// Best-effort removal of an element created earlier in a compound operation
+// that then failed, so a partial failure leaves no orphan behind. Any
+// relationship already attached to it comes with it.
+void rollback_element(sacm::model::Document& doc, const sacm::model::ElementId& element_id) {
+    doc.apply(sacm::commands::DeleteElement{
+        .target = element_id,
+        .reference_policy = sacm::commands::ReferenceDeletePolicy::DeleteReferencingRelationships,
+    });
+}
+
 } // namespace
 
 AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& parent_id,
@@ -233,6 +247,7 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
         const sacm::commands::MutationResult declared = doc.apply(sacm::commands::SetAssertionDeclaration{
             .element = element_id, .declaration = *plan->assertion});
         if (!declared.applied) {
+            rollback_element(doc, element_id);
             return failed_child(declared);
         }
     }
@@ -251,6 +266,7 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
     }
     const sacm::commands::MutationResult linked = doc.apply(relationship);
     if (!linked.applied || linked.created_ids().empty()) {
+        rollback_element(doc, element_id);
         return failed_child(linked);
     }
 
@@ -304,6 +320,7 @@ AddChildOutcome apply_challenge(LibraryDocument& document, const std::string& ta
         .is_counter = true,
     });
     if (!linked.applied || linked.created_ids().empty()) {
+        rollback_element(doc, counter_id);
         return failed_child(linked);
     }
 
@@ -397,9 +414,11 @@ AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id
     const std::string acp_id = next_acp_id(existing_acp_ids(doc));
 
     // Marker + name + resolutionKind = none, matching core::acp::UpsertAcpTags
-    // for a freshly added (unresolved) ACP.
-    const sacm::commands::MutationResult marker =
-        add_tag(doc, target, kAcpMarkerKey, acp_id, sacm::model::ElementId(acp_id));
+    // for a freshly added (unresolved) ACP. The ACP id is the marker's *value*,
+    // not the tag element's id: forcing the tag element id to it would collide
+    // with the library's global element-id uniqueness if a real element already
+    // uses that id, so let the library generate the tag id.
+    const sacm::commands::MutationResult marker = add_tag(doc, target, kAcpMarkerKey, acp_id);
     if (!marker.applied) {
         return failed_acp(marker);
     }

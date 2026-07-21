@@ -381,6 +381,42 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildUnderMissingParentUnsupported) {
     EXPECT_FALSE(added.applied);
 }
 
+// A non-primary-language content edit is not wired (the flat per-language
+// content map is a later multi-language slice), so it reports unsupported and
+// the command bus re-derives instead -- rather than the seam guessing at a
+// LangString entry and diverging from the legacy edit.
+TEST(SacmLibraryEdit, SACM23_INT_001_ContentEditUnsupportedForNonPrimaryLanguage) {
+    sacm_adapter::LoadOutcome loaded = load_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::EditOutcome edit = sacm_adapter::apply_text_edit(
+        *loaded.document, "G1", sacm_adapter::TextField::Content, "ja", "\xe5\xae\x89\xe5\x85\xa8");
+    EXPECT_FALSE(edit.supported);
+    EXPECT_FALSE(edit.applied);
+}
+
+// The ACP id is a TaggedValue value, not an element id. Adding an ACP must not
+// force the marker tag's element id to the ACP id, which would collide with the
+// library's global element-id uniqueness when a real element already uses it.
+TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpDoesNotCollideWithElementId) {
+    const std::filesystem::path path =
+        repo_root() / "tests" / "data" / "fixture_acp_id_collision.sacm.xml";
+    ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+
+    // The document already contains an element with id "ACP1"; the generated ACP
+    // id is also "ACP1". The add must still succeed.
+    const sacm_adapter::AcpOutcome added = sacm_adapter::apply_add_acp(*loaded.document, "S1");
+    ASSERT_TRUE(added.supported);
+    ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    EXPECT_EQ(added.acp_id, "ACP1");
+
+    const core::AssuranceCase projected = sacm_adapter::project_case(*loaded.document);
+    EXPECT_NE(find_acp(projected, "ACP1"), nullptr);
+}
+
 // SACM23-INT-001, edit slice: adding an Assurance Claim Point to an eligible
 // element (an ArtifactReference) through the library must produce the same ACP
 // record the legacy core::acp::AddAcp does. The id generator is shared
