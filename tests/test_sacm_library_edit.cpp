@@ -542,6 +542,27 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpDoesNotCollideWithElementId) {
     EXPECT_NE(find_acp(projected, "ACP1"), nullptr);
 }
 
+// SACM23-INT-001, edit slice: a caller-supplied ACP id is used verbatim, so an
+// audited/replayed ACP add reproduces the exact id the legacy generator recorded
+// rather than regenerating from the (possibly diverged) live document state.
+TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpUsesCallerSuppliedId) {
+    const std::filesystem::path path = repo_root() / "tests" / "data" / "fixture_acp_edit.sacm.xml";
+    ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm_adapter::AcpOutcome added =
+        sacm_adapter::apply_add_acp(*loaded.document, "S1", "ACP5");
+    ASSERT_TRUE(added.supported);
+    ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    EXPECT_EQ(added.acp_id, "ACP5") << "the supplied id must be used verbatim, not regenerated";
+
+    const core::AssuranceCase projected = sacm_adapter::project_case(*loaded.document);
+    EXPECT_NE(find_acp(projected, "ACP5"), nullptr);
+    EXPECT_EQ(find_acp(projected, "ACP1"), nullptr) << "the generated id must not appear";
+}
+
 // SACM23-INT-001, edit slice: adding an Assurance Claim Point to an eligible
 // element (an ArtifactReference) through the library must produce the same ACP
 // record the legacy core::acp::AddAcp does. The id generator is shared

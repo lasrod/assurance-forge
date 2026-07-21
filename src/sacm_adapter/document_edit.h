@@ -164,7 +164,12 @@ struct AcpOutcome {
 // relationships report `supported == false`: an ACP on a goal attaches through
 // its supporting relationship, and relationship-ACP eligibility needs the
 // wider `RelationshipEligibleForAcp` rules, both later slices.
-AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id);
+//
+// When `requested_acp_id` is non-empty it is the `ACP<n>` id used verbatim (so an
+// audited/replayed ACP add reproduces the id the legacy generator recorded);
+// empty generates the next free one.
+AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id,
+                         const std::string& requested_acp_id = {});
 
 // Result of deleting an element.
 struct DeleteOutcome {

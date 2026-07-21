@@ -499,7 +499,8 @@ sacm::commands::MutationResult add_tag(sacm::model::Document& doc,
 
 } // namespace
 
-AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id) {
+AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id,
+                         const std::string& requested_acp_id) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::model::ElementId target(target_id);
 
@@ -511,7 +512,11 @@ AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id
         return unsupported_acp();
     }
 
-    const std::string acp_id = next_acp_id(existing_acp_ids(doc));
+    // A caller-supplied id is used verbatim (so an audited/replayed ACP add
+    // reproduces the exact `ACP<n>` the legacy core::acp::AddAcp generated);
+    // empty means generate the next free one.
+    const std::string acp_id =
+        requested_acp_id.empty() ? next_acp_id(existing_acp_ids(doc)) : requested_acp_id;
 
     // Marker + name + resolutionKind = none, matching core::acp::UpsertAcpTags
     // for a freshly added (unresolved) ACP. The ACP id is the marker's *value*,
