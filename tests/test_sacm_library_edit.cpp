@@ -247,6 +247,11 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildReproducesLegacyStructure) {
          {"artifactreference", "asserted", "assertedcontext", true, true, false}},
         {sacm_adapter::ChildKind::Assumption, core::NewElementKind::Assumption,
          {"claim", "assumed", "assertedcontext", true, true, false}},
+        // Justification: stored as axiomatic + a gsn.role tag, translated back to
+        // the app's internal "justification" by the projection -- so it now
+        // reproduces the legacy structure.
+        {sacm_adapter::ChildKind::Justification, core::NewElementKind::Justification,
+         {"claim", "justification", "assertedcontext", true, true, false}},
     };
 
     for (const Scenario& scenario : scenarios) {
@@ -353,21 +358,99 @@ TEST(SacmLibraryEdit, SACM23_INT_001_ChallengeReproducesLegacyStructure) {
     }
 }
 
-// Strategy and Justification have no like-for-like library mapping yet: a bare
-// strategy inference would have no source (SACM source [1..*]), and the
-// standards-correct Justification value is axiomatic rather than the legacy
-// "justification" literal. The seam reports them unsupported rather than
-// silently producing invalid or divergent structure.
-TEST(SacmLibraryEdit, SACM23_INT_001_AddChildStrategyAndJustificationUnsupported) {
-    for (const sacm_adapter::ChildKind kind :
-         {sacm_adapter::ChildKind::Strategy, sacm_adapter::ChildKind::Justification}) {
-        sacm_adapter::LoadOutcome loaded = load_fixture();
-        ASSERT_NE(loaded.document, nullptr);
-        const sacm_adapter::AddChildOutcome added =
-            sacm_adapter::apply_add_child(*loaded.document, "G1", kind);
-        EXPECT_FALSE(added.supported);
-        EXPECT_FALSE(added.applied);
+// A Strategy is added before its sub-goals, so it is created as a standalone
+// ArgumentReasoning (with a strategyTarget tag naming its goal) and no inference
+// yet -- the inference would be source-less, which SACM's source [1..*] forbids.
+// The inference is materialized on the first sub-goal (a following increment).
+TEST(SacmLibraryEdit, SACM23_INT_001_AddChildStrategyCreatesPendingReasoning) {
+    sacm_adapter::LoadOutcome loaded = load_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm_adapter::AddChildOutcome added = sacm_adapter::apply_add_child(
+        *loaded.document, "G1", sacm_adapter::ChildKind::Strategy, "STRAT1");
+    ASSERT_TRUE(added.supported);
+    ASSERT_TRUE(added.applied)
+        << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    EXPECT_EQ(added.new_element_id, "STRAT1");
+    EXPECT_TRUE(added.new_relationship_id.empty()) << "no inference until the first sub-goal";
+
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    const core::SacmElement* strategy = find_element(after, "STRAT1");
+    ASSERT_NE(strategy, nullptr);
+    EXPECT_EQ(strategy->type, "argumentreasoning");
+    // No relationship references it yet.
+    for (const core::SacmElement& element : after.elements) {
+        EXPECT_EQ(std::find(element.source_refs.begin(), element.source_refs.end(), "STRAT1"),
+                  element.source_refs.end());
+        EXPECT_NE(element.reasoning_ref, "STRAT1");
     }
+}
+
+// The GSN Justification round-trips: adding one stores axiomatic + the gsn.role
+// tag in the library, and after an XMI save/load the projection still renders it
+// as a justification -- proving the vendor tag survives (standards-correct SACM
+// on disk, GSN semantics preserved).
+TEST(SacmLibraryEdit, SACM23_INT_001_JustificationRoundTripsViaGsnRoleTag) {
+    sacm_adapter::LoadOutcome loaded = load_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm_adapter::AddChildOutcome added = sacm_adapter::apply_add_child(
+        *loaded.document, "G1", sacm_adapter::ChildKind::Justification, "JUST1", "JREL1");
+    ASSERT_TRUE(added.applied)
+        << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+
+    const core::AssuranceCase before_case = sacm_adapter::project_case(*loaded.document);
+    const core::SacmElement* before = find_element(before_case, "JUST1");
+    ASSERT_NE(before, nullptr);
+    EXPECT_EQ(before->assertion_declaration, "justification");
+
+    // Save to XMI and reload: the gsn.role tag must survive.
+    const sacm_adapter::SaveOutcome saved = sacm_adapter::save_document(*loaded.document);
+    ASSERT_TRUE(saved.ok);
+    sacm_adapter::LibraryDocument reloaded;
+    ASSERT_TRUE(sacm_adapter::reload_document(reloaded, saved.xml));
+    const core::AssuranceCase after_case = sacm_adapter::project_case(reloaded);
+    const core::SacmElement* after = find_element(after_case, "JUST1");
+    ASSERT_NE(after, nullptr);
+    EXPECT_EQ(after->assertion_declaration, "justification");
+}
+
+// Stage 7 prerequisite: when the caller supplies ids, the created element and
+// relationship must use them verbatim (not library-generated ones), so a
+// library-primary audit replay can reproduce exact ids.
+TEST(SacmLibraryEdit, SACM23_INT_001_AddChildUsesCallerSuppliedIds) {
+    sacm_adapter::LoadOutcome loaded = load_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm_adapter::AddChildOutcome added = sacm_adapter::apply_add_child(
+        *loaded.document, "G1", sacm_adapter::ChildKind::Goal, "CALLER_GOAL", "CALLER_REL");
+    ASSERT_TRUE(added.applied)
+        << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    EXPECT_EQ(added.new_element_id, "CALLER_GOAL");
+    EXPECT_EQ(added.new_relationship_id, "CALLER_REL");
+
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    ASSERT_NE(find_element(after, "CALLER_GOAL"), nullptr);
+    const core::SacmElement* relationship = find_element(after, "CALLER_REL");
+    ASSERT_NE(relationship, nullptr);
+    EXPECT_EQ(relationship->source_refs, std::vector<std::string>{"CALLER_GOAL"});
+}
+
+TEST(SacmLibraryEdit, SACM23_INT_001_ChallengeUsesCallerSuppliedIds) {
+    sacm_adapter::LoadOutcome loaded = load_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm_adapter::AddChildOutcome added = sacm_adapter::apply_challenge(
+        *loaded.document, "G1", sacm_adapter::ChallengeSource::CounterArgument, "CALLER_COUNTER",
+        "CALLER_CREL");
+    ASSERT_TRUE(added.applied)
+        << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    EXPECT_EQ(added.new_element_id, "CALLER_COUNTER");
+    EXPECT_EQ(added.new_relationship_id, "CALLER_CREL");
+
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    ASSERT_NE(find_element(after, "CALLER_COUNTER"), nullptr);
+    ASSERT_NE(find_element(after, "CALLER_CREL"), nullptr);
 }
 
 // Adding a child under an id that is not a claim-like container in an argument

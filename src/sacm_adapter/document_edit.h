@@ -71,11 +71,11 @@ EditOutcome apply_text_edit(LibraryDocument& document, const std::string& elemen
 // to a new element plus an asserted relationship linking it to the parent.
 enum class ChildKind {
     Goal,          // Claim   <- AssertedInference
-    Strategy,      // not wired: bare strategy inference has no source (see below)
+    Strategy,      // ArgumentReasoning + strategyTarget tag (inference deferred)
     Solution,      // ArtifactReference <- AssertedEvidence
     Context,       // ArtifactReference <- AssertedContext
-    Assumption,    // Claim (assumed)   <- AssertedContext
-    Justification, // not wired: see below
+    Assumption,    // Claim (assumed)      <- AssertedContext
+    Justification, // Claim (axiomatic + gsn.role tag) <- AssertedContext
 };
 
 // Result of adding a child element through the library. Reports the ids the
@@ -95,19 +95,25 @@ struct AddChildOutcome {
 // new element (premise) -- except a Strategy, whose ArgumentReasoning attaches
 // through the inference's `reasoning` end rather than a source.
 //
-// Two kinds report `supported == false` for now:
-//   * Strategy -- its AssertedInference is created before any sub-goal exists,
-//     so it would have no source, which SACM's source [1..*] forbids. The
-//     legacy app produced that invalid transient state; representing a bare
-//     strategy in valid SACM is an open decision.
-//   * Justification -- the standards-correct GSN mapping is
-//     `assertionDeclaration = axiomatic` (docs/sacm/sacm-gsn-mapping.md), which
-//     deliberately diverges from the legacy app's non-standard "justification"
-//     literal, so it is not a like-for-like reproduction.
-// The parent must be a claim-like container in an ArgumentPackage; otherwise
-// the outcome reports unsupported.
+// Strategy is added before any sub-goal exists (a bare strategy inference would
+// have no source, which SACM's source [1..*] forbids), so this creates only the
+// ArgumentReasoning plus a `strategyTarget` vendor tag naming the goal it will
+// support; the inference is materialized when the first sub-goal is added (that
+// materialization, and extending an inference's sources for later sub-goals, is
+// a following increment). Justification maps to a Claim with axiomatic + a
+// gsn.role tag (see gsn_role_tag.h). The parent must be a claim-like container
+// in an ArgumentPackage; otherwise the outcome reports unsupported.
+// When `element_id`/`relationship_id` are non-empty they are used verbatim
+// instead of library-generated ids (the library's create operations accept a
+// caller-supplied id). This makes the operation id-deterministic, which a
+// library-primary audit replay needs to reproduce exact ids -- a Phase 9 Stage
+// 7 prerequisite. Empty means the library generates the id. `relationship_id`
+// applies only when a relationship is created; a Strategy creates none yet (its
+// inference is deferred to the first sub-goal), so it is ignored for
+// `ChildKind::Strategy`.
 AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& parent_id,
-                                ChildKind kind);
+                                ChildKind kind, const std::string& element_id = {},
+                                const std::string& relationship_id = {});
 
 // The source of a dialectic challenge, mirroring core::ChallengeSourceType.
 enum class ChallengeSource {
@@ -122,8 +128,11 @@ enum class ChallengeSource {
 // may itself be a relationship (challenging an inference) -- SACM allows it
 // because an AssertedRelationship is a SACMElement. Reuses AddChildOutcome: the
 // result is likewise a new element plus a new relationship.
+// `element_id`/`relationship_id`: see apply_add_child -- non-empty ids are used
+// verbatim for id-deterministic replay.
 AddChildOutcome apply_challenge(LibraryDocument& document, const std::string& target_id,
-                                ChallengeSource source);
+                                ChallengeSource source, const std::string& element_id = {},
+                                const std::string& relationship_id = {});
 
 // Result of adding an Assurance Claim Point. `acp_id` is the id the seam
 // generated (deterministic `ACP<n>`, matching core's NextAcpId), empty unless

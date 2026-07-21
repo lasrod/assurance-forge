@@ -1,5 +1,6 @@
 #include "sacm_adapter/document_edit.h"
 
+#include "sacm_adapter/gsn_role_tag.h"
 #include "sacm_adapter/library_document_access.h"
 
 #include "sacm/commands/mutation.h"
@@ -165,44 +166,71 @@ AddChildOutcome failed_child(const sacm::commands::MutationResult& result) {
 // The new element and the relationship linking it to the parent, per kind.
 struct ChildPlan {
     sacm::commands::Operation create_element;
-    std::optional<sacm::model::AssertionDeclaration> assertion;  // set for Assumption
+    std::optional<sacm::model::AssertionDeclaration> assertion;  // set for Assumption/Justification
+    // GSN node role to record as a vendor TaggedValue (e.g. "Justification"),
+    // preserving a GSN type SACM's AssertionDeclaration cannot express on its own.
+    std::optional<std::string> gsn_role;
     sacm::metadata::ElementKind relationship_kind;
     bool attach_via_reasoning = false;  // Strategy: the reasoning end, not a source
 };
 
 // Builds the create operations for `kind` under argument package `package_id`.
 // Returns nullopt for kinds with no like-for-like library mapping yet.
-std::optional<ChildPlan> plan_child(ChildKind kind, const sacm::model::ElementId& package_id) {
+// Converts a possibly-empty id string to the library's optional id: empty means
+// "let the library generate one".
+std::optional<sacm::model::ElementId> to_optional_id(const std::string& id) {
+    if (id.empty()) {
+        return std::nullopt;
+    }
+    return sacm::model::ElementId(id);
+}
+
+std::optional<ChildPlan> plan_child(ChildKind kind, const sacm::model::ElementId& package_id,
+                                    const std::optional<sacm::model::ElementId>& element_id) {
     using sacm::metadata::ElementKind;
     switch (kind) {
     case ChildKind::Goal:
-        return ChildPlan{.create_element = sacm::commands::CreateClaim{.parent = package_id},
-                         .assertion = std::nullopt,
-                         .relationship_kind = ElementKind::AssertedInference};
+        return ChildPlan{
+            .create_element = sacm::commands::CreateClaim{.parent = package_id, .id = element_id},
+            .assertion = std::nullopt,
+            .relationship_kind = ElementKind::AssertedInference};
     case ChildKind::Strategy:
-        // Not wired: a strategy is added before any sub-goal exists, so its
-        // AssertedInference would have a `reasoning` and a `target` but no
-        // source -- which SACM's source [1..*] (clause 11.13) forbids. The
-        // library correctly rejects that transient state the legacy app
-        // tolerated; representing a bare strategy in valid SACM is an open
-        // decision (docs/sacm/sacm-gsn-metamodel-gaps.md).
+        // Unreachable: apply_add_child intercepts Strategy before calling
+        // plan_child, because a strategy is added before any sub-goal exists and
+        // maps to only an ArgumentReasoning (no inference yet -- a sourceless
+        // inference violates SACM source [1..*], clause 11.13). Kept for switch
+        // exhaustiveness; see the Strategy branch in apply_add_child and
+        // docs/sacm/sacm-gsn-metamodel-gaps.md.
         return std::nullopt;
     case ChildKind::Solution:
         return ChildPlan{
-            .create_element = sacm::commands::CreateArtifactReference{.parent = package_id},
+            .create_element =
+                sacm::commands::CreateArtifactReference{.parent = package_id, .id = element_id},
             .assertion = std::nullopt,
             .relationship_kind = ElementKind::AssertedEvidence};
     case ChildKind::Context:
         return ChildPlan{
-            .create_element = sacm::commands::CreateArtifactReference{.parent = package_id},
+            .create_element =
+                sacm::commands::CreateArtifactReference{.parent = package_id, .id = element_id},
             .assertion = std::nullopt,
             .relationship_kind = ElementKind::AssertedContext};
     case ChildKind::Assumption:
-        return ChildPlan{.create_element = sacm::commands::CreateClaim{.parent = package_id},
-                         .assertion = sacm::model::AssertionDeclaration::Assumed,
-                         .relationship_kind = ElementKind::AssertedContext};
+        return ChildPlan{
+            .create_element = sacm::commands::CreateClaim{.parent = package_id, .id = element_id},
+            .assertion = sacm::model::AssertionDeclaration::Assumed,
+            .relationship_kind = ElementKind::AssertedContext};
     case ChildKind::Justification:
-        return std::nullopt;
+        // A GSN Justification maps to a Claim with assertionDeclaration =
+        // axiomatic (the standards-correct mapping, docs/sacm/sacm-gsn-mapping.md
+        // -- not the legacy non-standard "justification" literal). SACM cannot
+        // distinguish a Justification from an axiomatically-asserted Goal, so the
+        // GSN role is preserved in a vendor TaggedValue and translated back by
+        // the projection.
+        return ChildPlan{
+            .create_element = sacm::commands::CreateClaim{.parent = package_id, .id = element_id},
+            .assertion = sacm::model::AssertionDeclaration::Axiomatic,
+            .gsn_role = std::string(kGsnRoleJustification),
+            .relationship_kind = ElementKind::AssertedContext};
     }
     return std::nullopt;
 }
@@ -220,7 +248,8 @@ void rollback_element(sacm::model::Document& doc, const sacm::model::ElementId& 
 } // namespace
 
 AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& parent_id,
-                                ChildKind kind) {
+                                ChildKind kind, const std::string& element_id,
+                                const std::string& relationship_id) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::model::ElementId parent(parent_id);
 
@@ -230,25 +259,62 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
     }
     const sacm::model::ElementId package_id = package->id();
 
-    const std::optional<ChildPlan> plan = plan_child(kind, package_id);
+    // A Strategy is added before it has any sub-goals; its AssertedInference
+    // would have no source (SACM source [1..*]), so create only the
+    // ArgumentReasoning and record the goal it will support in a vendor tag
+    // (app-defer). The inference is materialized when the first sub-goal gives it
+    // a source -- a following increment (extending an existing inference's
+    // sources for the second and later sub-goals needs a new library op).
+    if (kind == ChildKind::Strategy) {
+        const sacm::commands::MutationResult created_strategy =
+            doc.apply(sacm::commands::CreateArgumentReasoning{.parent = package_id,
+                                                              .id = to_optional_id(element_id)});
+        if (!created_strategy.applied || created_strategy.created_ids().empty()) {
+            return failed_child(created_strategy);
+        }
+        const sacm::model::ElementId strategy_id = created_strategy.created_ids().front();
+        const sacm::commands::MutationResult tagged = doc.apply(sacm::commands::AddTaggedValue{
+            .element = strategy_id, .key = kGsnStrategyTargetTagKey, .value = parent_id});
+        if (!tagged.applied) {
+            rollback_element(doc, strategy_id);
+            return failed_child(tagged);
+        }
+        AddChildOutcome outcome;
+        outcome.supported = true;
+        outcome.applied = true;
+        outcome.new_element_id = strategy_id.value();
+        return outcome;  // no relationship yet -- materialized on the first sub-goal
+    }
+
+    const std::optional<ChildPlan> plan = plan_child(kind, package_id, to_optional_id(element_id));
     if (!plan.has_value()) {
         return unsupported_child();
     }
 
-    // 1. Create the element and take the id the library generated for it.
+    // 1. Create the element; take back the id (caller-supplied or generated).
     const sacm::commands::MutationResult created = doc.apply(plan->create_element);
     if (!created.applied || created.created_ids().empty()) {
         return failed_child(created);
     }
-    const sacm::model::ElementId element_id = created.created_ids().front();
+    const sacm::model::ElementId created_id = created.created_ids().front();
 
-    // 2. Assumption is a claim marked `assumed`.
+    // 2. Assumption/Justification set an assertion declaration.
     if (plan->assertion.has_value()) {
         const sacm::commands::MutationResult declared = doc.apply(sacm::commands::SetAssertionDeclaration{
-            .element = element_id, .declaration = *plan->assertion});
+            .element = created_id, .declaration = *plan->assertion});
         if (!declared.applied) {
-            rollback_element(doc, element_id);
+            rollback_element(doc, created_id);
             return failed_child(declared);
+        }
+    }
+
+    // 2b. Preserve a GSN role (Justification) SACM cannot express, as a vendor tag.
+    if (plan->gsn_role.has_value()) {
+        const sacm::commands::MutationResult tagged = doc.apply(sacm::commands::AddTaggedValue{
+            .element = created_id, .key = kGsnRoleTagKey, .value = *plan->gsn_role});
+        if (!tagged.applied) {
+            rollback_element(doc, created_id);
+            return failed_child(tagged);
         }
     }
 
@@ -257,29 +323,31 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
     sacm::commands::CreateAssertedRelationship relationship{
         .parent = package_id,
         .kind = plan->relationship_kind,
+        .id = to_optional_id(relationship_id),
         .targets = {parent},
     };
     if (plan->attach_via_reasoning) {
-        relationship.reasoning = element_id;
+        relationship.reasoning = created_id;
     } else {
-        relationship.sources = {element_id};
+        relationship.sources = {created_id};
     }
     const sacm::commands::MutationResult linked = doc.apply(relationship);
     if (!linked.applied || linked.created_ids().empty()) {
-        rollback_element(doc, element_id);
+        rollback_element(doc, created_id);
         return failed_child(linked);
     }
 
     AddChildOutcome outcome;
     outcome.supported = true;
     outcome.applied = true;
-    outcome.new_element_id = element_id.value();
+    outcome.new_element_id = created_id.value();
     outcome.new_relationship_id = linked.created_ids().front().value();
     return outcome;
 }
 
 AddChildOutcome apply_challenge(LibraryDocument& document, const std::string& target_id,
-                                ChallengeSource source) {
+                                ChallengeSource source, const std::string& element_id,
+                                const std::string& relationship_id) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::model::ElementId target(target_id);
 
@@ -292,16 +360,18 @@ AddChildOutcome apply_challenge(LibraryDocument& document, const std::string& ta
         return unsupported_child();
     }
     const sacm::model::ElementId package_id = package->id();
+    const std::optional<sacm::model::ElementId> counter_id_hint = to_optional_id(element_id);
 
     sacm::commands::Operation create_counter;
     sacm::metadata::ElementKind relationship_kind = sacm::metadata::ElementKind::AssertedInference;
     switch (source) {
     case ChallengeSource::CounterArgument:
-        create_counter = sacm::commands::CreateClaim{.parent = package_id};
+        create_counter = sacm::commands::CreateClaim{.parent = package_id, .id = counter_id_hint};
         relationship_kind = sacm::metadata::ElementKind::AssertedInference;
         break;
     case ChallengeSource::CounterEvidence:
-        create_counter = sacm::commands::CreateArtifactReference{.parent = package_id};
+        create_counter =
+            sacm::commands::CreateArtifactReference{.parent = package_id, .id = counter_id_hint};
         relationship_kind = sacm::metadata::ElementKind::AssertedEvidence;
         break;
     }
@@ -315,6 +385,7 @@ AddChildOutcome apply_challenge(LibraryDocument& document, const std::string& ta
     const sacm::commands::MutationResult linked = doc.apply(sacm::commands::CreateAssertedRelationship{
         .parent = package_id,
         .kind = relationship_kind,
+        .id = to_optional_id(relationship_id),
         .sources = {counter_id},
         .targets = {target},
         .is_counter = true,
