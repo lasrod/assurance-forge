@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fixture for the Phase 9 Stage 5 ACP edit seam. Unlike fixture_acp_parity
+     (which carries pre-authored ACPs on a claim and a relationship), this one
+     carries no ACPs and includes an ArtifactReference (Solution) S1 -- the only
+     element kind core::acp::ElementEligibleForAcp accepts -- so a newly added
+     element ACP has a clean, eligible target. -->
+<AssuranceCasePackage xmlns="http://www.omg.org/spec/SACM/20220301" id="ACP_EDIT" name="ACP Edit Case">
+  <argumentPackage id="AP1" name="Argument">
+    <claim id="G1" name="Top Goal" content="The system is acceptably safe."/>
+    <artifactReference id="S1" name="Test Report"/>
+    <assertedEvidence id="R1" source="S1" target="G1"/>
+  </argumentPackage>
+</AssuranceCasePackage>

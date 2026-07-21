@@ -13,6 +13,7 @@
 
 #include <optional>
 #include <string>
+#include <unordered_set>
 
 namespace sacm_adapter {
 
@@ -311,6 +312,112 @@ AddChildOutcome apply_challenge(LibraryDocument& document, const std::string& ta
     outcome.applied = true;
     outcome.new_element_id = counter_id.value();
     outcome.new_relationship_id = linked.created_ids().front().value();
+    return outcome;
+}
+
+namespace {
+
+constexpr const char* kAcpMarkerKey = "assuranceForge.acp";
+
+// Collects every ACP id already present in the document, so the next id does
+// not collide across packages -- mirroring core's CollectAcpsForIdGeneration.
+std::unordered_set<std::string> existing_acp_ids(const sacm::model::Document& doc) {
+    std::unordered_set<std::string> ids;
+    doc.for_each_element([&](const sacm::model::SACMElement& element) {
+        const auto* model_element = dynamic_cast<const sacm::model::ModelElement*>(&element);
+        if (model_element == nullptr) {
+            return;
+        }
+        for (const auto& tag : model_element->tagged_values()) {
+            if (tag->key().primary() == kAcpMarkerKey) {
+                const std::string value(tag->content().primary());
+                if (!value.empty()) {
+                    ids.insert(value);
+                }
+            }
+        }
+    });
+    return ids;
+}
+
+// The next free `ACP<n>` id, matching core::acp::NextAcpId exactly.
+std::string next_acp_id(const std::unordered_set<std::string>& existing) {
+    for (int index = 1; index < 100000; ++index) {
+        std::string candidate = "ACP" + std::to_string(index);
+        if (!existing.contains(candidate)) {
+            return candidate;
+        }
+    }
+    return "ACPx";
+}
+
+AcpOutcome unsupported_acp() {
+    return AcpOutcome{.supported = false};
+}
+
+AcpOutcome failed_acp(const sacm::commands::MutationResult& result) {
+    AcpOutcome outcome;
+    outcome.supported = true;
+    outcome.applied = false;
+    for (const sacm::validation::Diagnostic& diagnostic : result.diagnostics) {
+        outcome.diagnostics.push_back(LoadDiagnostic{
+            .code = diagnostic.code,
+            .severity = std::string(sacm::validation::severity_name(diagnostic.severity)),
+            .message = diagnostic.message,
+        });
+    }
+    return outcome;
+}
+
+// Adds one vendor TaggedValue to `element`. Returns the library's result so the
+// caller can stop on the first failure and leave the document unchanged beyond
+// what already applied.
+sacm::commands::MutationResult add_tag(sacm::model::Document& doc,
+                                       const sacm::model::ElementId& element, const std::string& key,
+                                       const std::string& value,
+                                       std::optional<sacm::model::ElementId> tag_id = {}) {
+    return doc.apply(sacm::commands::AddTaggedValue{
+        .element = element, .id = std::move(tag_id), .key = key, .value = value});
+}
+
+} // namespace
+
+AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId target(target_id);
+
+    const sacm::model::SACMElement* element = doc.find(target);
+    // Element ACPs are eligible only on an ArtifactReference (core's
+    // ElementEligibleForAcp); claims and relationships are later slices.
+    if (element == nullptr ||
+        element->kind() != sacm::metadata::ElementKind::ArtifactReference) {
+        return unsupported_acp();
+    }
+
+    const std::string acp_id = next_acp_id(existing_acp_ids(doc));
+
+    // Marker + name + resolutionKind = none, matching core::acp::UpsertAcpTags
+    // for a freshly added (unresolved) ACP.
+    const sacm::commands::MutationResult marker =
+        add_tag(doc, target, kAcpMarkerKey, acp_id, sacm::model::ElementId(acp_id));
+    if (!marker.applied) {
+        return failed_acp(marker);
+    }
+    const sacm::commands::MutationResult name =
+        add_tag(doc, target, std::string(kAcpMarkerKey) + "." + acp_id + ".name", acp_id);
+    if (!name.applied) {
+        return failed_acp(name);
+    }
+    const sacm::commands::MutationResult resolution = add_tag(
+        doc, target, std::string(kAcpMarkerKey) + "." + acp_id + ".resolutionKind", "none");
+    if (!resolution.applied) {
+        return failed_acp(resolution);
+    }
+
+    AcpOutcome outcome;
+    outcome.supported = true;
+    outcome.applied = true;
+    outcome.acp_id = acp_id;
     return outcome;
 }
 

@@ -125,4 +125,27 @@ enum class ChallengeSource {
 AddChildOutcome apply_challenge(LibraryDocument& document, const std::string& target_id,
                                 ChallengeSource source);
 
+// Result of adding an Assurance Claim Point. `acp_id` is the id the seam
+// generated (deterministic `ACP<n>`, matching core's NextAcpId), empty unless
+// applied.
+struct AcpOutcome {
+    bool supported = true;
+    bool applied = false;
+    std::string acp_id;
+    std::vector<LoadDiagnostic> diagnostics;
+};
+
+// Adds an Assurance Claim Point to `target_id`, mirroring `core::acp::AddAcp`:
+// generates the next `ACP<n>` id and writes the vendor TaggedValues the
+// projection reads back (`assuranceForge.acp` marker + `.name` + a
+// `.resolutionKind = none`). ACP is a vendor extension (clause 8.12), not a
+// SACM concept, so this is `AddTaggedValue` under the hood.
+//
+// Scoped to *element* ACPs on an `ArtifactReference` (Solution/Context) -- the
+// only element kind `core::acp::ElementEligibleForAcp` accepts. Claims and
+// relationships report `supported == false`: an ACP on a goal attaches through
+// its supporting relationship, and relationship-ACP eligibility needs the
+// wider `RelationshipEligibleForAcp` rules, both later slices.
+AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id);
+
 } // namespace sacm_adapter

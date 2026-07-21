@@ -20,6 +20,7 @@
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/library_load.h"
 
+#include "core/acp/acp_editing.h"
 #include "core/element_factory.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_parser.h"
@@ -97,6 +98,15 @@ struct ChildShape {
 // the legacy parser leaves a new Goal's empty. Treat them as the same state.
 std::string normalize_assertion(const std::string& assertion) {
     return (assertion.empty() || assertion == "asserted") ? "asserted" : assertion;
+}
+
+const core::AcpRecord* find_acp(const core::AssuranceCase& assurance_case, const std::string& id) {
+    for (const core::AcpRecord& acp : assurance_case.acps) {
+        if (acp.id == id) {
+            return &acp;
+        }
+    }
+    return nullptr;
 }
 
 ChildShape describe_child(const core::AssuranceCase& assurance_case, const std::string& parent_id,
@@ -358,6 +368,88 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildUnderMissingParentUnsupported) {
         sacm_adapter::apply_add_child(*loaded.document, "NO_SUCH_ID", sacm_adapter::ChildKind::Goal);
     EXPECT_FALSE(added.supported);
     EXPECT_FALSE(added.applied);
+}
+
+// SACM23-INT-001, edit slice: adding an Assurance Claim Point to an eligible
+// element (an ArtifactReference) through the library must produce the same ACP
+// record the legacy core::acp::AddAcp does. The id generator is shared
+// (deterministic ACP<n>), so unlike the create ops the records -- id included --
+// compare exactly.
+TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpReproducesLegacyRecord) {
+    const std::filesystem::path path = repo_root() / "tests" / "data" / "fixture_acp_edit.sacm.xml";
+    ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
+
+    // Library path: add an ACP to the ArtifactReference S1.
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::AcpOutcome added = sacm_adapter::apply_add_acp(*loaded.document, "S1");
+    ASSERT_TRUE(added.supported);
+    ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    EXPECT_EQ(added.acp_id, "ACP1");  // no ACPs pre-exist, so the first id is ACP1
+
+    const core::AssuranceCase projected = sacm_adapter::project_case(*loaded.document);
+    const core::AcpRecord* library_acp = find_acp(projected, added.acp_id);
+    ASSERT_NE(library_acp, nullptr) << "projection did not synthesize the added ACP";
+
+    // Legacy path: the same add through core::acp::AddAcp.
+    const auto legacy_case = parser::parse_sacm_xml(path.string());
+    ASSERT_TRUE(legacy_case.has_value()) << legacy_case.error();
+    const auto legacy_package = sacm::parse_sacm(path.string());
+    ASSERT_TRUE(legacy_package.has_value()) << legacy_package.error();
+    core::AssuranceCase legacy = *legacy_case;
+    sacm::AssuranceCasePackage package = *legacy_package;
+    const core::acp::AcpEditResult result = core::acp::AddAcp(legacy, &package, "element", "S1");
+    ASSERT_TRUE(result.error.empty()) << result.error;
+    const core::AcpRecord* legacy_acp = find_acp(legacy, result.acp_id);
+    ASSERT_NE(legacy_acp, nullptr);
+
+    // The two records match field for field, ids included.
+    EXPECT_EQ(library_acp->id, legacy_acp->id);
+    EXPECT_EQ(library_acp->name, legacy_acp->name);
+    EXPECT_EQ(library_acp->target_kind, legacy_acp->target_kind);
+    EXPECT_EQ(library_acp->target_id, legacy_acp->target_id);
+    EXPECT_EQ(library_acp->resolution_kind, legacy_acp->resolution_kind);
+    // And they are the expected values for a fresh, unresolved element ACP.
+    EXPECT_EQ(library_acp->name, "ACP1");
+    EXPECT_EQ(library_acp->target_kind, "element");
+    EXPECT_EQ(library_acp->target_id, "S1");
+    EXPECT_EQ(library_acp->resolution_kind, "none");
+}
+
+// An ACP on an ineligible element (a claim, not an ArtifactReference) must be
+// refused, matching core::acp::AddAcp, which rejects the same target. A
+// relationship target is likewise unsupported for now (relationship-ACP
+// eligibility is a later slice).
+TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpRefusesIneligibleTargets) {
+    const std::filesystem::path path =
+        repo_root() / "tests" / "data" / "fixture_acp_parity.sacm.xml";
+    ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+
+    // G1 is a claim -> ineligible for an element ACP.
+    const sacm_adapter::AcpOutcome on_claim = sacm_adapter::apply_add_acp(*loaded.document, "G1");
+    EXPECT_FALSE(on_claim.supported);
+    EXPECT_FALSE(on_claim.applied);
+
+    // Legacy agrees the claim is not an eligible element ACP target.
+    const auto legacy_case = parser::parse_sacm_xml(path.string());
+    ASSERT_TRUE(legacy_case.has_value());
+    const auto legacy_package = sacm::parse_sacm(path.string());
+    ASSERT_TRUE(legacy_package.has_value());
+    core::AssuranceCase legacy = *legacy_case;
+    sacm::AssuranceCasePackage package = *legacy_package;
+    const core::acp::AcpEditResult result = core::acp::AddAcp(legacy, &package, "element", "G1");
+    EXPECT_FALSE(result.error.empty());
+
+    // R1 is a relationship -> not yet wired.
+    const sacm_adapter::AcpOutcome on_relationship =
+        sacm_adapter::apply_add_acp(*loaded.document, "R1");
+    EXPECT_FALSE(on_relationship.supported);
+    EXPECT_FALSE(on_relationship.applied);
 }
 
 // A rename targeting an id the document does not contain must fail cleanly: the
