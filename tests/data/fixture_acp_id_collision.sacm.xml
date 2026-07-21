@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Regression fixture: a real element already uses the id "ACP1", which is
+     also the first id core::acp::NextAcpId would generate. The ACP id is only a
+     TaggedValue value, so adding an ACP must not force a tag element id of
+     "ACP1" (that would collide with the library's global element-id uniqueness
+     and spuriously fail). S1 is the eligible ArtifactReference ACP target. -->
+<AssuranceCasePackage xmlns="http://www.omg.org/spec/SACM/20220301" id="ACP_COLLIDE" name="ACP Id Collision Case">
+  <argumentPackage id="AP1" name="Argument">
+    <claim id="ACP1" name="Top Goal" content="The system is acceptably safe."/>
+    <artifactReference id="S1" name="Test Report"/>
+    <assertedEvidence id="R1" source="S1" target="ACP1"/>
+  </argumentPackage>
+</AssuranceCasePackage>

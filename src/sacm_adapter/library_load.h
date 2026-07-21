@@ -19,6 +19,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace sacm_adapter {
@@ -58,5 +59,14 @@ struct LoadOutcome {
 // application must use: real project files include pre-2.3 revisions and
 // third-party dialects.
 LoadOutcome load_document(const std::filesystem::path& path);
+
+// Re-derives `document` in place from serialized SACM XML, tolerantly. This is
+// the Phase 9 Stage 5 safety net: after an audited edit that was not routed
+// through a library operation, the application rebuilds the library document
+// from the authoritative legacy package's serialization so it never drifts.
+// Returns false (and leaves `document` unchanged) if the XML could not be
+// loaded. The wrapper identity is preserved -- only the contained document is
+// replaced -- so existing handles stay valid.
+bool reload_document(LibraryDocument& document, std::string_view xml);
 
 } // namespace sacm_adapter

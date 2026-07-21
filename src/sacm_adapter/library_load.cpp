@@ -16,6 +16,10 @@ const sacm::model::Document& LibraryDocumentAccess::document(const LibraryDocume
     return wrapper.impl_->document;
 }
 
+sacm::model::Document& LibraryDocumentAccess::mutable_document(LibraryDocument& wrapper) {
+    return wrapper.impl_->document;
+}
+
 void LibraryDocumentAccess::set_document(LibraryDocument& wrapper,
                                          sacm::model::Document&& document) {
     wrapper.impl_->document = std::move(document);
@@ -46,6 +50,15 @@ LoadOutcome load_document(const std::filesystem::path& path) {
         LibraryDocumentAccess::set_document(*outcome.document, std::move(*result.document));
     }
     return outcome;
+}
+
+bool reload_document(LibraryDocument& document, std::string_view xml) {
+    sacm::io::LoadResult result = sacm::io::load_xmi_string(xml);
+    if (!result.ok || !result.document.has_value()) {
+        return false;
+    }
+    LibraryDocumentAccess::set_document(document, std::move(*result.document));
+    return true;
 }
 
 } // namespace sacm_adapter

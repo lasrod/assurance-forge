@@ -18,6 +18,10 @@ struct LibraryDocument::Impl {
 
 struct LibraryDocumentAccess {
     static const sacm::model::Document& document(const LibraryDocument& wrapper);
+    // Mutable access for the edit seam (Phase 9 Stage 5). Confined to adapter
+    // translation units, same as the const accessor, so `sacm::model` still
+    // never leaves this layer.
+    static sacm::model::Document& mutable_document(LibraryDocument& wrapper);
     // Document is move-only, so construction goes through here rather than a
     // constructor taking a library type (which would put sacm::model in the
     // public header this file exists to keep it out of).

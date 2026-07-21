@@ -4,6 +4,7 @@
 #include "core/audit/canonical_model_hash.h"
 #include "core/project_file_io.h"
 #include "core/sha256.h"
+#include "sacm_adapter/library_load.h"
 #include "sacm/sacm_parser.h"
 #include "sacm/sacm_serializer.h"
 
@@ -80,6 +81,22 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     result.raw_file_hash_after = raw_after;
     result.canonical_model_hash_after = canonical_after;
     result.success = true;
+
+    // Phase 9 Stage 5 safety net: keep the library-owned document consistent
+    // with the just-committed edit. A command that routed its edit through a
+    // library operation set `library_synced` and already mutated it natively;
+    // for anything else, re-derive it from the authoritative serialization
+    // (`xml`, the same bytes we hashed) so it never drifts. This touches
+    // neither the audit log nor the saved package, so the tamper chain is
+    // unaffected.
+    if (ctx.library_document != nullptr && !ctx.library_synced) {
+        if (!sacm_adapter::reload_document(*ctx.library_document, xml)) {
+            // Soft warning: the edit is committed and the saved package is
+            // authoritative, but the library-backed view could not be
+            // re-derived, so surface it rather than let it drift silently.
+            result.error = "Library view re-derive failed (edit committed).";
+        }
+    }
 
     // Step 2: write SACM atomically (temp file + fsync + rename). A crash
     // here leaves the audit log ahead of SACM by one transaction; on next

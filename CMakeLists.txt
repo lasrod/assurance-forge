@@ -254,6 +254,8 @@ endif()
 include(CTest)
 add_executable(tests
     tests/test_sacm_library_parallel_load.cpp
+    tests/test_sacm_library_edit.cpp
+    tests/test_acp_controller.cpp
     tests/test_xml_parser.cpp
     tests/test_assurance_tree.cpp
     tests/test_layout.cpp
