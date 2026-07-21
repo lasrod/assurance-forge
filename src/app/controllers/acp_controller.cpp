@@ -6,8 +6,16 @@
 
 namespace app::controllers {
 
-AcpController::AcpController(AppEvents& events, core::ProblemsManager& problems_manager)
-    : events_(events), problems_manager_(problems_manager) {}
+AcpController::AcpController(AppEvents& events, core::ProblemsManager& problems_manager,
+                            std::function<void()> on_edit_applied)
+    : events_(events), problems_manager_(problems_manager),
+      on_edit_applied_(std::move(on_edit_applied)) {}
+
+void AcpController::NotifyEditApplied() {
+    if (on_edit_applied_) {
+        on_edit_applied_();
+    }
+}
 
 void AcpController::SyncProblems(const parser::AssuranceCase& model, const sacm::AssuranceCasePackage* package) {
     app::SyncAcpProblems(problems_manager_, &model, package);
@@ -28,6 +36,7 @@ bool AcpController::HandleResult(const char* action, const core::acp::AcpEditRes
     ui_state.selected_relationship_edge_key.clear();
     events_.Emit(DocumentDirtyEvent{});
     events_.Emit(StatusMessageEvent{std::string(action) + " " + result.acp_id});
+    NotifyEditApplied();
     return true;
 }
 
@@ -67,6 +76,7 @@ bool AcpController::RemoveAcp(parser::AssuranceCase& model,
     events_.Emit(DocumentDirtyEvent{});
     events_.Emit(StatusMessageEvent{"Removed " + acp_id});
     SyncProblems(model, package);
+    NotifyEditApplied();
     return true;
 }
 
@@ -82,6 +92,7 @@ bool AcpController::UpsertAcp(parser::AssuranceCase& model,
         return false;
     events_.Emit(DocumentDirtyEvent{});
     SyncProblems(model, package);
+    NotifyEditApplied();
     return true;
 }
 
@@ -111,6 +122,7 @@ bool AcpController::CreateConfidenceArgumentTreeForAcp(parser::AssuranceCase& mo
     events_.Emit(
         StatusMessageEvent{"Created confidence argument tree " + result.argument_package_id + " for " + result.acp_id});
     SyncProblems(model, package);
+    NotifyEditApplied();
     return true;
 }
 

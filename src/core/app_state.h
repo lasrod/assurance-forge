@@ -51,6 +51,13 @@ struct AppState {
         ++case_revision;
     }
 
+    // Phase 9 Stage 5: re-derive `library_document` from the current
+    // `sacm_package` so it stays consistent after an edit that did not route
+    // through a library operation (e.g. the unaudited ACP controller path,
+    // which bypasses the command bus and its re-derive net). No-op when either
+    // is absent. Touches neither the audit log nor the saved file.
+    void sync_library_document();
+
     // Load an assurance case from file
     bool load_file(const std::string& file_path);
 

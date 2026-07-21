@@ -436,4 +436,12 @@ bool AppState::open_project_file(const ProjectFileEntry& entry) {
     return true;
 }
 
+void AppState::sync_library_document() {
+    if (library_document == nullptr || !sacm_package.has_value()) {
+        return;
+    }
+    const std::string xml = sacm::serialize_sacm(sacm_package.value());
+    sacm_adapter::reload_document(*library_document, xml);
+}
+
 } // namespace core
