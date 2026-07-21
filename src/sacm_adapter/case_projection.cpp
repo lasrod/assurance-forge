@@ -1,5 +1,6 @@
 #include "sacm_adapter/case_projection.h"
 
+#include "sacm_adapter/gsn_role_tag.h"
 #include "sacm_adapter/library_document_access.h"
 
 #include "sacm/model/argumentation.h"
@@ -160,6 +161,18 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
     if (const auto* assertion = dynamic_cast<const sacm::model::Assertion*>(&element)) {
         projected.assertion_declaration =
             sacm::model::assertion_declaration_name(assertion->assertion_declaration());
+        // A GSN Justification is stored as `axiomatic` plus a vendor gsn.role
+        // tag (SACM cannot express the node type; see gsn_role_tag.h). Translate
+        // it back to the app's internal "justification" so the tree classifier
+        // (core::classify_role) renders it correctly.
+        if (assertion->assertion_declaration() == sacm::model::AssertionDeclaration::Axiomatic) {
+            if (const auto* model_element =
+                    dynamic_cast<const sacm::model::ModelElement*>(&element)) {
+                if (tagged_value_for(*model_element, kGsnRoleTagKey) == kGsnRoleJustification) {
+                    projected.assertion_declaration = "justification";
+                }
+            }
+        }
         projected.meta_claim_refs = to_id_strings(assertion->meta_claims());
         // GSN "undeveloped" is `needsSupport` in SACM terms; see
         // docs/sacm/sacm-gsn-mapping.md.

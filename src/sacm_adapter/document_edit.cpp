@@ -1,5 +1,6 @@
 #include "sacm_adapter/document_edit.h"
 
+#include "sacm_adapter/gsn_role_tag.h"
 #include "sacm_adapter/library_document_access.h"
 
 #include "sacm/commands/mutation.h"
@@ -165,7 +166,10 @@ AddChildOutcome failed_child(const sacm::commands::MutationResult& result) {
 // The new element and the relationship linking it to the parent, per kind.
 struct ChildPlan {
     sacm::commands::Operation create_element;
-    std::optional<sacm::model::AssertionDeclaration> assertion;  // set for Assumption
+    std::optional<sacm::model::AssertionDeclaration> assertion;  // set for Assumption/Justification
+    // GSN node role to record as a vendor TaggedValue (e.g. "Justification"),
+    // preserving a GSN type SACM's AssertionDeclaration cannot express on its own.
+    std::optional<std::string> gsn_role;
     sacm::metadata::ElementKind relationship_kind;
     bool attach_via_reasoning = false;  // Strategy: the reasoning end, not a source
 };
@@ -216,7 +220,17 @@ std::optional<ChildPlan> plan_child(ChildKind kind, const sacm::model::ElementId
             .assertion = sacm::model::AssertionDeclaration::Assumed,
             .relationship_kind = ElementKind::AssertedContext};
     case ChildKind::Justification:
-        return std::nullopt;
+        // A GSN Justification maps to a Claim with assertionDeclaration =
+        // axiomatic (the standards-correct mapping, docs/sacm/sacm-gsn-mapping.md
+        // -- not the legacy non-standard "justification" literal). SACM cannot
+        // distinguish a Justification from an axiomatically-asserted Goal, so the
+        // GSN role is preserved in a vendor TaggedValue and translated back by
+        // the projection.
+        return ChildPlan{
+            .create_element = sacm::commands::CreateClaim{.parent = package_id, .id = element_id},
+            .assertion = sacm::model::AssertionDeclaration::Axiomatic,
+            .gsn_role = std::string(kGsnRoleJustification),
+            .relationship_kind = ElementKind::AssertedContext};
     }
     return std::nullopt;
 }
@@ -257,13 +271,23 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
     }
     const sacm::model::ElementId created_id = created.created_ids().front();
 
-    // 2. Assumption is a claim marked `assumed`.
+    // 2. Assumption/Justification set an assertion declaration.
     if (plan->assertion.has_value()) {
         const sacm::commands::MutationResult declared = doc.apply(sacm::commands::SetAssertionDeclaration{
             .element = created_id, .declaration = *plan->assertion});
         if (!declared.applied) {
             rollback_element(doc, created_id);
             return failed_child(declared);
+        }
+    }
+
+    // 2b. Preserve a GSN role (Justification) SACM cannot express, as a vendor tag.
+    if (plan->gsn_role.has_value()) {
+        const sacm::commands::MutationResult tagged = doc.apply(sacm::commands::AddTaggedValue{
+            .element = created_id, .key = kGsnRoleTagKey, .value = *plan->gsn_role});
+        if (!tagged.applied) {
+            rollback_element(doc, created_id);
+            return failed_child(tagged);
         }
     }
 
