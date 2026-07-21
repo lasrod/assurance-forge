@@ -240,7 +240,10 @@ bool AppState::save_file(const std::string& file_path) {
 
     // Phase 9 Stage 6: the library is the serialization source of truth, so
     // write library SACM XMI (falling back to the legacy serialization only if
-    // the library round-trip fails).
+    // the library round-trip fails). Note this round-trips the legacy package,
+    // which already dropped truly-unknown/foreign XML at load; it preserves
+    // everything the legacy structs model (ACP and other TaggedValues included)
+    // but not unknown extension content -- no worse than the pre-Stage-6 save.
     const std::string bytes = core::library_xmi_from_package(sacm_package.value())
                                   .value_or(sacm::serialize_sacm(sacm_package.value()));
     if (WriteTextFileAtomic(file_path, bytes)) {

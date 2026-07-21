@@ -44,11 +44,19 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     // Serialize once so the bytes we write, the bytes we hash, and the
     // bytes we re-derive the canonical hash from are identical. Phase 9 Stage
     // 6: the library is now the serialization source of truth, so we write
-    // library SACM XMI (falling back to the legacy serialization only if the
-    // library round-trip fails). The audit readers are already routed through
-    // the library, so they read this back and converge.
-    const std::string xml =
-        core::library_xmi_from_package(ctx.package).value_or(sacm::serialize_sacm(ctx.package));
+    // library SACM XMI. The audit readers are already routed through the
+    // library, so they read this back and converge. A failure to produce XMI
+    // (the library could not read our own serialization -- a bug, not an
+    // expected path) falls back to the legacy bytes but is surfaced as a soft
+    // warning below rather than swallowed.
+    std::string xml;
+    bool library_save_fell_back = false;
+    if (auto library_xml = core::library_xmi_from_package(ctx.package)) {
+        xml = std::move(*library_xml);
+    } else {
+        xml = sacm::serialize_sacm(ctx.package);
+        library_save_fell_back = true;
+    }
     const std::string raw_after = Sha256::HexDigest(xml);
 
     // Phase 9 Stage 6: derive the canonical hash through the library so this
@@ -92,6 +100,15 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     result.canonical_model_hash_after = canonical_after;
     result.success = true;
 
+    // Surface the Stage 6 library-XMI fallback (see above): the edit committed
+    // and the audit stays consistent (the legacy bytes read back through the
+    // library), but the saved file is legacy XML rather than XMI, which the
+    // caller should know about.
+    if (library_save_fell_back && result.error.empty()) {
+        result.error = "Library XMI save failed; wrote the legacy serialization "
+                       "(audit remains consistent).";
+    }
+
     // Phase 9 Stage 5 safety net: keep the library-owned document consistent
     // with the just-committed edit. A command that routed its edit through a
     // library operation set `library_synced` and already mutated it natively;
@@ -100,7 +117,7 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     // neither the audit log nor the saved package, so the tamper chain is
     // unaffected.
     if (ctx.library_document != nullptr && !ctx.library_synced) {
-        if (!sacm_adapter::reload_document(*ctx.library_document, xml)) {
+        if (!sacm_adapter::reload_document(*ctx.library_document, xml) && result.error.empty()) {
             // Soft warning: the edit is committed and the saved package is
             // authoritative, but the library-backed view could not be
             // re-derived, so surface it rather than let it drift silently.

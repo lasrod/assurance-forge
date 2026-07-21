@@ -44,13 +44,21 @@ std::optional<std::string> library_canonical_hash_from_xml(std::string_view xml)
 std::optional<std::string> library_canonical_hash(const sacm::AssuranceCasePackage& package);
 std::optional<std::string> library_canonical_hash_from_file(const std::filesystem::path& path);
 
-// Phase 9 Stage 6: serializes a legacy package to library SACM XMI, by loading
-// it through the library and saving it back out (tolerant mode, so preserved
-// vendor/compatibility content survives). This is what the save sites write so
-// the library becomes the serialization source of truth; the audit readers,
-// already routed through the library (library_canonical_hash*), read the XMI
-// and converge. Returns nullopt if the round-trip through the library fails, so
-// callers can fall back to the legacy serialization.
+// Phase 9 Stage 6: serializes a package to library SACM XMI, by loading it
+// through the library and saving it back out in tolerant mode. This is what the
+// save sites write so the library becomes the serialization source of truth;
+// the audit readers, already routed through the library (library_canonical_hash*),
+// read the XMI back and converge.
+//
+// Preservation caveat: the input is a *legacy* `sacm::AssuranceCasePackage`,
+// which already dropped any foreign/unknown XML at parse time (see
+// src/sacm/sacm_model.h). So this preserves everything the legacy structs model
+// -- including ACP and other TaggedValues (clause 8.12) -- but NOT truly-unknown
+// extension content that only survived tolerant load in the library document.
+// That is no worse than the pre-Stage-6 legacy save; a full round-trip of
+// unknown content awaits the library-primary model (Stage 7), where edits no
+// longer round-trip through the legacy serialization. Returns nullopt if the
+// library round-trip fails, so callers can fall back to the legacy serialization.
 std::optional<std::string> library_xmi_from_package(const sacm::AssuranceCasePackage& package);
 
 } // namespace core
