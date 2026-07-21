@@ -98,9 +98,12 @@ because reporting them would be noise:
 - **Utility elements** (`Description`, `Note`, `TaggedValue`,
   `ImplementationConstraint`). These are metadata carried *on* elements, not
   elements in their own right.
-- **Assurance Claim Points.** Synthesized by the application from vendor
-  TaggedValues rather than read from SACM, so they are not part of this
-  projection. See `docs/sacm/sacm-gsn-metamodel-gaps.md`.
+- **Assurance Claim Points are now synthesized** by the projection from the same
+  `assuranceForge.acp` vendor TaggedValues the app uses, matching the legacy
+  parser's `extract_acps`. No repo fixture carries ACPs, so a dedicated fixture
+  (`tests/data/fixture_acp_parity.sacm.xml`) exercises the synthesis in
+  `SACM23_INT_001_ProjectionSynthesizesAcpsLikeLegacy`. ACP support was a hard
+  requirement of the migration.
 
 Excluding these took the count from roughly 400 to 98, and the remainder are all
 substantive.

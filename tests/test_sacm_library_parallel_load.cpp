@@ -101,6 +101,57 @@ std::map<std::string, std::size_t> count_by_category(
 
 } // namespace
 
+// ACP synthesis parity. No repo fixture carries Assurance Claim Points, so the
+// baseline test above never exercises them. This loads a fixture that does
+// through both the legacy parser and the library projection and asserts the
+// synthesized ACP records match exactly -- ACP support is a hard requirement of
+// the migration, so a projection that dropped or mis-synthesized them must fail.
+TEST(SacmLibraryParallelLoad, SACM23_INT_001_ProjectionSynthesizesAcpsLikeLegacy) {
+    const std::filesystem::path path = repo_root() / "tests" / "data" / "fixture_acp_parity.sacm.xml";
+    ASSERT_TRUE(std::filesystem::exists(path));
+
+    const auto legacy = parser::parse_sacm_xml(path.string());
+    ASSERT_TRUE(legacy.has_value()) << legacy.error();
+    ASSERT_EQ(legacy->acps.size(), 2u) << "the fixture must actually carry ACPs";
+
+    const sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+    const core::AssuranceCase projected = sacm_adapter::project_case(*loaded.document);
+
+    const std::vector<sacm_adapter::ProjectionDifference> differences =
+        sacm_adapter::diff_cases(*legacy, projected);
+    for (const sacm_adapter::ProjectionDifference& difference : differences) {
+        if (difference.category.rfind("acp", 0) == 0) {
+            ADD_FAILURE() << difference.category << " " << difference.path << ": "
+                          << difference.message;
+        }
+    }
+    ASSERT_EQ(projected.acps.size(), 2u) << "projection dropped ACPs";
+
+    // Spot-check the field-level synthesis on the element ACP and the
+    // relationship ACP.
+    const auto find_acp = [&](const std::string& id) -> const core::AcpRecord* {
+        for (const core::AcpRecord& acp : projected.acps) {
+            if (acp.id == id) {
+                return &acp;
+            }
+        }
+        return nullptr;
+    };
+    const core::AcpRecord* acp1 = find_acp("ACP1");
+    ASSERT_NE(acp1, nullptr);
+    EXPECT_EQ(acp1->target_kind, "element");
+    EXPECT_EQ(acp1->target_id, "G1");
+    EXPECT_EQ(acp1->resolution_kind, "text");
+    EXPECT_EQ(acp1->confidence_claim_id, "CC1");
+    const core::AcpRecord* acp2 = find_acp("ACP2");
+    ASSERT_NE(acp2, nullptr);
+    EXPECT_EQ(acp2->target_kind, "relationship");
+    EXPECT_EQ(acp2->target_id, "R1");
+    EXPECT_EQ(acp2->top_goal_id, "CONF_TOP");
+}
+
 TEST(SacmLibraryParallelLoad, SACM23_INT_001_ProjectionMatchesLegacyWithinBaseline) {
     const std::map<BaselineKey, std::size_t> baseline = load_baseline();
     std::map<BaselineKey, std::size_t> observed;

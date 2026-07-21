@@ -84,6 +84,42 @@ std::vector<ProjectionDifference> diff_cases(const core::AssuranceCase& legacy,
         });
     }
 
+    // Assurance Claim Points, matched by id. A per-id difference is reported for
+    // an ACP present on one side only or whose fields differ.
+    const auto acp_index = [](const core::AssuranceCase& source) {
+        std::map<std::string, const core::AcpRecord*> index;
+        for (const core::AcpRecord& acp : source.acps) {
+            index.emplace(acp.id, &acp);
+        }
+        return index;
+    };
+    const auto legacy_acps = acp_index(legacy);
+    const auto projected_acps = acp_index(projected);
+    const auto acp_fields_equal = [](const core::AcpRecord& a, const core::AcpRecord& b) {
+        return a.name == b.name && a.target_kind == b.target_kind && a.target_id == b.target_id &&
+               a.resolution_kind == b.resolution_kind && a.text == b.text &&
+               a.confidence_claim_id == b.confidence_claim_id &&
+               a.argument_package_id == b.argument_package_id && a.top_goal_id == b.top_goal_id;
+    };
+    for (const auto& [id, acp] : legacy_acps) {
+        const auto found = projected_acps.find(id);
+        if (found == projected_acps.end()) {
+            differences.push_back(ProjectionDifference{
+                .category = "acp-missing", .path = id,
+                .message = std::format("legacy has ACP '{}'; projection does not", id)});
+        } else if (!acp_fields_equal(*acp, *found->second)) {
+            differences.push_back(ProjectionDifference{
+                .category = "acp-field", .path = id, .message = "ACP fields differ"});
+        }
+    }
+    for (const auto& [id, acp] : projected_acps) {
+        if (!legacy_acps.contains(id)) {
+            differences.push_back(ProjectionDifference{
+                .category = "acp-extra", .path = id,
+                .message = std::format("projection has ACP '{}'; legacy does not", id)});
+        }
+    }
+
     const auto legacy_index = index_by_id(legacy);
     const auto projected_index = index_by_id(projected);
 

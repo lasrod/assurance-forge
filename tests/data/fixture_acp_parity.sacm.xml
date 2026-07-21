@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AssuranceCasePackage xmlns="http://www.omg.org/spec/SACM/20220301" id="ACP_CASE" name="ACP Parity Case">
+  <argumentPackage id="AP1" name="Argument">
+    <claim id="G1" name="Top Goal" content="The system is acceptably safe.">
+      <taggedValue key="assuranceForge.acp" value="ACP1"/>
+      <taggedValue key="assuranceForge.acp.ACP1.name" value="Confidence in G1"/>
+      <taggedValue key="assuranceForge.acp.ACP1.resolutionKind" value="text"/>
+      <taggedValue key="assuranceForge.acp.ACP1.text" value="Justified by independent review."/>
+      <taggedValue key="assuranceForge.acp.ACP1.confidenceClaimId" value="CC1"/>
+    </claim>
+    <claim id="G2" name="Sub Goal" content="Hazards are mitigated."/>
+    <assertedInference id="R1" source="G2" target="G1">
+      <taggedValue key="assuranceForge.acp" value="ACP2"/>
+      <taggedValue key="assuranceForge.acp.ACP2.name" value="Confidence in the inference"/>
+      <taggedValue key="assuranceForge.acp.ACP2.resolutionKind" value="topGoalReference"/>
+      <taggedValue key="assuranceForge.acp.ACP2.argumentPackageId" value="CONF_AP"/>
+      <taggedValue key="assuranceForge.acp.ACP2.topGoalId" value="CONF_TOP"/>
+    </assertedInference>
+  </argumentPackage>
+</AssuranceCasePackage>

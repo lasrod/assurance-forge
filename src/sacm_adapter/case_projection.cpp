@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <set>
 #include <string>
 
 namespace sacm_adapter {
@@ -44,6 +45,51 @@ std::vector<std::string> to_id_strings(const std::vector<sacm::model::ElementId>
         out.push_back(id.value());
     }
     return out;
+}
+
+// Assurance Claim Points are not a SACM concept: the application encodes them as
+// vendor TaggedValues keyed "assuranceForge.acp[.<id>.<field>]" (clause 8.12
+// extension mechanism), which the library preserves. Synthesize the POD records
+// from them exactly as the legacy parser's extract_acps does, so ACP support
+// survives the projection. Keyed by TaggedValue key -> value.
+std::string tagged_value_for(const sacm::model::ModelElement& element, const std::string& key) {
+    for (const auto& tag : element.tagged_values()) {
+        if (tag->key().primary() == key) {
+            return std::string(tag->content().primary());
+        }
+    }
+    return {};
+}
+
+void collect_acps(const sacm::model::ModelElement& element, std::string_view target_kind,
+                  std::vector<core::AcpRecord>& out) {
+    std::set<std::string> seen;
+    for (const auto& tag : element.tagged_values()) {
+        if (tag->key().primary() != "assuranceForge.acp") {
+            continue;
+        }
+        const std::string acp_id(tag->content().primary());
+        if (acp_id.empty() || !seen.insert(acp_id).second) {
+            continue;
+        }
+        const auto field = [&](const char* name) {
+            return tagged_value_for(element, "assuranceForge.acp." + acp_id + "." + name);
+        };
+        core::AcpRecord acp;
+        acp.id = acp_id;
+        acp.name = field("name");
+        acp.target_kind = std::string(target_kind);
+        acp.target_id = element.id().value();
+        acp.resolution_kind = field("resolutionKind");
+        if (acp.resolution_kind.empty()) {
+            acp.resolution_kind = "none";
+        }
+        acp.text = field("text");
+        acp.confidence_claim_id = field("confidenceClaimId");
+        acp.argument_package_id = field("argumentPackageId");
+        acp.top_goal_id = field("topGoalId");
+        out.push_back(std::move(acp));
+    }
 }
 
 core::SacmElement project_element(const sacm::model::SACMElement& element) {
@@ -160,12 +206,19 @@ core::AssuranceCase project_case(const LibraryDocument& document) {
             return;
         }
         projected.elements.push_back(project_element(element));
+
+        // Synthesize any Assurance Claim Points this element carries. Target
+        // kind mirrors the legacy parser: relationships are "relationship",
+        // everything else "element".
+        if (const auto* model_element =
+                dynamic_cast<const sacm::model::ModelElement*>(&element)) {
+            const bool is_relationship =
+                dynamic_cast<const sacm::model::AssertedRelationship*>(&element) != nullptr;
+            collect_acps(*model_element, is_relationship ? "relationship" : "element",
+                         projected.acps);
+        }
     });
 
-    // Assurance Claim Points are synthesized by the application from vendor
-    // TaggedValues, not read from SACM, so they are out of scope for this
-    // projection and excluded from the Stage 3 comparison rather than silently
-    // reported as missing. See docs/sacm/sacm-gsn-metamodel-gaps.md.
     return projected;
 }
 
