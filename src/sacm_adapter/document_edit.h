@@ -107,7 +107,10 @@ struct AddChildOutcome {
 // instead of library-generated ids (the library's create operations accept a
 // caller-supplied id). This makes the operation id-deterministic, which a
 // library-primary audit replay needs to reproduce exact ids -- a Phase 9 Stage
-// 7 prerequisite. Empty means the library generates the id.
+// 7 prerequisite. Empty means the library generates the id. `relationship_id`
+// applies only when a relationship is created; a Strategy creates none yet (its
+// inference is deferred to the first sub-goal), so it is ignored for
+// `ChildKind::Strategy`.
 AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& parent_id,
                                 ChildKind kind, const std::string& element_id = {},
                                 const std::string& relationship_id = {});

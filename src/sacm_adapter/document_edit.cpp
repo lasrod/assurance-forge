@@ -195,12 +195,12 @@ std::optional<ChildPlan> plan_child(ChildKind kind, const sacm::model::ElementId
             .assertion = std::nullopt,
             .relationship_kind = ElementKind::AssertedInference};
     case ChildKind::Strategy:
-        // Not wired: a strategy is added before any sub-goal exists, so its
-        // AssertedInference would have a `reasoning` and a `target` but no
-        // source -- which SACM's source [1..*] (clause 11.13) forbids. The
-        // library correctly rejects that transient state the legacy app
-        // tolerated; representing a bare strategy in valid SACM is an open
-        // decision (docs/sacm/sacm-gsn-metamodel-gaps.md).
+        // Unreachable: apply_add_child intercepts Strategy before calling
+        // plan_child, because a strategy is added before any sub-goal exists and
+        // maps to only an ArgumentReasoning (no inference yet -- a sourceless
+        // inference violates SACM source [1..*], clause 11.13). Kept for switch
+        // exhaustiveness; see the Strategy branch in apply_add_child and
+        // docs/sacm/sacm-gsn-metamodel-gaps.md.
         return std::nullopt;
     case ChildKind::Solution:
         return ChildPlan{
