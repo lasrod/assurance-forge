@@ -123,6 +123,41 @@ TEST(Sacm23Validation, SACM23_XMI_003_GeneratedIdDoesNotCollideWithPersistedExpl
         << "reader minted 'generated_1' for the id-less description, duplicating the persisted tag id";
 }
 
+// End-to-end closure of the above through the writer, mirroring the
+// core::library_xmi_from_package (serialize -> reload -> save) pipeline whose
+// failure surfaced the bug: load a document carrying a persisted generated id
+// alongside an id-less element, save it, and load the result again. Both loads
+// must be clean and the two models must match. (Without the pre-reservation the
+// first load already fails on a duplicate id, so this gates the fix too.)
+TEST(Sacm23Validation, SACM23_XMI_003_PersistedGeneratedIdRoundTripsCleanly) {
+    const std::string xml =
+        R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301"
+    xmlns:xmi="http://www.omg.org/spec/XMI/20131001"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:id="CASE">
+  <argumentPackage xmi:id="AP">
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G1">
+      <description>
+        <content lang="en" content="a claim with an id-less description" />
+      </description>
+      <taggedValue xmi:id="generated_1" key="assuranceForge.example" value="v" />
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+    const LoadResult first = sacm::io::load_xmi_string(xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(first.ok) << "first load failed on a persisted generated id";
+    ASSERT_TRUE(first.document.has_value());
+
+    const sacm::io::SaveResult saved = sacm::io::save_xmi_string(*first.document);
+    ASSERT_TRUE(saved.ok);
+
+    const LoadResult second = sacm::io::load_xmi_string(saved.xml);
+    ASSERT_TRUE(second.ok);
+    EXPECT_FALSE(has_code(second.diagnostics, sacm::validation::codes::kIdDuplicate));
+    EXPECT_TRUE(sacm::compare::semantic_compare(*first.document, *second.document).empty())
+        << "round-trip changed the model";
+}
+
 TEST(Sacm23Validation, SACM23_XMI_001_RejectsNonPackageRoot) {
     const LoadResult result = sacm::io::load_xmi_file(fixture("invalid/root-invalid.sacm.xmi"));
     EXPECT_FALSE(result.ok);
