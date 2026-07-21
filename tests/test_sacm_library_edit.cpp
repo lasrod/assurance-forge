@@ -370,6 +370,44 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildStrategyAndJustificationUnsupported
     }
 }
 
+// Stage 7 prerequisite: when the caller supplies ids, the created element and
+// relationship must use them verbatim (not library-generated ones), so a
+// library-primary audit replay can reproduce exact ids.
+TEST(SacmLibraryEdit, SACM23_INT_001_AddChildUsesCallerSuppliedIds) {
+    sacm_adapter::LoadOutcome loaded = load_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm_adapter::AddChildOutcome added = sacm_adapter::apply_add_child(
+        *loaded.document, "G1", sacm_adapter::ChildKind::Goal, "CALLER_GOAL", "CALLER_REL");
+    ASSERT_TRUE(added.applied)
+        << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    EXPECT_EQ(added.new_element_id, "CALLER_GOAL");
+    EXPECT_EQ(added.new_relationship_id, "CALLER_REL");
+
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    ASSERT_NE(find_element(after, "CALLER_GOAL"), nullptr);
+    const core::SacmElement* relationship = find_element(after, "CALLER_REL");
+    ASSERT_NE(relationship, nullptr);
+    EXPECT_EQ(relationship->source_refs, std::vector<std::string>{"CALLER_GOAL"});
+}
+
+TEST(SacmLibraryEdit, SACM23_INT_001_ChallengeUsesCallerSuppliedIds) {
+    sacm_adapter::LoadOutcome loaded = load_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm_adapter::AddChildOutcome added = sacm_adapter::apply_challenge(
+        *loaded.document, "G1", sacm_adapter::ChallengeSource::CounterArgument, "CALLER_COUNTER",
+        "CALLER_CREL");
+    ASSERT_TRUE(added.applied)
+        << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    EXPECT_EQ(added.new_element_id, "CALLER_COUNTER");
+    EXPECT_EQ(added.new_relationship_id, "CALLER_CREL");
+
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    ASSERT_NE(find_element(after, "CALLER_COUNTER"), nullptr);
+    ASSERT_NE(find_element(after, "CALLER_CREL"), nullptr);
+}
+
 // Adding a child under an id that is not a claim-like container in an argument
 // package must fail cleanly rather than create a dangling element.
 TEST(SacmLibraryEdit, SACM23_INT_001_AddChildUnderMissingParentUnsupported) {

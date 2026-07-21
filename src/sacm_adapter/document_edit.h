@@ -106,8 +106,14 @@ struct AddChildOutcome {
 //     literal, so it is not a like-for-like reproduction.
 // The parent must be a claim-like container in an ArgumentPackage; otherwise
 // the outcome reports unsupported.
+// When `element_id`/`relationship_id` are non-empty they are used verbatim
+// instead of library-generated ids (the library's create operations accept a
+// caller-supplied id). This makes the operation id-deterministic, which a
+// library-primary audit replay needs to reproduce exact ids -- a Phase 9 Stage
+// 7 prerequisite. Empty means the library generates the id.
 AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& parent_id,
-                                ChildKind kind);
+                                ChildKind kind, const std::string& element_id = {},
+                                const std::string& relationship_id = {});
 
 // The source of a dialectic challenge, mirroring core::ChallengeSourceType.
 enum class ChallengeSource {
@@ -122,8 +128,11 @@ enum class ChallengeSource {
 // may itself be a relationship (challenging an inference) -- SACM allows it
 // because an AssertedRelationship is a SACMElement. Reuses AddChildOutcome: the
 // result is likewise a new element plus a new relationship.
+// `element_id`/`relationship_id`: see apply_add_child -- non-empty ids are used
+// verbatim for id-deterministic replay.
 AddChildOutcome apply_challenge(LibraryDocument& document, const std::string& target_id,
-                                ChallengeSource source);
+                                ChallengeSource source, const std::string& element_id = {},
+                                const std::string& relationship_id = {});
 
 // Result of adding an Assurance Claim Point. `acp_id` is the id the seam
 // generated (deterministic `ACP<n>`, matching core's NextAcpId), empty unless
