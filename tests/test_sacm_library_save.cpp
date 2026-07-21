@@ -14,6 +14,9 @@
 #include "sacm_adapter/library_load.h"
 #include "sacm_adapter/projection_diff.h"
 
+#include "core/audit/canonical_model_hash.h"
+#include "core/library_package_projection.h"
+
 #include <gtest/gtest.h>
 
 #include <filesystem>
@@ -85,4 +88,33 @@ TEST(SacmLibrarySave, SACM23_INT_002_XmiSavePreservesAcps) {
     sacm_adapter::LibraryDocument reloaded;
     ASSERT_TRUE(sacm_adapter::reload_document(reloaded, saved.xml));
     EXPECT_EQ(sacm_adapter::project_case(reloaded).acps.size(), 2u);
+}
+
+// The library->package projection the audit will hash must capture the argument
+// content and, crucially, produce a canonical hash that is STABLE across an XMI
+// save/load. That stability is what makes the audit's on-disk and replayed sides
+// converge once both route through this projection (Approach B).
+TEST(SacmLibrarySave, SACM23_INT_002_LibraryPackageHashIsStableUnderXmiRoundTrip) {
+    // Argument-only fixtures: terminology/artifact projection is a following
+    // increment, so restrict the content assertion to fixtures without them.
+    const std::filesystem::path path = repo_root() / "tests" / "data" / "fixture_acp_parity.sacm.xml";
+    ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm::AssuranceCasePackage package = core::project_library_package(*loaded.document);
+    ASSERT_FALSE(package.argumentPackages.empty());
+    EXPECT_EQ(package.argumentPackages.front().claims.size(), 2u);  // G1, G2 captured
+    const std::string hash_before = core::audit::CanonicalModelHash(package);
+    EXPECT_FALSE(hash_before.empty());
+
+    const sacm_adapter::SaveOutcome saved = sacm_adapter::save_document(*loaded.document);
+    ASSERT_TRUE(saved.ok);
+    sacm_adapter::LibraryDocument reloaded;
+    ASSERT_TRUE(sacm_adapter::reload_document(reloaded, saved.xml));
+
+    const std::string hash_after = core::audit::CanonicalModelHash(core::project_library_package(reloaded));
+    EXPECT_EQ(hash_before, hash_after) << "projection hash must be stable across an XMI round-trip";
 }
