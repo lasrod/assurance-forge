@@ -81,6 +81,42 @@ bool SacmHasContextRelation(const sacm::AssuranceCasePackage& pkg,
     return false;
 }
 
+int CountStrategyInferences(const sacm::AssuranceCasePackage& pkg, const std::string& strategy_id) {
+    int count = 0;
+    for (const auto& ap : pkg.argumentPackages)
+        for (const auto& inference : ap.assertedInferences)
+            if (inference.reasoning == strategy_id)
+                ++count;
+    return count;
+}
+
+const sacm::AssertedInference* FindStrategyInference(const sacm::AssuranceCasePackage& pkg,
+                                                     const std::string& strategy_id) {
+    for (const auto& ap : pkg.argumentPackages)
+        for (const auto& inference : ap.assertedInferences)
+            if (inference.reasoning == strategy_id)
+                return &inference;
+    return nullptr;
+}
+
+std::string StrategyTargetTag(const sacm::AssuranceCasePackage& pkg, const std::string& strategy_id) {
+    for (const auto& ap : pkg.argumentPackages)
+        for (const auto& reasoning : ap.argumentReasonings)
+            if (reasoning.id == strategy_id)
+                for (const auto& tag : reasoning.taggedValues)
+                    if (tag.key == "assuranceForge.gsn.strategyTarget")
+                        return tag.value;
+    return {};
+}
+
+const parser::SacmElement* FindModelStrategyInference(const parser::AssuranceCase& ac,
+                                                      const std::string& strategy_id) {
+    for (const auto& element : ac.elements)
+        if (element.type == "assertedinference" && element.reasoning_ref == strategy_id)
+            return &element;
+    return nullptr;
+}
+
 } // namespace
 
 TEST(ElementFactoryAdd, AddTopGoalCreatesClaimInParserAndSacm) {
@@ -115,6 +151,63 @@ TEST(ElementFactoryAdd, AddContextCreatesArtifactReferenceAndAssertedContext) {
     ASSERT_EQ(tree.root->group2_attachments.size(), 1u);
     EXPECT_EQ(tree.root->group2_attachments.front()->id, context_id);
     EXPECT_EQ(tree.root->group2_attachments.front()->role, core::NodeRole::Context);
+}
+
+// A GSN strategy uses the standard single-inference encoding: the strategy is a
+// bare ArgumentReasoning carrying a strategyTarget tag (no package inference),
+// and its sub-goals become the sources of ONE inference -- materialized on the
+// first sub-goal and extended on later ones, not a separate inference each. This
+// is what lets a library-primary replay reproduce the on-disk model, since the
+// library forbids the legacy bare inference. Phase 9 Stage 7.
+TEST(ElementFactoryAdd, StrategyUsesSingleInferenceEncoding) {
+    auto mc = MakeRootGoalCase();
+    std::string err;
+
+    // Add-strategy: the package gets a reasoning + strategyTarget tag and NO
+    // inference; the model gets a render-only placeholder inference so the bare
+    // strategy still draws under its goal. No relationship is created.
+    std::string strategy_id, strategy_rel;
+    ASSERT_TRUE(
+        core::AddChildElement(mc.ac, &mc.pkg, "G1", core::NewElementKind::Strategy, strategy_id, strategy_rel, err))
+        << err;
+    EXPECT_TRUE(strategy_rel.empty()) << "add-strategy must not create a relationship";
+    EXPECT_EQ(CountStrategyInferences(mc.pkg, strategy_id), 0) << "strategy has no package inference yet";
+    EXPECT_EQ(StrategyTargetTag(mc.pkg, strategy_id), "G1");
+    const parser::SacmElement* placeholder = FindModelStrategyInference(mc.ac, strategy_id);
+    ASSERT_NE(placeholder, nullptr) << "model needs a placeholder inference so the bare strategy renders";
+    ASSERT_EQ(placeholder->target_refs.size(), 1u);
+    EXPECT_EQ(placeholder->target_refs.front(), "G1");
+    EXPECT_TRUE(placeholder->source_refs.empty());
+
+    // First sub-goal materializes the single inference {target=G1, reasoning=S,
+    // source=sub}; the render placeholder is replaced by the real relationship.
+    std::string sub1, rel1;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, strategy_id, core::NewElementKind::Goal, sub1, rel1, err)) << err;
+    EXPECT_FALSE(rel1.empty()) << "materializing the strategy inference creates a relationship";
+    ASSERT_EQ(CountStrategyInferences(mc.pkg, strategy_id), 1);
+    const sacm::AssertedInference* inference = FindStrategyInference(mc.pkg, strategy_id);
+    ASSERT_NE(inference, nullptr);
+    ASSERT_EQ(inference->targets.size(), 1u);
+    EXPECT_EQ(inference->targets.front(), "G1");
+    ASSERT_EQ(inference->sources.size(), 1u);
+    EXPECT_EQ(inference->sources.front(), sub1);
+    const parser::SacmElement* model_inference = FindModelStrategyInference(mc.ac, strategy_id);
+    ASSERT_NE(model_inference, nullptr);
+    EXPECT_EQ(model_inference->id, rel1) << "the placeholder was replaced by the real inference id";
+    ASSERT_EQ(model_inference->source_refs.size(), 1u);
+    EXPECT_EQ(model_inference->source_refs.front(), sub1);
+
+    // Second sub-goal EXTENDS the same inference (one inference, two sources) and
+    // creates no new relationship.
+    std::string sub2, rel2;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, strategy_id, core::NewElementKind::Goal, sub2, rel2, err)) << err;
+    EXPECT_TRUE(rel2.empty()) << "extending an existing inference creates no relationship";
+    ASSERT_EQ(CountStrategyInferences(mc.pkg, strategy_id), 1) << "still one inference, not one per sub-goal";
+    inference = FindStrategyInference(mc.pkg, strategy_id);
+    ASSERT_NE(inference, nullptr);
+    ASSERT_EQ(inference->sources.size(), 2u);
+    EXPECT_EQ(inference->sources[0], sub1);
+    EXPECT_EQ(inference->sources[1], sub2);
 }
 
 TEST(ElementFactoryAdd, UsesAcpPackagePrefixInsideConfidenceArgumentPackage) {
