@@ -7,14 +7,19 @@
 #include "sacm/commands/operations.h"
 #include "sacm/metadata/element_kind.h"
 #include "sacm/model/argumentation.h"
+#include "sacm/model/assurance_case.h"
 #include "sacm/model/document.h"
 #include "sacm/model/element.h"
 #include "sacm/model/element_id.h"
 #include "sacm/model/lang_string.h"
+#include "sacm/model/terminology.h"
 
+#include <algorithm>
+#include <cctype>
 #include <optional>
 #include <string>
 #include <unordered_set>
+#include <vector>
 
 namespace sacm_adapter {
 
@@ -594,6 +599,347 @@ DeleteOutcome apply_delete_element(LibraryDocument& document, const std::string&
             .message = diagnostic.message,
         });
     }
+    return outcome;
+}
+
+// -------------------------------------------------------------- terminology
+
+namespace {
+
+// The AssertedContext description the application uses to mark a terminology
+// context as *visible* in the GSN view. Duplicated from
+// `core::kVisibleTerminologyContextMarker`: the adapter sits below `core` and
+// must not include its headers, so keep the two literals in sync.
+constexpr const char* kVisibleTerminologyContextMarker = "assurance-forge:visible-term-context";
+
+// Mirrors core::TrimWhitespace (std::isspace on both ends).
+std::string trim_whitespace(const std::string& value) {
+    auto begin = value.begin();
+    while (begin != value.end() && std::isspace(static_cast<unsigned char>(*begin)) != 0) {
+        ++begin;
+    }
+    auto end = value.end();
+    while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1))) != 0) {
+        --end;
+    }
+    return std::string(begin, end);
+}
+
+// Mirrors core::NormalizeRef (strip one leading '#', then trim).
+std::string normalize_ref(const std::string& value) {
+    std::string trimmed = trim_whitespace(value);
+    if (!trimmed.empty() && trimmed.front() == '#') {
+        trimmed.erase(trimmed.begin());
+    }
+    return trimmed;
+}
+
+// Mirrors core::NormalizeCategoryRefs: trim, strip a leading '#', drop empties
+// and duplicates, preserve order.
+std::vector<std::string> normalize_category_refs(const std::vector<std::string>& refs) {
+    std::vector<std::string> normalized;
+    for (const std::string& raw : refs) {
+        std::string ref = trim_whitespace(raw);
+        if (!ref.empty() && ref.front() == '#') {
+            ref.erase(ref.begin());
+        }
+        if (ref.empty() ||
+            std::find(normalized.begin(), normalized.end(), ref) != normalized.end()) {
+            continue;
+        }
+        normalized.push_back(std::move(ref));
+    }
+    return normalized;
+}
+
+// The root AssuranceCasePackage a top-level TerminologyPackage is created under
+// (mirroring the legacy `CreateTerminologyPackage`, which appends to the case
+// package's terminologyPackages). Null if the document has no root.
+const sacm::model::AssuranceCasePackage* root_case_package(const sacm::model::Document& doc) {
+    return doc.roots().empty() ? nullptr : doc.roots().front().get();
+}
+
+void fill_diagnostics(std::vector<LoadDiagnostic>& out,
+                      const sacm::commands::MutationResult& result) {
+    out.reserve(out.size() + result.diagnostics.size());
+    for (const sacm::validation::Diagnostic& diagnostic : result.diagnostics) {
+        out.push_back(LoadDiagnostic{
+            .code = diagnostic.code,
+            .severity = std::string(sacm::validation::severity_name(diagnostic.severity)),
+            .message = diagnostic.message,
+        });
+    }
+}
+
+TerminologyCreateOutcome failed_terminology_create(const sacm::commands::MutationResult& result) {
+    TerminologyCreateOutcome outcome;
+    outcome.supported = true;
+    outcome.applied = false;
+    fill_diagnostics(outcome.diagnostics, result);
+    return outcome;
+}
+
+TerminologyEditOutcome failed_terminology_edit(const sacm::commands::MutationResult& result) {
+    TerminologyEditOutcome outcome;
+    outcome.supported = true;
+    outcome.applied = false;
+    fill_diagnostics(outcome.diagnostics, result);
+    return outcome;
+}
+
+TerminologyEditOutcome terminology_edit_error(const std::string& code, const std::string& message) {
+    TerminologyEditOutcome outcome;
+    outcome.supported = true;
+    outcome.applied = false;
+    outcome.diagnostics.push_back(LoadDiagnostic{.code = code, .severity = "Error", .message = message});
+    return outcome;
+}
+
+TerminologyContextOutcome failed_terminology_context(const sacm::commands::MutationResult& result) {
+    TerminologyContextOutcome outcome;
+    outcome.supported = true;
+    outcome.applied = false;
+    fill_diagnostics(outcome.diagnostics, result);
+    return outcome;
+}
+
+TerminologyContextOutcome terminology_context_error(const std::string& code,
+                                                    const std::string& message) {
+    TerminologyContextOutcome outcome;
+    outcome.supported = true;
+    outcome.applied = false;
+    outcome.diagnostics.push_back(LoadDiagnostic{.code = code, .severity = "Error", .message = message});
+    return outcome;
+}
+
+// Sets/updates a terminology element's description under the front Description's
+// existing language (or lang-less for a new one), matching the reader convention
+// and `apply_text_edit`'s Content/Description handling. Empty text clears it.
+// Returns the library result so the caller can stop on failure.
+sacm::commands::MutationResult set_terminology_description(sacm::model::Document& doc,
+                                                          const sacm::model::ElementId& id,
+                                                          const std::string& text) {
+    std::string language;
+    if (const auto* element = doc.find_as<sacm::model::ModelElement>(id)) {
+        language = primary_description_language(*element);
+    }
+    return doc.apply(sacm::commands::SetDescription{.element = id, .text = text, .language = language});
+}
+
+// Reproduces core's TermContextLabel for the ArtifactReference/AssertedContext
+// names a term association creates.
+std::string term_context_label(const sacm::model::Term& term) {
+    const std::string value = term.value();
+    const std::string name = term.name().content;
+    if (value.empty()) {
+        return name.empty() ? term.id().value() : name;
+    }
+    if (name.empty() || name == value) {
+        return value;
+    }
+    return value + ": " + name;
+}
+
+bool ids_contain(const std::vector<sacm::model::ElementId>& ids, const sacm::model::ElementId& id) {
+    return std::find(ids.begin(), ids.end(), id) != ids.end();
+}
+
+// An ArtifactReference whose referencedArtifact resolves to `term_id` (the term's
+// id; library-created terminology references carry no gid).
+bool reference_targets_term(const sacm::model::ArtifactReference& reference,
+                            const sacm::model::ElementId& term_id) {
+    return ids_contain(reference.referenced_artifact_elements(), term_id);
+}
+
+// The front Description text of a relationship, for the visible-context marker
+// check (mirrors core::IsVisibleTerminologyContext on `context.description`).
+bool is_visible_terminology_context(const sacm::model::AssertedContext& context) {
+    return trim_whitespace(context.description().primary()) == kVisibleTerminologyContextMarker;
+}
+
+// Collects the AssertedContexts directly contained in `package`.
+std::vector<const sacm::model::AssertedContext*> package_contexts(
+    const sacm::model::ArgumentPackage& package) {
+    std::vector<const sacm::model::AssertedContext*> contexts;
+    for (const auto& element : package.argument_elements()) {
+        if (const auto* context = dynamic_cast<const sacm::model::AssertedContext*>(element.get())) {
+            contexts.push_back(context);
+        }
+    }
+    return contexts;
+}
+
+// Mirrors core::ArtifactReferenceUsedByOtherContexts: is `reference` a source of
+// any context (other than `ignore_context_id`) that does NOT target
+// `target_id`?
+bool reference_used_by_other_contexts(const sacm::model::ArgumentPackage& package,
+                                      const sacm::model::ElementId& reference_id,
+                                      const sacm::model::ElementId& target_id,
+                                      const sacm::model::ElementId& ignore_context_id) {
+    for (const sacm::model::AssertedContext* context : package_contexts(package)) {
+        if (context->id() == ignore_context_id) {
+            continue;
+        }
+        if (!ids_contain(context->sources(), reference_id)) {
+            continue;
+        }
+        if (!ids_contain(context->targets(), target_id)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// A target element eligible for a terminology *context* association (claim,
+// strategy, or solution), mirroring core::ArgumentPackageContainsTargetElement.
+bool is_association_target(const sacm::model::SACMElement* element) {
+    if (element == nullptr) {
+        return false;
+    }
+    switch (element->kind()) {
+    case sacm::metadata::ElementKind::Claim:
+    case sacm::metadata::ElementKind::ArgumentReasoning:
+    case sacm::metadata::ElementKind::ArtifactReference:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// A target eligible as a *visible* context (claim or strategy only), mirroring
+// core::ArgumentPackageContainsVisibleContextTarget.
+bool is_visible_context_target(const sacm::model::SACMElement* element) {
+    if (element == nullptr) {
+        return false;
+    }
+    return element->kind() == sacm::metadata::ElementKind::Claim ||
+           element->kind() == sacm::metadata::ElementKind::ArgumentReasoning;
+}
+
+} // namespace
+
+TerminologyCreateOutcome apply_create_terminology_package(LibraryDocument& document,
+                                                         const std::string& name,
+                                                         const std::string& description,
+                                                         const std::string& package_id) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::AssuranceCasePackage* root = root_case_package(doc);
+    if (root == nullptr) {
+        return TerminologyCreateOutcome{.supported = false};
+    }
+    // Legacy CreateTerminologyPackage stores the name/description unmodified.
+    const sacm::commands::MutationResult created = doc.apply(sacm::commands::CreateTerminologyPackage{
+        .parent = root->id(), .id = to_optional_id(package_id), .name = name});
+    if (!created.applied || created.created_ids().empty()) {
+        return failed_terminology_create(created);
+    }
+    const sacm::model::ElementId new_id = created.created_ids().front();
+    if (!description.empty()) {
+        const sacm::commands::MutationResult described =
+            set_terminology_description(doc, new_id, description);
+        if (!described.applied) {
+            rollback_element(doc, new_id);
+            return failed_terminology_create(described);
+        }
+    }
+    TerminologyCreateOutcome outcome;
+    outcome.applied = true;
+    outcome.element_id = new_id.value();
+    return outcome;
+}
+
+TerminologyCreateOutcome apply_create_terminology_category(LibraryDocument& document,
+                                                          const std::string& package_id,
+                                                          const std::string& name,
+                                                          const std::string& description,
+                                                          const std::string& category_id) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    // Legacy ApplyCategoryDraft trims the name/description.
+    const sacm::commands::MutationResult created = doc.apply(sacm::commands::CreateCategory{
+        .parent = sacm::model::ElementId(package_id),
+        .id = to_optional_id(category_id),
+        .name = trim_whitespace(name)});
+    if (!created.applied || created.created_ids().empty()) {
+        return failed_terminology_create(created);
+    }
+    const sacm::model::ElementId new_id = created.created_ids().front();
+    const std::string trimmed_description = trim_whitespace(description);
+    if (!trimmed_description.empty()) {
+        const sacm::commands::MutationResult described =
+            set_terminology_description(doc, new_id, trimmed_description);
+        if (!described.applied) {
+            rollback_element(doc, new_id);
+            return failed_terminology_create(described);
+        }
+    }
+    TerminologyCreateOutcome outcome;
+    outcome.applied = true;
+    outcome.element_id = new_id.value();
+    return outcome;
+}
+
+TerminologyCreateOutcome apply_create_terminology_term(LibraryDocument& document,
+                                                      const std::string& package_id,
+                                                      const TerminologyTermFields& fields,
+                                                      const std::string& term_id) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    // Legacy ApplyTermDraft trims value/name/externalReference/origin and
+    // normalizes the category refs; reproduce that so the projection matches.
+    const sacm::commands::MutationResult created = doc.apply(sacm::commands::CreateTerm{
+        .parent = sacm::model::ElementId(package_id),
+        .id = to_optional_id(term_id),
+        .name = trim_whitespace(fields.name),
+        .value = trim_whitespace(fields.value),
+        .external_reference = trim_whitespace(fields.external_reference),
+        .origin = to_optional_id(normalize_ref(fields.origin)),
+    });
+    if (!created.applied || created.created_ids().empty()) {
+        return failed_terminology_create(created);
+    }
+    const sacm::model::ElementId new_id = created.created_ids().front();
+
+    const std::string description = trim_whitespace(fields.description);
+    if (!description.empty()) {
+        const sacm::commands::MutationResult described =
+            set_terminology_description(doc, new_id, description);
+        if (!described.applied) {
+            rollback_element(doc, new_id);
+            return failed_terminology_create(described);
+        }
+    }
+
+    const std::vector<std::string> categories = normalize_category_refs(fields.category_refs);
+    if (!categories.empty()) {
+        std::vector<sacm::model::ElementId> category_ids;
+        category_ids.reserve(categories.size());
+        for (const std::string& category : categories) {
+            category_ids.emplace_back(category);
+        }
+        const sacm::commands::MutationResult classified =
+            doc.apply(sacm::commands::SetExpressionCategories{.element = new_id,
+                                                              .categories = std::move(category_ids)});
+        if (!classified.applied) {
+            rollback_element(doc, new_id);
+            return failed_terminology_create(classified);
+        }
+    }
+
+    TerminologyCreateOutcome outcome;
+    outcome.applied = true;
+    outcome.element_id = new_id.value();
+    return outcome;
+}
+
+TerminologyEditOutcome apply_delete_terminology_element(LibraryDocument& document,
+                                                       const std::string& element_id) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::commands::MutationResult result = doc.apply(sacm::commands::DeleteElement{
+        .target = sacm::model::ElementId(element_id),
+        .reference_policy = sacm::commands::ReferenceDeletePolicy::DeleteReferencingRelationships,
+    });
+    TerminologyEditOutcome outcome;
+    outcome.applied = result.applied;
+    fill_diagnostics(outcome.diagnostics, result);
     return outcome;
 }
 
