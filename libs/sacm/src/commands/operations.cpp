@@ -30,6 +30,16 @@ std::string_view operation_name(const Operation& operation) {
                 return "SetAssertionDeclaration";
             } else if constexpr (std::is_same_v<T, AddMetaClaim>) {
                 return "AddMetaClaim";
+            } else if constexpr (std::is_same_v<T, AddRelationshipSource>) {
+                return "AddRelationshipSource";
+            } else if constexpr (std::is_same_v<T, SetExpressionValue>) {
+                return "SetExpressionValue";
+            } else if constexpr (std::is_same_v<T, SetTermExternalReference>) {
+                return "SetTermExternalReference";
+            } else if constexpr (std::is_same_v<T, SetTermOrigin>) {
+                return "SetTermOrigin";
+            } else if constexpr (std::is_same_v<T, SetExpressionCategories>) {
+                return "SetExpressionCategories";
             } else if constexpr (std::is_same_v<T, CreateTerminologyPackage>) {
                 return "CreateTerminologyPackage";
             } else if constexpr (std::is_same_v<T, CreateCategory>) {

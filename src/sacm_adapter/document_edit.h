@@ -21,12 +21,19 @@
 //
 //   * Name    -> SetName (clause 8.6 single name LangString, primary language).
 //   * Content -> SetDescription on a Claim/ArgumentReasoning: the app's
-//     `content` is the element's primary Description (clause 8.9), which the
-//     library's SetDescription edits.
+//     `content` is the element's primary Description (clause 8.9). A primary-
+//     language edit overwrites the front Description's stored entry in place; a
+//     non-primary edit adds/updates that language's LangString.
+//   * Description -> SetDescription on a *non*-claim ModelElement (artifact
+//     reference, relationship, ...), whose POD `description` IS the front
+//     Description; same language handling as Content.
 //
 // Deliberately not yet mapped (later slices, some needing new library
-// operations): a Claim's secondary-note Description, Term/Expression `value`,
-// and multi-language names/Descriptions that exceed a single LangString.
+// operations): a multi-language *name* (SACM's name is one LangString, so extra
+// languages need the reserved "sacm.import.name" TaggedValue), a Claim's
+// secondary-note Description (the POD `description` on a claim is a *second*
+// Description, which SetDescription's front-only edit cannot target), and
+// Term/Expression `value`.
 
 #include "sacm_adapter/library_load.h"  // LibraryDocument, LoadDiagnostic
 
@@ -115,6 +122,15 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
                                 ChildKind kind, const std::string& element_id = {},
                                 const std::string& relationship_id = {});
 
+// Adds a top goal, mirroring `core::AddTopGoal`: creates a Claim with no parent
+// relationship in the document's first ArgumentPackage (mirroring
+// `core::FindOwningArgumentPackage`'s fallback for an element with no owning
+// relationship). Reuses AddChildOutcome; `new_relationship_id` is always empty
+// (a top goal has no incoming relationship). When `element_id` is non-empty it
+// is used verbatim (id-deterministic replay); empty means the library generates
+// it. Reports `supported == false` only if the document has no ArgumentPackage.
+AddChildOutcome apply_add_top_goal(LibraryDocument& document, const std::string& element_id = {});
+
 // The source of a dialectic challenge, mirroring core::ChallengeSourceType.
 enum class ChallengeSource {
     CounterArgument, // Claim             <- AssertedInference (isCounter)
@@ -155,7 +171,12 @@ struct AcpOutcome {
 // relationships report `supported == false`: an ACP on a goal attaches through
 // its supporting relationship, and relationship-ACP eligibility needs the
 // wider `RelationshipEligibleForAcp` rules, both later slices.
-AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id);
+//
+// When `requested_acp_id` is non-empty it is the `ACP<n>` id used verbatim (so an
+// audited/replayed ACP add reproduces the id the legacy generator recorded);
+// empty generates the next free one.
+AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id,
+                         const std::string& requested_acp_id = {});
 
 // Result of deleting an element.
 struct DeleteOutcome {

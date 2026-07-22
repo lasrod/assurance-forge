@@ -13,6 +13,16 @@ namespace sacm_adapter {
 inline constexpr const char* kGsnRoleTagKey = "assuranceForge.gsn.role";
 inline constexpr const char* kGsnRoleJustification = "Justification";
 
+// Reserved compat TaggedValue the *library* writes on import when it normalizes a
+// legacy, non-standard `assertionDeclaration="justification"` to `axiomatic`
+// (libs/sacm/src/io/xmi_reader.cpp). Its content is the original literal
+// ("justification"). This lets the projection recognize a GSN Justification that
+// came from an old file that predates the `assuranceForge.gsn.role` encoding. The
+// key string must stay in sync with the reader; the justification round-trip test
+// guards it.
+inline constexpr const char* kImportAssertionDeclarationKey = "sacm.import.assertionDeclaration";
+inline constexpr const char* kImportAssertionDeclarationJustification = "justification";
+
 // A GSN Strategy is added under a goal before it has any sub-goals, but SACM's
 // AssertedInference requires source [1..*] (clause 11.13), so a bare strategy
 // inference is invalid. The strategy is created as a standalone ArgumentReasoning

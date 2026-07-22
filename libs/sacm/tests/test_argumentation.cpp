@@ -13,6 +13,7 @@
 namespace {
 
 using sacm::commands::AddMetaClaim;
+using sacm::commands::AddRelationshipSource;
 using sacm::commands::ChangeRecord;
 using sacm::commands::CreateArgumentPackage;
 using sacm::commands::CreateArgumentReasoning;
@@ -70,6 +71,43 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_LegacyUndevelopedNormalizesToNeedsSuppo
     const LoadResult specific = load(R"(undeveloped="true" assertionDeclaration="assumed")");
     ASSERT_TRUE(specific.ok);
     EXPECT_EQ(declaration_of(specific), AssertionDeclaration::Assumed);
+}
+
+// A GSN Justification predates the vendor gsn.role encoding: old Assurance Forge
+// files wrote a non-standard assertionDeclaration="justification". The library
+// normalizes it to the standards-correct `axiomatic` (docs/sacm/sacm-gsn-mapping.md)
+// and preserves the original GSN role in a reserved TaggedValue, so a client can
+// still tell a Justification from a plain axiomatic Goal and strict save stays clean.
+TEST(Sacm23Argumentation, SACM23_ARG_001_LegacyJustificationNormalizesToAxiomatic) {
+    const LoadResult legacy = sacm::io::load_xmi_string(
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+        R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+        R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">)"
+        R"(<argumentPackage xmi:id="ap_1">)"
+        R"(<argumentElement xsi:type="sacm:Claim" xmi:id="J1" assertionDeclaration="justification">)"
+        R"(<name content="Just"/></argumentElement></argumentPackage></sacm:AssuranceCasePackage>)");
+    ASSERT_TRUE(legacy.ok);
+    const auto* claim = legacy.document->find_as<sacm::model::Claim>(sacm::model::ElementId{"J1"});
+    ASSERT_NE(claim, nullptr);
+    EXPECT_EQ(claim->assertion_declaration(), AssertionDeclaration::Axiomatic);
+
+    bool has_role_tag = false;
+    for (const auto& tag : claim->tagged_values()) {
+        if (tag->key().primary() == "sacm.import.assertionDeclaration" &&
+            tag->content().primary() == "justification") {
+            has_role_tag = true;
+        }
+    }
+    EXPECT_TRUE(has_role_tag) << "the GSN Justification role was not preserved";
+
+    // Normalized, not opaque -- strict save accepts it and it round-trips.
+    const auto saved = sacm::io::save_xmi_string(*legacy.document);
+    ASSERT_TRUE(saved.ok);
+    const LoadResult reloaded =
+        sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(*legacy.document, *reloaded.document).empty());
 }
 
 // Assurance Forge encodes two product-critical GSN v3 concepts in SACM: a
@@ -264,6 +302,88 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_CreatesRelationshipsWithCommands) {
         sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(reloaded.ok);
     EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
+}
+
+// A strategy's inference is materialized with its first sub-goal as source, then
+// extended with a second source when the next sub-goal is added -- the GSN
+// incremental-construction workflow. AddRelationshipSource must append the source
+// and the result must round-trip.
+TEST(Sacm23Argumentation, SACM23_ARG_001_AddsSourceToExistingRelationship) {
+    Document document = build_argument_case();
+    ASSERT_TRUE(document
+                    .apply(CreateArgumentReasoning{.parent = ElementId{"argpkg_1"},
+                                                   .id = ElementId{"ar_1"},
+                                                   .name = "Strategy"})
+                    .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateAssertedRelationship{
+                        .parent = ElementId{"argpkg_1"},
+                        .kind = ElementKind::AssertedInference,
+                        .id = ElementId{"inf_1"},
+                        .sources = {ElementId{"claim_sub"}},
+                        .targets = {ElementId{"claim_top"}},
+                        .reasoning = ElementId{"ar_1"},
+                    })
+                    .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateClaim{.parent = ElementId{"argpkg_1"},
+                                       .id = ElementId{"claim_sub2"},
+                                       .name = "Sub2"})
+                    .applied);
+
+    const auto added = document.apply(
+        AddRelationshipSource{.relationship = ElementId{"inf_1"}, .source = ElementId{"claim_sub2"}});
+    ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    ASSERT_EQ(added.changes.size(), 1u);
+    EXPECT_EQ(added.changes.front().property.value_or(""), "source");
+    EXPECT_EQ(added.changes.front().change, ChangeRecord::Change::Modified);
+
+    const auto* inference = document.find_as<sacm::model::AssertedRelationship>(ElementId{"inf_1"});
+    ASSERT_NE(inference, nullptr);
+    ASSERT_EQ(inference->sources().size(), 2u);
+    EXPECT_EQ(inference->sources().back(), ElementId{"claim_sub2"});
+
+    EXPECT_TRUE(sacm::validation::validate(document).empty());
+    const auto saved = sacm::io::save_xmi_string(document);
+    ASSERT_TRUE(saved.ok);
+    const LoadResult reloaded =
+        sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
+}
+
+// AddRelationshipSource enforces the same typing as CreateAssertedRelationship
+// (relationship must be an AssertedRelationship; source must be an ArgumentAsset)
+// and rejects a duplicate source rather than silently repeating it.
+TEST(Sacm23Argumentation, SACM23_ARG_002_AddSourceValidatesTargetAndDuplicate) {
+    Document document = build_argument_case();
+    ASSERT_TRUE(document
+                    .apply(CreateAssertedRelationship{
+                        .parent = ElementId{"argpkg_1"},
+                        .kind = ElementKind::AssertedInference,
+                        .id = ElementId{"inf_1"},
+                        .sources = {ElementId{"claim_sub"}},
+                        .targets = {ElementId{"claim_top"}},
+                    })
+                    .applied);
+
+    // The relationship id must resolve to an AssertedRelationship.
+    const auto not_relationship = document.apply(
+        AddRelationshipSource{.relationship = ElementId{"claim_top"}, .source = ElementId{"claim_sub"}});
+    EXPECT_FALSE(not_relationship.applied);
+    EXPECT_TRUE(has_code(not_relationship.diagnostics, sacm::validation::codes::kCmdTargetNotFound));
+
+    // A source must be an ArgumentAsset (a package is not).
+    const auto wrong_type = document.apply(
+        AddRelationshipSource{.relationship = ElementId{"inf_1"}, .source = ElementId{"argpkg_1"}});
+    EXPECT_FALSE(wrong_type.applied);
+    EXPECT_TRUE(has_code(wrong_type.diagnostics, sacm::validation::codes::kRefWrongType));
+
+    // A source already present is rejected.
+    const auto duplicate = document.apply(
+        AddRelationshipSource{.relationship = ElementId{"inf_1"}, .source = ElementId{"claim_sub"}});
+    EXPECT_FALSE(duplicate.applied);
+    EXPECT_TRUE(has_code(duplicate.diagnostics, sacm::validation::codes::kMultiplicityViolation));
 }
 
 TEST(Sacm23Argumentation, SACM23_ARG_002_RejectsRelationshipWithWrongTargetKind) {

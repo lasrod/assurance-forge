@@ -117,6 +117,16 @@ struct AddMetaClaim {
     model::ElementId meta_claim;
 };
 
+// Add a source to an existing AssertedRelationship (clause 11.13, source[1..*]).
+// Supports GSN strategy editing: a strategy's inference is materialized when its
+// first sub-goal is added, and this extends that inference's sources for each
+// later sub-goal. The source must be an ArgumentAsset (same typing as
+// CreateAssertedRelationship); adding one already present is rejected.
+struct AddRelationshipSource {
+    model::ElementId relationship;
+    model::ElementId source;
+};
+
 // Create a TerminologyPackage inside an AssuranceCasePackage or (nested)
 // inside another TerminologyPackage.
 struct CreateTerminologyPackage {
@@ -172,6 +182,31 @@ struct SetDescription {
     std::string language;  // may be empty
 };
 
+// Set the value text of a Term or Expression (clause 10.7 / 10.10).
+struct SetExpressionValue {
+    model::ElementId element;
+    std::string value;
+};
+
+// Set a Term's external reference URI/text (clause 10.7).
+struct SetTermExternalReference {
+    model::ElementId element;
+    std::string external_reference;
+};
+
+// Set or clear a Term's origin reference (clause 10.7); absent origin clears it.
+struct SetTermOrigin {
+    model::ElementId element;
+    std::optional<model::ElementId> origin;
+};
+
+// Replace the set of Categories a Term or Expression belongs to (clause 10.8);
+// each id must resolve to a Category.
+struct SetExpressionCategories {
+    model::ElementId element;
+    std::vector<model::ElementId> categories;
+};
+
 // Attach a TaggedValue key/value pair (clause 8.12 extension mechanism).
 struct AddTaggedValue {
     model::ElementId element;
@@ -197,7 +232,8 @@ using Operation =
                  CreateTerminologyPackage, CreateCategory, CreateTerm, CreateExpression,
                  CreateArtifactPackage, CreateArtifactAsset, CreateArtifactAssetRelationship,
                  SetCitation, SetName, SetDescription, SetAssertionDeclaration, AddMetaClaim,
-                 AddTaggedValue, DeleteElement>;
+                 AddRelationshipSource, SetExpressionValue, SetTermExternalReference,
+                 SetTermOrigin, SetExpressionCategories, AddTaggedValue, DeleteElement>;
 
 // Stable operation name ("CreateClaim", "DeleteElement", ...) used in
 // previews, results, and diagnostics.

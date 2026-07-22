@@ -97,30 +97,43 @@ EditOutcome apply_text_edit(LibraryDocument& document, const std::string& elemen
         return applied_outcome(doc.apply(operation));
     }
     case TextField::Content: {
-        // Non-primary languages accumulate a per-language content map the POD
-        // keeps flat but the library stores as extra Description LangStrings;
-        // that multi-language mapping is a later slice. Under a non-primary
-        // language, leave it unsupported so the command bus re-derives from the
-        // authoritative package instead (matching the legacy edit exactly).
-        if (language != kPrimaryLanguage) {
-            return unsupported_outcome();
-        }
         const auto* element = doc.find_as<sacm::model::ModelElement>(id);
         if (element == nullptr || !content_maps_to_description(element->kind())) {
             return unsupported_outcome();
         }
-        const sacm::commands::Operation operation = sacm::commands::SetDescription{
+        // Content is the front Description (the statement, clause 8.9). A primary
+        // edit overwrites the front's stored (possibly lang-less) entry in place;
+        // a non-primary edit adds/updates that language's LangString, which the
+        // projection reads back into content_langs.
+        const std::string target_language =
+            language == kPrimaryLanguage ? primary_description_language(*element) : language;
+        return applied_outcome(doc.apply(sacm::commands::SetDescription{
             .element = id,
             .text = value,
-            .language = primary_description_language(*element),
-        };
-        return applied_outcome(doc.apply(operation));
+            .language = target_language,
+        }));
     }
-    case TextField::Description:
-        // The secondary-note Description (claim) and non-claim Descriptions are
-        // not wired yet; see the header. Report unsupported so the caller keeps
-        // the legacy edit authoritative.
-        return unsupported_outcome();
+    case TextField::Description: {
+        const auto* element = doc.find_as<sacm::model::ModelElement>(id);
+        if (element == nullptr) {
+            return unsupported_outcome();
+        }
+        // For a claim-like element the POD `description` is a *second* Description
+        // (a note); SetDescription edits the front (which is the statement /
+        // content there), so it cannot target the note -- that stays a later
+        // slice. For every other element the POD `description` IS the front
+        // Description, so it maps directly (same language handling as Content).
+        if (content_maps_to_description(element->kind())) {
+            return unsupported_outcome();
+        }
+        const std::string target_language =
+            language == kPrimaryLanguage ? primary_description_language(*element) : language;
+        return applied_outcome(doc.apply(sacm::commands::SetDescription{
+            .element = id,
+            .text = value,
+            .language = target_language,
+        }));
+    }
     }
     return unsupported_outcome();
 }
@@ -140,6 +153,17 @@ const sacm::model::ArgumentPackage* owning_argument_package(
         }
     }
     return nullptr;
+}
+
+// The argument package a top goal is created in: the root's first, mirroring
+// core::FindOwningArgumentPackage's fallback for an element with no owning
+// relationship. Null if the document has no argument package.
+const sacm::model::ArgumentPackage* first_argument_package(const sacm::model::Document& doc) {
+    if (doc.roots().empty()) {
+        return nullptr;
+    }
+    const auto& packages = doc.roots().front()->argument_packages();
+    return packages.empty() ? nullptr : packages.front().get();
 }
 
 AddChildOutcome unsupported_child() {
@@ -345,6 +369,24 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
     return outcome;
 }
 
+AddChildOutcome apply_add_top_goal(LibraryDocument& document, const std::string& element_id) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ArgumentPackage* package = first_argument_package(doc);
+    if (package == nullptr) {
+        return unsupported_child();
+    }
+    const sacm::commands::MutationResult created = doc.apply(
+        sacm::commands::CreateClaim{.parent = package->id(), .id = to_optional_id(element_id)});
+    if (!created.applied || created.created_ids().empty()) {
+        return failed_child(created);
+    }
+    AddChildOutcome outcome;
+    outcome.supported = true;
+    outcome.applied = true;
+    outcome.new_element_id = created.created_ids().front().value();
+    return outcome;  // a top goal has no parent, so no relationship
+}
+
 AddChildOutcome apply_challenge(LibraryDocument& document, const std::string& target_id,
                                 ChallengeSource source, const std::string& element_id,
                                 const std::string& relationship_id) {
@@ -470,7 +512,8 @@ sacm::commands::MutationResult add_tag(sacm::model::Document& doc,
 
 } // namespace
 
-AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id) {
+AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id,
+                         const std::string& requested_acp_id) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::model::ElementId target(target_id);
 
@@ -482,7 +525,27 @@ AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id
         return unsupported_acp();
     }
 
-    const std::string acp_id = next_acp_id(existing_acp_ids(doc));
+    // A caller-supplied id is used verbatim (so an audited/replayed ACP add
+    // reproduces the exact `ACP<n>` the legacy core::acp::AddAcp generated);
+    // empty means generate the next free one.
+    const std::unordered_set<std::string> existing = existing_acp_ids(doc);
+    const std::string acp_id = requested_acp_id.empty() ? next_acp_id(existing) : requested_acp_id;
+
+    // A caller-supplied id must be unused: reusing one already present would write
+    // duplicate marker tags and make the projection ambiguous. (A correct replay
+    // supplies an id that was unique when first generated, so this only guards a
+    // corrupt or double-applied event.)
+    if (!requested_acp_id.empty() && existing.count(acp_id) != 0) {
+        AcpOutcome outcome;
+        outcome.supported = true;
+        outcome.applied = false;
+        outcome.diagnostics.push_back(LoadDiagnostic{
+            .code = "SACM-CMD-004",
+            .severity = "Error",
+            .message = "requested ACP id '" + acp_id + "' already exists",
+        });
+        return outcome;
+    }
 
     // Marker + name + resolutionKind = none, matching core::acp::UpsertAcpTags
     // for a freshly added (unresolved) ACP. The ACP id is the marker's *value*,

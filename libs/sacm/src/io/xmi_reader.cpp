@@ -1259,6 +1259,27 @@ void read_kind_specific_attributes(Reader& reader, SACMElement& element,
             if (const std::optional<model::AssertionDeclaration> parsed =
                     model::parse_assertion_declaration(attr.value())) {
                 Access::assertion_declaration(*assertion) = *parsed;
+            } else if (std::string_view(attr.value()) == "justification") {
+                // Legacy Assurance Forge / GSN shorthand: `justification` is not a
+                // SACM AssertionDeclaration literal. GSN's own mapping makes a
+                // Justification an `axiomatic` assertion (docs/sacm/sacm-gsn-mapping.md);
+                // normalize to that and preserve the original GSN role in a
+                // reserved TaggedValue (clause 8.12) so a client can tell a
+                // Justification from a plain axiomatic Goal. The key is a library
+                // import convention (mirrors "sacm.import.name"); the Assurance
+                // Forge adapter reads it (sacm_adapter::kImportAssertionDeclarationKey).
+                Access::assertion_declaration(*assertion) = model::AssertionDeclaration::Axiomatic;
+                auto role = std::make_unique<model::TaggedValue>(
+                    reader.generate_id(ElementKind::TaggedValue));
+                Access::key(*role).set("", "sacm.import.assertionDeclaration");
+                Access::content(*role).set("", "justification");
+                Access::set_parent(*role, &element);
+                Access::tagged_values(*assertion).push_back(std::move(role));
+                reader.report(validation::codes::kXmiUnknownElement, Severity::Info,
+                              "SACM23-COMPAT-001", node, {element.id()},
+                              "legacy assertionDeclaration=\"justification\" normalized to "
+                              "axiomatic (GSN role preserved in TaggedValue "
+                              "'sacm.import.assertionDeclaration')");
             } else {
                 reader.report(validation::codes::kEnumInvalidLiteral, reader.mode_severity(),
                               "SACM23-ARG-001", node, {element.id()},

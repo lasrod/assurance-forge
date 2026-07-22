@@ -292,6 +292,48 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildReproducesLegacyStructure) {
     }
 }
 
+// SACM23-INT-001, edit slice: adding a top goal through the library (a Claim in
+// the first ArgumentPackage, no relationship) must reproduce the legacy
+// core::AddTopGoal structure. The caller-supplied id is used verbatim, which the
+// library-primary audit replay needs.
+TEST(SacmLibraryEdit, SACM23_INT_001_AddTopGoalReproducesLegacyStructure) {
+    // Library path.
+    sacm_adapter::LoadOutcome loaded = load_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::AddChildOutcome added =
+        sacm_adapter::apply_add_top_goal(*loaded.document, "TG1");
+    ASSERT_TRUE(added.supported);
+    ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    EXPECT_EQ(added.new_element_id, "TG1");
+    EXPECT_TRUE(added.new_relationship_id.empty()) << "a top goal has no incoming relationship";
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    const core::SacmElement* library_goal = find_element(after, "TG1");
+    ASSERT_NE(library_goal, nullptr);
+
+    // Legacy path.
+    const auto legacy_case = parser::parse_sacm_xml(fixture_path().string());
+    ASSERT_TRUE(legacy_case.has_value()) << legacy_case.error();
+    const auto legacy_package = sacm::parse_sacm(fixture_path().string());
+    ASSERT_TRUE(legacy_package.has_value()) << legacy_package.error();
+    core::AssuranceCase legacy = *legacy_case;
+    sacm::AssuranceCasePackage package = *legacy_package;
+    std::string error;
+    ASSERT_TRUE(core::AddTopGoalWithId(legacy, &package, "TG1", error)) << error;
+    const core::SacmElement* legacy_goal = find_element(legacy, "TG1");
+    ASSERT_NE(legacy_goal, nullptr);
+
+    // Same kind and (empty) name, and no relationship references it in either.
+    EXPECT_EQ(library_goal->type, "claim");
+    EXPECT_EQ(library_goal->type, legacy_goal->type);
+    EXPECT_EQ(library_goal->name, legacy_goal->name);
+    for (const core::SacmElement& element : after.elements) {
+        EXPECT_EQ(std::find(element.source_refs.begin(), element.source_refs.end(), "TG1"),
+                  element.source_refs.end());
+        EXPECT_EQ(std::find(element.target_refs.begin(), element.target_refs.end(), "TG1"),
+                  element.target_refs.end());
+    }
+}
+
 // SACM23-INT-001, edit slice: a dialectic challenge through the library
 // (create counter element + create isCounter relationship) must produce the
 // same structure the legacy AddChallenge does -- counter element kind, counter
@@ -464,15 +506,95 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildUnderMissingParentUnsupported) {
     EXPECT_FALSE(added.applied);
 }
 
-// A non-primary-language content edit is not wired (the flat per-language
-// content map is a later multi-language slice), so it reports unsupported and
-// the command bus re-derives instead -- rather than the seam guessing at a
-// LangString entry and diverging from the legacy edit.
-TEST(SacmLibraryEdit, SACM23_INT_001_ContentEditUnsupportedForNonPrimaryLanguage) {
+// A non-primary-language content edit adds that language's LangString to the
+// front Description; the projected content_langs entry must match the legacy
+// per-language content map, and the primary content must be untouched.
+TEST(SacmLibraryEdit, SACM23_INT_001_ContentEditReproducesLegacyForNonPrimaryLanguage) {
+    const std::string kJa = "安全";  // Japanese for "safety"
+
+    sacm_adapter::LoadOutcome loaded = load_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const core::AssuranceCase before = sacm_adapter::project_case(*loaded.document);
+    const core::SacmElement* before_g1 = find_element(before, "G1");
+    ASSERT_NE(before_g1, nullptr);
+    const std::string english_before = before_g1->content;
+
+    const sacm_adapter::EditOutcome edit = sacm_adapter::apply_text_edit(
+        *loaded.document, "G1", sacm_adapter::TextField::Content, "ja", kJa);
+    ASSERT_TRUE(edit.supported);
+    ASSERT_TRUE(edit.applied) << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
+
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    const core::SacmElement* after_g1 = find_element(after, "G1");
+    ASSERT_NE(after_g1, nullptr);
+    ASSERT_TRUE(after_g1->content_langs.contains("ja"));
+    EXPECT_EQ(after_g1->content_langs.at("ja"), kJa);
+    EXPECT_EQ(after_g1->content, english_before) << "the primary content must be untouched";
+
+    const core::AssuranceCase legacy = legacy_edit("G1", core::ElementTextField::Content, "ja", kJa);
+    const core::SacmElement* legacy_g1 = find_element(legacy, "G1");
+    ASSERT_NE(legacy_g1, nullptr);
+    ASSERT_TRUE(legacy_g1->content_langs.contains("ja"));
+    EXPECT_EQ(after_g1->content_langs.at("ja"), legacy_g1->content_langs.at("ja"));
+}
+
+// The Description field on a non-claim element (here the relationship R1) maps to
+// its front Description, so the edit reproduces the legacy description edit.
+TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditReproducesLegacyForNonClaim) {
+    const std::string kNote = "Decomposition over identified hazards.";
+
     sacm_adapter::LoadOutcome loaded = load_fixture();
     ASSERT_NE(loaded.document, nullptr);
     const sacm_adapter::EditOutcome edit = sacm_adapter::apply_text_edit(
-        *loaded.document, "G1", sacm_adapter::TextField::Content, "ja", "\xe5\xae\x89\xe5\x85\xa8");
+        *loaded.document, "R1", sacm_adapter::TextField::Description, "en", kNote);
+    ASSERT_TRUE(edit.supported);
+    ASSERT_TRUE(edit.applied) << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
+
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    const core::SacmElement* after_r1 = find_element(after, "R1");
+    ASSERT_NE(after_r1, nullptr);
+    EXPECT_EQ(after_r1->description, kNote);
+    ASSERT_TRUE(after_r1->description_langs.contains("en"));
+    EXPECT_EQ(after_r1->description_langs.at("en"), kNote);
+
+    const core::AssuranceCase legacy =
+        legacy_edit("R1", core::ElementTextField::Description, "en", kNote);
+    const core::SacmElement* legacy_r1 = find_element(legacy, "R1");
+    ASSERT_NE(legacy_r1, nullptr);
+    EXPECT_EQ(after_r1->description, legacy_r1->description);
+    ASSERT_TRUE(legacy_r1->description_langs.contains("en"));
+    EXPECT_EQ(after_r1->description_langs.at("en"), legacy_r1->description_langs.at("en"));
+}
+
+// A legacy file using the non-standard assertionDeclaration="justification"
+// (predating the gsn.role encoding) projects as the app's "justification" role:
+// the library normalizes it to axiomatic + a reserved compat tag on import, and
+// the projection honours that tag so old Justifications survive the migration.
+TEST(SacmLibraryEdit, SACM23_INT_001_LegacyJustificationProjectsAsJustification) {
+    const std::string xml =
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+        R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+        R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">)"
+        R"(<argumentPackage xmi:id="ap_1">)"
+        R"(<argumentElement xsi:type="sacm:Claim" xmi:id="J1" assertionDeclaration="justification">)"
+        R"(<name content="Just"/></argumentElement></argumentPackage></sacm:AssuranceCasePackage>)";
+    sacm_adapter::LibraryDocument document;
+    ASSERT_TRUE(sacm_adapter::reload_document(document, xml));
+    const core::AssuranceCase projected = sacm_adapter::project_case(document);
+    const core::SacmElement* j1 = find_element(projected, "J1");
+    ASSERT_NE(j1, nullptr);
+    EXPECT_EQ(j1->assertion_declaration, "justification");
+}
+
+// The Description field on a claim-like element is a *second* Description (a
+// note) that SetDescription's front-only edit cannot target, so it stays
+// unsupported and the caller keeps the legacy edit authoritative.
+TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditUnsupportedForClaim) {
+    sacm_adapter::LoadOutcome loaded = load_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::EditOutcome edit = sacm_adapter::apply_text_edit(
+        *loaded.document, "G1", sacm_adapter::TextField::Description, "en", "a note");
     EXPECT_FALSE(edit.supported);
     EXPECT_FALSE(edit.applied);
 }
@@ -498,6 +620,46 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpDoesNotCollideWithElementId) {
 
     const core::AssuranceCase projected = sacm_adapter::project_case(*loaded.document);
     EXPECT_NE(find_acp(projected, "ACP1"), nullptr);
+}
+
+// SACM23-INT-001, edit slice: a caller-supplied ACP id is used verbatim, so an
+// audited/replayed ACP add reproduces the exact id the legacy generator recorded
+// rather than regenerating from the (possibly diverged) live document state.
+TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpUsesCallerSuppliedId) {
+    const std::filesystem::path path = repo_root() / "tests" / "data" / "fixture_acp_edit.sacm.xml";
+    ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm_adapter::AcpOutcome added =
+        sacm_adapter::apply_add_acp(*loaded.document, "S1", "ACP5");
+    ASSERT_TRUE(added.supported);
+    ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    EXPECT_EQ(added.acp_id, "ACP5") << "the supplied id must be used verbatim, not regenerated";
+
+    const core::AssuranceCase projected = sacm_adapter::project_case(*loaded.document);
+    EXPECT_NE(find_acp(projected, "ACP5"), nullptr);
+    EXPECT_EQ(find_acp(projected, "ACP1"), nullptr) << "the generated id must not appear";
+}
+
+// A caller-supplied ACP id already in use is refused rather than writing duplicate
+// marker tags (guards a corrupt or double-applied replay).
+TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpRejectsDuplicateRequestedId) {
+    const std::filesystem::path path = repo_root() / "tests" / "data" / "fixture_acp_edit.sacm.xml";
+    ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm_adapter::AcpOutcome first = sacm_adapter::apply_add_acp(*loaded.document, "S1");
+    ASSERT_TRUE(first.applied) << (first.diagnostics.empty() ? "" : first.diagnostics.front().message);
+    ASSERT_EQ(first.acp_id, "ACP1");
+
+    const sacm_adapter::AcpOutcome duplicate =
+        sacm_adapter::apply_add_acp(*loaded.document, "S1", "ACP1");
+    EXPECT_TRUE(duplicate.supported);
+    EXPECT_FALSE(duplicate.applied) << "a duplicate requested ACP id must be rejected";
 }
 
 // SACM23-INT-001, edit slice: adding an Assurance Claim Point to an eligible
