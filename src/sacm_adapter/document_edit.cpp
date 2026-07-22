@@ -1033,4 +1033,276 @@ TerminologyEditOutcome apply_delete_terminology_element(LibraryDocument& documen
     return outcome;
 }
 
+TerminologyContextOutcome apply_associate_terminology_term(LibraryDocument& document,
+                                                          const std::string& target_element_id,
+                                                          const std::string& term_id,
+                                                          const std::string& artifact_reference_id,
+                                                          const std::string& asserted_context_id) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId term_ref(term_id);
+    const auto* term = doc.find_as<sacm::model::Term>(term_ref);
+    if (term == nullptr) {
+        return terminology_context_error("SACM-CMD-002", "Term not found.");
+    }
+    const sacm::model::ElementId target(target_element_id);
+    const sacm::model::SACMElement* target_element = doc.find(target);
+    const sacm::model::ArgumentPackage* package = owning_argument_package(target_element);
+    if (package == nullptr || !is_association_target(target_element)) {
+        return terminology_context_error(
+            "SACM-CMD-002",
+            "Selected element is not a claim, strategy, or solution in an argument package.");
+    }
+    const sacm::model::ElementId package_id = package->id();
+
+    // Reuse: an existing terminology reference to the term in this package, and
+    // an existing context that already links it to the target.
+    const sacm::model::ArtifactReference* reusable_reference = nullptr;
+    for (const auto& element : package->argument_elements()) {
+        const auto* reference = dynamic_cast<const sacm::model::ArtifactReference*>(element.get());
+        if (reference == nullptr || !reference_targets_term(*reference, term_ref)) {
+            continue;
+        }
+        if (reusable_reference == nullptr) {
+            reusable_reference = reference;
+        }
+        for (const sacm::model::AssertedContext* context : package_contexts(*package)) {
+            if (ids_contain(context->sources(), reference->id()) &&
+                ids_contain(context->targets(), target)) {
+                TerminologyContextOutcome associated;
+                associated.applied = true;
+                associated.already_associated = true;
+                associated.artifact_reference_id = reference->id().value();
+                associated.asserted_context_id = context->id().value();
+                return associated;
+            }
+        }
+    }
+
+    TerminologyContextOutcome outcome;
+    std::string reference_id;
+    if (reusable_reference == nullptr) {
+        const sacm::commands::MutationResult created_reference =
+            doc.apply(sacm::commands::CreateArtifactReference{
+                .parent = package_id,
+                .id = to_optional_id(artifact_reference_id),
+                .name = term_context_label(*term),
+                .referenced_artifact_elements = {term_ref}});
+        if (!created_reference.applied || created_reference.created_ids().empty()) {
+            return failed_terminology_context(created_reference);
+        }
+        reference_id = created_reference.created_ids().front().value();
+        outcome.created_artifact_reference = true;
+    } else {
+        reference_id = reusable_reference->id().value();
+    }
+
+    const sacm::commands::MutationResult created_context =
+        doc.apply(sacm::commands::CreateAssertedRelationship{
+            .parent = package_id,
+            .kind = sacm::metadata::ElementKind::AssertedContext,
+            .id = to_optional_id(asserted_context_id),
+            .name = "Context: " + term_context_label(*term),
+            .sources = {sacm::model::ElementId(reference_id)},
+            .targets = {target}});
+    if (!created_context.applied || created_context.created_ids().empty()) {
+        if (outcome.created_artifact_reference) {
+            rollback_element(doc, sacm::model::ElementId(reference_id));
+        }
+        return failed_terminology_context(created_context);
+    }
+
+    outcome.applied = true;
+    outcome.created_asserted_context = true;
+    outcome.artifact_reference_id = reference_id;
+    outcome.asserted_context_id = created_context.created_ids().front().value();
+    return outcome;
+}
+
+namespace {
+
+// Candidates for the visible-context edit, mirroring core's
+// VisibleContextSearchResult (ids captured by value so they survive the
+// mutations the caller then applies).
+struct VisibleContextCandidates {
+    bool has_existing_visible = false;
+    sacm::model::ElementId existing_visible_reference;
+    sacm::model::ElementId existing_visible_context;
+    bool has_promotable = false;
+    sacm::model::ElementId promotable_reference;
+    sacm::model::ElementId promotable_context;
+    std::vector<sacm::model::ElementId> hidden_contexts_to_remove;
+};
+
+// Mirrors core::FindVisibleContextCandidates.
+VisibleContextCandidates find_visible_context_candidates(const sacm::model::ArgumentPackage& package,
+                                                         const sacm::model::ElementId& term_ref,
+                                                         const sacm::model::ElementId& target) {
+    VisibleContextCandidates result;
+    for (const auto& element : package.argument_elements()) {
+        const auto* reference = dynamic_cast<const sacm::model::ArtifactReference*>(element.get());
+        if (reference == nullptr || !reference_targets_term(*reference, term_ref)) {
+            continue;
+        }
+        for (const sacm::model::AssertedContext* context : package_contexts(package)) {
+            if (!ids_contain(context->sources(), reference->id()) ||
+                !ids_contain(context->targets(), target)) {
+                continue;
+            }
+            if (is_visible_terminology_context(*context)) {
+                result.has_existing_visible = true;
+                result.existing_visible_reference = reference->id();
+                result.existing_visible_context = context->id();
+                return result;
+            }
+            if (!reference_used_by_other_contexts(package, reference->id(), target, context->id()) &&
+                !result.has_promotable) {
+                result.has_promotable = true;
+                result.promotable_reference = reference->id();
+                result.promotable_context = context->id();
+            } else {
+                result.hidden_contexts_to_remove.push_back(context->id());
+            }
+        }
+    }
+    return result;
+}
+
+// Mirrors core::RemoveUnreferencedTerminologyArtifacts: delete any terminology
+// reference to the term (other than `keep`) that no context still references.
+void remove_unreferenced_term_artifacts(sacm::model::Document& doc,
+                                        const sacm::model::ElementId& package_id,
+                                        const sacm::model::ElementId& term_ref,
+                                        const sacm::model::ElementId& keep) {
+    const auto* package = doc.find_as<sacm::model::ArgumentPackage>(package_id);
+    if (package == nullptr) {
+        return;
+    }
+    std::vector<sacm::model::ElementId> doomed;
+    for (const auto& element : package->argument_elements()) {
+        const auto* reference = dynamic_cast<const sacm::model::ArtifactReference*>(element.get());
+        if (reference == nullptr || reference->id() == keep ||
+            !reference_targets_term(*reference, term_ref)) {
+            continue;
+        }
+        bool referenced = false;
+        for (const sacm::model::AssertedContext* context : package_contexts(*package)) {
+            if (ids_contain(context->sources(), reference->id())) {
+                referenced = true;
+                break;
+            }
+        }
+        if (!referenced) {
+            doomed.push_back(reference->id());
+        }
+    }
+    for (const sacm::model::ElementId& id : doomed) {
+        doc.apply(sacm::commands::DeleteElement{
+            .target = id,
+            .reference_policy = sacm::commands::ReferenceDeletePolicy::DeleteReferencingRelationships,
+        });
+    }
+}
+
+} // namespace
+
+TerminologyContextOutcome apply_add_terminology_visible_context(LibraryDocument& document,
+                                                               const std::string& target_element_id,
+                                                               const std::string& term_id,
+                                                               const std::string& artifact_reference_id,
+                                                               const std::string& asserted_context_id) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId term_ref(term_id);
+    const auto* term = doc.find_as<sacm::model::Term>(term_ref);
+    if (term == nullptr) {
+        return terminology_context_error("SACM-CMD-002", "Term not found.");
+    }
+    const sacm::model::ElementId target(target_element_id);
+    const sacm::model::SACMElement* target_element = doc.find(target);
+    const sacm::model::ArgumentPackage* package = owning_argument_package(target_element);
+    if (package == nullptr || !is_visible_context_target(target_element)) {
+        return terminology_context_error(
+            "SACM-CMD-002", "Selected element is not a claim or strategy in an argument package.");
+    }
+    const sacm::model::ElementId package_id = package->id();
+
+    const VisibleContextCandidates candidates =
+        find_visible_context_candidates(*package, term_ref, target);
+
+    // Already a visible context linking the term to the target.
+    if (candidates.has_existing_visible) {
+        TerminologyContextOutcome associated;
+        associated.applied = true;
+        associated.already_associated = true;
+        associated.artifact_reference_id = candidates.existing_visible_reference.value();
+        associated.asserted_context_id = candidates.existing_visible_context.value();
+        return associated;
+    }
+
+    // Promote a non-visible context in place by marking it visible.
+    if (candidates.has_promotable) {
+        const sacm::commands::MutationResult promoted = set_terminology_description(
+            doc, candidates.promotable_context, kVisibleTerminologyContextMarker);
+        if (!promoted.applied) {
+            return failed_terminology_context(promoted);
+        }
+        TerminologyContextOutcome outcome;
+        outcome.applied = true;
+        outcome.artifact_reference_id = candidates.promotable_reference.value();
+        outcome.asserted_context_id = candidates.promotable_context.value();
+        return outcome;
+    }
+
+    // Create a fresh terminology reference and a visible context.
+    const sacm::commands::MutationResult created_reference =
+        doc.apply(sacm::commands::CreateArtifactReference{
+            .parent = package_id,
+            .id = to_optional_id(artifact_reference_id),
+            .name = term_context_label(*term),
+            .referenced_artifact_elements = {term_ref}});
+    if (!created_reference.applied || created_reference.created_ids().empty()) {
+        return failed_terminology_context(created_reference);
+    }
+    const sacm::model::ElementId reference_id = created_reference.created_ids().front();
+
+    const sacm::commands::MutationResult created_context =
+        doc.apply(sacm::commands::CreateAssertedRelationship{
+            .parent = package_id,
+            .kind = sacm::metadata::ElementKind::AssertedContext,
+            .id = to_optional_id(asserted_context_id),
+            .name = "Context: " + term_context_label(*term),
+            .sources = {reference_id},
+            .targets = {target}});
+    if (!created_context.applied || created_context.created_ids().empty()) {
+        rollback_element(doc, reference_id);
+        return failed_terminology_context(created_context);
+    }
+    const sacm::model::ElementId context_id = created_context.created_ids().front();
+
+    const sacm::commands::MutationResult marked =
+        set_terminology_description(doc, context_id, kVisibleTerminologyContextMarker);
+    if (!marked.applied) {
+        rollback_element(doc, context_id);
+        rollback_element(doc, reference_id);
+        return failed_terminology_context(marked);
+    }
+
+    // Clean up the contexts the search superseded and any now-unreferenced
+    // terminology reference to the term (mirroring the legacy create branch).
+    for (const sacm::model::ElementId& hidden : candidates.hidden_contexts_to_remove) {
+        doc.apply(sacm::commands::DeleteElement{
+            .target = hidden,
+            .reference_policy = sacm::commands::ReferenceDeletePolicy::DeleteReferencingRelationships,
+        });
+    }
+    remove_unreferenced_term_artifacts(doc, package_id, term_ref, reference_id);
+
+    TerminologyContextOutcome outcome;
+    outcome.applied = true;
+    outcome.created_artifact_reference = true;
+    outcome.created_asserted_context = true;
+    outcome.artifact_reference_id = reference_id.value();
+    outcome.asserted_context_id = context_id.value();
+    return outcome;
+}
+
 } // namespace sacm_adapter

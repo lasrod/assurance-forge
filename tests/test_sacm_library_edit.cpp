@@ -1225,3 +1225,157 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DeleteTerminologyTermMatchesLegacy) {
               (std::vector<std::string>{"CAT1", "CAT2", "E1"}));
 }
 
+// SACM23-INT-001, terminology slice: associating a term with a visible element
+// creates an ArtifactReference (referencedArtifact = term) plus an AssertedContext
+// {source = ref, target = element}, matching the legacy association -- reference
+// name, referencedArtifact, and context endpoints -- and reports the created-*
+// flags. The context is not a visible one.
+TEST(SacmLibraryEdit, SACM23_INT_001_AssociateTerminologyTermMatchesLegacy) {
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::TerminologyContextOutcome associated =
+        sacm_adapter::apply_associate_terminology_term(*loaded.document, "G1", "T1", "AR_X", "AC_X");
+    ASSERT_TRUE(associated.applied)
+        << (associated.diagnostics.empty() ? "" : associated.diagnostics.front().message);
+    EXPECT_TRUE(associated.created_artifact_reference);
+    EXPECT_TRUE(associated.created_asserted_context);
+    EXPECT_FALSE(associated.already_associated);
+    EXPECT_EQ(associated.artifact_reference_id, "AR_X");
+    EXPECT_EQ(associated.asserted_context_id, "AC_X");
+    const sacm::AssuranceCasePackage library_package =
+        core::project_library_package_with_tags(*loaded.document);
+    const ContextLink library_link = extract_context_link(library_package, "AR_X", "AC_X");
+    ASSERT_TRUE(library_link.found);
+
+    sacm::AssuranceCasePackage legacy = load_legacy_terminology();
+    const core::TerminologyContextForcedIds forced{"AR_X", "", "AC_X", ""};
+    const core::TerminologyContextAssociationResult legacy_result =
+        core::AssociateTerminologyTermWithElementWithIds(
+            legacy, "G1", package_ref("TP1"), core::TerminologyTermRef{"T1", ""}, forced);
+    ASSERT_TRUE(legacy_result.success) << legacy_result.error;
+    EXPECT_TRUE(legacy_result.created_artifact_reference);
+    EXPECT_TRUE(legacy_result.created_asserted_context);
+    EXPECT_FALSE(legacy_result.already_associated);
+    const ContextLink legacy_link = extract_context_link(legacy, "AR_X", "AC_X");
+    ASSERT_TRUE(legacy_link.found);
+
+    EXPECT_EQ(library_link, legacy_link);
+    EXPECT_EQ(library_link.referenced_artifact, "T1");
+    EXPECT_EQ(library_link.ctx_sources, (std::vector<std::string>{"AR_X"}));
+    EXPECT_EQ(library_link.ctx_targets, (std::vector<std::string>{"G1"}));
+    EXPECT_FALSE(library_link.visible);
+}
+
+// SACM23-INT-001, terminology slice: adding a term as a visible context is (8)
+// plus the visible-context marker on the AssertedContext, so the projected
+// context reads back as visible on both paths.
+TEST(SacmLibraryEdit, SACM23_INT_001_AddTerminologyVisibleContextMatchesLegacy) {
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::TerminologyContextOutcome added =
+        sacm_adapter::apply_add_terminology_visible_context(*loaded.document, "G1", "T1", "VR_X",
+                                                            "VC_X");
+    ASSERT_TRUE(added.applied)
+        << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    EXPECT_TRUE(added.created_artifact_reference);
+    EXPECT_TRUE(added.created_asserted_context);
+    EXPECT_FALSE(added.already_associated);
+    const sacm::AssuranceCasePackage library_package =
+        core::project_library_package_with_tags(*loaded.document);
+    const ContextLink library_link = extract_context_link(library_package, "VR_X", "VC_X");
+    ASSERT_TRUE(library_link.found);
+
+    sacm::AssuranceCasePackage legacy = load_legacy_terminology();
+    const core::TerminologyContextForcedIds forced{"VR_X", "", "VC_X", ""};
+    const core::TerminologyContextAssociationResult legacy_result =
+        core::AddTerminologyTermAsVisibleContextWithIds(
+            legacy, "G1", package_ref("TP1"), core::TerminologyTermRef{"T1", ""}, forced);
+    ASSERT_TRUE(legacy_result.success) << legacy_result.error;
+    EXPECT_TRUE(legacy_result.created_artifact_reference);
+    EXPECT_TRUE(legacy_result.created_asserted_context);
+    const ContextLink legacy_link = extract_context_link(legacy, "VR_X", "VC_X");
+    ASSERT_TRUE(legacy_link.found);
+
+    EXPECT_EQ(library_link, legacy_link);
+    EXPECT_TRUE(library_link.visible) << "the added context must read back as a visible context";
+    EXPECT_EQ(library_link.referenced_artifact, "T1");
+    EXPECT_EQ(library_link.ctx_targets, (std::vector<std::string>{"G1"}));
+}
+
+// SACM23-INT-001, terminology slice: associating the same term with the same
+// element twice reuses the existing reference and context and reports
+// already_associated on the second call, matching the legacy reuse semantics.
+TEST(SacmLibraryEdit, SACM23_INT_001_AssociateTerminologyTermReusesExisting) {
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::TerminologyContextOutcome first =
+        sacm_adapter::apply_associate_terminology_term(*loaded.document, "G1", "T1");
+    ASSERT_TRUE(first.applied)
+        << (first.diagnostics.empty() ? "" : first.diagnostics.front().message);
+    ASSERT_TRUE(first.created_asserted_context);
+    const sacm_adapter::TerminologyContextOutcome second =
+        sacm_adapter::apply_associate_terminology_term(*loaded.document, "G1", "T1");
+    ASSERT_TRUE(second.applied);
+    EXPECT_TRUE(second.already_associated);
+    EXPECT_FALSE(second.created_artifact_reference);
+    EXPECT_FALSE(second.created_asserted_context);
+    EXPECT_EQ(second.artifact_reference_id, first.artifact_reference_id);
+    EXPECT_EQ(second.asserted_context_id, first.asserted_context_id);
+
+    sacm::AssuranceCasePackage legacy = load_legacy_terminology();
+    const core::TerminologyContextAssociationResult legacy_first =
+        core::AssociateTerminologyTermWithElement(legacy, "G1", package_ref("TP1"),
+                                                  core::TerminologyTermRef{"T1", ""});
+    ASSERT_TRUE(legacy_first.success) << legacy_first.error;
+    const core::TerminologyContextAssociationResult legacy_second =
+        core::AssociateTerminologyTermWithElement(legacy, "G1", package_ref("TP1"),
+                                                  core::TerminologyTermRef{"T1", ""});
+    ASSERT_TRUE(legacy_second.success) << legacy_second.error;
+    EXPECT_TRUE(legacy_second.already_associated);
+    EXPECT_FALSE(legacy_second.created_asserted_context);
+    EXPECT_EQ(legacy_second.asserted_context_id, legacy_first.asserted_context_id);
+}
+
+// SACM23-INT-001, terminology slice: adding a term as a visible context when a
+// non-visible context already links it to the target promotes that context in
+// place (no new reference or context), marking it visible -- matching the legacy
+// promote semantics.
+TEST(SacmLibraryEdit, SACM23_INT_001_AddTerminologyVisibleContextPromotesExisting) {
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::TerminologyContextOutcome associated =
+        sacm_adapter::apply_associate_terminology_term(*loaded.document, "G1", "T1", "AR_X", "AC_X");
+    ASSERT_TRUE(associated.created_asserted_context)
+        << (associated.diagnostics.empty() ? "" : associated.diagnostics.front().message);
+    const sacm_adapter::TerminologyContextOutcome promoted =
+        sacm_adapter::apply_add_terminology_visible_context(*loaded.document, "G1", "T1");
+    ASSERT_TRUE(promoted.applied)
+        << (promoted.diagnostics.empty() ? "" : promoted.diagnostics.front().message);
+    EXPECT_FALSE(promoted.created_artifact_reference) << "the existing reference is reused";
+    EXPECT_FALSE(promoted.created_asserted_context) << "the existing context is promoted in place";
+    EXPECT_EQ(promoted.artifact_reference_id, "AR_X");
+    EXPECT_EQ(promoted.asserted_context_id, "AC_X");
+    const sacm::AssuranceCasePackage library_package =
+        core::project_library_package_with_tags(*loaded.document);
+    const ContextLink library_link = extract_context_link(library_package, "AR_X", "AC_X");
+    ASSERT_TRUE(library_link.found);
+    EXPECT_TRUE(library_link.visible) << "the promoted context must read back as visible";
+
+    sacm::AssuranceCasePackage legacy = load_legacy_terminology();
+    const core::TerminologyContextForcedIds forced{"AR_X", "", "AC_X", ""};
+    ASSERT_TRUE(core::AssociateTerminologyTermWithElementWithIds(
+                    legacy, "G1", package_ref("TP1"), core::TerminologyTermRef{"T1", ""}, forced)
+                    .success);
+    const core::TerminologyContextAssociationResult legacy_promoted =
+        core::AddTerminologyTermAsVisibleContext(legacy, "G1", package_ref("TP1"),
+                                                 core::TerminologyTermRef{"T1", ""});
+    ASSERT_TRUE(legacy_promoted.success) << legacy_promoted.error;
+    EXPECT_FALSE(legacy_promoted.created_artifact_reference);
+    EXPECT_FALSE(legacy_promoted.created_asserted_context);
+    EXPECT_EQ(legacy_promoted.asserted_context_id, "AC_X");
+    const ContextLink legacy_link = extract_context_link(legacy, "AR_X", "AC_X");
+    ASSERT_TRUE(legacy_link.found);
+    EXPECT_TRUE(legacy_link.visible);
+
+    EXPECT_EQ(library_link, legacy_link);
+}
