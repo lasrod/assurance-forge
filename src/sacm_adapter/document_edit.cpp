@@ -528,8 +528,24 @@ AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id
     // A caller-supplied id is used verbatim (so an audited/replayed ACP add
     // reproduces the exact `ACP<n>` the legacy core::acp::AddAcp generated);
     // empty means generate the next free one.
-    const std::string acp_id =
-        requested_acp_id.empty() ? next_acp_id(existing_acp_ids(doc)) : requested_acp_id;
+    const std::unordered_set<std::string> existing = existing_acp_ids(doc);
+    const std::string acp_id = requested_acp_id.empty() ? next_acp_id(existing) : requested_acp_id;
+
+    // A caller-supplied id must be unused: reusing one already present would write
+    // duplicate marker tags and make the projection ambiguous. (A correct replay
+    // supplies an id that was unique when first generated, so this only guards a
+    // corrupt or double-applied event.)
+    if (!requested_acp_id.empty() && existing.count(acp_id) != 0) {
+        AcpOutcome outcome;
+        outcome.supported = true;
+        outcome.applied = false;
+        outcome.diagnostics.push_back(LoadDiagnostic{
+            .code = "SACM-CMD-004",
+            .severity = "Error",
+            .message = "requested ACP id '" + acp_id + "' already exists",
+        });
+        return outcome;
+    }
 
     // Marker + name + resolutionKind = none, matching core::acp::UpsertAcpTags
     // for a freshly added (unresolved) ACP. The ACP id is the marker's *value*,

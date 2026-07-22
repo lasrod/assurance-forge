@@ -506,15 +506,11 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildUnderMissingParentUnsupported) {
     EXPECT_FALSE(added.applied);
 }
 
-// A non-primary-language content edit is not wired (the flat per-language
-// content map is a later multi-language slice), so it reports unsupported and
-// the command bus re-derives instead -- rather than the seam guessing at a
-// LangString entry and diverging from the legacy edit.
 // A non-primary-language content edit adds that language's LangString to the
 // front Description; the projected content_langs entry must match the legacy
 // per-language content map, and the primary content must be untouched.
 TEST(SacmLibraryEdit, SACM23_INT_001_ContentEditReproducesLegacyForNonPrimaryLanguage) {
-    const std::string kJa = "\xe5\xae\x89\xe5\x85\xa8";  // an in the Japanese for "safety"
+    const std::string kJa = "安全";  // Japanese for "safety"
 
     sacm_adapter::LoadOutcome loaded = load_fixture();
     ASSERT_NE(loaded.document, nullptr);
@@ -645,6 +641,25 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpUsesCallerSuppliedId) {
     const core::AssuranceCase projected = sacm_adapter::project_case(*loaded.document);
     EXPECT_NE(find_acp(projected, "ACP5"), nullptr);
     EXPECT_EQ(find_acp(projected, "ACP1"), nullptr) << "the generated id must not appear";
+}
+
+// A caller-supplied ACP id already in use is refused rather than writing duplicate
+// marker tags (guards a corrupt or double-applied replay).
+TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpRejectsDuplicateRequestedId) {
+    const std::filesystem::path path = repo_root() / "tests" / "data" / "fixture_acp_edit.sacm.xml";
+    ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm_adapter::AcpOutcome first = sacm_adapter::apply_add_acp(*loaded.document, "S1");
+    ASSERT_TRUE(first.applied) << (first.diagnostics.empty() ? "" : first.diagnostics.front().message);
+    ASSERT_EQ(first.acp_id, "ACP1");
+
+    const sacm_adapter::AcpOutcome duplicate =
+        sacm_adapter::apply_add_acp(*loaded.document, "S1", "ACP1");
+    EXPECT_TRUE(duplicate.supported);
+    EXPECT_FALSE(duplicate.applied) << "a duplicate requested ACP id must be rejected";
 }
 
 // SACM23-INT-001, edit slice: adding an Assurance Claim Point to an eligible

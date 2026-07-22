@@ -747,14 +747,14 @@ CheckOutcome check_set_term_origin(const model::Document& document, const SetTer
                        std::format("origin '{}' not found", set.origin->value())));
         return outcome;
     }
-    outcome.effects.push_back(ChangeRecord{.id = set.element,
-                                           .kind = term->kind(),
-                                           .change = ChangeRecord::Change::Modified,
-                                           .parent = std::nullopt,
-                                           .property = "origin",
-                                           .before = std::nullopt,
-                                           .after = set.origin.has_value() ? set.origin->value()
-                                                                           : std::string{}});
+    outcome.effects.push_back(ChangeRecord{
+        .id = set.element,
+        .kind = term->kind(),
+        .change = ChangeRecord::Change::Modified,
+        .parent = std::nullopt,
+        .property = "origin",
+        .before = term->origin().has_value() ? term->origin()->value() : std::string{},
+        .after = set.origin.has_value() ? set.origin->value() : std::string{}});
     return outcome;
 }
 
