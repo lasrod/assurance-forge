@@ -198,4 +198,160 @@ struct DeleteOutcome {
 // docs/sacm/sacm-gsn-metamodel-gaps.md.
 DeleteOutcome apply_delete_element(LibraryDocument& document, const std::string& element_id);
 
+// ---------------------------------------------------------------------------
+// Terminology edit seams (Phase 0 part 2).
+//
+// These mirror the legacy `core::*Terminology*WithIds` mutators, routing each
+// terminology edit through a library Operation instead of mutating the POD
+// `sacm::AssuranceCasePackage`. Inputs and outputs are string-only so no
+// `sacm::model` type crosses into `core` (same boundary rule as the element
+// seams above). Where the legacy variant accepts a `forced_id`, the seam accepts
+// an optional caller-supplied id used verbatim for id-deterministic replay.
+//
+// gid caveat: the legacy `...WithIds` mutators also accept a `forced_gid` and,
+// absent one, generate `gid-<id>`. The library has no create-time gid operation
+// and no public gid setter, so library-created terminology elements carry no gid
+// (clause 8.2 gid is String[0..1], optional). The seams therefore do NOT take a
+// gid, and the created element's gid stays empty until a save/reload assigns one
+// from serialized identity. Callers comparing against a legacy edit must compare
+// terminology *content*, not gid -- the same rule the element seams already use
+// for library- vs legacy-generated ids.
+
+// The app's terminology term draft, mirroring `core::TerminologyTermDraft`
+// without depending on `core`. All fields are plain strings the seam translates
+// into library operations; `category_refs` and `origin` are element ids (a
+// leading '#' and surrounding whitespace are tolerated and normalized, matching
+// the legacy `NormalizeCategoryRefs`/`NormalizeRef`).
+struct TerminologyTermFields {
+    std::string value;
+    std::string name;
+    std::string description;
+    std::vector<std::string> category_refs;
+    std::string external_reference;
+    std::string origin;
+};
+
+// Result of creating a terminology element (package/category/term). `element_id`
+// is the id the library generated or the caller supplied; empty unless applied.
+// See the gid caveat above -- no gid is reported because none is created.
+struct TerminologyCreateOutcome {
+    bool supported = true;
+    bool applied = false;
+    std::string element_id;
+    std::vector<LoadDiagnostic> diagnostics;
+};
+
+// Result of an update or delete terminology seam.
+struct TerminologyEditOutcome {
+    bool supported = true;
+    bool applied = false;
+    std::vector<LoadDiagnostic> diagnostics;
+};
+
+// Result of associating a term with an element / adding it as a visible context,
+// mirroring `core::TerminologyContextAssociationResult` including its reuse and
+// promote flags. `artifact_reference_id`/`asserted_context_id` are the created
+// -- or reused/promoted -- ids.
+struct TerminologyContextOutcome {
+    bool supported = true;
+    bool applied = false;
+    bool already_associated = false;
+    bool created_artifact_reference = false;
+    bool created_asserted_context = false;
+    std::string artifact_reference_id;
+    std::string asserted_context_id;
+    std::vector<LoadDiagnostic> diagnostics;
+};
+
+// (1) Create a TerminologyPackage under the document's root AssuranceCasePackage,
+// mirroring `core::CreateTerminologyPackageWithIds`. `package_id` when non-empty
+// is used verbatim. Reports `supported == false` only if the document has no root
+// AssuranceCasePackage.
+TerminologyCreateOutcome apply_create_terminology_package(LibraryDocument& document,
+                                                         const std::string& name,
+                                                         const std::string& description,
+                                                         const std::string& package_id = {});
+
+// (2) Create a Category inside terminology package `package_id`, mirroring
+// `core::CreateTerminologyCategoryWithIds`. `category_id` when non-empty is used
+// verbatim.
+TerminologyCreateOutcome apply_create_terminology_category(LibraryDocument& document,
+                                                          const std::string& package_id,
+                                                          const std::string& name,
+                                                          const std::string& description,
+                                                          const std::string& category_id = {});
+
+// (3) Create a Term inside terminology package `package_id`, mirroring
+// `core::CreateTerminologyTermWithIds`. Composes CreateTerm (name/value/external
+// reference/origin) + SetDescription + SetExpressionCategories; a partial failure
+// rolls the created term back. Each category ref must resolve to a Category and
+// a non-empty origin must resolve to an element (the library validates both,
+// unlike the legacy POD which stored any string). `term_id` when non-empty is
+// used verbatim.
+TerminologyCreateOutcome apply_create_terminology_term(LibraryDocument& document,
+                                                      const std::string& package_id,
+                                                      const TerminologyTermFields& fields,
+                                                      const std::string& term_id = {});
+
+// (4) Update a TerminologyPackage's name/description, mirroring
+// `core::UpdateTerminologyPackage` (SetName + SetDescription; empty description
+// clears it).
+TerminologyEditOutcome apply_update_terminology_package(LibraryDocument& document,
+                                                       const std::string& package_id,
+                                                       const std::string& name,
+                                                       const std::string& description);
+
+// (5) Update a Category's name/description, mirroring
+// `core::UpdateTerminologyCategory`.
+TerminologyEditOutcome apply_update_terminology_category(LibraryDocument& document,
+                                                        const std::string& category_id,
+                                                        const std::string& name,
+                                                        const std::string& description);
+
+// (6) Update a Term's fields, mirroring `core::UpdateTerminologyTerm`. Composes
+// SetName + SetExpressionValue + SetDescription + SetExpressionCategories +
+// SetTermExternalReference + SetTermOrigin, applied in sequence and stopping on
+// the first library rejection (the composed sequence is not transactional, so a
+// mid-sequence failure leaves the earlier sets applied -- unlike the atomic
+// legacy mutator).
+TerminologyEditOutcome apply_update_terminology_term(LibraryDocument& document,
+                                                    const std::string& term_id,
+                                                    const TerminologyTermFields& fields);
+
+// (7) Delete a terminology package, category, or term, mirroring the primitive
+// the legacy delete mutators compose: `DeleteElement` with the
+// DeleteReferencingRelationships policy so no relationship is left dangling. This
+// does NOT reproduce the legacy app-level guards (refuse to delete a non-empty
+// package or an in-use category) -- those are UI safety checks, not model
+// invariants; the library's own RejectIfNonEmpty package policy still rejects a
+// non-empty package.
+TerminologyEditOutcome apply_delete_terminology_element(LibraryDocument& document,
+                                                       const std::string& element_id);
+
+// (8) Associate term `term_id` with element `target_element_id`, mirroring
+// `core::AssociateTerminologyTermWithElementWithIds`: creates an ArtifactReference
+// (referencedArtifact = term) and an AssertedContext {source = ref, target =
+// element}, REUSING an existing term ArtifactReference in the target's argument
+// package if one exists and reporting `already_associated` when a context already
+// links them. The target must be a claim, strategy (ArgumentReasoning), or
+// solution (ArtifactReference) in an argument package. Caller-supplied ids are
+// consulted only when the corresponding entity is newly created.
+TerminologyContextOutcome apply_associate_terminology_term(LibraryDocument& document,
+                                                          const std::string& target_element_id,
+                                                          const std::string& term_id,
+                                                          const std::string& artifact_reference_id = {},
+                                                          const std::string& asserted_context_id = {});
+
+// (9) Add term `term_id` as a visible context on `target_element_id`, mirroring
+// `core::AddTerminologyTermAsVisibleContextWithIds`: like (8) plus the visible-
+// context marker on the AssertedContext's description, and it PROMOTES an existing
+// non-visible context in place (marking it visible) rather than creating a
+// duplicate when one is promotable. The target must be a claim or strategy. Caller
+// -supplied ids are consulted only when a new reference/context is created.
+TerminologyContextOutcome apply_add_terminology_visible_context(LibraryDocument& document,
+                                                               const std::string& target_element_id,
+                                                               const std::string& term_id,
+                                                               const std::string& artifact_reference_id = {},
+                                                               const std::string& asserted_context_id = {});
+
 } // namespace sacm_adapter

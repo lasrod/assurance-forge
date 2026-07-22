@@ -22,6 +22,9 @@
 
 #include "core/acp/acp_editing.h"
 #include "core/element_factory.h"
+#include "core/library_package_projection.h"
+#include "core/string_utils.h"
+#include "core/terminology_package_service.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_parser.h"
 
@@ -809,4 +812,595 @@ TEST(SacmLibraryEdit, SACM23_INT_001_SetNameOnMissingElementFailsUnchanged) {
     const core::SacmElement* g1 = find_element(projected, "G1");
     ASSERT_NE(g1, nullptr);
     EXPECT_EQ(g1->name, "Top Goal");
+}
+
+// ---------------------------------------------------------------------------
+// Terminology edit seams (Phase 0 part 2).
+//
+// Each test applies the same logical terminology edit through both paths -- the
+// library seam (sacm_adapter::apply_*_terminology_*) on a LibraryDocument, and
+// the legacy core::*Terminology*WithIds mutator on a sacm::AssuranceCasePackage
+// parsed from the same fixture -- and asserts the projected library terminology
+// matches the legacy package on the edited fields. Ids differ between the two id
+// generators and the library assigns no gid to created terminology elements, so
+// neither id nor gid is compared: the contract is that the terminology *content*
+// lands identically. fixture_terminology_parity carries package TP1 (categories
+// CAT1/CAT2, expression E1, term T1) and argument package AP1 (claims G1/G2).
+
+namespace {
+
+std::filesystem::path terminology_fixture_path() {
+    return repo_root() / "tests" / "data" / "fixture_terminology_parity.sacm.xml";
+}
+
+sacm_adapter::LoadOutcome load_terminology_fixture() {
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(terminology_fixture_path());
+    EXPECT_TRUE(loaded.ok);
+    EXPECT_NE(loaded.document, nullptr);
+    return loaded;
+}
+
+sacm::AssuranceCasePackage load_legacy_terminology() {
+    const auto parsed = sacm::parse_sacm(terminology_fixture_path().string());
+    EXPECT_TRUE(parsed.has_value());
+    return parsed.has_value() ? *parsed : sacm::AssuranceCasePackage{};
+}
+
+const sacm::TerminologyPackage* find_terminology_package(
+    const std::vector<sacm::TerminologyPackage>& packages, const std::string& id) {
+    for (const sacm::TerminologyPackage& package : packages) {
+        if (package.id == id) {
+            return &package;
+        }
+    }
+    return nullptr;
+}
+
+const sacm::Term* find_term(const sacm::TerminologyPackage& package, const std::string& id) {
+    for (const sacm::Term& term : package.terms) {
+        if (term.id == id) {
+            return &term;
+        }
+    }
+    return nullptr;
+}
+
+const sacm::Category* find_category(const sacm::TerminologyPackage& package, const std::string& id) {
+    for (const sacm::Category& category : package.categories) {
+        if (category.id == id) {
+            return &category;
+        }
+    }
+    return nullptr;
+}
+
+// A term's edited fields, comparable across the two paths (id and gid excluded).
+struct TermFields {
+    std::string value;
+    std::string name;
+    std::string description;
+    std::string external_reference;
+    std::string origin;
+    std::vector<std::string> category_refs;
+    friend bool operator==(const TermFields&, const TermFields&) = default;
+};
+
+TermFields term_fields(const sacm::Term& term) {
+    return TermFields{term.value,          term.name,   term.description,
+                      term.externalReference, term.origin, term.category_refs};
+}
+
+// The sorted ids of every element a terminology package contains, for delete
+// parity (categories + expressions + terms).
+std::vector<std::string> terminology_element_ids(const sacm::TerminologyPackage& package) {
+    std::vector<std::string> ids;
+    for (const sacm::Category& category : package.categories) {
+        ids.push_back(category.id);
+    }
+    for (const sacm::Expression& expression : package.expressions) {
+        ids.push_back(expression.id);
+    }
+    for (const sacm::Term& term : package.terms) {
+        ids.push_back(term.id);
+    }
+    std::sort(ids.begin(), ids.end());
+    return ids;
+}
+
+std::vector<std::string> strip_hashes(const std::vector<std::string>& refs) {
+    std::vector<std::string> out;
+    out.reserve(refs.size());
+    for (const std::string& ref : refs) {
+        out.push_back(core::StripLeadingHash(ref));
+    }
+    return out;
+}
+
+// The shape a term association leaves in an argument package: the created
+// artifact reference (name + referencedArtifact) and asserted context (source /
+// target / visibility). Extracted by id so it works on either path's package.
+struct ContextLink {
+    bool found = false;
+    std::string ref_name;
+    std::string referenced_artifact;
+    std::vector<std::string> ctx_sources;
+    std::vector<std::string> ctx_targets;
+    bool visible = false;
+    friend bool operator==(const ContextLink&, const ContextLink&) = default;
+};
+
+ContextLink extract_context_link(const sacm::AssuranceCasePackage& package,
+                                 const std::string& reference_id, const std::string& context_id) {
+    const sacm::ArtifactReference* reference = nullptr;
+    const sacm::AssertedContext* context = nullptr;
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::ArtifactReference& candidate : argument_package.artifactReferences) {
+            if (candidate.id == reference_id) {
+                reference = &candidate;
+            }
+        }
+        for (const sacm::AssertedContext& candidate : argument_package.assertedContexts) {
+            if (candidate.id == context_id) {
+                context = &candidate;
+            }
+        }
+    }
+    ContextLink link;
+    if (reference == nullptr || context == nullptr) {
+        return link;
+    }
+    link.found = true;
+    link.ref_name = reference->name;
+    link.referenced_artifact = core::StripLeadingHash(reference->referencedArtifact);
+    link.ctx_sources = strip_hashes(context->sources);
+    link.ctx_targets = strip_hashes(context->targets);
+    link.visible = core::IsVisibleTerminologyContext(*context);
+    return link;
+}
+
+core::TerminologyPackageRef package_ref(const std::string& id) {
+    return core::TerminologyPackageRef{id, ""};
+}
+
+} // namespace
+
+// SACM23-INT-001, terminology slice: creating a TerminologyPackage through the
+// library must reproduce the legacy CreateTerminologyPackageWithIds content.
+TEST(SacmLibraryEdit, SACM23_INT_001_CreateTerminologyPackageMatchesLegacy) {
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::TerminologyCreateOutcome created =
+        sacm_adapter::apply_create_terminology_package(*loaded.document, "Glossary",
+                                                       "Project glossary", "TP_NEW");
+    ASSERT_TRUE(created.applied)
+        << (created.diagnostics.empty() ? "" : created.diagnostics.front().message);
+    EXPECT_EQ(created.element_id, "TP_NEW");
+    const std::vector<sacm::TerminologyPackage> library_packages =
+        sacm_adapter::project_terminology_packages(*loaded.document);
+    const sacm::TerminologyPackage* library_tp = find_terminology_package(library_packages, "TP_NEW");
+    ASSERT_NE(library_tp, nullptr);
+
+    sacm::AssuranceCasePackage legacy = load_legacy_terminology();
+    const core::TerminologyPackageCreateResult legacy_result =
+        core::CreateTerminologyPackageWithIds(legacy, "Glossary", "Project glossary", "TP_NEW", "");
+    ASSERT_TRUE(legacy_result.success) << legacy_result.error;
+    const sacm::TerminologyPackage* legacy_tp =
+        find_terminology_package(legacy.terminologyPackages, "TP_NEW");
+    ASSERT_NE(legacy_tp, nullptr);
+
+    EXPECT_EQ(library_tp->name, legacy_tp->name);
+    EXPECT_EQ(library_tp->description, legacy_tp->description);
+    EXPECT_EQ(library_tp->name, "Glossary");
+    EXPECT_EQ(library_tp->description, "Project glossary");
+}
+
+// SACM23-INT-001, terminology slice: creating a Category must reproduce the
+// legacy CreateTerminologyCategoryWithIds content.
+TEST(SacmLibraryEdit, SACM23_INT_001_CreateTerminologyCategoryMatchesLegacy) {
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::TerminologyCreateOutcome created =
+        sacm_adapter::apply_create_terminology_category(*loaded.document, "TP1", "Metrics",
+                                                        "Safety metrics", "CAT_NEW");
+    ASSERT_TRUE(created.applied)
+        << (created.diagnostics.empty() ? "" : created.diagnostics.front().message);
+    EXPECT_EQ(created.element_id, "CAT_NEW");
+    const std::vector<sacm::TerminologyPackage> library_packages =
+        sacm_adapter::project_terminology_packages(*loaded.document);
+    const sacm::TerminologyPackage* library_tp = find_terminology_package(library_packages, "TP1");
+    ASSERT_NE(library_tp, nullptr);
+    const sacm::Category* library_category = find_category(*library_tp, "CAT_NEW");
+    ASSERT_NE(library_category, nullptr);
+
+    sacm::AssuranceCasePackage legacy = load_legacy_terminology();
+    const core::TerminologyCategoryDraft draft{"Metrics", "Safety metrics"};
+    const core::TerminologyCategoryCreateResult legacy_result =
+        core::CreateTerminologyCategoryWithIds(legacy, package_ref("TP1"), draft, "CAT_NEW", "");
+    ASSERT_TRUE(legacy_result.success) << legacy_result.error;
+    const sacm::TerminologyPackage* legacy_tp =
+        find_terminology_package(legacy.terminologyPackages, "TP1");
+    ASSERT_NE(legacy_tp, nullptr);
+    const sacm::Category* legacy_category = find_category(*legacy_tp, "CAT_NEW");
+    ASSERT_NE(legacy_category, nullptr);
+
+    EXPECT_EQ(library_category->name, legacy_category->name);
+    EXPECT_EQ(library_category->description, legacy_category->description);
+    EXPECT_EQ(library_category->name, "Metrics");
+    EXPECT_EQ(library_category->description, "Safety metrics");
+}
+
+// SACM23-INT-001, terminology slice: creating a Term (composing CreateTerm +
+// SetDescription + SetExpressionCategories) must reproduce the legacy
+// CreateTerminologyTermWithIds content across every draft field.
+TEST(SacmLibraryEdit, SACM23_INT_001_CreateTerminologyTermMatchesLegacy) {
+    const sacm_adapter::TerminologyTermFields fields{
+        .value = "Hazard",
+        .name = "Hazard",
+        .description = "A potential source of harm.",
+        .category_refs = {"CAT1", "CAT2"},
+        .external_reference = "ISO-99999",
+        .origin = "E1"};
+
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::TerminologyCreateOutcome created =
+        sacm_adapter::apply_create_terminology_term(*loaded.document, "TP1", fields, "T_NEW");
+    ASSERT_TRUE(created.applied)
+        << (created.diagnostics.empty() ? "" : created.diagnostics.front().message);
+    EXPECT_EQ(created.element_id, "T_NEW");
+    const std::vector<sacm::TerminologyPackage> library_packages =
+        sacm_adapter::project_terminology_packages(*loaded.document);
+    const sacm::TerminologyPackage* library_tp = find_terminology_package(library_packages, "TP1");
+    ASSERT_NE(library_tp, nullptr);
+    const sacm::Term* library_term = find_term(*library_tp, "T_NEW");
+    ASSERT_NE(library_term, nullptr);
+
+    sacm::AssuranceCasePackage legacy = load_legacy_terminology();
+    const core::TerminologyTermDraft draft{"Hazard", "Hazard", "A potential source of harm.",
+                                           {"CAT1", "CAT2"}, "ISO-99999", "E1"};
+    const core::TerminologyTermCreateResult legacy_result =
+        core::CreateTerminologyTermWithIds(legacy, package_ref("TP1"), draft, "T_NEW", "");
+    ASSERT_TRUE(legacy_result.success) << legacy_result.error;
+    const sacm::TerminologyPackage* legacy_tp =
+        find_terminology_package(legacy.terminologyPackages, "TP1");
+    ASSERT_NE(legacy_tp, nullptr);
+    const sacm::Term* legacy_term = find_term(*legacy_tp, "T_NEW");
+    ASSERT_NE(legacy_term, nullptr);
+
+    EXPECT_EQ(term_fields(*library_term), term_fields(*legacy_term));
+    EXPECT_EQ(library_term->value, "Hazard");
+    EXPECT_EQ(library_term->externalReference, "ISO-99999");
+    EXPECT_EQ(library_term->origin, "E1");
+    EXPECT_EQ(library_term->category_refs, (std::vector<std::string>{"CAT1", "CAT2"}));
+}
+
+// SACM23-INT-001, terminology slice: updating a TerminologyPackage's
+// name/description must reproduce the legacy UpdateTerminologyPackage content.
+TEST(SacmLibraryEdit, SACM23_INT_001_UpdateTerminologyPackageMatchesLegacy) {
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::TerminologyEditOutcome edit = sacm_adapter::apply_update_terminology_package(
+        *loaded.document, "TP1", "Renamed Terminology", "Updated description");
+    ASSERT_TRUE(edit.applied)
+        << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
+    const std::vector<sacm::TerminologyPackage> library_packages =
+        sacm_adapter::project_terminology_packages(*loaded.document);
+    const sacm::TerminologyPackage* library_tp = find_terminology_package(library_packages, "TP1");
+    ASSERT_NE(library_tp, nullptr);
+
+    sacm::AssuranceCasePackage legacy = load_legacy_terminology();
+    std::string error;
+    ASSERT_TRUE(core::UpdateTerminologyPackage(legacy, package_ref("TP1"), "Renamed Terminology",
+                                               "Updated description", error))
+        << error;
+    const sacm::TerminologyPackage* legacy_tp =
+        find_terminology_package(legacy.terminologyPackages, "TP1");
+    ASSERT_NE(legacy_tp, nullptr);
+
+    EXPECT_EQ(library_tp->name, legacy_tp->name);
+    EXPECT_EQ(library_tp->description, legacy_tp->description);
+    EXPECT_EQ(library_tp->name, "Renamed Terminology");
+    EXPECT_EQ(library_tp->description, "Updated description");
+}
+
+// SACM23-INT-001, terminology slice: updating a Category must reproduce the
+// legacy UpdateTerminologyCategory content.
+TEST(SacmLibraryEdit, SACM23_INT_001_UpdateTerminologyCategoryMatchesLegacy) {
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::TerminologyEditOutcome edit = sacm_adapter::apply_update_terminology_category(
+        *loaded.document, "CAT1", "Renamed Concept", "Concept category");
+    ASSERT_TRUE(edit.applied)
+        << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
+    const std::vector<sacm::TerminologyPackage> library_packages =
+        sacm_adapter::project_terminology_packages(*loaded.document);
+    const sacm::TerminologyPackage* library_tp = find_terminology_package(library_packages, "TP1");
+    ASSERT_NE(library_tp, nullptr);
+    const sacm::Category* library_category = find_category(*library_tp, "CAT1");
+    ASSERT_NE(library_category, nullptr);
+
+    sacm::AssuranceCasePackage legacy = load_legacy_terminology();
+    const core::TerminologyCategoryDraft draft{"Renamed Concept", "Concept category"};
+    std::string error;
+    ASSERT_TRUE(core::UpdateTerminologyCategory(legacy, package_ref("TP1"),
+                                                core::TerminologyCategoryRef{"CAT1", ""}, draft,
+                                                error))
+        << error;
+    const sacm::TerminologyPackage* legacy_tp =
+        find_terminology_package(legacy.terminologyPackages, "TP1");
+    ASSERT_NE(legacy_tp, nullptr);
+    const sacm::Category* legacy_category = find_category(*legacy_tp, "CAT1");
+    ASSERT_NE(legacy_category, nullptr);
+
+    EXPECT_EQ(library_category->name, legacy_category->name);
+    EXPECT_EQ(library_category->description, legacy_category->description);
+    EXPECT_EQ(library_category->name, "Renamed Concept");
+}
+
+// SACM23-INT-001, terminology slice: updating a Term (composing SetName/
+// SetExpressionValue/SetDescription/SetExpressionCategories/
+// SetTermExternalReference/SetTermOrigin) must reproduce the legacy
+// UpdateTerminologyTerm content across every draft field, leaving other
+// terminology elements (CAT1/CAT2/E1) intact.
+TEST(SacmLibraryEdit, SACM23_INT_001_UpdateTerminologyTermMatchesLegacy) {
+    const sacm_adapter::TerminologyTermFields fields{
+        .value = "Revised safety",
+        .name = "Safety (revised)",
+        .description = "Updated definition.",
+        .category_refs = {"CAT2"},
+        .external_reference = "ISO-54321",
+        .origin = "E1"};
+
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::TerminologyEditOutcome edit =
+        sacm_adapter::apply_update_terminology_term(*loaded.document, "T1", fields);
+    ASSERT_TRUE(edit.applied)
+        << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
+    const std::vector<sacm::TerminologyPackage> library_packages =
+        sacm_adapter::project_terminology_packages(*loaded.document);
+    const sacm::TerminologyPackage* library_tp = find_terminology_package(library_packages, "TP1");
+    ASSERT_NE(library_tp, nullptr);
+    const sacm::Term* library_term = find_term(*library_tp, "T1");
+    ASSERT_NE(library_term, nullptr);
+
+    sacm::AssuranceCasePackage legacy = load_legacy_terminology();
+    const core::TerminologyTermDraft draft{"Revised safety", "Safety (revised)",
+                                           "Updated definition.", {"CAT2"}, "ISO-54321", "E1"};
+    std::string error;
+    ASSERT_TRUE(core::UpdateTerminologyTerm(legacy, package_ref("TP1"),
+                                            core::TerminologyTermRef{"T1", ""}, draft, error))
+        << error;
+    const sacm::TerminologyPackage* legacy_tp =
+        find_terminology_package(legacy.terminologyPackages, "TP1");
+    ASSERT_NE(legacy_tp, nullptr);
+    const sacm::Term* legacy_term = find_term(*legacy_tp, "T1");
+    ASSERT_NE(legacy_term, nullptr);
+
+    EXPECT_EQ(term_fields(*library_term), term_fields(*legacy_term));
+    EXPECT_EQ(library_term->value, "Revised safety");
+    EXPECT_EQ(library_term->category_refs, (std::vector<std::string>{"CAT2"}));
+    EXPECT_EQ(library_term->origin, "E1");
+    // Unrelated standard terminology data is preserved on both paths.
+    EXPECT_EQ(terminology_element_ids(*library_tp), terminology_element_ids(*legacy_tp));
+    EXPECT_NE(find_category(*library_tp, "CAT1"), nullptr);
+    EXPECT_NE(find_category(*library_tp, "CAT2"), nullptr);
+}
+
+// A term update with an unresolvable category ref is rejected and leaves the term
+// unchanged -- the composed setters pre-validate categories/origin so the update
+// is atomic (the ADR's failure->unchanged contract), rather than partially
+// applying the name/value the legacy ApplyTermDraft would also have rolled back.
+TEST(SacmLibraryEdit, SACM23_INT_001_UpdateTerminologyTermIsAtomicOnBadRef) {
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm_adapter::TerminologyTermFields fields{.value = "changed value",
+                                                     .name = "changed name",
+                                                     .category_refs = {"NO_SUCH_CATEGORY"}};
+    const sacm_adapter::TerminologyEditOutcome edit =
+        sacm_adapter::apply_update_terminology_term(*loaded.document, "T1", fields);
+    EXPECT_FALSE(edit.applied) << "an unresolvable category ref must reject the update";
+
+    const std::vector<sacm::TerminologyPackage> after =
+        sacm_adapter::project_terminology_packages(*loaded.document);
+    const sacm::TerminologyPackage* after_tp = find_terminology_package(after, "TP1");
+    ASSERT_NE(after_tp, nullptr);
+    const sacm::Term* term = find_term(*after_tp, "T1");
+    ASSERT_NE(term, nullptr);
+    EXPECT_EQ(term->name, "Safety") << "name must not have partially applied";
+    EXPECT_EQ(term->value, "Freedom from unacceptable risk") << "value must not have partially applied";
+}
+
+// SACM23-INT-001, terminology slice: deleting a Term (the primitive the legacy
+// delete mutators compose) must leave the same terminology elements the legacy
+// DeleteTerminologyTerm does.
+TEST(SacmLibraryEdit, SACM23_INT_001_DeleteTerminologyTermMatchesLegacy) {
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    {
+        const std::vector<sacm::TerminologyPackage> before =
+            sacm_adapter::project_terminology_packages(*loaded.document);
+        const sacm::TerminologyPackage* before_tp = find_terminology_package(before, "TP1");
+        ASSERT_NE(before_tp, nullptr);
+        ASSERT_NE(find_term(*before_tp, "T1"), nullptr);  // vacuity guard
+    }
+    const sacm_adapter::TerminologyEditOutcome deleted =
+        sacm_adapter::apply_delete_terminology_element(*loaded.document, "T1");
+    ASSERT_TRUE(deleted.applied)
+        << (deleted.diagnostics.empty() ? "" : deleted.diagnostics.front().message);
+    const std::vector<sacm::TerminologyPackage> library_packages =
+        sacm_adapter::project_terminology_packages(*loaded.document);
+    const sacm::TerminologyPackage* library_tp = find_terminology_package(library_packages, "TP1");
+    ASSERT_NE(library_tp, nullptr);
+    EXPECT_EQ(find_term(*library_tp, "T1"), nullptr);
+
+    sacm::AssuranceCasePackage legacy = load_legacy_terminology();
+    std::string error;
+    ASSERT_TRUE(core::DeleteTerminologyTerm(legacy, package_ref("TP1"),
+                                            core::TerminologyTermRef{"T1", ""}, error))
+        << error;
+    const sacm::TerminologyPackage* legacy_tp =
+        find_terminology_package(legacy.terminologyPackages, "TP1");
+    ASSERT_NE(legacy_tp, nullptr);
+
+    // Both paths remove T1 and keep CAT1, CAT2, E1.
+    EXPECT_EQ(terminology_element_ids(*library_tp), terminology_element_ids(*legacy_tp));
+    EXPECT_EQ(terminology_element_ids(*library_tp),
+              (std::vector<std::string>{"CAT1", "CAT2", "E1"}));
+}
+
+// SACM23-INT-001, terminology slice: associating a term with a visible element
+// creates an ArtifactReference (referencedArtifact = term) plus an AssertedContext
+// {source = ref, target = element}, matching the legacy association -- reference
+// name, referencedArtifact, and context endpoints -- and reports the created-*
+// flags. The context is not a visible one.
+TEST(SacmLibraryEdit, SACM23_INT_001_AssociateTerminologyTermMatchesLegacy) {
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::TerminologyContextOutcome associated =
+        sacm_adapter::apply_associate_terminology_term(*loaded.document, "G1", "T1", "AR_X", "AC_X");
+    ASSERT_TRUE(associated.applied)
+        << (associated.diagnostics.empty() ? "" : associated.diagnostics.front().message);
+    EXPECT_TRUE(associated.created_artifact_reference);
+    EXPECT_TRUE(associated.created_asserted_context);
+    EXPECT_FALSE(associated.already_associated);
+    EXPECT_EQ(associated.artifact_reference_id, "AR_X");
+    EXPECT_EQ(associated.asserted_context_id, "AC_X");
+    const sacm::AssuranceCasePackage library_package =
+        core::project_library_package_with_tags(*loaded.document);
+    const ContextLink library_link = extract_context_link(library_package, "AR_X", "AC_X");
+    ASSERT_TRUE(library_link.found);
+
+    sacm::AssuranceCasePackage legacy = load_legacy_terminology();
+    const core::TerminologyContextForcedIds forced{"AR_X", "", "AC_X", ""};
+    const core::TerminologyContextAssociationResult legacy_result =
+        core::AssociateTerminologyTermWithElementWithIds(
+            legacy, "G1", package_ref("TP1"), core::TerminologyTermRef{"T1", ""}, forced);
+    ASSERT_TRUE(legacy_result.success) << legacy_result.error;
+    EXPECT_TRUE(legacy_result.created_artifact_reference);
+    EXPECT_TRUE(legacy_result.created_asserted_context);
+    EXPECT_FALSE(legacy_result.already_associated);
+    const ContextLink legacy_link = extract_context_link(legacy, "AR_X", "AC_X");
+    ASSERT_TRUE(legacy_link.found);
+
+    EXPECT_EQ(library_link, legacy_link);
+    EXPECT_EQ(library_link.referenced_artifact, "T1");
+    EXPECT_EQ(library_link.ctx_sources, (std::vector<std::string>{"AR_X"}));
+    EXPECT_EQ(library_link.ctx_targets, (std::vector<std::string>{"G1"}));
+    EXPECT_FALSE(library_link.visible);
+}
+
+// SACM23-INT-001, terminology slice: adding a term as a visible context is (8)
+// plus the visible-context marker on the AssertedContext, so the projected
+// context reads back as visible on both paths.
+TEST(SacmLibraryEdit, SACM23_INT_001_AddTerminologyVisibleContextMatchesLegacy) {
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::TerminologyContextOutcome added =
+        sacm_adapter::apply_add_terminology_visible_context(*loaded.document, "G1", "T1", "VR_X",
+                                                            "VC_X");
+    ASSERT_TRUE(added.applied)
+        << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    EXPECT_TRUE(added.created_artifact_reference);
+    EXPECT_TRUE(added.created_asserted_context);
+    EXPECT_FALSE(added.already_associated);
+    const sacm::AssuranceCasePackage library_package =
+        core::project_library_package_with_tags(*loaded.document);
+    const ContextLink library_link = extract_context_link(library_package, "VR_X", "VC_X");
+    ASSERT_TRUE(library_link.found);
+
+    sacm::AssuranceCasePackage legacy = load_legacy_terminology();
+    const core::TerminologyContextForcedIds forced{"VR_X", "", "VC_X", ""};
+    const core::TerminologyContextAssociationResult legacy_result =
+        core::AddTerminologyTermAsVisibleContextWithIds(
+            legacy, "G1", package_ref("TP1"), core::TerminologyTermRef{"T1", ""}, forced);
+    ASSERT_TRUE(legacy_result.success) << legacy_result.error;
+    EXPECT_TRUE(legacy_result.created_artifact_reference);
+    EXPECT_TRUE(legacy_result.created_asserted_context);
+    const ContextLink legacy_link = extract_context_link(legacy, "VR_X", "VC_X");
+    ASSERT_TRUE(legacy_link.found);
+
+    EXPECT_EQ(library_link, legacy_link);
+    EXPECT_TRUE(library_link.visible) << "the added context must read back as a visible context";
+    EXPECT_EQ(library_link.referenced_artifact, "T1");
+    EXPECT_EQ(library_link.ctx_targets, (std::vector<std::string>{"G1"}));
+}
+
+// SACM23-INT-001, terminology slice: associating the same term with the same
+// element twice reuses the existing reference and context and reports
+// already_associated on the second call, matching the legacy reuse semantics.
+TEST(SacmLibraryEdit, SACM23_INT_001_AssociateTerminologyTermReusesExisting) {
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::TerminologyContextOutcome first =
+        sacm_adapter::apply_associate_terminology_term(*loaded.document, "G1", "T1");
+    ASSERT_TRUE(first.applied)
+        << (first.diagnostics.empty() ? "" : first.diagnostics.front().message);
+    ASSERT_TRUE(first.created_asserted_context);
+    const sacm_adapter::TerminologyContextOutcome second =
+        sacm_adapter::apply_associate_terminology_term(*loaded.document, "G1", "T1");
+    ASSERT_TRUE(second.applied);
+    EXPECT_TRUE(second.already_associated);
+    EXPECT_FALSE(second.created_artifact_reference);
+    EXPECT_FALSE(second.created_asserted_context);
+    EXPECT_EQ(second.artifact_reference_id, first.artifact_reference_id);
+    EXPECT_EQ(second.asserted_context_id, first.asserted_context_id);
+
+    sacm::AssuranceCasePackage legacy = load_legacy_terminology();
+    const core::TerminologyContextAssociationResult legacy_first =
+        core::AssociateTerminologyTermWithElement(legacy, "G1", package_ref("TP1"),
+                                                  core::TerminologyTermRef{"T1", ""});
+    ASSERT_TRUE(legacy_first.success) << legacy_first.error;
+    const core::TerminologyContextAssociationResult legacy_second =
+        core::AssociateTerminologyTermWithElement(legacy, "G1", package_ref("TP1"),
+                                                  core::TerminologyTermRef{"T1", ""});
+    ASSERT_TRUE(legacy_second.success) << legacy_second.error;
+    EXPECT_TRUE(legacy_second.already_associated);
+    EXPECT_FALSE(legacy_second.created_asserted_context);
+    EXPECT_EQ(legacy_second.asserted_context_id, legacy_first.asserted_context_id);
+}
+
+// SACM23-INT-001, terminology slice: adding a term as a visible context when a
+// non-visible context already links it to the target promotes that context in
+// place (no new reference or context), marking it visible -- matching the legacy
+// promote semantics.
+TEST(SacmLibraryEdit, SACM23_INT_001_AddTerminologyVisibleContextPromotesExisting) {
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::TerminologyContextOutcome associated =
+        sacm_adapter::apply_associate_terminology_term(*loaded.document, "G1", "T1", "AR_X", "AC_X");
+    ASSERT_TRUE(associated.created_asserted_context)
+        << (associated.diagnostics.empty() ? "" : associated.diagnostics.front().message);
+    const sacm_adapter::TerminologyContextOutcome promoted =
+        sacm_adapter::apply_add_terminology_visible_context(*loaded.document, "G1", "T1");
+    ASSERT_TRUE(promoted.applied)
+        << (promoted.diagnostics.empty() ? "" : promoted.diagnostics.front().message);
+    EXPECT_FALSE(promoted.created_artifact_reference) << "the existing reference is reused";
+    EXPECT_FALSE(promoted.created_asserted_context) << "the existing context is promoted in place";
+    EXPECT_EQ(promoted.artifact_reference_id, "AR_X");
+    EXPECT_EQ(promoted.asserted_context_id, "AC_X");
+    const sacm::AssuranceCasePackage library_package =
+        core::project_library_package_with_tags(*loaded.document);
+    const ContextLink library_link = extract_context_link(library_package, "AR_X", "AC_X");
+    ASSERT_TRUE(library_link.found);
+    EXPECT_TRUE(library_link.visible) << "the promoted context must read back as visible";
+
+    sacm::AssuranceCasePackage legacy = load_legacy_terminology();
+    const core::TerminologyContextForcedIds forced{"AR_X", "", "AC_X", ""};
+    ASSERT_TRUE(core::AssociateTerminologyTermWithElementWithIds(
+                    legacy, "G1", package_ref("TP1"), core::TerminologyTermRef{"T1", ""}, forced)
+                    .success);
+    const core::TerminologyContextAssociationResult legacy_promoted =
+        core::AddTerminologyTermAsVisibleContext(legacy, "G1", package_ref("TP1"),
+                                                 core::TerminologyTermRef{"T1", ""});
+    ASSERT_TRUE(legacy_promoted.success) << legacy_promoted.error;
+    EXPECT_FALSE(legacy_promoted.created_artifact_reference);
+    EXPECT_FALSE(legacy_promoted.created_asserted_context);
+    EXPECT_EQ(legacy_promoted.asserted_context_id, "AC_X");
+    const ContextLink legacy_link = extract_context_link(legacy, "AR_X", "AC_X");
+    ASSERT_TRUE(legacy_link.found);
+    EXPECT_TRUE(legacy_link.visible);
+
+    EXPECT_EQ(library_link, legacy_link);
 }

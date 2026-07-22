@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Terminology parity fixture for the SACM library terminology edit seams.
+  Loads cleanly through both the legacy parser (sacm::parse_sacm) and the
+  library (sacm_adapter::load_document), so the terminology edit seams can be
+  compared against the legacy core::*Terminology*WithIds mutators on the same
+  input. Carries:
+    - a terminology package TP1 with two categories (CAT1, CAT2), one base
+      expression E1 (an origin target), and one term T1 (value/name/description
+      + external reference);
+    - an argument package AP1 with two claims (G1, G2) as association targets.
+-->
+<AssuranceCasePackage xmlns="http://www.omg.org/spec/SACM/20220301" id="TERM_CASE" name="Terminology Parity Case">
+  <terminologyPackage id="TP1" name="Terminology">
+    <category id="CAT1" name="Concepts"/>
+    <category id="CAT2" name="Standards"/>
+    <expression id="E1" value="Base expression"/>
+    <term id="T1" name="Safety" value="Freedom from unacceptable risk" externalReference="ISO-12345">
+      <description>
+        <content lang="en">The state of being protected from harm.</content>
+      </description>
+    </term>
+  </terminologyPackage>
+  <argumentPackage id="AP1" name="Safety Argument">
+    <claim id="G1" name="Top Goal" content="The system is acceptably safe."/>
+    <claim id="G2" name="Sub Goal" content="Hazards are controlled."/>
+  </argumentPackage>
+</AssuranceCasePackage>
