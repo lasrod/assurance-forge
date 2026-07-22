@@ -30,6 +30,8 @@ std::string_view operation_name(const Operation& operation) {
                 return "SetAssertionDeclaration";
             } else if constexpr (std::is_same_v<T, AddMetaClaim>) {
                 return "AddMetaClaim";
+            } else if constexpr (std::is_same_v<T, AddRelationshipSource>) {
+                return "AddRelationshipSource";
             } else if constexpr (std::is_same_v<T, CreateTerminologyPackage>) {
                 return "CreateTerminologyPackage";
             } else if constexpr (std::is_same_v<T, CreateCategory>) {

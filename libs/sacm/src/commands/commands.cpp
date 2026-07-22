@@ -633,6 +633,49 @@ void perform_add_meta_claim(model::Document& document, const AddMetaClaim& add) 
     Access::meta_claims(*assertion).push_back(add.meta_claim);
 }
 
+CheckOutcome check_add_relationship_source(const model::Document& document,
+                                           const AddRelationshipSource& add, const Operation& op) {
+    CheckOutcome outcome;
+    const auto* relationship = document.find_as<model::AssertedRelationship>(add.relationship);
+    if (relationship == nullptr) {
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kCmdTargetNotFound, "SACM23-ARG-002", op, {add.relationship},
+            std::format("'{}' is not an AssertedRelationship", add.relationship.value())));
+        return outcome;
+    }
+    // The source must be an ArgumentAsset, the same typing CreateAssertedRelationship enforces.
+    const auto is_argument_asset = [](const SACMElement& element) {
+        return dynamic_cast<const model::ArgumentAsset*>(&element) != nullptr;
+    };
+    if (!require_target(document, add.source, "source", is_argument_asset, op, outcome)) {
+        return outcome;
+    }
+    const std::vector<ElementId>& sources = relationship->sources();
+    if (std::find(sources.begin(), sources.end(), add.source) != sources.end()) {
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kMultiplicityViolation, "SACM23-ARG-002", op, {add.source},
+            std::format("'{}' is already a source of '{}'", add.source.value(),
+                        add.relationship.value())));
+        return outcome;
+    }
+    outcome.effects.push_back(ChangeRecord{
+        .id = add.relationship,
+        .kind = relationship->kind(),
+        .change = ChangeRecord::Change::Modified,
+        .parent = std::nullopt,
+        .property = "source",
+        .before = std::nullopt,
+        .after = add.source.value(),
+    });
+    return outcome;
+}
+
+void perform_add_relationship_source(model::Document& document, const AddRelationshipSource& add) {
+    auto* relationship = const_cast<model::AssertedRelationship*>(
+        document.find_as<model::AssertedRelationship>(add.relationship));
+    Access::sources(*relationship).push_back(add.source);
+}
+
 // ------------------------------------------------------------- terminology
 
 // Shared check for creating a terminology element under a parent.
@@ -1364,6 +1407,8 @@ CheckOutcome check(const model::Document& document, const Operation& operation) 
                 return check_set_assertion_declaration(document, op, operation);
             } else if constexpr (std::is_same_v<T, AddMetaClaim>) {
                 return check_add_meta_claim(document, op, operation);
+            } else if constexpr (std::is_same_v<T, AddRelationshipSource>) {
+                return check_add_relationship_source(document, op, operation);
             } else if constexpr (std::is_same_v<T, CreateTerminologyPackage>) {
                 return check_create_terminology(document, op.parent, op.id,
                                                 model::ElementKind::TerminologyPackage,
@@ -1420,6 +1465,8 @@ void perform(model::Document& document, const Operation& operation,
                 perform_set_assertion_declaration(document, op);
             } else if constexpr (std::is_same_v<T, AddMetaClaim>) {
                 perform_add_meta_claim(document, op);
+            } else if constexpr (std::is_same_v<T, AddRelationshipSource>) {
+                perform_add_relationship_source(document, op);
             } else if constexpr (std::is_same_v<T, CreateTerminologyPackage>) {
                 perform_create_terminology_package(document, op, effects);
             } else if constexpr (std::is_same_v<T, CreateCategory>) {

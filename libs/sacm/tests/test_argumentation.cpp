@@ -13,6 +13,7 @@
 namespace {
 
 using sacm::commands::AddMetaClaim;
+using sacm::commands::AddRelationshipSource;
 using sacm::commands::ChangeRecord;
 using sacm::commands::CreateArgumentPackage;
 using sacm::commands::CreateArgumentReasoning;
@@ -264,6 +265,88 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_CreatesRelationshipsWithCommands) {
         sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(reloaded.ok);
     EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
+}
+
+// A strategy's inference is materialized with its first sub-goal as source, then
+// extended with a second source when the next sub-goal is added -- the GSN
+// incremental-construction workflow. AddRelationshipSource must append the source
+// and the result must round-trip.
+TEST(Sacm23Argumentation, SACM23_ARG_001_AddsSourceToExistingRelationship) {
+    Document document = build_argument_case();
+    ASSERT_TRUE(document
+                    .apply(CreateArgumentReasoning{.parent = ElementId{"argpkg_1"},
+                                                   .id = ElementId{"ar_1"},
+                                                   .name = "Strategy"})
+                    .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateAssertedRelationship{
+                        .parent = ElementId{"argpkg_1"},
+                        .kind = ElementKind::AssertedInference,
+                        .id = ElementId{"inf_1"},
+                        .sources = {ElementId{"claim_sub"}},
+                        .targets = {ElementId{"claim_top"}},
+                        .reasoning = ElementId{"ar_1"},
+                    })
+                    .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateClaim{.parent = ElementId{"argpkg_1"},
+                                       .id = ElementId{"claim_sub2"},
+                                       .name = "Sub2"})
+                    .applied);
+
+    const auto added = document.apply(
+        AddRelationshipSource{.relationship = ElementId{"inf_1"}, .source = ElementId{"claim_sub2"}});
+    ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    ASSERT_EQ(added.changes.size(), 1u);
+    EXPECT_EQ(added.changes.front().property.value_or(""), "source");
+    EXPECT_EQ(added.changes.front().change, ChangeRecord::Change::Modified);
+
+    const auto* inference = document.find_as<sacm::model::AssertedRelationship>(ElementId{"inf_1"});
+    ASSERT_NE(inference, nullptr);
+    ASSERT_EQ(inference->sources().size(), 2u);
+    EXPECT_EQ(inference->sources().back(), ElementId{"claim_sub2"});
+
+    EXPECT_TRUE(sacm::validation::validate(document).empty());
+    const auto saved = sacm::io::save_xmi_string(document);
+    ASSERT_TRUE(saved.ok);
+    const LoadResult reloaded =
+        sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
+}
+
+// AddRelationshipSource enforces the same typing as CreateAssertedRelationship
+// (relationship must be an AssertedRelationship; source must be an ArgumentAsset)
+// and rejects a duplicate source rather than silently repeating it.
+TEST(Sacm23Argumentation, SACM23_ARG_002_AddSourceValidatesTargetAndDuplicate) {
+    Document document = build_argument_case();
+    ASSERT_TRUE(document
+                    .apply(CreateAssertedRelationship{
+                        .parent = ElementId{"argpkg_1"},
+                        .kind = ElementKind::AssertedInference,
+                        .id = ElementId{"inf_1"},
+                        .sources = {ElementId{"claim_sub"}},
+                        .targets = {ElementId{"claim_top"}},
+                    })
+                    .applied);
+
+    // The relationship id must resolve to an AssertedRelationship.
+    const auto not_relationship = document.apply(
+        AddRelationshipSource{.relationship = ElementId{"claim_top"}, .source = ElementId{"claim_sub"}});
+    EXPECT_FALSE(not_relationship.applied);
+    EXPECT_TRUE(has_code(not_relationship.diagnostics, sacm::validation::codes::kCmdTargetNotFound));
+
+    // A source must be an ArgumentAsset (a package is not).
+    const auto wrong_type = document.apply(
+        AddRelationshipSource{.relationship = ElementId{"inf_1"}, .source = ElementId{"argpkg_1"}});
+    EXPECT_FALSE(wrong_type.applied);
+    EXPECT_TRUE(has_code(wrong_type.diagnostics, sacm::validation::codes::kRefWrongType));
+
+    // A source already present is rejected.
+    const auto duplicate = document.apply(
+        AddRelationshipSource{.relationship = ElementId{"inf_1"}, .source = ElementId{"claim_sub"}});
+    EXPECT_FALSE(duplicate.applied);
+    EXPECT_TRUE(has_code(duplicate.diagnostics, sacm::validation::codes::kMultiplicityViolation));
 }
 
 TEST(Sacm23Argumentation, SACM23_ARG_002_RejectsRelationshipWithWrongTargetKind) {

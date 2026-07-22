@@ -117,6 +117,16 @@ struct AddMetaClaim {
     model::ElementId meta_claim;
 };
 
+// Add a source to an existing AssertedRelationship (clause 11.13, source[1..*]).
+// Supports GSN strategy editing: a strategy's inference is materialized when its
+// first sub-goal is added, and this extends that inference's sources for each
+// later sub-goal. The source must be an ArgumentAsset (same typing as
+// CreateAssertedRelationship); adding one already present is rejected.
+struct AddRelationshipSource {
+    model::ElementId relationship;
+    model::ElementId source;
+};
+
 // Create a TerminologyPackage inside an AssuranceCasePackage or (nested)
 // inside another TerminologyPackage.
 struct CreateTerminologyPackage {
@@ -197,7 +207,7 @@ using Operation =
                  CreateTerminologyPackage, CreateCategory, CreateTerm, CreateExpression,
                  CreateArtifactPackage, CreateArtifactAsset, CreateArtifactAssetRelationship,
                  SetCitation, SetName, SetDescription, SetAssertionDeclaration, AddMetaClaim,
-                 AddTaggedValue, DeleteElement>;
+                 AddRelationshipSource, AddTaggedValue, DeleteElement>;
 
 // Stable operation name ("CreateClaim", "DeleteElement", ...) used in
 // previews, results, and diagnostics.
