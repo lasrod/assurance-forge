@@ -660,15 +660,30 @@ const sacm::model::AssuranceCasePackage* root_case_package(const sacm::model::Do
 }
 
 void fill_diagnostics(std::vector<LoadDiagnostic>& out,
-                      const sacm::commands::MutationResult& result) {
-    out.reserve(out.size() + result.diagnostics.size());
-    for (const sacm::validation::Diagnostic& diagnostic : result.diagnostics) {
+                      const std::vector<sacm::validation::Diagnostic>& diagnostics) {
+    out.reserve(out.size() + diagnostics.size());
+    for (const sacm::validation::Diagnostic& diagnostic : diagnostics) {
         out.push_back(LoadDiagnostic{
             .code = diagnostic.code,
             .severity = std::string(sacm::validation::severity_name(diagnostic.severity)),
             .message = diagnostic.message,
         });
     }
+}
+
+void fill_diagnostics(std::vector<LoadDiagnostic>& out,
+                      const sacm::commands::MutationResult& result) {
+    fill_diagnostics(out, result.diagnostics);
+}
+
+// A terminology-edit failure carrying a preview's diagnostics (used to reject an
+// update before any of its composed setters run, keeping the update atomic).
+TerminologyEditOutcome preview_failed_terminology_edit(const sacm::commands::OperationPreview& preview) {
+    TerminologyEditOutcome outcome;
+    outcome.supported = true;
+    outcome.applied = false;
+    fill_diagnostics(outcome.diagnostics, preview.diagnostics);
+    return outcome;
 }
 
 TerminologyCreateOutcome failed_terminology_create(const sacm::commands::MutationResult& result) {
@@ -981,8 +996,27 @@ TerminologyEditOutcome apply_update_terminology_term(LibraryDocument& document,
         return terminology_edit_error("SACM-CMD-002", "'" + term_id + "' is not a Term");
     }
 
-    // Compose the setters that reproduce ApplyTermDraft, stopping on the first
-    // library rejection.
+    // Pre-validate the two setters that can fail (an unresolvable category or
+    // origin ref is the only realistic failure) so the composed update is atomic:
+    // nothing is applied unless all of it will -- the ADR's success->changed /
+    // failure->unchanged contract, which the legacy ApplyTermDraft also honours.
+    std::vector<sacm::model::ElementId> pending_categories;
+    for (const std::string& category : normalize_category_refs(fields.category_refs)) {
+        pending_categories.emplace_back(category);
+    }
+    const sacm::commands::OperationPreview category_preview = doc.preview(
+        sacm::commands::SetExpressionCategories{.element = id, .categories = pending_categories});
+    if (!category_preview.can_apply) {
+        return preview_failed_terminology_edit(category_preview);
+    }
+    const sacm::commands::OperationPreview origin_preview = doc.preview(sacm::commands::SetTermOrigin{
+        .element = id, .origin = to_optional_id(normalize_ref(fields.origin))});
+    if (!origin_preview.can_apply) {
+        return preview_failed_terminology_edit(origin_preview);
+    }
+
+    // Compose the setters that reproduce ApplyTermDraft. Categories/origin are
+    // pre-validated above, so on a found Term none of these can now fail.
     const sacm::commands::MutationResult named =
         doc.apply(sacm::commands::SetName{.element = id, .name = trim_whitespace(fields.name), .language = {}});
     if (!named.applied) {

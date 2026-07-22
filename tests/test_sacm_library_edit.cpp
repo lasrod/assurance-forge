@@ -1187,6 +1187,31 @@ TEST(SacmLibraryEdit, SACM23_INT_001_UpdateTerminologyTermMatchesLegacy) {
     EXPECT_NE(find_category(*library_tp, "CAT2"), nullptr);
 }
 
+// A term update with an unresolvable category ref is rejected and leaves the term
+// unchanged -- the composed setters pre-validate categories/origin so the update
+// is atomic (the ADR's failure->unchanged contract), rather than partially
+// applying the name/value the legacy ApplyTermDraft would also have rolled back.
+TEST(SacmLibraryEdit, SACM23_INT_001_UpdateTerminologyTermIsAtomicOnBadRef) {
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm_adapter::TerminologyTermFields fields{.value = "changed value",
+                                                     .name = "changed name",
+                                                     .category_refs = {"NO_SUCH_CATEGORY"}};
+    const sacm_adapter::TerminologyEditOutcome edit =
+        sacm_adapter::apply_update_terminology_term(*loaded.document, "T1", fields);
+    EXPECT_FALSE(edit.applied) << "an unresolvable category ref must reject the update";
+
+    const std::vector<sacm::TerminologyPackage> after =
+        sacm_adapter::project_terminology_packages(*loaded.document);
+    const sacm::TerminologyPackage* after_tp = find_terminology_package(after, "TP1");
+    ASSERT_NE(after_tp, nullptr);
+    const sacm::Term* term = find_term(*after_tp, "T1");
+    ASSERT_NE(term, nullptr);
+    EXPECT_EQ(term->name, "Safety") << "name must not have partially applied";
+    EXPECT_EQ(term->value, "Freedom from unacceptable risk") << "value must not have partially applied";
+}
+
 // SACM23-INT-001, terminology slice: deleting a Term (the primitive the legacy
 // delete mutators compose) must leave the same terminology elements the legacy
 // DeleteTerminologyTerm does.
