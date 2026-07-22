@@ -341,7 +341,10 @@ AddChildOutcome apply_add_subgoal_under_strategy(sacm::model::Document& doc,
         outcome.supported = true;
         outcome.applied = true;
         outcome.new_element_id = goal_id.value();
-        outcome.new_relationship_id = inference_id.value();  // existing -- not newly created
+        // No relationship is created (the existing inference is extended), so
+        // new_relationship_id stays empty per the AddChildOutcome contract -- and
+        // the audit event correspondingly records no generated relationship id
+        // (replay finds the inference to extend itself).
         return outcome;
     }
 

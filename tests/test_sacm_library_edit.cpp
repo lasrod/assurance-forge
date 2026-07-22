@@ -466,7 +466,8 @@ TEST(SacmLibraryEdit, SACM23_INT_001_SubGoalUnderStrategyMaterializesThenExtends
     const sacm_adapter::AddChildOutcome second = sacm_adapter::apply_add_child(
         *loaded.document, "S1", sacm_adapter::ChildKind::Goal, "SG2");
     ASSERT_TRUE(second.applied) << (second.diagnostics.empty() ? "" : second.diagnostics.front().message);
-    EXPECT_EQ(second.new_relationship_id, "R_INF") << "extends the existing inference, not a new one";
+    EXPECT_TRUE(second.new_relationship_id.empty())
+        << "extending an existing inference creates no relationship (contract: id only set when created)";
 
     after = sacm_adapter::project_case(*loaded.document);
     const core::SacmElement* extended = find_element(after, "R_INF");
