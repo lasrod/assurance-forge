@@ -74,12 +74,14 @@ bool AppState::load_file(const std::string& file_path) {
             // tag-carrying projection preserves ACP/confidence/GSN-role tags; the
             // terminology passes then hide/refresh the already-projected model.
             sacm_package = core::project_library_package_with_tags(*library_document);
+            SynthesizeBareStrategyPlacements(loaded_case.value(), sacm_package.value());
             HideTerminologyArtifactReferences(loaded_case.value(), sacm_package.value());
             RefreshVisibleTerminologyContextDisplay(loaded_case.value(), sacm_package.value());
             status_message = summary + load_note;
         } else if (auto sacm_result = sacm::parse_sacm(file_path)) {
             // Legacy-parser fallback path (the library could not read the file).
             sacm_package = std::move(*sacm_result);
+            SynthesizeBareStrategyPlacements(loaded_case.value(), sacm_package.value());
             HideTerminologyArtifactReferences(loaded_case.value(), sacm_package.value());
             RefreshVisibleTerminologyContextDisplay(loaded_case.value(), sacm_package.value());
             status_message = summary + load_note;

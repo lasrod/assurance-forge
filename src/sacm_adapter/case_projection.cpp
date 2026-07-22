@@ -202,52 +202,6 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
     return projected;
 }
 
-// A GSN strategy is created as an ArgumentReasoning carrying a `strategyTarget`
-// tag (the goal it will support) with no inference until its first sub-goal
-// materializes one (the deferred single-inference encoding). Such a *bare*
-// strategy has no relationship to place it under its goal, so synthesize a
-// sourceless placeholder AssertedInference {reasoning=strategy, target=goal} into
-// the render model -- the POD tree tolerates a sourceless inference and renders
-// the strategy under its goal. It is a render-only element (never in the library
-// or the saved package); once a real inference (reasoning=strategy) exists none
-// is synthesized. The id is derived from the strategy so it is stable.
-void synthesize_bare_strategy_placements(const sacm::model::Document& source,
-                                         core::AssuranceCase& projected) {
-    std::unordered_set<std::string> materialized;
-    for (const core::SacmElement& element : projected.elements) {
-        if (element.type == "assertedinference" && !element.reasoning_ref.empty()) {
-            materialized.insert(element.reasoning_ref);
-        }
-    }
-    std::vector<core::SacmElement> placeholders;
-    source.for_each_element([&](const sacm::model::SACMElement& element) {
-        if (element.kind() != sacm::metadata::ElementKind::ArgumentReasoning) {
-            return;
-        }
-        const auto* model_element = dynamic_cast<const sacm::model::ModelElement*>(&element);
-        if (model_element == nullptr) {
-            return;
-        }
-        const std::string strategy_id = element.id().value();
-        if (materialized.count(strategy_id) != 0) {
-            return;
-        }
-        const std::string target = tagged_value_for(*model_element, kGsnStrategyTargetTagKey);
-        if (target.empty()) {
-            return;
-        }
-        core::SacmElement placeholder;
-        placeholder.id = strategy_id + "__pending_inference";
-        placeholder.type = "assertedinference";
-        placeholder.reasoning_ref = strategy_id;
-        placeholder.target_refs.push_back(target);
-        placeholders.push_back(std::move(placeholder));
-    });
-    for (core::SacmElement& placeholder : placeholders) {
-        projected.elements.push_back(std::move(placeholder));
-    }
-}
-
 } // namespace
 
 core::AssuranceCase project_case(const LibraryDocument& document) {
@@ -290,7 +244,6 @@ core::AssuranceCase project_case(const LibraryDocument& document) {
         }
     });
 
-    synthesize_bare_strategy_placements(source, projected);
     return projected;
 }
 
