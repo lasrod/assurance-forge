@@ -676,6 +676,130 @@ void perform_add_relationship_source(model::Document& document, const AddRelatio
     Access::sources(*relationship).push_back(add.source);
 }
 
+// ----------------------------------------------------- terminology edits
+
+CheckOutcome check_set_expression_value(const model::Document& document,
+                                        const SetExpressionValue& set, const Operation& op) {
+    CheckOutcome outcome;
+    const auto* element = document.find_as<model::ExpressionElement>(set.element);
+    if (element == nullptr) {
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kCmdTargetNotFound, "SACM23-TERM-001", op, {set.element},
+            std::format("'{}' is not a Term or Expression", set.element.value())));
+        return outcome;
+    }
+    outcome.effects.push_back(ChangeRecord{.id = set.element,
+                                           .kind = element->kind(),
+                                           .change = ChangeRecord::Change::Modified,
+                                           .parent = std::nullopt,
+                                           .property = "value",
+                                           .before = element->value(),
+                                           .after = set.value});
+    return outcome;
+}
+
+void perform_set_expression_value(model::Document& document, const SetExpressionValue& set) {
+    auto* element =
+        const_cast<model::ExpressionElement*>(document.find_as<model::ExpressionElement>(set.element));
+    Access::value(*element) = set.value;
+}
+
+CheckOutcome check_set_term_external_reference(const model::Document& document,
+                                               const SetTermExternalReference& set,
+                                               const Operation& op) {
+    CheckOutcome outcome;
+    const auto* term = document.find_as<model::Term>(set.element);
+    if (term == nullptr) {
+        outcome.diagnostics.push_back(
+            make_error(validation::codes::kCmdTargetNotFound, "SACM23-TERM-001", op, {set.element},
+                       std::format("'{}' is not a Term", set.element.value())));
+        return outcome;
+    }
+    outcome.effects.push_back(ChangeRecord{.id = set.element,
+                                           .kind = term->kind(),
+                                           .change = ChangeRecord::Change::Modified,
+                                           .parent = std::nullopt,
+                                           .property = "externalReference",
+                                           .before = term->external_reference(),
+                                           .after = set.external_reference});
+    return outcome;
+}
+
+void perform_set_term_external_reference(model::Document& document,
+                                         const SetTermExternalReference& set) {
+    auto* term = const_cast<model::Term*>(document.find_as<model::Term>(set.element));
+    Access::external_reference(*term) = set.external_reference;
+}
+
+CheckOutcome check_set_term_origin(const model::Document& document, const SetTermOrigin& set,
+                                   const Operation& op) {
+    CheckOutcome outcome;
+    const auto* term = document.find_as<model::Term>(set.element);
+    if (term == nullptr) {
+        outcome.diagnostics.push_back(
+            make_error(validation::codes::kCmdTargetNotFound, "SACM23-TERM-001", op, {set.element},
+                       std::format("'{}' is not a Term", set.element.value())));
+        return outcome;
+    }
+    if (set.origin.has_value() && document.find(*set.origin) == nullptr) {
+        outcome.diagnostics.push_back(
+            make_error(validation::codes::kCmdTargetNotFound, "SACM23-TERM-001", op, {*set.origin},
+                       std::format("origin '{}' not found", set.origin->value())));
+        return outcome;
+    }
+    outcome.effects.push_back(ChangeRecord{.id = set.element,
+                                           .kind = term->kind(),
+                                           .change = ChangeRecord::Change::Modified,
+                                           .parent = std::nullopt,
+                                           .property = "origin",
+                                           .before = std::nullopt,
+                                           .after = set.origin.has_value() ? set.origin->value()
+                                                                           : std::string{}});
+    return outcome;
+}
+
+void perform_set_term_origin(model::Document& document, const SetTermOrigin& set) {
+    auto* term = const_cast<model::Term*>(document.find_as<model::Term>(set.element));
+    Access::origin(*term) = set.origin;
+}
+
+CheckOutcome check_set_expression_categories(const model::Document& document,
+                                             const SetExpressionCategories& set,
+                                             const Operation& op) {
+    CheckOutcome outcome;
+    const auto* element = document.find_as<model::ExpressionElement>(set.element);
+    if (element == nullptr) {
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kCmdTargetNotFound, "SACM23-TERM-001", op, {set.element},
+            std::format("'{}' is not a Term or Expression", set.element.value())));
+        return outcome;
+    }
+    const auto is_category = [](const SACMElement& element) {
+        return element.kind() == model::ElementKind::Category;
+    };
+    for (const ElementId& category : set.categories) {
+        if (!require_target(document, category, "category", is_category, op, outcome)) {
+            outcome.effects.clear();
+            return outcome;
+        }
+    }
+    outcome.effects.push_back(ChangeRecord{.id = set.element,
+                                           .kind = element->kind(),
+                                           .change = ChangeRecord::Change::Modified,
+                                           .parent = std::nullopt,
+                                           .property = "category",
+                                           .before = std::nullopt,
+                                           .after = std::nullopt});
+    return outcome;
+}
+
+void perform_set_expression_categories(model::Document& document,
+                                        const SetExpressionCategories& set) {
+    auto* element =
+        const_cast<model::ExpressionElement*>(document.find_as<model::ExpressionElement>(set.element));
+    Access::categories(*element) = set.categories;
+}
+
 // ------------------------------------------------------------- terminology
 
 // Shared check for creating a terminology element under a parent.
@@ -1409,6 +1533,14 @@ CheckOutcome check(const model::Document& document, const Operation& operation) 
                 return check_add_meta_claim(document, op, operation);
             } else if constexpr (std::is_same_v<T, AddRelationshipSource>) {
                 return check_add_relationship_source(document, op, operation);
+            } else if constexpr (std::is_same_v<T, SetExpressionValue>) {
+                return check_set_expression_value(document, op, operation);
+            } else if constexpr (std::is_same_v<T, SetTermExternalReference>) {
+                return check_set_term_external_reference(document, op, operation);
+            } else if constexpr (std::is_same_v<T, SetTermOrigin>) {
+                return check_set_term_origin(document, op, operation);
+            } else if constexpr (std::is_same_v<T, SetExpressionCategories>) {
+                return check_set_expression_categories(document, op, operation);
             } else if constexpr (std::is_same_v<T, CreateTerminologyPackage>) {
                 return check_create_terminology(document, op.parent, op.id,
                                                 model::ElementKind::TerminologyPackage,
@@ -1467,6 +1599,14 @@ void perform(model::Document& document, const Operation& operation,
                 perform_add_meta_claim(document, op);
             } else if constexpr (std::is_same_v<T, AddRelationshipSource>) {
                 perform_add_relationship_source(document, op);
+            } else if constexpr (std::is_same_v<T, SetExpressionValue>) {
+                perform_set_expression_value(document, op);
+            } else if constexpr (std::is_same_v<T, SetTermExternalReference>) {
+                perform_set_term_external_reference(document, op);
+            } else if constexpr (std::is_same_v<T, SetTermOrigin>) {
+                perform_set_term_origin(document, op);
+            } else if constexpr (std::is_same_v<T, SetExpressionCategories>) {
+                perform_set_expression_categories(document, op);
             } else if constexpr (std::is_same_v<T, CreateTerminologyPackage>) {
                 perform_create_terminology_package(document, op, effects);
             } else if constexpr (std::is_same_v<T, CreateCategory>) {

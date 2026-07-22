@@ -17,6 +17,10 @@ using sacm::commands::CreateExpression;
 using sacm::commands::CreateTerm;
 using sacm::commands::CreateTerminologyPackage;
 using sacm::commands::DeleteElement;
+using sacm::commands::SetExpressionCategories;
+using sacm::commands::SetExpressionValue;
+using sacm::commands::SetTermExternalReference;
+using sacm::commands::SetTermOrigin;
 using sacm::commands::ReferenceDeletePolicy;
 using sacm::io::LoadOptions;
 using sacm::io::LoadResult;
@@ -128,6 +132,102 @@ TEST(Sacm23Terminology, SACM23_TERM_001_CreatesAndDeletesTerminologyElements) {
                     .applied);
     EXPECT_EQ(document.find(ElementId{"term_1"}), nullptr);
     EXPECT_TRUE(sacm::validation::validate(document).empty());
+}
+
+// A client must be able to edit a Term in place (value, external reference,
+// origin, categories) -- the app's UpdateTerminologyTerm routes through these.
+// Each command applies, and the edited term round-trips through strict save.
+TEST(Sacm23Terminology, SACM23_TERM_001_UpdatesTermFieldsWithCommands) {
+    Document document;
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"})
+                    .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateTerminologyPackage{
+                        .parent = ElementId{"acp_1"}, .id = ElementId{"tp_1"}, .name = "Vocab"})
+                    .applied);
+    ASSERT_TRUE(
+        document.apply(CreateCategory{.parent = ElementId{"tp_1"}, .id = ElementId{"cat_1"}, .name = "C1"})
+            .applied);
+    ASSERT_TRUE(
+        document.apply(CreateCategory{.parent = ElementId{"tp_1"}, .id = ElementId{"cat_2"}, .name = "C2"})
+            .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateTerm{.parent = ElementId{"tp_1"},
+                                      .id = ElementId{"term_1"},
+                                      .name = "T",
+                                      .value = "old"})
+                    .applied);
+
+    ASSERT_TRUE(
+        document.apply(SetExpressionValue{.element = ElementId{"term_1"}, .value = "new value"})
+            .applied);
+    ASSERT_TRUE(document
+                    .apply(SetTermExternalReference{.element = ElementId{"term_1"},
+                                                    .external_reference = "https://example.org"})
+                    .applied);
+    ASSERT_TRUE(document
+                    .apply(SetExpressionCategories{
+                        .element = ElementId{"term_1"},
+                        .categories = {ElementId{"cat_1"}, ElementId{"cat_2"}}})
+                    .applied);
+    // origin references any element (the library validates existence only).
+    ASSERT_TRUE(
+        document.apply(SetTermOrigin{.element = ElementId{"term_1"}, .origin = ElementId{"cat_1"}})
+            .applied);
+
+    const auto* term = document.find_as<sacm::model::Term>(ElementId{"term_1"});
+    ASSERT_NE(term, nullptr);
+    EXPECT_EQ(term->value(), "new value");
+    EXPECT_EQ(term->external_reference(), "https://example.org");
+    ASSERT_EQ(term->categories().size(), 2u);
+    ASSERT_TRUE(term->origin().has_value());
+    EXPECT_EQ(term->origin()->value(), "cat_1");
+
+    EXPECT_TRUE(sacm::validation::validate(document).empty());
+    const auto saved = sacm::io::save_xmi_string(document);
+    ASSERT_TRUE(saved.ok);
+    const LoadResult reloaded =
+        sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
+
+    // origin can be cleared.
+    ASSERT_TRUE(document.apply(SetTermOrigin{.element = ElementId{"term_1"}, .origin = std::nullopt})
+                    .applied);
+    EXPECT_FALSE(document.find_as<sacm::model::Term>(ElementId{"term_1"})->origin().has_value());
+}
+
+// The term-update commands enforce their target kinds: value/categories require a
+// Term or Expression, external reference/origin require a Term, and a category id
+// must resolve to a Category.
+TEST(Sacm23Terminology, SACM23_TERM_001_TermUpdateCommandsValidateTargets) {
+    Document document;
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"})
+                    .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateTerminologyPackage{
+                        .parent = ElementId{"acp_1"}, .id = ElementId{"tp_1"}, .name = "Vocab"})
+                    .applied);
+    ASSERT_TRUE(
+        document.apply(CreateCategory{.parent = ElementId{"tp_1"}, .id = ElementId{"cat_1"}, .name = "C"})
+            .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateTerm{.parent = ElementId{"tp_1"}, .id = ElementId{"term_1"}, .name = "T"})
+                    .applied);
+
+    // value on a non-expression (a Category) is rejected.
+    EXPECT_FALSE(document.apply(SetExpressionValue{.element = ElementId{"cat_1"}, .value = "x"}).applied);
+    // external reference on a non-Term (a Category) is rejected.
+    EXPECT_FALSE(
+        document.apply(SetTermExternalReference{.element = ElementId{"cat_1"}, .external_reference = "x"})
+            .applied);
+    // a category id that is not a Category (the term itself) is rejected.
+    const auto bad_category = document.apply(
+        SetExpressionCategories{.element = ElementId{"term_1"}, .categories = {ElementId{"term_1"}}});
+    EXPECT_FALSE(bad_category.applied);
+    EXPECT_TRUE(std::ranges::any_of(bad_category.diagnostics, [](const auto& diagnostic) {
+        return diagnostic.code == sacm::validation::codes::kRefWrongType;
+    }));
 }
 
 TEST(Sacm23Terminology, SACM23_TERM_001_RejectsTermOutsideTerminologyPackage) {
