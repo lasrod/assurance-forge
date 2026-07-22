@@ -930,6 +930,96 @@ TerminologyCreateOutcome apply_create_terminology_term(LibraryDocument& document
     return outcome;
 }
 
+TerminologyEditOutcome apply_update_terminology_package(LibraryDocument& document,
+                                                       const std::string& package_id,
+                                                       const std::string& name,
+                                                       const std::string& description) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId id(package_id);
+    const sacm::commands::MutationResult named =
+        doc.apply(sacm::commands::SetName{.element = id, .name = name, .language = {}});
+    if (!named.applied) {
+        return failed_terminology_edit(named);
+    }
+    const sacm::commands::MutationResult described =
+        set_terminology_description(doc, id, description);
+    if (!described.applied) {
+        return failed_terminology_edit(described);
+    }
+    return TerminologyEditOutcome{.applied = true};
+}
+
+TerminologyEditOutcome apply_update_terminology_category(LibraryDocument& document,
+                                                        const std::string& category_id,
+                                                        const std::string& name,
+                                                        const std::string& description) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    if (doc.find_as<sacm::model::Category>(sacm::model::ElementId(category_id)) == nullptr) {
+        return terminology_edit_error("SACM-CMD-002", "'" + category_id + "' is not a Category");
+    }
+    const sacm::model::ElementId id(category_id);
+    // Legacy ApplyCategoryDraft trims name/description.
+    const sacm::commands::MutationResult named =
+        doc.apply(sacm::commands::SetName{.element = id, .name = trim_whitespace(name), .language = {}});
+    if (!named.applied) {
+        return failed_terminology_edit(named);
+    }
+    const sacm::commands::MutationResult described =
+        set_terminology_description(doc, id, trim_whitespace(description));
+    if (!described.applied) {
+        return failed_terminology_edit(described);
+    }
+    return TerminologyEditOutcome{.applied = true};
+}
+
+TerminologyEditOutcome apply_update_terminology_term(LibraryDocument& document,
+                                                    const std::string& term_id,
+                                                    const TerminologyTermFields& fields) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId id(term_id);
+    if (doc.find_as<sacm::model::Term>(id) == nullptr) {
+        return terminology_edit_error("SACM-CMD-002", "'" + term_id + "' is not a Term");
+    }
+
+    // Compose the setters that reproduce ApplyTermDraft, stopping on the first
+    // library rejection.
+    const sacm::commands::MutationResult named =
+        doc.apply(sacm::commands::SetName{.element = id, .name = trim_whitespace(fields.name), .language = {}});
+    if (!named.applied) {
+        return failed_terminology_edit(named);
+    }
+    const sacm::commands::MutationResult valued =
+        doc.apply(sacm::commands::SetExpressionValue{.element = id, .value = trim_whitespace(fields.value)});
+    if (!valued.applied) {
+        return failed_terminology_edit(valued);
+    }
+    const sacm::commands::MutationResult described =
+        set_terminology_description(doc, id, trim_whitespace(fields.description));
+    if (!described.applied) {
+        return failed_terminology_edit(described);
+    }
+    std::vector<sacm::model::ElementId> category_ids;
+    for (const std::string& category : normalize_category_refs(fields.category_refs)) {
+        category_ids.emplace_back(category);
+    }
+    const sacm::commands::MutationResult classified = doc.apply(
+        sacm::commands::SetExpressionCategories{.element = id, .categories = std::move(category_ids)});
+    if (!classified.applied) {
+        return failed_terminology_edit(classified);
+    }
+    const sacm::commands::MutationResult referenced = doc.apply(sacm::commands::SetTermExternalReference{
+        .element = id, .external_reference = trim_whitespace(fields.external_reference)});
+    if (!referenced.applied) {
+        return failed_terminology_edit(referenced);
+    }
+    const sacm::commands::MutationResult origin = doc.apply(sacm::commands::SetTermOrigin{
+        .element = id, .origin = to_optional_id(normalize_ref(fields.origin))});
+    if (!origin.applied) {
+        return failed_terminology_edit(origin);
+    }
+    return TerminologyEditOutcome{.applied = true};
+}
+
 TerminologyEditOutcome apply_delete_terminology_element(LibraryDocument& document,
                                                        const std::string& element_id) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);

@@ -1074,6 +1074,119 @@ TEST(SacmLibraryEdit, SACM23_INT_001_CreateTerminologyTermMatchesLegacy) {
     EXPECT_EQ(library_term->category_refs, (std::vector<std::string>{"CAT1", "CAT2"}));
 }
 
+// SACM23-INT-001, terminology slice: updating a TerminologyPackage's
+// name/description must reproduce the legacy UpdateTerminologyPackage content.
+TEST(SacmLibraryEdit, SACM23_INT_001_UpdateTerminologyPackageMatchesLegacy) {
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::TerminologyEditOutcome edit = sacm_adapter::apply_update_terminology_package(
+        *loaded.document, "TP1", "Renamed Terminology", "Updated description");
+    ASSERT_TRUE(edit.applied)
+        << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
+    const std::vector<sacm::TerminologyPackage> library_packages =
+        sacm_adapter::project_terminology_packages(*loaded.document);
+    const sacm::TerminologyPackage* library_tp = find_terminology_package(library_packages, "TP1");
+    ASSERT_NE(library_tp, nullptr);
+
+    sacm::AssuranceCasePackage legacy = load_legacy_terminology();
+    std::string error;
+    ASSERT_TRUE(core::UpdateTerminologyPackage(legacy, package_ref("TP1"), "Renamed Terminology",
+                                               "Updated description", error))
+        << error;
+    const sacm::TerminologyPackage* legacy_tp =
+        find_terminology_package(legacy.terminologyPackages, "TP1");
+    ASSERT_NE(legacy_tp, nullptr);
+
+    EXPECT_EQ(library_tp->name, legacy_tp->name);
+    EXPECT_EQ(library_tp->description, legacy_tp->description);
+    EXPECT_EQ(library_tp->name, "Renamed Terminology");
+    EXPECT_EQ(library_tp->description, "Updated description");
+}
+
+// SACM23-INT-001, terminology slice: updating a Category must reproduce the
+// legacy UpdateTerminologyCategory content.
+TEST(SacmLibraryEdit, SACM23_INT_001_UpdateTerminologyCategoryMatchesLegacy) {
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::TerminologyEditOutcome edit = sacm_adapter::apply_update_terminology_category(
+        *loaded.document, "CAT1", "Renamed Concept", "Concept category");
+    ASSERT_TRUE(edit.applied)
+        << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
+    const std::vector<sacm::TerminologyPackage> library_packages =
+        sacm_adapter::project_terminology_packages(*loaded.document);
+    const sacm::TerminologyPackage* library_tp = find_terminology_package(library_packages, "TP1");
+    ASSERT_NE(library_tp, nullptr);
+    const sacm::Category* library_category = find_category(*library_tp, "CAT1");
+    ASSERT_NE(library_category, nullptr);
+
+    sacm::AssuranceCasePackage legacy = load_legacy_terminology();
+    const core::TerminologyCategoryDraft draft{"Renamed Concept", "Concept category"};
+    std::string error;
+    ASSERT_TRUE(core::UpdateTerminologyCategory(legacy, package_ref("TP1"),
+                                                core::TerminologyCategoryRef{"CAT1", ""}, draft,
+                                                error))
+        << error;
+    const sacm::TerminologyPackage* legacy_tp =
+        find_terminology_package(legacy.terminologyPackages, "TP1");
+    ASSERT_NE(legacy_tp, nullptr);
+    const sacm::Category* legacy_category = find_category(*legacy_tp, "CAT1");
+    ASSERT_NE(legacy_category, nullptr);
+
+    EXPECT_EQ(library_category->name, legacy_category->name);
+    EXPECT_EQ(library_category->description, legacy_category->description);
+    EXPECT_EQ(library_category->name, "Renamed Concept");
+}
+
+// SACM23-INT-001, terminology slice: updating a Term (composing SetName/
+// SetExpressionValue/SetDescription/SetExpressionCategories/
+// SetTermExternalReference/SetTermOrigin) must reproduce the legacy
+// UpdateTerminologyTerm content across every draft field, leaving other
+// terminology elements (CAT1/CAT2/E1) intact.
+TEST(SacmLibraryEdit, SACM23_INT_001_UpdateTerminologyTermMatchesLegacy) {
+    const sacm_adapter::TerminologyTermFields fields{
+        .value = "Revised safety",
+        .name = "Safety (revised)",
+        .description = "Updated definition.",
+        .category_refs = {"CAT2"},
+        .external_reference = "ISO-54321",
+        .origin = "E1"};
+
+    sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::TerminologyEditOutcome edit =
+        sacm_adapter::apply_update_terminology_term(*loaded.document, "T1", fields);
+    ASSERT_TRUE(edit.applied)
+        << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
+    const std::vector<sacm::TerminologyPackage> library_packages =
+        sacm_adapter::project_terminology_packages(*loaded.document);
+    const sacm::TerminologyPackage* library_tp = find_terminology_package(library_packages, "TP1");
+    ASSERT_NE(library_tp, nullptr);
+    const sacm::Term* library_term = find_term(*library_tp, "T1");
+    ASSERT_NE(library_term, nullptr);
+
+    sacm::AssuranceCasePackage legacy = load_legacy_terminology();
+    const core::TerminologyTermDraft draft{"Revised safety", "Safety (revised)",
+                                           "Updated definition.", {"CAT2"}, "ISO-54321", "E1"};
+    std::string error;
+    ASSERT_TRUE(core::UpdateTerminologyTerm(legacy, package_ref("TP1"),
+                                            core::TerminologyTermRef{"T1", ""}, draft, error))
+        << error;
+    const sacm::TerminologyPackage* legacy_tp =
+        find_terminology_package(legacy.terminologyPackages, "TP1");
+    ASSERT_NE(legacy_tp, nullptr);
+    const sacm::Term* legacy_term = find_term(*legacy_tp, "T1");
+    ASSERT_NE(legacy_term, nullptr);
+
+    EXPECT_EQ(term_fields(*library_term), term_fields(*legacy_term));
+    EXPECT_EQ(library_term->value, "Revised safety");
+    EXPECT_EQ(library_term->category_refs, (std::vector<std::string>{"CAT2"}));
+    EXPECT_EQ(library_term->origin, "E1");
+    // Unrelated standard terminology data is preserved on both paths.
+    EXPECT_EQ(terminology_element_ids(*library_tp), terminology_element_ids(*legacy_tp));
+    EXPECT_NE(find_category(*library_tp, "CAT1"), nullptr);
+    EXPECT_NE(find_category(*library_tp, "CAT2"), nullptr);
+}
+
 // SACM23-INT-001, terminology slice: deleting a Term (the primitive the legacy
 // delete mutators compose) must leave the same terminology elements the legacy
 // DeleteTerminologyTerm does.
