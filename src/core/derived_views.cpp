@@ -1,13 +1,12 @@
 #include "core/derived_views.h"
 
-#include "core/library_package_projection.h"
 #include "core/string_utils.h"
 #include "core/terminology_package_service.h"
 #include "core/terminology_text_utils.h"
-#include "sacm_adapter/case_projection.h"
 
 #include <algorithm>
 #include <cstddef>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -146,15 +145,6 @@ void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model, const
                 element->description_langs["en"] = element->description;
         }
     }
-}
-
-void RebuildDerivedViewsFromLibrary(const sacm_adapter::LibraryDocument& library,
-                                    parser::AssuranceCase& out_model,
-                                    sacm::AssuranceCasePackage& out_package) {
-    out_model = sacm_adapter::project_case(library);
-    out_package = project_library_package_with_tags(library);
-    HideTerminologyArtifactReferences(out_model, out_package);
-    RefreshVisibleTerminologyContextDisplay(out_model, out_package);
 }
 
 } // namespace core
