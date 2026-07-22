@@ -570,6 +570,27 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditReproducesLegacyForNonClaim)
     EXPECT_EQ(after_r1->description_langs.at("en"), legacy_r1->description_langs.at("en"));
 }
 
+// A legacy file using the non-standard assertionDeclaration="justification"
+// (predating the gsn.role encoding) projects as the app's "justification" role:
+// the library normalizes it to axiomatic + a reserved compat tag on import, and
+// the projection honours that tag so old Justifications survive the migration.
+TEST(SacmLibraryEdit, SACM23_INT_001_LegacyJustificationProjectsAsJustification) {
+    const std::string xml =
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+        R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+        R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">)"
+        R"(<argumentPackage xmi:id="ap_1">)"
+        R"(<argumentElement xsi:type="sacm:Claim" xmi:id="J1" assertionDeclaration="justification">)"
+        R"(<name content="Just"/></argumentElement></argumentPackage></sacm:AssuranceCasePackage>)";
+    sacm_adapter::LibraryDocument document;
+    ASSERT_TRUE(sacm_adapter::reload_document(document, xml));
+    const core::AssuranceCase projected = sacm_adapter::project_case(document);
+    const core::SacmElement* j1 = find_element(projected, "J1");
+    ASSERT_NE(j1, nullptr);
+    EXPECT_EQ(j1->assertion_declaration, "justification");
+}
+
 // The Description field on a claim-like element is a *second* Description (a
 // note) that SetDescription's front-only edit cannot target, so it stays
 // unsupported and the caller keeps the legacy edit authoritative.

@@ -164,11 +164,20 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
         // A GSN Justification is stored as `axiomatic` plus a vendor gsn.role
         // tag (SACM cannot express the node type; see gsn_role_tag.h). Translate
         // it back to the app's internal "justification" so the tree classifier
-        // (core::classify_role) renders it correctly.
+        // (core::classify_role) renders it correctly. A file that predates the
+        // gsn.role encoding used a non-standard assertionDeclaration="justification";
+        // the library normalizes that to axiomatic and preserves the role in the
+        // reserved kImportAssertionDeclarationKey tag, which we also honour so old
+        // files render (and re-save via gsn.role) as Justifications.
         if (assertion->assertion_declaration() == sacm::model::AssertionDeclaration::Axiomatic) {
             if (const auto* model_element =
                     dynamic_cast<const sacm::model::ModelElement*>(&element)) {
-                if (tagged_value_for(*model_element, kGsnRoleTagKey) == kGsnRoleJustification) {
+                const bool via_gsn_role =
+                    tagged_value_for(*model_element, kGsnRoleTagKey) == kGsnRoleJustification;
+                const bool via_import = tagged_value_for(*model_element,
+                                                         kImportAssertionDeclarationKey) ==
+                                        kImportAssertionDeclarationJustification;
+                if (via_gsn_role || via_import) {
                     projected.assertion_declaration = "justification";
                 }
             }

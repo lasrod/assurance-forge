@@ -73,6 +73,43 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_LegacyUndevelopedNormalizesToNeedsSuppo
     EXPECT_EQ(declaration_of(specific), AssertionDeclaration::Assumed);
 }
 
+// A GSN Justification predates the vendor gsn.role encoding: old Assurance Forge
+// files wrote a non-standard assertionDeclaration="justification". The library
+// normalizes it to the standards-correct `axiomatic` (docs/sacm/sacm-gsn-mapping.md)
+// and preserves the original GSN role in a reserved TaggedValue, so a client can
+// still tell a Justification from a plain axiomatic Goal and strict save stays clean.
+TEST(Sacm23Argumentation, SACM23_ARG_001_LegacyJustificationNormalizesToAxiomatic) {
+    const LoadResult legacy = sacm::io::load_xmi_string(
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+        R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+        R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">)"
+        R"(<argumentPackage xmi:id="ap_1">)"
+        R"(<argumentElement xsi:type="sacm:Claim" xmi:id="J1" assertionDeclaration="justification">)"
+        R"(<name content="Just"/></argumentElement></argumentPackage></sacm:AssuranceCasePackage>)");
+    ASSERT_TRUE(legacy.ok);
+    const auto* claim = legacy.document->find_as<sacm::model::Claim>(sacm::model::ElementId{"J1"});
+    ASSERT_NE(claim, nullptr);
+    EXPECT_EQ(claim->assertion_declaration(), AssertionDeclaration::Axiomatic);
+
+    bool has_role_tag = false;
+    for (const auto& tag : claim->tagged_values()) {
+        if (tag->key().primary() == "sacm.import.assertionDeclaration" &&
+            tag->content().primary() == "justification") {
+            has_role_tag = true;
+        }
+    }
+    EXPECT_TRUE(has_role_tag) << "the GSN Justification role was not preserved";
+
+    // Normalized, not opaque -- strict save accepts it and it round-trips.
+    const auto saved = sacm::io::save_xmi_string(*legacy.document);
+    ASSERT_TRUE(saved.ok);
+    const LoadResult reloaded =
+        sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(*legacy.document, *reloaded.document).empty());
+}
+
 // Assurance Forge encodes two product-critical GSN v3 concepts in SACM: a
 // Challenge is a relationship with isCounter=true (SACM-native, clause 11.13),
 // and an Assurance Claim Point is a vendor TaggedValue keyed
