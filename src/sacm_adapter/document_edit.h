@@ -21,12 +21,19 @@
 //
 //   * Name    -> SetName (clause 8.6 single name LangString, primary language).
 //   * Content -> SetDescription on a Claim/ArgumentReasoning: the app's
-//     `content` is the element's primary Description (clause 8.9), which the
-//     library's SetDescription edits.
+//     `content` is the element's primary Description (clause 8.9). A primary-
+//     language edit overwrites the front Description's stored entry in place; a
+//     non-primary edit adds/updates that language's LangString.
+//   * Description -> SetDescription on a *non*-claim ModelElement (artifact
+//     reference, relationship, ...), whose POD `description` IS the front
+//     Description; same language handling as Content.
 //
 // Deliberately not yet mapped (later slices, some needing new library
-// operations): a Claim's secondary-note Description, Term/Expression `value`,
-// and multi-language names/Descriptions that exceed a single LangString.
+// operations): a multi-language *name* (SACM's name is one LangString, so extra
+// languages need the reserved "sacm.import.name" TaggedValue), a Claim's
+// secondary-note Description (the POD `description` on a claim is a *second*
+// Description, which SetDescription's front-only edit cannot target), and
+// Term/Expression `value`.
 
 #include "sacm_adapter/library_load.h"  // LibraryDocument, LoadDiagnostic
 

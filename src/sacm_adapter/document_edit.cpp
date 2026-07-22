@@ -97,30 +97,43 @@ EditOutcome apply_text_edit(LibraryDocument& document, const std::string& elemen
         return applied_outcome(doc.apply(operation));
     }
     case TextField::Content: {
-        // Non-primary languages accumulate a per-language content map the POD
-        // keeps flat but the library stores as extra Description LangStrings;
-        // that multi-language mapping is a later slice. Under a non-primary
-        // language, leave it unsupported so the command bus re-derives from the
-        // authoritative package instead (matching the legacy edit exactly).
-        if (language != kPrimaryLanguage) {
-            return unsupported_outcome();
-        }
         const auto* element = doc.find_as<sacm::model::ModelElement>(id);
         if (element == nullptr || !content_maps_to_description(element->kind())) {
             return unsupported_outcome();
         }
-        const sacm::commands::Operation operation = sacm::commands::SetDescription{
+        // Content is the front Description (the statement, clause 8.9). A primary
+        // edit overwrites the front's stored (possibly lang-less) entry in place;
+        // a non-primary edit adds/updates that language's LangString, which the
+        // projection reads back into content_langs.
+        const std::string target_language =
+            language == kPrimaryLanguage ? primary_description_language(*element) : language;
+        return applied_outcome(doc.apply(sacm::commands::SetDescription{
             .element = id,
             .text = value,
-            .language = primary_description_language(*element),
-        };
-        return applied_outcome(doc.apply(operation));
+            .language = target_language,
+        }));
     }
-    case TextField::Description:
-        // The secondary-note Description (claim) and non-claim Descriptions are
-        // not wired yet; see the header. Report unsupported so the caller keeps
-        // the legacy edit authoritative.
-        return unsupported_outcome();
+    case TextField::Description: {
+        const auto* element = doc.find_as<sacm::model::ModelElement>(id);
+        if (element == nullptr) {
+            return unsupported_outcome();
+        }
+        // For a claim-like element the POD `description` is a *second* Description
+        // (a note); SetDescription edits the front (which is the statement /
+        // content there), so it cannot target the note -- that stays a later
+        // slice. For every other element the POD `description` IS the front
+        // Description, so it maps directly (same language handling as Content).
+        if (content_maps_to_description(element->kind())) {
+            return unsupported_outcome();
+        }
+        const std::string target_language =
+            language == kPrimaryLanguage ? primary_description_language(*element) : language;
+        return applied_outcome(doc.apply(sacm::commands::SetDescription{
+            .element = id,
+            .text = value,
+            .language = target_language,
+        }));
+    }
     }
     return unsupported_outcome();
 }

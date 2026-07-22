@@ -510,11 +510,74 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildUnderMissingParentUnsupported) {
 // content map is a later multi-language slice), so it reports unsupported and
 // the command bus re-derives instead -- rather than the seam guessing at a
 // LangString entry and diverging from the legacy edit.
-TEST(SacmLibraryEdit, SACM23_INT_001_ContentEditUnsupportedForNonPrimaryLanguage) {
+// A non-primary-language content edit adds that language's LangString to the
+// front Description; the projected content_langs entry must match the legacy
+// per-language content map, and the primary content must be untouched.
+TEST(SacmLibraryEdit, SACM23_INT_001_ContentEditReproducesLegacyForNonPrimaryLanguage) {
+    const std::string kJa = "\xe5\xae\x89\xe5\x85\xa8";  // an in the Japanese for "safety"
+
+    sacm_adapter::LoadOutcome loaded = load_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const core::AssuranceCase before = sacm_adapter::project_case(*loaded.document);
+    const core::SacmElement* before_g1 = find_element(before, "G1");
+    ASSERT_NE(before_g1, nullptr);
+    const std::string english_before = before_g1->content;
+
+    const sacm_adapter::EditOutcome edit = sacm_adapter::apply_text_edit(
+        *loaded.document, "G1", sacm_adapter::TextField::Content, "ja", kJa);
+    ASSERT_TRUE(edit.supported);
+    ASSERT_TRUE(edit.applied) << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
+
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    const core::SacmElement* after_g1 = find_element(after, "G1");
+    ASSERT_NE(after_g1, nullptr);
+    ASSERT_TRUE(after_g1->content_langs.contains("ja"));
+    EXPECT_EQ(after_g1->content_langs.at("ja"), kJa);
+    EXPECT_EQ(after_g1->content, english_before) << "the primary content must be untouched";
+
+    const core::AssuranceCase legacy = legacy_edit("G1", core::ElementTextField::Content, "ja", kJa);
+    const core::SacmElement* legacy_g1 = find_element(legacy, "G1");
+    ASSERT_NE(legacy_g1, nullptr);
+    ASSERT_TRUE(legacy_g1->content_langs.contains("ja"));
+    EXPECT_EQ(after_g1->content_langs.at("ja"), legacy_g1->content_langs.at("ja"));
+}
+
+// The Description field on a non-claim element (here the relationship R1) maps to
+// its front Description, so the edit reproduces the legacy description edit.
+TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditReproducesLegacyForNonClaim) {
+    const std::string kNote = "Decomposition over identified hazards.";
+
     sacm_adapter::LoadOutcome loaded = load_fixture();
     ASSERT_NE(loaded.document, nullptr);
     const sacm_adapter::EditOutcome edit = sacm_adapter::apply_text_edit(
-        *loaded.document, "G1", sacm_adapter::TextField::Content, "ja", "\xe5\xae\x89\xe5\x85\xa8");
+        *loaded.document, "R1", sacm_adapter::TextField::Description, "en", kNote);
+    ASSERT_TRUE(edit.supported);
+    ASSERT_TRUE(edit.applied) << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
+
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    const core::SacmElement* after_r1 = find_element(after, "R1");
+    ASSERT_NE(after_r1, nullptr);
+    EXPECT_EQ(after_r1->description, kNote);
+    ASSERT_TRUE(after_r1->description_langs.contains("en"));
+    EXPECT_EQ(after_r1->description_langs.at("en"), kNote);
+
+    const core::AssuranceCase legacy =
+        legacy_edit("R1", core::ElementTextField::Description, "en", kNote);
+    const core::SacmElement* legacy_r1 = find_element(legacy, "R1");
+    ASSERT_NE(legacy_r1, nullptr);
+    EXPECT_EQ(after_r1->description, legacy_r1->description);
+    ASSERT_TRUE(legacy_r1->description_langs.contains("en"));
+    EXPECT_EQ(after_r1->description_langs.at("en"), legacy_r1->description_langs.at("en"));
+}
+
+// The Description field on a claim-like element is a *second* Description (a
+// note) that SetDescription's front-only edit cannot target, so it stays
+// unsupported and the caller keeps the legacy edit authoritative.
+TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditUnsupportedForClaim) {
+    sacm_adapter::LoadOutcome loaded = load_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::EditOutcome edit = sacm_adapter::apply_text_edit(
+        *loaded.document, "G1", sacm_adapter::TextField::Description, "en", "a note");
     EXPECT_FALSE(edit.supported);
     EXPECT_FALSE(edit.applied);
 }
