@@ -3,6 +3,7 @@
 #include "core/string_utils.h"
 #include "core/terminology_package_service.h"
 #include "core/terminology_text_utils.h"
+#include "sacm_adapter/gsn_role_tag.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -145,6 +146,41 @@ void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model, const
                 element->description_langs["en"] = element->description;
         }
     }
+}
+
+void SynthesizeBareStrategyPlacements(parser::AssuranceCase& model,
+                                      const sacm::AssuranceCasePackage& package) {
+    // Strategy ids that already have a real inference in the render model.
+    std::unordered_set<std::string> materialized;
+    for (const parser::SacmElement& element : model.elements) {
+        if (element.type == "assertedinference" && !element.reasoning_ref.empty())
+            materialized.insert(element.reasoning_ref);
+    }
+
+    std::vector<parser::SacmElement> placeholders;
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::ArgumentReasoning& reasoning : argument_package.argumentReasonings) {
+            if (materialized.find(reasoning.id) != materialized.end())
+                continue;  // a real inference already places this strategy
+            std::string target;
+            for (const sacm::TaggedValue& tag : reasoning.taggedValues) {
+                if (tag.key == sacm_adapter::kGsnStrategyTargetTagKey) {
+                    target = tag.value;
+                    break;
+                }
+            }
+            if (target.empty())
+                continue;  // not a bare strategy
+            parser::SacmElement placeholder;
+            placeholder.id = reasoning.id + "__pending_inference";
+            placeholder.type = "assertedinference";
+            placeholder.reasoning_ref = reasoning.id;
+            placeholder.target_refs.push_back(target);
+            placeholders.push_back(std::move(placeholder));
+        }
+    }
+    for (parser::SacmElement& placeholder : placeholders)
+        model.elements.push_back(std::move(placeholder));
 }
 
 } // namespace core

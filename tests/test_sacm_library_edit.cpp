@@ -21,6 +21,7 @@
 #include "sacm_adapter/library_load.h"
 
 #include "core/acp/acp_editing.h"
+#include "core/derived_views.h"
 #include "core/element_factory.h"
 #include "core/library_package_projection.h"
 #include "core/string_utils.h"
@@ -419,15 +420,44 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildStrategyCreatesPendingReasoning) {
     EXPECT_EQ(added.new_element_id, "STRAT1");
     EXPECT_TRUE(added.new_relationship_id.empty()) << "no inference until the first sub-goal";
 
-    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    // The render model: project + the render-layer placement synthesis (the same
+    // steps the load path runs). project_case itself stays pure.
+    core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    const sacm::AssuranceCasePackage render_package =
+        core::project_library_package_with_tags(*loaded.document);
+    core::SynthesizeBareStrategyPlacements(after, render_package);
+
     const core::SacmElement* strategy = find_element(after, "STRAT1");
     ASSERT_NE(strategy, nullptr);
     EXPECT_EQ(strategy->type, "argumentreasoning");
-    // No relationship references it yet.
+
+    // The seam materializes no *real* inference (new_relationship_id is empty), but
+    // the render-layer synthesis adds a sourceless placeholder {reasoning=STRAT1,
+    // target=G1} so the bare strategy still renders under its goal until its first
+    // sub-goal. The strategy is never a source of anything.
+    const core::SacmElement* placeholder = find_element(after, "STRAT1__pending_inference");
+    ASSERT_NE(placeholder, nullptr);
+    EXPECT_EQ(placeholder->type, "assertedinference");
+    EXPECT_EQ(placeholder->reasoning_ref, "STRAT1");
+    EXPECT_EQ(placeholder->target_refs, (std::vector<std::string>{"G1"}));
+    EXPECT_TRUE(placeholder->source_refs.empty()) << "the placeholder is sourceless until a sub-goal";
+    int reasoning_refs_to_strategy = 0;
     for (const core::SacmElement& element : after.elements) {
         EXPECT_EQ(std::find(element.source_refs.begin(), element.source_refs.end(), "STRAT1"),
                   element.source_refs.end());
-        EXPECT_NE(element.reasoning_ref, "STRAT1");
+        if (element.reasoning_ref == "STRAT1")
+            ++reasoning_refs_to_strategy;
+    }
+    EXPECT_EQ(reasoning_refs_to_strategy, 1) << "only the synthesized placeholder";
+
+    // The placeholder is render-only: it must NOT leak into the audit package
+    // (project_library_package feeds the canonical hash + the saved file).
+    const sacm::AssuranceCasePackage audit_package = core::project_library_package(*loaded.document);
+    for (const sacm::ArgumentPackage& argument_package : audit_package.argumentPackages) {
+        for (const sacm::AssertedInference& inference : argument_package.assertedInferences) {
+            EXPECT_EQ(inference.id.find("__pending_inference"), std::string::npos)
+                << "the render-only placeholder must not reach the audit/saved package";
+        }
     }
 }
 

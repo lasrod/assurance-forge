@@ -24,4 +24,17 @@ void HideTerminologyArtifactReferences(parser::AssuranceCase& model,
 void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model,
                                              const sacm::AssuranceCasePackage& package);
 
+// A GSN strategy is created as an ArgumentReasoning carrying a `strategyTarget`
+// tag (the goal it will support) with no inference until its first sub-goal
+// materializes one (the deferred single-inference encoding). Such a *bare*
+// strategy has no relationship to place it under its goal, so synthesize a
+// sourceless placeholder AssertedInference `{reasoning=strategy, target=goal}`
+// into the render model -- the POD tree tolerates a sourceless inference and
+// renders the strategy under its goal. This is a **render-only** step applied to
+// the render model, NOT the projection (which feeds the saved package + audit
+// hash), so the placeholder is never serialized. Once a real inference
+// (reasoning=strategy) exists, none is synthesized.
+void SynthesizeBareStrategyPlacements(parser::AssuranceCase& model,
+                                      const sacm::AssuranceCasePackage& package);
+
 } // namespace core
