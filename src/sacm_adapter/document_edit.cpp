@@ -274,6 +274,105 @@ void rollback_element(sacm::model::Document& doc, const sacm::model::ElementId& 
     });
 }
 
+// The strategy's single inference, if it has been materialized: the
+// AssertedRelationship in `package` whose reasoning end is `strategy`.
+const sacm::model::AssertedRelationship* find_strategy_inference(
+    const sacm::model::ArgumentPackage& package, const sacm::model::ElementId& strategy) {
+    for (const auto& element : package.argument_elements()) {
+        const auto* relationship =
+            dynamic_cast<const sacm::model::AssertedRelationship*>(element.get());
+        if (relationship != nullptr && relationship->reasoning().has_value() &&
+            *relationship->reasoning() == strategy) {
+            return relationship;
+        }
+    }
+    return nullptr;
+}
+
+// The goal a bare strategy will support, recorded in its strategyTarget vendor
+// tag by apply_add_child(Strategy). Empty if absent.
+std::string strategy_target_of(const sacm::model::ModelElement& strategy) {
+    for (const auto& tag : strategy.tagged_values()) {
+        if (tag->key().primary() == kGsnStrategyTargetTagKey) {
+            return std::string(tag->content().primary());
+        }
+    }
+    return {};
+}
+
+// A sub-goal added under a strategy is a source of the strategy's single
+// inference (the standard one-inference GSN->SACM encoding, not the legacy
+// per-sub-goal inference). Materialize `{target = the goal the strategy supports,
+// reasoning = strategy, source = sub-goal}` on the first sub-goal (from the
+// strategyTarget tag); extend that inference's sources on later ones. The tag is
+// left in place -- once the inference exists it is ignored (only a *bare*
+// strategy consults it), and leaving it keeps the live and replayed encodings
+// identical.
+AddChildOutcome apply_add_subgoal_under_strategy(sacm::model::Document& doc,
+                                                 const sacm::model::ElementId& strategy,
+                                                 const sacm::model::ElementId& package_id,
+                                                 const std::string& element_id,
+                                                 const std::string& relationship_id) {
+    const sacm::commands::MutationResult created =
+        doc.apply(sacm::commands::CreateClaim{.parent = package_id, .id = to_optional_id(element_id)});
+    if (!created.applied || created.created_ids().empty()) {
+        return failed_child(created);
+    }
+    const sacm::model::ElementId goal_id = created.created_ids().front();
+
+    // Re-fetch the package after the create (the element vector may have grown).
+    const auto* package = doc.find_as<sacm::model::ArgumentPackage>(package_id);
+    if (package == nullptr) {
+        rollback_element(doc, goal_id);
+        return unsupported_child();
+    }
+
+    if (const sacm::model::AssertedRelationship* inference =
+            find_strategy_inference(*package, strategy)) {
+        // Later sub-goal: extend the existing inference's sources.
+        const sacm::model::ElementId inference_id = inference->id();
+        const sacm::commands::MutationResult extended = doc.apply(
+            sacm::commands::AddRelationshipSource{.relationship = inference_id, .source = goal_id});
+        if (!extended.applied) {
+            rollback_element(doc, goal_id);
+            return failed_child(extended);
+        }
+        AddChildOutcome outcome;
+        outcome.supported = true;
+        outcome.applied = true;
+        outcome.new_element_id = goal_id.value();
+        outcome.new_relationship_id = inference_id.value();  // existing -- not newly created
+        return outcome;
+    }
+
+    // First sub-goal: materialize the inference against the goal the strategy
+    // supports (its strategyTarget tag).
+    const auto* strategy_element = doc.find_as<sacm::model::ModelElement>(strategy);
+    const std::string target = strategy_element ? strategy_target_of(*strategy_element) : std::string{};
+    if (target.empty()) {
+        rollback_element(doc, goal_id);
+        return unsupported_child();
+    }
+    const sacm::commands::MutationResult materialized =
+        doc.apply(sacm::commands::CreateAssertedRelationship{
+            .parent = package_id,
+            .kind = sacm::metadata::ElementKind::AssertedInference,
+            .id = to_optional_id(relationship_id),
+            .sources = {goal_id},
+            .targets = {sacm::model::ElementId(target)},
+            .reasoning = strategy});
+    if (!materialized.applied || materialized.created_ids().empty()) {
+        rollback_element(doc, goal_id);
+        return failed_child(materialized);
+    }
+    AddChildOutcome outcome;
+    outcome.supported = true;
+    outcome.applied = true;
+    outcome.new_element_id = goal_id.value();
+    outcome.new_relationship_id = materialized.created_ids().front().value();
+    return outcome;
+}
+
 } // namespace
 
 AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& parent_id,
@@ -313,6 +412,17 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
         outcome.applied = true;
         outcome.new_element_id = strategy_id.value();
         return outcome;  // no relationship yet -- materialized on the first sub-goal
+    }
+
+    // A Goal added under a strategy (ArgumentReasoning) is a source of the
+    // strategy's single inference, not a new inference targeting the strategy:
+    // materialize that inference on the first sub-goal, extend it on later ones.
+    // Other kinds under a strategy keep the normal path (they attach to the
+    // strategy node itself, e.g. a context via AssertedContext).
+    if (kind == ChildKind::Goal &&
+        doc.find(parent) != nullptr &&
+        doc.find(parent)->kind() == sacm::metadata::ElementKind::ArgumentReasoning) {
+        return apply_add_subgoal_under_strategy(doc, parent, package_id, element_id, relationship_id);
     }
 
     const std::optional<ChildPlan> plan = plan_child(kind, package_id, to_optional_id(element_id));
