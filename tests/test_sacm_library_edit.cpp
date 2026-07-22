@@ -431,6 +431,57 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildStrategyCreatesPendingReasoning) {
     }
 }
 
+// Strategy part 2: a sub-goal added under a strategy is a source of the strategy's
+// single inference. The first sub-goal materializes {target=the goal the strategy
+// supports, reasoning=strategy, source=sub-goal}; later sub-goals extend that same
+// inference's sources -- the standard one-inference GSN->SACM encoding, with no
+// per-sub-goal inference.
+TEST(SacmLibraryEdit, SACM23_INT_001_SubGoalUnderStrategyMaterializesThenExtendsInference) {
+    sacm_adapter::LoadOutcome loaded = load_fixture();  // fixture claim G1
+    ASSERT_NE(loaded.document, nullptr);
+
+    // A strategy under G1 -- bare, no inference yet.
+    const sacm_adapter::AddChildOutcome strategy = sacm_adapter::apply_add_child(
+        *loaded.document, "G1", sacm_adapter::ChildKind::Strategy, "S1");
+    ASSERT_TRUE(strategy.applied)
+        << (strategy.diagnostics.empty() ? "" : strategy.diagnostics.front().message);
+    ASSERT_TRUE(strategy.new_relationship_id.empty());
+
+    // First sub-goal under S1 -> materialize the inference with the caller id.
+    const sacm_adapter::AddChildOutcome first = sacm_adapter::apply_add_child(
+        *loaded.document, "S1", sacm_adapter::ChildKind::Goal, "SG1", "R_INF");
+    ASSERT_TRUE(first.applied) << (first.diagnostics.empty() ? "" : first.diagnostics.front().message);
+    EXPECT_EQ(first.new_element_id, "SG1");
+    EXPECT_EQ(first.new_relationship_id, "R_INF") << "the inference is materialized on the first sub-goal";
+
+    core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    const core::SacmElement* inference = find_element(after, "R_INF");
+    ASSERT_NE(inference, nullptr);
+    EXPECT_EQ(inference->type, "assertedinference");
+    EXPECT_EQ(inference->reasoning_ref, "S1");
+    EXPECT_EQ(inference->target_refs, (std::vector<std::string>{"G1"}));
+    EXPECT_EQ(inference->source_refs, (std::vector<std::string>{"SG1"}));
+
+    // Second sub-goal -> extend the SAME inference (no new relationship created).
+    const sacm_adapter::AddChildOutcome second = sacm_adapter::apply_add_child(
+        *loaded.document, "S1", sacm_adapter::ChildKind::Goal, "SG2");
+    ASSERT_TRUE(second.applied) << (second.diagnostics.empty() ? "" : second.diagnostics.front().message);
+    EXPECT_TRUE(second.new_relationship_id.empty())
+        << "extending an existing inference creates no relationship (contract: id only set when created)";
+
+    after = sacm_adapter::project_case(*loaded.document);
+    const core::SacmElement* extended = find_element(after, "R_INF");
+    ASSERT_NE(extended, nullptr);
+    EXPECT_EQ(extended->source_refs, (std::vector<std::string>{"SG1", "SG2"}));
+    int inferences_under_s1 = 0;
+    for (const core::SacmElement& element : after.elements) {
+        if (element.type == "assertedinference" && element.reasoning_ref == "S1") {
+            ++inferences_under_s1;
+        }
+    }
+    EXPECT_EQ(inferences_under_s1, 1) << "single-inference encoding: no per-sub-goal inference";
+}
+
 // The GSN Justification round-trips: adding one stores axiomatic + the gsn.role
 // tag in the library, and after an XMI save/load the projection still renders it
 // as a justification -- proving the vendor tag survives (standards-correct SACM
