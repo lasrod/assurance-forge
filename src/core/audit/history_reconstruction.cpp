@@ -31,8 +31,11 @@ std::expected<ReplayState, std::string> ReconstructAtSequence(const AssurancePro
     // reproduce INTERMEDIATE states up to `target_transaction_sequence`.
     const std::filesystem::path snapshot_path = SnapshotSacmPath(project.rootPath, kInitialSnapshotId);
     sacm_adapter::LoadOutcome snapshot = sacm_adapter::load_document(snapshot_path);
-    if (!snapshot.ok || snapshot.document == nullptr)
-        return std::unexpected("Failed to load snapshot through the library: " + snapshot_path.string());
+    if (!snapshot.ok || snapshot.document == nullptr) {
+        const std::string diagnostics = sacm_adapter::summarize_load_diagnostics(snapshot.diagnostics);
+        return std::unexpected("Failed to load snapshot through the library: " + snapshot_path.string() +
+                               (diagnostics.empty() ? "" : " (" + diagnostics + ")"));
+    }
 
     std::string store_error;
     auto store = EventStore::Open(project.rootPath, store_error);

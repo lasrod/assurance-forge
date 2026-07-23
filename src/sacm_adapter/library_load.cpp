@@ -52,6 +52,16 @@ LoadOutcome load_document(const std::filesystem::path& path) {
     return outcome;
 }
 
+std::string summarize_load_diagnostics(const std::vector<LoadDiagnostic>& diagnostics) {
+    std::string summary;
+    for (const LoadDiagnostic& diagnostic : diagnostics) {
+        if (!summary.empty())
+            summary += "; ";
+        summary += diagnostic.code + "/" + diagnostic.severity + ": " + diagnostic.message;
+    }
+    return summary;
+}
+
 bool reload_document(LibraryDocument& document, std::string_view xml) {
     sacm::io::LoadResult result = sacm::io::load_xmi_string(xml);
     if (!result.ok || !result.document.has_value()) {

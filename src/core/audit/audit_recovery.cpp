@@ -52,7 +52,9 @@ bool RestoreSacmFromAudit(const AssuranceProject& project,
         SnapshotSacmPath(project.rootPath, replay_root.snapshot_id);
     sacm_adapter::LoadOutcome snapshot = sacm_adapter::load_document(snapshot_path);
     if (!snapshot.ok || snapshot.document == nullptr) {
-        error = "Failed to load snapshot through the library: " + snapshot_path.string();
+        const std::string diagnostics = sacm_adapter::summarize_load_diagnostics(snapshot.diagnostics);
+        error = "Failed to load snapshot through the library: " + snapshot_path.string() +
+                (diagnostics.empty() ? "" : " (" + diagnostics + ")");
         return false;
     }
 

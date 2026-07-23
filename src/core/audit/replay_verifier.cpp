@@ -79,15 +79,17 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
         SnapshotSacmPath(project.rootPath, replay_root.snapshot_id);
     sacm_adapter::LoadOutcome snapshot = sacm_adapter::load_document(snapshot_path);
     if (!snapshot.ok || snapshot.document == nullptr) {
+        const std::string diagnostics = sacm_adapter::summarize_load_diagnostics(snapshot.diagnostics);
         result.success = false;
         result.ran = true;
         result.cause = DivergenceCause::SnapshotMissing;
-        result.diagnostics.emplace_back("Failed to load snapshot through the library: " +
-                                        snapshot_path.string());
+        result.diagnostics.emplace_back("Failed to load snapshot through the library: " + snapshot_path.string() +
+                                        (diagnostics.empty() ? "" : " (" + diagnostics + ")"));
         return result;
     }
+    const sacm::AssuranceCasePackage snapshot_package = core::project_library_package(*snapshot.document);
     result.snapshot_canonical_hash =
-        core::library_canonical_hash(core::project_library_package(*snapshot.document)).value_or(std::string());
+        core::library_canonical_hash(snapshot_package).value_or(CanonicalModelHash(snapshot_package));
 
     std::unique_ptr<EventStore> store;
     {
