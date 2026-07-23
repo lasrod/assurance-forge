@@ -487,6 +487,25 @@ TEST(Sacm23BaseModel, SACM23_BASE_001_SetDescriptionAtAddressesDescriptionSlots)
     EXPECT_EQ(*claim.descriptions().front()->content().find("en"), "The statement.");
     EXPECT_EQ(*claim.descriptions()[1]->content().find("en"), "A revised note.");
 
+    // Empty text CLEARS the language entry, and the effect must report the value
+    // as absent (not as an empty string) so audit/undo consumers can tell a clear
+    // from a set-to-empty -- the same convention SetGid uses.
+    {
+        const sacm::commands::MutationResult cleared = document.apply(SetDescriptionAt{
+            .element = ElementId{"c_1"}, .index = 1, .text = "", .language = "en"});
+        ASSERT_TRUE(cleared.applied);
+        ASSERT_EQ(cleared.changes.size(), 1u);
+        EXPECT_FALSE(cleared.changes.front().after.has_value());
+        EXPECT_EQ(claim.descriptions()[1]->content().find("en"), nullptr);
+    }
+    // Restore the note for the round-trip below.
+    ASSERT_TRUE(document
+                    .apply(SetDescriptionAt{.element = ElementId{"c_1"},
+                                            .index = 1,
+                                            .text = "A revised note.",
+                                            .language = "en"})
+                    .applied);
+
     // A second Description is valid in the machine model (Description[0..*]);
     // the validator only warns on the surplus (clause 8.6 spec text is [0..1]),
     // so there must be no Error, and the sole diagnostic is that warning.

@@ -1125,7 +1125,10 @@ CheckOutcome check_set_description_at(const model::Document& document, const Set
             .parent = std::nullopt,
             .property = std::format("description[{}]", set.index),
             .before = std::nullopt,
-            .after = set.text,
+            // Empty text REMOVES the language entry, so report the value as absent
+            // rather than as an empty string -- audit/undo consumers must be able
+            // to tell a clear from a set-to-empty (same convention as SetGid).
+            .after = set.text.empty() ? std::nullopt : std::optional(set.text),
         });
         return outcome;
     }
