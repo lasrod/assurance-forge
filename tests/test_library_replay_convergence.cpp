@@ -8,8 +8,14 @@
 // are hashed through `core::library_canonical_hash`, which serializes and
 // reloads through the library so projection-vs-legacy normalization differences
 // cancel out on both sides. What CANNOT cancel is data present on one side and
-// absent on the other -- which is exactly how the terminology gid impedance
-// (documented in src/sacm_adapter/document_edit.h) surfaces below.
+// absent on the other -- which is how the two slice-3a impedances (terminology
+// gid; claim content vs second-Description slot) used to surface.
+//
+// Slice 3b-1 resolves both by BRIDGING the divergent events: the gid-minting
+// terminology CREATE/ASSOCIATE events and the `Content`/`Description` text edits
+// run the SAME legacy mutator the live path uses onto a projected package, then
+// re-derive the library. So every test below now converges on the RAW canonical
+// hash -- no gid normalization.
 //
 // These tests only prove the additive path converges; no existing consumer is
 // rewired here (a later slice does that).
@@ -139,40 +145,6 @@ std::unique_ptr<sacm_adapter::LibraryDocument> LibraryReplay(
     return std::move(replayed.value());
 }
 
-void blank_element_gid(sacm::SacmElement& element) { element.gid.clear(); }
-
-void blank_terminology_package_gids(sacm::TerminologyPackage& tp) {
-    blank_element_gid(tp);
-    for (sacm::Category& c : tp.categories) blank_element_gid(c);
-    for (sacm::Expression& e : tp.expressions) blank_element_gid(e);
-    for (sacm::Term& t : tp.terms) blank_element_gid(t);
-}
-
-// Clears every gid in the package. Used to prove that the ONLY residual
-// divergence between the library-created terminology and the legacy-created
-// terminology is the gid the library seam cannot assign (clause 8.2 gid is
-// optional). Once gid is normalized away, StableKey falls back to id -- which
-// the library replay forces to match the legacy id -- so the two converge.
-sacm::AssuranceCasePackage BlankAllGids(sacm::AssuranceCasePackage package) {
-    blank_element_gid(package);
-    for (sacm::TerminologyPackage& tp : package.terminologyPackages) blank_terminology_package_gids(tp);
-    for (sacm::ArtifactPackage& ap : package.artifactPackages) {
-        blank_element_gid(ap);
-        for (sacm::Artifact& a : ap.artifacts) blank_element_gid(a);
-    }
-    for (sacm::ArgumentPackage& ap : package.argumentPackages) {
-        blank_element_gid(ap);
-        for (sacm::TerminologyPackage& tp : ap.terminologyPackages) blank_terminology_package_gids(tp);
-        for (sacm::Claim& c : ap.claims) blank_element_gid(c);
-        for (sacm::ArgumentReasoning& r : ap.argumentReasonings) blank_element_gid(r);
-        for (sacm::ArtifactReference& r : ap.artifactReferences) blank_element_gid(r);
-        for (sacm::AssertedInference& r : ap.assertedInferences) blank_element_gid(r);
-        for (sacm::AssertedContext& r : ap.assertedContexts) blank_element_gid(r);
-        for (sacm::AssertedEvidence& r : ap.assertedEvidences) blank_element_gid(r);
-    }
-    return package;
-}
-
 } // namespace
 
 // The differential oracle: a multi-edit sequence (top goal, strategy + two
@@ -206,13 +178,19 @@ TEST(LibraryReplayConvergence, MultiEditElementSequenceConvergesWithLegacyReplay
     ASSERT_TRUE(bus->Execute(add_solution, ctx, "tester").success);
     const std::string solution_id = add_solution.GeneratedId();
 
-    // A name edit on G1 (maps cleanly to SetName on both paths) and a content
-    // edit on a freshly-created sub-goal (which has no pre-existing Description
-    // to collide with, unlike G1's `description=` attribute -- see the claim
-    // content/description impedance in src/sacm_adapter/document_edit.h).
+    // A name edit on G1 (maps cleanly to SetName on both paths); a content edit
+    // on G1 itself -- the snapshot's `description=`-only claim, whose Content edit
+    // used to diverge (the library seam overwrote the front Description; the
+    // legacy mutator kept the note and wrote a separate content field). Slice
+    // 3b-1 bridges the Content edit, so this now converges on the raw hash. Plus
+    // a content edit on a freshly-created sub-goal (clean content semantics, no
+    // pre-existing Description) -- both routed through the same bridge.
     core::commands::UpdateElementTextCommand name_edit("G1", core::ElementTextField::Name, "en",
                                                        "Revised top goal");
     ASSERT_TRUE(bus->Execute(name_edit, ctx, "tester").success);
+    core::commands::UpdateElementTextCommand g1_content_edit("G1", core::ElementTextField::Content,
+                                                             "en", "The system is fully safe.");
+    ASSERT_TRUE(bus->Execute(g1_content_edit, ctx, "tester").success);
     core::commands::UpdateElementTextCommand content_edit(sub1_id, core::ElementTextField::Content,
                                                           "en", "The subsystem is acceptably safe.");
     ASSERT_TRUE(bus->Execute(content_edit, ctx, "tester").success);
@@ -272,15 +250,13 @@ TEST(LibraryReplayConvergence, StrategyWithSubGoalsConverges) {
     EXPECT_EQ(*library_hash, *legacy_hash);
 }
 
-// Terminology create + associate: the library replay converges with the legacy
-// replay on CONTENT, but NOT on the raw canonical hash -- the library seams
-// cannot assign the `gid-<id>` the legacy mutators generate (clause 8.2 gid is
-// optional; the library has no create-time gid operation). This test pins that
-// impedance precisely: content parity once gid is normalized away, plus a raw
-// hash divergence proving gid is the *only* residual difference. It does NOT
-// weaken the differential oracle -- it documents a real seam divergence, the
-// resolution of which is a later flip-slice concern.
-TEST(LibraryReplayConvergence, TerminologyCreateAndAssociateConvergeModuloGid) {
+// Terminology create + associate now converges on the RAW canonical hash. The
+// gid-minting CREATE and ASSOCIATE events are bridged through the legacy
+// mutators, which mint the `gid-<id>` (via GenerateUniqueGid) and force the
+// ArtifactReference / AssertedContext gids that the library seams could not
+// assign. Slice 3b-1 resolves impedance 1 from slice 3a -- no gid normalization
+// is needed anymore.
+TEST(LibraryReplayConvergence, TerminologyCreateAndAssociateConverge) {
     auto f = MakeFixture("terminology");
 
     std::string error;
@@ -309,19 +285,83 @@ TEST(LibraryReplayConvergence, TerminologyCreateAndAssociateConvergeModuloGid) {
 
     const std::optional<std::string> library_hash =
         core::library_canonical_hash(core::project_library_package(*library_doc));
-    const std::optional<std::string> legacy_raw_hash = core::library_canonical_hash(legacy.package);
-    const std::optional<std::string> legacy_blanked_hash =
-        core::library_canonical_hash(BlankAllGids(legacy.package));
+    const std::optional<std::string> legacy_hash = core::library_canonical_hash(legacy.package);
     ASSERT_TRUE(library_hash.has_value());
-    ASSERT_TRUE(legacy_raw_hash.has_value());
-    ASSERT_TRUE(legacy_blanked_hash.has_value());
+    ASSERT_TRUE(legacy_hash.has_value());
+    EXPECT_EQ(*library_hash, *legacy_hash);
+}
 
-    // Content converges once the gid the seam cannot assign is normalized away.
-    EXPECT_EQ(*library_hash, *legacy_blanked_hash)
-        << "terminology content diverged beyond gid -- a structural seam problem, not the gid impedance";
-    // ... but the raw hashes differ, confirming gid is the sole residual divergence.
-    EXPECT_NE(*library_hash, *legacy_raw_hash)
-        << "expected the terminology gid impedance to make the raw hashes differ";
+// Focused pin for impedance 2 (claim content vs second-Description slot): G1 is
+// loaded from a `description=` attribute (no `content=`), so the library puts
+// that text in its FRONT Description = the app's content slot. Editing G1's
+// Content used to diverge -- the library seam `apply_text_edit(Content)`
+// overwrote the front Description, while the legacy mutator wrote a separate
+// content field and kept the original as the note. Slice 3b-1 bridges the
+// Content edit through the legacy SetElementTextField, so the raw canonical
+// hashes converge with no gid or slot normalization.
+TEST(LibraryReplayConvergence, ContentEditOnDescriptionOnlyClaimConverges) {
+    auto f = MakeFixture("content_edit_desc_only");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package};
+
+    core::commands::UpdateElementTextCommand content_edit("G1", core::ElementTextField::Content,
+                                                          "en", "The system is fully safe.");
+    ASSERT_TRUE(bus->Execute(content_edit, ctx, "tester").success);
+
+    const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
+    const core::audit::ReplayState legacy = LegacyReplay(f, txns);
+    const std::unique_ptr<sacm_adapter::LibraryDocument> library_doc = LibraryReplay(f, txns);
+    ASSERT_NE(library_doc, nullptr);
+
+    const std::optional<std::string> library_hash =
+        core::library_canonical_hash(core::project_library_package(*library_doc));
+    const std::optional<std::string> legacy_hash = core::library_canonical_hash(legacy.package);
+    ASSERT_TRUE(library_hash.has_value());
+    ASSERT_TRUE(legacy_hash.has_value());
+    EXPECT_EQ(*library_hash, *legacy_hash);
+}
+
+// Focused pin for the visible-context association bridge: "add as visible
+// context" creates an ArtifactReference and an AssertedContext (with the visible
+// marker) carrying legacy-minted gids the library seam could not assign. Slice
+// 3b-1 bridges it, so create-package + create-term + add-as-visible-context
+// converges on the raw canonical hash.
+TEST(LibraryReplayConvergence, AddTerminologyVisibleContextBridgeConverges) {
+    auto f = MakeFixture("terminology_visible_context");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package};
+
+    core::commands::CreateTerminologyPackageCommand create_package("Terms", "Shared definitions.");
+    ASSERT_TRUE(bus->Execute(create_package, ctx, "tester").success);
+    const core::TerminologyPackageRef package_ref = create_package.GeneratedRef();
+
+    core::TerminologyTermDraft draft;
+    draft.value = "ODD";
+    draft.name = "Operational Design Domain";
+    core::commands::CreateTerminologyTermCommand create_term(package_ref, draft);
+    ASSERT_TRUE(bus->Execute(create_term, ctx, "tester").success);
+
+    core::commands::AddTerminologyTermAsVisibleContextCommand add_visible("G1", package_ref,
+                                                                          create_term.GeneratedRef());
+    ASSERT_TRUE(bus->Execute(add_visible, ctx, "tester").success);
+
+    const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
+    const core::audit::ReplayState legacy = LegacyReplay(f, txns);
+    const std::unique_ptr<sacm_adapter::LibraryDocument> library_doc = LibraryReplay(f, txns);
+    ASSERT_NE(library_doc, nullptr);
+
+    const std::optional<std::string> library_hash =
+        core::library_canonical_hash(core::project_library_package(*library_doc));
+    const std::optional<std::string> legacy_hash = core::library_canonical_hash(legacy.package);
+    ASSERT_TRUE(library_hash.has_value());
+    ASSERT_TRUE(legacy_hash.has_value());
+    EXPECT_EQ(*library_hash, *legacy_hash);
 }
 
 // Bridge event: RemoveTerminologyPackage has no parity seam (the library's
