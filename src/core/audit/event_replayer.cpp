@@ -17,6 +17,7 @@
 #include "sacm_adapter/document_edit.h"
 #include "sacm_adapter/library_load.h"
 
+#include <functional>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -88,6 +89,32 @@ std::string FormatSeamFailure(const std::string& seam, std::uint64_t tx_seq, con
     return seam + " failed at " + FormatLocation(tx_seq, event.event_sequence, event.event_type) +
            " (supported=" + (supported ? "true" : "false") + ", applied=" + (applied ? "true" : "false") +
            "): " + SummarizeDiagnostics(diagnostics);
+}
+
+// Shared bridge for library-primary replay. No parity seam exists (the
+// library's equivalent diverges from the legacy mutator -- e.g. it mints no
+// create-time gid, or maps a claim's content/description differently), so
+// project the library to the legacy models, run the SAME legacy mutator the
+// live path uses, then re-derive the library from the serialized package. This
+// keeps library-primary replay converged with the legacy live path for these
+// events. `mutate` receives the projected parser model and package; it returns
+// false (setting `out_error`, already formatted with the event location) to
+// abort. On success the wrapper serializes the mutated package and reloads it
+// back into `document` in place.
+using BridgeMutator =
+    std::function<bool(parser::AssuranceCase&, sacm::AssuranceCasePackage&, std::string&)>;
+
+bool BridgeViaLegacy(sacm_adapter::LibraryDocument& document, const std::string& location,
+                     const BridgeMutator& mutate, std::string& out_error) {
+    parser::AssuranceCase      model   = sacm_adapter::project_case(document);
+    sacm::AssuranceCasePackage package = core::project_library_package(document);
+    if (!mutate(model, package, out_error))
+        return false;
+    if (!sacm_adapter::reload_document(document, sacm::serialize_sacm(package))) {
+        out_error = "Bridge re-derive (reload_document) failed at " + location;
+        return false;
+    }
+    return true;
 }
 
 bool ApplyEvent(ReplayState& state,
@@ -793,14 +820,39 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
                         FormatLocation(tx_seq, event.event_sequence, type);
             return false;
         }
-        const sacm_adapter::EditOutcome outcome = sacm_adapter::apply_text_edit(
-            document, element_id, ToAdapterTextField(field), language, new_value);
-        if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure("apply_text_edit", tx_seq, event, outcome.supported,
-                                          outcome.applied, outcome.diagnostics);
-            return false;
+        // `Name` maps cleanly onto the library seam (SetName). `Content` and
+        // `Description` do NOT: the app models a claim with two text slots
+        // (content = statement, description = note), while SACM/library has an
+        // ordered Description list. A claim loaded from a `description=`
+        // attribute puts that text in the library's FRONT Description = the
+        // app's content slot, so `apply_text_edit(Content)` would overwrite it,
+        // whereas the legacy mutator writes a separate content field and keeps
+        // the note -- a real divergence (see the impedance note in
+        // src/sacm_adapter/document_edit.h). Bridge those two fields through the
+        // legacy `SetElementTextField` so replay reproduces the live path.
+        if (field == core::ElementTextField::Name) {
+            const sacm_adapter::EditOutcome outcome = sacm_adapter::apply_text_edit(
+                document, element_id, ToAdapterTextField(field), language, new_value);
+            if (!outcome.supported || !outcome.applied) {
+                out_error = FormatSeamFailure("apply_text_edit", tx_seq, event, outcome.supported,
+                                              outcome.applied, outcome.diagnostics);
+                return false;
+            }
+            return true;
         }
-        return true;
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate = [&](parser::AssuranceCase& model,
+                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            std::string old_value_unused;
+            std::string set_error;
+            if (!core::SetElementTextField(model, &package, element_id, field, language, new_value,
+                                           old_value_unused, set_error)) {
+                err = "SetElementTextField (bridge) failed at " + location + ": " + set_error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
     }
 
     if (type == "RemoveArgumentPackage") {
@@ -821,13 +873,16 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         return true;
     }
 
-    // ---- Terminology seam events ----------------------------------------
-    // The seams key on a single library ElementId; the payload carries id+gid.
-    // We pass the `id` (the library-generated element id, forced verbatim on the
-    // create events so it matches). The library has no create-time gid, so
-    // terminology-created elements carry no gid -- a documented content-vs-gid
-    // impedance (see src/sacm_adapter/document_edit.h) the convergence test
-    // pins.
+    // ---- Terminology events ---------------------------------------------
+    // The gid-minting CREATE and ASSOCIATE events are BRIDGED: the legacy
+    // `Create*WithIds` / associate mutators mint `gid-<id>` (via
+    // GenerateUniqueGid) and the created ArtifactReference/AssertedContext carry
+    // forced gids, none of which the library seams assign (the library has no
+    // create-time gid operation -- see src/sacm_adapter/document_edit.h). So we
+    // run the SAME legacy mutator onto a projected package and re-derive the
+    // library, reproducing the legacy gids exactly. The terminology
+    // UPDATE/DELETE events below stay on the seams: they operate on existing
+    // ids and converge without a gid op.
 
     if (type == "CreateTerminologyPackage") {
         std::string name, description, generated_id, generated_gid;
@@ -839,14 +894,19 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         if (!require_string("generated_gid", generated_gid))
             return false;
-        const sacm_adapter::TerminologyCreateOutcome outcome =
-            sacm_adapter::apply_create_terminology_package(document, name, description, generated_id);
-        if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure("apply_create_terminology_package", tx_seq, event,
-                                          outcome.supported, outcome.applied, outcome.diagnostics);
-            return false;
-        }
-        return true;
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate = [&](parser::AssuranceCase& /*model*/,
+                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            const core::TerminologyPackageCreateResult result = core::CreateTerminologyPackageWithIds(
+                package, name, description, generated_id, generated_gid);
+            if (!result.success) {
+                err = "CreateTerminologyPackageWithIds (bridge) failed at " + location + ": " +
+                      result.error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
     }
 
     if (type == "UpdateTerminologyPackage") {
@@ -883,15 +943,23 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         if (!require_string("generated_gid", generated_gid))
             return false;
-        const sacm_adapter::TerminologyCreateOutcome outcome =
-            sacm_adapter::apply_create_terminology_category(document, package_id, name, description,
-                                                            generated_id);
-        if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure("apply_create_terminology_category", tx_seq, event,
-                                          outcome.supported, outcome.applied, outcome.diagnostics);
-            return false;
-        }
-        return true;
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate = [&](parser::AssuranceCase& /*model*/,
+                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            core::TerminologyCategoryDraft draft;
+            draft.name        = name;
+            draft.description = description;
+            const core::TerminologyCategoryCreateResult result = core::CreateTerminologyCategoryWithIds(
+                package, core::TerminologyPackageRef{package_id, package_gid}, draft, generated_id,
+                generated_gid);
+            if (!result.success) {
+                err = "CreateTerminologyCategoryWithIds (bridge) failed at " + location + ": " +
+                      result.error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
     }
 
     if (type == "UpdateTerminologyCategory") {
@@ -959,27 +1027,33 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         if (!require_string("generated_gid", generated_gid))
             return false;
-        sacm_adapter::TerminologyTermFields fields;
-        fields.value             = value;
-        fields.name              = name;
-        fields.description       = description;
-        fields.external_reference = external_reference;
-        fields.origin            = origin;
-        auto category_refs_it    = payload.find("category_refs");
+        core::TerminologyTermDraft draft;
+        draft.value             = value;
+        draft.name              = name;
+        draft.description       = description;
+        draft.externalReference = external_reference;
+        draft.origin            = origin;
+        auto category_refs_it   = payload.find("category_refs");
         if (category_refs_it != payload.end() && category_refs_it->is_array()) {
             for (const auto& entry : *category_refs_it) {
                 if (entry.is_string())
-                    fields.category_refs.push_back(entry.get<std::string>());
+                    draft.category_refs.push_back(entry.get<std::string>());
             }
         }
-        const sacm_adapter::TerminologyCreateOutcome outcome =
-            sacm_adapter::apply_create_terminology_term(document, package_id, fields, generated_id);
-        if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure("apply_create_terminology_term", tx_seq, event,
-                                          outcome.supported, outcome.applied, outcome.diagnostics);
-            return false;
-        }
-        return true;
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate = [&](parser::AssuranceCase& /*model*/,
+                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            const core::TerminologyTermCreateResult result = core::CreateTerminologyTermWithIds(
+                package, core::TerminologyPackageRef{package_id, package_gid}, draft, generated_id,
+                generated_gid);
+            if (!result.success) {
+                err = "CreateTerminologyTermWithIds (bridge) failed at " + location + ": " +
+                      result.error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
     }
 
     if (type == "UpdateTerminologyTerm") {
@@ -1046,10 +1120,13 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         return true;
     }
 
+    // Reads the association payload including the FORCED artifact-reference /
+    // asserted-context ids AND gids. The bridged legacy mutators reproduce those
+    // gids verbatim -- the exact data the library seams could not assign.
     auto read_context_association = [&](std::string& element_id, std::string& package_id,
                                         std::string& package_gid, std::string& term_id,
-                                        std::string& term_gid, std::string& artifact_reference_id,
-                                        std::string& asserted_context_id) -> bool {
+                                        std::string& term_gid,
+                                        core::TerminologyContextForcedIds& forced) -> bool {
         if (!require_string("element_id", element_id))
             return false;
         if (!require_string("package_id", package_id))
@@ -1060,63 +1137,71 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         if (!require_string("term_gid", term_gid))
             return false;
-        // Only the ids (not gids) cross into the library; the created ref/context
-        // reuse them verbatim so replay reproduces the legacy element ids.
-        std::string artifact_reference_gid, asserted_context_gid;
-        if (!require_string("artifact_reference_id", artifact_reference_id))
+        if (!require_string("artifact_reference_id", forced.artifact_reference_id))
             return false;
-        if (!require_string("artifact_reference_gid", artifact_reference_gid))
+        if (!require_string("artifact_reference_gid", forced.artifact_reference_gid))
             return false;
-        if (!require_string("asserted_context_id", asserted_context_id))
+        if (!require_string("asserted_context_id", forced.asserted_context_id))
             return false;
-        if (!require_string("asserted_context_gid", asserted_context_gid))
+        if (!require_string("asserted_context_gid", forced.asserted_context_gid))
             return false;
         return true;
     };
 
     if (type == "AssociateTerminologyTermWithElement") {
-        std::string element_id, package_id, package_gid, term_id, term_gid, artifact_reference_id,
-            asserted_context_id;
-        if (!read_context_association(element_id, package_id, package_gid, term_id, term_gid,
-                                      artifact_reference_id, asserted_context_id))
+        std::string element_id, package_id, package_gid, term_id, term_gid;
+        core::TerminologyContextForcedIds forced;
+        if (!read_context_association(element_id, package_id, package_gid, term_id, term_gid, forced))
             return false;
-        const sacm_adapter::TerminologyContextOutcome outcome =
-            sacm_adapter::apply_associate_terminology_term(document, element_id, term_id,
-                                                           artifact_reference_id, asserted_context_id);
-        // An already-associated result is a legitimate no-op success (the legacy
-        // mutator reuses the existing context too).
-        if (!outcome.supported || !(outcome.applied || outcome.already_associated)) {
-            out_error = FormatSeamFailure("apply_associate_terminology_term", tx_seq, event,
-                                          outcome.supported, outcome.applied, outcome.diagnostics);
-            return false;
-        }
-        return true;
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate = [&](parser::AssuranceCase& /*model*/,
+                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            const core::TerminologyContextAssociationResult result =
+                core::AssociateTerminologyTermWithElementWithIds(
+                    package, element_id, core::TerminologyPackageRef{package_id, package_gid},
+                    core::TerminologyTermRef{term_id, term_gid}, forced);
+            if (!result.success) {
+                err = "AssociateTerminologyTermWithElementWithIds (bridge) failed at " + location +
+                      ": " + result.error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
     }
 
     if (type == "AddTerminologyTermAsVisibleContext") {
-        std::string element_id, package_id, package_gid, term_id, term_gid, artifact_reference_id,
-            asserted_context_id;
-        if (!read_context_association(element_id, package_id, package_gid, term_id, term_gid,
-                                      artifact_reference_id, asserted_context_id))
+        std::string element_id, package_id, package_gid, term_id, term_gid;
+        core::TerminologyContextForcedIds forced;
+        if (!read_context_association(element_id, package_id, package_gid, term_id, term_gid, forced))
             return false;
-        const sacm_adapter::TerminologyContextOutcome outcome =
-            sacm_adapter::apply_add_terminology_visible_context(document, element_id, term_id,
-                                                                artifact_reference_id,
-                                                                asserted_context_id);
-        if (!outcome.supported || !(outcome.applied || outcome.already_associated)) {
-            out_error = FormatSeamFailure("apply_add_terminology_visible_context", tx_seq, event,
-                                          outcome.supported, outcome.applied, outcome.diagnostics);
-            return false;
-        }
-        return true;
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate = [&](parser::AssuranceCase& /*model*/,
+                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            // The legacy live path also syncs the parser model
+            // (SyncVisibleTerminologyContextToParser), but that only touches the
+            // projected model -- the bridge re-derives the library from the
+            // serialized package, so only the package mutation matters here.
+            const core::TerminologyContextAssociationResult result =
+                core::AddTerminologyTermAsVisibleContextWithIds(
+                    package, element_id, core::TerminologyPackageRef{package_id, package_gid},
+                    core::TerminologyTermRef{term_id, term_gid}, forced);
+            if (!result.success) {
+                err = "AddTerminologyTermAsVisibleContextWithIds (bridge) failed at " + location +
+                      ": " + result.error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
     }
 
     // ---- Bridge events ---------------------------------------------------
     // No parity seam exists (the library's equivalent diverges from the legacy
     // mutator), so apply the SAME legacy mutator the live path uses onto models
     // projected FROM the library, then re-derive the library from the serialized
-    // package. This keeps library-primary replay converged with the legacy live
-    // path for these events.
+    // package (BridgeViaLegacy). This keeps library-primary replay converged
+    // with the legacy live path for these events.
 
     if (type == "RemoveArtifactPackage") {
         std::string id, gid;
@@ -1124,19 +1209,17 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         if (!require_string("package_gid", gid))
             return false;
-        sacm::AssuranceCasePackage package = core::project_library_package(document);
-        std::string err;
-        if (!core::DeleteArtifactPackage(package, id, gid, err)) {
-            out_error = "DeleteArtifactPackage (bridge) failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
-            return false;
-        }
-        if (!sacm_adapter::reload_document(document, sacm::serialize_sacm(package))) {
-            out_error = "Bridge re-derive (reload_document) failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type);
-            return false;
-        }
-        return true;
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate = [&](parser::AssuranceCase& /*model*/,
+                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            std::string delete_error;
+            if (!core::DeleteArtifactPackage(package, id, gid, delete_error)) {
+                err = "DeleteArtifactPackage (bridge) failed at " + location + ": " + delete_error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
     }
 
     if (type == "RemoveTerminologyPackage") {
@@ -1145,19 +1228,18 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         if (!require_string("package_gid", gid))
             return false;
-        sacm::AssuranceCasePackage package = core::project_library_package(document);
-        std::string err;
-        if (!core::DeleteTerminologyPackage(package, core::TerminologyPackageRef{id, gid}, err)) {
-            out_error = "DeleteTerminologyPackage (bridge) failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
-            return false;
-        }
-        if (!sacm_adapter::reload_document(document, sacm::serialize_sacm(package))) {
-            out_error = "Bridge re-derive (reload_document) failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type);
-            return false;
-        }
-        return true;
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate = [&](parser::AssuranceCase& /*model*/,
+                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            std::string delete_error;
+            if (!core::DeleteTerminologyPackage(package, core::TerminologyPackageRef{id, gid},
+                                                delete_error)) {
+                err = "DeleteTerminologyPackage (bridge) failed at " + location + ": " + delete_error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
     }
 
     if (type == "ApplyProposal") {
@@ -1186,23 +1268,20 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             }
             predetermined_ids[it.key()] = it->get<std::string>();
         }
-        parser::AssuranceCase      model = sacm_adapter::project_case(document);
-        sacm::AssuranceCasePackage package = core::project_library_package(document);
-        reviews::ReviewProposalPatchService patch_service;
-        reviews::ApplyProposalResult        result =
-            patch_service.ApplyProposalWithIds(proposal, model, predetermined_ids);
-        if (!result.success) {
-            out_error = "ApplyProposalWithIds (bridge) failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
-            return false;
-        }
-        core::RebuildSacmArgumentPackageFromParser(model, package);
-        if (!sacm_adapter::reload_document(document, sacm::serialize_sacm(package))) {
-            out_error = "Bridge re-derive (reload_document) failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type);
-            return false;
-        }
-        return true;
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate = [&](parser::AssuranceCase& model,
+                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            reviews::ReviewProposalPatchService patch_service;
+            reviews::ApplyProposalResult        result =
+                patch_service.ApplyProposalWithIds(proposal, model, predetermined_ids);
+            if (!result.success) {
+                err = "ApplyProposalWithIds (bridge) failed at " + location + ": " + result.error;
+                return false;
+            }
+            core::RebuildSacmArgumentPackageFromParser(model, package);
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
     }
 
     if (type == "Undo" || type == "SacmRestoredFromAudit") {
