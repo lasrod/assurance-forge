@@ -36,6 +36,16 @@ public:
     // strictly greater than `up_to_transaction_sequence` are skipped, so
     // passing `UINT64_MAX` replays the entire log.
     //
+    // `from_transaction_sequence` is an EXCLUSIVE lower bound: events with a
+    // `transaction_sequence` less than or equal to it are skipped, because the
+    // supplied snapshot is a *trusted replay root* that already reflects them.
+    // The default (0) replays from the very beginning (sequences start at 1),
+    // matching the "snapshot 0 + full log" behaviour. When replaying from a
+    // trusted baseline at sequence N, pass `from_transaction_sequence = N`.
+    // Undo events are resolved over the replayed window `(from, up_to]` only;
+    // an undo cannot cross a trusted baseline (the baseline has already baked
+    // in every transaction at or before it).
+    //
     // Returns the reconstructed state on success. On the first event that
     // fails to apply, returns an error string containing the offending
     // transaction / event sequence and the underlying mutator error so the
@@ -44,7 +54,8 @@ public:
         const parser::AssuranceCase&         snapshot_model,
         const sacm::AssuranceCasePackage&    snapshot_package,
         const std::vector<AuditTransaction>& transactions,
-        std::uint64_t                        up_to_transaction_sequence);
+        std::uint64_t                        up_to_transaction_sequence,
+        std::uint64_t                        from_transaction_sequence = 0);
 };
 
 } // namespace core::audit

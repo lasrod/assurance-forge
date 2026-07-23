@@ -579,29 +579,35 @@ std::expected<ReplayState, std::string> Replayer::ReplayFrom(
     const parser::AssuranceCase&         snapshot_model,
     const sacm::AssuranceCasePackage&    snapshot_package,
     const std::vector<AuditTransaction>& transactions,
-    std::uint64_t                        up_to_transaction_sequence) {
+    std::uint64_t                        up_to_transaction_sequence,
+    std::uint64_t                        from_transaction_sequence) {
 
     ReplayState state{snapshot_model, snapshot_package};
 
     // Pre-pass: compute the set of transactions cancelled by an active
-    // Undo event (see `undo_resolver.h`). We do this over the FULL log
-    // — not just the [snapshot, up_to_seq] window — so that an Undo
+    // Undo event (see `undo_resolver.h`). We do this over the replayed
+    // window `(from, up_to]` — not just up to `up_to_seq` — so that an Undo
     // emitted *after* `up_to_transaction_sequence` does not retroactively
     // suppress an earlier transaction when the user navigates back to a
     // past point. Honest audit semantics: at any historical point, only
-    // the undos that were already on the books at that point count.
+    // the undos that were already on the books at that point count. Events at
+    // or before `from` are excluded because the trusted replay root has
+    // already baked them in (an undo cannot cross a trusted baseline).
     std::unordered_set<std::uint64_t> skipped;
     {
         std::vector<AuditTransaction> in_window;
         in_window.reserve(transactions.size());
         for (const AuditTransaction& tx : transactions) {
-            if (tx.transaction_sequence <= up_to_transaction_sequence)
+            if (tx.transaction_sequence > from_transaction_sequence &&
+                tx.transaction_sequence <= up_to_transaction_sequence)
                 in_window.push_back(tx);
         }
         skipped = ComputeUndoSkipSet(in_window);
     }
 
     for (const AuditTransaction& tx : transactions) {
+        if (tx.transaction_sequence <= from_transaction_sequence)
+            continue;
         if (tx.transaction_sequence > up_to_transaction_sequence)
             continue;
         if (skipped.count(tx.transaction_sequence) != 0)

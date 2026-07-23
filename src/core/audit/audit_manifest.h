@@ -24,6 +24,14 @@ struct AuditManifest {
     // to the project root.
     std::string current_sacm;
     std::string initial_snapshot_id;
+    // The trusted replay root: the snapshot the verifier and recovery replay
+    // forward from, applying only events after that snapshot's transaction
+    // sequence. Empty means "replay from `initial_snapshot_id`" (snapshot 0 +
+    // the full log), which is the default for every project until a trusted
+    // baseline is promoted (e.g. after a migration). Kept SEPARATE from
+    // `initial_snapshot_id` so the timeline still tags snapshot 0 as the
+    // initial state and the history slider still reconstructs early states.
+    std::string replay_root_snapshot_id;
     std::uint64_t latest_transaction_sequence = 0;
     std::uint64_t latest_event_sequence = 0;
     std::string last_known_raw_file_hash;

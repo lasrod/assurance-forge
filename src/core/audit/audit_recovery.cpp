@@ -2,6 +2,7 @@
 
 #include "core/audit/audit_manifest.h"
 #include "core/audit/audit_paths.h"
+#include "core/audit/audit_snapshot.h"
 #include "core/audit/canonical_model_hash.h"
 #include "core/audit/event_replayer.h"
 #include "core/audit/event_store.h"
@@ -64,9 +65,14 @@ bool RestoreSacmFromAudit(const AssuranceProject& project,
     if (!ReadAuditManifest(project.rootPath, manifest, error))
         return false;
 
+    // Replay from the trusted root (a promoted baseline when present, else
+    // snapshot 0), applying only events after the root's transaction sequence.
+    const ReplayRoot replay_root =
+        ResolveReplayRoot(project.rootPath, manifest.replay_root_snapshot_id, manifest.initial_snapshot_id);
+
     parser::AssuranceCase snapshot_model;
     sacm::AssuranceCasePackage snapshot_package;
-    if (!LoadSnapshotForRestore(project.rootPath, manifest.initial_snapshot_id, snapshot_model,
+    if (!LoadSnapshotForRestore(project.rootPath, replay_root.snapshot_id, snapshot_model,
                                 snapshot_package, error))
         return false;
 
@@ -75,7 +81,8 @@ bool RestoreSacmFromAudit(const AssuranceProject& project,
         return false;
 
     auto replayed = Replayer::ReplayFrom(snapshot_model, snapshot_package, store->Transactions(),
-                                         std::numeric_limits<std::uint64_t>::max());
+                                         std::numeric_limits<std::uint64_t>::max(),
+                                         replay_root.from_transaction_sequence);
     if (!replayed) {
         error = "Replay failed: " + replayed.error();
         return false;

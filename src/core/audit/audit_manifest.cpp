@@ -36,6 +36,7 @@ std::string SerializeAuditManifest(const AuditManifest& m) {
     j["created_by"] = m.created_by;
     j["current_sacm"] = m.current_sacm;
     j["initial_snapshot_id"] = m.initial_snapshot_id;
+    j["replay_root_snapshot_id"] = m.replay_root_snapshot_id;
     j["latest_transaction_sequence"] = m.latest_transaction_sequence;
     j["latest_event_sequence"] = m.latest_event_sequence;
     j["last_known_raw_file_hash"] = m.last_known_raw_file_hash;
@@ -64,6 +65,7 @@ bool ParseAuditManifest(const std::string& text, AuditManifest& out, std::string
     out.created_by = ReadOr<std::string>(j, "created_by", {});
     out.current_sacm = ReadOr<std::string>(j, "current_sacm", {});
     out.initial_snapshot_id = ReadOr<std::string>(j, "initial_snapshot_id", {});
+    out.replay_root_snapshot_id = ReadOr<std::string>(j, "replay_root_snapshot_id", {});
     out.latest_transaction_sequence = ReadOr<std::uint64_t>(j, "latest_transaction_sequence", 0);
     out.latest_event_sequence = ReadOr<std::uint64_t>(j, "latest_event_sequence", 0);
     out.last_known_raw_file_hash = ReadOr<std::string>(j, "last_known_raw_file_hash", {});
