@@ -180,15 +180,20 @@ bool MigrateStrategyEncodingIfNeeded(const AssuranceProject& project,
     if (!ReadAuditManifest(project.rootPath, manifest, error))
         return false;
 
+    // Only the manifest's tracked current SACM is audited: verify and the trusted
+    // baseline are keyed to it. Skip unless the file the caller opened is that one,
+    // so we never rewrite (or take a baseline of) a SACM this audit store does not
+    // cover -- e.g. a second argument file or a stale manifest.
+    if (manifest.current_sacm.empty() || sacm_relative_path.generic_string() != manifest.current_sacm)
+        return true;
+
     // With no transactions, replay reproduces snapshot 0 verbatim (nothing is
     // re-encoded through the current factory), so the legacy bytes still match --
     // there is no divergence to heal and nothing to migrate yet.
     if (manifest.latest_transaction_sequence == 0)
         return true;
-    if (manifest.current_sacm.empty())
-        return true;
 
-    const std::filesystem::path sacm_abs = project.rootPath / manifest.current_sacm;
+    const std::filesystem::path sacm_abs = project.rootPath / sacm_relative_path;
     if (!std::filesystem::exists(sacm_abs))
         return true;
 

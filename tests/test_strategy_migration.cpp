@@ -332,3 +332,28 @@ TEST(StrategyMigration, MigratesLegacyProjectAndVerifyConverges) {
     ASSERT_TRUE(core::audit::MigrateStrategyEncodingIfNeeded(f.project, f.sacm_rel, again, error)) << error;
     EXPECT_FALSE(again.migrated);
 }
+
+TEST(StrategyMigration, SkipsWhenPathIsNotTheAuditedSacm) {
+    Fixture f = MakeFixture("wrong_path");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package};
+    core::commands::CreateChildElementCommand add_strategy("G1", core::NewElementKind::Strategy);
+    ASSERT_TRUE(bus->Execute(add_strategy, ctx, "tester").success);
+    const std::string strategy_id = add_strategy.GeneratedId();
+    core::commands::CreateChildElementCommand add_sub1(strategy_id, core::NewElementKind::Goal);
+    ASSERT_TRUE(bus->Execute(add_sub1, ctx, "tester").success);
+
+    WriteLegacyStrategyOnDisk(f.sacm_abs, strategy_id, add_sub1.GeneratedId(), add_sub1.GeneratedId());
+
+    // A path that is not the manifest's current_sacm must never be migrated -- the
+    // audit store does not cover it, so rewriting it would corrupt an unrelated file.
+    core::audit::StrategyMigrationResult migration;
+    ASSERT_TRUE(core::audit::MigrateStrategyEncodingIfNeeded(f.project, "some-other-argument.sacm",
+                                                            migration, error))
+        << error;
+    EXPECT_FALSE(migration.migrated);
+    EXPECT_TRUE(migration.baseline_snapshot_id.empty());
+}
