@@ -11,6 +11,7 @@
 #include "parser/xml_parser.h"
 #include "sacm/sacm_parser.h"
 #include "sacm/sacm_serializer.h"
+#include "sacm_adapter/library_load.h"
 #include "core/sha256.h"
 
 #include <cstdint>
@@ -18,18 +19,6 @@
 #include <limits>
 
 namespace core::audit {
-
-namespace {
-
-bool LoadSnapshotForRestore(const std::filesystem::path& project_root,
-                            const std::string& snapshot_id,
-                            parser::AssuranceCase& out_model,
-                            sacm::AssuranceCasePackage& out_package,
-                            std::string& out_error) {
-    return LoadSnapshotModels(SnapshotSacmPath(project_root, snapshot_id), out_model, out_package, out_error);
-}
-
-} // namespace
 
 bool RestoreSacmFromAudit(const AssuranceProject& project,
                           const std::filesystem::path& sacm_relative_path,
@@ -57,23 +46,28 @@ bool RestoreSacmFromAudit(const AssuranceProject& project,
     const ReplayRoot replay_root =
         ResolveReplayRoot(project.rootPath, manifest.replay_root_snapshot_id, manifest.initial_snapshot_id);
 
-    parser::AssuranceCase snapshot_model;
-    sacm::AssuranceCasePackage snapshot_package;
-    if (!LoadSnapshotForRestore(project.rootPath, replay_root.snapshot_id, snapshot_model,
-                                snapshot_package, error))
+    // Phase 1b flip: load the trusted-root snapshot as a library document and
+    // replay forward through the library (`ReplayToLibrary`).
+    const std::filesystem::path snapshot_path =
+        SnapshotSacmPath(project.rootPath, replay_root.snapshot_id);
+    sacm_adapter::LoadOutcome snapshot = sacm_adapter::load_document(snapshot_path);
+    if (!snapshot.ok || snapshot.document == nullptr) {
+        error = "Failed to load snapshot through the library: " + snapshot_path.string();
         return false;
+    }
 
     auto store = EventStore::Open(project.rootPath, error);
     if (!store)
         return false;
 
-    auto replayed = Replayer::ReplayFrom(snapshot_model, snapshot_package, store->Transactions(),
-                                         std::numeric_limits<std::uint64_t>::max(),
-                                         replay_root.from_transaction_sequence);
+    auto replayed = Replayer::ReplayToLibrary(std::move(snapshot.document), store->Transactions(),
+                                              std::numeric_limits<std::uint64_t>::max(),
+                                              replay_root.from_transaction_sequence);
     if (!replayed) {
         error = "Replay failed: " + replayed.error();
         return false;
     }
+    const sacm::AssuranceCasePackage replayed_package = core::project_library_package(**replayed);
 
     // Capture the on-disk hash BEFORE rewriting, so the audit event records
     // what state was overwritten. Best effort: missing/unparsable files
@@ -93,8 +87,8 @@ bool RestoreSacmFromAudit(const AssuranceProject& project,
     // the restored file is then legacy XML, which the audit still reads through
     // the library and verifies consistently; the format difference is benign.
     // (Recovery replays legacy events, so there is no unknown content to lose.)
-    std::optional<std::string> library_xml = core::library_xmi_from_package(replayed->package);
-    const std::string xml = library_xml.value_or(sacm::serialize_sacm(replayed->package));
+    std::optional<std::string> library_xml = core::library_xmi_from_package(replayed_package);
+    const std::string xml = library_xml.value_or(sacm::serialize_sacm(replayed_package));
     auto library_hash = core::library_canonical_hash_from_xml(xml);
     if (!library_hash) {
         error = "Failed to load restored SACM through the library for hashing";

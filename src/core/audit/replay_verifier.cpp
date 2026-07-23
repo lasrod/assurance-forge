@@ -11,6 +11,7 @@
 #include "parser/xml_parser.h"
 #include "sacm/sacm_parser.h"
 #include "sacm/sacm_serializer.h"
+#include "sacm_adapter/library_load.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -31,18 +32,6 @@ const char* ToString(DivergenceCause cause) {
     }
     return "Unknown";
 }
-
-namespace {
-
-bool LoadSnapshot(const std::filesystem::path& project_root,
-                  const std::string& snapshot_id,
-                  parser::AssuranceCase& out_model,
-                  sacm::AssuranceCasePackage& out_package,
-                  std::string& out_error) {
-    return LoadSnapshotModels(SnapshotSacmPath(project_root, snapshot_id), out_model, out_package, out_error);
-}
-
-} // namespace
 
 ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
     ReplayVerificationResult result;
@@ -81,21 +70,24 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
     const ReplayRoot replay_root =
         ResolveReplayRoot(project.rootPath, manifest.replay_root_snapshot_id, manifest.initial_snapshot_id);
 
-    parser::AssuranceCase snapshot_model;
-    sacm::AssuranceCasePackage snapshot_package;
-    {
-        std::string err;
-        if (!LoadSnapshot(project.rootPath, replay_root.snapshot_id, snapshot_model, snapshot_package,
-                          err)) {
-            result.success = false;
-            result.ran = true;
-            result.cause = DivergenceCause::SnapshotMissing;
-            result.diagnostics.emplace_back(err);
-            return result;
-        }
+    // Phase 1b flip: load the trusted-root snapshot as a library document and
+    // replay the log forward THROUGH the library (`ReplayToLibrary`). The library
+    // is now the replay source of truth; `ReplayFrom` and the legacy models
+    // survive only as the convergence oracle's reference (tests/test_library_
+    // replay_convergence.cpp).
+    const std::filesystem::path snapshot_path =
+        SnapshotSacmPath(project.rootPath, replay_root.snapshot_id);
+    sacm_adapter::LoadOutcome snapshot = sacm_adapter::load_document(snapshot_path);
+    if (!snapshot.ok || snapshot.document == nullptr) {
+        result.success = false;
+        result.ran = true;
+        result.cause = DivergenceCause::SnapshotMissing;
+        result.diagnostics.emplace_back("Failed to load snapshot through the library: " +
+                                        snapshot_path.string());
+        return result;
     }
     result.snapshot_canonical_hash =
-        core::library_canonical_hash(snapshot_package).value_or(CanonicalModelHash(snapshot_package));
+        core::library_canonical_hash(core::project_library_package(*snapshot.document)).value_or(std::string());
 
     std::unique_ptr<EventStore> store;
     {
@@ -110,9 +102,9 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
         }
     }
 
-    auto replayed = Replayer::ReplayFrom(snapshot_model, snapshot_package, store->Transactions(),
-                                         std::numeric_limits<std::uint64_t>::max(),
-                                         replay_root.from_transaction_sequence);
+    auto replayed = Replayer::ReplayToLibrary(std::move(snapshot.document), store->Transactions(),
+                                              std::numeric_limits<std::uint64_t>::max(),
+                                              replay_root.from_transaction_sequence);
     if (!replayed) {
         result.success = false;
         result.ran = true;
@@ -120,13 +112,10 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
         result.diagnostics.emplace_back("Replay failed: " + replayed.error());
         return result;
     }
-    // Phase 9 Stage 6: normalize the replayed package by hashing it through the
-    // library, the same derivation the on-disk read and the manifest cache use,
-    // so all three converge regardless of the projection-vs-legacy baseline.
-    // (CanonicalModelHash is not invariant under a plain serialize/reparse, so
-    // both sides must go through the identical library projection.)
+    // Hash the replayed library the same way the on-disk read and the manifest
+    // cache derive theirs (`library_canonical_hash`), so all three converge.
     {
-        auto library_hash = core::library_canonical_hash(replayed->package);
+        auto library_hash = core::library_canonical_hash(core::project_library_package(**replayed));
         if (!library_hash) {
             result.success = false;
             result.ran = true;
