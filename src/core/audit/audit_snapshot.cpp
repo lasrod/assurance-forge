@@ -7,7 +7,10 @@
 #include "core/project_file_io.h"
 #include "core/sha256.h"
 #include "core/time_utils.h"
+#include "parser/xml_parser.h"
 #include "sacm/sacm_parser.h"
+#include "sacm_adapter/case_projection.h"
+#include "sacm_adapter/library_load.h"
 
 #include <nlohmann/json.hpp>
 
@@ -277,6 +280,36 @@ ReplayRoot ResolveReplayRoot(const std::filesystem::path& project_root,
         root.from_transaction_sequence = 0;
     }
     return root;
+}
+
+bool LoadSnapshotModels(const std::filesystem::path& sacm_path,
+                        parser::AssuranceCase& out_model,
+                        sacm::AssuranceCasePackage& out_package,
+                        std::string& error) {
+    // Prefer the library: it reads both legacy XML and library XMI, so a snapshot
+    // saved as library XMI (Stage 6+) loads with full content instead of the
+    // near-empty result the legacy package parser returns for XMI.
+    sacm_adapter::LoadOutcome outcome = sacm_adapter::load_document(sacm_path);
+    if (outcome.ok && outcome.document != nullptr) {
+        out_model = sacm_adapter::project_case(*outcome.document);
+        out_package = core::project_library_package_with_tags(*outcome.document);
+        return true;
+    }
+
+    // Legacy fallback: the library could not read this snapshot.
+    auto pkg = sacm::parse_sacm(sacm_path.string());
+    if (!pkg) {
+        error = "Failed to parse snapshot SACM at " + sacm_path.string() + ": " + pkg.error();
+        return false;
+    }
+    auto ac = parser::parse_sacm_xml(sacm_path.string());
+    if (!ac) {
+        error = "Failed to parse snapshot parser model at " + sacm_path.string() + ": " + ac.error();
+        return false;
+    }
+    out_package = std::move(*pkg);
+    out_model = std::move(*ac);
+    return true;
 }
 
 } // namespace core::audit

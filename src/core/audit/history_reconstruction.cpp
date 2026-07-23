@@ -2,6 +2,7 @@
 
 #include "core/argument_package_projection.h"
 #include "core/audit/audit_paths.h"
+#include "core/audit/audit_snapshot.h"
 #include "core/audit/event_store.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_parser.h"
@@ -14,16 +15,11 @@ namespace {
 
 std::expected<ReplayState, std::string> LoadSnapshot(const std::filesystem::path& project_root,
                                                      const std::string& snapshot_id) {
-    const std::filesystem::path sacm_path = SnapshotSacmPath(project_root, snapshot_id);
-    auto pkg = sacm::parse_sacm(sacm_path.string());
-    if (!pkg)
-        return std::unexpected("Failed to parse snapshot SACM at " + sacm_path.string() + ": " +
-                               pkg.error());
-    auto ac = parser::parse_sacm_xml(sacm_path.string());
-    if (!ac)
-        return std::unexpected("Failed to parse snapshot parser model at " + sacm_path.string() + ": " +
-                               ac.error());
-    return ReplayState{std::move(*ac), std::move(*pkg)};
+    ReplayState state;
+    std::string error;
+    if (!LoadSnapshotModels(SnapshotSacmPath(project_root, snapshot_id), state.model, state.package, error))
+        return std::unexpected(std::move(error));
+    return state;
 }
 
 } // namespace

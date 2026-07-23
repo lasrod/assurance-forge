@@ -1,5 +1,8 @@
 #pragma once
 
+#include "parser/xml_parser.h"
+#include "sacm/sacm_model.h"
+
 #include <cstdint>
 #include <filesystem>
 #include <string>
@@ -79,5 +82,16 @@ struct ReplayRoot {
 ReplayRoot ResolveReplayRoot(const std::filesystem::path& project_root,
                              const std::string& replay_root_snapshot_id,
                              const std::string& initial_snapshot_id);
+
+// Load a snapshot SACM file into the legacy (model, package) pair, preferring the
+// SACM library so a library-XMI snapshot -- which the legacy `sacm::parse_sacm`
+// reads near-empty -- loads with full content. Falls back to the legacy parsers
+// only when the library cannot read the file, so a legacy-XML snapshot still
+// loads. Returns false with `error` set only when both paths fail. Shared by the
+// verifier, recovery, and history snapshot loaders (Phase 1b).
+bool LoadSnapshotModels(const std::filesystem::path& sacm_path,
+                        parser::AssuranceCase& out_model,
+                        sacm::AssuranceCasePackage& out_package,
+                        std::string& error);
 
 } // namespace core::audit
