@@ -64,4 +64,20 @@ bool CreateUserSnapshot(const std::filesystem::path& project_root,
                         SnapshotMetadata& out_metadata,
                         std::string& error);
 
+// The trusted replay root a project should replay forward from.
+struct ReplayRoot {
+    std::string   snapshot_id;                     // the snapshot to load as the base state
+    std::uint64_t from_transaction_sequence = 0;   // exclusive floor: replay events after this
+};
+
+// Resolve the trusted replay root. Prefers `replay_root_snapshot_id` (a promoted
+// trusted baseline); when empty, falls back to `initial_snapshot_id` (snapshot 0,
+// floor 0 = replay the full log). The floor is the root snapshot's own
+// transaction sequence. If the chosen root's metadata cannot be read, falls back
+// to the initial snapshot with floor 0 -- never trust a floor we cannot verify,
+// so the worst case is replaying the entire log (today's behaviour).
+ReplayRoot ResolveReplayRoot(const std::filesystem::path& project_root,
+                             const std::string& replay_root_snapshot_id,
+                             const std::string& initial_snapshot_id);
+
 } // namespace core::audit

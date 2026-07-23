@@ -1,6 +1,7 @@
 #include "core/element_factory.h"
 
 #include "core/acp/assurance_claim_point.h"
+#include "sacm_adapter/gsn_role_tag.h"
 
 #include <algorithm>
 #include <cctype>
@@ -208,6 +209,142 @@ void MirrorEvidence(sacm::ArgumentPackage* ap, const parser::SacmElement& rel) {
 
 namespace {
 
+// A GSN strategy uses the standard single-inference encoding: it is created as a
+// standalone ArgumentReasoning carrying a `strategyTarget` tag (the goal it will
+// support), with NO inference until its first sub-goal materializes one. The
+// package gets the reasoning + tag; the render model gets the reasoning plus a
+// sourceless placeholder inference (matching core::SynthesizeBareStrategyPlacements)
+// so the strategy renders under its goal until a sub-goal makes it real.
+bool InstallStrategy(parser::AssuranceCase& ac,
+                     sacm::ArgumentPackage* ap,
+                     const std::string& goal_id,
+                     const std::string& element_id) {
+    parser::SacmElement reasoning;
+    reasoning.id = element_id;
+    reasoning.type = "argumentreasoning";
+    reasoning.name = DefaultNameFor(NewElementKind::Strategy);
+
+    parser::SacmElement placeholder;
+    placeholder.id = element_id + "__pending_inference";
+    placeholder.type = "assertedinference";
+    placeholder.reasoning_ref = element_id;
+    placeholder.target_refs.push_back(goal_id);
+
+    if (ap) {
+        MirrorReasoning(ap, reasoning);
+        // Record the target goal on the package reasoning so the first sub-goal
+        // can materialize the inference. A deterministic explicit id (not a
+        // generated_N) survives the save/reload round-trip without the library
+        // re-minting and colliding.
+        for (sacm::ArgumentReasoning& r : ap->argumentReasonings) {
+            if (r.id == element_id) {
+                r.taggedValues.push_back(sacm::TaggedValue{.id = element_id + "__strategyTarget",
+                                                           .key = sacm_adapter::kGsnStrategyTargetTagKey,
+                                                           .value = goal_id});
+                break;
+            }
+        }
+    }
+
+    ac.elements.push_back(std::move(reasoning));
+    ac.elements.push_back(std::move(placeholder));
+    return true;
+}
+
+// A sub-goal added under a strategy becomes a source of the strategy's single
+// inference. The first sub-goal materializes {target = the goal the strategy
+// supports (its strategyTarget tag), reasoning = strategy, source = sub-goal},
+// consuming the render placeholder; later sub-goals extend that inference's
+// sources. Mirrors the proven seam sacm_adapter::apply_add_subgoal_under_strategy.
+bool InstallSubGoalUnderStrategy(parser::AssuranceCase& ac,
+                                 sacm::ArgumentPackage* ap,
+                                 const std::string& strategy_id,
+                                 const std::string& element_id,
+                                 const std::string& relationship_id,
+                                 std::string& out_error,
+                                 std::string* out_created_relationship_id) {
+    const std::string placeholder_id = strategy_id + "__pending_inference";
+
+    // The strategy's real (materialized) inference, if one exists yet.
+    parser::SacmElement* existing = nullptr;
+    for (parser::SacmElement& e : ac.elements) {
+        if (e.type == "assertedinference" && e.reasoning_ref == strategy_id && e.id != placeholder_id) {
+            existing = &e;
+            break;
+        }
+    }
+
+    parser::SacmElement goal;
+    goal.id = element_id;
+    goal.type = "claim";
+    goal.name = DefaultNameFor(NewElementKind::Goal);
+
+    if (existing != nullptr) {
+        // Later sub-goal: extend the existing inference's sources (model + package).
+        existing->source_refs.push_back(element_id);
+        if (ap) {
+            for (sacm::AssertedInference& ai : ap->assertedInferences) {
+                if (ai.id == existing->id) {
+                    ai.sources.push_back(element_id);
+                    break;
+                }
+            }
+            MirrorClaim(ap, goal);
+        }
+        ac.elements.push_back(std::move(goal));
+        if (out_created_relationship_id)
+            out_created_relationship_id->clear();  // extending an existing inference creates no relationship
+        return true;
+    }
+
+    // First sub-goal: materialize. The inference targets the goal the strategy was
+    // created to support (its strategyTarget tag on the package reasoning).
+    std::string target_goal;
+    if (ap) {
+        for (const sacm::ArgumentReasoning& r : ap->argumentReasonings) {
+            if (r.id != strategy_id)
+                continue;
+            for (const sacm::TaggedValue& tag : r.taggedValues) {
+                if (tag.key == sacm_adapter::kGsnStrategyTargetTagKey) {
+                    target_goal = tag.value;
+                    break;
+                }
+            }
+            break;
+        }
+    }
+    if (target_goal.empty()) {
+        out_error = "Strategy has no target goal recorded; cannot materialize its inference.";
+        return false;
+    }
+    if (relationship_id.empty()) {
+        out_error = "Materializing a strategy inference requires a relationship id.";
+        return false;
+    }
+
+    // Consume the render-only placeholder (its role is taken over by the real inference).
+    ac.elements.erase(std::remove_if(ac.elements.begin(), ac.elements.end(),
+                                     [&](const parser::SacmElement& e) { return e.id == placeholder_id; }),
+                      ac.elements.end());
+
+    parser::SacmElement inference;
+    inference.id = relationship_id;
+    inference.type = "assertedinference";
+    inference.reasoning_ref = strategy_id;
+    inference.target_refs.push_back(target_goal);
+    inference.source_refs.push_back(element_id);
+
+    if (ap) {
+        MirrorClaim(ap, goal);
+        MirrorInference(ap, inference);
+    }
+    ac.elements.push_back(std::move(goal));
+    ac.elements.push_back(std::move(inference));
+    if (out_created_relationship_id)
+        *out_created_relationship_id = relationship_id;
+    return true;
+}
+
 // Shared installation logic: validate parent, then build the new element +
 // relationship using the supplied ids and install into both models. Both the
 // id-generating `AddChildElement` and the replay-only `AddChildElementWithIds`
@@ -218,13 +355,19 @@ bool InstallChildElement(parser::AssuranceCase& ac,
                          NewElementKind kind,
                          const std::string& element_id,
                          const std::string& relationship_id,
-                         std::string& out_error) {
+                         std::string& out_error,
+                         std::string* out_created_relationship_id = nullptr) {
+    if (out_created_relationship_id)
+        out_created_relationship_id->clear();
     if (parent_id.empty()) {
         out_error = "No parent element selected.";
         return false;
     }
-    if (element_id.empty() || relationship_id.empty()) {
-        out_error = "Element and relationship ids must be non-empty.";
+    // A strategy (and a sub-goal that extends an existing strategy inference)
+    // creates no relationship, so only the element id is universally required;
+    // the relationship id is checked per-branch where one is actually created.
+    if (element_id.empty()) {
+        out_error = "Element id must be non-empty.";
         return false;
     }
 
@@ -246,6 +389,21 @@ bool InstallChildElement(parser::AssuranceCase& ac,
     }
 
     sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, parent_id);
+
+    // GSN strategies use the single-inference encoding: a strategy is a bare
+    // ArgumentReasoning + strategyTarget tag; a sub-goal under a strategy is a
+    // source of that strategy's single inference (materialize/extend).
+    if (kind == NewElementKind::Strategy)
+        return InstallStrategy(ac, ap, parent_id, element_id);
+    if (kind == NewElementKind::Goal && ptype == "argumentreasoning")
+        return InstallSubGoalUnderStrategy(ac, ap, parent_id, element_id, relationship_id, out_error,
+                                           out_created_relationship_id);
+
+    // Every other child creates its own relationship, which requires an id.
+    if (relationship_id.empty()) {
+        out_error = "Relationship id must be non-empty.";
+        return false;
+    }
 
     parser::SacmElement new_elem;
     new_elem.id = element_id;
@@ -318,6 +476,8 @@ bool InstallChildElement(parser::AssuranceCase& ac,
 
     ac.elements.push_back(std::move(new_elem));
     ac.elements.push_back(std::move(rel));
+    if (out_created_relationship_id)
+        *out_created_relationship_id = relationship_id;
     return true;
 }
 
@@ -466,11 +626,15 @@ bool AddChildElement(parser::AssuranceCase& ac,
     existing_ids.insert(element_id);
     std::string relationship_id = GenerateUniqueId(existing_ids, ScopedRelationshipPrefixFor(ap));
 
-    if (!InstallChildElement(ac, pkg, parent_id, kind, element_id, relationship_id, out_error))
+    // A strategy and an inference-extending sub-goal create no relationship, so the
+    // event must record an empty relationship id -- take the id actually created.
+    std::string created_relationship_id;
+    if (!InstallChildElement(ac, pkg, parent_id, kind, element_id, relationship_id, out_error,
+                             &created_relationship_id))
         return false;
 
     out_new_id = std::move(element_id);
-    out_new_relationship_id = std::move(relationship_id);
+    out_new_relationship_id = std::move(created_relationship_id);
     return true;
 }
 

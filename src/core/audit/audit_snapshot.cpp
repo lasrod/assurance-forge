@@ -252,4 +252,31 @@ bool CreateUserSnapshot(const std::filesystem::path& project_root,
     return true;
 }
 
+ReplayRoot ResolveReplayRoot(const std::filesystem::path& project_root,
+                             const std::string& replay_root_snapshot_id,
+                             const std::string& initial_snapshot_id) {
+    ReplayRoot root;
+    root.snapshot_id = replay_root_snapshot_id.empty() ? initial_snapshot_id : replay_root_snapshot_id;
+    root.from_transaction_sequence = 0;
+
+    // The initial snapshot (or an unset root) is the sequence-0 base: replay the
+    // full log. Only a distinct trusted baseline carries a non-zero floor.
+    if (root.snapshot_id.empty() || root.snapshot_id == initial_snapshot_id) {
+        root.snapshot_id = initial_snapshot_id;
+        return root;
+    }
+
+    SnapshotMetadata metadata;
+    std::string      error;
+    if (ReadSnapshotMetadata(project_root, root.snapshot_id, metadata, error)) {
+        root.from_transaction_sequence = metadata.transaction_sequence;
+    } else {
+        // Cannot verify the baseline's floor: fall back to the initial snapshot
+        // and replay everything rather than trust an unknown floor.
+        root.snapshot_id = initial_snapshot_id;
+        root.from_transaction_sequence = 0;
+    }
+    return root;
+}
+
 } // namespace core::audit

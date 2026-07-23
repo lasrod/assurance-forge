@@ -2,6 +2,7 @@
 
 #include "core/audit/audit_manifest.h"
 #include "core/audit/audit_paths.h"
+#include "core/audit/audit_snapshot.h"
 #include "core/audit/canonical_model_hash.h"
 #include "core/audit/event_replayer.h"
 #include "core/audit/event_store.h"
@@ -88,11 +89,16 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
     }
     result.manifest_canonical_hash = manifest.last_known_canonical_model_hash;
 
+    // Replay from the trusted root (a promoted baseline when present, else
+    // snapshot 0), applying only events after the root's transaction sequence.
+    const ReplayRoot replay_root =
+        ResolveReplayRoot(project.rootPath, manifest.replay_root_snapshot_id, manifest.initial_snapshot_id);
+
     parser::AssuranceCase snapshot_model;
     sacm::AssuranceCasePackage snapshot_package;
     {
         std::string err;
-        if (!LoadSnapshot(project.rootPath, manifest.initial_snapshot_id, snapshot_model, snapshot_package,
+        if (!LoadSnapshot(project.rootPath, replay_root.snapshot_id, snapshot_model, snapshot_package,
                           err)) {
             result.success = false;
             result.ran = true;
@@ -118,7 +124,8 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
     }
 
     auto replayed = Replayer::ReplayFrom(snapshot_model, snapshot_package, store->Transactions(),
-                                         std::numeric_limits<std::uint64_t>::max());
+                                         std::numeric_limits<std::uint64_t>::max(),
+                                         replay_root.from_transaction_sequence);
     if (!replayed) {
         result.success = false;
         result.ran = true;

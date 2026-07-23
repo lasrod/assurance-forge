@@ -10,6 +10,7 @@
 #include "core/commands/element_commands.h"
 #include "core/commands/terminology_commands.h"
 #include "core/element_factory.h"
+#include "core/library_package_projection.h"
 #include "core/project_model.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_parser.h"
@@ -125,6 +126,72 @@ TEST(EventReplayer, ReplaysSingleCreateChildToMatchLiveState) {
         if (e.id == cmd.GeneratedId() && e.type == "argumentreasoning") { found = true; break; }
     }
     EXPECT_TRUE(found) << "replayed strategy " << cmd.GeneratedId() << " missing";
+}
+
+namespace {
+
+int CountStrategyInferences(const sacm::AssuranceCasePackage& package, const std::string& strategy_id) {
+    int count = 0;
+    for (const auto& ap : package.argumentPackages)
+        for (const auto& inference : ap.assertedInferences)
+            if (inference.reasoning == strategy_id)
+                ++count;
+    return count;
+}
+
+} // namespace
+
+// A strategy with multiple sub-goals uses the single-inference encoding on BOTH
+// the live edit and replay -- add-strategy records no relationship, the first
+// sub-goal materializes the inference, later ones extend it -- so the replayed
+// canonical hash matches the live one. This is the audit-integrity guarantee for
+// the encoding change: without it, library-primary replay would diverge on any
+// case containing a strategy. Phase 9 Stage 7 (SACM23-INT-001).
+TEST(EventReplayer, ReplaysStrategyWithSubGoalsMatchesCanonicalHash) {
+    auto f = MakeFixture("strategy_subgoals");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+
+    core::commands::CommandContext ctx{f.model, f.package};
+
+    core::commands::CreateChildElementCommand add_strategy("G1", core::NewElementKind::Strategy);
+    ASSERT_TRUE(bus->Execute(add_strategy, ctx, "tester").success);
+    const std::string strategy_id = add_strategy.GeneratedId();
+    EXPECT_TRUE(add_strategy.GeneratedRelationshipId().empty()) << "add-strategy records no relationship";
+
+    core::commands::CreateChildElementCommand add_sub1(strategy_id, core::NewElementKind::Goal);
+    ASSERT_TRUE(bus->Execute(add_sub1, ctx, "tester").success);
+    EXPECT_FALSE(add_sub1.GeneratedRelationshipId().empty()) << "first sub-goal materializes (records) the inference";
+
+    core::commands::CreateChildElementCommand add_sub2(strategy_id, core::NewElementKind::Goal);
+    ASSERT_TRUE(bus->Execute(add_sub2, ctx, "tester").success);
+    EXPECT_TRUE(add_sub2.GeneratedRelationshipId().empty()) << "later sub-goal extends; records no relationship";
+
+    // The live edit produced exactly one inference for the strategy.
+    EXPECT_EQ(CountStrategyInferences(f.package, strategy_id), 1);
+
+    // Replay from snapshot zero reconstructs the same package by construction
+    // (record and replay both route through the single-inference factory).
+    auto snapshot = LoadSnapshotState(f.project.rootPath, core::audit::kInitialSnapshotId);
+    auto replayed = core::audit::Replayer::ReplayFrom(
+        snapshot.model, snapshot.package, bus->Store().Transactions(),
+        std::numeric_limits<std::uint64_t>::max());
+    ASSERT_TRUE(replayed.has_value()) << (replayed.has_value() ? "" : replayed.error());
+
+    EXPECT_EQ(CountStrategyInferences(replayed->package, strategy_id), 1)
+        << "replay must reproduce the single-inference encoding";
+
+    // Both the legacy canonical hash and the library-derived hash (the one the
+    // audit chain actually records) converge across live and replay.
+    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package),
+              core::audit::CanonicalModelHash(f.package));
+    const auto live_library_hash = core::library_canonical_hash(f.package);
+    const auto replayed_library_hash = core::library_canonical_hash(replayed->package);
+    ASSERT_TRUE(live_library_hash.has_value());
+    ASSERT_TRUE(replayed_library_hash.has_value());
+    EXPECT_EQ(*replayed_library_hash, *live_library_hash);
 }
 
 TEST(EventReplayer, ReplaysCreateChainThenRemoveAndMatchesCanonicalHash) {
