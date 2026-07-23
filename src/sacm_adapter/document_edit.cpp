@@ -720,8 +720,9 @@ DeleteOutcome apply_delete_package(LibraryDocument& document, const std::string&
 
     const sacm::commands::MutationResult result = doc.apply(sacm::commands::DeleteElement{
         .target = sacm::model::ElementId(package_id),
-        // Drop referencing relationships rather than reject, matching the legacy
-        // package-removal helpers.
+        // Drop referencing relationships rather than reject, so no relationship is
+        // left dangling (SACM-clean; cleaner than legacy `DeleteArtifactPackage`,
+        // which leaves them).
         .reference_policy = sacm::commands::ReferenceDeletePolicy::DeleteReferencingRelationships,
         // The target is a package: take its whole subtree.
         .package_policy = sacm::commands::PackageDeletePolicy::DeleteRecursively,
