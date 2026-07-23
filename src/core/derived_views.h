@@ -11,7 +11,30 @@
 #include "parser/xml_parser.h"
 #include "sacm/sacm_model.h"
 
+namespace sacm_adapter {
+class LibraryDocument;
+}
+
 namespace core {
+
+// Phase 2 slice 2b-1: rebuild BOTH legacy views from the library-owned
+// document, reproducing exactly what `AppState::load_file` does after a library
+// load -- the tag-carrying package projection, the POD case projection, and the
+// three render passes below in that order.
+//
+// This is the inverse of the Stage 5 net (which re-derived the library from the
+// authoritative package). A command that mutated the library natively sets
+// `CommandContext::library_primary`, and the command bus calls this so
+// `loaded_case` / `sacm_package` become DERIVED views of the library rather
+// than independently-mutated state.
+//
+// The pass order is load-bearing and must stay in step with `load_file`: a
+// missing `SynthesizeBareStrategyPlacements` leaves a bare strategy floating
+// with no placement, and a missing terminology pass renders terms as drawn
+// context nodes instead of inline chips.
+void RebuildDerivedViewsFromLibrary(const sacm_adapter::LibraryDocument& document,
+                                    parser::AssuranceCase& out_model,
+                                    sacm::AssuranceCasePackage& out_package);
 
 // Remove terminology artifact references (and the contexts sourcing them) that
 // are not a *visible* terminology context from the render model, so a term shows

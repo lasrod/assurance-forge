@@ -118,12 +118,17 @@ bool IsRelationshipType(const std::string& t) {
     return t == "assertedinference" || t == "assertedcontext" || t == "assertedevidence";
 }
 
-// Determine which ArgumentPackage in the sacm model owns the parent element.
-// Falls back to the first package, creating one if necessary.
-sacm::ArgumentPackage* FindOwningArgumentPackage(sacm::AssuranceCasePackage* pkg, const std::string& parent_id) {
+// Determine which ArgumentPackage in the sacm model owns the parent element,
+// without mutating the package. Falls back to the first package; null when
+// there is none (the mutable variant below creates one instead). For id
+// planning the two agree: a freshly created package has an empty id, and
+// AcpPrefixForPackage yields the same empty prefix for an empty id and for
+// null.
+const sacm::ArgumentPackage* FindOwningArgumentPackageConst(const sacm::AssuranceCasePackage* pkg,
+                                                            const std::string& parent_id) {
     if (!pkg)
         return nullptr;
-    for (auto& ap : pkg->argumentPackages) {
+    for (const auto& ap : pkg->argumentPackages) {
         for (const auto& c : ap.claims)
             if (c.id == parent_id)
                 return &ap;
@@ -134,10 +139,20 @@ sacm::ArgumentPackage* FindOwningArgumentPackage(sacm::AssuranceCasePackage* pkg
             if (ar.id == parent_id)
                 return &ap;
     }
+    return pkg->argumentPackages.empty() ? nullptr : &pkg->argumentPackages.front();
+}
+
+// Determine which ArgumentPackage in the sacm model owns the parent element.
+// Falls back to the first package, creating one if necessary. `const_cast` is
+// well-defined here: `pkg` is non-const and every returned pointer points into
+// it.
+sacm::ArgumentPackage* FindOwningArgumentPackage(sacm::AssuranceCasePackage* pkg, const std::string& parent_id) {
+    if (!pkg)
+        return nullptr;
     if (pkg->argumentPackages.empty()) {
         pkg->argumentPackages.emplace_back();
     }
-    return &pkg->argumentPackages.front();
+    return const_cast<sacm::ArgumentPackage*>(FindOwningArgumentPackageConst(pkg, parent_id));
 }
 
 void MirrorClaim(sacm::ArgumentPackage* ap, const parser::SacmElement& src) {
@@ -578,25 +593,15 @@ bool InstallChallenge(parser::AssuranceCase& ac,
 
 } // namespace
 
-bool AddChildElement(parser::AssuranceCase& ac,
-                     sacm::AssuranceCasePackage* pkg,
-                     const std::string& parent_id,
-                     NewElementKind kind,
-                     std::string& out_new_id,
-                     std::string& out_error) {
-    std::string rel_id;
-    return AddChildElement(ac, pkg, parent_id, kind, out_new_id, rel_id, out_error);
-}
-
-bool AddChildElement(parser::AssuranceCase& ac,
-                     sacm::AssuranceCasePackage* pkg,
-                     const std::string& parent_id,
-                     NewElementKind kind,
-                     std::string& out_new_id,
-                     std::string& out_new_relationship_id,
-                     std::string& out_error) {
-    out_new_id.clear();
-    out_new_relationship_id.clear();
+bool PlanChildElementIds(const parser::AssuranceCase& ac,
+                         const sacm::AssuranceCasePackage* pkg,
+                         const std::string& parent_id,
+                         NewElementKind kind,
+                         std::string& out_element_id,
+                         std::string& out_relationship_id,
+                         std::string& out_error) {
+    out_element_id.clear();
+    out_relationship_id.clear();
     out_error.clear();
 
     if (parent_id.empty()) {
@@ -619,12 +624,81 @@ bool AddChildElement(parser::AssuranceCase& ac,
         return false;
     }
 
-    auto existing_ids = CollectIds(ac);
-    sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, parent_id);
+    std::unordered_set<std::string> existing_ids = CollectIds(ac);
+    const sacm::ArgumentPackage* ap = FindOwningArgumentPackageConst(pkg, parent_id);
 
-    std::string element_id = GenerateUniqueId(existing_ids, ScopedPrefixFor(ap, kind));
-    existing_ids.insert(element_id);
-    std::string relationship_id = GenerateUniqueId(existing_ids, ScopedRelationshipPrefixFor(ap));
+    out_element_id = GenerateUniqueId(existing_ids, ScopedPrefixFor(ap, kind));
+    existing_ids.insert(out_element_id);
+    out_relationship_id = GenerateUniqueId(existing_ids, ScopedRelationshipPrefixFor(ap));
+    return true;
+}
+
+bool PlanChallengeIds(const parser::AssuranceCase& ac,
+                      const sacm::AssuranceCasePackage* pkg,
+                      const ArgumentTarget& target,
+                      ChallengeSourceType source_type,
+                      std::string& out_element_id,
+                      std::string& out_relationship_id,
+                      std::string& out_error) {
+    out_element_id.clear();
+    out_relationship_id.clear();
+    out_error.clear();
+
+    if (target.id.empty()) {
+        out_error = "No challenge target supplied.";
+        return false;
+    }
+    const parser::SacmElement* target_elem = FindElement(ac, target.id);
+    if (!target_elem) {
+        out_error = "Challenge target not found in model.";
+        return false;
+    }
+
+    // A relationship target is not indexed by the owning-package lookup, so
+    // anchor on the element it points at (matching InstallChallenge).
+    std::string anchor_id = target.id;
+    if (target.kind == ArgumentTarget::Kind::Relationship && !target_elem->target_refs.empty()) {
+        anchor_id = target_elem->target_refs.front();
+    }
+
+    std::unordered_set<std::string> existing_ids = CollectIds(ac);
+    const sacm::ArgumentPackage* ap = FindOwningArgumentPackageConst(pkg, anchor_id);
+
+    out_element_id = GenerateUniqueId(existing_ids, ScopedChallengePrefixFor(ap, source_type));
+    existing_ids.insert(out_element_id);
+    out_relationship_id = GenerateUniqueId(existing_ids, ScopedRelationshipPrefixFor(ap));
+    return true;
+}
+
+std::string PlanTopGoalId(const parser::AssuranceCase& ac) {
+    return GenerateUniqueId(CollectIds(ac), PrefixFor(NewElementKind::Goal));
+}
+
+bool AddChildElement(parser::AssuranceCase& ac,
+                     sacm::AssuranceCasePackage* pkg,
+                     const std::string& parent_id,
+                     NewElementKind kind,
+                     std::string& out_new_id,
+                     std::string& out_error) {
+    std::string rel_id;
+    return AddChildElement(ac, pkg, parent_id, kind, out_new_id, rel_id, out_error);
+}
+
+bool AddChildElement(parser::AssuranceCase& ac,
+                     sacm::AssuranceCasePackage* pkg,
+                     const std::string& parent_id,
+                     NewElementKind kind,
+                     std::string& out_new_id,
+                     std::string& out_new_relationship_id,
+                     std::string& out_error) {
+    out_new_id.clear();
+    out_new_relationship_id.clear();
+    out_error.clear();
+
+    std::string element_id;
+    std::string relationship_id;
+    if (!PlanChildElementIds(ac, pkg, parent_id, kind, element_id, relationship_id, out_error))
+        return false;
 
     // A strategy and an inference-extending sub-goal create no relationship, so the
     // event must record an empty relationship id -- take the id actually created.
@@ -660,27 +734,10 @@ bool AddChallenge(parser::AssuranceCase& ac,
     out_new_relationship_id.clear();
     out_error.clear();
 
-    if (target.id.empty()) {
-        out_error = "No challenge target supplied.";
+    std::string element_id;
+    std::string relationship_id;
+    if (!PlanChallengeIds(ac, pkg, target, source_type, element_id, relationship_id, out_error))
         return false;
-    }
-    const parser::SacmElement* target_elem = FindElement(ac, target.id);
-    if (!target_elem) {
-        out_error = "Challenge target not found in model.";
-        return false;
-    }
-
-    std::string anchor_id = target.id;
-    if (target.kind == ArgumentTarget::Kind::Relationship && !target_elem->target_refs.empty()) {
-        anchor_id = target_elem->target_refs.front();
-    }
-
-    auto existing_ids = CollectIds(ac);
-    sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, anchor_id);
-
-    std::string element_id = GenerateUniqueId(existing_ids, ScopedChallengePrefixFor(ap, source_type));
-    existing_ids.insert(element_id);
-    std::string relationship_id = GenerateUniqueId(existing_ids, ScopedRelationshipPrefixFor(ap));
 
     if (!InstallChallenge(ac, pkg, target, source_type, element_id, relationship_id, out_error))
         return false;
@@ -708,8 +765,7 @@ bool AddTopGoal(parser::AssuranceCase& ac,
     out_new_id.clear();
     out_error.clear();
 
-    auto existing_ids = CollectIds(ac);
-    std::string id = GenerateUniqueId(existing_ids, PrefixFor(NewElementKind::Goal));
+    std::string id = PlanTopGoalId(ac);
     if (!InstallTopGoal(ac, pkg, id, out_error))
         return false;
     out_new_id = std::move(id);
@@ -952,6 +1008,57 @@ std::unordered_set<std::string> PlanRemoval(const parser::AssuranceCase& ac, con
         CollectGroup2AttachmentIds(idx, nid, result);
     }
     return result;
+}
+
+namespace {
+
+// True if the relationship names any planned-for-deletion element in its
+// sources, targets, or reasoning -- i.e. the library's delete cascade would take
+// the whole relationship with it.
+bool RelationshipReferencesAnyOf(const parser::SacmElement& relationship,
+                                 const std::unordered_set<std::string>& ids) {
+    if (!relationship.reasoning_ref.empty() && ids.count(relationship.reasoning_ref) > 0)
+        return true;
+    for (const std::string& ref : relationship.source_refs) {
+        if (ids.count(ref) > 0)
+            return true;
+    }
+    for (const std::string& ref : relationship.target_refs) {
+        if (ids.count(ref) > 0)
+            return true;
+    }
+    return false;
+}
+
+} // namespace
+
+bool RemovalPlanIsCascadeEquivalent(const parser::AssuranceCase& ac,
+                                    const std::string& id,
+                                    RemoveMode mode) {
+    const std::unordered_set<std::string> planned = PlanRemoval(ac, id, mode);
+    if (planned.empty())
+        return false;
+
+    // NodeOnly reparents whatever the plan leaves behind. When the NodeOnly plan
+    // already covers everything NodeAndDescendants would take, there is nothing
+    // to reparent and the two coincide.
+    if (mode == RemoveMode::NodeOnly && planned != PlanRemoval(ac, id, RemoveMode::NodeAndDescendants))
+        return false;
+
+    // Every relationship must be dropped by both rules or kept by both. A
+    // relationship id is never in the plan (PlanRemoval yields node ids), so
+    // "legacy drops it" is exactly "it is structurally empty after the scrub".
+    for (const parser::SacmElement& element : ac.elements) {
+        if (!IsRelationshipType(element.type))
+            continue;
+        const bool library_drops = RelationshipReferencesAnyOf(element, planned);
+        parser::SacmElement scrubbed = element;
+        ScrubParserRelationshipRefs(scrubbed, planned);
+        const bool legacy_drops = IsParserRelationshipDangling(scrubbed);
+        if (library_drops != legacy_drops)
+            return false;
+    }
+    return true;
 }
 
 namespace {

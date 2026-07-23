@@ -364,6 +364,46 @@ TEST(LibraryReplayConvergence, AddTerminologyVisibleContextBridgeConverges) {
     EXPECT_EQ(*library_hash, *legacy_hash);
 }
 
+// Removing ONE sub-goal of a strategy whose single inference has SEVERAL sources
+// must scrub that source and KEEP the inference (the legacy rule), not cascade the
+// whole relationship away -- cascading would silently detach the strategy and its
+// remaining sub-goal from the argument. This is the shape the other delete test
+// does not cover (its target is a single-source leaf).
+TEST(LibraryReplayConvergence, RemoveOneSourceOfSharedStrategyInferenceConverges) {
+    auto f = MakeFixture("shared_inference_remove");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package};
+
+    core::commands::CreateChildElementCommand add_strategy("G1", core::NewElementKind::Strategy);
+    ASSERT_TRUE(bus->Execute(add_strategy, ctx, "tester").success);
+    const std::string strategy_id = add_strategy.GeneratedId();
+    core::commands::CreateChildElementCommand add_sub1(strategy_id, core::NewElementKind::Goal);
+    ASSERT_TRUE(bus->Execute(add_sub1, ctx, "tester").success);
+    core::commands::CreateChildElementCommand add_sub2(strategy_id, core::NewElementKind::Goal);
+    ASSERT_TRUE(bus->Execute(add_sub2, ctx, "tester").success);
+
+    // Remove the first sub-goal; the strategy's single inference still has the
+    // second sub-goal as a source, so it must survive with the source scrubbed.
+    core::commands::RemoveElementCommand remove(add_sub1.GeneratedId(),
+                                                core::RemoveMode::NodeAndDescendants);
+    ASSERT_TRUE(bus->Execute(remove, ctx, "tester").success);
+
+    const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
+    const core::audit::ReplayState legacy = LegacyReplay(f, txns);
+    const std::unique_ptr<sacm_adapter::LibraryDocument> library_doc = LibraryReplay(f, txns);
+    ASSERT_NE(library_doc, nullptr);
+
+    const std::optional<std::string> library_hash =
+        core::library_canonical_hash(core::project_library_package(*library_doc));
+    const std::optional<std::string> legacy_hash = core::library_canonical_hash(legacy.package);
+    ASSERT_TRUE(library_hash.has_value());
+    ASSERT_TRUE(legacy_hash.has_value());
+    EXPECT_EQ(*library_hash, *legacy_hash);
+}
+
 // Bridge event: RemoveTerminologyPackage has no parity seam (the library's
 // recursive delete diverges from the legacy non-empty-refusing mutator), so the
 // library replay bridges -- applying the legacy mutator onto a projected package

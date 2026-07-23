@@ -1,8 +1,10 @@
 #include "core/derived_views.h"
 
+#include "core/library_package_projection.h"
 #include "core/string_utils.h"
 #include "core/terminology_package_service.h"
 #include "core/terminology_text_utils.h"
+#include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/gsn_role_tag.h"
 
 #include <algorithm>
@@ -181,6 +183,21 @@ void SynthesizeBareStrategyPlacements(parser::AssuranceCase& model,
     }
     for (parser::SacmElement& placeholder : placeholders)
         model.elements.push_back(std::move(placeholder));
+}
+
+void RebuildDerivedViewsFromLibrary(const sacm_adapter::LibraryDocument& document,
+                                    parser::AssuranceCase& out_model,
+                                    sacm::AssuranceCasePackage& out_package) {
+    // Mirrors AppState::load_file's library branch step for step. The package is
+    // projected FIRST because all three render passes read it, and the
+    // tag-carrying projection is what preserves ACP / confidence-purpose /
+    // GSN-role tags and each artifact reference's referencedArtifact (which the
+    // terminology passes key on).
+    out_package = core::project_library_package_with_tags(document);
+    out_model = sacm_adapter::project_case(document);
+    SynthesizeBareStrategyPlacements(out_model, out_package);
+    HideTerminologyArtifactReferences(out_model, out_package);
+    RefreshVisibleTerminologyContextDisplay(out_model, out_package);
 }
 
 } // namespace core

@@ -212,6 +212,19 @@ hid:
   only delete-and-recreate the relationships (new ids, losing any per-relationship
   metadata) or the standard must add a retarget operation. Deleting a node *with*
   its descendants, by contrast, composes cleanly from per-element deletes.
+- **Deleting one sub-goal of a GSN Strategy needs a `source` removal, which SACM
+  editing does not define.** The standards-correct encoding gives a Strategy a
+  single `AssertedInference` whose `source` list holds *all* its sub-goals
+  (clause 11.13, `source : SACMElement[1..*]`). Removing one sub-goal therefore
+  means removing one entry from that list — but SACM defines no per-end edit, so
+  a conformant editor can only delete the whole relationship (detaching the
+  Strategy and every surviving sub-goal) or delete-and-recreate it with a new id.
+  Measured in Assurance Forge: with `sources = {G3, G4}`, deleting `G3` through
+  the library's `DeleteElement` +
+  `ReferenceDeletePolicy::DeleteReferencingRelationships` removes the inference
+  entirely, while the intended result keeps it with `sources = {G4}`. Note the
+  asymmetry — the library *does* define adding a source (`AddRelationshipSource`)
+  but not removing one, so a Strategy can gain sub-goals but not lose them.
 
 ## Submitting this
 
