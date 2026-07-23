@@ -201,18 +201,17 @@ TEST(ElementEditControllerTest, FlushPendingTextEditsCommitsUncommittedEditWitho
     ASSERT_TRUE(core::audit::EnsureAuditStore(project, sacm_rel, ensure, error)) << error;
 
     const fs::path sacm_abs = root / sacm_rel;
-    auto pkg = sacm::parse_sacm(sacm_abs.string());
-    ASSERT_TRUE(pkg.has_value());
-    auto parsed = parser::parse_sacm_xml_string(kSacm);
-    ASSERT_TRUE(parsed.has_value());
-
     auto bus = core::commands::CommandBus::Open(project, sacm_abs, error);
     ASSERT_TRUE(bus) << error;
 
     app::AppRuntimeState state;
-    state.app_state.loaded_case  = std::move(parsed.value());
-    state.app_state.sacm_package = std::move(pkg.value());
-    state.command_bus            = std::move(bus);
+    // Load through the production path (library-owned document -> projected views)
+    // so the in-memory package matches what the audit verifier reconstructs from
+    // the (now library-projected) snapshot. A manual sacm::parse_sacm base would
+    // diverge from the library projection on a description edit's language handling.
+    // Phase 1b.
+    ASSERT_TRUE(state.app_state.load_file(sacm_abs.string())) << state.app_state.status_message;
+    state.command_bus = std::move(bus);
 
     parser::AssuranceCase& model = state.app_state.loaded_case.value();
     parser::SacmElement* elem = nullptr;

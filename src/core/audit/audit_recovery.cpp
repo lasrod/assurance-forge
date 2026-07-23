@@ -26,20 +26,7 @@ bool LoadSnapshotForRestore(const std::filesystem::path& project_root,
                             parser::AssuranceCase& out_model,
                             sacm::AssuranceCasePackage& out_package,
                             std::string& out_error) {
-    const std::filesystem::path sacm_path = SnapshotSacmPath(project_root, snapshot_id);
-    auto pkg = sacm::parse_sacm(sacm_path.string());
-    if (!pkg) {
-        out_error = "Failed to parse snapshot SACM at " + sacm_path.string() + ": " + pkg.error();
-        return false;
-    }
-    auto ac = parser::parse_sacm_xml(sacm_path.string());
-    if (!ac) {
-        out_error = "Failed to parse snapshot parser-model at " + sacm_path.string() + ": " + ac.error();
-        return false;
-    }
-    out_package = std::move(*pkg);
-    out_model = std::move(*ac);
-    return true;
+    return LoadSnapshotModels(SnapshotSacmPath(project_root, snapshot_id), out_model, out_package, out_error);
 }
 
 } // namespace

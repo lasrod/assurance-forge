@@ -6,6 +6,7 @@
 #include "core/commands/command_bus.h"
 #include "core/commands/element_commands.h"
 #include "core/element_factory.h"
+#include "core/library_package_projection.h"
 #include "core/project_model.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_parser.h"
@@ -140,8 +141,16 @@ TEST(HistoryReconstruction, ReconstructionAtLatestSequenceMatchesLiveCanonicalHa
                                                     std::numeric_limits<std::uint64_t>::max());
     ASSERT_TRUE(state.has_value());
 
-    EXPECT_EQ(core::audit::CanonicalModelHash(state->package),
-              core::audit::CanonicalModelHash(f.package));
+    // Compare on the projection-invariant library hash (the one the verifier uses),
+    // not the legacy CanonicalModelHash. Phase 1b routes snapshot loading through
+    // the library, so the reconstruction base is library-projected while this
+    // fixture's live package is legacy-parsed; the legacy hash is not invariant
+    // under that projection, but the authoritative library hash converges.
+    const auto reconstructed_hash = core::library_canonical_hash(state->package);
+    const auto live_hash = core::library_canonical_hash(f.package);
+    ASSERT_TRUE(reconstructed_hash.has_value());
+    ASSERT_TRUE(live_hash.has_value());
+    EXPECT_EQ(*reconstructed_hash, *live_hash);
 }
 
 TEST(HistoryReconstruction, FailsForProjectWithoutAuditStore) {
