@@ -21,6 +21,7 @@
 #include "sacm_adapter/library_load.h"
 
 #include "core/acp/acp_editing.h"
+#include "core/commands/package_commands.h"
 #include "core/derived_views.h"
 #include "core/element_factory.h"
 #include "core/library_package_projection.h"
@@ -873,6 +874,101 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DeleteLeafReproducesLegacyRemoval) {
 
     // The two paths leave the same set of elements.
     EXPECT_EQ(sorted_element_ids(after), sorted_element_ids(legacy));
+}
+
+// Deleting a whole ArgumentPackage through the library seam (apply_delete_package
+// -> DeleteElement + DeleteRecursively) leaves the same element set as the legacy
+// core::DeleteArgumentPackage. Phase 1b (SACM23-INT-001).
+TEST(SacmLibraryEdit, SACM23_INT_001_DeleteArgumentPackageReproducesLegacy) {
+    const std::filesystem::path path =
+        repo_root() / "tests" / "data" / "fixture_roundtrip_open_autonomy.sacm.xml";
+    ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::DeleteOutcome deleted =
+        sacm_adapter::apply_delete_package(*loaded.document, "ARG_OrgTrust");
+    ASSERT_TRUE(deleted.supported);
+    ASSERT_TRUE(deleted.applied) << (deleted.diagnostics.empty() ? "" : deleted.diagnostics.front().message);
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+
+    const auto legacy_case = parser::parse_sacm_xml(path.string());
+    ASSERT_TRUE(legacy_case.has_value()) << legacy_case.error();
+    const auto legacy_package = sacm::parse_sacm(path.string());
+    ASSERT_TRUE(legacy_package.has_value()) << legacy_package.error();
+    core::AssuranceCase legacy = *legacy_case;
+    sacm::AssuranceCasePackage package = *legacy_package;
+    std::string error;
+    ASSERT_TRUE(core::DeleteArgumentPackage(package, legacy, "ARG_OrgTrust", "", error)) << error;
+
+    EXPECT_EQ(sorted_element_ids(after), sorted_element_ids(legacy));
+}
+
+// Deleting an ArtifactPackage recursively through the seam removes it cleanly and
+// leaves the argument packages intact. NOTE: this deliberately does NOT assert
+// parity with legacy `core::DeleteArtifactPackage`, which is package-only and
+// leaves the referencing evidence relationships DANGLING; the library seam drops
+// them (SACM-clean). That divergence is a flip-slice concern (a legacy
+// artifact-package-delete event would not converge under library-primary replay
+// without a migration), recorded here so the difference is explicit. Phase 1b.
+TEST(SacmLibraryEdit, SACM23_INT_001_DeleteArtifactPackageRemovesItCleanly) {
+    const std::filesystem::path path =
+        repo_root() / "tests" / "data" / "fixture_roundtrip_open_autonomy.sacm.xml";
+    ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+    const core::AssuranceCase before = sacm_adapter::project_case(*loaded.document);
+
+    const sacm_adapter::DeleteOutcome deleted =
+        sacm_adapter::apply_delete_package(*loaded.document, "AP_Evidence");
+    ASSERT_TRUE(deleted.supported);
+    ASSERT_TRUE(deleted.applied) << (deleted.diagnostics.empty() ? "" : deleted.diagnostics.front().message);
+
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    // The referencing evidence relationships are dropped, so the projection shrinks;
+    // the argument tree itself (its top claim) survives -- nothing was over-deleted.
+    EXPECT_LT(sorted_element_ids(after).size(), sorted_element_ids(before).size());
+    EXPECT_NE(find_element(after, "AC_TopLevel"), nullptr);
+    // No dangling evidence relationship references a now-deleted artifact.
+    for (const core::SacmElement& element : after.elements) {
+        if (element.type != "assertedevidence")
+            continue;
+        for (const std::string& source : element.source_refs)
+            EXPECT_NE(find_element(after, core::StripLeadingHash(source)), nullptr)
+                << "dangling evidence source " << source << " after artifact-package delete";
+    }
+}
+
+// The seam can delete a NON-EMPTY TerminologyPackage recursively -- legacy
+// `core::DeleteTerminologyPackage` refuses this (SACM-clean cascade the legacy
+// helper lacks). Assert it removes the package and leaves the argument tree intact.
+// Phase 1b (SACM23-INT-001).
+TEST(SacmLibraryEdit, SACM23_INT_001_DeleteTerminologyPackageRemovesItRecursively) {
+    const std::filesystem::path path =
+        repo_root() / "tests" / "data" / "fixture_roundtrip_open_autonomy.sacm.xml";
+    ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
+
+    // Vacuity: the legacy helper rejects this non-empty package.
+    const auto legacy_package = sacm::parse_sacm(path.string());
+    ASSERT_TRUE(legacy_package.has_value()) << legacy_package.error();
+    sacm::AssuranceCasePackage package = *legacy_package;
+    std::string legacy_error;
+    EXPECT_FALSE(core::DeleteTerminologyPackage(package, core::TerminologyPackageRef{"TP_Standards", ""},
+                                                legacy_error));
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+    const sacm_adapter::DeleteOutcome deleted =
+        sacm_adapter::apply_delete_package(*loaded.document, "TP_Standards");
+    ASSERT_TRUE(deleted.supported);
+    ASSERT_TRUE(deleted.applied) << (deleted.diagnostics.empty() ? "" : deleted.diagnostics.front().message);
+
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    EXPECT_NE(find_element(after, "AC_TopLevel"), nullptr);
 }
 
 // A rename targeting an id the document does not contain must fail cleanly: the
