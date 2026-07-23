@@ -6,8 +6,13 @@
 
 #include <cstdint>
 #include <expected>
+#include <memory>
 #include <string>
 #include <vector>
+
+namespace sacm_adapter {
+class LibraryDocument;
+}
 
 // Audit replay engine (design §11). Given the initial snapshot of a project
 // and the full chain of audit transactions, the replayer reconstructs the
@@ -27,6 +32,31 @@ struct ReplayState {
     parser::AssuranceCase       model;
     sacm::AssuranceCasePackage  package;
 };
+
+// Phase 1b slice 3a: the library-primary counterpart of the file-local
+// `ApplyEvent`. Applies ONE audit event to a library-owned `LibraryDocument`,
+// mirroring `ApplyEvent`'s payload extraction verbatim but routing the mutation
+// through the `sacm_adapter` library seams (`apply_*`) instead of the legacy
+// `core::*` mutators. This is an ADDITIVE parallel path proven to converge with
+// the legacy replay (see tests/test_library_replay_convergence.cpp); no existing
+// consumer is rewired here.
+//
+// Event routing:
+//   * Seam-mapped events call the matching `apply_*` seam and treat
+//     `outcome.supported && outcome.applied` as success.
+//   * Bridge events (no parity seam: RemoveArtifactPackage,
+//     RemoveTerminologyPackage, ApplyProposal) project the document to the
+//     legacy models, apply the SAME legacy mutator the live path uses, then
+//     re-derive the library document from the serialized package so replay
+//     converges with the legacy live path.
+//   * No-op events (Undo, SacmRestoredFromAudit) touch nothing.
+//
+// On the first failure returns false and writes a diagnostic naming the
+// transaction / event location, matching `ApplyEvent`'s style.
+bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
+                         std::uint64_t                  tx_seq,
+                         const AuditEvent&              event,
+                         std::string&                   out_error);
 
 class Replayer {
 public:
@@ -56,6 +86,19 @@ public:
         const std::vector<AuditTransaction>& transactions,
         std::uint64_t                        up_to_transaction_sequence,
         std::uint64_t                        from_transaction_sequence = 0);
+
+    // Phase 1b slice 3a: the library-primary counterpart of `ReplayFrom`. Takes
+    // ownership of a `LibraryDocument` snapshot (loaded through the library) and
+    // replays every event in the same window via `ApplyEventToLibrary`, using
+    // the IDENTICAL undo-skip pre-pass and transaction windowing/skip logic as
+    // `ReplayFrom`. Returns the mutated document on success, or an error string
+    // naming the first event that failed to apply. This is an additive parallel
+    // path; `ReplayFrom` and its consumers are untouched.
+    static std::expected<std::unique_ptr<sacm_adapter::LibraryDocument>, std::string> ReplayToLibrary(
+        std::unique_ptr<sacm_adapter::LibraryDocument> snapshot_document,
+        const std::vector<AuditTransaction>&           transactions,
+        std::uint64_t                                  up_to_transaction_sequence,
+        std::uint64_t                                  from_transaction_sequence = 0);
 };
 
 } // namespace core::audit
