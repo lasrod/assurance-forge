@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <unordered_set>
@@ -59,22 +60,26 @@ bool content_maps_to_description(sacm::metadata::ElementKind kind) {
            kind == sacm::metadata::ElementKind::ArgumentReasoning;
 }
 
-// The library language a primary-language content edit must overwrite. A legacy
-// `content=` statement is stored lang-less (set("", ...)); editing it under the
-// primary language must overwrite that entry in place, not append a parallel
-// "en" one that `primary()` would never return. So we target the front
-// Description's existing language.
-std::string primary_description_language(const sacm::model::ModelElement& element) {
-    if (!element.descriptions().empty()) {
+// The library language a primary-language edit must overwrite at Description
+// slot `index`. A legacy `content=`/`description=` value is stored lang-less
+// (set("", ...)); editing it under the primary language must overwrite that
+// entry in place, not append a parallel "en" one that `primary()` would never
+// return. So we target the existing slot's stored language, or the reader's
+// lang-less convention for a slot that does not exist yet (so a later load
+// round-trips identically).
+std::string description_slot_language(const sacm::model::ModelElement& element, std::size_t index) {
+    if (index < element.descriptions().size()) {
         const std::vector<sacm::model::LangString>& values =
-            element.descriptions().front()->content().values;
+            element.descriptions()[index]->content().values;
         if (!values.empty()) {
             return values.front().lang;
         }
     }
-    // No statement yet: match the reader's lang-less convention for a created
-    // Description so a later load round-trips identically.
     return "";
+}
+
+std::string primary_description_language(const sacm::model::ModelElement& element) {
+    return description_slot_language(element, 0);
 }
 
 } // namespace
@@ -106,12 +111,13 @@ EditOutcome apply_text_edit(LibraryDocument& document, const std::string& elemen
         if (element == nullptr || !content_maps_to_description(element->kind())) {
             return unsupported_outcome();
         }
-        // Content is the front Description (the statement, clause 8.9). A primary
-        // edit overwrites the front's stored (possibly lang-less) entry in place;
-        // a non-primary edit adds/updates that language's LangString, which the
-        // projection reads back into content_langs.
+        // Content is the FIRST Description (the statement, clause 8.9). A primary
+        // edit overwrites slot 0's stored (possibly lang-less) entry in place; a
+        // non-primary edit adds/updates that language's LangString, which the
+        // projection reads back into content_langs. SetDescription targets the
+        // front Description (creating it when absent) = slot 0.
         const std::string target_language =
-            language == kPrimaryLanguage ? primary_description_language(*element) : language;
+            language == kPrimaryLanguage ? description_slot_language(*element, 0) : language;
         return applied_outcome(doc.apply(sacm::commands::SetDescription{
             .element = id,
             .text = value,
@@ -123,16 +129,29 @@ EditOutcome apply_text_edit(LibraryDocument& document, const std::string& elemen
         if (element == nullptr) {
             return unsupported_outcome();
         }
-        // For a claim-like element the POD `description` is a *second* Description
-        // (a note); SetDescription edits the front (which is the statement /
-        // content there), so it cannot target the note -- that stays a later
-        // slice. For every other element the POD `description` IS the front
-        // Description, so it maps directly (same language handling as Content).
         if (content_maps_to_description(element->kind())) {
-            return unsupported_outcome();
+            // For a claim-like element the POD `description` is the SECOND
+            // Description (a note); the first is the statement (content). Target
+            // slot 1 via SetDescriptionAt, creating it when absent. A claim with
+            // no statement yet (no slot 0) has no anchor for a note -- slot 1
+            // would be a gap the library rejects -- so report it unsupported
+            // rather than write something the projection could not read back.
+            if (element->descriptions().empty()) {
+                return unsupported_outcome();
+            }
+            const std::string target_language =
+                language == kPrimaryLanguage ? description_slot_language(*element, 1) : language;
+            return applied_outcome(doc.apply(sacm::commands::SetDescriptionAt{
+                .element = id,
+                .index = 1,
+                .text = value,
+                .language = target_language,
+            }));
         }
+        // For every other element the POD `description` IS the front Description,
+        // so it maps directly (same language handling as Content).
         const std::string target_language =
-            language == kPrimaryLanguage ? primary_description_language(*element) : language;
+            language == kPrimaryLanguage ? description_slot_language(*element, 0) : language;
         return applied_outcome(doc.apply(sacm::commands::SetDescription{
             .element = id,
             .text = value,
@@ -883,6 +902,18 @@ sacm::commands::MutationResult set_terminology_description(sacm::model::Document
     return doc.apply(sacm::commands::SetDescription{.element = id, .text = text, .language = language});
 }
 
+// Mint the legacy `gid-<id>` on a freshly created element so a library-seam
+// create matches the legacy `core::*WithIds` mutators, which stamp
+// `GenerateUniqueGid(package, id)` on the terminology package/category/term and
+// the association's ArtifactReference/AssertedContext. Fresh ids are unique, so
+// the base `gid-<id>` never collides and the legacy disambiguation suffix
+// (`-2`, `-3`, ...) is unreachable here -- the replayed forced ids are exactly
+// the ids the live path generated, whose gids were this same base form.
+sacm::commands::MutationResult assign_legacy_gid(sacm::model::Document& doc,
+                                                 const sacm::model::ElementId& id) {
+    return doc.apply(sacm::commands::SetGid{.element = id, .gid = "gid-" + id.value()});
+}
+
 // Reproduces core's TermContextLabel for the ArtifactReference/AssertedContext
 // names a term association creates.
 std::string term_context_label(const sacm::model::Term& term) {
@@ -991,6 +1022,12 @@ TerminologyCreateOutcome apply_create_terminology_package(LibraryDocument& docum
         return failed_terminology_create(created);
     }
     const sacm::model::ElementId new_id = created.created_ids().front();
+    // Legacy CreateTerminologyPackageWithIds stamps GenerateUniqueGid on the
+    // package; mint the same gid so the projection and canonical hash match.
+    if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, new_id); !gid.applied) {
+        rollback_element(doc, new_id);
+        return failed_terminology_create(gid);
+    }
     if (!description.empty()) {
         const sacm::commands::MutationResult described =
             set_terminology_description(doc, new_id, description);
@@ -1020,6 +1057,11 @@ TerminologyCreateOutcome apply_create_terminology_category(LibraryDocument& docu
         return failed_terminology_create(created);
     }
     const sacm::model::ElementId new_id = created.created_ids().front();
+    // Legacy CreateTerminologyCategoryWithIds stamps GenerateUniqueGid.
+    if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, new_id); !gid.applied) {
+        rollback_element(doc, new_id);
+        return failed_terminology_create(gid);
+    }
     const std::string trimmed_description = trim_whitespace(description);
     if (!trimmed_description.empty()) {
         const sacm::commands::MutationResult described =
@@ -1054,6 +1096,11 @@ TerminologyCreateOutcome apply_create_terminology_term(LibraryDocument& document
         return failed_terminology_create(created);
     }
     const sacm::model::ElementId new_id = created.created_ids().front();
+    // Legacy CreateTerminologyTermWithIds stamps GenerateUniqueGid.
+    if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, new_id); !gid.applied) {
+        rollback_element(doc, new_id);
+        return failed_terminology_create(gid);
+    }
 
     const std::string description = trim_whitespace(fields.description);
     if (!description.empty()) {
@@ -1268,6 +1315,15 @@ TerminologyContextOutcome apply_associate_terminology_term(LibraryDocument& docu
         }
         reference_id = created_reference.created_ids().front().value();
         outcome.created_artifact_reference = true;
+        // Legacy AssociateTerminologyTermWithElementWithIds stamps
+        // GenerateUniqueGid on a newly created reference (a reused one keeps its
+        // gid); mint the same so replay converges on the raw hash.
+        if (const sacm::commands::MutationResult gid =
+                assign_legacy_gid(doc, sacm::model::ElementId(reference_id));
+            !gid.applied) {
+            rollback_element(doc, sacm::model::ElementId(reference_id));
+            return failed_terminology_context(gid);
+        }
     } else {
         reference_id = reusable_reference->id().value();
     }
@@ -1286,11 +1342,20 @@ TerminologyContextOutcome apply_associate_terminology_term(LibraryDocument& docu
         }
         return failed_terminology_context(created_context);
     }
+    const sacm::model::ElementId context_id = created_context.created_ids().front();
+    // The AssertedContext also carries a legacy GenerateUniqueGid.
+    if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, context_id); !gid.applied) {
+        rollback_element(doc, context_id);
+        if (outcome.created_artifact_reference) {
+            rollback_element(doc, sacm::model::ElementId(reference_id));
+        }
+        return failed_terminology_context(gid);
+    }
 
     outcome.applied = true;
     outcome.created_asserted_context = true;
     outcome.artifact_reference_id = reference_id;
-    outcome.asserted_context_id = created_context.created_ids().front().value();
+    outcome.asserted_context_id = context_id.value();
     return outcome;
 }
 
@@ -1439,6 +1504,12 @@ TerminologyContextOutcome apply_add_terminology_visible_context(LibraryDocument&
         return failed_terminology_context(created_reference);
     }
     const sacm::model::ElementId reference_id = created_reference.created_ids().front();
+    // Legacy AddTerminologyTermAsVisibleContextWithIds stamps GenerateUniqueGid
+    // on the created reference and context; mint the same for raw-hash parity.
+    if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, reference_id); !gid.applied) {
+        rollback_element(doc, reference_id);
+        return failed_terminology_context(gid);
+    }
 
     const sacm::commands::MutationResult created_context =
         doc.apply(sacm::commands::CreateAssertedRelationship{
@@ -1453,6 +1524,11 @@ TerminologyContextOutcome apply_add_terminology_visible_context(LibraryDocument&
         return failed_terminology_context(created_context);
     }
     const sacm::model::ElementId context_id = created_context.created_ids().front();
+    if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, context_id); !gid.applied) {
+        rollback_element(doc, context_id);
+        rollback_element(doc, reference_id);
+        return failed_terminology_context(gid);
+    }
 
     const sacm::commands::MutationResult marked =
         set_terminology_description(doc, context_id, kVisibleTerminologyContextMarker);

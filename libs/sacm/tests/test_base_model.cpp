@@ -17,6 +17,8 @@ using sacm::commands::CreateArgumentPackage;
 using sacm::commands::CreateAssuranceCasePackage;
 using sacm::commands::CreateClaim;
 using sacm::commands::SetDescription;
+using sacm::commands::SetDescriptionAt;
+using sacm::commands::SetGid;
 using sacm::commands::SetName;
 using sacm::io::LoadOptions;
 using sacm::io::LoadResult;
@@ -375,6 +377,133 @@ TEST(Sacm23BaseModel, SACM23_BASE_001_SetNameSetDescriptionAddTaggedValue) {
     const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(reloaded.ok);
     EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
+}
+
+// SetGid assigns the clause-8.2 SACMElement.gid, applies to any element (here a
+// package and a claim, neither a citation), records a before/after ChangeRecord,
+// round-trips through strict save, and clears to absent on an empty gid. This is
+// the operation the Assurance Forge terminology seams use to mint the legacy
+// `gid-<id>` at create time.
+TEST(Sacm23BaseModel, SACM23_BASE_001_SetGidAssignsElementGid) {
+    Document document;
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"})
+                    .applied);
+    ASSERT_TRUE(document.apply(CreateArgumentPackage{.parent = ElementId{"acp_1"},
+                                                     .id = ElementId{"ap_1"},
+                                                     .name = "Args"})
+                    .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateClaim{.parent = ElementId{"ap_1"}, .id = ElementId{"c_1"},
+                                       .name = "G", .description = "d", .language = "en"})
+                    .applied);
+
+    EXPECT_FALSE(document.find(ElementId{"acp_1"})->gid().has_value());  // vacuity guard
+
+    const sacm::commands::MutationResult set_pkg =
+        document.apply(SetGid{.element = ElementId{"acp_1"}, .gid = "gid-acp_1"});
+    ASSERT_TRUE(set_pkg.applied);
+    const sacm::commands::MutationResult set_claim =
+        document.apply(SetGid{.element = ElementId{"c_1"}, .gid = "gid-c_1"});
+    ASSERT_TRUE(set_claim.applied);
+
+    ASSERT_TRUE(document.find(ElementId{"acp_1"})->gid().has_value());
+    EXPECT_EQ(*document.find(ElementId{"acp_1"})->gid(), "gid-acp_1");
+    EXPECT_EQ(*document.find(ElementId{"c_1"})->gid(), "gid-c_1");
+
+    // The change record carries the before (absent) and after value.
+    ASSERT_EQ(set_pkg.changes.size(), 1u);
+    EXPECT_EQ(set_pkg.changes.front().property, "gid");
+    EXPECT_FALSE(set_pkg.changes.front().before.has_value());
+    ASSERT_TRUE(set_pkg.changes.front().after.has_value());
+    EXPECT_EQ(*set_pkg.changes.front().after, "gid-acp_1");
+
+    EXPECT_TRUE(sacm::validation::validate(document).empty());
+
+    // The gid round-trips through strict save.
+    const auto saved = sacm::io::save_xmi_string(document);
+    ASSERT_TRUE(saved.ok);
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(reloaded.ok);
+    ASSERT_TRUE(reloaded.document->find(ElementId{"acp_1"})->gid().has_value());
+    EXPECT_EQ(*reloaded.document->find(ElementId{"acp_1"})->gid(), "gid-acp_1");
+
+    // An empty gid clears it back to absent.
+    ASSERT_TRUE(document.apply(SetGid{.element = ElementId{"acp_1"}, .gid = ""}).applied);
+    EXPECT_FALSE(document.find(ElementId{"acp_1"})->gid().has_value());
+
+    // A missing target fails, unchanged.
+    const sacm::commands::MutationResult missing =
+        document.apply(SetGid{.element = ElementId{"nope"}, .gid = "gid-x"});
+    EXPECT_FALSE(missing.applied);
+}
+
+// SetDescriptionAt addresses a ModelElement's Description list by ordinal slot
+// (clause 8.9 Description[0..*]): slot 0 is the statement, slot 1 a second note.
+// Appending at the count grows the list; an in-range index edits in place; a gap
+// (index > count) is rejected; and the two descriptions round-trip through
+// strict save. This is the operation the Assurance Forge claim seam uses to set
+// a note in the second Description without disturbing the front statement.
+TEST(Sacm23BaseModel, SACM23_BASE_001_SetDescriptionAtAddressesDescriptionSlots) {
+    Document document;
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"})
+                    .applied);
+    ASSERT_TRUE(document.apply(CreateArgumentPackage{.parent = ElementId{"acp_1"},
+                                                     .id = ElementId{"ap_1"},
+                                                     .name = "Args"})
+                    .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateClaim{.parent = ElementId{"ap_1"}, .id = ElementId{"c_1"},
+                                       .name = "G", .description = "The statement.",
+                                       .language = "en"})
+                    .applied);
+    const auto& claim = *document.find_as<sacm::model::ModelElement>(ElementId{"c_1"});
+    ASSERT_EQ(claim.descriptions().size(), 1u);  // vacuity guard: only the statement
+
+    // A gap (index 2 when there is 1 description) is rejected, unchanged.
+    const sacm::commands::MutationResult gap = document.apply(
+        SetDescriptionAt{.element = ElementId{"c_1"}, .index = 2, .text = "x", .language = "en"});
+    EXPECT_FALSE(gap.applied);
+    EXPECT_EQ(claim.descriptions().size(), 1u);
+
+    // Appending at index 1 creates the second Description (the note).
+    ASSERT_TRUE(document
+                    .apply(SetDescriptionAt{.element = ElementId{"c_1"},
+                                            .index = 1,
+                                            .text = "A note.",
+                                            .language = "en"})
+                    .applied);
+    ASSERT_EQ(claim.descriptions().size(), 2u);
+    EXPECT_EQ(*claim.descriptions().front()->content().find("en"), "The statement.");
+    EXPECT_EQ(*claim.descriptions()[1]->content().find("en"), "A note.");
+
+    // An in-range index edits that slot without touching the other.
+    ASSERT_TRUE(document
+                    .apply(SetDescriptionAt{.element = ElementId{"c_1"},
+                                            .index = 1,
+                                            .text = "A revised note.",
+                                            .language = "en"})
+                    .applied);
+    ASSERT_EQ(claim.descriptions().size(), 2u);
+    EXPECT_EQ(*claim.descriptions().front()->content().find("en"), "The statement.");
+    EXPECT_EQ(*claim.descriptions()[1]->content().find("en"), "A revised note.");
+
+    // A second Description is valid in the machine model (Description[0..*]);
+    // the validator only warns on the surplus (clause 8.6 spec text is [0..1]),
+    // so there must be no Error, and the sole diagnostic is that warning.
+    const auto diagnostics = sacm::validation::validate(document);
+    for (const auto& diagnostic : diagnostics) {
+        EXPECT_NE(diagnostic.severity, sacm::validation::Severity::Error) << diagnostic.message;
+    }
+
+    // Both descriptions survive a strict save round-trip.
+    const auto saved = sacm::io::save_xmi_string(document);
+    ASSERT_TRUE(saved.ok);
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(reloaded.ok);
+    const auto& reloaded_claim =
+        *reloaded.document->find_as<sacm::model::ModelElement>(ElementId{"c_1"});
+    ASSERT_EQ(reloaded_claim.descriptions().size(), 2u);
+    EXPECT_EQ(*reloaded_claim.descriptions()[1]->content().find("en"), "A revised note.");
 }
 
 }  // namespace

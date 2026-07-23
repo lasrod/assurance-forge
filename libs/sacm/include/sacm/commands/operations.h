@@ -6,6 +6,7 @@
 #include "sacm/model/element_id.h"
 #include "sacm/model/lang_string.h"
 
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -167,6 +168,16 @@ struct SetCitation {
     std::optional<model::ElementId> cited;
 };
 
+// Set (or clear) a SACMElement's gid (clause 8.2: gid is String[0..1]). Applies
+// to any SACMElement, not only ModelElements. A non-empty `gid` sets it; an
+// empty `gid` clears it to absent. The model keeps an explicit gid="" distinct
+// from an absent gid for round-trip fidelity, but this operation cannot set the
+// empty-string form (no client needs it) -- empty means clear.
+struct SetGid {
+    model::ElementId element;
+    std::string gid;
+};
+
 // Set a ModelElement's name (clause 8.6: LangString[1]).
 struct SetName {
     model::ElementId element;
@@ -178,6 +189,21 @@ struct SetName {
 // absent (clause 8.9). Empty text removes that language entry.
 struct SetDescription {
     model::ElementId element;
+    std::string text;
+    std::string language;  // may be empty
+};
+
+// Set the description text for one language at ordinal slot `index` in a
+// ModelElement's Description list. The SACM machine model stores descriptions
+// as Description[0..*] (clause 8.9); a client that models more than one (e.g. a
+// primary statement plus a secondary note) addresses them by index. `index`
+// must be <= the current count -- no gaps: an in-range index edits that
+// Description, an index equal to the count appends a new one. Empty text removes
+// that language's entry from an existing slot and never creates a slot.
+// SetDescription is the index==0 special case.
+struct SetDescriptionAt {
+    model::ElementId element;
+    std::size_t index = 0;
     std::string text;
     std::string language;  // may be empty
 };
@@ -231,7 +257,8 @@ using Operation =
                  CreateArgumentReasoning, CreateArtifactReference, CreateAssertedRelationship,
                  CreateTerminologyPackage, CreateCategory, CreateTerm, CreateExpression,
                  CreateArtifactPackage, CreateArtifactAsset, CreateArtifactAssetRelationship,
-                 SetCitation, SetName, SetDescription, SetAssertionDeclaration, AddMetaClaim,
+                 SetCitation, SetGid, SetName, SetDescription, SetDescriptionAt,
+                 SetAssertionDeclaration, AddMetaClaim,
                  AddRelationshipSource, SetExpressionValue, SetTermExternalReference,
                  SetTermOrigin, SetExpressionCategories, AddTaggedValue, DeleteElement>;
 
