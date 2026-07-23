@@ -715,6 +715,35 @@ DeleteOutcome apply_delete_element(LibraryDocument& document, const std::string&
     return outcome;
 }
 
+DeleteOutcome apply_delete_package(LibraryDocument& document, const std::string& package_id) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+
+    const sacm::commands::MutationResult result = doc.apply(sacm::commands::DeleteElement{
+        .target = sacm::model::ElementId(package_id),
+        // Drop referencing relationships rather than reject, so no relationship is
+        // left dangling (SACM-clean; cleaner than legacy `DeleteArtifactPackage`,
+        // which leaves them).
+        .reference_policy = sacm::commands::ReferenceDeletePolicy::DeleteReferencingRelationships,
+        // The target is a package: take its whole subtree.
+        .package_policy = sacm::commands::PackageDeletePolicy::DeleteRecursively,
+        // References from OTHER packages into the removed subtree are dropped too
+        // (a removed argument package may be cited from elsewhere).
+        .cross_package_policy = sacm::commands::CrossPackageReferencePolicy::DeleteExternalReferencingRelationships,
+    });
+
+    DeleteOutcome outcome;
+    outcome.supported = true;
+    outcome.applied = result.applied;
+    for (const sacm::validation::Diagnostic& diagnostic : result.diagnostics) {
+        outcome.diagnostics.push_back(LoadDiagnostic{
+            .code = diagnostic.code,
+            .severity = std::string(sacm::validation::severity_name(diagnostic.severity)),
+            .message = diagnostic.message,
+        });
+    }
+    return outcome;
+}
+
 // -------------------------------------------------------------- terminology
 
 namespace {

@@ -198,6 +198,23 @@ struct DeleteOutcome {
 // docs/sacm/sacm-gsn-metamodel-gaps.md.
 DeleteOutcome apply_delete_element(LibraryDocument& document, const std::string& element_id);
 
+// Deletes an entire package (ArgumentPackage, ArtifactPackage, or
+// TerminologyPackage) and everything it contains, plus the relationships that
+// referenced the removed elements. Routes through the library's `DeleteElement`
+// with `PackageDeletePolicy::DeleteRecursively` and the reference/cross-package
+// policies that drop referencing relationships rather than reject. One seam
+// covers all three package kinds because the library keys deletion on the
+// package's `ElementId`.
+//
+// This is a SACM-clean recursive delete, which matches legacy
+// `core::DeleteArgumentPackage` exactly but is intentionally *cleaner* than the
+// other two legacy helpers: `core::DeleteArtifactPackage` is package-only and
+// leaves referencing evidence relationships dangling (this seam drops them), and
+// `core::DeleteTerminologyPackage` rejects a non-empty package (this seam deletes
+// it recursively). Those divergences are pinned by the tests and are a flip-slice
+// migration concern -- see Phase 1b.
+DeleteOutcome apply_delete_package(LibraryDocument& document, const std::string& package_id);
+
 // ---------------------------------------------------------------------------
 // Terminology edit seams (Phase 0 part 2).
 //
