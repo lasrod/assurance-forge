@@ -60,6 +60,11 @@ struct LoadOutcome {
 // third-party dialects.
 LoadOutcome load_document(const std::filesystem::path& path);
 
+// One-line human-readable summary of load diagnostics ("code/severity: message"
+// entries joined by "; "), for surfacing the library's root-cause in an error
+// message when a load fails. Empty when there are no diagnostics.
+std::string summarize_load_diagnostics(const std::vector<LoadDiagnostic>& diagnostics);
+
 // Re-derives `document` in place from serialized SACM XML, tolerantly. This is
 // the Phase 9 Stage 5 safety net: after an audited edit that was not routed
 // through a library operation, the application rebuilds the library document
