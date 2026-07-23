@@ -17,6 +17,7 @@
 #include "sacm_adapter/document_edit.h"
 #include "sacm_adapter/library_load.h"
 
+#include <map>
 #include <memory>
 #include <sstream>
 #include <unordered_set>

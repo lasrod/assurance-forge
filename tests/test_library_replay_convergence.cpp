@@ -96,10 +96,12 @@ ProjectFixture MakeFixture(const std::string& tag) {
     f.snapshot_abs = core::audit::SnapshotSacmPath(f.project.rootPath, core::audit::kInitialSnapshotId);
     auto pkg = sacm::parse_sacm(f.sacm_abs.string());
     EXPECT_TRUE(pkg.has_value()) << (pkg.has_value() ? "" : pkg.error());
-    f.package = std::move(pkg.value());
+    if (pkg.has_value())
+        f.package = std::move(pkg.value());
     auto parsed = parser::parse_sacm_xml_string(kSampleSacm);
     EXPECT_TRUE(parsed.has_value()) << (parsed.has_value() ? "" : parsed.error());
-    f.model = std::move(parsed.value());
+    if (parsed.has_value())
+        f.model = std::move(parsed.value());
     return f;
 }
 
@@ -107,12 +109,17 @@ ProjectFixture MakeFixture(const std::string& tag) {
 core::audit::ReplayState LegacyReplay(const ProjectFixture& f,
                                       const std::vector<core::audit::AuditTransaction>& txns) {
     auto snapshot_pkg = sacm::parse_sacm(f.snapshot_abs.string());
-    EXPECT_TRUE(snapshot_pkg.has_value());
     auto snapshot_model = parser::parse_sacm_xml(f.snapshot_abs.string());
-    EXPECT_TRUE(snapshot_model.has_value());
+    if (!snapshot_pkg.has_value() || !snapshot_model.has_value()) {
+        ADD_FAILURE() << "snapshot parse failed";
+        return {};
+    }
     auto replayed = core::audit::Replayer::ReplayFrom(
         *snapshot_model, *snapshot_pkg, txns, std::numeric_limits<std::uint64_t>::max());
-    EXPECT_TRUE(replayed.has_value()) << (replayed.has_value() ? "" : replayed.error());
+    if (!replayed.has_value()) {
+        ADD_FAILURE() << replayed.error();
+        return {};
+    }
     return std::move(replayed.value());
 }
 
