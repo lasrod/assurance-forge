@@ -135,11 +135,21 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
         const auto* model_element = static_cast<const sacm::model::ModelElement*>(&element);
         const auto& descriptions = model_element->descriptions();
         if (!descriptions.empty()) {
+            // content = the FIRST Description (clause 8.9 statement, slot 0).
             const sacm::model::MultiLangString& statement = descriptions.front()->content();
             projected.content = statement.primary();
             fill_lang_map(projected.content_langs, statement);
-            // The statement is the primary Description; a second Description is
-            // the secondary note the POD keeps in its `description` field.
+            // note (the POD `description`) = the SECOND Description (slot 1) when
+            // present; otherwise it mirrors the statement. The mirror is
+            // deliberate and load-bearing: a claim whose text lives in a single
+            // Description (whether authored as `content=` or a lone
+            // `description=`) has no distinct note, and the app's `description`
+            // field has historically shown that statement. It also keeps the
+            // audit's legacy-bridge convergent -- the bridge round-trips a
+            // description-only claim through this projection, and mirroring the
+            // statement is what reproduces the legacy parser's `description`
+            // field for such a claim. A genuine note (a real second Description,
+            // e.g. written by the Description edit seam) is read from slot 1.
             const sacm::model::MultiLangString& note =
                 descriptions.size() > 1 ? descriptions[1]->content() : statement;
             projected.description = note.primary();

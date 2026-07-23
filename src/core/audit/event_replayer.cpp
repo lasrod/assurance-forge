@@ -821,15 +821,40 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         }
         // `Name` maps cleanly onto the library seam (SetName). `Content` and
-        // `Description` do NOT: the app models a claim with two text slots
-        // (content = statement, description = note), while SACM/library has an
-        // ordered Description list. A claim loaded from a `description=`
-        // attribute puts that text in the library's FRONT Description = the
-        // app's content slot, so `apply_text_edit(Content)` would overwrite it,
-        // whereas the legacy mutator writes a separate content field and keeps
-        // the note -- a real divergence (see the impedance note in
-        // src/sacm_adapter/document_edit.h). Bridge those two fields through the
-        // legacy `SetElementTextField` so replay reproduces the live path.
+        // `Description` on a CLAIM stay BRIDGED -- and this is not a missing op
+        // (Phase 2 slice 2a added SetDescriptionAt so the seam can address both
+        // Description slots) but an IRRECONCILABLE data-model difference, proven
+        // by measuring the replay:
+        //
+        //   The app models a claim with two text slots (content = statement,
+        //   description = note). The legacy POD keeps them as two independent
+        //   fields whose values depend on how the claim was LOADED: a `content=`
+        //   attribute fills `content`, a `description=` attribute fills
+        //   `description`. The library instead stores clause-8.9 Description[0..*]
+        //   as an ordered list, and a claim with a single Description is
+        //   indistinguishable whether that text arrived as content or as a note.
+        //
+        //   So a claim loaded from `description="X"` (no content) has, in the
+        //   library, one Description at slot 0 = the app's content. Editing
+        //   Content overwrites it (correct for the library-primary model), which
+        //   DESTROYS "X". The legacy mutator instead sets a separate `content`
+        //   field and KEEPS `description="X"` as the note. Measured:
+        //     library: content="fully safe", description="fully safe"
+        //     legacy:  content="fully safe", description="The system is safe."
+        //   No seam or projection can recover "The system is safe." -- the
+        //   overwrite already dropped it -- and preserving the old slot 0 as a
+        //   note would instead break a content-only claim (whose legacy
+        //   description is empty). The two legacy states collapse to one library
+        //   state, so the seam cannot reproduce both.
+        //
+        //   This divergence is the migration being MORE correct (a lone
+        //   Description is the statement, clause 8.9), but the replay oracle
+        //   compares against the legacy mutator, so Content/Description stay
+        //   bridged: run the SAME legacy `SetElementTextField` onto a projected
+        //   package and re-derive the library, reproducing the legacy fields
+        //   exactly. The seam's SetDescriptionAt slot mapping still powers the
+        //   LIVE library-primary edit path (apply_text_edit), where the
+        //   description-only claim's text is correctly a statement.
         if (field == core::ElementTextField::Name) {
             const sacm_adapter::EditOutcome outcome = sacm_adapter::apply_text_edit(
                 document, element_id, ToAdapterTextField(field), language, new_value);
@@ -874,15 +899,15 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
     }
 
     // ---- Terminology events ---------------------------------------------
-    // The gid-minting CREATE and ASSOCIATE events are BRIDGED: the legacy
-    // `Create*WithIds` / associate mutators mint `gid-<id>` (via
-    // GenerateUniqueGid) and the created ArtifactReference/AssertedContext carry
-    // forced gids, none of which the library seams assign (the library has no
-    // create-time gid operation -- see src/sacm_adapter/document_edit.h). So we
-    // run the SAME legacy mutator onto a projected package and re-derive the
-    // library, reproducing the legacy gids exactly. The terminology
-    // UPDATE/DELETE events below stay on the seams: they operate on existing
-    // ids and converge without a gid op.
+    // Phase 2 slice 2a routes the gid-minting CREATE and ASSOCIATE events back
+    // through the library seams. The seams now mint the legacy `gid-<id>` (via
+    // the SetGid operation, matching core::GenerateUniqueGid) on the created
+    // terminology package/category/term and on the association's
+    // ArtifactReference/AssertedContext, so these converge on the RAW canonical
+    // hash without bridging. The forced element ids the audit recorded are
+    // passed to the seams verbatim; each element's gid is `gid-<id>`, so the
+    // seam reconstructs the recorded gid from the id alone (no forced-gid
+    // plumbing needed). UPDATE/DELETE were already seam-mapped.
 
     if (type == "CreateTerminologyPackage") {
         std::string name, description, generated_id, generated_gid;
@@ -894,19 +919,14 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         if (!require_string("generated_gid", generated_gid))
             return false;
-        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate = [&](parser::AssuranceCase& /*model*/,
-                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-            const core::TerminologyPackageCreateResult result = core::CreateTerminologyPackageWithIds(
-                package, name, description, generated_id, generated_gid);
-            if (!result.success) {
-                err = "CreateTerminologyPackageWithIds (bridge) failed at " + location + ": " +
-                      result.error;
-                return false;
-            }
-            return true;
-        };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        const sacm_adapter::TerminologyCreateOutcome outcome =
+            sacm_adapter::apply_create_terminology_package(document, name, description, generated_id);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = FormatSeamFailure("apply_create_terminology_package", tx_seq, event,
+                                          outcome.supported, outcome.applied, outcome.diagnostics);
+            return false;
+        }
+        return true;
     }
 
     if (type == "UpdateTerminologyPackage") {
@@ -943,23 +963,15 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         if (!require_string("generated_gid", generated_gid))
             return false;
-        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate = [&](parser::AssuranceCase& /*model*/,
-                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-            core::TerminologyCategoryDraft draft;
-            draft.name        = name;
-            draft.description = description;
-            const core::TerminologyCategoryCreateResult result = core::CreateTerminologyCategoryWithIds(
-                package, core::TerminologyPackageRef{package_id, package_gid}, draft, generated_id,
-                generated_gid);
-            if (!result.success) {
-                err = "CreateTerminologyCategoryWithIds (bridge) failed at " + location + ": " +
-                      result.error;
-                return false;
-            }
-            return true;
-        };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        const sacm_adapter::TerminologyCreateOutcome outcome =
+            sacm_adapter::apply_create_terminology_category(document, package_id, name, description,
+                                                            generated_id);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = FormatSeamFailure("apply_create_terminology_category", tx_seq, event,
+                                          outcome.supported, outcome.applied, outcome.diagnostics);
+            return false;
+        }
+        return true;
     }
 
     if (type == "UpdateTerminologyCategory") {
@@ -1027,33 +1039,27 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         if (!require_string("generated_gid", generated_gid))
             return false;
-        core::TerminologyTermDraft draft;
-        draft.value             = value;
-        draft.name              = name;
-        draft.description       = description;
-        draft.externalReference = external_reference;
-        draft.origin            = origin;
-        auto category_refs_it   = payload.find("category_refs");
+        sacm_adapter::TerminologyTermFields fields;
+        fields.value              = value;
+        fields.name               = name;
+        fields.description        = description;
+        fields.external_reference = external_reference;
+        fields.origin             = origin;
+        auto category_refs_it     = payload.find("category_refs");
         if (category_refs_it != payload.end() && category_refs_it->is_array()) {
             for (const auto& entry : *category_refs_it) {
                 if (entry.is_string())
-                    draft.category_refs.push_back(entry.get<std::string>());
+                    fields.category_refs.push_back(entry.get<std::string>());
             }
         }
-        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate = [&](parser::AssuranceCase& /*model*/,
-                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-            const core::TerminologyTermCreateResult result = core::CreateTerminologyTermWithIds(
-                package, core::TerminologyPackageRef{package_id, package_gid}, draft, generated_id,
-                generated_gid);
-            if (!result.success) {
-                err = "CreateTerminologyTermWithIds (bridge) failed at " + location + ": " +
-                      result.error;
-                return false;
-            }
-            return true;
-        };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        const sacm_adapter::TerminologyCreateOutcome outcome =
+            sacm_adapter::apply_create_terminology_term(document, package_id, fields, generated_id);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = FormatSeamFailure("apply_create_terminology_term", tx_seq, event,
+                                          outcome.supported, outcome.applied, outcome.diagnostics);
+            return false;
+        }
+        return true;
     }
 
     if (type == "UpdateTerminologyTerm") {
@@ -1153,21 +1159,19 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         core::TerminologyContextForcedIds forced;
         if (!read_context_association(element_id, package_id, package_gid, term_id, term_gid, forced))
             return false;
-        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate = [&](parser::AssuranceCase& /*model*/,
-                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-            const core::TerminologyContextAssociationResult result =
-                core::AssociateTerminologyTermWithElementWithIds(
-                    package, element_id, core::TerminologyPackageRef{package_id, package_gid},
-                    core::TerminologyTermRef{term_id, term_gid}, forced);
-            if (!result.success) {
-                err = "AssociateTerminologyTermWithElementWithIds (bridge) failed at " + location +
-                      ": " + result.error;
-                return false;
-            }
-            return true;
-        };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        // The forced element ids are passed to the seam verbatim; the seam mints
+        // each created element's `gid-<id>` from its id, reproducing the legacy
+        // forced gids exactly.
+        const sacm_adapter::TerminologyContextOutcome outcome =
+            sacm_adapter::apply_associate_terminology_term(document, element_id, term_id,
+                                                           forced.artifact_reference_id,
+                                                           forced.asserted_context_id);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = FormatSeamFailure("apply_associate_terminology_term", tx_seq, event,
+                                          outcome.supported, outcome.applied, outcome.diagnostics);
+            return false;
+        }
+        return true;
     }
 
     if (type == "AddTerminologyTermAsVisibleContext") {
@@ -1175,25 +1179,16 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         core::TerminologyContextForcedIds forced;
         if (!read_context_association(element_id, package_id, package_gid, term_id, term_gid, forced))
             return false;
-        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate = [&](parser::AssuranceCase& /*model*/,
-                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-            // The legacy live path also syncs the parser model
-            // (SyncVisibleTerminologyContextToParser), but that only touches the
-            // projected model -- the bridge re-derives the library from the
-            // serialized package, so only the package mutation matters here.
-            const core::TerminologyContextAssociationResult result =
-                core::AddTerminologyTermAsVisibleContextWithIds(
-                    package, element_id, core::TerminologyPackageRef{package_id, package_gid},
-                    core::TerminologyTermRef{term_id, term_gid}, forced);
-            if (!result.success) {
-                err = "AddTerminologyTermAsVisibleContextWithIds (bridge) failed at " + location +
-                      ": " + result.error;
-                return false;
-            }
-            return true;
-        };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        const sacm_adapter::TerminologyContextOutcome outcome =
+            sacm_adapter::apply_add_terminology_visible_context(document, element_id, term_id,
+                                                                forced.artifact_reference_id,
+                                                                forced.asserted_context_id);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = FormatSeamFailure("apply_add_terminology_visible_context", tx_seq, event,
+                                          outcome.supported, outcome.applied, outcome.diagnostics);
+            return false;
+        }
+        return true;
     }
 
     // ---- Bridge events ---------------------------------------------------

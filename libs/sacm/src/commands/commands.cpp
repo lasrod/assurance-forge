@@ -956,6 +956,38 @@ void perform_set_citation(model::Document& document, const SetCitation& set) {
     Access::is_citation(*element) = set.cited.has_value();
 }
 
+CheckOutcome check_set_gid(const model::Document& document, const SetGid& set, const Operation& op) {
+    CheckOutcome outcome;
+    const SACMElement* element = document.find(set.element);
+    if (element == nullptr) {
+        outcome.diagnostics.push_back(
+            make_error(validation::codes::kCmdTargetNotFound, "SACM23-BASE-001", op, {set.element},
+                       std::format("element '{}' not found", set.element.value())));
+        return outcome;
+    }
+    // gid lives on the SACMElement base (clause 8.2), so every element is a
+    // valid target -- no ModelElement narrowing.
+    outcome.effects.push_back(ChangeRecord{
+        .id = set.element,
+        .kind = element->kind(),
+        .change = ChangeRecord::Change::Modified,
+        .parent = std::nullopt,
+        .property = "gid",
+        .before = element->gid(),
+        .after = set.gid.empty() ? std::nullopt : std::optional(set.gid),
+    });
+    return outcome;
+}
+
+void perform_set_gid(model::Document& document, const SetGid& set) {
+    auto* element = const_cast<SACMElement*>(document.find(set.element));
+    if (set.gid.empty()) {
+        Access::gid(*element) = std::nullopt;
+    } else {
+        Access::gid(*element) = set.gid;
+    }
+}
+
 // Shared check for setters targeting a ModelElement.
 CheckOutcome check_model_element_target(const model::Document& document,
                                         const model::ElementId& target,
@@ -1057,6 +1089,93 @@ void perform_set_description(model::Document& document, const SetDescription& se
     } else {
         content.set(set.language, set.text);
     }
+}
+
+CheckOutcome check_set_description_at(const model::Document& document, const SetDescriptionAt& set,
+                                      const Operation& op) {
+    CheckOutcome outcome;
+    const SACMElement* element = document.find(set.element);
+    if (element == nullptr) {
+        outcome.diagnostics.push_back(
+            make_error(validation::codes::kCmdTargetNotFound, "SACM23-BASE-001", op, {set.element},
+                       std::format("element '{}' not found", set.element.value())));
+        return outcome;
+    }
+    const auto* model_element = dynamic_cast<const model::ModelElement*>(element);
+    if (model_element == nullptr) {
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kCmdInvalidParent, "SACM23-BASE-001", op, {set.element},
+            std::format("a {} carries no description metadata",
+                        metadata::kind_name(element->kind()))));
+        return outcome;
+    }
+    const std::size_t count = model_element->descriptions().size();
+    if (set.index > count) {
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kCmdInvalidParent, "SACM23-BASE-001", op, {set.element},
+            std::format("cannot set description slot {}; element has {} description(s) (no gaps)",
+                        set.index, count)));
+        return outcome;
+    }
+    if (set.index < count) {
+        outcome.effects.push_back(ChangeRecord{
+            .id = set.element,
+            .kind = element->kind(),
+            .change = ChangeRecord::Change::Modified,
+            .parent = std::nullopt,
+            .property = std::format("description[{}]", set.index),
+            .before = std::nullopt,
+            // Empty text REMOVES the language entry, so report the value as absent
+            // rather than as an empty string -- audit/undo consumers must be able
+            // to tell a clear from a set-to-empty (same convention as SetGid).
+            .after = set.text.empty() ? std::nullopt : std::optional(set.text),
+        });
+        return outcome;
+    }
+    // index == count: appending a new Description (only when there is text).
+    if (!set.text.empty()) {
+        std::unordered_set<ElementId> claimed;
+        outcome.effects.push_back(ChangeRecord{
+            .id = peek_generated_id(document, model::ElementKind::Description, claimed),
+            .kind = model::ElementKind::Description,
+            .change = ChangeRecord::Change::Created,
+            .parent = set.element,
+            .property = std::nullopt,
+            .after = set.text,
+        });
+    }
+    return outcome;
+}
+
+void perform_set_description_at(model::Document& document, const SetDescriptionAt& set,
+                                const std::vector<ChangeRecord>& effects) {
+    auto* element =
+        const_cast<model::ModelElement*>(document.find_as<model::ModelElement>(set.element));
+    std::vector<std::unique_ptr<model::Description>>& descriptions = Access::descriptions(*element);
+    if (set.index < descriptions.size()) {
+        model::MultiLangString& content = Access::content(*descriptions[set.index]);
+        if (set.text.empty()) {
+            std::erase_if(content.values, [&set](const model::LangString& entry) {
+                return entry.lang == set.language;
+            });
+        } else {
+            content.set(set.language, set.text);
+        }
+        return;
+    }
+    // Appending a new Description at the end (index == size). Empty text is a
+    // no-op (no slot to create), so the check emitted no Created effect.
+    if (set.text.empty()) {
+        return;
+    }
+    const ChangeRecord& created = effects.back();
+    auto description = std::make_unique<model::Description>(created.id);
+    Access::content(*description).set(set.language, set.text);
+    Access::set_parent(*description, element);
+    advance_id_counter(document, model::ElementKind::Description, created.id);
+    model::Description* raw = description.get();
+    descriptions.push_back(std::move(description));
+    Access::index(document)[raw->id()] = raw;
 }
 
 CheckOutcome check_add_tagged_value(const model::Document& document, const AddTaggedValue& add,
@@ -1557,10 +1676,14 @@ CheckOutcome check(const model::Document& document, const Operation& operation) 
                                                 /*parent_may_be_acp=*/false, op.name, operation);
             } else if constexpr (std::is_same_v<T, SetCitation>) {
                 return check_set_citation(document, op, operation);
+            } else if constexpr (std::is_same_v<T, SetGid>) {
+                return check_set_gid(document, op, operation);
             } else if constexpr (std::is_same_v<T, SetName>) {
                 return check_set_name(document, op, operation);
             } else if constexpr (std::is_same_v<T, SetDescription>) {
                 return check_set_description(document, op, operation);
+            } else if constexpr (std::is_same_v<T, SetDescriptionAt>) {
+                return check_set_description_at(document, op, operation);
             } else if constexpr (std::is_same_v<T, AddTaggedValue>) {
                 return check_add_tagged_value(document, op, operation);
             } else {
@@ -1617,10 +1740,14 @@ void perform(model::Document& document, const Operation& operation,
                 perform_create_expression(document, op, effects);
             } else if constexpr (std::is_same_v<T, SetCitation>) {
                 perform_set_citation(document, op);
+            } else if constexpr (std::is_same_v<T, SetGid>) {
+                perform_set_gid(document, op);
             } else if constexpr (std::is_same_v<T, SetName>) {
                 perform_set_name(document, op);
             } else if constexpr (std::is_same_v<T, SetDescription>) {
                 perform_set_description(document, op, effects);
+            } else if constexpr (std::is_same_v<T, SetDescriptionAt>) {
+                perform_set_description_at(document, op, effects);
             } else if constexpr (std::is_same_v<T, AddTaggedValue>) {
                 perform_add_tagged_value(document, op, effects);
             } else {

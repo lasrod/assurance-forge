@@ -50,10 +50,14 @@ std::string_view operation_name(const Operation& operation) {
                 return "CreateExpression";
             } else if constexpr (std::is_same_v<T, SetCitation>) {
                 return "SetCitation";
+            } else if constexpr (std::is_same_v<T, SetGid>) {
+                return "SetGid";
             } else if constexpr (std::is_same_v<T, SetName>) {
                 return "SetName";
             } else if constexpr (std::is_same_v<T, SetDescription>) {
                 return "SetDescription";
+            } else if constexpr (std::is_same_v<T, SetDescriptionAt>) {
+                return "SetDescriptionAt";
             } else if constexpr (std::is_same_v<T, AddTaggedValue>) {
                 return "AddTaggedValue";
             } else {
