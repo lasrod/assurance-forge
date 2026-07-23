@@ -296,15 +296,25 @@ bool LoadSnapshotModels(const std::filesystem::path& sacm_path,
         return true;
     }
 
-    // Legacy fallback: the library could not read this snapshot.
+    // The library could not read this snapshot; fall back to the legacy parsers.
+    // Keep the library diagnostics so that if the fallback ALSO fails, the error
+    // reports the root cause (e.g. an XMI dialect/version issue) rather than only
+    // the legacy parser's message.
+    std::string library_note;
+    for (const sacm_adapter::LoadDiagnostic& diagnostic : outcome.diagnostics)
+        library_note += "\n    [library " + diagnostic.severity + "] " + diagnostic.message;
+    const std::string library_suffix =
+        library_note.empty() ? std::string() : "\n  SACM library load also failed:" + library_note;
+
     auto pkg = sacm::parse_sacm(sacm_path.string());
     if (!pkg) {
-        error = "Failed to parse snapshot SACM at " + sacm_path.string() + ": " + pkg.error();
+        error = "Failed to parse snapshot SACM at " + sacm_path.string() + ": " + pkg.error() + library_suffix;
         return false;
     }
     auto ac = parser::parse_sacm_xml(sacm_path.string());
     if (!ac) {
-        error = "Failed to parse snapshot parser model at " + sacm_path.string() + ": " + ac.error();
+        error = "Failed to parse snapshot parser model at " + sacm_path.string() + ": " + ac.error() +
+                library_suffix;
         return false;
     }
     out_package = std::move(*pkg);
