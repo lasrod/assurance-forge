@@ -487,6 +487,7 @@ TEST(LibraryPrimaryEditFlip, AcpConfidenceTreeMatchesLegacyCanonicalHash) {
         core::commands::CreateConfidenceArgumentTreeForAcpCommand create_tree(acp_id);
         EXPECT_TRUE(RunCommand(fixture, create_tree, ctx).success);
         EXPECT_FALSE(create_tree.GeneratedArgumentPackageId().empty());
+        EXPECT_FALSE(create_tree.GeneratedTopGoalId().empty());
     };
     run(*library_side);
     run(*legacy_side);
