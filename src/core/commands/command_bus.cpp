@@ -2,6 +2,7 @@
 
 #include "core/audit/audit_paths.h"
 #include "core/audit/canonical_model_hash.h"
+#include "core/derived_views.h"
 #include "core/library_package_projection.h"
 #include "core/project_file_io.h"
 #include "core/sha256.h"
@@ -33,13 +34,35 @@ std::unique_ptr<CommandBus> CommandBus::Open(AssuranceProject project,
 CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const std::string& author) {
     CommandResult result;
 
+    // Each command must opt into its edit-routing explicitly. The context is
+    // reused across commands, so reset the per-command flags before `Apply`:
+    // otherwise a `library_primary` flag left set by a PRIOR flipped command
+    // would make the bus rebuild the views from the library over a LATER
+    // unflipped command's legacy edit (losing it, and drifting the library).
+    ctx.library_primary = false;
+    ctx.library_synced = false;
+
     audit::AuditEvent event;
     std::string apply_error;
     if (!command.Apply(ctx, event, apply_error)) {
+        // A library-primary command that failed part-way through a compound
+        // mutation may already have changed the library. Re-derive the views so
+        // they can never drift from it, even on the failure path.
+        if (ctx.library_primary && ctx.library_document != nullptr)
+            core::RebuildDerivedViewsFromLibrary(*ctx.library_document, ctx.model, ctx.package);
         result.success = false;
         result.error = std::move(apply_error);
         return result;
     }
+
+    // Phase 2 slice 2b-1 -- the live edit flip. The command mutated the LIBRARY
+    // natively, so the library is the source of truth for this edit and the two
+    // legacy views are rebuilt from it (the same projection + render passes
+    // `AppState::load_file` applies after a library load) BEFORE anything
+    // downstream reads them. Serialization, hashing, the audit append and the
+    // autosave are untouched: they just read the freshly-derived package.
+    if (ctx.library_primary && ctx.library_document != nullptr)
+        core::RebuildDerivedViewsFromLibrary(*ctx.library_document, ctx.model, ctx.package);
 
     // Serialize once so the bytes we write, the bytes we hash, and the
     // bytes we re-derive the canonical hash from are identical. Phase 9 Stage
@@ -116,7 +139,11 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     // (`xml`, the same bytes we hashed) so it never drifts. This touches
     // neither the audit log nor the saved package, so the tamper chain is
     // unaffected.
-    if (ctx.library_document != nullptr && !ctx.library_synced) {
+    //
+    // A `library_primary` command runs the OPPOSITE direction (the views were
+    // rebuilt from the library above), so it must be excluded here or the net
+    // would immediately overwrite the library with a package projected from it.
+    if (ctx.library_document != nullptr && !ctx.library_synced && !ctx.library_primary) {
         if (!sacm_adapter::reload_document(*ctx.library_document, xml) && result.error.empty()) {
             // Soft warning: the edit is committed and the saved package is
             // authoritative, but the library-backed view could not be

@@ -773,14 +773,33 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
                         FormatLocation(tx_seq, event.event_sequence, type);
             return false;
         }
-        // The legacy `RemoveElement` cascades a subtree via a removal plan; the
-        // library seam deletes one element (plus its relationships). Reproduce
-        // the plan by deleting every id the command recorded in `deleted_ids`
-        // (node ids only -- `PlanRemoval` excludes relationships, which the seam
-        // drops as it deletes each node). NodeOnly-with-children reparenting is
-        // NOT reproduced here (the library has no relationship-retarget op yet);
-        // that gap is a later slice, see src/sacm_adapter/document_edit.h.
-        (void)mode;
+        // The legacy `RemoveElement` SCRUBS references and drops a relationship
+        // only once it is structurally empty; the library seam's delete CASCADES
+        // the whole relationship as soon as it references a doomed element. Those
+        // agree only for some shapes. Removing ONE sub-goal of a strategy whose
+        // single inference has several sources diverges -- cascading there drops
+        // the inference and silently detaches the strategy and its remaining
+        // sub-goals from the argument. Use the seams only where the cascade
+        // provably reproduces the legacy removal; otherwise bridge through the
+        // same legacy mutator the live path uses. (The proper fix is a library
+        // relationship-source-removal operation, which would let both paths
+        // scrub -- see docs/sacm/sacm-gsn-metamodel-gaps.md.)
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const parser::AssuranceCase planning_model = sacm_adapter::project_case(document);
+        if (!core::RemovalPlanIsCascadeEquivalent(planning_model, element_id, mode)) {
+            const BridgeMutator mutate = [&](parser::AssuranceCase& model,
+                                             sacm::AssuranceCasePackage& package,
+                                             std::string& err) -> bool {
+                std::string remove_error;
+                if (!core::RemoveElement(model, &package, element_id, mode, remove_error)) {
+                    err = "RemoveElement (bridge) failed at " + location + ": " + remove_error;
+                    return false;
+                }
+                return true;
+            };
+            return BridgeViaLegacy(document, location, mutate, out_error);
+        }
+
         auto deleted_it = payload.find("deleted_ids");
         if (deleted_it == payload.end() || !deleted_it->is_array()) {
             out_error = "Missing or non-array 'deleted_ids' at " +

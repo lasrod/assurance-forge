@@ -3,6 +3,8 @@
 #include "sacm_adapter/document_edit.h"
 
 #include <algorithm>
+#include <string>
+#include <vector>
 
 namespace core::commands {
 
@@ -21,6 +23,69 @@ sacm_adapter::TextField ToAdapterTextField(ElementTextField field) {
         return sacm_adapter::TextField::Content;
     }
     return sacm_adapter::TextField::Name;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2 slice 2b-1 -- the LIVE edit flip for the core GSN element commands.
+//
+// A flipped command mutates the library FIRST (through the seams Phase 1b
+// proved canonical-hash-equivalent to the legacy mutators) and sets
+// `ctx.library_primary`, which makes the bus rebuild `ctx.model` /
+// `ctx.package` from the library. The audit payload is unchanged: the ids are
+// planned by the SAME generator the legacy factory uses
+// (`core::Plan*Ids`) and handed to the seam verbatim.
+//
+// The flip is conditional on a library document being present, because two
+// legitimate callers have none: a file opened through the legacy-parser
+// fallback, and the no-bus dispatch path (plus most unit tests). Those keep the
+// legacy mutator, and the bus's Stage 5 net keeps the library in step -- i.e.
+// exactly the pre-flip behaviour.
+//
+// The seams report two distinct failures and this routing keeps them distinct:
+//   * supported == false  -- no library mapping for this shape; NOTHING was
+//     mutated, so fall back to the legacy mutator.
+//   * applied == false    -- the library REJECTED the edit. Its diagnostics are
+//     surfaced verbatim and the command fails. Quietly applying the legacy edit
+//     instead would reinterpret a library rejection, which is precisely the
+//     divergence this migration exists to remove.
+
+sacm_adapter::ChildKind ToAdapterChildKind(NewElementKind kind) {
+    switch (kind) {
+    case NewElementKind::Goal:          return sacm_adapter::ChildKind::Goal;
+    case NewElementKind::Strategy:      return sacm_adapter::ChildKind::Strategy;
+    case NewElementKind::Solution:      return sacm_adapter::ChildKind::Solution;
+    case NewElementKind::Context:       return sacm_adapter::ChildKind::Context;
+    case NewElementKind::Assumption:    return sacm_adapter::ChildKind::Assumption;
+    case NewElementKind::Justification: return sacm_adapter::ChildKind::Justification;
+    }
+    return sacm_adapter::ChildKind::Goal;
+}
+
+sacm_adapter::ChallengeSource ToAdapterChallengeSource(ChallengeSourceType type) {
+    switch (type) {
+    case ChallengeSourceType::CounterArgument: return sacm_adapter::ChallengeSource::CounterArgument;
+    case ChallengeSourceType::CounterEvidence: return sacm_adapter::ChallengeSource::CounterEvidence;
+    }
+    return sacm_adapter::ChallengeSource::CounterArgument;
+}
+
+// Library diagnostics, surfaced verbatim (code/severity/message) so the
+// application never has to reinterpret why the library refused an edit.
+std::string FormatLibraryDiagnostics(const std::vector<sacm_adapter::LoadDiagnostic>& diagnostics) {
+    if (diagnostics.empty())
+        return "(no library diagnostics)";
+    std::string summary;
+    for (const sacm_adapter::LoadDiagnostic& diagnostic : diagnostics) {
+        if (!summary.empty())
+            summary += "; ";
+        summary += diagnostic.code + "/" + diagnostic.severity + ": " + diagnostic.message;
+    }
+    return summary;
+}
+
+std::string LibraryRejection(const std::string& seam,
+                             const std::vector<sacm_adapter::LoadDiagnostic>& diagnostics) {
+    return "The SACM library rejected " + seam + ": " + FormatLibraryDiagnostics(diagnostics);
 }
 
 } // namespace
@@ -90,7 +155,22 @@ bool ArgumentTargetKindFromToken(const std::string& token, ArgumentTarget::Kind&
 }
 
 bool CreateTopGoalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
-    if (!core::AddTopGoal(ctx.model, &ctx.package, generated_id_, out_error))
+    bool applied_to_library = false;
+    if (ctx.library_document != nullptr) {
+        const std::string planned_id = core::PlanTopGoalId(ctx.model);
+        const sacm_adapter::AddChildOutcome outcome =
+            sacm_adapter::apply_add_top_goal(*ctx.library_document, planned_id);
+        if (outcome.supported && !outcome.applied) {
+            out_error = LibraryRejection("the new top goal", outcome.diagnostics);
+            return false;
+        }
+        if (outcome.applied) {
+            generated_id_ = outcome.new_element_id;
+            ctx.library_primary = true;
+            applied_to_library = true;
+        }
+    }
+    if (!applied_to_library && !core::AddTopGoal(ctx.model, &ctx.package, generated_id_, out_error))
         return false;
 
     out_event.event_type = "CreateTopGoal";
@@ -104,7 +184,34 @@ bool CreateChildElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& ou
         out_error = "CreateChildElementCommand requires a parent id";
         return false;
     }
-    if (!core::AddChildElement(ctx.model, &ctx.package, parent_id_, kind_, generated_id_,
+
+    bool applied_to_library = false;
+    if (ctx.library_document != nullptr) {
+        std::string planned_element_id;
+        std::string planned_relationship_id;
+        if (!core::PlanChildElementIds(ctx.model, &ctx.package, parent_id_, kind_, planned_element_id,
+                                       planned_relationship_id, out_error))
+            return false;
+        const sacm_adapter::AddChildOutcome outcome =
+            sacm_adapter::apply_add_child(*ctx.library_document, parent_id_, ToAdapterChildKind(kind_),
+                                          planned_element_id, planned_relationship_id);
+        if (outcome.supported && !outcome.applied) {
+            out_error = LibraryRejection("the new child element", outcome.diagnostics);
+            return false;
+        }
+        if (outcome.applied) {
+            generated_id_ = outcome.new_element_id;
+            // Empty for a Strategy (its inference is deferred to the first
+            // sub-goal) and for a sub-goal that EXTENDS an existing strategy
+            // inference -- the same "id actually created" semantics the legacy
+            // factory records, so the audit payload is unchanged.
+            generated_relationship_id_ = outcome.new_relationship_id;
+            ctx.library_primary = true;
+            applied_to_library = true;
+        }
+    }
+    if (!applied_to_library &&
+        !core::AddChildElement(ctx.model, &ctx.package, parent_id_, kind_, generated_id_,
                                generated_relationship_id_, out_error))
         return false;
 
@@ -122,8 +229,34 @@ bool CreateChallengeCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_e
         out_error = "CreateChallengeCommand requires a target id";
         return false;
     }
-    if (!core::AddChallenge(ctx.model, &ctx.package, target_, source_type_, generated_id_, generated_relationship_id_,
-                            out_error))
+
+    bool applied_to_library = false;
+    if (ctx.library_document != nullptr) {
+        std::string planned_element_id;
+        std::string planned_relationship_id;
+        if (!core::PlanChallengeIds(ctx.model, &ctx.package, target_, source_type_, planned_element_id,
+                                    planned_relationship_id, out_error))
+            return false;
+        // The seam resolves an element vs relationship target itself (the
+        // library gives every contained element a parent), so `target_.kind` is
+        // only used above, for the anchor the legacy id prefix is scoped to.
+        const sacm_adapter::AddChildOutcome outcome = sacm_adapter::apply_challenge(
+            *ctx.library_document, target_.id, ToAdapterChallengeSource(source_type_),
+            planned_element_id, planned_relationship_id);
+        if (outcome.supported && !outcome.applied) {
+            out_error = LibraryRejection("the new challenge", outcome.diagnostics);
+            return false;
+        }
+        if (outcome.applied) {
+            generated_id_ = outcome.new_element_id;
+            generated_relationship_id_ = outcome.new_relationship_id;
+            ctx.library_primary = true;
+            applied_to_library = true;
+        }
+    }
+    if (!applied_to_library &&
+        !core::AddChallenge(ctx.model, &ctx.package, target_, source_type_, generated_id_,
+                            generated_relationship_id_, out_error))
         return false;
 
     out_event.event_type = "CreateChallenge";
@@ -151,7 +284,41 @@ bool RemoveElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
     std::vector<std::string> deleted_ids(planned.begin(), planned.end());
     std::sort(deleted_ids.begin(), deleted_ids.end());
 
-    if (!core::RemoveElement(ctx.model, &ctx.package, element_id_, mode_, out_error))
+    // The library seam deletes ONE element and cascades every relationship that
+    // references it, which reproduces the legacy scrub-then-drop only for some
+    // removal shapes -- `RemovalPlanIsCascadeEquivalent` decides, and the ones it
+    // rejects keep the legacy mutator (with the bus's Stage 5 net re-deriving the
+    // library afterwards, so nothing drifts).
+    //
+    // Measured divergence this guard prevents (LibraryPrimaryEditFlip
+    // .RemoveKeepsSiblingUnderSharedStrategyInference): with a strategy S1 whose
+    // single inference R1 has sources {G3, G4}, deleting G3 leaves legacy with
+    // `R1 reasoning=S1 sources=G4 targets=G1` but leaves the library with NO
+    // inference at all -- S1 and G4 silently fall off the argument. Canonical
+    // hashes 7b74343d... (legacy) vs 6be86b56... (cascade). Closing that gap
+    // needs a source-removal operation in libs/sacm, not a workaround here.
+    bool applied_to_library = false;
+    if (ctx.library_document != nullptr &&
+        core::RemovalPlanIsCascadeEquivalent(ctx.model, element_id_, mode_)) {
+        // Exactly the ids `PlanRemoval` produced -- the same set the audit event
+        // records, walked in the same sorted order `ApplyEventToLibrary` replays,
+        // so the live document and the replayed document agree by construction.
+        for (const std::string& id : deleted_ids) {
+            const sacm_adapter::DeleteOutcome outcome =
+                sacm_adapter::apply_delete_element(*ctx.library_document, id);
+            if (!outcome.applied) {
+                // Mid-cascade failure: earlier ids are already gone, so the bus
+                // re-derives the views from the library on the failure path
+                // rather than leaving them describing a document that no longer
+                // exists.
+                out_error = LibraryRejection("the deletion of " + id, outcome.diagnostics);
+                return false;
+            }
+            ctx.library_primary = true;
+            applied_to_library = true;
+        }
+    }
+    if (!applied_to_library && !core::RemoveElement(ctx.model, &ctx.package, element_id_, mode_, out_error))
         return false;
 
     removed_count_ = deleted_ids.size();

@@ -63,6 +63,47 @@ bool AddChallengeWithIds(parser::AssuranceCase& ac,
                          const std::string& relationship_id,
                          std::string& out_error);
 
+// ---------------------------------------------------------------------------
+// Id planning (Phase 2 slice 2b-1).
+//
+// A library-native create must mint the SAME ids the legacy factory would, or
+// the audit-event payloads and the on-disk ids would change. These expose the
+// generation that used to be buried inside `AddChildElement` / `AddChallenge` /
+// `AddTopGoal` so a command can plan the ids, hand them to the library seam,
+// and record the unchanged payload. The mutators below now route through them,
+// so there is ONE id-generation implementation.
+//
+// `pkg` is read-only here: it only supplies the ACP-scoped prefix of the
+// argument package owning `parent_id` (an `<acp>_AP<n>` confidence package
+// scopes ids as `<acp>_G1`, `<acp>_R1`, ...). May be null.
+
+// Plans the element + relationship ids for `AddChildElement`. Performs the same
+// parent validation the mutator does, so a caller that plans first reports the
+// identical error before touching any model. `out_relationship_id` is always
+// planned; the *caller* decides whether a relationship is actually created (a
+// Strategy and an inference-extending sub-goal create none).
+bool PlanChildElementIds(const parser::AssuranceCase& ac,
+                         const sacm::AssuranceCasePackage* pkg,
+                         const std::string& parent_id,
+                         NewElementKind kind,
+                         std::string& out_element_id,
+                         std::string& out_relationship_id,
+                         std::string& out_error);
+
+// Plans the counter element + counter relationship ids for `AddChallenge`,
+// including the same target validation.
+bool PlanChallengeIds(const parser::AssuranceCase& ac,
+                      const sacm::AssuranceCasePackage* pkg,
+                      const ArgumentTarget& target,
+                      ChallengeSourceType source_type,
+                      std::string& out_element_id,
+                      std::string& out_relationship_id,
+                      std::string& out_error);
+
+// Plans the id for `AddTopGoal`. A top goal has no owning relationship, so its
+// prefix is never ACP-scoped and no package is consulted.
+std::string PlanTopGoalId(const parser::AssuranceCase& ac);
+
 // Add a new element of the given kind as a child of parent_id.
 // Updates both the parser model (drives UI) and the sacm package (drives save).
 // Returns true on success and writes the new element id to out_new_id.
@@ -131,6 +172,29 @@ enum class RemoveMode {
 // label items with the count, and by the UI to highlight nodes pending
 // confirmation. Relationship element ids are NOT included.
 std::unordered_set<std::string> PlanRemoval(const parser::AssuranceCase& ac, const std::string& id, RemoveMode mode);
+
+// True when deleting each id of `PlanRemoval(ac, id, mode)` one at a time --
+// with every relationship that references a deleted element cascaded away with
+// it -- reproduces `RemoveElement(ac, ..., id, mode)` exactly.
+//
+// That cascade is the only deletion the SACM library exposes today
+// (`ReferenceDeletePolicy::DeleteReferencingRelationships`), and it differs from
+// this file's scrub-then-drop in two measurable ways:
+//
+//   * A relationship that still connects a SURVIVING source to its target after
+//     the scrub is KEPT here but cascaded away by the library. The GSN
+//     single-inference strategy encoding hits this: two sub-goals share one
+//     AssertedInference, so deleting one sub-goal would take the inference --
+//     and with it the strategy and its remaining sub-goals -- off the tree.
+//   * `NodeOnly` REPARENTS the structural children of `id` onto its parent,
+//     which needs a relationship-retarget operation the library does not have.
+//
+// So a library-primary delete is only correct where this returns true; callers
+// keep the legacy mutator otherwise (see src/core/commands/element_commands.cpp
+// and docs/sacm/sacm-gsn-metamodel-gaps.md).
+bool RemovalPlanIsCascadeEquivalent(const parser::AssuranceCase& ac,
+                                    const std::string& id,
+                                    RemoveMode mode);
 
 // Remove the element with id `id` from both the parser and sacm models, plus
 // any relationship elements that become structurally empty as a result.

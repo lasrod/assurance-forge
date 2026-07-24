@@ -48,6 +48,21 @@ struct CommandContext {
     // that did not, so it never drifts. See src/sacm_adapter/document_edit.h.
     sacm_adapter::LibraryDocument* library_document = nullptr;
     bool                          library_synced = false;
+
+    // Phase 2 slice 2b-1: the LIVE edit flip, inverted per command. A command
+    // sets this when it mutated the LIBRARY natively (rather than the legacy
+    // models), which makes the library the source of truth for that edit: the
+    // bus then REBUILDS `model` + `package` from it via
+    // `core::RebuildDerivedViewsFromLibrary` before serializing, hashing and
+    // appending, so the legacy views are derived rather than independently
+    // mutated.
+    //
+    // Deliberately separate from `library_synced` because the flip is
+    // incremental: a command that has not been flipped (or that had no library
+    // document to mutate) leaves this false and keeps the Stage 5 net, which
+    // re-derives the library FROM the authoritative package. Exactly one of the
+    // two directions runs per command.
+    bool                          library_primary = false;
 };
 
 struct CommandResult {
