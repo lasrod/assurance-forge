@@ -34,6 +34,14 @@ std::unique_ptr<CommandBus> CommandBus::Open(AssuranceProject project,
 CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const std::string& author) {
     CommandResult result;
 
+    // Each command must opt into its edit-routing explicitly. The context is
+    // reused across commands, so reset the per-command flags before `Apply`:
+    // otherwise a `library_primary` flag left set by a PRIOR flipped command
+    // would make the bus rebuild the views from the library over a LATER
+    // unflipped command's legacy edit (losing it, and drifting the library).
+    ctx.library_primary = false;
+    ctx.library_synced = false;
+
     audit::AuditEvent event;
     std::string apply_error;
     if (!command.Apply(ctx, event, apply_error)) {

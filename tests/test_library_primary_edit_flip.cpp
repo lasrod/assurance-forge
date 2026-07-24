@@ -1,4 +1,4 @@
-﻿// Phase 2 slice 2b-1: the LIVE edit flip. The core GSN element commands
+// Phase 2 slice 2b-1: the LIVE edit flip. The core GSN element commands
 // (CreateTopGoal, CreateChildElement, CreateChallenge, RemoveElement) now mutate
 // the SACM library FIRST when a library document is present, and the command bus
 // REBUILDS the legacy views (`loaded_case` / `sacm_package`) from it.
@@ -386,5 +386,44 @@ TEST(LibraryPrimaryEditFlip, RebuiltModelKeepsTerminologyHiddenButLibraryKeepsIt
     }
     EXPECT_TRUE(package_has_reference) << "UI-hidden terminology reference was dropped from the model";
     EXPECT_FALSE(fixture->package.terminologyPackages.empty());
+}
+
+// The CommandContext is reused across commands, and a flipped command leaves
+// `library_primary` set. The bus MUST reset that before the next command --
+// otherwise an unflipped, legacy-only command that follows a flipped one has its
+// edit discarded when the bus rebuilds the views from the (stale, un-updated)
+// library. Here: a flipped create, then an unflipped terminology create, in ONE
+// context. Both edits must survive. (Regression guard for the reset in
+// CommandBus::Execute.)
+TEST(LibraryPrimaryEditFlip, UnflippedCommandAfterFlippedKeepsItsEdit) {
+    std::unique_ptr<EditFixture> fixture = MakeFixture("mixed_flip", /*library_backed=*/true);
+    core::commands::CommandContext ctx = MakeContext(*fixture);
+
+    const auto count_terminology = [](const sacm::AssuranceCasePackage& package) {
+        std::size_t total = package.terminologyPackages.size();
+        for (const auto& argument_package : package.argumentPackages)
+            total += argument_package.terminologyPackages.size();
+        return total;
+    };
+    ASSERT_EQ(count_terminology(fixture->package), 0u);
+
+    // Flipped: mutates the library first and sets library_primary.
+    core::commands::CreateChildElementCommand add_goal("G1", core::NewElementKind::Goal);
+    ASSERT_TRUE(fixture->bus->Execute(add_goal, ctx, "tester").success);
+    const std::string goal_id = add_goal.GeneratedId();
+
+    // Unflipped legacy-only: mutates the package via the legacy mutator. Its edit
+    // must not be clobbered by a stale library_primary from the create above.
+    core::commands::CreateTerminologyPackageCommand add_terms("Terms", "Shared definitions.");
+    ASSERT_TRUE(fixture->bus->Execute(add_terms, ctx, "tester").success);
+
+    EXPECT_EQ(count_terminology(fixture->package), 1u)
+        << "the unflipped terminology edit was clobbered by a stale library_primary flag";
+    bool has_goal = false;
+    for (const auto& argument_package : fixture->package.argumentPackages)
+        for (const auto& claim : argument_package.claims)
+            if (claim.id == goal_id)
+                has_goal = true;
+    EXPECT_TRUE(has_goal) << "the flipped create was lost";
 }
 
