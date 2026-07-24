@@ -20,4 +20,15 @@ bool BridgeLegacyMutationToLibrary(sacm_adapter::LibraryDocument& document,
     return true;
 }
 
+bool ApplyLibraryPrimaryOrLegacy(CommandContext& ctx, const LibraryBridgeMutator& mutate,
+                                 std::string& error) {
+    if (ctx.library_document != nullptr && ctx.allow_library_primary) {
+        if (!BridgeLegacyMutationToLibrary(*ctx.library_document, mutate, error))
+            return false;
+        ctx.library_primary = true;
+        return true;
+    }
+    return mutate(ctx.model, ctx.package, error);
+}
+
 } // namespace core::commands

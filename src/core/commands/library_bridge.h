@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/commands/command_bus.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_model.h"
 
@@ -31,5 +32,18 @@ using LibraryBridgeMutator = std::function<bool(parser::AssuranceCase& model,
 // or if the reload cannot read the serialization.
 bool BridgeLegacyMutationToLibrary(sacm_adapter::LibraryDocument& document,
                                    const LibraryBridgeMutator& mutate, std::string& error);
+
+// The single chokepoint every audited command uses to become library-primary.
+// When a library document is present and the flip is allowed, `mutate` runs on a
+// scratch projection of the library (via BridgeLegacyMutationToLibrary) and
+// `ctx.library_primary` is set, so the command bus derives what it saves/hashes from
+// the library and the app re-derives the live views at the frame boundary. Otherwise
+// (legacy-parser fallback, no-bus dispatch, or the kill switch) `mutate` runs in place
+// on the caller's `ctx.model`/`ctx.package`, exactly as before. `mutate` sees the same
+// legacy (model, package) signature either way, so a command flips by wrapping its
+// existing mutator once -- reproducing the legacy result, which the audit replay also
+// reproduces, so live and replay converge by construction.
+bool ApplyLibraryPrimaryOrLegacy(CommandContext& ctx, const LibraryBridgeMutator& mutate,
+                                 std::string& error);
 
 } // namespace core::commands

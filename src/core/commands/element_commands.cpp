@@ -340,27 +340,15 @@ bool UpdateElementTextCommand::Apply(CommandContext& ctx, audit::AuditEvent& out
     // two-slot content/description semantics for existing on-disk data (see the long
     // comment in event_replayer.cpp's UpdateElementText branch). Bridging the SAME
     // legacy mutator onto the library reproduces the legacy result exactly, so the
-    // recorded hash and the replayed hash converge by construction with no migration,
-    // AND the edit is library-primary: the live views are untouched here and the app
-    // re-derives them from the library at the next frame boundary.
-    bool applied_to_library = false;
-    if (ctx.library_document != nullptr && ctx.allow_library_primary) {
-        std::string                captured_old;
-        const LibraryBridgeMutator mutate = [&](parser::AssuranceCase& model,
-                                                sacm::AssuranceCasePackage& package,
-                                                std::string& err) -> bool {
-            return core::SetElementTextField(model, &package, element_id_, field_, language_, new_value_,
-                                             captured_old, err);
-        };
-        if (!BridgeLegacyMutationToLibrary(*ctx.library_document, mutate, out_error))
-            return false;
-        old_value_ = captured_old;
-        ctx.library_primary = true;
-        applied_to_library = true;
-    }
-    if (!applied_to_library &&
-        !core::SetElementTextField(ctx.model, &ctx.package, element_id_, field_, language_, new_value_,
-                                   old_value_, out_error))
+    // recorded hash and the replayed hash converge by construction with no migration.
+    // `old_value_` is captured whether the bridge runs it on the scratch projection
+    // (the library's last committed value) or the legacy fallback runs it in place.
+    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase& model,
+                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        return core::SetElementTextField(model, &package, element_id_, field_, language_, new_value_,
+                                         old_value_, err);
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
 
     was_no_op_ = (old_value_ == new_value_);
