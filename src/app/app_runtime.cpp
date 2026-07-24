@@ -27,6 +27,7 @@
 #include "app/terminology_problem_sync.h"
 #include "core/acp/assurance_claim_point.h"
 #include "core/app_state.h"
+#include "core/derived_views.h"
 #include "core/element_factory.h"
 #include "core/problems/problem_attention.h"
 #include "core/problems/problems_manager.h"
@@ -422,6 +423,24 @@ void AppRuntime::ScanDirectory() {
 }
 
 void AppRuntime::RebuildDerivedViewsIfNeeded() {
+    // A library-primary (flipped) command committed its edit to the library but
+    // deliberately did NOT rebuild the live loaded_case/sacm_package inside the
+    // command bus -- doing so mid-dispatch replaces containers the canvas is still
+    // rendering from this frame (it holds &loaded_case across the frame, and a
+    // context-menu edit dispatches mid-render). Re-derive them here, at the top of
+    // the frame before any panel renders -- the same deferred-to-next-frame remedy
+    // `pending_reconcile_audit_store` uses for the same class of hazard. This runs
+    // even when the proposal canvas is active (the edit is committed regardless).
+    if (impl_->rederive_views_from_library) {
+        impl_->rederive_views_from_library = false;
+        if (impl_->app_state.library_document && impl_->app_state.loaded_case.has_value() &&
+            impl_->app_state.sacm_package.has_value()) {
+            core::RebuildDerivedViewsFromLibrary(*impl_->app_state.library_document,
+                                                 impl_->app_state.loaded_case.value(),
+                                                 impl_->app_state.sacm_package.value());
+        }
+    }
+
     if (impl_->IsProposalCanvasActive()) {
         return;
     }

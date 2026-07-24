@@ -74,14 +74,18 @@ DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state, core::commands::I
     core::commands::CommandContext ctx{state.app_state.loaded_case.value(),
                                        state.app_state.sacm_package.value(),
                                        state.app_state.library_document.get()};
-    // Hotfix: keep the interactive app on the legacy in-place mutators. The
-    // library-primary flip rebuilds `loaded_case`/`sacm_package` WHOLESALE mid-
-    // command, which crashes a panel that is iterating those containers while its
-    // context menu triggers the edit (a GUI re-entrancy the legacy append avoided
-    // and the audit path never hits). The flip stays exercised by tests; re-enable
-    // here once the re-entrancy is fixed. See CommandContext::allow_library_primary.
-    ctx.allow_library_primary = false;
+    // The library-primary flip is live again. The command bus no longer rebuilds
+    // `loaded_case`/`sacm_package` mid-dispatch (that wholesale replace freed
+    // containers the canvas was still rendering from -- the create-a-Claim crash).
+    // It derives what it saves and hashes into a scratch copy instead; when the
+    // flip engaged we re-derive the live views from the library at the next frame
+    // boundary, the same deferred-to-next-frame remedy `pending_reconcile_audit_store`
+    // uses for the identical mid-render container-teardown hazard.
     const auto result = state.command_bus->Execute(command, ctx, {});
+    if (ctx.library_primary) {
+        state.rederive_views_from_library = true;
+        state.tree_needs_rebuild = true;
+    }
 
     // Mirror ElementEditController::EmitAutosaveStatus semantics: a non-empty
     // error is always user-visible; a clean success clears any stale banner.

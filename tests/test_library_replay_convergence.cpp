@@ -404,6 +404,48 @@ TEST(LibraryReplayConvergence, RemoveOneSourceOfSharedStrategyInferenceConverges
     EXPECT_EQ(*library_hash, *legacy_hash);
 }
 
+// NodeOnly removal of a non-strategy INTERIOR goal REPARENTS its child onto the
+// grandparent: legacy core::RemoveElement RETARGETS the child's inference from the
+// removed node to the parent (ReparentChildrenToParent). That retarget is NOT a
+// delete, so replaying `deleted_ids` alone through the scrub seam would scrub the
+// removed node out of the child's inference target, leave it target-less, drop it,
+// and orphan the grandchild -- diverging from legacy. NodeOnly must therefore
+// bridge through the legacy mutator on replay. This pins it: G1 -> E -> C, remove
+// E NodeOnly, C promoted under G1 on BOTH paths. (NodeAndDescendants, covered by
+// the tests above, has no reparenting and stays on the seam.)
+TEST(LibraryReplayConvergence, RemoveNodeOnlyInteriorReparentsAndConverges) {
+    auto f = MakeFixture("node_only_interior");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package};
+
+    // A plain goal-under-goal chain (no strategy): each link is an assertedinference
+    // {target=parent, source=child}, so removing the middle goal exercises the
+    // target-retarget path, not the reasoning-clear path a strategy would take.
+    core::commands::CreateChildElementCommand add_e("G1", core::NewElementKind::Goal);
+    ASSERT_TRUE(bus->Execute(add_e, ctx, "tester").success);
+    const std::string e_id = add_e.GeneratedId();
+    core::commands::CreateChildElementCommand add_c(e_id, core::NewElementKind::Goal);
+    ASSERT_TRUE(bus->Execute(add_c, ctx, "tester").success);
+
+    core::commands::RemoveElementCommand remove(e_id, core::RemoveMode::NodeOnly);
+    ASSERT_TRUE(bus->Execute(remove, ctx, "tester").success);
+
+    const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
+    const core::audit::ReplayState legacy = LegacyReplay(f, txns);
+    const std::unique_ptr<sacm_adapter::LibraryDocument> library_doc = LibraryReplay(f, txns);
+    ASSERT_NE(library_doc, nullptr);
+
+    const std::optional<std::string> library_hash =
+        core::library_canonical_hash(core::project_library_package(*library_doc));
+    const std::optional<std::string> legacy_hash = core::library_canonical_hash(legacy.package);
+    ASSERT_TRUE(library_hash.has_value());
+    ASSERT_TRUE(legacy_hash.has_value());
+    EXPECT_EQ(*library_hash, *legacy_hash);
+}
+
 // Bridge event: RemoveTerminologyPackage has no parity seam (the library's
 // recursive delete diverges from the legacy non-empty-refusing mutator), so the
 // library replay bridges -- applying the legacy mutator onto a projected package

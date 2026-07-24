@@ -225,6 +225,16 @@ struct AppRuntimeState {
     // run ReconcileAuditStore() at the top of the next frame.
     bool pending_reconcile_audit_store = false;
 
+    // Set by DispatchAuditedCommand after a library-primary (flipped) command
+    // commits: the command bus derives what it saves/hashes into a scratch copy
+    // and deliberately leaves the live loaded_case/sacm_package untouched, because
+    // rebuilding them wholesale mid-dispatch frees containers the canvas is still
+    // rendering from this frame (a use-after-free -- the create-a-Claim crash).
+    // AppRuntime::RebuildDerivedViewsIfNeeded re-derives them from the library at
+    // the top of the next frame, before any panel renders. Same idiom as
+    // `pending_reconcile_audit_store`.
+    bool rederive_views_from_library = false;
+
     bool tree_needs_rebuild = false;
     ProblemSyncDirty problems_dirty;
     core::AssuranceTree current_tree;

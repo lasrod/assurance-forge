@@ -716,9 +716,12 @@ DeleteOutcome apply_delete_element(LibraryDocument& document, const std::string&
 
     const sacm::commands::MutationResult result = doc.apply(sacm::commands::DeleteElement{
         .target = sacm::model::ElementId(element_id),
-        // Match the legacy helper, which drops relationships that become empty
-        // rather than rejecting a referenced target.
-        .reference_policy = sacm::commands::ReferenceDeletePolicy::DeleteReferencingRelationships,
+        // Reproduce the legacy core::RemoveElement exactly: SCRUB the deleted
+        // element out of referencing relationships and drop a relationship only
+        // once it is left structurally empty -- not the whole-relationship
+        // cascade. This keeps a strategy's shared inference alive when one of its
+        // several sub-goals is removed (the cascade would detach the strategy).
+        .reference_policy = sacm::commands::ReferenceDeletePolicy::ScrubReferences,
     });
 
     DeleteOutcome outcome;

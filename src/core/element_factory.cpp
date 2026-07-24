@@ -1012,57 +1012,6 @@ std::unordered_set<std::string> PlanRemoval(const parser::AssuranceCase& ac, con
 
 namespace {
 
-// True if the relationship names any planned-for-deletion element in its
-// sources, targets, or reasoning -- i.e. the library's delete cascade would take
-// the whole relationship with it.
-bool RelationshipReferencesAnyOf(const parser::SacmElement& relationship,
-                                 const std::unordered_set<std::string>& ids) {
-    if (!relationship.reasoning_ref.empty() && ids.count(relationship.reasoning_ref) > 0)
-        return true;
-    for (const std::string& ref : relationship.source_refs) {
-        if (ids.count(ref) > 0)
-            return true;
-    }
-    for (const std::string& ref : relationship.target_refs) {
-        if (ids.count(ref) > 0)
-            return true;
-    }
-    return false;
-}
-
-} // namespace
-
-bool RemovalPlanIsCascadeEquivalent(const parser::AssuranceCase& ac,
-                                    const std::string& id,
-                                    RemoveMode mode) {
-    const std::unordered_set<std::string> planned = PlanRemoval(ac, id, mode);
-    if (planned.empty())
-        return false;
-
-    // NodeOnly reparents whatever the plan leaves behind. When the NodeOnly plan
-    // already covers everything NodeAndDescendants would take, there is nothing
-    // to reparent and the two coincide.
-    if (mode == RemoveMode::NodeOnly && planned != PlanRemoval(ac, id, RemoveMode::NodeAndDescendants))
-        return false;
-
-    // Every relationship must be dropped by both rules or kept by both. A
-    // relationship id is never in the plan (PlanRemoval yields node ids), so
-    // "legacy drops it" is exactly "it is structurally empty after the scrub".
-    for (const parser::SacmElement& element : ac.elements) {
-        if (!IsRelationshipType(element.type))
-            continue;
-        const bool library_drops = RelationshipReferencesAnyOf(element, planned);
-        parser::SacmElement scrubbed = element;
-        ScrubParserRelationshipRefs(scrubbed, planned);
-        const bool legacy_drops = IsParserRelationshipDangling(scrubbed);
-        if (library_drops != legacy_drops)
-            return false;
-    }
-    return true;
-}
-
-namespace {
-
 // Reparent the structural children of `node_id` to its structural parent.
 // Mutates both models so the subsequent scrub-then-drop pass leaves a coherent
 // tree. No-op if the node has no structural parent (root or orphan).

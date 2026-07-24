@@ -130,6 +130,24 @@ std::string CanonicalHash(const EditFixture& fixture) {
     return hash.value_or(std::string{});
 }
 
+// Run a command through the bus, then mirror the app's frame boundary. The bus no
+// longer rebuilds the live views for a FLIPPED command (that wholesale replace
+// mid-dispatch was the create-a-Claim crash) -- it derives what it saves/hashes
+// into a scratch copy and leaves loaded_case/sacm_package untouched. The real app
+// re-derives them from the library at the next frame's top
+// (AppRuntime::RebuildDerivedViewsIfNeeded). These tests run several commands
+// back-to-back with no frame in between, and a flipped command PLANS ITS IDS from
+// ctx.model, so the views must be fresh before the next one: re-derive here, exactly
+// as the frame boundary would. An unflipped command leaves library_primary false and
+// mutated the views in place, so nothing to do.
+core::commands::CommandResult RunCommand(EditFixture& fixture, core::commands::ICommand& command,
+                                         core::commands::CommandContext& ctx) {
+    core::commands::CommandResult result = fixture.bus->Execute(command, ctx, "tester");
+    if (ctx.library_primary && fixture.document != nullptr)
+        core::RebuildDerivedViewsFromLibrary(*fixture.document, fixture.model, fixture.package);
+    return result;
+}
+
 const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const std::string& id) {
     const auto it = std::find_if(model.elements.begin(), model.elements.end(),
                                  [&](const parser::SacmElement& element) { return element.id == id; });
@@ -158,36 +176,36 @@ CreateSequenceIds RunCreateSequence(EditFixture& fixture) {
     CreateSequenceIds ids;
 
     core::commands::CreateTopGoalCommand top_goal;
-    EXPECT_TRUE(fixture.bus->Execute(top_goal, ctx, "tester").success);
+    EXPECT_TRUE(RunCommand(fixture, top_goal, ctx).success);
     ids.top_goal = top_goal.GeneratedId();
 
     core::commands::CreateChildElementCommand add_strategy("G1", core::NewElementKind::Strategy);
-    EXPECT_TRUE(fixture.bus->Execute(add_strategy, ctx, "tester").success);
+    EXPECT_TRUE(RunCommand(fixture, add_strategy, ctx).success);
     ids.strategy = add_strategy.GeneratedId();
     EXPECT_TRUE(add_strategy.GeneratedRelationshipId().empty());
 
     core::commands::CreateChildElementCommand add_sub_one(ids.strategy, core::NewElementKind::Goal);
-    EXPECT_TRUE(fixture.bus->Execute(add_sub_one, ctx, "tester").success);
+    EXPECT_TRUE(RunCommand(fixture, add_sub_one, ctx).success);
     ids.sub_goal_one = add_sub_one.GeneratedId();
 
     core::commands::CreateChildElementCommand add_sub_two(ids.strategy, core::NewElementKind::Goal);
-    EXPECT_TRUE(fixture.bus->Execute(add_sub_two, ctx, "tester").success);
+    EXPECT_TRUE(RunCommand(fixture, add_sub_two, ctx).success);
     ids.sub_goal_two = add_sub_two.GeneratedId();
     // Extending the strategy's single inference creates no relationship.
     EXPECT_TRUE(add_sub_two.GeneratedRelationshipId().empty());
 
     core::commands::CreateChildElementCommand add_solution(ids.sub_goal_one,
                                                            core::NewElementKind::Solution);
-    EXPECT_TRUE(fixture.bus->Execute(add_solution, ctx, "tester").success);
+    EXPECT_TRUE(RunCommand(fixture, add_solution, ctx).success);
     ids.solution = add_solution.GeneratedId();
 
     core::commands::CreateChildElementCommand add_context("G1", core::NewElementKind::Context);
-    EXPECT_TRUE(fixture.bus->Execute(add_context, ctx, "tester").success);
+    EXPECT_TRUE(RunCommand(fixture, add_context, ctx).success);
 
     core::commands::CreateChallengeCommand challenge(
         core::ArgumentTarget{core::ArgumentTarget::Kind::Element, "G1"},
         core::ChallengeSourceType::CounterArgument);
-    EXPECT_TRUE(fixture.bus->Execute(challenge, ctx, "tester").success);
+    EXPECT_TRUE(RunCommand(fixture, challenge, ctx).success);
     ids.challenge = challenge.GeneratedId();
     ids.challenge_relationship = challenge.GeneratedRelationshipId();
 
@@ -234,11 +252,9 @@ TEST(LibraryPrimaryEditFlip, RemoveLeafMatchesLegacyCanonicalHash) {
     const auto run = [](EditFixture& fixture) {
         const CreateSequenceIds ids = RunCreateSequence(fixture);
         core::commands::CommandContext ctx = MakeContext(fixture);
-        EXPECT_TRUE(core::RemovalPlanIsCascadeEquivalent(fixture.model, ids.solution,
-                                                         core::RemoveMode::NodeAndDescendants));
         core::commands::RemoveElementCommand remove(ids.solution,
                                                     core::RemoveMode::NodeAndDescendants);
-        EXPECT_TRUE(fixture.bus->Execute(remove, ctx, "tester").success);
+        EXPECT_TRUE(RunCommand(fixture, remove, ctx).success);
         EXPECT_EQ(remove.RemovedCount(), 1u);
         EXPECT_EQ(FindElement(fixture.model, ids.solution), nullptr);
     };
@@ -248,20 +264,16 @@ TEST(LibraryPrimaryEditFlip, RemoveLeafMatchesLegacyCanonicalHash) {
     EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
 }
 
-// (2b) The removal shape the library CANNOT reproduce, pinned so the guard that
-// keeps it on the legacy mutator cannot be removed by accident.
-//
-// The GSN single-inference encoding gives a strategy ONE AssertedInference whose
-// sources are all its sub-goals. Deleting one sub-goal must leave that inference
-// in place with the surviving sub-goal. The library's only delete cascades every
-// relationship that references the deleted element, which would take the whole
+// (2b) The GSN single-inference encoding gives a strategy ONE AssertedInference
+// whose sources are all its sub-goals. Deleting one sub-goal must leave that
+// inference in place with the surviving sub-goal. A naive cascade delete (drop
+// every relationship referencing the deleted element) would take the whole
 // inference -- silently detaching the strategy and its remaining sub-goals from
-// the argument. Measured canonical hashes at the time this guard was added:
-// legacy 7b74343d..., unguarded cascade 6be86b56....
-//
-// The second edit afterwards is deliberately a FLIPPED command: it rebuilds both
-// views from the library, so it fails unless the bus's Stage 5 net kept the
-// library in step with the legacy delete.
+// the argument. The library delete instead SCRUBS
+// (ReferenceDeletePolicy::ScrubReferences): it removes the deleted sub-goal from
+// the inference's sources and keeps the relationship because a source remains,
+// reproducing the legacy scrub-then-drop, so the library-primary delete converges
+// with the legacy one on this shape without any fallback.
 TEST(LibraryPrimaryEditFlip, RemoveKeepsSiblingUnderSharedStrategyInference) {
     std::unique_ptr<EditFixture> library_side = MakeFixture("shared_inf_library", /*library_backed=*/true);
     std::unique_ptr<EditFixture> legacy_side = MakeFixture("shared_inf_legacy", /*library_backed=*/false);
@@ -271,13 +283,9 @@ TEST(LibraryPrimaryEditFlip, RemoveKeepsSiblingUnderSharedStrategyInference) {
         const CreateSequenceIds ids = RunCreateSequence(fixture);
         core::commands::CommandContext ctx = MakeContext(fixture);
 
-        // The shared inference is exactly why this shape is not cascade-equivalent.
-        EXPECT_FALSE(core::RemovalPlanIsCascadeEquivalent(fixture.model, ids.sub_goal_one,
-                                                          core::RemoveMode::NodeAndDescendants));
-
         core::commands::RemoveElementCommand remove(ids.sub_goal_one,
                                                     core::RemoveMode::NodeAndDescendants);
-        EXPECT_TRUE(fixture.bus->Execute(remove, ctx, "tester").success);
+        EXPECT_TRUE(RunCommand(fixture, remove, ctx).success);
 
         // The strategy's inference survives, now sourced by the other sub-goal.
         bool inference_survives = false;
@@ -296,7 +304,42 @@ TEST(LibraryPrimaryEditFlip, RemoveKeepsSiblingUnderSharedStrategyInference) {
         // library, so this only holds if the library stayed in step.
         core::commands::CreateChildElementCommand add_goal(ids.sub_goal_two,
                                                            core::NewElementKind::Solution);
-        EXPECT_TRUE(fixture.bus->Execute(add_goal, ctx, "tester").success);
+        EXPECT_TRUE(RunCommand(fixture, add_goal, ctx).success);
+    };
+    run(*library_side);
+    run(*legacy_side);
+
+    EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
+}
+
+// (2c) NodeOnly removal of an interior goal REPARENTS its children onto the
+// grandparent -- legacy core::RemoveElement RETARGETS the child's inference from
+// the removed node to the parent. That retarget is not a delete, so the pure
+// delete+scrub seam cannot reproduce it (it would leave the child inference
+// target-less, drop it, and orphan the grandchild). The flip must route NodeOnly
+// through the legacy mutator and re-derive the library, NOT the seam. Both routings
+// of `G1 -> E -> C`, remove E NodeOnly, must hash identically with C promoted to G1.
+TEST(LibraryPrimaryEditFlip, RemoveNodeOnlyInteriorReparentsMatchesLegacy) {
+    std::unique_ptr<EditFixture> library_side = MakeFixture("node_only_library", /*library_backed=*/true);
+    std::unique_ptr<EditFixture> legacy_side = MakeFixture("node_only_legacy", /*library_backed=*/false);
+    ASSERT_NE(library_side->document, nullptr);
+
+    const auto run = [](EditFixture& fixture) {
+        core::commands::CommandContext ctx = MakeContext(fixture);
+        core::commands::CreateChildElementCommand add_e("G1", core::NewElementKind::Goal);
+        EXPECT_TRUE(RunCommand(fixture, add_e, ctx).success);
+        const std::string e_id = add_e.GeneratedId();
+        core::commands::CreateChildElementCommand add_c(e_id, core::NewElementKind::Goal);
+        EXPECT_TRUE(RunCommand(fixture, add_c, ctx).success);
+        const std::string c_id = add_c.GeneratedId();
+
+        core::commands::RemoveElementCommand remove(e_id, core::RemoveMode::NodeOnly);
+        EXPECT_TRUE(RunCommand(fixture, remove, ctx).success);
+        EXPECT_FALSE(ctx.library_primary)
+            << "NodeOnly took the library-primary seam, which cannot reparent";
+        // E is gone; C survives, reparented onto G1.
+        EXPECT_EQ(FindElement(fixture.model, e_id), nullptr);
+        EXPECT_NE(FindElement(fixture.model, c_id), nullptr);
     };
     run(*library_side);
     run(*legacy_side);
@@ -316,7 +359,7 @@ TEST(LibraryPrimaryEditFlip, RebuiltModelKeepsBareStrategyPlacement) {
     core::commands::CommandContext ctx = MakeContext(*fixture);
 
     core::commands::CreateChildElementCommand add_strategy("G1", core::NewElementKind::Strategy);
-    ASSERT_TRUE(fixture->bus->Execute(add_strategy, ctx, "tester").success);
+    ASSERT_TRUE(RunCommand(*fixture, add_strategy, ctx).success);
     const std::string strategy_id = add_strategy.GeneratedId();
 
     ASSERT_TRUE(HasElementOfType(fixture->model, strategy_id, "argumentreasoning"));
@@ -331,7 +374,7 @@ TEST(LibraryPrimaryEditFlip, RebuiltModelKeepsBareStrategyPlacement) {
     // The first sub-goal materializes the real inference, and the placeholder
     // must then be gone (otherwise the strategy renders twice).
     core::commands::CreateChildElementCommand add_sub(strategy_id, core::NewElementKind::Goal);
-    ASSERT_TRUE(fixture->bus->Execute(add_sub, ctx, "tester").success);
+    ASSERT_TRUE(RunCommand(*fixture, add_sub, ctx).success);
     EXPECT_EQ(FindElement(fixture->model, strategy_id + "__pending_inference"), nullptr);
     const parser::SacmElement* inference =
         FindElement(fixture->model, add_sub.GeneratedRelationshipId());
@@ -352,18 +395,18 @@ TEST(LibraryPrimaryEditFlip, RebuiltModelKeepsTerminologyHiddenButLibraryKeepsIt
     core::commands::CommandContext ctx = MakeContext(*fixture);
 
     core::commands::CreateTerminologyPackageCommand create_package("Terms", "Shared definitions.");
-    ASSERT_TRUE(fixture->bus->Execute(create_package, ctx, "tester").success);
+    ASSERT_TRUE(RunCommand(*fixture, create_package, ctx).success);
     const core::TerminologyPackageRef package_ref = create_package.GeneratedRef();
 
     core::TerminologyTermDraft draft;
     draft.value = "ODD";
     draft.name = "Operational Design Domain";
     core::commands::CreateTerminologyTermCommand create_term(package_ref, draft);
-    ASSERT_TRUE(fixture->bus->Execute(create_term, ctx, "tester").success);
+    ASSERT_TRUE(RunCommand(*fixture, create_term, ctx).success);
 
     core::commands::AssociateTerminologyTermWithElementCommand associate("G1", package_ref,
                                                                          create_term.GeneratedRef());
-    ASSERT_TRUE(fixture->bus->Execute(associate, ctx, "tester").success);
+    ASSERT_TRUE(RunCommand(*fixture, associate, ctx).success);
     const std::string artifact_reference_id = associate.Result().artifact_reference_id;
     ASSERT_FALSE(artifact_reference_id.empty());
     EXPECT_EQ(FindElement(fixture->model, artifact_reference_id), nullptr)
@@ -371,7 +414,7 @@ TEST(LibraryPrimaryEditFlip, RebuiltModelKeepsTerminologyHiddenButLibraryKeepsIt
 
     // A FLIPPED command now rebuilds both views from the library.
     core::commands::CreateChildElementCommand add_goal("G1", core::NewElementKind::Goal);
-    ASSERT_TRUE(fixture->bus->Execute(add_goal, ctx, "tester").success);
+    ASSERT_TRUE(RunCommand(*fixture, add_goal, ctx).success);
 
     EXPECT_EQ(FindElement(fixture->model, artifact_reference_id), nullptr)
         << "the rebuild resurrected a terminology artifact reference as a drawn node";
@@ -409,13 +452,13 @@ TEST(LibraryPrimaryEditFlip, UnflippedCommandAfterFlippedKeepsItsEdit) {
 
     // Flipped: mutates the library first and sets library_primary.
     core::commands::CreateChildElementCommand add_goal("G1", core::NewElementKind::Goal);
-    ASSERT_TRUE(fixture->bus->Execute(add_goal, ctx, "tester").success);
+    ASSERT_TRUE(RunCommand(*fixture, add_goal, ctx).success);
     const std::string goal_id = add_goal.GeneratedId();
 
     // Unflipped legacy-only: mutates the package via the legacy mutator. Its edit
     // must not be clobbered by a stale library_primary from the create above.
     core::commands::CreateTerminologyPackageCommand add_terms("Terms", "Shared definitions.");
-    ASSERT_TRUE(fixture->bus->Execute(add_terms, ctx, "tester").success);
+    ASSERT_TRUE(RunCommand(*fixture, add_terms, ctx).success);
 
     EXPECT_EQ(count_terminology(fixture->package), 1u)
         << "the unflipped terminology edit was clobbered by a stale library_primary flag";
@@ -438,7 +481,7 @@ TEST(LibraryPrimaryEditFlip, AllowLibraryPrimaryFalseTakesLegacyPath) {
     ctx.allow_library_primary = false;
 
     core::commands::CreateChildElementCommand cmd("G1", core::NewElementKind::Goal);
-    ASSERT_TRUE(fixture->bus->Execute(cmd, ctx, "tester").success);
+    ASSERT_TRUE(RunCommand(*fixture, cmd, ctx).success);
     EXPECT_FALSE(ctx.library_primary) << "the flip engaged despite allow_library_primary=false";
 
     bool found = false;
@@ -447,4 +490,45 @@ TEST(LibraryPrimaryEditFlip, AllowLibraryPrimaryFalseTakesLegacyPath) {
             if (claim.id == cmd.GeneratedId())
                 found = true;
     EXPECT_TRUE(found) << "the legacy-path create did not persist";
+}
+
+// The core of the re-entrancy fix (the create-a-Claim crash). A FLIPPED command
+// must NOT rebuild the live loaded_case/sacm_package inside the bus: the canvas
+// renders from &loaded_case across the whole frame, and a context-menu edit
+// dispatches mid-render, so replacing those containers in-dispatch frees what the
+// canvas is still iterating. Assert the bus leaves the passed-in views untouched
+// after a flipped command (same element count, same hash), while the library holds
+// the edit; the app surfaces it at the next frame boundary (the RebuildDerived-
+// ViewsFromLibrary call below, which RunCommand performs elsewhere). Dispatching
+// straight through the bus here -- NOT RunCommand -- reproduces the exact window
+// the canvas renders in.
+TEST(LibraryPrimaryEditFlip, FlippedCommandLeavesLiveViewsUntouchedUntilRebuild) {
+    std::unique_ptr<EditFixture> fixture = MakeFixture("no_mid_dispatch_rebuild", /*library_backed=*/true);
+    ASSERT_NE(fixture->document, nullptr);
+    core::commands::CommandContext ctx = MakeContext(*fixture);
+
+    const std::size_t elements_before = fixture->model.elements.size();
+    const std::string hash_before = CanonicalHash(*fixture);
+
+    core::commands::CreateChildElementCommand add_goal("G1", core::NewElementKind::Goal);
+    ASSERT_TRUE(fixture->bus->Execute(add_goal, ctx, "tester").success);
+    ASSERT_TRUE(ctx.library_primary) << "expected the create to flip to the library";
+
+    // Untouched by the bus -- so any reference the UI held into them survives.
+    EXPECT_EQ(fixture->model.elements.size(), elements_before)
+        << "the bus rebuilt loaded_case mid-dispatch (the re-entrancy hazard)";
+    EXPECT_EQ(CanonicalHash(*fixture), hash_before)
+        << "the bus rebuilt sacm_package mid-dispatch (the re-entrancy hazard)";
+
+    // The edit lives in the library; the frame-boundary re-derive surfaces it.
+    core::RebuildDerivedViewsFromLibrary(*fixture->document, fixture->model, fixture->package);
+    EXPECT_GT(fixture->model.elements.size(), elements_before)
+        << "the deferred re-derive did not surface the committed edit";
+    EXPECT_NE(CanonicalHash(*fixture), hash_before);
+    bool has_new = false;
+    for (const auto& argument_package : fixture->package.argumentPackages)
+        for (const auto& claim : argument_package.claims)
+            if (claim.id == add_goal.GeneratedId())
+                has_new = true;
+    EXPECT_TRUE(has_new) << "the committed claim is missing after the re-derive";
 }

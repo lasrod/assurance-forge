@@ -46,23 +46,36 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     std::string apply_error;
     if (!command.Apply(ctx, event, apply_error)) {
         // A library-primary command that failed part-way through a compound
-        // mutation may already have changed the library. Re-derive the views so
-        // they can never drift from it, even on the failure path.
-        if (ctx.library_primary && ctx.library_document != nullptr)
-            core::RebuildDerivedViewsFromLibrary(*ctx.library_document, ctx.model, ctx.package);
+        // mutation may already have changed the library. We do NOT rebuild the
+        // live ctx.model/ctx.package here: replacing them wholesale mid-dispatch
+        // frees containers the UI is still rendering from this frame (the canvas
+        // holds &loaded_case across the frame). The caller re-derives the live
+        // views from the library at the next frame boundary whenever the flip
+        // engaged (ctx.library_primary), which also covers this partial-failure
+        // case. See app::commands::DispatchAuditedCommand + RebuildDerivedViewsIfNeeded.
         result.success = false;
         result.error = std::move(apply_error);
         return result;
     }
 
     // Phase 2 slice 2b-1 -- the live edit flip. The command mutated the LIBRARY
-    // natively, so the library is the source of truth for this edit and the two
-    // legacy views are rebuilt from it (the same projection + render passes
-    // `AppState::load_file` applies after a library load) BEFORE anything
-    // downstream reads them. Serialization, hashing, the audit append and the
-    // autosave are untouched: they just read the freshly-derived package.
-    if (ctx.library_primary && ctx.library_document != nullptr)
-        core::RebuildDerivedViewsFromLibrary(*ctx.library_document, ctx.model, ctx.package);
+    // natively, so the library is the source of truth for this edit. We derive the
+    // package to serialize and hash from it -- but into a SCRATCH copy, never the
+    // live ctx.model/ctx.package. Rebuilding those wholesale here frees containers
+    // the UI is still rendering from this frame (the canvas holds &loaded_case
+    // across the frame; a context-menu edit dispatches mid-render, so an in-dispatch
+    // replace is a use-after-free). The caller re-derives the live views from the
+    // library at the next frame boundary (AppRuntime::RebuildDerivedViewsIfNeeded),
+    // the same safe point every other derived-view refresh uses. For an UNFLIPPED
+    // command `source_package` is just the authoritative, in-place-mutated legacy
+    // ctx.package, so serialization/hashing/autosave below are untouched.
+    parser::AssuranceCase      flipped_scratch_model;
+    sacm::AssuranceCasePackage flipped_scratch_package;
+    const bool library_primary_flip = ctx.library_primary && ctx.library_document != nullptr;
+    if (library_primary_flip)
+        core::RebuildDerivedViewsFromLibrary(*ctx.library_document, flipped_scratch_model,
+                                             flipped_scratch_package);
+    sacm::AssuranceCasePackage& source_package = library_primary_flip ? flipped_scratch_package : ctx.package;
 
     // Serialize once so the bytes we write, the bytes we hash, and the
     // bytes we re-derive the canonical hash from are identical. Phase 9 Stage
@@ -74,10 +87,10 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     // warning below rather than swallowed.
     std::string xml;
     bool library_save_fell_back = false;
-    if (auto library_xml = core::library_xmi_from_package(ctx.package)) {
+    if (auto library_xml = core::library_xmi_from_package(source_package)) {
         xml = std::move(*library_xml);
     } else {
-        xml = sacm::serialize_sacm(ctx.package);
+        xml = sacm::serialize_sacm(source_package);
         library_save_fell_back = true;
     }
     const std::string raw_after = Sha256::HexDigest(xml);
@@ -90,7 +103,7 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     if (auto library_hash = core::library_canonical_hash_from_xml(xml)) {
         canonical_after = *library_hash;
     } else {
-        canonical_after = audit::CanonicalModelHash(ctx.package);
+        canonical_after = audit::CanonicalModelHash(source_package);
     }
 
     // Step 1: append to the audit log FIRST and fsync. The log is the
