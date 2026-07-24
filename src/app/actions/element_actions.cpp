@@ -127,7 +127,7 @@ core::TreeDropValidationResult ElementActions::ValidateTreeDrop(const std::strin
 bool ElementActions::PerformTreeDrop(const std::string& dragged_id,
                                      const std::string& target_id,
                                      core::TreeDropMode drop_mode) {
-    if (!state_.app_state.loaded_case.has_value()) {
+    if (!state_.app_state.loaded_case.has_value() || !state_.app_state.has_projected_package()) {
         SetStatus(state_, "No assurance case loaded.");
         return false;
     }

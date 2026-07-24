@@ -36,10 +36,13 @@ bool ReorderSiblingsCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_e
         reordered_ = scratch_order;
         return true;
     };
-    // A benign no-op records nothing: `core::ReorderSiblings` returning false with
-    // an empty `err` propagates here as a false-with-empty-error, so the bus
-    // appends no transaction and the caller shows no error (mirrors the ACP/remove
-    // commands' `if (!changed) return false`). A real failure carries the reason.
+    // `core::ReorderSiblings` returns false BOTH on a genuine no-op (nothing to
+    // reorder) and on a real failure, distinguished only by whether `err` is set. A
+    // false-with-empty-error propagates here so `Apply` returns false with an empty
+    // `out_error` -- the bus appends NO transaction (the mutation did nothing), and
+    // the empty error string is what distinguishes a no-op from a real failure for
+    // the caller. (In practice `ValidateTreeDrop` gates invalid drops before dispatch,
+    // so a no-op does not reach here.)
     if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
 
