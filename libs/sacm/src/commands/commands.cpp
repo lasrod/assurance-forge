@@ -1229,6 +1229,44 @@ void perform_add_tagged_value(model::Document& document, const AddTaggedValue& a
 
 // ---------------------------------------------------------------- delete
 
+// True when removing every doomed id from `element`'s source/target/reasoning
+// lists would leave the relationship structurally invalid under SACM
+// relationship multiplicity, so the ScrubReferences policy must drop it rather
+// than keep it scrubbed. Mirrors the GSN editor's legacy drop rule
+// (core::IsParserRelationshipDangling / IsInferenceDangling): an
+// AssertedRelationship needs at least one surviving target and at least one
+// surviving source -- except an AssertedInference, which a surviving reasoning
+// (its ArgumentReasoning / strategy) also keeps alive (clauses 11.13-11.15). An
+// ArtifactAssetRelationship needs a surviving source and target (clause 12.14).
+// Non-relationship referrers are never dropped, only cleaned.
+bool relationship_invalid_after_scrub(const SACMElement& element,
+                                      const std::unordered_set<ElementId>& doomed) {
+    const auto all_gone = [&doomed](const std::vector<ElementId>& ids) {
+        // An empty (or fully-doomed) list is "gone" -- an empty end violates
+        // the [1..*] multiplicity just as a scrubbed-empty one does.
+        return std::ranges::all_of(
+            ids, [&doomed](const ElementId& id) { return doomed.contains(id); });
+    };
+    if (const auto* rel = dynamic_cast<const model::AssertedRelationship*>(&element)) {
+        if (all_gone(rel->targets())) {
+            return true;
+        }
+        if (!all_gone(rel->sources())) {
+            return false;
+        }
+        // Sources are gone. An AssertedInference stays alive on its reasoning.
+        if (element.kind() == model::ElementKind::AssertedInference) {
+            const std::optional<ElementId>& reasoning = rel->reasoning();
+            return !reasoning.has_value() || doomed.contains(*reasoning);
+        }
+        return true;
+    }
+    if (const auto* rel = dynamic_cast<const model::ArtifactAssetRelationship*>(&element)) {
+        return all_gone(rel->targets()) || all_gone(rel->sources());
+    }
+    return false;
+}
+
 CheckOutcome check_delete(const model::Document& document, const DeleteElement& erase,
                           const Operation& op) {
     CheckOutcome outcome;
@@ -1282,6 +1320,10 @@ CheckOutcome check_delete(const model::Document& document, const DeleteElement& 
             if (rejected || doomed.contains(element.id())) {
                 return;
             }
+            // Under ScrubReferences a relationship is dropped at most once per
+            // pass; a later pass re-evaluates it against a possibly-larger
+            // doomed set.
+            bool dropped_here = false;
             model::traverse::for_each_reference(
                 element, [&](const model::traverse::ReferenceUse& use) {
                     if (rejected || !doomed.contains(*use.target)) {
@@ -1311,11 +1353,35 @@ CheckOutcome check_delete(const model::Document& document, const DeleteElement& 
                         rejected = true;
                         return;
                     }
-                    // Cascade relationships; clean references elsewhere.
+                    // How a referring relationship is handled depends on the
+                    // policy. DeleteReferencingRelationships cascades the whole
+                    // relationship as soon as it references a doomed element.
+                    // ScrubReferences instead removes only the doomed refs and
+                    // keeps the relationship, dropping it (and recursing) only
+                    // once scrubbing leaves it structurally invalid. A
+                    // non-relationship referrer always just has the doomed
+                    // reference cleaned.
                     const bool is_relationship =
                         metadata::is_asserted_relationship_kind(element.kind()) ||
                         element.kind() == model::ElementKind::ArtifactAssetRelationship;
-                    if (is_relationship) {
+                    if (is_relationship &&
+                        erase.reference_policy == ReferenceDeletePolicy::ScrubReferences) {
+                        if (dropped_here) {
+                            return;  // already dropped this relationship this pass
+                        }
+                        if (relationship_invalid_after_scrub(element, doomed)) {
+                            model::traverse::for_each_descendant(
+                                element, [&](const SACMElement& descendant) {
+                                    doomed.insert(descendant.id());
+                                });
+                            cascaded_relationships.push_back(&element);
+                            changed = true;
+                            dropped_here = true;
+                        } else {
+                            cleaned_references.push_back(
+                                InboundRef{&element, use.role, *use.target});
+                        }
+                    } else if (is_relationship) {
                         model::traverse::for_each_descendant(
                             element, [&](const SACMElement& descendant) {
                                 doomed.insert(descendant.id());

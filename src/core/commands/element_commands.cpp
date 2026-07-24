@@ -284,22 +284,16 @@ bool RemoveElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
     std::vector<std::string> deleted_ids(planned.begin(), planned.end());
     std::sort(deleted_ids.begin(), deleted_ids.end());
 
-    // The library seam deletes ONE element and cascades every relationship that
-    // references it, which reproduces the legacy scrub-then-drop only for some
-    // removal shapes -- `RemovalPlanIsCascadeEquivalent` decides, and the ones it
-    // rejects keep the legacy mutator (with the bus's Stage 5 net re-deriving the
-    // library afterwards, so nothing drifts).
-    //
-    // Measured divergence this guard prevents (LibraryPrimaryEditFlip
-    // .RemoveKeepsSiblingUnderSharedStrategyInference): with a strategy S1 whose
-    // single inference R1 has sources {G3, G4}, deleting G3 leaves legacy with
-    // `R1 reasoning=S1 sources=G4 targets=G1` but leaves the library with NO
-    // inference at all -- S1 and G4 silently fall off the argument. Canonical
-    // hashes 7b74343d... (legacy) vs 6be86b56... (cascade). Closing that gap
-    // needs a source-removal operation in libs/sacm, not a workaround here.
+    // The library seam deletes ONE element and SCRUBS it out of every
+    // referencing relationship, dropping a relationship only once it is left
+    // structurally empty -- exactly the legacy core::RemoveElement scrub-then-drop
+    // (ReferenceDeletePolicy::ScrubReferences in the adapter). So the seam
+    // reproduces the legacy removal for every shape, including removing one
+    // sub-goal of a strategy whose single inference has several sources (the
+    // inference survives, scrubbed to the rest, rather than cascading away). The
+    // only remaining gate is the app's hotfix kill switch.
     bool applied_to_library = false;
-    if (ctx.library_document != nullptr && ctx.allow_library_primary &&
-        core::RemovalPlanIsCascadeEquivalent(ctx.model, element_id_, mode_)) {
+    if (ctx.library_document != nullptr && ctx.allow_library_primary) {
         // Exactly the ids `PlanRemoval` produced -- the same set the audit event
         // records, walked in the same sorted order `ApplyEventToLibrary` replays,
         // so the live document and the replayed document agree by construction.

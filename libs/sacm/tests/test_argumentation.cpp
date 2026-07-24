@@ -440,4 +440,80 @@ TEST(Sacm23Argumentation, SACM23_ARG_003_ClaimDeletePreviewListsAffectedRelation
     EXPECT_TRUE(sacm::validation::validate(document).empty());
 }
 
+// The ScrubReferences delete policy removes the deleted element from a
+// referencing relationship's source list and KEEPS the relationship as long as
+// it stays structurally valid (source[1..*] / target[1..*], clause 11.13),
+// dropping it only once scrubbing empties it. This is the scrub-then-drop the
+// GSN editor needs and that DeleteReferencingRelationships cannot do: an
+// inference with several sub-goal sources must survive the removal of one
+// sub-goal, scrubbed to the rest.
+TEST(Sacm23Argumentation, SACM23_CMD_005_ScrubReferencesKeepsMultiSourceInference) {
+    Document document = build_argument_case();
+    // A second sub-goal so the inference has two sources.
+    ASSERT_TRUE(document
+                    .apply(CreateClaim{.parent = ElementId{"argpkg_1"},
+                                       .id = ElementId{"claim_sub2"},
+                                       .name = "Sub2"})
+                    .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateAssertedRelationship{
+                        .parent = ElementId{"argpkg_1"},
+                        .kind = ElementKind::AssertedInference,
+                        .id = ElementId{"inf_1"},
+                        .sources = {ElementId{"claim_sub"}, ElementId{"claim_sub2"}},
+                        .targets = {ElementId{"claim_top"}},
+                    })
+                    .applied);
+
+    // Removing ONE source scrubs it and keeps the inference: the preview lists
+    // the inference as Modified (scrubbed), not RelationshipDeleted.
+    const OperationPreview preview = document.preview(DeleteElement{
+        .target = ElementId{"claim_sub"},
+        .reference_policy = ReferenceDeletePolicy::ScrubReferences,
+    });
+    ASSERT_TRUE(preview.can_apply);
+    EXPECT_TRUE(std::ranges::any_of(preview.effects, [](const ChangeRecord& record) {
+        return record.id.value() == "inf_1" && record.change == ChangeRecord::Change::Modified;
+    }));
+    EXPECT_FALSE(std::ranges::any_of(preview.effects, [](const ChangeRecord& record) {
+        return record.id.value() == "inf_1" &&
+               record.change == ChangeRecord::Change::RelationshipDeleted;
+    }));
+
+    const auto scrubbed = document.apply(
+        DeleteElement{.target = ElementId{"claim_sub"},
+                      .reference_policy = ReferenceDeletePolicy::ScrubReferences},
+        preview.document_revision);
+    ASSERT_TRUE(scrubbed.applied);
+    const auto* inference =
+        document.find_as<sacm::model::AssertedRelationship>(ElementId{"inf_1"});
+    ASSERT_NE(inference, nullptr) << "scrub dropped an inference that still had a source";
+    ASSERT_EQ(inference->sources().size(), 1u);
+    EXPECT_EQ(inference->sources().front(), ElementId{"claim_sub2"});
+    EXPECT_EQ(document.find(ElementId{"claim_sub"}), nullptr);
+    EXPECT_TRUE(sacm::validation::validate(document).empty());
+
+    // The scrubbed inference round-trips through strict save.
+    const auto saved = sacm::io::save_xmi_string(document);
+    ASSERT_TRUE(saved.ok);
+    const LoadResult reloaded =
+        sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
+
+    // Removing the LAST source empties the inference, so scrubbing now DROPS it.
+    const auto emptied = document.apply(DeleteElement{
+        .target = ElementId{"claim_sub2"},
+        .reference_policy = ReferenceDeletePolicy::ScrubReferences});
+    ASSERT_TRUE(emptied.applied);
+    EXPECT_EQ(document.find(ElementId{"inf_1"}), nullptr)
+        << "scrub kept an inference with no remaining source";
+    EXPECT_TRUE(std::ranges::any_of(emptied.changes, [](const ChangeRecord& record) {
+        return record.id.value() == "inf_1" &&
+               record.change == ChangeRecord::Change::RelationshipDeleted;
+    }));
+    EXPECT_EQ(document.find(ElementId{"claim_sub2"}), nullptr);
+    EXPECT_TRUE(sacm::validation::validate(document).empty());
+}
+
 }  // namespace

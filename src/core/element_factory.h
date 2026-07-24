@@ -173,29 +173,6 @@ enum class RemoveMode {
 // confirmation. Relationship element ids are NOT included.
 std::unordered_set<std::string> PlanRemoval(const parser::AssuranceCase& ac, const std::string& id, RemoveMode mode);
 
-// True when deleting each id of `PlanRemoval(ac, id, mode)` one at a time --
-// with every relationship that references a deleted element cascaded away with
-// it -- reproduces `RemoveElement(ac, ..., id, mode)` exactly.
-//
-// That cascade is the only deletion the SACM library exposes today
-// (`ReferenceDeletePolicy::DeleteReferencingRelationships`), and it differs from
-// this file's scrub-then-drop in two measurable ways:
-//
-//   * A relationship that still connects a SURVIVING source to its target after
-//     the scrub is KEPT here but cascaded away by the library. The GSN
-//     single-inference strategy encoding hits this: two sub-goals share one
-//     AssertedInference, so deleting one sub-goal would take the inference --
-//     and with it the strategy and its remaining sub-goals -- off the tree.
-//   * `NodeOnly` REPARENTS the structural children of `id` onto its parent,
-//     which needs a relationship-retarget operation the library does not have.
-//
-// So a library-primary delete is only correct where this returns true; callers
-// keep the legacy mutator otherwise (see src/core/commands/element_commands.cpp
-// and docs/sacm/sacm-gsn-metamodel-gaps.md).
-bool RemovalPlanIsCascadeEquivalent(const parser::AssuranceCase& ac,
-                                    const std::string& id,
-                                    RemoveMode mode);
-
 // Remove the element with id `id` from both the parser and sacm models, plus
 // any relationship elements that become structurally empty as a result.
 // Behavior depends on `mode` (see RemoveMode above). For NodeOnly, structural

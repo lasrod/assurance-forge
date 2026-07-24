@@ -234,8 +234,6 @@ TEST(LibraryPrimaryEditFlip, RemoveLeafMatchesLegacyCanonicalHash) {
     const auto run = [](EditFixture& fixture) {
         const CreateSequenceIds ids = RunCreateSequence(fixture);
         core::commands::CommandContext ctx = MakeContext(fixture);
-        EXPECT_TRUE(core::RemovalPlanIsCascadeEquivalent(fixture.model, ids.solution,
-                                                         core::RemoveMode::NodeAndDescendants));
         core::commands::RemoveElementCommand remove(ids.solution,
                                                     core::RemoveMode::NodeAndDescendants);
         EXPECT_TRUE(fixture.bus->Execute(remove, ctx, "tester").success);
@@ -248,20 +246,16 @@ TEST(LibraryPrimaryEditFlip, RemoveLeafMatchesLegacyCanonicalHash) {
     EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
 }
 
-// (2b) The removal shape the library CANNOT reproduce, pinned so the guard that
-// keeps it on the legacy mutator cannot be removed by accident.
-//
-// The GSN single-inference encoding gives a strategy ONE AssertedInference whose
-// sources are all its sub-goals. Deleting one sub-goal must leave that inference
-// in place with the surviving sub-goal. The library's only delete cascades every
-// relationship that references the deleted element, which would take the whole
+// (2b) The GSN single-inference encoding gives a strategy ONE AssertedInference
+// whose sources are all its sub-goals. Deleting one sub-goal must leave that
+// inference in place with the surviving sub-goal. A naive cascade delete (drop
+// every relationship referencing the deleted element) would take the whole
 // inference -- silently detaching the strategy and its remaining sub-goals from
-// the argument. Measured canonical hashes at the time this guard was added:
-// legacy 7b74343d..., unguarded cascade 6be86b56....
-//
-// The second edit afterwards is deliberately a FLIPPED command: it rebuilds both
-// views from the library, so it fails unless the bus's Stage 5 net kept the
-// library in step with the legacy delete.
+// the argument. The library delete instead SCRUBS
+// (ReferenceDeletePolicy::ScrubReferences): it removes the deleted sub-goal from
+// the inference's sources and keeps the relationship because a source remains,
+// reproducing the legacy scrub-then-drop, so the library-primary delete converges
+// with the legacy one on this shape without any fallback.
 TEST(LibraryPrimaryEditFlip, RemoveKeepsSiblingUnderSharedStrategyInference) {
     std::unique_ptr<EditFixture> library_side = MakeFixture("shared_inf_library", /*library_backed=*/true);
     std::unique_ptr<EditFixture> legacy_side = MakeFixture("shared_inf_legacy", /*library_backed=*/false);
@@ -270,10 +264,6 @@ TEST(LibraryPrimaryEditFlip, RemoveKeepsSiblingUnderSharedStrategyInference) {
     const auto run = [](EditFixture& fixture) {
         const CreateSequenceIds ids = RunCreateSequence(fixture);
         core::commands::CommandContext ctx = MakeContext(fixture);
-
-        // The shared inference is exactly why this shape is not cascade-equivalent.
-        EXPECT_FALSE(core::RemovalPlanIsCascadeEquivalent(fixture.model, ids.sub_goal_one,
-                                                          core::RemoveMode::NodeAndDescendants));
 
         core::commands::RemoveElementCommand remove(ids.sub_goal_one,
                                                     core::RemoveMode::NodeAndDescendants);

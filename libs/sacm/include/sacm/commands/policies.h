@@ -15,6 +15,19 @@ enum class ReferenceDeletePolicy {
     // referencing entries (group membership, citations, ...) from their
     // owners. No reference is ever left dangling.
     DeleteReferencingRelationships,
+    // Scrub the deleted element(s) out of every referencing relationship's
+    // source/target/reasoning (and membership) lists instead of deleting the
+    // whole relationship. A relationship is deleted only once scrubbing leaves
+    // it structurally invalid under SACM relationship multiplicity
+    // (AssertedRelationship source[1..*] / target[1..*], clause 11.13); a
+    // relationship that still has a surviving source and target survives,
+    // scrubbed. A relationship deleted this way is in turn scrubbed from
+    // anything referencing it (fixpoint). This is the scrub-then-drop semantics
+    // a GSN editor needs: removing one sub-goal of a strategy whose single
+    // inference has several sources keeps the inference, sourced by the rest,
+    // where DeleteReferencingRelationships would cascade the whole inference
+    // away. Like the cascade variant, no reference is ever left dangling.
+    ScrubReferences,
 };
 
 // What to do when the delete target is a package that contains elements.

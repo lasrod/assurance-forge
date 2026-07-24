@@ -773,32 +773,17 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
                         FormatLocation(tx_seq, event.event_sequence, type);
             return false;
         }
-        // The legacy `RemoveElement` SCRUBS references and drops a relationship
-        // only once it is structurally empty; the library seam's delete CASCADES
-        // the whole relationship as soon as it references a doomed element. Those
-        // agree only for some shapes. Removing ONE sub-goal of a strategy whose
-        // single inference has several sources diverges -- cascading there drops
-        // the inference and silently detaches the strategy and its remaining
-        // sub-goals from the argument. Use the seams only where the cascade
-        // provably reproduces the legacy removal; otherwise bridge through the
-        // same legacy mutator the live path uses. (The proper fix is a library
-        // relationship-source-removal operation, which would let both paths
-        // scrub -- see docs/sacm/sacm-gsn-metamodel-gaps.md.)
-        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const parser::AssuranceCase planning_model = sacm_adapter::project_case(document);
-        if (!core::RemovalPlanIsCascadeEquivalent(planning_model, element_id, mode)) {
-            const BridgeMutator mutate = [&](parser::AssuranceCase& model,
-                                             sacm::AssuranceCasePackage& package,
-                                             std::string& err) -> bool {
-                std::string remove_error;
-                if (!core::RemoveElement(model, &package, element_id, mode, remove_error)) {
-                    err = "RemoveElement (bridge) failed at " + location + ": " + remove_error;
-                    return false;
-                }
-                return true;
-            };
-            return BridgeViaLegacy(document, location, mutate, out_error);
-        }
+        // The library replay depends only on the recorded `deleted_ids` -- the
+        // exact PlanRemoval set the live path computed. The scrub seam deletes
+        // each planned id through ReferenceDeletePolicy::ScrubReferences, which
+        // reproduces the legacy scrub-then-drop for EVERY removal shape (a
+        // strategy's shared inference survives, sourced by the sub-goals that
+        // remain, rather than cascading away), so the guarded legacy bridge is
+        // gone. `element_id`/`mode` stay required for payload-shape parity with
+        // the recorded event and the legacy replay's failure surface, but the
+        // seam does not consult them (deleted_ids already reflects the mode).
+        (void)element_id;
+        (void)mode;
 
         auto deleted_it = payload.find("deleted_ids");
         if (deleted_it == payload.end() || !deleted_it->is_array()) {

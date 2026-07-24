@@ -212,19 +212,24 @@ hid:
   only delete-and-recreate the relationships (new ids, losing any per-relationship
   metadata) or the standard must add a retarget operation. Deleting a node *with*
   its descendants, by contrast, composes cleanly from per-element deletes.
-- **Deleting one sub-goal of a GSN Strategy needs a `source` removal, which SACM
-  editing does not define.** The standards-correct encoding gives a Strategy a
-  single `AssertedInference` whose `source` list holds *all* its sub-goals
-  (clause 11.13, `source : SACMElement[1..*]`). Removing one sub-goal therefore
-  means removing one entry from that list — but SACM defines no per-end edit, so
-  a conformant editor can only delete the whole relationship (detaching the
-  Strategy and every surviving sub-goal) or delete-and-recreate it with a new id.
-  Measured in Assurance Forge: with `sources = {G3, G4}`, deleting `G3` through
-  the library's `DeleteElement` +
-  `ReferenceDeletePolicy::DeleteReferencingRelationships` removes the inference
-  entirely, while the intended result keeps it with `sources = {G4}`. Note the
-  asymmetry — the library *does* define adding a source (`AddRelationshipSource`)
-  but not removing one, so a Strategy can gain sub-goals but not lose them.
+- **Deleting one sub-goal of a GSN Strategy scrubs a `source`, now handled by a
+  scrubbing delete policy (gap closed).** The standards-correct encoding gives a
+  Strategy a single `AssertedInference` whose `source` list holds *all* its
+  sub-goals (clause 11.13, `source : SACMElement[1..*]`). Removing one sub-goal
+  means removing one entry from that list. There is still no *general* per-end
+  retarget/move operation on an `AssertedRelationship`, but *source removal as a
+  consequence of deleting the sub-goal* is now expressed by the library's
+  `ReferenceDeletePolicy::ScrubReferences` on `DeleteElement`: deleting the
+  sub-goal scrubs it out of the inference's `source` list and keeps the
+  inference as long as at least one source (or, for an inference, its reasoning)
+  and one target survive, dropping the relationship only once scrubbing empties
+  it. Measured in Assurance Forge: with `sources = {G3, G4}`, deleting `G3` now
+  keeps the inference with `sources = {G4}` (the intended result), whereas the
+  older `DeleteReferencingRelationships` cascade removed the inference entirely.
+  The asymmetry with `AddRelationshipSource` (add a source but no explicit
+  *remove-a-source* command) remains for the case of editing a source without
+  deleting the sub-goal element itself; deletion-driven source removal is
+  covered.
 
 ## Submitting this
 
