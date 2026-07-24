@@ -42,12 +42,10 @@ void RenderInspectorArea(AppRuntimeState& state,
         if (!ui::GetUiState().selected_acp_id.empty()) {
             ui::panels::AcpPanelCallbacks acp_callbacks;
             acp_callbacks.upsert_acp = [&](const parser::AcpRecord& acp) {
-                return state.acp_controller && loaded_case &&
-                       state.acp_controller->UpsertAcp(*loaded_case, sacm_package, acp);
+                return state.acp_controller && loaded_case && state.acp_controller->UpsertAcp(state, acp);
             };
             acp_callbacks.remove_acp = [&](const std::string& acp_id) {
-                return state.acp_controller && loaded_case &&
-                       state.acp_controller->RemoveAcp(*loaded_case, sacm_package, acp_id);
+                return state.acp_controller && loaded_case && state.acp_controller->RemoveAcp(state, acp_id);
             };
             acp_callbacks.create_confidence_argument_tree = [&](const std::string& acp_id) {
                 return state.acp_controller && loaded_case &&
@@ -69,7 +67,7 @@ void RenderInspectorArea(AppRuntimeState& state,
             ui::panels::RelationshipPanelCallbacks relationship_callbacks;
             relationship_callbacks.add_acp = [&](const std::string& relationship_id) {
                 return state.acp_controller && loaded_case &&
-                       state.acp_controller->AddRelationshipAcp(*loaded_case, sacm_package, relationship_id);
+                       state.acp_controller->AddRelationshipAcp(state, relationship_id);
             };
             relationship_callbacks.open_acp = [](const std::string&) {};
             ui::panels::ShowRelationshipPanel(loaded_case, &relationship_callbacks);

@@ -450,6 +450,22 @@ AcpEditResult AddAcp(parser::AssuranceCase& model,
                      sacm::AssuranceCasePackage* package,
                      const std::string& target_kind,
                      const std::string& target_id) {
+    // Generate the id from the full flat model (all packages) to avoid colliding with ACP ids that
+    // already exist in other argument packages, then delegate. Audit replay calls AddAcpWithId
+    // directly with the id recorded here.
+    const std::string acp_id = NextAcpId(CollectAcpsForIdGeneration(model, nullptr));
+    return AddAcpWithId(model, package, target_kind, target_id, acp_id);
+}
+
+AcpEditResult AddAcpWithId(parser::AssuranceCase& model,
+                           sacm::AssuranceCasePackage* package,
+                           const std::string& target_kind,
+                           const std::string& target_id,
+                           const std::string& acp_id) {
+    // A caller-supplied id (audit replay, direct callers) must be non-empty: an
+    // empty id would write an unaddressable ACP tag set and corrupt the model.
+    if (acp_id.empty())
+        return ErrorResult({}, "ACP id must not be empty.");
     if (target_kind != kTargetKindElement && target_kind != kTargetKindRelationship)
         return ErrorResult({}, "Unsupported ACP target kind.");
     if (!ParserTargetExists(model, target_kind, target_id))
@@ -466,9 +482,7 @@ AcpEditResult AddAcp(parser::AssuranceCase& model,
         return ErrorResult({}, "ACP target was not found in the SACM package.");
 
     Acp acp;
-    // Generate the id from the full flat model (all packages) to avoid colliding with ACP ids that
-    // already exist in other argument packages.
-    acp.id = NextAcpId(CollectAcpsForIdGeneration(model, nullptr));
+    acp.id = acp_id;
     acp.name = acp.id;
     acp.target.kind = AcpTargetKindFromString(target_kind);
     acp.target.target_id = target_id;

@@ -53,6 +53,13 @@ DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state, core::commands::I
         if (!command.Apply(ctx, unused_event, apply_error)) {
             return {false, apply_error};
         }
+        // No bus, so `ctx` carried no library document and the command took the
+        // legacy in-place path, mutating `sacm_package` but not the library-owned
+        // document. Re-derive the library from the package so it stays the source
+        // of truth even outside a project/audit context (the bus's Stage-5 net does
+        // this on the audited path; the ACP controller used to do it itself before
+        // its edits were routed through the bus).
+        state.app_state.sync_library_document();
         // The model has been mutated in-place but we have no bus to drive
         // the autosave path. Set the dirty flag directly (matching how
         // helpers like `EnsureQuickDefineTargetPackage` mark state) so
