@@ -27,6 +27,7 @@
 #include "core/commands/command_bus.h"
 #include "core/commands/element_commands.h"
 #include "core/commands/terminology_commands.h"
+#include "core/commands/tree_commands.h"
 #include "core/derived_views.h"
 #include "core/element_factory.h"
 #include "core/library_package_projection.h"
@@ -158,6 +159,19 @@ const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const
 bool HasElementOfType(const parser::AssuranceCase& model, const std::string& id, const std::string& type) {
     const parser::SacmElement* element = FindElement(model, id);
     return element != nullptr && element->type == type;
+}
+
+// The (unsorted) source order of the AssertedInference a strategy reasons over --
+// the vector a sibling reorder mutates, and what the app saves/loads.
+std::vector<std::string> StrategyInferenceSources(const sacm::AssuranceCasePackage& package,
+                                                  const std::string& strategy_id) {
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::AssertedInference& inference : argument_package.assertedInferences) {
+            if (inference.reasoning == strategy_id)
+                return inference.sources;
+        }
+    }
+    return {};
 }
 
 // Runs the shared create sequence on one fixture and reports the ids the
@@ -488,6 +502,54 @@ TEST(LibraryPrimaryEditFlip, AcpConfidenceTreeMatchesLegacyCanonicalHash) {
         EXPECT_TRUE(RunCommand(fixture, create_tree, ctx).success);
         EXPECT_FALSE(create_tree.GeneratedArgumentPackageId().empty());
         EXPECT_FALSE(create_tree.GeneratedTopGoalId().empty());
+    };
+    run(*library_side);
+    run(*legacy_side);
+
+    EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
+}
+
+// (2g) The structural tree drop (reorder siblings + move a subtree) is library-
+// primary like every other audited command. Run a reorder and a move library-primary
+// vs legacy and converge on the canonical hash. The move makes the sequence non-vacuous
+// for the (order-insensitive) canonical hash; the explicit source-order check confirms
+// the library-primary REORDER preserved the sibling order on the model the flipped side
+// saves (the library), which is the data loss the audit fix prevents -- and which the
+// canonical hash alone would not catch because it sorts sources.
+TEST(LibraryPrimaryEditFlip, TreeDropMatchesLegacyCanonicalHash) {
+    std::unique_ptr<EditFixture> library_side = MakeFixture("tree_drop_library", /*library_backed=*/true);
+    std::unique_ptr<EditFixture> legacy_side = MakeFixture("tree_drop_legacy", /*library_backed=*/false);
+    ASSERT_NE(library_side->document, nullptr);
+    ASSERT_EQ(legacy_side->document, nullptr);
+
+    const auto run = [](EditFixture& fixture) {
+        core::commands::CommandContext ctx = MakeContext(fixture);
+
+        core::commands::CreateChildElementCommand add_strategy("G1", core::NewElementKind::Strategy);
+        EXPECT_TRUE(RunCommand(fixture, add_strategy, ctx).success);
+        const std::string strategy_id = add_strategy.GeneratedId();
+        core::commands::CreateChildElementCommand add_sub1(strategy_id, core::NewElementKind::Goal);
+        EXPECT_TRUE(RunCommand(fixture, add_sub1, ctx).success);
+        const std::string sub1_id = add_sub1.GeneratedId();
+        core::commands::CreateChildElementCommand add_sub2(strategy_id, core::NewElementKind::Goal);
+        EXPECT_TRUE(RunCommand(fixture, add_sub2, ctx).success);
+        const std::string sub2_id = add_sub2.GeneratedId();
+
+        // Reorder sub2 above sub1. Library-primary on the flipped side -- the reorder
+        // must land in the library, not just the transient views.
+        core::commands::ReorderSiblingsCommand reorder(sub2_id, sub1_id, core::TreeDropMode::Before);
+        EXPECT_TRUE(RunCommand(fixture, reorder, ctx).success);
+        EXPECT_EQ(StrategyInferenceSources(fixture.package, strategy_id),
+                  (std::vector<std::string>{sub2_id, sub1_id}))
+            << "the library-primary reorder did not reach the saved model";
+
+        // A move changes the relationship structure, so it moves the (order-insensitive)
+        // canonical hash off the start value -- both routings must agree on the result.
+        core::commands::CreateChildElementCommand add_c("G1", core::NewElementKind::Goal);
+        EXPECT_TRUE(RunCommand(fixture, add_c, ctx).success);
+        const std::string c_id = add_c.GeneratedId();
+        core::commands::MoveSubtreeCommand move(c_id, sub1_id);
+        EXPECT_TRUE(RunCommand(fixture, move, ctx).success);
     };
     run(*library_side);
     run(*legacy_side);

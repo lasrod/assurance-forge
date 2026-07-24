@@ -2,6 +2,8 @@
 
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
+#include "app/commands/dispatch.h"
+#include "core/commands/tree_commands.h"
 #include "ui/ui_state.h"
 
 namespace app::actions {
@@ -130,27 +132,35 @@ bool ElementActions::PerformTreeDrop(const std::string& dragged_id,
         return false;
     }
 
-    parser::AssuranceCase& model = state_.app_state.loaded_case.value();
-    sacm::AssuranceCasePackage* package =
-        state_.app_state.sacm_package.has_value() ? &state_.app_state.sacm_package.value() : nullptr;
-
-    std::string error;
-    bool changed = false;
+    // Route the drop through the audited command bus so it is recorded (replayable,
+    // no verify divergence) AND library-primary (the library document is mutated and
+    // the live views re-derive from it). The command owns the mutation -- the same
+    // `core::ReorderSiblings` / `core::MoveSubtree` this used to call directly on the
+    // loaded case + package, which internally re-validate the drop (preserving the
+    // pre-check behavior). This was the last bus-bypassing writer of `sacm_package`.
     if (drop_mode == core::TreeDropMode::Before || drop_mode == core::TreeDropMode::After) {
-        changed = core::ReorderSiblings(model,
-                                        package,
-                                        state_.current_tree,
-                                        state_.tree_display_order,
-                                        core::ReorderSiblingsCommand{dragged_id, target_id, drop_mode},
-                                        error);
+        core::commands::ReorderSiblingsCommand command(dragged_id, target_id, drop_mode);
+        const app::commands::DispatchOutcome outcome =
+            app::commands::DispatchAuditedCommand(state_, command);
+        if (!outcome.success) {
+            SetStatus(state_,
+                      outcome.error.empty() ? "Tree move failed." : "Tree move failed: " + outcome.error);
+            return false;
+        }
+        // Refresh the transient render-order override immediately so the reorder is
+        // visible before the frame-boundary re-derive rebuilds the tree from the
+        // (now reordered) SACM.
+        for (const auto& [parent_id, order] : command.ReorderedOrder().children_by_parent)
+            state_.tree_display_order.children_by_parent[parent_id] = order;
     } else {
-        changed = core::MoveSubtree(
-            model, package, state_.current_tree, core::MoveSubtreeCommand{dragged_id, target_id}, error);
-    }
-
-    if (!changed) {
-        SetStatus(state_, "Tree move failed: " + error);
-        return false;
+        core::commands::MoveSubtreeCommand command(dragged_id, target_id);
+        const app::commands::DispatchOutcome outcome =
+            app::commands::DispatchAuditedCommand(state_, command);
+        if (!outcome.success) {
+            SetStatus(state_,
+                      outcome.error.empty() ? "Tree move failed." : "Tree move failed: " + outcome.error);
+            return false;
+        }
     }
 
     state_.events.Emit(TreeDirtyEvent{});

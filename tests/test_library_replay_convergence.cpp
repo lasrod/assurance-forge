@@ -28,12 +28,14 @@
 #include "core/commands/element_commands.h"
 #include "core/commands/package_commands.h"
 #include "core/commands/terminology_commands.h"
+#include "core/commands/tree_commands.h"
 #include "core/element_factory.h"
 #include "core/library_package_projection.h"
 #include "core/project_model.h"
 #include "core/terminology_package_service.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_parser.h"
+#include "sacm/sacm_serializer.h"
 #include "sacm_adapter/library_load.h"
 
 #include <gtest/gtest.h>
@@ -144,6 +146,20 @@ std::unique_ptr<sacm_adapter::LibraryDocument> LibraryReplay(
         return nullptr;
     }
     return std::move(replayed.value());
+}
+
+// The (unsorted) source order of the single AssertedInference a strategy reasons
+// over -- the exact vector `ApplySourceOrder` reorders on a sibling reorder, and
+// what the order-insensitive canonical hash normalizes away.
+std::vector<std::string> StrategyInferenceSources(const sacm::AssuranceCasePackage& package,
+                                                  const std::string& strategy_id) {
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::AssertedInference& inference : argument_package.assertedInferences) {
+            if (inference.reasoning == strategy_id)
+                return inference.sources;
+        }
+    }
+    return {};
 }
 
 } // namespace
@@ -552,6 +568,115 @@ TEST(LibraryReplayConvergence, AcpCreateConfidenceTreeConverges) {
     ASSERT_TRUE(bus->Execute(create_tree, ctx, "tester").success);
     ASSERT_FALSE(create_tree.GeneratedArgumentPackageId().empty());
     ASSERT_FALSE(create_tree.GeneratedTopGoalId().empty());
+
+    const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
+    const core::audit::ReplayState legacy = LegacyReplay(f, txns);
+    const std::unique_ptr<sacm_adapter::LibraryDocument> library_doc = LibraryReplay(f, txns);
+    ASSERT_NE(library_doc, nullptr);
+
+    const std::optional<std::string> library_hash =
+        core::library_canonical_hash(core::project_library_package(*library_doc));
+    const std::optional<std::string> legacy_hash = core::library_canonical_hash(legacy.package);
+    ASSERT_TRUE(library_hash.has_value());
+    ASSERT_TRUE(legacy_hash.has_value());
+    EXPECT_EQ(*library_hash, *legacy_hash);
+}
+
+// A sibling REORDER changes only the ORDER of a relationship's sources, which the
+// order-insensitive canonical hash (it sorts sources and relationships) normalizes
+// away -- so the canonical hash is NOT a witness that the reorder happened. Prove
+// non-vacuousness against the order-sensitive RAW serialization (the file the app
+// saves), then prove the bridged library replay reproduces the legacy replay's
+// source order exactly -- i.e. the reorder survives the library round-trip, which
+// is precisely the data loss the audit fix must prevent.
+TEST(LibraryReplayConvergence, TreeReorderSiblingsConvergesAndChangesSerialization) {
+    auto f = MakeFixture("tree_reorder");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package};
+
+    core::commands::CreateChildElementCommand add_strategy("G1", core::NewElementKind::Strategy);
+    ASSERT_TRUE(bus->Execute(add_strategy, ctx, "tester").success);
+    const std::string strategy_id = add_strategy.GeneratedId();
+    core::commands::CreateChildElementCommand add_sub1(strategy_id, core::NewElementKind::Goal);
+    ASSERT_TRUE(bus->Execute(add_sub1, ctx, "tester").success);
+    const std::string sub1_id = add_sub1.GeneratedId();
+    core::commands::CreateChildElementCommand add_sub2(strategy_id, core::NewElementKind::Goal);
+    ASSERT_TRUE(bus->Execute(add_sub2, ctx, "tester").success);
+    const std::string sub2_id = add_sub2.GeneratedId();
+
+    // The strategy's single inference sources the two sub-goals in creation order.
+    ASSERT_EQ(StrategyInferenceSources(f.package, strategy_id),
+              (std::vector<std::string>{sub1_id, sub2_id}));
+    const std::string serialized_before = sacm::serialize_sacm(f.package);
+
+    // Move sub2 ABOVE sub1.
+    core::commands::ReorderSiblingsCommand reorder(sub2_id, sub1_id, core::TreeDropMode::Before);
+    ASSERT_TRUE(bus->Execute(reorder, ctx, "tester").success);
+
+    // Non-vacuous: the reorder changed the serialized SACM (the raw file the app
+    // saves), even though the order-insensitive canonical hash cannot see it.
+    const std::string serialized_after = sacm::serialize_sacm(f.package);
+    EXPECT_NE(serialized_before, serialized_after);
+    EXPECT_EQ(StrategyInferenceSources(f.package, strategy_id),
+              (std::vector<std::string>{sub2_id, sub1_id}));
+
+    const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
+    const core::audit::ReplayState legacy = LegacyReplay(f, txns);
+    const std::unique_ptr<sacm_adapter::LibraryDocument> library_doc = LibraryReplay(f, txns);
+    ASSERT_NE(library_doc, nullptr);
+    const sacm::AssuranceCasePackage library_package = core::project_library_package(*library_doc);
+
+    // Order-sensitive convergence: the bridged library replay reproduces the legacy
+    // replay's reordered source order (the reorder survived the library round-trip),
+    // and it matches the intended reorder.
+    const std::vector<std::string> legacy_sources = StrategyInferenceSources(legacy.package, strategy_id);
+    const std::vector<std::string> library_sources = StrategyInferenceSources(library_package, strategy_id);
+    EXPECT_EQ(legacy_sources, (std::vector<std::string>{sub2_id, sub1_id}));
+    EXPECT_EQ(library_sources, legacy_sources);
+
+    // The canonical hash still matches (order-insensitively) -- the standard oracle.
+    const std::optional<std::string> library_hash = core::library_canonical_hash(library_package);
+    const std::optional<std::string> legacy_hash = core::library_canonical_hash(legacy.package);
+    ASSERT_TRUE(library_hash.has_value());
+    ASSERT_TRUE(legacy_hash.has_value());
+    EXPECT_EQ(*library_hash, *legacy_hash);
+}
+
+// MoveSubtree changes the relationship structure (a source moves under a new
+// parent, the old relationship is dropped, a new one minted), so it DOES change
+// the canonical hash -- the standard oracle applies directly. The new relationship
+// id is minted deterministically (GenerateRelationshipId), so the bridged library
+// replay regenerates the same id the legacy replay does and they converge without a
+// WithId variant.
+TEST(LibraryReplayConvergence, TreeMoveSubtreeConvergesWithLegacyReplay) {
+    auto f = MakeFixture("tree_move");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package};
+
+    core::commands::CreateChildElementCommand add_a("G1", core::NewElementKind::Goal);
+    ASSERT_TRUE(bus->Execute(add_a, ctx, "tester").success);
+    const std::string a_id = add_a.GeneratedId();
+    core::commands::CreateChildElementCommand add_b("G1", core::NewElementKind::Goal);
+    ASSERT_TRUE(bus->Execute(add_b, ctx, "tester").success);
+    const std::string b_id = add_b.GeneratedId();
+
+    const std::optional<std::string> hash_before = core::library_canonical_hash(f.package);
+    ASSERT_TRUE(hash_before.has_value());
+
+    // Move Gb from under G1 to under Ga.
+    core::commands::MoveSubtreeCommand move(b_id, a_id);
+    ASSERT_TRUE(bus->Execute(move, ctx, "tester").success);
+
+    // Non-vacuous: the move changed the canonical hash (unlike a pure reorder).
+    const std::optional<std::string> hash_after = core::library_canonical_hash(f.package);
+    ASSERT_TRUE(hash_after.has_value());
+    EXPECT_NE(*hash_before, *hash_after);
 
     const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
     const core::audit::ReplayState legacy = LegacyReplay(f, txns);

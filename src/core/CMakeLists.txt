@@ -34,6 +34,7 @@ add_library(af_core OBJECT
     commands/package_commands.cpp
     commands/proposal_commands.cpp
     commands/terminology_commands.cpp
+    commands/tree_commands.cpp
     commands/undo_command.cpp
     confidence/confidence_store.cpp
     element_factory.cpp

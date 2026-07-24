@@ -1,13 +1,16 @@
 #include "core/audit/event_replayer.h"
 
 #include "core/acp/acp_editing.h"
+#include "core/assurance_tree.h"
 #include "core/audit/undo_resolver.h"
 #include "core/commands/acp_commands.h"
 #include "core/commands/element_commands.h"
 #include "core/commands/package_commands.h"
 #include "core/commands/proposal_commands.h"
 #include "core/commands/terminology_commands.h"
+#include "core/commands/tree_commands.h"
 #include "core/element_factory.h"
+#include "core/tree_editing.h"
 #include "core/library_package_projection.h"
 #include "core/reviews/review_proposal.h"
 #include "core/reviews/review_proposal_patch_service.h"
@@ -226,6 +229,56 @@ bool ApplyEvent(ReplayState& state,
         std::string err;
         if (!core::RemoveElement(state.model, &state.package, element_id, mode, err)) {
             out_error = "RemoveElement failed at " + FormatLocation(tx_seq, event.event_sequence, type) +
+                        ": " + err;
+            return false;
+        }
+        return true;
+    }
+
+    if (type == "ReorderSiblings") {
+        std::string dragged_id, target_id, drop_mode_token;
+        if (!require_string("dragged_id", dragged_id))
+            return false;
+        if (!require_string("target_id", target_id))
+            return false;
+        if (!require_string("drop_mode", drop_mode_token))
+            return false;
+        core::TreeDropMode drop_mode;
+        if (!commands::TreeDropModeFromToken(drop_mode_token, drop_mode)) {
+            out_error = "Unknown tree drop mode token '" + drop_mode_token + "' at " +
+                        FormatLocation(tx_seq, event.event_sequence, type);
+            return false;
+        }
+        const core::AssuranceTree tree = core::AssuranceTree::Build(state.model, "");
+        core::TreeDisplayOrder    scratch_order;
+        std::string               err;
+        // `ReorderSiblings` returns false on a genuine no-op (nothing to reorder)
+        // AND on error, distinguished by whether `err` is set. A non-empty `err`
+        // is a real failure; an empty `err` is an idempotent no-op, so replay
+        // succeeds either way except on a true error.
+        if (!core::ReorderSiblings(state.model, &state.package, tree, scratch_order,
+                                   core::ReorderSiblingsCommand{dragged_id, target_id, drop_mode}, err) &&
+            !err.empty()) {
+            out_error = "ReorderSiblings failed at " + FormatLocation(tx_seq, event.event_sequence, type) +
+                        ": " + err;
+            return false;
+        }
+        return true;
+    }
+
+    if (type == "MoveSubtree") {
+        std::string dragged_id, new_parent_id;
+        if (!require_string("dragged_id", dragged_id))
+            return false;
+        if (!require_string("new_parent_id", new_parent_id))
+            return false;
+        const core::AssuranceTree tree = core::AssuranceTree::Build(state.model, "");
+        std::string               err;
+        // Same no-op-vs-error distinction as ReorderSiblings above.
+        if (!core::MoveSubtree(state.model, &state.package, tree,
+                               core::MoveSubtreeCommand{dragged_id, new_parent_id}, err) &&
+            !err.empty()) {
+            out_error = "MoveSubtree failed at " + FormatLocation(tx_seq, event.event_sequence, type) +
                         ": " + err;
             return false;
         }
@@ -897,6 +950,69 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             }
         }
         return true;
+    }
+
+    // The tree drop mutators (reorder siblings / move a subtree) have no parity
+    // library seam -- they reorder relationships/sources and re-mint relationship
+    // ids in the legacy vocabulary. Bridge them: run the SAME `core::*` mutator the
+    // live path uses onto models projected FROM the library, then re-derive the
+    // library from the serialized package. `MoveSubtree` mints its new relationship
+    // id deterministically (`GenerateRelationshipId`), so the projected scratch
+    // regenerates the same id the live bridge did and they converge.
+    if (type == "ReorderSiblings") {
+        std::string dragged_id, target_id, drop_mode_token;
+        if (!require_string("dragged_id", dragged_id))
+            return false;
+        if (!require_string("target_id", target_id))
+            return false;
+        if (!require_string("drop_mode", drop_mode_token))
+            return false;
+        core::TreeDropMode drop_mode;
+        if (!commands::TreeDropModeFromToken(drop_mode_token, drop_mode)) {
+            out_error = "Unknown tree drop mode token '" + drop_mode_token + "' at " +
+                        FormatLocation(tx_seq, event.event_sequence, type);
+            return false;
+        }
+        const std::string   location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate   = [&](parser::AssuranceCase&         model,
+                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            const core::AssuranceTree tree = core::AssuranceTree::Build(model, "");
+            core::TreeDisplayOrder    scratch_order;
+            std::string               reorder_error;
+            // Non-empty `reorder_error` is a real failure; a false-with-empty is an
+            // idempotent no-op (mirrors the legacy replay branch).
+            if (!core::ReorderSiblings(model, &package, tree, scratch_order,
+                                       core::ReorderSiblingsCommand{dragged_id, target_id, drop_mode},
+                                       reorder_error) &&
+                !reorder_error.empty()) {
+                err = "ReorderSiblings (bridge) failed at " + location + ": " + reorder_error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
+    }
+
+    if (type == "MoveSubtree") {
+        std::string dragged_id, new_parent_id;
+        if (!require_string("dragged_id", dragged_id))
+            return false;
+        if (!require_string("new_parent_id", new_parent_id))
+            return false;
+        const std::string   location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate   = [&](parser::AssuranceCase&         model,
+                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            const core::AssuranceTree tree = core::AssuranceTree::Build(model, "");
+            std::string               move_error;
+            if (!core::MoveSubtree(model, &package, tree,
+                                   core::MoveSubtreeCommand{dragged_id, new_parent_id}, move_error) &&
+                !move_error.empty()) {
+                err = "MoveSubtree (bridge) failed at " + location + ": " + move_error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
     }
 
     if (type == "UpdateElementText") {
