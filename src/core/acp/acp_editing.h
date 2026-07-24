@@ -39,6 +39,17 @@ AcpEditResult CreateConfidenceArgumentTreeForAcp(parser::AssuranceCase& model,
                                                  sacm::AssuranceCasePackage* package,
                                                  const std::string& acp_id);
 
+// Identical to CreateConfidenceArgumentTreeForAcp but uses the supplied
+// `argument_package_id` and `top_goal_id` verbatim instead of generating them.
+// The plain form generates the two ids (the only non-deterministic outputs of
+// this compound op) and delegates here; audit replay calls this directly with
+// the recorded ids so a replayed create reproduces the exact identities minted.
+AcpEditResult CreateConfidenceArgumentTreeForAcpWithIds(parser::AssuranceCase& model,
+                                                        sacm::AssuranceCasePackage* package,
+                                                        const std::string& acp_id,
+                                                        const std::string& argument_package_id,
+                                                        const std::string& top_goal_id);
+
 const parser::AcpRecord* FindAcp(const parser::AssuranceCase& model, const std::string& acp_id);
 parser::AcpRecord* FindAcp(parser::AssuranceCase& model, const std::string& acp_id);
 

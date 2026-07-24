@@ -115,4 +115,31 @@ bool UpsertAcpCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, 
     return true;
 }
 
+bool CreateConfidenceArgumentTreeForAcpCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event,
+                                                      std::string& out_error) {
+    core::acp::AcpEditResult   result;
+    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase&         model,
+                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        result = core::acp::CreateConfidenceArgumentTreeForAcp(model, &package, acp_id_);
+        if (!result.error.empty()) {
+            err = result.error;
+            return false;
+        }
+        if (!result.changed)
+            return false;
+        return true;
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        return false;
+    argument_package_id_ = result.argument_package_id;
+    top_goal_id_         = result.top_goal_id;
+
+    out_event.event_type = "CreateConfidenceArgumentTree";
+    out_event.payload    = nlohmann::ordered_json::object();
+    out_event.payload["acp_id"]              = acp_id_;
+    out_event.payload["argument_package_id"] = argument_package_id_;
+    out_event.payload["top_goal_id"]         = top_goal_id_;
+    return true;
+}
+
 } // namespace core::commands

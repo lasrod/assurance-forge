@@ -527,6 +527,45 @@ TEST(LibraryReplayConvergence, AcpRemoveConverge) {
     EXPECT_EQ(*library_hash, *legacy_hash);
 }
 
+// Creating a confidence argument tree for an ACP is a COMPOUND op (a confidence
+// ArgumentPackage + top goal + linking UpsertAcp) that mints two ids. The command
+// records both; the bridged replay forces them via
+// CreateConfidenceArgumentTreeForAcpWithIds, so legacy and library replay converge.
+TEST(LibraryReplayConvergence, AcpCreateConfidenceTreeConverges) {
+    auto f = MakeFixture("acp_confidence_tree");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package};
+
+    core::commands::CreateChildElementCommand add_solution("G1", core::NewElementKind::Solution);
+    ASSERT_TRUE(bus->Execute(add_solution, ctx, "tester").success);
+    const std::string solution_id = add_solution.GeneratedId();
+
+    core::commands::AddAcpCommand add_acp("element", solution_id);
+    ASSERT_TRUE(bus->Execute(add_acp, ctx, "tester").success);
+    const std::string acp_id = add_acp.GeneratedAcpId();
+    ASSERT_FALSE(acp_id.empty());
+
+    core::commands::CreateConfidenceArgumentTreeForAcpCommand create_tree(acp_id);
+    ASSERT_TRUE(bus->Execute(create_tree, ctx, "tester").success);
+    ASSERT_FALSE(create_tree.GeneratedArgumentPackageId().empty());
+    ASSERT_FALSE(create_tree.GeneratedTopGoalId().empty());
+
+    const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
+    const core::audit::ReplayState legacy = LegacyReplay(f, txns);
+    const std::unique_ptr<sacm_adapter::LibraryDocument> library_doc = LibraryReplay(f, txns);
+    ASSERT_NE(library_doc, nullptr);
+
+    const std::optional<std::string> library_hash =
+        core::library_canonical_hash(core::project_library_package(*library_doc));
+    const std::optional<std::string> legacy_hash = core::library_canonical_hash(legacy.package);
+    ASSERT_TRUE(library_hash.has_value());
+    ASSERT_TRUE(legacy_hash.has_value());
+    EXPECT_EQ(*library_hash, *legacy_hash);
+}
+
 // Bridge event: RemoveTerminologyPackage has no parity seam (the library's
 // recursive delete diverges from the legacy non-empty-refusing mutator), so the
 // library replay bridges -- applying the legacy mutator onto a projected package

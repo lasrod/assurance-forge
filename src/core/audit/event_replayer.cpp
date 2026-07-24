@@ -719,6 +719,24 @@ bool ApplyEvent(ReplayState& state,
         return true;
     }
 
+    if (type == "CreateConfidenceArgumentTree") {
+        std::string acp_id, argument_package_id, top_goal_id;
+        if (!require_string("acp_id", acp_id))
+            return false;
+        if (!require_string("argument_package_id", argument_package_id))
+            return false;
+        if (!require_string("top_goal_id", top_goal_id))
+            return false;
+        const core::acp::AcpEditResult result = core::acp::CreateConfidenceArgumentTreeForAcpWithIds(
+            state.model, &state.package, acp_id, argument_package_id, top_goal_id);
+        if (!result.error.empty()) {
+            out_error = "CreateConfidenceArgumentTreeForAcpWithIds failed at " +
+                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
+            return false;
+        }
+        return true;
+    }
+
     out_error = "Unknown event type '" + type + "' at " +
                 FormatLocation(tx_seq, event.event_sequence, type);
     return false;
@@ -1419,6 +1437,29 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             const core::acp::AcpEditResult result = core::acp::UpsertAcp(model, &package, record);
             if (!result.error.empty()) {
                 err = "UpsertAcp (bridge) failed at " + location + ": " + result.error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
+    }
+
+    if (type == "CreateConfidenceArgumentTree") {
+        std::string acp_id, argument_package_id, top_goal_id;
+        if (!require_string("acp_id", acp_id))
+            return false;
+        if (!require_string("argument_package_id", argument_package_id))
+            return false;
+        if (!require_string("top_goal_id", top_goal_id))
+            return false;
+        const std::string   location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate   = [&](parser::AssuranceCase&         model,
+                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            const core::acp::AcpEditResult result = core::acp::CreateConfidenceArgumentTreeForAcpWithIds(
+                model, &package, acp_id, argument_package_id, top_goal_id);
+            if (!result.error.empty()) {
+                err = "CreateConfidenceArgumentTreeForAcpWithIds (bridge) failed at " + location + ": " +
+                      result.error;
                 return false;
             }
             return true;

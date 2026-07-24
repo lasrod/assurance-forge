@@ -463,6 +463,37 @@ TEST(LibraryPrimaryEditFlip, AcpEditsMatchLegacyCanonicalHash) {
     EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
 }
 
+// (2f) Creating a confidence argument tree for an ACP -- a compound op (confidence
+// ArgumentPackage + top goal + linking UpsertAcp) minting two ids -- is library-primary
+// via the bridge, reproducing the legacy result. Run it library-primary vs legacy and
+// converge on the canonical hash.
+TEST(LibraryPrimaryEditFlip, AcpConfidenceTreeMatchesLegacyCanonicalHash) {
+    std::unique_ptr<EditFixture> library_side = MakeFixture("acp_tree_library", /*library_backed=*/true);
+    std::unique_ptr<EditFixture> legacy_side = MakeFixture("acp_tree_legacy", /*library_backed=*/false);
+    ASSERT_NE(library_side->document, nullptr);
+
+    const auto run = [](EditFixture& fixture) {
+        core::commands::CommandContext ctx = MakeContext(fixture);
+
+        core::commands::CreateChildElementCommand add_solution("G1", core::NewElementKind::Solution);
+        EXPECT_TRUE(RunCommand(fixture, add_solution, ctx).success);
+        const std::string solution_id = add_solution.GeneratedId();
+
+        core::commands::AddAcpCommand add_acp("element", solution_id);
+        EXPECT_TRUE(RunCommand(fixture, add_acp, ctx).success);
+        const std::string acp_id = add_acp.GeneratedAcpId();
+        EXPECT_FALSE(acp_id.empty());
+
+        core::commands::CreateConfidenceArgumentTreeForAcpCommand create_tree(acp_id);
+        EXPECT_TRUE(RunCommand(fixture, create_tree, ctx).success);
+        EXPECT_FALSE(create_tree.GeneratedArgumentPackageId().empty());
+    };
+    run(*library_side);
+    run(*legacy_side);
+
+    EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
+}
+
 // (3) The rebuilt render model still carries the bare-strategy placement pass. A
 // GSN strategy is stored as an ArgumentReasoning with a `strategyTarget` tag and
 // NO inference until its first sub-goal, so the render model needs the

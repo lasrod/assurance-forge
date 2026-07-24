@@ -556,8 +556,28 @@ AcpEditResult RemoveAcp(parser::AssuranceCase& model, sacm::AssuranceCasePackage
 AcpEditResult CreateConfidenceArgumentTreeForAcp(parser::AssuranceCase& model,
                                                  sacm::AssuranceCasePackage* package,
                                                  const std::string& acp_id) {
+    // Generate the two ids (the only non-deterministic outputs of this compound op)
+    // and delegate. Audit replay calls CreateConfidenceArgumentTreeForAcpWithIds
+    // directly with the ids recorded here.
     if (!package)
         return ErrorResult(acp_id, "No SACM package is loaded.");
+    const parser::AcpRecord* acp = FindAcp(model, acp_id);
+    if (!acp)
+        return ErrorResult(acp_id, "ACP was not found.");
+    const std::string argument_package_id = NextAcpArgumentPackageId(*package, acp_id);
+    const std::string top_goal_id = NextElementIdWithPrefix(model, *package, acp_id + "_G");
+    return CreateConfidenceArgumentTreeForAcpWithIds(model, package, acp_id, argument_package_id, top_goal_id);
+}
+
+AcpEditResult CreateConfidenceArgumentTreeForAcpWithIds(parser::AssuranceCase& model,
+                                                        sacm::AssuranceCasePackage* package,
+                                                        const std::string& acp_id,
+                                                        const std::string& argument_package_id,
+                                                        const std::string& top_goal_id) {
+    if (!package)
+        return ErrorResult(acp_id, "No SACM package is loaded.");
+    if (argument_package_id.empty() || top_goal_id.empty())
+        return ErrorResult(acp_id, "Confidence argument tree ids must not be empty.");
     parser::AcpRecord* acp = FindAcp(model, acp_id);
     if (!acp)
         return ErrorResult(acp_id, "ACP was not found.");
@@ -577,8 +597,6 @@ AcpEditResult CreateConfidenceArgumentTreeForAcp(parser::AssuranceCase& model,
     if (!FindSacmTarget(package, acp->target_kind, acp->target_id).element)
         return ErrorResult(acp_id, "ACP target was not found in the SACM package.");
 
-    const std::string argument_package_id = NextAcpArgumentPackageId(*package, acp->id);
-    const std::string top_goal_id = NextElementIdWithPrefix(model, *package, acp->id + "_G");
     const std::string target_summary = TargetSummaryForDefaultClaim(model, *acp);
     const bool has_custom_display_name = !acp->name.empty() && acp->name != acp->id;
     const std::string top_goal_name = has_custom_display_name ? acp->id + ": " + acp->name : std::string{};
