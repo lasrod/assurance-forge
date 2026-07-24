@@ -63,6 +63,18 @@ struct CommandContext {
     // re-derives the library FROM the authoritative package. Exactly one of the
     // two directions runs per command.
     bool                          library_primary = false;
+
+    // Kill switch for the library-primary live edit flip. When false, flipped
+    // commands take the legacy-mutator path regardless of `library_document`, so
+    // the derived views are mutated in place rather than rebuilt wholesale.
+    //
+    // The interactive app sets this false (see app::commands::DispatchAuditedCommand):
+    // the flip's wholesale rebuild of `model`/`package` mid-frame invalidates a
+    // panel that is iterating those containers while its own context-menu triggers
+    // the edit (the legacy in-place append did not) -- a GUI re-entrancy the audit
+    // path never hits. Defaults true so the flip stays exercised end to end by
+    // tests until the re-entrancy is fixed and the app re-enables it.
+    bool                          allow_library_primary = true;
 };
 
 struct CommandResult {
