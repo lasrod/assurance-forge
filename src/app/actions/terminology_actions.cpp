@@ -147,15 +147,19 @@ void TerminologyActions::BeginDeletePackage() {
 }
 
 bool TerminologyActions::ConfirmDeletePackage() {
-    // Route the delete through the audited command bus (library-primary) instead of
-    // mutating `sacm_package` directly -- so the edit is a recorded, replayable
-    // transaction and the library stays the source of truth.
+    // Route the delete through the command bus instead of mutating `sacm_package`
+    // directly. With a project audit bus this makes it a recorded, replayable,
+    // library-primary transaction; opened outside a project it falls back to the
+    // shared dispatch path (a direct apply that still keeps the library in step).
     const core::TerminologyPackageRef package_ref = state_.terminology.selected_package_ref;
     core::commands::RemoveTerminologyPackageCommand command(package_ref.id, package_ref.gid);
     const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(state_, command);
     if (!outcome.success) {
-        if (!outcome.error.empty())
-            SetStatus(state_, "Terminology package delete failed: " + outcome.error);
+        // Always surface a failure (the modal stays open otherwise); fall back to a
+        // generic message if the dispatch reported no error string.
+        SetStatus(state_, "Terminology package delete failed: " +
+                              (outcome.error.empty() ? std::string("the delete could not be completed.")
+                                                     : outcome.error));
         return false;
     }
 
