@@ -4,6 +4,7 @@
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
 #include "app/commands/dispatch.h"
+#include "core/commands/package_commands.h"
 #include "core/commands/terminology_commands.h"
 #include "core/ignored_terminology_store.h"
 #include "core/string_utils.h"
@@ -146,13 +147,15 @@ void TerminologyActions::BeginDeletePackage() {
 }
 
 bool TerminologyActions::ConfirmDeletePackage() {
-    if (!state_.app_state.sacm_package.has_value())
-        return false;
-
-    std::string error;
-    if (!core::DeleteTerminologyPackage(
-            state_.app_state.sacm_package.value(), state_.terminology.selected_package_ref, error)) {
-        SetStatus(state_, "Terminology package delete failed: " + error);
+    // Route the delete through the audited command bus (library-primary) instead of
+    // mutating `sacm_package` directly -- so the edit is a recorded, replayable
+    // transaction and the library stays the source of truth.
+    const core::TerminologyPackageRef package_ref = state_.terminology.selected_package_ref;
+    core::commands::RemoveTerminologyPackageCommand command(package_ref.id, package_ref.gid);
+    const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(state_, command);
+    if (!outcome.success) {
+        if (!outcome.error.empty())
+            SetStatus(state_, "Terminology package delete failed: " + outcome.error);
         return false;
     }
 
