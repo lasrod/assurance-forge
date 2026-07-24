@@ -156,7 +156,7 @@ bool ArgumentTargetKindFromToken(const std::string& token, ArgumentTarget::Kind&
 
 bool CreateTopGoalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
     bool applied_to_library = false;
-    if (ctx.library_document != nullptr) {
+    if (ctx.library_document != nullptr && ctx.allow_library_primary) {
         const std::string planned_id = core::PlanTopGoalId(ctx.model);
         const sacm_adapter::AddChildOutcome outcome =
             sacm_adapter::apply_add_top_goal(*ctx.library_document, planned_id);
@@ -186,7 +186,7 @@ bool CreateChildElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& ou
     }
 
     bool applied_to_library = false;
-    if (ctx.library_document != nullptr) {
+    if (ctx.library_document != nullptr && ctx.allow_library_primary) {
         std::string planned_element_id;
         std::string planned_relationship_id;
         if (!core::PlanChildElementIds(ctx.model, &ctx.package, parent_id_, kind_, planned_element_id,
@@ -231,7 +231,7 @@ bool CreateChallengeCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_e
     }
 
     bool applied_to_library = false;
-    if (ctx.library_document != nullptr) {
+    if (ctx.library_document != nullptr && ctx.allow_library_primary) {
         std::string planned_element_id;
         std::string planned_relationship_id;
         if (!core::PlanChallengeIds(ctx.model, &ctx.package, target_, source_type_, planned_element_id,
@@ -298,7 +298,7 @@ bool RemoveElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
     // hashes 7b74343d... (legacy) vs 6be86b56... (cascade). Closing that gap
     // needs a source-removal operation in libs/sacm, not a workaround here.
     bool applied_to_library = false;
-    if (ctx.library_document != nullptr &&
+    if (ctx.library_document != nullptr && ctx.allow_library_primary &&
         core::RemovalPlanIsCascadeEquivalent(ctx.model, element_id_, mode_)) {
         // Exactly the ids `PlanRemoval` produced -- the same set the audit event
         // records, walked in the same sorted order `ApplyEventToLibrary` replays,

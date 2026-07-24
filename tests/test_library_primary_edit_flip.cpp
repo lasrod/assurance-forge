@@ -427,3 +427,24 @@ TEST(LibraryPrimaryEditFlip, UnflippedCommandAfterFlippedKeepsItsEdit) {
     EXPECT_TRUE(has_goal) << "the flipped create was lost";
 }
 
+
+// The interactive app disables the flip via CommandContext::allow_library_primary
+// (a GUI re-entrancy hotfix); with it false, a flippable command must take the
+// legacy in-place path instead -- it never sets library_primary -- while still
+// producing the element. Guards the kill switch.
+TEST(LibraryPrimaryEditFlip, AllowLibraryPrimaryFalseTakesLegacyPath) {
+    std::unique_ptr<EditFixture> fixture = MakeFixture("allow_false", /*library_backed=*/true);
+    core::commands::CommandContext ctx = MakeContext(*fixture);
+    ctx.allow_library_primary = false;
+
+    core::commands::CreateChildElementCommand cmd("G1", core::NewElementKind::Goal);
+    ASSERT_TRUE(fixture->bus->Execute(cmd, ctx, "tester").success);
+    EXPECT_FALSE(ctx.library_primary) << "the flip engaged despite allow_library_primary=false";
+
+    bool found = false;
+    for (const auto& argument_package : fixture->package.argumentPackages)
+        for (const auto& claim : argument_package.claims)
+            if (claim.id == cmd.GeneratedId())
+                found = true;
+    EXPECT_TRUE(found) << "the legacy-path create did not persist";
+}

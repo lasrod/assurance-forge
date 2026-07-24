@@ -74,6 +74,13 @@ DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state, core::commands::I
     core::commands::CommandContext ctx{state.app_state.loaded_case.value(),
                                        state.app_state.sacm_package.value(),
                                        state.app_state.library_document.get()};
+    // Hotfix: keep the interactive app on the legacy in-place mutators. The
+    // library-primary flip rebuilds `loaded_case`/`sacm_package` WHOLESALE mid-
+    // command, which crashes a panel that is iterating those containers while its
+    // context menu triggers the edit (a GUI re-entrancy the legacy append avoided
+    // and the audit path never hits). The flip stays exercised by tests; re-enable
+    // here once the re-entrancy is fixed. See CommandContext::allow_library_primary.
+    ctx.allow_library_primary = false;
     const auto result = state.command_bus->Execute(command, ctx, {});
 
     // Mirror ElementEditController::EmitAutosaveStatus semantics: a non-empty
