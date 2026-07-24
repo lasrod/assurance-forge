@@ -1,5 +1,6 @@
 #include "core/commands/element_commands.h"
 
+#include "core/commands/library_bridge.h"
 #include "sacm_adapter/document_edit.h"
 
 #include <algorithm>
@@ -9,21 +10,6 @@
 namespace core::commands {
 
 namespace {
-
-// Maps the app text field to the adapter's field enum for the Phase 9 Stage 5
-// shadow-apply. Kept local: the adapter sits below core and cannot see
-// core::ElementTextField.
-sacm_adapter::TextField ToAdapterTextField(ElementTextField field) {
-    switch (field) {
-    case ElementTextField::Name:
-        return sacm_adapter::TextField::Name;
-    case ElementTextField::Description:
-        return sacm_adapter::TextField::Description;
-    case ElementTextField::Content:
-        return sacm_adapter::TextField::Content;
-    }
-    return sacm_adapter::TextField::Name;
-}
 
 // ---------------------------------------------------------------------------
 // Phase 2 slice 2b-1 -- the LIVE edit flip for the core GSN element commands.
@@ -346,25 +332,38 @@ bool UpdateElementTextCommand::Apply(CommandContext& ctx, audit::AuditEvent& out
         out_error = "UpdateElementTextCommand requires a language code";
         return false;
     }
-    if (!core::SetElementTextField(ctx.model, &ctx.package, element_id_, field_, language_,
-                                   new_value_, old_value_, out_error))
+
+    // Phase 2 slice 2b-2 -- the LIVE edit flip for text edits, via a BRIDGE rather
+    // than the apply_text_edit seam. The seam makes a claim's Content/Description
+    // "more correct" (a lone Description is the statement, clause 8.9), which would
+    // DIVERGE from the audit replay -- which stays bridged to preserve the legacy
+    // two-slot content/description semantics for existing on-disk data (see the long
+    // comment in event_replayer.cpp's UpdateElementText branch). Bridging the SAME
+    // legacy mutator onto the library reproduces the legacy result exactly, so the
+    // recorded hash and the replayed hash converge by construction with no migration,
+    // AND the edit is library-primary: the live views are untouched here and the app
+    // re-derives them from the library at the next frame boundary.
+    bool applied_to_library = false;
+    if (ctx.library_document != nullptr && ctx.allow_library_primary) {
+        std::string                captured_old;
+        const LibraryBridgeMutator mutate = [&](parser::AssuranceCase& model,
+                                                sacm::AssuranceCasePackage& package,
+                                                std::string& err) -> bool {
+            return core::SetElementTextField(model, &package, element_id_, field_, language_, new_value_,
+                                             captured_old, err);
+        };
+        if (!BridgeLegacyMutationToLibrary(*ctx.library_document, mutate, out_error))
+            return false;
+        old_value_ = captured_old;
+        ctx.library_primary = true;
+        applied_to_library = true;
+    }
+    if (!applied_to_library &&
+        !core::SetElementTextField(ctx.model, &ctx.package, element_id_, field_, language_, new_value_,
+                                   old_value_, out_error))
         return false;
 
     was_no_op_ = (old_value_ == new_value_);
-
-    // Phase 9 Stage 5: route the same edit through the library-owned document.
-    // The legacy models above stay authoritative (save/hash/replay); this only
-    // keeps the library document current. If the mapping does not yet cover
-    // this (field, kind), leave `library_synced` false so the bus re-derives.
-    //
-    // Skip a no-op edit: SetElementTextField leaves the legacy model unchanged
-    // for old == new, but a library apply could still rewrite the stored
-    // language tag, and marking it synced would suppress the bus re-derive.
-    if (ctx.library_document != nullptr && !was_no_op_) {
-        const sacm_adapter::EditOutcome edit = sacm_adapter::apply_text_edit(
-            *ctx.library_document, element_id_, ToAdapterTextField(field_), language_, new_value_);
-        ctx.library_synced = edit.supported && edit.applied;
-    }
 
     out_event.event_type = "UpdateElementText";
     out_event.payload = nlohmann::ordered_json::object();

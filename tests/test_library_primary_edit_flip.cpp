@@ -347,6 +347,42 @@ TEST(LibraryPrimaryEditFlip, RemoveNodeOnlyInteriorReparentsMatchesLegacy) {
     EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
 }
 
+// (2d) Text edits are library-primary via a BRIDGE (not the apply_text_edit seam),
+// so they reproduce the legacy two-slot content/description result exactly -- the same
+// result the audit replay reproduces (which stays bridged) -- and converge with the
+// legacy mutator on the canonical hash. Covers Name, Content on the description-only
+// G1 (the slot-collapse case the seam would diverge on), and Content on a freshly
+// created sub-goal. The bridge captures old->new from the library (the last committed
+// state), so the ids/hash match the legacy mutator's.
+TEST(LibraryPrimaryEditFlip, TextEditsMatchLegacyCanonicalHash) {
+    std::unique_ptr<EditFixture> library_side = MakeFixture("text_library", /*library_backed=*/true);
+    std::unique_ptr<EditFixture> legacy_side = MakeFixture("text_legacy", /*library_backed=*/false);
+    ASSERT_NE(library_side->document, nullptr);
+    ASSERT_EQ(legacy_side->document, nullptr);
+
+    const auto run = [](EditFixture& fixture) {
+        core::commands::CommandContext ctx = MakeContext(fixture);
+
+        core::commands::CreateChildElementCommand add_sub("G1", core::NewElementKind::Goal);
+        EXPECT_TRUE(RunCommand(fixture, add_sub, ctx).success);
+        const std::string sub_id = add_sub.GeneratedId();
+
+        core::commands::UpdateElementTextCommand name_edit("G1", core::ElementTextField::Name, "en",
+                                                           "Revised top goal");
+        EXPECT_TRUE(RunCommand(fixture, name_edit, ctx).success);
+        core::commands::UpdateElementTextCommand content_edit("G1", core::ElementTextField::Content, "en",
+                                                              "The system is fully safe.");
+        EXPECT_TRUE(RunCommand(fixture, content_edit, ctx).success);
+        core::commands::UpdateElementTextCommand sub_content(sub_id, core::ElementTextField::Content, "en",
+                                                             "The subsystem is acceptably safe.");
+        EXPECT_TRUE(RunCommand(fixture, sub_content, ctx).success);
+    };
+    run(*library_side);
+    run(*legacy_side);
+
+    EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
+}
+
 // (3) The rebuilt render model still carries the bare-strategy placement pass. A
 // GSN strategy is stored as an ArgumentReasoning with a `strategyTarget` tag and
 // NO inference until its first sub-goal, so the render model needs the

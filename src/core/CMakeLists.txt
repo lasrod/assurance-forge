@@ -28,6 +28,7 @@ add_library(af_core OBJECT
     audit/undo_resolver.cpp
     commands/command_bus.cpp
     commands/element_commands.cpp
+    commands/library_bridge.cpp
     library_package_projection.cpp
     commands/package_commands.cpp
     commands/proposal_commands.cpp
