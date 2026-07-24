@@ -49,7 +49,7 @@ void RenderInspectorArea(AppRuntimeState& state,
             };
             acp_callbacks.create_confidence_argument_tree = [&](const std::string& acp_id) {
                 return state.acp_controller && loaded_case &&
-                       state.acp_controller->CreateConfidenceArgumentTreeForAcp(*loaded_case, sacm_package, acp_id);
+                       state.acp_controller->CreateConfidenceArgumentTreeForAcp(state, acp_id);
             };
             acp_callbacks.open_confidence_argument_tree = [&](const std::string& acp_id) {
                 return state.acp_controller && loaded_case &&

@@ -68,4 +68,25 @@ private:
     parser::AcpRecord acp_;
 };
 
+// Create a confidence argument tree (a confidence ArgumentPackage + top goal) for
+// an existing ACP and link the ACP to it. The compound op generates exactly two
+// ids -- the argument package and the top goal -- both captured into the audit
+// payload; replay forces them via `core::acp::CreateConfidenceArgumentTreeForAcpWithIds`.
+class CreateConfidenceArgumentTreeForAcpCommand final : public ICommand {
+public:
+    explicit CreateConfidenceArgumentTreeForAcpCommand(std::string acp_id) : acp_id_(std::move(acp_id)) {}
+
+    std::string Name() const override { return "CreateConfidenceArgumentTree"; }
+    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+    const std::string& AcpId() const { return acp_id_; }
+    const std::string& GeneratedArgumentPackageId() const { return argument_package_id_; }
+    const std::string& GeneratedTopGoalId() const { return top_goal_id_; }
+
+private:
+    std::string acp_id_;
+    std::string argument_package_id_;
+    std::string top_goal_id_;
+};
+
 } // namespace core::commands

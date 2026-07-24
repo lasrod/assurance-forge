@@ -1,6 +1,5 @@
 #include "app/controllers/acp_controller.h"
 
-#include "app/acp_problem_sync.h"
 #include "app/app_runtime_state.h"
 #include "app/commands/dispatch.h"
 #include "core/acp/acp_editing.h"
@@ -9,20 +8,7 @@
 
 namespace app::controllers {
 
-AcpController::AcpController(AppEvents& events, core::ProblemsManager& problems_manager,
-                            std::function<void()> on_edit_applied)
-    : events_(events), problems_manager_(problems_manager),
-      on_edit_applied_(std::move(on_edit_applied)) {}
-
-void AcpController::NotifyEditApplied() {
-    if (on_edit_applied_) {
-        on_edit_applied_();
-    }
-}
-
-void AcpController::SyncProblems(const parser::AssuranceCase& model, const sacm::AssuranceCasePackage* package) {
-    app::SyncAcpProblems(problems_manager_, &model, package);
-}
+AcpController::AcpController(AppEvents& events) : events_(events) {}
 
 bool AcpController::DispatchAddAcp(AppRuntimeState& state, const std::string& target_kind,
                                    const std::string& target_id) {
@@ -90,20 +76,20 @@ bool AcpController::UpsertAcp(AppRuntimeState& state, const parser::AcpRecord& a
     return true;
 }
 
-bool AcpController::CreateConfidenceArgumentTreeForAcp(parser::AssuranceCase& model,
-                                                       sacm::AssuranceCasePackage* package,
-                                                       const std::string& acp_id) {
-    const core::acp::AcpEditResult result = core::acp::CreateConfidenceArgumentTreeForAcp(model, package, acp_id);
-    if (!result.error.empty()) {
-        events_.Emit(StatusMessageEvent{"Create confidence argument tree failed: " + result.error});
+bool AcpController::CreateConfidenceArgumentTreeForAcp(AppRuntimeState& state, const std::string& acp_id) {
+    core::commands::CreateConfidenceArgumentTreeForAcpCommand command(acp_id);
+    const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(state, command);
+    if (!outcome.success) {
+        if (!outcome.error.empty())
+            events_.Emit(StatusMessageEvent{"Create confidence argument tree failed: " + outcome.error});
         return false;
     }
-    if (!result.changed)
-        return false;
+    const std::string& argument_package_id = command.GeneratedArgumentPackageId();
+    const std::string& top_goal_id         = command.GeneratedTopGoalId();
 
     ui::UiState& ui_state = ui::GetUiState();
     ui_state.selected_acp_id.clear();
-    ui_state.selected_element_id = result.top_goal_id;
+    ui_state.selected_element_id = top_goal_id;
     ui_state.selected_relationship_id.clear();
     ui_state.selected_relationship_edge_key.clear();
     ui_state.center_on_selection = true;
@@ -112,11 +98,12 @@ bool AcpController::CreateConfidenceArgumentTreeForAcp(parser::AssuranceCase& mo
     events_.Emit(DocumentDirtyEvent{});
     events_.Emit(ProjectFilesChangedEvent{});
     events_.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
-    events_.Emit(ArgumentPackageCanvasRequestEvent{result.argument_package_id, {}, "Confidence argument", result.top_goal_id});
+    events_.Emit(ArgumentPackageCanvasRequestEvent{argument_package_id, {}, "Confidence argument", top_goal_id});
     events_.Emit(
-        StatusMessageEvent{"Created confidence argument tree " + result.argument_package_id + " for " + result.acp_id});
-    SyncProblems(model, package);
-    NotifyEditApplied();
+        StatusMessageEvent{"Created confidence argument tree " + argument_package_id + " for " + acp_id});
+    // The frame-boundary re-derive refreshes the ACP-decorated views; ACP problems
+    // re-sync from the fresh model when this dirty flag is serviced next frame.
+    state.problems_dirty.acp = true;
     return true;
 }
 
