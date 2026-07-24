@@ -86,7 +86,7 @@ bool TerminologyActions::ConfirmAddPackage() {
     }
     if (!EnsureProjectSacmFileOpen(state_, entry, false))
         return false;
-    if (!state_.app_state.sacm_package.has_value()) {
+    if (!state_.app_state.has_projected_package()) {
         SetStatus(state_, "Could not load an editable SACM package model.");
         return false;
     }
@@ -107,7 +107,7 @@ bool TerminologyActions::ConfirmAddPackage() {
     CopyToBuffer(state_.terminology.category_filter_buf, sizeof(state_.terminology.category_filter_buf), "");
     state_.terminology.selected_package_file_path = state_.app_state.active_project_file_path;
     if (const sacm::TerminologyPackage* package =
-            core::FindTerminologyPackage(state_.app_state.sacm_package.value(), created_ref)) {
+            core::FindTerminologyPackage(state_.app_state.projected_package(), created_ref)) {
         CopyTerminologyPackageToEditor(state_, *package);
     }
     InvalidateSacmPackageTreeCache(state_, entry.relativePath);
@@ -121,7 +121,7 @@ bool TerminologyActions::ConfirmAddPackage() {
 }
 
 bool TerminologyActions::ApplyPackageEdits() {
-    if (!state_.app_state.sacm_package.has_value())
+    if (!state_.app_state.has_projected_package())
         return false;
 
     core::commands::UpdateTerminologyPackageCommand command(
@@ -180,13 +180,13 @@ bool TerminologyActions::ConfirmDeletePackage() {
 
 bool TerminologyActions::OpenTermFromCanvas(const core::TerminologyPackageRef& package_ref,
                                             const core::TerminologyTermRef& term_ref) {
-    if (!state_.app_state.sacm_package.has_value()) {
+    if (!state_.app_state.has_projected_package()) {
         SetStatus(state_, "Open a SACM model before opening terminology terms.");
         return false;
     }
 
     const sacm::TerminologyPackage* terminology_package =
-        core::FindTerminologyPackage(state_.app_state.sacm_package.value(), package_ref);
+        core::FindTerminologyPackage(state_.app_state.projected_package(), package_ref);
     if (!terminology_package) {
         SetStatus(state_, "Terminology package not found.");
         return false;
@@ -215,9 +215,9 @@ bool TerminologyActions::EditTermFromCanvas(const core::TerminologyPackageRef& p
                                             const core::TerminologyTermRef& term_ref) {
     if (!OpenTermFromCanvas(package_ref, term_ref))
         return false;
-    if (!state_.app_state.sacm_package.has_value())
+    if (!state_.app_state.has_projected_package())
         return false;
-    const sacm::Term* term = core::FindTerminologyTerm(state_.app_state.sacm_package.value(), package_ref, term_ref);
+    const sacm::Term* term = core::FindTerminologyTerm(state_.app_state.projected_package(), package_ref, term_ref);
     if (!term)
         return false;
     state_.terminology.selected_term_ref = term_ref;
@@ -230,7 +230,7 @@ bool TerminologyActions::EditTermFromCanvas(const core::TerminologyPackageRef& p
 bool TerminologyActions::AddTermAsContextFromCanvas(const std::string& element_id,
                                                     const core::TerminologyPackageRef& package_ref,
                                                     const core::TerminologyTermRef& term_ref) {
-    if (!state_.app_state.sacm_package.has_value()) {
+    if (!state_.app_state.has_projected_package()) {
         SetStatus(state_, "Open a SACM model before associating terminology.");
         return false;
     }
@@ -260,12 +260,12 @@ bool TerminologyActions::AddTermAsContextFromCanvas(const std::string& element_i
 bool TerminologyActions::AddVisibleTermContextFromCanvas(const std::string& element_id,
                                                          const core::TerminologyPackageRef& package_ref,
                                                          const core::TerminologyTermRef& term_ref) {
-    if (!state_.app_state.sacm_package.has_value()) {
+    if (!state_.app_state.has_projected_package()) {
         SetStatus(state_, "Open a SACM model before adding terminology context.");
         return false;
     }
 
-    const std::string term_label = TermStatusLabel(state_.app_state.sacm_package.value(), package_ref, term_ref);
+    const std::string term_label = TermStatusLabel(state_.app_state.projected_package(), package_ref, term_ref);
     core::commands::AddTerminologyTermAsVisibleContextCommand command(element_id, package_ref, term_ref);
     const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
     if (!outcome.success) {
@@ -299,7 +299,7 @@ void TerminologyActions::SelectTerm(const core::TerminologyTermRef& term_ref) {
 }
 
 void TerminologyActions::BeginAddTerm() {
-    if (!state_.app_state.sacm_package.has_value()) {
+    if (!state_.app_state.has_projected_package()) {
         SetStatus(state_, "Open a terminology package before adding terms.");
         return;
     }
@@ -309,10 +309,10 @@ void TerminologyActions::BeginAddTerm() {
 }
 
 bool TerminologyActions::BeginEditTerm(const core::TerminologyTermRef& term_ref) {
-    if (!state_.app_state.sacm_package.has_value())
+    if (!state_.app_state.has_projected_package())
         return false;
     const sacm::Term* term = core::FindTerminologyTerm(
-        state_.app_state.sacm_package.value(), state_.terminology.selected_package_ref, term_ref);
+        state_.app_state.projected_package(), state_.terminology.selected_package_ref, term_ref);
     if (!term) {
         SetStatus(state_, "Term not found.");
         return false;
@@ -325,7 +325,7 @@ bool TerminologyActions::BeginEditTerm(const core::TerminologyTermRef& term_ref)
 }
 
 bool TerminologyActions::ConfirmTermEdit() {
-    if (!state_.app_state.sacm_package.has_value())
+    if (!state_.app_state.has_projected_package())
         return false;
 
     const core::TerminologyTermDraft draft = TermDraftFromEditor(state_);
@@ -357,22 +357,22 @@ bool TerminologyActions::ConfirmTermEdit() {
 }
 
 void TerminologyActions::BeginDeleteTerm(const core::TerminologyTermRef& term_ref) {
-    if (!state_.app_state.sacm_package.has_value())
+    if (!state_.app_state.has_projected_package())
         return;
     const sacm::Term* term = core::FindTerminologyTerm(
-        state_.app_state.sacm_package.value(), state_.terminology.selected_package_ref, term_ref);
+        state_.app_state.projected_package(), state_.terminology.selected_package_ref, term_ref);
     if (!term) {
         SetStatus(state_, "Term not found.");
         return;
     }
     state_.terminology.selected_term_ref = term_ref;
     state_.terminology.pending_delete_term_usage_count =
-        core::CountTerminologyTermUsage(state_.app_state.sacm_package.value(), *term);
+        core::CountTerminologyTermUsage(state_.app_state.projected_package(), *term);
     state_.terminology.show_delete_term_modal = true;
 }
 
 bool TerminologyActions::ConfirmDeleteTerm() {
-    if (!state_.app_state.sacm_package.has_value())
+    if (!state_.app_state.has_projected_package())
         return false;
 
     core::commands::DeleteTerminologyTermCommand command(
@@ -402,7 +402,7 @@ void TerminologyActions::SetCategoryFilter(const std::string& category_filter) {
 }
 
 void TerminologyActions::BeginAddCategory() {
-    if (!state_.app_state.sacm_package.has_value()) {
+    if (!state_.app_state.has_projected_package()) {
         SetStatus(state_, "Open a terminology package before adding categories.");
         return;
     }
@@ -412,10 +412,10 @@ void TerminologyActions::BeginAddCategory() {
 }
 
 bool TerminologyActions::BeginEditCategory(const core::TerminologyCategoryRef& category_ref) {
-    if (!state_.app_state.sacm_package.has_value())
+    if (!state_.app_state.has_projected_package())
         return false;
     const sacm::Category* category = core::FindTerminologyCategory(
-        state_.app_state.sacm_package.value(), state_.terminology.selected_package_ref, category_ref);
+        state_.app_state.projected_package(), state_.terminology.selected_package_ref, category_ref);
     if (!category) {
         SetStatus(state_, "Category not found.");
         return false;
@@ -429,7 +429,7 @@ bool TerminologyActions::BeginEditCategory(const core::TerminologyCategoryRef& c
 }
 
 void TerminologyActions::ConfirmCategoryEdit() {
-    if (!state_.app_state.sacm_package.has_value())
+    if (!state_.app_state.has_projected_package())
         return;
 
     const core::TerminologyCategoryDraft draft = CategoryDraftFromEditor(state_);
@@ -459,10 +459,10 @@ void TerminologyActions::ConfirmCategoryEdit() {
 }
 
 void TerminologyActions::BeginDeleteCategory(const core::TerminologyCategoryRef& category_ref) {
-    if (!state_.app_state.sacm_package.has_value())
+    if (!state_.app_state.has_projected_package())
         return;
     const sacm::TerminologyPackage* terminology_package =
-        core::FindTerminologyPackage(state_.app_state.sacm_package.value(), state_.terminology.selected_package_ref);
+        core::FindTerminologyPackage(state_.app_state.projected_package(), state_.terminology.selected_package_ref);
     if (!terminology_package) {
         SetStatus(state_, "Terminology package not found.");
         return;
@@ -480,7 +480,7 @@ void TerminologyActions::BeginDeleteCategory(const core::TerminologyCategoryRef&
 }
 
 void TerminologyActions::ConfirmDeleteCategory() {
-    if (!state_.app_state.sacm_package.has_value())
+    if (!state_.app_state.has_projected_package())
         return;
 
     core::commands::DeleteTerminologyCategoryCommand command(
@@ -499,11 +499,11 @@ void TerminologyActions::ConfirmDeleteCategory() {
 }
 
 void TerminologyActions::SeedRecommendedCategories() {
-    if (!state_.app_state.sacm_package.has_value())
+    if (!state_.app_state.has_projected_package())
         return;
 
-    sacm::TerminologyPackage* terminology_package =
-        core::FindTerminologyPackage(state_.app_state.sacm_package.value(), state_.terminology.selected_package_ref);
+    const sacm::TerminologyPackage* terminology_package =
+        core::FindTerminologyPackage(state_.app_state.projected_package(), state_.terminology.selected_package_ref);
     if (!terminology_package) {
         SetStatus(state_, "Terminology package not found.");
         return;
@@ -551,14 +551,14 @@ void TerminologyActions::BeginFindUsages(const core::TerminologyPackageRef& pack
     state_.terminology.usage_results.clear();
     state_.terminology.selected_usage_index = -1;
 
-    if (!state_.app_state.sacm_package.has_value()) {
+    if (!state_.app_state.has_projected_package()) {
         state_.terminology.usage_search_error = "Open a SACM model before finding terminology usages.";
         SetStatus(state_, state_.terminology.usage_search_error);
         return;
     }
 
     core::TerminologyTermUsageSearchResult result =
-        core::FindTerminologyTermUsages(state_.app_state.sacm_package.value(), package_ref, term_ref);
+        core::FindTerminologyTermUsages(state_.app_state.projected_package(), package_ref, term_ref);
     state_.terminology.usage_search_term_value = result.term_value;
     state_.terminology.usage_search_term_name = result.term_name;
     if (!result.success) {
@@ -598,7 +598,7 @@ void TerminologyActions::ChangeMeaningFromCanvas(const std::string& element_id, 
 }
 
 void TerminologyActions::BeginQuickDefineTerm(const std::string& element_id, const std::string& term_value) {
-    if (!state_.app_state.sacm_package.has_value()) {
+    if (!state_.app_state.has_projected_package()) {
         SetStatus(state_, "Open a SACM model before defining terms.");
         return;
     }
@@ -631,12 +631,12 @@ void TerminologyActions::BeginQuickDefineTerm(const std::string& element_id, con
 }
 
 void TerminologyActions::BeginLinkExistingTerm(const std::string& element_id, const std::string& term_value) {
-    if (state_.app_state.sacm_package.has_value()) {
+    if (state_.app_state.has_projected_package()) {
         const core::TerminologyPackageRef target_package_ref = ResolveQuickDefineTargetPackage(state_, element_id);
         if (HasTerminologyPackageRef(target_package_ref)) {
             state_.terminology.selected_package_ref = target_package_ref;
             if (const sacm::TerminologyPackage* package =
-                    core::FindTerminologyPackage(state_.app_state.sacm_package.value(), target_package_ref)) {
+                    core::FindTerminologyPackage(state_.app_state.projected_package(), target_package_ref)) {
                 CopyTerminologyPackageToEditor(state_, *package);
             }
         }
@@ -653,7 +653,7 @@ void TerminologyActions::BeginLinkExistingTerm(const std::string& element_id, co
 }
 
 bool TerminologyActions::ConfirmQuickDefineTerm(bool add_as_context) {
-    if (!state_.app_state.sacm_package.has_value())
+    if (!state_.app_state.has_projected_package())
         return false;
 
     const core::TerminologyTermDraft draft = TermDraftFromEditor(state_);
@@ -672,7 +672,7 @@ bool TerminologyActions::ConfirmQuickDefineTerm(bool add_as_context) {
     CopyToBuffer(state_.terminology.category_filter_buf, sizeof(state_.terminology.category_filter_buf), "");
     state_.terminology.selected_package_file_path = state_.app_state.active_project_file_path;
     if (const sacm::TerminologyPackage* package = core::FindTerminologyPackage(
-            state_.app_state.sacm_package.value(), state_.terminology.selected_package_ref)) {
+            state_.app_state.projected_package(), state_.terminology.selected_package_ref)) {
         CopyTerminologyPackageToEditor(state_, *package);
     }
 

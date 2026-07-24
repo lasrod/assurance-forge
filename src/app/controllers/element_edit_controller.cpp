@@ -23,7 +23,7 @@ bool TryGetWorkingModel(AppRuntimeState& state,
                         AppEvents& events,
                         parser::AssuranceCase*& out_model,
                         sacm::AssuranceCasePackage*& out_package) {
-    if (!state.app_state.loaded_case.has_value() || !state.app_state.sacm_package.has_value()) {
+    if (!state.app_state.loaded_case.has_value() || !state.app_state.has_projected_package()) {
         events.Emit(StatusMessageEvent{std::string(action_label) + " failed: no SACM model loaded."});
         return false;
     }

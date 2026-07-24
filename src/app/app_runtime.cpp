@@ -459,7 +459,7 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
 
     const auto& ac = *impl_->app_state.loaded_case;
     const sacm::AssuranceCasePackage* sacm_package =
-        impl_->app_state.sacm_package ? &*impl_->app_state.sacm_package : nullptr;
+        impl_->app_state.has_projected_package() ? &impl_->app_state.projected_package() : nullptr;
     const std::optional<parser::AssuranceCase> filtered_case = FilterConfidencePackageElementsFromMainTree(ac, sacm_package);
     impl_->current_tree = ui::gsn::BuildAssuranceTree(filtered_case ? *filtered_case : ac,
                                                       ui::GetUiState().active_secondary_lang);
@@ -621,7 +621,7 @@ void AppRuntime::SyncTerminologyProblems() {
     const parser::AssuranceCase* model =
         impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
     const sacm::AssuranceCasePackage* package =
-        impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
+        impl_->app_state.has_projected_package() ? &impl_->app_state.projected_package() : nullptr;
     app::SyncTerminologyProblems(
         impl_->problems_manager, model, package, [this](const std::string& element_id, const std::string& term_value) {
             return IsTerminologySuggestionIgnored(element_id, term_value);
@@ -642,7 +642,7 @@ void AppRuntime::SyncAcpProblems() {
     const parser::AssuranceCase* model =
         impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
     const sacm::AssuranceCasePackage* package =
-        impl_->app_state.sacm_package.has_value() ? &impl_->app_state.sacm_package.value() : nullptr;
+        impl_->app_state.has_projected_package() ? &impl_->app_state.projected_package() : nullptr;
     app::SyncAcpProblems(impl_->problems_manager, model, package);
 }
 

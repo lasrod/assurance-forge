@@ -70,7 +70,7 @@ sacm::SacmPackageTreeResult BuildLoadedSacmPackageTree(const core::AppState& app
                                                        const core::AssuranceProject& project,
                                                        const core::ProjectFileEntry& entry) {
     sacm::SacmPackageTreeResult result = sacm::build_sacm_package_tree_from_string(
-        sacm::serialize_sacm(app_state.sacm_package.value()), entry.relativePath.filename().generic_string());
+        sacm::serialize_sacm(app_state.projected_package()), entry.relativePath.filename().generic_string());
     result.source_path = project.rootPath / entry.relativePath;
     result.root.id = result.source_path.generic_string();
     return result;
@@ -119,12 +119,12 @@ bool ProjectFileOpenWouldLeaveLoadedSacm(const core::AppState& app_state, const 
 
 bool CurrentSacmDocumentHasUnsavedChanges(const AppRuntimeState& state) {
     const bool sacm_document_loaded =
-        state.app_state.sacm_package.has_value() || state.app_state.loaded_case.has_value();
+        state.app_state.has_projected_package() || state.app_state.loaded_case.has_value();
     return sacm_document_loaded && (state.document_dirty || state.app_state.has_unsaved_changes);
 }
 
 bool EnsureProjectSacmFileOpen(AppRuntimeState& state, const core::ProjectFileEntry& entry, bool require_loaded_case) {
-    if (IsLoadedProjectSacmFile(state.app_state, entry) && state.app_state.sacm_package.has_value() &&
+    if (IsLoadedProjectSacmFile(state.app_state, entry) && state.app_state.has_projected_package() &&
         (!require_loaded_case || state.app_state.loaded_case.has_value())) {
         return true;
     }
@@ -459,8 +459,8 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
         impl_->workbench.pending_focus_root = false;
 
         std::string first_id;
-        if (impl_->app_state.sacm_package.has_value()) {
-            first_id = FirstElementIdForArgumentPackage(impl_->app_state.sacm_package.value(), node);
+        if (impl_->app_state.has_projected_package()) {
+            first_id = FirstElementIdForArgumentPackage(impl_->app_state.projected_package(), node);
             if (!first_id.empty()) {
                 ui_state.selected_element_id = first_id;
                 ui_state.center_on_selection = true;
@@ -479,14 +479,14 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
         }
         if (!EnsureProjectSacmFileOpen(*impl_, entry, false))
             return;
-        if (!impl_->app_state.sacm_package.has_value()) {
+        if (!impl_->app_state.has_projected_package()) {
             SetStatus("Opened SACM file, but no editable package model was available.");
             return;
         }
 
         core::TerminologyPackageRef package_ref{node.id, node.gid};
         const sacm::TerminologyPackage* terminology_package =
-            core::FindTerminologyPackage(impl_->app_state.sacm_package.value(), package_ref);
+            core::FindTerminologyPackage(impl_->app_state.projected_package(), package_ref);
         if (!terminology_package) {
             SetStatus("Terminology package was not found in the editable model.");
             return;
@@ -604,9 +604,9 @@ void AppRuntime::OpenArgumentPackageCanvas(const std::string& package_id,
 }
 
 void AppRuntime::OpenFirstArgumentPackageCanvas() {
-    if (!impl_->app_state.sacm_package.has_value())
+    if (!impl_->app_state.has_projected_package())
         return;
-    const sacm::ArgumentPackage* argument_package = FirstArgumentPackage(impl_->app_state.sacm_package.value());
+    const sacm::ArgumentPackage* argument_package = FirstArgumentPackage(impl_->app_state.projected_package());
     if (!argument_package)
         return;
     const std::string title = argument_package->name.empty() ? argument_package->id : argument_package->name;
@@ -647,7 +647,7 @@ void AppRuntime::RemoveProjectPackage(const core::ProjectFileEntry& entry, const
     }
     if (!EnsureProjectSacmFileOpen(*impl_, entry, false))
         return;
-    if (!impl_->app_state.sacm_package.has_value()) {
+    if (!impl_->app_state.has_projected_package()) {
         SetStatus("Could not load an editable SACM package model.");
         return;
     }
@@ -970,7 +970,7 @@ void AppRuntime::RefreshSacmPackageTreeCache() {
         live_paths.insert(relative);
         if (impl_->sacm_package_tree_cache.find(relative) != impl_->sacm_package_tree_cache.end())
             continue;
-        if (IsLoadedProjectSacmFile(impl_->app_state, entry) && impl_->app_state.sacm_package.has_value()) {
+        if (IsLoadedProjectSacmFile(impl_->app_state, entry) && impl_->app_state.has_projected_package()) {
             impl_->sacm_package_tree_cache[relative] = BuildLoadedSacmPackageTree(impl_->app_state, project, entry);
             continue;
         }
