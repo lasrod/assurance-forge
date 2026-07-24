@@ -1,6 +1,7 @@
 #include "core/commands/package_commands.h"
 
 #include "core/acp/assurance_claim_point.h"
+#include "core/commands/library_bridge.h"
 #include "core/terminology_package_service.h"
 
 #include <algorithm>
@@ -129,11 +130,12 @@ bool RemoveTerminologyPackageCommand::Apply(CommandContext& ctx,
         out_error = "RemoveTerminologyPackageCommand requires an id or gid.";
         return false;
     }
-    if (!core::DeleteTerminologyPackage(ctx.package,
-                                        core::TerminologyPackageRef{id_, gid_},
-                                        out_error)) {
+    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase&,
+                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        return core::DeleteTerminologyPackage(package, core::TerminologyPackageRef{id_, gid_}, err);
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
-    }
     FillIdentityPayload(out_event, "RemoveTerminologyPackage", id_, gid_);
     return true;
 }
@@ -145,9 +147,12 @@ bool RemoveArgumentPackageCommand::Apply(CommandContext& ctx,
         out_error = "RemoveArgumentPackageCommand requires an id or gid.";
         return false;
     }
-    if (!core::DeleteArgumentPackage(ctx.package, ctx.model, id_, gid_, out_error)) {
+    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase&         model,
+                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        return core::DeleteArgumentPackage(package, model, id_, gid_, err);
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
-    }
     FillIdentityPayload(out_event, "RemoveArgumentPackage", id_, gid_);
     return true;
 }
@@ -159,9 +164,12 @@ bool RemoveArtifactPackageCommand::Apply(CommandContext& ctx,
         out_error = "RemoveArtifactPackageCommand requires an id or gid.";
         return false;
     }
-    if (!core::DeleteArtifactPackage(ctx.package, id_, gid_, out_error)) {
+    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase&,
+                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        return core::DeleteArtifactPackage(package, id_, gid_, err);
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
-    }
     FillIdentityPayload(out_event, "RemoveArtifactPackage", id_, gid_);
     return true;
 }

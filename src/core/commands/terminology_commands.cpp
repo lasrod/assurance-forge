@@ -1,5 +1,6 @@
 #include "core/commands/terminology_commands.h"
 
+#include "core/commands/library_bridge.h"
 #include "core/terminology_context_projection.h"
 
 namespace core::commands {
@@ -7,12 +8,18 @@ namespace core::commands {
 bool CreateTerminologyPackageCommand::Apply(CommandContext&   ctx,
                                             audit::AuditEvent& out_event,
                                             std::string&       out_error) {
-    core::TerminologyPackageCreateResult result =
-        core::CreateTerminologyPackage(ctx.package, name_, description_);
-    if (!result.success) {
-        out_error = result.error;
+    core::TerminologyPackageCreateResult result;
+    const LibraryBridgeMutator           mutate = [&](parser::AssuranceCase&,
+                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        result = core::CreateTerminologyPackage(package, name_, description_);
+        if (!result.success) {
+            err = result.error;
+            return false;
+        }
+        return true;
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
-    }
     generated_ref_ = result.package_ref;
 
     out_event.event_type = "CreateTerminologyPackage";
@@ -27,7 +34,11 @@ bool CreateTerminologyPackageCommand::Apply(CommandContext&   ctx,
 bool UpdateTerminologyPackageCommand::Apply(CommandContext&   ctx,
                                             audit::AuditEvent& out_event,
                                             std::string&       out_error) {
-    if (!core::UpdateTerminologyPackage(ctx.package, package_ref_, name_, description_, out_error))
+    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase&,
+                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        return core::UpdateTerminologyPackage(package, package_ref_, name_, description_, err);
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
 
     out_event.event_type = "UpdateTerminologyPackage";
@@ -42,12 +53,18 @@ bool UpdateTerminologyPackageCommand::Apply(CommandContext&   ctx,
 bool CreateTerminologyCategoryCommand::Apply(CommandContext&   ctx,
                                              audit::AuditEvent& out_event,
                                              std::string&       out_error) {
-    core::TerminologyCategoryCreateResult result =
-        core::CreateTerminologyCategory(ctx.package, package_ref_, draft_);
-    if (!result.success) {
-        out_error = result.error;
+    core::TerminologyCategoryCreateResult result;
+    const LibraryBridgeMutator            mutate = [&](parser::AssuranceCase&,
+                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        result = core::CreateTerminologyCategory(package, package_ref_, draft_);
+        if (!result.success) {
+            err = result.error;
+            return false;
+        }
+        return true;
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
-    }
     generated_ref_ = result.category_ref;
 
     out_event.event_type = "CreateTerminologyCategory";
@@ -64,7 +81,11 @@ bool CreateTerminologyCategoryCommand::Apply(CommandContext&   ctx,
 bool UpdateTerminologyCategoryCommand::Apply(CommandContext&   ctx,
                                              audit::AuditEvent& out_event,
                                              std::string&       out_error) {
-    if (!core::UpdateTerminologyCategory(ctx.package, package_ref_, category_ref_, draft_, out_error))
+    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase&,
+                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        return core::UpdateTerminologyCategory(package, package_ref_, category_ref_, draft_, err);
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
 
     out_event.event_type = "UpdateTerminologyCategory";
@@ -81,7 +102,11 @@ bool UpdateTerminologyCategoryCommand::Apply(CommandContext&   ctx,
 bool DeleteTerminologyCategoryCommand::Apply(CommandContext&   ctx,
                                              audit::AuditEvent& out_event,
                                              std::string&       out_error) {
-    if (!core::DeleteTerminologyCategory(ctx.package, package_ref_, category_ref_, out_error))
+    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase&,
+                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        return core::DeleteTerminologyCategory(package, package_ref_, category_ref_, err);
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
 
     out_event.event_type = "DeleteTerminologyCategory";
@@ -109,12 +134,18 @@ void WriteTermDraftToPayload(nlohmann::ordered_json& payload, const core::Termin
 bool CreateTerminologyTermCommand::Apply(CommandContext&   ctx,
                                          audit::AuditEvent& out_event,
                                          std::string&       out_error) {
-    core::TerminologyTermCreateResult result =
-        core::CreateTerminologyTerm(ctx.package, package_ref_, draft_);
-    if (!result.success) {
-        out_error = result.error;
+    core::TerminologyTermCreateResult result;
+    const LibraryBridgeMutator        mutate = [&](parser::AssuranceCase&,
+                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        result = core::CreateTerminologyTerm(package, package_ref_, draft_);
+        if (!result.success) {
+            err = result.error;
+            return false;
+        }
+        return true;
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
-    }
     generated_ref_ = result.term_ref;
 
     out_event.event_type = "CreateTerminologyTerm";
@@ -130,9 +161,15 @@ bool CreateTerminologyTermCommand::Apply(CommandContext&   ctx,
 bool UpdateTerminologyTermCommand::Apply(CommandContext&   ctx,
                                          audit::AuditEvent& out_event,
                                          std::string&       out_error) {
-    if (!core::UpdateTerminologyTerm(ctx.package, package_ref_, term_ref_, draft_, out_error))
+    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase&         model,
+                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        if (!core::UpdateTerminologyTerm(package, package_ref_, term_ref_, draft_, err))
+            return false;
+        core::RefreshVisibleTerminologyContextProjection(model, package);
+        return true;
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
-    core::RefreshVisibleTerminologyContextProjection(ctx.model, ctx.package);
 
     out_event.event_type = "UpdateTerminologyTerm";
     out_event.payload    = nlohmann::ordered_json::object();
@@ -147,9 +184,15 @@ bool UpdateTerminologyTermCommand::Apply(CommandContext&   ctx,
 bool DeleteTerminologyTermCommand::Apply(CommandContext&   ctx,
                                          audit::AuditEvent& out_event,
                                          std::string&       out_error) {
-    if (!core::DeleteTerminologyTerm(ctx.package, package_ref_, term_ref_, out_error))
+    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase&         model,
+                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        if (!core::DeleteTerminologyTerm(package, package_ref_, term_ref_, err))
+            return false;
+        core::RefreshVisibleTerminologyContextProjection(model, package);
+        return true;
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
-    core::RefreshVisibleTerminologyContextProjection(ctx.model, ctx.package);
 
     out_event.event_type = "DeleteTerminologyTerm";
     out_event.payload    = nlohmann::ordered_json::object();
@@ -186,11 +229,17 @@ void WriteContextAssociationPayload(nlohmann::ordered_json&                     
 bool AssociateTerminologyTermWithElementCommand::Apply(CommandContext&   ctx,
                                                        audit::AuditEvent& out_event,
                                                        std::string&       out_error) {
-    result_ = core::AssociateTerminologyTermWithElement(ctx.package, element_id_, package_ref_, term_ref_);
-    if (!result_.success) {
-        out_error = result_.error;
+    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase&,
+                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        result_ = core::AssociateTerminologyTermWithElement(package, element_id_, package_ref_, term_ref_);
+        if (!result_.success) {
+            err = result_.error;
+            return false;
+        }
+        return true;
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
-    }
 
     out_event.event_type = "AssociateTerminologyTermWithElement";
     out_event.payload    = nlohmann::ordered_json::object();
@@ -201,12 +250,18 @@ bool AssociateTerminologyTermWithElementCommand::Apply(CommandContext&   ctx,
 bool AddTerminologyTermAsVisibleContextCommand::Apply(CommandContext&   ctx,
                                                       audit::AuditEvent& out_event,
                                                       std::string&       out_error) {
-    result_ = core::AddTerminologyTermAsVisibleContext(ctx.package, element_id_, package_ref_, term_ref_);
-    if (!result_.success) {
-        out_error = result_.error;
+    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase&         model,
+                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        result_ = core::AddTerminologyTermAsVisibleContext(package, element_id_, package_ref_, term_ref_);
+        if (!result_.success) {
+            err = result_.error;
+            return false;
+        }
+        core::SyncVisibleTerminologyContextToParser(model, package, result_);
+        return true;
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
-    }
-    core::SyncVisibleTerminologyContextToParser(ctx.model, ctx.package, result_);
 
     out_event.event_type = "AddTerminologyTermAsVisibleContext";
     out_event.payload    = nlohmann::ordered_json::object();

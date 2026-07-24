@@ -107,8 +107,8 @@ std::size_t ClaimCount(const core::AssuranceCase& assurance_case) {
 // library-owned document. The command reports it synced, and the projected
 // library document reflects the new value -- proving the edit executed as a
 // library operation, not just on the legacy models.
-TEST(CommandBus, SACM23_INT_001_UpdateElementTextShadowAppliesToLibraryDocument) {
-    auto f = MakeFixture("shadow_text");
+TEST(CommandBus, SACM23_INT_001_UpdateElementTextIsLibraryPrimary) {
+    auto f = MakeFixture("primary_text");
 
     sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
     ASSERT_TRUE(loaded.ok);
@@ -121,18 +121,22 @@ TEST(CommandBus, SACM23_INT_001_UpdateElementTextShadowAppliesToLibraryDocument)
     std::string error;
     ASSERT_TRUE(cmd.Apply(ctx, event, error)) << error;
 
-    EXPECT_TRUE(ctx.library_synced) << "the text edit should route through the library";
+    // Phase 2 slice 2b-2: the text edit is now LIBRARY-PRIMARY. It bridges the
+    // legacy mutator onto the library (leaving the caller's legacy views for the
+    // frame-boundary re-derive), so the library document itself reflects the edit.
+    EXPECT_TRUE(ctx.library_primary) << "the text edit should be library-primary";
     const core::AssuranceCase projected = sacm_adapter::project_case(*loaded.document);
     const core::SacmElement* g1 = FindProjected(projected, "G1");
     ASSERT_NE(g1, nullptr);
     EXPECT_EQ(g1->name, "Renamed Goal");
 }
 
-// A no-op text edit (new value equals current) must not mark the command
-// library-synced: SetElementTextField leaves the legacy model unchanged, and a
-// library apply could still rewrite the stored language tag, so the edit is left
-// to the bus re-derive net rather than shadow-applied.
-TEST(CommandBus, SACM23_INT_001_NoOpTextEditDoesNotMarkLibrarySynced) {
+// A no-op text edit (new value equals current) is still detected as a no-op via
+// WasNoOp. Like any text edit it is now library-primary -- the bridge routes it
+// through the library (a harmless reload of the unchanged value). In the app the
+// controller short-circuits no-ops before dispatch, so this only exercises the
+// command directly.
+TEST(CommandBus, SACM23_INT_001_NoOpTextEditIsDetected) {
     auto f = MakeFixture("noop_text");
 
     sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
@@ -148,7 +152,7 @@ TEST(CommandBus, SACM23_INT_001_NoOpTextEditDoesNotMarkLibrarySynced) {
     ASSERT_TRUE(cmd.Apply(ctx, event, error)) << error;
 
     EXPECT_TRUE(cmd.WasNoOp());
-    EXPECT_FALSE(ctx.library_synced) << "a no-op must not suppress the re-derive net";
+    EXPECT_TRUE(ctx.library_primary) << "a text edit routes through the library";
 }
 
 // A command with no library seam yet (CreateTopGoal) leaves `library_synced`

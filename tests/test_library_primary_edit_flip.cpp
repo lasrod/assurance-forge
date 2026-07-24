@@ -347,6 +347,81 @@ TEST(LibraryPrimaryEditFlip, RemoveNodeOnlyInteriorReparentsMatchesLegacy) {
     EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
 }
 
+// (2d) Text edits are library-primary via a BRIDGE (not the apply_text_edit seam),
+// so they reproduce the legacy two-slot content/description result exactly -- the same
+// result the audit replay reproduces (which stays bridged) -- and converge with the
+// legacy mutator on the canonical hash. Covers Name, Content on the description-only
+// G1 (the slot-collapse case the seam would diverge on), and Content on a freshly
+// created sub-goal. The bridge captures old->new from the library (the last committed
+// state), so the ids/hash match the legacy mutator's.
+TEST(LibraryPrimaryEditFlip, TextEditsMatchLegacyCanonicalHash) {
+    std::unique_ptr<EditFixture> library_side = MakeFixture("text_library", /*library_backed=*/true);
+    std::unique_ptr<EditFixture> legacy_side = MakeFixture("text_legacy", /*library_backed=*/false);
+    ASSERT_NE(library_side->document, nullptr);
+    ASSERT_EQ(legacy_side->document, nullptr);
+
+    const auto run = [](EditFixture& fixture) {
+        core::commands::CommandContext ctx = MakeContext(fixture);
+
+        core::commands::CreateChildElementCommand add_sub("G1", core::NewElementKind::Goal);
+        EXPECT_TRUE(RunCommand(fixture, add_sub, ctx).success);
+        const std::string sub_id = add_sub.GeneratedId();
+
+        core::commands::UpdateElementTextCommand name_edit("G1", core::ElementTextField::Name, "en",
+                                                           "Revised top goal");
+        EXPECT_TRUE(RunCommand(fixture, name_edit, ctx).success);
+        core::commands::UpdateElementTextCommand content_edit("G1", core::ElementTextField::Content, "en",
+                                                              "The system is fully safe.");
+        EXPECT_TRUE(RunCommand(fixture, content_edit, ctx).success);
+        core::commands::UpdateElementTextCommand sub_content(sub_id, core::ElementTextField::Content, "en",
+                                                             "The subsystem is acceptably safe.");
+        EXPECT_TRUE(RunCommand(fixture, sub_content, ctx).success);
+    };
+    run(*library_side);
+    run(*legacy_side);
+
+    EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
+}
+
+// (2e) The remaining audited commands -- terminology (create package + term, add as
+// visible context, update term) -- are library-primary via the bridge, reproducing the
+// legacy result exactly. Run a representative sequence library-primary vs legacy and
+// converge on the canonical hash. (Package removal + proposal converge the same way and
+// are covered by the replay-convergence suite.)
+TEST(LibraryPrimaryEditFlip, TerminologyEditsMatchLegacyCanonicalHash) {
+    std::unique_ptr<EditFixture> library_side = MakeFixture("term_library", /*library_backed=*/true);
+    std::unique_ptr<EditFixture> legacy_side = MakeFixture("term_legacy", /*library_backed=*/false);
+    ASSERT_NE(library_side->document, nullptr);
+    ASSERT_EQ(legacy_side->document, nullptr);
+
+    const auto run = [](EditFixture& fixture) {
+        core::commands::CommandContext ctx = MakeContext(fixture);
+
+        core::commands::CreateTerminologyPackageCommand create_pkg("Terms", "Shared definitions.");
+        EXPECT_TRUE(RunCommand(fixture, create_pkg, ctx).success);
+        const core::TerminologyPackageRef pkg = create_pkg.GeneratedRef();
+
+        core::TerminologyTermDraft draft;
+        draft.value = "ODD";
+        draft.name  = "Operational Design Domain";
+        core::commands::CreateTerminologyTermCommand create_term(pkg, draft);
+        EXPECT_TRUE(RunCommand(fixture, create_term, ctx).success);
+        const core::TerminologyTermRef term = create_term.GeneratedRef();
+
+        core::commands::AddTerminologyTermAsVisibleContextCommand add_visible("G1", pkg, term);
+        EXPECT_TRUE(RunCommand(fixture, add_visible, ctx).success);
+
+        core::TerminologyTermDraft updated = draft;
+        updated.description = "The operating conditions under which the system is designed to function.";
+        core::commands::UpdateTerminologyTermCommand update_term(pkg, term, updated);
+        EXPECT_TRUE(RunCommand(fixture, update_term, ctx).success);
+    };
+    run(*library_side);
+    run(*legacy_side);
+
+    EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
+}
+
 // (3) The rebuilt render model still carries the bare-strategy placement pass. A
 // GSN strategy is stored as an ArgumentReasoning with a `strategyTarget` tag and
 // NO inference until its first sub-goal, so the render model needs the
@@ -385,10 +460,11 @@ TEST(LibraryPrimaryEditFlip, RebuiltModelKeepsBareStrategyPlacement) {
 // (4) The rebuilt render model still carries the terminology passes. Associating
 // a term with an element creates an ArtifactReference + AssertedContext that the
 // UI must NOT draw as a context node; `HideTerminologyArtifactReferences` removes
-// them from the render model. The association command is not flipped, so this
-// also proves a flipped command rebuilding the views does not resurrect data an
-// unflipped command hid -- and that the hidden elements survive in the library
-// (they are still in the projected package, and therefore still saved).
+// them from the render model. The association command is now library-primary (via
+// the bridge), so the re-derive already runs after it -- this proves that re-derive,
+// and every later flipped command's re-derive, keeps the artifact reference hidden in
+// the render model while the library still owns it (it stays in the projected package,
+// and is therefore still saved).
 TEST(LibraryPrimaryEditFlip, RebuiltModelKeepsTerminologyHiddenButLibraryKeepsIt) {
     std::unique_ptr<EditFixture> fixture = MakeFixture("terminology", /*library_backed=*/true);
     ASSERT_NE(fixture->document, nullptr);
@@ -410,7 +486,7 @@ TEST(LibraryPrimaryEditFlip, RebuiltModelKeepsTerminologyHiddenButLibraryKeepsIt
     const std::string artifact_reference_id = associate.Result().artifact_reference_id;
     ASSERT_FALSE(artifact_reference_id.empty());
     EXPECT_EQ(FindElement(fixture->model, artifact_reference_id), nullptr)
-        << "terminology artifact reference should not be a drawn node before the flip";
+        << "the terminology artifact reference must be hidden from the render model";
 
     // A FLIPPED command now rebuilds both views from the library.
     core::commands::CreateChildElementCommand add_goal("G1", core::NewElementKind::Goal);
@@ -432,42 +508,46 @@ TEST(LibraryPrimaryEditFlip, RebuiltModelKeepsTerminologyHiddenButLibraryKeepsIt
 }
 
 // The CommandContext is reused across commands, and a flipped command leaves
-// `library_primary` set. The bus MUST reset that before the next command --
-// otherwise an unflipped, legacy-only command that follows a flipped one has its
-// edit discarded when the bus rebuilds the views from the (stale, un-updated)
-// library. Here: a flipped create, then an unflipped terminology create, in ONE
-// context. Both edits must survive. (Regression guard for the reset in
-// CommandBus::Execute.)
-TEST(LibraryPrimaryEditFlip, UnflippedCommandAfterFlippedKeepsItsEdit) {
+// `library_primary` set. The bus MUST reset it at the start of every Execute --
+// otherwise a following LEGACY command (the kill switch, or a legacy-parser fallback)
+// inherits the stale flag, and the bus serializes from the scratch library projection
+// the previous flipped command set up (which the legacy edit never touched) instead of
+// from ctx.package, dropping the legacy edit ON DISK. All audited commands can now
+// flip, so the legacy path is forced here via allow_library_primary=false. This checks
+// the SAVED file (what the bus actually serialized), which is what the reset protects.
+// (Regression guard for the reset in CommandBus::Execute.)
+TEST(LibraryPrimaryEditFlip, LegacyCommandAfterFlippedKeepsItsEditOnDisk) {
     std::unique_ptr<EditFixture> fixture = MakeFixture("mixed_flip", /*library_backed=*/true);
     core::commands::CommandContext ctx = MakeContext(*fixture);
 
-    const auto count_terminology = [](const sacm::AssuranceCasePackage& package) {
-        std::size_t total = package.terminologyPackages.size();
-        for (const auto& argument_package : package.argumentPackages)
-            total += argument_package.terminologyPackages.size();
-        return total;
-    };
-    ASSERT_EQ(count_terminology(fixture->package), 0u);
-
-    // Flipped: mutates the library first and sets library_primary.
+    // Flipped: mutates the library and sets library_primary.
     core::commands::CreateChildElementCommand add_goal("G1", core::NewElementKind::Goal);
     ASSERT_TRUE(RunCommand(*fixture, add_goal, ctx).success);
     const std::string goal_id = add_goal.GeneratedId();
 
-    // Unflipped legacy-only: mutates the package via the legacy mutator. Its edit
-    // must not be clobbered by a stale library_primary from the create above.
+    // Force the next command onto the legacy path.
+    ctx.allow_library_primary = false;
     core::commands::CreateTerminologyPackageCommand add_terms("Terms", "Shared definitions.");
     ASSERT_TRUE(RunCommand(*fixture, add_terms, ctx).success);
+    EXPECT_FALSE(ctx.library_primary) << "the second command should have taken the legacy path";
 
-    EXPECT_EQ(count_terminology(fixture->package), 1u)
-        << "the unflipped terminology edit was clobbered by a stale library_primary flag";
+    // The SAVED file (what the bus serialized) must reflect BOTH edits.
+    const sacm_adapter::LoadOutcome saved = sacm_adapter::load_document(fixture->sacm_abs);
+    ASSERT_TRUE(saved.ok);
+    ASSERT_NE(saved.document, nullptr);
+    const sacm::AssuranceCasePackage on_disk = core::project_library_package(*saved.document);
+
     bool has_goal = false;
-    for (const auto& argument_package : fixture->package.argumentPackages)
+    for (const auto& argument_package : on_disk.argumentPackages)
         for (const auto& claim : argument_package.claims)
             if (claim.id == goal_id)
                 has_goal = true;
-    EXPECT_TRUE(has_goal) << "the flipped create was lost";
+    EXPECT_TRUE(has_goal) << "the flipped create was lost on disk";
+
+    std::size_t term_count = on_disk.terminologyPackages.size();
+    for (const auto& argument_package : on_disk.argumentPackages)
+        term_count += argument_package.terminologyPackages.size();
+    EXPECT_EQ(term_count, 1u) << "the legacy terminology edit was clobbered by a stale library_primary";
 }
 
 
