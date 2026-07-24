@@ -45,10 +45,10 @@ bool TermDefinitionHasDuplicate(const AppRuntimeState& state,
                                 const std::string& description,
                                 bool editing_existing_term,
                                 const core::TerminologyTermRef& selected_term_ref) {
-    if (value.empty() || description.empty() || !state.app_state.sacm_package.has_value())
+    if (value.empty() || description.empty() || !state.app_state.has_projected_package())
         return false;
     const sacm::TerminologyPackage* package =
-        core::FindTerminologyPackage(state.app_state.sacm_package.value(), package_ref);
+        core::FindTerminologyPackage(state.app_state.projected_package(), package_ref);
     if (!package)
         return false;
     for (const auto& term : package->terms) {
@@ -95,8 +95,8 @@ void SetCategoryChecked(AppRuntimeState& state, const sacm::Category& category, 
 
 void RenderTermCategoryPickerForPackage(AppRuntimeState& state, const core::TerminologyPackageRef& package_ref) {
     const sacm::TerminologyPackage* package = nullptr;
-    if (state.app_state.sacm_package.has_value()) {
-        package = core::FindTerminologyPackage(state.app_state.sacm_package.value(), package_ref);
+    if (state.app_state.has_projected_package()) {
+        package = core::FindTerminologyPackage(state.app_state.projected_package(), package_ref);
     }
 
     ImGui::TextUnformatted(AF_TR("Categories").c_str());
@@ -179,10 +179,10 @@ std::string PackageDisplayLabel(const sacm::TerminologyPackage& package, const s
 
 std::vector<TerminologyPackageChoice> BuildTerminologyPackageChoices(const AppRuntimeState& state) {
     std::vector<TerminologyPackageChoice> choices;
-    if (!state.app_state.sacm_package.has_value())
+    if (!state.app_state.has_projected_package())
         return choices;
 
-    const sacm::AssuranceCasePackage& package = state.app_state.sacm_package.value();
+    const sacm::AssuranceCasePackage& package = state.app_state.projected_package();
     for (const auto& terminology_package : package.terminologyPackages) {
         choices.push_back({TerminologyPackageRefFor(terminology_package),
                            PackageDisplayLabel(terminology_package, AF_TR("Assurance case"))});
@@ -377,8 +377,8 @@ void ModalHost::RenderQuickDefineTermModal() {
         const std::string description = TrimWhitespace(state_.terminology.term_definition_buf);
         const bool has_target_package =
             HasTerminologyPackageRef(state_.terminology.quick_define_target_package_ref) &&
-            state_.app_state.sacm_package.has_value() &&
-            core::FindTerminologyPackage(state_.app_state.sacm_package.value(),
+            state_.app_state.has_projected_package() &&
+            core::FindTerminologyPackage(state_.app_state.projected_package(),
                                          state_.terminology.quick_define_target_package_ref);
         const bool can_create = !value.empty() && has_target_package;
         RenderTerminologyTermValidationMessages(

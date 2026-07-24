@@ -159,10 +159,10 @@ bool IsArgumentTerminologyPackage(const sacm::ArgumentPackage& argument_package,
 
 core::TerminologyPackageRef ResolveQuickDefineTargetPackage(const AppRuntimeState& state,
                                                             const std::string& element_id) {
-    if (!state.app_state.sacm_package.has_value())
+    if (!state.app_state.has_projected_package())
         return {};
 
-    const sacm::AssuranceCasePackage& package = state.app_state.sacm_package.value();
+    const sacm::AssuranceCasePackage& package = state.app_state.projected_package();
     const sacm::ArgumentPackage* containing_argument_package = FindContainingArgumentPackage(package, element_id);
     if (HasTerminologyPackageRef(state.terminology.selected_package_ref) &&
         core::FindTerminologyPackage(package, state.terminology.selected_package_ref)) {
@@ -186,7 +186,7 @@ QuickDefineTargetPackageResult EnsureQuickDefineTargetPackage(AppRuntimeState& s
     if (HasTerminologyPackageRef(target.package_ref))
         return target;
 
-    if (!state.app_state.sacm_package.has_value()) {
+    if (!state.app_state.has_projected_package()) {
         target.error = "Open a SACM model before defining terms.";
         return target;
     }
@@ -211,7 +211,7 @@ QuickDefineTargetPackageResult EnsureQuickDefineTargetPackage(AppRuntimeState& s
     state.terminology.selected_category_ref = core::TerminologyCategoryRef{};
     state.terminology.selected_package_file_path = state.app_state.active_project_file_path;
     if (const sacm::TerminologyPackage* package =
-            core::FindTerminologyPackage(state.app_state.sacm_package.value(), command.GeneratedRef())) {
+            core::FindTerminologyPackage(state.app_state.projected_package(), command.GeneratedRef())) {
         CopyTerminologyPackageToEditor(state, *package);
     }
     return target;
@@ -240,7 +240,7 @@ bool IsActiveProjectSacmFile(const core::AppState& app_state, const core::Projec
 }
 
 bool EnsureProjectSacmFileOpen(AppRuntimeState& state, const core::ProjectFileEntry& entry, bool require_loaded_case) {
-    if (IsActiveProjectSacmFile(state.app_state, entry) && state.app_state.sacm_package.has_value() &&
+    if (IsActiveProjectSacmFile(state.app_state, entry) && state.app_state.has_projected_package() &&
         (!require_loaded_case || state.app_state.loaded_case.has_value())) {
         return true;
     }
@@ -248,18 +248,18 @@ bool EnsureProjectSacmFileOpen(AppRuntimeState& state, const core::ProjectFileEn
 }
 
 bool RefreshVisibleTerminologyContextProjection(core::AppState& app_state) {
-    if (!app_state.loaded_case.has_value() || !app_state.sacm_package.has_value())
+    if (!app_state.loaded_case.has_value() || !app_state.has_projected_package())
         return false;
     return core::RefreshVisibleTerminologyContextProjection(app_state.loaded_case.value(),
-                                                            app_state.sacm_package.value());
+                                                            app_state.projected_package());
 }
 
 bool SyncVisibleTerminologyContextToParser(core::AppState& app_state,
                                            const core::TerminologyContextAssociationResult& result) {
-    if (!app_state.loaded_case.has_value() || !app_state.sacm_package.has_value())
+    if (!app_state.loaded_case.has_value() || !app_state.has_projected_package())
         return false;
     return core::SyncVisibleTerminologyContextToParser(app_state.loaded_case.value(),
-                                                       app_state.sacm_package.value(), result);
+                                                       app_state.projected_package(), result);
 }
 
 std::string TermStatusLabel(const sacm::AssuranceCasePackage& package,
@@ -314,10 +314,10 @@ bool OpenTerminologyProblemTerm(AppRuntimeState& state,
                                 const core::TerminologyPackageRef& package_ref,
                                 const core::TerminologyTermRef& term_ref,
                                 const std::string& filter_value) {
-    if (!state.app_state.sacm_package.has_value())
+    if (!state.app_state.has_projected_package())
         return false;
     const sacm::TerminologyPackage* package =
-        core::FindTerminologyPackage(state.app_state.sacm_package.value(), package_ref);
+        core::FindTerminologyPackage(state.app_state.projected_package(), package_ref);
     if (!package)
         return false;
     state.terminology.selected_package_ref = package_ref;

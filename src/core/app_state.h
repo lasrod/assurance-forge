@@ -22,6 +22,16 @@ struct AppState {
     // terminology display until later Phase 9 stages retire it).
     std::optional<sacm::AssuranceCasePackage> sacm_package;
 
+    // The SACM package projected from the library-owned document. Currently returns the
+    // cached `sacm_package` field; a later Phase 3 slice will compute it from
+    // `library_document` and delete the field. Callers must guard with has_projected_package().
+    const sacm::AssuranceCasePackage& projected_package() const {
+        return sacm_package.value();
+    }
+    bool has_projected_package() const {
+        return sacm_package.has_value();
+    }
+
     // The library-owned SACM document. As of Phase 9 Stage 4 this is the load
     // source of truth: `loaded_case` is projected from it. Null when the file
     // was loaded through the legacy parser fallback (a library load gap).

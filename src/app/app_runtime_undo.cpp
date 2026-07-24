@@ -38,7 +38,7 @@ bool AppRuntime::CanUndo() const {
     if (!state.command_bus) return false;
     if (!state.app_state.current_project.has_value()) return false;
     if (!state.app_state.loaded_case.has_value()) return false;
-    if (!state.app_state.sacm_package.has_value()) return false;
+    if (!state.app_state.has_projected_package()) return false;
     if (ActiveCanvasInHistoricalPreview(state)) return false;
 
     const auto& transactions = state.command_bus->Store().Transactions();
@@ -61,7 +61,7 @@ bool AppRuntime::Undo() {
     }
     if (!state.app_state.current_project.has_value() ||
         !state.app_state.loaded_case.has_value() ||
-        !state.app_state.sacm_package.has_value()) {
+        !state.app_state.has_projected_package()) {
         state.app_state.status_message = "Undo unavailable: no project loaded.";
         return false;
     }

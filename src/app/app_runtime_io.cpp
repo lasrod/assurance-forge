@@ -17,7 +17,7 @@ void AppRuntime::FlushPendingTextEdits() {
     std::vector<ui::PendingTextEdit> pending = ui::TextEditSession::CollectPendingEdits();
     if (pending.empty())
         return;
-    if (!impl_->app_state.loaded_case.has_value() || !impl_->app_state.sacm_package.has_value())
+    if (!impl_->app_state.loaded_case.has_value() || !impl_->app_state.has_projected_package())
         return;
     impl_->element_edit_controller->FlushPendingTextEdits(*impl_, pending);
 }

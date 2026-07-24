@@ -150,7 +150,7 @@ void RenderGsnCanvasTab(AppRuntimeState& state, ui::UiState& ui_state, const Wor
             : (state.app_state.loaded_case.has_value() ? &state.app_state.loaded_case.value() : nullptr);
     ui_state.proposal_canvas_active = state.IsProposalCanvasActive();
     const sacm::AssuranceCasePackage* terminology_package =
-        state.app_state.sacm_package.has_value() ? &state.app_state.sacm_package.value() : nullptr;
+        state.app_state.has_projected_package() ? &state.app_state.projected_package() : nullptr;
     ui::gsn::ShowGsnCanvasContent(ui_state, visible_case, actions, terminology_package);
 }
 
@@ -159,12 +159,12 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
                                     const WorkbenchAreaCallbacks& callbacks,
                                     WorkbenchState::ArgumentPackageCanvasTab& tab) {
     ui_state.center_view = ui::CenterView::GsnCanvas;
-    if (!state.app_state.loaded_case.has_value() || !state.app_state.sacm_package.has_value()) {
+    if (!state.app_state.loaded_case.has_value() || !state.app_state.has_projected_package()) {
         ImGui::TextDisabled("%s", AF_TR("No SACM argument model is loaded.").c_str());
         return;
     }
 
-    const sacm::ArgumentPackage* argument_package = FindArgumentPackage(state.app_state.sacm_package.value(), tab);
+    const sacm::ArgumentPackage* argument_package = FindArgumentPackage(state.app_state.projected_package(), tab);
     if (!argument_package) {
         ImGui::TextDisabled("%s", AF_TR("Argument package was not found in the loaded SACM model.").c_str());
         return;
@@ -224,7 +224,7 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
     }
 
     const sacm::AssuranceCasePackage* terminology_package =
-        state.app_state.sacm_package.has_value() ? &state.app_state.sacm_package.value() : nullptr;
+        state.app_state.has_projected_package() ? &state.app_state.projected_package() : nullptr;
     RenderArgumentPackageCanvasWithTimeline(state, ui_state, callbacks, tab, *argument_package,
                                             cache.visible_case, renderer, actions,
                                             terminology_package);
@@ -232,9 +232,9 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
 
 void RenderTerminologyPackageTab(AppRuntimeState& state, const WorkbenchAreaCallbacks& callbacks) {
     const sacm::TerminologyPackage* terminology_package = nullptr;
-    if (state.app_state.sacm_package.has_value()) {
+    if (state.app_state.has_projected_package()) {
         terminology_package =
-            core::FindTerminologyPackage(state.app_state.sacm_package.value(), state.terminology.selected_package_ref);
+            core::FindTerminologyPackage(state.app_state.projected_package(), state.terminology.selected_package_ref);
     }
     std::string delete_block_reason;
     const bool can_delete =
@@ -258,7 +258,7 @@ void RenderTerminologyPackageTab(AppRuntimeState& state, const WorkbenchAreaCall
     if (terminology_package) {
         model.term_issues = core::ValidateTerminologyTerms(*terminology_package);
         model.term_usage_summaries =
-            core::BuildTerminologyTermUsageSummaries(state.app_state.sacm_package.value(), *terminology_package);
+            core::BuildTerminologyTermUsageSummaries(state.app_state.projected_package(), *terminology_package);
         model.category_usage_summaries = core::BuildTerminologyCategoryUsageSummaries(*terminology_package);
     }
 

@@ -194,7 +194,7 @@ void ShowSacmViewerPanel(float width,
     }
 
     ImGui::SameLine();
-    bool can_save = model.app_state.sacm_package.has_value();
+    bool can_save = model.app_state.has_projected_package();
     if (!can_save)
         ImGui::BeginDisabled();
     if (ImGui::Button(AF_TR("Save").c_str())) {
