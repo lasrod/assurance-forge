@@ -32,7 +32,7 @@ bool AcpController::DispatchAddAcp(AppRuntimeState& state, const std::string& ta
         // An empty error is a benign no-op (nothing to record); only surface a
         // real failure, matching the pre-bus controller's silent no-op.
         if (!outcome.error.empty())
-            events_.Emit(StatusMessageEvent{"Added ACP failed: " + outcome.error});
+            events_.Emit(StatusMessageEvent{"Add ACP failed: " + outcome.error});
         return false;
     }
     const std::string& acp_id = command.GeneratedAcpId();

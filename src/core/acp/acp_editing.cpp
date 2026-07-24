@@ -462,6 +462,10 @@ AcpEditResult AddAcpWithId(parser::AssuranceCase& model,
                            const std::string& target_kind,
                            const std::string& target_id,
                            const std::string& acp_id) {
+    // A caller-supplied id (audit replay, direct callers) must be non-empty: an
+    // empty id would write an unaddressable ACP tag set and corrupt the model.
+    if (acp_id.empty())
+        return ErrorResult({}, "ACP id must not be empty.");
     if (target_kind != kTargetKindElement && target_kind != kTargetKindRelationship)
         return ErrorResult({}, "Unsupported ACP target kind.");
     if (!ParserTargetExists(model, target_kind, target_id))
