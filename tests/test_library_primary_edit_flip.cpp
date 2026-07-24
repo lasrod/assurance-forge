@@ -23,6 +23,7 @@
 
 #include "core/audit/audit_paths.h"
 #include "core/audit/audit_store.h"
+#include "core/commands/acp_commands.h"
 #include "core/commands/command_bus.h"
 #include "core/commands/element_commands.h"
 #include "core/commands/terminology_commands.h"
@@ -415,6 +416,46 @@ TEST(LibraryPrimaryEditFlip, TerminologyEditsMatchLegacyCanonicalHash) {
         updated.description = "The operating conditions under which the system is designed to function.";
         core::commands::UpdateTerminologyTermCommand update_term(pkg, term, updated);
         EXPECT_TRUE(RunCommand(fixture, update_term, ctx).success);
+    };
+    run(*library_side);
+    run(*legacy_side);
+
+    EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
+}
+
+// (2f) ACP record CRUD (Phase 2 slice 2c-1) is library-primary via the bridge:
+// AddAcp reproduces the deterministic ACP<n> id and the vendor ACP TaggedValues,
+// and Upsert edits them, exactly as the legacy mutator does. Create a Solution
+// (the only element kind eligible for an element ACP), add an element ACP, then
+// edit its name -- run library-primary vs legacy and converge on the canonical
+// hash. The AddAcp id (ACP1) matches on both sides because both plan it from the
+// same one-ACP-free starting model.
+TEST(LibraryPrimaryEditFlip, AcpEditsMatchLegacyCanonicalHash) {
+    std::unique_ptr<EditFixture> library_side = MakeFixture("acp_library", /*library_backed=*/true);
+    std::unique_ptr<EditFixture> legacy_side = MakeFixture("acp_legacy", /*library_backed=*/false);
+    ASSERT_NE(library_side->document, nullptr);
+    ASSERT_EQ(legacy_side->document, nullptr);
+
+    const auto run = [](EditFixture& fixture) {
+        core::commands::CommandContext ctx = MakeContext(fixture);
+
+        core::commands::CreateChildElementCommand add_solution("G1", core::NewElementKind::Solution);
+        EXPECT_TRUE(RunCommand(fixture, add_solution, ctx).success);
+        const std::string solution_id = add_solution.GeneratedId();
+
+        core::commands::AddAcpCommand add_acp("element", solution_id);
+        EXPECT_TRUE(RunCommand(fixture, add_acp, ctx).success);
+        const std::string acp_id = add_acp.GeneratedAcpId();
+        EXPECT_FALSE(acp_id.empty());
+
+        parser::AcpRecord edited;
+        edited.id              = acp_id;
+        edited.name            = "Confidence in the test report";
+        edited.target_kind     = "element";
+        edited.target_id       = solution_id;
+        edited.resolution_kind = "none";
+        core::commands::UpsertAcpCommand upsert(edited);
+        EXPECT_TRUE(RunCommand(fixture, upsert, ctx).success);
     };
     run(*library_side);
     run(*legacy_side);

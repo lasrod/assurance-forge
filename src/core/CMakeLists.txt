@@ -26,6 +26,7 @@ add_library(af_core OBJECT
     audit/timeline_model_builder.cpp
     audit/undo_boundary.cpp
     audit/undo_resolver.cpp
+    commands/acp_commands.cpp
     commands/command_bus.cpp
     commands/element_commands.cpp
     commands/library_bridge.cpp

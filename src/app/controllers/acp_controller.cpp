@@ -1,7 +1,10 @@
 #include "app/controllers/acp_controller.h"
 
 #include "app/acp_problem_sync.h"
+#include "app/app_runtime_state.h"
+#include "app/commands/dispatch.h"
 #include "core/acp/acp_editing.h"
+#include "core/commands/acp_commands.h"
 #include "ui/ui_state.h"
 
 namespace app::controllers {
@@ -21,53 +24,48 @@ void AcpController::SyncProblems(const parser::AssuranceCase& model, const sacm:
     app::SyncAcpProblems(problems_manager_, &model, package);
 }
 
-bool AcpController::HandleResult(const char* action, const core::acp::AcpEditResult& result) {
-    if (!result.error.empty()) {
-        events_.Emit(StatusMessageEvent{std::string(action) + " failed: " + result.error});
+bool AcpController::DispatchAddAcp(AppRuntimeState& state, const std::string& target_kind,
+                                   const std::string& target_id) {
+    core::commands::AddAcpCommand        command(target_kind, target_id);
+    const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(state, command);
+    if (!outcome.success) {
+        // An empty error is a benign no-op (nothing to record); only surface a
+        // real failure, matching the pre-bus controller's silent no-op.
+        if (!outcome.error.empty())
+            events_.Emit(StatusMessageEvent{"Added ACP failed: " + outcome.error});
         return false;
     }
-    if (!result.changed)
-        return false;
-
-    ui::UiState& ui_state = ui::GetUiState();
-    ui_state.selected_acp_id = result.acp_id;
+    const std::string& acp_id = command.GeneratedAcpId();
+    ui::UiState&       ui_state = ui::GetUiState();
+    ui_state.selected_acp_id = acp_id;
     ui_state.selected_element_id.clear();
     ui_state.selected_relationship_id.clear();
     ui_state.selected_relationship_edge_key.clear();
     events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{std::string(action) + " " + result.acp_id});
-    NotifyEditApplied();
+    events_.Emit(StatusMessageEvent{"Added ACP " + acp_id});
+    // The command bus + frame-boundary re-derive refresh the model; ACP problems
+    // re-sync from the fresh model when this dirty flag is serviced next frame
+    // (an immediate sync here would read the momentarily-stale flipped views).
+    state.problems_dirty.acp = true;
     return true;
 }
 
-bool AcpController::AddElementAcp(parser::AssuranceCase& model,
-                                  sacm::AssuranceCasePackage* package,
-                                  const std::string& element_id) {
-    const bool handled = HandleResult("Added ACP", core::acp::AddAcp(model, package, "element", element_id));
-    if (handled)
-        SyncProblems(model, package);
-    return handled;
+bool AcpController::AddElementAcp(AppRuntimeState& state, const std::string& element_id) {
+    return DispatchAddAcp(state, "element", element_id);
 }
 
-bool AcpController::AddRelationshipAcp(parser::AssuranceCase& model,
-                                       sacm::AssuranceCasePackage* package,
-                                       const std::string& relationship_id) {
-    const bool handled = HandleResult("Added ACP", core::acp::AddAcp(model, package, "relationship", relationship_id));
-    if (handled)
-        SyncProblems(model, package);
-    return handled;
+bool AcpController::AddRelationshipAcp(AppRuntimeState& state, const std::string& relationship_id) {
+    return DispatchAddAcp(state, "relationship", relationship_id);
 }
 
-bool AcpController::RemoveAcp(parser::AssuranceCase& model,
-                              sacm::AssuranceCasePackage* package,
-                              const std::string& acp_id) {
-    const core::acp::AcpEditResult result = core::acp::RemoveAcp(model, package, acp_id);
-    if (!result.error.empty()) {
-        events_.Emit(StatusMessageEvent{"Remove ACP failed: " + result.error});
+bool AcpController::RemoveAcp(AppRuntimeState& state, const std::string& acp_id) {
+    core::commands::RemoveAcpCommand     command(acp_id);
+    const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(state, command);
+    if (!outcome.success) {
+        if (!outcome.error.empty())
+            events_.Emit(StatusMessageEvent{"Remove ACP failed: " + outcome.error});
         return false;
     }
-    if (!result.changed)
-        return false;
     ui::UiState& ui_state = ui::GetUiState();
     if (ui_state.selected_acp_id == acp_id)
         ui_state.selected_acp_id.clear();
@@ -75,24 +73,20 @@ bool AcpController::RemoveAcp(parser::AssuranceCase& model,
     ui_state.selected_relationship_edge_key.clear();
     events_.Emit(DocumentDirtyEvent{});
     events_.Emit(StatusMessageEvent{"Removed " + acp_id});
-    SyncProblems(model, package);
-    NotifyEditApplied();
+    state.problems_dirty.acp = true;
     return true;
 }
 
-bool AcpController::UpsertAcp(parser::AssuranceCase& model,
-                              sacm::AssuranceCasePackage* package,
-                              const parser::AcpRecord& acp) {
-    const core::acp::AcpEditResult result = core::acp::UpsertAcp(model, package, acp);
-    if (!result.error.empty()) {
-        events_.Emit(StatusMessageEvent{"Update ACP failed: " + result.error});
+bool AcpController::UpsertAcp(AppRuntimeState& state, const parser::AcpRecord& acp) {
+    core::commands::UpsertAcpCommand     command(acp);
+    const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(state, command);
+    if (!outcome.success) {
+        if (!outcome.error.empty())
+            events_.Emit(StatusMessageEvent{"Update ACP failed: " + outcome.error});
         return false;
     }
-    if (!result.changed)
-        return false;
     events_.Emit(DocumentDirtyEvent{});
-    SyncProblems(model, package);
-    NotifyEditApplied();
+    state.problems_dirty.acp = true;
     return true;
 }
 

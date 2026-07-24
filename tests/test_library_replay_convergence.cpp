@@ -23,6 +23,7 @@
 #include "core/audit/audit_paths.h"
 #include "core/audit/audit_store.h"
 #include "core/audit/event_replayer.h"
+#include "core/commands/acp_commands.h"
 #include "core/commands/command_bus.h"
 #include "core/commands/element_commands.h"
 #include "core/commands/package_commands.h"
@@ -432,6 +433,86 @@ TEST(LibraryReplayConvergence, RemoveNodeOnlyInteriorReparentsAndConverges) {
 
     core::commands::RemoveElementCommand remove(e_id, core::RemoveMode::NodeOnly);
     ASSERT_TRUE(bus->Execute(remove, ctx, "tester").success);
+
+    const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
+    const core::audit::ReplayState legacy = LegacyReplay(f, txns);
+    const std::unique_ptr<sacm_adapter::LibraryDocument> library_doc = LibraryReplay(f, txns);
+    ASSERT_NE(library_doc, nullptr);
+
+    const std::optional<std::string> library_hash =
+        core::library_canonical_hash(core::project_library_package(*library_doc));
+    const std::optional<std::string> legacy_hash = core::library_canonical_hash(legacy.package);
+    ASSERT_TRUE(library_hash.has_value());
+    ASSERT_TRUE(legacy_hash.has_value());
+    EXPECT_EQ(*library_hash, *legacy_hash);
+}
+
+// ACP CRUD (Phase 2 slice 2c-1) is library-primary via the bridge: AddAcp forces
+// the recorded ACP<n> id via core::acp::AddAcpWithId, and Upsert re-runs the same
+// legacy mutator on the projected package. Create a Solution (the only element
+// kind ElementEligibleForAcp accepts), add an element ACP on it, then edit its
+// name -- and the raw canonical hashes must converge across both replays.
+TEST(LibraryReplayConvergence, AcpAddAndUpsertConverge) {
+    auto f = MakeFixture("acp_add_upsert");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package};
+
+    core::commands::CreateChildElementCommand add_solution("G1", core::NewElementKind::Solution);
+    ASSERT_TRUE(bus->Execute(add_solution, ctx, "tester").success);
+    const std::string solution_id = add_solution.GeneratedId();
+
+    core::commands::AddAcpCommand add_acp("element", solution_id);
+    ASSERT_TRUE(bus->Execute(add_acp, ctx, "tester").success);
+    const std::string acp_id = add_acp.GeneratedAcpId();
+    ASSERT_FALSE(acp_id.empty());
+
+    parser::AcpRecord edited;
+    edited.id              = acp_id;
+    edited.name            = "Confidence in the test report";
+    edited.target_kind     = "element";
+    edited.target_id       = solution_id;
+    edited.resolution_kind = "none";
+    core::commands::UpsertAcpCommand upsert(edited);
+    ASSERT_TRUE(bus->Execute(upsert, ctx, "tester").success);
+
+    const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
+    const core::audit::ReplayState legacy = LegacyReplay(f, txns);
+    const std::unique_ptr<sacm_adapter::LibraryDocument> library_doc = LibraryReplay(f, txns);
+    ASSERT_NE(library_doc, nullptr);
+
+    const std::optional<std::string> library_hash =
+        core::library_canonical_hash(core::project_library_package(*library_doc));
+    const std::optional<std::string> legacy_hash = core::library_canonical_hash(legacy.package);
+    ASSERT_TRUE(library_hash.has_value());
+    ASSERT_TRUE(legacy_hash.has_value());
+    EXPECT_EQ(*library_hash, *legacy_hash);
+}
+
+// The RemoveAcp event replays through the same bridge (the legacy core::acp::RemoveAcp
+// strips the vendor ACP TaggedValues). Add then remove an element ACP -- both replays
+// must land on the ACP-free canonical hash.
+TEST(LibraryReplayConvergence, AcpRemoveConverge) {
+    auto f = MakeFixture("acp_remove");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package};
+
+    core::commands::CreateChildElementCommand add_solution("G1", core::NewElementKind::Solution);
+    ASSERT_TRUE(bus->Execute(add_solution, ctx, "tester").success);
+    const std::string solution_id = add_solution.GeneratedId();
+
+    core::commands::AddAcpCommand add_acp("element", solution_id);
+    ASSERT_TRUE(bus->Execute(add_acp, ctx, "tester").success);
+    const std::string acp_id = add_acp.GeneratedAcpId();
+    ASSERT_FALSE(acp_id.empty());
+
+    core::commands::RemoveAcpCommand remove_acp(acp_id);
+    ASSERT_TRUE(bus->Execute(remove_acp, ctx, "tester").success);
 
     const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
     const core::audit::ReplayState legacy = LegacyReplay(f, txns);

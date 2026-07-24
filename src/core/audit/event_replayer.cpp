@@ -1,6 +1,8 @@
 #include "core/audit/event_replayer.h"
 
+#include "core/acp/acp_editing.h"
 #include "core/audit/undo_resolver.h"
+#include "core/commands/acp_commands.h"
 #include "core/commands/element_commands.h"
 #include "core/commands/package_commands.h"
 #include "core/commands/proposal_commands.h"
@@ -659,6 +661,64 @@ bool ApplyEvent(ReplayState& state,
         return true;
     }
 
+    // ---- ACP events -----------------------------------------------------
+    // Legacy replay runs the SAME `core::acp::*` mutators the live command used,
+    // directly on the legacy model/package. AddAcp forces the recorded id via
+    // AddAcpWithId; Remove/Upsert take explicit ids.
+
+    if (type == "AddAcp") {
+        std::string target_kind, target_id, generated_acp_id;
+        if (!require_string("target_kind", target_kind))
+            return false;
+        if (!require_string("target_id", target_id))
+            return false;
+        if (!require_string("generated_acp_id", generated_acp_id))
+            return false;
+        const core::acp::AcpEditResult result =
+            core::acp::AddAcpWithId(state.model, &state.package, target_kind, target_id, generated_acp_id);
+        if (!result.error.empty()) {
+            out_error = "AddAcpWithId failed at " +
+                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
+            return false;
+        }
+        return true;
+    }
+
+    if (type == "RemoveAcp") {
+        std::string acp_id;
+        if (!require_string("acp_id", acp_id))
+            return false;
+        const core::acp::AcpEditResult result = core::acp::RemoveAcp(state.model, &state.package, acp_id);
+        if (!result.error.empty()) {
+            out_error = "RemoveAcp failed at " +
+                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
+            return false;
+        }
+        return true;
+    }
+
+    if (type == "UpsertAcp") {
+        auto acp_it = payload.find("acp");
+        if (acp_it == payload.end()) {
+            out_error = "Missing 'acp' payload at " + FormatLocation(tx_seq, event.event_sequence, type);
+            return false;
+        }
+        parser::AcpRecord record;
+        std::string       parse_error;
+        if (!commands::DeserializeAcpRecord(*acp_it, record, parse_error)) {
+            out_error = "Failed to deserialize ACP record at " +
+                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + parse_error;
+            return false;
+        }
+        const core::acp::AcpEditResult result = core::acp::UpsertAcp(state.model, &state.package, record);
+        if (!result.error.empty()) {
+            out_error = "UpsertAcp failed at " +
+                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
+            return false;
+        }
+        return true;
+    }
+
     out_error = "Unknown event type '" + type + "' at " +
                 FormatLocation(tx_seq, event.event_sequence, type);
     return false;
@@ -1291,6 +1351,76 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
                 return false;
             }
             core::RebuildSacmArgumentPackageFromParser(model, package);
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
+    }
+
+    // ACP events have no parity library seam (ACPs are legacy vendor TaggedValues,
+    // not a library-native operation), so they bridge: run the SAME legacy
+    // `core::acp::*` mutator the live path used onto a projected package, then
+    // re-derive the library. AddAcp forces the recorded id via AddAcpWithId, so
+    // the bridged replay reproduces the legacy result and converges by construction.
+    if (type == "AddAcp") {
+        std::string target_kind, target_id, generated_acp_id;
+        if (!require_string("target_kind", target_kind))
+            return false;
+        if (!require_string("target_id", target_id))
+            return false;
+        if (!require_string("generated_acp_id", generated_acp_id))
+            return false;
+        const std::string   location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate   = [&](parser::AssuranceCase&         model,
+                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            const core::acp::AcpEditResult result =
+                core::acp::AddAcpWithId(model, &package, target_kind, target_id, generated_acp_id);
+            if (!result.error.empty()) {
+                err = "AddAcpWithId (bridge) failed at " + location + ": " + result.error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
+    }
+
+    if (type == "RemoveAcp") {
+        std::string acp_id;
+        if (!require_string("acp_id", acp_id))
+            return false;
+        const std::string   location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate   = [&](parser::AssuranceCase&         model,
+                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            const core::acp::AcpEditResult result = core::acp::RemoveAcp(model, &package, acp_id);
+            if (!result.error.empty()) {
+                err = "RemoveAcp (bridge) failed at " + location + ": " + result.error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
+    }
+
+    if (type == "UpsertAcp") {
+        auto acp_it = payload.find("acp");
+        if (acp_it == payload.end()) {
+            out_error = "Missing 'acp' payload at " + FormatLocation(tx_seq, event.event_sequence, type);
+            return false;
+        }
+        parser::AcpRecord record;
+        std::string       parse_error;
+        if (!commands::DeserializeAcpRecord(*acp_it, record, parse_error)) {
+            out_error = "Failed to deserialize ACP record at " +
+                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + parse_error;
+            return false;
+        }
+        const std::string   location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate   = [&](parser::AssuranceCase&         model,
+                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            const core::acp::AcpEditResult result = core::acp::UpsertAcp(model, &package, record);
+            if (!result.error.empty()) {
+                err = "UpsertAcp (bridge) failed at " + location + ": " + result.error;
+                return false;
+            }
             return true;
         };
         return BridgeViaLegacy(document, location, mutate, out_error);

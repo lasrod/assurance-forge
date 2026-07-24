@@ -20,6 +20,16 @@ AcpEditResult AddAcp(parser::AssuranceCase& model,
                      const std::string& target_kind,
                      const std::string& target_id);
 
+// Identical to AddAcp but uses the supplied `acp_id` verbatim instead of
+// generating one via NextAcpId. AddAcp generates the deterministic ACP<n> id and
+// delegates here; audit replay calls this directly with the recorded id so a
+// replayed AddAcp reproduces the exact identity the live edit minted.
+AcpEditResult AddAcpWithId(parser::AssuranceCase& model,
+                           sacm::AssuranceCasePackage* package,
+                           const std::string& target_kind,
+                           const std::string& target_id,
+                           const std::string& acp_id);
+
 AcpEditResult
 UpsertAcp(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package, const parser::AcpRecord& acp);
 

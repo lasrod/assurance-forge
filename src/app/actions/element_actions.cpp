@@ -70,10 +70,7 @@ bool ElementActions::AddAcpToSelectedElement() {
         SetStatus(state_, "No element selected.");
         return false;
     }
-    parser::AssuranceCase& ac = state_.app_state.loaded_case.value();
-    sacm::AssuranceCasePackage* pkg =
-        state_.app_state.sacm_package.has_value() ? &state_.app_state.sacm_package.value() : nullptr;
-    return state_.acp_controller->AddElementAcp(ac, pkg, selected_id);
+    return state_.acp_controller->AddElementAcp(state_, selected_id);
 }
 
 bool ElementActions::AddAcpToRelationship(const std::string& relationship_id) {
@@ -81,10 +78,7 @@ bool ElementActions::AddAcpToRelationship(const std::string& relationship_id) {
         SetStatus(state_, "No assurance case loaded.");
         return false;
     }
-    parser::AssuranceCase& ac = state_.app_state.loaded_case.value();
-    sacm::AssuranceCasePackage* pkg =
-        state_.app_state.sacm_package.has_value() ? &state_.app_state.sacm_package.value() : nullptr;
-    return state_.acp_controller->AddRelationshipAcp(ac, pkg, relationship_id);
+    return state_.acp_controller->AddRelationshipAcp(state_, relationship_id);
 }
 
 bool ElementActions::RemoveAcp(const std::string& acp_id) {
@@ -92,10 +86,7 @@ bool ElementActions::RemoveAcp(const std::string& acp_id) {
         SetStatus(state_, "No assurance case loaded.");
         return false;
     }
-    parser::AssuranceCase& ac = state_.app_state.loaded_case.value();
-    sacm::AssuranceCasePackage* pkg =
-        state_.app_state.sacm_package.has_value() ? &state_.app_state.sacm_package.value() : nullptr;
-    return state_.acp_controller->RemoveAcp(ac, pkg, acp_id);
+    return state_.acp_controller->RemoveAcp(state_, acp_id);
 }
 
 void ElementActions::RemoveSelected(core::RemoveMode mode) {
