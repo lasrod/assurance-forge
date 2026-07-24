@@ -288,12 +288,23 @@ bool RemoveElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
     // referencing relationship, dropping a relationship only once it is left
     // structurally empty -- exactly the legacy core::RemoveElement scrub-then-drop
     // (ReferenceDeletePolicy::ScrubReferences in the adapter). So the seam
-    // reproduces the legacy removal for every shape, including removing one
-    // sub-goal of a strategy whose single inference has several sources (the
-    // inference survives, scrubbed to the rest, rather than cascading away). The
-    // only remaining gate is the app's hotfix kill switch.
+    // reproduces the legacy removal for a closed subtree of any shape, including
+    // removing one sub-goal of a strategy whose single inference has several
+    // sources (the inference survives, scrubbed to the rest, rather than cascading
+    // away).
+    //
+    // NodeOnly is the exception and stays on the legacy mutator: it REPARENTS the
+    // removed node's structural children onto its parent (core::ReparentChildren-
+    // ToParent RETARGETS a child's inference from the node to the parent, or clears
+    // a strategy's reasoning). A retarget is not expressible as a set of per-id
+    // deletes, so the seam cannot reproduce it -- it would leave the child inference
+    // target-less, drop it, and orphan the promoted node. NodeOnly therefore falls
+    // through to `core::RemoveElement` below (library_primary stays false; the bus
+    // re-derives the library from the mutated package). A native retarget op would
+    // let the seam take it too.
     bool applied_to_library = false;
-    if (ctx.library_document != nullptr && ctx.allow_library_primary) {
+    if (ctx.library_document != nullptr && ctx.allow_library_primary &&
+        mode_ == RemoveMode::NodeAndDescendants) {
         // Exactly the ids `PlanRemoval` produced -- the same set the audit event
         // records, walked in the same sorted order `ApplyEventToLibrary` replays,
         // so the live document and the replayed document agree by construction.

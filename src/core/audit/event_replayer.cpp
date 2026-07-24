@@ -773,18 +773,31 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
                         FormatLocation(tx_seq, event.event_sequence, type);
             return false;
         }
-        // The library replay depends only on the recorded `deleted_ids` -- the
-        // exact PlanRemoval set the live path computed. The scrub seam deletes
-        // each planned id through ReferenceDeletePolicy::ScrubReferences, which
-        // reproduces the legacy scrub-then-drop for EVERY removal shape (a
-        // strategy's shared inference survives, sourced by the sub-goals that
-        // remain, rather than cascading away), so the guarded legacy bridge is
-        // gone. `element_id`/`mode` stay required for payload-shape parity with
-        // the recorded event and the legacy replay's failure surface, but the
-        // seam does not consult them (deleted_ids already reflects the mode).
-        (void)element_id;
-        (void)mode;
+        // NodeOnly REPARENTS the removed node's structural children onto its
+        // parent (core::ReparentChildrenToParent RETARGETS a child's inference
+        // from the node to the parent, or clears a strategy's reasoning) before
+        // the scrub. That retarget is not expressible as a set of per-id deletes,
+        // so replaying `deleted_ids` through the scrub seam would leave the child
+        // inference target-less, drop it, and orphan the promoted node. Bridge
+        // NodeOnly through the legacy core::RemoveElement (project -> mutate ->
+        // reload), which recomputes the same PlanRemoval the live path recorded --
+        // exactly as the legacy replay does.
+        if (mode == core::RemoveMode::NodeOnly) {
+            const std::string   location = FormatLocation(tx_seq, event.event_sequence, type);
+            const BridgeMutator mutate   = [&](parser::AssuranceCase& model,
+                                             sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+                return core::RemoveElement(model, &package, element_id, core::RemoveMode::NodeOnly, err);
+            };
+            return BridgeViaLegacy(document, location, mutate, out_error);
+        }
 
+        // NodeAndDescendants removes a closed subtree with no reparenting, so the
+        // library replay depends only on the recorded `deleted_ids` -- the exact
+        // PlanRemoval set the live path computed. The scrub seam deletes each
+        // planned id through ReferenceDeletePolicy::ScrubReferences, which
+        // reproduces the legacy scrub-then-drop for every subtree shape (a
+        // strategy's shared inference survives, sourced by the sub-goals that
+        // remain, rather than cascading away).
         auto deleted_it = payload.find("deleted_ids");
         if (deleted_it == payload.end() || !deleted_it->is_array()) {
             out_error = "Missing or non-array 'deleted_ids' at " +

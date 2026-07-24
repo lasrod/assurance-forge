@@ -1348,7 +1348,10 @@ CheckOutcome check_delete(const model::Document& document, const DeleteElement& 
                             validation::codes::kCmdDeleteReferenced, "SACM23-CMD-005", op,
                             {element.id(), *use.target},
                             std::format("'{}' is referenced ({}) by '{}'; deleting it requires "
-                                        "ReferenceDeletePolicy::DeleteReferencingRelationships",
+                                        "ReferenceDeletePolicy::DeleteReferencingRelationships "
+                                        "(cascade) or ReferenceDeletePolicy::ScrubReferences (scrub "
+                                        "the reference, keeping the referring relationship while it "
+                                        "stays structurally valid)",
                                         use.target->value(), use.role, element.id().value())));
                         rejected = true;
                         return;

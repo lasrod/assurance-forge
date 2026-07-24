@@ -294,6 +294,41 @@ TEST(LibraryPrimaryEditFlip, RemoveKeepsSiblingUnderSharedStrategyInference) {
     EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
 }
 
+// (2c) NodeOnly removal of an interior goal REPARENTS its children onto the
+// grandparent -- legacy core::RemoveElement RETARGETS the child's inference from
+// the removed node to the parent. That retarget is not a delete, so the pure
+// delete+scrub seam cannot reproduce it (it would leave the child inference
+// target-less, drop it, and orphan the grandchild). The flip must route NodeOnly
+// through the legacy mutator and re-derive the library, NOT the seam. Both routings
+// of `G1 -> E -> C`, remove E NodeOnly, must hash identically with C promoted to G1.
+TEST(LibraryPrimaryEditFlip, RemoveNodeOnlyInteriorReparentsMatchesLegacy) {
+    std::unique_ptr<EditFixture> library_side = MakeFixture("node_only_library", /*library_backed=*/true);
+    std::unique_ptr<EditFixture> legacy_side = MakeFixture("node_only_legacy", /*library_backed=*/false);
+    ASSERT_NE(library_side->document, nullptr);
+
+    const auto run = [](EditFixture& fixture) {
+        core::commands::CommandContext ctx = MakeContext(fixture);
+        core::commands::CreateChildElementCommand add_e("G1", core::NewElementKind::Goal);
+        EXPECT_TRUE(fixture.bus->Execute(add_e, ctx, "tester").success);
+        const std::string e_id = add_e.GeneratedId();
+        core::commands::CreateChildElementCommand add_c(e_id, core::NewElementKind::Goal);
+        EXPECT_TRUE(fixture.bus->Execute(add_c, ctx, "tester").success);
+        const std::string c_id = add_c.GeneratedId();
+
+        core::commands::RemoveElementCommand remove(e_id, core::RemoveMode::NodeOnly);
+        EXPECT_TRUE(fixture.bus->Execute(remove, ctx, "tester").success);
+        EXPECT_FALSE(ctx.library_primary)
+            << "NodeOnly took the library-primary seam, which cannot reparent";
+        // E is gone; C survives, reparented onto G1.
+        EXPECT_EQ(FindElement(fixture.model, e_id), nullptr);
+        EXPECT_NE(FindElement(fixture.model, c_id), nullptr);
+    };
+    run(*library_side);
+    run(*legacy_side);
+
+    EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
+}
+
 // (3) The rebuilt render model still carries the bare-strategy placement pass. A
 // GSN strategy is stored as an ArgumentReasoning with a `strategyTarget` tag and
 // NO inference until its first sub-goal, so the render model needs the
