@@ -797,7 +797,16 @@ void preserve_extension_subtree(Reader& reader, SACMElement& parent, const pugi:
 void read_containment_child(Reader& reader, SACMElement& parent, const pugi::xml_node& node,
                             std::optional<ElementKind> declared_kind) {
     std::optional<ElementKind> kind;
+    // Resolve `xsi:type` under the CHILD's own namespace scope: a document may
+    // declare the xsi or the extension prefix on this element rather than on an
+    // ancestor, and without the scope `resolve_prefix` would return empty --
+    // the type would look unqualified, miss the extension branch entirely, and
+    // the subtree would be silently dropped or coerced (the very failure this
+    // preservation path exists to prevent). The declared-role branch in
+    // `populate` and `read_root` already scope their own reads the same way.
+    reader.push_scope(node);
     const XsiTypeResult xsi_type = read_xsi_type(reader, node);
+    reader.pop_scope();
     if (xsi_type.preserve()) {
         // Not a fall-through to name-based inference: the element name here is
         // the abstract role ("argumentElement"), which is no class name, so

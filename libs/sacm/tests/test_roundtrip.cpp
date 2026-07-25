@@ -189,6 +189,21 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_CurrentGsnNamespaceAndAwayTypesAreRecogn
 // prefix, so the strict-mode assertions below are not confounded by the GSN
 // fixture's dialect namespace and missing ids (strict rejects those first, and
 // never reaches the element).
+// The same shape, but the extension prefix is declared ON THE CHILD rather than
+// on an ancestor. Namespace scoping makes this equivalent XML, so it must behave
+// identically -- resolving `xsi:type` without pushing the child's own scope would
+// leave the prefix unresolvable, miss the extension branch, and drop the subtree.
+constexpr std::string_view kLocallyDeclaredExtensionDocument =
+    R"(<?xml version="1.0" encoding="UTF-8"?>)"
+    R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+    R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+    R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" )"
+    R"(xmi:version="2.0" xmi:id="acp_1">)"
+    R"(<name content="Locally Declared Case"/><argumentPackage xmi:id="argpkg_1">)"
+    R"(<argumentElement xmlns:gsn="http://scsc.acwg.gsn/2.0" xsi:type="gsn:Context" )"
+    R"(xmi:id="ctx_1"><name content="C1"/>)"
+    R"(</argumentElement></argumentPackage></sacm:AssuranceCasePackage>)";
+
 constexpr std::string_view kStrictNamespaceExtensionDocument =
     R"(<?xml version="1.0" encoding="UTF-8"?>)"
     R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
@@ -303,6 +318,25 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedExtensionFragmentDeclaresItsNam
         ADD_FAILURE() << "[" << difference.category << "] " << difference.path << ": "
                       << difference.message;
     }
+}
+
+// Namespace scoping: an extension prefix declared on the element itself is
+// equivalent XML to one declared on an ancestor, so it must resolve the same way.
+// Reading `xsi:type` without pushing the child's own scope left the prefix
+// unresolvable, so the type missed the extension branch and the subtree was
+// dropped -- the same silent loss this preservation path exists to prevent.
+TEST(Sacm23RoundTrip, SACM23_COMPAT_002_LocallyDeclaredExtensionPrefixIsPreserved) {
+    const LoadResult loaded = sacm::io::load_xmi_string(kLocallyDeclaredExtensionDocument);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_EQ(loaded.document->roots().size(), 1u);
+
+    const sacm::io::SaveResult saved =
+        sacm::io::save_xmi_string(*loaded.document, sacm::io::SaveOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(saved.ok);
+    EXPECT_NE(saved.xml.find(R"(xsi:type="gsn:Context")"), std::string::npos)
+        << "the locally-declared extension subtree was dropped: " << saved.xml;
+    EXPECT_NE(saved.xml.find(R"(xmlns:gsn="http://scsc.acwg.gsn/2.0")"), std::string::npos)
+        << "the preserved fragment's prefix was not declared: " << saved.xml;
 }
 
 // Preserving on one save is not preserving: the loss shows up on the second
