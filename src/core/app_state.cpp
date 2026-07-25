@@ -33,6 +33,8 @@ bool AppState::load_file(const std::string& file_path) {
         library_document.reset();
         sacm_adapter::LoadOutcome outcome = sacm_adapter::load_document(file_path);
         if (!outcome.ok || outcome.document == nullptr) {
+            active_project_file_role = ProjectFileRole::Unknown;
+            active_project_file_path.clear();
             loaded_file_path.clear();
             has_unsaved_changes = false;
             loaded_case.reset();

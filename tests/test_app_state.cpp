@@ -131,11 +131,9 @@ TEST(AppStateTest, LoadFileUsesTheLibraryDocumentAsTheSourceOfTruth) {
     EXPECT_EQ(goal->content, "The system is acceptably safe.");
 }
 
-// When the library cannot read a file, load_file falls back to the legacy
-// parser and must keep that visible in the status message -- otherwise a
-// library gap goes silent whenever the save-support parse then succeeds. A
-// DOCTYPE triggers the library's XXE rejection while the legacy parser still
-// reads the file.
+// The SACM library is the sole load path (no legacy-parser fallback). A <!DOCTYPE>
+// triggers the library's XXE rejection, so such a file now fails to open cleanly
+// instead of being accepted by a less-strict legacy parser.
 TEST(AppStateTest, LoadFileRejectsDoctypeFileLibraryOnly) {
     TempDir temp(MakeTempDir());
     const std::filesystem::path sacm_path = temp.path / "doctype.sacm";
