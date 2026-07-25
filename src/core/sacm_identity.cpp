@@ -1,5 +1,7 @@
 #include "core/sacm_identity.h"
 
+#include "parser/model_utils.h"
+
 #include <algorithm>
 #include <chrono>
 #include <random>
@@ -107,26 +109,32 @@ std::string GenerateSacmGid() {
            HexGroup(rng, 12);
 }
 
-EnsureGidResult EnsureElementGid(parser::AssuranceCase& model,
-                                 sacm::AssuranceCasePackage* package,
-                                 parser::SacmElement& element,
-                                 std::string& error) {
-    error.clear();
-    if (!element.gid.empty())
-        return EnsureGidResult::AlreadyPresent;
-
+std::string GenerateUniqueElementGid(const parser::AssuranceCase& model) {
     std::unordered_set<std::string> gids = ExistingGids(model);
     std::string gid;
     do {
         gid = GenerateSacmGid();
     } while (gids.find(gid) != gids.end());
+    return gid;
+}
 
-    if (package && !SetPackageElementGid(*package, element.id, gid)) {
-        error = "Could not assign generated gid to the SACM model element.";
-        return EnsureGidResult::Failed;
+bool SetElementGid(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package,
+                   const std::string& element_id, const std::string& gid, std::string& error) {
+    error.clear();
+    parser::SacmElement* element = parser::FindElementById(model, element_id);
+    if (element == nullptr) {
+        error = "Could not find SACM model element '" + element_id + "' to assign a gid.";
+        return false;
     }
-    element.gid = gid;
-    return EnsureGidResult::Generated;
+    // Write the package first: if it fails, the model is left unchanged (the
+    // ICommand contract, and what the library bridge's scratch-then-reload relies
+    // on to reproduce the legacy result exactly).
+    if (package != nullptr && !SetPackageElementGid(*package, element_id, gid)) {
+        error = "Could not assign generated gid to the SACM model element.";
+        return false;
+    }
+    element->gid = gid;
+    return true;
 }
 
 } // namespace core

@@ -26,6 +26,7 @@
 #include "core/commands/acp_commands.h"
 #include "core/commands/command_bus.h"
 #include "core/commands/element_commands.h"
+#include "core/commands/gid_commands.h"
 #include "core/commands/terminology_commands.h"
 #include "core/commands/tree_commands.h"
 #include "core/derived_views.h"
@@ -553,6 +554,50 @@ TEST(LibraryPrimaryEditFlip, TreeDropMatchesLegacyCanonicalHash) {
     };
     run(*library_side);
     run(*legacy_side);
+
+    EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
+}
+
+// (2h) Assigning a SACM gid to an element that lacks one is library-primary via
+// the bridge, reproducing the legacy in-place SetElementGid exactly. The gid is
+// RANDOM, so a fresh command per side would mint two different values and could
+// not converge; instead ONE command instance is reused across both routings so it
+// forces the SAME recorded gid on each (the "generated ONCE" contract). Create a
+// solution (no gid), assign a gid library-primary vs legacy, and converge on the
+// canonical hash -- gids contribute to that hash, so equality proves the routings
+// agree on the assigned gid.
+TEST(LibraryPrimaryEditFlip, GidAssignmentMatchesLegacyCanonicalHash) {
+    std::unique_ptr<EditFixture> library_side = MakeFixture("gid_library", /*library_backed=*/true);
+    std::unique_ptr<EditFixture> legacy_side = MakeFixture("gid_legacy", /*library_backed=*/false);
+    ASSERT_NE(library_side->document, nullptr);
+    ASSERT_EQ(legacy_side->document, nullptr);
+
+    // Create the gid-less element on both sides (deterministic ids, so the same id).
+    const auto create_solution = [](EditFixture& fixture) -> std::string {
+        core::commands::CommandContext ctx = MakeContext(fixture);
+        core::commands::CreateChildElementCommand add_solution("G1", core::NewElementKind::Solution);
+        EXPECT_TRUE(RunCommand(fixture, add_solution, ctx).success);
+        const parser::SacmElement* created = FindElement(fixture.model, add_solution.GeneratedId());
+        EXPECT_NE(created, nullptr);
+        if (created != nullptr)
+            EXPECT_TRUE(created->gid.empty()) << "a freshly created element unexpectedly has a gid";
+        return add_solution.GeneratedId();
+    };
+    const std::string library_solution = create_solution(*library_side);
+    const std::string legacy_solution = create_solution(*legacy_side);
+    ASSERT_EQ(library_solution, legacy_solution);
+
+    // ONE command instance drives BOTH routings so it forces the same generated gid.
+    core::commands::EnsureElementGidCommand assign_gid(library_solution);
+
+    core::commands::CommandContext library_ctx = MakeContext(*library_side);
+    ASSERT_TRUE(RunCommand(*library_side, assign_gid, library_ctx).success);
+    EXPECT_TRUE(library_ctx.library_primary) << "the gid assignment did not flip to the library";
+    ASSERT_FALSE(assign_gid.GeneratedGid().empty());
+
+    core::commands::CommandContext legacy_ctx = MakeContext(*legacy_side);
+    ASSERT_TRUE(RunCommand(*legacy_side, assign_gid, legacy_ctx).success);
+    EXPECT_FALSE(legacy_ctx.library_primary) << "the legacy side unexpectedly flipped";
 
     EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
 }

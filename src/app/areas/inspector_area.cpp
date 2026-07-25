@@ -2,13 +2,14 @@
 
 #include "app/app_runtime_state.h"
 #include "app/areas/audit_data_cache.h"
+#include "app/commands/dispatch.h"
 #include "app/confidence_problem_sync.h"
 #include "app/frame/app_layout_regions.h"
 #include "core/audit/audit_baseline.h"
 #include "core/audit/audit_diff.h"
 #include "core/audit/event_store.h"
+#include "core/commands/gid_commands.h"
 #include "core/confidence/confidence_store.h"
-#include "core/sacm_identity.h"
 #include "ui/i18n/localization.h"
 #include "ui/panels/acp_panel.h"
 #include "ui/panels/element_panel.h"
@@ -118,19 +119,24 @@ void RenderInspectorArea(AppRuntimeState& state,
             }
             bool generated_gid = false;
             if (element.gid.empty()) {
-                if (!loaded_case || !sacm_package) {
+                if (!loaded_case) {
                     state.events.Emit(
                         StatusMessageEvent{AF_TR("Could not assign a SACM gid for confidence storage.")});
                     return false;
                 }
-                std::string error;
-                const core::EnsureGidResult gid_result =
-                    core::EnsureElementGid(*loaded_case, sacm_package, element, error);
-                if (gid_result == core::EnsureGidResult::Failed) {
-                    state.events.Emit(StatusMessageEvent{ui::i18n::trf("Confidence save failed: {0}", error)});
+                core::commands::EnsureElementGidCommand cmd(element.id);
+                const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(state, cmd);
+                if (!outcome.success) {
+                    state.events.Emit(StatusMessageEvent{ui::i18n::trf(
+                        "Confidence save failed: {0}",
+                        outcome.error.empty() ? std::string("could not assign a SACM gid") : outcome.error)});
                     return false;
                 }
-                generated_gid = gid_result == core::EnsureGidResult::Generated;
+                // Set the gid on the LIVE element so UpsertElementConfidence can key by
+                // it this frame; the library-primary command set it in the library and
+                // the frame-boundary re-derive re-projects the same gid.
+                element.gid = cmd.GeneratedGid();
+                generated_gid = true;
             }
             std::string error;
             if (!state.confidence_controller->UpsertElementConfidence(element, confidence, error)) {

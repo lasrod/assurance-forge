@@ -29,6 +29,7 @@ add_library(af_core OBJECT
     commands/acp_commands.cpp
     commands/command_bus.cpp
     commands/element_commands.cpp
+    commands/gid_commands.cpp
     commands/library_bridge.cpp
     library_package_projection.cpp
     commands/package_commands.cpp
