@@ -24,6 +24,9 @@ private:
     void RenderPreferencesWindow();
     void RenderNotImplementedModal();
     void RenderRemoveConfirmModal();
+    // The library-backed part of the remove confirmation: what else this
+    // delete reaches (SACM23-INT-002).
+    void RenderRemovalPreview();
     void RenderDeleteReviewItemConfirmModal();
     void RenderStartupProjectWindow();
     void RenderCreateProjectModal();

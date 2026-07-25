@@ -121,6 +121,10 @@ struct Reader {
         metadata::namespaces::StandardVersion::Unknown;
     std::uint64_t generated_counter = 0;
     std::unordered_set<std::string> used_ids;
+    // Ids found inside subtrees kept as preserved compatibility content. They
+    // never enter the element index, so without this a reference to one is
+    // indistinguishable from a reference to nothing (SACM23-COMPAT-002).
+    std::unordered_set<ElementId> preserved_element_ids;
 
     bool strict() const { return mode == Mode::Strict; }
 
@@ -779,12 +783,68 @@ bool attach_child(Reader& reader, SACMElement& parent, std::unique_ptr<SACMEleme
 // read_xsi_type has already reported the type as an error there, and strict
 // output carries no compatibility content (SACM23-XMI-004), so the load fails
 // rather than the element being written back without it.
+// Records every id inside a preserved subtree. Those elements never reach the
+// index, so a relationship endpoint naming one would otherwise look dangling --
+// reporting an intact argument as broken purely because we could not type one
+// of its elements.
+void collect_preserved_ids(Reader& reader, const pugi::xml_node& node) {
+    for (const pugi::xml_attribute& attr : node.attributes()) {
+        const std::string_view name = attr.name();
+        if (local_name(name) != "id" || name.starts_with("xmlns")) {
+            continue;
+        }
+        // Only the XMI serialization identity counts. Matching any attribute
+        // whose local name happens to be "id" would let a vendor's own
+        // `acme:id` downgrade a genuinely dangling SACM reference from
+        // SACM-REF-001 to SACM-REF-003 -- masking a broken document on the
+        // strength of an unrelated attribute that shares a spelling.
+        //
+        // `is_xmi_namespace` rather than a comparison against the pinned URI:
+        // it also accepts the older `http://www.omg.org/XMI`, which is what the
+        // EMF dialects in the interop corpus actually declare. Comparing
+        // exactly made preserved-element identity depend on the prefix
+        // happening to be spelled `xmi`, reinstating the false
+        // "structurally broken" failure for any EMF file that spells it
+        // otherwise.
+        const std::string_view prefix = prefix_of(name);
+        if (!prefix.empty()) {
+            const std::string uri = reader.resolve_prefix(prefix);
+            // An UNDECLARED `xmi:` prefix is accepted on its spelling -- that is
+            // the conventional form and plenty of real files never declare it.
+            // A DECLARED one must resolve to an XMI namespace, so a document
+            // that rebinds `xmlns:xmi` to something else cannot confer
+            // serialization identity on its own terms. Accepting the spelling
+            // unconditionally would let such a document downgrade a genuinely
+            // dangling reference to SACM-REF-003, which is the same masking the
+            // prefix check exists to prevent.
+            const bool is_xmi_identity = uri.empty()
+                                             ? prefix == "xmi"
+                                             : metadata::namespaces::is_xmi_namespace(uri);
+            if (!is_xmi_identity) {
+                continue;
+            }
+        }
+        if (attr.value() != nullptr && *attr.value() != '\0') {
+            reader.preserved_element_ids.insert(ElementId{attr.value()});
+        }
+        break;
+    }
+    for (const pugi::xml_node& child : node.children()) {
+        if (child.type() == pugi::node_element) {
+            collect_preserved_ids(reader, child);
+        }
+    }
+}
+
 void preserve_extension_subtree(Reader& reader, SACMElement& parent, const pugi::xml_node& node,
-                                std::string_view type_name) {
+                                std::string_view type_name, std::string_view role,
+                                std::size_t role_index) {
     if (reader.strict()) {
         return;
     }
-    Access::preserved_content(parent).push_back(node_to_string(node));
+    Access::preserved_content(parent).push_back(model::PreservedFragment{
+        .xml = node_to_string(node), .role = std::string(role), .index = role_index});
+    collect_preserved_ids(reader, node);
     reader.report(validation::codes::kXmiUnknownElement, Severity::Warning, "SACM23-COMPAT-002",
                   node, {parent.id()},
                   std::format("element '{}' with xsi:type '{}' preserved as compatibility content "
@@ -795,7 +855,8 @@ void preserve_extension_subtree(Reader& reader, SACMElement& parent, const pugi:
 // Handles a containment child whose concrete kind must be resolved from
 // xsi:type, the role's declared type, or (tolerant) the class name.
 void read_containment_child(Reader& reader, SACMElement& parent, const pugi::xml_node& node,
-                            std::optional<ElementKind> declared_kind) {
+                            std::optional<ElementKind> declared_kind, std::string_view role,
+                            std::size_t role_index) {
     std::optional<ElementKind> kind;
     // Resolve `xsi:type` under the CHILD's own namespace scope: a document may
     // declare the xsi or the extension prefix on this element rather than on an
@@ -811,7 +872,7 @@ void read_containment_child(Reader& reader, SACMElement& parent, const pugi::xml
         // Not a fall-through to name-based inference: the element name here is
         // the abstract role ("argumentElement"), which is no class name, so
         // inference would fail and the subtree would be dropped.
-        preserve_extension_subtree(reader, parent, node, xsi_type.type_name);
+        preserve_extension_subtree(reader, parent, node, xsi_type.type_name, role, role_index);
         return;
     }
     if (xsi_type.resolved()) {
@@ -1563,6 +1624,13 @@ void populate(Reader& reader, SACMElement& element, const pugi::xml_node& node) 
     }
 
     // Containment children.
+    //
+    // Counted per role as the source spells them, because a preserved fragment
+    // has to be re-emitted in the slot it occupied: the EMF dialect addresses
+    // siblings by position, so appending it instead would renumber everything
+    // after it. Typed and preserved children share one counter -- the writer
+    // re-interleaves them into a single sequence.
+    std::unordered_map<std::string, std::size_t> next_role_index;
     for (const pugi::xml_node& child : node.children()) {
         if (child.type() != pugi::node_element) {
             continue;
@@ -1571,6 +1639,7 @@ void populate(Reader& reader, SACMElement& element, const pugi::xml_node& node) 
         if (is_common_role(role) || is_reference_role(element, role)) {
             continue;
         }
+        const std::size_t role_index = next_role_index[std::string(role)]++;
         if (const std::optional<ElementKind> declared = containment_role_kind(element, role)) {
             // Concrete declared type; xsi:type may still refine to a subtype.
             reader.push_scope(child);
@@ -1581,7 +1650,8 @@ void populate(Reader& reader, SACMElement& element, const pugi::xml_node& node) 
                 // xsi:type says the element is something the declared class
                 // cannot represent, so falling back to it would silently coerce
                 // the element into an unrelated class.
-                preserve_extension_subtree(reader, element, child, xsi_type.type_name);
+                preserve_extension_subtree(reader, element, child, xsi_type.type_name, role,
+                                           role_index);
                 continue;
             }
             std::optional<ElementKind> kind = declared;
@@ -1607,7 +1677,7 @@ void populate(Reader& reader, SACMElement& element, const pugi::xml_node& node) 
             continue;
         }
         if (is_abstract_containment_role(element, role)) {
-            read_containment_child(reader, element, child, std::nullopt);
+            read_containment_child(reader, element, child, std::nullopt, role, role_index);
             continue;
         }
         // Tolerant fallback: element name is a class name (repo fixtures).
@@ -1638,7 +1708,13 @@ void populate(Reader& reader, SACMElement& element, const pugi::xml_node& node) 
         } else {
             // Never silently dropped: preserved verbatim; compat save
             // re-emits it, strict save refuses (SACM-XMI-006).
-            Access::preserved_content(element).push_back(node_to_string(child));
+            //
+            // No role is recorded: the element's name is not a containment role
+            // the writer emits, so there is no sibling sequence to hold a slot
+            // in and the fragment can only be appended.
+            Access::preserved_content(element).push_back(
+                model::PreservedFragment{.xml = node_to_string(child), .role = {}, .index = 0});
+            collect_preserved_ids(reader, child);
             reader.report(validation::codes::kXmiUnknownElement, Severity::Warning,
                           "SACM23-COMPAT-001", child, {element.id()},
                           std::format("unknown element '{}' under {} preserved as "
@@ -1686,6 +1762,53 @@ void check_root_namespace(Reader& reader, const pugi::xml_node& root) {
     }
 }
 
+// The SACM interchange-package kind a node denotes, if any. Tries xsi:type, the
+// element's own name, and the singular of a plural containment role -- real
+// containers spell the role `assuranceCasePackages` for a list of them.
+std::optional<ElementKind> interchange_package_kind(Reader& reader, const pugi::xml_node& node) {
+    const auto package_kind = [](std::optional<ElementKind> kind) -> std::optional<ElementKind> {
+        if (kind.has_value() && metadata::is_package_kind(*kind)) {
+            return kind;
+        }
+        return std::nullopt;
+    };
+
+    reader.push_scope(node);
+    const XsiTypeResult xsi_type = read_xsi_type(reader, node);
+    reader.pop_scope();
+    if (xsi_type.resolved()) {
+        if (const std::optional<ElementKind> kind =
+                package_kind(detail::kind_from_class_name_ci(xsi_type.type_name))) {
+            return kind;
+        }
+    }
+
+    const std::string_view name = local_name(node.name());
+    if (const std::optional<ElementKind> kind = package_kind(detail::kind_from_class_name_ci(name))) {
+        return kind;
+    }
+    if (name.size() > 1 && name.back() == 's') {
+        return package_kind(detail::kind_from_class_name_ci(name.substr(0, name.size() - 1)));
+    }
+    return std::nullopt;
+}
+
+// Collects the OUTERMOST SACM interchange packages inside a foreign container,
+// without descending into one once found (its contents are the reader's job).
+void collect_embedded_packages(Reader& reader, const pugi::xml_node& node,
+                               std::vector<pugi::xml_node>& out) {
+    for (const pugi::xml_node& child : node.children()) {
+        if (child.type() != pugi::node_element) {
+            continue;
+        }
+        if (interchange_package_kind(reader, child).has_value()) {
+            out.push_back(child);
+            continue;
+        }
+        collect_embedded_packages(reader, child, out);
+    }
+}
+
 // Reads one root element into the document.
 void read_root(Reader& reader, model::Document& document, const pugi::xml_node& root) {
     reader.push_scope(root);
@@ -1707,14 +1830,56 @@ void read_root(Reader& reader, model::Document& document, const pugi::xml_node& 
                                   xsi_type.type_name, local_name(root.name())));
     }
     if (!kind.has_value()) {
-        kind = reader.strict() ? detail::kind_from_class_name(local_name(root.name()))
-                               : detail::kind_from_class_name_ci(local_name(root.name()));
+        const std::string_view name = local_name(root.name());
+        kind = reader.strict() ? detail::kind_from_class_name(name)
+                               : detail::kind_from_class_name_ci(name);
+        // A multi-valued containment role is spelled plural in real containers:
+        // an ODE DDIPackage holds its assurance case under `assuranceCasePackages`.
+        // Without this the reader descends past that element into the argument
+        // package inside it, silently dropping the AssuranceCasePackage level.
+        if (!kind.has_value() && !reader.strict() && name.size() > 1 && name.back() == 's') {
+            kind = detail::kind_from_class_name_ci(name.substr(0, name.size() - 1));
+        }
     }
     reader.pop_scope();
 
     const bool valid_root =
         kind.has_value() && metadata::is_package_kind(*kind);
     if (!valid_root) {
+        // Real toolchains ship SACM embedded in a larger container -- an ODE
+        // DDIPackage carrying architecture and failure-logic models alongside
+        // the assurance case. Strict refuses such a file, but refusing it on the
+        // tolerant path too would mean a user with a real vendor file simply
+        // cannot open their own assurance case.
+        //
+        // So read the SACM out of it and be explicit about what that costs: the
+        // file is not a conformant SACM interchange document, the container's
+        // non-SACM content is not represented in the model, and a save produces
+        // conformant SACM rather than the original container. Silence here would
+        // be the worst option -- the user would see their argument load and have
+        // no reason to expect the rest of the file to disappear on save.
+        if (!reader.strict()) {
+            std::vector<pugi::xml_node> embedded;
+            collect_embedded_packages(reader, root, embedded);
+            if (!embedded.empty()) {
+                reader.report(
+                    validation::codes::kXmiForeignContainerRoot, Severity::Warning,
+                    "SACM23-COMPAT-002", root, {},
+                    std::format(
+                        "'{}' is not a SACM interchange package root; {} SACM package(s) were read "
+                        "from inside it. This file does not conform to SACM 2.3 as an interchange "
+                        "document: content outside the SACM packages is NOT represented in the "
+                        "model, and saving will write a conformant SACM document rather than the "
+                        "original container",
+                        root.name(), embedded.size()));
+                for (const pugi::xml_node& package : embedded) {
+                    reader.push_scope(package);
+                    read_root(reader, document, package);
+                    reader.pop_scope();
+                }
+                return;
+            }
+        }
         reader.report(validation::codes::kXmiInvalidRoot, Severity::Error, "SACM23-XMI-001", root,
                       {},
                       std::format("'{}' is not a SACM interchange package root", root.name()));
@@ -1757,19 +1922,39 @@ void check_references(Reader& reader, const model::Document& document) {
     document.for_each_element([&](const SACMElement& element) {
         model::traverse::for_each_reference(
             element, [&](const model::traverse::ReferenceUse& use) {
-                if (document.find(*use.target) == nullptr) {
+                if (document.find(*use.target) != nullptr) {
+                    return;
+                }
+                // An endpoint naming an element we preserved verbatim is not a
+                // broken reference: the target is in the file, we just could not
+                // type it. Saying "missing" there would report an intact
+                // argument as malformed, and at Error severity it would fail
+                // every GSN document containing so much as a Context.
+                if (document.has_preserved_element(*use.target)) {
                     reader.diagnostics.push_back(Diagnostic{
-                        .code = std::string(validation::codes::kRefDangling),
-                        .severity = reader.mode_severity(),
-                        .requirement_id = "SACM23-XMI-003",
+                        .code = std::string(validation::codes::kRefPreservedTarget),
+                        .severity = Severity::Warning,
+                        .requirement_id = "SACM23-COMPAT-002",
                         .operation = "",
                         .affected = {element.id(), *use.target},
                         .location = std::nullopt,
-                        .message = std::format("'{}' references ({}) missing element '{}'",
-                                               element.id().value(), use.role,
-                                               use.target->value()),
+                        .message = std::format(
+                            "'{}' references ({}) '{}', which was preserved as compatibility "
+                            "content and therefore cannot be type-checked",
+                            element.id().value(), use.role, use.target->value()),
                     });
+                    return;
                 }
+                reader.diagnostics.push_back(Diagnostic{
+                    .code = std::string(validation::codes::kRefDangling),
+                    .severity = reader.mode_severity(),
+                    .requirement_id = "SACM23-XMI-003",
+                    .operation = "",
+                    .affected = {element.id(), *use.target},
+                    .location = std::nullopt,
+                    .message = std::format("'{}' references ({}) missing element '{}'",
+                                           element.id().value(), use.role, use.target->value()),
+                });
             });
     });
 }
@@ -1875,6 +2060,9 @@ LoadResult load_impl(std::string_view xml, std::string source_file, const LoadOp
     }
 
     build_index(reader, document);
+    // Must precede check_references: it is what lets a reference into preserved
+    // content be told apart from a reference to nothing.
+    Access::preserved_element_ids(document) = reader.preserved_element_ids;
     check_references(reader, document);
 
     result.diagnostics = std::move(reader.diagnostics);

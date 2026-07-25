@@ -4,6 +4,12 @@
 // command layer and the XMI reader mutate documents exclusively through
 // this struct, keeping "mutation only via Document::apply or load"
 // mechanically enforced at the public API.
+//
+// One further writer: `sacm::compat::adopt_preserved_content`. It is part of
+// the load-side story -- it restores content a load produced onto a document a
+// client rebuilt from a lossy intermediate -- and its contract is narrow:
+// compatibility content only, never the typed model. See the note in
+// `sacm/model/document.h`.
 
 #include "sacm/model/assurance_case.h"
 #include "sacm/model/document.h"
@@ -27,7 +33,7 @@ struct Access {
     static std::vector<std::string>& preserved_attributes(model::SACMElement& e) {
         return e.preserved_attributes_;
     }
-    static std::vector<std::string>& preserved_content(model::SACMElement& e) {
+    static std::vector<model::PreservedFragment>& preserved_content(model::SACMElement& e) {
         return e.preserved_content_;
     }
 
@@ -191,6 +197,9 @@ struct Access {
     }
     static std::map<std::string, std::string>& foreign_namespaces(model::Document& d) {
         return d.foreign_namespaces_;
+    }
+    static std::unordered_set<model::ElementId>& preserved_element_ids(model::Document& d) {
+        return d.preserved_element_ids_;
     }
     static std::uint64_t& revision(model::Document& d) { return d.revision_; }
 };

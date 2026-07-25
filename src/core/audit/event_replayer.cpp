@@ -11,6 +11,7 @@
 #include "core/commands/tree_commands.h"
 #include "core/element_factory.h"
 #include "core/tree_editing.h"
+#include "core/commands/library_bridge.h"
 #include "core/library_package_projection.h"
 #include "core/reviews/review_proposal.h"
 #include "core/reviews/review_proposal_patch_service.h"
@@ -112,15 +113,16 @@ using BridgeMutator =
 
 bool BridgeViaLegacy(sacm_adapter::LibraryDocument& document, const std::string& location,
                      const BridgeMutator& mutate, std::string& out_error) {
-    parser::AssuranceCase      model   = sacm_adapter::project_case(document);
-    sacm::AssuranceCasePackage package = core::project_library_package(document);
-    if (!mutate(model, package, out_error))
-        return false;
-    if (!sacm_adapter::reload_document(document, sacm::serialize_sacm(package))) {
-        out_error = "Bridge re-derive (reload_document) failed at " + location;
-        return false;
-    }
-    return true;
+    // Delegates rather than duplicating. This WAS a second copy of
+    // `core::commands::BridgeLegacyMutationToLibrary`, and the copy is what made
+    // fixing the live path insufficient: the live bridge stopped dropping vendor
+    // content while this one carried the defect onto the RESTORE path, where a
+    // recovery rebuilt the document through the tag-less audit projection and
+    // silently destroyed every Assurance Claim Point -- reporting no degradation,
+    // because the canonical hash drops the same tags on both sides and cannot see
+    // it. Restore-from-audit losing data is precisely what the audit subsystem
+    // exists to prevent. One implementation now, so the two cannot drift again.
+    return core::commands::BridgeLegacyMutationToLibrary(document, mutate, out_error, location);
 }
 
 bool ApplyEvent(ReplayState& state,

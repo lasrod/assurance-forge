@@ -185,10 +185,61 @@ struct DeleteOutcome {
     std::vector<LoadDiagnostic> diagnostics;
 };
 
-// Deletes a single element and the relationships that reference it, the
-// primitive `core::RemoveElement` composes. Uses the library's
-// DeleteReferencingRelationships policy so no relationship is left dangling --
-// matching the legacy helper, which drops relationships that become empty.
+// One consequence of a delete, flattened to strings for the UI.
+//
+// `deleted == false` means the element SURVIVES but is changed -- a
+// relationship scrubbed of a deleted endpoint that still has a source and a
+// target. That distinction is the point of showing a preview at all: "your
+// strategy's inference loses one of its three sub-goals" and "your strategy's
+// inference disappears" are different outcomes and the user has to be able to
+// tell them apart before confirming.
+struct DeleteEffect {
+    std::string element_id;
+    std::string kind;  // SACM class name ("Claim", "AssertedInference", ...)
+    std::string name;  // display name; empty when the element has none
+    bool is_relationship = false;
+    bool deleted = true;
+};
+
+// What deleting a set of elements would do. `requested` are the effects on the
+// elements the caller named; `consequential` are everything else the delete
+// drags with it -- the part a user cannot predict and the reason this exists.
+struct DeletePreview {
+    bool supported = true;
+    // False when the library would refuse the delete outright; `diagnostics`
+    // say why. Advisory: the legacy removal path is still authoritative for
+    // applying, so a caller shows this rather than blocking on it.
+    bool can_apply = false;
+    std::vector<DeleteEffect> requested;
+    std::vector<DeleteEffect> consequential;
+    std::vector<LoadDiagnostic> diagnostics;
+};
+
+// Computes what deleting `element_ids` would do, leaving `document` untouched
+// (SACM23-INT-002).
+//
+// The deletes are modelled on a scratch copy of the document rather than
+// element-by-element against the live one, because the consequences of deleting
+// a SET are not the union of the consequences of deleting each member: under
+// ScrubReferences an inference with three sources survives losing any one of
+// them but dies when all three go. Previewing individually would understate the
+// damage, which is the one direction a delete confirmation must never err in.
+//
+// Uses the same policy as `apply_delete_element` (ScrubReferences), so the
+// preview describes the operation the caller will actually perform. Ids that do
+// not resolve are skipped rather than reported: the caller's removal plan is
+// computed over the app's GSN projection, which legitimately contains ids with
+// no library counterpart.
+DeletePreview preview_delete_elements(const LibraryDocument& document,
+                                      const std::vector<std::string>& element_ids);
+
+// Deletes a single element and scrubs it out of the relationships that
+// reference it, the primitive `core::RemoveElement` composes. Uses the
+// library's ScrubReferences policy: a referencing relationship is scrubbed of
+// the deleted element and dropped only once that leaves it structurally invalid
+// under SACM multiplicity -- matching the legacy helper's scrub-then-drop. It
+// is NOT DeleteReferencingRelationships, which would cascade away a strategy's
+// shared inference when one of several sub-goals is removed.
 //
 // This is the single-element building block. For a *leaf* it reproduces
 // `RemoveElement` in either mode (they coincide when there are no children).

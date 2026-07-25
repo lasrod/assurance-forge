@@ -1,0 +1,7 @@
+# These files are redistributed verbatim under someone else's licence, and
+# NOTICE.md states they are byte-for-byte as published. Git's line-ending
+# conversion would rewrite them on checkout, quietly making that claim false and
+# breaking the sha256 anyone verifying the attribution would compute.
+#
+# -text disables all conversion. Do not remove.
+* -text

@@ -5,6 +5,7 @@
 
 #include "sacm/commands/mutation.h"
 #include "sacm/commands/operations.h"
+#include "sacm/io/xmi.h"
 #include "sacm/metadata/element_kind.h"
 #include "sacm/model/argumentation.h"
 #include "sacm/model/assurance_case.h"
@@ -19,6 +20,7 @@
 #include <cstddef>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -735,6 +737,135 @@ DeleteOutcome apply_delete_element(LibraryDocument& document, const std::string&
         });
     }
     return outcome;
+}
+
+DeletePreview preview_delete_elements(const LibraryDocument& document,
+                                      const std::vector<std::string>& element_ids) {
+    DeletePreview preview;
+    preview.supported = true;
+
+    const sacm::model::Document& live = LibraryDocumentAccess::document(document);
+
+    // The deletes are modelled on a scratch copy so the live document is never
+    // touched and the effects compose. Round-tripping through the serializer is
+    // how a copy is made at all -- Document is move-only by design, and the
+    // tolerant mode keeps preserved compatibility content so the scratch is a
+    // faithful stand-in rather than a stripped one.
+    const sacm::io::SaveResult serialized =
+        sacm::io::save_xmi_string(live, sacm::io::SaveOptions{.mode = sacm::io::Mode::Tolerant});
+    if (!serialized.ok) {
+        preview.supported = false;
+        preview.diagnostics.push_back(LoadDiagnostic{
+            .code = "AF-PREVIEW-001",
+            .severity = "Warning",
+            .message = "could not build a preview: the document did not serialize",
+        });
+        return preview;
+    }
+    sacm::io::LoadResult scratch = sacm::io::load_xmi_string(serialized.xml);
+    if (!scratch.document.has_value()) {
+        preview.supported = false;
+        preview.diagnostics.push_back(LoadDiagnostic{
+            .code = "AF-PREVIEW-001",
+            .severity = "Warning",
+            .message = "could not build a preview: the document did not reload",
+        });
+        return preview;
+    }
+
+    // Names have to be captured before anything is deleted -- afterwards the
+    // elements they belong to are gone.
+    std::unordered_map<std::string, std::string> names;
+    scratch.document->for_each_element([&names](const sacm::model::SACMElement& element) {
+        if (const auto* named = dynamic_cast<const sacm::model::ModelElement*>(&element)) {
+            names.emplace(element.id().value(), named->name().content);
+        }
+    });
+
+    const std::unordered_set<std::string> requested_ids(element_ids.begin(), element_ids.end());
+    std::unordered_set<std::string> reported;
+    bool any_applied = false;
+
+    // Utility elements (clause 8.7: Description/ImplementationConstraint/Note/
+    // TaggedValue) are attachments, not things in their own right. They are
+    // deleted with their owner, and the owner is already in the list -- listing
+    // them separately turns "this goal and its inference" into a dozen rows of
+    // internal bookkeeping and buries the consequence that matters.
+    const auto is_attachment = [](sacm::metadata::ElementKind kind) {
+        return kind == sacm::metadata::ElementKind::Description ||
+               kind == sacm::metadata::ElementKind::ImplementationConstraint ||
+               kind == sacm::metadata::ElementKind::Note ||
+               kind == sacm::metadata::ElementKind::TaggedValue;
+    };
+
+    const auto record = [&](const sacm::commands::ChangeRecord& change) {
+        if (is_attachment(change.kind)) {
+            return;
+        }
+        const std::string id = change.id.value();
+        // A relationship can be touched by several deletes in the set; report
+        // each element once, and let an outright deletion win over a scrub
+        // recorded for the same element earlier in the sequence.
+        const bool deleted = change.change == sacm::commands::ChangeRecord::Change::Deleted ||
+                             change.change ==
+                                 sacm::commands::ChangeRecord::Change::RelationshipDeleted;
+        if (!reported.insert(id).second) {
+            std::vector<DeleteEffect>& bucket =
+                requested_ids.contains(id) ? preview.requested : preview.consequential;
+            for (DeleteEffect& existing : bucket) {
+                if (existing.element_id == id && deleted) {
+                    existing.deleted = true;
+                }
+            }
+            return;
+        }
+        const auto name = names.find(id);
+        DeleteEffect effect{
+            .element_id = id,
+            .kind = std::string(sacm::metadata::kind_name(change.kind)),
+            .name = name != names.end() ? name->second : std::string{},
+            .is_relationship =
+                change.change == sacm::commands::ChangeRecord::Change::RelationshipDeleted ||
+                sacm::metadata::is_asserted_relationship_kind(change.kind) ||
+                change.kind == sacm::metadata::ElementKind::ArtifactAssetRelationship,
+            .deleted = deleted,
+        };
+        if (requested_ids.contains(id)) {
+            preview.requested.push_back(std::move(effect));
+        } else {
+            preview.consequential.push_back(std::move(effect));
+        }
+    };
+
+    for (const std::string& element_id : element_ids) {
+        const sacm::model::ElementId id{element_id};
+        if (scratch.document->find(id) == nullptr) {
+            // Not a library element (or already removed as a consequence of an
+            // earlier delete in this set). Both are ordinary, not errors.
+            continue;
+        }
+        const sacm::commands::MutationResult result =
+            scratch.document->apply(sacm::commands::DeleteElement{
+                .target = id,
+                // Same policy as apply_delete_element, or the preview would
+                // describe an operation the caller never performs.
+                .reference_policy = sacm::commands::ReferenceDeletePolicy::ScrubReferences,
+            });
+        any_applied = any_applied || result.applied;
+        for (const sacm::commands::ChangeRecord& change : result.changes) {
+            record(change);
+        }
+        for (const sacm::validation::Diagnostic& diagnostic : result.diagnostics) {
+            preview.diagnostics.push_back(LoadDiagnostic{
+                .code = diagnostic.code,
+                .severity = std::string(sacm::validation::severity_name(diagnostic.severity)),
+                .message = diagnostic.message,
+            });
+        }
+    }
+
+    preview.can_apply = any_applied;
+    return preview;
 }
 
 DeleteOutcome apply_delete_package(LibraryDocument& document, const std::string& package_id) {

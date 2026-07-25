@@ -21,6 +21,29 @@ namespace sacm::model {
 
 using metadata::ElementKind;
 
+// A child element a tolerant load kept verbatim because it could not be typed
+// (clause-foreign vendor content, or an extension type whose SACM supertype is
+// abstract). `role` and `index` record where it sat among its siblings in the
+// source document.
+//
+// The position is not cosmetic. The EMF dialect addresses elements by
+// containment position rather than by id
+// (source="//@argumentPackage.0/@argumentationElement.18"), so re-emitting a
+// fragment out of position renumbers every sibling that followed it and
+// silently repoints any positional reference into that package.
+struct PreservedFragment {
+    // Verbatim source XML of the child element, including its subtree.
+    std::string xml;
+    // Normalized containment role the fragment occupied, spelled as the writer
+    // spells it ("argumentElement"). Empty when the fragment is not a
+    // containment child of any role the writer emits -- unknown vendor
+    // elements -- in which case it can only be appended.
+    std::string role;
+    // 0-based position among that role's children in the source, counting
+    // preserved and typed siblings alike.
+    std::size_t index = 0;
+};
+
 // Abstract base of every identifiable SACM element (clause 8.2).
 // Identity: `id` is the XMI serialization identity (xmi:id); `gid` is SACM's
 // optional model-global identifier.
@@ -45,10 +68,11 @@ class SACMElement {
     // Containment parent; nullptr for document roots.
     const SACMElement* parent() const { return parent_; }
 
-    // Raw XML of unknown (vendor-extension) child elements kept by tolerant
-    // loads. Never silently dropped: strict save refuses documents carrying
-    // preserved content (SACM-XMI-006); compatibility save re-emits it.
-    const std::vector<std::string>& preserved_content() const { return preserved_content_; }
+    // Unknown (vendor-extension) child elements kept verbatim by tolerant
+    // loads, with the sibling position each occupied. Never silently dropped:
+    // strict save refuses documents carrying preserved content (SACM-XMI-006);
+    // compatibility save re-emits each fragment in its recorded position.
+    const std::vector<PreservedFragment>& preserved_content() const { return preserved_content_; }
 
     // Vendor-extension attributes (those in a foreign namespace) kept by
     // tolerant loads, as `name="value"` fragments. Held separately from
@@ -71,7 +95,7 @@ class SACMElement {
     bool is_abstract_ = false;
     std::optional<ElementId> cited_element_;
     std::optional<ElementId> abstract_form_;
-    std::vector<std::string> preserved_content_;
+    std::vector<PreservedFragment> preserved_content_;
     std::vector<std::string> preserved_attributes_;
     SACMElement* parent_ = nullptr;
 };

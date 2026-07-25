@@ -1,0 +1,647 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assuranceCase_:AssuranceCasePackage xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:assuranceCase_="http://omg.sacm/2.2/assurancecase" xmlns:base_="http://omg.sacm/2.2/base" xmlns:gsn_="http://acwg.org/3.0/gsn">
+  <argumentPackage xsi:type="gsn_:Module">
+    <name lang="lang" content="name"/>
+    <description>
+      <content>
+        <value lang="language" content="Description"/>
+      </content>
+    </description>
+    <implementationConstraint>
+      <content>
+        <value lang="language" content="null"/>
+        <value lang="language" content="null"/>
+      </content>
+    </implementationConstraint>
+    <argumentationElement xsi:type="gsn_:Goal">
+      <name lang="lang" content="G1"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="English" content="Control System is acceptably safe to operate"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Context">
+      <name lang="lang" content="C2"/>
+      <description>
+        <content>
+          <value lang="English" content="Control System Definition"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Justification">
+      <name lang="lang" content="J1"/>
+      <description>
+        <content>
+          <value lang="English" content="SIL apportionment is correct and complete&#x9;"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Assumption">
+      <name lang="lang" content="A1"/>
+      <description>
+        <content>
+          <value lang="English" content="All hazards have been identified"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Strategy">
+      <name lang="lang" content="S1"/>
+      <description>
+        <content>
+          <value lang="English" content="Argument over each identified hazard"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Solution">
+      <name lang="lang" content="Sn1"/>
+      <description>
+        <content>
+          <value lang="English" content="Formal Verification"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Goal">
+      <name lang="lang" content="G2"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="English" content="All identified hazards have been eliminated or sufficiently mitigated"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Goal">
+      <name lang="lang" content="C3"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="English" content="Software in the Control System has been developed to SIL appropriate to hazards involved"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Context">
+      <name lang="lang" content="C1"/>
+      <description>
+        <content>
+          <value lang="English" content="Operating Role and Context"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Strategy">
+      <name lang="lang" content="S2"/>
+      <description>
+        <content>
+          <value lang="English" content="Argument over allocated SIL for Primart and Secondary elements"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Solution">
+      <name lang="lang" content="Sn2"/>
+      <description>
+        <content>
+          <value lang="English" content="Fault Tree Analysis"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Solution">
+      <name lang="lang" content="Sn3"/>
+      <description>
+        <content>
+          <value lang="English" content="Process Evidence for SIL4"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Solution">
+      <name lang="lang" content="Sn4"/>
+      <description>
+        <content>
+          <value lang="English" content="Process Evidence for SIL2"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Context">
+      <name lang="lang" content="C4"/>
+      <description>
+        <content>
+          <value lang="English" content="Hazards identified from FHA (Ref Y)"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Context">
+      <name lang="lang" content="C5"/>
+      <description>
+        <content>
+          <value lang="English" content="SIL Guidelines and Processes"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Context">
+      <name lang="lang" content="C3"/>
+      <description>
+        <content>
+          <value lang="language" content="Tolerability targets (Ref Z)"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Goal">
+      <name lang="lang" content="G4"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="English" content="Hazard H1 has been eliminated"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Goal">
+      <name lang="lang" content="G5"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="English" content="Probability of Hazard H2 occuring &lt; 1x10-6 per year"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Goal">
+      <name lang="lang" content="G6"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="English" content="Probability of Hazard H3 occuring &lt; 1x10-3 per year"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Goal">
+      <name lang="lang" content="G7"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="English" content="Primary Protection System Developed to SIL 4"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Goal">
+      <name lang="lang" content="G8"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="English" content="Secondary Protection System Development to SIL2"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:InContextOf" source="//@argumentPackage.0/@argumentationElement.0" target="//@argumentPackage.0/@argumentationElement.1">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:InContextOf" source="//@argumentPackage.0/@argumentationElement.0" target="//@argumentPackage.0/@argumentationElement.8">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:InContextOf" source="//@argumentPackage.0/@argumentationElement.7" target="//@argumentPackage.0/@argumentationElement.13">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:InContextOf" source="//@argumentPackage.0/@argumentationElement.7" target="//@argumentPackage.0/@argumentationElement.14">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:InContextOf" source="//@argumentPackage.0/@argumentationElement.6" target="//@argumentPackage.0/@argumentationElement.13">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:InContextOf" source="//@argumentPackage.0/@argumentationElement.6" target="//@argumentPackage.0/@argumentationElement.15">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:InContextOf" source="//@argumentPackage.0/@argumentationElement.4" target="//@argumentPackage.0/@argumentationElement.3">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:InContextOf" source="//@argumentPackage.0/@argumentationElement.9" target="//@argumentPackage.0/@argumentationElement.2">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:Context">
+      <name lang="lang" content="C6"/>
+      <description>
+        <content>
+          <value lang="English" content="Identified software hazards"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:InContextOf" source="//@argumentPackage.0/@argumentationElement.9" target="//@argumentPackage.0/@argumentationElement.29">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:SupportedBy" source="//@argumentPackage.0/@argumentationElement.0" target="//@argumentPackage.0/@argumentationElement.6">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:SupportedBy" source="//@argumentPackage.0/@argumentationElement.0" target="//@argumentPackage.0/@argumentationElement.7">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:SupportedBy" source="//@argumentPackage.0/@argumentationElement.6" target="//@argumentPackage.0/@argumentationElement.4">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:SupportedBy" source="//@argumentPackage.0/@argumentationElement.7" target="//@argumentPackage.0/@argumentationElement.9">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:SupportedBy" source="//@argumentPackage.0/@argumentationElement.9" target="//@argumentPackage.0/@argumentationElement.19">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:SupportedBy" source="//@argumentPackage.0/@argumentationElement.9" target="//@argumentPackage.0/@argumentationElement.20">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:SupportedBy" source="//@argumentPackage.0/@argumentationElement.20" target="//@argumentPackage.0/@argumentationElement.12">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:SupportedBy" source="//@argumentPackage.0/@argumentationElement.19" target="//@argumentPackage.0/@argumentationElement.11">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:SupportedBy" source="//@argumentPackage.0/@argumentationElement.4" target="//@argumentPackage.0/@argumentationElement.17">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:SupportedBy" source="//@argumentPackage.0/@argumentationElement.4" target="//@argumentPackage.0/@argumentationElement.18">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:SupportedBy" source="//@argumentPackage.0/@argumentationElement.4" target="//@argumentPackage.0/@argumentationElement.16">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:SupportedBy" source="//@argumentPackage.0/@argumentationElement.16" target="//@argumentPackage.0/@argumentationElement.5">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:SupportedBy" source="//@argumentPackage.0/@argumentationElement.17" target="//@argumentPackage.0/@argumentationElement.10">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+    <argumentationElement xsi:type="gsn_:SupportedBy" source="//@argumentPackage.0/@argumentationElement.18" target="//@argumentPackage.0/@argumentationElement.10">
+      <name lang="lang" content="name"/>
+      <description>
+        <content>
+          <value xsi:type="base_:ExpressionLangString" lang="language" content="Description"/>
+        </content>
+      </description>
+      <implementationConstraint>
+        <content>
+          <value lang="language" content="null"/>
+          <value lang="language" content="result"/>
+        </content>
+      </implementationConstraint>
+    </argumentationElement>
+  </argumentPackage>
+</assuranceCase_:AssuranceCasePackage>

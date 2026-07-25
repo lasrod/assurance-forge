@@ -66,12 +66,63 @@ public:
     core::RemoveMode PendingRemoveMode() const;
     const std::vector<std::string>& PendingRemoveIds() const;
 
+    // One line of the delete confirmation, already resolved to display text so
+    // the modal does no model lookups (SACM23-INT-002). English msgids only —
+    // `label` is a SACM class name and `name` is user data; the panel
+    // translates the surrounding sentence, not these.
+    struct RemovalEffect {
+        std::string element_id;
+        std::string kind;  // SACM class name, e.g. "Claim"
+        std::string name;  // may be empty
+        bool is_relationship = false;
+        bool deleted = true; // false: survives, changed (a scrubbed relationship)
+    };
+
+    // What the SACM library says this removal would do. `Consequences` are the
+    // elements the user did NOT select that the delete reaches anyway — the
+    // part the confirmation exists to disclose.
+    const std::vector<RemovalEffect>& PendingRemoveTargets() const;
+    const std::vector<RemovalEffect>& PendingRemoveConsequences() const;
+    // Library diagnostics for the pending removal, flattened to display lines.
+    // Advisory: the legacy removal path still performs the delete, so these
+    // inform the user rather than block the button.
+    const std::vector<std::string>& PendingRemoveWarnings() const;
+    // False when the library could not model this removal at all (e.g. the
+    // selection has no library counterpart). The modal then falls back to the
+    // plain count rather than claiming a preview it does not have.
+    bool PendingRemovePreviewAvailable() const;
+
 private:
+    // Fills the pending-removal preview fields from the library document.
+    //
+    // `mode` is not decoration. `RemoveElementCommand` routes
+    // NodeAndDescendants through the library seam but leaves NodeOnly on
+    // `core::RemoveElement`, which REPARENTS the removed node's children onto
+    // its parent — retargeting a child's inference rather than deleting it. The
+    // library has no retarget operation, so modelling NodeOnly as a set of
+    // deletes would announce that the child's inference is being removed when
+    // it in fact survives, retargeted. No preview is produced for NodeOnly
+    // until the library can express the retarget; the modal says so rather than
+    // showing a confident wrong answer.
+    void BuildRemovalPreview(AppRuntimeState& state,
+                             const std::vector<std::string>& planned_ids,
+                             core::RemoveMode mode);
+
+    // Adds the Assurance Claim Points that die with the elements already in the
+    // preview. ACPs live in vendor TaggedValues, which the seam filters out as
+    // attachments — correct for notes, wrong for a record the UI treats as
+    // first-class.
+    void AppendAcpConsequences(AppRuntimeState& state);
+
     AppEvents& events_;
     bool show_remove_confirm_ = false;
     std::string pending_remove_id_;
     core::RemoveMode pending_remove_mode_ = core::RemoveMode::NodeOnly;
     std::vector<std::string> pending_remove_ids_;
+    std::vector<RemovalEffect> pending_remove_targets_;
+    std::vector<RemovalEffect> pending_remove_consequences_;
+    std::vector<std::string> pending_remove_warnings_;
+    bool pending_remove_preview_available_ = false;
 };
 
 } // namespace app::controllers

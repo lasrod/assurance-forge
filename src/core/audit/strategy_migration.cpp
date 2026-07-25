@@ -228,12 +228,19 @@ bool MigrateStrategyEncodingIfNeeded(const AssuranceProject& project,
 
     // Promote a trusted replay baseline at HEAD from the migrated state, so
     // open-verify replays forward from it (no pre-migration events re-run) and
-    // matches the on-disk bytes by construction. The baseline is written as
-    // *legacy* XML because snapshots are loaded by the legacy parser
-    // (`LoadSnapshot` uses `sacm::parse_sacm`, which reads library XMI near-empty
-    // -- a latent gap Phase 1b closes); its library-canonical hash still matches
-    // the library-XMI on-disk file (the same convergence the initial snapshot
-    // relies on today).
+    // matches the on-disk bytes by construction.
+    //
+    // This baseline is the ONE remaining place the application writes SACM
+    // bytes through the legacy serializer rather than the library. The former
+    // justification -- "snapshots are loaded by the legacy parser (`LoadSnapshot`
+    // uses `sacm::parse_sacm`)" -- no longer holds:
+    // `core::audit::LoadSnapshotModels` already prefers the library. What keeps
+    // it here is narrower: this function normalizes a *projection* rather than a
+    // document (there is no library document at this point in the migration), so
+    // the legacy serializer is the only thing that can write it. Its
+    // library-canonical hash still matches the library-XMI on-disk file, which is
+    // the same convergence the initial snapshot relies on. Routing the migration
+    // through a library document would retire the last legacy writer entirely.
     const std::string baseline_xml = sacm::serialize_sacm(package);
     const std::string baseline_raw_hash = Sha256::HexDigest(baseline_xml);
     std::string baseline_snapshot_id;

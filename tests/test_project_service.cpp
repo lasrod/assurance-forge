@@ -1,10 +1,15 @@
 #include "core/project_service.h"
 #include "parser/xml_parser.h"
+#include "sacm/io/xmi.h"
+#include "sacm/metadata/namespaces.h"
+#include "sacm/model/document.h"
+#include "sacm/validation/validate.h"
 
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <gtest/gtest.h>
 
 namespace {
@@ -84,6 +89,54 @@ TEST(ProjectServiceTest, CreateEmptyProjectCreatesRequiredStructureAndManifest) 
     core::ProjectLoadReport open_report;
     ASSERT_TRUE(core::ProjectService::OpenProject(root, reopened, open_report, error)) << error;
     EXPECT_FALSE(open_report.showPopup) << ReportSummary(open_report);
+}
+
+// The seed a new project starts from is a real SACM 2.3 document, not a
+// hand-written approximation. It used to be a literal in the SACM 2.2
+// namespace using `id=` instead of `xmi:id`: the tolerant reader accepted it,
+// so nothing looked wrong, but every new project began as a document no strict
+// consumer would take and the first save quietly replaced it with a different
+// dialect. Asserted through a STRICT load, which is what makes the difference
+// visible -- a tolerant load passes either way.
+TEST(ProjectServiceTest, SACM23_LIB_002_NewProjectSeedIsStrictSacm23Xmi) {
+    TempDir tmp(MakeTempParent());
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("MySafetyCase", tmp.path, project, report,
+                                                         error))
+        << error;
+
+    const std::filesystem::path seed = project.rootPath / "arguments" / "main.sacm";
+    const sacm::io::LoadResult strict =
+        sacm::io::load_xmi_file(seed, sacm::io::LoadOptions{.mode = sacm::io::Mode::Strict});
+    ASSERT_TRUE(strict.ok) << "the seed a new project starts from is not strict SACM 2.3: "
+                           << (strict.diagnostics.empty() ? "" : strict.diagnostics.front().message);
+    EXPECT_EQ(strict.source_version, sacm::metadata::namespaces::StandardVersion::V2_3);
+    EXPECT_TRUE(sacm::validation::validate(*strict.document).empty());
+
+    // The project name reaches the document, and the seed carries the one goal
+    // the app expects to render.
+    ASSERT_EQ(strict.document->roots().size(), 1u);
+    EXPECT_EQ(strict.document->roots().front()->name().content, "MySafetyCase");
+    int claims = 0;
+    strict.document->for_each_element([&](const sacm::model::SACMElement& element) {
+        if (element.kind() == sacm::metadata::ElementKind::Claim) {
+            ++claims;
+        }
+    });
+    EXPECT_EQ(claims, 1);
+
+    // Round-tripping the seed through a save must not rewrite it: a new file
+    // and a saved file are the same dialect.
+    const sacm::io::SaveResult resaved = sacm::io::save_xmi_string(*strict.document);
+    ASSERT_TRUE(resaved.ok);
+    std::ifstream stream(seed, std::ios::binary);
+    std::ostringstream on_disk;
+    on_disk << stream.rdbuf();
+    EXPECT_EQ(on_disk.str(), resaved.xml)
+        << "the seed on disk is not what the writer would produce for the same model, so the "
+           "first save silently rewrites a brand-new file";
 }
 
 TEST(ProjectServiceTest, AddProjectFilesNormalizesNamesAndTracksManifestEntries) {

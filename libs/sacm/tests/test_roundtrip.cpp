@@ -1,4 +1,5 @@
 #include "sacm/compare/semantic_compare.h"
+#include "sacm/compat/preserve.h"
 #include "sacm/io/xmi.h"
 #include "sacm/metadata/element_kind.h"
 #include "sacm/metadata/namespaces.h"
@@ -236,11 +237,11 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_ExtensionTypedElementIsPreservedNotDropp
     // reinterpreted -- not its type, not its name, not its children.
     int preserved_fragments = 0;
     loaded.document->for_each_element([&](const sacm::model::SACMElement& element) {
-        for (const std::string& fragment : element.preserved_content()) {
-            if (fragment.find("gsn_:Context") != std::string::npos) {
+        for (const sacm::model::PreservedFragment& fragment : element.preserved_content()) {
+            if (fragment.xml.find("gsn_:Context") != std::string::npos) {
                 ++preserved_fragments;
-                EXPECT_NE(fragment.find(R"(content="C1")"), std::string::npos)
-                    << "the fragment was truncated to its opening tag: " << fragment;
+                EXPECT_NE(fragment.xml.find(R"(content="C1")"), std::string::npos)
+                    << "the fragment was truncated to its opening tag: " << fragment.xml;
             }
         }
     });
@@ -356,8 +357,8 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedExtensionContentSurvivesTwoRoun
 
     int preserved_fragments = 0;
     second.document->for_each_element([&](const sacm::model::SACMElement& element) {
-        for (const std::string& fragment : element.preserved_content()) {
-            if (fragment.find("gsn_:Context") != std::string::npos) {
+        for (const sacm::model::PreservedFragment& fragment : element.preserved_content()) {
+            if (fragment.xml.find("gsn_:Context") != std::string::npos) {
                 ++preserved_fragments;
             }
         }
@@ -372,6 +373,234 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedExtensionContentSurvivesTwoRoun
         << "the preserved fragment did not survive a second round trip:\n"
         << twice.xml;
     EXPECT_NE(twice.xml.find(R"(content="C1")"), std::string::npos) << twice.xml;
+}
+
+// A relationship endpoint that points at an element only preserved
+// compatibility content can carry is not a broken reference: the target IS in
+// the file, the reader simply cannot type it. Reporting SACM-REF-001 there
+// states the opposite of what happened -- and because that code is an Error, it
+// makes every GSN file containing a Context fail validation even though its
+// argument is intact.
+constexpr std::string_view kReferenceToPreservedElementDocument =
+    R"(<?xml version="1.0" encoding="UTF-8"?>)"
+    R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+    R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+    R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" )"
+    R"(xmlns:gsn="http://scsc.acwg.gsn/2.0" xmi:version="2.0" xmi:id="acp_1">)"
+    R"(<name content="Context Reference Case"/>)"
+    R"(<argumentPackage xmi:id="ap_1"><name content="Main"/>)"
+    R"(<argumentElement xsi:type="sacm:Claim" xmi:id="g1"><name content="G1"/></argumentElement>)"
+    R"(<argumentElement xsi:type="gsn:Context" xmi:id="c1"><name content="C1"/></argumentElement>)"
+    R"(<argumentElement xsi:type="sacm:AssertedContext" xmi:id="ctx_1" source="g1" )"
+    R"(target="c1"/></argumentPackage></sacm:AssuranceCasePackage>)";
+
+TEST(Sacm23RoundTrip, SACM23_COMPAT_002_ReferenceToPreservedElementIsNotDangling) {
+    const LoadResult loaded = sacm::io::load_xmi_string(kReferenceToPreservedElementDocument);
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
+                                                          : loaded.diagnostics.front().message);
+
+    // Precondition: the Context really is preserved rather than parsed, so the
+    // reference really does point outside the index.
+    ASSERT_TRUE(loaded.document->find(ElementId{"c1"}) == nullptr)
+        << "fixture no longer preserves the Context; the test measures nothing";
+    EXPECT_TRUE(loaded.document->has_preserved_element(ElementId{"c1"}))
+        << "the preserved element's id was not recorded, so nothing can tell a reference into "
+           "compatibility content from a reference into nothing";
+
+    // The distinction the codes have to carry: not missing (SACM-REF-001),
+    // but untyped (SACM-REF-003).
+    EXPECT_FALSE(has_code(loaded.diagnostics, sacm::validation::codes::kRefDangling))
+        << "a reference into preserved content was reported as dangling";
+    EXPECT_TRUE(has_code(loaded.diagnostics, sacm::validation::codes::kRefPreservedTarget));
+
+    const std::vector<sacm::validation::Diagnostic> problems =
+        sacm::validation::validate(*loaded.document);
+    EXPECT_FALSE(has_code(problems, sacm::validation::codes::kRefDangling))
+        << "validation still calls the preserved target missing";
+    for (const auto& problem : problems) {
+        EXPECT_NE(problem.severity, sacm::validation::Severity::Error)
+            << "[" << problem.code << "] " << problem.message;
+    }
+    EXPECT_TRUE(has_code(problems, sacm::validation::codes::kRefPreservedTarget))
+        << "validation gave no signal at all that the endpoint is untyped; silence would be "
+           "worse than the wrong code";
+
+    // The endpoint itself must survive: a compatibility save re-emits both the
+    // preserved element and the reference to it, and the pair still holds
+    // together on the way back in.
+    const sacm::io::SaveOptions compat_options{.mode = Mode::Tolerant};
+    const sacm::io::SaveResult saved =
+        sacm::io::save_xmi_string(*loaded.document, compat_options);
+    ASSERT_TRUE(saved.ok);
+    EXPECT_NE(saved.xml.find(R"(target="c1")"), std::string::npos)
+        << "the reference to the preserved element was dropped on save:\n"
+        << saved.xml;
+
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml);
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_TRUE(reloaded.document->has_preserved_element(ElementId{"c1"}));
+    EXPECT_FALSE(has_code(sacm::validation::validate(*reloaded.document),
+                          sacm::validation::codes::kRefDangling))
+        << "the endpoint became dangling once the saved file was read back";
+    const auto differences = sacm::compare::semantic_compare(*loaded.document, *reloaded.document);
+    for (const auto& difference : differences) {
+        ADD_FAILURE() << "[" << difference.category << "] " << difference.path << ": "
+                      << difference.message;
+    }
+}
+
+// The boundary of the REF-001 -> REF-003 downgrade. A document with BOTH a
+// preserved target and a genuinely missing one must report one code each: if
+// the downgrade leaked, a real broken reference would be demoted to a warning
+// and the document would validate. Also pins that a vendor attribute merely
+// spelled `...:id` does not confer preserved-element identity.
+constexpr std::string_view kMixedTargetDocument =
+    R"(<?xml version="1.0" encoding="UTF-8"?>)"
+    R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+    R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+    R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" )"
+    R"(xmlns:gsn="http://scsc.acwg.gsn/2.0" xmlns:acme="http://acme.example/t" )"
+    R"(xmi:version="2.0" xmi:id="acp_1"><name content="Mixed Targets"/>)"
+    R"(<argumentPackage xmi:id="ap_1"><name content="Main"/>)"
+    R"(<argumentElement xsi:type="sacm:Claim" xmi:id="g1"><name content="G1"/></argumentElement>)"
+    R"(<argumentElement xsi:type="gsn:Context" xmi:id="c1" acme:id="ghost_1">)"
+    R"(<name content="C1"/></argumentElement>)"
+    R"(<argumentElement xsi:type="sacm:AssertedContext" xmi:id="ctx_1" source="g1" )"
+    R"(target="c1"/>)"
+    R"(<argumentElement xsi:type="sacm:AssertedContext" xmi:id="ctx_2" source="g1" )"
+    R"(target="nowhere_1"/>)"
+    R"(<argumentElement xsi:type="sacm:AssertedContext" xmi:id="ctx_3" source="g1" )"
+    R"(target="ghost_1"/></argumentPackage></sacm:AssuranceCasePackage>)";
+
+TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedTargetDowngradeDoesNotMaskRealDangling) {
+    const LoadResult loaded = sacm::io::load_xmi_string(kMixedTargetDocument);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_TRUE(loaded.document->has_preserved_element(ElementId{"c1"}))
+        << "fixture no longer preserves the Context; the test measures nothing";
+
+    // A vendor attribute that merely spells `id` must not confer identity:
+    // `ghost_1` exists only as `acme:id`, so a reference to it is still broken.
+    EXPECT_FALSE(loaded.document->has_preserved_element(ElementId{"ghost_1"}))
+        << "a foreign attribute whose local name is 'id' was treated as the element's XMI "
+           "identity, which would demote a genuinely dangling reference to a warning";
+
+    const std::vector<sacm::validation::Diagnostic> problems =
+        sacm::validation::validate(*loaded.document);
+    const auto code_for = [&problems](std::string_view target) -> std::string {
+        for (const auto& problem : problems) {
+            if (problem.message.find(target) != std::string::npos) {
+                return problem.code;
+            }
+        }
+        return {};
+    };
+    EXPECT_EQ(code_for("c1"), std::string(sacm::validation::codes::kRefPreservedTarget));
+    EXPECT_EQ(code_for("nowhere_1"), std::string(sacm::validation::codes::kRefDangling));
+    EXPECT_EQ(code_for("ghost_1"), std::string(sacm::validation::codes::kRefDangling));
+
+    // The other half of the identity rule: XMI identity must be recognized by
+    // NAMESPACE, not by the prefix happening to be spelled `xmi`. The EMF
+    // dialects in the corpus declare the older `http://www.omg.org/XMI`; if
+    // that URI is not accepted here, every EMF file that binds it to some other
+    // prefix loses preserved-element identity and its references go back to
+    // being reported as broken.
+    const LoadResult legacy_xmi_prefix = sacm::io::load_xmi_string(
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+        R"(xmlns:x="http://www.omg.org/XMI" )"
+        R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" )"
+        R"(xmlns:gsn="http://scsc.acwg.gsn/2.0" x:version="2.0" x:id="acp_9">)"
+        R"(<name content="Legacy XMI Prefix"/><argumentPackage x:id="ap_9"><name content="M"/>)"
+        R"(<argumentElement xsi:type="sacm:Claim" x:id="g9"><name content="G9"/></argumentElement>)"
+        R"(<argumentElement xsi:type="gsn:Context" x:id="c9"><name content="C9"/></argumentElement>)"
+        R"(<argumentElement xsi:type="sacm:AssertedContext" x:id="ctx_9" source="g9" )"
+        R"(target="c9"/></argumentPackage></sacm:AssuranceCasePackage>)");
+    ASSERT_TRUE(legacy_xmi_prefix.ok);
+    EXPECT_TRUE(legacy_xmi_prefix.document->has_preserved_element(ElementId{"c9"}))
+        << "XMI identity was matched on the prefix spelling rather than the namespace, so an EMF "
+           "document binding the legacy XMI URI to another prefix loses preserved-element identity";
+    EXPECT_FALSE(has_code(sacm::validation::validate(*legacy_xmi_prefix.document),
+                          sacm::validation::codes::kRefDangling))
+        << "the reference into preserved content was reported as broken again";
+
+    // The real breakage still fails the document.
+    EXPECT_TRUE(std::ranges::any_of(problems, [](const auto& problem) {
+        return problem.severity == sacm::validation::Severity::Error;
+    })) << "a document with a genuinely dangling reference validated clean";
+
+    // Strict mode preserves nothing, so every unresolved target is plain
+    // SACM-REF-001 there -- the downgrade is a tolerant-path concept only.
+    const LoadResult strict =
+        sacm::io::load_xmi_string(kMixedTargetDocument, LoadOptions{.mode = Mode::Strict});
+    EXPECT_FALSE(has_code(strict.diagnostics, sacm::validation::codes::kRefPreservedTarget))
+        << "strict mode produced a preserved-target diagnostic despite preserving nothing";
+
+    // The prefix spelling `xmi` is accepted only when UNDECLARED. A document
+    // that rebinds `xmlns:xmi` to a non-XMI namespace must not be able to
+    // confer serialization identity on its own terms -- otherwise it could
+    // downgrade a genuinely dangling reference to a warning, which is the same
+    // masking this check exists to prevent.
+    const LoadResult rebound = sacm::io::load_xmi_string(
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+        R"(xmlns:xmi="http://acme.example/not-xmi" )"
+        R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" )"
+        R"(xmlns:gsn="http://scsc.acwg.gsn/2.0" xmi:id="acp_r">)"
+        R"(<name content="Rebound XMI Prefix"/><argumentPackage xmi:id="ap_r"><name content="M"/>)"
+        R"(<argumentElement xsi:type="sacm:Claim" xmi:id="g_r"><name content="GR"/></argumentElement>)"
+        R"(<argumentElement xsi:type="gsn:Context" xmi:id="c_r"><name content="CR"/></argumentElement>)"
+        R"(<argumentElement xsi:type="sacm:AssertedContext" xmi:id="ctx_r" source="g_r" )"
+        R"(target="c_r"/></argumentPackage></sacm:AssuranceCasePackage>)");
+    ASSERT_TRUE(rebound.ok);
+    EXPECT_FALSE(rebound.document->has_preserved_element(ElementId{"c_r"}))
+        << "a document that rebound xmlns:xmi to a non-XMI namespace was still allowed to confer "
+           "preserved-element identity, so it could mask a real dangling reference";
+    EXPECT_TRUE(has_code(sacm::validation::validate(*rebound.document),
+                         sacm::validation::codes::kRefDangling))
+        << "the reference should be reported as genuinely dangling, since nothing in this document "
+           "establishes XMI identity for the preserved element";
+}
+
+// EMF-dialect files address elements by containment position
+// (//@argumentPackage.0/@argumentationElement.18), so where a preserved
+// fragment sits among its siblings is not cosmetic: re-emitting it after the
+// typed children renumbers every element that followed it in the source, and
+// any positional reference into that package then resolves to a different
+// element. Our own reload is immune (the reader assigns ids first), which is
+// exactly why this has to be asserted on the bytes.
+TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedFragmentKeepsItsSiblingPosition) {
+    const LoadResult loaded =
+        sacm::io::load_xmi_file(fixture("interop-gsn20-current-namespace-valid.sacm.xmi"));
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
+                                                          : loaded.diagnostics.front().message);
+
+    const sacm::io::SaveResult compat =
+        sacm::io::save_xmi_string(*loaded.document, sacm::io::SaveOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(compat.ok);
+
+    // Source order inside the argumentPackage: G1, AA1, AJ1, Sn1, C1(preserved),
+    // SupportedBy. So the Context belongs after the Solution and before the
+    // inference -- not appended at the end, and not hoisted to the front.
+    const std::size_t solution = compat.xml.find(R"(content="Sn1")");
+    const std::size_t context = compat.xml.find("gsn_:Context");
+    const std::size_t inference = compat.xml.find("AssertedInference");
+    ASSERT_NE(solution, std::string::npos) << compat.xml;
+    ASSERT_NE(context, std::string::npos) << compat.xml;
+    ASSERT_NE(inference, std::string::npos) << compat.xml;
+    EXPECT_LT(solution, context) << "the preserved fragment was hoisted above its siblings:\n"
+                                 << compat.xml;
+    EXPECT_LT(context, inference)
+        << "the preserved fragment was appended after the typed children instead of kept in "
+           "position, which renumbers every later sibling:\n"
+        << compat.xml;
+
+    // Position has to be stable under repeated saves, or the file churns.
+    const LoadResult reloaded = sacm::io::load_xmi_string(compat.xml);
+    ASSERT_TRUE(reloaded.ok);
+    const sacm::io::SaveResult twice =
+        sacm::io::save_xmi_string(*reloaded.document, sacm::io::SaveOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(twice.ok);
+    EXPECT_EQ(compat.xml, twice.xml) << "preserved-fragment placement is not idempotent";
 }
 
 // GSN's SupportedBy runs opposite to SACM's AssertedInference: GSN writes
@@ -647,3 +876,162 @@ TEST(Sacm23XmiConformance, SACM23_XMI_004_StrictSaveOmitsLayoutAndRefusesCompatO
 }
 
 }  // namespace
+
+// The import half of the strict/compatibility mode boundary. The COMPAT-001
+// tests all assert tolerant-load-preserves + strict-save-refuses; without this,
+// nothing pins that a STRICT LOAD refuses vendor content and keeps none of it.
+// "Compatibility behaviour is not default strict behaviour" is a claim about
+// both directions, and warn-and-keep on the strict path would satisfy every
+// other test in the row while violating the requirement.
+TEST(Sacm23RoundTrip, SACM23_COMPAT_001_StrictLoadRefusesVendorContent) {
+    const std::filesystem::path path = fixture("vendor-extension-valid.sacm.xmi");
+
+    // Tolerant is the preserving path (the control: without this the strict
+    // assertions below could pass simply because nothing was there to keep).
+    const LoadResult tolerant = sacm::io::load_xmi_file(path);
+    ASSERT_TRUE(tolerant.ok);
+    ASSERT_FALSE(tolerant.document->roots().front()->preserved_content().empty())
+        << "fixture no longer carries vendor content; the test measures nothing";
+
+    const LoadResult strict = sacm::io::load_xmi_file(path, LoadOptions{.mode = Mode::Strict});
+    EXPECT_FALSE(strict.ok) << "strict load accepted a document carrying vendor content";
+    EXPECT_TRUE(std::ranges::any_of(strict.diagnostics, [](const auto& diagnostic) {
+        return diagnostic.severity == sacm::validation::Severity::Error;
+    })) << "strict load reported no error for unknown content";
+    // The half that matters: refusing is not enough if the content is kept
+    // anyway. A strict document carries no compatibility content at all.
+    if (strict.document.has_value()) {
+        strict.document->for_each_element([](const sacm::model::SACMElement& element) {
+            EXPECT_TRUE(element.preserved_content().empty())
+                << "strict load kept preserved content on " << element.id().value();
+            EXPECT_TRUE(element.preserved_attributes().empty())
+                << "strict load kept a preserved attribute on " << element.id().value();
+        });
+        EXPECT_TRUE(strict.document->preserved_element_ids().empty())
+            << "strict load recorded preserved-element identity";
+    }
+
+    // Same for a foreign ATTRIBUTE, which travels a different reader path.
+    const LoadResult strict_attribute =
+        sacm::io::load_xmi_string(kForeignNamespaceDocument, LoadOptions{.mode = Mode::Strict});
+    EXPECT_FALSE(strict_attribute.ok);
+    if (strict_attribute.document.has_value()) {
+        strict_attribute.document->for_each_element([](const sacm::model::SACMElement& element) {
+            EXPECT_TRUE(element.preserved_attributes().empty())
+                << "strict load kept a vendor attribute on " << element.id().value();
+        });
+    }
+}
+
+// A minted id must not collide with an id living inside preserved content.
+// This cannot be caught by any other test: `build_index` and `validate` walk
+// the index, and preserved content is deliberately not indexed, so a collision
+// emits two elements with the same xmi:id and nothing goes red. Removing the
+// guard in peek_generated_id must fail here or the guard is untraceable.
+TEST(Sacm23RoundTrip, SACM23_COMPAT_002_MintedIdDoesNotCollideWithPreservedContent) {
+    // The preserved fragment carries `Claim_1` -- exactly the id the Claim
+    // generator produces first.
+    LoadResult loaded = sacm::io::load_xmi_string(
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+        R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+        R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" )"
+        R"(xmlns:gsn="http://scsc.acwg.gsn/2.0" xmi:version="2.0" xmi:id="acp_m">)"
+        R"(<name content="Mint Collision"/><argumentPackage xmi:id="ap_m"><name content="M"/>)"
+        R"(<argumentElement xsi:type="gsn:Context" xmi:id="claim_1"><name content="Preserved"/>)"
+        R"(</argumentElement></argumentPackage></sacm:AssuranceCasePackage>)");
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_TRUE(loaded.document->has_preserved_element(ElementId{"claim_1"}))
+        << "fixture no longer preserves an element under the generator's first id";
+
+    Document document = std::move(*loaded.document);
+    const sacm::commands::MutationResult created =
+        document.apply(CreateClaim{.parent = ElementId{"ap_m"}, .name = "New Claim"});
+    ASSERT_TRUE(created.applied)
+        << (created.diagnostics.empty() ? "" : created.diagnostics.front().message);
+    ASSERT_EQ(created.created_ids().size(), 1u);
+    EXPECT_NE(created.created_ids().front().value(), "claim_1")
+        << "the generator minted an id already used by preserved content; a compatibility save "
+           "would emit two elements with the same xmi:id and nothing would detect it";
+
+    // Proof at the byte level: the saved document must not carry the id twice.
+    const sacm::io::SaveResult saved =
+        sacm::io::save_xmi_string(document, sacm::io::SaveOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(saved.ok);
+    const std::string needle = R"(xmi:id="claim_1")";
+    const std::size_t first = saved.xml.find(needle);
+    ASSERT_NE(first, std::string::npos);
+    EXPECT_EQ(saved.xml.find(needle, first + 1), std::string::npos)
+        << "duplicate xmi:id in compatibility output:\n" << saved.xml;
+}
+
+// --- sacm::compat::adopt_preserved_content ---------------------------------
+//
+// A client that rebuilds a document from a lossy intermediate -- a projection
+// whose structs have no field for unknown XML -- would otherwise drop everything
+// a tolerant load preserved, even though the content is still in the document it
+// rebuilt FROM. This is the library's answer, and it is exercised here from the
+// library side: a standalone consumer must be able to rely on it without an
+// application's test suite standing in for its coverage.
+TEST(Sacm23RoundTrip, SACM23_LIB_002_AdoptPreservedContentRestoresWhatAProjectionDrops) {
+    LoadResult source = sacm::io::load_xmi_string(kReferenceToPreservedElementDocument);
+    ASSERT_TRUE(source.ok);
+    ASSERT_TRUE(source.document->has_preserved_element(ElementId{"c1"}))
+        << "fixture no longer preserves anything; the test measures nothing";
+
+    // Stand in for a lossy intermediate: a STRICT reload of the same document
+    // keeps the typed model and nothing else, exactly as a POD projection would.
+    const sacm::io::SaveResult intermediate_bytes = sacm::io::save_xmi_string(
+        *source.document, sacm::io::SaveOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(intermediate_bytes.ok);
+    LoadResult rebuilt = sacm::io::load_xmi_string(intermediate_bytes.xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(rebuilt.document.has_value());
+    bool rebuilt_carries_anything = false;
+    rebuilt.document->for_each_element([&](const sacm::model::SACMElement& element) {
+        rebuilt_carries_anything = rebuilt_carries_anything ||
+                                   !element.preserved_content().empty() ||
+                                   !element.preserved_attributes().empty();
+    });
+    ASSERT_FALSE(rebuilt_carries_anything) << "the stand-in intermediate was not lossy";
+
+    const std::size_t adopted =
+        sacm::compat::adopt_preserved_content(*rebuilt.document, *source.document);
+    EXPECT_EQ(adopted, 1u);
+
+    // (a) the fragment is back
+    bool restored = false;
+    rebuilt.document->for_each_element([&](const sacm::model::SACMElement& element) {
+        for (const sacm::model::PreservedFragment& fragment : element.preserved_content()) {
+            restored = restored || fragment.xml.find("gsn:Context") != std::string::npos;
+        }
+    });
+    EXPECT_TRUE(restored) << "the preserved fragment was not restored";
+
+    // (b) and so is the identity that makes it legible. Without this the
+    // rebuilt document reports a hard SACM-REF-001 Error against an element its
+    // own output still carries.
+    EXPECT_TRUE(rebuilt.document->has_preserved_element(ElementId{"c1"}));
+    const std::vector<sacm::validation::Diagnostic> problems =
+        sacm::validation::validate(*rebuilt.document);
+    EXPECT_FALSE(has_code(problems, sacm::validation::codes::kRefDangling))
+        << "adoption restored the bytes but not the knowledge that makes them legible";
+    EXPECT_TRUE(has_code(problems, sacm::validation::codes::kRefPreservedTarget));
+
+    // (c) the foreign namespace declaration travels, or the re-emitted fragment
+    // is not namespace-well-formed on the way back out.
+    EXPECT_FALSE(rebuilt.document->foreign_namespaces().empty());
+
+    // (d) adoption does not overwrite content the rebuild already produced --
+    // that content came from the more recent parse.
+    LoadResult already_has = sacm::io::load_xmi_string(kReferenceToPreservedElementDocument);
+    ASSERT_TRUE(already_has.ok);
+    const std::size_t before_second =
+        sacm::compat::adopt_preserved_content(*already_has.document, *source.document);
+    EXPECT_EQ(before_second, 0u)
+        << "adoption overwrote preserved content the target already had";
+
+    // (e) an id present only in the source does not invent an element.
+    const std::size_t count_before = rebuilt.document->element_count();
+    sacm::compat::adopt_preserved_content(*rebuilt.document, *source.document);
+    EXPECT_EQ(rebuilt.document->element_count(), count_before);
+}

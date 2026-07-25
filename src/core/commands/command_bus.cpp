@@ -187,8 +187,16 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     // A `library_primary` command runs the OPPOSITE direction (the views were
     // rebuilt from the library above), so it must be excluded here or the net
     // would immediately overwrite the library with a package projected from it.
+    //
+    // Preserving reload: `xml` is a projection of the document being replaced,
+    // and the legacy package cannot carry unknown/foreign XML, so the plain
+    // reload dropped preserved vendor content on every unflipped command
+    // (NodeOnly removal, undo, an unseamed command) -- from the in-memory
+    // document and, through the next save, from disk.
     if (ctx.library_document != nullptr && !ctx.library_synced && !ctx.library_primary) {
-        if (!sacm_adapter::reload_document(*ctx.library_document, xml) && result.error.empty()) {
+        if (!sacm_adapter::reload_document_keeping_compatibility_content(*ctx.library_document,
+                                                                         xml) &&
+            result.error.empty()) {
             // Soft warning: the edit is committed and the saved package is
             // authoritative, but the library-backed view could not be
             // re-derived, so surface it rather than let it drift silently.

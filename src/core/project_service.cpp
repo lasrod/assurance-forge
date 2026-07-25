@@ -6,6 +6,7 @@
 #include "core/sha256.h"
 #include "core/string_utils.h"
 #include "parser/xml_parser.h"
+#include "sacm_adapter/library_load.h"
 
 #include <algorithm>
 #include <array>
@@ -76,32 +77,6 @@ std::string GenerateId(const char* prefix) {
     return out.str();
 }
 
-std::string EscapeXmlAttribute(const std::string& value) {
-    std::ostringstream out;
-    for (char c : value) {
-        switch (c) {
-        case '&':
-            out << "&amp;";
-            break;
-        case '"':
-            out << "&quot;";
-            break;
-        case '\'':
-            out << "&apos;";
-            break;
-        case '<':
-            out << "&lt;";
-            break;
-        case '>':
-            out << "&gt;";
-            break;
-        default:
-            out << c;
-            break;
-        }
-    }
-    return out.str();
-}
 
 std::filesystem::path
 NormalizeFileName(const std::string& requested_file_name, const char* default_name, const char* extension) {
@@ -139,16 +114,23 @@ std::string ReviewItemsJson() {
     return reviews::SerializeReviewItems({});
 }
 
+// The seed for a new SACM file, built through the library and serialized in
+// strict mode so a new project starts as conformant SACM 2.3 XMI.
+//
+// This used to be a hand-written string in the SACM *2.2* namespace using `id=`
+// attributes rather than `xmi:id`. The tolerant reader accepts that dialect, so
+// nothing broke visibly -- but every new project began life as a document no
+// strict SACM consumer would take, and the first save silently rewrote it into
+// a different dialect than the one on disk. Generating it through the same
+// writer that performs every save removes both the nonconformance and the
+// discontinuity.
+//
+// Returns an empty string if the library declines to build or serialize the
+// seed; the caller reports that rather than falling back to a dialect we no
+// longer intend to produce.
 std::string MinimalSacmXml(const std::string& case_name) {
-    return std::string("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n") +
-           "<sacm:AssuranceCasePackage xmlns:sacm=\"http://www.omg.org/spec/SACM/2.2/Argumentation\" "
-           "id=\"ACP_EMPTY\" name=\"" +
-           EscapeXmlAttribute(case_name) +
-           "\">\n"
-           "  <argumentPackage id=\"AP_MAIN\" name=\"Main Argument\">\n"
-           "    <claim id=\"G1\" name=\"New Goal\" />\n"
-           "  </argumentPackage>\n"
-           "</sacm:AssuranceCasePackage>\n";
+    const sacm_adapter::SaveOutcome seed = sacm_adapter::new_case_document_xmi(case_name);
+    return seed.ok ? seed.xml : std::string{};
 }
 
 std::string EvidenceRegisterJson() {
@@ -325,8 +307,13 @@ bool ProjectService::AddSacmFile(AssuranceProject& project,
                                  ProjectFileEntry& entry,
                                  std::string& error) {
     std::filesystem::path file_name = NormalizeFileName(requested_file_name, "main.sacm", ".sacm");
+    const std::string seed = MinimalSacmXml(project.name);
+    if (seed.empty()) {
+        error = "Could not generate a SACM 2.3 seed document";
+        return false;
+    }
     return AddTrackedFile(
-        project, "arguments", file_name, ProjectFileRole::SacmArgument, MinimalSacmXml(project.name), entry, error);
+        project, "arguments", file_name, ProjectFileRole::SacmArgument, seed, entry, error);
 }
 
 bool ProjectService::AddEvidenceRegister(AssuranceProject& project,

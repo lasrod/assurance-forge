@@ -1625,3 +1625,141 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddTerminologyVisibleContextPromotesExistin
 
     EXPECT_EQ(library_link, legacy_link);
 }
+
+// --- SACM23-INT-002: delete previews ---------------------------------------
+//
+// The delete confirmation must show what a delete drags with it, and it must
+// get that from the library rather than from a second guess computed over the
+// app's projection. These prove the seam is (a) non-mutating, (b) accurate
+// about set semantics, and (c) an honest description of the operation the app
+// then performs -- a preview that describes a different operation is worse than
+// none, because the user approves something that does not happen.
+
+namespace {
+
+// One inference supported by three sub-goals, so scrub-vs-drop is observable:
+// removing one sub-goal leaves the inference standing (scrubbed), removing all
+// three leaves it structurally empty and it goes.
+constexpr const char* kMultiSourceInferenceXml =
+    R"(<?xml version="1.0" encoding="UTF-8"?>)"
+    R"(<AssuranceCasePackage xmlns="http://www.omg.org/spec/SACM/20220301" id="ACP1" )"
+    R"(name="Multi Source"><argumentPackage id="AP1" name="Argument">)"
+    R"(<claim id="G1" name="Top Goal"/>)"
+    R"(<claim id="G2" name="Sub Goal A"/>)"
+    R"(<claim id="G3" name="Sub Goal B"/>)"
+    R"(<claim id="G4" name="Sub Goal C"/>)"
+    R"(<assertedInference id="R1" source="G2 G3 G4" target="G1"/>)"
+    R"(</argumentPackage></AssuranceCasePackage>)";
+
+const sacm_adapter::DeleteEffect* find_effect(const std::vector<sacm_adapter::DeleteEffect>& effects,
+                                              const std::string& id) {
+    for (const sacm_adapter::DeleteEffect& effect : effects) {
+        if (effect.element_id == id) {
+            return &effect;
+        }
+    }
+    return nullptr;
+}
+
+} // namespace
+
+TEST(SacmLibraryEdit, SACM23_INT_002_DeletePreviewReportsConsequencesWithoutMutating) {
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(fixture_path());
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm_adapter::DeletePreview preview =
+        sacm_adapter::preview_delete_elements(*loaded.document, {"G2"});
+    ASSERT_TRUE(preview.supported);
+    EXPECT_TRUE(preview.can_apply);
+
+    // The element the user picked.
+    const sacm_adapter::DeleteEffect* target = find_effect(preview.requested, "G2");
+    ASSERT_NE(target, nullptr) << "the preview did not mention the element being deleted";
+    EXPECT_TRUE(target->deleted);
+    EXPECT_EQ(target->kind, "Claim");
+    EXPECT_EQ(target->name, "Sub Goal");
+
+    // The consequence the user cannot see coming: G2 is R1's only source, so
+    // the inference goes with it. This is the whole reason for the preview.
+    const sacm_adapter::DeleteEffect* inference = find_effect(preview.consequential, "R1");
+    ASSERT_NE(inference, nullptr) << "the preview did not report the relationship the delete drags "
+                                     "with it";
+    EXPECT_TRUE(inference->deleted);
+    EXPECT_TRUE(inference->is_relationship);
+
+    // Nothing was mutated: a preview that changes the document is not a preview.
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    EXPECT_NE(find_element(after, "G2"), nullptr) << "preview_delete_elements mutated the document";
+    EXPECT_NE(find_element(after, "R1"), nullptr) << "preview_delete_elements mutated the document";
+}
+
+// Deleting a set is not deleting each member in turn and unioning the answers.
+// Previewing element-by-element would report the inference as surviving in both
+// cases, understating the damage -- the one direction a delete confirmation
+// must never be wrong in.
+TEST(SacmLibraryEdit, SACM23_INT_002_DeletePreviewUsesSetSemanticsNotPerElementUnion) {
+    sacm_adapter::LibraryDocument document;
+    ASSERT_TRUE(sacm_adapter::reload_document(document, kMultiSourceInferenceXml));
+
+    // One of three sources: the inference survives, scrubbed of G2.
+    const sacm_adapter::DeletePreview one =
+        sacm_adapter::preview_delete_elements(document, {"G2"});
+    ASSERT_TRUE(one.supported);
+    const sacm_adapter::DeleteEffect* survives = find_effect(one.consequential, "R1");
+    ASSERT_NE(survives, nullptr) << "the preview said nothing about the affected inference";
+    EXPECT_FALSE(survives->deleted)
+        << "the inference still has two sources, so it survives scrubbed -- reporting it as "
+           "deleted would overstate the damage";
+
+    // All three: the inference has no sources left and is removed.
+    const sacm_adapter::DeletePreview all =
+        sacm_adapter::preview_delete_elements(document, {"G2", "G3", "G4"});
+    ASSERT_TRUE(all.supported);
+    const sacm_adapter::DeleteEffect* removed = find_effect(all.consequential, "R1");
+    ASSERT_NE(removed, nullptr);
+    EXPECT_TRUE(removed->deleted)
+        << "deleting every source leaves the inference structurally empty, so it must be "
+           "reported as going away; a per-element preview would have missed this";
+    EXPECT_EQ(all.requested.size(), 3u);
+}
+
+// The preview and the apply must describe the same operation. If they drift,
+// the user approves one thing and gets another.
+TEST(SacmLibraryEdit, SACM23_INT_002_DeletePreviewMatchesWhatApplyDoes) {
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(fixture_path());
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm_adapter::DeletePreview preview =
+        sacm_adapter::preview_delete_elements(*loaded.document, {"G2"});
+    ASSERT_TRUE(preview.supported);
+
+    std::vector<std::string> predicted_gone;
+    for (const std::vector<sacm_adapter::DeleteEffect>* bucket :
+         {&preview.requested, &preview.consequential}) {
+        for (const sacm_adapter::DeleteEffect& effect : *bucket) {
+            if (effect.deleted) {
+                predicted_gone.push_back(effect.element_id);
+            }
+        }
+    }
+    std::sort(predicted_gone.begin(), predicted_gone.end());
+
+    const core::AssuranceCase before = sacm_adapter::project_case(*loaded.document);
+    const sacm_adapter::DeleteOutcome applied =
+        sacm_adapter::apply_delete_element(*loaded.document, "G2");
+    ASSERT_TRUE(applied.applied);
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+
+    std::vector<std::string> actually_gone;
+    for (const std::string& id : sorted_element_ids(before)) {
+        if (find_element(after, id) == nullptr) {
+            actually_gone.push_back(id);
+        }
+    }
+    std::sort(actually_gone.begin(), actually_gone.end());
+
+    EXPECT_EQ(predicted_gone, actually_gone)
+        << "the preview promised a different set of deletions than the apply performed";
+}

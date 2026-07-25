@@ -136,6 +136,21 @@ std::vector<Diagnostic> validate_structure(const model::Document& document) {
             element, [&](const model::traverse::ReferenceUse& use) {
                 const SACMElement* target = document.find(*use.target);
                 if (target == nullptr) {
+                    // A target held only as preserved compatibility content is
+                    // present in the document but absent from the index. It is
+                    // untyped, not missing, so it cannot be kind-checked -- but
+                    // calling it missing would mark an intact argument invalid
+                    // (SACM23-COMPAT-002).
+                    if (document.has_preserved_element(*use.target)) {
+                        diagnostics.push_back(make(
+                            codes::kRefPreservedTarget, Severity::Warning, "SACM23-COMPAT-002",
+                            {element.id(), *use.target},
+                            std::format("'{}' references ({}) '{}', which was preserved as "
+                                        "compatibility content and therefore cannot be "
+                                        "type-checked",
+                                        element.id().value(), use.role, use.target->value())));
+                        return;
+                    }
                     diagnostics.push_back(make(
                         codes::kRefDangling, Severity::Error, "SACM23-XMI-003",
                         {element.id(), *use.target},

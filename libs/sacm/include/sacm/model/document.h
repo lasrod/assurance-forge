@@ -12,6 +12,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace sacm::model {
@@ -23,10 +24,20 @@ namespace sacm::model {
 // References between elements are stored as ElementIds and resolved through
 // the document's index.
 //
-// Mutation: exclusively through preview/apply. Public mutations either
-// succeed and leave the document valid for the supported slice, or fail
-// leaving it unchanged with diagnostics (SACM23-VAL-002). Navigation is
-// const-only.
+// Mutation of the TYPED MODEL: exclusively through preview/apply. Public
+// mutations either succeed and leave the document valid for the supported
+// slice, or fail leaving it unchanged with diagnostics (SACM23-VAL-002).
+// Navigation is const-only.
+//
+// One narrow exception, and it does not touch the typed model:
+// `sacm::compat::adopt_preserved_content` moves opaque compatibility content
+// (preserved fragments, vendor attributes, foreign namespace declarations,
+// preserved-element ids) from one document onto another. No operation can
+// produce that content and none reads it, so it cannot affect what an
+// operation sees or decides -- which is why it is revision-neutral: `apply`'s
+// `expected_revision` guards the typed model, and adoption cannot change it.
+// It CAN change save behaviour (a document that would strict-save may
+// afterwards refuse with SACM-XMI-006), because that is the point.
 class Document {
   public:
     Document();
@@ -52,6 +63,21 @@ class Document {
     // documents created through the editing API.
     const std::map<std::string, std::string>& foreign_namespaces() const {
         return foreign_namespaces_;
+    }
+
+    // Ids carried by elements that only preserved compatibility content
+    // represents -- they are in the source document but not in the index,
+    // because the reader could not type them (SACM23-COMPAT-002).
+    //
+    // A reference to one of these is not dangling: the target exists, it is
+    // merely untyped. Validation needs the distinction so that a file whose
+    // argument is intact is not reported as structurally broken.
+    bool has_preserved_element(const ElementId& id) const {
+        return preserved_element_ids_.contains(id);
+    }
+
+    const std::unordered_set<ElementId>& preserved_element_ids() const {
+        return preserved_element_ids_;
     }
 
     // Element lookup by id; nullptr when absent.
@@ -89,6 +115,7 @@ class Document {
     std::vector<std::unique_ptr<AssuranceCasePackage>> roots_;
     std::vector<std::unique_ptr<SACMElement>> other_roots_;
     std::unordered_map<ElementId, SACMElement*> index_;
+    std::unordered_set<ElementId> preserved_element_ids_;
     std::map<ElementKind, std::uint64_t> id_counters_;
     std::map<std::string, std::string> foreign_namespaces_;
     std::uint64_t revision_ = 0;
