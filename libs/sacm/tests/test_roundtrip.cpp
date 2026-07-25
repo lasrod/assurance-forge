@@ -185,6 +185,195 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_CurrentGsnNamespaceAndAwayTypesAreRecogn
     EXPECT_TRUE(context_reported) << "GSN Context was dropped without explanation";
 }
 
+// The same extension type under our own pinned namespace and a different
+// prefix, so the strict-mode assertions below are not confounded by the GSN
+// fixture's dialect namespace and missing ids (strict rejects those first, and
+// never reaches the element).
+// The same shape, but the extension prefix is declared ON THE CHILD rather than
+// on an ancestor. Namespace scoping makes this equivalent XML, so it must behave
+// identically -- resolving `xsi:type` without pushing the child's own scope would
+// leave the prefix unresolvable, miss the extension branch, and drop the subtree.
+constexpr std::string_view kLocallyDeclaredExtensionDocument =
+    R"(<?xml version="1.0" encoding="UTF-8"?>)"
+    R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+    R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+    R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" )"
+    R"(xmi:version="2.0" xmi:id="acp_1">)"
+    R"(<name content="Locally Declared Case"/><argumentPackage xmi:id="argpkg_1">)"
+    R"(<argumentElement xmlns:gsn="http://scsc.acwg.gsn/2.0" xsi:type="gsn:Context" )"
+    R"(xmi:id="ctx_1"><name content="C1"/>)"
+    R"(</argumentElement></argumentPackage></sacm:AssuranceCasePackage>)";
+
+constexpr std::string_view kStrictNamespaceExtensionDocument =
+    R"(<?xml version="1.0" encoding="UTF-8"?>)"
+    R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+    R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+    R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" )"
+    R"(xmlns:gsn="http://scsc.acwg.gsn/2.0" xmi:version="2.0" xmi:id="acp_1">)"
+    R"(<name content="Strict Namespace Case"/><argumentPackage xmi:id="argpkg_1">)"
+    R"(<argumentElement xsi:type="gsn:Context" xmi:id="ctx_1"><name content="C1"/>)"
+    R"(</argumentElement></argumentPackage></sacm:AssuranceCasePackage>)";
+
+// A GSN `Context` specializes the *abstract* SACM ArgumentAsset, so there is no
+// concrete class for the reader to build. It said as much -- "preserved as
+// compatibility content" -- and then dropped the element: the `std::nullopt`
+// that meant "preserve this subtree" was indistinguishable from the one that
+// meant "there is no xsi:type here", so the caller fell through to name-based
+// kind inference, failed, and returned having preserved nothing. A diagnostic
+// that claims preservation while the element disappears is worse than silence,
+// because it reads as evidence that nothing was lost.
+TEST(Sacm23RoundTrip, SACM23_COMPAT_002_ExtensionTypedElementIsPreservedNotDropped) {
+    const std::filesystem::path path = fixture("interop-gsn20-current-namespace-valid.sacm.xmi");
+    ASSERT_NE(read_file(path).find(R"(xsi:type="gsn_:Context")"), std::string::npos)
+        << "fixture no longer carries an extension type with an abstract SACM supertype; "
+           "the test measures nothing";
+
+    const LoadResult loaded = sacm::io::load_xmi_file(path);
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
+                                                          : loaded.diagnostics.front().message);
+
+    // The subtree lands verbatim on its parent, so nothing about it is
+    // reinterpreted -- not its type, not its name, not its children.
+    int preserved_fragments = 0;
+    loaded.document->for_each_element([&](const sacm::model::SACMElement& element) {
+        for (const std::string& fragment : element.preserved_content()) {
+            if (fragment.find("gsn_:Context") != std::string::npos) {
+                ++preserved_fragments;
+                EXPECT_NE(fragment.find(R"(content="C1")"), std::string::npos)
+                    << "the fragment was truncated to its opening tag: " << fragment;
+            }
+        }
+    });
+    EXPECT_EQ(preserved_fragments, 1) << "the GSN Context subtree was dropped, not preserved";
+
+    // A compatibility save re-emits it; without this the preservation is
+    // internal bookkeeping the user never gets back.
+    const sacm::io::SaveResult compat =
+        sacm::io::save_xmi_string(*loaded.document, sacm::io::SaveOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(compat.ok);
+    EXPECT_NE(compat.xml.find(R"(xsi:type="gsn_:Context")"), std::string::npos)
+        << "compatibility output dropped the preserved extension element:\n"
+        << compat.xml;
+    EXPECT_NE(compat.xml.find(R"(content="C1")"), std::string::npos) << compat.xml;
+
+    // Strict save must refuse the document rather than quietly writing it
+    // without the fragment (SACM23-XMI-004).
+    const sacm::io::SaveResult strict = sacm::io::save_xmi_string(*loaded.document);
+    EXPECT_FALSE(strict.ok);
+    EXPECT_TRUE(has_code(strict.diagnostics, sacm::validation::codes::kXmiStrictSaveRefused));
+
+    // Preservation is the *tolerant* answer. Strict must keep rejecting: a
+    // strict document carries no compatibility content, so accepting one and
+    // preserving the element would let strict output be produced from input
+    // strict does not admit. The prefix here is `gsn`, not the fixture's
+    // `gsn_` -- the reader resolves the namespace, never the prefix spelling.
+    const LoadResult strict_load = sacm::io::load_xmi_string(kStrictNamespaceExtensionDocument,
+                                                             LoadOptions{.mode = Mode::Strict});
+    EXPECT_FALSE(strict_load.ok) << "strict accepted a type it cannot represent";
+    EXPECT_TRUE(std::ranges::any_of(strict_load.diagnostics, [](const auto& diagnostic) {
+        return diagnostic.requirement_id == "SACM23-COMPAT-002" &&
+               diagnostic.severity == sacm::validation::Severity::Error;
+    })) << "strict rejection was not attributed to the extension type";
+
+    // The same document on the tolerant path preserves it, prefix and all.
+    const LoadResult tolerant = sacm::io::load_xmi_string(kStrictNamespaceExtensionDocument);
+    ASSERT_TRUE(tolerant.ok);
+    const sacm::io::SaveResult tolerant_saved =
+        sacm::io::save_xmi_string(*tolerant.document, sacm::io::SaveOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(tolerant_saved.ok);
+    EXPECT_NE(tolerant_saved.xml.find(R"(xsi:type="gsn:Context")"), std::string::npos)
+        << tolerant_saved.xml;
+}
+
+// The same loss that SACM23-COMPAT-001 fixed for vendor prefixes applies to
+// extension prefixes the moment extension fragments actually reach preserved
+// content: a fragment re-emitted under an undeclared prefix is not
+// namespace-well-formed, and the next load resolves the prefix to no namespace.
+TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedExtensionFragmentDeclaresItsNamespace) {
+    const LoadResult loaded =
+        sacm::io::load_xmi_file(fixture("interop-gsn20-current-namespace-valid.sacm.xmi"));
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
+                                                          : loaded.diagnostics.front().message);
+
+    const auto& declarations = loaded.document->foreign_namespaces();
+    const auto gsn = declarations.find("gsn_");
+    ASSERT_NE(gsn, declarations.end())
+        << "the prefix the preserved fragment uses was not recorded for re-declaration";
+    EXPECT_EQ(gsn->second, "http://scsc.acwg.gsn/2.0");
+
+    const sacm::io::SaveResult compat =
+        sacm::io::save_xmi_string(*loaded.document, sacm::io::SaveOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(compat.ok);
+    EXPECT_NE(compat.xml.find(R"(xmlns:gsn_="http://scsc.acwg.gsn/2.0")"), std::string::npos)
+        << "compatibility output re-emits the gsn_ prefix without declaring it:\n"
+        << compat.xml;
+
+    // The declaration exists to make the fragment readable again, so a reload
+    // must classify it exactly as the first load did.
+    const LoadResult reloaded = sacm::io::load_xmi_string(compat.xml);
+    ASSERT_TRUE(reloaded.ok) << (reloaded.diagnostics.empty() ? compat.xml
+                                                             : reloaded.diagnostics.front().message);
+    const auto differences = sacm::compare::semantic_compare(*loaded.document, *reloaded.document);
+    for (const auto& difference : differences) {
+        ADD_FAILURE() << "[" << difference.category << "] " << difference.path << ": "
+                      << difference.message;
+    }
+}
+
+// Namespace scoping: an extension prefix declared on the element itself is
+// equivalent XML to one declared on an ancestor, so it must resolve the same way.
+// Reading `xsi:type` without pushing the child's own scope left the prefix
+// unresolvable, so the type missed the extension branch and the subtree was
+// dropped -- the same silent loss this preservation path exists to prevent.
+TEST(Sacm23RoundTrip, SACM23_COMPAT_002_LocallyDeclaredExtensionPrefixIsPreserved) {
+    const LoadResult loaded = sacm::io::load_xmi_string(kLocallyDeclaredExtensionDocument);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_EQ(loaded.document->roots().size(), 1u);
+
+    const sacm::io::SaveResult saved =
+        sacm::io::save_xmi_string(*loaded.document, sacm::io::SaveOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(saved.ok);
+    EXPECT_NE(saved.xml.find(R"(xsi:type="gsn:Context")"), std::string::npos)
+        << "the locally-declared extension subtree was dropped: " << saved.xml;
+    EXPECT_NE(saved.xml.find(R"(xmlns:gsn="http://scsc.acwg.gsn/2.0")"), std::string::npos)
+        << "the preserved fragment's prefix was not declared: " << saved.xml;
+}
+
+// Preserving on one save is not preserving: the loss shows up on the second
+// pass, when the re-emitted fragment has to be read back through the same
+// reader that produced it.
+TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedExtensionContentSurvivesTwoRoundTrips) {
+    const sacm::io::SaveOptions compat_options{.mode = Mode::Tolerant};
+    const LoadResult first =
+        sacm::io::load_xmi_file(fixture("interop-gsn20-current-namespace-valid.sacm.xmi"));
+    ASSERT_TRUE(first.ok);
+
+    const sacm::io::SaveResult once = sacm::io::save_xmi_string(*first.document, compat_options);
+    ASSERT_TRUE(once.ok);
+    const LoadResult second = sacm::io::load_xmi_string(once.xml);
+    ASSERT_TRUE(second.ok) << (second.diagnostics.empty() ? once.xml
+                                                          : second.diagnostics.front().message);
+
+    int preserved_fragments = 0;
+    second.document->for_each_element([&](const sacm::model::SACMElement& element) {
+        for (const std::string& fragment : element.preserved_content()) {
+            if (fragment.find("gsn_:Context") != std::string::npos) {
+                ++preserved_fragments;
+            }
+        }
+    });
+    EXPECT_EQ(preserved_fragments, 1) << "the re-emitted fragment was lost when read back:\n"
+                                      << once.xml;
+
+    const sacm::io::SaveResult twice = sacm::io::save_xmi_string(*second.document, compat_options);
+    ASSERT_TRUE(twice.ok);
+    EXPECT_EQ(once.xml, twice.xml) << "compatibility output is not idempotent";
+    EXPECT_NE(twice.xml.find(R"(xsi:type="gsn_:Context")"), std::string::npos)
+        << "the preserved fragment did not survive a second round trip:\n"
+        << twice.xml;
+    EXPECT_NE(twice.xml.find(R"(content="C1")"), std::string::npos) << twice.xml;
+}
+
 // GSN's SupportedBy runs opposite to SACM's AssertedInference: GSN writes
 // source="the goal being supported", while SACM 2.3 clause 11.14 states that
 // "the truth of Claim A -- the source -- is said to infer the truth of Claim B
