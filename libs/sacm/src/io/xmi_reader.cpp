@@ -807,10 +807,22 @@ void collect_preserved_ids(Reader& reader, const pugi::xml_node& node) {
         // "structurally broken" failure for any EMF file that spells it
         // otherwise.
         const std::string_view prefix = prefix_of(name);
-        if (!prefix.empty() &&
-            !metadata::namespaces::is_xmi_namespace(reader.resolve_prefix(prefix)) &&
-            prefix != "xmi") {
-            continue;
+        if (!prefix.empty()) {
+            const std::string uri = reader.resolve_prefix(prefix);
+            // An UNDECLARED `xmi:` prefix is accepted on its spelling -- that is
+            // the conventional form and plenty of real files never declare it.
+            // A DECLARED one must resolve to an XMI namespace, so a document
+            // that rebinds `xmlns:xmi` to something else cannot confer
+            // serialization identity on its own terms. Accepting the spelling
+            // unconditionally would let such a document downgrade a genuinely
+            // dangling reference to SACM-REF-003, which is the same masking the
+            // prefix check exists to prevent.
+            const bool is_xmi_identity = uri.empty()
+                                             ? prefix == "xmi"
+                                             : metadata::namespaces::is_xmi_namespace(uri);
+            if (!is_xmi_identity) {
+                continue;
+            }
         }
         if (attr.value() != nullptr && *attr.value() != '\0') {
             reader.preserved_element_ids.insert(ElementId{attr.value()});

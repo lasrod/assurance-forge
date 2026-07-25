@@ -534,6 +534,31 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedTargetDowngradeDoesNotMaskRealD
         sacm::io::load_xmi_string(kMixedTargetDocument, LoadOptions{.mode = Mode::Strict});
     EXPECT_FALSE(has_code(strict.diagnostics, sacm::validation::codes::kRefPreservedTarget))
         << "strict mode produced a preserved-target diagnostic despite preserving nothing";
+
+    // The prefix spelling `xmi` is accepted only when UNDECLARED. A document
+    // that rebinds `xmlns:xmi` to a non-XMI namespace must not be able to
+    // confer serialization identity on its own terms -- otherwise it could
+    // downgrade a genuinely dangling reference to a warning, which is the same
+    // masking this check exists to prevent.
+    const LoadResult rebound = sacm::io::load_xmi_string(
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+        R"(xmlns:xmi="http://acme.example/not-xmi" )"
+        R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" )"
+        R"(xmlns:gsn="http://scsc.acwg.gsn/2.0" xmi:id="acp_r">)"
+        R"(<name content="Rebound XMI Prefix"/><argumentPackage xmi:id="ap_r"><name content="M"/>)"
+        R"(<argumentElement xsi:type="sacm:Claim" xmi:id="g_r"><name content="GR"/></argumentElement>)"
+        R"(<argumentElement xsi:type="gsn:Context" xmi:id="c_r"><name content="CR"/></argumentElement>)"
+        R"(<argumentElement xsi:type="sacm:AssertedContext" xmi:id="ctx_r" source="g_r" )"
+        R"(target="c_r"/></argumentPackage></sacm:AssuranceCasePackage>)");
+    ASSERT_TRUE(rebound.ok);
+    EXPECT_FALSE(rebound.document->has_preserved_element(ElementId{"c_r"}))
+        << "a document that rebound xmlns:xmi to a non-XMI namespace was still allowed to confer "
+           "preserved-element identity, so it could mask a real dangling reference";
+    EXPECT_TRUE(has_code(sacm::validation::validate(*rebound.document),
+                         sacm::validation::codes::kRefDangling))
+        << "the reference should be reported as genuinely dangling, since nothing in this document "
+           "establishes XMI identity for the preserved element";
 }
 
 // EMF-dialect files address elements by containment position
