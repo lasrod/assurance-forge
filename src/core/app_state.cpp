@@ -9,7 +9,6 @@
 #include "core/terminology_package_service.h"
 #include "core/terminology_text_utils.h"
 #include "parser/model_utils.h"
-#include "sacm/sacm_parser.h"
 #include "sacm/sacm_serializer.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/library_load.h"
@@ -26,71 +25,44 @@ namespace core {
 
 bool AppState::load_file(const std::string& file_path) {
     try {
-        // The SACM library is the load source of truth (Phase 9 Stage 4): the
-        // projected POD model is what the UI renders. If the library cannot load
-        // the file we fall back to the legacy parser so opening never breaks on
-        // a library gap -- and say so, so the gap is visible rather than silent.
+        // The SACM library is the SOLE load path: the projected POD model is what
+        // the UI renders and `sacm_package` is a derived cache of the library. There
+        // is NO legacy-parser fallback -- a file the library cannot read is a library
+        // import bug to fix in the library, not a reason to keep a parallel legacy
+        // parser in the app.
         library_document.reset();
         sacm_adapter::LoadOutcome outcome = sacm_adapter::load_document(file_path);
-        std::optional<parser::AssuranceCase> projected;
-        std::string load_note;
-        if (outcome.ok && outcome.document != nullptr) {
-            library_document = std::move(outcome.document);
-            projected = sacm_adapter::project_case(*library_document);
-        } else {
-            std::expected<parser::AssuranceCase, std::string> legacy =
-                parser::parse_sacm_xml(file_path);
-            if (!legacy) {
-                loaded_file_path.clear();
-                has_unsaved_changes = false;
-                loaded_case.reset();
-                sacm_package.reset();
-                status_message = "Error: " + std::move(legacy.error());
-                return false;
-            }
-            projected = std::move(*legacy);
-            load_note = " (loaded via legacy parser; the SACM library could not read this file)";
+        if (!outcome.ok || outcome.document == nullptr) {
+            active_project_file_role = ProjectFileRole::Unknown;
+            active_project_file_path.clear();
+            loaded_file_path.clear();
+            has_unsaved_changes = false;
+            loaded_case.reset();
+            sacm_package.reset();
+            ++case_revision;
+            const std::string detail = sacm_adapter::summarize_load_diagnostics(outcome.diagnostics);
+            status_message =
+                "Error: the SACM library could not read this file" + (detail.empty() ? "." : ": " + detail);
+            return false;
         }
+        library_document = std::move(outcome.document);
 
         active_project_file_role = ProjectFileRole::Unknown;
         active_project_file_path.clear();
         loaded_file_path = std::filesystem::path(file_path);
         has_unsaved_changes = false;
-        loaded_case = std::move(*projected);
+        loaded_case = sacm_adapter::project_case(*library_document);
         ++case_revision;
 
-        // Also populate the SACM domain model for save support. `load_note` (the
-        // legacy-parser-fallback warning) is appended to every branch, or a
-        // library load gap would go silent whenever sacm::parse_sacm succeeds.
-        const std::string summary =
+        // `sacm_package` is the derived render/save cache, projected from the
+        // library. The tag-carrying projection preserves ACP/confidence/GSN-role
+        // tags; the terminology passes then hide/refresh the projected model.
+        sacm_package = core::project_library_package_with_tags(*library_document);
+        SynthesizeBareStrategyPlacements(loaded_case.value(), sacm_package.value());
+        HideTerminologyArtifactReferences(loaded_case.value(), sacm_package.value());
+        RefreshVisibleTerminologyContextDisplay(loaded_case.value(), sacm_package.value());
+        status_message =
             "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
-        sacm_package.reset();
-        if (library_document != nullptr) {
-            // The library is the load source of truth, so derive the legacy
-            // package from it rather than re-parsing the file. This is required
-            // for correctness since Phase 9 Stage 6: saved files are library XMI,
-            // which `sacm::parse_sacm` reads as a near-empty package -- breaking
-            // terminology display, ACP, and (on re-save) losing data. The
-            // tag-carrying projection preserves ACP/confidence/GSN-role tags; the
-            // terminology passes then hide/refresh the already-projected model.
-            sacm_package = core::project_library_package_with_tags(*library_document);
-            SynthesizeBareStrategyPlacements(loaded_case.value(), sacm_package.value());
-            HideTerminologyArtifactReferences(loaded_case.value(), sacm_package.value());
-            RefreshVisibleTerminologyContextDisplay(loaded_case.value(), sacm_package.value());
-            status_message = summary + load_note;
-        } else if (auto sacm_result = sacm::parse_sacm(file_path)) {
-            // Legacy-parser fallback path (the library could not read the file).
-            sacm_package = std::move(*sacm_result);
-            SynthesizeBareStrategyPlacements(loaded_case.value(), sacm_package.value());
-            HideTerminologyArtifactReferences(loaded_case.value(), sacm_package.value());
-            RefreshVisibleTerminologyContextDisplay(loaded_case.value(), sacm_package.value());
-            status_message = summary + load_note;
-        } else {
-            status_message = "Loaded with warning: " + loaded_case->name + " (" +
-                             std::to_string(loaded_case->elements.size()) +
-                             " elements), but save support is unavailable (SACM parse failed: " +
-                             std::string(sacm_result.error()) + ")" + load_note;
-        }
 
         return true;
     } catch (const std::bad_alloc&) {
