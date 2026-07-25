@@ -28,6 +28,7 @@ Every `sacm::validation::Diagnostic` carries: `code`, `severity`
 | SACM-XMI-006 | Error | Strict save refused: document contains preserved unknown content or compatibility-only data. |
 | SACM-XMI-007 | Warning | External (cross-document) `href` reference is not supported; kept as opaque text in compatibility mode only. |
 | SACM-XMI-008 | Warning | Document declares a SACM revision other than 2.3; loaded in compatibility mode. Distinct from SACM-XMI-002, which means the namespace itself is unrecognized. |
+| SACM-XMI-009 | Warning | The document's root is not a SACM interchange package, but SACM packages were found inside it (an ODE `DDIPackage`, say). A tolerant load reads the SACM out and states that the file does not conform, that content outside the SACM packages is not represented, and that saving writes conformant SACM rather than the original container. Strict refuses the document (SACM-XMI-001). |
 
 ## Identity and references
 

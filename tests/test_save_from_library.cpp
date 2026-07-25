@@ -791,3 +791,43 @@ TEST(SaveFromLibrary, SACM23_INT_001_UnflippedBusCommandPreservesUnknownContentI
     EXPECT_TRUE(Contains(bytes, kVendorElementMarker))
         << "the Stage-5 net dropped the vendor element from the library document:\n" << bytes;
 }
+
+// A load can SUCCEED and still have told us something the user must know. The
+// sharpest case: an ODE container embedding SACM opens fine, so nothing on
+// screen suggests the rest of the file is about to disappear on save. The
+// library reports SACM-XMI-009; AppState used to discard every diagnostic on
+// the success path, so the warning existed and reached nobody.
+TEST(SaveFromLibrary, SACM23_INT_001_LoadSurfacesNonConformanceWarningToTheUser) {
+    const std::filesystem::path container = std::filesystem::path(AF_REPO_ROOT) / "libs" / "sacm" /
+                                            "tests" / "data" / "interop-thirdparty" /
+                                            "mobstr-safetycase.integration";
+    ASSERT_TRUE(std::filesystem::exists(container)) << container.string();
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(container.string())) << state.status_message;
+
+    // The user is told, in the status line they already read after every open.
+    EXPECT_TRUE(Contains(state.status_message, "SACM-XMI-009"))
+        << "the non-conformance warning did not reach the status line: " << state.status_message;
+    EXPECT_TRUE(Contains(state.status_message, "does not conform")) << state.status_message;
+
+    ASSERT_FALSE(state.load_warnings.empty());
+    EXPECT_TRUE(std::any_of(state.load_warnings.begin(), state.load_warnings.end(),
+                            [](const std::string& warning) {
+                                return warning.find("SACM-XMI-009") != std::string::npos;
+                            }));
+
+    // A conformant file must not be decorated with warnings it did not earn --
+    // a status line that always says something alarming says nothing.
+    ProjectFixture clean = MakeProject("clean-load", kVendorElementOnlySacm);
+    core::AppState ordinary;
+    ASSERT_TRUE(ordinary.load_file(clean.sacm_absolute.string())) << ordinary.status_message;
+    EXPECT_FALSE(Contains(ordinary.status_message, "SACM-XMI-009")) << ordinary.status_message;
+
+    // And the warning is cleared by the next load rather than persisting.
+    EXPECT_TRUE(ordinary.load_warnings.empty() ||
+                std::none_of(ordinary.load_warnings.begin(), ordinary.load_warnings.end(),
+                             [](const std::string& warning) {
+                                 return warning.find("SACM-XMI-009") != std::string::npos;
+                             }));
+}

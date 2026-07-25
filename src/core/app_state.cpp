@@ -64,6 +64,51 @@ bool AppState::load_file(const std::string& file_path) {
         status_message =
             "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
 
+        // A load that SUCCEEDS can still have told us something the user must
+        // know -- most sharply, that the file is not a conformant SACM
+        // interchange document and saving will not reproduce it (SACM-XMI-009,
+        // an ODE container embedding SACM). These diagnostics used to be
+        // discarded on the success path, so such a file opened silently and the
+        // first save quietly rewrote it. The failure branch already surfaces
+        // diagnostics; success must too, or "the library warns about this" is a
+        // claim the product does not keep.
+        //
+        // Warning and above only: the Info stream is per-element reader detail,
+        // and burying one real warning in fifty notices is the same as not
+        // showing it.
+        // Deduplicated BY CODE, because the raw stream is per-element: one real
+        // file produces 222 warnings of which 220 are "this element had no
+        // xmi:id, one was generated". Showing the first of those and calling it
+        // the warning is the same as showing nothing.
+        load_warnings.clear();
+        std::vector<std::string> seen_codes;
+        for (const sacm_adapter::LoadDiagnostic& diagnostic : outcome.diagnostics) {
+            if (diagnostic.severity == "Info")
+                continue;
+            if (std::find(seen_codes.begin(), seen_codes.end(), diagnostic.code) != seen_codes.end())
+                continue;
+            seen_codes.push_back(diagnostic.code);
+            load_warnings.push_back(diagnostic.code + ": " + diagnostic.message);
+        }
+
+        // One code leads regardless of document order: SACM-XMI-009 says the
+        // file is not a conformant SACM interchange document and that saving
+        // will not reproduce it. Every other warning describes how we read the
+        // file; that one describes what we are about to do to it, and the user
+        // is deciding whether to keep working in this tool at all.
+        const auto not_conformant =
+            std::find_if(load_warnings.begin(), load_warnings.end(), [](const std::string& line) {
+                return line.starts_with("SACM-XMI-009");
+            });
+        if (not_conformant != load_warnings.end())
+            std::rotate(load_warnings.begin(), not_conformant, not_conformant + 1);
+
+        if (!load_warnings.empty()) {
+            status_message += " -- " + std::to_string(load_warnings.size()) +
+                              (load_warnings.size() == 1 ? " warning: " : " warning kinds: ") +
+                              load_warnings.front();
+        }
+
         return true;
     } catch (const std::bad_alloc&) {
         loaded_file_path.clear();

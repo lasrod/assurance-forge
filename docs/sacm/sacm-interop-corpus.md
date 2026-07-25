@@ -11,16 +11,21 @@ to evidence rather than to a fixture whose origin nobody recorded.
 
 ## The redistribution rule
 
-**No bytes produced by another tool are committed to this repository.**
+**Third-party bytes are committed only when their licence permits redistribution
+and that licence is recorded.**
 
-Every interop fixture in `libs/sacm/tests/data/sacm23/` is either a *reduced
-reproduction* (hand-authored to reproduce a dialect's structural shape, from a
-public example that is not itself copied in) or *authored from a specification
-figure*. That keeps the repository free of third-party licensing obligations we
-would otherwise have to track, vendor, and re-check on every release.
+`libs/sacm/tests/data/interop-thirdparty/` holds files produced by other
+people's tools, unmodified, with source URL, upstream commit and licence in its
+[NOTICE.md](../../libs/sacm/tests/data/interop-thirdparty/NOTICE.md). Those run
+in CI. Anything whose licence does not permit redistribution — including the
+single most useful file found — stays out and is reachable only through the
+opt-in harness below.
 
-It also caps what the corpus can prove, and that limit is stated explicitly in
-[Known gaps](#known-gaps) rather than left for a reader to infer.
+Everything in `libs/sacm/tests/data/sacm23/` remains our own: a *reduced
+reproduction* of a dialect's structural shape, or a fixture *authored from a
+specification figure*. Those prove the reader handles the shape we **believe** a
+tool emits; only the third-party directory proves it handles what a tool
+actually emitted.
 
 ## Corpus register
 
@@ -48,13 +53,16 @@ It also caps what the corpus can prove, and that limit is stated explicitly in
 | `SACM23_COMPAT_001_VendorContentPreservedAndStrictSaveRefuses` | vendor-extension |
 | `SACM23_COMPAT_001_PreservedForeignAttributeSurvivesTwoRoundTrips` | inline document |
 | `SACM23_RT_001_Repo*RoundTrips`, `SACM23_BASE_001_JapaneseMultiLanguageFixtureRoundTrips` | repository fixtures |
+| `SACM23_COMPAT_002_ThirdPartyOdeContainerImportsWithNonConformanceWarning` | **third-party** `mobstr-safetycase.integration` |
+| `SACM23_COMPAT_002_ThirdPartyEmfFileImportsAndReportsItsRealViolations` | **third-party** `sysmline-easyexample.assurancecase` |
+| `SACM23_COMPAT_002_ThirdPartyFiles{ParseIntoSacmElements,SemanticallyRoundTrip}` | opt-in `SACM_INTEROP_CORPUS` directory |
 
-## Third-party corpus (opt-in, not committed)
+## Third-party corpus
 
-Files produced by other tools, located by public search. **None are committed** —
-the redistribution rule above still holds, and the most useful of them carries no
-declared licence at all, so it could not be vendored even if the rule were
-relaxed.
+Files produced by other tools, located by public search. The two EPL-2.0 files
+are **committed** under `libs/sacm/tests/data/interop-thirdparty/` and run in CI;
+the rest cannot be redistributed and are reachable only through the opt-in
+harness.
 
 Point `SACM_INTEROP_CORPUS` at a directory containing them and
 `Sacm23InteropCorpus.SACM23_COMPAT_002_*` (`libs/sacm/tests/test_interop_corpus.cpp`)
@@ -68,10 +76,10 @@ SACM_INTEROP_CORPUS=/path/to/corpus ctest --test-dir build -C Release -R Sacm23I
 | Source | Licence | File | Dialect | Measured result |
 |---|---|---|---|---|
 | [LuisFelipeAN/aceditor-mbac-results](https://github.com/LuisFelipeAN/aceditor-mbac-results) — output of the SACM **ACEditor MBAC** tool | **none declared** (do not redistribute) | `HBS/default.sacm2` | `http://SACM_ACEditor/sacm/2.1`, legacy XMI URI, `gid=` identity, no `xmi:id` | **Imports, validates with 0 errors, semantically round-trips.** The one file that satisfies COMPAT-002's requirement text end to end |
-| [Ruizhe-Yang/SysMLine](https://github.com/Ruizhe-Yang/SysMLine) — EMF/ACME | EPL-2.0 | `dut.cs.sysmline/model/SACM/EasyExample.assurancecase` | `http://omg.sacm/2.2/*` per-package + `http://acwg.org/3.0/gsn` | Imports and round-trips. 80 validation errors, all genuine rule violations in the source: `implementationConstraint` on non-abstract elements (clause 8.6) and duplicate language tags — it is EMF template output with placeholder values |
+| [Ruizhe-Yang/SysMLine](https://github.com/Ruizhe-Yang/SysMLine) — EMF/ACME | EPL-2.0 | `dut.cs.sysmline/model/SACM/EasyExample.assurancecase` | `http://omg.sacm/2.2/*` per-package + `http://acwg.org/3.0/gsn` | **Committed** under `interop-thirdparty/`. Imports and round-trips. 80 validation errors, all genuine rule violations in the source: `implementationConstraint` on non-abstract elements (clause 8.6) and duplicate language tags — it is EMF template output with placeholder values |
 | [Ruizhe-Yang/SysMini](https://github.com/Ruizhe-Yang/SysMini) | none declared | `org.omg.sysmini/model/SACM/quan.assurancecase` | same, plus `artifact_` | Imports and round-trips; 45 errors, same two causes |
-| [panorama-research/mobstr-dataset](https://github.com/panorama-research/mobstr-dataset) — MobSTr automotive safety dataset | EPL-2.0 | `org.panorama-research.mobstr.safetycase/mobstr-safetycase.integration` | ODE `DDIPackage` embedding SACM, `http://www.deis-project.eu/ode/mergedODE/sacm/*` | **Declined**: root is an ODE container, not a SACM interchange root (clause 2.4) |
-| [DEIS-Project-EU/DDI-Scripting-Tools](https://github.com/DEIS-Project-EU/DDI-Scripting-Tools) | MIT | `Examples/ETCS/etcs.model`, `trackside.model` | same | **Declined**, same reason |
+| [panorama-research/mobstr-dataset](https://github.com/panorama-research/mobstr-dataset) — MobSTr automotive safety dataset | EPL-2.0 | `org.panorama-research.mobstr.safetycase/mobstr-safetycase.integration` | ODE `DDIPackage` embedding SACM, `http://www.deis-project.eu/ode/mergedODE/sacm/*` | **Imports** with a `SACM-XMI-009` non-conformance warning (see below); validates with 0 errors; round-trips. **Committed** under `interop-thirdparty/` |
+| [DEIS-Project-EU/DDI-Scripting-Tools](https://github.com/DEIS-Project-EU/DDI-Scripting-Tools) | MIT | `Examples/ETCS/etcs.model`, `trackside.model` | same | Imports the same way. Not committed — one ODE container in CI is enough, and this one is 100 KB |
 
 Two findings worth keeping:
 
@@ -82,32 +90,46 @@ Two findings worth keeping:
   third-party content and correctly identified real SACM rule violations, while
   still round-tripping the documents semantically.
 
-The two declined files raise a genuine open question rather than a defect: real
-toolchains ship SACM *embedded in a larger container*. Accepting a foreign
-wrapper root is a conformance decision (SACM 2.3 clause 2.4 defines the
-interchange roots), not something to change unilaterally — see
-[Known gaps](#known-gaps) item 1.
+### Foreign container roots
+
+Real toolchains ship SACM *embedded in a larger container* — an ODE
+`DDIPackage` carrying architecture and failure-logic models alongside the
+assurance case. Clause 2.4 defines the SACM interchange roots and such a
+container is not one, so **strict refuses these files**.
+
+Refusing them on the tolerant path too would mean a user holding a real vendor
+file simply cannot open their own assurance case. So a tolerant load reads the
+SACM out and reports `SACM-XMI-009`, which states all three things the user
+needs in one diagnostic:
+
+- the file **does not conform** to SACM 2.3 as an interchange document;
+- content outside the SACM packages is **not represented** in the model;
+- **saving writes a conformant SACM document**, not the original container.
+
+That last point is why silence would have been the worst option: the argument
+loads cleanly, so nothing else would warn the user that the rest of their file
+is about to disappear on save.
 
 ## Known gaps
 
 These are the limits of what the register above supports. They are the reason
 `SACM23-COMPAT-002` is not claimed beyond what its matrix row says.
 
-1. **Third-party evidence exists but is not exercised by default.** The corpus
-   above is real and measured, and the harness is reproducible for anyone
-   holding the files — but CI skips it, because the files cannot be committed.
-   Closing this fully needs either a licence-clean file that *can* be vendored,
-   or a CI job that fetches the corpus.
+1. **Coverage is two tools, not the field.** CI now parses real third-party
+   bytes, which closes the gap that held SACM23-COMPAT-002 — but two EPL-2.0
+   files from two projects is a floor, not breadth. Papyrus in particular has
+   still produced nothing we have seen (decision #20 named it as the original
+   target).
 
-   Related, and undecided: whether the library should read SACM out of a foreign
-   container root (ODE `DDIPackage`). Two of the five files found are in that
-   shape, and rejecting them is defensible under clause 2.4 — but if that is how
-   real toolchains ship SACM, "we support the dialect" and "we can read their
-   files" are not the same claim.
+   The strongest single piece of evidence — ACEditor MBAC output, which imports
+   and validates with **zero** errors — carries no declared licence and so runs
+   only through `SACM_INTEROP_CORPUS`. If its author ever states a licence, it
+   should be vendored.
 
    Superseded history: an earlier one-off developer check parsed a public
    EMF/GSN file and yielded 39 SACM elements where the previous reader yielded 0.
-   It is recorded here as history, not evidence; the harness above replaces it.
+   It is recorded here as history, not evidence; the committed fixtures and the
+   opt-in harness replace it.
 
 2. **No Papyrus output.** Papyrus was the original interop target (decision
    #20). Nothing from it has been obtained or modelled.

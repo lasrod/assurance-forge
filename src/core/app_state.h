@@ -51,6 +51,14 @@ struct AppState {
     // Status message for UI display
     std::string status_message;
 
+    // Warning-and-above diagnostics from the last successful load, as display
+    // lines. A load can succeed and still have something the user must know --
+    // that the file is not a conformant SACM interchange document and saving
+    // will not reproduce it, for one (SACM-XMI-009). `status_message` carries
+    // the first; this holds all of them for a panel that wants to list them.
+    // Cleared by every load.
+    std::vector<std::string> load_warnings;
+
     // Monotonic counter bumped whenever the loaded document is loaded,
     // mutated, or otherwise invalidated. Render-side caches (e.g. the
     // per-tab workbench visible-case projection) compare this against a

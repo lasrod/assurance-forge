@@ -23,6 +23,14 @@ inline constexpr std::string_view kXmiExternalReference = "SACM-XMI-007";
 // Conflating the two would make "we do not know this namespace" and "this is
 // SACM 2.2" indistinguishable to a caller.
 inline constexpr std::string_view kXmiOlderStandardVersion = "SACM-XMI-008";
+// The document's root is not a SACM interchange package, but SACM packages were
+// found inside it -- the shape real toolchains use when they embed SACM in a
+// larger container (an ODE DDIPackage, say). A tolerant load reads the SACM out
+// of it and says so: the file is NOT a conformant SACM 2.3 interchange
+// document, everything outside the SACM packages is not represented, and saving
+// produces a conformant SACM document rather than the original container.
+// Strict rejects such a document outright (SACM-XMI-001).
+inline constexpr std::string_view kXmiForeignContainerRoot = "SACM-XMI-009";
 
 // Identity and references.
 inline constexpr std::string_view kIdDuplicate = "SACM-ID-001";

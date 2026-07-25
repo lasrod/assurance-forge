@@ -1762,6 +1762,53 @@ void check_root_namespace(Reader& reader, const pugi::xml_node& root) {
     }
 }
 
+// The SACM interchange-package kind a node denotes, if any. Tries xsi:type, the
+// element's own name, and the singular of a plural containment role -- real
+// containers spell the role `assuranceCasePackages` for a list of them.
+std::optional<ElementKind> interchange_package_kind(Reader& reader, const pugi::xml_node& node) {
+    const auto package_kind = [](std::optional<ElementKind> kind) -> std::optional<ElementKind> {
+        if (kind.has_value() && metadata::is_package_kind(*kind)) {
+            return kind;
+        }
+        return std::nullopt;
+    };
+
+    reader.push_scope(node);
+    const XsiTypeResult xsi_type = read_xsi_type(reader, node);
+    reader.pop_scope();
+    if (xsi_type.resolved()) {
+        if (const std::optional<ElementKind> kind =
+                package_kind(detail::kind_from_class_name_ci(xsi_type.type_name))) {
+            return kind;
+        }
+    }
+
+    const std::string_view name = local_name(node.name());
+    if (const std::optional<ElementKind> kind = package_kind(detail::kind_from_class_name_ci(name))) {
+        return kind;
+    }
+    if (name.size() > 1 && name.back() == 's') {
+        return package_kind(detail::kind_from_class_name_ci(name.substr(0, name.size() - 1)));
+    }
+    return std::nullopt;
+}
+
+// Collects the OUTERMOST SACM interchange packages inside a foreign container,
+// without descending into one once found (its contents are the reader's job).
+void collect_embedded_packages(Reader& reader, const pugi::xml_node& node,
+                               std::vector<pugi::xml_node>& out) {
+    for (const pugi::xml_node& child : node.children()) {
+        if (child.type() != pugi::node_element) {
+            continue;
+        }
+        if (interchange_package_kind(reader, child).has_value()) {
+            out.push_back(child);
+            continue;
+        }
+        collect_embedded_packages(reader, child, out);
+    }
+}
+
 // Reads one root element into the document.
 void read_root(Reader& reader, model::Document& document, const pugi::xml_node& root) {
     reader.push_scope(root);
@@ -1783,14 +1830,56 @@ void read_root(Reader& reader, model::Document& document, const pugi::xml_node& 
                                   xsi_type.type_name, local_name(root.name())));
     }
     if (!kind.has_value()) {
-        kind = reader.strict() ? detail::kind_from_class_name(local_name(root.name()))
-                               : detail::kind_from_class_name_ci(local_name(root.name()));
+        const std::string_view name = local_name(root.name());
+        kind = reader.strict() ? detail::kind_from_class_name(name)
+                               : detail::kind_from_class_name_ci(name);
+        // A multi-valued containment role is spelled plural in real containers:
+        // an ODE DDIPackage holds its assurance case under `assuranceCasePackages`.
+        // Without this the reader descends past that element into the argument
+        // package inside it, silently dropping the AssuranceCasePackage level.
+        if (!kind.has_value() && !reader.strict() && name.size() > 1 && name.back() == 's') {
+            kind = detail::kind_from_class_name_ci(name.substr(0, name.size() - 1));
+        }
     }
     reader.pop_scope();
 
     const bool valid_root =
         kind.has_value() && metadata::is_package_kind(*kind);
     if (!valid_root) {
+        // Real toolchains ship SACM embedded in a larger container -- an ODE
+        // DDIPackage carrying architecture and failure-logic models alongside
+        // the assurance case. Strict refuses such a file, but refusing it on the
+        // tolerant path too would mean a user with a real vendor file simply
+        // cannot open their own assurance case.
+        //
+        // So read the SACM out of it and be explicit about what that costs: the
+        // file is not a conformant SACM interchange document, the container's
+        // non-SACM content is not represented in the model, and a save produces
+        // conformant SACM rather than the original container. Silence here would
+        // be the worst option -- the user would see their argument load and have
+        // no reason to expect the rest of the file to disappear on save.
+        if (!reader.strict()) {
+            std::vector<pugi::xml_node> embedded;
+            collect_embedded_packages(reader, root, embedded);
+            if (!embedded.empty()) {
+                reader.report(
+                    validation::codes::kXmiForeignContainerRoot, Severity::Warning,
+                    "SACM23-COMPAT-002", root, {},
+                    std::format(
+                        "'{}' is not a SACM interchange package root; {} SACM package(s) were read "
+                        "from inside it. This file does not conform to SACM 2.3 as an interchange "
+                        "document: content outside the SACM packages is NOT represented in the "
+                        "model, and saving will write a conformant SACM document rather than the "
+                        "original container",
+                        root.name(), embedded.size()));
+                for (const pugi::xml_node& package : embedded) {
+                    reader.push_scope(package);
+                    read_root(reader, document, package);
+                    reader.pop_scope();
+                }
+                return;
+            }
+        }
         reader.report(validation::codes::kXmiInvalidRoot, Severity::Error, "SACM23-XMI-001", root,
                       {},
                       std::format("'{}' is not a SACM interchange package root", root.name()));
