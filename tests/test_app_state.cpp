@@ -136,7 +136,7 @@ TEST(AppStateTest, LoadFileUsesTheLibraryDocumentAsTheSourceOfTruth) {
 // library gap goes silent whenever the save-support parse then succeeds. A
 // DOCTYPE triggers the library's XXE rejection while the legacy parser still
 // reads the file.
-TEST(AppStateTest, LoadFileFallbackToLegacyParserStaysVisibleInStatus) {
+TEST(AppStateTest, LoadFileRejectsDoctypeFileLibraryOnly) {
     TempDir temp(MakeTempDir());
     const std::filesystem::path sacm_path = temp.path / "doctype.sacm";
     std::ofstream(sacm_path) << R"(<?xml version="1.0"?>
@@ -147,17 +147,17 @@ TEST(AppStateTest, LoadFileFallbackToLegacyParserStaysVisibleInStatus) {
   </argumentPackage>
 </sacm:AssuranceCasePackage>)";
 
+    // The SACM library rejects a <!DOCTYPE> (XXE protection). With the library as
+    // the SOLE load path -- no legacy-parser fallback -- such a file now fails to
+    // open cleanly rather than being silently accepted by a less-strict legacy
+    // parser. That is the secure, no-legacy behavior.
     core::AppState state;
-    ASSERT_TRUE(state.load_file(sacm_path.string())) << state.status_message;
-
-    // The library rejected it (XXE), so the fallback loaded it and no library
-    // document is retained.
+    EXPECT_FALSE(state.load_file(sacm_path.string()));
     EXPECT_EQ(state.library_document, nullptr);
-    ASSERT_TRUE(state.loaded_case.has_value());
-    EXPECT_NE(FindElement(state.loaded_case.value(), "G1"), nullptr);
-    // The fallback is not silent, even though save-support parsing succeeded.
-    EXPECT_NE(state.status_message.find("legacy parser"), std::string::npos)
-        << "fallback note was dropped: " << state.status_message;
+    EXPECT_FALSE(state.loaded_case.has_value());
+    EXPECT_FALSE(state.sacm_package.has_value());
+    EXPECT_NE(state.status_message.find("could not read"), std::string::npos)
+        << "expected a clear library-read failure, got: " << state.status_message;
 }
 
 TEST(AppStateTest, OpenProjectSacmFilePreservesActiveProjectFile) {
