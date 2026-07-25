@@ -256,6 +256,7 @@ add_executable(tests
     tests/test_sacm_library_parallel_load.cpp
     tests/test_sacm_library_edit.cpp
     tests/test_sacm_library_save.cpp
+    tests/test_save_from_library.cpp
     tests/test_acp_controller.cpp
     tests/test_xml_parser.cpp
     tests/test_assurance_tree.cpp

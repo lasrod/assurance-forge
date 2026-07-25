@@ -10,6 +10,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -41,6 +42,17 @@ class Document {
     // Roots of other kinds accepted by tolerant loads (bare ArgumentPackage/
     // ArtifactPackage/TerminologyPackage interchange units, clauses 2.2/2.3).
     const std::vector<std::unique_ptr<SACMElement>>& other_roots() const { return other_roots_; }
+
+    // Namespace declarations carried by the source document whose URIs this
+    // library does not itself emit, keyed by prefix. Preserved compatibility
+    // fragments (SACM23-COMPAT-001) are stored as opaque text, so the prefixes
+    // they use are only meaningful while their declarations survive with them:
+    // a compatibility save re-declares these so the output stays
+    // namespace-well-formed and the fragments can be read back. Empty for
+    // documents created through the editing API.
+    const std::map<std::string, std::string>& foreign_namespaces() const {
+        return foreign_namespaces_;
+    }
 
     // Element lookup by id; nullptr when absent.
     const SACMElement* find(const ElementId& id) const;
@@ -78,6 +90,7 @@ class Document {
     std::vector<std::unique_ptr<SACMElement>> other_roots_;
     std::unordered_map<ElementId, SACMElement*> index_;
     std::map<ElementKind, std::uint64_t> id_counters_;
+    std::map<std::string, std::string> foreign_namespaces_;
     std::uint64_t revision_ = 0;
 };
 

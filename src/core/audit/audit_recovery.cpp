@@ -69,7 +69,6 @@ bool RestoreSacmFromAudit(const AssuranceProject& project,
         error = "Replay failed: " + replayed.error();
         return false;
     }
-    const sacm::AssuranceCasePackage replayed_package = core::project_library_package(**replayed);
 
     // Capture the on-disk hash BEFORE rewriting, so the audit event records
     // what state was overwritten. Best effort: missing/unparsable files
@@ -81,16 +80,38 @@ bool RestoreSacmFromAudit(const AssuranceProject& project,
             pre_restore_canonical = *library_hash;
     }
 
-    // Serialize the replayed package and write it atomically. The
-    // canonical hash is taken from a reparse of the serialized bytes for
-    // round-trip stability (mirrors VerifyProject). Phase 9 Stage 6: write
-    // library SACM XMI so the restored file matches the live save format. The
-    // legacy fallback keeps recovery robust if the library round-trip fails --
-    // the restored file is then legacy XML, which the audit still reads through
-    // the library and verifies consistently; the format difference is benign.
-    // (Recovery replays legacy events, so there is no unknown content to lose.)
-    std::optional<std::string> library_xml = core::library_xmi_from_package(replayed_package);
-    const std::string xml = library_xml.value_or(sacm::serialize_sacm(replayed_package));
+    // Serialize the replayed document and write it atomically. The canonical
+    // hash is taken from a reparse of the serialized bytes for round-trip
+    // stability (mirrors VerifyProject). Phase 9 Stage 6: write library SACM XMI
+    // so the restored file matches the live save format. Phase 9 Stage 7: the
+    // replay target IS a library document, so serialize it directly instead of
+    // round-tripping the package projected from it -- the same save the live
+    // path uses, so a restored file and an autosaved file describe the same
+    // state the same way. Whatever unknown content the trusted-root snapshot
+    // carried into the replay therefore survives the restore too.
+    //
+    // The projection fallback keeps recovery robust if the library round-trip
+    // fails: the restored file is then a package projection (legacy XMI, or
+    // legacy XML if even that fails), which the audit still reads through the
+    // library and verifies consistently; the format difference is benign.
+    std::string xml;
+    {
+        sacm_adapter::SaveOutcome saved = sacm_adapter::save_document(**replayed);
+        if (saved.ok) {
+            xml = std::move(saved.xml);
+        } else {
+            const sacm::AssuranceCasePackage replayed_package =
+                core::project_library_package(**replayed);
+            xml = core::library_xmi_from_package(replayed_package)
+                      .value_or(sacm::serialize_sacm(replayed_package));
+            // Report the degraded path: the projection cannot carry the unknown /
+            // vendor-specific content the replayed document held, so a caller must
+            // not present this as a fully faithful restore.
+            out_result.lossy_fallback_warning =
+                "Could not serialize the replayed SACM library document; restored a projection "
+                "instead, which does not preserve unknown or vendor-specific content.";
+        }
+    }
     auto library_hash = core::library_canonical_hash_from_xml(xml);
     if (!library_hash) {
         error = "Failed to load restored SACM through the library for hashing";

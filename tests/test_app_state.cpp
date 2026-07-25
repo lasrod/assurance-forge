@@ -234,7 +234,15 @@ TEST(AppStateTest, SaveProjectKeepsSacmTargetAfterOpeningNonSacmFile) {
 
     ASSERT_TRUE(state.open_project_file(*main_entry)) << state.status_message;
     ASSERT_TRUE(state.sacm_package.has_value());
+    // Dirty the document with a marker the saved file must carry. Since Phase 9
+    // Stage 7 `save_file` serializes the LIBRARY-OWNED document, not the derived
+    // `sacm_package` cache, so a bus-less legacy mutation has to be pushed onto
+    // the library the same way production does it (app::commands::
+    // DispatchAuditedCommand calls sync_library_document() on its no-bus path).
+    // Writing only the cache would no longer reach the file -- which is the point
+    // of the flip, not a regression.
     state.sacm_package->name = "Updated Project";
+    state.sync_library_document();
     state.mark_dirty();
 
     ASSERT_TRUE(state.open_project_file(evidence_entry)) << state.status_message;

@@ -36,6 +36,19 @@ std::string canonical_multi_lang(const model::MultiLangString& value) {
     return joined;
 }
 
+// Canonical string form of a preserved-fragment list: sorted, then joined with
+// a separator that cannot occur in XML text. Order-insensitive by design --
+// preserved fragments are opaque, so their relative order carries no meaning.
+std::string canonical_fragments(std::vector<std::string> fragments) {
+    std::ranges::sort(fragments);
+    std::string joined;
+    for (const std::string& fragment : fragments) {
+        joined += fragment;
+        joined.push_back('\x1f');
+    }
+    return joined;
+}
+
 // Comparable scalar state (attributes + name), with defaults normalized:
 // only non-default values appear in the snapshot.
 std::map<std::string, std::string> attribute_snapshot(const SACMElement& element) {
@@ -109,14 +122,14 @@ std::map<std::string, std::string> attribute_snapshot(const SACMElement& element
         }
     }
     if (!element.preserved_content().empty()) {
-        std::vector<std::string> fragments = element.preserved_content();
-        std::ranges::sort(fragments);
-        std::string joined;
-        for (const std::string& fragment : fragments) {
-            joined += fragment;
-            joined.push_back('\x1f');
-        }
-        snapshot["preservedContent"] = std::move(joined);
+        snapshot["preservedContent"] = canonical_fragments(element.preserved_content());
+    }
+    // Preserved *attributes* are compared for the same reason as preserved
+    // content: without them a round-trip that dropped every vendor attribute
+    // still compared equal, so the compatibility round-trip assertions passed
+    // without ever looking at the data they exist to protect.
+    if (!element.preserved_attributes().empty()) {
+        snapshot["preservedAttributes"] = canonical_fragments(element.preserved_attributes());
     }
     return snapshot;
 }

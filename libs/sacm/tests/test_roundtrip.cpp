@@ -268,6 +268,95 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_001_EmfReferenceDialectImportsAndNormalizes)
     expect_semantic_roundtrip(path);
 }
 
+// A tolerant-mode document carrying both kinds of foreign content: an attribute
+// (`acme:owner`) and a child element (`acme:vendorMetadata`), under a prefix
+// declared only by the source file.
+constexpr std::string_view kForeignNamespaceDocument =
+    R"(<?xml version="1.0" encoding="UTF-8"?>)"
+    R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+    R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+    R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" )"
+    R"(xmlns:acme="http://acme.example/toolchain" xmi:version="2.0" xmi:id="acp_1" )"
+    R"(acme:owner="alice"><name content="Vendor Extended Case"/>)"
+    R"(<acme:vendorMetadata reviewCycle="Q3-2026"/></sacm:AssuranceCasePackage>)";
+
+// Preserving vendor content on one save is not preserving it: the compatibility
+// writer re-emits `acme:owner` verbatim, so unless the saved file also declares
+// the `acme` prefix, the next load cannot tell the attribute is foreign (an
+// undeclared prefix resolves to no namespace) and drops it. The loss therefore
+// only shows up on the *second* save, which is what this exercises.
+TEST(Sacm23RoundTrip, SACM23_COMPAT_001_PreservedForeignAttributeSurvivesTwoRoundTrips) {
+    const LoadResult first = sacm::io::load_xmi_string(kForeignNamespaceDocument);
+    ASSERT_TRUE(first.ok);
+    ASSERT_EQ(first.document->roots().size(), 1u);
+    ASSERT_EQ(first.document->roots().front()->preserved_attributes().size(), 1u)
+        << "fixture no longer carries a foreign attribute; the test measures nothing";
+
+    const sacm::io::SaveResult once =
+        sacm::io::save_xmi_string(*first.document, sacm::io::SaveOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(once.ok);
+    EXPECT_NE(once.xml.find(R"(acme:owner="alice")"), std::string::npos);
+
+    const LoadResult second = sacm::io::load_xmi_string(once.xml);
+    ASSERT_TRUE(second.ok);
+    ASSERT_EQ(second.document->roots().size(), 1u);
+    EXPECT_EQ(second.document->roots().front()->preserved_attributes().size(), 1u)
+        << "the foreign attribute was dropped when the saved file was read back";
+
+    const sacm::io::SaveResult twice =
+        sacm::io::save_xmi_string(*second.document, sacm::io::SaveOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(twice.ok);
+    EXPECT_NE(twice.xml.find(R"(acme:owner="alice")"), std::string::npos)
+        << "the foreign attribute did not survive a second save:\n"
+        << twice.xml;
+    EXPECT_NE(twice.xml.find("vendorMetadata"), std::string::npos);
+
+    // The same loss must be visible to semantic_compare, or every round-trip
+    // assertion over vendor content passes without ever looking at it.
+    const auto differences = sacm::compare::semantic_compare(*first.document, *second.document);
+    for (const auto& difference : differences) {
+        ADD_FAILURE() << "[" << difference.category << "] " << difference.path << ": "
+                      << difference.message;
+    }
+}
+
+// Compatibility output that re-emits a prefixed fragment must declare the
+// prefix; otherwise the file this library writes is not namespace-well-formed,
+// whatever a downstream consumer does with it.
+TEST(Sacm23RoundTrip, SACM23_COMPAT_001_SavedOutputDeclaresPreservedForeignNamespaces) {
+    const LoadResult loaded = sacm::io::load_xmi_string(kForeignNamespaceDocument);
+    ASSERT_TRUE(loaded.ok);
+
+    // The declaration is recorded on the document, not rediscovered from the
+    // fragments -- the fragments are opaque text by design.
+    const auto& foreign = loaded.document->foreign_namespaces();
+    const auto acme = foreign.find("acme");
+    ASSERT_NE(acme, foreign.end()) << "the foreign namespace declaration was not recorded";
+    EXPECT_EQ(acme->second, "http://acme.example/toolchain");
+
+    const sacm::io::SaveResult compat =
+        sacm::io::save_xmi_string(*loaded.document, sacm::io::SaveOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(compat.ok);
+    EXPECT_NE(compat.xml.find(R"(xmlns:acme="http://acme.example/toolchain")"), std::string::npos)
+        << "compatibility output re-emits the `acme` prefix without declaring it:\n"
+        << compat.xml;
+
+    // Strict output stays clean: it refuses the document rather than emitting a
+    // declaration for content it will not write (SACM23-LIB-003, SACM23-XMI-004).
+    const sacm::io::SaveResult strict = sacm::io::save_xmi_string(*loaded.document);
+    EXPECT_FALSE(strict.ok);
+    EXPECT_TRUE(has_code(strict.diagnostics, sacm::validation::codes::kXmiStrictSaveRefused));
+
+    // A document with nothing preserved gains no declaration, so ordinary output
+    // is unchanged by this mechanism.
+    const LoadResult clean = sacm::io::load_xmi_file(fixture("package-minimal-valid.sacm.xmi"));
+    ASSERT_TRUE(clean.ok);
+    const sacm::io::SaveResult clean_compat =
+        sacm::io::save_xmi_string(*clean.document, sacm::io::SaveOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(clean_compat.ok);
+    EXPECT_EQ(clean_compat.xml.find("acme"), std::string::npos);
+}
+
 Document build_minimal_document() {
     Document document;
     EXPECT_TRUE(document

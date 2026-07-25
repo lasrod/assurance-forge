@@ -26,6 +26,12 @@ struct RestoreSacmFromAuditResult {
     std::string pre_restore_on_disk_canonical_hash;
     // Sequence number of the appended SacmRestoredFromAudit transaction.
     std::uint64_t transaction_sequence = 0;
+    // Non-empty when the replayed LIBRARY DOCUMENT could not be serialized and the
+    // restore fell back to writing a package projection. The restore still succeeds
+    // and the audit stays consistent, but the projection cannot carry the
+    // unknown/vendor-specific content the document preserved, so the caller should
+    // surface this rather than report a clean restore.
+    std::string lossy_fallback_warning;
 };
 
 // Rebuild the on-disk SACM file at `<project_root>/<sacm_relative_path>` by

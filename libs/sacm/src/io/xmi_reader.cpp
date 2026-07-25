@@ -11,6 +11,7 @@
 
 #include <format>
 #include <fstream>
+#include <map>
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
@@ -59,6 +60,43 @@ std::string node_to_string(const pugi::xml_node& node) {
 std::string_view prefix_of(std::string_view qualified) {
     const std::size_t colon = qualified.find(':');
     return colon == std::string_view::npos ? std::string_view{} : qualified.substr(0, colon);
+}
+
+// True when the writer declares `uri` itself, so recording it on the document
+// would be redundant -- and, for a SACM namespace, actively wrong: re-declaring
+// the source dialect's URI would fight the export-namespace override.
+// Deliberately the same partition of "ours" vs "foreign" that
+// capture_vendor_attributes applies, so exactly the namespaces whose attributes
+// are preserved are the ones whose declarations are preserved.
+bool is_self_declared_namespace(std::string_view uri) {
+    return metadata::namespaces::is_xmi_namespace(uri) || uri == metadata::namespaces::kXsi ||
+           metadata::namespaces::is_accepted_sacm_namespace(uri) ||
+           detail::is_sacm_extension_namespace(uri);
+}
+
+// Collects the document's foreign `xmlns:<prefix>` declarations as a union over
+// the whole tree, not just the root: a fragment preserved verbatim may use a
+// prefix declared on any ancestor, and the fragment itself is opaque text once
+// captured. First declaration in document order wins, so a prefix rebound at
+// different depths still yields a deterministic result.
+void collect_foreign_namespaces(const pugi::xml_node& node,
+                                std::map<std::string, std::string>& out) {
+    for (const pugi::xml_attribute& attr : node.attributes()) {
+        const std::string_view name = attr.name();
+        if (!name.starts_with("xmlns:")) {
+            continue;
+        }
+        const std::string_view uri = attr.value();
+        if (uri.empty() || is_self_declared_namespace(uri)) {
+            continue;
+        }
+        out.emplace(std::string(name.substr(6)), std::string(uri));
+    }
+    for (const pugi::xml_node& child : node.children()) {
+        if (child.type() == pugi::node_element) {
+            collect_foreign_namespaces(child, out);
+        }
+    }
 }
 
 struct Reader {
@@ -1704,6 +1742,9 @@ LoadResult load_impl(std::string_view xml, std::string source_file, const LoadOp
     collect_existing_ids(root, reader.used_ids);
 
     model::Document document;
+    // Recorded before parsing: preserved fragments keep their prefixes, so the
+    // declarations that give those prefixes meaning have to outlive the DOM.
+    collect_foreign_namespaces(root, Access::foreign_namespaces(document));
     reader.push_scope(root);
     if (local_name(root.name()) == "XMI") {
         for (const pugi::xml_node& child : root.children()) {
