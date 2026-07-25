@@ -130,7 +130,9 @@ bool SetElementGid(parser::AssuranceCase& model, sacm::AssuranceCasePackage* pac
     // ICommand contract, and what the library bridge's scratch-then-reload relies
     // on to reproduce the legacy result exactly).
     if (package != nullptr && !SetPackageElementGid(*package, element_id, gid)) {
-        error = "Could not assign generated gid to the SACM model element.";
+        // Phrased generically: the gid may be freshly generated (live edit) or the one
+        // recorded in the audit event (replay).
+        error = "Could not assign a gid to SACM package element '" + element_id + "'.";
         return false;
     }
     element->gid = gid;

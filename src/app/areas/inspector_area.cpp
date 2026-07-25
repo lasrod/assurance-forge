@@ -10,6 +10,7 @@
 #include "core/audit/event_store.h"
 #include "core/commands/gid_commands.h"
 #include "core/confidence/confidence_store.h"
+#include "parser/model_utils.h"
 #include "ui/i18n/localization.h"
 #include "ui/panels/acp_panel.h"
 #include "ui/panels/element_panel.h"
@@ -126,17 +127,29 @@ void RenderInspectorArea(AppRuntimeState& state,
                 }
                 core::commands::EnsureElementGidCommand cmd(element.id);
                 const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(state, cmd);
-                if (!outcome.success) {
-                    state.events.Emit(StatusMessageEvent{ui::i18n::trf(
-                        "Confidence save failed: {0}",
-                        outcome.error.empty() ? std::string("could not assign a SACM gid") : outcome.error)});
+                if (outcome.success) {
+                    // Set the gid on the LIVE element so UpsertElementConfidence can key
+                    // by it this frame; the library-primary command set it in the library
+                    // and the frame-boundary re-derive re-projects the same gid.
+                    element.gid = cmd.GeneratedGid();
+                    generated_gid = true;
+                } else if (!outcome.error.empty()) {
+                    state.events.Emit(
+                        StatusMessageEvent{ui::i18n::trf("Confidence save failed: {0}", outcome.error)});
                     return false;
+                } else {
+                    // A false outcome with NO error is the benign no-op the command
+                    // reports when the model element already carries a gid (i.e. this
+                    // view's copy was stale). Adopt the existing gid rather than failing
+                    // the save; only a genuinely gid-less element is unrecoverable.
+                    const parser::SacmElement* current = parser::FindElementById(*loaded_case, element.id);
+                    if (current == nullptr || current->gid.empty()) {
+                        state.events.Emit(
+                            StatusMessageEvent{AF_TR("Could not assign a SACM gid for confidence storage.")});
+                        return false;
+                    }
+                    element.gid = current->gid;
                 }
-                // Set the gid on the LIVE element so UpsertElementConfidence can key by
-                // it this frame; the library-primary command set it in the library and
-                // the frame-boundary re-derive re-projects the same gid.
-                element.gid = cmd.GeneratedGid();
-                generated_gid = true;
             }
             std::string error;
             if (!state.confidence_controller->UpsertElementConfidence(element, confidence, error)) {
