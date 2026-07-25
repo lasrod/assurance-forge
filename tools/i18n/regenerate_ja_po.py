@@ -265,6 +265,14 @@ TRANSLATIONS = {
     "Remove {0}?": "{0} を除去しますか?",
     "this node and its attachments": "このノードとその付随要素",
     "this node and its descendants": "このノードとその子孫",
+    # Delete confirmation backed by SACM library operation previews
+    # (SACM23-INT-002).
+    "Will be removed:": "削除されるもの:",
+    "Will be modified (references removed):": "変更されるもの (参照が削除されます):",
+    "Reported by the SACM library:": "SACM ライブラリからの報告:",
+    "The SACM library could not preview this removal.":
+        "SACM ライブラリはこの削除をプレビューできませんでした。",
+    "{0} ({1})": "{0} ({1})",
     "{0} is not implemented yet.": "{0} はまだ実装されていません。",
     "Overwrite File?": "ファイルを上書きしますか?",
     "File already exists:\n{0}": "ファイルは既に存在します:\n{0}",

@@ -5,6 +5,7 @@
 #include "core/commands/element_commands.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_model.h"
+#include "sacm_adapter/document_edit.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -136,7 +137,17 @@ bool ElementEditController::RemoveSelected(AppRuntimeState& state,
         return false;
     }
 
-    if (planned.size() == 1) {
+    std::vector<std::string> planned_ids(planned.begin(), planned.end());
+    std::sort(planned_ids.begin(), planned_ids.end());
+    BuildRemovalPreview(state, planned_ids, mode);
+
+    // Confirm whenever the removal reaches past what the user picked: several
+    // planned elements, or the library reporting that something else goes with
+    // them. A leaf with no consequences still deletes immediately — putting a
+    // dialog in front of every single delete teaches the user to dismiss it
+    // unread, which costs more than it protects.
+    if (planned.size() == 1 && pending_remove_consequences_.empty()) {
+        CancelPendingRemoval();
         core::commands::RemoveElementCommand cmd(selected_id, mode);
         const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
         if (!outcome.success) {
@@ -153,9 +164,92 @@ bool ElementEditController::RemoveSelected(AppRuntimeState& state,
     show_remove_confirm_ = true;
     pending_remove_id_   = selected_id;
     pending_remove_mode_ = mode;
-    pending_remove_ids_.assign(planned.begin(), planned.end());
-    std::sort(pending_remove_ids_.begin(), pending_remove_ids_.end());
+    pending_remove_ids_  = std::move(planned_ids);
     return true;
+}
+
+void ElementEditController::BuildRemovalPreview(AppRuntimeState& state,
+                                                const std::vector<std::string>& planned_ids,
+                                                core::RemoveMode mode) {
+    pending_remove_targets_.clear();
+    pending_remove_consequences_.clear();
+    pending_remove_warnings_.clear();
+    pending_remove_preview_available_ = false;
+
+    // See the header: NodeOnly reparents rather than deletes, and the library
+    // cannot express a retarget. Previewing it as a set of deletes would report
+    // a child's inference as removed when it survives. No preview is better
+    // than a wrong one.
+    if (mode == core::RemoveMode::NodeOnly)
+        return;
+
+    // The library document is the source of truth for what a delete implies
+    // (SACM23-INT-002). Without one there is nothing to ask, and the modal
+    // says so rather than presenting the plan as if the library had confirmed
+    // it.
+    if (state.app_state.library_document == nullptr)
+        return;
+
+    const sacm_adapter::DeletePreview preview =
+        sacm_adapter::preview_delete_elements(*state.app_state.library_document, planned_ids);
+    if (!preview.supported)
+        return;
+
+    const auto to_effect = [](const sacm_adapter::DeleteEffect& effect) {
+        return RemovalEffect{
+            .element_id     = effect.element_id,
+            .kind           = effect.kind,
+            .name           = effect.name,
+            .is_relationship = effect.is_relationship,
+            .deleted        = effect.deleted,
+        };
+    };
+    for (const sacm_adapter::DeleteEffect& effect : preview.requested)
+        pending_remove_targets_.push_back(to_effect(effect));
+    for (const sacm_adapter::DeleteEffect& effect : preview.consequential)
+        pending_remove_consequences_.push_back(to_effect(effect));
+    for (const sacm_adapter::LoadDiagnostic& diagnostic : preview.diagnostics)
+        pending_remove_warnings_.push_back(diagnostic.code + ": " + diagnostic.message);
+
+    AppendAcpConsequences(state);
+
+    // A preview in which nothing the user selected resolved is not a preview
+    // that found no consequences — it is no preview at all. Reporting it as
+    // available renders an empty consequence list, which reads as "nothing
+    // else is affected".
+    pending_remove_preview_available_ = !pending_remove_targets_.empty();
+}
+
+// Assurance Claim Points are stored as `assuranceForge.acp.*` TaggedValues on
+// the element they annotate, and the seam filters utility elements out of the
+// effect list (they are attachments of an owner already listed). That filter is
+// right for descriptions and notes and wrong for ACPs: an ACP is a first-class
+// record with its own panel, and when its owner is a *consequential* deletion
+// the user never selected it, nothing on screen would say the ACP is going.
+void ElementEditController::AppendAcpConsequences(AppRuntimeState& state) {
+    if (!state.app_state.loaded_case.has_value())
+        return;
+
+    std::vector<std::string> doomed;
+    for (const std::vector<RemovalEffect>* bucket :
+         {&pending_remove_targets_, &pending_remove_consequences_}) {
+        for (const RemovalEffect& effect : *bucket) {
+            if (effect.deleted)
+                doomed.push_back(effect.element_id);
+        }
+    }
+
+    for (const core::AcpRecord& acp : state.app_state.loaded_case->acps) {
+        if (std::find(doomed.begin(), doomed.end(), acp.target_id) == doomed.end())
+            continue;
+        pending_remove_consequences_.push_back(RemovalEffect{
+            .element_id      = acp.id,
+            .kind            = "AssuranceClaimPoint",
+            .name            = acp.name,
+            .is_relationship = false,
+            .deleted         = true,
+        });
+    }
 }
 
 bool ElementEditController::ConfirmPendingRemoval(AppRuntimeState& state) {
@@ -185,6 +279,10 @@ void ElementEditController::CancelPendingRemoval() {
     show_remove_confirm_ = false;
     pending_remove_id_.clear();
     pending_remove_ids_.clear();
+    pending_remove_targets_.clear();
+    pending_remove_consequences_.clear();
+    pending_remove_warnings_.clear();
+    pending_remove_preview_available_ = false;
 }
 
 bool ElementEditController::CommitElementTextEdit(AppRuntimeState& state,
@@ -275,6 +373,24 @@ core::RemoveMode ElementEditController::PendingRemoveMode() const {
 
 const std::vector<std::string>& ElementEditController::PendingRemoveIds() const {
     return pending_remove_ids_;
+}
+
+const std::vector<ElementEditController::RemovalEffect>&
+ElementEditController::PendingRemoveTargets() const {
+    return pending_remove_targets_;
+}
+
+const std::vector<ElementEditController::RemovalEffect>&
+ElementEditController::PendingRemoveConsequences() const {
+    return pending_remove_consequences_;
+}
+
+const std::vector<std::string>& ElementEditController::PendingRemoveWarnings() const {
+    return pending_remove_warnings_;
+}
+
+bool ElementEditController::PendingRemovePreviewAvailable() const {
+    return pending_remove_preview_available_;
 }
 
 } // namespace app::controllers

@@ -195,6 +195,7 @@ void ModalHost::RenderRemoveConfirmModal() {
                                               n,
                                               n)
                                    .c_str());
+        RenderRemovalPreview();
         ImGui::Spacing();
         ImGui::Spacing();
 
@@ -219,6 +220,61 @@ void ModalHost::RenderRemoveConfirmModal() {
         ImGui::EndPopup();
     } else if (state_.element_edit_controller->ShouldShowRemoveConfirm()) {
         ImGui::OpenPopup("##remove_confirm_modal");
+    }
+}
+
+// Renders what the SACM library says this removal implies. The count alone
+// answers "how many?" but not "which, and what else?" -- and the "what else"
+// is exactly the part a user cannot work out from the canvas, because a
+// relationship is not a node they selected.
+void ModalHost::RenderRemovalPreview() {
+    using RemovalEffect = app::controllers::ElementEditController::RemovalEffect;
+    const auto& controller = *state_.element_edit_controller;
+
+    if (!controller.PendingRemovePreviewAvailable()) {
+        ImGui::Spacing();
+        ImGui::TextDisabled("%s", AF_TR("The SACM library could not preview this removal.").c_str());
+        return;
+    }
+
+    // `kind` is a SACM class name and `name` is the user's own text; neither is
+    // translated. Only the surrounding sentence is.
+    const auto render_rows = [](const std::vector<RemovalEffect>& effects) {
+        for (const RemovalEffect& effect : effects) {
+            const std::string& display = effect.name.empty() ? effect.element_id : effect.name;
+            ImGui::Bullet();
+            ImGui::TextUnformatted(ui::i18n::trf("{0} ({1})", display, effect.kind).c_str());
+        }
+    };
+
+    std::vector<RemovalEffect> removed;
+    std::vector<RemovalEffect> modified;
+    for (const std::vector<RemovalEffect>* bucket :
+         {&controller.PendingRemoveTargets(), &controller.PendingRemoveConsequences()}) {
+        for (const RemovalEffect& effect : *bucket) {
+            (effect.deleted ? removed : modified).push_back(effect);
+        }
+    }
+
+    if (!removed.empty()) {
+        ImGui::Spacing();
+        ImGui::TextUnformatted(AF_TR("Will be removed:").c_str());
+        render_rows(removed);
+    }
+    if (!modified.empty()) {
+        ImGui::Spacing();
+        ImGui::TextUnformatted(AF_TR("Will be modified (references removed):").c_str());
+        render_rows(modified);
+    }
+
+    const std::vector<std::string>& warnings = controller.PendingRemoveWarnings();
+    if (!warnings.empty()) {
+        ImGui::Spacing();
+        ImGui::TextUnformatted(AF_TR("Reported by the SACM library:").c_str());
+        for (const std::string& warning : warnings) {
+            ImGui::Bullet();
+            ImGui::TextDisabled("%s", warning.c_str());
+        }
     }
 }
 

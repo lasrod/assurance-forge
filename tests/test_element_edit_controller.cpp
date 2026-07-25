@@ -7,7 +7,10 @@
 #include "core/audit/event_store.h"
 #include "core/audit/replay_verifier.h"
 #include "core/commands/command_bus.h"
+#include "core/element_factory.h"
 #include "core/project_model.h"
+#include "parser/model_utils.h"
+#include "sacm_adapter/case_projection.h"
 #include "sacm/sacm_parser.h"
 #include "ui/text_edit_session.h"
 
@@ -251,4 +254,220 @@ TEST(ElementEditControllerTest, FlushPendingTextEditsCommitsUncommittedEditWitho
     EXPECT_EQ(result.cause, core::audit::DivergenceCause::None);
 
     fs::remove_all(root);
+}
+
+// --- SACM23-INT-002: the delete confirmation is library-backed --------------
+
+// Deleting a leaf whose removal drags a relationship with it must STOP and
+// disclose that, not just delete. Before this, a single-element plan skipped
+// the confirmation entirely: removing a sub-goal silently took its inference
+// with it, and the count-only dialog (when it did appear) never named what
+// else was going.
+TEST(ElementEditControllerTest, SACM23_INT_002_RemoveConfirmDisclosesLibraryConsequences) {
+    const std::filesystem::path fixture =
+        std::filesystem::path(AF_REPO_ROOT) / "tests" / "data" / "fixture_acp_parity.sacm.xml";
+    ASSERT_TRUE(std::filesystem::exists(fixture)) << fixture.string();
+
+    app::AppRuntimeState state;
+    ASSERT_TRUE(state.app_state.load_file(fixture.string())) << state.app_state.status_message;
+    ASSERT_NE(state.app_state.library_document, nullptr);
+
+    // G2 is a leaf: the legacy plan is one element, so this used to delete
+    // straight away with no dialog at all.
+    ASSERT_TRUE(state.element_edit_controller->RemoveSelected(state, "G2",
+                                                             core::RemoveMode::NodeAndDescendants));
+    ASSERT_TRUE(state.element_edit_controller->ShouldShowRemoveConfirm())
+        << "a delete with consequences went through without asking";
+    EXPECT_TRUE(state.element_edit_controller->PendingRemovePreviewAvailable());
+
+    const auto& targets = state.element_edit_controller->PendingRemoveTargets();
+    ASSERT_EQ(targets.size(), 1u);
+    EXPECT_EQ(targets.front().element_id, "G2");
+
+    // The disclosures that matter: R1 goes too, and so does the Assurance
+    // Claim Point riding on R1. The ACP is the harder of the two -- it lives in
+    // vendor TaggedValues, which the seam filters out as attachments, and its
+    // owner is a consequential deletion the user never selected. Without an
+    // explicit line for it, ACP2 and its confidence argument package would
+    // disappear with nothing on screen having mentioned them.
+    const auto& consequences = state.element_edit_controller->PendingRemoveConsequences();
+    const auto consequence_for = [&consequences](const std::string& id) {
+        return std::find_if(consequences.begin(), consequences.end(),
+                            [&id](const auto& effect) { return effect.element_id == id; });
+    };
+
+    const auto inference = consequence_for("R1");
+    ASSERT_NE(inference, consequences.end()) << "the inference dragged along was not disclosed";
+    EXPECT_EQ(inference->kind, "AssertedInference");
+    EXPECT_TRUE(inference->is_relationship);
+    EXPECT_TRUE(inference->deleted);
+
+    const auto acp = consequence_for("ACP2");
+    ASSERT_NE(acp, consequences.end())
+        << "the Assurance Claim Point on the cascaded inference was not disclosed";
+    EXPECT_EQ(acp->kind, "AssuranceClaimPoint");
+    EXPECT_EQ(acp->name, "Confidence in the inference");
+    EXPECT_TRUE(acp->deleted);
+
+    // ACP1 belongs to G1, which survives; it must not be listed.
+    EXPECT_EQ(consequence_for("ACP1"), consequences.end())
+        << "an ACP on a surviving element was reported as going away";
+
+    // Nothing has been removed yet -- this is a confirmation, not a report.
+    EXPECT_NE(parser::FindElementById(state.app_state.loaded_case.value(), "G2"), nullptr);
+
+    // Cancelling leaves the model and the preview state clean.
+    state.element_edit_controller->CancelPendingRemoval();
+    EXPECT_FALSE(state.element_edit_controller->ShouldShowRemoveConfirm());
+    EXPECT_TRUE(state.element_edit_controller->PendingRemoveConsequences().empty());
+    EXPECT_NE(parser::FindElementById(state.app_state.loaded_case.value(), "G2"), nullptr);
+}
+
+// The counterpart: a delete that really does reach nothing else still goes
+// through without a dialog. A confirmation on every delete is a confirmation
+// on none -- users learn to click past it, and then it protects nothing when
+// it matters.
+TEST(ElementEditControllerTest, SACM23_INT_002_RemoveWithoutConsequencesStillDeletesImmediately) {
+    const std::filesystem::path fixture =
+        std::filesystem::path(AF_REPO_ROOT) / "tests" / "data" / "fixture_acp_parity.sacm.xml";
+    app::AppRuntimeState state;
+    ASSERT_TRUE(state.app_state.load_file(fixture.string())) << state.app_state.status_message;
+
+    // Clear the way: R1 carries an ACP, so removing it legitimately prompts.
+    // Confirm through, leaving G2 an unreferenced, ACP-free leaf. The dispatch
+    // path re-derives the library document, so the second preview sees the
+    // post-removal state rather than a stale one.
+    ASSERT_TRUE(state.element_edit_controller->RemoveSelected(state, "R1",
+                                                             core::RemoveMode::NodeAndDescendants));
+    ASSERT_TRUE(state.element_edit_controller->ConfirmPendingRemoval(state));
+    ASSERT_EQ(parser::FindElementById(state.app_state.loaded_case.value(), "R1"), nullptr);
+
+    ASSERT_TRUE(state.element_edit_controller->RemoveSelected(state, "G2",
+                                                             core::RemoveMode::NodeAndDescendants));
+    EXPECT_FALSE(state.element_edit_controller->ShouldShowRemoveConfirm())
+        << "a delete with no consequences should not interrupt the user";
+    EXPECT_EQ(parser::FindElementById(state.app_state.loaded_case.value(), "G2"), nullptr);
+}
+
+// `RemoveMode::NodeOnly` REPARENTS the removed node's children onto its parent
+// -- `core::ReparentChildrenToParent` retargets a child's inference rather than
+// deleting it -- and the library has no retarget operation, so the delete stays
+// on the legacy mutator. Modelling it as a set of deletes would announce that
+// the child's inference is being removed when it in fact survives, retargeted.
+// A confident wrong disclosure is worse than none, so no preview is offered.
+TEST(ElementEditControllerTest, SACM23_INT_002_NodeOnlyOffersNoPreviewRatherThanAWrongOne) {
+    namespace fs = std::filesystem;
+    constexpr const char* kChain = R"(<?xml version="1.0" encoding="UTF-8"?>
+<AssuranceCasePackage xmlns="http://www.omg.org/spec/SACM/20220301" id="ACP1" name="Chain">
+  <argumentPackage id="AP1" name="Argument">
+    <claim id="G1" name="Top"/>
+    <claim id="G2" name="Middle"/>
+    <claim id="G3" name="Leaf"/>
+    <assertedInference id="R1" source="G2" target="G1"/>
+    <assertedInference id="R2" source="G3" target="G2"/>
+  </argumentPackage>
+</AssuranceCasePackage>)";
+
+    const fs::path path = fs::temp_directory_path() / "af_int002_nodeonly.sacm.xml";
+    { std::ofstream(path) << kChain; }
+
+    app::AppRuntimeState state;
+    ASSERT_TRUE(state.app_state.load_file(path.string())) << state.app_state.status_message;
+
+    // NodeOnly on the interior goal: R2 must NOT be advertised as removed.
+    ASSERT_TRUE(
+        state.element_edit_controller->RemoveSelected(state, "G2", core::RemoveMode::NodeOnly));
+    EXPECT_FALSE(state.element_edit_controller->PendingRemovePreviewAvailable())
+        << "a preview was offered for a removal the library cannot model; it would have claimed "
+           "the promoted child's inference is deleted when it survives, retargeted";
+    for (const auto& effect : state.element_edit_controller->PendingRemoveConsequences()) {
+        EXPECT_NE(effect.element_id, "R2")
+            << "the preview claimed the retargeted inference is removed";
+    }
+
+    // With no preview and a single-element plan there is nothing to confirm, so
+    // the removal already happened — the same behaviour as before this feature,
+    // which is the point: NodeOnly gains no wrong dialog.
+    EXPECT_FALSE(state.element_edit_controller->ShouldShowRemoveConfirm());
+    EXPECT_EQ(parser::FindElementById(state.app_state.loaded_case.value(), "G2"), nullptr);
+
+    // And here is why previewing it as a set of deletes would have lied: R2 and
+    // G3 both survive. A delete-modelled preview would have listed R2 as
+    // removed, because in the library its only target (G2) is doomed.
+    EXPECT_NE(parser::FindElementById(state.app_state.loaded_case.value(), "R2"), nullptr)
+        << "fixture assumption broken: NodeOnly no longer keeps the child inference";
+    EXPECT_NE(parser::FindElementById(state.app_state.loaded_case.value(), "G3"), nullptr)
+        << "the promoted child was orphaned";
+
+    fs::remove(path);
+}
+
+// The assertion that keeps preview and apply honest: build the preview, confirm
+// it through the SAME dispatch path the UI uses, and require the resulting
+// model to match what was promised -- exactly, in both directions. A preview
+// that under-reports lets a user destroy something unannounced; one that
+// over-reports trains them to ignore it.
+TEST(ElementEditControllerTest, SACM23_INT_002_ConfirmedRemovalMatchesThePreviewExactly) {
+    const std::filesystem::path fixture =
+        std::filesystem::path(AF_REPO_ROOT) / "tests" / "data" / "fixture_acp_parity.sacm.xml";
+    app::AppRuntimeState state;
+    ASSERT_TRUE(state.app_state.load_file(fixture.string())) << state.app_state.status_message;
+
+    ASSERT_TRUE(state.element_edit_controller->RemoveSelected(state, "G2",
+                                                             core::RemoveMode::NodeAndDescendants));
+    ASSERT_TRUE(state.element_edit_controller->ShouldShowRemoveConfirm());
+    ASSERT_TRUE(state.element_edit_controller->PendingRemovePreviewAvailable());
+
+    // Snapshot the promise and the pre-state before confirming.
+    std::vector<std::string> promised_gone;
+    std::vector<std::string> promised_kept;
+    for (const auto* bucket : {&state.element_edit_controller->PendingRemoveTargets(),
+                               &state.element_edit_controller->PendingRemoveConsequences()}) {
+        for (const auto& effect : *bucket) {
+            // ACP ids are vendor records, not model elements; they are checked
+            // separately below.
+            if (effect.kind == "AssuranceClaimPoint")
+                continue;
+            (effect.deleted ? promised_gone : promised_kept).push_back(effect.element_id);
+        }
+    }
+    ASSERT_FALSE(promised_gone.empty());
+    std::vector<std::string> before;
+    for (const auto& element : state.app_state.loaded_case->elements)
+        before.push_back(element.id);
+
+    ASSERT_TRUE(state.element_edit_controller->ConfirmPendingRemoval(state));
+
+    std::vector<std::string> actually_gone;
+    for (const std::string& id : before) {
+        if (parser::FindElementById(state.app_state.loaded_case.value(), id) == nullptr)
+            actually_gone.push_back(id);
+    }
+    std::sort(promised_gone.begin(), promised_gone.end());
+    std::sort(actually_gone.begin(), actually_gone.end());
+    EXPECT_EQ(promised_gone, actually_gone)
+        << "the confirmed removal did not match what the dialog promised";
+
+    // Anything the preview said would merely be modified must still exist.
+    for (const std::string& id : promised_kept) {
+        EXPECT_NE(parser::FindElementById(state.app_state.loaded_case.value(), id), nullptr)
+            << id << " was promised to survive, scrubbed, but is gone";
+    }
+
+    // The ACP the dialog named is really gone. Asserted against the library
+    // document rather than `loaded_case.acps`: the ACP lives in TaggedValues on
+    // R1, so deleting R1 destroys it in the document, while the in-memory
+    // projection's `acps` vector is a cache that this path does not rebuild.
+    // The document is what the user's file will contain.
+    ASSERT_NE(state.app_state.library_document, nullptr);
+    const core::AssuranceCase reprojected =
+        sacm_adapter::project_case(*state.app_state.library_document);
+    EXPECT_EQ(std::find_if(reprojected.acps.begin(), reprojected.acps.end(),
+                           [](const auto& acp) { return acp.id == "ACP2"; }),
+              reprojected.acps.end())
+        << "ACP2 was announced as removed but survives in the library document";
+    EXPECT_NE(std::find_if(reprojected.acps.begin(), reprojected.acps.end(),
+                           [](const auto& acp) { return acp.id == "ACP1"; }),
+              reprojected.acps.end())
+        << "ACP1 belongs to a surviving element and must not have been destroyed";
 }

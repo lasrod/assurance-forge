@@ -1282,6 +1282,9 @@ msgstr "対象から SACM ベースの ACP メタデータを除去します。"
 msgid "Remove {0}?"
 msgstr "{0} を除去しますか?"
 
+msgid "Reported by the SACM library:"
+msgstr "SACM ライブラリからの報告:"
+
 msgid "Reset toggles"
 msgstr "切替をリセット"
 
@@ -1567,6 +1570,9 @@ msgstr "テキスト信頼度論証"
 msgid "Text confidence argument is empty."
 msgstr "テキスト信頼度論証が空です。"
 
+msgid "The SACM library could not preview this removal."
+msgstr "SACM ライブラリはこの削除をプレビューできませんでした。"
+
 msgid "The attached proposal will also be deleted."
 msgstr "添付された提案も削除されます。"
 
@@ -1708,6 +1714,12 @@ msgstr "ウェルカム画面"
 msgid "Welcome!"
 msgstr "ようこそ!"
 
+msgid "Will be modified (references removed):"
+msgstr "変更されるもの (参照が削除されます):"
+
+msgid "Will be removed:"
+msgstr "削除されるもの:"
+
 msgid "XML File:"
 msgstr "XML ファイル:"
 
@@ -1788,6 +1800,9 @@ msgstr "{0}\nクリックしてレビュータブを開きます。"
 
 msgid "{0}  by {1}"
 msgstr "{0}  作業者 {1}"
+
+msgid "{0} ({1})"
+msgstr "{0} ({1})"
 
 msgid "{0} claims · {1} strategies · {2} evidence · {3} undeveloped"
 msgstr "主張 {0} 件 · 戦略 {1} 件 · エビデンス {2} 件 · 未展開 {3} 件"
