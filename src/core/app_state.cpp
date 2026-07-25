@@ -327,8 +327,15 @@ void AppState::sync_library_document() {
     if (library_document == nullptr || !sacm_package.has_value()) {
         return;
     }
+    // Preserving reload, not the plain one. This rebuilds the document from a
+    // projection OF THAT DOCUMENT, and the legacy package has no field for
+    // unknown/foreign XML -- so the plain reload erased preserved vendor
+    // content here just as it did in the bridge. Reachable without a project:
+    // a file opened outside one takes the no-bus dispatch branch, which calls
+    // this after every command, and the next `save_file` then writes the
+    // degraded document to disk.
     const std::string xml = sacm::serialize_sacm(sacm_package.value());
-    sacm_adapter::reload_document(*library_document, xml);
+    sacm_adapter::reload_document_keeping_compatibility_content(*library_document, xml);
 }
 
 } // namespace core

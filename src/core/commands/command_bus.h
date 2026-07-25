@@ -68,12 +68,15 @@ struct CommandContext {
     // commands take the legacy-mutator path regardless of `library_document`, so
     // the derived views are mutated in place rather than rebuilt wholesale.
     //
-    // The interactive app sets this false (see app::commands::DispatchAuditedCommand):
-    // the flip's wholesale rebuild of `model`/`package` mid-frame invalidates a
-    // panel that is iterating those containers while its own context-menu triggers
-    // the edit (the legacy in-place append did not) -- a GUI re-entrancy the audit
-    // path never hits. Defaults true so the flip stays exercised end to end by
-    // tests until the re-entrancy is fixed and the app re-enables it.
+    // The flip is LIVE in the interactive app. This used to say the app set it
+    // false to dodge a GUI re-entrancy (a wholesale mid-frame rebuild of
+    // `model`/`package` invalidating a panel iterating them); that re-entrancy
+    // was fixed and the flip re-enabled, but the comment stayed, which made the
+    // whole live edit path read as legacy-only to anyone reasoning from here.
+    // Nothing under `src/app/` assigns this now -- see the note in
+    // `app::commands::DispatchAuditedCommand`. It remains a kill switch: set it
+    // false and flipped commands take the legacy-mutator path regardless of
+    // `library_document`.
     bool                          allow_library_primary = true;
 };
 

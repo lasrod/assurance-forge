@@ -137,6 +137,16 @@ struct ProjectFixture {
     std::filesystem::path   sacm_absolute;
 };
 
+// Number of non-overlapping occurrences of `needle` in `haystack`.
+std::size_t CountOccurrences(std::string_view haystack, std::string_view needle) {
+    std::size_t count = 0;
+    for (std::size_t at = haystack.find(needle); at != std::string_view::npos;
+         at = haystack.find(needle, at + needle.size())) {
+        ++count;
+    }
+    return count;
+}
+
 ProjectFixture MakeProject(const std::string& tag, const char* sacm_xml = kVendorExtendedSacm) {
     ProjectFixture fixture{TempDir(MakeTempDir(tag))};
     WriteFile(fixture.temp.path / fixture.sacm_relative, sacm_xml);
@@ -431,4 +441,353 @@ TEST(SaveFromLibrary, SACM23_LIB_002_RepeatedSavesAreByteStableForRepositoryCase
         ASSERT_TRUE(reopened.save_file(third.string())) << reopened.status_message;
         EXPECT_EQ(first_bytes, ReadFile(third)) << "save -> load -> save is not a fixed point";
     }
+}
+
+// --- Bridged commands must preserve as much as native-seam commands ---------
+//
+// The tests above use CreateChildElementCommand, which reaches the library
+// through a NATIVE seam. Most audited commands do not: text edits, terminology,
+// ACP CRUD, package removal and tree reorder all route through
+// `core::commands::BridgeLegacyMutationToLibrary`, which rebuilds the live
+// document from a projection of it. Whether that projection is faithful decides
+// whether "the library is the serialization source of truth" is true for the
+// commands users actually run most.
+//
+// It was not. The bridge used `core::project_library_package` -- the AUDIT
+// projection, which by its own contract "may collapse packages as long as it
+// does so consistently on both audit sides" and never calls
+// `copy_library_tags_onto_package`. So one rename dropped every vendor
+// TaggedValue from the document and from the saved file, and a case with
+// several argument packages collapsed into one, duplicating ids until the
+// re-derive was rejected outright.
+//
+// The convergence tests could not see any of this: they compare canonical
+// hashes computed through that same collapsing, tag-dropping projection on both
+// sides, so the loss is invisible by construction. These assert on the saved
+// BYTES instead.
+
+namespace {
+
+// A bridged edit: `UpdateElementTextCommand` goes through
+// ApplyLibraryPrimaryOrLegacy, not through a native library operation.
+core::commands::CommandResult RunBridgedRename(ProjectFixture& fixture, core::AppState& state,
+                                               const std::string& element_id,
+                                               const std::string& new_name,
+                                               bool& out_library_primary) {
+    std::string error;
+    std::unique_ptr<core::commands::CommandBus> bus =
+        core::commands::CommandBus::Open(fixture.project, fixture.sacm_absolute, error);
+    EXPECT_TRUE(bus) << error;
+    if (!bus) {
+        return core::commands::CommandResult{};
+    }
+    core::commands::UpdateElementTextCommand command(element_id, core::ElementTextField::Name, "en",
+                                                     new_name);
+    core::commands::CommandContext ctx{state.loaded_case.value(), state.sacm_package.value(),
+                                       state.library_document.get()};
+    const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
+    out_library_primary = ctx.library_primary;
+    return result;
+}
+
+} // namespace
+
+TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesUnknownContent) {
+    ProjectFixture fixture = MakeProject("bridged-vendor");
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    bool library_primary = false;
+    const core::commands::CommandResult result =
+        RunBridgedRename(fixture, state, "G1", "Renamed goal", library_primary);
+    ASSERT_TRUE(result.success) << result.error;
+    ASSERT_TRUE(library_primary)
+        << "the rename did not take the bridged library-primary path; this test measures nothing";
+
+    const std::string autosaved = ReadFile(fixture.sacm_absolute);
+    EXPECT_TRUE(Contains(autosaved, kVendorAttributeMarker))
+        << "a bridged edit dropped the vendor attribute:\n" << autosaved;
+    EXPECT_TRUE(Contains(autosaved, kVendorElementMarker))
+        << "a bridged edit dropped the vendor element:\n" << autosaved;
+    EXPECT_TRUE(Contains(autosaved, "Renamed goal")) << autosaved;
+}
+
+TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesAcpTaggedValues) {
+    const std::string acp_case =
+        ReadFile(std::filesystem::path(AF_REPO_ROOT) / "tests" / "data" /
+                 "fixture_acp_parity.sacm.xml");
+    ASSERT_FALSE(acp_case.empty());
+    ProjectFixture fixture = MakeProject("bridged-acp", acp_case.c_str());
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    const std::size_t before = CountOccurrences(ReadFile(fixture.sacm_absolute), "assuranceForge.acp");
+    ASSERT_GT(before, 0u) << "fixture carries no ACP tags; this test measures nothing";
+
+    bool library_primary = false;
+    const core::commands::CommandResult result =
+        RunBridgedRename(fixture, state, "G1", "Renamed top goal", library_primary);
+    ASSERT_TRUE(result.success) << result.error;
+    ASSERT_TRUE(library_primary);
+
+    const std::string autosaved = ReadFile(fixture.sacm_absolute);
+    EXPECT_EQ(CountOccurrences(autosaved, "assuranceForge.acp"), before)
+        << "a bridged rename destroyed Assurance Claim Points -- they are vendor TaggedValues, "
+           "and the projection the bridge round-trips through does not carry them";
+    EXPECT_TRUE(Contains(autosaved, "Renamed top goal")) << autosaved;
+}
+
+// The repository's flagship case has four argument packages. The audit
+// projection collapses them into one, which duplicates artifact-reference ids
+// and makes the bridge's re-derive fail outright -- so before this, no bridged
+// command could be run against it at all.
+TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditSucceedsOnMultiArgumentPackageCase) {
+    const std::string big_case =
+        ReadFile(std::filesystem::path(AF_REPO_ROOT) / "data" / "open-autonomy-safety-case.sacm.xml");
+    ASSERT_FALSE(big_case.empty());
+    ProjectFixture fixture = MakeProject("bridged-multipackage", big_case.c_str());
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    const std::size_t packages_before = state.sacm_package->argumentPackages.size();
+    ASSERT_GT(packages_before, 1u)
+        << "fixture no longer has several argument packages; this test measures nothing";
+
+    // Rename whatever the first claim is, so the test does not depend on the
+    // case's content beyond its package structure.
+    std::string target_id;
+    for (const core::SacmElement& element : state.loaded_case->elements) {
+        if (element.type == "claim") {
+            target_id = element.id;
+            break;
+        }
+    }
+    ASSERT_FALSE(target_id.empty());
+
+    bool library_primary = false;
+    const core::commands::CommandResult result =
+        RunBridgedRename(fixture, state, target_id, "Renamed", library_primary);
+    ASSERT_TRUE(result.success)
+        << "a bridged edit failed on a multi-argument-package case: " << result.error;
+    ASSERT_TRUE(library_primary);
+
+    core::RebuildDerivedViewsFromLibrary(*state.library_document, state.loaded_case.value(),
+                                         state.sacm_package.value());
+    EXPECT_EQ(state.sacm_package->argumentPackages.size(), packages_before)
+        << "the bridged edit collapsed the case's argument packages";
+}
+
+// --- Restore-from-audit must preserve as much as the live path -------------
+//
+// SACM23_LIB_002_RestoreFromAuditPreservesUnknownContent above passes only
+// because CreateChildElement replays through a NATIVE seam. The replayer has a
+// bridged path too, and it was a second copy of the live bridge: when the live
+// one was fixed, the copy kept the defect and relocated it to the restore site,
+// where a recovery silently destroyed every Assurance Claim Point and reported
+// no degradation at all -- the canonical hash drops the same tags on both sides,
+// so neither the verifier nor the warning could see it.
+//
+// These replay a CONTENT edit, which is bridged on the replay side (Name is
+// native there, so it would not exercise this).
+
+namespace {
+
+// Runs a bridged content edit through the bus, tampers with the file so the
+// verifier sees divergence, and restores from the audit log. Returns the
+// restored bytes.
+std::string EditTamperAndRestore(ProjectFixture& fixture, core::AppState& state,
+                                 const std::string& element_id,
+                                 core::audit::RestoreSacmFromAuditResult& restored,
+                                 std::string& error) {
+    std::unique_ptr<core::commands::CommandBus> bus =
+        core::commands::CommandBus::Open(fixture.project, fixture.sacm_absolute, error);
+    EXPECT_TRUE(bus) << error;
+    if (!bus) {
+        return {};
+    }
+    core::commands::UpdateElementTextCommand command(element_id, core::ElementTextField::Content,
+                                                     "en", "Edited through the bridge.");
+    core::commands::CommandContext ctx{state.loaded_case.value(), state.sacm_package.value(),
+                                       state.library_document.get()};
+    const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
+    EXPECT_TRUE(result.success) << result.error;
+    if (!result.success) {
+        return {};
+    }
+    bus.reset();
+
+    WriteFile(fixture.sacm_absolute, kTamperedSacm);
+    if (!core::audit::RestoreSacmFromAudit(fixture.project, fixture.sacm_relative, "tester",
+                                           restored, error)) {
+        return {};
+    }
+    return ReadFile(fixture.sacm_absolute);
+}
+
+} // namespace
+
+TEST(SaveFromLibrary, SACM23_LIB_002_RestoreAfterBridgedEditPreservesAcpTaggedValues) {
+    const std::string acp_case = ReadFile(std::filesystem::path(AF_REPO_ROOT) / "tests" / "data" /
+                                          "fixture_acp_parity.sacm.xml");
+    ASSERT_FALSE(acp_case.empty());
+    ProjectFixture fixture = MakeProject("restore-acp", acp_case.c_str());
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    const std::size_t before =
+        CountOccurrences(ReadFile(fixture.sacm_absolute), "assuranceForge.acp");
+    ASSERT_GT(before, 0u) << "fixture carries no ACP tags; this test measures nothing";
+
+    core::audit::RestoreSacmFromAuditResult restored;
+    std::string error;
+    const std::string bytes = EditTamperAndRestore(fixture, state, "G1", restored, error);
+    ASSERT_FALSE(bytes.empty()) << error;
+    EXPECT_TRUE(restored.lossy_fallback_warning.empty()) << restored.lossy_fallback_warning;
+
+    EXPECT_EQ(CountOccurrences(bytes, "assuranceForge.acp"), before)
+        << "restoring from the audit log destroyed Assurance Claim Points -- and reported no "
+           "degradation while doing it";
+}
+
+TEST(SaveFromLibrary, SACM23_LIB_002_RestoreAfterBridgedEditPreservesUnknownContent) {
+    ProjectFixture fixture = MakeProject("restore-vendor");
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+
+    core::audit::RestoreSacmFromAuditResult restored;
+    std::string error;
+    const std::string bytes = EditTamperAndRestore(fixture, state, "G1", restored, error);
+    ASSERT_FALSE(bytes.empty()) << error;
+    EXPECT_TRUE(restored.lossy_fallback_warning.empty()) << restored.lossy_fallback_warning;
+
+    EXPECT_TRUE(Contains(bytes, kVendorAttributeMarker))
+        << "the restore dropped the vendor attribute:\n" << bytes;
+    EXPECT_TRUE(Contains(bytes, kVendorElementMarker))
+        << "the restore dropped the vendor element:\n" << bytes;
+}
+
+// A project whose log contains one bridged content edit must be recoverable at
+// all. Before the fix the replay aborted on this case -- the audit projection
+// collapsed its four argument packages and duplicated artifact-reference ids, so
+// the re-derive was rejected and the flagship case could not be restored.
+TEST(SaveFromLibrary, SACM23_LIB_002_RestoreAfterBridgedEditSucceedsOnMultiArgumentPackageCase) {
+    const std::string big_case = ReadFile(std::filesystem::path(AF_REPO_ROOT) / "data" /
+                                          "open-autonomy-safety-case.sacm.xml");
+    ASSERT_FALSE(big_case.empty());
+    ProjectFixture fixture = MakeProject("restore-multipackage", big_case.c_str());
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+
+    std::string target_id;
+    for (const core::SacmElement& element : state.loaded_case->elements) {
+        if (element.type == "claim") {
+            target_id = element.id;
+            break;
+        }
+    }
+    ASSERT_FALSE(target_id.empty());
+
+    core::audit::RestoreSacmFromAuditResult restored;
+    std::string error;
+    const std::string bytes = EditTamperAndRestore(fixture, state, target_id, restored, error);
+    ASSERT_FALSE(bytes.empty())
+        << "a project with one bridged content edit in its log could not be restored: " << error;
+
+    core::AppState reopened;
+    ASSERT_TRUE(reopened.load_file(fixture.sacm_absolute.string())) << reopened.status_message;
+    EXPECT_GT(reopened.sacm_package->argumentPackages.size(), 1u)
+        << "the restore collapsed the case's argument packages";
+}
+
+// The self-rebuild pattern outside the bridge. `AppState::sync_library_document`
+// and the command bus's Stage-5 net both re-derive the library document from a
+// projection OF THAT DOCUMENT -- the same shape as the bridge, with the same
+// consequence, because the legacy package has no field for unknown XML.
+//
+// The reachable case needs no project at all: a SACM file opened standalone
+// takes the no-bus dispatch branch, which calls `sync_library_document` after
+// every command. One edit erased the preserved vendor content from the document,
+// and the next save wrote the degraded version to disk.
+TEST(SaveFromLibrary, SACM23_INT_001_NoBusEditPreservesUnknownContentThroughSync) {
+    ProjectFixture fixture = MakeProject("nobus-sync");
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    // Mutate the legacy package the way the no-bus path does, then sync.
+    std::string discarded;
+    std::string error;
+    ASSERT_TRUE(core::SetElementTextField(state.loaded_case.value(), &state.sacm_package.value(),
+                                          "G1", core::ElementTextField::Name, "en",
+                                          "Renamed without a bus", discarded, error))
+        << error;
+    state.sync_library_document();
+
+    // The document is what every save site serializes, so the loss would reach
+    // disk on the next save whether or not it is visible in memory first.
+    const std::filesystem::path saved_path = fixture.temp.path / "after-sync.sacm";
+    ASSERT_TRUE(state.save_file(saved_path.string())) << state.status_message;
+    const std::string bytes = ReadFile(saved_path);
+
+    EXPECT_TRUE(Contains(bytes, kVendorAttributeMarker))
+        << "syncing the library from the legacy package dropped the vendor attribute:\n" << bytes;
+    EXPECT_TRUE(Contains(bytes, kVendorElementMarker))
+        << "syncing the library from the legacy package dropped the vendor element:\n" << bytes;
+    EXPECT_TRUE(Contains(bytes, "Renamed without a bus")) << bytes;
+}
+
+// The Stage-5 net: the branch that re-derives the library document after an
+// UNFLIPPED command (`!library_synced && !library_primary`) -- a NodeOnly
+// removal, an undo, an unseamed command. It is the fourth instance of the
+// self-rebuild pattern, and the only one no existing assertion could see: the
+// single test that reaches the branch compares canonical hashes, and those drop
+// preserved content on BOTH sides, so a lossy reload there is invisible.
+//
+// Asserted through an explicit save, because that is what serializes the
+// library document. (The bus's own autosave for an unflipped command writes
+// projection bytes, which is a separate, disclosed limitation -- this test is
+// about whether the in-memory document survived the re-derive.)
+TEST(SaveFromLibrary, SACM23_INT_001_UnflippedBusCommandPreservesUnknownContentInTheDocument) {
+    ProjectFixture fixture = MakeProject("unflipped-net");
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    std::string error;
+    std::unique_ptr<core::commands::CommandBus> bus =
+        core::commands::CommandBus::Open(fixture.project, fixture.sacm_absolute, error);
+    ASSERT_TRUE(bus) << error;
+
+    // NodeOnly reparents rather than deletes, so it has no library seam and
+    // stays unflipped -- which is exactly the branch under test.
+    core::commands::RemoveElementCommand command("G1", core::RemoveMode::NodeOnly);
+    core::commands::CommandContext ctx{state.loaded_case.value(), state.sacm_package.value(),
+                                       state.library_document.get()};
+    const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
+    ASSERT_TRUE(result.success) << result.error;
+    ASSERT_FALSE(ctx.library_primary)
+        << "the command flipped, so this test never reaches the Stage-5 net it exists to cover";
+
+    // The net has re-derived `library_document` from the legacy package. If it
+    // used the plain reload, the document no longer carries the vendor content
+    // and the next explicit save -- which serializes the document -- writes it
+    // out degraded.
+    const std::filesystem::path explicit_path = fixture.temp.path / "after-unflipped.sacm";
+    ASSERT_TRUE(state.save_file(explicit_path.string())) << state.status_message;
+    const std::string bytes = ReadFile(explicit_path);
+
+    EXPECT_TRUE(Contains(bytes, kVendorAttributeMarker))
+        << "the Stage-5 net dropped the vendor attribute from the library document:\n" << bytes;
+    EXPECT_TRUE(Contains(bytes, kVendorElementMarker))
+        << "the Stage-5 net dropped the vendor element from the library document:\n" << bytes;
 }

@@ -74,6 +74,23 @@ std::string summarize_load_diagnostics(const std::vector<LoadDiagnostic>& diagno
 // replaced -- so existing handles stay valid.
 bool reload_document(LibraryDocument& document, std::string_view xml);
 
+// Re-derives `document` from `xml` like `reload_document`, then restores onto
+// the result the compatibility content the outgoing document carried --
+// preserved vendor elements, preserved vendor attributes, and the foreign
+// namespace declarations they need to stay readable.
+//
+// Use this whenever `xml` came from a projection of the very document being
+// replaced. The legacy `sacm::AssuranceCasePackage` has no field for unknown
+// XML, so serializing through it silently drops everything a tolerant load
+// preserved; the content is still in the outgoing document, and this puts it
+// back. Round-trip integrity for assurance-case data is a hard project
+// constraint, and a bridged edit that quietly erases a vendor's data on save
+// breaks it just as surely as a lossy save does.
+//
+// Returns false (leaving `document` unchanged) if the XML could not be loaded.
+bool reload_document_keeping_compatibility_content(LibraryDocument& document,
+                                                   std::string_view xml);
+
 // Result of serializing a library document to SACM XMI.
 struct SaveOutcome {
     bool ok = false;
@@ -87,5 +104,18 @@ struct SaveOutcome {
 // Strict mode is the clean SACM 2.3 export and refuses such content
 // (SACM-XMI-006); use it only for an explicit "export strict" action.
 SaveOutcome save_document(const LibraryDocument& document, bool tolerant = true);
+
+// Builds the seed document a new SACM file starts from -- an
+// AssuranceCasePackage named `case_name` holding one ArgumentPackage and one
+// Claim -- and serializes it in STRICT mode.
+//
+// This exists so the seed is produced by the same writer that performs every
+// save. It used to be a hand-written literal in `core`, in the SACM 2.2
+// namespace and using `id=` rather than `xmi:id`; the tolerant reader accepted
+// it, so nothing looked broken, but a new project began as a document no strict
+// consumer would take and the first save silently rewrote it. Strict mode is
+// deliberate: a brand-new document carries nothing to preserve, so anything
+// strict would refuse is a defect in this function.
+SaveOutcome new_case_document_xmi(std::string_view case_name);
 
 } // namespace sacm_adapter

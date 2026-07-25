@@ -29,9 +29,18 @@ using LibraryBridgeMutator = std::function<bool(parser::AssuranceCase& model,
 // whose native library seam is not (yet) audit-equivalent to the legacy mutator.
 //
 // Returns false and sets `error` if `mutate` fails (the library is then unchanged)
-// or if the reload cannot read the serialization.
+// or if the reload cannot read the serialization. `rederive_failure_context`, when
+// given, is appended to the re-derive failure message ("... failed at transaction 3
+// event 1") so a replayer can say WHERE in the log the failure was.
+//
+// This is the ONLY implementation. The audit replayer's `BridgeViaLegacy` used to
+// be a second copy of the same algorithm; when this one was fixed to stop dropping
+// vendor content, the copy kept the defect and relocated it to the restore path,
+// where a recovery silently destroyed every Assurance Claim Point. They are one
+// function now so they cannot drift apart again.
 bool BridgeLegacyMutationToLibrary(sacm_adapter::LibraryDocument& document,
-                                   const LibraryBridgeMutator& mutate, std::string& error);
+                                   const LibraryBridgeMutator& mutate, std::string& error,
+                                   std::string_view rederive_failure_context = {});
 
 // The single chokepoint every audited command uses to become library-primary.
 // When a library document is present and the flip is allowed, `mutate` runs on a

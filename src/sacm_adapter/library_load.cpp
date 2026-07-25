@@ -2,6 +2,8 @@
 
 #include "sacm_adapter/library_document_access.h"
 
+#include "sacm/commands/operations.h"
+#include "sacm/compat/preserve.h"
 #include "sacm/io/xmi.h"
 #include "sacm/validation/diagnostic.h"
 
@@ -71,6 +73,20 @@ bool reload_document(LibraryDocument& document, std::string_view xml) {
     return true;
 }
 
+bool reload_document_keeping_compatibility_content(LibraryDocument& document,
+                                                   std::string_view xml) {
+    sacm::io::LoadResult result = sacm::io::load_xmi_string(xml);
+    if (!result.ok || !result.document.has_value()) {
+        return false;
+    }
+    // Adopt BEFORE the swap: the outgoing document is still the one holding the
+    // preserved content, and after set_document it is gone.
+    sacm::compat::adopt_preserved_content(*result.document,
+                                          LibraryDocumentAccess::document(document));
+    LibraryDocumentAccess::set_document(document, std::move(*result.document));
+    return true;
+}
+
 SaveOutcome save_document(const LibraryDocument& document, bool tolerant) {
     sacm::io::SaveOptions options;
     options.mode = tolerant ? sacm::io::Mode::Tolerant : sacm::io::Mode::Strict;
@@ -78,6 +94,60 @@ SaveOutcome save_document(const LibraryDocument& document, bool tolerant) {
         sacm::io::save_xmi_string(LibraryDocumentAccess::document(document), options);
 
     SaveOutcome outcome;
+    outcome.ok = result.ok;
+    outcome.xml = std::move(result.xml);
+    outcome.diagnostics.reserve(result.diagnostics.size());
+    for (const sacm::validation::Diagnostic& diagnostic : result.diagnostics) {
+        outcome.diagnostics.push_back(LoadDiagnostic{
+            .code = diagnostic.code,
+            .severity = std::string(sacm::validation::severity_name(diagnostic.severity)),
+            .message = diagnostic.message,
+        });
+    }
+    return outcome;
+}
+
+SaveOutcome new_case_document_xmi(std::string_view case_name) {
+    // Stable, human-legible ids: a seed is the one document a user reads before
+    // the tool has generated anything, and these show up in every later diff.
+    const sacm::model::ElementId package_id{"ACP_EMPTY"};
+    const sacm::model::ElementId argument_id{"AP_MAIN"};
+
+    SaveOutcome outcome;
+    sacm::model::Document document;
+    const auto fail = [&outcome](std::string_view step) {
+        outcome.ok = false;
+        outcome.diagnostics.push_back(LoadDiagnostic{
+            .code = "AF-SEED-001",
+            .severity = "Error",
+            .message = std::string("could not build the new-case seed document: ") +
+                       std::string(step),
+        });
+        return outcome;
+    };
+
+    if (!document
+             .apply(sacm::commands::CreateAssuranceCasePackage{.id = package_id,
+                                                              .name = std::string(case_name)})
+             .applied) {
+        return fail("CreateAssuranceCasePackage");
+    }
+    if (!document
+             .apply(sacm::commands::CreateArgumentPackage{
+                 .parent = package_id, .id = argument_id, .name = "Main Argument"})
+             .applied) {
+        return fail("CreateArgumentPackage");
+    }
+    if (!document
+             .apply(sacm::commands::CreateClaim{.parent = argument_id,
+                                                .id = sacm::model::ElementId{"G1"},
+                                                .name = "New Goal"})
+             .applied) {
+        return fail("CreateClaim");
+    }
+
+    sacm::io::SaveResult result =
+        sacm::io::save_xmi_string(document, sacm::io::SaveOptions{.mode = sacm::io::Mode::Strict});
     outcome.ok = result.ok;
     outcome.xml = std::move(result.xml);
     outcome.diagnostics.reserve(result.diagnostics.size());
