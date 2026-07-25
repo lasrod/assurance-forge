@@ -15,11 +15,10 @@ to evidence rather than to a fixture whose origin nobody recorded.
 and that licence is recorded.**
 
 `libs/sacm/tests/data/interop-thirdparty/` holds files produced by other
-people's tools, unmodified, with source URL, upstream commit and licence in its
-[NOTICE.md](../../libs/sacm/tests/data/interop-thirdparty/NOTICE.md). Those run
-in CI. Anything whose licence does not permit redistribution — including the
-single most useful file found — stays out and is reachable only through the
-opt-in harness below.
+people's tools, unmodified, with source URL, upstream commit, licence and full
+licence text in that directory's `NOTICE.md`. Those run in CI. Anything whose
+licence does not permit redistribution — including the single most useful file
+found — stays out and is reachable only through the opt-in harness below.
 
 Everything in `libs/sacm/tests/data/sacm23/` remains our own: a *reduced
 reproduction* of a dialect's structural shape, or a fixture *authored from a
@@ -55,6 +54,7 @@ actually emitted.
 | `SACM23_RT_001_Repo*RoundTrips`, `SACM23_BASE_001_JapaneseMultiLanguageFixtureRoundTrips` | repository fixtures |
 | `SACM23_COMPAT_002_ThirdPartyOdeContainerImportsWithNonConformanceWarning` | **third-party** `mobstr-safetycase.integration` |
 | `SACM23_COMPAT_002_ThirdPartyEmfFileImportsAndReportsItsRealViolations` | **third-party** `sysmline-easyexample.assurancecase` |
+| `SACM23_COMPAT_002_ThirdPartyContainerLosesItsNonSacmSiblings` | **third-party** `deis-etcs.model` |
 | `SACM23_COMPAT_002_ThirdPartyFiles{ParseIntoSacmElements,SemanticallyRoundTrip}` | opt-in `SACM_INTEROP_CORPUS` directory |
 
 ## Third-party corpus
