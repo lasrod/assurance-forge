@@ -65,13 +65,23 @@ std::string_view prefix_of(std::string_view qualified) {
 // True when the writer declares `uri` itself, so recording it on the document
 // would be redundant -- and, for a SACM namespace, actively wrong: re-declaring
 // the source dialect's URI would fight the export-namespace override.
-// Deliberately the same partition of "ours" vs "foreign" that
-// capture_vendor_attributes applies, so exactly the namespaces whose attributes
-// are preserved are the ones whose declarations are preserved.
+//
+// A SACM *extension* namespace (GSN and friends) is deliberately not in this
+// set, even though the reader understands it. An extension type whose SACM
+// supertype is abstract has no concrete class to become, so its subtree is kept
+// verbatim in preserved content and re-emitted with its original prefix -- a
+// prefix the writer declares for no other reason. Treating the namespace as
+// self-declared would emit that fragment under an undeclared prefix: output
+// that is not namespace-well-formed, and whose attributes the next load drops
+// because an undeclared prefix resolves to no namespace. That is exactly the
+// loss fixed for vendor prefixes under SACM23-COMPAT-001, and it became
+// reachable for extension prefixes once extension fragments started reaching
+// preserved content at all (SACM23-COMPAT-002). The writer emits recorded
+// declarations only when something is preserved, so recording a prefix the
+// document never re-emits costs nothing.
 bool is_self_declared_namespace(std::string_view uri) {
     return metadata::namespaces::is_xmi_namespace(uri) || uri == metadata::namespaces::kXsi ||
-           metadata::namespaces::is_accepted_sacm_namespace(uri) ||
-           detail::is_sacm_extension_namespace(uri);
+           metadata::namespaces::is_accepted_sacm_namespace(uri);
 }
 
 // Collects the document's foreign `xmlns:<prefix>` declarations as a union over
@@ -358,8 +368,37 @@ void normalize_emf_references(pugi::xml_node root) {
     rewrite_emf_paths(root, path_to_id);
 }
 
+// What reading `xsi:type` established about the node. The three cases were once
+// two -- a class name or `std::nullopt` -- which conflated "there is no xsi:type
+// here, infer the kind from the element name" with "there is one, and this
+// subtree has to survive verbatim". Every caller took the second for the first,
+// so an extension type whose SACM supertype is abstract was reported as
+// preserved and then dropped without a trace.
+enum class XsiTypeOutcome {
+    // No xsi:type attribute on the node; the caller falls back to the role's
+    // declared type or (tolerant) the element name.
+    Absent,
+    // Resolved to a SACM class name, directly or through an extension type's
+    // SACM supertype.
+    Resolved,
+    // A type this reader recognizes but cannot represent as any concrete SACM
+    // class. The caller must keep the subtree verbatim (tolerant) or reject it
+    // (strict); inferring a kind here would silently retype the element.
+    PreserveAsCompatibility,
+};
+
+struct XsiTypeResult {
+    XsiTypeOutcome outcome = XsiTypeOutcome::Absent;
+    // The SACM class name when `Resolved`; the raw qualified xsi:type value
+    // when `PreserveAsCompatibility`, so a caller can name it in a diagnostic.
+    std::string type_name;
+
+    bool resolved() const { return outcome == XsiTypeOutcome::Resolved; }
+    bool preserve() const { return outcome == XsiTypeOutcome::PreserveAsCompatibility; }
+};
+
 // xsi:type="sacm:Claim" -> class name, validating the prefix namespace.
-std::optional<std::string> read_xsi_type(Reader& reader, const pugi::xml_node& node) {
+XsiTypeResult read_xsi_type(Reader& reader, const pugi::xml_node& node) {
     for (const pugi::xml_attribute& attr : node.attributes()) {
         const std::string_view name = attr.name();
         if (local_name(name) != "type" || name.starts_with("xmlns")) {
@@ -384,21 +423,25 @@ std::optional<std::string> read_xsi_type(Reader& reader, const pugi::xml_node& n
                     detail::resolve_extension_type(type_ns, local_name(value))) {
                 if (!extension->sacm_kind.has_value()) {
                     // Known extension type whose SACM supertype is abstract:
-                    // there is nothing concrete to become. Preserve it rather
-                    // than silently coercing it into an unrelated class.
+                    // there is nothing concrete to become. The caller keeps the
+                    // subtree rather than silently coercing it into an unrelated
+                    // class; strict rejects the document, which is why this is
+                    // an error there and a warning on the tolerant path.
                     reader.report(
-                        validation::codes::kXmiUnknownElement, Severity::Warning, "SACM23-COMPAT-002",
-                        node, {},
+                        validation::codes::kXmiUnknownElement, reader.mode_severity(),
+                        "SACM23-COMPAT-002", node, {},
                         std::format("xsi:type '{}' extends an abstract SACM class and has no "
-                                    "concrete equivalent; preserved as compatibility content",
+                                    "concrete equivalent",
                                     value));
-                    return std::nullopt;
+                    return XsiTypeResult{XsiTypeOutcome::PreserveAsCompatibility,
+                                         std::string(value)};
                 }
                 reader.report(validation::codes::kXmiUnknownElement, Severity::Info,
                               "SACM23-COMPAT-001", node, {},
                               std::format("xsi:type '{}' resolved to its SACM supertype '{}'", value,
                                           metadata::kind_name(*extension->sacm_kind)));
-                return std::string(metadata::kind_name(*extension->sacm_kind));
+                return XsiTypeResult{XsiTypeOutcome::Resolved,
+                                     std::string(metadata::kind_name(*extension->sacm_kind))};
             }
             // Distinguish "we know this metamodel but not this type" from
             // "we do not know this metamodel at all". Both end up preserved,
@@ -409,21 +452,21 @@ std::optional<std::string> read_xsi_type(Reader& reader, const pugi::xml_node& n
                     validation::codes::kXmiUnknownElement, reader.mode_severity(),
                     "SACM23-COMPAT-002", node, {},
                     std::format("xsi:type '{}' is an unrecognized type in the known SACM-extension "
-                                "namespace '{}'; preserved as compatibility content",
+                                "namespace '{}'",
                                 value, type_ns));
-                return std::nullopt;
+                return XsiTypeResult{XsiTypeOutcome::PreserveAsCompatibility, std::string(value)};
             }
             reader.report(validation::codes::kXmiUnknownNamespace, reader.mode_severity(),
                           "SACM23-XMI-002", node, {},
                           std::format("xsi:type '{}' resolves to non-SACM namespace '{}'", value,
                                       type_ns));
             if (reader.strict()) {
-                return std::nullopt;
+                return XsiTypeResult{};
             }
         }
-        return std::string(local_name(value));
+        return XsiTypeResult{XsiTypeOutcome::Resolved, std::string(local_name(value))};
     }
-    return std::nullopt;
+    return XsiTypeResult{};
 }
 
 std::unique_ptr<SACMElement> make_element(ElementKind kind, ElementId id) {
@@ -731,20 +774,46 @@ bool attach_child(Reader& reader, SACMElement& parent, std::unique_ptr<SACMEleme
     return false;
 }
 
+// Keeps a subtree the reader recognizes but cannot type verbatim on its parent,
+// so a compatibility save re-emits it unchanged. Strict mode preserves nothing:
+// read_xsi_type has already reported the type as an error there, and strict
+// output carries no compatibility content (SACM23-XMI-004), so the load fails
+// rather than the element being written back without it.
+void preserve_extension_subtree(Reader& reader, SACMElement& parent, const pugi::xml_node& node,
+                                std::string_view type_name) {
+    if (reader.strict()) {
+        return;
+    }
+    Access::preserved_content(parent).push_back(node_to_string(node));
+    reader.report(validation::codes::kXmiUnknownElement, Severity::Warning, "SACM23-COMPAT-002",
+                  node, {parent.id()},
+                  std::format("element '{}' with xsi:type '{}' preserved as compatibility content "
+                              "under {}",
+                              node.name(), type_name, metadata::kind_name(parent.kind())));
+}
+
 // Handles a containment child whose concrete kind must be resolved from
 // xsi:type, the role's declared type, or (tolerant) the class name.
 void read_containment_child(Reader& reader, SACMElement& parent, const pugi::xml_node& node,
                             std::optional<ElementKind> declared_kind) {
     std::optional<ElementKind> kind;
-    if (const std::optional<std::string> xsi_type = read_xsi_type(reader, node)) {
-        kind = detail::kind_from_class_name(*xsi_type);
+    const XsiTypeResult xsi_type = read_xsi_type(reader, node);
+    if (xsi_type.preserve()) {
+        // Not a fall-through to name-based inference: the element name here is
+        // the abstract role ("argumentElement"), which is no class name, so
+        // inference would fail and the subtree would be dropped.
+        preserve_extension_subtree(reader, parent, node, xsi_type.type_name);
+        return;
+    }
+    if (xsi_type.resolved()) {
+        kind = detail::kind_from_class_name(xsi_type.type_name);
         if (!kind.has_value()) {
-            kind = detail::kind_from_class_name_ci(*xsi_type);
+            kind = detail::kind_from_class_name_ci(xsi_type.type_name);
         }
         if (!kind.has_value()) {
             reader.report(validation::codes::kXmiUnknownElement, reader.mode_severity(),
                           "SACM23-XMI-001", node, {parent.id()},
-                          std::format("unknown xsi:type '{}'", *xsi_type));
+                          std::format("unknown xsi:type '{}'", xsi_type.type_name));
             return;
         }
     } else if (declared_kind.has_value()) {
@@ -1496,13 +1565,21 @@ void populate(Reader& reader, SACMElement& element, const pugi::xml_node& node) 
         if (const std::optional<ElementKind> declared = containment_role_kind(element, role)) {
             // Concrete declared type; xsi:type may still refine to a subtype.
             reader.push_scope(child);
-            const std::optional<std::string> xsi_type = read_xsi_type(reader, child);
+            const XsiTypeResult xsi_type = read_xsi_type(reader, child);
             reader.pop_scope();
+            if (xsi_type.preserve()) {
+                // The role's declared kind is not a safe default here: the
+                // xsi:type says the element is something the declared class
+                // cannot represent, so falling back to it would silently coerce
+                // the element into an unrelated class.
+                preserve_extension_subtree(reader, element, child, xsi_type.type_name);
+                continue;
+            }
             std::optional<ElementKind> kind = declared;
-            if (xsi_type.has_value()) {
-                kind = detail::kind_from_class_name(*xsi_type);
+            if (xsi_type.resolved()) {
+                kind = detail::kind_from_class_name(xsi_type.type_name);
                 if (!kind.has_value()) {
-                    kind = detail::kind_from_class_name_ci(*xsi_type);
+                    kind = detail::kind_from_class_name_ci(xsi_type.type_name);
                 }
             }
             if (!kind.has_value()) {
@@ -1604,8 +1681,21 @@ void check_root_namespace(Reader& reader, const pugi::xml_node& root) {
 void read_root(Reader& reader, model::Document& document, const pugi::xml_node& root) {
     reader.push_scope(root);
     std::optional<ElementKind> kind;
-    if (const std::optional<std::string> xsi_type = read_xsi_type(reader, root)) {
-        kind = detail::kind_from_class_name(*xsi_type);
+    const XsiTypeResult xsi_type = read_xsi_type(reader, root);
+    if (xsi_type.resolved()) {
+        kind = detail::kind_from_class_name(xsi_type.type_name);
+    } else if (xsi_type.preserve()) {
+        // A document root has no parent element to carry preserved content, so
+        // the subtree cannot be kept the way a child's can. Say that plainly
+        // instead of leaving the type diagnostic to imply a preservation that
+        // did not happen: the root is read from its element name as before, and
+        // if that is not a package kind the invalid-root error below stands.
+        reader.report(validation::codes::kXmiUnknownElement, reader.mode_severity(),
+                      "SACM23-COMPAT-002", root, {},
+                      std::format("root element's xsi:type '{}' has no concrete SACM equivalent "
+                                  "and a document root cannot be preserved as compatibility "
+                                  "content; reading the root from its element name '{}'",
+                                  xsi_type.type_name, local_name(root.name())));
     }
     if (!kind.has_value()) {
         kind = reader.strict() ? detail::kind_from_class_name(local_name(root.name()))
