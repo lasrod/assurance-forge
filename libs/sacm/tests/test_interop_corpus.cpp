@@ -6,10 +6,11 @@
 // handles the shape we *believe* a tool emits -- not a detail we did not know to
 // reproduce.
 //
-// The corpus itself is deliberately not committed: docs/sacm/sacm-interop-corpus.md
-// keeps this repository free of third-party licensing obligations, and one of
-// the most useful files found so far carries no declared licence at all, so it
-// could not be vendored even if the rule were relaxed.
+// Licence-clean third-party files ARE committed, under
+// libs/sacm/tests/data/interop-thirdparty/, and are exercised unconditionally
+// further down. What is deliberately NOT committed is the part that cannot be:
+// the most useful file found so far carries no declared licence at all, so it
+// could not be vendored even if we wanted to.
 //
 // Point SACM_INTEROP_CORPUS at a directory of such files and these run against
 // every file in it. Absent, they SKIP -- visibly, so a green CI run is never
@@ -162,11 +163,14 @@ std::size_t count_code(const std::vector<sacm::validation::Diagnostic>& diagnost
 
 }  // namespace
 
-// An ODE DDIPackage embedding a SACM assurance case alongside architecture and
-// failure-logic models -- the shape a real toolchain produces when SACM is one
-// model among several. Strict refuses it; the tolerant path reads the SACM out
-// and says plainly what that costs, because a user whose vendor file opens
-// cleanly has no other reason to expect the rest of it to vanish on save.
+// An ODE DDIPackage whose sole child is the SACM assurance case: it declares
+// the architecture_ and failureLogic_ prefixes but never uses them, so what the
+// foreign-root path drops here is the container element and its attributes.
+// (deis-etcs.model below is the fixture that carries real sibling models, and
+// is where the loss itself is asserted.) Strict refuses this shape; the
+// tolerant path reads the SACM out and says plainly what that costs, because a
+// user whose vendor file opens cleanly has no other reason to expect anything
+// of it to vanish on save.
 TEST(Sacm23InteropCorpus, SACM23_COMPAT_002_ThirdPartyOdeContainerImportsWithNonConformanceWarning) {
     const std::filesystem::path path = third_party("mobstr-safetycase.integration");
     ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
@@ -325,7 +329,9 @@ TEST(Sacm23InteropCorpus, SACM23_COMPAT_002_ThirdPartyContainerLosesItsNonSacmSi
             ++claims;
         }
     });
-    EXPECT_GT(claims, 0);
+    // Exact, for the same reason as the other fixtures: byte-pinned source, so
+    // a loose `> 0` would hide a regression that swallowed all but one claim.
+    EXPECT_EQ(claims, 9);
 
     // ...and the non-SACM siblings do not, which is the whole point of the
     // warning. Asserting the drop rather than hoping the user reads the text:

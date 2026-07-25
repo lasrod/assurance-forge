@@ -59,10 +59,11 @@ actually emitted.
 
 ## Third-party corpus
 
-Files produced by other tools, located by public search. The two EPL-2.0 files
-are **committed** under `libs/sacm/tests/data/interop-thirdparty/` and run in CI;
-the rest cannot be redistributed and are reachable only through the opt-in
-harness.
+Files produced by other tools, located by public search. **Three** are
+**committed** under `libs/sacm/tests/data/interop-thirdparty/` and run in CI —
+two under EPL-2.0 and one under MIT, with source, upstream commit and full
+licence text in that directory. The rest cannot be redistributed and are
+reachable only through the opt-in harness.
 
 Point `SACM_INTEROP_CORPUS` at a directory containing them and
 `Sacm23InteropCorpus.SACM23_COMPAT_002_*` (`libs/sacm/tests/test_interop_corpus.cpp`)
@@ -79,7 +80,7 @@ SACM_INTEROP_CORPUS=/path/to/corpus ctest --test-dir build -C Release -R Sacm23I
 | [Ruizhe-Yang/SysMLine](https://github.com/Ruizhe-Yang/SysMLine) — EMF/ACME | EPL-2.0 | `dut.cs.sysmline/model/SACM/EasyExample.assurancecase` | `http://omg.sacm/2.2/*` per-package + `http://acwg.org/3.0/gsn` | **Committed** under `interop-thirdparty/`. Imports and round-trips. 80 validation errors, all genuine rule violations in the source: `implementationConstraint` on non-abstract elements (clause 8.6) and duplicate language tags — it is EMF template output with placeholder values |
 | [Ruizhe-Yang/SysMini](https://github.com/Ruizhe-Yang/SysMini) | none declared | `org.omg.sysmini/model/SACM/quan.assurancecase` | same, plus `artifact_` | Imports and round-trips; 45 errors, same two causes |
 | [panorama-research/mobstr-dataset](https://github.com/panorama-research/mobstr-dataset) — MobSTr automotive safety dataset | EPL-2.0 | `org.panorama-research.mobstr.safetycase/mobstr-safetycase.integration` | ODE `DDIPackage` embedding SACM, `http://www.deis-project.eu/ode/mergedODE/sacm/*` | **Imports** with a `SACM-XMI-009` non-conformance warning (see below); validates with 0 errors; round-trips. **Committed** under `interop-thirdparty/` |
-| [DEIS-Project-EU/DDI-Scripting-Tools](https://github.com/DEIS-Project-EU/DDI-Scripting-Tools) | MIT | `Examples/ETCS/etcs.model`, `trackside.model` | same | Imports the same way. Not committed — one ODE container in CI is enough, and this one is 100 KB |
+| [DEIS-Project-EU/DDI-Scripting-Tools](https://github.com/DEIS-Project-EU/DDI-Scripting-Tools) | MIT | `Examples/ETCS/etcs.model`, `trackside.model` | same | **Committed** under `interop-thirdparty/` (MIT). The container that genuinely carries other models: three `odeProductPackages` siblings, 503 non-SACM elements, all dropped on load — so it is what makes the `SACM-XMI-009` loss assertable rather than theoretical |
 
 Two findings worth keeping:
 
@@ -115,11 +116,10 @@ is about to disappear on save.
 These are the limits of what the register above supports. They are the reason
 `SACM23-COMPAT-002` is not claimed beyond what its matrix row says.
 
-1. **Coverage is two tools, not the field.** CI now parses real third-party
-   bytes, which closes the gap that held SACM23-COMPAT-002 — but two EPL-2.0
-   files from two projects is a floor, not breadth. Papyrus in particular has
-   still produced nothing we have seen (decision #20 named it as the original
-   target).
+1. **Coverage is three projects, not the field.** CI now parses real third-party
+   bytes, which closes the gap that held SACM23-COMPAT-002 — but three files
+   from three projects is a floor, not breadth. Papyrus in particular has still
+   produced nothing we have seen (decision #20 named it as the original target).
 
    The strongest single piece of evidence — ACEditor MBAC output, which imports
    and validates with **zero** errors — carries no declared licence and so runs

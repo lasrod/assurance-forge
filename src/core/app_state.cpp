@@ -31,6 +31,9 @@ bool AppState::load_file(const std::string& file_path) {
         // import bug to fix in the library, not a reason to keep a parallel legacy
         // parser in the app.
         library_document.reset();
+        // Cleared here, not in the success branch: a failed load must not leave the
+        // previous file's warnings standing next to a status message about this one.
+        load_warnings.clear();
         sacm_adapter::LoadOutcome outcome = sacm_adapter::load_document(file_path);
         if (!outcome.ok || outcome.document == nullptr) {
             active_project_file_role = ProjectFileRole::Unknown;
@@ -80,7 +83,6 @@ bool AppState::load_file(const std::string& file_path) {
         // file produces 222 warnings of which 220 are "this element had no
         // xmi:id, one was generated". Showing the first of those and calling it
         // the warning is the same as showing nothing.
-        load_warnings.clear();
         std::vector<std::string> seen_codes;
         for (const sacm_adapter::LoadDiagnostic& diagnostic : outcome.diagnostics) {
             if (diagnostic.severity == "Info")
