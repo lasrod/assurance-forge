@@ -60,4 +60,14 @@ void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model,
 void SynthesizeBareStrategyPlacements(parser::AssuranceCase& model,
                                       const sacm::AssuranceCasePackage& package);
 
+// Same pass scoped to ONE ArgumentPackage, for a render view that was projected
+// down to a single package (`core::BuildArgumentPackageProjection`, which feeds
+// the workbench's per-package canvas tabs). The placeholder is render-only and
+// therefore absent from the package, so a package projection filters it out and
+// the bare strategy loses its placement -- it has to be re-synthesized on the
+// projected view. Both overloads are idempotent: an existing placeholder counts
+// as a placement, so re-running adds nothing.
+void SynthesizeBareStrategyPlacements(parser::AssuranceCase& model,
+                                      const sacm::ArgumentPackage& argument_package);
+
 } // namespace core
