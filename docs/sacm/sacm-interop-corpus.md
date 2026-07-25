@@ -49,22 +49,65 @@ It also caps what the corpus can prove, and that limit is stated explicitly in
 | `SACM23_COMPAT_001_PreservedForeignAttributeSurvivesTwoRoundTrips` | inline document |
 | `SACM23_RT_001_Repo*RoundTrips`, `SACM23_BASE_001_JapaneseMultiLanguageFixtureRoundTrips` | repository fixtures |
 
+## Third-party corpus (opt-in, not committed)
+
+Files produced by other tools, located by public search. **None are committed** —
+the redistribution rule above still holds, and the most useful of them carries no
+declared licence at all, so it could not be vendored even if the rule were
+relaxed.
+
+Point `SACM_INTEROP_CORPUS` at a directory containing them and
+`Sacm23InteropCorpus.SACM23_COMPAT_002_*` (`libs/sacm/tests/test_interop_corpus.cpp`)
+runs against every file in it. Unset, those tests **skip visibly**, so a green CI
+run is never mistaken for third-party evidence.
+
+```bash
+SACM_INTEROP_CORPUS=/path/to/corpus ctest --test-dir build -C Release -R Sacm23InteropCorpus
+```
+
+| Source | Licence | File | Dialect | Measured result |
+|---|---|---|---|---|
+| [LuisFelipeAN/aceditor-mbac-results](https://github.com/LuisFelipeAN/aceditor-mbac-results) — output of the SACM **ACEditor MBAC** tool | **none declared** (do not redistribute) | `HBS/default.sacm2` | `http://SACM_ACEditor/sacm/2.1`, legacy XMI URI, `gid=` identity, no `xmi:id` | **Imports, validates with 0 errors, semantically round-trips.** The one file that satisfies COMPAT-002's requirement text end to end |
+| [Ruizhe-Yang/SysMLine](https://github.com/Ruizhe-Yang/SysMLine) — EMF/ACME | EPL-2.0 | `dut.cs.sysmline/model/SACM/EasyExample.assurancecase` | `http://omg.sacm/2.2/*` per-package + `http://acwg.org/3.0/gsn` | Imports and round-trips. 80 validation errors, all genuine rule violations in the source: `implementationConstraint` on non-abstract elements (clause 8.6) and duplicate language tags — it is EMF template output with placeholder values |
+| [Ruizhe-Yang/SysMini](https://github.com/Ruizhe-Yang/SysMini) | none declared | `org.omg.sysmini/model/SACM/quan.assurancecase` | same, plus `artifact_` | Imports and round-trips; 45 errors, same two causes |
+| [panorama-research/mobstr-dataset](https://github.com/panorama-research/mobstr-dataset) — MobSTr automotive safety dataset | EPL-2.0 | `org.panorama-research.mobstr.safetycase/mobstr-safetycase.integration` | ODE `DDIPackage` embedding SACM, `http://www.deis-project.eu/ode/mergedODE/sacm/*` | **Declined**: root is an ODE container, not a SACM interchange root (clause 2.4) |
+| [DEIS-Project-EU/DDI-Scripting-Tools](https://github.com/DEIS-Project-EU/DDI-Scripting-Tools) | MIT | `Examples/ETCS/etcs.model`, `trackside.model` | same | **Declined**, same reason |
+
+Two findings worth keeping:
+
+- The reader handles **three previously unseen dialects** without change —
+  including SACM 2.1 with `gid=`-only identity, which no fixture in this
+  repository models.
+- The validation errors are the library **working**, not failing: it read
+  third-party content and correctly identified real SACM rule violations, while
+  still round-tripping the documents semantically.
+
+The two declined files raise a genuine open question rather than a defect: real
+toolchains ship SACM *embedded in a larger container*. Accepting a foreign
+wrapper root is a conformance decision (SACM 2.3 clause 2.4 defines the
+interchange roots), not something to change unilaterally — see
+[Known gaps](#known-gaps) item 1.
+
 ## Known gaps
 
 These are the limits of what the register above supports. They are the reason
 `SACM23-COMPAT-002` is not claimed beyond what its matrix row says.
 
-1. **No bytes produced by an independent tool are parsed in CI.** Every dialect
-   fixture is our reconstruction of a dialect. A reconstruction proves the
-   reader handles the shape we *believe* a tool emits; it cannot catch a detail
-   we did not know to reproduce. This is the single largest gap in the
-   compatibility claim.
+1. **Third-party evidence exists but is not exercised by default.** The corpus
+   above is real and measured, and the harness is reproducible for anyone
+   holding the files — but CI skips it, because the files cannot be committed.
+   Closing this fully needs either a licence-clean file that *can* be vendored,
+   or a CI job that fetches the corpus.
 
-   One manual check has been done outside CI: a real public EMF/GSN file was
-   parsed during the SACM23-COMPAT-002 work and yielded 39 SACM elements where
-   the previous reader yielded 0. That was a one-off developer check, is not
-   reproducible from this repository, and is recorded here as history rather
-   than as evidence.
+   Related, and undecided: whether the library should read SACM out of a foreign
+   container root (ODE `DDIPackage`). Two of the five files found are in that
+   shape, and rejecting them is defensible under clause 2.4 — but if that is how
+   real toolchains ship SACM, "we support the dialect" and "we can read their
+   files" are not the same claim.
+
+   Superseded history: an earlier one-off developer check parsed a public
+   EMF/GSN file and yielded 39 SACM elements where the previous reader yielded 0.
+   It is recorded here as history, not evidence; the harness above replaces it.
 
 2. **No Papyrus output.** Papyrus was the original interop target (decision
    #20). Nothing from it has been obtained or modelled.

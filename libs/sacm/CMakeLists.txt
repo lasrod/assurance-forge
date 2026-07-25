@@ -100,6 +100,7 @@ if(SACM_BUILD_TESTS)
         tests/test_roundtrip.cpp
         tests/test_base_model.cpp
         tests/test_repo_fixture_interop.cpp
+        tests/test_interop_corpus.cpp
         tests/test_packages.cpp
         tests/test_terminology.cpp
         tests/test_argumentation.cpp
