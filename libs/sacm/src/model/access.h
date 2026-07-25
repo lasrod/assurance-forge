@@ -189,6 +189,9 @@ struct Access {
         const model::Document& d) {
         return d.id_counters_;
     }
+    static std::map<std::string, std::string>& foreign_namespaces(model::Document& d) {
+        return d.foreign_namespaces_;
+    }
     static std::uint64_t& revision(model::Document& d) { return d.revision_; }
 };
 

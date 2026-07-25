@@ -10,6 +10,7 @@
 
 #include <format>
 #include <fstream>
+#include <map>
 #include <string>
 
 namespace sacm::io {
@@ -39,6 +40,8 @@ std::string idrefs(const std::vector<ElementId>& ids) {
 void write_element(pugi::xml_node parent, const SACMElement& element, std::string_view node_name,
                    std::optional<ElementKind> declared_kind);
 std::string qualified_class_name_for_expression_lang_string();
+
+const std::map<std::string, std::string> kNoForeignNamespaces;
 
 // <value lang=".." content=".."/> entries of a MultiLangString.
 void write_multi_lang(pugi::xml_node owner, std::string_view wrapper_name,
@@ -356,6 +359,26 @@ void write_preserved_content(pugi::xml_node node, const SACMElement& element) {
     }
 }
 
+// Re-declares the prefixes the preserved fragments use. Without this the output
+// is not namespace-well-formed, and worse, a re-load cannot classify a
+// preserved *attribute*: an undeclared prefix resolves to no namespace, so the
+// attribute stops looking foreign and is skipped -- the vendor data survives one
+// save and is lost on the next (SACM23-COMPAT-001). Prefixes the writer already
+// declared win, so a foreign document cannot rebind `sacm`, `xmi` or `xsi`.
+void write_namespace_declarations(pugi::xml_node node,
+                                  const std::map<std::string, std::string>& foreign_namespaces) {
+    for (const auto& [prefix, uri] : foreign_namespaces) {
+        if (prefix.empty()) {
+            continue;
+        }
+        const std::string declaration = std::format("xmlns:{}", prefix);
+        if (node.attribute(declaration.c_str())) {
+            continue;
+        }
+        node.append_attribute(declaration.c_str()) = uri.c_str();
+    }
+}
+
 void write_element(pugi::xml_node parent, const SACMElement& element, std::string_view node_name,
                    std::optional<ElementKind> declared_kind) {
     pugi::xml_node node = parent.append_child(std::string(node_name).c_str());
@@ -375,12 +398,14 @@ void write_element(pugi::xml_node parent, const SACMElement& element, std::strin
 }
 
 void write_root(pugi::xml_node parent, const SACMElement& element, bool declare_namespaces,
-                std::string_view sacm_namespace) {
+                std::string_view sacm_namespace,
+                const std::map<std::string, std::string>& foreign_namespaces) {
     pugi::xml_node node = parent.append_child(qualified_class_name(element.kind()).c_str());
     if (declare_namespaces) {
         node.append_attribute("xmlns:sacm") = std::string(sacm_namespace).c_str();
         node.append_attribute("xmlns:xmi") = std::string(ns::kXmi).c_str();
         node.append_attribute("xmlns:xsi") = std::string(ns::kXsi).c_str();
+        write_namespace_declarations(node, foreign_namespaces);
         node.append_attribute("xmi:version") = std::string(ns::kXmiVersion).c_str();
     }
     write_common_attributes(node, element);
@@ -408,14 +433,13 @@ SaveResult save_xmi_string(const model::Document& document, const SaveOptions& o
     // Strict save must not emit compatibility-only content — and must not
     // silently drop it either: refuse with SACM-XMI-006 (settled decision
     // #9/#10). Compatibility save re-emits preserved fragments verbatim.
+    std::vector<model::ElementId> carriers;
+    document.for_each_element([&carriers](const SACMElement& element) {
+        if (!element.preserved_content().empty() || !element.preserved_attributes().empty()) {
+            carriers.push_back(element.id());
+        }
+    });
     if (options.mode == Mode::Strict) {
-        std::vector<model::ElementId> carriers;
-        document.for_each_element([&carriers](const SACMElement& element) {
-            if (!element.preserved_content().empty() ||
-                !element.preserved_attributes().empty()) {
-                carriers.push_back(element.id());
-            }
-        });
         if (!carriers.empty()) {
             result.diagnostics.push_back(validation::Diagnostic{
                 .code = std::string(validation::codes::kXmiStrictSaveRefused),
@@ -432,6 +456,15 @@ SaveResult save_xmi_string(const model::Document& document, const SaveOptions& o
     }
     g_emit_preserved_content = options.mode != Mode::Strict;
 
+    // Foreign namespace declarations exist to make the preserved fragments
+    // readable, so they follow the fragments: emitted only in compatibility mode
+    // and only when something is actually preserved. Strict output therefore
+    // stays free of them, and a document carrying nothing unknown serializes
+    // exactly as before.
+    const std::map<std::string, std::string>& foreign_namespaces =
+        g_emit_preserved_content && !carriers.empty() ? document.foreign_namespaces()
+                                                      : kNoForeignNamespaces;
+
     // An empty override means the pinned default. SACM 2.3 determines no
     // instance namespace, so this is a project choice a caller may override.
     const std::string_view sacm_namespace =
@@ -445,21 +478,23 @@ SaveResult save_xmi_string(const model::Document& document, const SaveOptions& o
     const std::size_t root_count = document.roots().size() + document.other_roots().size();
     if (root_count == 1) {
         if (!document.roots().empty()) {
-            write_root(xml, *document.roots().front(), true, sacm_namespace);
+            write_root(xml, *document.roots().front(), true, sacm_namespace, foreign_namespaces);
         } else {
-            write_root(xml, *document.other_roots().front(), true, sacm_namespace);
+            write_root(xml, *document.other_roots().front(), true, sacm_namespace,
+                       foreign_namespaces);
         }
     } else {
         pugi::xml_node wrapper = xml.append_child("xmi:XMI");
         wrapper.append_attribute("xmlns:sacm") = std::string(sacm_namespace).c_str();
         wrapper.append_attribute("xmlns:xmi") = std::string(ns::kXmi).c_str();
         wrapper.append_attribute("xmlns:xsi") = std::string(ns::kXsi).c_str();
+        write_namespace_declarations(wrapper, foreign_namespaces);
         wrapper.append_attribute("xmi:version") = std::string(ns::kXmiVersion).c_str();
         for (const auto& root : document.roots()) {
-            write_root(wrapper, *root, false, sacm_namespace);
+            write_root(wrapper, *root, false, sacm_namespace, kNoForeignNamespaces);
         }
         for (const auto& root : document.other_roots()) {
-            write_root(wrapper, *root, false, sacm_namespace);
+            write_root(wrapper, *root, false, sacm_namespace, kNoForeignNamespaces);
         }
     }
 
