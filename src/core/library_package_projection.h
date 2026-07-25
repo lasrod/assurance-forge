@@ -59,20 +59,20 @@ std::optional<std::string> library_canonical_hash(const sacm::AssuranceCasePacka
 std::optional<std::string> library_canonical_hash_from_file(const std::filesystem::path& path);
 
 // Phase 9 Stage 6: serializes a package to library SACM XMI, by loading it
-// through the library and saving it back out in tolerant mode. This is what the
-// save sites write so the library becomes the serialization source of truth;
-// the audit readers, already routed through the library (library_canonical_hash*),
-// read the XMI back and converge.
+// through the library and saving it back out in tolerant mode.
 //
-// Preservation caveat: the input is a *legacy* `sacm::AssuranceCasePackage`,
-// which already dropped any foreign/unknown XML at parse time (see
-// src/sacm/sacm_model.h). So this preserves everything the legacy structs model
-// -- including ACP and other TaggedValues (clause 8.12) -- but NOT truly-unknown
-// extension content that only survived tolerant load in the library document.
-// That is no worse than the pre-Stage-6 legacy save; a full round-trip of
-// unknown content awaits the library-primary model (Stage 7), where edits no
-// longer round-trip through the legacy serialization. Returns nullopt if the
-// library round-trip fails, so callers can fall back to the legacy serialization.
+// **LOSSY for unknown content -- FALLBACK ONLY.** Since Stage 7 every save site
+// that has a `sacm_adapter::LibraryDocument` describing the state to persist
+// serializes THAT document (`sacm_adapter::save_document`), which re-emits the
+// unknown/foreign XML and vendor attributes a tolerant load preserved. This
+// function stays for the cases where no such document exists (or where the
+// state to persist lives only in a package -- the strategy migration normalizes
+// the projection, not the document): its input is a *legacy*
+// `sacm::AssuranceCasePackage`, which has no field for unknown content (see
+// src/sacm/sacm_model.h), so anything the structs cannot model is dropped here.
+// It preserves everything they do model, ACP and other TaggedValues (clause
+// 8.12) included. Returns nullopt if the library round-trip fails, so callers
+// can fall back to the legacy serialization.
 std::optional<std::string> library_xmi_from_package(const sacm::AssuranceCasePackage& package);
 
 } // namespace core

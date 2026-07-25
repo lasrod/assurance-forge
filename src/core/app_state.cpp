@@ -92,14 +92,30 @@ bool AppState::save_file(const std::string& file_path) {
         return false;
     }
 
-    // Phase 9 Stage 6: the library is the serialization source of truth, so
-    // write library SACM XMI (falling back to the legacy serialization only if
-    // the library round-trip fails). Note this round-trips the legacy package,
-    // which already dropped truly-unknown/foreign XML at load; it preserves
-    // everything the legacy structs model (ACP and other TaggedValues included)
-    // but not unknown extension content -- no worse than the pre-Stage-6 save.
-    const std::string bytes = core::library_xmi_from_package(sacm_package.value())
-                                  .value_or(sacm::serialize_sacm(sacm_package.value()));
+    // Phase 9 Stage 7: serialize the LIBRARY-OWNED document itself, not a
+    // projection of it. `sacm_package` is a derived cache whose legacy structs
+    // model only what the application renders, so round-tripping through it
+    // dropped everything the library preserved but the structs cannot hold --
+    // unknown/foreign child elements and vendor-namespace attributes. The live
+    // document has held every committed edit since the command flip, so saving
+    // it is both current and lossless.
+    //
+    // The package fallback is defensive: the library is the sole load path, so a
+    // loaded file always has a document. It is lossy for unknown content (see
+    // core::library_xmi_from_package).
+    std::string bytes;
+    bool        serialized_from_library = false;
+    if (library_document != nullptr) {
+        sacm_adapter::SaveOutcome saved = sacm_adapter::save_document(*library_document);
+        if (saved.ok) {
+            bytes = std::move(saved.xml);
+            serialized_from_library = true;
+        }
+    }
+    if (!serialized_from_library) {
+        bytes = core::library_xmi_from_package(sacm_package.value())
+                    .value_or(sacm::serialize_sacm(sacm_package.value()));
+    }
     if (WriteTextFileAtomic(file_path, bytes)) {
         loaded_file_path = std::filesystem::path(file_path);
         has_unsaved_changes = false;

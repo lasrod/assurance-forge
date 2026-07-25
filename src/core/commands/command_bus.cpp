@@ -85,13 +85,34 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     // (the library could not read our own serialization -- a bug, not an
     // expected path) falls back to the legacy bytes but is surfaced as a soft
     // warning below rather than swallowed.
+    //
+    // Phase 9 Stage 7: when the flip engaged, serialize the LIBRARY DOCUMENT
+    // directly rather than the package projected from it. The library already
+    // holds the committed edit, so this is the same logical state the projection
+    // described -- but it additionally preserves the unknown/foreign content the
+    // legacy structs cannot model and therefore silently dropped on every save.
+    // This is gated on the flip, NOT merely on `library_document != nullptr`:
+    // an unflipped command (undo, a NodeOnly removal, an unsupported seam) mutated
+    // the legacy package in place and the library does not hold that edit until
+    // the Stage 5 net re-derives it from `xml` further down -- serializing the
+    // document here would write the PRE-edit state.
     std::string xml;
     bool library_save_fell_back = false;
-    if (auto library_xml = core::library_xmi_from_package(source_package)) {
-        xml = std::move(*library_xml);
-    } else {
-        xml = sacm::serialize_sacm(source_package);
-        library_save_fell_back = true;
+    bool serialized_from_library = false;
+    if (library_primary_flip) {
+        sacm_adapter::SaveOutcome saved = sacm_adapter::save_document(*ctx.library_document);
+        if (saved.ok) {
+            xml = std::move(saved.xml);
+            serialized_from_library = true;
+        }
+    }
+    if (!serialized_from_library) {
+        if (auto library_xml = core::library_xmi_from_package(source_package)) {
+            xml = std::move(*library_xml);
+        } else {
+            xml = sacm::serialize_sacm(source_package);
+            library_save_fell_back = true;
+        }
     }
     const std::string raw_after = Sha256::HexDigest(xml);
 
