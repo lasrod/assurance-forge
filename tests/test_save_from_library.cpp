@@ -54,10 +54,10 @@ constexpr const char* kVendorExtendedSacm = R"(<?xml version="1.0" encoding="UTF
 </sacm:AssuranceCasePackage>
 )";
 
-// The same case carrying only the vendor *element*. Preserved child elements are
-// re-emitted verbatim and re-read as preserved content, so this document is a
-// fixed point of save->load->save; a preserved *attribute* is not (see the
-// known-gap note in SACM23_LIB_002_UnknownContentSurvivesLoadEditSaveReload).
+// The same case carrying only the vendor *element*, for the paths that only
+// need to prove unknown content survives: a preserved child element is
+// re-emitted and re-read verbatim, independent of the namespace-declaration
+// handling the vendor *attribute* above depends on.
 constexpr const char* kVendorElementOnlySacm = R"(<?xml version="1.0" encoding="UTF-8"?>
 <sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation"
     xmlns:acme="http://acme.example/toolchain" id="AC1" name="Sample">
@@ -261,22 +261,16 @@ TEST(SaveFromLibrary, SACM23_LIB_002_UnknownContentSurvivesLoadEditSaveReload) {
     EXPECT_TRUE(Contains(resaved.xml, kVendorElementMarker))
         << "the vendor element did not round-trip back into the model";
 
-    // KNOWN LIBRARY GAP, not an Assurance Forge one. The tolerant writer re-emits
-    // preserved vendor *attributes* and *elements* but never re-declares the
-    // foreign namespace prefix they use, so the saved file carries `acme:owner`
-    // (and `<acme:vendorMetadata>`) with an undeclared prefix. A preserved child
-    // element survives that anyway -- it is re-read verbatim as preserved content
-    // -- but a preserved attribute is only recognized as a vendor attribute when
-    // its prefix resolves, so it is lost on the NEXT load. `semantic_compare`
-    // does not cover preserved_attributes, which is why the library's own
-    // SACM23-COMPAT-001 round-trip test cannot see this.
-    //
-    // Pinned rather than asserted-as-desired so the gap stays visible: this
-    // expectation fails loudly once the library declares the prefix.
-    EXPECT_FALSE(Contains(resaved.xml, kVendorAttributeMarker))
-        << "the library now round-trips preserved vendor ATTRIBUTES -- flip this to EXPECT_TRUE, "
-           "extend SACM23_LIB_002_RepeatedSavesAreByteStable to the vendor-attribute fixture, and "
-           "drop the known-gap note";
+    // A preserved vendor *attribute* is the harder half: unlike a preserved
+    // child element (re-read verbatim as preserved content), an attribute is
+    // only recognized as foreign once its prefix resolves. The library now
+    // re-declares the foreign namespaces a document arrived with, so the
+    // attribute survives this second save instead of vanishing on the reload
+    // that precedes it (SACM23-COMPAT-001).
+    EXPECT_TRUE(Contains(resaved.xml, kVendorAttributeMarker))
+        << "the vendor attribute did not round-trip back into the model";
+    EXPECT_TRUE(Contains(resaved.xml, "xmlns:acme=\"http://acme.example/toolchain\""))
+        << "the vendor attribute is re-emitted under an undeclared prefix";
 }
 
 // The three save sites must agree byte-for-byte for the same logical state.
@@ -320,10 +314,10 @@ TEST(SaveFromLibrary, SACM23_LIB_002_AutosaveAndExplicitSaveProduceIdenticalByte
 // autosave would rewrite the tracked file (and invalidate the manifest's raw
 // hash) on every save, and the byte-agreement property above would be accidental.
 TEST(SaveFromLibrary, SACM23_LIB_002_RepeatedSavesAreByteStable) {
-    // Vendor-element fixture: the preserved-attribute namespace gap noted in
-    // SACM23_LIB_002_UnknownContentSurvivesLoadEditSaveReload would otherwise
-    // make the save->load->save leg fail for a reason unrelated to the save path.
-    ProjectFixture fixture = MakeProject("stable", kVendorElementOnlySacm);
+    // The vendor-*attribute* fixture: its foreign namespace declaration has to
+    // be re-emitted for the save->load->save leg to be a fixed point, so this
+    // covers the harder of the two preservation paths.
+    ProjectFixture fixture = MakeProject("stable", kVendorExtendedSacm);
 
     core::AppState state;
     ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
