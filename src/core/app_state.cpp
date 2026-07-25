@@ -120,6 +120,13 @@ bool AppState::save_file(const std::string& file_path) {
         loaded_file_path = std::filesystem::path(file_path);
         has_unsaved_changes = false;
         status_message = "Saved to: " + file_path;
+        // The package fallback cannot carry unknown/foreign content the document
+        // preserved, so a degraded save must be visible rather than silent.
+        if (!serialized_from_library) {
+            status_message += " (warning: saved a projection because the SACM library "
+                              "document could not be serialized; unknown or vendor-specific "
+                              "content was not preserved)";
+        }
         return true;
     } else {
         status_message = "Error: Failed to write " + file_path;

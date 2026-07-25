@@ -380,6 +380,10 @@ TEST(SaveFromLibrary, SACM23_LIB_002_RestoreFromAuditPreservesUnknownContent) {
                                                   restored, error))
         << error;
 
+    // The restore took the library-document path, not the lossy projection
+    // fallback -- which is what makes the preservation assertion below meaningful.
+    EXPECT_TRUE(restored.lossy_fallback_warning.empty()) << restored.lossy_fallback_warning;
+
     const std::string restored_bytes = ReadFile(fixture.sacm_absolute);
     EXPECT_TRUE(Contains(restored_bytes, kVendorElementMarker))
         << "the restore dropped the vendor content the trusted-root snapshot carried";

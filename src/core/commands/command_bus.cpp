@@ -98,12 +98,19 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     // document here would write the PRE-edit state.
     std::string xml;
     bool library_save_fell_back = false;
+    bool lossy_document_fallback = false;
     bool serialized_from_library = false;
     if (library_primary_flip) {
         sacm_adapter::SaveOutcome saved = sacm_adapter::save_document(*ctx.library_document);
         if (saved.ok) {
             xml = std::move(saved.xml);
             serialized_from_library = true;
+        } else {
+            // The document could not be serialized, so we fall back to the package
+            // projection below -- which is LOSSY for the unknown/foreign content
+            // only the document holds. Surface it rather than silently degrading
+            // the very preservation this path exists for.
+            lossy_document_fallback = true;
         }
     }
     if (!serialized_from_library) {
@@ -164,6 +171,9 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     if (library_save_fell_back && result.error.empty()) {
         result.error = "Library XMI save failed; wrote the legacy serialization "
                        "(audit remains consistent).";
+    } else if (lossy_document_fallback && result.error.empty()) {
+        result.error = "Could not serialize the SACM library document; saved a projection "
+                       "instead, which does not preserve unknown or vendor-specific content.";
     }
 
     // Phase 9 Stage 5 safety net: keep the library-owned document consistent

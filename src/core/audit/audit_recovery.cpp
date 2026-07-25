@@ -104,6 +104,12 @@ bool RestoreSacmFromAudit(const AssuranceProject& project,
                 core::project_library_package(**replayed);
             xml = core::library_xmi_from_package(replayed_package)
                       .value_or(sacm::serialize_sacm(replayed_package));
+            // Report the degraded path: the projection cannot carry the unknown /
+            // vendor-specific content the replayed document held, so a caller must
+            // not present this as a fully faithful restore.
+            out_result.lossy_fallback_warning =
+                "Could not serialize the replayed SACM library document; restored a projection "
+                "instead, which does not preserve unknown or vendor-specific content.";
         }
     }
     auto library_hash = core::library_canonical_hash_from_xml(xml);
