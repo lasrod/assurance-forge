@@ -27,7 +27,16 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 MATRIX_PATH = REPO / "docs/sacm/sacm-conformance-matrix.md"
-TESTS_DIR = REPO / "libs/sacm/tests"
+
+# Both test trees are scanned. `libs/sacm/tests` holds the library's own
+# conformance tests; `tests` holds Assurance Forge's, which is where the
+# evidence for the *integration* rows (SACM23-INT-*, and the app half of
+# SACM23-LIB-002) necessarily lives -- those rows are about the application
+# consuming the library, so they cannot be proven from inside the library.
+# Scanning only the library tree made check 1 unsatisfiable for every
+# integration row: the row could never reach `verified` no matter how well it
+# was tested, because the gate could not see its tests.
+TESTS_DIRS = (REPO / "libs/sacm/tests", REPO / "tests")
 
 # Status vocabulary, per the matrix preamble.
 VALID_STATUSES = {
@@ -84,10 +93,13 @@ def parse_matrix():
 def collect_test_ids():
     """Requirement IDs embedded in gtest names, mapped to the names using them."""
     by_id = {}
-    for path in sorted(TESTS_DIR.glob("*.cpp")):
-        for test_name in _TEST_RE.findall(path.read_text(encoding="utf-8")):
-            for found in _ID_RE.findall(test_name):
-                by_id.setdefault(normalize(found), []).append(f"{path.name}:{test_name}")
+    for tests_dir in TESTS_DIRS:
+        if not tests_dir.is_dir():
+            continue
+        for path in sorted(tests_dir.glob("*.cpp")):
+            for test_name in _TEST_RE.findall(path.read_text(encoding="utf-8")):
+                for found in _ID_RE.findall(test_name):
+                    by_id.setdefault(normalize(found), []).append(f"{path.name}:{test_name}")
     return by_id
 
 
@@ -158,9 +170,13 @@ def main():
     if not MATRIX_PATH.exists():
         print(f"error: matrix not found at {MATRIX_PATH}", file=sys.stderr)
         return 1
-    if not TESTS_DIR.is_dir():
-        print(f"error: test directory not found at {TESTS_DIR}", file=sys.stderr)
-        return 1
+    # Every configured tree must exist. A missing one would silently shrink the
+    # evidence the gate can see, turning check 1 into a weaker test rather than
+    # a failing one.
+    for tests_dir in TESTS_DIRS:
+        if not tests_dir.is_dir():
+            print(f"error: test directory not found at {tests_dir}", file=sys.stderr)
+            return 1
 
     rows = parse_matrix()
     if not rows:
