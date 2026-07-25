@@ -15,6 +15,7 @@
 #include "core/reviews/review_proposal.h"
 #include "core/reviews/review_proposal_patch_service.h"
 #include "core/sacm_argument_sync.h"
+#include "core/sacm_identity.h"
 #include "core/terminology_context_projection.h"
 #include "core/terminology_package_service.h"
 #include "sacm/sacm_serializer.h"
@@ -229,6 +230,24 @@ bool ApplyEvent(ReplayState& state,
         std::string err;
         if (!core::RemoveElement(state.model, &state.package, element_id, mode, err)) {
             out_error = "RemoveElement failed at " + FormatLocation(tx_seq, event.event_sequence, type) +
+                        ": " + err;
+            return false;
+        }
+        return true;
+    }
+
+    if (type == "SetElementGid") {
+        std::string element_id, gid;
+        if (!require_string("element_id", element_id))
+            return false;
+        if (!require_string("gid", gid))
+            return false;
+        std::string err;
+        // Replay forces the recorded gid (the exact value the live command minted),
+        // so live and replay converge. An event only exists because a gid WAS
+        // assigned, so a false return here is always a real failure to abort on.
+        if (!core::SetElementGid(state.model, &state.package, element_id, gid, err)) {
+            out_error = "SetElementGid failed at " + FormatLocation(tx_seq, event.event_sequence, type) +
                         ": " + err;
             return false;
         }
@@ -950,6 +969,30 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             }
         }
         return true;
+    }
+
+    if (type == "SetElementGid") {
+        std::string element_id, gid;
+        if (!require_string("element_id", element_id))
+            return false;
+        if (!require_string("gid", gid))
+            return false;
+        // No parity library seam mints the legacy RANDOM gid (the terminology seams
+        // mint a deterministic `gid-<id>`, but an element gid is a UUID captured in
+        // the payload). Bridge: run the same legacy core::SetElementGid onto a
+        // projected package -- forcing the recorded gid -- then re-derive the
+        // library, so this converges with the legacy replay by construction.
+        const std::string   location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate   = [&](parser::AssuranceCase&         model,
+                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            std::string set_error;
+            if (!core::SetElementGid(model, &package, element_id, gid, set_error)) {
+                err = "SetElementGid (bridge) failed at " + location + ": " + set_error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
     }
 
     // The tree drop mutators (reorder siblings / move a subtree) have no parity

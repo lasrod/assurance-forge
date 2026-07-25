@@ -260,7 +260,7 @@ TEST(ConfidenceControllerTest, RefreshStaleFlagsDoesNotEmitDirtyEvent) {
     events.Unsubscribe(subscription);
 }
 
-TEST(ConfidenceStoreTest, EnsureElementGidGeneratesAndMirrorsToSacmPackage) {
+TEST(ConfidenceStoreTest, SetElementGidGeneratesAndMirrorsToSacmPackage) {
     parser::AssuranceCase model;
     parser::SacmElement element = MakeClaim("", "Claim text");
     model.elements.push_back(element);
@@ -271,14 +271,12 @@ TEST(ConfidenceStoreTest, EnsureElementGidGeneratesAndMirrorsToSacmPackage) {
     claim.id = element.id;
     package.argumentPackages.front().claims.push_back(claim);
 
+    const std::string gid = core::GenerateUniqueElementGid(model);
+    EXPECT_FALSE(gid.empty());
     std::string error;
-    EXPECT_EQ(core::EnsureElementGid(model, &package, model.elements.front(), error), core::EnsureGidResult::Generated)
-        << error;
-    EXPECT_FALSE(model.elements.front().gid.empty());
-    EXPECT_EQ(package.argumentPackages.front().claims.front().gid, model.elements.front().gid);
-    EXPECT_EQ(core::EnsureElementGid(model, &package, model.elements.front(), error),
-              core::EnsureGidResult::AlreadyPresent)
-        << error;
+    ASSERT_TRUE(core::SetElementGid(model, &package, model.elements.front().id, gid, error)) << error;
+    EXPECT_EQ(model.elements.front().gid, gid);
+    EXPECT_EQ(package.argumentPackages.front().claims.front().gid, gid);
 }
 
 TEST(ConfidenceStoreTest, SaveConfidenceFileCreatesAnalysisSidecarAndTracksManifestRole) {

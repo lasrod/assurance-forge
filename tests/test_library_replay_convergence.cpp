@@ -26,6 +26,7 @@
 #include "core/commands/acp_commands.h"
 #include "core/commands/command_bus.h"
 #include "core/commands/element_commands.h"
+#include "core/commands/gid_commands.h"
 #include "core/commands/package_commands.h"
 #include "core/commands/terminology_commands.h"
 #include "core/commands/tree_commands.h"
@@ -33,6 +34,7 @@
 #include "core/library_package_projection.h"
 #include "core/project_model.h"
 #include "core/terminology_package_service.h"
+#include "parser/model_utils.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_parser.h"
 #include "sacm/sacm_serializer.h"
@@ -674,6 +676,57 @@ TEST(LibraryReplayConvergence, TreeMoveSubtreeConvergesWithLegacyReplay) {
     ASSERT_TRUE(bus->Execute(move, ctx, "tester").success);
 
     // Non-vacuous: the move changed the canonical hash (unlike a pure reorder).
+    const std::optional<std::string> hash_after = core::library_canonical_hash(f.package);
+    ASSERT_TRUE(hash_after.has_value());
+    EXPECT_NE(*hash_before, *hash_after);
+
+    const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
+    const core::audit::ReplayState legacy = LegacyReplay(f, txns);
+    const std::unique_ptr<sacm_adapter::LibraryDocument> library_doc = LibraryReplay(f, txns);
+    ASSERT_NE(library_doc, nullptr);
+
+    const std::optional<std::string> library_hash =
+        core::library_canonical_hash(core::project_library_package(*library_doc));
+    const std::optional<std::string> legacy_hash = core::library_canonical_hash(legacy.package);
+    ASSERT_TRUE(library_hash.has_value());
+    ASSERT_TRUE(legacy_hash.has_value());
+    EXPECT_EQ(*library_hash, *legacy_hash);
+}
+
+// A SetElementGid event assigns a random gid to an element that lacks one -- the
+// gid the confidence-save flow used to write inline, un-audited. Element gids ARE
+// in the canonical hash, so the assignment must be recorded and replay-stable. The
+// live command mints the gid ONCE and records it; both replays force that value
+// (legacy via core::SetElementGid, library via the bridge), so they converge. The
+// hash BEFORE vs AFTER the assignment must DIFFER (else the test is vacuous -- gids
+// contribute to the hash, and an un-audited gid write is exactly the divergence
+// this audits away).
+TEST(LibraryReplayConvergence, SetElementGidConvergesAndChangesCanonicalHash) {
+    auto f = MakeFixture("set_element_gid");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package};
+
+    // A freshly created solution carries no gid: the element factory mints ids but
+    // no gid, which is exactly the gap the confidence-save flow filled inline.
+    core::commands::CreateChildElementCommand add_solution("G1", core::NewElementKind::Solution);
+    ASSERT_TRUE(bus->Execute(add_solution, ctx, "tester").success);
+    const std::string solution_id = add_solution.GeneratedId();
+    const parser::SacmElement* created = parser::FindElementById(f.model, solution_id);
+    ASSERT_NE(created, nullptr);
+    ASSERT_TRUE(created->gid.empty()) << "a freshly created element unexpectedly already has a gid";
+
+    // The canonical hash before the gid assignment (gids are in the hash).
+    const std::optional<std::string> hash_before = core::library_canonical_hash(f.package);
+    ASSERT_TRUE(hash_before.has_value());
+
+    core::commands::EnsureElementGidCommand assign_gid(solution_id);
+    ASSERT_TRUE(bus->Execute(assign_gid, ctx, "tester").success);
+    ASSERT_FALSE(assign_gid.GeneratedGid().empty());
+
+    // Non-vacuous: assigning the gid moved the canonical hash off its prior value.
     const std::optional<std::string> hash_after = core::library_canonical_hash(f.package);
     ASSERT_TRUE(hash_after.has_value());
     EXPECT_NE(*hash_before, *hash_after);
