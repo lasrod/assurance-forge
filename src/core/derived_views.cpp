@@ -150,37 +150,61 @@ void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model, const
     }
 }
 
-void SynthesizeBareStrategyPlacements(parser::AssuranceCase& model,
-                                      const sacm::AssuranceCasePackage& package) {
-    // Strategy ids that already have a real inference in the render model.
-    std::unordered_set<std::string> materialized;
+namespace {
+
+// Strategy ids that already have an inference placing them in the render model.
+// A synthesized placeholder counts (it also carries `reasoning_ref`), which is
+// what makes the passes below idempotent.
+std::unordered_set<std::string> CollectPlacedStrategies(const parser::AssuranceCase& model) {
+    std::unordered_set<std::string> placed;
     for (const parser::SacmElement& element : model.elements) {
         if (element.type == "assertedinference" && !element.reasoning_ref.empty())
-            materialized.insert(element.reasoning_ref);
+            placed.insert(element.reasoning_ref);
     }
+    return placed;
+}
 
-    std::vector<parser::SacmElement> placeholders;
-    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
-        for (const sacm::ArgumentReasoning& reasoning : argument_package.argumentReasonings) {
-            if (materialized.find(reasoning.id) != materialized.end())
-                continue;  // a real inference already places this strategy
-            std::string target;
-            for (const sacm::TaggedValue& tag : reasoning.taggedValues) {
-                if (tag.key == sacm_adapter::kGsnStrategyTargetTagKey) {
-                    target = tag.value;
-                    break;
-                }
+void CollectPlaceholdersForArgumentPackage(const sacm::ArgumentPackage& argument_package,
+                                           const std::unordered_set<std::string>& placed,
+                                           std::vector<parser::SacmElement>& out_placeholders) {
+    for (const sacm::ArgumentReasoning& reasoning : argument_package.argumentReasonings) {
+        if (placed.find(reasoning.id) != placed.end())
+            continue;  // a real inference already places this strategy
+        std::string target;
+        for (const sacm::TaggedValue& tag : reasoning.taggedValues) {
+            if (tag.key == sacm_adapter::kGsnStrategyTargetTagKey) {
+                target = tag.value;
+                break;
             }
-            if (target.empty())
-                continue;  // not a bare strategy
-            parser::SacmElement placeholder;
-            placeholder.id = reasoning.id + "__pending_inference";
-            placeholder.type = "assertedinference";
-            placeholder.reasoning_ref = reasoning.id;
-            placeholder.target_refs.push_back(target);
-            placeholders.push_back(std::move(placeholder));
         }
+        if (target.empty())
+            continue;  // not a bare strategy
+        parser::SacmElement placeholder;
+        placeholder.id = reasoning.id + "__pending_inference";
+        placeholder.type = "assertedinference";
+        placeholder.reasoning_ref = reasoning.id;
+        placeholder.target_refs.push_back(target);
+        out_placeholders.push_back(std::move(placeholder));
     }
+}
+
+} // namespace
+
+void SynthesizeBareStrategyPlacements(parser::AssuranceCase& model,
+                                      const sacm::AssuranceCasePackage& package) {
+    const std::unordered_set<std::string> placed = CollectPlacedStrategies(model);
+    std::vector<parser::SacmElement> placeholders;
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages)
+        CollectPlaceholdersForArgumentPackage(argument_package, placed, placeholders);
+    for (parser::SacmElement& placeholder : placeholders)
+        model.elements.push_back(std::move(placeholder));
+}
+
+void SynthesizeBareStrategyPlacements(parser::AssuranceCase& model,
+                                      const sacm::ArgumentPackage& argument_package) {
+    const std::unordered_set<std::string> placed = CollectPlacedStrategies(model);
+    std::vector<parser::SacmElement> placeholders;
+    CollectPlaceholdersForArgumentPackage(argument_package, placed, placeholders);
     for (parser::SacmElement& placeholder : placeholders)
         model.elements.push_back(std::move(placeholder));
 }

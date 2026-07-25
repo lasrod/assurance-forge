@@ -28,7 +28,10 @@ const sacm::ArgumentPackage* FindArgumentPackageByIdentity(const sacm::Assurance
 // `argument_package`. The returned case copies the package's id/name/
 // description (falling back to the source's id and `fallback_name` for empty
 // fields) and contains only those elements whose `id` or `gid` is owned by
-// the package.
+// the package -- plus the render-only bare-strategy placements
+// (`core::SynthesizeBareStrategyPlacements`), which are deliberately NOT in the
+// package and would otherwise be filtered away, leaving a strategy that has no
+// sub-goal yet floating unattached from its goal.
 parser::AssuranceCase BuildArgumentPackageProjection(const parser::AssuranceCase& source_model,
                                                      const sacm::ArgumentPackage& argument_package,
                                                      std::string_view fallback_name);

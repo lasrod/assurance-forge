@@ -1,5 +1,7 @@
 #include "core/argument_package_projection.h"
 
+#include "core/derived_views.h"
+
 #include <algorithm>
 #include <string>
 #include <string_view>
@@ -63,6 +65,13 @@ parser::AssuranceCase BuildArgumentPackageProjection(const parser::AssuranceCase
         if (element_ids.count(acp.target_id) > 0 || element_gids.count(acp.target_id) > 0)
             projection.acps.push_back(acp);
     }
+
+    // A bare strategy (an ArgumentReasoning with a `strategyTarget` tag and no
+    // inference yet) is placed under its goal by a RENDER-ONLY placeholder
+    // inference, which by design is never in the SACM package -- so the filter
+    // above always drops it and the strategy would render detached from the goal
+    // it was just added to. Re-synthesize the placement on the projected view.
+    SynthesizeBareStrategyPlacements(projection, argument_package);
     return projection;
 }
 
