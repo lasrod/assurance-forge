@@ -49,6 +49,19 @@ std::string canonical_fragments(std::vector<std::string> fragments) {
     return joined;
 }
 
+// Preserved child elements carry the sibling slot they occupy, and that slot is
+// compared along with the XML. It is not presentation: EMF-dialect documents
+// address siblings by containment position, so a round trip that moved a
+// fragment changed what every positional reference after it resolves to.
+std::string canonical_fragments(const std::vector<model::PreservedFragment>& fragments) {
+    std::vector<std::string> keyed;
+    keyed.reserve(fragments.size());
+    for (const model::PreservedFragment& fragment : fragments) {
+        keyed.push_back(std::format("{}[{}]{}", fragment.role, fragment.index, fragment.xml));
+    }
+    return canonical_fragments(std::move(keyed));
+}
+
 // Comparable scalar state (attributes + name), with defaults normalized:
 // only non-default values appear in the snapshot.
 std::map<std::string, std::string> attribute_snapshot(const SACMElement& element) {

@@ -350,12 +350,60 @@ void write_preserved_attributes(pugi::xml_node node, const SACMElement& element)
     }
 }
 
+// Re-emits preserved fragments in the sibling slots they occupied in the
+// source. Position matters because the EMF dialect addresses elements by
+// containment position rather than by id, so a fragment appended after the
+// typed children renumbers every sibling that followed it and repoints any
+// positional reference into that package at a different element.
+//
+// Anchors are taken from a snapshot of the typed children made BEFORE anything
+// is inserted: the recorded index counts source siblings, and an inserted
+// fragment keeps the source's spelling of the role ("argumentationElement")
+// rather than the writer's ("argumentElement"), so counting live nodes by name
+// would not see the fragments already placed.
 void write_preserved_content(pugi::xml_node node, const SACMElement& element) {
     if (!g_emit_preserved_content) {
         return;
     }
-    for (const std::string& fragment : element.preserved_content()) {
-        node.append_buffer(fragment.data(), fragment.size());
+    std::map<std::string, std::vector<pugi::xml_node>> typed_by_role;
+    for (pugi::xml_node child : node.children()) {
+        if (child.type() == pugi::node_element) {
+            typed_by_role[child.name()].push_back(child);
+        }
+    }
+
+    // Fragments arrive in source document order, so per role their recorded
+    // indices ascend; this counts how many of a role's slots earlier fragments
+    // already claimed, converting a source index into an index among the typed
+    // children alone.
+    std::map<std::string, std::size_t> fragments_placed_in_role;
+    for (const model::PreservedFragment& fragment : element.preserved_content()) {
+        pugi::xml_document parsed;
+        if (!parsed.load_buffer(fragment.xml.data(), fragment.xml.size())) {
+            // Unparseable here means it was unparseable at load too, which the
+            // reader could not have produced. Fall back to the append form
+            // rather than dropping content.
+            node.append_buffer(fragment.xml.data(), fragment.xml.size());
+            continue;
+        }
+        const pugi::xml_node source = parsed.first_child();
+        if (!source) {
+            continue;
+        }
+        pugi::xml_node anchor;
+        if (!fragment.role.empty()) {
+            const std::vector<pugi::xml_node>& typed = typed_by_role[fragment.role];
+            const std::size_t claimed = fragments_placed_in_role[fragment.role]++;
+            const std::size_t slot = fragment.index > claimed ? fragment.index - claimed : 0;
+            if (slot < typed.size()) {
+                anchor = typed[slot];
+            }
+        }
+        if (anchor) {
+            node.insert_copy_before(source, anchor);
+        } else {
+            node.append_copy(source);
+        }
     }
 }
 

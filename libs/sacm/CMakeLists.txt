@@ -41,6 +41,7 @@ add_library(sacm STATIC
     src/commands/mutation.cpp
     src/commands/operations.cpp
     src/compare/semantic_compare.cpp
+    src/compat/preserve.cpp
     src/io/name_tables.cpp
     src/io/xmi_reader.cpp
     src/io/xmi_writer.cpp

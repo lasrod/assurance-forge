@@ -37,6 +37,7 @@ Every `sacm::validation::Diagnostic` carries: `code`, `severity`
 | SACM-ID-002 | Error | Invalid element ID syntax. |
 | SACM-REF-001 | Error | Dangling reference: target ID does not resolve. |
 | SACM-REF-002 | Error | Reference resolves to an element of the wrong type. |
+| SACM-REF-003 | Warning | Reference resolves to an element the document carries only as preserved compatibility content, so it cannot be type-checked. Distinct from SACM-REF-001: the target is present in the source, it is merely untyped. Conflating them reports an intact argument as structurally broken. |
 
 ## Validation
 

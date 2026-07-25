@@ -29,6 +29,11 @@ inline constexpr std::string_view kIdDuplicate = "SACM-ID-001";
 inline constexpr std::string_view kIdInvalid = "SACM-ID-002";
 inline constexpr std::string_view kRefDangling = "SACM-REF-001";
 inline constexpr std::string_view kRefWrongType = "SACM-REF-002";
+// The reference resolves to an element the document carries only as preserved
+// compatibility content, so it cannot be type-checked. Distinct from
+// SACM-REF-001: the target is present in the source, it is merely untyped, and
+// conflating the two reports an intact argument as structurally broken.
+inline constexpr std::string_view kRefPreservedTarget = "SACM-REF-003";
 
 // Validation.
 inline constexpr std::string_view kEnumInvalidLiteral = "SACM-ENUM-001";

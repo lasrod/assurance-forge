@@ -68,7 +68,14 @@ ElementId peek_generated_id(const model::Document& document, model::ElementKind 
     while (true) {
         ++counter;
         ElementId candidate{std::format("{}_{}", prefix, counter)};
-        if (!document.contains(candidate) && !claimed.contains(candidate)) {
+        // `contains` only sees the index, and preserved compatibility content is
+        // deliberately not indexed. Without the second check a minted id can
+        // collide with an id living inside a preserved fragment; the compat save
+        // then emits two elements carrying the same xmi:id, and neither
+        // build_index nor validate can see the duplicate because neither walks
+        // preserved content.
+        if (!document.contains(candidate) && !document.has_preserved_element(candidate) &&
+            !claimed.contains(candidate)) {
             claimed.insert(candidate);
             return candidate;
         }

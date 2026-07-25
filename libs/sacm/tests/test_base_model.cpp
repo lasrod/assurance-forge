@@ -222,7 +222,7 @@ TEST(Sacm23BaseModel, SACM23_COMPAT_001_VendorContentPreservedAndStrictSaveRefus
     ASSERT_TRUE(loaded.ok);
     const auto& acp = *loaded.document->roots().front();
     ASSERT_EQ(acp.preserved_content().size(), 1u);
-    EXPECT_NE(acp.preserved_content().front().find("vendorMetadata"), std::string::npos);
+    EXPECT_NE(acp.preserved_content().front().xml.find("vendorMetadata"), std::string::npos);
 
     // Strict save refuses rather than silently dropping.
     const auto strict = sacm::io::save_xmi_string(*loaded.document);
