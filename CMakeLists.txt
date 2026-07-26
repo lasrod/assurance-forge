@@ -224,6 +224,21 @@ if(WIN32)
 endif()
 af_copy_sccg_data(assurance-forge)
 
+# --- MCP server ---
+# A headless companion binary an MCP client launches, speaking JSON-RPC 2.0 over
+# stdin/stdout. Deliberately a plain add_executable rather than
+# hello_imgui_add_app: it has no window, no event loop, and must not drag in the
+# GUI runtime. It links no af_ui and no af_ai — the layer gate forbids `mcp/`
+# from including either, which is what keeps the MCP server and the in-app AI
+# review from growing a shared inference path (docs/features/mcp-server.md).
+add_executable(assurance-forge-mcp src/mcp/main.cpp)
+target_link_libraries(assurance-forge-mcp PRIVATE
+    af_mcp af_core af_sacm_adapter af_sacm af_parser
+)
+if(WIN32)
+    target_link_libraries(assurance-forge-mcp PRIVATE bcrypt advapi32)
+endif()
+
 # --- Localization catalogs (optional regeneration) ---
 # The Japanese .mo is committed and bundled as an asset, so normal builds need
 # no gettext tools. This convenience target regenerates the .mo from the .po
@@ -341,6 +356,9 @@ add_executable(tests
     tests/test_undo_command.cpp
     tests/test_dialectic_challenge.cpp
     tests/test_projection_coverage.cpp
+    tests/test_mcp_jsonrpc.cpp
+    tests/test_mcp_server.cpp
+    tests/test_user_settings_path.cpp
 )
 # Production sources are pulled in via the per-layer af_* OBJECT libraries
 # (see src/<layer>/CMakeLists.txt). The tests target intentionally links
@@ -349,7 +367,7 @@ target_compile_definitions(tests PRIVATE AF_REPO_ROOT="${CMAKE_SOURCE_DIR}")
 target_link_libraries(tests PRIVATE
     GTest::gtest_main
     hello_imgui
-    af_app af_ui af_ai af_export af_core af_sacm_adapter af_sacm af_parser
+    af_app af_ui af_ai af_export af_mcp af_core af_sacm_adapter af_sacm af_parser
 )
 if(WIN32)
     target_link_libraries(tests PRIVATE bcrypt advapi32 dwmapi)
@@ -372,6 +390,24 @@ add_test(
     "${AF_SCCG_DIST_DIR}/review_profiles.json"
     "$<TARGET_FILE_DIR:tests>/data/sccg/dist/review_profiles.json"
 )
+
+# --- MCP stdio transport gates ---
+# The unit tests cover dispatch; these drive the real process through real pipes,
+# which is the only way to catch stdout pollution and newline translation. Both
+# modes assert the response line count, so anything writing to stdout that is not
+# the protocol fails the build rather than silently breaking every client.
+foreach(_mcp_mode granted withheld)
+    add_test(
+        NAME McpStdioSmoke_${_mcp_mode}
+        COMMAND ${CMAKE_COMMAND}
+            -DAF_MCP_EXE=$<TARGET_FILE:assurance-forge-mcp>
+            -DAF_MCP_PROJECT=${CMAKE_SOURCE_DIR}/tests/data/fixture_roundtrip_core_argument.sacm.xml
+            -DAF_MCP_INPUT=${CMAKE_SOURCE_DIR}/tests/data/mcp_smoke_handshake.jsonl
+            -DAF_MCP_MODE=${_mcp_mode}
+            -DAF_MCP_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}
+            -P ${CMAKE_SOURCE_DIR}/cmake/run_mcp_smoke_test.cmake
+    )
+endforeach()
 
 # Localization catalog consistency gate: fails if any source msgid is missing
 # from the .po, or if the committed .mo is out of sync with the .po. Registered

@@ -1254,10 +1254,16 @@
       "id": "AF-AI-007",
       "area": "AI",
       "name": "MCP server — build safety cases from an external AI client",
-      "status": "planned",
-      "evidence": [],
-      "tests": [],
-      "notes": "Design recorded in docs/features/mcp-server.md."
+      "status": "in-development",
+      "evidence": [
+        "src/mcp/server.cpp",
+        "src/mcp/tools.cpp"
+      ],
+      "tests": [
+        "tests/test_mcp_server.cpp",
+        "tests/test_mcp_jsonrpc.cpp"
+      ],
+      "notes": "Design: docs/features/mcp-server.md. Reading works end to end — `assurance-forge-mcp` speaks JSON-RPC 2.0 over stdio and serves case overview, element search, element detail and the GSN argument tree, so an external client can read and reason about a case. Building it cannot: the write surface (proposal drafts a human accepts) is not implemented, which is why this is not `prototype`. Sharing is gated by an `mcp.enabled` setting that fails closed, verified through the real process by cmake/run_mcp_smoke_test.cmake. Independent of AF-AI-001..006: the layer gate forbids `mcp/` from including `ai/`, so the two features cannot share an inference path."
     },
     {
       "id": "AF-PLAT-001",
