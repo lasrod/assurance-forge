@@ -1,0 +1,1372 @@
+{
+  "$comment": "Generated from docs/features/feature-matrix.md by tools/features/export_feature_matrix.py. Do not edit by hand.",
+  "source": "docs/features/feature-matrix.md",
+  "statuses": [
+    {
+      "key": "supported",
+      "label": "Supported",
+      "meaning": "Available and intended for normal use. Backed by code and tests.",
+      "roadmapEquivalent": "Stable"
+    },
+    {
+      "key": "prototype",
+      "label": "Prototype",
+      "meaning": "Usable, but format or UX is expected to change. Backed by code.",
+      "roadmapEquivalent": "Prototype 1 / 2"
+    },
+    {
+      "key": "in-development",
+      "label": "In development",
+      "meaning": "Actively being built; not yet usable end to end.",
+      "roadmapEquivalent": null
+    },
+    {
+      "key": "planned",
+      "label": "Planned",
+      "meaning": "Committed to the roadmap, not started.",
+      "roadmapEquivalent": "Planned"
+    },
+    {
+      "key": "candidate",
+      "label": "Candidate",
+      "meaning": "Under consideration. Scope and timing may change.",
+      "roadmapEquivalent": "Candidate"
+    },
+    {
+      "key": "not-planned",
+      "label": "Not planned",
+      "meaning": "Deliberately out of scope. Recorded so it is not re-proposed.",
+      "roadmapEquivalent": null
+    }
+  ],
+  "areas": [
+    {
+      "code": "STD",
+      "label": "Standards foundation (SACM)"
+    },
+    {
+      "code": "GSN",
+      "label": "Core GSN"
+    },
+    {
+      "code": "PAT",
+      "label": "GSN Pattern Extension"
+    },
+    {
+      "code": "MOD",
+      "label": "GSN Modular Extension"
+    },
+    {
+      "code": "ACP",
+      "label": "Assurance Claim Points and confidence arguments"
+    },
+    {
+      "code": "DIA",
+      "label": "Dialectic arguments"
+    },
+    {
+      "code": "METH",
+      "label": "Guided development methods"
+    },
+    {
+      "code": "ENG",
+      "label": "Assurance case engineering"
+    },
+    {
+      "code": "AI",
+      "label": "AI assistance"
+    },
+    {
+      "code": "PLAT",
+      "label": "Platform and application"
+    }
+  ],
+  "features": [
+    {
+      "id": "AF-STD-001",
+      "area": "STD",
+      "name": "SACM 2.3 as the source of truth for assurance data",
+      "status": "supported",
+      "evidence": [
+        "libs/sacm/src",
+        "src/sacm_adapter/library_load.cpp"
+      ],
+      "tests": [
+        "tests/test_save_from_library.cpp"
+      ],
+      "notes": "ADR 0003. The app saves from the library model, not from projected UI state."
+    },
+    {
+      "id": "AF-STD-002",
+      "area": "STD",
+      "name": "SACM 2.3 XMI import",
+      "status": "supported",
+      "evidence": [
+        "libs/sacm/src/io",
+        "src/sacm_adapter/library_load.cpp"
+      ],
+      "tests": [
+        "libs/sacm/tests",
+        "tests/test_sacm_roundtrip.cpp"
+      ],
+      "notes": "SACM23-XMI-001..004 verified. Both namespace dialects accepted on import."
+    },
+    {
+      "id": "AF-STD-003",
+      "area": "STD",
+      "name": "SACM 2.3 XMI export",
+      "status": "supported",
+      "evidence": [
+        "libs/sacm/src/io",
+        "src/sacm/sacm_serializer.cpp"
+      ],
+      "tests": [
+        "tests/test_sacm_roundtrip.cpp"
+      ],
+      "notes": "Strict export normalizes to the pinned namespace; the pin is a project choice, not normative."
+    },
+    {
+      "id": "AF-STD-004",
+      "area": "STD",
+      "name": "Import → export round-trip integrity",
+      "status": "supported",
+      "evidence": [
+        "libs/sacm/src/io",
+        "src/sacm_adapter/projection_diff.cpp"
+      ],
+      "tests": [
+        "tests/test_sacm_roundtrip.cpp",
+        "tests/test_projection_coverage.cpp"
+      ],
+      "notes": "SACM23-RT-001, SACM23-RT-002."
+    },
+    {
+      "id": "AF-STD-005",
+      "area": "STD",
+      "name": "Argumentation package model",
+      "status": "supported",
+      "evidence": [
+        "libs/sacm/src",
+        "src/sacm/sacm_package_tree.cpp"
+      ],
+      "tests": [
+        "tests/test_sacm_package_tree.cpp",
+        "tests/test_package_commands.cpp"
+      ],
+      "notes": "SACM23-ARG-001..003, SACM23-PKG-001..003."
+    },
+    {
+      "id": "AF-STD-006",
+      "area": "STD",
+      "name": "Artifact model",
+      "status": "supported",
+      "evidence": [
+        "libs/sacm/src",
+        "src/ui/register_views.cpp"
+      ],
+      "tests": [
+        "tests/test_sacm_roundtrip.cpp"
+      ],
+      "notes": "SACM23-ART-001. Surfaced to users through the evidence register, which is still prototype (AF-ENG-008)."
+    },
+    {
+      "id": "AF-STD-007",
+      "area": "STD",
+      "name": "Terminology model",
+      "status": "supported",
+      "evidence": [
+        "libs/sacm/src",
+        "src/core/terminology_package_service.cpp"
+      ],
+      "tests": [
+        "tests/test_terminology_package_service.cpp"
+      ],
+      "notes": "SACM23-TERM-001."
+    },
+    {
+      "id": "AF-STD-008",
+      "area": "STD",
+      "name": "Assurance Case Package",
+      "status": "in-development",
+      "evidence": [
+        "libs/sacm/src",
+        "src/core/library_package_projection.cpp"
+      ],
+      "tests": [],
+      "notes": "Package containment exists; a full ACP-level container with interfaces does not."
+    },
+    {
+      "id": "AF-STD-009",
+      "area": "STD",
+      "name": "SACM model validation and diagnostics",
+      "status": "supported",
+      "evidence": [
+        "libs/sacm/src"
+      ],
+      "tests": [
+        "libs/sacm/tests"
+      ],
+      "notes": "SACM23-VAL-001, SACM23-VAL-002. Diagnostics catalog: docs/sacm/sacm-diagnostics-catalog.md."
+    },
+    {
+      "id": "AF-STD-010",
+      "area": "STD",
+      "name": "Editing through SACM-native commands",
+      "status": "supported",
+      "evidence": [
+        "libs/sacm/src/commands",
+        "src/sacm_adapter/document_edit.cpp"
+      ],
+      "tests": [
+        "tests/test_sacm_library_edit.cpp",
+        "tests/test_library_primary_edit_flip.cpp"
+      ],
+      "notes": "SACM23-CMD-001..006."
+    },
+    {
+      "id": "AF-STD-011",
+      "area": "STD",
+      "name": "Refusal to lose unrepresentable SACM on edit",
+      "status": "supported",
+      "evidence": [
+        "src/sacm_adapter/projection_diff.cpp"
+      ],
+      "tests": [
+        "tests/test_projection_coverage.cpp"
+      ],
+      "notes": "SACM23-LIB-002. Bridged edits that would delete unrepresentable SACM are refused, not silently applied."
+    },
+    {
+      "id": "AF-STD-012",
+      "area": "STD",
+      "name": "GSN-typed SACM files read as GSN",
+      "status": "supported",
+      "evidence": [
+        "libs/sacm/src/io/name_tables.cpp"
+      ],
+      "tests": [
+        "libs/sacm/tests"
+      ],
+      "notes": "SACM23-COMPAT-001. See docs/sacm/sacm-gsn-mapping.md for the transformation and its evidence."
+    },
+    {
+      "id": "AF-STD-013",
+      "area": "STD",
+      "name": "Preserve the original GSN type through round-trip",
+      "status": "supported",
+      "evidence": [
+        "libs/sacm/src/io/xmi_reader.cpp",
+        "libs/sacm/src/io/name_tables.cpp"
+      ],
+      "tests": [
+        "libs/sacm/tests/test_roundtrip.cpp"
+      ],
+      "notes": "SACM23-COMPAT-002. The GSN type is recorded as `sacm.import.extensionType` (`{ns}Goal`) and Assumption/Justification get their SACM declaration, so they no longer collapse into identical Claims. A save normalizes to SACM types — the information round-trips, the GSN syntax does not."
+    },
+    {
+      "id": "AF-STD-014",
+      "area": "STD",
+      "name": "Standalone SACM library, reusable outside the app",
+      "status": "supported",
+      "evidence": [
+        "libs/sacm/CMakeLists.txt",
+        "cmake/check_layer_gates.cmake"
+      ],
+      "tests": [
+        "cmake/check_layer_gates.cmake",
+        "libs/sacm/tests"
+      ],
+      "notes": "SACM23-LIB-001. The reverse gate scans quoted and angle includes and bans pugixml from public headers; it runs at configure time, so it cannot be skipped."
+    },
+    {
+      "id": "AF-STD-015",
+      "area": "STD",
+      "name": "SACM 2.4 alignment",
+      "status": "candidate",
+      "evidence": [],
+      "tests": [],
+      "notes": "Tracked in docs/sacm/sacm-2.4-watch.md. RTF active; `metaClaim` and `defeated` removal would affect AF-ACP-* and AF-DIA-*."
+    },
+    {
+      "id": "AF-GSN-001",
+      "area": "GSN",
+      "name": "Goal",
+      "status": "supported",
+      "evidence": [
+        "src/core/element_factory.cpp",
+        "src/ui/gsn/gsn_shapes.cpp"
+      ],
+      "tests": [
+        "tests/test_element_factory.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-GSN-002",
+      "area": "GSN",
+      "name": "Strategy",
+      "status": "supported",
+      "evidence": [
+        "src/core/element_factory.cpp",
+        "src/ui/gsn/gsn_shapes.cpp"
+      ],
+      "tests": [
+        "tests/test_element_factory.cpp",
+        "tests/test_strategy_migration.cpp"
+      ],
+      "notes": "Maps to SACM `ArgumentReasoning`; see docs/sacm/sacm-gsn-mapping.md."
+    },
+    {
+      "id": "AF-GSN-003",
+      "area": "GSN",
+      "name": "Solution",
+      "status": "supported",
+      "evidence": [
+        "src/core/element_factory.cpp",
+        "src/ui/gsn/gsn_shapes.cpp"
+      ],
+      "tests": [
+        "tests/test_element_factory.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-GSN-004",
+      "area": "GSN",
+      "name": "Context",
+      "status": "supported",
+      "evidence": [
+        "src/core/element_factory.cpp",
+        "src/ui/gsn/gsn_shapes.cpp"
+      ],
+      "tests": [
+        "tests/test_element_factory.cpp"
+      ],
+      "notes": "Claim-versus-ArtifactReference typing is preserved and diagnosed, not guessed."
+    },
+    {
+      "id": "AF-GSN-005",
+      "area": "GSN",
+      "name": "Assumption",
+      "status": "supported",
+      "evidence": [
+        "src/core/element_factory.cpp",
+        "src/ui/gsn/gsn_shapes.cpp"
+      ],
+      "tests": [
+        "tests/test_element_factory.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-GSN-006",
+      "area": "GSN",
+      "name": "Justification",
+      "status": "supported",
+      "evidence": [
+        "src/core/element_factory.cpp",
+        "src/ui/gsn/gsn_shapes.cpp"
+      ],
+      "tests": [
+        "tests/test_element_factory.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-GSN-007",
+      "area": "GSN",
+      "name": "SupportedBy relationship",
+      "status": "supported",
+      "evidence": [
+        "src/ui/gsn/gsn_edge_renderer.cpp",
+        "src/core/tree_editing.cpp"
+      ],
+      "tests": [
+        "tests/test_tree_editing.cpp",
+        "tests/test_assurance_tree.cpp"
+      ],
+      "notes": "Endpoints are swapped against SACM `AssertedInference` on import."
+    },
+    {
+      "id": "AF-GSN-008",
+      "area": "GSN",
+      "name": "InContextOf relationship",
+      "status": "supported",
+      "evidence": [
+        "src/ui/gsn/gsn_edge_renderer.cpp",
+        "src/core/tree_editing.cpp"
+      ],
+      "tests": [
+        "tests/test_tree_editing.cpp"
+      ],
+      "notes": "Endpoints swapped against SACM `AssertedContext`."
+    },
+    {
+      "id": "AF-GSN-009",
+      "area": "GSN",
+      "name": "Undeveloped decorator",
+      "status": "supported",
+      "evidence": [
+        "src/ui/gsn/gsn_model.h",
+        "src/ui/gsn/gsn_shapes.cpp"
+      ],
+      "tests": [
+        "tests/test_assurance_tree.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-GSN-010",
+      "area": "GSN",
+      "name": "Automatic diagram layout",
+      "status": "supported",
+      "evidence": [
+        "src/core/gsn_layout.cpp",
+        "src/ui/gsn/gsn_layout.cpp"
+      ],
+      "tests": [
+        "tests/test_layout.cpp"
+      ],
+      "notes": "Deterministic; no manual node positioning. Policy: docs/sacm/sacm-layout-policy.md."
+    },
+    {
+      "id": "AF-GSN-011",
+      "area": "GSN",
+      "name": "Canvas navigation, selection and hit testing",
+      "status": "supported",
+      "evidence": [
+        "src/ui/gsn/gsn_canvas.cpp",
+        "src/ui/gsn/gsn_hit_tester.cpp"
+      ],
+      "tests": [
+        "tests/test_ui_state.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-GSN-012",
+      "area": "GSN",
+      "name": "GSN element identifier (G1, S1, Sn1 …)",
+      "status": "supported",
+      "evidence": [
+        "src/core/element_factory.cpp",
+        "src/core/assurance_tree.cpp"
+      ],
+      "tests": [
+        "tests/test_element_factory.cpp"
+      ],
+      "notes": "GSN v3 makes the identifier mandatory. New elements are minted with the GSN prefix for their node type, unique within the case, and rendered as `id: name` on the canvas and in exported SVG. See AF-GSN-015 for the remaining limitation."
+    },
+    {
+      "id": "AF-GSN-015",
+      "area": "GSN",
+      "name": "Identifier independent of the storage id",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "The identifier *is* the SACM `xmi:id`, so it cannot be renumbered without changing element identity and every reference to it, and a file imported with opaque ids (`generated_3`) shows those on the diagram instead of GSN identifiers."
+    },
+    {
+      "id": "AF-GSN-013",
+      "area": "GSN",
+      "name": "Off-diagram decorators for reports",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "Needed by AF-ENG-004; a report page cannot show an unbounded diagram."
+    },
+    {
+      "id": "AF-GSN-014",
+      "area": "GSN",
+      "name": "Choice node",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "v2.2 models `Choice` with no attributes; \"m of n\" cardinality is a GSN v3 concept with no metamodel. See docs/sacm/sacm-gsn-metamodel-gaps.md row 9."
+    },
+    {
+      "id": "AF-PAT-001",
+      "area": "PAT",
+      "name": "Uninstantiated decorator",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "Maps to SACM `isAbstract`."
+    },
+    {
+      "id": "AF-PAT-002",
+      "area": "PAT",
+      "name": "Undeveloped-and-uninstantiated decorator",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": ""
+    },
+    {
+      "id": "AF-PAT-003",
+      "area": "PAT",
+      "name": "Multiplicity decorator",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "GSN `isMany`; no SACM feature exists to carry it."
+    },
+    {
+      "id": "AF-PAT-004",
+      "area": "PAT",
+      "name": "Optionality decorator",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "GSN `isOptional`; no SACM feature exists to carry it."
+    },
+    {
+      "id": "AF-PAT-005",
+      "area": "PAT",
+      "name": "Pattern template arguments",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": ""
+    },
+    {
+      "id": "AF-PAT-006",
+      "area": "PAT",
+      "name": "Instantiation data reference",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": ""
+    },
+    {
+      "id": "AF-PAT-007",
+      "area": "PAT",
+      "name": "Pattern catalogue and instantiation workflow",
+      "status": "candidate",
+      "evidence": [],
+      "tests": [],
+      "notes": "Pattern Definition has no GSN or SACM class; see docs/sacm/sacm-gsn-metamodel-gaps.md row 13."
+    },
+    {
+      "id": "AF-MOD-001",
+      "area": "MOD",
+      "name": "Argument modules as packages",
+      "status": "supported",
+      "evidence": [
+        "src/sacm/sacm_package_tree.cpp",
+        "src/core/library_package_projection.cpp"
+      ],
+      "tests": [
+        "tests/test_sacm_package_tree.cpp",
+        "tests/test_package_commands.cpp"
+      ],
+      "notes": "Modules exist and are editable; the modular *notation* below is not yet drawn."
+    },
+    {
+      "id": "AF-MOD-002",
+      "area": "MOD",
+      "name": "Package details and navigation",
+      "status": "supported",
+      "evidence": [
+        "src/ui/panels/package_details_panel.cpp",
+        "src/ui/panels/project_explorer_panel.cpp"
+      ],
+      "tests": [
+        "tests/test_argument_package_projection.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-MOD-003",
+      "area": "MOD",
+      "name": "Away Goal",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": ""
+    },
+    {
+      "id": "AF-MOD-004",
+      "area": "MOD",
+      "name": "Away Solution",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": ""
+    },
+    {
+      "id": "AF-MOD-005",
+      "area": "MOD",
+      "name": "Away Context",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "Metamodel is contested; decided 2026-07-20 to preserve rather than retype. See docs/sacm/sacm-gsn-mapping.md."
+    },
+    {
+      "id": "AF-MOD-006",
+      "area": "MOD",
+      "name": "Away Assumption and Away Justification",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": ""
+    },
+    {
+      "id": "AF-MOD-007",
+      "area": "MOD",
+      "name": "Module reference element",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": ""
+    },
+    {
+      "id": "AF-MOD-008",
+      "area": "MOD",
+      "name": "Contract module and contract reference",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "Maps to SACM `ArgumentPackageBinding`, not `ArgumentPackage`."
+    },
+    {
+      "id": "AF-MOD-009",
+      "area": "MOD",
+      "name": "Module interface",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "SACM `ArgumentPackageInterface` exists; GSN v2.2 OCL disables it. See docs/sacm/sacm-gsn-metamodel-gaps.md row 10."
+    },
+    {
+      "id": "AF-MOD-010",
+      "area": "MOD",
+      "name": "Architecture view",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "Diagrammatic; lands in the SACM 2.4 draft."
+    },
+    {
+      "id": "AF-MOD-011",
+      "area": "MOD",
+      "name": "Public decorator",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": ""
+    },
+    {
+      "id": "AF-MOD-012",
+      "area": "MOD",
+      "name": "To-be-supported-by-contract decorator",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": ""
+    },
+    {
+      "id": "AF-ACP-001",
+      "area": "ACP",
+      "name": "ACP on a SupportedBy relationship",
+      "status": "supported",
+      "evidence": [
+        "src/core/acp/assurance_claim_point.cpp",
+        "src/ui/gsn/gsn_acp_decorator.cpp"
+      ],
+      "tests": [
+        "tests/test_assurance_claim_point.cpp",
+        "tests/test_acp_editing.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-ACP-002",
+      "area": "ACP",
+      "name": "ACP on an InContextOf relationship",
+      "status": "supported",
+      "evidence": [
+        "src/core/acp/acp_relationship_index.cpp",
+        "src/ui/gsn/gsn_acp_decorator.cpp"
+      ],
+      "tests": [
+        "tests/test_acp_relationship_index.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-ACP-003",
+      "area": "ACP",
+      "name": "ACP identifiers",
+      "status": "supported",
+      "evidence": [
+        "src/core/acp/assurance_claim_point.cpp"
+      ],
+      "tests": [
+        "tests/test_assurance_claim_point.cpp"
+      ],
+      "notes": "GSN v3 §1:5.2.3. Carried in a TaggedValue; v2.2 Base OCL forbids TaggedValue, so this is not GSN-metamodel-conformant."
+    },
+    {
+      "id": "AF-ACP-004",
+      "area": "ACP",
+      "name": "ACP editing and management panel",
+      "status": "supported",
+      "evidence": [
+        "src/ui/panels/acp_panel.cpp",
+        "src/app/controllers"
+      ],
+      "tests": [
+        "tests/test_acp_controller.cpp",
+        "tests/test_acp_problem_sync.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-ACP-005",
+      "area": "ACP",
+      "name": "ACP on a Solution or Context",
+      "status": "not-planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "Structurally unrepresentable in SACM 2.3 — those extend `ArgumentAsset`, which has no `metaClaim`. Open at OMG as SACM24-83. Revisit when 2.4 lands."
+    },
+    {
+      "id": "AF-ACP-006",
+      "area": "ACP",
+      "name": "Confidence model and store",
+      "status": "prototype",
+      "evidence": [
+        "src/core/confidence/confidence_store.cpp",
+        "src/ui/confidence_model.cpp"
+      ],
+      "tests": [
+        "tests/test_confidence_store.cpp",
+        "tests/test_confidence_model.cpp"
+      ],
+      "notes": "Prototype: see docs/features/confidence-panel-prototype.md. Scoring model is not final."
+    },
+    {
+      "id": "AF-ACP-007",
+      "area": "ACP",
+      "name": "Confidence panel",
+      "status": "prototype",
+      "evidence": [
+        "src/ui/panels/confidence_panel.cpp"
+      ],
+      "tests": [
+        "tests/test_confidence_problem_sync.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-ACP-008",
+      "area": "ACP",
+      "name": "Confidence argument module linking",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "Links an ACP to the module holding its confidence argument."
+    },
+    {
+      "id": "AF-DIA-001",
+      "area": "DIA",
+      "name": "Challenge relationship",
+      "status": "supported",
+      "evidence": [
+        "src/ui/gsn/gsn_model.h",
+        "src/ui/gsn/gsn_edge_renderer.cpp"
+      ],
+      "tests": [
+        "tests/test_dialectic_challenge.cpp"
+      ],
+      "notes": "Rests on SACM `AssertedRelationship.isCounter`, which GSN v2.2 OCL forbids — see docs/sacm/sacm-gsn-metamodel-gaps.md row 4."
+    },
+    {
+      "id": "AF-DIA-002",
+      "area": "DIA",
+      "name": "Counter-argument and counter-evidence rendering",
+      "status": "supported",
+      "evidence": [
+        "src/ui/gsn/gsn_edge_renderer.cpp",
+        "src/ui/gsn/gsn_layout.cpp"
+      ],
+      "tests": [
+        "tests/test_dialectic_challenge.cpp"
+      ],
+      "notes": "Dashed open-arrow challenge edge; side-stacked layout."
+    },
+    {
+      "id": "AF-DIA-003",
+      "area": "DIA",
+      "name": "Challenge targeting a relationship",
+      "status": "supported",
+      "evidence": [
+        "src/ui/gsn/gsn_model.h",
+        "src/ui/gsn/gsn_edge_renderer.cpp"
+      ],
+      "tests": [
+        "tests/test_dialectic_challenge.cpp"
+      ],
+      "notes": "Arrow lands on the target relationship's midpoint."
+    },
+    {
+      "id": "AF-DIA-004",
+      "area": "DIA",
+      "name": "Challenge-to-challenge",
+      "status": "supported",
+      "evidence": [
+        "src/ui/gsn/gsn_model.h"
+      ],
+      "tests": [
+        "tests/test_dialectic_challenge.cpp"
+      ],
+      "notes": "A challenge relationship is itself challengeable."
+    },
+    {
+      "id": "AF-DIA-005",
+      "area": "DIA",
+      "name": "Defeated decorator",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "SACM `AssertionDeclaration::defeated` exists but SACM24-12 proposes removing it."
+    },
+    {
+      "id": "AF-DIA-006",
+      "area": "DIA",
+      "name": "Defeat on Strategy, Solution or Context",
+      "status": "not-planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "Normatively required by GSN v3 §1:6.3.12 but structurally unrepresentable in SACM 2.3. See docs/sacm/sacm-gsn-metamodel-gaps.md row 3."
+    },
+    {
+      "id": "AF-METH-001",
+      "area": "METH",
+      "name": "Problem detection and attention model",
+      "status": "supported",
+      "evidence": [
+        "src/core/problems/problems_manager.cpp",
+        "src/ui/panels/problems_panel.cpp"
+      ],
+      "tests": [
+        "tests/test_problems_manager.cpp",
+        "tests/test_problem_attention.cpp"
+      ],
+      "notes": "The substrate every quality check below reports through."
+    },
+    {
+      "id": "AF-METH-002",
+      "area": "METH",
+      "name": "SCCG guideline catalog",
+      "status": "supported",
+      "evidence": [
+        "src/parser/sccg_dist_parser.cpp",
+        "src/parser/guidelines_parser.cpp"
+      ],
+      "tests": [
+        "tests/test_guideline_catalog.cpp",
+        "tests/test_guidelines_parser.cpp"
+      ],
+      "notes": "Safety Case Core Guidelines, from the `external/safety-case-core-guidelines` submodule."
+    },
+    {
+      "id": "AF-METH-003",
+      "area": "METH",
+      "name": "Manual and AI-assisted review workflow",
+      "status": "supported",
+      "evidence": [
+        "src/core/reviews/review_item_manager.cpp",
+        "src/ui/panels/review_panel.cpp"
+      ],
+      "tests": [
+        "tests/test_review_controller.cpp",
+        "tests/test_review_item.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-METH-004",
+      "area": "METH",
+      "name": "Review proposals with applyable patches",
+      "status": "supported",
+      "evidence": [
+        "src/core/reviews/review_proposal_patch_service.cpp"
+      ],
+      "tests": [
+        "tests/test_review_proposal_patch_service.cpp",
+        "tests/test_review_proposal.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-METH-005",
+      "area": "METH",
+      "name": "Guided top-down development method",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "Structured authoring starting from goals."
+    },
+    {
+      "id": "AF-METH-006",
+      "area": "METH",
+      "name": "Guided bottom-up development method",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "Structured authoring starting from evidence."
+    },
+    {
+      "id": "AF-METH-007",
+      "area": "METH",
+      "name": "Missing-support detection",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": ""
+    },
+    {
+      "id": "AF-METH-008",
+      "area": "METH",
+      "name": "Circular-argument detection",
+      "status": "supported",
+      "evidence": [
+        "src/core/problems/argument_cycles.cpp",
+        "src/app/structure_problem_sync.cpp"
+      ],
+      "tests": [
+        "tests/test_argument_cycles.cpp"
+      ],
+      "notes": "Reports every distinct loop in the support graph as an error, naming the strategy on it. InContextOf and GSN v3 challenges are excluded — both point \"backwards\" without being support, and following either would flag sound arguments."
+    },
+    {
+      "id": "AF-METH-009",
+      "area": "METH",
+      "name": "Common GSN mistake detection",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "Would report through AF-METH-001."
+    },
+    {
+      "id": "AF-ENG-001",
+      "area": "ENG",
+      "name": "Audit register with a replayable event log",
+      "status": "supported",
+      "evidence": [
+        "src/core/audit/event_store.cpp",
+        "src/core/audit/audit_store.cpp"
+      ],
+      "tests": [
+        "tests/test_event_store_jsonl.cpp",
+        "tests/test_reconcile_audit_store.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-ENG-002",
+      "area": "ENG",
+      "name": "Baselines",
+      "status": "supported",
+      "evidence": [
+        "src/core/audit/audit_baseline.cpp"
+      ],
+      "tests": [
+        "tests/test_audit_baseline.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-ENG-003",
+      "area": "ENG",
+      "name": "Snapshots",
+      "status": "supported",
+      "evidence": [
+        "src/core/audit/audit_snapshot.cpp",
+        "src/core/audit/audit_manifest.cpp"
+      ],
+      "tests": [
+        "tests/test_audit_user_snapshot.cpp",
+        "tests/test_audit_manifest.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-ENG-004",
+      "area": "ENG",
+      "name": "Report creation",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "Depends on AF-GSN-013."
+    },
+    {
+      "id": "AF-ENG-005",
+      "area": "ENG",
+      "name": "SVG diagram export",
+      "status": "supported",
+      "evidence": [
+        "src/export/gsn_svg_exporter.cpp",
+        "src/export/svg_writer.cpp"
+      ],
+      "tests": [
+        "tests/test_gsn_svg_exporter.cpp"
+      ],
+      "notes": "Core GSN nodes, SupportedBy/InContextOf/Challenges edges, and decorators (AF-ENG-015). Nodes and edges carry `gsn-*` CSS classes for restyling."
+    },
+    {
+      "id": "AF-ENG-006",
+      "area": "ENG",
+      "name": "History timeline and reconstruction",
+      "status": "supported",
+      "evidence": [
+        "src/core/audit/history_reconstruction.cpp",
+        "src/ui/panels/history_timeline_panel.cpp"
+      ],
+      "tests": [
+        "tests/test_history_reconstruction.cpp",
+        "tests/test_timeline_model_builder.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-ENG-007",
+      "area": "ENG",
+      "name": "Undo with explicit boundaries",
+      "status": "supported",
+      "evidence": [
+        "src/core/audit/undo_boundary.cpp",
+        "src/core/audit/undo_resolver.cpp"
+      ],
+      "tests": [
+        "tests/test_undo_command.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-ENG-008",
+      "area": "ENG",
+      "name": "Evidence register",
+      "status": "prototype",
+      "evidence": [
+        "src/core/registers/register_model.cpp",
+        "src/ui/register_views.cpp"
+      ],
+      "tests": [
+        "tests/test_register_model.cpp"
+      ],
+      "notes": "Row derivation is in core and tested; evidence nothing cites is listed rather than hidden. Assessments persist with the project (AF-ENG-016). Expected to migrate to a SACM Artifact-backed register; see docs/roadmap/public.md."
+    },
+    {
+      "id": "AF-ENG-009",
+      "area": "ENG",
+      "name": "CSE register",
+      "status": "prototype",
+      "evidence": [
+        "src/core/registers/register_model.cpp",
+        "src/ui/register_views.cpp"
+      ],
+      "tests": [
+        "tests/test_register_model.cpp"
+      ],
+      "notes": "Claim/evidence pairings are derived in core and tested, with a pinned CSE id format. Assessments persist with the project (AF-ENG-016). Format transition is expected to break backwards compatibility."
+    },
+    {
+      "id": "AF-ENG-010",
+      "area": "ENG",
+      "name": "Terminology assist and controlled vocabulary",
+      "status": "supported",
+      "evidence": [
+        "src/core/terminology_scope_service.cpp",
+        "src/ui/panels/terminology_package_panel.cpp"
+      ],
+      "tests": [
+        "tests/test_terminology_scope_service.cpp",
+        "tests/test_terminology_commands.cpp"
+      ],
+      "notes": "Documented in docs/features/terminology-assist.md."
+    },
+    {
+      "id": "AF-ENG-011",
+      "area": "ENG",
+      "name": "Term usage detection and promotion to context",
+      "status": "supported",
+      "evidence": [
+        "src/core/terminology_term_usage.cpp",
+        "src/core/terminology_context_projection.cpp"
+      ],
+      "tests": [
+        "tests/test_terminology_context_projection.cpp",
+        "tests/test_terminology_visible_term_context.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-ENG-012",
+      "area": "ENG",
+      "name": "Dual-language safety case content",
+      "status": "supported",
+      "evidence": [
+        "src/core/sacm_model.h",
+        "src/core/translation_review_store.cpp"
+      ],
+      "tests": [
+        "tests/test_translation_review_sync.cpp"
+      ],
+      "notes": "Per-element `name_langs` / `content_langs` maps carried through the model."
+    },
+    {
+      "id": "AF-ENG-013",
+      "area": "ENG",
+      "name": "Deterministic model hashing for change detection",
+      "status": "supported",
+      "evidence": [
+        "src/core/audit/canonical_model_hash.cpp"
+      ],
+      "tests": [
+        "tests/test_canonical_model_hash.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-ENG-014",
+      "area": "ENG",
+      "name": "Conformance tracking surfaced in the app",
+      "status": "candidate",
+      "evidence": [],
+      "tests": [],
+      "notes": "This matrix and the SACM one are repo artifacts today, not app features."
+    },
+    {
+      "id": "AF-ENG-016",
+      "area": "ENG",
+      "name": "Register assessments persist with the project",
+      "status": "supported",
+      "evidence": [
+        "src/app/controllers/register_controller.cpp",
+        "src/app/register_problem_sync.cpp",
+        "src/core/project_service.cpp"
+      ],
+      "tests": [
+        "tests/test_register_controller.cpp",
+        "tests/test_register_problem_sync.cpp"
+      ],
+      "notes": "Owners, criteria, assessment status and notes are held by `RegisterController`, saved to `registers/register-assessments.af.json` on project save, and tracked in the manifest. A file that fails to load is reported in the register tab, editing is disabled and saving is refused, so a bad read cannot overwrite what is on disk. Only rows a user edited are stored. An assessment whose CSE or evidence id leaves the argument is kept, never auto-deleted, and raised as a warning in the Problems panel carrying the stored content — the row is gone from the table, so the problem is the only place left to read it. Its \"Discard assessment\" quick fix drops it in memory; the file is only rewritten on save, so closing without saving takes it back."
+    },
+    {
+      "id": "AF-ENG-015",
+      "area": "ENG",
+      "name": "SVG export renders decorators and challenge edges",
+      "status": "supported",
+      "evidence": [
+        "src/export/gsn_projection.cpp",
+        "src/export/svg_writer.cpp"
+      ],
+      "tests": [
+        "tests/test_gsn_svg_exporter.cpp"
+      ],
+      "notes": "Undeveloped diamonds, ACP badges and dashed open-arrow Challenges edges now export. Previously a counter relationship projected as a `SupportedBy` edge, drawing counter-evidence as support for the claim it attacks."
+    },
+    {
+      "id": "AF-AI-001",
+      "area": "AI",
+      "name": "Provider-agnostic AI integration with explicit consent",
+      "status": "supported",
+      "evidence": [
+        "src/ai/ai_service.cpp",
+        "src/ai/ai_provider.h"
+      ],
+      "tests": [
+        "tests/test_ai_service.cpp"
+      ],
+      "notes": "ADR 0005. No data leaves the machine without user action."
+    },
+    {
+      "id": "AF-AI-002",
+      "area": "AI",
+      "name": "AI profiles and settings",
+      "status": "supported",
+      "evidence": [
+        "src/ai/ai_settings.cpp"
+      ],
+      "tests": [
+        "tests/test_ai_settings.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-AI-003",
+      "area": "AI",
+      "name": "OpenAI-compatible provider",
+      "status": "supported",
+      "evidence": [
+        "src/ai/openai_provider.cpp"
+      ],
+      "tests": [
+        "tests/test_openai_provider.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-AI-004",
+      "area": "AI",
+      "name": "Local secret storage for API keys",
+      "status": "supported",
+      "evidence": [
+        "src/ai/secret_store.cpp"
+      ],
+      "tests": [
+        "tests/test_ai_service.cpp"
+      ],
+      "notes": "Tests exercise the `ISecretStore` seam through a fake, including the store-unavailable path. The platform-backed implementation in `src/ai/secret_store.cpp` has no direct test."
+    },
+    {
+      "id": "AF-AI-005",
+      "area": "AI",
+      "name": "Background AI task execution",
+      "status": "supported",
+      "evidence": [
+        "src/ai/ai_task_runner.cpp"
+      ],
+      "tests": [
+        "tests/test_ai_task_runner.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-AI-006",
+      "area": "AI",
+      "name": "SCCG-guided AI claim review",
+      "status": "supported",
+      "evidence": [
+        "src/ai/ai_claim_review.cpp"
+      ],
+      "tests": [
+        "tests/test_ai_claim_review.cpp",
+        "tests/test_ai_review_controller.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-AI-007",
+      "area": "AI",
+      "name": "MCP server — build safety cases from an external AI client",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "Design recorded in docs/features/mcp-server.md."
+    },
+    {
+      "id": "AF-PLAT-001",
+      "area": "PLAT",
+      "name": "Project model, load and save",
+      "status": "supported",
+      "evidence": [
+        "src/core/project_service.cpp",
+        "src/core/project_file_io.cpp"
+      ],
+      "tests": [
+        "tests/test_project_service.cpp",
+        "tests/test_project_model.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-PLAT-002",
+      "area": "PLAT",
+      "name": "Project explorer",
+      "status": "prototype",
+      "evidence": [
+        "src/ui/panels/project_explorer_panel.cpp"
+      ],
+      "tests": [
+        "tests/test_project_controller.cpp"
+      ],
+      "notes": "Prototype 2 per docs/roadmap/public.md; a redesign is expected."
+    },
+    {
+      "id": "AF-PLAT-003",
+      "area": "PLAT",
+      "name": "Recent projects",
+      "status": "supported",
+      "evidence": [
+        "src/core/project_manifest.cpp"
+      ],
+      "tests": [
+        "tests/test_recent_projects.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-PLAT-004",
+      "area": "PLAT",
+      "name": "Multi-language UI (English, Japanese)",
+      "status": "supported",
+      "evidence": [
+        "src/ui/i18n/localization.cpp",
+        "src/ui/i18n/mo_catalog.cpp"
+      ],
+      "tests": [
+        "tests/test_localization.cpp"
+      ],
+      "notes": "Catalog consistency is gated by the `i18n_catalog_check` CTest."
+    },
+    {
+      "id": "AF-PLAT-005",
+      "area": "PLAT",
+      "name": "Dark and light themes",
+      "status": "prototype",
+      "evidence": [
+        "src/ui/theme.cpp"
+      ],
+      "tests": [
+        "tests/test_theme.cpp"
+      ],
+      "notes": "Prototype 2; the styling model is expected to evolve."
+    },
+    {
+      "id": "AF-PLAT-006",
+      "area": "PLAT",
+      "name": "Command bus and undo-aware mutation",
+      "status": "supported",
+      "evidence": [
+        "src/core/commands",
+        "src/app/app_runtime.cpp"
+      ],
+      "tests": [
+        "tests/test_command_bus.cpp",
+        "tests/test_app_events.cpp"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "AF-PLAT-007",
+      "area": "PLAT",
+      "name": "Layered architecture enforced at build time",
+      "status": "supported",
+      "evidence": [
+        "cmake/check_layer_gates.cmake"
+      ],
+      "tests": [
+        "cmake/check_layer_gates.cmake"
+      ],
+      "notes": "ADR 0002. The gate is its own evidence: a configure-time FATAL_ERROR that runs on every build, not a lint."
+    },
+    {
+      "id": "AF-PLAT-008",
+      "area": "PLAT",
+      "name": "Crash-resilient project recovery",
+      "status": "supported",
+      "evidence": [
+        "src/core/audit/audit_recovery.cpp"
+      ],
+      "tests": [
+        "tests/test_audit_recovery.cpp"
+      ],
+      "notes": ""
+    }
+  ]
+}

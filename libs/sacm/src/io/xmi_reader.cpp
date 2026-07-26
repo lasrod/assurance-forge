@@ -1429,6 +1429,96 @@ void read_reference_attributes(Reader& reader, SACMElement& element, const pugi:
     (void)reader;
 }
 
+// An extension type with its namespace owned. `ExtensionType::namespace_uri`
+// aliases the argument given to `resolve_extension_type`, which here is a
+// temporary from prefix resolution, so it must be copied out before use.
+// `type_name` and `assertion_declaration` point into the static table and are
+// safe to keep as views.
+struct ExtensionOrigin {
+    std::string namespace_uri;
+    std::string_view type_name;
+    std::optional<ElementKind> sacm_kind;
+    std::string_view assertion_declaration;
+};
+
+// Resolves the node's xsi:type back to the extension type it named, if any.
+// `populate` has already pushed this node's scope, so prefixes resolve here.
+std::optional<ExtensionOrigin> extension_type_of(Reader& reader, const pugi::xml_node& node) {
+    for (const pugi::xml_attribute& attr : node.attributes()) {
+        if (local_name(attr.name()) != "type") {
+            continue;
+        }
+        const std::string_view value = attr.value();
+        const std::string namespace_uri = reader.resolve_prefix(prefix_of(value));
+        const std::optional<detail::ExtensionType> extension =
+            detail::resolve_extension_type(namespace_uri, local_name(value));
+        if (!extension.has_value()) {
+            return std::nullopt;
+        }
+        return ExtensionOrigin{namespace_uri, extension->type_name, extension->sacm_kind,
+                               extension->assertion_declaration};
+    }
+    return std::nullopt;
+}
+
+// GSN types resolve to their SACM supertypes, and that resolution is lossy:
+// Goal, Assumption and Justification all land on `Claim`. Two things stop the
+// distinction from disappearing:
+//
+//   1. The original GSN type is recorded in a reserved TaggedValue (clause 8.12
+//      extension mechanism), qualified with its namespace so the value is
+//      unambiguous when a document mixes GSN revisions.
+//   2. The AssertionDeclaration the GSN transformation defines is applied --
+//      but only when the source did not state one. An explicit declaration in
+//      the file is more specific than one inferred from the type and must win,
+//      the same rule the `undeveloped` shorthand already follows.
+//
+// Before this, a GSN file round-tripped into indistinguishable Claims and the
+// argument's assumptions and justifications became plain goals (SACM23-COMPAT-002).
+void record_extension_origin(Reader& reader, SACMElement& element, const pugi::xml_node& node) {
+    const std::optional<ExtensionOrigin> extension = extension_type_of(reader, node);
+    if (!extension.has_value() || !extension->sacm_kind.has_value()) {
+        return;
+    }
+
+    auto* model_element = dynamic_cast<model::ModelElement*>(&element);
+    if (model_element == nullptr) {
+        return;
+    }
+
+    auto origin = std::make_unique<model::TaggedValue>(reader.generate_id(ElementKind::TaggedValue));
+    Access::key(*origin).set("", std::string(detail::kImportExtensionTypeKey));
+    Access::content(*origin).set(
+        "", std::format("{{{}}}{}", extension->namespace_uri, extension->type_name));
+    Access::set_parent(*origin, &element);
+    Access::tagged_values(*model_element).push_back(std::move(origin));
+
+    if (extension->assertion_declaration.empty()) {
+        return;
+    }
+    auto* assertion = dynamic_cast<model::Assertion*>(&element);
+    if (assertion == nullptr) {
+        return;
+    }
+    // An assertionDeclaration written in the file has already been read; only
+    // fill in the default.
+    if (node.attribute("assertionDeclaration")) {
+        return;
+    }
+    const std::optional<model::AssertionDeclaration> declaration =
+        model::parse_assertion_declaration(std::string(extension->assertion_declaration));
+    if (!declaration.has_value()) {
+        return;
+    }
+    Access::assertion_declaration(*assertion) = *declaration;
+    reader.report(validation::codes::kXmiUnknownElement, Severity::Info, "SACM23-COMPAT-002", node,
+                  {element.id()},
+                  std::format("GSN '{}' resolved to Claim with assertionDeclaration='{}' (original "
+                              "type preserved in TaggedValue '{}')",
+                              extension->type_name, extension->assertion_declaration,
+                              detail::kImportExtensionTypeKey));
+}
+
 void read_kind_specific_attributes(Reader& reader, SACMElement& element,
                                    const pugi::xml_node& node) {
     if (auto* assertion = dynamic_cast<model::Assertion*>(&element)) {
@@ -1611,6 +1701,9 @@ void populate(Reader& reader, SACMElement& element, const pugi::xml_node& node) 
 
     read_common_attributes(reader, element, node);
     read_kind_specific_attributes(reader, element, node);
+    // Must follow read_kind_specific_attributes: it decides whether the source
+    // set an assertionDeclaration of its own, which this must not override.
+    record_extension_origin(reader, element, node);
     read_reference_attributes(reader, element, node);
     if (auto* model_element = dynamic_cast<model::ModelElement*>(&element)) {
         read_model_element_children(reader, *model_element, node);

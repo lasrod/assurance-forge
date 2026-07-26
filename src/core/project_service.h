@@ -63,6 +63,13 @@ public:
                                    ProjectFileEntry& entry,
                                    std::string& error);
 
+    // Writes the CSE / Evidence register assessments to
+    // registers/register-assessments.af.json and tracks it in the manifest.
+    static bool SaveRegisterAssessmentsFile(AssuranceProject& project,
+                                            const std::string& content,
+                                            ProjectFileEntry& entry,
+                                            std::string& error);
+
     static bool TrackExistingFile(AssuranceProject& project,
                                   const std::filesystem::path& relative_path,
                                   ProjectFileRole role,

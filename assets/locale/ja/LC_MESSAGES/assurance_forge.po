@@ -325,6 +325,9 @@ msgstr "変更は提案ドラフトに記録されています。レビューパ
 msgid "Choose a target TerminologyPackage."
 msgstr "対象の TerminologyPackage を選択してください。"
 
+msgid "Circular support: {0}. An argument that assumes its own conclusion establishes nothing."
+msgstr "循環した支持関係: {0}。自らの結論を前提とする議論は何も立証しません。"
+
 msgid "Claim"
 msgstr "主張"
 
@@ -537,6 +540,9 @@ msgstr "不信"
 
 msgid "Discard Draft"
 msgstr "ドラフトを破棄"
+
+msgid "Discard assessment"
+msgstr "評価を破棄"
 
 msgid "Dismiss"
 msgstr "閉じる"
@@ -1255,6 +1261,9 @@ msgstr "提案プロパティの変更を記録しました。"
 msgid "Reference: {0}"
 msgstr "参照: {0}"
 
+msgid "Register assessments could not be loaded, so edits cannot be saved: {0}"
+msgstr "登録簿の評価を読み込めなかったため、編集を保存できません: {0}"
+
 msgid "Relationship not found: {0}"
 msgstr "関係が見つかりません: {0}"
 
@@ -1441,6 +1450,9 @@ msgstr "重大度"
 msgid "Show FPS"
 msgstr "FPS を表示"
 
+msgid "Show cycle"
+msgstr "循環を表示"
+
 msgid "Snapshot created at sequence {0}."
 msgstr "スナップショットをシーケンス {0} で作成しました。"
 
@@ -1572,6 +1584,12 @@ msgstr "テキスト信頼度論証が空です。"
 
 msgid "The SACM library could not preview this removal."
 msgstr "SACM ライブラリはこの削除をプレビューできませんでした。"
+
+msgid "The assessment of evidence {0} is kept, but that evidence is no longer in the argument. Stored: {1}"
+msgstr "エビデンス {0} の評価は保持されていますが、そのエビデンスは論証にありません。保存内容: {1}"
+
+msgid "The assessment of {0} is kept, but the argument no longer links that claim to that evidence. Stored: {1}"
+msgstr "{0} の評価は保持されていますが、論証はその主張とエビデンスを結び付けていません。保存内容: {1}"
 
 msgid "The attached proposal will also be deleted."
 msgstr "添付された提案も削除されます。"
@@ -1818,6 +1836,9 @@ msgstr "{0} は定義されていません。"
 
 msgid "{0} is not implemented yet."
 msgstr "{0} はまだ実装されていません。"
+
+msgid "{0} is supported by itself, so it establishes nothing."
+msgstr "{0} は自分自身によって支持されているため、何も立証しません。"
 
 msgid "{0} looks like an undefined terminology entry."
 msgstr "{0} は未定義の用語項目のように見えます。"

@@ -192,6 +192,9 @@ struct GsnType {
     std::string_view name;
     std::optional<ElementKind> kind;
     bool reverse_endpoints = false;
+    // SACM AssertionDeclaration literal implied by the GSN type, per the ecore
+    // and docs/sacm/sacm-gsn-mapping.md. Empty when the type implies none.
+    std::string_view assertion_declaration = {};
 };
 
 constexpr GsnType kGsnTypes[] = {
@@ -199,12 +202,15 @@ constexpr GsnType kGsnTypes[] = {
     {"ContractModule", ElementKind::ArgumentPackageBinding},
     {"Strategy", ElementKind::ArgumentReasoning},
     {"Goal", ElementKind::Claim},
-    {"Justification", ElementKind::Claim},
-    {"Assumption", ElementKind::Claim},
+    // Goal, Justification and Assumption share one SACM supertype, so the
+    // declaration is the only thing that keeps them apart once the GSN type is
+    // resolved away. Both mappings come from the ecore, not from the names.
+    {"Justification", ElementKind::Claim, /*reverse_endpoints=*/false, "axiomatic"},
+    {"Assumption", ElementKind::Claim, /*reverse_endpoints=*/false, "assumed"},
     {"AwayGoal", ElementKind::Claim},
     // Present only in the current (scsc.acwg.gsn/2.0) metamodel.
-    {"AwayAssumption", ElementKind::Claim},
-    {"AwayJustification", ElementKind::Claim},
+    {"AwayAssumption", ElementKind::Claim, /*reverse_endpoints=*/false, "assumed"},
+    {"AwayJustification", ElementKind::Claim, /*reverse_endpoints=*/false, "axiomatic"},
     {"Solution", ElementKind::ArtifactReference},
     {"AwaySolution", ElementKind::ArtifactReference},
     {"ModuleReference", ElementKind::ArtifactReference},
@@ -294,7 +300,8 @@ std::optional<ExtensionType> resolve_extension_type(std::string_view namespace_u
     }
     for (const GsnType& known : kGsnTypes) {
         if (known.name == type_name) {
-            return ExtensionType{namespace_uri, known.name, known.kind, known.reverse_endpoints};
+            return ExtensionType{namespace_uri, known.name, known.kind, known.reverse_endpoints,
+                                 known.assertion_declaration};
         }
     }
     return std::nullopt;

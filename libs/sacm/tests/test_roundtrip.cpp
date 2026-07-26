@@ -186,6 +186,133 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_CurrentGsnNamespaceAndAwayTypesAreRecogn
     EXPECT_TRUE(context_reported) << "GSN Context was dropped without explanation";
 }
 
+namespace {
+
+constexpr std::string_view kImportExtensionTypeKey = "sacm.import.extensionType";
+
+// The value of the first TaggedValue with `key` on `element`, or empty.
+std::string tagged_value_for(const sacm::model::SACMElement& element, std::string_view key) {
+    const auto* model_element = dynamic_cast<const sacm::model::ModelElement*>(&element);
+    if (model_element == nullptr) {
+        return {};
+    }
+    for (const auto& tag : model_element->tagged_values()) {
+        if (!tag->key().values.empty() && tag->key().values.front().content == key &&
+            !tag->content().values.empty()) {
+            return tag->content().values.front().content;
+        }
+    }
+    return {};
+}
+
+// Maps each element's name to the GSN type recorded for it on import.
+std::map<std::string, std::string> gsn_types_by_name(const Document& document) {
+    std::map<std::string, std::string> types;
+    document.for_each_element([&](const sacm::model::SACMElement& element) {
+        const auto* model_element = dynamic_cast<const sacm::model::ModelElement*>(&element);
+        if (model_element == nullptr || model_element->name().content.empty()) {
+            return;
+        }
+        const std::string recorded = tagged_value_for(element, kImportExtensionTypeKey);
+        if (!recorded.empty()) {
+            types[model_element->name().content] = recorded;
+        }
+    });
+    return types;
+}
+
+std::map<std::string, sacm::model::AssertionDeclaration> declarations_by_name(
+    const Document& document) {
+    std::map<std::string, sacm::model::AssertionDeclaration> declarations;
+    document.for_each_element([&](const sacm::model::SACMElement& element) {
+        const auto* assertion = dynamic_cast<const sacm::model::Assertion*>(&element);
+        const auto* model_element = dynamic_cast<const sacm::model::ModelElement*>(&element);
+        if (assertion == nullptr || model_element == nullptr ||
+            model_element->name().content.empty()) {
+            return;
+        }
+        declarations[model_element->name().content] = assertion->assertion_declaration();
+    });
+    return declarations;
+}
+
+} // namespace
+
+// Resolving a GSN type to its SACM supertype is lossy: Goal, Assumption and
+// Justification all become Claim. Recording the original type keeps the
+// information recoverable.
+TEST(Sacm23RoundTrip, SACM23_COMPAT_002_OriginalGsnTypeIsRecordedOnImport) {
+    const LoadResult loaded =
+        sacm::io::load_xmi_file(fixture("interop-gsn20-current-namespace-valid.sacm.xmi"));
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
+                                                          : loaded.diagnostics.front().message);
+
+    const std::map<std::string, std::string> types = gsn_types_by_name(*loaded.document);
+    EXPECT_EQ(types.at("G1"), "{http://scsc.acwg.gsn/2.0}Goal");
+    EXPECT_EQ(types.at("AA1"), "{http://scsc.acwg.gsn/2.0}AwayAssumption");
+    EXPECT_EQ(types.at("AJ1"), "{http://scsc.acwg.gsn/2.0}AwayJustification");
+    EXPECT_EQ(types.at("Sn1"), "{http://scsc.acwg.gsn/2.0}Solution");
+}
+
+// The defect: three distinct GSN node types collapsing into identical Claims,
+// so an argument's assumptions and justifications read as plain goals.
+TEST(Sacm23RoundTrip, SACM23_COMPAT_002_GsnAssumptionAndJustificationAreNotPlainGoals) {
+    const LoadResult loaded =
+        sacm::io::load_xmi_file(fixture("interop-gsn20-current-namespace-valid.sacm.xmi"));
+    ASSERT_TRUE(loaded.ok);
+
+    const auto declarations = declarations_by_name(*loaded.document);
+    EXPECT_EQ(declarations.at("G1"), sacm::model::AssertionDeclaration::Asserted);
+    EXPECT_EQ(declarations.at("AA1"), sacm::model::AssertionDeclaration::Assumed);
+    EXPECT_EQ(declarations.at("AJ1"), sacm::model::AssertionDeclaration::Axiomatic);
+    // All three are still Claims -- the distinction is carried, not invented.
+    EXPECT_NE(declarations.at("AA1"), declarations.at("AJ1"));
+    EXPECT_NE(declarations.at("G1"), declarations.at("AA1"));
+}
+
+TEST(Sacm23RoundTrip, SACM23_COMPAT_002_RecordedGsnTypeSurvivesSaveAndReload) {
+    const LoadResult loaded =
+        sacm::io::load_xmi_file(fixture("interop-gsn20-current-namespace-valid.sacm.xmi"));
+    ASSERT_TRUE(loaded.ok);
+
+    const sacm::io::SaveResult saved =
+        sacm::io::save_xmi_string(*loaded.document, sacm::io::SaveOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(saved.ok);
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml);
+    ASSERT_TRUE(reloaded.ok);
+
+    EXPECT_EQ(gsn_types_by_name(*reloaded.document), gsn_types_by_name(*loaded.document));
+    EXPECT_EQ(declarations_by_name(*reloaded.document), declarations_by_name(*loaded.document));
+}
+
+// A declaration written in the file is more specific than one inferred from the
+// GSN type, so inference must not overwrite it. Same rule the `undeveloped`
+// shorthand already follows.
+TEST(Sacm23RoundTrip, SACM23_COMPAT_002_ExplicitAssertionDeclarationBeatsTheGsnType) {
+    constexpr std::string_view kDocument =
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<assuranceCase_:AssuranceCasePackage xmi:version="2.0" )"
+        R"(xmlns:xmi="http://www.omg.org/XMI" )"
+        R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" )"
+        R"(xmlns:assuranceCase_="http://omg.sacm/2.3/assurancecase" )"
+        R"(xmlns:gsn_="http://scsc.acwg.gsn/2.0">)"
+        R"(<argumentPackage xsi:type="gsn_:Module">)"
+        R"(<argumentationElement xsi:type="gsn_:Assumption" assertionDeclaration="defeated">)"
+        R"(<name lang="English" content="A1"/>)"
+        R"(</argumentationElement>)"
+        R"(</argumentPackage>)"
+        R"(</assuranceCase_:AssuranceCasePackage>)";
+
+    const LoadResult loaded = sacm::io::load_xmi_string(std::string(kDocument));
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
+                                                          : loaded.diagnostics.front().message);
+
+    EXPECT_EQ(declarations_by_name(*loaded.document).at("A1"),
+              sacm::model::AssertionDeclaration::Defeated);
+    // The GSN type is still recorded, so nothing is lost by deferring to the file.
+    EXPECT_EQ(gsn_types_by_name(*loaded.document).at("A1"), "{http://scsc.acwg.gsn/2.0}Assumption");
+}
+
 // The same extension type under our own pinned namespace and a different
 // prefix, so the strict-mode assertions below are not confounded by the GSN
 // fixture's dialect namespace and missing ids (strict rejects those first, and

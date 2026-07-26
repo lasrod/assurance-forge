@@ -47,6 +47,18 @@ std::string EscapeXml(const std::string& value) {
     return out.str();
 }
 
+// Decorator geometry. The undeveloped diamond hangs below bottom-centre, as GSN
+// requires; an ACP badge sits beside it so a node carrying both stays readable.
+constexpr double kUndevelopedRadius = 9.0;
+constexpr double kUndevelopedGap = 6.0;
+constexpr double kAcpBoxHalf = 8.0;
+constexpr double kAcpGap = 6.0;
+constexpr double kAcpLabelGap = 5.0;
+// Challenges read as adversarial and must not be mistaken for support at a
+// glance, so they are the one coloured element in an otherwise black-on-white
+// diagram. Consumers can restyle via the `gsn-challenges` class.
+constexpr const char* kChallengeColor = "#b3261e";
+
 const char* CssClassFor(GsnNodeKind kind) {
     switch (kind) {
     case GsnNodeKind::Goal:
@@ -140,6 +152,65 @@ void WriteText(std::ostringstream& out, const GsnNode& node, double x, double y)
     out << "    </text>\n";
 }
 
+const char* CssClassFor(GsnEdgeKind kind) {
+    switch (kind) {
+    case GsnEdgeKind::SupportedBy:
+        return "gsn-supportedby";
+    case GsnEdgeKind::InContextOf:
+        return "gsn-incontextof";
+    case GsnEdgeKind::Challenges:
+        return "gsn-challenges";
+    }
+    return "gsn-edge";
+}
+
+std::string JoinAcpLabels(const std::vector<std::string>& labels) {
+    std::string joined;
+    for (const std::string& label : labels) {
+        if (!joined.empty())
+            joined += ", ";
+        joined += label;
+    }
+    return joined;
+}
+
+// The GSN undeveloped decorator: a hollow diamond below bottom-centre, meaning
+// the element requires support that has not been provided. Omitting it from an
+// export makes an incomplete argument read as a finished one.
+void WriteUndevelopedMarker(std::ostringstream& out, const GsnNode& node) {
+    if (!node.undeveloped)
+        return;
+    const double cx = node.x + node.width / 2.0;
+    const double cy = node.y + node.height + kUndevelopedGap + kUndevelopedRadius;
+    out << "    <polygon class=\"gsn-undeveloped\" points=\"" << cx << "," << cy - kUndevelopedRadius << " "
+        << cx + kUndevelopedRadius << "," << cy << " " << cx << "," << cy + kUndevelopedRadius << " "
+        << cx - kUndevelopedRadius << "," << cy
+        << "\" fill=\"white\" stroke=\"black\" stroke-width=\"1.2\"/>\n";
+}
+
+// The ACP badge: a small square carrying the Assurance Claim Point identifier,
+// marking where a confidence argument attaches (GSN v3 §1:5.2.3).
+void WriteAcpBadge(std::ostringstream& out, double center_x, double center_y, const std::vector<std::string>& labels) {
+    if (labels.empty())
+        return;
+    out << "    <rect class=\"gsn-acp\" x=\"" << center_x - kAcpBoxHalf << "\" y=\"" << center_y - kAcpBoxHalf
+        << "\" width=\"" << kAcpBoxHalf * 2.0 << "\" height=\"" << kAcpBoxHalf * 2.0
+        << "\" rx=\"2\" ry=\"2\" fill=\"white\" stroke=\"black\" stroke-width=\"1.2\"/>\n";
+    out << "    <text x=\"" << center_x + kAcpBoxHalf + kAcpLabelGap << "\" y=\"" << center_y + 4.0
+        << "\" font-family=\"Arial, Helvetica, sans-serif\" font-size=\"11\" fill=\"black\" stroke=\"none\">"
+        << EscapeXml(JoinAcpLabels(labels)) << "</text>\n";
+}
+
+void WriteElementAcpBadge(std::ostringstream& out, const GsnNode& node) {
+    if (node.acp_labels.empty())
+        return;
+    // Sit clear of the undeveloped diamond when the element carries both.
+    const double offset = node.undeveloped ? kUndevelopedRadius + kAcpBoxHalf + kAcpGap : 0.0;
+    const double cx = node.x + node.width / 2.0 + offset;
+    const double cy = node.y + node.height + kAcpGap + kAcpBoxHalf;
+    WriteAcpBadge(out, cx, cy, node.acp_labels);
+}
+
 void WriteNode(std::ostringstream& out, const GsnNode& node) {
     out << "  <g id=\"" << EscapeXml(node.id) << "\" class=\"" << CssClassFor(node.kind) << "\">\n";
     switch (node.kind) {
@@ -182,6 +253,8 @@ void WriteNode(std::ostringstream& out, const GsnNode& node) {
         break;
     }
     }
+    WriteUndevelopedMarker(out, node);
+    WriteElementAcpBadge(out, node);
     out << "  </g>\n";
 }
 
@@ -202,21 +275,60 @@ Point SidePoint(const GsnNode& node, bool right_side) {
     return Point{right_side ? node.x + node.width : node.x, node.y + node.height / 2.0};
 }
 
+Point Center(const GsnNode& node) {
+    return Point{node.x + node.width / 2.0, node.y + node.height / 2.0};
+}
+
+Point Midpoint(Point a, Point b) {
+    return Point{(a.x + b.x) / 2.0, (a.y + b.y) / 2.0};
+}
+
+// Where an edge's ACP badge and any challenge aimed at this edge should land.
+Point EdgeMidpoint(const GsnEdge& edge, const GsnNode& from, const GsnNode& to) {
+    if (edge.kind == GsnEdgeKind::SupportedBy)
+        return Midpoint(BottomCenter(from), TopCenter(to));
+    const bool to_right = (to.x + to.width / 2.0) >= (from.x + from.width / 2.0);
+    return Midpoint(SidePoint(from, to_right), SidePoint(to, !to_right));
+}
+
+void WriteEdgePath(std::ostringstream& out, const GsnEdge& edge, Point start, Point end) {
+    out << "  <path class=\"" << CssClassFor(edge.kind) << "\" d=\"M " << start.x << " " << start.y << " L " << end.x
+        << " " << end.y << "\" fill=\"none\" ";
+    switch (edge.kind) {
+    case GsnEdgeKind::SupportedBy:
+        out << "stroke=\"black\" stroke-width=\"1.2\" marker-end=\"url(#supportedByArrow)\"";
+        break;
+    case GsnEdgeKind::InContextOf:
+        out << "stroke=\"black\" stroke-width=\"1.2\" stroke-dasharray=\"6,4\" marker-end=\"url(#contextArrow)\"";
+        break;
+    case GsnEdgeKind::Challenges:
+        out << "stroke=\"" << kChallengeColor
+            << "\" stroke-width=\"1.8\" stroke-dasharray=\"6,4\" marker-end=\"url(#challengeArrow)\"";
+        break;
+    }
+    out << "/>\n";
+}
+
+// A challenge sourced at `from` and aimed at a point rather than a node -- used
+// when the challenged thing is another relationship.
+void WriteChallengeToPoint(std::ostringstream& out, const GsnEdge& edge, const GsnNode& from, Point target) {
+    WriteEdgePath(out, edge, Center(from), target);
+}
+
 void WriteEdge(std::ostringstream& out, const GsnEdge& edge, const GsnNode& from, const GsnNode& to) {
     if (edge.kind == GsnEdgeKind::SupportedBy) {
-        const Point start = BottomCenter(from);
-        const Point end = TopCenter(to);
-        out << "  <path d=\"M " << start.x << " " << start.y << " L " << end.x << " " << end.y
-            << "\" fill=\"none\" stroke=\"black\" stroke-width=\"1.2\" marker-end=\"url(#supportedByArrow)\"/>\n";
+        WriteEdgePath(out, edge, BottomCenter(from), TopCenter(to));
+        return;
+    }
+    if (edge.kind == GsnEdgeKind::Challenges) {
+        // Aim at the challenged element's border on the side facing the counter.
+        const bool to_right = (to.x + to.width / 2.0) >= (from.x + from.width / 2.0);
+        WriteEdgePath(out, edge, SidePoint(from, to_right), SidePoint(to, !to_right));
         return;
     }
 
     const bool to_right = (to.x + to.width / 2.0) >= (from.x + from.width / 2.0);
-    const Point start = SidePoint(from, to_right);
-    const Point end = SidePoint(to, !to_right);
-    out << "  <path d=\"M " << start.x << " " << start.y << " L " << end.x << " " << end.y
-        << "\" fill=\"none\" stroke=\"black\" stroke-width=\"1.2\" stroke-dasharray=\"6,4\" "
-           "marker-end=\"url(#contextArrow)\"/>\n";
+    WriteEdgePath(out, edge, SidePoint(from, to_right), SidePoint(to, !to_right));
 }
 
 } // namespace
@@ -253,20 +365,72 @@ std::string GenerateGsnSvg(const GsnDiagram& diagram) {
            "orient=\"auto\" markerUnits=\"strokeWidth\">\n";
     out << "    <path d=\"M 0 0 L 10 5 L 0 10\" fill=\"none\" stroke=\"black\" stroke-width=\"1\"/>\n";
     out << "  </marker>\n";
+    // Hollow (open) arrowhead, matching the canvas's challenge edge.
+    out << "  <marker id=\"challengeArrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"10\" refY=\"5\" "
+           "orient=\"auto\" markerUnits=\"strokeWidth\">\n";
+    out << "    <path d=\"M 0 0 L 10 5 L 0 10\" fill=\"none\" stroke=\"" << kChallengeColor
+        << "\" stroke-width=\"1\"/>\n";
+    out << "  </marker>\n";
     out << "</defs>\n";
     out << "<rect x=\"0\" y=\"0\" width=\"100%\" height=\"100%\" fill=\"white\"/>\n";
     out << "<g id=\"diagram\" font-family=\"Arial, Helvetica, sans-serif\" font-size=\"13\" fill=\"none\" "
            "stroke=\"black\" stroke-width=\"1.2\">\n";
 
+    // Midpoints are recorded as edges are drawn so a challenge aimed at a
+    // relationship can land on the edge that represents it, and so relationship
+    // ACP badges sit on the line they annotate.
+    std::unordered_map<std::string, Point> midpoint_by_edge_id;
+    std::vector<const GsnEdge*> challenges_to_edges;
+
     for (const GsnEdge& edge : diagram.edges) {
         auto from_it = node_by_id.find(edge.from_id);
+        if (from_it == node_by_id.end())
+            continue;
+        if (!edge.to_edge_id.empty()) {
+            challenges_to_edges.push_back(&edge);
+            continue;
+        }
         auto to_it = node_by_id.find(edge.to_id);
-        if (from_it == node_by_id.end() || to_it == node_by_id.end())
+        if (to_it == node_by_id.end())
             continue;
         WriteEdge(out, edge, *from_it->second, *to_it->second);
+        midpoint_by_edge_id[edge.id] = EdgeMidpoint(edge, *from_it->second, *to_it->second);
     }
+
+    // A challenge may itself be challenged (GSN v3), so a challenge-to-edge can
+    // target another one. Resolve repeatedly until no more midpoints appear;
+    // anything still unresolved is a cycle or a dangling target and is dropped.
+    bool resolved_any = true;
+    while (resolved_any && !challenges_to_edges.empty()) {
+        resolved_any = false;
+        std::vector<const GsnEdge*> pending;
+        for (const GsnEdge* edge : challenges_to_edges) {
+            auto from_it = node_by_id.find(edge->from_id);
+            auto target_it = midpoint_by_edge_id.find(edge->to_edge_id);
+            if (from_it == node_by_id.end())
+                continue;
+            if (target_it == midpoint_by_edge_id.end()) {
+                pending.push_back(edge);
+                continue;
+            }
+            WriteChallengeToPoint(out, *edge, *from_it->second, target_it->second);
+            midpoint_by_edge_id[edge->id] = Midpoint(Center(*from_it->second), target_it->second);
+            resolved_any = true;
+        }
+        challenges_to_edges.swap(pending);
+    }
+
     for (const GsnNode& node : diagram.nodes) {
         WriteNode(out, node);
+    }
+
+    for (const GsnEdge& edge : diagram.edges) {
+        auto midpoint = midpoint_by_edge_id.find(edge.id);
+        if (edge.acp_labels.empty() || midpoint == midpoint_by_edge_id.end())
+            continue;
+        out << "  <g class=\"gsn-acp-group\">\n";
+        WriteAcpBadge(out, midpoint->second.x, midpoint->second.y, edge.acp_labels);
+        out << "  </g>\n";
     }
 
     out << "</g>\n";

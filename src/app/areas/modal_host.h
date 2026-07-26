@@ -16,7 +16,10 @@ struct ModalHostCallbacks {
     std::function<void()> begin_open_project;
     std::function<bool(const std::string&)> try_open_project_manifest;
     std::function<bool()> open_first_project_sacm_file;
-    std::function<bool()> ensure_review_item_storage;
+    // Re-points every controller that owns a file of its own at the project
+    // that was just created. Review items, confidence assessments and register
+    // assessments all live outside the SACM document.
+    std::function<void()> ensure_project_side_storage;
     std::function<void()> touch_current_project_recent;
     std::function<bool()> save_project;
     std::function<void(bool)> confirm_pending_project_file_open;

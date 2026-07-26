@@ -10,6 +10,11 @@ enum class ProjectFileRole {
     SacmArgument,
     EvidenceRegister,
     J3377CaeRegister,
+    // What reviewers typed into the CSE and Evidence registers (owners,
+    // criteria, assessment status, notes). Distinct from the two register
+    // *documents* above: those are register files a user asked for, this is the
+    // single project-wide store of assessments keyed by CSE / evidence id.
+    RegisterAssessments,
     ReviewItems,
     ReviewProposal,
     ConfidenceAssessments,

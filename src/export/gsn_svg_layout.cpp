@@ -134,6 +134,20 @@ core::ElementGroup ToCoreGroup(GsnNodeKind kind) {
     return IsSideInformation(kind) ? core::ElementGroup::Group2 : core::ElementGroup::Group1;
 }
 
+// The node a layout edge attaches to. Normally the edge's own target, but a
+// challenge aimed at a relationship has no node target -- it lands on another
+// edge. That edge's `to_id` is the SACM relationship's *source* (endpoints are
+// swapped for SupportedBy/InContextOf), which is the element the canvas hosts
+// such a challenge on: challenging "InContextOf C1 -> G1" sits the counter with
+// C1, not with G1.
+std::string ResolveLayoutAnchorId(const GsnEdge& edge,
+                                  const std::unordered_map<std::string, const GsnEdge*>& edge_by_id) {
+    if (edge.to_edge_id.empty())
+        return edge.to_id;
+    auto target = edge_by_id.find(edge.to_edge_id);
+    return target != edge_by_id.end() ? target->second->to_id : std::string{};
+}
+
 } // namespace
 
 GsnSvgLayoutResult LayoutGsnSvgDiagram(GsnDiagram& diagram) {
@@ -158,14 +172,30 @@ GsnSvgLayoutResult LayoutGsnSvgDiagram(GsnDiagram& diagram) {
         input_nodes[node.id] = std::move(node);
     }
 
+    std::unordered_map<std::string, const GsnEdge*> edge_by_id;
+    for (const GsnEdge& edge : diagram.edges)
+        edge_by_id[edge.id] = &edge;
+
     for (const GsnEdge& edge : diagram.edges) {
+        const std::string anchor_id = ResolveLayoutAnchorId(edge, edge_by_id);
         auto from_node = input_nodes.find(edge.from_id);
-        auto to_node = input_nodes.find(edge.to_id);
+        auto to_node = input_nodes.find(anchor_id);
         if (from_node == input_nodes.end() || to_node == input_nodes.end()) {
             result.warnings.push_back("Layout skipped edge '" + edge.id + "' because an endpoint was missing.");
             continue;
         }
-        if (edge.kind == GsnEdgeKind::InContextOf) {
+        if (edge.kind == GsnEdgeKind::Challenges) {
+            // A challenge is not support. Wiring it as a parent/child edge would
+            // place counter-evidence inside the support tree of the very claim it
+            // attacks. Side-attaching the counter to its anchor puts it beside
+            // what it challenges, which is how the canvas lays it out.
+            if (side_child_ids.count(edge.from_id) > 0 || support_child_ids.count(edge.from_id) > 0)
+                continue; // already placed; a node has one position
+            to_node->second.group2_attachments.push_back(edge.from_id);
+            from_node->second.parent_id = anchor_id;
+            from_node->second.group = core::ElementGroup::Group2;
+            side_child_ids.insert(edge.from_id);
+        } else if (edge.kind == GsnEdgeKind::InContextOf) {
             from_node->second.group2_attachments.push_back(edge.to_id);
             to_node->second.parent_id = edge.from_id;
             to_node->second.group = core::ElementGroup::Group2;

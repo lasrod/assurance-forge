@@ -281,6 +281,29 @@ void RenderTerminologyPackageTab(AppRuntimeState& state, const WorkbenchAreaCall
     ui::panels::ShowTerminologyPackagePanel(model, package_callbacks);
 }
 
+// Renders one of the two register tables against the controller's store and
+// marks it dirty when the user edits a cell, so the next project save writes it.
+//
+// A register file that failed to load disables editing instead of accepting
+// keystrokes: the controller refuses to save over a file it could not read, so
+// anything typed here would be discarded on close without a word.
+void RenderRegisterTable(AppRuntimeState& state, bool (*show_table)(core::registers::RegisterStore&)) {
+    controllers::RegisterController& register_assessments = *state.register_controller;
+    const bool storage_failed = register_assessments.HasStorageError();
+    if (storage_failed) {
+        ImGui::TextWrapped("%s",
+                           ui::i18n::trf("Register assessments could not be loaded, so edits cannot be saved: {0}",
+                                         register_assessments.StorageError())
+                               .c_str());
+        ImGui::Separator();
+    }
+
+    ImGui::BeginDisabled(storage_failed);
+    if (show_table(register_assessments.MutableStore()))
+        register_assessments.MarkDirty();
+    ImGui::EndDisabled();
+}
+
 } // namespace
 
 void RenderWorkbenchArea(AppRuntimeState& state,
@@ -371,7 +394,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                         "%s", AF_TR("Editable CAE register content will be implemented in a later workflow.").c_str());
                     ImGui::Separator();
                 }
-                ui::ShowCseRegisterView();
+                RenderRegisterTable(state, ui::ShowCseRegisterView);
                 ImGui::EndTabItem();
             }
         }
@@ -395,7 +418,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                         AF_TR("Editable evidence register content will be implemented in a later workflow.").c_str());
                     ImGui::Separator();
                 }
-                ui::ShowEvidenceRegisterView();
+                RenderRegisterTable(state, ui::ShowEvidenceRegisterView);
                 ImGui::EndTabItem();
             }
         }

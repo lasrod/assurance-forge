@@ -110,6 +110,35 @@ requirement IDs — test names embed them.
   dialects; strict export normalizes to our pin. Do not treat the pinned URI as
   normative.
 
+## Capability matrix (`docs/features/feature-matrix.md`)
+
+The canonical record of what Assurance Forge can actually do, and the source the
+documentation site renders. It is separate from the SACM conformance matrix:
+that one answers "does the library implement the standard", this one answers
+"can a user do the thing".
+
+- **Any user-visible capability change requires a matrix row change.** A new
+  feature adds a row; a finished feature raises a status; a discovered
+  limitation goes in Notes. Overstated rows are read by people deciding whether
+  to trust the tool with a safety argument.
+- **`supported` requires a cited test that exists.** `planned`, `candidate` and
+  `not-planned` rows must cite no tests — a planned row with tests is the
+  signature of a status reality has overtaken.
+- After editing, run `python tools/features/export_feature_matrix.py` (the
+  committed `feature-matrix.json` must stay in sync) and
+  `python tools/features/check_feature_matrix.py`. CI enforces both via the
+  `feature_matrix_check` CTest.
+- For a judgement-level audit — overstatement, silent caveats, missing rows —
+  use the `feature-matrix-steward` agent. The CTest only checks mechanics.
+
+## GSN work
+
+Load the `gsn-expert` skill before implementing, reviewing, or reasoning about
+any GSN feature. GSN→SACM mappings are evidence-backed and recorded in
+`docs/sacm/sacm-gsn-mapping.md`; never invent one in code. Note that the canvas
+(`src/ui/gsn/`) and the SVG export (`src/export/`) are separate renderers with
+separate models — a decorator added to one is absent from the other.
+
 ## Key Constraints
 
 - **Keep `core` small.** Add to it only when behavior is reusable domain logic with no UI, file-dialog, or provider dependency. Do not add helpers there for a single `ui` or `app` caller.

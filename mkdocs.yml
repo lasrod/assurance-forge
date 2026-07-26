@@ -57,6 +57,7 @@ nav:
   - Home: index.md
   - Features:
     - Overview: features/index.md
+    - Capability Matrix: features/feature-matrix.md
     - Terminology Assist: features/terminology-assist.md
     - Confidence Panel Prototype: features/confidence-panel-prototype.md
     - MCP Server (planned): features/mcp-server.md

@@ -1,5 +1,6 @@
 #include "ui/register_views.h"
 
+#include "core/registers/register_model.h"
 #include "imgui.h"
 #include "ui/i18n/localization.h"
 
@@ -13,53 +14,21 @@
 namespace ui {
 namespace {
 
-struct CseMetadata {
-    std::string claim_owner;
-    std::string evidence_owner;
-    std::string safety_case_owner;
-    std::string claim_criteria;
-    std::string evidence_criteria;
-    std::string assessment_status = "Not Assessed";
-    std::string notes;
-};
-
-struct EvidenceMetadata {
-    std::string evidence_owner;
-    std::string type;
-    std::string recency;
-    std::string maturity;
-    std::string controlled_environment;
-    std::string notes;
-};
+using core::registers::CseMetadata;
+using core::registers::EvidenceMetadata;
 
 static std::vector<CseRegisterRow> g_cse_rows;
 static std::vector<EvidenceRegisterRow> g_evidence_rows;
 
-static std::unordered_map<std::string, CseMetadata> g_cse_metadata;
-static std::unordered_map<std::string, EvidenceMetadata> g_evidence_metadata;
-
-static bool IsClaimType(const std::string& t) {
-    return t == "claim";
-}
-
-static bool IsEvidenceType(const std::string& t) {
-    return t == "artifact" || t == "artifactreference" || t == "expression";
-}
-
-static std::string DisplayTextFor(const parser::SacmElement* e) {
-    if (!e)
-        return "";
-    if (!e->name.empty())
-        return e->name;
-    if (!e->content.empty())
-        return e->content;
-    if (!e->description.empty())
-        return e->description;
-    return e->id;
-}
-
-static std::string BuildCseId(const std::string& claim_id, const std::string& evidence_id) {
-    return std::string("CSE:") + claim_id + "->" + evidence_id;
+// Reads an assessment without creating one. `store.cse[id]` would insert a
+// default entry for every derived row, which would then be written to the
+// project — turning "nobody has assessed this yet" into a stored row claiming
+// "Not Assessed", and later into a phantom orphan once the argument changes.
+template <typename MetadataT>
+static const MetadataT& StoredOrDefault(const std::map<std::string, MetadataT>& assessments, const std::string& id) {
+    static const MetadataT kUnassessed{};
+    const auto found = assessments.find(id);
+    return found == assessments.end() ? kUnassessed : found->second;
 }
 
 static bool EditCellText(const char* id, std::string& value, int max_len = 512) {
@@ -77,7 +46,7 @@ static bool EditCellText(const char* id, std::string& value, int max_len = 512) 
     return changed;
 }
 
-static void DrawAssessmentStatusCell(std::string& status) {
+static bool DrawAssessmentStatusCell(std::string& status) {
     static const char* kStatuses[] = {
         "Not Assessed",
         "Adequately Supported",
@@ -92,23 +61,47 @@ static void DrawAssessmentStatusCell(std::string& status) {
         }
     }
 
+    bool changed = false;
     ImGui::SetNextItemWidth(-FLT_MIN);
     if (ImGui::BeginCombo("##assessment_status", kStatuses[idx])) {
         for (int i = 0; i < 3; ++i) {
             bool selected = (i == idx);
-            if (ImGui::Selectable(kStatuses[i], selected)) {
+            if (ImGui::Selectable(kStatuses[i], selected) && !selected) {
                 status = kStatuses[i];
+                changed = true;
             }
             if (selected)
                 ImGui::SetItemDefaultFocus();
         }
         ImGui::EndCombo();
     }
+    return changed;
+}
+
+static void StoreCseRow(core::registers::RegisterStore& store, const CseRegisterRow& row) {
+    CseMetadata& metadata = store.cse[row.cse_id];
+    metadata.claim_owner = row.claim_owner;
+    metadata.evidence_owner = row.evidence_owner;
+    metadata.safety_case_owner = row.safety_case_owner;
+    metadata.claim_criteria = row.claim_criteria;
+    metadata.evidence_criteria = row.evidence_criteria;
+    metadata.assessment_status = row.assessment_status;
+    metadata.notes = row.notes;
+}
+
+static void StoreEvidenceRow(core::registers::RegisterStore& store, const EvidenceRegisterRow& row) {
+    EvidenceMetadata& metadata = store.evidence[row.evidence_id];
+    metadata.evidence_owner = row.evidence_owner;
+    metadata.type = row.type;
+    metadata.recency = row.recency;
+    metadata.maturity = row.maturity;
+    metadata.controlled_environment = row.controlled_environment;
+    metadata.notes = row.notes;
 }
 
 } // namespace
 
-void RebuildRegisterViews(const parser::AssuranceCase* ac) {
+void RebuildRegisterViews(const parser::AssuranceCase* ac, const core::registers::RegisterStore& store) {
     g_cse_rows.clear();
     g_evidence_rows.clear();
 
@@ -122,84 +115,26 @@ void RebuildRegisterViews(const parser::AssuranceCase* ac) {
         by_id[elem.id] = &elem;
     }
 
-    std::set<std::pair<std::string, std::string>> claim_evidence_links;
-    std::set<std::string> evidence_ids;
+    auto find_element = [&by_id](const std::string& id) -> const parser::SacmElement* {
+        auto found = by_id.find(id);
+        return found == by_id.end() ? nullptr : found->second;
+    };
 
-    for (const auto& elem : ac->elements) {
-        if (IsEvidenceType(elem.type)) {
-            evidence_ids.insert(elem.id);
-        }
+    // Structure comes from core::registers, which is where it is tested; this
+    // function only joins it to what the user typed and hands the result to
+    // the table renderers below. Both collections arrive sorted.
+    const std::vector<core::registers::CseLink> links = core::registers::DeriveCseLinks(*ac);
+    const std::vector<std::string> evidence_ids = core::registers::DeriveEvidenceIds(*ac);
 
-        if (elem.type != "assertedevidence") {
-            continue;
-        }
-
-        std::vector<std::string> claim_ids;
-        std::vector<std::string> local_evidence_ids;
-
-        auto collect_ref = [&](const std::string& id) {
-            auto it = by_id.find(id);
-            if (it == by_id.end() || !it->second)
-                return;
-            const auto* ref = it->second;
-            if (IsClaimType(ref->type)) {
-                claim_ids.push_back(id);
-            } else if (IsEvidenceType(ref->type)) {
-                local_evidence_ids.push_back(id);
-            }
-        };
-
-        for (const auto& id : elem.source_refs)
-            collect_ref(id);
-        for (const auto& id : elem.target_refs)
-            collect_ref(id);
-
-        std::sort(claim_ids.begin(), claim_ids.end());
-        claim_ids.erase(std::unique(claim_ids.begin(), claim_ids.end()), claim_ids.end());
-        std::sort(local_evidence_ids.begin(), local_evidence_ids.end());
-        local_evidence_ids.erase(std::unique(local_evidence_ids.begin(), local_evidence_ids.end()),
-                                 local_evidence_ids.end());
-
-        for (const auto& claim_id : claim_ids) {
-            for (const auto& evidence_id : local_evidence_ids) {
-                claim_evidence_links.insert({claim_id, evidence_id});
-                evidence_ids.insert(evidence_id);
-            }
-        }
-    }
-
-    std::unordered_map<std::string, int> used_count;
-    for (const auto& link : claim_evidence_links) {
-        used_count[link.second] += 1;
-    }
-
-    for (const auto& link : claim_evidence_links) {
-        const std::string& claim_id = link.first;
-        const std::string& evidence_id = link.second;
-
-        const parser::SacmElement* claim_elem = nullptr;
-        const parser::SacmElement* evidence_elem = nullptr;
-
-        auto claim_it = by_id.find(claim_id);
-        if (claim_it != by_id.end())
-            claim_elem = claim_it->second;
-
-        auto evidence_it = by_id.find(evidence_id);
-        if (evidence_it != by_id.end())
-            evidence_elem = evidence_it->second;
-
+    for (const core::registers::CseLink& link : links) {
         CseRegisterRow row;
-        row.cse_id = BuildCseId(claim_id, evidence_id);
-        row.claim_id = claim_id;
-        row.claim = DisplayTextFor(claim_elem);
-        row.evidence_id = evidence_id;
-        row.evidence = DisplayTextFor(evidence_elem);
+        row.cse_id = core::registers::MakeCseId(link.claim_id, link.evidence_id);
+        row.claim_id = link.claim_id;
+        row.claim = core::registers::DisplayTextFor(find_element(link.claim_id));
+        row.evidence_id = link.evidence_id;
+        row.evidence = core::registers::DisplayTextFor(find_element(link.evidence_id));
 
-        CseMetadata& meta = g_cse_metadata[row.cse_id];
-        if (meta.assessment_status.empty()) {
-            meta.assessment_status = "Not Assessed";
-        }
-
+        const CseMetadata& meta = StoredOrDefault(store.cse, row.cse_id);
         row.claim_owner = meta.claim_owner;
         row.evidence_owner = meta.evidence_owner;
         row.safety_case_owner = meta.safety_case_owner;
@@ -211,24 +146,13 @@ void RebuildRegisterViews(const parser::AssuranceCase* ac) {
         g_cse_rows.push_back(std::move(row));
     }
 
-    std::sort(g_cse_rows.begin(), g_cse_rows.end(), [](const CseRegisterRow& a, const CseRegisterRow& b) {
-        if (a.claim_id == b.claim_id)
-            return a.evidence_id < b.evidence_id;
-        return a.claim_id < b.claim_id;
-    });
-
-    for (const auto& evidence_id : evidence_ids) {
-        const parser::SacmElement* evidence_elem = nullptr;
-        auto it = by_id.find(evidence_id);
-        if (it != by_id.end())
-            evidence_elem = it->second;
-
+    for (const std::string& evidence_id : evidence_ids) {
         EvidenceRegisterRow row;
         row.evidence_id = evidence_id;
-        row.evidence = DisplayTextFor(evidence_elem);
-        row.used_by_cse_count = used_count[evidence_id];
+        row.evidence = core::registers::DisplayTextFor(find_element(evidence_id));
+        row.used_by_cse_count = core::registers::CountCseUses(links, evidence_id);
 
-        EvidenceMetadata& meta = g_evidence_metadata[row.evidence_id];
+        const EvidenceMetadata& meta = StoredOrDefault(store.evidence, row.evidence_id);
         row.evidence_owner = meta.evidence_owner;
         row.type = meta.type;
         row.recency = meta.recency;
@@ -238,10 +162,6 @@ void RebuildRegisterViews(const parser::AssuranceCase* ac) {
 
         g_evidence_rows.push_back(std::move(row));
     }
-
-    std::sort(g_evidence_rows.begin(),
-              g_evidence_rows.end(),
-              [](const EvidenceRegisterRow& a, const EvidenceRegisterRow& b) { return a.evidence_id < b.evidence_id; });
 }
 
 size_t GetCseRegisterRowCount() {
@@ -252,17 +172,17 @@ size_t GetEvidenceRegisterRowCount() {
     return g_evidence_rows.size();
 }
 
-void ShowCseRegisterView() {
+bool ShowCseRegisterView(core::registers::RegisterStore& store) {
     if (g_cse_rows.empty()) {
         ImGui::TextDisabled("%s", AF_TR("No CSE rows were derived from direct claim-evidence relations.").c_str());
-        return;
+        return false;
     }
 
     ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
                             ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
 
     if (!ImGui::BeginTable("cse_register_table", 12, flags)) {
-        return;
+        return false;
     }
 
     ImGui::TableSetupScrollFreeze(2, 1);
@@ -280,9 +200,10 @@ void ShowCseRegisterView() {
     ImGui::TableSetupColumn(AF_TR("Notes").c_str());
     ImGui::TableHeadersRow();
 
+    bool edited = false;
     for (auto& row : g_cse_rows) {
         ImGui::PushID(row.cse_id.c_str());
-        CseMetadata& meta = g_cse_metadata[row.cse_id];
+        bool row_edited = false;
 
         ImGui::TableNextRow();
 
@@ -302,51 +223,49 @@ void ShowCseRegisterView() {
         ImGui::TextUnformatted(row.evidence.c_str());
 
         ImGui::TableSetColumnIndex(5);
-        EditCellText("##claim_owner", row.claim_owner);
+        row_edited |= EditCellText("##claim_owner", row.claim_owner);
 
         ImGui::TableSetColumnIndex(6);
-        EditCellText("##evidence_owner", row.evidence_owner);
+        row_edited |= EditCellText("##evidence_owner", row.evidence_owner);
 
         ImGui::TableSetColumnIndex(7);
-        EditCellText("##safety_case_owner", row.safety_case_owner);
+        row_edited |= EditCellText("##safety_case_owner", row.safety_case_owner);
 
         ImGui::TableSetColumnIndex(8);
-        EditCellText("##claim_criteria", row.claim_criteria, 1024);
+        row_edited |= EditCellText("##claim_criteria", row.claim_criteria, 1024);
 
         ImGui::TableSetColumnIndex(9);
-        EditCellText("##evidence_criteria", row.evidence_criteria, 1024);
+        row_edited |= EditCellText("##evidence_criteria", row.evidence_criteria, 1024);
 
         ImGui::TableSetColumnIndex(10);
-        DrawAssessmentStatusCell(row.assessment_status);
+        row_edited |= DrawAssessmentStatusCell(row.assessment_status);
 
         ImGui::TableSetColumnIndex(11);
-        EditCellText("##notes", row.notes, 1024);
+        row_edited |= EditCellText("##notes", row.notes, 1024);
 
-        meta.claim_owner = row.claim_owner;
-        meta.evidence_owner = row.evidence_owner;
-        meta.safety_case_owner = row.safety_case_owner;
-        meta.claim_criteria = row.claim_criteria;
-        meta.evidence_criteria = row.evidence_criteria;
-        meta.assessment_status = row.assessment_status;
-        meta.notes = row.notes;
+        if (row_edited) {
+            StoreCseRow(store, row);
+            edited = true;
+        }
 
         ImGui::PopID();
     }
 
     ImGui::EndTable();
+    return edited;
 }
 
-void ShowEvidenceRegisterView() {
+bool ShowEvidenceRegisterView(core::registers::RegisterStore& store) {
     if (g_evidence_rows.empty()) {
         ImGui::TextDisabled("%s", AF_TR("No evidence/work-product rows were derived from the model.").c_str());
-        return;
+        return false;
     }
 
     ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
                             ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
 
     if (!ImGui::BeginTable("evidence_register_table", 9, flags)) {
-        return;
+        return false;
     }
 
     ImGui::TableSetupScrollFreeze(2, 1);
@@ -361,9 +280,10 @@ void ShowEvidenceRegisterView() {
     ImGui::TableSetupColumn(AF_TR("Notes").c_str());
     ImGui::TableHeadersRow();
 
+    bool edited = false;
     for (auto& row : g_evidence_rows) {
         ImGui::PushID(row.evidence_id.c_str());
-        EvidenceMetadata& meta = g_evidence_metadata[row.evidence_id];
+        bool row_edited = false;
 
         ImGui::TableNextRow();
 
@@ -374,37 +294,36 @@ void ShowEvidenceRegisterView() {
         ImGui::TextUnformatted(row.evidence.c_str());
 
         ImGui::TableSetColumnIndex(2);
-        EditCellText("##evidence_owner", row.evidence_owner);
+        row_edited |= EditCellText("##evidence_owner", row.evidence_owner);
 
         ImGui::TableSetColumnIndex(3);
-        EditCellText("##type", row.type);
+        row_edited |= EditCellText("##type", row.type);
 
         ImGui::TableSetColumnIndex(4);
-        EditCellText("##recency", row.recency);
+        row_edited |= EditCellText("##recency", row.recency);
 
         ImGui::TableSetColumnIndex(5);
-        EditCellText("##maturity", row.maturity);
+        row_edited |= EditCellText("##maturity", row.maturity);
 
         ImGui::TableSetColumnIndex(6);
-        EditCellText("##controlled_environment", row.controlled_environment);
+        row_edited |= EditCellText("##controlled_environment", row.controlled_environment);
 
         ImGui::TableSetColumnIndex(7);
         ImGui::Text("%d", row.used_by_cse_count);
 
         ImGui::TableSetColumnIndex(8);
-        EditCellText("##notes", row.notes, 1024);
+        row_edited |= EditCellText("##notes", row.notes, 1024);
 
-        meta.evidence_owner = row.evidence_owner;
-        meta.type = row.type;
-        meta.recency = row.recency;
-        meta.maturity = row.maturity;
-        meta.controlled_environment = row.controlled_environment;
-        meta.notes = row.notes;
+        if (row_edited) {
+            StoreEvidenceRow(store, row);
+            edited = true;
+        }
 
         ImGui::PopID();
     }
 
     ImGui::EndTable();
+    return edited;
 }
 
 } // namespace ui

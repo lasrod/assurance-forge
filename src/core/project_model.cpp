@@ -18,6 +18,8 @@ const char* ProjectFileRoleToString(ProjectFileRole role) {
         return "af.evidenceRegister";
     case ProjectFileRole::J3377CaeRegister:
         return "af.j3377CaeRegister";
+    case ProjectFileRole::RegisterAssessments:
+        return "af.registerAssessments";
     case ProjectFileRole::ReviewItems:
         return "af.reviewItems";
     case ProjectFileRole::ReviewProposal:
@@ -42,6 +44,8 @@ const char* ProjectFileRoleToDisplayString(ProjectFileRole role) {
         return "Evidence Register";
     case ProjectFileRole::J3377CaeRegister:
         return "J3377 CAE Register";
+    case ProjectFileRole::RegisterAssessments:
+        return "Register Assessments";
     case ProjectFileRole::ReviewItems:
         return "Review Items";
     case ProjectFileRole::ReviewProposal:
@@ -65,6 +69,8 @@ ProjectFileRole ProjectFileRoleFromString(const std::string& value) {
         return ProjectFileRole::EvidenceRegister;
     if (value == "af.j3377CaeRegister")
         return ProjectFileRole::J3377CaeRegister;
+    if (value == "af.registerAssessments")
+        return ProjectFileRole::RegisterAssessments;
     if (value == "af.reviewItems")
         return ProjectFileRole::ReviewItems;
     if (value == "af.reviewProposal")

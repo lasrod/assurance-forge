@@ -740,3 +740,75 @@ TEST(ElementFactoryRemove, RemovalPlannerIgnoresDanglingReasoningAndSourceRefs) 
     EXPECT_FALSE(plan.count("MISSING_REASONING"));
     EXPECT_FALSE(plan.count("MISSING_SOURCE"));
 }
+
+// ===== AF-GSN-012: the GSN element identifier contract =====
+//
+// GSN v3 makes the element identifier mandatory, and the diagram shows it on
+// every node. In this codebase the identifier *is* the element's storage id, so
+// these tests pin the three properties users depend on: the identifier follows
+// the GSN prefix convention for its node type, it is unique within the case,
+// and it reaches the label the canvas and the SVG export both render.
+
+TEST(ElementIdentifierTest, NewElementsGetGsnConventionalPrefixes) {
+    MiniCase mc = MakeRootGoalCase();
+    std::string err;
+
+    std::string goal_id;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1", core::NewElementKind::Goal, goal_id, err)) << err;
+    std::string solution_id;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1", core::NewElementKind::Solution, solution_id, err)) << err;
+
+    EXPECT_EQ(goal_id.rfind("G", 0), 0u) << "goal identifier was '" << goal_id << "'";
+    EXPECT_EQ(solution_id.rfind("Sn", 0), 0u) << "solution identifier was '" << solution_id << "'";
+}
+
+TEST(ElementIdentifierTest, IdentifiersAreUniqueWithinTheCase) {
+    MiniCase mc = MakeRootGoalCase();
+    std::string err;
+
+    std::vector<std::string> minted;
+    for (int i = 0; i < 5; ++i) {
+        std::string id;
+        ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1", core::NewElementKind::Goal, id, err)) << err;
+        minted.push_back(id);
+    }
+
+    std::sort(minted.begin(), minted.end());
+    EXPECT_EQ(std::adjacent_find(minted.begin(), minted.end()), minted.end())
+        << "two elements were minted the same identifier";
+    // The seeded G1 must not be reused either.
+    EXPECT_EQ(std::find(minted.begin(), minted.end(), "G1"), minted.end());
+}
+
+TEST(ElementIdentifierTest, PlannedIdMatchesTheIdActuallyMinted) {
+    // Audit payloads record the planned id, so a divergence here would write an
+    // event naming an element that does not exist.
+    MiniCase mc = MakeRootGoalCase();
+    std::string err;
+    std::string planned_element;
+    std::string planned_relationship;
+    ASSERT_TRUE(core::PlanChildElementIds(mc.ac, &mc.pkg, "G1", core::NewElementKind::Goal, planned_element,
+                                          planned_relationship, err))
+        << err;
+
+    std::string actual;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1", core::NewElementKind::Goal, actual, err)) << err;
+    EXPECT_EQ(actual, planned_element);
+}
+
+TEST(ElementIdentifierTest, IdentifierIsRenderedInTheNodeLabel) {
+    MiniCase mc = MakeRootGoalCase();
+    std::string err;
+    std::string goal_id;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1", core::NewElementKind::Goal, goal_id, err)) << err;
+
+    const core::AssuranceTree tree = core::AssuranceTree::Build(mc.ac, "ja");
+    const core::TreeNode* node = nullptr;
+    for (const auto& owned : tree.nodes) {
+        if (owned->id == goal_id)
+            node = owned.get();
+    }
+    ASSERT_NE(node, nullptr);
+    EXPECT_EQ(node->label.rfind(goal_id + ":", 0), 0u)
+        << "identifier missing from the rendered label: '" << node->label << "'";
+}

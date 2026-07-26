@@ -366,9 +366,11 @@ void ModalHost::RenderCreateProjectModal() {
                                                       state_.project_controller->project_parent_buf)) {
                 state_.document_dirty = false;
                 state_.review_controller->ClearDirty();
+                state_.confidence_controller->ClearDirty();
+                state_.register_controller->ClearDirty();
                 if (state_.app_state.current_project.has_value()) {
                     state_.proposal_controller->manager.SetProjectRoot(state_.app_state.current_project->rootPath);
-                    callbacks_.ensure_review_item_storage();
+                    callbacks_.ensure_project_side_storage();
                 }
                 callbacks_.open_first_project_sacm_file();
                 callbacks_.touch_current_project_recent();
