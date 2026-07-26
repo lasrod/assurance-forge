@@ -97,9 +97,15 @@ bool AppRuntime::Undo() {
         return false;
     }
 
+    // The reconstructed DOCUMENT is handed over too, so the undo is
+    // library-primary: the prior document becomes the live one and the bus
+    // serializes it, preserving the unknown/foreign content no projection can
+    // carry. The views come along for the legacy path (a context with no
+    // library document).
     core::commands::UndoLastTransactionCommand cmd(
         target.target_sequence, target.target_command_name,
-        std::move(prior.value().model), std::move(prior.value().package));
+        std::move(prior.value().views.model), std::move(prior.value().views.package),
+        std::move(prior.value().document));
 
     const auto outcome = commands::DispatchAuditedCommand(state, cmd);
     if (!outcome.success) {

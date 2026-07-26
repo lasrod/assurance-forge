@@ -46,8 +46,6 @@ namespace {
 struct ReconstructionCache {
     std::filesystem::path project_root;
     std::optional<std::uint64_t> sequence;
-    std::size_t element_count = 0;
-    std::string canonical_hash;
     std::string error;
     bool valid = false;
     bool has_state = false;
@@ -166,10 +164,10 @@ void RefreshReconstruction(ReconstructionCache& cache,
         cache.valid = true;
         return;
     }
-    cache.element_count = state->model.elements.size();
-    cache.canonical_hash = core::audit::CanonicalModelHash(state->package);
-    cache.tree = ui::gsn::BuildAssuranceTree(state->model, ui::GetUiState().active_secondary_lang);
-    cache.state = std::move(*state);
+    cache.tree = ui::gsn::BuildAssuranceTree(state->views.model, ui::GetUiState().active_secondary_lang);
+    // The reconstructed document is not kept: the historical canvas renders from
+    // the derived views. Undo is the caller that needs the document itself.
+    cache.state = std::move(state->views);
     cache.has_state = true;
     cache.valid = true;
 }

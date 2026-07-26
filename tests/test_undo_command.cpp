@@ -52,6 +52,22 @@ constexpr const char* kSampleSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
 </sacm:AssuranceCasePackage>
 )";
 
+// The same case carrying a vendor element in a foreign namespace. A tolerant
+// library load PRESERVES it (SACM23-COMPAT-001); `sacm::AssuranceCasePackage`
+// has no field for it, so anything routed through the POD drops it without
+// trace. This is what separates a library-primary undo from a legacy one.
+constexpr const char* kVendorExtendedSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation"
+    xmlns:acme="http://acme.example/toolchain" id="AC1" name="Sample">
+  <acme:vendorMetadata reviewCycle="Q3-2026"/>
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+
+constexpr std::string_view kVendorElementMarker = "vendorMetadata";
+
 std::filesystem::path MakeTempProjectRoot(const std::string& tag) {
     auto root = std::filesystem::temp_directory_path() /
                 ("af_undo_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
@@ -76,11 +92,11 @@ struct ProjectFixture {
     std::unique_ptr<sacm_adapter::LibraryDocument> document;
 };
 
-ProjectFixture MakeFixture(const std::string& tag) {
+ProjectFixture MakeFixture(const std::string& tag, const char* sacm_xml = kSampleSacm) {
     ProjectFixture f;
     const auto root = MakeTempProjectRoot(tag);
     const std::filesystem::path sacm_rel = "argument.sacm";
-    WriteFile(root / sacm_rel, kSampleSacm);
+    WriteFile(root / sacm_rel, sacm_xml);
 
     f.project.id       = "p";
     f.project.name     = "Project";
@@ -99,7 +115,7 @@ ProjectFixture MakeFixture(const std::string& tag) {
     auto pkg    = sacm::parse_sacm(f.sacm_abs.string());
     EXPECT_TRUE(pkg.has_value());
     f.package   = std::move(pkg.value());
-    auto parsed = parser::parse_sacm_xml_string(kSampleSacm);
+    auto parsed = parser::parse_sacm_xml_string(sacm_xml);
     EXPECT_TRUE(parsed.has_value());
     f.model     = std::move(parsed.value());
     return f;
@@ -107,8 +123,8 @@ ProjectFixture MakeFixture(const std::string& tag) {
 
 // The same project with its views derived from the library document the way
 // `AppState::load_file` derives them, so commands take the library-primary path.
-ProjectFixture MakeLibraryBackedFixture(const std::string& tag) {
-    ProjectFixture f = MakeFixture(tag);
+ProjectFixture MakeLibraryBackedFixture(const std::string& tag, const char* sacm_xml = kSampleSacm) {
+    ProjectFixture f = MakeFixture(tag, sacm_xml);
     sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
     EXPECT_TRUE(loaded.ok);
     EXPECT_NE(loaded.document, nullptr);
@@ -158,23 +174,27 @@ std::string ReadFile(const std::filesystem::path& path) {
 }
 
 // Execute Undo on the given bus, mirroring the orchestration in
-// `AppRuntime::Undo()` but without the AppRuntime / UI dependencies.
-bool DoUndo(core::commands::CommandBus& bus, core::commands::CommandContext& ctx,
-            const core::AssuranceProject& project, std::string& error_out) {
+// `AppRuntime::Undo()` but without the AppRuntime / UI dependencies —
+// including handing the reconstructed DOCUMENT to the command (which is what
+// makes the undo library-primary) and the frame-boundary re-derive that
+// follows a flipped command.
+bool DoUndo(ProjectFixture& f, core::commands::CommandBus& bus, core::commands::CommandContext& ctx,
+            std::string& error_out) {
     const auto& transactions = bus.Store().Transactions();
     const auto  target       = core::audit::FindUndoTarget(transactions);
     if (!target.has_target) {
         error_out = "nothing to undo";
         return false;
     }
-    auto prior = core::audit::ReconstructAtSequence(project, target.target_sequence - 1);
+    auto prior = core::audit::ReconstructAtSequence(f.project, target.target_sequence - 1);
     if (!prior.has_value()) {
         error_out = prior.error();
         return false;
     }
     core::commands::UndoLastTransactionCommand cmd(
         target.target_sequence, target.target_command_name,
-        std::move(prior.value().model), std::move(prior.value().package));
+        std::move(prior.value().views.model), std::move(prior.value().views.package),
+        std::move(prior.value().document));
     const auto result = bus.Execute(cmd, ctx, "tester");
     if (!result.success) {
         error_out = result.error;
@@ -187,6 +207,8 @@ bool DoUndo(core::commands::CommandBus& bus, core::commands::CommandContext& ctx
         error_out = "bus reported a soft warning: " + result.error;
         return false;
     }
+    if (ctx.library_primary && f.document != nullptr)
+        core::RebuildDerivedViewsFromLibrary(*f.document, f.model, f.package);
     return true;
 }
 
@@ -226,7 +248,7 @@ TEST(UndoCommand, SACM23_LIB_002_UndoPreservesVendorTaggedValuesInTheSavedFile) 
     const int acp_tags_before = CountTaggedValuesWithKey(f.package, "assuranceForge.acp");
     ASSERT_GT(acp_tags_before, 0);
 
-    ASSERT_TRUE(DoUndo(*bus, ctx, f.project, error)) << error;
+    ASSERT_TRUE(DoUndo(f, *bus, ctx, error)) << error;
 
     // The undo did what it says: the last-added goal is gone.
     bool goal_survived = false;
@@ -244,6 +266,75 @@ TEST(UndoCommand, SACM23_LIB_002_UndoPreservesVendorTaggedValuesInTheSavedFile) 
         << "undo destroyed the Assurance Claim Point in the saved file";
     EXPECT_EQ(CountTaggedValuesWithKey(f.package, "assuranceForge.acp"), acp_tags_before)
         << "undo destroyed the Assurance Claim Point in the live package";
+}
+
+// What the library-primary routing buys over the legacy one: the reconstructed
+// DOCUMENT becomes the live document and the bus serializes IT, so content no
+// projection can carry -- unknown/foreign XML preserved by a tolerant load --
+// survives an undo. The legacy routing serializes a POD projection, which has
+// no field for it.
+//
+// The document is not rebuilt from the projection either: it was replayed from
+// the snapshot through the library, so it holds the preserved content of the
+// state being restored rather than of the state being replaced.
+TEST(UndoCommand, SACM23_LIB_002_LibraryPrimaryUndoPreservesUnknownVendorContent) {
+    auto f = MakeLibraryBackedFixture("vendor_xml", kVendorExtendedSacm);
+    ASSERT_NE(f.document, nullptr);
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package, f.document.get()};
+
+    // Non-vacuity: the snapshot the reconstruction replays from must itself
+    // carry the vendor content, or this test would pass on a technicality.
+    const std::filesystem::path snapshot =
+        core::audit::SnapshotSacmPath(f.project.rootPath, core::audit::kInitialSnapshotId);
+    ASSERT_NE(ReadFile(snapshot).find(kVendorElementMarker), std::string::npos)
+        << "the snapshot lost the vendor content before the undo path was even reached";
+
+    core::commands::CreateChildElementCommand add_goal("G1", core::NewElementKind::Goal);
+    RunCommand(f, *bus, add_goal, ctx);
+    ASSERT_NE(ReadFile(f.sacm_abs).find(kVendorElementMarker), std::string::npos)
+        << "the edit itself dropped the vendor content; this test cannot say anything about undo";
+
+    ASSERT_TRUE(DoUndo(f, *bus, ctx, error)) << error;
+    EXPECT_TRUE(ctx.library_primary) << "the undo did not take the library-primary path";
+
+    bool goal_survived = false;
+    for (const parser::SacmElement& element : f.model.elements) {
+        if (element.id == add_goal.GeneratedId())
+            goal_survived = true;
+    }
+    EXPECT_FALSE(goal_survived) << "undo did not take back the edit";
+    EXPECT_NE(ReadFile(f.sacm_abs).find(kVendorElementMarker), std::string::npos)
+        << "undo wrote a projection and erased the preserved vendor content";
+}
+
+// Undo is exempt from the `allow_library_primary` kill switch, and deliberately
+// so: for undo the two routings are inverted (see undo_command.h), so honouring
+// the switch would take the path that BOTH replaces the live views mid-dispatch
+// -- the hazard the switch exists to prevent -- and restores the wrong preserved
+// content, since the Stage-5 net adopts the compatibility content of the
+// outgoing document rather than of the state being restored.
+TEST(UndoCommand, SACM23_LIB_002_UndoStaysLibraryPrimaryUnderTheKillSwitch) {
+    auto f = MakeLibraryBackedFixture("kill_switch", kVendorExtendedSacm);
+    ASSERT_NE(f.document, nullptr);
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package, f.document.get()};
+    ctx.allow_library_primary = false;
+
+    core::commands::CreateChildElementCommand add_goal("G1", core::NewElementKind::Goal);
+    RunCommand(f, *bus, add_goal, ctx);
+    ASSERT_FALSE(ctx.library_primary) << "the kill switch did not force the EDIT onto the legacy path";
+
+    ASSERT_TRUE(DoUndo(f, *bus, ctx, error)) << error;
+    EXPECT_TRUE(ctx.library_primary) << "undo honoured the kill switch and took the lossy path";
+    EXPECT_NE(ReadFile(f.sacm_abs).find(kVendorElementMarker), std::string::npos)
+        << "undo under the kill switch erased the preserved vendor content";
 }
 
 TEST(UndoBoundary, ImplicitInitialSnapshotIsAlwaysTheFloor) {
@@ -325,7 +416,7 @@ TEST(UndoCommand, EmitsUndoEventAndRestoresPriorState) {
     const auto pre_undo_hash = core::audit::CanonicalModelHash(f.package);
 
     std::string undo_err;
-    ASSERT_TRUE(DoUndo(*bus, ctx, f.project, undo_err)) << undo_err;
+    ASSERT_TRUE(DoUndo(f, *bus, ctx, undo_err)) << undo_err;
 
     // The added strategy is gone from both model and package.
     for (const auto& e : f.model.elements) {
@@ -347,7 +438,7 @@ TEST(UndoCommand, EmitsUndoEventAndRestoresPriorState) {
     auto reconstructed = core::audit::ReconstructAtSequence(f.project, 0);
     ASSERT_TRUE(reconstructed.has_value()) << reconstructed.error();
     EXPECT_EQ(core::audit::CanonicalModelHash(f.package),
-              core::audit::CanonicalModelHash(reconstructed->package));
+              core::audit::CanonicalModelHash(reconstructed->views.package));
 }
 
 TEST(UndoCommand, ReplayerSkipsUndoneTransactions) {
@@ -365,14 +456,14 @@ TEST(UndoCommand, ReplayerSkipsUndoneTransactions) {
     ASSERT_TRUE(bus->Execute(add2, ctx, "tester").success);
 
     std::string undo_err;
-    ASSERT_TRUE(DoUndo(*bus, ctx, f.project, undo_err)) << undo_err; // undoes add2
+    ASSERT_TRUE(DoUndo(f, *bus, ctx, undo_err)) << undo_err; // undoes add2
     const auto live_hash = core::audit::CanonicalModelHash(f.package);
 
     // Replay from snapshot zero produces the same canonical hash.
     auto replayed = core::audit::ReconstructAtSequence(f.project,
                                                       std::numeric_limits<std::uint64_t>::max());
     ASSERT_TRUE(replayed.has_value()) << replayed.error();
-    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package), live_hash);
+    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->views.package), live_hash);
 }
 
 TEST(UndoCommand, TwoSuccessiveUndosWalkBackwards) {
@@ -390,8 +481,8 @@ TEST(UndoCommand, TwoSuccessiveUndosWalkBackwards) {
     ASSERT_TRUE(bus->Execute(add2, ctx, "tester").success);
 
     std::string undo_err;
-    ASSERT_TRUE(DoUndo(*bus, ctx, f.project, undo_err)) << undo_err; // undoes add2
-    ASSERT_TRUE(DoUndo(*bus, ctx, f.project, undo_err)) << undo_err; // undoes add1
+    ASSERT_TRUE(DoUndo(f, *bus, ctx, undo_err)) << undo_err; // undoes add2
+    ASSERT_TRUE(DoUndo(f, *bus, ctx, undo_err)) << undo_err; // undoes add1
 
     const auto& txs = bus->Store().Transactions();
     ASSERT_EQ(txs.size(), 4u);
@@ -404,7 +495,7 @@ TEST(UndoCommand, TwoSuccessiveUndosWalkBackwards) {
     auto original = core::audit::ReconstructAtSequence(f.project, 0);
     ASSERT_TRUE(original.has_value());
     EXPECT_EQ(core::audit::CanonicalModelHash(f.package),
-              core::audit::CanonicalModelHash(original->package));
+              core::audit::CanonicalModelHash(original->views.package));
 }
 
 TEST(UndoCommand, NothingToUndoOnFreshProject) {
