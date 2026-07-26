@@ -97,6 +97,64 @@ std::vector<std::filesystem::path> ConformingFixtures() {
 
 } // namespace
 
+// SACM23-INT-001 claims the POD projection is "field-complete and lossless".
+// The evidence behind that -- the Stage-3 parallel-load baseline -- compares the
+// library against the LEGACY PARSER over six Assurance Forge files, so it can
+// only speak for constructs those files contain, and they contain none of
+// clause 11's groups or artifact relationships. The claim was true over that
+// corpus and unproven beyond it.
+//
+// This measures the completeness half over conforming SACM 2.3 instead: every
+// element the library read must appear in `project_case`. The projection is
+// entitled to exactly two exclusions -- packages (containers, not drawn nodes)
+// and clause 8.7 utility elements (metadata carried ON elements) -- and this
+// fails if it quietly makes a third.
+//
+// Scope, stated because the INT-001 sentence overreached in exactly this way:
+// this proves ELEMENT completeness, not FIELD completeness. Per-field fidelity
+// is still only measured over the Stage-3 corpus.
+TEST(ProjectionCoverage, SACM23_INT_001_ProjectionEmitsEveryNonContainerElement) {
+    const std::vector<std::filesystem::path> fixtures = ConformingFixtures();
+    ASSERT_FALSE(fixtures.empty()) << "no conforming SACM 2.3 fixtures found";
+
+    std::size_t checked = 0;
+    std::set<std::string> covered_kinds;
+
+    for (const std::filesystem::path& fixture : fixtures) {
+        sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(fixture);
+        ASSERT_TRUE(loaded.ok) << fixture.filename().string();
+        ASSERT_NE(loaded.document, nullptr) << fixture.filename().string();
+
+        std::set<std::string> projected_ids;
+        for (const core::SacmElement& element : sacm_adapter::project_case(*loaded.document).elements)
+            projected_ids.insert(element.id);
+
+        for (const sacm_adapter::DocumentElement& element :
+             sacm_adapter::list_document_elements(*loaded.document)) {
+            // A fixture may legitimately contribute nothing -- vendor-extension-valid
+            // is packages plus preserved content -- so non-vacuity is checked over the
+            // corpus below rather than per file.
+            if (element.is_package || element.is_utility)
+                continue;
+            ++checked;
+            covered_kinds.insert(element.kind);
+            EXPECT_TRUE(projected_ids.count(element.id) > 0)
+                << fixture.filename().string() << ": the projection drops " << element.kind << " '"
+                << element.id << "', which is neither a package nor a utility element";
+        }
+    }
+
+    EXPECT_GT(checked, 0u) << "the sweep checked no elements at all";
+    // The whole point is reaching past the shapes Assurance Forge's own files
+    // contain. If the corpus stopped carrying these, the test would still pass
+    // while proving only what the Stage-3 baseline already proved.
+    for (const char* beyond_gsn : {"argumentgroup", "assertedartifactsupport", "terminologygroup"}) {
+        EXPECT_TRUE(covered_kinds.count(beyond_gsn) > 0)
+            << "the corpus no longer exercises '" << beyond_gsn
+            << "', so this test has stopped reaching beyond the Stage-3 corpus";
+    }
+}
+
 TEST(ProjectionCoverage, SACM23_LIB_002_BridgeRoundTripLosesOnlyTheKnownKinds) {
     const std::vector<std::filesystem::path> fixtures = ConformingFixtures();
     ASSERT_FALSE(fixtures.empty()) << "no conforming SACM 2.3 fixtures found; this test measures nothing";

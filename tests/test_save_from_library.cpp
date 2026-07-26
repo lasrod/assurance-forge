@@ -81,6 +81,19 @@ constexpr const char* kTamperedSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
 constexpr std::string_view kVendorAttributeMarker = "acme:owner";
 constexpr std::string_view kVendorElementMarker = "vendorMetadata";
 
+// A counter (dialectic challenge) relationship on an otherwise ordinary case:
+// `isCounter` is standard SACM 2.3 (clause 11.13), not a vendor tag, and it is
+// the shape `core::AddChallenge` produces.
+constexpr const char* kCounterArgumentSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+    <claim id="CG1" name="Counter goal" description="Braking distance exceeds the limit in rain."/>
+    <assertedInference id="R_counter" source="CG1" target="G1" isCounter="true"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+
 // Movable so a fixture can be returned by value; the moved-from instance clears
 // its path and therefore removes nothing.
 struct TempDir {
@@ -525,11 +538,12 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesUnknownContent) {
 // the saved bytes: the canonical hash is computed through the same projection on
 // both sides and cannot see it.
 TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesCounterRelationships) {
-    const std::string counter_case =
-        ReadFile(std::filesystem::path(AF_REPO_ROOT) / "libs" / "sacm" / "tests" / "data" / "sacm23" /
-                 "argumentation-full-valid.sacm.xmi");
-    ASSERT_FALSE(counter_case.empty());
-    ProjectFixture fixture = MakeProject("bridged-counter", counter_case.c_str());
+    // A counter relationship on a case the projection CAN represent -- the shape
+    // the application's own dialectic-challenge feature produces. (The library's
+    // argumentation-full fixture also carries one, but it carries an ArgumentGroup
+    // too, so the representability guard refuses edits on it and this test would
+    // measure the refusal instead of the flag.)
+    ProjectFixture fixture = MakeProject("bridged-counter", kCounterArgumentSacm);
 
     core::AppState state;
     ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
@@ -540,7 +554,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesCounterRelationships) {
 
     bool library_primary = false;
     const core::commands::CommandResult result =
-        RunBridgedRename(fixture, state, "claim_top", "Renamed top claim", library_primary);
+        RunBridgedRename(fixture, state, "G1", "Renamed top claim", library_primary);
     ASSERT_TRUE(result.success) << result.error;
     ASSERT_TRUE(library_primary)
         << "the rename did not take the bridged library-primary path; this test measures nothing";
@@ -550,6 +564,48 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesCounterRelationships) {
         << "a bridged rename cleared isCounter -- the rebuttal is now recorded as SUPPORTING the "
            "claim it was raised against";
     EXPECT_TRUE(Contains(autosaved, "Renamed top claim")) << autosaved;
+}
+
+// The projection the bridge round-trips through cannot express every SACM 2.3
+// element kind, and it is RELOADED over the live document rather than compared --
+// so an unrepresentable element is deleted, on a command that reaches disk.
+//
+// The bridge now REFUSES instead. Preserving would mean growing the legacy POD to
+// cover all of SACM 2.3 (a model this migration exists to retire) or new library
+// API to re-adopt typed elements across the round trip; failing the command turns
+// a silent corruption of a safety argument into a visible refusal, which is what
+// "never silently modify or reinterpret safety arguments" requires.
+//
+// Asserted on the saved bytes: the refusal is worth nothing if the file changed
+// anyway.
+TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditRefusesRatherThanDeleteUnrepresentableElements) {
+    const std::string full_case =
+        ReadFile(std::filesystem::path(AF_REPO_ROOT) / "libs" / "sacm" / "tests" / "data" / "sacm23" /
+                 "argumentation-full-valid.sacm.xmi");
+    ASSERT_FALSE(full_case.empty());
+    ProjectFixture fixture = MakeProject("bridged-unrepresentable", full_case.c_str());
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    // Non-vacuity: the case really does carry a kind the projection cannot hold.
+    const std::string before = ReadFile(fixture.sacm_absolute);
+    ASSERT_TRUE(Contains(before, "ArgumentGroup"))
+        << "fixture carries no unrepresentable element; this test measures nothing";
+
+    bool library_primary = false;
+    const core::commands::CommandResult result =
+        RunBridgedRename(fixture, state, "claim_top", "Renamed top claim", library_primary);
+
+    EXPECT_FALSE(result.success) << "the bridged edit was applied and deleted part of the case";
+    EXPECT_TRUE(Contains(result.error, "ArgumentGroup"))
+        << "the refusal does not say what would have been destroyed: " << result.error;
+
+    // The case is untouched -- a refusal that still rewrote the file would be the
+    // same data loss with a worse message.
+    EXPECT_EQ(ReadFile(fixture.sacm_absolute), before)
+        << "the refused edit still rewrote the tracked file";
 }
 
 TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesAcpTaggedValues) {
