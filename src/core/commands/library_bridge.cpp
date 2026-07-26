@@ -5,7 +5,82 @@
 #include "sacm_adapter/library_load.h"
 #include "sacm/sacm_serializer.h"
 
+#include <cstddef>
+#include <set>
+#include <string>
+#include <vector>
+
 namespace core::commands {
+
+namespace {
+
+// Every id the legacy `sacm::AssuranceCasePackage` can hold. Anything the
+// document contains that is NOT here is deleted by the projection round trip
+// below, because there is no field to put it in.
+void IndexRepresentedIds(const sacm::AssuranceCasePackage& package, std::set<std::string>& ids) {
+    const auto add = [&ids](const std::string& id) {
+        if (!id.empty())
+            ids.insert(id);
+    };
+    const auto index_terminology = [&](const sacm::TerminologyPackage& terminology) {
+        add(terminology.id);
+        for (const sacm::Category& category : terminology.categories) add(category.id);
+        for (const sacm::Expression& expression : terminology.expressions) add(expression.id);
+        for (const sacm::Term& term : terminology.terms) add(term.id);
+    };
+
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        add(argument_package.id);
+        for (const sacm::Claim& claim : argument_package.claims) add(claim.id);
+        for (const sacm::ArgumentReasoning& r : argument_package.argumentReasonings) add(r.id);
+        for (const sacm::ArtifactReference& r : argument_package.artifactReferences) add(r.id);
+        for (const sacm::AssertedInference& r : argument_package.assertedInferences) add(r.id);
+        for (const sacm::AssertedContext& r : argument_package.assertedContexts) add(r.id);
+        for (const sacm::AssertedEvidence& r : argument_package.assertedEvidences) add(r.id);
+        for (const sacm::TerminologyPackage& t : argument_package.terminologyPackages)
+            index_terminology(t);
+    }
+    for (const sacm::TerminologyPackage& terminology : package.terminologyPackages)
+        index_terminology(terminology);
+    for (const sacm::ArtifactPackage& artifact_package : package.artifactPackages) {
+        add(artifact_package.id);
+        for (const sacm::Artifact& artifact : artifact_package.artifacts) add(artifact.id);
+    }
+}
+
+// Human-readable summary of what this edit would destroy, or empty when the
+// projection accounts for every element in the document.
+//
+// SCOPE: element-level. `sacm_adapter::project_case` does not emit package
+// kinds, so a lost *package* (a nested ArgumentPackage) is not detected here.
+// That gap is disclosed on SACM23-LIB-002 rather than silently implied away.
+std::string DescribeUnrepresentableElements(const parser::AssuranceCase& model,
+                                            const sacm::AssuranceCasePackage& package) {
+    std::set<std::string> represented;
+    IndexRepresentedIds(package, represented);
+
+    std::vector<std::string> lost;
+    for (const parser::SacmElement& element : model.elements) {
+        if (represented.count(element.id) == 0)
+            lost.push_back(sacm_adapter::sacm_class_name_for_pod_type(element.type) + " '" +
+                           element.id + "'");
+    }
+    if (lost.empty())
+        return {};
+
+    constexpr std::size_t kMaxListed = 5;
+    std::string summary;
+    for (std::size_t i = 0; i < lost.size() && i < kMaxListed; ++i) {
+        if (!summary.empty())
+            summary += ", ";
+        summary += lost[i];
+    }
+    if (lost.size() > kMaxListed)
+        summary += " and " + std::to_string(lost.size() - kMaxListed) + " more";
+    return summary;
+}
+
+} // namespace
 
 bool BridgeLegacyMutationToLibrary(sacm_adapter::LibraryDocument& document,
                                    const LibraryBridgeMutator& mutate, std::string& error,
@@ -30,6 +105,37 @@ bool BridgeLegacyMutationToLibrary(sacm_adapter::LibraryDocument& document,
     // through `project_library_package` at the point of hashing, so both audit
     // sides still see the same collapsed view they always did.
     sacm::AssuranceCasePackage package = core::project_library_package_with_tags(document);
+
+    // REFUSE rather than silently delete. This projection is not compared, it is
+    // RELOADED over the live document, so anything the legacy package cannot
+    // express is gone -- and on a bridged command that reaches disk. Measured on
+    // conforming SACM 2.3: a single rename deleted an ArgumentGroup (11.2), an
+    // AssertedArtifactSupport (11.17) and an AssertedArtifactContext (11.18)
+    // with no diagnostic.
+    //
+    // Refusing is deliberate and is the smaller half of a choice. Preserving
+    // would mean either growing the legacy POD to cover all of SACM 2.3 -- a
+    // model this migration exists to retire -- or new library API to extract and
+    // re-adopt typed elements across the round trip. Failing the command turns a
+    // silent, unannounced corruption of a safety argument into a visible refusal,
+    // which is the trade this project makes everywhere else, and it is what the
+    // "never silently modify or reinterpret safety arguments" constraint
+    // requires. The real fix is retiring the bridge as commands go native.
+    //
+    // Cost, measured: none on ordinary cases. Every fixture in tests/data, and
+    // every argument in the repository's sample projects, projects completely.
+    // Only a document carrying one of the unrepresentable kinds is refused, and
+    // for those the alternative was losing the content.
+    if (const std::string unrepresentable = DescribeUnrepresentableElements(model, package);
+        !unrepresentable.empty()) {
+        error = "Refused: this edit goes through a conversion that cannot represent part of this "
+                "case, and applying it would delete " + unrepresentable +
+                ". The case is unchanged. This is a known gap in the legacy edit path "
+                "(SACM23-LIB-002); creating, deleting and challenging elements still work, as "
+                "they do not use it.";
+        return false;
+    }
+
     if (!mutate(model, package, error))
         return false;
     // ...and re-derive while KEEPING what the projection could not carry. The

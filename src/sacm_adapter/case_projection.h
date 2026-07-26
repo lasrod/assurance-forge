@@ -16,6 +16,8 @@
 #include "core/sacm_model.h"
 #include "sacm/sacm_model.h"
 
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace sacm_adapter {
@@ -23,6 +25,14 @@ namespace sacm_adapter {
 class LibraryDocument;
 
 core::AssuranceCase project_case(const LibraryDocument& document);
+
+// The SACM 2.3 class name for a POD `SacmElement::type`, which the projection
+// writes as the lowercased class name. Callers that put an element kind in front
+// of a user need the spec's spelling ("ArgumentGroup", not "argumentgroup") --
+// it is what the standard, the file and the diagnostics catalogue all use.
+// Returns `pod_type` unchanged when it matches no SACM class, so an extension or
+// dialect type still prints as something rather than nothing.
+std::string sacm_class_name_for_pod_type(std::string_view pod_type);
 
 // Phase 9 Stage 6: projects the library document's terminology and artifact
 // packages into the legacy structs the audit's canonical hash covers. The flat
