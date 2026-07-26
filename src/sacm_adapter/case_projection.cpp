@@ -214,6 +214,33 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
 
 } // namespace
 
+std::vector<DocumentElement> list_document_elements(const LibraryDocument& document) {
+    const sacm::model::Document& source = LibraryDocumentAccess::document(document);
+    std::vector<DocumentElement> elements;
+    source.for_each_element([&elements](const sacm::model::SACMElement& element) {
+        DocumentElement summary;
+        summary.id = element.id().value();
+        summary.kind = lowercase_kind_name(element.kind());
+        summary.is_package = sacm::metadata::is_package_kind(element.kind());
+        summary.is_utility = dynamic_cast<const sacm::model::UtilityElement*>(&element) != nullptr;
+        elements.push_back(std::move(summary));
+    });
+    return elements;
+}
+
+std::string sacm_class_name_for_pod_type(std::string_view pod_type) {
+    // The projection lowercases `sacm::metadata::kind_name`, so the inverse is a
+    // scan of the same table -- which keeps the two spellings from drifting and
+    // needs no second list to maintain.
+    for (int index = 0; index <= static_cast<int>(sacm::metadata::ElementKind::Property); ++index) {
+        const sacm::metadata::ElementKind kind = static_cast<sacm::metadata::ElementKind>(index);
+        if (lowercase_kind_name(kind) == pod_type) {
+            return std::string(sacm::metadata::kind_name(kind));
+        }
+    }
+    return std::string(pod_type);
+}
+
 core::AssuranceCase project_case(const LibraryDocument& document) {
     const sacm::model::Document& source = LibraryDocumentAccess::document(document);
 

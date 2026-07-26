@@ -169,6 +169,10 @@ void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sa
             inference.targets = element.target_refs;
             inference.reasoning = element.reasoning_ref;
             inference.assertionDeclaration = element.assertion_declaration;
+            // Clause 11.13. A dialectic challenge IS this flag; dropping it does not
+            // lose a decoration, it reverses the relationship's meaning -- a rebuttal
+            // comes back as support for the claim it attacks.
+            inference.isCounter = element.is_counter;
             argument_package.assertedInferences.push_back(std::move(inference));
         } else if (element.type == "assertedcontext") {
             sacm::AssertedContext context;
@@ -176,6 +180,7 @@ void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sa
             context.sources = element.source_refs;
             context.targets = element.target_refs;
             context.assertionDeclaration = element.assertion_declaration;
+            context.isCounter = element.is_counter;
             argument_package.assertedContexts.push_back(std::move(context));
         } else if (element.type == "assertedevidence") {
             sacm::AssertedEvidence evidence;
@@ -183,6 +188,7 @@ void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sa
             evidence.sources = element.source_refs;
             evidence.targets = element.target_refs;
             evidence.assertionDeclaration = element.assertion_declaration;
+            evidence.isCounter = element.is_counter;
             argument_package.assertedEvidences.push_back(std::move(evidence));
         }
     }
