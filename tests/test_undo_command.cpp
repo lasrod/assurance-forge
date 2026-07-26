@@ -21,19 +21,24 @@
 #include "core/audit/history_reconstruction.h"
 #include "core/audit/undo_boundary.h"
 #include "core/audit/undo_resolver.h"
+#include "core/commands/acp_commands.h"
 #include "core/commands/command_bus.h"
 #include "core/commands/element_commands.h"
 #include "core/commands/undo_command.h"
+#include "core/derived_views.h"
 #include "core/element_factory.h"
 #include "core/project_model.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_parser.h"
+#include "sacm_adapter/library_load.h"
 
 #include <gtest/gtest.h>
 
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <memory>
+#include <sstream>
 #include <string>
 #include <string_view>
 
@@ -66,6 +71,9 @@ struct ProjectFixture {
     std::filesystem::path      sacm_abs;
     sacm::AssuranceCasePackage package;
     parser::AssuranceCase      model;
+    // Null for the legacy-parsed fixture below; populated by the library-backed
+    // variant, which is how production always runs.
+    std::unique_ptr<sacm_adapter::LibraryDocument> document;
 };
 
 ProjectFixture MakeFixture(const std::string& tag) {
@@ -97,6 +105,53 @@ ProjectFixture MakeFixture(const std::string& tag) {
     return f;
 }
 
+// The same project with its views derived from the library document the way
+// `AppState::load_file` derives them, so commands take the library-primary path.
+ProjectFixture MakeLibraryBackedFixture(const std::string& tag) {
+    ProjectFixture f = MakeFixture(tag);
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
+    EXPECT_TRUE(loaded.ok);
+    EXPECT_NE(loaded.document, nullptr);
+    if (loaded.document == nullptr)
+        return f;
+    core::RebuildDerivedViewsFromLibrary(*loaded.document, f.model, f.package);
+    f.document = std::move(loaded.document);
+    return f;
+}
+
+// Mirror the app's frame boundary after a flipped command.
+void RunCommand(ProjectFixture& f, core::commands::CommandBus& bus, core::commands::ICommand& command,
+                core::commands::CommandContext& ctx) {
+    const core::commands::CommandResult result = bus.Execute(command, ctx, "tester");
+    ASSERT_TRUE(result.success) << result.error;
+    if (ctx.library_primary && f.document != nullptr)
+        core::RebuildDerivedViewsFromLibrary(*f.document, f.model, f.package);
+}
+
+int CountTaggedValuesWithKey(const sacm::AssuranceCasePackage& package, const std::string& key) {
+    int total = 0;
+    const auto count = [&](const std::vector<sacm::TaggedValue>& tags) {
+        for (const sacm::TaggedValue& tag : tags) {
+            if (tag.key.rfind(key, 0) == 0)
+                ++total;
+        }
+    };
+    for (const sacm::ArgumentPackage& ap : package.argumentPackages) {
+        count(ap.taggedValues);
+        for (const sacm::Claim& c : ap.claims) count(c.taggedValues);
+        for (const sacm::ArgumentReasoning& r : ap.argumentReasonings) count(r.taggedValues);
+        for (const sacm::ArtifactReference& r : ap.artifactReferences) count(r.taggedValues);
+    }
+    return total;
+}
+
+std::string ReadFile(const std::filesystem::path& path) {
+    std::ifstream in(path, std::ios::binary);
+    std::ostringstream buffer;
+    buffer << in.rdbuf();
+    return buffer.str();
+}
+
 // Execute Undo on the given bus, mirroring the orchestration in
 // `AppRuntime::Undo()` but without the AppRuntime / UI dependencies.
 bool DoUndo(core::commands::CommandBus& bus, core::commands::CommandContext& ctx,
@@ -124,6 +179,60 @@ bool DoUndo(core::commands::CommandBus& bus, core::commands::CommandContext& ctx
 }
 
 } // namespace
+
+// Undo replaces the live model and package wholesale and the bus SERIALIZES the
+// result, so whatever the reconstruction cannot carry is not merely missing from
+// a view -- it is written to the tracked file. Asserted on the saved BYTES: the
+// canonical hash drops vendor TaggedValues on both sides and is structurally
+// blind to this class of loss, which is why it went unnoticed.
+TEST(UndoCommand, SACM23_LIB_002_UndoPreservesVendorTaggedValuesInTheSavedFile) {
+    auto f = MakeLibraryBackedFixture("vendor_tags");
+    ASSERT_NE(f.document, nullptr);
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package, f.document.get()};
+
+    // A bare strategy carries a `strategyTarget` tag; an ACP on a solution
+    // carries several `assuranceForge.acp*` tags.
+    core::commands::CreateChildElementCommand add_strategy("G1", core::NewElementKind::Strategy);
+    RunCommand(f, *bus, add_strategy, ctx);
+    core::commands::CreateChildElementCommand add_solution("G1", core::NewElementKind::Solution);
+    RunCommand(f, *bus, add_solution, ctx);
+    core::commands::AddAcpCommand add_acp("element", add_solution.GeneratedId());
+    RunCommand(f, *bus, add_acp, ctx);
+    ASSERT_FALSE(add_acp.GeneratedAcpId().empty());
+
+    // One more edit, which is the one the undo takes back.
+    core::commands::CreateChildElementCommand add_goal("G1", core::NewElementKind::Goal);
+    RunCommand(f, *bus, add_goal, ctx);
+
+    const std::string before = ReadFile(f.sacm_abs);
+    ASSERT_NE(before.find("assuranceForge.gsn.strategyTarget"), std::string::npos);
+    ASSERT_NE(before.find("assuranceForge.acp"), std::string::npos);
+    const int acp_tags_before = CountTaggedValuesWithKey(f.package, "assuranceForge.acp");
+    ASSERT_GT(acp_tags_before, 0);
+
+    ASSERT_TRUE(DoUndo(*bus, ctx, f.project, error)) << error;
+
+    // The undo did what it says: the last-added goal is gone.
+    bool goal_survived = false;
+    for (const parser::SacmElement& element : f.model.elements) {
+        if (element.id == add_goal.GeneratedId())
+            goal_survived = true;
+    }
+    EXPECT_FALSE(goal_survived) << "undo did not take back the edit";
+
+    // ...and took nothing else with it.
+    const std::string after = ReadFile(f.sacm_abs);
+    EXPECT_NE(after.find("assuranceForge.gsn.strategyTarget"), std::string::npos)
+        << "undo stripped the strategy's target goal from the saved file";
+    EXPECT_NE(after.find("assuranceForge.acp"), std::string::npos)
+        << "undo destroyed the Assurance Claim Point in the saved file";
+    EXPECT_EQ(CountTaggedValuesWithKey(f.package, "assuranceForge.acp"), acp_tags_before)
+        << "undo destroyed the Assurance Claim Point in the live package";
+}
 
 TEST(UndoBoundary, ImplicitInitialSnapshotIsAlwaysTheFloor) {
     // Empty snapshot/baseline lists still pin the wall at sequence 0.

@@ -5,6 +5,7 @@
 #include "core/audit/audit_snapshot.h"
 #include "core/audit/event_replayer.h"
 #include "core/audit/event_store.h"
+#include "core/derived_views.h"
 #include "core/library_package_projection.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_parser.h"
@@ -47,9 +48,21 @@ std::expected<ReplayState, std::string> ReconstructAtSequence(const AssurancePro
     if (!replayed_document)
         return std::unexpected(std::move(replayed_document.error()));
 
+    // Derive the state exactly as `AppState::load_file` does. This is NOT a hash
+    // input: `UndoLastTransactionCommand` assigns it straight over the live model
+    // and package, which the command bus then serializes to the tracked file, and
+    // the history canvas renders from it. Projecting through
+    // `core::project_library_package` -- the AUDIT projection, whose own contract
+    // permits it to collapse packages and which never restores vendor
+    // TaggedValues -- meant an undo wrote back a document stripped of every ACP
+    // and every bare strategy's `strategyTarget`, with the confidence argument
+    // package merged into the main one. The canonical hash cannot see that: it
+    // re-projects through the tagless projection at hashing time, so the loss is
+    // dropped on both sides by construction. Same defect, same projection, as the
+    // one fixed in `core::commands::BridgeLegacyMutationToLibrary`; this site was
+    // missed because it is reached through the audit path rather than the edit one.
     ReplayState replayed;
-    replayed.model = sacm_adapter::project_case(**replayed_document);
-    replayed.package = core::project_library_package(**replayed_document);
+    core::RebuildDerivedViewsFromLibrary(**replayed_document, replayed.model, replayed.package);
 
     if (!argument_package_id.empty() || !argument_package_gid.empty()) {
         const sacm::ArgumentPackage* arg_pkg = core::FindArgumentPackageByIdentity(

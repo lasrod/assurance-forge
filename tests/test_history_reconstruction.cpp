@@ -3,19 +3,25 @@
 #include "core/audit/canonical_model_hash.h"
 #include "core/audit/event_replayer.h"
 #include "core/audit/history_reconstruction.h"
+#include "core/commands/acp_commands.h"
 #include "core/commands/command_bus.h"
 #include "core/commands/element_commands.h"
+#include "core/derived_views.h"
 #include "core/element_factory.h"
 #include "core/library_package_projection.h"
 #include "core/project_model.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_parser.h"
+#include "sacm_adapter/gsn_role_tag.h"
+#include "sacm_adapter/library_load.h"
 
 #include <gtest/gtest.h>
 
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <memory>
+#include <string>
 #include <string_view>
 
 namespace {
@@ -47,6 +53,9 @@ struct ProjectFixture {
     std::filesystem::path      sacm_abs;
     sacm::AssuranceCasePackage package;
     parser::AssuranceCase      model;
+    // Null for the legacy-parsed fixture below. The library-backed variant
+    // populates it, mirroring production where `AppState` always holds one.
+    std::unique_ptr<sacm_adapter::LibraryDocument> document;
 };
 
 ProjectFixture MakeFixture(const std::string& tag) {
@@ -76,6 +85,70 @@ ProjectFixture MakeFixture(const std::string& tag) {
     EXPECT_TRUE(parsed.has_value());
     f.model = std::move(parsed.value());
     return f;
+}
+
+// The same project, but with the views derived the way `AppState::load_file`
+// derives them and the library document retained — so commands take the
+// library-primary path they take in production.
+ProjectFixture MakeLibraryBackedFixture(const std::string& tag) {
+    ProjectFixture f = MakeFixture(tag);
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
+    EXPECT_TRUE(loaded.ok);
+    EXPECT_NE(loaded.document, nullptr);
+    if (loaded.document == nullptr)
+        return f;
+    core::RebuildDerivedViewsFromLibrary(*loaded.document, f.model, f.package);
+    f.document = std::move(loaded.document);
+    return f;
+}
+
+// Run a command through the bus and mirror the app's frame boundary: a flipped
+// command leaves the live views for `AppRuntime::RebuildDerivedViewsIfNeeded`,
+// and the next command plans its ids from them.
+void RunCommand(ProjectFixture& f, core::commands::CommandBus& bus, core::commands::ICommand& command,
+                core::commands::CommandContext& ctx) {
+    const core::commands::CommandResult result = bus.Execute(command, ctx, "tester");
+    ASSERT_TRUE(result.success) << result.error;
+    if (ctx.library_primary && f.document != nullptr)
+        core::RebuildDerivedViewsFromLibrary(*f.document, f.model, f.package);
+}
+
+int CountTaggedValuesWithKey(const sacm::AssuranceCasePackage& package, const std::string& key) {
+    int total = 0;
+    const auto count = [&](const std::vector<sacm::TaggedValue>& tags) {
+        for (const sacm::TaggedValue& tag : tags) {
+            if (tag.key.rfind(key, 0) == 0)
+                ++total;
+        }
+    };
+    for (const sacm::ArgumentPackage& ap : package.argumentPackages) {
+        count(ap.taggedValues);
+        for (const sacm::Claim& c : ap.claims) count(c.taggedValues);
+        for (const sacm::ArgumentReasoning& r : ap.argumentReasonings) count(r.taggedValues);
+        for (const sacm::ArtifactReference& r : ap.artifactReferences) count(r.taggedValues);
+    }
+    return total;
+}
+
+// Build the state the defect is about: a bare strategy (one `strategyTarget`
+// tag), a solution carrying an ACP (several `assuranceForge.acp*` tags), and
+// the ACP's confidence argument tree (a SECOND ArgumentPackage). Every one of
+// those is vendor TaggedValue content or package structure that the POD
+// projection cannot carry.
+void BuildVendorTagState(ProjectFixture& f, core::commands::CommandBus& bus,
+                         core::commands::CommandContext& ctx) {
+    core::commands::CreateChildElementCommand add_strategy("G1", core::NewElementKind::Strategy);
+    RunCommand(f, bus, add_strategy, ctx);
+
+    core::commands::CreateChildElementCommand add_solution("G1", core::NewElementKind::Solution);
+    RunCommand(f, bus, add_solution, ctx);
+
+    core::commands::AddAcpCommand add_acp("element", add_solution.GeneratedId());
+    RunCommand(f, bus, add_acp, ctx);
+    ASSERT_FALSE(add_acp.GeneratedAcpId().empty());
+
+    core::commands::CreateConfidenceArgumentTreeForAcpCommand add_tree(add_acp.GeneratedAcpId());
+    RunCommand(f, bus, add_tree, ctx);
 }
 
 } // namespace
@@ -151,6 +224,73 @@ TEST(HistoryReconstruction, ReconstructionAtLatestSequenceMatchesLiveCanonicalHa
     ASSERT_TRUE(reconstructed_hash.has_value());
     ASSERT_TRUE(live_hash.has_value());
     EXPECT_EQ(*reconstructed_hash, *live_hash);
+}
+
+// The reconstructed state is not a hash input -- `UndoLastTransactionCommand`
+// assigns it straight over the live model and package, which the bus then
+// SERIALIZES. So it has to be derived the way a load derives it, or an undo
+// writes a document stripped of everything the POD projection cannot carry:
+// every vendor TaggedValue (ACPs, a bare strategy's `strategyTarget`) and the
+// separate confidence ArgumentPackage, which the audit projection is entitled
+// to collapse.
+TEST(HistoryReconstruction, SACM23_LIB_002_ReconstructionPreservesVendorTaggedValues) {
+    auto f = MakeLibraryBackedFixture("vendor_tags");
+    ASSERT_NE(f.document, nullptr);
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package, f.document.get()};
+    BuildVendorTagState(f, *bus, ctx);
+
+    // What the live state carries, so the reconstruction is compared against a
+    // measured expectation rather than a guessed one.
+    const int live_strategy_tags =
+        CountTaggedValuesWithKey(f.package, sacm_adapter::kGsnStrategyTargetTagKey);
+    const int live_acp_tags = CountTaggedValuesWithKey(f.package, "assuranceForge.acp");
+    ASSERT_GT(live_strategy_tags, 0);
+    ASSERT_GT(live_acp_tags, 0);
+    ASSERT_EQ(f.package.argumentPackages.size(), 2u) << "the confidence tree did not get its own package";
+
+    auto state = core::audit::ReconstructAtSequence(f.project,
+                                                    std::numeric_limits<std::uint64_t>::max());
+    ASSERT_TRUE(state.has_value()) << state.error();
+
+    EXPECT_EQ(CountTaggedValuesWithKey(state->package, sacm_adapter::kGsnStrategyTargetTagKey),
+              live_strategy_tags)
+        << "a bare strategy would lose the goal it supports";
+    EXPECT_EQ(CountTaggedValuesWithKey(state->package, "assuranceForge.acp"), live_acp_tags)
+        << "every Assurance Claim Point would be destroyed";
+    EXPECT_EQ(state->package.argumentPackages.size(), f.package.argumentPackages.size())
+        << "the confidence argument package would be merged into the main one";
+}
+
+// The render passes a load applies must apply here too: the reconstructed model
+// feeds both the historical canvas and (through undo) the live one, and a bare
+// strategy with no synthesized placement renders detached from its goal.
+TEST(HistoryReconstruction, SACM23_LIB_002_ReconstructionCarriesBareStrategyPlacement) {
+    auto f = MakeLibraryBackedFixture("bare_strategy");
+    ASSERT_NE(f.document, nullptr);
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package, f.document.get()};
+
+    core::commands::CreateChildElementCommand add_strategy("G1", core::NewElementKind::Strategy);
+    RunCommand(f, *bus, add_strategy, ctx);
+    const std::string placement_id = add_strategy.GeneratedId() + "__pending_inference";
+
+    auto state = core::audit::ReconstructAtSequence(f.project,
+                                                    std::numeric_limits<std::uint64_t>::max());
+    ASSERT_TRUE(state.has_value()) << state.error();
+
+    bool found = false;
+    for (const parser::SacmElement& element : state->model.elements) {
+        if (element.id == placement_id)
+            found = true;
+    }
+    EXPECT_TRUE(found) << "reconstructed model lost the bare strategy's placement";
 }
 
 TEST(HistoryReconstruction, FailsForProjectWithoutAuditStore) {
