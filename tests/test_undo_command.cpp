@@ -124,6 +124,11 @@ void RunCommand(ProjectFixture& f, core::commands::CommandBus& bus, core::comman
                 core::commands::CommandContext& ctx) {
     const core::commands::CommandResult result = bus.Execute(command, ctx, "tester");
     ASSERT_TRUE(result.success) << result.error;
+    // The bus reports a lossy/degraded save as a SOFT warning: success stays
+    // true and `error` carries the diagnostic. A preservation test that ignored
+    // it could pass while the bus was announcing the very degradation the test
+    // exists to rule out.
+    ASSERT_TRUE(result.error.empty()) << "bus reported a soft warning: " << result.error;
     if (ctx.library_primary && f.document != nullptr)
         core::RebuildDerivedViewsFromLibrary(*f.document, f.model, f.package);
 }
@@ -173,6 +178,13 @@ bool DoUndo(core::commands::CommandBus& bus, core::commands::CommandContext& ctx
     const auto result = bus.Execute(cmd, ctx, "tester");
     if (!result.success) {
         error_out = result.error;
+        return false;
+    }
+    // A soft warning (success with a non-empty error) means the bus degraded
+    // the save; surface it as a failure here so a preservation assertion cannot
+    // pass over it.
+    if (!result.error.empty()) {
+        error_out = "bus reported a soft warning: " + result.error;
         return false;
     }
     return true;
