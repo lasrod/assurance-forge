@@ -15,7 +15,16 @@ bool UndoLastTransactionCommand::Apply(CommandContext& ctx,
     // to generate an inverse event-set. Instead, the audit log carries an
     // explicit `Undo` marker, and the replayer (event_replayer.cpp) is
     // aware of these markers and skips the transactions they cancel.
-    if (ctx.library_document != nullptr && ctx.allow_library_primary && prior_document_ != nullptr) {
+    // Deliberately NOT gated on `ctx.allow_library_primary`, unlike every other
+    // flipped command. That kill switch exists to stop a command replacing the
+    // live views wholesale mid-dispatch; for undo the routings are INVERTED --
+    // the library-primary path leaves the views alone and the legacy path is the
+    // one that replaces them. Honouring the switch here would therefore buy the
+    // hazard it exists to prevent, and pay for it twice: the legacy path also
+    // restores the WRONG preserved content, because the Stage-5 net re-derives
+    // the document from projection bytes and adopts the compatibility content of
+    // the outgoing (post-edit) document rather than of the state being restored.
+    if (ctx.library_document != nullptr && prior_document_ != nullptr) {
         // The reconstructed document BECOMES the live one. Move-assigning the
         // contained document keeps the wrapper's identity, so `AppState`'s
         // `unique_ptr` and every raw pointer into it (including `ctx`'s) stay
