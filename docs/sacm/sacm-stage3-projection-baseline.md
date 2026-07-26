@@ -10,6 +10,33 @@ list reaching zero.
 Nothing in the application depends on the library yet. The measurement comes
 first precisely so that migrating does not silently change what users see.
 
+## What this corpus can and cannot show
+
+The comparison is **library projection vs legacy parser**, over six Assurance
+Forge files. That bounds it twice over:
+
+1. The reference side is a GSN-shaped reader that cannot express most of
+   SACM 2.3, so pointing this test at richer files would produce a flood of
+   legacy-parser gaps rather than projection findings.
+2. The six files contain no `ArgumentGroup`, no `AssertedArtifactSupport` or
+   `AssertedArtifactContext`, and no `TerminologyGroup`.
+
+So "field-complete and lossless" is a statement **about this corpus**. It was
+written on the SACM23-INT-001 row without that qualifier, and the 2026-07-26
+round-2 verification of SACM23-LIB-002 falsified the general reading by
+measurement -- a bridged edit deleted exactly the constructs this corpus lacks.
+
+Element completeness beyond the corpus is now measured separately, against the
+document rather than against the legacy parser:
+`ProjectionCoverage.SACM23_INT_001_ProjectionEmitsEveryNonContainerElement`
+sweeps `libs/sacm/tests/data/sacm23/*-valid.sacm.xmi` and requires `project_case`
+to emit every element the library read, allowing only packages and clause-8.7
+utility elements to be omitted.
+
+**Field** completeness is still corpus-bound. Closing that needs a reference that
+is not the legacy parser -- comparing the projection's fields against the library
+model directly, rather than against a reader which cannot represent them.
+
 Test: `tests/test_sacm_library_parallel_load.cpp`
 Baseline: `tests/data/sacm_parallel_load_baseline.json`
 
