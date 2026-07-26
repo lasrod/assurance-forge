@@ -143,12 +143,29 @@ you lose them.**
 | `isPublic` | TaggedValue |
 | `isMany`, `isOptional` | *no SACM feature* |
 
-## Known limitation
+## Recording the original GSN type
 
-The importer currently resolves GSN types to their SACM supertypes **without
-recording which GSN type an element came from**, so `Goal`, `Assumption`, and
-`Justification` all become indistinguishable `Claim`s and no
-`assertionDeclaration` is applied. v2.2 states that a transformation *must* apply
-the appropriate declaration. Closing this needs the original type preserved —
-the reserved-TaggedValue pattern already used for `sacm.import.name` fits — and
-is tracked on `SACM23-COMPAT-002`.
+Resolving a GSN type to its SACM supertype is lossy — `Goal`, `Assumption` and
+`Justification` all land on `Claim`. Two mechanisms keep the distinction, both
+in `libs/sacm/src/io/xmi_reader.cpp` (`record_extension_origin`):
+
+1. **The original type is recorded** in a reserved TaggedValue with the key
+   `sacm.import.extensionType`, whose value is the namespace-qualified type in
+   Clark notation: `{http://scsc.acwg.gsn/2.0}Goal`. Qualified, because a
+   document may mix GSN revisions and a bare `Goal` would be ambiguous. This
+   follows the `sacm.import.name` / `sacm.import.assertionDeclaration`
+   convention (clause 8.12).
+2. **The declaration v2.2 requires is applied** — `Assumption`/`AwayAssumption`
+   → `assumed`, `Justification`/`AwayJustification` → `axiomatic` — but only
+   when the file did not state one. An explicit `assertionDeclaration` is more
+   specific than one inferred from the type and wins, the same rule the
+   `undeveloped` shorthand follows.
+
+Both survive save-and-reload. Note that a save **normalizes to SACM types**: the
+information round-trips, the GSN syntax does not. Re-emitting `xsi:type="gsn_:Goal"`
+would be a compatibility-save feature and is not implemented.
+
+Tests: `SACM23_COMPAT_002_OriginalGsnTypeIsRecordedOnImport`,
+`SACM23_COMPAT_002_GsnAssumptionAndJustificationAreNotPlainGoals`,
+`SACM23_COMPAT_002_RecordedGsnTypeSurvivesSaveAndReload`,
+`SACM23_COMPAT_002_ExplicitAssertionDeclarationBeatsTheGsnType`.

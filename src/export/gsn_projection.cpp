@@ -207,23 +207,154 @@ std::string EdgeId(const parser::SacmElement& relationship, const std::string& f
     return raw;
 }
 
-void AddEdge(GsnDiagram& diagram,
-             std::unordered_map<std::string, int>& id_counts,
-             std::vector<std::string>& warnings,
-             const parser::SacmElement& relationship,
-             const std::string& from_id,
-             const std::string& to_id,
-             GsnEdgeKind kind) {
+// Collects everything an edge needs to be created, named uniquely, and indexed
+// by the relationship it came from. The index exists so a GSN v3 challenge
+// aimed at a *relationship* can be pointed at the edge representing it.
+struct EdgeSink {
+    GsnDiagram& diagram;
+    std::unordered_map<std::string, int>& id_counts;
+    std::vector<std::string>& warnings;
+    std::unordered_map<std::string, std::vector<std::string>>& edge_ids_by_relationship;
+};
+
+void IndexEdgeByRelationship(EdgeSink& sink, const parser::SacmElement& relationship, const std::string& edge_id) {
+    for (const std::string& ref : {relationship.id, relationship.gid}) {
+        const std::string key = core::NormalizeRef(ref);
+        if (!key.empty())
+            sink.edge_ids_by_relationship[key].push_back(edge_id);
+    }
+}
+
+// Returns the id assigned to the new edge, or an empty string when the edge was
+// skipped.
+std::string AddEdge(EdgeSink& sink,
+                    const parser::SacmElement& relationship,
+                    const std::vector<std::string>& acp_labels,
+                    const std::string& from_id,
+                    const std::string& to_id,
+                    GsnEdgeKind kind) {
     if (from_id.empty() || to_id.empty()) {
-        warnings.push_back("Skipped relationship '" + DisplaySourceId(relationship) + "' with a missing endpoint.");
-        return;
+        sink.warnings.push_back("Skipped relationship '" + DisplaySourceId(relationship) +
+                                "' with a missing endpoint.");
+        return {};
     }
     GsnEdge edge;
-    edge.id = MakeUniqueSvgId(EdgeId(relationship, from_id, to_id), id_counts, warnings);
+    edge.id = MakeUniqueSvgId(EdgeId(relationship, from_id, to_id), sink.id_counts, sink.warnings);
+    const std::string assigned_id = edge.id;
     edge.from_id = from_id;
     edge.to_id = to_id;
     edge.kind = kind;
-    diagram.edges.push_back(std::move(edge));
+    edge.acp_labels = acp_labels;
+    sink.diagram.edges.push_back(std::move(edge));
+    IndexEdgeByRelationship(sink, relationship, assigned_id);
+    return assigned_id;
+}
+
+// A challenge whose target is another relationship. Drawn to that edge's
+// midpoint rather than to a node.
+void AddChallengeToEdge(EdgeSink& sink,
+                        const parser::SacmElement& relationship,
+                        const std::vector<std::string>& acp_labels,
+                        const std::string& from_id,
+                        const std::string& target_edge_id) {
+    GsnEdge edge;
+    edge.id = MakeUniqueSvgId(EdgeId(relationship, from_id, target_edge_id), sink.id_counts, sink.warnings);
+    const std::string assigned_id = edge.id;
+    edge.from_id = from_id;
+    edge.to_edge_id = target_edge_id;
+    edge.kind = GsnEdgeKind::Challenges;
+    edge.acp_labels = acp_labels;
+    sink.diagram.edges.push_back(std::move(edge));
+    IndexEdgeByRelationship(sink, relationship, assigned_id);
+}
+
+// Assurance Claim Points are held on the case rather than on the element, so
+// they are indexed once and attached to whatever they point at. `target_kind`
+// is "relationship" or "element"; the id may be either an id or a gid.
+std::unordered_map<std::string, std::vector<std::string>> BuildAcpLabelsByTarget(const parser::AssuranceCase& model,
+                                                                                 const std::string& target_kind) {
+    std::unordered_map<std::string, std::vector<std::string>> labels;
+    for (const parser::AcpRecord& acp : model.acps) {
+        if (acp.target_kind != target_kind)
+            continue;
+        const std::string key = core::NormalizeRef(acp.target_id);
+        if (key.empty() || acp.id.empty())
+            continue;
+        labels[key].push_back(acp.id);
+    }
+    for (auto& entry : labels)
+        std::sort(entry.second.begin(), entry.second.end());
+    return labels;
+}
+
+void AttachAcpLabels(std::vector<std::string>& target,
+                     const std::unordered_map<std::string, std::vector<std::string>>& labels_by_target,
+                     const std::string& primary_ref,
+                     const std::string& secondary_ref) {
+    for (const std::string& ref : {primary_ref, secondary_ref}) {
+        const std::string key = core::NormalizeRef(ref);
+        if (key.empty())
+            continue;
+        auto it = labels_by_target.find(key);
+        if (it == labels_by_target.end())
+            continue;
+        for (const std::string& label : it->second) {
+            if (std::find(target.begin(), target.end(), label) == target.end())
+                target.push_back(label);
+        }
+    }
+}
+
+// GSN v3 dialectics. A counter relationship runs *from* the challenging element
+// *to* what it challenges, and unlike SupportedBy/InContextOf its endpoints are
+// not swapped on import -- see docs/sacm/sacm-gsn-mapping.md.
+//
+// The target may be an element or another relationship (a challenge may itself
+// be challenged), so this runs after every structural edge exists.
+void ProjectChallenges(const parser::AssuranceCase& model,
+                       const std::unordered_map<std::string, std::vector<std::string>>& relationship_acp_labels,
+                       const std::unordered_map<std::string, size_t>& node_by_ref,
+                       EdgeSink& sink) {
+    for (const parser::SacmElement& relationship : model.elements) {
+        if (!IsRelationshipType(relationship.type) || !relationship.is_counter)
+            continue;
+
+        const size_t* source_index = FindFirstNodeIndex(node_by_ref, relationship.source_refs);
+        if (!source_index) {
+            sink.warnings.push_back("Skipped Challenges relationship '" + DisplaySourceId(relationship) +
+                                    "' because its counter source was missing.");
+            continue;
+        }
+        if (relationship.target_refs.empty()) {
+            sink.warnings.push_back("Skipped Challenges relationship '" + DisplaySourceId(relationship) +
+                                    "' because it had no target.");
+            continue;
+        }
+
+        std::vector<std::string> acp_labels;
+        AttachAcpLabels(acp_labels, relationship_acp_labels, relationship.id, relationship.gid);
+        const std::string& from_id = sink.diagram.nodes[*source_index].id;
+        const std::string& target_ref = relationship.target_refs.front();
+
+        if (const size_t* target_index = FindNodeIndex(node_by_ref, target_ref)) {
+            AddEdge(sink,
+                    relationship,
+                    acp_labels,
+                    from_id,
+                    sink.diagram.nodes[*target_index].id,
+                    GsnEdgeKind::Challenges);
+            continue;
+        }
+
+        const auto target_edges = sink.edge_ids_by_relationship.find(core::NormalizeRef(target_ref));
+        if (target_edges != sink.edge_ids_by_relationship.end() && !target_edges->second.empty()) {
+            AddChallengeToEdge(sink, relationship, acp_labels, from_id, target_edges->second.front());
+            continue;
+        }
+
+        sink.warnings.push_back("Skipped Challenges relationship '" + DisplaySourceId(relationship) +
+                                "' because its target '" + core::NormalizeRef(target_ref) + "' was not exported.");
+    }
 }
 
 void ApplyContextKind(GsnNode& node) {
@@ -243,6 +374,13 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
     std::unordered_set<std::string> context_attachment_refs;
     std::unordered_map<std::string, const parser::SacmElement*> elements_by_ref;
     std::set<std::string> reserved_source_ids;
+    const std::unordered_map<std::string, std::vector<std::string>> element_acp_labels =
+        BuildAcpLabelsByTarget(model, "element");
+    const std::unordered_map<std::string, std::vector<std::string>> relationship_acp_labels =
+        BuildAcpLabelsByTarget(model, "relationship");
+    // Relationship source id -> ids of the edges it produced, so a challenge
+    // aimed at a relationship can be pointed at the edge that represents it.
+    std::unordered_map<std::string, std::vector<std::string>> edge_ids_by_relationship;
 
     for (const parser::SacmElement& element : model.elements) {
         if (IsRelationshipType(element.type))
@@ -312,6 +450,8 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
         node.kind = is_visible_terminology_context ? GsnNodeKind::Context : InitialKindFor(element);
         node.title = element.name;
         node.text = TextFor(element);
+        node.undeveloped = element.undeveloped;
+        AttachAcpLabels(node.acp_labels, element_acp_labels, element.id, element.gid);
         if (node.title.empty() && node.text.empty()) {
             node.title = "(no title)";
             result.warnings.push_back("Node '" + node.id + "' had no title or text; placeholder title was used.");
@@ -323,9 +463,19 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
         AddReference(node_by_ref, element.gid, node_index, result.warnings);
     }
 
+    EdgeSink edge_sink{result.diagram, edge_id_counts, result.warnings, edge_ids_by_relationship};
+
+    // Pass 1: structural relationships. Counter relationships are deliberately
+    // excluded -- a GSN v3 challenge is not support, and projecting one as a
+    // SupportedBy edge would show counter-evidence as evidence for the very
+    // claim it attacks. They are handled in pass 2, once every structural edge
+    // exists and can therefore be named as a challenge target.
     for (const parser::SacmElement& relationship : model.elements) {
-        if (!IsRelationshipType(relationship.type))
+        if (!IsRelationshipType(relationship.type) || relationship.is_counter)
             continue;
+
+        std::vector<std::string> edge_acp_labels;
+        AttachAcpLabels(edge_acp_labels, relationship_acp_labels, relationship.id, relationship.gid);
 
         if (relationship.type == "assertedinference") {
             const size_t* target_index = FindFirstNodeIndex(node_by_ref, relationship.target_refs);
@@ -339,10 +489,9 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
             if (!relationship.reasoning_ref.empty()) {
                 if (const size_t* reasoning_index = FindNodeIndex(node_by_ref, relationship.reasoning_ref)) {
                     result.diagram.nodes[*reasoning_index].kind = GsnNodeKind::Strategy;
-                    AddEdge(result.diagram,
-                            edge_id_counts,
-                            result.warnings,
+                    AddEdge(edge_sink,
                             relationship,
+                            edge_acp_labels,
                             attach_parent_id,
                             result.diagram.nodes[*reasoning_index].id,
                             GsnEdgeKind::SupportedBy);
@@ -364,10 +513,9 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
                                               "' because the node was missing.");
                     continue;
                 }
-                AddEdge(result.diagram,
-                        edge_id_counts,
-                        result.warnings,
+                AddEdge(edge_sink,
                         relationship,
+                        edge_acp_labels,
                         attach_parent_id,
                         result.diagram.nodes[*source_index].id,
                         GsnEdgeKind::SupportedBy);
@@ -391,10 +539,9 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
                     continue;
                 }
                 result.diagram.nodes[*source_index].kind = GsnNodeKind::Solution;
-                AddEdge(result.diagram,
-                        edge_id_counts,
-                        result.warnings,
+                AddEdge(edge_sink,
                         relationship,
+                        edge_acp_labels,
                         result.diagram.nodes[*target_index].id,
                         result.diagram.nodes[*source_index].id,
                         GsnEdgeKind::SupportedBy);
@@ -422,16 +569,17 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
                     continue;
                 }
                 ApplyContextKind(result.diagram.nodes[*source_index]);
-                AddEdge(result.diagram,
-                        edge_id_counts,
-                        result.warnings,
+                AddEdge(edge_sink,
                         relationship,
+                        edge_acp_labels,
                         result.diagram.nodes[*target_index].id,
                         result.diagram.nodes[*source_index].id,
                         GsnEdgeKind::InContextOf);
             }
         }
     }
+
+    ProjectChallenges(model, relationship_acp_labels, node_by_ref, edge_sink);
 
     return result;
 }

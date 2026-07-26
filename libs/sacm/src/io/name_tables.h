@@ -36,6 +36,10 @@ std::optional<ElementKind> kind_from_class_name_ci(std::string_view name);
 // Sourced from the extension metamodels' own eSuperTypes declarations, not
 // inferred from names.
 struct ExtensionType {
+    // Aliases the `namespace_uri` argument passed to `resolve_extension_type`,
+    // which is typically a temporary from prefix resolution. Copy it before the
+    // argument dies -- unlike the other views here, it does not point into the
+    // static table.
     std::string_view namespace_uri;
     std::string_view type_name;
     // The concrete SACM class this type specializes, if there is one.
@@ -48,6 +52,16 @@ struct ExtensionType {
     // resolving the type without swapping silently reverses every inference
     // in the argument.
     bool reverse_endpoints = false;
+    // The SACM AssertionDeclaration literal this GSN type carries, when the GSN
+    // transformation defines one ("assumed" for Assumption, "axiomatic" for
+    // Justification). Empty when the type implies no declaration.
+    //
+    // Without it, Goal, Assumption and Justification all resolve to a bare
+    // `Claim` and become indistinguishable -- GSN Metamodel v2.2 states a
+    // transformation *must* apply the appropriate declaration. Carried as the
+    // literal rather than the enum so this header stays free of the model
+    // headers; the reader parses it with `model::parse_assertion_declaration`.
+    std::string_view assertion_declaration;
 };
 
 // Resolves an xsi:type from a known SACM-extension namespace. Returns nullopt
@@ -57,6 +71,13 @@ struct ExtensionType {
 // preserve rather than guess.
 std::optional<ExtensionType> resolve_extension_type(std::string_view namespace_uri,
                                                     std::string_view type_name);
+
+// Reserved TaggedValue key recording the extension type an element was read
+// from, e.g. "{http://scsc.acwg.gsn/2.0}Goal". Written on import whenever an
+// extension type resolves to a SACM supertype, because that resolution is lossy
+// and the original class is not otherwise recoverable. Mirrors the existing
+// "sacm.import.name" and "sacm.import.assertionDeclaration" conventions.
+inline constexpr std::string_view kImportExtensionTypeKey = "sacm.import.extensionType";
 
 // True when the URI belongs to a metamodel known to specialize SACM.
 bool is_sacm_extension_namespace(std::string_view namespace_uri);

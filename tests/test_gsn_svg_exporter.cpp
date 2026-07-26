@@ -87,6 +87,43 @@ parser::AssuranceCase BuildRepresentativeCase() {
     return model;
 }
 
+parser::SacmElement Challenge(std::string id,
+                              std::string type,
+                              std::vector<std::string> sources,
+                              std::vector<std::string> targets) {
+    parser::SacmElement relationship = Relationship(std::move(id), std::move(type), std::move(sources),
+                                                    std::move(targets));
+    relationship.is_counter = true;
+    return relationship;
+}
+
+parser::AcpRecord Acp(std::string id, std::string target_kind, std::string target_id) {
+    parser::AcpRecord acp;
+    acp.id = std::move(id);
+    acp.target_kind = std::move(target_kind);
+    acp.target_id = std::move(target_id);
+    return acp;
+}
+
+const export_gsn::GsnEdge* FindEdgeBetween(const export_gsn::GsnDiagram& diagram,
+                                           const std::string& from_id,
+                                           const std::string& to_id) {
+    for (const export_gsn::GsnEdge& edge : diagram.edges) {
+        if (edge.from_id == from_id && edge.to_id == to_id)
+            return &edge;
+    }
+    return nullptr;
+}
+
+size_t CountEdgesOfKind(const export_gsn::GsnDiagram& diagram, export_gsn::GsnEdgeKind kind) {
+    size_t count = 0;
+    for (const export_gsn::GsnEdge& edge : diagram.edges) {
+        if (edge.kind == kind)
+            ++count;
+    }
+    return count;
+}
+
 const export_gsn::GsnNode* FindNode(const export_gsn::GsnDiagram& diagram, const std::string& id) {
     for (const export_gsn::GsnNode& node : diagram.nodes) {
         if (node.id == id)
@@ -379,6 +416,200 @@ TEST(GsnSvgExporterTest, SvgContainsNamespaceMarkersAndPublicationStyle) {
     EXPECT_NE(svg.find("fill=\"white\""), std::string::npos);
     EXPECT_NE(svg.find("stroke=\"black\""), std::string::npos);
     EXPECT_NE(svg.find("class=\"gsn-solution\""), std::string::npos);
+}
+
+// ===== AF-ENG-015: the exported SVG must not understate the argument =====
+
+TEST(GsnSvgExporterTest, CounterEvidenceIsNeverProjectedAsSupport) {
+    // The defect this guards: a counter relationship exported as SupportedBy
+    // shows evidence *against* a claim as evidence *for* it.
+    parser::AssuranceCase model;
+    model.elements = {Element("G1", "claim", "Goal", "System is acceptably safe."),
+                      Element("Sn9", "artifactreference", "Field incident report", "Counter evidence."),
+                      Challenge("ch1", "assertedevidence", {"Sn9"}, {"G1"})};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+
+    EXPECT_EQ(CountEdgesOfKind(projection.diagram, export_gsn::GsnEdgeKind::SupportedBy), 0u);
+    ASSERT_EQ(CountEdgesOfKind(projection.diagram, export_gsn::GsnEdgeKind::Challenges), 1u);
+    const export_gsn::GsnEdge* challenge = FindEdgeBetween(projection.diagram, "Sn9", "G1");
+    ASSERT_NE(challenge, nullptr);
+    EXPECT_EQ(challenge->kind, export_gsn::GsnEdgeKind::Challenges);
+}
+
+TEST(GsnSvgExporterTest, CounterClaimChallengesItsTargetElement) {
+    parser::AssuranceCase model;
+    model.elements = {Element("G1", "claim", "Goal", "System is acceptably safe."),
+                      Element("G9", "claim", "Counter claim", "The hazard list is incomplete."),
+                      Challenge("ch1", "assertedinference", {"G9"}, {"G1"})};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+
+    ASSERT_EQ(projection.diagram.edges.size(), 1u);
+    EXPECT_EQ(projection.diagram.edges.front().kind, export_gsn::GsnEdgeKind::Challenges);
+    EXPECT_EQ(projection.diagram.edges.front().from_id, "G9");
+    EXPECT_EQ(projection.diagram.edges.front().to_id, "G1");
+}
+
+TEST(GsnSvgExporterTest, ChallengeTargetingRelationshipLandsOnThatEdge) {
+    parser::AssuranceCase model;
+    model.elements = {Element("G1", "claim", "Goal", "System is acceptably safe."),
+                      Element("C1", "artifactreference", "Operating context", "Defined operating domain."),
+                      Element("G9", "claim", "Counter claim", "That context does not hold."),
+                      Relationship("ctx1", "assertedcontext", {"C1"}, {"G1"}),
+                      Challenge("ch1", "assertedinference", {"G9"}, {"ctx1"})};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+
+    ASSERT_EQ(CountEdgesOfKind(projection.diagram, export_gsn::GsnEdgeKind::Challenges), 1u);
+    const export_gsn::GsnEdge* challenge = nullptr;
+    for (const export_gsn::GsnEdge& edge : projection.diagram.edges) {
+        if (edge.kind == export_gsn::GsnEdgeKind::Challenges)
+            challenge = &edge;
+    }
+    ASSERT_NE(challenge, nullptr);
+    EXPECT_EQ(challenge->from_id, "G9");
+    EXPECT_TRUE(challenge->to_id.empty());
+    EXPECT_EQ(challenge->to_edge_id, "ctx1");
+}
+
+TEST(GsnSvgExporterTest, ChallengeWithUnexportedTargetWarnsInsteadOfVanishing) {
+    parser::AssuranceCase model;
+    model.elements = {Element("G9", "claim", "Counter claim", "Something is wrong."),
+                      Challenge("ch1", "assertedinference", {"G9"}, {"missing"})};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+
+    EXPECT_TRUE(projection.diagram.edges.empty());
+    ASSERT_FALSE(projection.warnings.empty());
+}
+
+TEST(GsnSvgExporterTest, LayoutKeepsCounterOutOfTheSupportTree) {
+    parser::AssuranceCase model;
+    model.elements = {Element("G1", "claim", "Goal", "System is acceptably safe."),
+                      Element("G2", "claim", "Sub goal", "Hazards are mitigated."),
+                      Element("G9", "claim", "Counter claim", "The hazard list is incomplete."),
+                      Relationship("inf1", "assertedinference", {"G2"}, {"G1"}),
+                      Challenge("ch1", "assertedinference", {"G9"}, {"G1"})};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+
+    const export_gsn::GsnNode* goal = FindNode(projection.diagram, "G1");
+    const export_gsn::GsnNode* sub_goal = FindNode(projection.diagram, "G2");
+    const export_gsn::GsnNode* counter = FindNode(projection.diagram, "G9");
+    ASSERT_NE(goal, nullptr);
+    ASSERT_NE(sub_goal, nullptr);
+    ASSERT_NE(counter, nullptr);
+
+    // The supported sub-goal hangs below; the counter sits beside, not below.
+    EXPECT_GT(sub_goal->y, goal->y);
+    EXPECT_NE(counter->x, goal->x);
+    EXPECT_FALSE(RectanglesOverlap(*counter, *sub_goal));
+}
+
+TEST(GsnSvgExporterTest, SvgDrawsChallengeDistinctlyFromSupport) {
+    parser::AssuranceCase model;
+    model.elements = {Element("G1", "claim", "Goal", "System is acceptably safe."),
+                      Element("G9", "claim", "Counter claim", "The hazard list is incomplete."),
+                      Challenge("ch1", "assertedinference", {"G9"}, {"G1"})};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+    const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
+
+    EXPECT_NE(svg.find("id=\"challengeArrow\""), std::string::npos);
+    EXPECT_NE(svg.find("class=\"gsn-challenges\""), std::string::npos);
+    EXPECT_NE(svg.find("marker-end=\"url(#challengeArrow)\""), std::string::npos);
+    EXPECT_EQ(svg.find("marker-end=\"url(#supportedByArrow)\""), std::string::npos);
+}
+
+TEST(GsnSvgExporterTest, ProjectionCarriesUndevelopedFlagToTheDiagram) {
+    parser::AssuranceCase model;
+    parser::SacmElement undeveloped_goal = Element("G2", "claim", "Undeveloped goal", "Not yet argued.");
+    undeveloped_goal.undeveloped = true;
+    model.elements = {Element("G1", "claim", "Goal", "System is acceptably safe."),
+                      undeveloped_goal,
+                      Relationship("inf1", "assertedinference", {"G2"}, {"G1"})};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+
+    ASSERT_NE(FindNode(projection.diagram, "G2"), nullptr);
+    EXPECT_TRUE(FindNode(projection.diagram, "G2")->undeveloped);
+    EXPECT_FALSE(FindNode(projection.diagram, "G1")->undeveloped);
+}
+
+TEST(GsnSvgExporterTest, SvgDrawsTheUndevelopedDiamond) {
+    // Without this the export shows an incomplete argument as a finished one.
+    parser::AssuranceCase model;
+    parser::SacmElement undeveloped_goal = Element("G1", "claim", "Undeveloped goal", "Not yet argued.");
+    undeveloped_goal.undeveloped = true;
+    model.elements = {undeveloped_goal};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+    const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
+
+    EXPECT_NE(svg.find("class=\"gsn-undeveloped\""), std::string::npos);
+}
+
+TEST(GsnSvgExporterTest, SvgOmitsTheUndevelopedDiamondWhenNotUndeveloped) {
+    parser::AssuranceCase model;
+    model.elements = {Element("G1", "claim", "Developed goal", "Fully argued.")};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+    const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
+
+    EXPECT_EQ(svg.find("class=\"gsn-undeveloped\""), std::string::npos);
+}
+
+TEST(GsnSvgExporterTest, AcpOnAnElementIsProjectedAndDrawn) {
+    parser::AssuranceCase model;
+    model.elements = {Element("G1", "claim", "Goal", "System is acceptably safe.")};
+    model.acps = {Acp("ACP1", "element", "G1")};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+    const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
+
+    ASSERT_NE(FindNode(projection.diagram, "G1"), nullptr);
+    ASSERT_EQ(FindNode(projection.diagram, "G1")->acp_labels.size(), 1u);
+    EXPECT_EQ(FindNode(projection.diagram, "G1")->acp_labels.front(), "ACP1");
+    EXPECT_NE(svg.find("class=\"gsn-acp\""), std::string::npos);
+    EXPECT_NE(svg.find("ACP1"), std::string::npos);
+}
+
+TEST(GsnSvgExporterTest, AcpOnARelationshipIsProjectedAndDrawn) {
+    parser::AssuranceCase model;
+    model.elements = {Element("G1", "claim", "Goal", "System is acceptably safe."),
+                      Element("G2", "claim", "Sub goal", "Hazards are mitigated."),
+                      Relationship("inf1", "assertedinference", {"G2"}, {"G1"})};
+    model.acps = {Acp("ACP7", "relationship", "inf1")};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+    const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
+
+    ASSERT_EQ(projection.diagram.edges.size(), 1u);
+    ASSERT_EQ(projection.diagram.edges.front().acp_labels.size(), 1u);
+    EXPECT_EQ(projection.diagram.edges.front().acp_labels.front(), "ACP7");
+    EXPECT_NE(svg.find("ACP7"), std::string::npos);
+}
+
+TEST(GsnSvgExporterTest, NodeCarryingBothDecoratorsKeepsThemApart) {
+    parser::AssuranceCase model;
+    parser::SacmElement goal = Element("G1", "claim", "Goal", "System is acceptably safe.");
+    goal.undeveloped = true;
+    model.elements = {goal};
+    model.acps = {Acp("ACP1", "element", "G1")};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+    const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
+
+    EXPECT_NE(svg.find("class=\"gsn-undeveloped\""), std::string::npos);
+    EXPECT_NE(svg.find("class=\"gsn-acp\""), std::string::npos);
 }
 
 TEST(GsnSvgExporterTest, ExportWritesStandaloneSvgAndUsesUniqueNames) {
