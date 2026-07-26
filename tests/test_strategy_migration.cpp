@@ -1,6 +1,7 @@
 #include "core/audit/strategy_migration.h"
 
 #include "core/audit/audit_manifest.h"
+#include "core/audit/audit_paths.h"
 #include "core/audit/audit_store.h"
 #include "core/audit/replay_verifier.h"
 #include "core/commands/command_bus.h"
@@ -15,6 +16,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <string>
 #include <string_view>
 
@@ -280,6 +282,43 @@ void WriteLegacyStrategyOnDisk(const std::filesystem::path& sacm_abs,
     WriteFile(sacm_abs, sacm::serialize_sacm(package));
 }
 
+constexpr std::string_view kVendorNamespace = "http://acme.example/toolchain";
+constexpr std::string_view kVendorElementMarker = "vendorMetadata";
+constexpr std::string_view kVendorAttributeMarker = "Q3-2026";
+
+// The same legacy on-disk state, plus a foreign-namespace element on the root
+// package. The legacy serializer has no way to emit one, so it is injected into
+// its output -- which keeps the surrounding structure exactly what the legacy
+// writer produces and adds only the content a tolerant library load preserves
+// and no POD projection can carry.
+void WriteLegacyStrategyOnDiskWithVendorContent(const std::filesystem::path& sacm_abs,
+                                                const std::string& strategy_id,
+                                                const std::string& sub1,
+                                                const std::string& sub2) {
+    WriteLegacyStrategyOnDisk(sacm_abs, strategy_id, sub1, sub2);
+
+    std::ifstream in(sacm_abs, std::ios::binary);
+    std::string xml((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    in.close();
+
+    // The root element name carries whatever namespace prefix the package had,
+    // so anchor on the class name rather than on a spelling.
+    const std::size_t root = xml.find("AssuranceCasePackage");
+    ASSERT_NE(root, std::string::npos) << "legacy serializer output changed shape";
+    const std::size_t root_end = xml.find('>', root);
+    ASSERT_NE(root_end, std::string::npos);
+
+    xml.insert(root_end, " xmlns:acme=\"" + std::string(kVendorNamespace) + "\"");
+    const std::size_t insert_at = xml.find('>', root) + 1;
+    xml.insert(insert_at, "\n  <acme:vendorMetadata reviewCycle=\"Q3-2026\"/>");
+    WriteFile(sacm_abs, xml);
+}
+
+std::string ReadFileText(const std::filesystem::path& path) {
+    std::ifstream in(path, std::ios::binary);
+    return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+}
+
 } // namespace
 
 TEST(StrategyMigration, MigratesLegacyProjectAndVerifyConverges) {
@@ -331,6 +370,80 @@ TEST(StrategyMigration, MigratesLegacyProjectAndVerifyConverges) {
     core::audit::StrategyMigrationResult again;
     ASSERT_TRUE(core::audit::MigrateStrategyEncodingIfNeeded(f.project, f.sacm_rel, again, error)) << error;
     EXPECT_FALSE(again.migrated);
+}
+
+// The migration rewrites the TRACKED WORKING FILE and promotes a trusted
+// baseline that becomes the replay root. It runs silently at project open, so
+// anything it drops is gone before the user sees the case -- and unrecoverable
+// from inside the app, because restore-from-audit replays from the promoted
+// baseline and the baseline is also an undo wall.
+//
+// It holds a library document (it loads one to read the file) and must serialize
+// THAT for both writes. Routing either write through a POD projection
+// (`core::library_xmi_from_package` / `sacm::serialize_sacm`) destroys the
+// unknown/foreign XML only a tolerant load preserves.
+//
+// Asserted on the BYTES of both artifacts. A canonical-hash assertion cannot see
+// this: the hash re-projects through the tagless projection on both sides and
+// drops the same content twice.
+TEST(StrategyMigration, SACM23_LIB_002_StrategyMigrationPreservesUnknownContent) {
+    Fixture f = MakeFixture("vendor_content");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package};
+
+    core::commands::CreateChildElementCommand add_strategy("G1", core::NewElementKind::Strategy);
+    ASSERT_TRUE(bus->Execute(add_strategy, ctx, "tester").success);
+    const std::string strategy_id = add_strategy.GeneratedId();
+    core::commands::CreateChildElementCommand add_sub1(strategy_id, core::NewElementKind::Goal);
+    ASSERT_TRUE(bus->Execute(add_sub1, ctx, "tester").success);
+    core::commands::CreateChildElementCommand add_sub2(strategy_id, core::NewElementKind::Goal);
+    ASSERT_TRUE(bus->Execute(add_sub2, ctx, "tester").success);
+
+    WriteLegacyStrategyOnDiskWithVendorContent(f.sacm_abs, strategy_id, add_sub1.GeneratedId(),
+                                               add_sub2.GeneratedId());
+
+    // Non-vacuity: the pre-migration file really does carry the vendor content,
+    // so a pass cannot come from never having had anything to lose.
+    const std::string before = ReadFileText(f.sacm_abs);
+    ASSERT_NE(before.find(kVendorElementMarker), std::string::npos);
+    ASSERT_NE(before.find(kVendorAttributeMarker), std::string::npos);
+
+    core::audit::StrategyMigrationResult migration;
+    ASSERT_TRUE(core::audit::MigrateStrategyEncodingIfNeeded(f.project, f.sacm_rel, migration, error))
+        << error;
+    ASSERT_TRUE(migration.migrated) << "nothing was migrated, so this test proves nothing";
+    ASSERT_FALSE(migration.baseline_snapshot_id.empty());
+
+    // (1) The tracked working file.
+    const std::string migrated = ReadFileText(f.sacm_abs);
+    EXPECT_NE(migrated.find(kVendorElementMarker), std::string::npos)
+        << "the migration destroyed the preserved vendor element in the working file";
+    EXPECT_NE(migrated.find(kVendorAttributeMarker), std::string::npos)
+        << "the migration destroyed the preserved vendor attribute in the working file";
+    EXPECT_NE(migrated.find(kVendorNamespace), std::string::npos)
+        << "the migrated file does not declare the foreign namespace, so the next load drops it";
+
+    // (2) The promoted trusted baseline -- the replay root, and the floor undo
+    // and restore-from-audit can reach. If the content is missing here it is
+    // unrecoverable even though the working file has it.
+    const std::string baseline =
+        ReadFileText(core::audit::SnapshotSacmPath(f.project.rootPath, migration.baseline_snapshot_id));
+    ASSERT_FALSE(baseline.empty());
+    EXPECT_NE(baseline.find(kVendorElementMarker), std::string::npos)
+        << "the promoted baseline lost the vendor element; restore-from-audit cannot recover it";
+    EXPECT_NE(baseline.find(kVendorAttributeMarker), std::string::npos)
+        << "the promoted baseline lost the vendor attribute";
+    EXPECT_NE(baseline.find(kVendorNamespace), std::string::npos)
+        << "the promoted baseline does not declare the foreign namespace";
+
+    // The migration's own reason for existing must still hold.
+    const core::audit::ReplayVerificationResult after = core::audit::VerifyProject(f.project);
+    ASSERT_TRUE(after.ran);
+    EXPECT_TRUE(after.success) << "post-migration verify should converge; diagnostics: "
+                               << (after.diagnostics.empty() ? "" : after.diagnostics.front());
 }
 
 TEST(StrategyMigration, SkipsWhenPathIsNotTheAuditedSacm) {

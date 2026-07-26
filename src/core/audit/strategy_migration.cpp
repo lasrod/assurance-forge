@@ -3,11 +3,11 @@
 #include "core/audit/audit_manifest.h"
 #include "core/audit/audit_paths.h"
 #include "core/audit/audit_snapshot.h"
+#include "core/commands/library_bridge.h"
 #include "core/library_package_projection.h"
 #include "core/project_file_io.h"
 #include "core/sha256.h"
 #include "core/time_utils.h"
-#include "sacm/sacm_serializer.h"
 #include "sacm_adapter/gsn_role_tag.h"
 #include "sacm_adapter/library_load.h"
 
@@ -207,42 +207,70 @@ bool MigrateStrategyEncodingIfNeeded(const AssuranceProject& project,
     if (!PackageHasLegacyStrategyEncoding(package))
         return true;  // already single-inference: nothing to migrate
 
-    NormalizeStrategyEncoding(package);
-
-    std::optional<std::string> migrated_xml = core::library_xmi_from_package(package);
-    if (!migrated_xml) {
-        error = "Strategy migration could not serialize the normalized package to library XMI.";
+    // Bridge the normalization onto the DOCUMENT rather than writing the
+    // projection out. This is the same shape as every other legacy mutation the
+    // application makes -- project, mutate the POD, re-derive the document while
+    // restoring what the POD cannot carry -- so it goes through the one
+    // implementation of it (`BridgeLegacyMutationToLibrary`), which is also what
+    // stops this becoming a seventh place the pattern has to be fixed.
+    //
+    // It is load-bearing here specifically: this function rewrites the TRACKED
+    // WORKING FILE and promotes the trusted baseline that becomes the replay
+    // root. Writing either from `core::library_xmi_from_package` /
+    // `sacm::serialize_sacm` of the projection destroyed the unknown/foreign XML
+    // only a tolerant load preserves -- silently, at project open, and
+    // unrecoverably, because restore-from-audit replays from the promoted
+    // baseline and the baseline is also an undo wall.
+    const core::commands::LibraryBridgeMutator normalize =
+        [](parser::AssuranceCase&, sacm::AssuranceCasePackage& scratch, std::string&) -> bool {
+        NormalizeStrategyEncoding(scratch);
+        return true;
+    };
+    if (!core::commands::BridgeLegacyMutationToLibrary(*outcome.document, normalize, error,
+                                                       "the strategy-encoding migration")) {
+        error = "Strategy migration could not re-derive the library document: " + error;
         return false;
     }
 
+    // Both artifacts are the DOCUMENT's own bytes, so the baseline is a byte copy
+    // of the migrated working file -- the same relationship the initial snapshot
+    // has to the live file, and one that cannot drift.
+    sacm_adapter::SaveOutcome saved = sacm_adapter::save_document(*outcome.document);
+    if (!saved.ok) {
+        error = "Strategy migration could not serialize the migrated document: " +
+                sacm_adapter::summarize_load_diagnostics(saved.diagnostics);
+        return false;
+    }
+    const std::string migrated_xml = std::move(saved.xml);
+
     // Rewrite the on-disk SACM with the migrated bytes.
-    if (auto write = core::WriteTextFileAtomic(sacm_abs, *migrated_xml); !write) {
+    if (auto write = core::WriteTextFileAtomic(sacm_abs, migrated_xml); !write) {
         error = "Strategy migration could not write the migrated SACM: " + write.error();
         return false;
     }
 
-    const std::string raw_hash = Sha256::HexDigest(*migrated_xml);
+    const std::string raw_hash = Sha256::HexDigest(migrated_xml);
     std::string canonical_hash;
-    if (auto canonical = core::library_canonical_hash_from_xml(*migrated_xml))
+    if (auto canonical = core::library_canonical_hash_from_xml(migrated_xml))
         canonical_hash = *canonical;
 
     // Promote a trusted replay baseline at HEAD from the migrated state, so
     // open-verify replays forward from it (no pre-migration events re-run) and
-    // matches the on-disk bytes by construction.
+    // matches the on-disk bytes by construction -- literally so now: the same
+    // bytes are written to both.
     //
-    // This baseline is the ONE remaining place the application writes SACM
-    // bytes through the legacy serializer rather than the library. The former
-    // justification -- "snapshots are loaded by the legacy parser (`LoadSnapshot`
-    // uses `sacm::parse_sacm`)" -- no longer holds:
-    // `core::audit::LoadSnapshotModels` already prefers the library. What keeps
-    // it here is narrower: this function normalizes a *projection* rather than a
-    // document (there is no library document at this point in the migration), so
-    // the legacy serializer is the only thing that can write it. Its
-    // library-canonical hash still matches the library-XMI on-disk file, which is
-    // the same convergence the initial snapshot relies on. Routing the migration
-    // through a library document would retire the last legacy writer entirely.
-    const std::string baseline_xml = sacm::serialize_sacm(package);
-    const std::string baseline_raw_hash = Sha256::HexDigest(baseline_xml);
+    // This used to be the last place the application wrote SACM through the
+    // legacy serializer, justified by "this function normalizes a projection
+    // rather than a document (there is no library document at this point in the
+    // migration)". That was false -- the document is loaded above and was simply
+    // discarded -- and it cost the baseline every byte of preserved vendor
+    // content, which is worse here than anywhere else because the baseline is
+    // what a restore replays from. With it gone, every remaining
+    // `sacm::serialize_sacm` in the working-file path is either a guarded
+    // fallback that surfaces a visible degradation warning or an in-memory
+    // intermediate -- none of them writes SACM to disk unannounced.
+    const std::string& baseline_xml = migrated_xml;
+    const std::string baseline_raw_hash = raw_hash;
     std::string baseline_snapshot_id;
     if (!WriteMigrationBaselineSnapshot(project.rootPath, baseline_xml,
                                         manifest.latest_transaction_sequence,
