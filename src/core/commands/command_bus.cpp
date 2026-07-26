@@ -92,10 +92,9 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     // described -- but it additionally preserves the unknown/foreign content the
     // legacy structs cannot model and therefore silently dropped on every save.
     // This is gated on the flip, NOT merely on `library_document != nullptr`:
-    // an unflipped command (a NodeOnly removal, an unsupported seam, a dispatch
-    // with no document) mutated
-    // the legacy package in place and the library does not hold that edit until
-    // the Stage 5 net re-derives it from `xml` further down -- serializing the
+    // an unflipped command (a NodeOnly removal, an unsupported seam) mutated the
+    // legacy package in place and the library does not hold that edit until the
+    // Stage 5 net re-derives it from `xml` further down -- serializing the
     // document here would write the PRE-edit state.
     std::string xml;
     bool library_save_fell_back = false;
@@ -192,8 +191,8 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     // Preserving reload: `xml` is a projection of the document being replaced,
     // and the legacy package cannot carry unknown/foreign XML, so the plain
     // reload dropped preserved vendor content on every unflipped command
-    // (NodeOnly removal, an unseamed command, a dispatch with no document) --
-    // from the in-memory document and, through the next save, from disk.
+    // (NodeOnly removal, an unseamed command) -- from the in-memory document
+    // and, through the next save, from disk.
     if (ctx.library_document != nullptr && !ctx.library_synced && !ctx.library_primary) {
         if (!sacm_adapter::reload_document_keeping_compatibility_content(*ctx.library_document,
                                                                          xml) &&
