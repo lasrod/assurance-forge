@@ -59,6 +59,7 @@ nav:
     - Overview: features/index.md
     - Terminology Assist: features/terminology-assist.md
     - Confidence Panel Prototype: features/confidence-panel-prototype.md
+    - MCP Server (planned): features/mcp-server.md
   - Roadmap:
     - Product Roadmap: roadmap/public.md
     - Workflow: roadmap/workflow.md
