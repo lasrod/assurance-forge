@@ -514,6 +514,44 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesUnknownContent) {
     EXPECT_TRUE(Contains(autosaved, "Renamed goal")) << autosaved;
 }
 
+// A dialectic challenge is `isCounter = true` on the relationship (clause 11.13).
+// It is not a vendor tag and not unknown content -- it is standard SACM 2.3 that
+// the library reads and writes correctly. The bridge round-trips through the
+// legacy POD, whose rebuild never copied the flag back, so a bridged edit
+// re-serialized a REBUTTAL as an inference SUPPORTING the claim it attacks.
+//
+// That is the project's "never silently modify or reinterpret safety arguments"
+// constraint, inverted on the most common edit in the application. Asserted on
+// the saved bytes: the canonical hash is computed through the same projection on
+// both sides and cannot see it.
+TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesCounterRelationships) {
+    const std::string counter_case =
+        ReadFile(std::filesystem::path(AF_REPO_ROOT) / "libs" / "sacm" / "tests" / "data" / "sacm23" /
+                 "argumentation-full-valid.sacm.xmi");
+    ASSERT_FALSE(counter_case.empty());
+    ProjectFixture fixture = MakeProject("bridged-counter", counter_case.c_str());
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    const std::size_t before = CountOccurrences(ReadFile(fixture.sacm_absolute), "isCounter");
+    ASSERT_GT(before, 0u) << "fixture carries no counter relationship; this test measures nothing";
+
+    bool library_primary = false;
+    const core::commands::CommandResult result =
+        RunBridgedRename(fixture, state, "claim_top", "Renamed top claim", library_primary);
+    ASSERT_TRUE(result.success) << result.error;
+    ASSERT_TRUE(library_primary)
+        << "the rename did not take the bridged library-primary path; this test measures nothing";
+
+    const std::string autosaved = ReadFile(fixture.sacm_absolute);
+    EXPECT_EQ(CountOccurrences(autosaved, "isCounter"), before)
+        << "a bridged rename cleared isCounter -- the rebuttal is now recorded as SUPPORTING the "
+           "claim it was raised against";
+    EXPECT_TRUE(Contains(autosaved, "Renamed top claim")) << autosaved;
+}
+
 TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesAcpTaggedValues) {
     const std::string acp_case =
         ReadFile(std::filesystem::path(AF_REPO_ROOT) / "tests" / "data" /
