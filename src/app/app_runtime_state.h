@@ -13,6 +13,7 @@
 #include "app/controllers/modal_coordinator.h"
 #include "app/controllers/project_controller.h"
 #include "app/controllers/proposal_controller.h"
+#include "app/controllers/register_controller.h"
 #include "app/controllers/review_controller.h"
 #include "app/guideline_catalog.h"
 #include "core/app_state.h"
@@ -168,9 +169,11 @@ struct ProblemSyncDirty {
     bool confidence = false;
     bool acp = false;
     bool translation = false;
+    bool structure = false;
+    bool registers = false;
 
     void MarkAll() {
-        review = terminology = confidence = acp = translation = true;
+        review = terminology = confidence = acp = translation = structure = registers = true;
     }
 };
 
@@ -187,6 +190,7 @@ struct AppRuntimeState {
     std::unique_ptr<controllers::ProposalController> proposal_controller;
     std::unique_ptr<controllers::ReviewController> review_controller;
     std::unique_ptr<controllers::ConfidenceController> confidence_controller;
+    std::unique_ptr<controllers::RegisterController> register_controller;
     std::unique_ptr<controllers::AcpController> acp_controller;
     std::optional<GuidelineCatalog> guideline_catalog;
     bool guideline_catalog_load_attempted = false;

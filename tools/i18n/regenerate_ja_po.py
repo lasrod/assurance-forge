@@ -616,6 +616,13 @@ TRANSLATIONS = {
     "  Content: {0}": "  内容: {0}",
 
     # ===== Registers =====
+    "Register assessments could not be loaded, so edits cannot be saved: {0}":
+        "登録簿の評価を読み込めなかったため、編集を保存できません: {0}",
+    "The assessment of {0} is kept, but the argument no longer links that claim to that evidence. Stored: {1}":
+        "{0} の評価は保持されていますが、論証はその主張とエビデンスを結び付けていません。保存内容: {1}",
+    "The assessment of evidence {0} is kept, but that evidence is no longer in the argument. Stored: {1}":
+        "エビデンス {0} の評価は保持されていますが、そのエビデンスは論証にありません。保存内容: {1}",
+    "Discard assessment": "評価を破棄",
     "No CSE rows were derived from direct claim-evidence relations.": "直接の主張–エビデンス関係から CSE 行が導出されませんでした。",
     "No evidence/work-product rows were derived from the model.": "モデルからエビデンス/作業成果物の行が導出されませんでした。",
     "CSE ID": "CSE ID",
@@ -704,6 +711,11 @@ TRANSLATIONS = {
         "{0} は未定義の用語項目のように見えます。",
     "{0} has {1} visible meanings. Choose the intended terminology entry.":
         "{0} には {1} 件の表示可能な意味があります。意図する用語項目を選択してください。",
+    "Circular support: {0}. An argument that assumes its own conclusion establishes nothing.":
+        "循環した支持関係: {0}。自らの結論を前提とする議論は何も立証しません。",
+    "{0} is supported by itself, so it establishes nothing.":
+        "{0} は自分自身によって支持されているため、何も立証しません。",
+    "Show cycle": "循環を表示",
 
     # ===== Static problem messages (translated at display via AF_TR) =====
     "The stored confidence assessment needs review because this element changed. Review the value "

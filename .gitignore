@@ -11,6 +11,8 @@ cmake-build-*/
 .vscode/
 .claude/*
 !.claude/agents/
+# Skills are shared project knowledge, not local tooling config.
+!.claude/skills/
 *.user
 *.suo
 *.sln

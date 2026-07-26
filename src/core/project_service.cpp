@@ -202,6 +202,72 @@ bool AddTrackedFile(AssuranceProject& project,
     return true;
 }
 
+// Writes `content` to a tracked project file, adding the manifest entry the
+// first time and refreshing its hashes on every write. Unlike AddTrackedFile
+// this overwrites an existing file, so it is the save path for the files the
+// app owns one of per project (review items, confidence assessments, register
+// assessments). Shared so those saves cannot drift apart in tracking or
+// hashing behaviour.
+bool WriteTrackedFile(AssuranceProject& project,
+                      const std::filesystem::path& relative_path,
+                      ProjectFileRole role,
+                      const char* role_mismatch_description,
+                      const std::string& content,
+                      ProjectFileEntry& entry,
+                      std::string& error) {
+    if (!IsSafeRelativePath(relative_path)) {
+        error = "Invalid project file path";
+        return false;
+    }
+
+    auto found = std::find_if(project.files.begin(), project.files.end(), [&](const ProjectFileEntry& candidate) {
+        return candidate.relativePath.generic_string() == relative_path.generic_string();
+    });
+
+    // Refuse before writing when something else already owns the path: an
+    // overwrite here would destroy a file of a different kind.
+    if (found != project.files.end() && found->role != role) {
+        error = std::string("Tracked file is not ") + role_mismatch_description + ": " +
+                relative_path.generic_string();
+        return false;
+    }
+
+    const std::filesystem::path absolute_path = project.rootPath / relative_path;
+    std::error_code ec;
+    if (!std::filesystem::create_directories(absolute_path.parent_path(), ec) && ec) {
+        error = "Could not create project directory: " + absolute_path.parent_path().string();
+        return false;
+    }
+    if (auto r = WriteTextFile(absolute_path, content); !r) {
+        error = std::move(r.error());
+        return false;
+    }
+
+    if (found == project.files.end()) {
+        ProjectFileEntry new_entry;
+        new_entry.id = GenerateId("af-file");
+        new_entry.relativePath = relative_path;
+        new_entry.role = role;
+        new_entry.hashAlgorithm = "sha256";
+        if (auto r = RefreshEntryHashes(project, new_entry, false); !r) {
+            error = std::move(r.error());
+            return false;
+        }
+        project.files.push_back(new_entry);
+        found = project.files.end() - 1;
+    } else if (auto r = RefreshEntryHashes(project, *found, false); !r) {
+        error = std::move(r.error());
+        return false;
+    }
+
+    project.modifiedUtc = NowUtc();
+    if (!ProjectService::WriteManifestSafely(project, error))
+        return false;
+
+    entry = *found;
+    return true;
+}
+
 void AddStep(ProjectLoadReport& report,
              const std::string& label,
              ProjectLoadStepStatus status,
@@ -348,53 +414,9 @@ bool ProjectService::SaveReviewItemsFile(AssuranceProject& project,
                                          ProjectFileEntry& entry,
                                          std::string& error) {
     std::filesystem::path file_name = NormalizeFileName(requested_file_name, "review-items.af.json", ".json");
-    std::filesystem::path relative_path = std::filesystem::path("reviews") / file_name;
-    if (!IsSafeRelativePath(relative_path)) {
-        error = "Invalid project file path";
-        return false;
-    }
-
-    auto found = std::find_if(project.files.begin(), project.files.end(), [&](const ProjectFileEntry& candidate) {
-        return candidate.relativePath.generic_string() == relative_path.generic_string();
-    });
-
-    const std::filesystem::path absolute_path = project.rootPath / relative_path;
-    std::error_code ec;
-    if (!std::filesystem::create_directories(absolute_path.parent_path(), ec) && ec) {
-        error = "Could not create project directory: " + absolute_path.parent_path().string();
-        return false;
-    }
-    if (auto r = WriteTextFile(absolute_path, content); !r) {
-        error = std::move(r.error());
-        return false;
-    }
-
-    if (found == project.files.end()) {
-        ProjectFileEntry new_entry;
-        new_entry.id = GenerateId("af-file");
-        new_entry.relativePath = relative_path;
-        new_entry.role = ProjectFileRole::ReviewItems;
-        new_entry.hashAlgorithm = "sha256";
-        if (auto r = RefreshEntryHashes(project, new_entry, false); !r) {
-            error = std::move(r.error());
-            return false;
-        }
-        project.files.push_back(new_entry);
-        found = project.files.end() - 1;
-    } else if (found->role != ProjectFileRole::ReviewItems) {
-        error = "Tracked file is not a review item file: " + relative_path.generic_string();
-        return false;
-    } else if (auto r = RefreshEntryHashes(project, *found, false); !r) {
-        error = std::move(r.error());
-        return false;
-    }
-
-    project.modifiedUtc = NowUtc();
-    if (!WriteManifestSafely(project, error))
-        return false;
-
-    entry = *found;
-    return true;
+    const std::filesystem::path relative_path = std::filesystem::path("reviews") / file_name;
+    return WriteTrackedFile(
+        project, relative_path, ProjectFileRole::ReviewItems, "a review item file", content, entry, error);
 }
 
 bool ProjectService::AddReviewProposalFile(AssuranceProject& project,
@@ -456,52 +478,31 @@ bool ProjectService::SaveConfidenceFile(AssuranceProject& project,
                                         ProjectFileEntry& entry,
                                         std::string& error) {
     const std::filesystem::path relative_path = std::filesystem::path("analysis") / "confidence.af.json";
-    if (!IsSafeRelativePath(relative_path)) {
-        error = "Invalid project file path";
-        return false;
-    }
+    return WriteTrackedFile(project,
+                            relative_path,
+                            ProjectFileRole::ConfidenceAssessments,
+                            "a confidence assessment file",
+                            content,
+                            entry,
+                            error);
+}
 
-    auto found = std::find_if(project.files.begin(), project.files.end(), [&](const ProjectFileEntry& candidate) {
-        return candidate.relativePath.generic_string() == relative_path.generic_string();
-    });
-
-    const std::filesystem::path absolute_path = project.rootPath / relative_path;
-    std::error_code ec;
-    if (!std::filesystem::create_directories(absolute_path.parent_path(), ec) && ec) {
-        error = "Could not create project directory: " + absolute_path.parent_path().string();
-        return false;
-    }
-    if (auto r = WriteTextFile(absolute_path, content); !r) {
-        error = std::move(r.error());
-        return false;
-    }
-
-    if (found == project.files.end()) {
-        ProjectFileEntry new_entry;
-        new_entry.id = GenerateId("af-file");
-        new_entry.relativePath = relative_path;
-        new_entry.role = ProjectFileRole::ConfidenceAssessments;
-        new_entry.hashAlgorithm = "sha256";
-        if (auto r = RefreshEntryHashes(project, new_entry, false); !r) {
-            error = std::move(r.error());
-            return false;
-        }
-        project.files.push_back(new_entry);
-        found = project.files.end() - 1;
-    } else if (found->role != ProjectFileRole::ConfidenceAssessments) {
-        error = "Tracked file is not a confidence assessment file: " + relative_path.generic_string();
-        return false;
-    } else if (auto r = RefreshEntryHashes(project, *found, false); !r) {
-        error = std::move(r.error());
-        return false;
-    }
-
-    project.modifiedUtc = NowUtc();
-    if (!WriteManifestSafely(project, error))
-        return false;
-
-    entry = *found;
-    return true;
+bool ProjectService::SaveRegisterAssessmentsFile(AssuranceProject& project,
+                                                 const std::string& content,
+                                                 ProjectFileEntry& entry,
+                                                 std::string& error) {
+    // One file per project, next to the register documents it annotates. The
+    // path is fixed rather than user-chosen: the assessments are keyed by CSE /
+    // evidence id, so a second file would just be a second opinion nobody could
+    // reconcile.
+    const std::filesystem::path relative_path = std::filesystem::path("registers") / "register-assessments.af.json";
+    return WriteTrackedFile(project,
+                            relative_path,
+                            ProjectFileRole::RegisterAssessments,
+                            "a register assessment file",
+                            content,
+                            entry,
+                            error);
 }
 
 bool ProjectService::TrackExistingFile(AssuranceProject& project,

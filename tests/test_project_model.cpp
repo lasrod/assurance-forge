@@ -12,12 +12,12 @@
 
 namespace {
 
-constexpr std::array<core::ProjectFileRole, 9> kAllRoles = {
+constexpr std::array<core::ProjectFileRole, 10> kAllRoles = {
     core::ProjectFileRole::SacmArgument,         core::ProjectFileRole::EvidenceRegister,
-    core::ProjectFileRole::J3377CaeRegister,     core::ProjectFileRole::ReviewItems,
-    core::ProjectFileRole::ReviewProposal,       core::ProjectFileRole::ConfidenceAssessments,
-    core::ProjectFileRole::ConformanceSheet,     core::ProjectFileRole::ExportedReport,
-    core::ProjectFileRole::Unknown,
+    core::ProjectFileRole::J3377CaeRegister,     core::ProjectFileRole::RegisterAssessments,
+    core::ProjectFileRole::ReviewItems,          core::ProjectFileRole::ReviewProposal,
+    core::ProjectFileRole::ConfidenceAssessments, core::ProjectFileRole::ConformanceSheet,
+    core::ProjectFileRole::ExportedReport,       core::ProjectFileRole::Unknown,
 };
 
 constexpr std::array<core::ProjectFileState, 9> kAllStates = {

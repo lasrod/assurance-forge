@@ -96,6 +96,8 @@ void AppRuntime::RenderFrame(bool& done) {
         if (current_epoch != last_language_epoch) {
             impl_->problems_dirty.terminology = true;
             impl_->problems_dirty.translation = true;
+            impl_->problems_dirty.structure = true;
+            impl_->problems_dirty.registers = true;
             last_language_epoch = current_epoch;
         }
     }
@@ -352,7 +354,7 @@ void AppRuntime::RenderFrame(bool& done) {
         return TryOpenProjectManifest(selected_path);
     };
     modal_callbacks.open_first_project_sacm_file = [this]() { return OpenFirstProjectSacmFile(); };
-    modal_callbacks.ensure_review_item_storage = [this]() { return EnsureReviewItemStorage(); };
+    modal_callbacks.ensure_project_side_storage = [this]() { EnsureProjectSideStorage(); };
     modal_callbacks.touch_current_project_recent = [this]() { TouchCurrentProjectRecent(); };
     modal_callbacks.save_project = [this]() { return SaveProject(); };
     modal_callbacks.confirm_pending_project_file_open = [this](bool save_current) {

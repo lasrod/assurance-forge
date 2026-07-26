@@ -42,6 +42,7 @@ add_library(af_core OBJECT
     gsn_layout.cpp
     ignored_terminology_store.cpp
     perf/frame_profiler.cpp
+    problems/argument_cycles.cpp
     problems/problem_attention.cpp
     problems/problem_item.cpp
     problems/problem_utils.cpp
@@ -50,6 +51,7 @@ add_library(af_core OBJECT
     project_file_io.cpp
     project_manifest.cpp
     project_service.cpp
+    registers/register_model.cpp
     reviews/review_item.cpp
     reviews/review_item_manager.cpp
     reviews/review_proposal.cpp

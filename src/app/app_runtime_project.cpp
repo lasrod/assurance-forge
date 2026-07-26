@@ -8,6 +8,7 @@
 #include "app/proposal_ui_state.h"
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
+#include "app/register_problem_sync.h"
 #include "app/translation_review_sync.h"
 #include "core/translation_review_store.h"
 #include "core/element_factory.h"
@@ -85,6 +86,14 @@ std::string ArgumentPackageCanvasKey(const std::filesystem::path& source_file_pa
 std::filesystem::path ConfidenceItemsPath(const core::AssuranceProject& project) {
     for (const core::ProjectFileEntry& entry : project.files) {
         if (entry.role == core::ProjectFileRole::ConfidenceAssessments)
+            return project.rootPath / entry.relativePath;
+    }
+    return {};
+}
+
+std::filesystem::path RegisterAssessmentsPath(const core::AssuranceProject& project) {
+    for (const core::ProjectFileEntry& entry : project.files) {
+        if (entry.role == core::ProjectFileRole::RegisterAssessments)
             return project.rootPath / entry.relativePath;
     }
     return {};
@@ -883,6 +892,33 @@ void AppRuntime::EnsureTranslationReviewStorage() {
     impl_->problems_dirty.translation = true;
 }
 
+void AppRuntime::DiscardOrphanedRegisterAssessment(const core::ProblemItem& problem) {
+    RegisterAssessmentRef ref;
+    if (!DecodeRegisterAssessmentPayload(problem.quick_fix_payload, ref)) {
+        SetStatus("Register problem does not identify an assessment.");
+        return;
+    }
+    if (impl_->register_controller->HasStorageError()) {
+        SetStatus("Register assessments could not be loaded, so nothing can be discarded: " +
+                  impl_->register_controller->StorageError());
+        return;
+    }
+
+    const bool discarded = ref.kind == RegisterAssessmentKind::Cse
+                               ? impl_->register_controller->DiscardCseAssessment(ref.key)
+                               : impl_->register_controller->DiscardEvidenceAssessment(ref.key);
+    if (!discarded) {
+        SetStatus("That register assessment was already discarded.");
+        impl_->problems_dirty.registers = true;
+        return;
+    }
+
+    // The file is only rewritten on save, so say so: this is the one undo the
+    // register store has.
+    SetStatus("Discarded the assessment of " + ref.key +
+              ". Close the project without saving to keep it after all.");
+}
+
 void AppRuntime::HandleProblemQuickFix(const core::ProblemItem& problem) {
     if (problem.type.rfind("Acp", 0) == 0) {
         if (problem.quick_fix_payload.empty()) {
@@ -904,6 +940,10 @@ void AppRuntime::HandleProblemQuickFix(const core::ProblemItem& problem) {
             impl_->events.Emit(SelectionChangedEvent{problem.element_id, true});
             impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
         }
+        return;
+    }
+    if (problem.type == kRegisterAssessmentOrphanedProblemType) {
+        DiscardOrphanedRegisterAssessment(problem);
         return;
     }
     actions::TerminologyActions(*impl_).HandleProblemQuickFix(problem);
@@ -1062,6 +1102,34 @@ bool AppRuntime::EnsureConfidenceStorage() {
     return false;
 }
 
+bool AppRuntime::EnsureRegisterStorage() {
+    impl_->problems_dirty.registers = true;
+    if (!impl_->app_state.current_project.has_value()) {
+        impl_->register_controller->ClearStorage();
+        return false;
+    }
+
+    const core::AssuranceProject& project = impl_->app_state.current_project.value();
+    std::filesystem::path register_path = RegisterAssessmentsPath(project);
+    if (register_path.empty())
+        register_path = project.rootPath / "registers" / "register-assessments.af.json";
+
+    std::string error;
+    if (impl_->register_controller->ConfigureStorage(register_path, error))
+        return true;
+
+    // The register tab tells the user the same thing for as long as the failure
+    // stands; this status line is for the moment it happens.
+    SetStatus("Register assessments could not be loaded: " + error);
+    return false;
+}
+
+void AppRuntime::EnsureProjectSideStorage() {
+    EnsureReviewItemStorage();
+    EnsureConfidenceStorage();
+    EnsureRegisterStorage();
+}
+
 bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {
     std::filesystem::path manifest_path(selected_path);
     if (!IsProjectManifestPath(manifest_path)) {
@@ -1074,11 +1142,11 @@ bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {
     impl_->document_dirty = false;
     impl_->review_controller->ClearDirty();
     impl_->confidence_controller->ClearDirty();
+    impl_->register_controller->ClearDirty();
     impl_->guideline_catalog_load_attempted = false;
     if (impl_->app_state.current_project.has_value()) {
         impl_->proposal_controller->manager.SetProjectRoot(impl_->app_state.current_project->rootPath);
-        EnsureReviewItemStorage();
-        EnsureConfidenceStorage();
+        EnsureProjectSideStorage();
     }
     RefreshSacmPackageTreeCache();
     OpenFirstProjectSacmFile();

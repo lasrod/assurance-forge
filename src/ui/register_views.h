@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/registers/register_model.h"
 #include "core/sacm_model.h"
 
 #include <string>
@@ -36,12 +37,18 @@ struct EvidenceRegisterRow {
     std::string notes;
 };
 
-void RebuildRegisterViews(const parser::AssuranceCase* ac);
+// Rejoins the rows derived from `ac` with the assessments held in `store`.
+// `ac == nullptr` clears the rows (no model open).
+void RebuildRegisterViews(const parser::AssuranceCase* ac, const core::registers::RegisterStore& store);
 
 size_t GetCseRegisterRowCount();
 size_t GetEvidenceRegisterRowCount();
 
-void ShowCseRegisterView();
-void ShowEvidenceRegisterView();
+// Render the register tables, writing edited cells straight into `store`.
+// Return true when the user changed a cell this frame, which is the caller's
+// cue to mark the store dirty so it gets saved. Only edited rows are stored, so
+// a register nobody has assessed leaves no entries behind.
+bool ShowCseRegisterView(core::registers::RegisterStore& store);
+bool ShowEvidenceRegisterView(core::registers::RegisterStore& store);
 
 } // namespace ui

@@ -158,6 +158,12 @@ private:
     bool ReconcileAuditStore();
     bool EnsureReviewItemStorage();
     bool EnsureConfidenceStorage();
+    bool EnsureRegisterStorage();
+    // Points every controller that owns a file outside the SACM document at the
+    // currently-open project. Must run on both project-open and project-create:
+    // a controller still holding the previous project's store would write it
+    // into the new project on the next save.
+    void EnsureProjectSideStorage();
     // Clears + reloads the current project's persisted terminology-ignore set, then
     // re-syncs terminology problems. Safe to call when no project is open.
     void EnsureTerminologyIgnoreStorage();
@@ -176,8 +182,14 @@ private:
     void SyncTerminologyProblems();
     void SyncConfidenceProblems();
     void SyncAcpProblems();
+    void SyncStructureProblems();
+    void SyncRegisterProblems();
     void SyncTranslationReviewProblems();
     void HandleProblemQuickFix(const core::ProblemItem& problem);
+    // Quick fix for an orphaned register assessment: drops the stored
+    // assessment the user has decided to let go of. Takes effect on disk at the
+    // next project save.
+    void DiscardOrphanedRegisterAssessment(const core::ProblemItem& problem);
 
     // Flags `element_id` for secondary-language translation review when the
     // element carries a translation. Called after a committed text edit. No-op

@@ -259,6 +259,8 @@ add_executable(tests
     tests/test_save_from_library.cpp
     tests/test_acp_controller.cpp
     tests/test_xml_parser.cpp
+    tests/test_argument_cycles.cpp
+    tests/test_register_model.cpp
     tests/test_assurance_tree.cpp
     tests/test_layout.cpp
     tests/test_problem_attention.cpp
@@ -294,6 +296,8 @@ add_executable(tests
     tests/test_ai_review_controller.cpp
     tests/test_review_problem_sync.cpp
     tests/test_review_controller.cpp
+    tests/test_register_controller.cpp
+    tests/test_register_problem_sync.cpp
     tests/test_element_edit_controller.cpp
     tests/test_modal_coordinator.cpp
     tests/test_ai_settings.cpp
@@ -388,11 +392,22 @@ if(Python3_Interpreter_FOUND)
         NAME sacm_matrix_check
         COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/sacm/check_conformance_matrix.py"
     )
+
+    # Capability matrix gate: fails if a `supported` row cites no existing test,
+    # if a `planned` row already has tests (the signature of a status reality has
+    # overtaken), if a cited path has moved, or if the exported JSON the
+    # documentation site consumes is stale. The matrix states what the tool can
+    # do for a safety argument, so an overstated row is a correctness problem.
+    add_test(
+        NAME feature_matrix_check
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/features/check_feature_matrix.py"
+    )
 else()
     # These are compliance gates, not conveniences. A silently absent gate reads
     # as a passing one, so say so loudly rather than skipping in silence.
     message(WARNING
-        "Python3 not found: the i18n_catalog_check and sacm_matrix_check gates "
-        "will NOT run. CI installs Python explicitly; a local build without it "
-        "cannot verify the translation catalog or the SACM conformance matrix.")
+        "Python3 not found: the i18n_catalog_check, sacm_matrix_check and "
+        "feature_matrix_check gates will NOT run. CI installs Python explicitly; "
+        "a local build without it cannot verify the translation catalog, the SACM "
+        "conformance matrix, or the capability matrix.")
 endif()

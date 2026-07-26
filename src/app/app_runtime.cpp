@@ -23,8 +23,10 @@
 #include "app/proposal_ui_state.h"
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
+#include "app/register_problem_sync.h"
 #include "app/review_problem_sync.h"
 #include "app/terminology_problem_sync.h"
+#include "app/structure_problem_sync.h"
 #include "core/acp/assurance_claim_point.h"
 #include "core/app_state.h"
 #include "core/derived_views.h"
@@ -172,7 +174,7 @@ AppRuntime::AppRuntime() : impl_(std::make_unique<AppRuntimeState>()) {
 
     impl_->current_tree = core::AssuranceTree();
     ui::gsn::SetCanvasTree(impl_->current_tree);
-    ui::RebuildRegisterViews(nullptr);
+    ui::RebuildRegisterViews(nullptr, impl_->register_controller->Store());
 
     ui::UiState& ui_state = ui::GetUiState();
     ui_state.center_view = ui::CenterView::GsnCanvas;
@@ -215,6 +217,11 @@ void AppRuntime::RegisterAppEventListeners() {
         if (event.mark_app_dirty)
             impl_->app_state.mark_dirty();
         impl_->problems_dirty.confidence = true;
+    });
+    impl_->events.Subscribe<RegisterAssessmentsDirtyEvent>([this](const RegisterAssessmentsDirtyEvent& event) {
+        if (event.mark_app_dirty)
+            impl_->app_state.mark_dirty();
+        impl_->problems_dirty.registers = true;
     });
     impl_->events.Subscribe<SelectionChangedEvent>([](const SelectionChangedEvent& event) {
         ui::UiState& ui_state = ui::GetUiState();
@@ -446,7 +453,10 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     }
 
     if (impl_->tree_needs_rebuild && !impl_->app_state.loaded_case.has_value()) {
-        ui::RebuildRegisterViews(nullptr);
+        ui::RebuildRegisterViews(nullptr, impl_->register_controller->Store());
+        // No argument means nothing to be orphaned against; drop the warnings
+        // rather than leave them standing against a model that is gone.
+        impl_->problems_dirty.registers = true;
         impl_->tree_edit_index = core::TreeEditIndex();
         impl_->tree_edit_index_valid = false;
         impl_->tree_needs_rebuild = false;
@@ -467,11 +477,17 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     impl_->tree_edit_index = core::BuildTreeEditIndex(ac);
     impl_->tree_edit_index_valid = true;
     ui::gsn::SetCanvasTree(impl_->current_tree);
-    ui::RebuildRegisterViews(&ac);
+    ui::RebuildRegisterViews(&ac, impl_->register_controller->Store());
     ui::GetUiState().model_has_translations = ui::ModelHasTranslations(ac);
     impl_->problems_dirty.terminology = true;
     impl_->problems_dirty.acp = true;
     impl_->problems_dirty.translation = true;
+    // Any edit to the support structure can create or break a cycle, and this
+    // rebuild runs on exactly those edits.
+    impl_->problems_dirty.structure = true;
+    // The same edits move claim-evidence pairings in and out of the argument,
+    // which is what makes a stored assessment orphaned or whole again.
+    impl_->problems_dirty.registers = true;
 
     if (impl_->workbench.pending_focus_root && impl_->current_tree.root) {
         ui::UiState& ui_state = ui::GetUiState();
@@ -505,7 +521,7 @@ void AppRuntime::RenderSacmViewerPanel(float left_w, float sacm_h, float top_y) 
         [this]() {
             impl_->current_tree = core::AssuranceTree();
             ui::gsn::SetCanvasTree(impl_->current_tree);
-            ui::RebuildRegisterViews(nullptr);
+            ui::RebuildRegisterViews(nullptr, impl_->register_controller->Store());
             ui::GetUiState().selected_element_id.clear();
         },
     };
@@ -611,6 +627,14 @@ void AppRuntime::RefreshDirtyProblems() {
         SyncTranslationReviewProblems();
         dirty.translation = false;
     }
+    if (dirty.structure) {
+        SyncStructureProblems();
+        dirty.structure = false;
+    }
+    if (dirty.registers) {
+        SyncRegisterProblems();
+        dirty.registers = false;
+    }
 }
 
 void AppRuntime::SyncReviewProblems() {
@@ -644,6 +668,20 @@ void AppRuntime::SyncAcpProblems() {
     const sacm::AssuranceCasePackage* package =
         impl_->app_state.has_projected_package() ? &impl_->app_state.projected_package() : nullptr;
     app::SyncAcpProblems(impl_->problems_manager, model, package);
+}
+
+void AppRuntime::SyncStructureProblems() {
+    const parser::AssuranceCase* model =
+        impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
+    app::SyncStructureProblems(impl_->problems_manager, model);
+}
+
+void AppRuntime::SyncRegisterProblems() {
+    const parser::AssuranceCase* model =
+        impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
+    const core::registers::RegisterStore* store =
+        impl_->register_controller ? &impl_->register_controller->Store() : nullptr;
+    app::SyncRegisterProblems(impl_->problems_manager, model, store);
 }
 
 bool AppRuntime::SetManualReviewOk(const std::string& element_id, bool manual_ok) {

@@ -2,6 +2,7 @@
 # directly into the executable target via hello_imgui_add_app().
 add_library(af_app OBJECT
     acp_problem_sync.cpp
+    structure_problem_sync.cpp
     actions/ai_review_actions.cpp
     actions/element_actions.cpp
     actions/proposal_actions.cpp
@@ -43,6 +44,7 @@ add_library(af_app OBJECT
     controllers/modal_coordinator.cpp
     controllers/project_controller.cpp
     controllers/proposal_controller.cpp
+    controllers/register_controller.cpp
     controllers/review_controller.cpp
     frame/app_layout_regions.cpp
     frame/app_menu_bar.cpp
@@ -52,6 +54,7 @@ add_library(af_app OBJECT
     project_workflow.cpp
     proposal_ui_state.cpp
     recent_projects.cpp
+    register_problem_sync.cpp
     review_problem_sync.cpp
     terminology_problem_sync.cpp
     translation_review_sync.cpp

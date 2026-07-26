@@ -34,8 +34,9 @@ bool AppRuntime::SaveProject() {
     }
 
     // Flush controllers that own their own persistence (review items,
-    // confidence assessments live in separate files outside SACM). These
-    // do not flow through CommandBus and never produce audit transactions.
+    // confidence assessments and register assessments live in separate files
+    // outside SACM). These do not flow through CommandBus and never produce
+    // audit transactions.
     if (impl_->review_controller->IsDirty()) {
         core::AssuranceProject& project = impl_->app_state.current_project.value();
         std::string error;
@@ -50,6 +51,15 @@ bool AppRuntime::SaveProject() {
         std::string error;
         if (!impl_->confidence_controller->SaveIfDirty(project, error)) {
             impl_->app_state.status_message = "Confidence save failed: " + error;
+            return false;
+        }
+    }
+
+    if (impl_->register_controller->IsDirty()) {
+        core::AssuranceProject& project = impl_->app_state.current_project.value();
+        std::string error;
+        if (!impl_->register_controller->SaveIfDirty(project, error)) {
+            impl_->app_state.status_message = "Register assessment save failed: " + error;
             return false;
         }
     }

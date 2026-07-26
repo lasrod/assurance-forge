@@ -34,6 +34,11 @@ struct ConfidenceDirtyEvent {
     bool mark_app_dirty = true;
 };
 
+struct RegisterAssessmentsDirtyEvent {
+    bool dirty = true;
+    bool mark_app_dirty = true;
+};
+
 struct ProjectFilesChangedEvent {};
 
 struct ActiveModelChangedEvent {
@@ -142,6 +147,7 @@ using AppEvent = std::variant<StatusMessageEvent,
                               DocumentDirtyEvent,
                               ReviewItemsDirtyEvent,
                               ConfidenceDirtyEvent,
+                              RegisterAssessmentsDirtyEvent,
                               ProjectFilesChangedEvent,
                               ActiveModelChangedEvent,
                               ArgumentPackageCanvasRequestEvent,
