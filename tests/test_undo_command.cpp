@@ -140,6 +140,11 @@ void RunCommand(ProjectFixture& f, core::commands::CommandBus& bus, core::comman
                 core::commands::CommandContext& ctx) {
     const core::commands::CommandResult result = bus.Execute(command, ctx, "tester");
     ASSERT_TRUE(result.success) << result.error;
+    // The bus reports a lossy/degraded save as a SOFT warning: success stays
+    // true and `error` carries the diagnostic. A preservation test that ignored
+    // it could pass while the bus was announcing the very degradation the test
+    // exists to rule out.
+    ASSERT_TRUE(result.error.empty()) << "bus reported a soft warning: " << result.error;
     if (ctx.library_primary && f.document != nullptr)
         core::RebuildDerivedViewsFromLibrary(*f.document, f.model, f.package);
 }
@@ -193,6 +198,13 @@ bool DoUndo(ProjectFixture& f, core::commands::CommandBus& bus, core::commands::
     const auto result = bus.Execute(cmd, ctx, "tester");
     if (!result.success) {
         error_out = result.error;
+        return false;
+    }
+    // A soft warning (success with a non-empty error) means the bus degraded
+    // the save; surface it as a failure here so a preservation assertion cannot
+    // pass over it.
+    if (!result.error.empty()) {
+        error_out = "bus reported a soft warning: " + result.error;
         return false;
     }
     if (ctx.library_primary && f.document != nullptr)
@@ -297,6 +309,32 @@ TEST(UndoCommand, SACM23_LIB_002_LibraryPrimaryUndoPreservesUnknownVendorContent
     EXPECT_FALSE(goal_survived) << "undo did not take back the edit";
     EXPECT_NE(ReadFile(f.sacm_abs).find(kVendorElementMarker), std::string::npos)
         << "undo wrote a projection and erased the preserved vendor content";
+}
+
+// Undo is exempt from the `allow_library_primary` kill switch, and deliberately
+// so: for undo the two routings are inverted (see undo_command.h), so honouring
+// the switch would take the path that BOTH replaces the live views mid-dispatch
+// -- the hazard the switch exists to prevent -- and restores the wrong preserved
+// content, since the Stage-5 net adopts the compatibility content of the
+// outgoing document rather than of the state being restored.
+TEST(UndoCommand, SACM23_LIB_002_UndoStaysLibraryPrimaryUnderTheKillSwitch) {
+    auto f = MakeLibraryBackedFixture("kill_switch", kVendorExtendedSacm);
+    ASSERT_NE(f.document, nullptr);
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package, f.document.get()};
+    ctx.allow_library_primary = false;
+
+    core::commands::CreateChildElementCommand add_goal("G1", core::NewElementKind::Goal);
+    RunCommand(f, *bus, add_goal, ctx);
+    ASSERT_FALSE(ctx.library_primary) << "the kill switch did not force the EDIT onto the legacy path";
+
+    ASSERT_TRUE(DoUndo(f, *bus, ctx, error)) << error;
+    EXPECT_TRUE(ctx.library_primary) << "undo honoured the kill switch and took the lossy path";
+    EXPECT_NE(ReadFile(f.sacm_abs).find(kVendorElementMarker), std::string::npos)
+        << "undo under the kill switch erased the preserved vendor content";
 }
 
 TEST(UndoBoundary, ImplicitInitialSnapshotIsAlwaysTheFloor) {

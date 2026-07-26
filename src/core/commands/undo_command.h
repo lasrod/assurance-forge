@@ -29,6 +29,12 @@
 //     snapshot through the library, not projected out of a POD.
 //   * LEGACY (no library document): the reconstructed `model`/`package` are
 //     assigned over the live ones, and the bus serializes a projection.
+//
+// Undo is the one command that does NOT consult `CommandContext::allow_library_primary`.
+// That switch exists to stop a command replacing the live views wholesale
+// mid-dispatch, and for undo the two routings are inverted: the library-primary
+// path leaves the views for the frame-boundary re-derive, while the legacy path
+// is the one that replaces them. See the comment on the branch in undo_command.cpp.
 namespace core::commands {
 
 class UndoLastTransactionCommand final : public ICommand {
