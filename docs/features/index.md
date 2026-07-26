@@ -6,3 +6,4 @@ Start with Terminology Assist when you need to manage controlled vocabulary, def
 
 - [Terminology Assist](terminology-assist.md)
 - [Confidence Panel Prototype](confidence-panel-prototype.md)
+- [MCP Server](mcp-server.md) — planned; build safety cases by chat from your own AI client
