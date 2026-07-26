@@ -161,7 +161,7 @@ TEST(HistoryReconstruction, ReturnsSnapshotStateAtSequenceZero) {
 
     // Snapshot is the empty initial SACM: only G1 should be present.
     bool found_g1 = false;
-    for (const auto& e : state->model.elements) {
+    for (const auto& e : state->views.model.elements) {
         if (e.id == "G1") found_g1 = true;
     }
     EXPECT_TRUE(found_g1);
@@ -183,7 +183,7 @@ TEST(HistoryReconstruction, ReconstructsUpToRequestedSequence) {
     auto at_one = core::audit::ReconstructAtSequence(f.project, 1);
     ASSERT_TRUE(at_one.has_value());
     bool at_one_has_a = false, at_one_has_b = false;
-    for (const auto& e : at_one->model.elements) {
+    for (const auto& e : at_one->views.model.elements) {
         if (e.id == a.GeneratedId()) at_one_has_a = true;
         if (e.id == b.GeneratedId()) at_one_has_b = true;
     }
@@ -193,7 +193,7 @@ TEST(HistoryReconstruction, ReconstructsUpToRequestedSequence) {
     auto at_two = core::audit::ReconstructAtSequence(f.project, 2);
     ASSERT_TRUE(at_two.has_value());
     bool at_two_has_b = false;
-    for (const auto& e : at_two->model.elements) {
+    for (const auto& e : at_two->views.model.elements) {
         if (e.id == b.GeneratedId()) at_two_has_b = true;
     }
     EXPECT_TRUE(at_two_has_b);
@@ -219,7 +219,7 @@ TEST(HistoryReconstruction, ReconstructionAtLatestSequenceMatchesLiveCanonicalHa
     // the library, so the reconstruction base is library-projected while this
     // fixture's live package is legacy-parsed; the legacy hash is not invariant
     // under that projection, but the authoritative library hash converges.
-    const auto reconstructed_hash = core::library_canonical_hash(state->package);
+    const auto reconstructed_hash = core::library_canonical_hash(state->views.package);
     const auto live_hash = core::library_canonical_hash(f.package);
     ASSERT_TRUE(reconstructed_hash.has_value());
     ASSERT_TRUE(live_hash.has_value());
@@ -256,12 +256,12 @@ TEST(HistoryReconstruction, SACM23_LIB_002_ReconstructionPreservesVendorTaggedVa
                                                     std::numeric_limits<std::uint64_t>::max());
     ASSERT_TRUE(state.has_value()) << state.error();
 
-    EXPECT_EQ(CountTaggedValuesWithKey(state->package, sacm_adapter::kGsnStrategyTargetTagKey),
+    EXPECT_EQ(CountTaggedValuesWithKey(state->views.package, sacm_adapter::kGsnStrategyTargetTagKey),
               live_strategy_tags)
         << "a bare strategy would lose the goal it supports";
-    EXPECT_EQ(CountTaggedValuesWithKey(state->package, "assuranceForge.acp"), live_acp_tags)
+    EXPECT_EQ(CountTaggedValuesWithKey(state->views.package, "assuranceForge.acp"), live_acp_tags)
         << "every Assurance Claim Point would be destroyed";
-    EXPECT_EQ(state->package.argumentPackages.size(), f.package.argumentPackages.size())
+    EXPECT_EQ(state->views.package.argumentPackages.size(), f.package.argumentPackages.size())
         << "the confidence argument package would be merged into the main one";
 }
 
@@ -286,7 +286,7 @@ TEST(HistoryReconstruction, SACM23_LIB_002_ReconstructionCarriesBareStrategyPlac
     ASSERT_TRUE(state.has_value()) << state.error();
 
     bool found = false;
-    for (const parser::SacmElement& element : state->model.elements) {
+    for (const parser::SacmElement& element : state->views.model.elements) {
         if (element.id == placement_id)
             found = true;
     }

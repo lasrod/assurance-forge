@@ -15,8 +15,25 @@ bool UndoLastTransactionCommand::Apply(CommandContext& ctx,
     // to generate an inverse event-set. Instead, the audit log carries an
     // explicit `Undo` marker, and the replayer (event_replayer.cpp) is
     // aware of these markers and skips the transactions they cancel.
-    ctx.model   = std::move(prior_model_);
-    ctx.package = std::move(prior_package_);
+    if (ctx.library_document != nullptr && ctx.allow_library_primary && prior_document_ != nullptr) {
+        // The reconstructed document BECOMES the live one. Move-assigning the
+        // contained document keeps the wrapper's identity, so `AppState`'s
+        // `unique_ptr` and every raw pointer into it (including `ctx`'s) stay
+        // valid.
+        *ctx.library_document = std::move(*prior_document_);
+        prior_document_.reset();
+        ctx.library_primary = true;
+
+        // Deliberately NOT assigning ctx.model / ctx.package. A library-primary
+        // command leaves the live views for the caller's frame-boundary
+        // re-derive (`AppRuntime::RebuildDerivedViewsIfNeeded`), because
+        // replacing them mid-dispatch frees containers the canvas is still
+        // rendering from this frame -- the hazard the bus stopped taking for
+        // every other flipped command, which undo was still taking here.
+    } else {
+        ctx.model   = std::move(prior_model_);
+        ctx.package = std::move(prior_package_);
+    }
 
     out_event.event_type                          = "Undo";
     out_event.payload["undone_transaction_sequence"] = undone_transaction_sequence_;
