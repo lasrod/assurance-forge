@@ -4,6 +4,7 @@
 #include "mcp/tools.h"
 
 #include "core/app_state.h"
+#include "core/project_service.h"
 
 #include <gtest/gtest.h>
 
@@ -293,4 +294,65 @@ TEST(McpOffline, RequiresATopicToSuggestPlacement) {
 
     const ToolCall placed = CallTool(server, "suggest_placement");
     EXPECT_TRUE(placed.is_error);
+}
+
+// Switching between a project's arguments had no test that actually switched:
+// the seeded fixture holds one argument, so every existing case exercised the
+// refusal path and none exercised success. A second argument is added here so
+// the tool is covered doing the thing it exists for.
+TEST(McpOffline, SwitchesToASecondArgumentAndKeepsReadingIt) {
+    std::unique_ptr<Fixture> fixture = MakeOfflineFixture("switch");
+    ASSERT_NE(fixture, nullptr);
+
+    // A second, deliberately distinguishable argument in the same project.
+    core::AppState builder;
+    ASSERT_TRUE(builder.open_project(fixture->project_root.string())) << builder.status_message;
+    core::ProjectFileEntry added;
+    std::string            error;
+    ASSERT_TRUE(core::ProjectService::AddSacmFile(builder.current_project.value(), "second", added,
+                                                  error))
+        << error;
+    ASSERT_TRUE(core::ProjectService::WriteManifestSafely(builder.current_project.value(), error))
+        << error;
+
+    // Reopen so the session sees the manifest the project now has.
+    mcp::Session::Config config;
+    config.project_path  = fixture->project_root;
+    config.settings_path = WriteConsentingSettings(fixture->workspace.path);
+    config.never_connect = true;
+    std::unique_ptr<mcp::Session> session = mcp::Session::Open(std::move(config), error);
+    ASSERT_NE(session, nullptr) << error;
+
+    mcp::Server server(*session);
+    Initialize(server);
+
+    const ToolCall listed = CallTool(server, "list_case_files");
+    ASSERT_FALSE(listed.is_error) << listed.payload.dump();
+    ASSERT_EQ(listed.payload["case_files"].size(), 2u) << listed.payload.dump();
+
+    std::string other;
+    for (const nlohmann::json& entry : listed.payload["case_files"]) {
+        if (!entry.value("loaded", false)) {
+            other = entry["path"].get<std::string>();
+        }
+    }
+    ASSERT_FALSE(other.empty()) << listed.payload.dump();
+
+    const ToolCall switched = CallTool(server, "open_case_file", {{"path", other}});
+    ASSERT_FALSE(switched.is_error) << switched.payload.dump();
+    // The overview must describe the file it moved TO. Returning the previous
+    // one would have an agent reason about a document it just navigated away
+    // from, which is indistinguishable from the switch not happening.
+    EXPECT_NE(switched.payload["loaded_file"].get<std::string>().find(other),
+              std::string::npos)
+        << switched.payload.dump();
+
+    // And the switch sticks for subsequent calls.
+    const ToolCall after = CallTool(server, "list_case_files");
+    ASSERT_FALSE(after.is_error) << after.payload.dump();
+    for (const nlohmann::json& entry : after.payload["case_files"]) {
+        if (entry["path"].get<std::string>() == other) {
+            EXPECT_TRUE(entry.value("loaded", false)) << after.payload.dump();
+        }
+    }
 }

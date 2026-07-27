@@ -119,6 +119,20 @@ void AppRuntime::RenderFrame(bool& done) {
     }
 
     {
+        // Whatever a connected AI client asked for runs here, on this thread,
+        // against the model the user is looking at. That is what makes an
+        // agent's view of the argument the same as the user's, and it is why no
+        // lock is needed around the model.
+        //
+        // Deliberately BEFORE the derived views are rebuilt. An agent can switch
+        // which argument file is open, which replaces the loaded case; running
+        // this after the rebuild left the frame drawing a tree built from the
+        // document that had just been navigated away from.
+        core::perf::ScopedTimer s("app.agent_bridge");
+        PollAgentBridge();
+    }
+
+    {
         core::perf::ScopedTimer s("app.derived_views");
         // Building the tree / GSN layout for a very large case can exhaust memory. Catch it here
         // so an allocation failure reports to the user and drops the case instead of escaping the
@@ -154,15 +168,6 @@ void AppRuntime::RenderFrame(bool& done) {
         // project open, so an incoming comment stayed invisible until the project
         // was reopened. The controller self-throttles and refuses to reload over
         // unsaved edits, so calling it every frame is safe.
-        // Whatever a connected AI client asked for runs here, on this thread,
-        // against the model this frame is about to draw. That is what makes an
-        // agent's view of the argument the same as the user's, and it is why no
-        // lock is needed around the model.
-        core::perf::ScopedTimer s("app.agent_bridge");
-        PollAgentBridge();
-    }
-
-    {
         core::perf::ScopedTimer s("app.review_external_poll");
         if (impl_->review_controller->ReloadIfChangedExternally()) {
             impl_->problems_dirty.review = true;

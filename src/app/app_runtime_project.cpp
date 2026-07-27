@@ -1247,8 +1247,30 @@ bool AppRuntime::OpenAgentRequestedCaseFile(const std::string& relative_path, st
         // Goes through the same path a user's click takes, so the command bus,
         // the audit store and every side-storage controller are reconfigured for
         // the new file exactly as they would be otherwise.
+        const std::filesystem::path wanted =
+            impl_->app_state.current_project->rootPath / entry.relativePath;
         OpenProjectFile(entry);
-        return true;
+
+        // `OpenProjectFile` returns normally in cases where it did NOT open the
+        // file: unsaved changes raise a save-first modal and defer the open, and
+        // a load failure returns void. Reporting success then would tell the
+        // agent it had switched while every subsequent read answered from the
+        // previous document -- an agent reasoning confidently about a file
+        // nobody is looking at, which is the whole failure this design exists to
+        // remove. So the result is taken from the state, not from the call.
+        if (impl_->app_state.loaded_file_path == wanted) {
+            return true;
+        }
+        if (impl_->project_controller->show_save_before_project_file_open_modal) {
+            error = "The argument currently open has unsaved changes, so Assurance Forge is asking "
+                    "the user whether to save before switching. Ask them to answer that prompt, "
+                    "then try again.";
+            return false;
+        }
+        error = impl_->app_state.status_message.empty()
+                    ? ("Assurance Forge could not open " + relative_path + ".")
+                    : impl_->app_state.status_message;
+        return false;
     }
 
     error = "No argument file in this project has the path \"" + relative_path + "\".";
