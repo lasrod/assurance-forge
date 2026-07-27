@@ -2,14 +2,14 @@
 
 // One MCP connection's view of an Assurance Forge project.
 //
-// The session opens the project READ-ONLY. It never constructs a
-// core::commands::CommandBus, never writes SACM XML, and never touches the audit
-// store. That is a design constraint rather than an unfinished edge: the MCP
-// write surface is ReviewProposal drafts a human accepts in the GUI, so the SACM
-// file keeps exactly one writer and the dual-writer problem does not arise.
+// The session never constructs a core::commands::CommandBus, never writes SACM
+// XML, and never touches the audit store. Its only write surface is
+// ReviewProposal drafts a human accepts in the GUI, so the SACM file keeps
+// exactly one writer and the dual-writer problem does not arise.
 // See docs/features/mcp-server.md.
 
 #include "core/app_state.h"
+#include "core/reviews/review_proposal_manager.h"
 
 #include <filesystem>
 #include <memory>
@@ -50,14 +50,23 @@ class Session {
 
     const std::filesystem::path& project_path() const { return project_path_; }
 
+    // Proposals live in the project directory, so a bare SACM file opened
+    // standalone can be read but not proposed against. Callers must check this
+    // rather than assume: `proposals()` is only meaningful when it is true.
+    bool has_project() const { return state_.current_project.has_value(); }
+
+    core::reviews::ReviewProposalManager&       proposals() { return proposals_; }
+    const core::reviews::ReviewProposalManager& proposals() const { return proposals_; }
+
   private:
     Session() = default;
 
-    core::AppState        state_;
-    std::filesystem::path project_path_;
-    bool                  consent_granted_ = false;
-    bool                  initialized_     = false;
-    std::string           client_label_;
+    core::AppState                       state_;
+    core::reviews::ReviewProposalManager proposals_;
+    std::filesystem::path                project_path_;
+    bool                                 consent_granted_ = false;
+    bool                                 initialized_     = false;
+    std::string                          client_label_;
 };
 
 // Reads the `mcp.enabled` flag from a settings document. A missing file, a

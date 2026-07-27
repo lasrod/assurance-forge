@@ -358,6 +358,7 @@ add_executable(tests
     tests/test_projection_coverage.cpp
     tests/test_mcp_jsonrpc.cpp
     tests/test_mcp_server.cpp
+    tests/test_mcp_proposals.cpp
     tests/test_user_settings_path.cpp
 )
 # Production sources are pulled in via the per-layer af_* OBJECT libraries

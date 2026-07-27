@@ -34,6 +34,33 @@ bool ElementExists(const parser::AssuranceCase& model, const std::string& id) {
     });
 }
 
+bool RefNamesExistingElement(const std::optional<ElementRef>& ref) {
+    return ref.has_value() && ref->existing_id.has_value() && !ref->existing_id->empty();
+}
+
+// Whether the proposal reads or modifies anything already in the case, as
+// opposed to being purely additive.
+//
+// This is what decides if an empty `anchor_element_id` is acceptable. The anchor
+// exists so a proposal can be shown against the element it concerns and can go
+// stale when that element changes underneath it. A proposal that creates the
+// case's first goal has neither property: there is no element to anchor to, and
+// nothing it could be stale against. Any proposal that does touch an existing
+// element still requires an anchor, so relaxing this costs no staleness
+// detection.
+bool TouchesExistingElement(const ReviewProposal& proposal) {
+    if (!proposal.affected_existing_element_ids.empty()) {
+        return true;
+    }
+    for (const PatchOperation& operation : proposal.operations) {
+        if (RefNamesExistingElement(operation.element) || RefNamesExistingElement(operation.source) ||
+            RefNamesExistingElement(operation.target)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const std::string& id) {
     for (const parser::SacmElement& element : model.elements) {
         if (element.id == id)
@@ -305,14 +332,24 @@ ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& prop
         result.reason = "The proposal is missing an id.";
         return result;
     }
-    if (proposal.anchor_element_id.empty() || !ElementExists(current_model, proposal.anchor_element_id)) {
+    if (proposal.anchor_element_id.empty()) {
+        // A purely additive proposal -- creating the case's first goal, say --
+        // has nothing to anchor to. Anything that touches an existing element
+        // still needs one.
+        if (TouchesExistingElement(proposal)) {
+            result.reason = "The proposal changes existing elements but names no anchor element.";
+            return result;
+        }
+    } else if (!ElementExists(current_model, proposal.anchor_element_id)) {
         result.reason = "The anchor element no longer exists.";
         return result;
     }
 
     std::set<std::string> affected_ids(proposal.affected_existing_element_ids.begin(),
                                        proposal.affected_existing_element_ids.end());
-    affected_ids.insert(proposal.anchor_element_id);
+    if (!proposal.anchor_element_id.empty()) {
+        affected_ids.insert(proposal.anchor_element_id);
+    }
     for (const std::string& id : affected_ids) {
         const parser::SacmElement* element = FindElement(current_model, id);
         if (!element) {

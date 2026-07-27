@@ -3,11 +3,17 @@
 #include "mcp/session.h"
 
 #include "core/assurance_tree.h"
+#include "core/reviews/review_proposal.h"
+#include "core/reviews/review_proposal_factory.h"
+#include "core/reviews/review_proposal_manager.h"
+#include "core/reviews/review_proposal_patch_service.h"
+#include "core/time_utils.h"
 #include "parser/model_utils.h"
 
 #include <algorithm>
 #include <cctype>
 #include <map>
+#include <set>
 #include <string>
 
 namespace mcp {
@@ -184,6 +190,10 @@ ToolResult GetCaseOverview(Session& session, const nlohmann::json&) {
         {"element_counts_by_type", counts_by_type},
         {"assurance_claim_point_count", static_cast<int>(model.acps.size())},
         {"project_path", session.project_path().string()},
+        // Which file the case came from. A project can hold several argument
+        // files and the session opens the first, so an agent reasoning about
+        // "the case" should be able to see which one that was.
+        {"loaded_file", session.state().loaded_file_path.generic_string()},
     };
     if (!model.description.empty()) {
         overview["case_description"] = model.description;
@@ -338,6 +348,328 @@ ToolResult GetArgumentTree(Session& session, const nlohmann::json& arguments) {
     return ToolResult::Ok(std::move(result));
 }
 
+// ---------------------------------------------------------------------------
+// Proposing changes
+//
+// The MCP server never edits the case. It writes ReviewProposal drafts, which a
+// human accepts in the GUI -- the same patch format, staleness detection and
+// apply path the in-app review flow already uses. An agent therefore cannot make
+// a change the user did not look at, and cannot make one the GUI could not.
+// ---------------------------------------------------------------------------
+
+// `{"id": "G1"}` names an element already in the case; `{"ref": "$goal"}` names
+// one this same proposal creates. Exactly one: a reference carrying both is
+// ambiguous, and one carrying neither cannot be resolved.
+bool ParseElementRef(const nlohmann::json& source, const char* field,
+                     std::optional<core::reviews::ElementRef>& out, std::string& error) {
+    const nlohmann::json::const_iterator found = source.find(field);
+    if (found == source.end() || found->is_null()) {
+        return true; // Absent is fine; the operation type decides what it needs.
+    }
+    if (!found->is_object()) {
+        error = std::string(field) + " must be an object like {\"id\": \"G1\"} or {\"ref\": \"$goal\"}.";
+        return false;
+    }
+
+    const nlohmann::json::const_iterator id  = found->find("id");
+    const nlohmann::json::const_iterator ref = found->find("ref");
+    const bool has_id  = id != found->end() && id->is_string() && !id->get<std::string>().empty();
+    const bool has_ref = ref != found->end() && ref->is_string() && !ref->get<std::string>().empty();
+    if (has_id == has_ref) {
+        error = std::string(field) + " must carry exactly one of \"id\" (an existing element) or "
+                                     "\"ref\" (one this proposal creates).";
+        return false;
+    }
+
+    core::reviews::ElementRef parsed;
+    if (has_id) {
+        parsed.existing_id = id->get<std::string>();
+    } else {
+        parsed.create_ref = ref->get<std::string>();
+    }
+    out = parsed;
+    return true;
+}
+
+bool ParsePatchOperation(const nlohmann::json& source, core::reviews::PatchOperation& out,
+                         std::string& error) {
+    if (!source.is_object()) {
+        error = "Each operation must be an object.";
+        return false;
+    }
+    const std::string type = StringArgument(source, "type");
+    if (type.empty()) {
+        error = "Each operation needs a \"type\".";
+        return false;
+    }
+    if (!core::reviews::PatchOperationTypeFromString(type, out.type)) {
+        error = "Unknown operation type \"" + type + "\".";
+        return false;
+    }
+
+    if (!ParseElementRef(source, "element", out.element, error) ||
+        !ParseElementRef(source, "source", out.source, error) ||
+        !ParseElementRef(source, "target", out.target, error)) {
+        return false;
+    }
+
+    const std::string create_ref = StringArgument(source, "create_ref");
+    if (!create_ref.empty()) {
+        out.create_ref = create_ref;
+    }
+    out.field     = StringArgument(source, "field");
+    out.old_value = StringArgument(source, "old_value");
+    out.new_value = StringArgument(source, "new_value");
+    out.text      = StringArgument(source, "text");
+    return true;
+}
+
+struct ProposalBuild {
+    core::reviews::ReviewProposal proposal;
+    std::string                   error;
+};
+
+ProposalBuild BuildProposal(Session& session, const nlohmann::json& arguments) {
+    ProposalBuild build;
+
+    const std::string title = StringArgument(arguments, "title");
+    if (title.empty()) {
+        build.error = "Argument \"title\" is required.";
+        return build;
+    }
+    const nlohmann::json::const_iterator operations = arguments.find("operations");
+    if (operations == arguments.end() || !operations->is_array() || operations->empty()) {
+        build.error = "Argument \"operations\" must be a non-empty array.";
+        return build;
+    }
+
+    core::reviews::ReviewProposal& proposal = build.proposal;
+    proposal.id                = core::reviews::GenerateReviewProposalId();
+    proposal.title             = title;
+    proposal.summary           = StringArgument(arguments, "summary");
+    proposal.created_utc       = core::NowUtcString();
+    proposal.anchor_element_id = StringArgument(arguments, "anchor_element_id");
+    // Attribution the GUI shows and the audit trail keeps, so an accepted change
+    // is traceable to the client that proposed it rather than to "the AI".
+    proposal.author_name = "MCP: " + session.client_label();
+
+    for (const nlohmann::json& operation : *operations) {
+        core::reviews::PatchOperation parsed;
+        if (!ParsePatchOperation(operation, parsed, build.error)) {
+            return build;
+        }
+        proposal.operations.push_back(std::move(parsed));
+    }
+
+    // Every existing element the patch reaches is declared as affected and gets a
+    // base hash. Collected here rather than trusted from the caller: an agent
+    // that under-declares would be handed weaker staleness checking than it
+    // deserves, which is the failure that lets a stale patch apply cleanly.
+    std::set<std::string> affected;
+    if (!proposal.anchor_element_id.empty()) {
+        affected.insert(proposal.anchor_element_id);
+    }
+    for (const core::reviews::PatchOperation& operation : proposal.operations) {
+        for (const std::optional<core::reviews::ElementRef>* ref :
+             {&operation.element, &operation.source, &operation.target}) {
+            if (ref->has_value() && (*ref)->existing_id.has_value() &&
+                !(*ref)->existing_id->empty()) {
+                affected.insert(*(*ref)->existing_id);
+            }
+        }
+    }
+
+    const parser::AssuranceCase& model = session.assurance_case();
+    proposal.base_model_hash           = core::reviews::ComputeModelSemanticHash(model);
+    for (const std::string& id : affected) {
+        const parser::SacmElement* element = parser::FindElementById(model, id);
+        if (element == nullptr) {
+            build.error = "Operation references unknown element \"" + id + "\".";
+            return build;
+        }
+        proposal.affected_existing_element_ids.push_back(id);
+        proposal.base_element_hashes[id] = core::reviews::ComputeElementSemanticHash(*element);
+    }
+    return build;
+}
+
+struct ProposalCheck {
+    bool           ok = false;
+    std::string    error;
+    nlohmann::json effects;
+};
+
+// Validity plus a dry run. Both the preview and the create path use this, so a
+// proposal that cannot apply is refused rather than written to disk for a human
+// to discover later.
+ProposalCheck CheckProposal(Session& session, const core::reviews::ReviewProposal& proposal) {
+    ProposalCheck check;
+    const parser::AssuranceCase& model = session.assurance_case();
+
+    const core::reviews::ProposalValidityResult validity =
+        core::reviews::EvaluateReviewProposalValidity(proposal, model);
+    if (validity.validity != core::reviews::ProposalValidity::Valid) {
+        check.error = "Proposal is not valid: " + validity.reason;
+        return check;
+    }
+
+    const core::reviews::ReviewProposalPatchService service;
+    const core::reviews::ProposalPreviewResult      preview =
+        service.BuildPreviewModel(proposal, model);
+    if (!preview.success) {
+        check.error = "Proposal could not be applied: " + preview.error;
+        return check;
+    }
+
+    nlohmann::json created = nlohmann::json::object();
+    for (const std::pair<const std::string, std::string>& entry : preview.generated_ids) {
+        created[entry.first] = entry.second;
+    }
+
+    check.ok      = true;
+    check.effects = nlohmann::json{
+        {"created_element_ids", std::move(created)},
+        {"element_count_before", static_cast<int>(model.elements.size())},
+        {"element_count_after", static_cast<int>(preview.preview_model.elements.size())},
+        {"operation_count", static_cast<int>(proposal.operations.size())},
+    };
+    return check;
+}
+
+ToolResult PreviewReviewProposal(Session& session, const nlohmann::json& arguments) {
+    const ToolResult guard = RequireCase(session);
+    if (guard.is_error) {
+        return guard;
+    }
+
+    ProposalBuild build = BuildProposal(session, arguments);
+    if (!build.error.empty()) {
+        return ToolResult::Error(build.error);
+    }
+    const ProposalCheck check = CheckProposal(session, build.proposal);
+    if (!check.ok) {
+        return ToolResult::Error(check.error);
+    }
+
+    nlohmann::json result = check.effects;
+    result["would_apply"]  = true;
+    result["saved"]        = false;
+    result["note"]         = "Nothing was written. Call create_review_proposal to save this as a "
+                             "draft for the user to review.";
+    return ToolResult::Ok(std::move(result));
+}
+
+ToolResult CreateReviewProposal(Session& session, const nlohmann::json& arguments) {
+    const ToolResult guard = RequireCase(session);
+    if (guard.is_error) {
+        return guard;
+    }
+    if (!session.has_project()) {
+        return ToolResult::Error(
+            "Proposals are stored in the project directory, but this session opened a standalone "
+            "SACM file. Point --project at the project to propose changes.");
+    }
+
+    ProposalBuild build = BuildProposal(session, arguments);
+    if (!build.error.empty()) {
+        return ToolResult::Error(build.error);
+    }
+    const ProposalCheck check = CheckProposal(session, build.proposal);
+    if (!check.ok) {
+        return ToolResult::Error(check.error);
+    }
+
+    std::filesystem::path relative_path;
+    std::string           error;
+    if (!session.proposals().SaveProposal(build.proposal, &relative_path, error)) {
+        return ToolResult::Error("Could not save the proposal: " + error);
+    }
+    // The GUI lists proposals from a cached directory scan; without this it would
+    // not show the new draft until its poll interval elapsed.
+    session.proposals().InvalidateProposalCache();
+
+    nlohmann::json result = check.effects;
+    result["proposal_id"]  = build.proposal.id;
+    result["path"]         = relative_path.generic_string();
+    result["author"]       = build.proposal.author_name;
+    result["saved"]        = true;
+    result["note"]         = "Saved as a draft. It changes nothing until the user reviews and "
+                             "accepts it in Assurance Forge.";
+    return ToolResult::Ok(std::move(result));
+}
+
+ToolResult ListReviewProposals(Session& session, const nlohmann::json&) {
+    const ToolResult guard = RequireCase(session);
+    if (guard.is_error) {
+        return guard;
+    }
+    if (!session.has_project()) {
+        return ToolResult::Error("This session opened a standalone SACM file, which has no "
+                                 "project directory to hold proposals.");
+    }
+
+    nlohmann::json listed = nlohmann::json::array();
+    for (const core::reviews::ReviewProposalSummary& summary :
+         session.proposals().ListProposals(&session.assurance_case())) {
+        nlohmann::json entry{
+            {"id", summary.id},
+            {"title", summary.title},
+            {"path", summary.relative_path.generic_string()},
+            {"valid", summary.validity.validity == core::reviews::ProposalValidity::Valid},
+        };
+        if (!summary.summary.empty()) {
+            entry["summary"] = summary.summary;
+        }
+        if (!summary.anchor_element_id.empty()) {
+            entry["anchor_element_id"] = summary.anchor_element_id;
+        }
+        // A proposal goes stale when the case moves under it. Reported so an
+        // agent revises rather than re-proposing something already broken.
+        if (!summary.validity.reason.empty()) {
+            entry["invalid_reason"] = summary.validity.reason;
+        }
+        listed.push_back(std::move(entry));
+    }
+    // Counted before the move, for the same reason as in find_elements: braced
+    // initializers evaluate left to right, so reading `listed.size()` after
+    // `std::move(listed)` reliably reports zero.
+    const int count = static_cast<int>(listed.size());
+    return ToolResult::Ok(nlohmann::json{{"proposals", std::move(listed)}, {"count", count}});
+}
+
+ToolResult GetReviewProposal(Session& session, const nlohmann::json& arguments) {
+    const ToolResult guard = RequireCase(session);
+    if (guard.is_error) {
+        return guard;
+    }
+    if (!session.has_project()) {
+        return ToolResult::Error("This session opened a standalone SACM file, which has no "
+                                 "project directory to hold proposals.");
+    }
+    const std::string id = StringArgument(arguments, "id");
+    if (id.empty()) {
+        return ToolResult::Error("Argument \"id\" is required.");
+    }
+
+    std::string                                         error;
+    const std::optional<core::reviews::ReviewProposal> loaded =
+        session.proposals().LoadProposal(id, error);
+    if (!loaded.has_value()) {
+        return ToolResult::Error("Could not load proposal \"" + id + "\": " + error);
+    }
+
+    const core::reviews::ProposalValidityResult validity =
+        core::reviews::EvaluateReviewProposalValidity(*loaded, session.assurance_case());
+
+    nlohmann::json result = nlohmann::json::parse(core::reviews::SerializeReviewProposal(*loaded),
+                                                  nullptr, /*allow_exceptions=*/false);
+    return ToolResult::Ok(nlohmann::json{
+        {"proposal", result.is_discarded() ? nlohmann::json::object() : std::move(result)},
+        {"valid", validity.validity == core::reviews::ProposalValidity::Valid},
+        {"invalid_reason", validity.reason},
+    });
+}
+
 std::vector<ToolDefinition> BuildTools() {
     std::vector<ToolDefinition> tools;
 
@@ -396,6 +728,92 @@ std::vector<ToolDefinition> BuildTools() {
                 {"description", "Levels to descend (default 4, maximum 12)."}}}}}},
         true,
         &GetArgumentTree,
+    });
+
+    // Shared by preview and create so the two can never drift apart on what they
+    // accept -- an agent that got a clean preview must be able to save it.
+    const nlohmann::json proposal_schema{
+        {"type", "object"},
+        {"properties",
+         {{"title", {{"type", "string"}, {"description", "Short title shown to the user."}}},
+          {"summary", {{"type", "string"}, {"description", "What the change does and why."}}},
+          {"anchor_element_id",
+           {{"type", "string"},
+            {"description", "Element the proposal is about. Omit only when the proposal creates "
+                            "elements and touches nothing existing, such as a first top goal."}}},
+          {"operations",
+           {{"type", "array"},
+            {"description", "Patch operations applied in order."},
+            {"items",
+             {{"type", "object"},
+              {"properties",
+               {{"type",
+                 {{"type", "string"},
+                  {"enum", nlohmann::json::array({"CreateClaim", "CreateStrategy", "CreateSolution",
+                                                  "CreateContext", "CreateAssumption",
+                                                  "CreateJustification", "UpdateElementText",
+                                                  "UpdateElementName", "SetUndeveloped",
+                                                  "ClearUndeveloped", "AddSupportedBy",
+                                                  "RemoveSupportedBy", "AddInContextOf",
+                                                  "RemoveInContextOf", "RemoveElement"})}}},
+                {"create_ref",
+                 {{"type", "string"},
+                  {"description",
+                   "For Create* operations: a patch-local name starting with '$', which later "
+                   "operations use as {\"ref\": \"$name\"}."}}},
+                {"element",
+                 {{"type", "object"},
+                  {"description",
+                   "Target of an update or removal: {\"id\": \"G1\"} or {\"ref\": \"$goal\"}."}}},
+                {"source", {{"type", "object"}, {"description", "Relationship source."}}},
+                {"target", {{"type", "object"}, {"description", "Relationship target."}}},
+                {"field",
+                 {{"type", "string"},
+                  {"description", "For UpdateElementText: which field, e.g. \"content\"."}}},
+                {"old_value", {{"type", "string"}}},
+                {"new_value", {{"type", "string"}}},
+                {"text",
+                 {{"type", "string"},
+                  {"description", "Initial text for a Create* operation."}}}}}}}}}}},
+        {"required", nlohmann::json::array({"title", "operations"})}};
+
+    tools.push_back(ToolDefinition{
+        "preview_review_proposal",
+        "Dry-run a set of patch operations against the case and report what they would do, "
+        "writing nothing. Use this to check a patch before saving it.",
+        proposal_schema,
+        true,
+        &PreviewReviewProposal,
+    });
+
+    tools.push_back(ToolDefinition{
+        "create_review_proposal",
+        "Save a set of patch operations as a review proposal for the user to accept or reject in "
+        "Assurance Forge. This does NOT change the safety case: a proposal is a draft, and only "
+        "the user can apply it. Refuses anything that would not apply cleanly.",
+        proposal_schema,
+        true,
+        &CreateReviewProposal,
+    });
+
+    tools.push_back(ToolDefinition{
+        "list_review_proposals",
+        "List saved review proposals for this project, including whether each still applies "
+        "cleanly to the current case.",
+        nlohmann::json{{"type", "object"}, {"properties", nlohmann::json::object()}},
+        true,
+        &ListReviewProposals,
+    });
+
+    tools.push_back(ToolDefinition{
+        "get_review_proposal",
+        "Fetch one saved review proposal in full by id, with its current validity.",
+        nlohmann::json{{"type", "object"},
+                       {"properties",
+                        {{"id", {{"type", "string"}, {"description", "Proposal id."}}}}},
+                       {"required", nlohmann::json::array({"id"})}},
+        true,
+        &GetReviewProposal,
     });
 
     return tools;
