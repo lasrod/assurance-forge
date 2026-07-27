@@ -1,7 +1,57 @@
 # MCP Server — build safety cases by chat
 
-- **Status:** Planned (not implemented)
-- **Date:** 2026-07-26
+- **Status:** Reading implemented; writing planned. Capability matrix row `AF-AI-007`.
+- **Date:** 2026-07-26 (plan), 2026-07-27 (read side landed)
+
+## Implementation status
+
+| Phase | State |
+|---|---|
+| 2 — `af_mcp` layer, JSON-RPC over stdio, consent gate, read tools | **Implemented** |
+| 1 — top goal in the proposal vocabulary | Not started (prerequisite for phase 3, not for phase 2) |
+| 3 — writing via proposals | Not started |
+| 4 — discoverability, preferences toggle, consent ADR | Not started |
+
+Phases 1 and 2 were built in the opposite order to the numbering below. The
+top-goal operation is a prerequisite for *writing*, not for the server itself, so
+building the server first produced something runnable sooner without changing any
+published tool schema.
+
+Shipped in phase 2:
+
+- `assurance-forge-mcp`, a headless binary an MCP client launches
+  (`src/mcp/main.cpp`).
+- JSON-RPC 2.0 over newline-delimited stdio (`src/mcp/jsonrpc.cpp`), with
+  `initialize`, `notifications/initialized`, `ping`, `tools/list` and `tools/call`
+  (`src/mcp/server.cpp`). Protocol version is pinned, not echoed.
+- Read tools `get_case_overview`, `find_elements`, `get_element` and
+  `get_argument_tree` (`src/mcp/tools.cpp`).
+- A consent gate that fails closed, driven by `mcp.enabled` in the settings file.
+
+### Two things the plan below got wrong
+
+**`LibraryDocument` is opaque.** The plan assumed the read tools would call
+`Document::for_each_element` and `sacm::validation::validate` directly.
+`sacm_adapter::LibraryDocument` exposes no accessors by design — that is what
+keeps `sacm::model` names out of `core` — so the read tools work off
+`parser::AssuranceCase`, the same projection the GUI renders, plus
+`core::AssuranceTree` for structure. This is a better answer anyway: an agent and
+a user now see the same view of the argument.
+
+**`validate_case` is deferred.** It needs a new `sacm_adapter` seam to reach the
+library's validator. Until then load-time diagnostics are surfaced through
+`get_case_overview`'s `load_warnings`, which is honest but narrower than a full
+validation pass. `list_review_items` and `get_audit_history` are likewise not
+built yet.
+
+### Note on the settings path
+
+The consent gate reads the same `settings.json` the AI settings live in, but the
+layer gate forbids `mcp/` from including `ai/`. The path rules therefore exist in
+two places: `core::UserSettingsFilePath` and
+`ai::AiSettingsStore::DefaultSettingsPath`. `tests/test_user_settings_path.cpp`
+pins them equal, because a divergence would point the consent gate at a file
+nobody writes.
 
 ## Summary
 

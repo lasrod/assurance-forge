@@ -13,7 +13,13 @@
 #   [ai]       ai/*               → may include model, parser, sacm, core
 #   [export]   export/*           → may include model, parser, sacm, core
 #   [ui]       ui/*               → may include model, parser, sacm, core
+#   [mcp]      mcp/*              → may include model, parser, sacm, core
 #   [app]      app/*              → may include everything
+#
+# `mcp` forbidding `ai/` is deliberate, not incidental: the MCP server and the
+# in-app AI review are two independent features that must not share an inference
+# path (docs/features/mcp-server.md). The gate is what keeps that separation from
+# eroding by convenience.
 #
 # Note: parser → core dep is intentional because core/sacm_model.h owns
 # the POD schema and re-exports parser:: aliases (Phase 2 migration).
@@ -34,6 +40,7 @@ set(_AF_FORBIDDEN_core   "ai/;export/;ui/;app/")
 set(_AF_FORBIDDEN_ai     "export/;ui/;app/")
 set(_AF_FORBIDDEN_export "ai/;ui/;app/")
 set(_AF_FORBIDDEN_ui     "ai/;export/;app/")
+set(_AF_FORBIDDEN_mcp    "ai/;export/;ui/;app/")
 # app may include anything.
 
 # Known cross-layer includes recorded as exceptions. Format:
@@ -44,7 +51,7 @@ set(_AF_ALLOWLIST
     "ui:ui/panels/welcome_modal.h=app/"
 )
 
-set(_AF_LAYERS parser sacm sacm_adapter core ai export ui)
+set(_AF_LAYERS parser sacm sacm_adapter core ai export ui mcp)
 set(_AF_VIOLATIONS "")
 
 foreach(layer IN LISTS _AF_LAYERS)

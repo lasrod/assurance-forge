@@ -74,5 +74,6 @@ add_library(af_core OBJECT
     terminology_text_utils.cpp
     time_utils.cpp
     tree_editing.cpp
+    user_settings.cpp
 )
 target_link_libraries(af_core PUBLIC af_common)
