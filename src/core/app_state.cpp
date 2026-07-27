@@ -1,6 +1,5 @@
 #include "core/app_state.h"
 
-
 #include "core/audit/audit_store.h"
 #include "core/derived_views.h"
 #include "core/library_package_projection.h"
