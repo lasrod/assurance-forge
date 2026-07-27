@@ -28,7 +28,6 @@ add_library(af_app OBJECT
     areas/inspector_area.cpp
     areas/modal_host.cpp
     mcp_client_config.cpp
-    proposal_adoption.cpp
     areas/modal_host_terminology.cpp
     areas/perf_overlay_area.cpp
     areas/problems_area.cpp

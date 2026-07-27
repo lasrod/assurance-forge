@@ -1,6 +1,5 @@
 #include "core/app_state.h"
 
-#include "core/active_argument.h"
 
 #include "core/audit/audit_store.h"
 #include "core/derived_views.h"
@@ -369,12 +368,6 @@ bool AppState::open_project_file(const ProjectFileEntry& entry) {
 
     active_project_file_role = entry.role;
     active_project_file_path = project_file_path;
-    // Recorded so a separate process -- the MCP server -- reads the argument the
-    // user is actually looking at instead of guessing at the first one. Best
-    // effort: a failure here costs an external reader its default, which is not
-    // worth failing an file open over.
-    std::string sidecar_error;
-    WriteActiveArgument(current_project->rootPath, entry.relativePath, sidecar_error);
     return true;
 }
 

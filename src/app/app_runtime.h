@@ -158,19 +158,6 @@ private:
     bool ReconcileAuditStore();
     bool EnsureReviewItemStorage();
 
-    // Takes ownership of proposal files another process dropped into
-    // reviews/proposals/, creating the review item that surfaces each one and
-    // tracking the file in the manifest.
-    //
-    // The MCP server writes proposal files and nothing else. It used to also
-    // write the review item and the manifest entry, which made it a second writer
-    // of files this application saves whole -- so the next save here silently
-    // reverted both and the proposal vanished. Adoption puts every project file
-    // back under a single writer: that process owns reviews/proposals/, this one
-    // owns everything else and picks up what it finds there.
-    //
-    // Returns true when anything was adopted, so the caller can refresh.
-    bool AdoptExternalProposals();
     bool EnsureConfidenceStorage();
     bool EnsureRegisterStorage();
     // Points every controller that owns a file outside the SACM document at the

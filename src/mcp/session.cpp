@@ -1,6 +1,5 @@
 #include "mcp/session.h"
 
-#include "core/active_argument.h"
 #include "core/user_settings.h"
 
 #include <nlohmann/json.hpp>
@@ -13,35 +12,23 @@ namespace {
 
 // Opening a project reads its manifest but does not load any of its documents,
 // so a session pointed at a project directory -- the normal case -- would
-// otherwise come up with no assurance case at all. Opens the project's argument
-// file to match what the application does on open.
+// otherwise come up with no assurance case at all. Opens the project's first
+// argument file to match what the application does on open.
 //
-// Prefers the argument the application currently has open, recorded in the
-// project's session sidecar, and falls back to the first one.
-//
-// Guessing "the first" meant an agent reasoning about `main.sacm` while the user
-// edited `main2.sacm` and proposing changes against an argument they were not
-// looking at -- which is indistinguishable, from the user's side, from the
-// proposal never arriving.
+// A standalone session cannot know which argument the user is looking at. That
+// is a property of the running application, and the answer arrives over the
+// bridge; `open_case_file` lets a client move in the meantime.
 bool OpenProjectArgumentFile(core::AppState& state) {
     if (!state.current_project.has_value()) {
         return false;
     }
 
-    const std::string active = core::ReadActiveArgument(state.current_project->rootPath);
-    const core::ProjectFileEntry* first = nullptr;
     for (const core::ProjectFileEntry& entry : state.current_project->files) {
-        if (entry.role != core::ProjectFileRole::SacmArgument) {
-            continue;
-        }
-        if (!active.empty() && entry.relativePath.generic_string() == active) {
+        if (entry.role == core::ProjectFileRole::SacmArgument) {
             return state.open_project_file(entry);
         }
-        if (first == nullptr) {
-            first = &entry;
-        }
     }
-    return first != nullptr && state.open_project_file(*first);
+    return false;
 }
 
 // A path we should hand to AppState::open_project rather than load_file: a
