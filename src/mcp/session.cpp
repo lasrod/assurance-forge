@@ -1,5 +1,6 @@
 #include "mcp/session.h"
 
+#include "core/active_argument.h"
 #include "core/user_settings.h"
 
 #include <nlohmann/json.hpp>
@@ -15,19 +16,32 @@ namespace {
 // otherwise come up with no assurance case at all. Opens the project's argument
 // file to match what the application does on open.
 //
-// Picks the first SacmArgument entry. A project holding several arguments has no
-// way to say which one it wants yet; `get_case_overview` reports the file that
-// was actually loaded so the choice is at least visible.
+// Prefers the argument the application currently has open, recorded in the
+// project's session sidecar, and falls back to the first one.
+//
+// Guessing "the first" meant an agent reasoning about `main.sacm` while the user
+// edited `main2.sacm` and proposing changes against an argument they were not
+// looking at -- which is indistinguishable, from the user's side, from the
+// proposal never arriving.
 bool OpenProjectArgumentFile(core::AppState& state) {
     if (!state.current_project.has_value()) {
         return false;
     }
+
+    const std::string active = core::ReadActiveArgument(state.current_project->rootPath);
+    const core::ProjectFileEntry* first = nullptr;
     for (const core::ProjectFileEntry& entry : state.current_project->files) {
-        if (entry.role == core::ProjectFileRole::SacmArgument) {
+        if (entry.role != core::ProjectFileRole::SacmArgument) {
+            continue;
+        }
+        if (!active.empty() && entry.relativePath.generic_string() == active) {
             return state.open_project_file(entry);
         }
+        if (first == nullptr) {
+            first = &entry;
+        }
     }
-    return false;
+    return first != nullptr && state.open_project_file(*first);
 }
 
 // A path we should hand to AppState::open_project rather than load_file: a
@@ -53,33 +67,6 @@ bool ReadMcpConsent(const std::filesystem::path& settings_path) {
 
 bool Session::consent_granted() const {
     return ReadMcpConsent(settings_path_);
-}
-
-void Session::LoadReviewItems() {
-    if (!state_.current_project.has_value()) {
-        return;
-    }
-    const core::AssuranceProject& project = state_.current_project.value();
-
-    // Mirrors ReviewController::SaveIfDirty: the tracked file when the project
-    // has one, otherwise the conventional name, which SaveReviewItemsFile then
-    // creates and tracks on first write.
-    std::filesystem::path relative = "review-items.af.json";
-    for (const core::ProjectFileEntry& entry : project.files) {
-        if (entry.role == core::ProjectFileRole::ReviewItems) {
-            relative = entry.relativePath;
-            break;
-        }
-    }
-
-    review_items_.SetFilePath(project.rootPath / relative);
-    std::string error;
-    if (!review_items_.Load(error)) {
-        // A project with no review file yet is the normal starting state, not a
-        // failure; an unreadable one is left empty rather than half-parsed.
-        review_items_.Clear();
-        review_items_.SetFilePath(project.rootPath / relative);
-    }
 }
 
 std::vector<core::ProjectFileEntry> Session::case_files() const {
@@ -148,7 +135,6 @@ std::unique_ptr<Session> Session::Open(Config config, std::string& error) {
 
     if (session->state_.current_project.has_value()) {
         session->proposals_.SetProjectRoot(session->state_.current_project->rootPath);
-        session->LoadReviewItems();
         if (!session->state_.loaded_case.has_value() && !OpenProjectArgumentFile(session->state_)) {
             // Not fatal: the project may legitimately hold no argument yet, and a
             // session that can still list proposals is more useful than none. The

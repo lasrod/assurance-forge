@@ -382,79 +382,48 @@ TEST(McpProposals, RefusesToProposeAgainstAStandaloneSacmFile) {
 // an item cannot be seen or accepted however well-formed it is.
 // ---------------------------------------------------------------------------
 
-TEST(McpProposals, TracksTheProposalInTheProjectManifest) {
-    std::unique_ptr<Fixture> fixture = MakeProjectFixture("manifest");
+// The MCP server writes proposal files and NOTHING else. It briefly also wrote
+// the review item and the manifest entry, which made it a second writer of files
+// the application saves whole -- so the next save there reverted both and the
+// proposal silently vanished. Reported from real use. The application now adopts
+// what it finds in reviews/proposals/, and this pins the split.
+TEST(McpProposals, TouchesNeitherTheManifestNorTheReviewItems) {
+    std::unique_ptr<Fixture> fixture = MakeProjectFixture("singlewriter");
     ASSERT_NE(fixture, nullptr);
     mcp::Server server(*fixture->session);
     Initialize(server);
     const std::string parent_id = FirstClaimId(server);
     ASSERT_FALSE(parent_id.empty());
 
-    const ToolCall created =
-        CallTool(server, "create_review_proposal",
-                 {{"title", "Tracked change"},
-                  {"anchor_element_id", parent_id},
-                  {"operations", AddSubGoalOperations(parent_id, "Sub-goal.")}});
-    ASSERT_FALSE(created.is_error) << created.payload.dump();
-    const std::string path = created.payload["path"].get<std::string>();
+    const std::filesystem::path manifest = fixture->project_root / "af.proj";
+    const std::filesystem::path review_items =
+        fixture->project_root / "reviews" / "review-items.af.json";
 
-    // Re-read from disk: an entry that only ever existed in memory would not
-    // survive this, and the app loads the manifest from disk.
-    core::AppState reopened;
-    ASSERT_TRUE(reopened.open_project(fixture->project_root.string())) << reopened.status_message;
-    ASSERT_TRUE(reopened.current_project.has_value());
-
-    bool tracked = false;
-    for (const core::ProjectFileEntry& entry : reopened.current_project->files) {
-        if (entry.relativePath.generic_string() == path) {
-            tracked = true;
-            EXPECT_EQ(entry.role, core::ProjectFileRole::ReviewProposal);
-        }
-    }
-    EXPECT_TRUE(tracked) << "proposal " << path << " is not tracked by the project manifest";
-}
-
-TEST(McpProposals, AttachesTheProposalToAReviewItemSoTheAppCanShowIt) {
-    std::unique_ptr<Fixture> fixture = MakeProjectFixture("reviewitem");
-    ASSERT_NE(fixture, nullptr);
-    mcp::Server server(*fixture->session);
-    Initialize(server);
-    const std::string parent_id = FirstClaimId(server);
-    ASSERT_FALSE(parent_id.empty());
+    const auto read = [](const std::filesystem::path& path) -> std::string {
+        std::ifstream      in(path, std::ios::binary);
+        std::ostringstream buffer;
+        buffer << in.rdbuf();
+        return buffer.str();
+    };
+    const std::string manifest_before = read(manifest);
+    const std::string review_before   = read(review_items);
 
     const ToolCall created =
         CallTool(server, "create_review_proposal",
-                 {{"title", "Visible change"},
-                  {"summary", "Adds a sub-goal."},
+                 {{"title", "Single writer"},
                   {"anchor_element_id", parent_id},
                   {"operations", AddSubGoalOperations(parent_id, "Sub-goal.")}});
     ASSERT_FALSE(created.is_error) << created.payload.dump();
-    const std::string proposal_id = created.payload["proposal_id"].get<std::string>();
 
-    core::AppState reopened;
-    ASSERT_TRUE(reopened.open_project(fixture->project_root.string())) << reopened.status_message;
-    std::filesystem::path review_path;
-    for (const core::ProjectFileEntry& entry : reopened.current_project->files) {
-        if (entry.role == core::ProjectFileRole::ReviewItems) {
-            review_path = reopened.current_project->rootPath / entry.relativePath;
-        }
-    }
-    ASSERT_FALSE(review_path.empty()) << "no review items file was tracked";
+    EXPECT_EQ(read(manifest), manifest_before)
+        << "the MCP server rewrote af.proj; the application owns that file";
+    EXPECT_EQ(read(review_items), review_before)
+        << "the MCP server rewrote review-items.af.json; the application owns that file";
 
-    core::reviews::ReviewItemManager items;
-    items.SetFilePath(review_path);
-    std::string error;
-    ASSERT_TRUE(items.Load(error)) << error;
-
-    bool linked = false;
-    for (const core::reviews::ReviewItem& item : items.GetItems()) {
-        if (item.proposal_id.has_value() && item.proposal_id.value() == proposal_id) {
-            linked = true;
-            EXPECT_EQ(item.element_id, parent_id);
-            EXPECT_EQ(item.title, "Visible change");
-        }
-    }
-    EXPECT_TRUE(linked) << "no review item points at the proposal, so the app cannot display it";
+    // The one thing it does own.
+    const std::filesystem::path written =
+        fixture->project_root / created.payload["path"].get<std::string>();
+    EXPECT_TRUE(std::filesystem::exists(written)) << written.string();
 }
 
 // ---------------------------------------------------------------------------

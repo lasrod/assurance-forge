@@ -582,65 +582,31 @@ ToolResult CreateReviewProposal(Session& session, const nlohmann::json& argument
         return ToolResult::Error(check.error);
     }
 
-    // Saved through ProjectService, not ReviewProposalManager, because the file
-    // has to be TRACKED in the project manifest to be part of the project rather
-    // than merely sitting inside its directory. Writing it directly produced a
-    // proposal that was on disk, valid, and invisible in the app.
-    core::AssuranceProject& project = session.project();
-    core::ProjectFileEntry  proposal_entry;
-    std::string             error;
-    if (!core::ProjectService::SaveReviewProposalFile(
-            project, build.proposal.id, core::reviews::SerializeReviewProposal(build.proposal),
-            proposal_entry, error)) {
+    // Writes ONLY the proposal file. Nothing else in the project is touched.
+    //
+    // An earlier version also tracked the file in the manifest and appended the
+    // review item that surfaces it, which is what the app does. That made this
+    // process a second writer of `af.proj` and `review-items.af.json`, and both
+    // are saved whole-file: the app, holding its own older copy, wrote over both
+    // on its next save and the proposal went back to being invisible. Reported
+    // from real use, and the reason the split is now strict -- this process owns
+    // `reviews/proposals/`, the app owns everything else and adopts what it finds
+    // here.
+    std::filesystem::path relative_path;
+    std::string           error;
+    if (!session.proposals().SaveProposal(build.proposal, &relative_path, error)) {
         return ToolResult::Error("Could not save the proposal: " + error);
-    }
-
-    // A proposal reaches the user through a review item: the Review panel walks
-    // items and renders a proposal only for those carrying a `proposal_id`. This
-    // is the half that was missing, and without it the draft cannot be seen or
-    // accepted no matter how well-formed it is.
-    core::reviews::ReviewItem item;
-    item.id            = "mcp-proposal:" + build.proposal.id;
-    item.element_id    = build.proposal.anchor_element_id;
-    item.title         = build.proposal.title;
-    item.message       = build.proposal.summary.empty()
-                             ? std::string("Proposed by an AI client over MCP.")
-                             : build.proposal.summary;
-    item.severity      = "info";
-    item.reviewer_name = build.proposal.author_name;
-    item.source        = core::reviews::ReviewItemSource::AIReview;
-    item.status        = core::reviews::ReviewItemStatus::Open;
-    item.proposal_id   = build.proposal.id;
-    item.created_utc   = build.proposal.created_utc;
-    item.updated_utc   = build.proposal.created_utc;
-    session.review_items().AddOrUpdateItem(item);
-
-    core::ProjectFileEntry review_entry;
-    const std::string      review_content = core::reviews::SerializeReviewItems(
-        session.review_items().GetItems(), session.review_items().GetElementReviewStates());
-    if (!core::ProjectService::SaveReviewItemsFile(project, "review-items.af.json", review_content,
-                                                   review_entry, error)) {
-        return ToolResult::Error("Saved the proposal but could not record the review comment: " +
-                                 error);
-    }
-
-    // Both writes tracked new entries in the in-memory manifest; persisting it is
-    // what makes the app see them on its next load.
-    if (!core::ProjectService::WriteManifestSafely(project, error)) {
-        return ToolResult::Error("Saved the proposal but could not update the project manifest: " +
-                                 error);
     }
     session.proposals().InvalidateProposalCache();
 
-    nlohmann::json result   = check.effects;
-    result["proposal_id"]   = build.proposal.id;
-    result["path"]          = proposal_entry.relativePath.generic_string();
-    result["review_item_id"] = item.id;
-    result["author"]        = build.proposal.author_name;
-    result["saved"]         = true;
-    result["note"]          = "Saved as a draft and attached to a review comment. It changes "
-                              "nothing until the user reviews and accepts it in Assurance Forge, "
-                              "where it appears under Review.";
+    nlohmann::json result = check.effects;
+    result["proposal_id"] = build.proposal.id;
+    result["path"]        = relative_path.generic_string();
+    result["author"]      = build.proposal.author_name;
+    result["saved"]       = true;
+    result["note"]        = "Saved as a draft. Assurance Forge picks it up within a second or two "
+                            "and lists it under Review, where the user can accept or reject it. It "
+                            "changes nothing until they do.";
     return ToolResult::Ok(std::move(result));
 }
 

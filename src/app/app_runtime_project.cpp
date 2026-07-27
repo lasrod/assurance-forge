@@ -1,4 +1,6 @@
 #include "app/app_runtime.h"
+
+#include "app/proposal_adoption.h"
 #include "app/actions/terminology_actions.h"
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
@@ -1077,6 +1079,67 @@ bool AppRuntime::EnsureReviewItemStorage() {
     impl_->problems_dirty.review = true;
     SetStatus("Review items could not be loaded: " + error);
     return false;
+}
+
+bool AppRuntime::AdoptExternalProposals() {
+    if (!impl_->app_state.current_project.has_value()) {
+        return false;
+    }
+    core::AssuranceProject& project = impl_->app_state.current_project.value();
+
+    const parser::AssuranceCase* model =
+        impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
+
+    // ListProposals throttles its own directory scan, so this is cheap per frame.
+    std::vector<core::reviews::ReviewProposal> proposals;
+    std::vector<std::filesystem::path>         paths;
+    for (const core::reviews::ReviewProposalSummary& summary :
+         impl_->proposal_controller->manager.ListProposals(model)) {
+        std::string error;
+        std::optional<core::reviews::ReviewProposal> proposal =
+            impl_->proposal_controller->manager.LoadProposal(summary.id, error);
+        if (!proposal.has_value()) {
+            // A half-written file from a writer mid-flush. Left alone; the next
+            // pass picks it up once it parses.
+            continue;
+        }
+        proposals.push_back(std::move(proposal.value()));
+        paths.push_back(summary.relative_path);
+    }
+
+    const std::vector<ProposalAdoption> adoptions =
+        PlanProposalAdoption(proposals, impl_->review_controller->Items());
+    if (adoptions.empty()) {
+        return false;
+    }
+
+    for (const ProposalAdoption& adoption : adoptions) {
+        impl_->review_controller->AddOrUpdateItem(adoption.item);
+        for (std::size_t index = 0; index < proposals.size(); ++index) {
+            if (proposals[index].id != adoption.proposal_id) {
+                continue;
+            }
+            // Already-tracked files report an error we do not care about; the
+            // point is that untracked ones become part of the project.
+            core::ProjectFileEntry entry;
+            std::string            track_error;
+            core::ProjectService::TrackExistingFile(project, paths[index],
+                                                    core::ProjectFileRole::ReviewProposal, entry,
+                                                    track_error);
+            break;
+        }
+    }
+
+    std::string error;
+    if (!impl_->review_controller->SaveIfDirty(project, error)) {
+        SetStatus("Adopted proposal could not be recorded: " + error);
+    }
+    if (!core::ProjectService::WriteManifestSafely(project, error)) {
+        SetStatus("Adopted proposal could not be tracked: " + error);
+    }
+    impl_->proposal_controller->manager.InvalidateProposalCache();
+    impl_->problems_dirty.review = true;
+    return true;
 }
 
 bool AppRuntime::EnsureConfidenceStorage() {

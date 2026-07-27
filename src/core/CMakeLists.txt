@@ -1,4 +1,5 @@
 add_library(af_core OBJECT
+    active_argument.cpp
     acp/acp_editing.cpp
     acp/acp_relationship_index.cpp
     acp/assurance_claim_point.cpp

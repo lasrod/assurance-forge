@@ -162,6 +162,11 @@ void AppRuntime::RenderFrame(bool& done) {
             // that cache is stale too.
             impl_->proposal_controller->manager.InvalidateProposalCache();
         }
+        // Then take ownership of anything another process dropped in. This is how
+        // an MCP proposal reaches the user: that process writes only the proposal
+        // file, and this side creates the review item and manifest entry, so no
+        // project file has two writers.
+        AdoptExternalProposals();
     }
 
     {
