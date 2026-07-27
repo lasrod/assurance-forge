@@ -44,32 +44,15 @@ bool LooksLikeAssuranceCaseFile(const std::filesystem::path& path) {
 } // namespace
 
 bool ReadMcpConsent(const std::filesystem::path& settings_path) {
-    std::error_code ec;
-    if (!std::filesystem::exists(settings_path, ec)) {
+    // Missing file, unreadable file, and malformed document all arrive here as a
+    // null section, which falls through to false along with a missing or
+    // non-boolean flag. Every path fails closed.
+    const nlohmann::json section = core::ReadUserSettingsSection(settings_path, "mcp");
+    if (!section.is_object()) {
         return false;
     }
-
-    std::ifstream file(settings_path);
-    if (!file) {
-        return false;
-    }
-
-    // Comments are tolerated because the sibling "ai" section is read the same
-    // way, and a hand-edited settings file is the only way to enable MCP until
-    // the preferences toggle lands.
-    const nlohmann::json root =
-        nlohmann::json::parse(file, nullptr, /*allow_exceptions=*/false, /*ignore_comments=*/true);
-    if (root.is_discarded() || !root.is_object()) {
-        return false;
-    }
-
-    const nlohmann::json::const_iterator section = root.find("mcp");
-    if (section == root.end() || !section->is_object()) {
-        return false;
-    }
-
-    const nlohmann::json::const_iterator enabled = section->find("enabled");
-    if (enabled == section->end() || !enabled->is_boolean()) {
+    const nlohmann::json::const_iterator enabled = section.find("enabled");
+    if (enabled == section.end() || !enabled->is_boolean()) {
         return false;
     }
     return enabled->get<bool>();

@@ -18,7 +18,10 @@
 // pointing at a stale file that still says `true` after the user revoked
 // permission. Neither is visible without this pin.
 
+#include <nlohmann/json.hpp>
+
 #include <filesystem>
+#include <string>
 
 namespace core {
 
@@ -27,5 +30,29 @@ namespace core {
 //          $HOME/.config/assurance-forge/settings.json
 // Fallback: <temp>/AssuranceForge/settings.json
 std::filesystem::path UserSettingsFilePath();
+
+// One settings file now holds several independent sections -- `"ai"` and
+// `"mcp"`, with more likely -- written by components that cannot see each other.
+// Anything that writes it must therefore read-modify-write.
+//
+// This is not hypothetical tidiness. `AiSettingsStore::Save` used to build a
+// fresh document containing only `"ai"` and truncate the file, so saving any AI
+// preference silently deleted the `"mcp"` section and turned the MCP server off.
+// The user got no diagnostic: their AI client simply started refusing with
+// "not been given permission". Every writer goes through the helper below so
+// that cannot happen again.
+
+// Returns the named top-level section, or a null json when the file is missing,
+// unreadable, malformed, or has no such section. Comments are tolerated, since
+// the file is hand-edited.
+nlohmann::json ReadUserSettingsSection(const std::filesystem::path& path, const std::string& section);
+
+// Sets one top-level section, preserving every sibling section already in the
+// file. Creates the file and its directory when absent. A malformed existing
+// document is replaced rather than propagated -- there is nothing to preserve in
+// something that cannot be parsed, and refusing to save would leave the user
+// unable to fix it from the UI.
+bool UpdateUserSettingsSection(const std::filesystem::path& path, const std::string& section,
+                               const nlohmann::json& value, std::string& error);
 
 } // namespace core

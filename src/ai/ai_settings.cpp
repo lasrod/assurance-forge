@@ -1,5 +1,7 @@
 #include "ai/ai_settings.h"
 
+#include "core/user_settings.h"
+
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -98,28 +100,17 @@ AiProviderSettings AiSettingsStore::Load(std::string* warning) const {
 }
 
 bool AiSettingsStore::Save(const AiProviderSettings& settings, std::string& error) const {
-    error.clear();
-    try {
-        std::filesystem::create_directories(settings_path_.parent_path());
-        nlohmann::json root;
-        root["ai"] = {
-            {"enabled", settings.enabled},
-            {"provider", ToSettingsString(settings.provider)},
-            {"model", settings.model.empty() ? kDefaultOpenAiModel : settings.model},
-            {"sendProjectDataOnlyOnExplicitUserAction", settings.sendProjectDataOnlyOnExplicitUserAction},
-        };
-
-        std::ofstream file(settings_path_, std::ios::binary | std::ios::trunc);
-        if (!file) {
-            error = "Could not write AI settings.";
-            return false;
-        }
-        file << root.dump(2) << '\n';
-        return true;
-    } catch (const std::exception& exception) {
-        error = exception.what();
-        return false;
-    }
+    // Writes only the "ai" section, read-modify-write, so sibling sections
+    // survive. This used to build a fresh document and truncate the file, which
+    // silently deleted the "mcp" section on every save and turned the MCP server
+    // off with no diagnostic. See core/user_settings.h.
+    const nlohmann::json ai{
+        {"enabled", settings.enabled},
+        {"provider", ToSettingsString(settings.provider)},
+        {"model", settings.model.empty() ? kDefaultOpenAiModel : settings.model},
+        {"sendProjectDataOnlyOnExplicitUserAction", settings.sendProjectDataOnlyOnExplicitUserAction},
+    };
+    return core::UpdateUserSettingsSection(settings_path_, "ai", ai, error);
 }
 
 } // namespace ai
