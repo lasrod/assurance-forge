@@ -6,6 +6,7 @@
 #include "ai/secret_store.h"
 #include "app/areas/baseline_modal.h"
 #include "app/app_events.h"
+#include "app/controllers/agent_bridge_controller.h"
 #include "app/controllers/ai_review_controller.h"
 #include "app/controllers/acp_controller.h"
 #include "app/controllers/confidence_controller.h"
@@ -193,6 +194,10 @@ struct AppRuntimeState {
     std::unique_ptr<controllers::ConfidenceController> confidence_controller;
     std::unique_ptr<controllers::RegisterController> register_controller;
     std::unique_ptr<controllers::AcpController> acp_controller;
+    // Serves connected AI clients. Requests it queues are executed on the frame
+    // thread by AppRuntime::PollAgentBridge, against the model the user is
+    // looking at.
+    std::unique_ptr<controllers::AgentBridgeController> agent_bridge;
     std::optional<GuidelineCatalog> guideline_catalog;
     bool guideline_catalog_load_attempted = false;
     std::string guideline_catalog_error;

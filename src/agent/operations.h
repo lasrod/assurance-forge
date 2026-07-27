@@ -1,0 +1,63 @@
+#pragma once
+
+// What an AI agent can ask of a safety case.
+//
+// These operations are executed in two places and must behave identically in
+// both: inside the running application, against the model the user is looking
+// at, and inside `assurance-forge-mcp` when no application is running, against
+// a copy it loaded itself. Writing them twice would let the two drift, and the
+// drift would show up as an agent that answers differently depending on whether
+// a window happens to be open.
+//
+// **This layer is the domain vocabulary; `bridge/` is the transport.** The
+// separation is what lets the wire contract stay ignorant of safety cases while
+// these functions stay ignorant of pipes.
+//
+// Read operations only. Everything that changes a safety case goes through a
+// change set and the command bus, and is therefore available only where a
+// command bus exists -- which is to say, only in the application.
+
+#include "core/app_state.h"
+
+#include <nlohmann/json.hpp>
+
+#include <string>
+
+namespace agent {
+
+struct Result {
+    nlohmann::json payload  = nlohmann::json::object();
+    bool           is_error = false;
+
+    static Result Ok(nlohmann::json payload);
+    // Worded for a model to read and act on, not for a log.
+    static Result Error(std::string message);
+};
+
+// Everything a read operation needs. Deliberately a reference to state the
+// caller owns: online this is the application's live `AppState`, so an
+// operation sees the user's current edits with no copying and no locking --
+// it runs on the frame thread, which is the thread that owns the model.
+struct ReadContext {
+    const core::AppState& state;
+    // How this case was addressed: the project directory, or the file itself
+    // when a bare SACM document was opened outside a project.
+    std::string           project_path;
+};
+
+Result GetCaseOverview(const ReadContext& context);
+Result FindElements(const ReadContext& context, const nlohmann::json& arguments);
+Result GetElement(const ReadContext& context, const nlohmann::json& arguments);
+Result GetArgumentTree(const ReadContext& context, const nlohmann::json& arguments);
+Result ListCaseFiles(const ReadContext& context);
+
+// A chat client pays for every token an operation returns, and a real safety
+// case does not fit in a context window. These are a correctness requirement
+// rather than a nicety: an unbounded search would spend the whole conversation
+// on one call. Exposed so the tool descriptions can quote the real numbers.
+inline constexpr int kDefaultResultLimit = 50;
+inline constexpr int kMaxResultLimit     = 200;
+inline constexpr int kDefaultTreeDepth   = 4;
+inline constexpr int kMaxTreeDepth       = 12;
+
+} // namespace agent

@@ -14,7 +14,8 @@
 #   [export]   export/*           → may include model, parser, sacm, core
 #   [ui]       ui/*               → may include model, parser, sacm, core
 #   [bridge]   bridge/*           → may include model, parser, sacm, core
-#   [mcp]      mcp/*              → may include model, parser, sacm, core, bridge
+#   [agent]    agent/*            → may include model, parser, sacm, core, bridge
+#   [mcp]      mcp/*              → may include model, parser, sacm, core, bridge, agent
 #   [app]      app/*              → may include everything
 #
 # `mcp` forbidding `ai/` is deliberate, not incidental: the MCP server and the
@@ -27,6 +28,13 @@
 # two can share a wire contract without either depending on the other, and it
 # forbids `core`-and-above vocabulary leaking downward the same way every other
 # layer does.
+#
+# `agent` holds the operations an AI agent performs on a safety case. It is
+# separate from `mcp` because the application executes the same operations when
+# a client is connected live, and separate from `bridge` because a transport
+# that knows what a claim is becomes a second model of the argument. Both the
+# adapter and the application link it, which is what stops online and offline
+# behaviour from drifting apart.
 #
 # Note: parser → core dep is intentional because core/sacm_model.h owns
 # the POD schema and re-exports parser:: aliases (Phase 2 migration).
@@ -47,7 +55,8 @@ set(_AF_FORBIDDEN_core   "ai/;export/;ui/;app/")
 set(_AF_FORBIDDEN_ai     "export/;ui/;app/")
 set(_AF_FORBIDDEN_export "ai/;ui/;app/")
 set(_AF_FORBIDDEN_ui     "ai/;export/;app/")
-set(_AF_FORBIDDEN_bridge "ai/;export/;ui/;mcp/;app/")
+set(_AF_FORBIDDEN_bridge "ai/;export/;ui/;agent/;mcp/;app/")
+set(_AF_FORBIDDEN_agent  "ai/;export/;ui/;mcp/;app/")
 set(_AF_FORBIDDEN_mcp    "ai/;export/;ui/;app/")
 # app may include anything.
 
@@ -59,7 +68,7 @@ set(_AF_ALLOWLIST
     "ui:ui/panels/welcome_modal.h=app/"
 )
 
-set(_AF_LAYERS parser sacm sacm_adapter core ai export ui bridge mcp)
+set(_AF_LAYERS parser sacm sacm_adapter core ai export ui bridge agent mcp)
 set(_AF_VIOLATIONS "")
 
 foreach(layer IN LISTS _AF_LAYERS)

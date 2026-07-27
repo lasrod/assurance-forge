@@ -158,6 +158,17 @@ private:
     bool ReconcileAuditStore();
     bool EnsureReviewItemStorage();
 
+    // Starts or stops serving connected AI clients to match the open project.
+    // A project with no root -- a bare SACM file -- is not served: there is
+    // nowhere to anchor an endpoint record, and nothing to propose against.
+    void UpdateAgentBridgeForProject();
+    // Runs whatever a connected client asked for, on this thread, against the
+    // model this frame is about to draw. Returns true when anything ran.
+    bool PollAgentBridge();
+    // Switches the application to another of the project's argument files at a
+    // connected client's request, through the same path a user's click takes.
+    bool OpenAgentRequestedCaseFile(const std::string& relative_path, std::string& error);
+
     bool EnsureConfidenceStorage();
     bool EnsureRegisterStorage();
     // Points every controller that owns a file outside the SACM document at the

@@ -1,15 +1,29 @@
 #pragma once
 
-// One MCP connection's view of an Assurance Forge project.
+// One MCP connection's view of an Assurance Forge project, in one of two modes.
 //
-// The session never constructs a core::commands::CommandBus, never writes SACM
-// XML, and never touches the audit store. Its only write surface is
-// ReviewProposal drafts a human accepts in the GUI, so the SACM file keeps
-// exactly one writer and the dual-writer problem does not arise.
-// See docs/features/mcp-server.md.
+// **Connected.** Assurance Forge has this project open. The session holds no
+// model of its own; every operation goes over the bridge and is answered by the
+// application from the argument the user is looking at. This is the mode that
+// matters: the agent and the user see one thing, and anything that changes the
+// case goes through the same command, validation, undo and audit path as an
+// edit made with the mouse.
+//
+// **Offline.** No application is running, so the session loads the project
+// itself and answers reads from that copy. It is **read-only**. Proposing a
+// change needs a command bus, an audit log and a human to accept it, none of
+// which exist in a headless process -- and a second writer in the project
+// directory is exactly the fault this design removes.
+//
+// The mode is decided once, at open. A session does not promote itself when the
+// application starts later: the client has already been told what this
+// connection can do, and quietly changing that mid-conversation is worse than
+// asking the user to reconnect.
 
 #include "core/app_state.h"
-#include "core/reviews/review_proposal_manager.h"
+
+#include "bridge/protocol.h"
+#include "bridge/transport.h"
 
 #include <filesystem>
 #include <memory>
@@ -19,6 +33,13 @@ namespace mcp {
 
 class Session {
   public:
+    enum class Mode {
+        // Answering from a running Assurance Forge over the bridge.
+        Connected,
+        // Answering from a copy this process loaded. Reads only.
+        Offline,
+    };
+
     struct Config {
         // A project directory, a project manifest, or a bare SACM file.
         std::filesystem::path project_path;
@@ -26,13 +47,31 @@ class Session {
         // temporary file so a developer's real consent setting cannot make a
         // test pass that would fail on a clean machine.
         std::filesystem::path settings_path;
+        // Tests set this to keep a session offline even when the developer
+        // happens to have the project open in Assurance Forge.
+        bool                  never_connect = false;
     };
 
     static std::unique_ptr<Session> Open(Config config, std::string& error);
+    ~Session();
 
-    bool                         has_case() const { return state_.loaded_case.has_value(); }
-    const parser::AssuranceCase& assurance_case() const { return state_.loaded_case.value(); }
-    const core::AppState&        state() const { return state_; }
+    Mode mode() const { return mode_; }
+    bool connected() const { return mode_ == Mode::Connected; }
+
+    // The application's version, when connected. Empty offline.
+    const std::string& application_version() const { return application_version_; }
+
+    // Runs one operation. Connected, this is a bridge round trip; offline it is
+    // executed against the loaded copy. Callers do not branch on the mode --
+    // that is the point of routing everything through here.
+    struct OperationResult {
+        nlohmann::json payload   = nlohmann::json::object();
+        bool           is_error  = false;
+        // True when the operation failed because this session is offline, so a
+        // caller can say so rather than reporting a generic failure.
+        bool           needs_application = false;
+    };
+    OperationResult Run(const std::string& op, const nlohmann::json& args);
 
     // True when the user has enabled the MCP server in settings.json. Every tool
     // that returns assurance-case content is refused until this is true.
@@ -58,32 +97,26 @@ class Session {
 
     const std::filesystem::path& project_path() const { return project_path_; }
 
-    // Proposals live in the project directory, so a bare SACM file opened
-    // standalone can be read but not proposed against. Callers must check this
-    // rather than assume: `proposals()` is only meaningful when it is true.
-    bool has_project() const { return state_.current_project.has_value(); }
-
-    core::reviews::ReviewProposalManager&       proposals() { return proposals_; }
-    const core::reviews::ReviewProposalManager& proposals() const { return proposals_; }
-
-    // The argument files this project holds, in manifest order.
-    std::vector<core::ProjectFileEntry> case_files() const;
-
-    // Loads one of `case_files()` in place, so a session can move between the
-    // arguments of a multi-file project without being relaunched.
-    bool OpenCaseFile(const std::string& relative_path, std::string& error);
-
   private:
     Session() = default;
 
+    bool ConnectToApplication(std::string& error);
+    bool OpenOffline(std::string& error);
+    OperationResult RunOverBridge(const std::string& op, const nlohmann::json& args);
+    OperationResult RunOffline(const std::string& op, const nlohmann::json& args);
 
-    core::AppState                       state_;
-    core::reviews::ReviewProposalManager proposals_;
-    std::filesystem::path                project_path_;
+    Mode                                mode_ = Mode::Offline;
+    core::AppState                      state_;
+    std::unique_ptr<bridge::Connection> connection_;
+    std::string                         token_;
+    std::string                         application_version_;
+    std::uint64_t                       next_request_id_ = 1;
+
+    std::filesystem::path project_path_;
     // Resolved once at open so every consent read hits the same file.
-    std::filesystem::path                settings_path_;
-    bool                                 initialized_ = false;
-    std::string                          client_label_;
+    std::filesystem::path settings_path_;
+    bool                  initialized_ = false;
+    std::string           client_label_;
 };
 
 // Reads the `mcp.enabled` flag from a settings document. A missing file, a

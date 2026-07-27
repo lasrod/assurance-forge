@@ -38,7 +38,9 @@ add_library(af_app OBJECT
     areas/workbench_area.cpp
     commands/dispatch.cpp
     confidence_problem_sync.cpp
+    agent_request_handler.cpp
     controllers/acp_controller.cpp
+    controllers/agent_bridge_controller.cpp
     controllers/ai_review_controller.cpp
     controllers/confidence_controller.cpp
     controllers/element_edit_controller.cpp

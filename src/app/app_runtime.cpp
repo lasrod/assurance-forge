@@ -719,6 +719,14 @@ void AppRuntime::RequestExit(bool& done) {
     // dirty.
     FlushPendingTextEdits();
 
+    // Stop serving AI clients before anything is flushed or torn down. An
+    // operation arriving mid-shutdown would run against half-closed state, and
+    // the endpoint record must not outlive the process that published it -- a
+    // stale one sends the next adapter to a pipe nobody is listening on.
+    if (impl_->agent_bridge != nullptr) {
+        impl_->agent_bridge->Stop();
+    }
+
     // Autosave on close: best-effort flush before exiting so the on-disk SACM
     // matches the user's latest in-memory edits. CommandBus already autosaves
     // per-transaction; SaveProject covers the remaining bypass paths (review

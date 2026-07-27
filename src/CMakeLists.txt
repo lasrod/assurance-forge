@@ -3,7 +3,7 @@
 #
 # Each top-level src/ subdirectory is a thin CMake OBJECT library:
 #   af_parser, af_sacm, af_sacm_adapter, af_core, af_ai, af_export, af_ui,
-#   af_bridge, af_mcp, af_app
+#   af_bridge, af_agent, af_mcp, af_app
 #
 # All libraries depend on `af_common` (INTERFACE) which carries the
 # include dirs and the third-party link surface. This keeps per-layer
@@ -35,5 +35,6 @@ add_subdirectory(ai)
 add_subdirectory(export)
 add_subdirectory(ui)
 add_subdirectory(bridge)
+add_subdirectory(agent)
 add_subdirectory(mcp)
 add_subdirectory(app)

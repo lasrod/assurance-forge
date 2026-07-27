@@ -1,6 +1,7 @@
 #include "app/app_runtime.h"
 
 #include "app/actions/terminology_actions.h"
+#include "app/agent_request_handler.h"
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
 #include "app/commands/dispatch.h"
@@ -1129,6 +1130,74 @@ void AppRuntime::EnsureProjectSideStorage() {
     EnsureReviewItemStorage();
     EnsureConfidenceStorage();
     EnsureRegisterStorage();
+    UpdateAgentBridgeForProject();
+}
+
+void AppRuntime::UpdateAgentBridgeForProject() {
+    if (impl_->agent_bridge == nullptr) {
+        return;
+    }
+    if (!impl_->app_state.current_project.has_value()) {
+        // Includes a bare SACM file opened outside a project: there is no root
+        // to key an endpoint record on, and no proposals directory to work
+        // against, so there is nothing useful to serve.
+        impl_->agent_bridge->Stop();
+        return;
+    }
+
+    std::string error;
+    if (!impl_->agent_bridge->Start(impl_->app_state.current_project->rootPath, kAppVersion,
+                                    error)) {
+        // Not fatal. The application is perfectly usable without an AI client
+        // attached, and failing an project open over it would be a poor trade.
+        SetStatus("AI clients cannot connect to this project: " + error);
+    }
+}
+
+bool AppRuntime::PollAgentBridge() {
+    if (impl_->agent_bridge == nullptr || !impl_->agent_bridge->listening()) {
+        return false;
+    }
+
+    const std::string project_path =
+        impl_->app_state.current_project.has_value()
+            ? impl_->app_state.current_project->rootPath.generic_string()
+            : std::string();
+
+    const int handled = impl_->agent_bridge->PollPendingRequests(
+        [this, &project_path](const bridge::Request&              request,
+                              const controllers::AgentConnection& connection) {
+            const AgentRequestContext context{
+                impl_->app_state, project_path, connection.client_label,
+                [this](const std::string& relative_path, std::string& error) {
+                    return OpenAgentRequestedCaseFile(relative_path, error);
+                }};
+            return HandleAgentRequest(request, context);
+        });
+    return handled > 0;
+}
+
+bool AppRuntime::OpenAgentRequestedCaseFile(const std::string& relative_path, std::string& error) {
+    error.clear();
+    if (!impl_->app_state.current_project.has_value()) {
+        error = "No project is open.";
+        return false;
+    }
+
+    for (const core::ProjectFileEntry& entry : impl_->app_state.current_project->files) {
+        if (entry.role != core::ProjectFileRole::SacmArgument ||
+            entry.relativePath.generic_string() != relative_path) {
+            continue;
+        }
+        // Goes through the same path a user's click takes, so the command bus,
+        // the audit store and every side-storage controller are reconfigured for
+        // the new file exactly as they would be otherwise.
+        OpenProjectFile(entry);
+        return true;
+    }
+
+    error = "No argument file in this project has the path \"" + relative_path + "\".";
+    return false;
 }
 
 bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {
