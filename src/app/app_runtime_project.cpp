@@ -1160,6 +1160,19 @@ bool AppRuntime::PollAgentBridge() {
         return false;
     }
 
+    // Anything an agent staged since the last frame has to reach the canvas, and
+    // staging deliberately mutates no model, so nothing else marks the derived
+    // views dirty. Checked before the poll as well as after: a change set left
+    // open when the user switched argument files must be redrawn on the way back.
+    const auto mark_dirty_if_changed = [this]() {
+        const std::uint64_t revision = impl_->agent_change_sets.revision();
+        if (revision != impl_->agent_change_revision_drawn) {
+            impl_->agent_change_revision_drawn = revision;
+            impl_->tree_needs_rebuild          = true;
+        }
+    };
+    mark_dirty_if_changed();
+
     const std::string project_path =
         impl_->app_state.current_project.has_value()
             ? impl_->app_state.current_project->rootPath.generic_string()
@@ -1179,6 +1192,8 @@ bool AppRuntime::PollAgentBridge() {
                 connection.id};
             return HandleAgentRequest(request, context);
         });
+
+    mark_dirty_if_changed();
     return handled > 0;
 }
 

@@ -84,6 +84,7 @@ std::string ChangeSetStore::Begin(std::uint64_t connection_id, std::string title
     // change is traceable to the client that proposed it rather than to "the AI".
     change_set.proposal.author_name = "MCP: " + change_set.client_label;
 
+    ++revision_;
     const std::string id = change_set.id;
     change_sets_.push_back(std::move(change_set));
     owners_.push_back(connection_id);
@@ -146,6 +147,7 @@ bool ChangeSetStore::Stage(const std::string&                          id,
     }
 
     *change_set = std::move(candidate);
+    ++revision_;
     return true;
 }
 
@@ -159,6 +161,7 @@ bool ChangeSetStore::Unstage(const std::string& id, std::size_t count, std::stri
 
     std::vector<reviews::PatchOperation>& operations = change_set->proposal.operations;
     operations.resize(count >= operations.size() ? 0 : operations.size() - count);
+    ++revision_;
     return true;
 }
 
@@ -174,6 +177,7 @@ bool ChangeSetStore::MarkReady(const std::string& id, std::string& error) {
         return false;
     }
     change_set->state = ChangeSetState::Ready;
+    ++revision_;
     return true;
 }
 
@@ -183,6 +187,7 @@ bool ChangeSetStore::MarkApplied(const std::string& id) {
         return false;
     }
     change_set->state = ChangeSetState::Applied;
+    ++revision_;
     return true;
 }
 
@@ -194,6 +199,7 @@ bool ChangeSetStore::Discard(const std::string& id, std::string& error) {
         return false;
     }
     change_set->state = ChangeSetState::Discarded;
+    ++revision_;
     return true;
 }
 
@@ -219,6 +225,7 @@ bool ChangeSetStore::has_open() const {
 void ChangeSetStore::Clear() {
     change_sets_.clear();
     owners_.clear();
+    ++revision_;
 }
 
 } // namespace core::changesets

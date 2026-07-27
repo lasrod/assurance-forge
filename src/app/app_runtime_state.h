@@ -203,6 +203,10 @@ struct AppRuntimeState {
     // into the project: a change set is a proposal in progress, not project
     // data, and a second writer in that directory is what this design removed.
     core::changesets::ChangeSetStore agent_change_sets;
+    // The store revision the canvas was last built against. Staging is not a
+    // model mutation and so marks nothing dirty; comparing this each frame is
+    // what turns an agent's staged operation into a repaint.
+    std::uint64_t                    agent_change_revision_drawn = 0;
     // The preview the canvas draws while a change set is open: the argument as
     // it would be if the user accepted, plus the elements it would remove put
     // back for display so a deletion can be seen rather than inferred from a gap.

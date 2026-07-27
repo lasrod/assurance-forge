@@ -52,12 +52,24 @@ class ChangeSetStore {
     // Whether anything is open, so the canvas can skip diffing entirely.
     bool                          has_open() const;
 
+    // Bumped by every call that changes what a reader would see. The
+    // application compares it each frame to decide whether the canvas needs
+    // rebuilding.
+    //
+    // Necessary because staging is deliberately *not* a model mutation: nothing
+    // it does marks the derived views dirty, so without this the preview only
+    // appeared when something unrelated happened to rebuild the tree -- which
+    // presented as an agent's work being invisible until the user clicked away
+    // to another argument file and back.
+    std::uint64_t revision() const { return revision_; }
+
     void Clear();
 
   private:
     std::vector<ChangeSet> change_sets_;
     std::vector<std::uint64_t> owners_;
     std::uint64_t              next_serial_ = 1;
+    std::uint64_t              revision_    = 0;
 };
 
 } // namespace core::changesets

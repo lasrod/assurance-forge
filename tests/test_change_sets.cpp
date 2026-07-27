@@ -288,3 +288,53 @@ TEST(ChangeSets, AttributesItselfToTheConnectedClient) {
     EXPECT_EQ(fixture->store.Find(id)->client_label, "claude-ai 0.1.0");
     EXPECT_EQ(fixture->store.Find(id)->proposal.author_name, "MCP: claude-ai 0.1.0");
 }
+
+// Staging is deliberately not a model mutation, so nothing it does marks the
+// application's derived views dirty. Something still has to tell the canvas that
+// the picture changed, and this revision is it.
+//
+// Reported: an agent staged operations and the app showed nothing at all. The
+// preview only appeared after clicking to another argument file and back --
+// which is to say, only when something unrelated happened to rebuild the tree.
+TEST(ChangeSets, AdvancesARevisionSoTheCanvasKnowsToRedraw) {
+    std::unique_ptr<Fixture> fixture = MakeFixture("revision");
+    ASSERT_NE(fixture, nullptr);
+    const std::string parent = FirstClaimId(fixture->state.loaded_case.value());
+
+    const std::uint64_t at_start = fixture->store.revision();
+
+    const std::string id = fixture->store.Begin(1, "Watch this", "", "", "claude-ai");
+    const std::uint64_t after_begin = fixture->store.revision();
+    EXPECT_NE(after_begin, at_start) << "beginning a change set must repaint";
+
+    std::string error;
+    ASSERT_TRUE(fixture->store.Stage(id, AddSubGoalUnder(parent, "A sub-goal"),
+                                     fixture->state.loaded_case.value(), error))
+        << error;
+    const std::uint64_t after_stage = fixture->store.revision();
+    EXPECT_NE(after_stage, after_begin) << "staging must repaint";
+
+    ASSERT_TRUE(fixture->store.Unstage(id, 1, error)) << error;
+    const std::uint64_t after_unstage = fixture->store.revision();
+    EXPECT_NE(after_unstage, after_stage) << "unstaging must repaint";
+
+    ASSERT_TRUE(fixture->store.Discard(id, error)) << error;
+    EXPECT_NE(fixture->store.revision(), after_unstage) << "discarding must repaint";
+}
+
+// Reading must not advance it, or the canvas rebuilds every frame a panel
+// happens to look at the store -- which for a large case is a visible stall.
+TEST(ChangeSets, DoesNotAdvanceTheRevisionOnReads) {
+    std::unique_ptr<Fixture> fixture = MakeFixture("revisionreads");
+    ASSERT_NE(fixture, nullptr);
+
+    const std::string id = fixture->store.Begin(1, "Something", "", "", "claude-ai");
+    const std::uint64_t settled = fixture->store.revision();
+
+    (void)fixture->store.Open();
+    (void)fixture->store.Find(id);
+    (void)fixture->store.OpenFor(1);
+    (void)fixture->store.has_open();
+
+    EXPECT_EQ(fixture->store.revision(), settled);
+}
