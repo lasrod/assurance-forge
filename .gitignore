@@ -69,3 +69,6 @@ __pycache__/
 
 # ImGui state
 imgui.ini
+
+# Screenshots produced by .claude/skills/run-assurance-forge
+shots/
