@@ -584,9 +584,6 @@ ToolResult CreateReviewProposal(Session& session, const nlohmann::json& argument
     if (!session.proposals().SaveProposal(build.proposal, &relative_path, error)) {
         return ToolResult::Error("Could not save the proposal: " + error);
     }
-    // The GUI lists proposals from a cached directory scan; without this it would
-    // not show the new draft until its poll interval elapsed.
-    session.proposals().InvalidateProposalCache();
 
     nlohmann::json result = check.effects;
     result["proposal_id"]  = build.proposal.id;
@@ -661,10 +658,17 @@ ToolResult GetReviewProposal(Session& session, const nlohmann::json& arguments) 
     const core::reviews::ProposalValidityResult validity =
         core::reviews::EvaluateReviewProposalValidity(*loaded, session.assurance_case());
 
-    nlohmann::json result = nlohmann::json::parse(core::reviews::SerializeReviewProposal(*loaded),
-                                                  nullptr, /*allow_exceptions=*/false);
+    nlohmann::json serialized = nlohmann::json::parse(
+        core::reviews::SerializeReviewProposal(*loaded), nullptr, /*allow_exceptions=*/false);
+    if (serialized.is_discarded()) {
+        // Should be unreachable: the serializer builds the document with nlohmann.
+        // Reported rather than papered over with an empty object, because a
+        // successful result holding no proposal is indistinguishable from a
+        // proposal that is genuinely empty, and hides the internal fault entirely.
+        return ToolResult::Error("Proposal \"" + id + "\" could not be serialized for transport.");
+    }
     return ToolResult::Ok(nlohmann::json{
-        {"proposal", result.is_discarded() ? nlohmann::json::object() : std::move(result)},
+        {"proposal", std::move(serialized)},
         {"valid", validity.validity == core::reviews::ProposalValidity::Valid},
         {"invalid_reason", validity.reason},
     });
