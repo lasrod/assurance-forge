@@ -1308,6 +1308,53 @@
       "notes": "An agent builds a **change set** the user watches take shape: from its first staged operation the GSN canvas draws the argument as it would be if accepted, with additions, edits and removals marked in place by border and badge (never colour alone). Staging changes nothing — no SACM write, no command, no audit transaction — and a change set that would not apply is refused at staging time, so the canvas can always draw one. **Acceptance is an ordinary audited edit**: it goes through the unchanged `ApplyProposalCommand`, so it is undoable, replayable and attributed to the connecting client. No agent-specific command type exists, which is what guarantees an agent cannot make a change the application could not make itself. Staleness is re-checked at acceptance, not at staging, because the user may edit the argument while reading the proposal. Accept and Reject live in the Review panel; there is no tool an agent can call to apply its own work. Replaces the earlier design in which the adapter wrote proposal files into the project, making it a second writer of `af.proj` and `review-items.af.json` that the application overwrote from its own older copy on the next save."
     },
     {
+      "id": "AF-AI-010",
+      "area": "AI",
+      "name": "SCCG guidance and checks for an external AI client",
+      "status": "supported",
+      "evidence": [
+        "src/mcp/guidance.cpp",
+        "src/core/sccg/staged_checks.cpp",
+        "src/core/guideline_catalog.cpp"
+      ],
+      "tests": [
+        "tests/test_sccg_staged_checks.cpp",
+        "tests/test_mcp_server.cpp"
+      ],
+      "notes": "Three mechanisms. **Resources**: `sccg://guidelines` publishes the catalog over MCP. **Prompts**: `draft_argument_from_standard`, `add_argumentation` and `restructure_case` each carry the guidance for that job, quoted from the catalog so prompt and guideline cannot drift — this is what makes an agent aware of the rules before it writes. **Checks**: findings returned in the result of every staging call and shown on the change set. The mechanical set is deliberately narrow and individually tested — EV.1 (claim with no support and no undeveloped marker), AR.2 (strategy developing into nothing), AR.1 (solution with children; support cycles), CL.5 (unbounded qualifier from the list SCCG names). Most of SCCG is prose only a reader can judge, so this is **not** \"SCCG compliance\": findings are advisory and never block acceptance."
+    },
+    {
+      "id": "AF-AI-011",
+      "area": "AI",
+      "name": "Suggest where new argument belongs",
+      "status": "supported",
+      "evidence": [
+        "src/agent/placement.cpp"
+      ],
+      "tests": [
+        "tests/test_mcp_modes.cpp"
+      ],
+      "notes": "`suggest_placement(topic)` returns ranked goals and strategies with the path from the top goal, the sub-claims already there and the context in scope. Substring search says where a word appears, which is a different question from where an argument belongs; without this an agent guesses and attaches at the root. Ranked by term overlap and structural fit, not by understanding — the reply says so, and says to report that nothing fits rather than pick the best of a bad set. Only goals and strategies are offered as anchors."
+    },
+    {
+      "id": "AF-AI-012",
+      "area": "AI",
+      "name": "Atomic re-parent for restructuring (`MoveUnder`)",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "Restructuring is expressible today as remove-then-add supported-by pairs, so the capability exists, but a large restructure reads as a pile of unrelated operations and the intent is lost in the diff a reviewer has to approve. A `MoveUnder` patch operation would carry the intent atomically. Adding a `PatchOperationType` is backward compatible for reading existing audit logs. Not built."
+    },
+    {
+      "id": "AF-AI-013",
+      "area": "AI",
+      "name": "Standards-clause traceability on claims",
+      "status": "candidate",
+      "evidence": [],
+      "tests": [],
+      "notes": "An agent applying a standard records which clause a claim answers in the claim description, because the element model has no citation field. That is a trace a human can read but not one a tool can follow, filter or check for coverage. A first-class citation would be a SACM modelling decision, not an MCP one."
+    },
+    {
       "id": "AF-PLAT-001",
       "area": "PLAT",
       "name": "Project model, load and save",

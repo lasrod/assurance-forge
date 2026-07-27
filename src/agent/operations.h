@@ -54,6 +54,16 @@ Result GetElement(const ReadContext& context, const nlohmann::json& arguments);
 Result GetArgumentTree(const ReadContext& context, const nlohmann::json& arguments);
 Result ListCaseFiles(const ReadContext& context);
 
+// Where new argument about a topic would fit. Ranked candidate anchors with the
+// structural facts behind each: the path from the root, the sibling claims
+// already there, and the context in scope.
+//
+// The agent still decides. This exists because it cannot decide well from
+// substring search alone -- `find_elements` says where a word appears, which is
+// not the same question as where an argument belongs, and an agent left to guess
+// attaches things at the root.
+Result SuggestPlacement(const ReadContext& context, const nlohmann::json& arguments);
+
 // ---------------------------------------------------------------------------
 // Change sets
 //

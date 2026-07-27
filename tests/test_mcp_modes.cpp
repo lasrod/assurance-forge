@@ -252,3 +252,45 @@ TEST(McpOffline, StopsServingWhenConsentIsWithdrawn) {
     EXPECT_TRUE(refused.is_error);
     EXPECT_NE(refused.payload["error"].get<std::string>().find("Preferences"), std::string::npos);
 }
+
+// "Add argumentation about Z where it fits best" is not answerable from
+// substring search: `find_elements` says where a word appears, which is a
+// different question from where an argument belongs. An agent left to guess
+// attaches things at the root.
+TEST(McpOffline, SuggestsWhereNewArgumentWouldFit) {
+    std::unique_ptr<Fixture> fixture = MakeOfflineFixture("placement");
+    ASSERT_NE(fixture, nullptr);
+    mcp::Server server(*fixture->session);
+    Initialize(server);
+
+    const ToolCall overview = CallTool(server, "get_case_overview");
+    ASSERT_FALSE(overview.is_error) << overview.payload.dump();
+    const std::string case_name = overview.payload.value("case_name", std::string("safety"));
+
+    const ToolCall placed =
+        CallTool(server, "suggest_placement", {{"topic", case_name + " thermal hazards"}});
+    ASSERT_FALSE(placed.is_error) << placed.payload.dump();
+    ASSERT_TRUE(placed.payload.contains("suggestions"));
+
+    for (const nlohmann::json& suggestion : placed.payload["suggestions"]) {
+        // Only goals and strategies host new argument. Offering a solution as an
+        // anchor would invite exactly the structural mistake the SCCG checks
+        // then report.
+        const std::string role = suggestion["role"].get<std::string>();
+        EXPECT_TRUE(role == "Goal" || role == "Strategy") << role;
+        // The path is the single most useful thing here: it says what the branch
+        // is about without needing the whole tree.
+        EXPECT_TRUE(suggestion.contains("path_from_root"));
+        EXPECT_TRUE(suggestion.contains("existing_sub_claims"));
+    }
+}
+
+TEST(McpOffline, RequiresATopicToSuggestPlacement) {
+    std::unique_ptr<Fixture> fixture = MakeOfflineFixture("notopic");
+    ASSERT_NE(fixture, nullptr);
+    mcp::Server server(*fixture->session);
+    Initialize(server);
+
+    const ToolCall placed = CallTool(server, "suggest_placement");
+    EXPECT_TRUE(placed.is_error);
+}

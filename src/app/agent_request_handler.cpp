@@ -73,6 +73,9 @@ bridge::Response HandleAgentRequest(const bridge::Request& request,
     if (request.op == "list_case_files") {
         return FromAgentResult(request.id, agent::ListCaseFiles(read));
     }
+    if (request.op == "suggest_placement") {
+        return FromAgentResult(request.id, agent::SuggestPlacement(read, request.args));
+    }
     if (request.op == "open_case_file") {
         return FromAgentResult(request.id, OpenCaseFile(read, request.args, context));
     }

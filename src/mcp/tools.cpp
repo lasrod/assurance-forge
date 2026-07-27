@@ -43,6 +43,10 @@ ToolResult OpenCaseFile(Session& session, const nlohmann::json& arguments) {
     return Run(session, "open_case_file", arguments);
 }
 
+ToolResult SuggestPlacement(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "suggest_placement", arguments);
+}
+
 ToolResult BeginChangeSet(Session& session, const nlohmann::json& arguments) {
     return Run(session, "begin_change_set", arguments);
 }
@@ -202,6 +206,26 @@ std::vector<ToolDefinition> BuildTools() {
                                     std::to_string(agent::kMaxTreeDepth) + ")."}}}}}},
         true,
         &GetArgumentTree,
+    });
+
+    tools.push_back(ToolDefinition{
+        "suggest_placement",
+        "Find where new argument about a topic would fit. Returns ranked candidate anchors with "
+        "the path from the top goal, the sub-claims already there, and the context in scope, so "
+        "you can attach to the branch this extends instead of guessing. Use this before staging "
+        "anything that adds argument to an existing case.",
+        nlohmann::json{
+            {"type", "object"},
+            {"properties",
+             {{"topic",
+               {{"type", "string"},
+                {"description", "What the new argument would establish."}}},
+              {"limit",
+               {{"type", "integer"},
+                {"description", "Maximum candidates to return (default 5, maximum 20)."}}}}},
+            {"required", nlohmann::json::array({"topic"})}},
+        true,
+        &SuggestPlacement,
     });
 
     // ---------------------------------------------------------------------
