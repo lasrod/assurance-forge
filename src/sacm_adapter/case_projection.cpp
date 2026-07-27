@@ -42,6 +42,33 @@ void fill_lang_map(std::map<std::string, std::string>& out,
     }
 }
 
+// Merges the reserved "sacm.import.name" overflow into a language map that
+// already holds the element's own `name`.
+//
+// Two rules, both learned from a real project that could not be opened:
+//
+// * **A lang-less overflow entry is dropped.** The overflow holds the languages
+//   that did not fit clause 8.6's single name LangString, so by construction
+//   every entry in it is a language other than the primary's. One carrying no
+//   language identifies nothing, and `fill_lang_map`'s "no lang means en"
+//   default let such an entry overwrite the real English name with a
+//   translation -- silently changing what the claim asserted.
+// * **The primary wins its own language.** `name` is the authoritative
+//   LangString; the overflow only supplies the extra ones.
+//
+// Without both, a case with translations changed meaning every time it was
+// projected and serialized, which also made its canonical hash unstable and
+// left the audit verifier reporting a divergence Reconcile could never clear.
+void merge_overflow_langs(std::map<std::string, std::string>& out,
+                          const sacm::model::MultiLangString& overflow) {
+    for (const sacm::model::LangString& entry : overflow.values) {
+        if (entry.content.empty() || entry.lang.empty()) {
+            continue;
+        }
+        out.emplace(entry.lang, entry.content);
+    }
+}
+
 std::vector<std::string> to_id_strings(const std::vector<sacm::model::ElementId>& ids) {
     std::vector<std::string> out;
     out.reserve(ids.size());
@@ -114,7 +141,7 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
         // language toggle would lose every translated name.
         for (const auto& tagged_value : model_element->tagged_values()) {
             if (tagged_value->key().primary() == "sacm.import.name") {
-                fill_lang_map(projected.name_langs, tagged_value->content());
+                merge_overflow_langs(projected.name_langs, tagged_value->content());
             }
         }
 
