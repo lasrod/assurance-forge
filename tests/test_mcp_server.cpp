@@ -231,6 +231,29 @@ TEST(McpServer, ConsentFailsClosedOnAMalformedSettingsFile) {
     EXPECT_FALSE(mcp::ReadMcpConsent(path));
 }
 
+// ADR 0007 promises that revoking consent takes effect on the next call rather
+// than when the client next restarts the server. That is only true if consent is
+// read per call: a grant cached at session open would keep serving the safety
+// case for as long as the client happened to leave the process running, which is
+// exactly the window a user revoking permission is trying to close.
+TEST(McpServer, RevokingConsentTakesEffectWithoutReopeningTheSession) {
+    const std::filesystem::path settings =
+        WriteSettings("revocable.json", {{"mcp", {{"enabled", true}}}});
+    std::unique_ptr<mcp::Session> session = OpenSession(settings);
+    ASSERT_NE(session, nullptr);
+    mcp::Server server(*session);
+    Initialize(server);
+
+    ASSERT_FALSE(CallTool(server, "get_case_overview").is_error)
+        << "consent was granted but the tool refused";
+
+    // Same session, same server object; only the file changes underneath.
+    WriteSettings("revocable.json", {{"mcp", {{"enabled", false}}}});
+
+    EXPECT_TRUE(CallTool(server, "get_case_overview").is_error)
+        << "revoked consent did not take effect until the server was restarted";
+}
+
 // ---------------------------------------------------------------------------
 // Read tools
 // ---------------------------------------------------------------------------

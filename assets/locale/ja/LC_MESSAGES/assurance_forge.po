@@ -184,6 +184,9 @@ msgstr "すべて"
 msgid "All categories"
 msgstr "すべての分類"
 
+msgid "Allow AI clients to read and propose changes"
+msgstr "AI クライアントに読み取りと変更提案を許可する"
+
 msgid "An audit log is created automatically the first time a model-mutating command is recorded for a SACM file in this project."
 msgstr "このプロジェクトの SACM ファイルに対してモデル変更コマンドが初めて記録されたとき、監査ログが自動的に作成されます。"
 
@@ -349,6 +352,9 @@ msgstr "すべてクリア"
 msgid "Click to open in the Problems panel."
 msgstr "クリックして問題パネルで開きます。"
 
+msgid "Client configuration"
+msgstr "クライアント設定"
+
 msgid "Close"
 msgstr "閉じる"
 
@@ -397,6 +403,9 @@ msgstr "続行しますか?"
 msgid "Controlled Environment"
 msgstr "管理環境"
 
+msgid "Copy Configuration"
+msgstr "設定をコピー"
+
 msgid "Copy report to clipboard"
 msgstr "レポートをクリップボードにコピー"
 
@@ -405,6 +414,9 @@ msgstr "信頼度保存用の SACM gid を割り当てられませんでした�
 
 msgid "Could not resolve this preview element for proposal edits."
 msgstr "提案編集のためのこのプレビュー要素を解決できませんでした。"
+
+msgid "Could not save the MCP setting: {0}"
+msgstr "MCP 設定を保存できませんでした: {0}"
 
 msgid "Create"
 msgstr "作成"
@@ -853,6 +865,9 @@ msgstr "提案ドラフトを編集する前に SACM モデルを読み込んで
 msgid "Low culling"
 msgstr "低カリング"
 
+msgid "MCP Server"
+msgstr "MCP サーバー"
+
 msgid "Main loop is currently throttled because no input was detected."
 msgstr "入力が検出されないため、メインループは現在スロットルされています。"
 
@@ -1069,6 +1084,9 @@ msgstr "最近のプロジェクトを開く"
 msgid "Open a SACM model and use any model-mutating action (add or remove a node) — each command will appear here."
 msgstr "SACM モデルを開いて、モデルを変更するアクション (ノードの追加または削除) を使用してください — 各コマンドがここに表示されます。"
 
+msgid "Open a project to see its client configuration."
+msgstr "クライアント設定を表示するにはプロジェクトを開いてください。"
+
 msgid "Open an assurance case before marking review status."
 msgstr "レビュー状態を記録する前に保証ケースを開いてください。"
 
@@ -1161,6 +1179,9 @@ msgstr "親の場所"
 
 msgid "Parse error: {0}"
 msgstr "パースエラー: {0}"
+
+msgid "Paste into your AI client's MCP settings."
+msgstr "AI クライアントの MCP 設定に貼り付けてください。"
 
 msgid "Pause"
 msgstr "一時停止"
@@ -1582,6 +1603,9 @@ msgstr "テキスト信頼度論証"
 msgid "Text confidence argument is empty."
 msgstr "テキスト信頼度論証が空です。"
 
+msgid "The MCP server program was not found next to Assurance Forge."
+msgstr "Assurance Forge の隣に MCP サーバープログラムが見つかりませんでした。"
+
 msgid "The SACM library could not preview this removal."
 msgstr "SACM ライブラリはこの削除をプレビューできませんでした。"
 
@@ -1731,6 +1755,9 @@ msgstr "ウェルカム画面"
 
 msgid "Welcome!"
 msgstr "ようこそ!"
+
+msgid "When this is on, an AI client you launch yourself (such as Claude Desktop) can read the open project's safety case and save proposed changes for you to review. Proposals never change the case until you accept them. While this is off, nothing is shared."
+msgstr "これを有効にすると、自分で起動した AI クライアント（Claude Desktop など）が開いているプロジェクトのセーフティケースを読み取り、変更提案を保存できます。提案は承認するまでケースを変更しません。無効の間は何も共有されません。"
 
 msgid "Will be modified (references removed):"
 msgstr "変更されるもの (参照が削除されます):"

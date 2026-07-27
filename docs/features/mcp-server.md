@@ -1,6 +1,6 @@
 # MCP Server — build safety cases by chat
 
-- **Status:** Reading and proposing implemented; discoverability outstanding. Capability matrix row `AF-AI-007`.
+- **Status:** Implemented and confirmed in a running app. Capability matrix row `AF-AI-007`.
 - **Date:** 2026-07-26 (plan), 2026-07-27 (read side, then write side)
 
 ## Implementation status
@@ -10,7 +10,23 @@
 | 2 — `af_mcp` layer, JSON-RPC over stdio, consent gate, read tools | **Implemented** |
 | 1 — top goal in the proposal vocabulary | **Implemented**, differently (see below) |
 | 3 — writing via proposals | **Implemented** |
-| 4 — discoverability, preferences toggle, consent ADR | Not started |
+| 4 — discoverability, preferences toggle, consent ADR | **Implemented** |
+
+Shipped in phase 4:
+
+- A **Preferences toggle** for the consent flag, so enabling MCP no longer means
+  hand-editing the settings file.
+- A **copyable client configuration** block naming the server binary and the open
+  project, so a user does not hand-write JSON containing two absolute paths.
+  Paths use forward slashes, which need no JSON escaping.
+- **ADR 0007** records the consent decision. ADR 0005 governs provider egress and
+  does not cover a server answering an arbitrary connecting client.
+
+Confirmed in a running app: the Preferences section renders, the consent toggle
+writes `mcp.enabled` to the settings file, and the sibling `ai` section survives
+that write — the live counterpart to the regression test added when
+`AiSettingsStore::Save` was fixed. The consent flag was toggled back off
+afterwards; it is not something a check should leave switched on.
 
 Phases 1 and 2 were built in the opposite order to the numbering below. The
 top-goal operation is a prerequisite for *writing*, not for the server itself, so

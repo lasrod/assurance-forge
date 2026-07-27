@@ -1,4 +1,7 @@
 #include "app/areas/modal_host.h"
+
+#include "app/mcp_client_config.h"
+#include "core/user_settings.h"
 #include "app/app_runtime_state.h"
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
@@ -77,6 +80,18 @@ void ModalHost::RenderPreferencesWindow() {
         model.showFps = runner_params->imGuiWindowParams.showStatus_Fps;
     }
 
+    model.mcpEnabled = state_.mcp_settings.enabled;
+    model.mcpStatus  = state_.mcp_status;
+    if (state_.app_state.current_project.has_value()) {
+        model.mcpClientConfig = app::BuildMcpClientConfig(state_.app_state.current_project->rootPath);
+        if (model.mcpClientConfig.empty()) {
+            model.mcpConfigUnavailableReason =
+                AF_TR("The MCP server program was not found next to Assurance Forge.");
+        }
+    } else {
+        model.mcpConfigUnavailableReason = AF_TR("Open a project to see its client configuration.");
+    }
+
     ui::panels::PreferencesPanelCallbacks callbacks;
     callbacks.save_settings = [this](const ai::AiProviderSettings& settings) {
         state_.ai.settings = settings;
@@ -125,6 +140,21 @@ void ModalHost::RenderPreferencesWindow() {
         std::shared_ptr<ai::AiService> service = state_.ai.service;
         state_.ai.test_task =
             state_.ai.task_runner.RunConnectionTest([service]() { return service->TestConnection(); });
+    };
+    callbacks.set_mcp_enabled = [this](bool enabled) {
+        core::McpUserSettings settings;
+        settings.enabled = enabled;
+        std::string error;
+        if (!core::SaveMcpUserSettings(state_.ai.settings_store->SettingsPath(), settings, error)) {
+            // Surfaced rather than swallowed: otherwise the checkbox flips, fails
+            // to save, and reverts next frame with nothing to explain it.
+            state_.mcp_status = ui::i18n::trf("Could not save the MCP setting: {0}", error);
+            return;
+        }
+        // Only after the write succeeds: the checkbox must reflect what the MCP
+        // server will actually read, not what the user clicked.
+        state_.mcp_settings = settings;
+        state_.mcp_status.clear();
     };
     callbacks.set_theme = [](ui::AppTheme theme) { ui::ApplyAppTheme(theme); };
     callbacks.set_language = [](ui::i18n::Language language) { ui::i18n::SetLanguage(language); };

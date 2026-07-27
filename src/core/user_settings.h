@@ -55,4 +55,23 @@ nlohmann::json ReadUserSettingsSection(const std::filesystem::path& path, const 
 bool UpdateUserSettingsSection(const std::filesystem::path& path, const std::string& section,
                                const nlohmann::json& value, std::string& error);
 
+// The `"mcp"` section: whether the user has allowed an external AI client to
+// read this machine's assurance cases over the MCP server.
+//
+// Typed here rather than left as raw JSON at each call site because two layers
+// that cannot see each other both need it -- `mcp/` reads it as a consent gate,
+// `app/` writes it from Preferences -- and a disagreement about the shape would
+// be a disagreement about whether the user granted permission.
+struct McpUserSettings {
+    bool enabled = false;
+};
+
+// Every failure reads as `enabled = false`. A consent gate must fail closed: the
+// failure in the other direction is publishing a safety argument to a client the
+// user never approved.
+McpUserSettings LoadMcpUserSettings(const std::filesystem::path& path);
+
+bool SaveMcpUserSettings(const std::filesystem::path& path, const McpUserSettings& settings,
+                         std::string& error);
+
 } // namespace core

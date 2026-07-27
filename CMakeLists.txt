@@ -359,6 +359,7 @@ add_executable(tests
     tests/test_mcp_jsonrpc.cpp
     tests/test_mcp_server.cpp
     tests/test_mcp_proposals.cpp
+    tests/test_mcp_client_config.cpp
     tests/test_user_settings_path.cpp
 )
 # Production sources are pulled in via the per-layer af_* OBJECT libraries
@@ -378,6 +379,10 @@ if(WIN32)
         COMMAND_EXPAND_LISTS
     )
 endif()
+# The client-config test resolves the MCP server binary beside the test
+# executable, so it must exist by the time the tests run. Without this the
+# test would silently exercise the not-found branch instead.
+add_dependencies(tests assurance-forge-mcp)
 af_copy_sccg_data(tests)
 include(GoogleTest)
 

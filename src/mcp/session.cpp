@@ -44,18 +44,15 @@ bool LooksLikeAssuranceCaseFile(const std::filesystem::path& path) {
 } // namespace
 
 bool ReadMcpConsent(const std::filesystem::path& settings_path) {
-    // Missing file, unreadable file, and malformed document all arrive here as a
-    // null section, which falls through to false along with a missing or
-    // non-boolean flag. Every path fails closed.
-    const nlohmann::json section = core::ReadUserSettingsSection(settings_path, "mcp");
-    if (!section.is_object()) {
-        return false;
-    }
-    const nlohmann::json::const_iterator enabled = section.find("enabled");
-    if (enabled == section.end() || !enabled->is_boolean()) {
-        return false;
-    }
-    return enabled->get<bool>();
+    // Shares the reader with the Preferences toggle that writes it, so the gate
+    // and the switch can never disagree about what "enabled" means. Every failure
+    // path -- missing file, unreadable, malformed, absent or non-boolean flag --
+    // resolves to false.
+    return core::LoadMcpUserSettings(settings_path).enabled;
+}
+
+bool Session::consent_granted() const {
+    return ReadMcpConsent(settings_path_);
 }
 
 std::unique_ptr<Session> Session::Open(Config config, std::string& error) {
@@ -74,9 +71,8 @@ std::unique_ptr<Session> Session::Open(Config config, std::string& error) {
 
     std::unique_ptr<Session> session(new Session());
     session->project_path_ = config.project_path;
-    session->consent_granted_ =
-        ReadMcpConsent(config.settings_path.empty() ? core::UserSettingsFilePath()
-                                                    : config.settings_path);
+    session->settings_path_ =
+        config.settings_path.empty() ? core::UserSettingsFilePath() : config.settings_path;
 
     const bool is_directory = std::filesystem::is_directory(config.project_path, ec);
     const bool opened = (is_directory || !LooksLikeAssuranceCaseFile(config.project_path))

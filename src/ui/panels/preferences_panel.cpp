@@ -144,6 +144,50 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
             .c_str());
 }
 
+void RenderMcpSection(const PreferencesPanelModel& model, const PreferencesPanelCallbacks& callbacks) {
+    ImGui::TextUnformatted(AF_TR("MCP Server").c_str());
+    ImGui::Separator();
+
+    bool enabled = model.mcpEnabled;
+    if (ImGui::Checkbox(AF_TR("Allow AI clients to read and propose changes").c_str(), &enabled)) {
+        if (callbacks.set_mcp_enabled)
+            callbacks.set_mcp_enabled(enabled);
+    }
+
+    if (!model.mcpStatus.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(ui::GetTheme().danger));
+        ImGui::TextWrapped("%s", model.mcpStatus.c_str());
+        ImGui::PopStyleColor();
+    }
+
+    ImGui::TextWrapped("%s",
+                       AF_TR("When this is on, an AI client you launch yourself (such as Claude "
+                             "Desktop) can read the open project's safety case and save proposed "
+                             "changes for you to review. Proposals never change the case until you "
+                             "accept them. While this is off, nothing is shared.")
+                           .c_str());
+
+    ImGui::Spacing();
+    if (model.mcpClientConfig.empty()) {
+        ImGui::TextDisabled("%s", model.mcpConfigUnavailableReason.c_str());
+        return;
+    }
+
+    ImGui::TextUnformatted(AF_TR("Client configuration").c_str());
+    ImGui::BeginChild("##mcp_client_config",
+                      ImVec2(0.0f, ui::gsn::DpiSize(96.0f)),
+                      true,
+                      ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::TextUnformatted(model.mcpClientConfig.c_str());
+    ImGui::EndChild();
+
+    if (ImGui::Button(AF_TR("Copy Configuration").c_str())) {
+        ImGui::SetClipboardText(model.mcpClientConfig.c_str());
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", AF_TR("Paste into your AI client's MCP settings.").c_str());
+}
+
 void RenderAppearanceSection(PreferencesPanelModel model, const PreferencesPanelCallbacks& callbacks) {
     ImGui::TextUnformatted(AF_TR("Appearance").c_str());
     ImGui::Separator();
@@ -240,6 +284,8 @@ void ShowPreferencesWindow(bool& open, PreferencesPanelModel model, const Prefer
         RenderReviewSection(model, callbacks);
         ImGui::Spacing();
         RenderAiSection(model, callbacks);
+        ImGui::Spacing();
+        RenderMcpSection(model, callbacks);
         ImGui::EndPopup();
     }
 
