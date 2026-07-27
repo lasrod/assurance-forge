@@ -32,10 +32,16 @@ else()
     message(FATAL_ERROR "AF_MCP_MODE must be 'granted' or 'withheld', got '${AF_MCP_MODE}'")
 endif()
 
+# Captured to a FILE, not to OUTPUT_VARIABLE. execute_process normalizes CRLF to
+# LF on the way into a variable, which silently destroys the evidence the
+# carriage-return assertion below depends on -- with OUTPUT_VARIABLE that check
+# passes even against a server that really is emitting CRLF. Measured, not
+# assumed.
+set(_stdout_file "${AF_MCP_WORK_DIR}/mcp_smoke_stdout_${AF_MCP_MODE}.txt")
 execute_process(
     COMMAND "${AF_MCP_EXE}" --project "${AF_MCP_PROJECT}" --settings "${_settings}"
     INPUT_FILE "${AF_MCP_INPUT}"
-    OUTPUT_VARIABLE _stdout
+    OUTPUT_FILE "${_stdout_file}"
     ERROR_VARIABLE _stderr
     RESULT_VARIABLE _exit_code
 )
@@ -43,6 +49,9 @@ execute_process(
 if(NOT _exit_code EQUAL 0)
     message(FATAL_ERROR "assurance-forge-mcp exited ${_exit_code}\nstderr:\n${_stderr}")
 endif()
+
+file(READ "${_stdout_file}" _stdout)
+file(READ "${_stdout_file}" _stdout_hex HEX)
 
 # --- Framing ---
 # Three requests and one notification go in; a notification must draw no reply,
@@ -54,6 +63,22 @@ if(NOT _line_count EQUAL 3)
     message(FATAL_ERROR
         "Expected exactly 3 response lines (a notification must not be answered), got ${_line_count}.\n"
         "This usually means something wrote to stdout that is not the protocol.\n"
+        "stdout:\n${_stdout}")
+endif()
+
+# Counting newlines does NOT catch CRLF -- "}\r\n" still holds exactly one \n, so
+# the check above passes on a stream that breaks any client which does not strip
+# \r. `UseBinaryStdout` in src/mcp/main.cpp stops the CRT rewriting the framing on
+# Windows; this is what holds that in place, and removing it fails this test.
+#
+# Split into bytes rather than searched as text: the hex dump is one continuous
+# string, so a naive FIND for "0d" could straddle a byte boundary and report a
+# carriage return that is not there.
+string(REGEX REPLACE "(..)" ";\\1" _stdout_bytes "${_stdout_hex}")
+if("0d" IN_LIST _stdout_bytes)
+    message(FATAL_ERROR
+        "stdout contains a carriage return; the transport must emit bare newlines.\n"
+        "This usually means the binary-mode stdout setup in src/mcp/main.cpp was lost.\n"
         "stdout:\n${_stdout}")
 endif()
 

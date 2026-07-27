@@ -12,8 +12,11 @@
 //
 // `tests/test_user_settings_path.cpp` pins this against
 // `ai::AiSettingsStore::DefaultSettingsPath()`, so the two cannot diverge
-// silently -- a divergence would point the consent gate at a file nobody writes,
-// which fails open in the direction that matters.
+// silently. A divergence points the consent gate at a file nobody writes, and it
+// then reads `false` forever: the gate fails closed, so nothing leaks, but MCP
+// quietly stops working with no diagnostic. The worse direction is a gate left
+// pointing at a stale file that still says `true` after the user revoked
+// permission. Neither is visible without this pin.
 
 #include <filesystem>
 
