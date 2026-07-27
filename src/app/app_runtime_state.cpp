@@ -31,6 +31,7 @@ AppRuntimeState::AppRuntimeState() {
     ai.review_controller = std::make_unique<controllers::AiReviewController>(
         events, problems_manager, *review_controller, ai.task_runner, ai.service);
     LoadAiSettingsState();
+    LoadMcpSettingsState();
 }
 
 void AppRuntimeState::LoadAiSettingsState() {
@@ -42,6 +43,10 @@ void AppRuntimeState::LoadAiSettingsState() {
     if (!warning.empty()) {
         ai.connection_status = ai::ErrorStatus(ai::AiErrorCode::SettingsError, warning);
     }
+}
+
+void AppRuntimeState::LoadMcpSettingsState() {
+    mcp_settings = core::LoadMcpUserSettings(ai.settings_store->SettingsPath());
 }
 
 void AppRuntimeState::RefreshStoredAiKeyState() {

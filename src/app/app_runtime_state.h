@@ -17,6 +17,7 @@
 #include "app/controllers/review_controller.h"
 #include "app/guideline_catalog.h"
 #include "core/app_state.h"
+#include "core/user_settings.h"
 #include "core/assurance_tree.h"
 #include "core/audit/replay_verifier.h"
 #include "core/problems/problems_manager.h"
@@ -262,6 +263,12 @@ struct AppRuntimeState {
 
     void LoadAiSettingsState();
     void RefreshStoredAiKeyState();
+
+    // Cached so the Preferences panel does not read the settings file on every
+    // frame it is open. The toggle updates this alongside the file, so the
+    // checkbox and the MCP server's consent gate never disagree.
+    core::McpUserSettings mcp_settings;
+    void LoadMcpSettingsState();
 };
 
 } // namespace app

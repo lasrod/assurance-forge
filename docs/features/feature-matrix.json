@@ -1258,14 +1258,14 @@
       "evidence": [
         "src/mcp/server.cpp",
         "src/mcp/tools.cpp",
-        "src/mcp/session.cpp"
+        "src/app/mcp_client_config.cpp"
       ],
       "tests": [
         "tests/test_mcp_server.cpp",
         "tests/test_mcp_proposals.cpp",
-        "tests/test_mcp_jsonrpc.cpp"
+        "tests/test_mcp_client_config.cpp"
       ],
-      "notes": "Design: docs/features/mcp-server.md. `assurance-forge-mcp` speaks JSON-RPC 2.0 over stdio. An external client can read a case (overview, search, element detail, GSN tree) and propose changes to it, which land as review proposals the user accepts in the app — the agent never edits the case, so it cannot make a change nobody looked at, nor one the app could not make itself. `prototype` rather than `supported` because enabling it still means hand-editing `mcp.enabled` into the settings file. Sharing is gated by that flag, which fails closed and is verified through the real process by cmake/run_mcp_smoke_test.cmake. Independent of AF-AI-001..006: the layer gate forbids `mcp/` from including `ai/`, so the two features cannot share an inference path."
+      "notes": "Design: docs/features/mcp-server.md. `assurance-forge-mcp` speaks JSON-RPC 2.0 over stdio. An external client can read a case (overview, search, element detail, GSN tree) and propose changes to it, which land as review proposals the user accepts in the app — the agent never edits the case, so it cannot make a change nobody looked at, nor one the app could not make itself. Consent: ADR 0007. Preferences carries the consent toggle and a copyable client configuration, so enabling it no longer means hand-editing the settings file. Still `prototype` rather than `supported` because that Preferences section has not been visually confirmed in a running app: its behaviour is tested, its layout is not. Sharing is gated by a flag that fails closed and is verified through the real process by cmake/run_mcp_smoke_test.cmake. Independent of AF-AI-001..006: the layer gate forbids `mcp/` from including `ai/`, so the two features cannot share an inference path."
     },
     {
       "id": "AF-PLAT-001",

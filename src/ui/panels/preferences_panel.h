@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <string>
 
 namespace ui::panels {
 
@@ -24,6 +25,14 @@ struct PreferencesPanelModel {
     ui::AppTheme theme = ui::AppTheme::Dark;
     ui::i18n::Language language = ui::i18n::Language::English;
     bool showFps = false;
+
+    // MCP server. The panel receives plain data rather than reaching into the
+    // `mcp` layer, which it must not depend on.
+    bool mcpEnabled = false;
+    // Client configuration to copy, already rendered. Empty when it cannot be
+    // built, in which case `mcpConfigUnavailableReason` says why.
+    std::string mcpClientConfig;
+    std::string mcpConfigUnavailableReason;
 };
 
 struct PreferencesPanelCallbacks {
@@ -35,6 +44,7 @@ struct PreferencesPanelCallbacks {
     std::function<void(ui::i18n::Language)> set_language;
     std::function<void(bool)> set_show_fps;
     std::function<void(const char*)> save_reviewer_name;
+    std::function<void(bool)> set_mcp_enabled;
 };
 
 void ShowPreferencesWindow(bool& open, PreferencesPanelModel model, const PreferencesPanelCallbacks& callbacks);

@@ -81,4 +81,25 @@ bool UpdateUserSettingsSection(const std::filesystem::path& path, const std::str
     }
 }
 
+McpUserSettings LoadMcpUserSettings(const std::filesystem::path& path) {
+    McpUserSettings settings;
+
+    const nlohmann::json section = ReadUserSettingsSection(path, "mcp");
+    if (!section.is_object()) {
+        return settings;
+    }
+    const nlohmann::json::const_iterator enabled = section.find("enabled");
+    if (enabled == section.end() || !enabled->is_boolean()) {
+        return settings;
+    }
+    settings.enabled = enabled->get<bool>();
+    return settings;
+}
+
+bool SaveMcpUserSettings(const std::filesystem::path& path, const McpUserSettings& settings,
+                         std::string& error) {
+    return UpdateUserSettingsSection(path, "mcp", nlohmann::json{{"enabled", settings.enabled}},
+                                     error);
+}
+
 } // namespace core

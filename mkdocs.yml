@@ -82,6 +82,7 @@ nav:
           - 0004 MkDocs Material documentation site: architecture/decisions/0004-mkdocs-material-documentation-site.md
           - 0005 Provider-agnostic AI with explicit user consent: architecture/decisions/0005-provider-agnostic-ai-with-user-consent.md
           - 0006 SACM 2.3 as an independent reusable library: architecture/decisions/0006-sacm-23-independent-library.md
+          - 0007 Explicit consent for sharing over MCP: architecture/decisions/0007-mcp-server-consent.md
       - Generated Class Diagrams: architecture/generated-class-diagrams.md
   - Developer Guide:
       - Overview: developer-guide/index.md

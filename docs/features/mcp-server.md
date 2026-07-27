@@ -10,7 +10,23 @@
 | 2 — `af_mcp` layer, JSON-RPC over stdio, consent gate, read tools | **Implemented** |
 | 1 — top goal in the proposal vocabulary | **Implemented**, differently (see below) |
 | 3 — writing via proposals | **Implemented** |
-| 4 — discoverability, preferences toggle, consent ADR | Not started |
+| 4 — discoverability, preferences toggle, consent ADR | **Implemented** |
+
+Shipped in phase 4:
+
+- A **Preferences toggle** for the consent flag, so enabling MCP no longer means
+  hand-editing the settings file.
+- A **copyable client configuration** block naming the server binary and the open
+  project, so a user does not hand-write JSON containing two absolute paths.
+  Paths use forward slashes, which need no JSON escaping.
+- **ADR 0007** records the consent decision. ADR 0005 governs provider egress and
+  does not cover a server answering an arbitrary connecting client.
+
+Not yet confirmed: the Preferences section's layout has not been checked in a
+running app. Driving this GUI is awkward — a native ImGui/OpenGL window offers no
+accessibility tree, and screen capture returns whatever is in front. The
+section's behaviour is tested; its appearance is not, which is why `AF-AI-007`
+stays `prototype`.
 
 Phases 1 and 2 were built in the opposite order to the numbering below. The
 top-goal operation is a prerequisite for *writing*, not for the server itself, so

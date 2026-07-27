@@ -678,6 +678,21 @@ TRANSLATIONS = {
     "Create baseline": "ベースラインを作成",
     "Reconcile audit log": "監査ログを再構築",
 
+    # ===== Preferences MCP section =====
+    "MCP Server": "MCP サーバー",
+    "Allow AI clients to read and propose changes":
+        "AI クライアントに読み取りと変更提案を許可する",
+    "When this is on, an AI client you launch yourself (such as Claude Desktop) can read the open project's safety case and save proposed changes for you to review. Proposals never change the case until you accept them. While this is off, nothing is shared.":
+        "これを有効にすると、自分で起動した AI クライアント（Claude Desktop など）が開いているプロジェクトのセーフティケースを読み取り、変更提案を保存できます。提案は承認するまでケースを変更しません。無効の間は何も共有されません。",
+    "Client configuration": "クライアント設定",
+    "Copy Configuration": "設定をコピー",
+    "Paste into your AI client's MCP settings.":
+        "AI クライアントの MCP 設定に貼り付けてください。",
+    "The MCP server program was not found next to Assurance Forge.":
+        "Assurance Forge の隣に MCP サーバープログラムが見つかりませんでした。",
+    "Open a project to see its client configuration.":
+        "クライアント設定を表示するにはプロジェクトを開いてください。",
+
     # ===== Preferences Review section =====
     "Reviewer name": "レビュー担当者名",
     "Save Reviewer Name": "レビュー担当者名を保存",
