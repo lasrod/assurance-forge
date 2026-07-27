@@ -81,6 +81,7 @@ void ModalHost::RenderPreferencesWindow() {
     }
 
     model.mcpEnabled = state_.mcp_settings.enabled;
+    model.mcpStatus  = state_.mcp_status;
     if (state_.app_state.current_project.has_value()) {
         model.mcpClientConfig = app::BuildMcpClientConfig(state_.app_state.current_project->rootPath);
         if (model.mcpClientConfig.empty()) {
@@ -145,11 +146,15 @@ void ModalHost::RenderPreferencesWindow() {
         settings.enabled = enabled;
         std::string error;
         if (!core::SaveMcpUserSettings(state_.ai.settings_store->SettingsPath(), settings, error)) {
+            // Surfaced rather than swallowed: otherwise the checkbox flips, fails
+            // to save, and reverts next frame with nothing to explain it.
+            state_.mcp_status = ui::i18n::trf("Could not save the MCP setting: {0}", error);
             return;
         }
         // Only after the write succeeds: the checkbox must reflect what the MCP
         // server will actually read, not what the user clicked.
         state_.mcp_settings = settings;
+        state_.mcp_status.clear();
     };
     callbacks.set_theme = [](ui::AppTheme theme) { ui::ApplyAppTheme(theme); };
     callbacks.set_language = [](ui::i18n::Language language) { ui::i18n::SetLanguage(language); };

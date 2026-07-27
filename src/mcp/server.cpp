@@ -143,8 +143,9 @@ nlohmann::json Server::HandleToolsCall(const jsonrpc::Request& request) {
             request.id,
             ContentResult(ToolResult::Error(
                 "Assurance Forge has not been given permission to share this project over MCP. "
-                "Enable it by setting \"mcp\": {\"enabled\": true} in the Assurance Forge "
-                "settings file, then restart the MCP server.")));
+                "Turn on \"Allow AI clients to read and propose changes\" in Assurance Forge's "
+                "Preferences, under MCP Server. It takes effect on the next call; there is no "
+                "need to restart anything.")));
     }
 
     return jsonrpc::MakeResult(request.id, ContentResult(tool->handler(session_, arguments)));

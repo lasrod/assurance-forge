@@ -51,6 +51,10 @@ bool ReadMcpConsent(const std::filesystem::path& settings_path) {
     return core::LoadMcpUserSettings(settings_path).enabled;
 }
 
+bool Session::consent_granted() const {
+    return ReadMcpConsent(settings_path_);
+}
+
 std::unique_ptr<Session> Session::Open(Config config, std::string& error) {
     error.clear();
 
@@ -67,9 +71,8 @@ std::unique_ptr<Session> Session::Open(Config config, std::string& error) {
 
     std::unique_ptr<Session> session(new Session());
     session->project_path_ = config.project_path;
-    session->consent_granted_ =
-        ReadMcpConsent(config.settings_path.empty() ? core::UserSettingsFilePath()
-                                                    : config.settings_path);
+    session->settings_path_ =
+        config.settings_path.empty() ? core::UserSettingsFilePath() : config.settings_path;
 
     const bool is_directory = std::filesystem::is_directory(config.project_path, ec);
     const bool opened = (is_directory || !LooksLikeAssuranceCaseFile(config.project_path))

@@ -36,7 +36,15 @@ class Session {
 
     // True when the user has enabled the MCP server in settings.json. Every tool
     // that returns assurance-case content is refused until this is true.
-    bool consent_granted() const { return consent_granted_; }
+    //
+    // Read from disk on every call rather than cached when the session opens.
+    // Consent is revocable, and a cached grant would keep serving a safety case
+    // for as long as the client happened to leave the process running -- the
+    // user turns the switch off in Preferences and nothing stops. Re-reading
+    // costs one small file read per tool call, which is nothing at
+    // human-conversation rates, and makes ADR 0007's promise that revocation
+    // takes effect on the next call actually true.
+    bool consent_granted() const;
 
     // MCP requires `initialize` before any other request. Tracking it here keeps
     // the ordering rule enforceable in one place.
@@ -64,8 +72,9 @@ class Session {
     core::AppState                       state_;
     core::reviews::ReviewProposalManager proposals_;
     std::filesystem::path                project_path_;
-    bool                                 consent_granted_ = false;
-    bool                                 initialized_     = false;
+    // Resolved once at open so every consent read hits the same file.
+    std::filesystem::path                settings_path_;
+    bool                                 initialized_ = false;
     std::string                          client_label_;
 };
 

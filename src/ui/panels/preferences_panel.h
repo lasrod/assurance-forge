@@ -33,6 +33,10 @@ struct PreferencesPanelModel {
     // built, in which case `mcpConfigUnavailableReason` says why.
     std::string mcpClientConfig;
     std::string mcpConfigUnavailableReason;
+    // Why the last toggle did not persist. Empty when nothing went wrong.
+    // Without this the checkbox flips, silently fails to save, and reverts on
+    // the next frame with nothing to explain it.
+    std::string mcpStatus;
 };
 
 struct PreferencesPanelCallbacks {

@@ -268,6 +268,9 @@ struct AppRuntimeState {
     // frame it is open. The toggle updates this alongside the file, so the
     // checkbox and the MCP server's consent gate never disagree.
     core::McpUserSettings mcp_settings;
+    // Why the last consent toggle failed to persist, shown in Preferences.
+    // Empty when the last write succeeded.
+    std::string mcp_status;
     void LoadMcpSettingsState();
 };
 

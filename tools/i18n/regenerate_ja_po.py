@@ -684,6 +684,8 @@ TRANSLATIONS = {
         "AI クライアントに読み取りと変更提案を許可する",
     "When this is on, an AI client you launch yourself (such as Claude Desktop) can read the open project's safety case and save proposed changes for you to review. Proposals never change the case until you accept them. While this is off, nothing is shared.":
         "これを有効にすると、自分で起動した AI クライアント（Claude Desktop など）が開いているプロジェクトのセーフティケースを読み取り、変更提案を保存できます。提案は承認するまでケースを変更しません。無効の間は何も共有されません。",
+    "Could not save the MCP setting: {0}":
+        "MCP 設定を保存できませんでした: {0}",
     "Client configuration": "クライアント設定",
     "Copy Configuration": "設定をコピー",
     "Paste into your AI client's MCP settings.":

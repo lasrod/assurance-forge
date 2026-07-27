@@ -2,22 +2,56 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cstdint>
+#include <vector>
+
 #ifdef _WIN32
 #include <windows.h>
+#elif defined(__APPLE__)
+#include <mach-o/dyld.h>
 #endif
 
 namespace app {
 namespace {
 
-// Mirrors the discovery in guideline_catalog.cpp: the running executable's
-// directory, falling back to the working directory where the platform gives us
-// no better answer.
+// The directory the running executable lives in.
+//
+// Every platform gets a real answer here rather than only Windows. The
+// working-directory fallback is genuinely a last resort and was actively wrong
+// before: the test harness runs with `WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}`, so
+// on Linux and macOS this resolved to the *source* tree, found no server binary
+// beside it, and the client-config tests failed on both. The same fallback would
+// have told a user "server not found" whenever the app was launched from
+// anywhere other than its own directory.
 std::filesystem::path ExecutableDirectory() {
 #ifdef _WIN32
     char        path[MAX_PATH] = {};
     const DWORD length         = GetModuleFileNameA(nullptr, path, MAX_PATH);
     if (length > 0 && length < MAX_PATH) {
         return std::filesystem::path(path).parent_path();
+    }
+#elif defined(__APPLE__)
+    // Never called with a null buffer: a too-small buffer returns non-zero and
+    // writes the required size back, so one grow-and-retry is enough.
+    std::vector<char> buffer(1024, '\0');
+    std::uint32_t     size = static_cast<std::uint32_t>(buffer.size());
+    if (_NSGetExecutablePath(buffer.data(), &size) != 0) {
+        buffer.assign(static_cast<std::size_t>(size) + 1, '\0');
+        size = static_cast<std::uint32_t>(buffer.size());
+        if (_NSGetExecutablePath(buffer.data(), &size) != 0) {
+            buffer[0] = '\0';
+        }
+    }
+    if (buffer[0] != '\0') {
+        std::error_code             ec;
+        const std::filesystem::path resolved = std::filesystem::weakly_canonical(buffer.data(), ec);
+        return ec ? std::filesystem::path(buffer.data()).parent_path() : resolved.parent_path();
+    }
+#elif defined(__linux__)
+    std::error_code             ec;
+    const std::filesystem::path self = std::filesystem::read_symlink("/proc/self/exe", ec);
+    if (!ec && !self.empty()) {
+        return self.parent_path();
     }
 #endif
     std::error_code ec;

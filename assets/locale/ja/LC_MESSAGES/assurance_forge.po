@@ -415,6 +415,9 @@ msgstr "信頼度保存用の SACM gid を割り当てられませんでした�
 msgid "Could not resolve this preview element for proposal edits."
 msgstr "提案編集のためのこのプレビュー要素を解決できませんでした。"
 
+msgid "Could not save the MCP setting: {0}"
+msgstr "MCP 設定を保存できませんでした: {0}"
+
 msgid "Create"
 msgstr "作成"
 

@@ -154,6 +154,12 @@ void RenderMcpSection(const PreferencesPanelModel& model, const PreferencesPanel
             callbacks.set_mcp_enabled(enabled);
     }
 
+    if (!model.mcpStatus.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(ui::GetTheme().danger));
+        ImGui::TextWrapped("%s", model.mcpStatus.c_str());
+        ImGui::PopStyleColor();
+    }
+
     ImGui::TextWrapped("%s",
                        AF_TR("When this is on, an AI client you launch yourself (such as Claude "
                              "Desktop) can read the open project's safety case and save proposed "
