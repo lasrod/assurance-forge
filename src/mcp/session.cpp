@@ -55,6 +55,66 @@ bool Session::consent_granted() const {
     return ReadMcpConsent(settings_path_);
 }
 
+void Session::LoadReviewItems() {
+    if (!state_.current_project.has_value()) {
+        return;
+    }
+    const core::AssuranceProject& project = state_.current_project.value();
+
+    // Mirrors ReviewController::SaveIfDirty: the tracked file when the project
+    // has one, otherwise the conventional name, which SaveReviewItemsFile then
+    // creates and tracks on first write.
+    std::filesystem::path relative = "review-items.af.json";
+    for (const core::ProjectFileEntry& entry : project.files) {
+        if (entry.role == core::ProjectFileRole::ReviewItems) {
+            relative = entry.relativePath;
+            break;
+        }
+    }
+
+    review_items_.SetFilePath(project.rootPath / relative);
+    std::string error;
+    if (!review_items_.Load(error)) {
+        // A project with no review file yet is the normal starting state, not a
+        // failure; an unreadable one is left empty rather than half-parsed.
+        review_items_.Clear();
+        review_items_.SetFilePath(project.rootPath / relative);
+    }
+}
+
+std::vector<core::ProjectFileEntry> Session::case_files() const {
+    std::vector<core::ProjectFileEntry> files;
+    if (!state_.current_project.has_value()) {
+        return files;
+    }
+    for (const core::ProjectFileEntry& entry : state_.current_project->files) {
+        if (entry.role == core::ProjectFileRole::SacmArgument) {
+            files.push_back(entry);
+        }
+    }
+    return files;
+}
+
+bool Session::OpenCaseFile(const std::string& relative_path, std::string& error) {
+    error.clear();
+    for (const core::ProjectFileEntry& entry : case_files()) {
+        if (entry.relativePath.generic_string() != relative_path) {
+            continue;
+        }
+        if (!state_.open_project_file(entry)) {
+            error = state_.status_message.empty() ? ("Could not open " + relative_path)
+                                                  : state_.status_message;
+            return false;
+        }
+        // Proposal validity is evaluated against the loaded case, so the cache
+        // must not survive a switch to a different argument.
+        proposals_.InvalidateProposalCache();
+        return true;
+    }
+    error = "No argument file in this project has the path \"" + relative_path + "\".";
+    return false;
+}
+
 std::unique_ptr<Session> Session::Open(Config config, std::string& error) {
     error.clear();
 
@@ -88,6 +148,7 @@ std::unique_ptr<Session> Session::Open(Config config, std::string& error) {
 
     if (session->state_.current_project.has_value()) {
         session->proposals_.SetProjectRoot(session->state_.current_project->rootPath);
+        session->LoadReviewItems();
         if (!session->state_.loaded_case.has_value() && !OpenProjectArgumentFile(session->state_)) {
             // Not fatal: the project may legitimately hold no argument yet, and a
             // session that can still list proposals is more useful than none. The

@@ -3,6 +3,9 @@
 #include "mcp/session.h"
 
 #include "core/assurance_tree.h"
+#include "core/project_service.h"
+#include "core/reviews/review_item.h"
+#include "core/reviews/review_item_manager.h"
 #include "core/reviews/review_proposal.h"
 #include "core/reviews/review_proposal_factory.h"
 #include "core/reviews/review_proposal_manager.h"
@@ -579,19 +582,65 @@ ToolResult CreateReviewProposal(Session& session, const nlohmann::json& argument
         return ToolResult::Error(check.error);
     }
 
-    std::filesystem::path relative_path;
-    std::string           error;
-    if (!session.proposals().SaveProposal(build.proposal, &relative_path, error)) {
+    // Saved through ProjectService, not ReviewProposalManager, because the file
+    // has to be TRACKED in the project manifest to be part of the project rather
+    // than merely sitting inside its directory. Writing it directly produced a
+    // proposal that was on disk, valid, and invisible in the app.
+    core::AssuranceProject& project = session.project();
+    core::ProjectFileEntry  proposal_entry;
+    std::string             error;
+    if (!core::ProjectService::SaveReviewProposalFile(
+            project, build.proposal.id, core::reviews::SerializeReviewProposal(build.proposal),
+            proposal_entry, error)) {
         return ToolResult::Error("Could not save the proposal: " + error);
     }
 
-    nlohmann::json result = check.effects;
-    result["proposal_id"]  = build.proposal.id;
-    result["path"]         = relative_path.generic_string();
-    result["author"]       = build.proposal.author_name;
-    result["saved"]        = true;
-    result["note"]         = "Saved as a draft. It changes nothing until the user reviews and "
-                             "accepts it in Assurance Forge.";
+    // A proposal reaches the user through a review item: the Review panel walks
+    // items and renders a proposal only for those carrying a `proposal_id`. This
+    // is the half that was missing, and without it the draft cannot be seen or
+    // accepted no matter how well-formed it is.
+    core::reviews::ReviewItem item;
+    item.id            = "mcp-proposal:" + build.proposal.id;
+    item.element_id    = build.proposal.anchor_element_id;
+    item.title         = build.proposal.title;
+    item.message       = build.proposal.summary.empty()
+                             ? std::string("Proposed by an AI client over MCP.")
+                             : build.proposal.summary;
+    item.severity      = "info";
+    item.reviewer_name = build.proposal.author_name;
+    item.source        = core::reviews::ReviewItemSource::AIReview;
+    item.status        = core::reviews::ReviewItemStatus::Open;
+    item.proposal_id   = build.proposal.id;
+    item.created_utc   = build.proposal.created_utc;
+    item.updated_utc   = build.proposal.created_utc;
+    session.review_items().AddOrUpdateItem(item);
+
+    core::ProjectFileEntry review_entry;
+    const std::string      review_content = core::reviews::SerializeReviewItems(
+        session.review_items().GetItems(), session.review_items().GetElementReviewStates());
+    if (!core::ProjectService::SaveReviewItemsFile(project, "review-items.af.json", review_content,
+                                                   review_entry, error)) {
+        return ToolResult::Error("Saved the proposal but could not record the review comment: " +
+                                 error);
+    }
+
+    // Both writes tracked new entries in the in-memory manifest; persisting it is
+    // what makes the app see them on its next load.
+    if (!core::ProjectService::WriteManifestSafely(project, error)) {
+        return ToolResult::Error("Saved the proposal but could not update the project manifest: " +
+                                 error);
+    }
+    session.proposals().InvalidateProposalCache();
+
+    nlohmann::json result   = check.effects;
+    result["proposal_id"]   = build.proposal.id;
+    result["path"]          = proposal_entry.relativePath.generic_string();
+    result["review_item_id"] = item.id;
+    result["author"]        = build.proposal.author_name;
+    result["saved"]         = true;
+    result["note"]          = "Saved as a draft and attached to a review comment. It changes "
+                              "nothing until the user reviews and accepts it in Assurance Forge, "
+                              "where it appears under Review.";
     return ToolResult::Ok(std::move(result));
 }
 
@@ -674,6 +723,53 @@ ToolResult GetReviewProposal(Session& session, const nlohmann::json& arguments) 
     });
 }
 
+// ---------------------------------------------------------------------------
+// Multi-argument projects
+//
+// A project can hold several SACM argument files. The session opens the first on
+// load, which left the rest unreachable: an agent asked about a second argument
+// could see neither its content nor that it existed.
+// ---------------------------------------------------------------------------
+
+ToolResult ListCaseFiles(Session& session, const nlohmann::json&) {
+    if (!session.has_project()) {
+        return ToolResult::Error("This session opened a standalone SACM file, so there is no "
+                                 "project holding other argument files.");
+    }
+
+    const std::string loaded = session.state().loaded_file_path.generic_string();
+    nlohmann::json    files  = nlohmann::json::array();
+    for (const core::ProjectFileEntry& entry : session.case_files()) {
+        const std::filesystem::path absolute = session.state().current_project->rootPath / entry.relativePath;
+        files.push_back(nlohmann::json{
+            {"path", entry.relativePath.generic_string()},
+            {"loaded", absolute.generic_string() == loaded},
+        });
+    }
+    return ToolResult::Ok(nlohmann::json{{"case_files", std::move(files)},
+                                         {"note", "Use open_case_file to switch which one the "
+                                                  "other tools read."}});
+}
+
+ToolResult OpenCaseFile(Session& session, const nlohmann::json& arguments) {
+    if (!session.has_project()) {
+        return ToolResult::Error("This session opened a standalone SACM file, so there is nothing "
+                                 "to switch between.");
+    }
+    const std::string path = StringArgument(arguments, "path");
+    if (path.empty()) {
+        return ToolResult::Error("Argument \"path\" is required; call list_case_files for the "
+                                 "paths this project holds.");
+    }
+
+    std::string error;
+    if (!session.OpenCaseFile(path, error)) {
+        return ToolResult::Error(error);
+    }
+    // Re-read after the switch so the caller sees the case it just moved to.
+    return GetCaseOverview(session, nlohmann::json::object());
+}
+
 std::vector<ToolDefinition> BuildTools() {
     std::vector<ToolDefinition> tools;
 
@@ -714,6 +810,29 @@ std::vector<ToolDefinition> BuildTools() {
                        {"required", nlohmann::json::array({"id"})}},
         true,
         &GetElement,
+    });
+
+    tools.push_back(ToolDefinition{
+        "list_case_files",
+        "List the SACM argument files this project holds and which one is currently loaded. A "
+        "project can contain several arguments; the other tools read the loaded one.",
+        nlohmann::json{{"type", "object"}, {"properties", nlohmann::json::object()}},
+        true,
+        &ListCaseFiles,
+    });
+
+    tools.push_back(ToolDefinition{
+        "open_case_file",
+        "Switch which of the project's argument files the other tools read, and return an "
+        "overview of it. Use a path from list_case_files.",
+        nlohmann::json{{"type", "object"},
+                       {"properties",
+                        {{"path",
+                          {{"type", "string"},
+                           {"description", "Project-relative path, e.g. \"arguments/main2.sacm\"."}}}}},
+                       {"required", nlohmann::json::array({"path"})}},
+        true,
+        &OpenCaseFile,
     });
 
     tools.push_back(ToolDefinition{

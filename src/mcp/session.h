@@ -9,6 +9,7 @@
 // See docs/features/mcp-server.md.
 
 #include "core/app_state.h"
+#include "core/reviews/review_item_manager.h"
 #include "core/reviews/review_proposal_manager.h"
 
 #include <filesystem>
@@ -66,11 +67,32 @@ class Session {
     core::reviews::ReviewProposalManager&       proposals() { return proposals_; }
     const core::reviews::ReviewProposalManager& proposals() const { return proposals_; }
 
+    // Review items are how a proposal becomes visible: the Review panel iterates
+    // items and renders a proposal only for those carrying a `proposal_id`. A
+    // proposal saved without one is orphaned -- on disk, valid, and invisible.
+    core::reviews::ReviewItemManager& review_items() { return review_items_; }
+
+    // Mutable because tracking a new file updates the project manifest, which is
+    // what puts the file in the project rather than merely next to it.
+    core::AssuranceProject& project() { return state_.current_project.value(); }
+
+    // The argument files this project holds, in manifest order.
+    std::vector<core::ProjectFileEntry> case_files() const;
+
+    // Loads one of `case_files()` in place, so a session can move between the
+    // arguments of a multi-file project without being relaunched.
+    bool OpenCaseFile(const std::string& relative_path, std::string& error);
+
   private:
     Session() = default;
 
+    // Points the review-item store at the project's tracked review file, or at
+    // the conventional name when the project has none yet.
+    void LoadReviewItems();
+
     core::AppState                       state_;
     core::reviews::ReviewProposalManager proposals_;
+    core::reviews::ReviewItemManager     review_items_;
     std::filesystem::path                project_path_;
     // Resolved once at open so every consent read hits the same file.
     std::filesystem::path                settings_path_;

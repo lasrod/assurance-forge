@@ -4,6 +4,8 @@
 #include "mcp/tools.h"
 
 #include "core/app_state.h"
+#include "core/reviews/review_item.h"
+#include "core/reviews/review_item_manager.h"
 #include "core/reviews/review_proposal.h"
 #include "core/reviews/review_proposal_patch_service.h"
 #include "parser/model_utils.h"
@@ -366,4 +368,193 @@ TEST(McpProposals, RefusesToProposeAgainstAStandaloneSacmFile) {
     EXPECT_TRUE(created.is_error);
     EXPECT_NE(created.payload.value("error", std::string{}).find("project"), std::string::npos)
         << created.payload.dump();
+}
+
+// ---------------------------------------------------------------------------
+// Proposal visibility
+//
+// Reported from real use: a proposal created over MCP never appeared in the app.
+// It was on disk and valid, but orphaned twice over -- untracked by the project
+// manifest, and attached to no review item. The Review panel walks review items
+// and renders a proposal only for those carrying a `proposal_id`, so one without
+// an item cannot be seen or accepted however well-formed it is.
+// ---------------------------------------------------------------------------
+
+TEST(McpProposals, TracksTheProposalInTheProjectManifest) {
+    std::unique_ptr<Fixture> fixture = MakeProjectFixture("manifest");
+    ASSERT_NE(fixture, nullptr);
+    mcp::Server server(*fixture->session);
+    Initialize(server);
+    const std::string parent_id = FirstClaimId(server);
+    ASSERT_FALSE(parent_id.empty());
+
+    const ToolCall created =
+        CallTool(server, "create_review_proposal",
+                 {{"title", "Tracked change"},
+                  {"anchor_element_id", parent_id},
+                  {"operations", AddSubGoalOperations(parent_id, "Sub-goal.")}});
+    ASSERT_FALSE(created.is_error) << created.payload.dump();
+    const std::string path = created.payload["path"].get<std::string>();
+
+    // Re-read from disk: an entry that only ever existed in memory would not
+    // survive this, and the app loads the manifest from disk.
+    core::AppState reopened;
+    ASSERT_TRUE(reopened.open_project(fixture->project_root.string())) << reopened.status_message;
+    ASSERT_TRUE(reopened.current_project.has_value());
+
+    bool tracked = false;
+    for (const core::ProjectFileEntry& entry : reopened.current_project->files) {
+        if (entry.relativePath.generic_string() == path) {
+            tracked = true;
+            EXPECT_EQ(entry.role, core::ProjectFileRole::ReviewProposal);
+        }
+    }
+    EXPECT_TRUE(tracked) << "proposal " << path << " is not tracked by the project manifest";
+}
+
+TEST(McpProposals, AttachesTheProposalToAReviewItemSoTheAppCanShowIt) {
+    std::unique_ptr<Fixture> fixture = MakeProjectFixture("reviewitem");
+    ASSERT_NE(fixture, nullptr);
+    mcp::Server server(*fixture->session);
+    Initialize(server);
+    const std::string parent_id = FirstClaimId(server);
+    ASSERT_FALSE(parent_id.empty());
+
+    const ToolCall created =
+        CallTool(server, "create_review_proposal",
+                 {{"title", "Visible change"},
+                  {"summary", "Adds a sub-goal."},
+                  {"anchor_element_id", parent_id},
+                  {"operations", AddSubGoalOperations(parent_id, "Sub-goal.")}});
+    ASSERT_FALSE(created.is_error) << created.payload.dump();
+    const std::string proposal_id = created.payload["proposal_id"].get<std::string>();
+
+    core::AppState reopened;
+    ASSERT_TRUE(reopened.open_project(fixture->project_root.string())) << reopened.status_message;
+    std::filesystem::path review_path;
+    for (const core::ProjectFileEntry& entry : reopened.current_project->files) {
+        if (entry.role == core::ProjectFileRole::ReviewItems) {
+            review_path = reopened.current_project->rootPath / entry.relativePath;
+        }
+    }
+    ASSERT_FALSE(review_path.empty()) << "no review items file was tracked";
+
+    core::reviews::ReviewItemManager items;
+    items.SetFilePath(review_path);
+    std::string error;
+    ASSERT_TRUE(items.Load(error)) << error;
+
+    bool linked = false;
+    for (const core::reviews::ReviewItem& item : items.GetItems()) {
+        if (item.proposal_id.has_value() && item.proposal_id.value() == proposal_id) {
+            linked = true;
+            EXPECT_EQ(item.element_id, parent_id);
+            EXPECT_EQ(item.title, "Visible change");
+        }
+    }
+    EXPECT_TRUE(linked) << "no review item points at the proposal, so the app cannot display it";
+}
+
+// ---------------------------------------------------------------------------
+// Multi-argument projects
+//
+// Also reported: a second argument file in the project was unreachable. The
+// session opens the first on load and nothing could see or select the others.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Adds a second argument to the fixture's project and reopens the session so it
+// sees the manifest that file was added to.
+std::unique_ptr<mcp::Session> ReopenWithSecondArgument(Fixture& fixture) {
+    core::AppState builder;
+    if (!builder.open_project(fixture.project_root.string())) {
+        ADD_FAILURE() << "could not reopen project: " << builder.status_message;
+        return nullptr;
+    }
+    if (!builder.create_project_sacm_file("main2.sacm")) {
+        ADD_FAILURE() << "could not add a second argument: " << builder.status_message;
+        return nullptr;
+    }
+
+    mcp::Session::Config config;
+    config.project_path  = fixture.project_root;
+    config.settings_path = WriteConsentingSettings(fixture.workspace.path);
+    std::string                   error;
+    std::unique_ptr<mcp::Session> session = mcp::Session::Open(std::move(config), error);
+    if (session == nullptr) {
+        ADD_FAILURE() << "could not reopen MCP session: " << error;
+    }
+    return session;
+}
+
+std::string UnloadedCaseFile(const ToolCall& listed) {
+    for (const nlohmann::json& file : listed.payload["case_files"]) {
+        if (!file["loaded"].get<bool>()) {
+            return file["path"].get<std::string>();
+        }
+    }
+    return {};
+}
+
+} // namespace
+
+TEST(McpCaseFiles, ListsEveryArgumentAndMarksTheLoadedOne) {
+    std::unique_ptr<Fixture> fixture = MakeProjectFixture("listfiles");
+    ASSERT_NE(fixture, nullptr);
+    std::unique_ptr<mcp::Session> session = ReopenWithSecondArgument(*fixture);
+    ASSERT_NE(session, nullptr);
+
+    mcp::Server server(*session);
+    Initialize(server);
+
+    const ToolCall listed = CallTool(server, "list_case_files");
+
+    ASSERT_FALSE(listed.is_error) << listed.payload.dump();
+    ASSERT_EQ(listed.payload["case_files"].size(), 2u) << listed.payload.dump();
+
+    int loaded_count = 0;
+    for (const nlohmann::json& file : listed.payload["case_files"]) {
+        if (file["loaded"].get<bool>()) {
+            ++loaded_count;
+        }
+    }
+    EXPECT_EQ(loaded_count, 1) << "exactly one argument should be reported as loaded";
+}
+
+TEST(McpCaseFiles, OpensASecondArgumentAndKeepsReadingIt) {
+    std::unique_ptr<Fixture> fixture = MakeProjectFixture("switchfiles");
+    ASSERT_NE(fixture, nullptr);
+    std::unique_ptr<mcp::Session> session = ReopenWithSecondArgument(*fixture);
+    ASSERT_NE(session, nullptr);
+
+    mcp::Server server(*session);
+    Initialize(server);
+
+    const ToolCall listed = CallTool(server, "list_case_files");
+    ASSERT_FALSE(listed.is_error) << listed.payload.dump();
+    const std::string unloaded = UnloadedCaseFile(listed);
+    ASSERT_FALSE(unloaded.empty()) << "expected a second, unloaded argument";
+
+    const ToolCall opened = CallTool(server, "open_case_file", {{"path", unloaded}});
+    ASSERT_FALSE(opened.is_error) << opened.payload.dump();
+    EXPECT_NE(opened.payload["loaded_file"].get<std::string>().find(unloaded), std::string::npos)
+        << opened.payload.dump();
+
+    // The switch must stick for later reads, not just colour the return value.
+    const ToolCall after = CallTool(server, "get_case_overview");
+    ASSERT_FALSE(after.is_error) << after.payload.dump();
+    EXPECT_NE(after.payload["loaded_file"].get<std::string>().find(unloaded), std::string::npos);
+}
+
+TEST(McpCaseFiles, ReportsAnUnknownPathRatherThanSilentlyKeepingTheOldCase) {
+    std::unique_ptr<Fixture> fixture = MakeProjectFixture("badswitch");
+    ASSERT_NE(fixture, nullptr);
+    mcp::Server server(*fixture->session);
+    Initialize(server);
+
+    const ToolCall opened = CallTool(server, "open_case_file", {{"path", "arguments/nope.sacm"}});
+
+    EXPECT_TRUE(opened.is_error);
+    EXPECT_NE(opened.payload.value("error", std::string{}).find("nope.sacm"), std::string::npos);
 }
