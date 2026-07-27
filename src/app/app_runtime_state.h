@@ -203,6 +203,11 @@ struct AppRuntimeState {
     // into the project: a change set is a proposal in progress, not project
     // data, and a second writer in that directory is what this design removed.
     core::changesets::ChangeSetStore agent_change_sets;
+    // The preview the canvas draws while a change set is open: the argument as
+    // it would be if the user accepted, plus the elements it would remove put
+    // back for display so a deletion can be seen rather than inferred from a gap.
+    // Empty when nothing is open, and never saved.
+    std::optional<parser::AssuranceCase> agent_preview_case;
     std::optional<GuidelineCatalog> guideline_catalog;
     bool guideline_catalog_load_attempted = false;
     std::string guideline_catalog_error;

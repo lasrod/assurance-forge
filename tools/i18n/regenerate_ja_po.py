@@ -293,6 +293,16 @@ TRANSLATIONS = {
     "AI review is already running.": "AI レビューは既に実行中です。",
     "AI review OK": "AI レビュー OK",
     "AI review OK is set by AI review outcomes.": "AI レビュー OK は AI レビューの結果によって設定されます。",
+    # MCP change sets: what a connected AI client is proposing, and the
+    # controls a person uses to accept or reject it.
+    "Accept change": "変更を受け入れる",
+    "Reject change": "変更を却下する",
+    "Proposed by {0}": "{0} による提案",
+    "Why: {0}": "理由: {0}",
+    "{0} added, {1} changed, {2} removed": "追加 {0}、変更 {1}、削除 {2}",
+    "Shown on the canvas as you watch it build.": "作成の様子がキャンバスに表示されています。",
+    "The argument changed while this was being prepared, so it no longer applies. Ask the AI client to rebuild it.":
+        "準備中に論証が変更されたため、この提案は適用できません。AI クライアントに再作成を依頼してください。",
     "Manual review OK": "手動レビュー OK",
     "Mark review OK manually": "レビュー OK を手動で記録",
     "Mark this element as manually reviewed OK.": "この要素を手動でレビュー OK としてマークします。",
@@ -745,6 +755,8 @@ TRANSLATIONS = {
 # Plural translations: (singular_msgid, plural_msgid) -> [japanese_form]
 # Japanese has nplurals=1, so we provide a single form.
 PLURAL_TRANSLATIONS = {
+    ("AI client connected: {0}", "AI clients connected: {0}"):
+        ["接続中の AI クライアント: {0}"],
     ("{0} item", "{0} items"): ["{0} 個"],
     ("{0} element will be deleted (highlighted in red).",
      "{0} elements will be deleted (highlighted in red).") :

@@ -26,6 +26,10 @@ struct ReviewPanelAreaCallbacks {
     std::function<void(const core::ProblemItem&)> quick_fix_problem;
     std::function<void(const std::string& element_id)> accept_translation_review;
     std::function<bool(const std::string&, bool)> set_manual_review_ok;
+    // The only path from an agent's staged work into the safety case, and a
+    // person's action. No tool an agent can call reaches it.
+    std::function<void(const std::string& change_set_id)> accept_agent_change_set;
+    std::function<void(const std::string& change_set_id)> reject_agent_change_set;
 };
 
 void RenderReviewPanelContent(AppRuntimeState& state, const ReviewPanelAreaCallbacks& callbacks);

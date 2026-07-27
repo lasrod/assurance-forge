@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/changesets/change_set.h"
 #include "ui/gsn/gsn_canvas.h" // for GsnNode
 
 #include <imgui.h>
@@ -38,5 +39,17 @@ void DrawReviewScopeHighlight(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bot
 // Solution/Evidence shapes, otherwise around the rounded rectangle.
 void DrawCounterChallengeDecoration(
     ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, bool circular, float zoom);
+
+// Mark a node that a connected AI client's open change set would add, change or
+// remove, so the user watches the argument take shape instead of being handed a
+// finished proposal to decode.
+//
+// Follows the same rule as the counter decoration: the cue is a border *and* a
+// short badge, never colour alone, so what is being proposed is legible to
+// someone who cannot distinguish the colours. `circular` traces round
+// Solution/Evidence shapes rather than the rounded rectangle.
+void DrawProposedChangeDecoration(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right,
+                                  bool circular, float zoom,
+                                  core::changesets::ElementChange change);
 
 } // namespace ui::gsn

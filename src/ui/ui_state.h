@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "core/changesets/change_set.h"
 #include "core/problems/problem_attention.h"
 #include "core/sacm_model.h"
 #include "ui/confidence_model.h"
@@ -78,6 +79,20 @@ struct UiState {
     // True while any proposal canvas mode (creator or preview) is active.
     // Used by the GSN canvas to apply a distinct background tint.
     bool proposal_canvas_active = false;
+
+    // What a connected AI client's open change set does to each element, so the
+    // canvas can show the work as the agent builds it rather than only once it
+    // is finished. Empty when no change set is open, which is the ordinary case
+    // and costs nothing to check.
+    //
+    // While this is non-empty the canvas is drawing a *preview* model, so a node
+    // here may not exist in the saved argument yet -- and a node marked Removed
+    // is drawn from the committed model, because the preview no longer holds it.
+    std::unordered_map<std::string, core::changesets::ElementChange> agent_change_status;
+    // The change set those statuses belong to, so the canvas legend and the
+    // Review panel can agree on which one is being shown.
+    std::string agent_change_set_id;
+    std::string agent_change_set_title;
 
     // Set to true when the canvas should fit-to-view the marked_for_removal set.
     bool center_on_marked = false;

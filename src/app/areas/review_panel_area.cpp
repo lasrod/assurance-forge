@@ -141,6 +141,37 @@ ui::panels::ReviewPanelModel BuildReviewPanelModel(AppRuntimeState& state) {
         proposals.creator_active ? proposals.draft.anchor_element_id : ui_state.selected_element_id;
     model.focus_review_item_id = state.workbench.focus_review_item_id;
     model.has_project = state.app_state.current_project.has_value();
+
+    // What connected AI clients are proposing. Assembled here rather than in the
+    // panel so the panel stays a renderer: it receives rows, not a change-set
+    // store and a model to diff against.
+    if (state.agent_bridge != nullptr) {
+        for (const controllers::AgentConnection& connection : state.agent_bridge->connections()) {
+            model.connected_agents.push_back(connection.client_label);
+        }
+    }
+    for (const core::changesets::ChangeSet* change_set : state.agent_change_sets.Open()) {
+        ui::panels::AgentChangeSetRow row;
+        row.id              = change_set->id;
+        row.title           = change_set->title;
+        row.summary         = change_set->summary;
+        row.intent          = change_set->intent;
+        row.client_label    = change_set->client_label;
+        row.state           = core::changesets::ChangeSetStateToString(change_set->state);
+        row.operation_count = static_cast<int>(change_set->proposal.operations.size());
+        row.shown_on_canvas = ui_state.agent_change_set_id == change_set->id;
+
+        if (state.app_state.loaded_case.has_value()) {
+            const core::changesets::ChangeSetDiff diff = core::changesets::ComputeChangeSetDiff(
+                *change_set, state.app_state.loaded_case.value());
+            row.applies        = diff.success;
+            row.problem        = diff.error;
+            row.added_count    = diff.added_count;
+            row.modified_count = diff.modified_count;
+            row.removed_count  = diff.removed_count;
+        }
+        model.agent_change_sets.push_back(std::move(row));
+    }
     EnsureReviewGuidelineCatalogLoaded(state);
     if (state.guideline_catalog.has_value()) {
         for (const GuidelineCatalogEntry& entry : state.guideline_catalog->entries) {
@@ -293,6 +324,14 @@ void RenderReviewPanelContent(AppRuntimeState& state, const ReviewPanelAreaCallb
     panel_callbacks.set_manual_review_ok = [&callbacks, element_id = model.selected_element_id](bool manual_ok) {
         if (callbacks.set_manual_review_ok)
             callbacks.set_manual_review_ok(element_id, manual_ok);
+    };
+    panel_callbacks.accept_agent_change_set = [&callbacks](const std::string& change_set_id) {
+        if (callbacks.accept_agent_change_set)
+            callbacks.accept_agent_change_set(change_set_id);
+    };
+    panel_callbacks.reject_agent_change_set = [&callbacks](const std::string& change_set_id) {
+        if (callbacks.reject_agent_change_set)
+            callbacks.reject_agent_change_set(change_set_id);
     };
     ui::panels::ShowReviewPanel(model, panel_callbacks);
     state.workbench.focus_review_item_id.clear();

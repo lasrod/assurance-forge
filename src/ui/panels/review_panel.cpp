@@ -393,6 +393,85 @@ void DrawProblemItem(const core::ProblemItem& problem, const ReviewPanelCallback
 
 } // namespace
 
+namespace {
+
+// What a connected AI client is proposing, and the only place a person can turn
+// it into a change to the safety case.
+void ShowAgentChangeSets(const ReviewPanelModel& model, const ReviewPanelCallbacks& callbacks) {
+    if (model.agent_change_sets.empty() && model.connected_agents.empty()) {
+        return;
+    }
+
+    if (!model.connected_agents.empty()) {
+        // A client reading a safety argument should never be invisible to the
+        // person responsible for it.
+        std::string clients;
+        for (const std::string& client : model.connected_agents) {
+            clients += clients.empty() ? client : (", " + client);
+        }
+        ImGui::TextUnformatted(ui::i18n::trnf("AI client connected: {0}", "AI clients connected: {0}",
+                                              static_cast<unsigned long>(model.connected_agents.size()),
+                                              clients)
+                                   .c_str());
+    }
+
+    for (const AgentChangeSetRow& row : model.agent_change_sets) {
+        ImGui::PushID(row.id.c_str());
+        ImGui::Separator();
+
+        ImGui::TextUnformatted(row.title.c_str());
+        ImGui::TextDisabled("%s", ui::i18n::trf("Proposed by {0}", row.client_label).c_str());
+
+        if (row.shown_on_canvas) {
+            ImGui::TextDisabled("%s", AF_TR("Shown on the canvas as you watch it build.").c_str());
+        }
+        if (!row.summary.empty()) {
+            ImGui::TextWrapped("%s", row.summary.c_str());
+        }
+        if (!row.intent.empty()) {
+            ImGui::TextWrapped("%s", ui::i18n::trf("Why: {0}", row.intent).c_str());
+        }
+
+        ImGui::TextUnformatted(ui::i18n::trf("{0} added, {1} changed, {2} removed",
+                                             std::to_string(row.added_count),
+                                             std::to_string(row.modified_count),
+                                             std::to_string(row.removed_count))
+                                   .c_str());
+
+        if (!row.applies) {
+            // The argument moved while this was being read. Accepting is refused
+            // rather than forced: the alternative is applying a patch built
+            // against an argument that no longer exists.
+            ImGui::TextWrapped(
+                "%s", AF_TR("The argument changed while this was being prepared, so it no longer "
+                            "applies. Ask the AI client to rebuild it.")
+                          .c_str());
+            if (!row.problem.empty()) {
+                ImGui::TextDisabled("%s", row.problem.c_str());
+            }
+        }
+
+        ImGui::BeginDisabled(!row.applies || row.operation_count == 0);
+        if (ImGui::Button(AF_TR("Accept change").c_str()) && callbacks.accept_agent_change_set) {
+            callbacks.accept_agent_change_set(row.id);
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button(AF_TR("Reject change").c_str()) && callbacks.reject_agent_change_set) {
+            callbacks.reject_agent_change_set(row.id);
+        }
+
+        ImGui::PopID();
+    }
+
+    if (!model.agent_change_sets.empty()) {
+        ImGui::Separator();
+        ImGui::Spacing();
+    }
+}
+
+} // namespace
+
 void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& callbacks) {
     ImGui::TextUnformatted(AF_TR("Review").c_str());
     ImGui::Separator();
@@ -401,6 +480,11 @@ void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& 
         ImGui::TextDisabled("%s", AF_TR("Open or create a project to store review comments.").c_str());
         return;
     }
+
+    // Before the element-selected gate: a change set belongs to the project, not
+    // to whatever happens to be selected, and something an AI client is
+    // proposing must never be hidden behind an unrelated click.
+    ShowAgentChangeSets(model, callbacks);
 
     if (model.selected_element_id.empty()) {
         ImGui::TextDisabled("%s", AF_TR("Select an element to review.").c_str());

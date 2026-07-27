@@ -1294,10 +1294,18 @@
       "id": "AF-AI-009",
       "area": "AI",
       "name": "Propose changes to a safety case from an external AI client",
-      "status": "planned",
-      "evidence": [],
-      "tests": [],
-      "notes": "Superseded the earlier design in which the adapter wrote review-proposal files into the project directly. That made it a second writer of `af.proj` and `review-items.af.json`, which the application overwrote from its own older copy on the next save, so an agent's proposal silently vanished. Replaced by change sets built over the bridge and applied by the existing `ApplyProposalCommand`, so an agent's edit is audited, undoable and attributable exactly like one made with the mouse. Not available until that lands."
+      "status": "supported",
+      "evidence": [
+        "src/core/changesets/change_set.cpp",
+        "src/core/changesets/change_set_store.cpp",
+        "src/agent/change_operations.cpp",
+        "src/app/app_runtime_project.cpp"
+      ],
+      "tests": [
+        "tests/test_change_sets.cpp",
+        "tests/test_change_set_acceptance.cpp"
+      ],
+      "notes": "An agent builds a **change set** the user watches take shape: from its first staged operation the GSN canvas draws the argument as it would be if accepted, with additions, edits and removals marked in place by border and badge (never colour alone). Staging changes nothing — no SACM write, no command, no audit transaction — and a change set that would not apply is refused at staging time, so the canvas can always draw one. **Acceptance is an ordinary audited edit**: it goes through the unchanged `ApplyProposalCommand`, so it is undoable, replayable and attributed to the connecting client. No agent-specific command type exists, which is what guarantees an agent cannot make a change the application could not make itself. Staleness is re-checked at acceptance, not at staging, because the user may edit the argument while reading the proposal. Accept and Reject live in the Review panel; there is no tool an agent can call to apply its own work. Replaces the earlier design in which the adapter wrote proposal files into the project, making it a second writer of `af.proj` and `review-items.af.json` that the application overwrote from its own older copy on the next save."
     },
     {
       "id": "AF-PLAT-001",

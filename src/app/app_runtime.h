@@ -169,6 +169,12 @@ private:
     // connected client's request, through the same path a user's click takes.
     bool OpenAgentRequestedCaseFile(const std::string& relative_path, std::string& error);
 
+    // Recomputes what a connected client's open change set would do and returns
+    // the model the canvas should draw: the preview when one is open, otherwise
+    // the committed case unchanged. Also refreshes the per-element change status
+    // the canvas decorates nodes with.
+    const parser::AssuranceCase& RefreshAgentChangePreview(const parser::AssuranceCase& committed);
+
   public:
     // Accepts an agent's change set: the one point where staged work becomes a
     // real edit. Goes through `ApplyProposalCommand`, so it is audited, undoable

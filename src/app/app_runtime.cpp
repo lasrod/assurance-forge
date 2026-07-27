@@ -429,6 +429,59 @@ void AppRuntime::ScanDirectory() {
     impl_->project_controller->ScanDirectory();
 }
 
+const parser::AssuranceCase& AppRuntime::RefreshAgentChangePreview(
+    const parser::AssuranceCase& committed) {
+    ui::UiState& ui_state = ui::GetUiState();
+
+    const std::vector<const core::changesets::ChangeSet*> open =
+        impl_->agent_change_sets.Open();
+    if (open.empty()) {
+        ui_state.agent_change_status.clear();
+        ui_state.agent_change_set_id.clear();
+        ui_state.agent_change_set_title.clear();
+        impl_->agent_preview_case.reset();
+        return committed;
+    }
+
+    // One canvas can only show one proposal legibly. Two connected clients are
+    // supported, but the newest open change set is the one drawn; the Review
+    // panel lists them all so the other is not hidden.
+    const core::changesets::ChangeSet& shown = *open.back();
+    const core::changesets::ChangeSetDiff diff =
+        core::changesets::ComputeChangeSetDiff(shown, committed);
+    if (!diff.success) {
+        // The argument moved under the change set. Showing a preview that cannot
+        // be applied would invite the user to accept something that will be
+        // refused, so fall back to the committed model; the Review panel reports
+        // why.
+        ui_state.agent_change_status.clear();
+        impl_->agent_preview_case.reset();
+        ui_state.agent_change_set_id    = shown.id;
+        ui_state.agent_change_set_title = shown.title;
+        return committed;
+    }
+
+    ui_state.agent_change_set_id    = shown.id;
+    ui_state.agent_change_set_title = shown.title;
+    ui_state.agent_change_status.clear();
+    for (const std::pair<const std::string, core::changesets::ElementChange>& entry :
+         diff.status_by_id) {
+        if (entry.second != core::changesets::ElementChange::Unchanged) {
+            ui_state.agent_change_status[entry.first] = entry.second;
+        }
+    }
+
+    impl_->agent_preview_case = diff.preview_model;
+    // A removed element is absent from the preview by definition, so it is put
+    // back for display only. A reviewer being asked to approve a deletion should
+    // be able to see what is being deleted, in place, rather than infer it from
+    // a gap.
+    for (const parser::SacmElement& removed : diff.removed) {
+        impl_->agent_preview_case->elements.push_back(removed);
+    }
+    return impl_->agent_preview_case.value();
+}
+
 void AppRuntime::RebuildDerivedViewsIfNeeded() {
     // A library-primary (flipped) command committed its edit to the library but
     // deliberately did NOT rebuild the live loaded_case/sacm_package inside the
@@ -467,7 +520,14 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
         return;
     }
 
-    const auto& ac = *impl_->app_state.loaded_case;
+    // While a connected AI client has a change set open, the canvas draws the
+    // *preview* -- the argument as it would be if the user accepted -- with each
+    // touched node marked. That is what makes the agent's work visible where it
+    // lands, rather than as a list of operations beside the diagram. The
+    // committed model is untouched; nothing here is saved.
+    const parser::AssuranceCase& committed = *impl_->app_state.loaded_case;
+    const parser::AssuranceCase& ac        = RefreshAgentChangePreview(committed);
+
     const sacm::AssuranceCasePackage* sacm_package =
         impl_->app_state.has_projected_package() ? &impl_->app_state.projected_package() : nullptr;
     const std::optional<parser::AssuranceCase> filtered_case = FilterConfidencePackageElementsFromMainTree(ac, sacm_package);

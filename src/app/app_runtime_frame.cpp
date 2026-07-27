@@ -274,6 +274,22 @@ void AppRuntime::RenderFrame(bool& done) {
     review_panel_callbacks.set_manual_review_ok = [this](const std::string& element_id, bool manual_ok) {
         return SetManualReviewOk(element_id, manual_ok);
     };
+    review_panel_callbacks.accept_agent_change_set = [this](const std::string& change_set_id) {
+        std::string error;
+        if (!AcceptAgentChangeSet(change_set_id, error)) {
+            SetStatus("Change could not be accepted: " + error);
+            return;
+        }
+        SetStatus("Change accepted. Undo reverses it like any other edit.");
+    };
+    review_panel_callbacks.reject_agent_change_set = [this](const std::string& change_set_id) {
+        std::string error;
+        if (!RejectAgentChangeSet(change_set_id, error)) {
+            SetStatus("Change could not be rejected: " + error);
+            return;
+        }
+        SetStatus("Change rejected.");
+    };
 
     areas::FeedbackDockAreaCallbacks feedback_dock_callbacks;
     feedback_dock_callbacks.problems.activate_problem = [this](const core::ProblemItem& problem) {
