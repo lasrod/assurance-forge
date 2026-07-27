@@ -1,6 +1,6 @@
 # MCP Server — build safety cases by chat
 
-- **Status:** Reading and proposing implemented; discoverability outstanding. Capability matrix row `AF-AI-007`.
+- **Status:** Implemented and confirmed in a running app. Capability matrix row `AF-AI-007`.
 - **Date:** 2026-07-26 (plan), 2026-07-27 (read side, then write side)
 
 ## Implementation status
@@ -22,11 +22,11 @@ Shipped in phase 4:
 - **ADR 0007** records the consent decision. ADR 0005 governs provider egress and
   does not cover a server answering an arbitrary connecting client.
 
-Not yet confirmed: the Preferences section's layout has not been checked in a
-running app. Driving this GUI is awkward — a native ImGui/OpenGL window offers no
-accessibility tree, and screen capture returns whatever is in front. The
-section's behaviour is tested; its appearance is not, which is why `AF-AI-007`
-stays `prototype`.
+Confirmed in a running app: the Preferences section renders, the consent toggle
+writes `mcp.enabled` to the settings file, and the sibling `ai` section survives
+that write — the live counterpart to the regression test added when
+`AiSettingsStore::Save` was fixed. The consent flag was toggled back off
+afterwards; it is not something a check should leave switched on.
 
 Phases 1 and 2 were built in the opposite order to the numbering below. The
 top-goal operation is a prerequisite for *writing*, not for the server itself, so
