@@ -14,6 +14,12 @@
 #         -P cmake/run_mcp_smoke_test.cmake
 # --------------------------------------------------------------------
 
+# A `cmake -P` script inherits no policy settings from the project, so without
+# this every policy defaults to OLD and the available syntax depends on the
+# runner's CMake version -- which is how a script that passed on one CI platform
+# failed on another. Matches the project's own minimum.
+cmake_minimum_required(VERSION 3.21)
+
 foreach(required AF_MCP_EXE AF_MCP_PROJECT AF_MCP_INPUT AF_MCP_MODE AF_MCP_WORK_DIR)
     if(NOT DEFINED ${required})
         message(FATAL_ERROR "run_mcp_smoke_test.cmake: -D${required} is required")
@@ -74,8 +80,13 @@ endif()
 # Split into bytes rather than searched as text: the hex dump is one continuous
 # string, so a naive FIND for "0d" could straddle a byte boundary and report a
 # carriage return that is not there.
+#
+# `list(FIND)` rather than `if(... IN_LIST ...)`: the latter needs policy CMP0057,
+# which a `-P` script does not get by default, so it silently degrades to an
+# "Unknown arguments" error on older CMake. This form needs no policy at all.
 string(REGEX REPLACE "(..)" ";\\1" _stdout_bytes "${_stdout_hex}")
-if("0d" IN_LIST _stdout_bytes)
+list(FIND _stdout_bytes "0d" _carriage_return_index)
+if(NOT _carriage_return_index EQUAL -1)
     message(FATAL_ERROR
         "stdout contains a carriage return; the transport must emit bare newlines.\n"
         "This usually means the binary-mode stdout setup in src/mcp/main.cpp was lost.\n"
