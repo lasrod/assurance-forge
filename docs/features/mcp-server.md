@@ -1,21 +1,51 @@
 # MCP Server — build safety cases by chat
 
-- **Status:** Reading implemented; writing planned. Capability matrix row `AF-AI-007`.
-- **Date:** 2026-07-26 (plan), 2026-07-27 (read side landed)
+- **Status:** Reading and proposing implemented; discoverability outstanding. Capability matrix row `AF-AI-007`.
+- **Date:** 2026-07-26 (plan), 2026-07-27 (read side, then write side)
 
 ## Implementation status
 
 | Phase | State |
 |---|---|
 | 2 — `af_mcp` layer, JSON-RPC over stdio, consent gate, read tools | **Implemented** |
-| 1 — top goal in the proposal vocabulary | Not started (prerequisite for phase 3, not for phase 2) |
-| 3 — writing via proposals | Not started |
+| 1 — top goal in the proposal vocabulary | **Implemented**, differently (see below) |
+| 3 — writing via proposals | **Implemented** |
 | 4 — discoverability, preferences toggle, consent ADR | Not started |
 
 Phases 1 and 2 were built in the opposite order to the numbering below. The
 top-goal operation is a prerequisite for *writing*, not for the server itself, so
 building the server first produced something runnable sooner without changing any
 published tool schema.
+
+### Phase 1 needed no new operation
+
+The plan called for a `PatchOperationType::CreateTopGoal`. Reading the patch
+service showed it was unnecessary: `ApplyCreateOperation` creates a standalone
+element with no parent, and relationships come from separate `AddSupportedBy`
+operations, so **`CreateClaim` already produces exactly a top goal**. A distinct
+operation would have been redundant surface producing byte-identical output.
+
+The real blocker was `EvaluateReviewProposalValidity` requiring a non-empty
+`anchor_element_id` that resolves. That is now relaxed for *purely additive*
+proposals only: a proposal may omit its anchor when it names no affected existing
+elements and no operation references an existing id. Anything that touches an
+existing element still requires an anchor, so no staleness detection is lost.
+
+Shipped in phase 3:
+
+- `preview_review_proposal` — dry-runs operations and reports effects, writing
+  nothing.
+- `create_review_proposal` — saves a draft through `ReviewProposalManager`,
+  attributed to the connected client (`MCP: <client> <version>`). Runs the same
+  validity check and dry run as preview, so nothing that cannot apply reaches
+  disk.
+- `list_review_proposals` / `get_review_proposal` — including whether each draft
+  still applies to the current case.
+
+The agent never edits the case. It cannot make a change nobody looked at, and
+because drafts apply through the existing `ApplyProposalCommand` and
+`PatchOperationType` vocabulary, it cannot make one the app could not make
+itself.
 
 Shipped in phase 2:
 

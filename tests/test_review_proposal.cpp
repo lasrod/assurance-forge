@@ -1,5 +1,6 @@
 #include "core/reviews/review_proposal.h"
 #include "core/reviews/review_proposal_manager.h"
+#include "core/reviews/review_proposal_patch_service.h"
 
 #include <chrono>
 #include <filesystem>
@@ -167,4 +168,94 @@ TEST(ReviewProposalManagerTest, SavesListsLoadsAndDeletesProposalFiles) {
 
     ASSERT_TRUE(manager.DeleteProposal(proposal.id, error)) << error;
     EXPECT_TRUE(manager.ListProposals(&model).empty());
+}
+// ---------------------------------------------------------------------------
+// Unanchored proposals
+//
+// A proposal carries an anchor so it can be shown against the element it
+// concerns and can go stale when that element changes. A proposal that creates
+// the case's first goal has neither property: an empty case offers nothing to
+// anchor to. These pin the narrow relaxation that allows -- and the boundary
+// that still refuses.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+core::reviews::ReviewProposal MakeTopGoalProposal() {
+    core::reviews::ReviewProposal proposal;
+    proposal.id = "proposal-top-goal";
+    proposal.title = "Create the top goal";
+    proposal.summary = "Seeds an empty case with its root claim.";
+    proposal.author_name = "MCP: TestClient";
+    proposal.created_utc = "2026-07-27T09:00:00Z";
+
+    core::reviews::PatchOperation create;
+    create.type = core::reviews::PatchOperationType::CreateClaim;
+    create.create_ref = "$top_goal";
+    create.text = "The braking system is acceptably safe.";
+    proposal.operations.push_back(create);
+
+    return proposal;
+}
+
+} // namespace
+
+TEST(ReviewProposalTest, AcceptsAnUnanchoredProposalAgainstAnEmptyCase) {
+    const parser::AssuranceCase empty_model;
+    core::reviews::ReviewProposal proposal = MakeTopGoalProposal();
+    proposal.base_model_hash = core::reviews::ComputeModelSemanticHash(empty_model);
+
+    const core::reviews::ProposalValidityResult result =
+        core::reviews::EvaluateReviewProposalValidity(proposal, empty_model);
+
+    EXPECT_EQ(result.validity, core::reviews::ProposalValidity::Valid) << result.reason;
+}
+
+TEST(ReviewProposalTest, RefusesAnUnanchoredProposalThatNamesAffectedElements) {
+    parser::AssuranceCase model = MakeCase();
+    core::reviews::ReviewProposal proposal = MakeTopGoalProposal();
+    proposal.affected_existing_element_ids = {"G12"};
+
+    const core::reviews::ProposalValidityResult result =
+        core::reviews::EvaluateReviewProposalValidity(proposal, model);
+
+    EXPECT_EQ(result.validity, core::reviews::ProposalValidity::Broken);
+    EXPECT_NE(result.reason.find("anchor"), std::string::npos);
+}
+
+// The dangerous case: an operation reaching an existing element without the
+// proposal declaring it. Skipping the anchor here would skip staleness checking
+// on an element the patch genuinely edits.
+TEST(ReviewProposalTest, RefusesAnUnanchoredProposalThatOperatesOnAnExistingElement) {
+    parser::AssuranceCase model = MakeCase();
+    core::reviews::ReviewProposal proposal = MakeTopGoalProposal();
+
+    core::reviews::PatchOperation link;
+    link.type = core::reviews::PatchOperationType::AddSupportedBy;
+    link.source = core::reviews::ElementRef{"G12", std::nullopt};
+    link.target = core::reviews::ElementRef{std::nullopt, "$top_goal"};
+    proposal.operations.push_back(link);
+
+    const core::reviews::ProposalValidityResult result =
+        core::reviews::EvaluateReviewProposalValidity(proposal, model);
+
+    EXPECT_EQ(result.validity, core::reviews::ProposalValidity::Broken);
+    EXPECT_NE(result.reason.find("anchor"), std::string::npos);
+}
+
+// End to end: the relaxation is only worth anything if applying the result
+// actually yields a usable top goal -- one claim, no incoming relationship.
+TEST(ReviewProposalPatchServiceTest, AppliesAnUnanchoredProposalAsATopGoal) {
+    parser::AssuranceCase model;
+    core::reviews::ReviewProposal proposal = MakeTopGoalProposal();
+
+    const core::reviews::ReviewProposalPatchService service;
+    const core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+
+    ASSERT_TRUE(result.success) << result.error;
+    ASSERT_EQ(model.elements.size(), 1u);
+    EXPECT_EQ(model.elements.front().type, "claim");
+    EXPECT_EQ(model.elements.front().content, "The braking system is acceptably safe.");
+    EXPECT_TRUE(model.elements.front().source_refs.empty());
+    EXPECT_TRUE(model.elements.front().target_refs.empty());
 }
