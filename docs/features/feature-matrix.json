@@ -1111,12 +1111,14 @@
       "status": "supported",
       "evidence": [
         "src/core/sacm_model.h",
-        "src/core/translation_review_store.cpp"
+        "src/core/translation_review_store.cpp",
+        "src/sacm_adapter/case_projection.cpp"
       ],
       "tests": [
-        "tests/test_translation_review_sync.cpp"
+        "tests/test_translation_review_sync.cpp",
+        "tests/test_multilingual_round_trip.cpp"
       ],
-      "notes": "Per-element `name_langs` / `content_langs` maps carried through the model."
+      "notes": "Per-element `name_langs` / `content_langs` maps carried through the model. A name carrying more than one language does not fit clause 8.6, so import parks the extra languages in a reserved `sacm.import.name` TaggedValue and the projection recombines them. That recombination used to let an overflow entry with no `lang` claim the primary's slot, replacing an English claim name with its translation on every projection — which changed what the claim asserted, made the canonical hash unstable, and left affected projects reporting an audit divergence that Reconcile could not clear. The overflow now never overwrites the primary language, and repeated project/serialize cycles are asserted to converge rather than accumulate."
     },
     {
       "id": "AF-ENG-013",

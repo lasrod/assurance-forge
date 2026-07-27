@@ -274,6 +274,7 @@ add_executable(tests
     tests/test_save_from_library.cpp
     tests/test_acp_controller.cpp
     tests/test_xml_parser.cpp
+    tests/test_multilingual_round_trip.cpp
     tests/test_argument_cycles.cpp
     tests/test_register_model.cpp
     tests/test_assurance_tree.cpp
