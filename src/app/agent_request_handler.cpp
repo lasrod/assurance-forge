@@ -46,6 +46,12 @@ agent::Result OpenCaseFile(const agent::ReadContext& read, const nlohmann::json&
     return agent::GetCaseOverview(read);
 }
 
+bool IsChangeOperation(const std::string& op) {
+    return op == "begin_change_set" || op == "stage_operations" || op == "unstage_operations" ||
+           op == "describe_change_set" || op == "submit_change_set" ||
+           op == "discard_change_set" || op == "list_change_sets";
+}
+
 } // namespace
 
 bridge::Response HandleAgentRequest(const bridge::Request& request,
@@ -69,6 +75,37 @@ bridge::Response HandleAgentRequest(const bridge::Request& request,
     }
     if (request.op == "open_case_file") {
         return FromAgentResult(request.id, OpenCaseFile(read, request.args, context));
+    }
+
+    if (IsChangeOperation(request.op)) {
+        if (context.change_sets == nullptr) {
+            return FromAgentResult(
+                request.id,
+                agent::Result::Error("This is a standalone SACM file rather than a project, so "
+                                     "there is nowhere to record a proposed change."));
+        }
+        const agent::ChangeContext change{context.state, *context.change_sets,
+                                          context.connection_id, context.client_label};
+
+        if (request.op == "begin_change_set") {
+            return FromAgentResult(request.id, agent::BeginChangeSet(change, request.args));
+        }
+        if (request.op == "stage_operations") {
+            return FromAgentResult(request.id, agent::StageOperations(change, request.args));
+        }
+        if (request.op == "unstage_operations") {
+            return FromAgentResult(request.id, agent::UnstageOperations(change, request.args));
+        }
+        if (request.op == "describe_change_set") {
+            return FromAgentResult(request.id, agent::DescribeChangeSet(change, request.args));
+        }
+        if (request.op == "submit_change_set") {
+            return FromAgentResult(request.id, agent::SubmitChangeSet(change, request.args));
+        }
+        if (request.op == "discard_change_set") {
+            return FromAgentResult(request.id, agent::DiscardChangeSet(change, request.args));
+        }
+        return FromAgentResult(request.id, agent::ListChangeSets(change));
     }
 
     return bridge::MakeError(request.id, bridge::error_code::kUnknownOperation,

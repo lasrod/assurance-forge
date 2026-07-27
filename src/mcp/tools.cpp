@@ -43,6 +43,78 @@ ToolResult OpenCaseFile(Session& session, const nlohmann::json& arguments) {
     return Run(session, "open_case_file", arguments);
 }
 
+ToolResult BeginChangeSet(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "begin_change_set", arguments);
+}
+
+ToolResult StageOperations(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "stage_operations", arguments);
+}
+
+ToolResult UnstageOperations(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "unstage_operations", arguments);
+}
+
+ToolResult DescribeChangeSet(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "describe_change_set", arguments);
+}
+
+ToolResult SubmitChangeSet(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "submit_change_set", arguments);
+}
+
+ToolResult DiscardChangeSet(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "discard_change_set", arguments);
+}
+
+ToolResult ListChangeSets(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "list_change_sets", arguments);
+}
+
+// The operation vocabulary, published from the same list the parser enforces so
+// the schema and the check cannot drift.
+nlohmann::json OperationTypeEnum() {
+    nlohmann::json values = nlohmann::json::array();
+    for (const std::string& name : agent::PatchOperationTypeNames()) {
+        values.push_back(name);
+    }
+    return values;
+}
+
+nlohmann::json OperationsSchema() {
+    return nlohmann::json{
+        {"type", "array"},
+        {"description", "Patch operations, applied in order."},
+        {"items",
+         {{"type", "object"},
+          {"properties",
+           {{"type", {{"type", "string"}, {"enum", OperationTypeEnum()}}},
+            {"create_ref",
+             {{"type", "string"},
+              {"description", "For Create* operations: a name starting with '$' that later "
+                              "operations refer to as {\"ref\": \"$name\"}."}}},
+            {"element",
+             {{"type", "object"},
+              {"description", "Target of an update or removal: {\"id\": \"G1\"} or "
+                              "{\"ref\": \"$goal\"}."}}},
+            {"source", {{"type", "object"}, {"description", "Relationship source."}}},
+            {"target", {{"type", "object"}, {"description", "Relationship target."}}},
+            {"field",
+             {{"type", "string"},
+              {"description", "For UpdateElementText: which field, e.g. \"content\"."}}},
+            {"old_value", {{"type", "string"}}},
+            {"new_value", {{"type", "string"}}},
+            {"text",
+             {{"type", "string"}, {"description", "Initial text for a Create* operation."}}}}}}}};
+}
+
+nlohmann::json ChangeSetIdSchema() {
+    return nlohmann::json{
+        {"change_set_id",
+         {{"type", "string"},
+          {"description", "Defaults to the change set this connection has open."}}}};
+}
+
 std::vector<ToolDefinition> BuildTools() {
     std::vector<ToolDefinition> tools;
 
@@ -130,6 +202,109 @@ std::vector<ToolDefinition> BuildTools() {
                                     std::to_string(agent::kMaxTreeDepth) + ")."}}}}}},
         true,
         &GetArgumentTree,
+    });
+
+    // ---------------------------------------------------------------------
+    // Change sets
+    //
+    // The descriptions carry one message repeatedly and deliberately: staging
+    // does not change the safety case. An agent that believes it has edited the
+    // argument will say so, and the user will believe it.
+    // ---------------------------------------------------------------------
+
+    tools.push_back(ToolDefinition{
+        "begin_change_set",
+        "Start a change the user watches you build. From this call onward, Assurance Forge shows "
+        "your work on the canvas as you stage it: new elements appear in a proposed style, edits "
+        "are marked in place, removals are ghosted. Nothing is applied to the safety case -- the "
+        "user accepts or rejects the finished change set in the application. Requires Assurance "
+        "Forge to be running with the project open.",
+        nlohmann::json{
+            {"type", "object"},
+            {"properties",
+             {{"title",
+               {{"type", "string"},
+                {"description", "Short title the user sees while you build this."}}},
+              {"summary", {{"type", "string"}, {"description", "What the change does."}}},
+              {"intent",
+               {{"type", "string"},
+                {"description", "Why you are making it. The reviewer is being asked to accept a "
+                                "change to a safety argument and needs the reasoning."}}}}},
+            {"required", nlohmann::json::array({"title"})}},
+        true,
+        &BeginChangeSet,
+    });
+
+    tools.push_back(ToolDefinition{
+        "stage_operations",
+        "Add operations to the open change set. They are checked against the current case and "
+        "refused as a group if they would not apply, so a clean result means the user is now "
+        "seeing exactly this on the canvas. Returns what changed and the ids given to elements "
+        "you created. This does NOT change the safety case.",
+        nlohmann::json{{"type", "object"},
+                       {"properties",
+                        [&] {
+                            nlohmann::json properties = ChangeSetIdSchema();
+                            properties["operations"]  = OperationsSchema();
+                            return properties;
+                        }()},
+                       {"required", nlohmann::json::array({"operations"})}},
+        true,
+        &StageOperations,
+    });
+
+    tools.push_back(ToolDefinition{
+        "unstage_operations",
+        "Remove the most recently staged operations from the open change set, so you can revise "
+        "after the user says it is not what they wanted rather than starting over.",
+        nlohmann::json{{"type", "object"},
+                       {"properties",
+                        [&] {
+                            nlohmann::json properties = ChangeSetIdSchema();
+                            properties["count"] = nlohmann::json{
+                                {"type", "integer"},
+                                {"description", "How many to drop from the end (default 1)."}};
+                            return properties;
+                        }()}},
+        true,
+        &UnstageOperations,
+    });
+
+    tools.push_back(ToolDefinition{
+        "describe_change_set",
+        "Report what a change set would do to the case: elements added, modified and removed, "
+        "with their text. Also reports whether it still applies -- the user may have edited the "
+        "argument while you were working.",
+        nlohmann::json{{"type", "object"}, {"properties", ChangeSetIdSchema()}},
+        true,
+        &DescribeChangeSet,
+    });
+
+    tools.push_back(ToolDefinition{
+        "submit_change_set",
+        "Hand the change set to the user for a decision. After this, tell them it is waiting for "
+        "review in Assurance Forge. Do not tell them the safety case has been changed: it has "
+        "not, and only they can change it.",
+        nlohmann::json{{"type", "object"}, {"properties", ChangeSetIdSchema()}},
+        true,
+        &SubmitChangeSet,
+    });
+
+    tools.push_back(ToolDefinition{
+        "discard_change_set",
+        "Abandon a change set and remove it from the user's canvas.",
+        nlohmann::json{{"type", "object"}, {"properties", ChangeSetIdSchema()}},
+        true,
+        &DiscardChangeSet,
+    });
+
+    tools.push_back(ToolDefinition{
+        "list_change_sets",
+        "List the change sets currently open against this project, including any built by other "
+        "connected clients.",
+        nlohmann::json{{"type", "object"}, {"properties", nlohmann::json::object()}},
+        true,
+        &ListChangeSets,
     });
 
     return tools;

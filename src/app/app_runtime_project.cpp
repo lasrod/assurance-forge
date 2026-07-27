@@ -19,6 +19,7 @@
 #include "core/audit/audit_store.h"
 #include "core/audit/strategy_migration.h"
 #include "core/commands/command_bus.h"
+#include "core/commands/proposal_commands.h"
 #include "core/commands/package_commands.h"
 #include "core/problems/problem_utils.h"
 #include "core/project_service.h"
@@ -1168,13 +1169,67 @@ bool AppRuntime::PollAgentBridge() {
         [this, &project_path](const bridge::Request&              request,
                               const controllers::AgentConnection& connection) {
             const AgentRequestContext context{
-                impl_->app_state, project_path, connection.client_label,
+                impl_->app_state,
+                project_path,
+                connection.client_label,
                 [this](const std::string& relative_path, std::string& error) {
                     return OpenAgentRequestedCaseFile(relative_path, error);
-                }};
+                },
+                &impl_->agent_change_sets,
+                connection.id};
             return HandleAgentRequest(request, context);
         });
     return handled > 0;
+}
+
+bool AppRuntime::AcceptAgentChangeSet(const std::string& change_set_id, std::string& error) {
+    error.clear();
+    const core::changesets::ChangeSet* change_set = impl_->agent_change_sets.Find(change_set_id);
+    if (change_set == nullptr || !change_set->open()) {
+        error = "That change set is no longer open.";
+        return false;
+    }
+    if (!impl_->app_state.loaded_case.has_value()) {
+        error = "No assurance case is loaded.";
+        return false;
+    }
+
+    // Re-checked at the moment of acceptance, not at the moment it was staged.
+    // The user may have edited the argument while reading the proposal, and a
+    // patch that no longer applies must be refused rather than forced.
+    const core::reviews::ProposalValidityResult validity =
+        core::reviews::EvaluateReviewProposalValidity(change_set->proposal,
+                                                      impl_->app_state.loaded_case.value());
+    if (validity.validity != core::reviews::ProposalValidity::Valid) {
+        error = "The argument changed while this was being reviewed, so it no longer applies: " +
+                validity.reason;
+        return false;
+    }
+
+    // The same audited command an accepted proposal has always gone through, so
+    // this edit is recorded, undoable and attributed exactly like one made with
+    // the mouse. No new command type exists for agent-authored changes, which is
+    // what guarantees they cannot do anything the application could not.
+    core::commands::ApplyProposalCommand command(change_set->proposal);
+    const app::commands::DispatchOutcome outcome =
+        app::commands::DispatchAuditedCommand(*impl_, command);
+    if (!outcome.success) {
+        error = outcome.error;
+        return false;
+    }
+
+    impl_->agent_change_sets.MarkApplied(change_set_id);
+    impl_->app_state.mark_dirty();
+    impl_->tree_needs_rebuild = true;
+    return true;
+}
+
+bool AppRuntime::RejectAgentChangeSet(const std::string& change_set_id, std::string& error) {
+    if (!impl_->agent_change_sets.Discard(change_set_id, error)) {
+        return false;
+    }
+    impl_->tree_needs_rebuild = true;
+    return true;
 }
 
 bool AppRuntime::OpenAgentRequestedCaseFile(const std::string& relative_path, std::string& error) {

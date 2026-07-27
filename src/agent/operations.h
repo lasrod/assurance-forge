@@ -18,10 +18,13 @@
 // command bus exists -- which is to say, only in the application.
 
 #include "core/app_state.h"
+#include "core/changesets/change_set_store.h"
 
 #include <nlohmann/json.hpp>
 
+#include <cstdint>
 #include <string>
+#include <vector>
 
 namespace agent {
 
@@ -50,6 +53,39 @@ Result FindElements(const ReadContext& context, const nlohmann::json& arguments)
 Result GetElement(const ReadContext& context, const nlohmann::json& arguments);
 Result GetArgumentTree(const ReadContext& context, const nlohmann::json& arguments);
 Result ListCaseFiles(const ReadContext& context);
+
+// ---------------------------------------------------------------------------
+// Change sets
+//
+// Building a change is available only where a command bus, an audit log and a
+// human to accept it exist -- which is to say, only inside the application.
+// These take the store as well as the model for that reason.
+// ---------------------------------------------------------------------------
+
+struct ChangeContext {
+    const core::AppState&              state;
+    core::changesets::ChangeSetStore&  store;
+    // Which connection is asking, so a client's operations reach its own change
+    // set and not another client's.
+    std::uint64_t                      connection_id = 0;
+    std::string                        client_label;
+};
+
+Result BeginChangeSet(const ChangeContext& context, const nlohmann::json& arguments);
+Result StageOperations(const ChangeContext& context, const nlohmann::json& arguments);
+Result UnstageOperations(const ChangeContext& context, const nlohmann::json& arguments);
+Result DescribeChangeSet(const ChangeContext& context, const nlohmann::json& arguments);
+Result SubmitChangeSet(const ChangeContext& context, const nlohmann::json& arguments);
+Result DiscardChangeSet(const ChangeContext& context, const nlohmann::json& arguments);
+Result ListChangeSets(const ChangeContext& context);
+
+// Parses the operation vocabulary an agent sends. Exposed so the operation
+// schema published over MCP and the parser that enforces it stay one thing.
+bool ParsePatchOperations(const nlohmann::json&                       source,
+                          std::vector<core::reviews::PatchOperation>& out, std::string& error);
+
+// The operation type names an agent may use, in schema order.
+const std::vector<std::string>& PatchOperationTypeNames();
 
 // A chat client pays for every token an operation returns, and a real safety
 // case does not fit in a context window. These are a correctness requirement

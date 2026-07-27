@@ -15,7 +15,9 @@
 
 #include "bridge/protocol.h"
 #include "core/app_state.h"
+#include "core/changesets/change_set_store.h"
 
+#include <cstdint>
 #include <functional>
 #include <string>
 
@@ -41,6 +43,13 @@ struct AgentRequestContext {
     // belong to the runtime, not to a request handler. Empty when the caller
     // cannot honour it.
     std::function<bool(const std::string& relative_path, std::string& error)> open_case_file;
+
+    // The change sets being built against this project. Null when there is no
+    // project, in which case every change operation is refused.
+    core::changesets::ChangeSetStore* change_sets = nullptr;
+    // Which connection is asking, so an agent's operations reach its own change
+    // set rather than another client's.
+    std::uint64_t                     connection_id = 0;
 };
 
 bridge::Response HandleAgentRequest(const bridge::Request& request,

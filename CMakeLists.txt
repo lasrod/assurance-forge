@@ -362,6 +362,8 @@ add_executable(tests
     tests/test_bridge_transport.cpp
     tests/test_agent_request_handler.cpp
     tests/test_agent_bridge_controller.cpp
+    tests/test_change_sets.cpp
+    tests/test_change_set_acceptance.cpp
     tests/test_mcp_jsonrpc.cpp
     tests/test_mcp_server.cpp
     tests/test_mcp_modes.cpp

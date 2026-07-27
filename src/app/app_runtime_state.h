@@ -7,6 +7,7 @@
 #include "app/areas/baseline_modal.h"
 #include "app/app_events.h"
 #include "app/controllers/agent_bridge_controller.h"
+#include "core/changesets/change_set_store.h"
 #include "app/controllers/ai_review_controller.h"
 #include "app/controllers/acp_controller.h"
 #include "app/controllers/confidence_controller.h"
@@ -198,6 +199,10 @@ struct AppRuntimeState {
     // thread by AppRuntime::PollAgentBridge, against the model the user is
     // looking at.
     std::unique_ptr<controllers::AgentBridgeController> agent_bridge;
+    // Changes connected clients are building. Held in memory and never written
+    // into the project: a change set is a proposal in progress, not project
+    // data, and a second writer in that directory is what this design removed.
+    core::changesets::ChangeSetStore agent_change_sets;
     std::optional<GuidelineCatalog> guideline_catalog;
     bool guideline_catalog_load_attempted = false;
     std::string guideline_catalog_error;

@@ -169,6 +169,15 @@ private:
     // connected client's request, through the same path a user's click takes.
     bool OpenAgentRequestedCaseFile(const std::string& relative_path, std::string& error);
 
+  public:
+    // Accepts an agent's change set: the one point where staged work becomes a
+    // real edit. Goes through `ApplyProposalCommand`, so it is audited, undoable
+    // and attributed like any other change. Only a person reaches this.
+    bool AcceptAgentChangeSet(const std::string& change_set_id, std::string& error);
+    bool RejectAgentChangeSet(const std::string& change_set_id, std::string& error);
+
+  private:
+
     bool EnsureConfidenceStorage();
     bool EnsureRegisterStorage();
     // Points every controller that owns a file outside the SACM document at the
