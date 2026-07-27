@@ -311,6 +311,7 @@ add_executable(tests
     tests/test_ai_review_controller.cpp
     tests/test_review_problem_sync.cpp
     tests/test_review_controller.cpp
+    tests/test_review_external_reload.cpp
     tests/test_register_controller.cpp
     tests/test_register_problem_sync.cpp
     tests/test_element_edit_controller.cpp

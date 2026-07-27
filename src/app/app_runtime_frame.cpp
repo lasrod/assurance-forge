@@ -148,6 +148,21 @@ void AppRuntime::RenderFrame(bool& done) {
         core::perf::ScopedTimer s("app.ai_poll");
         PollAiReviewTask();
     }
+    {
+        // Review items can be written by another process -- the MCP server saving
+        // a proposal, most obviously -- and were previously read only on project
+        // open, so an incoming comment stayed invisible until the project was
+        // reopened. The controller self-throttles and refuses to reload over
+        // unsaved edits, so calling it every frame is safe.
+        core::perf::ScopedTimer s("app.review_external_poll");
+        if (impl_->review_controller->ReloadIfChangedExternally()) {
+            impl_->problems_dirty.review = true;
+            // The proposal list is keyed off the loaded case and cached on a
+            // directory signature; an item arriving with a new proposal file means
+            // that cache is stale too.
+            impl_->proposal_controller->manager.InvalidateProposalCache();
+        }
+    }
 
     {
         core::perf::ScopedTimer s("app.problem_sync");

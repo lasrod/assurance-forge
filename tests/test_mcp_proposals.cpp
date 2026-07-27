@@ -15,7 +15,9 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <memory>
+#include <sstream>
 #include <string>
 
 // The MCP write surface. An agent cannot edit the case: it writes ReviewProposal
@@ -545,6 +547,56 @@ TEST(McpCaseFiles, OpensASecondArgumentAndKeepsReadingIt) {
     const ToolCall after = CallTool(server, "get_case_overview");
     ASSERT_FALSE(after.is_error) << after.payload.dump();
     EXPECT_NE(after.payload["loaded_file"].get<std::string>().find(unloaded), std::string::npos);
+}
+
+// docs/features/mcp-server.md states the server never writes SACM XML -- that is
+// what keeps the safety case single-writer and lets proposals be the only route
+// by which an agent changes anything. Switching arguments and saving a proposal
+// are the two operations most likely to breach it by accident, so this pins the
+// bytes rather than trusting the claim.
+TEST(McpCaseFiles, NeitherSwitchingNorProposingRewritesAnySacmFile) {
+    std::unique_ptr<Fixture> fixture = MakeProjectFixture("nosacmwrite");
+    ASSERT_NE(fixture, nullptr);
+    std::unique_ptr<mcp::Session> session = ReopenWithSecondArgument(*fixture);
+    ASSERT_NE(session, nullptr);
+
+    const std::filesystem::path arguments = fixture->project_root / "arguments";
+    std::map<std::string, std::string> before;
+    for (const std::filesystem::directory_entry& entry :
+         std::filesystem::directory_iterator(arguments)) {
+        if (entry.is_regular_file()) {
+            std::ifstream      in(entry.path(), std::ios::binary);
+            std::ostringstream buffer;
+            buffer << in.rdbuf();
+            before[entry.path().filename().string()] = buffer.str();
+        }
+    }
+    ASSERT_FALSE(before.empty());
+
+    mcp::Server server(*session);
+    Initialize(server);
+
+    const ToolCall listed = CallTool(server, "list_case_files");
+    ASSERT_FALSE(listed.is_error) << listed.payload.dump();
+    const std::string unloaded = UnloadedCaseFile(listed);
+    ASSERT_FALSE(unloaded.empty());
+    ASSERT_FALSE(CallTool(server, "open_case_file", {{"path", unloaded}}).is_error);
+
+    const std::string claim = FirstClaimId(server);
+    if (!claim.empty()) {
+        CallTool(server, "create_review_proposal",
+                 {{"title", "No SACM write"},
+                  {"anchor_element_id", claim},
+                  {"operations", AddSubGoalOperations(claim, "Sub-goal.")}});
+    }
+
+    for (const std::pair<const std::string, std::string>& entry : before) {
+        std::ifstream      in(arguments / entry.first, std::ios::binary);
+        std::ostringstream buffer;
+        buffer << in.rdbuf();
+        EXPECT_EQ(buffer.str(), entry.second)
+            << entry.first << " was rewritten; the MCP server must never write SACM";
+    }
 }
 
 TEST(McpCaseFiles, ReportsAnUnknownPathRatherThanSilentlyKeepingTheOldCase) {
