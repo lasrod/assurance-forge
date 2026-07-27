@@ -2,7 +2,8 @@
 
 #include "app/app_runtime_state.h"
 #include "app/controllers/review_controller.h"
-#include "app/guideline_catalog.h"
+#include "core/guideline_catalog.h"
+#include "core/sccg/staged_checks.h"
 #include "core/problems/problem_utils.h"
 #include "core/time_utils.h"
 #include "ui/panels/review_panel.h"
@@ -32,9 +33,9 @@ void EnsureReviewGuidelineCatalogLoaded(AppRuntimeState& state) {
     if (state.guideline_catalog_load_attempted)
         return;
 
-    GuidelineCatalog catalog;
+    core::GuidelineCatalog catalog;
     std::string error;
-    if (LoadGuidelineCatalog(catalog, error)) {
+    if (core::LoadGuidelineCatalog(catalog, error)) {
         state.guideline_catalog = std::move(catalog);
         state.guideline_catalog_error.clear();
     } else {
@@ -174,7 +175,7 @@ ui::panels::ReviewPanelModel BuildReviewPanelModel(AppRuntimeState& state) {
     }
     EnsureReviewGuidelineCatalogLoaded(state);
     if (state.guideline_catalog.has_value()) {
-        for (const GuidelineCatalogEntry& entry : state.guideline_catalog->entries) {
+        for (const core::GuidelineCatalogEntry& entry : state.guideline_catalog->entries) {
             model.guideline_options.push_back(ui::panels::ReviewGuidelineOption{
                 entry.id,
                 entry.category,

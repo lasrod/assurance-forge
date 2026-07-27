@@ -137,8 +137,8 @@ parser::Guideline MakeGuideline(std::string id, std::string category) {
     return guideline;
 }
 
-app::GuidelineCatalog MakeCatalog(parser::GuidelinesDocument document) {
-    return app::BuildGuidelineCatalog(std::move(document), "sccg.full.yaml");
+core::GuidelineCatalog MakeCatalog(parser::GuidelinesDocument document) {
+    return core::BuildGuidelineCatalog(std::move(document), "sccg.full.yaml");
 }
 
 core::ProblemItem MakeManualProblem(const std::string& id, const std::string& element_id) {
@@ -229,7 +229,7 @@ TEST(AiReviewControllerTest, SelectClaimReviewGuidelinesUsesProfileWhenAvailable
     profile.guideline_ids = {"RD.4"};
     document.review_profiles.push_back(profile);
 
-    app::GuidelineCatalog catalog = MakeCatalog(std::move(document));
+    core::GuidelineCatalog catalog = MakeCatalog(std::move(document));
     app::controllers::AiReviewGuidelineSelection selection = app::controllers::SelectClaimReviewGuidelines(catalog);
 
     ASSERT_NE(selection.review_profile, nullptr);
@@ -243,7 +243,7 @@ TEST(AiReviewControllerTest, SelectClaimReviewGuidelinesFallsBackToClWhenProfile
     document.guidelines.push_back(MakeGuideline("CL.1", "CL"));
     document.guidelines.push_back(MakeGuideline("RD.4", "RD"));
 
-    app::GuidelineCatalog catalog = MakeCatalog(std::move(document));
+    core::GuidelineCatalog catalog = MakeCatalog(std::move(document));
     app::controllers::AiReviewGuidelineSelection selection = app::controllers::SelectClaimReviewGuidelines(catalog);
 
     EXPECT_EQ(selection.review_profile, nullptr);
@@ -260,7 +260,7 @@ TEST(AiReviewControllerTest, SelectClaimReviewGuidelinesReportsProfileWithNoVali
     profile.guideline_ids = {"missing-guideline"};
     document.review_profiles.push_back(profile);
 
-    app::GuidelineCatalog catalog = MakeCatalog(std::move(document));
+    core::GuidelineCatalog catalog = MakeCatalog(std::move(document));
     app::controllers::AiReviewGuidelineSelection selection = app::controllers::SelectClaimReviewGuidelines(catalog);
 
     ASSERT_NE(selection.review_profile, nullptr);

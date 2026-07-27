@@ -7,7 +7,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace app {
+namespace core {
 
 struct GuidelineCatalogEntry {
     std::string id;
@@ -39,4 +39,4 @@ std::filesystem::path FindGuidelinesFile();
 GuidelineCatalog BuildGuidelineCatalog(parser::GuidelinesDocument document, std::filesystem::path source_path = {});
 bool LoadGuidelineCatalog(GuidelineCatalog& catalog, std::string& error);
 
-} // namespace app
+} // namespace core

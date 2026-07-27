@@ -48,6 +48,11 @@ struct AgentChangeSetRow {
     std::string problem;
     // True for the one currently drawn on the canvas.
     bool        shown_on_canvas = false;
+    // SCCG findings against what this change set would produce. Advisory: they
+    // never block acceptance, because the reviewer is the authority on a safety
+    // argument and only a named, mechanically-decidable subset of SCCG can be
+    // checked at all.
+    std::vector<std::string> sccg_findings;
 };
 
 struct ReviewPanelModel {

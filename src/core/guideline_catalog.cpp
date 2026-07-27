@@ -1,4 +1,4 @@
-#include "app/guideline_catalog.h"
+#include "core/guideline_catalog.h"
 
 #include "parser/sccg_dist_parser.h"
 
@@ -17,7 +17,7 @@
 #include <utility>
 #include <vector>
 
-namespace app {
+namespace core {
 namespace {
 
 std::filesystem::path ExecutableDirectory() {
@@ -158,4 +158,4 @@ bool LoadGuidelineCatalog(GuidelineCatalog& catalog, std::string& error) {
     return true;
 }
 
-} // namespace app
+} // namespace core

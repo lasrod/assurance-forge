@@ -52,7 +52,6 @@ add_library(af_app OBJECT
     frame/app_layout_regions.cpp
     frame/app_menu_bar.cpp
     frame/app_shell.cpp
-    guideline_catalog.cpp
     native_file_dialogs.cpp
     project_workflow.cpp
     proposal_ui_state.cpp

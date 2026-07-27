@@ -755,6 +755,8 @@ TRANSLATIONS = {
 # Plural translations: (singular_msgid, plural_msgid) -> [japanese_form]
 # Japanese has nplurals=1, so we provide a single form.
 PLURAL_TRANSLATIONS = {
+    ("{0} SCCG finding", "{0} SCCG findings"):
+        ["SCCG 指摘 {0} 件"],
     ("AI client connected: {0}", "AI clients connected: {0}"):
         ["接続中の AI クライアント: {0}"],
     ("{0} item", "{0} items"): ["{0} 個"],

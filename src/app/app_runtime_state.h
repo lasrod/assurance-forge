@@ -17,7 +17,7 @@
 #include "app/controllers/proposal_controller.h"
 #include "app/controllers/register_controller.h"
 #include "app/controllers/review_controller.h"
-#include "app/guideline_catalog.h"
+#include "core/guideline_catalog.h"
 #include "core/app_state.h"
 #include "core/user_settings.h"
 #include "core/assurance_tree.h"
@@ -208,7 +208,7 @@ struct AppRuntimeState {
     // back for display so a deletion can be seen rather than inferred from a gap.
     // Empty when nothing is open, and never saved.
     std::optional<parser::AssuranceCase> agent_preview_case;
-    std::optional<GuidelineCatalog> guideline_catalog;
+    std::optional<core::GuidelineCatalog> guideline_catalog;
     bool guideline_catalog_load_attempted = false;
     std::string guideline_catalog_error;
     bool document_dirty = false;

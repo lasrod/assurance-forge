@@ -1,6 +1,7 @@
 #include "agent/operations.h"
 
 #include "core/reviews/review_proposal.h"
+#include "core/sccg/staged_checks.h"
 #include "parser/model_utils.h"
 
 #include <optional>
@@ -146,6 +147,34 @@ nlohmann::json DiffJson(const core::changesets::ChangeSetDiff& diff,
     };
 }
 
+// SCCG findings against what the change set would produce, so an agent can fix
+// an obviously wrong shape before a reviewer spends attention on it. Only a
+// named, mechanically-decidable subset is checked -- see core/sccg/staged_checks.h
+// -- and nothing here blocks acceptance.
+nlohmann::json SccgFindingsJson(const core::changesets::ChangeSetDiff& diff) {
+    std::vector<std::string> touched;
+    for (const std::pair<const std::string, core::changesets::ElementChange>& entry :
+         diff.status_by_id) {
+        if (entry.second != core::changesets::ElementChange::Unchanged &&
+            entry.second != core::changesets::ElementChange::Removed) {
+            touched.push_back(entry.first);
+        }
+    }
+
+    nlohmann::json findings = nlohmann::json::array();
+    for (const core::sccg::StagedFinding& finding :
+         core::sccg::CheckStagedArgument(diff.preview_model, touched)) {
+        findings.push_back(nlohmann::json{
+            {"guideline_id", finding.guideline_id},
+            {"guideline", finding.statement},
+            {"element_id", finding.element_id},
+            {"detail", finding.detail},
+            {"severity", core::sccg::FindingSeverityToString(finding.severity)},
+        });
+    }
+    return findings;
+}
+
 nlohmann::json ChangeSetJson(const core::changesets::ChangeSet& change_set) {
     return nlohmann::json{
         {"change_set_id", change_set.id},
@@ -253,10 +282,11 @@ Result StageOperations(const ChangeContext& context, const nlohmann::json& argum
     const core::changesets::ChangeSetDiff diff =
         core::changesets::ComputeChangeSetDiff(*change_set, context.state.loaded_case.value());
 
-    nlohmann::json payload  = ChangeSetJson(*change_set);
-    payload["staged"]       = static_cast<int>(operations.size());
-    payload["diff"]         = DiffJson(diff, context.state.loaded_case.value());
-    payload["note"]         = kNotAppliedNote;
+    nlohmann::json payload = ChangeSetJson(*change_set);
+    payload["staged"]      = static_cast<int>(operations.size());
+    payload["diff"]        = DiffJson(diff, context.state.loaded_case.value());
+    payload["sccg_findings"] = SccgFindingsJson(diff);
+    payload["note"]          = kNotAppliedNote;
     return Result::Ok(std::move(payload));
 }
 
@@ -323,9 +353,10 @@ Result DescribeChangeSet(const ChangeContext& context, const nlohmann::json& arg
         payload["problem"] = diff.error;
         return Result::Ok(std::move(payload));
     }
-    payload["applies"] = true;
-    payload["diff"]    = DiffJson(diff, context.state.loaded_case.value());
-    payload["note"]    = kNotAppliedNote;
+    payload["applies"]       = true;
+    payload["diff"]          = DiffJson(diff, context.state.loaded_case.value());
+    payload["sccg_findings"] = SccgFindingsJson(diff);
+    payload["note"]          = kNotAppliedNote;
     return Result::Ok(std::move(payload));
 }
 

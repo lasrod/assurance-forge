@@ -1,5 +1,6 @@
 #include "mcp/server.h"
 
+#include "mcp/guidance.h"
 #include "mcp/tools.h"
 
 #include <istream>
@@ -77,6 +78,18 @@ nlohmann::json Server::Dispatch(const jsonrpc::Request& request) {
     if (request.method == "tools/list") {
         return HandleToolsList(request);
     }
+    if (request.method == "resources/list") {
+        return HandleResourcesList(request);
+    }
+    if (request.method == "resources/read") {
+        return HandleResourcesRead(request);
+    }
+    if (request.method == "prompts/list") {
+        return HandlePromptsList(request);
+    }
+    if (request.method == "prompts/get") {
+        return HandlePromptsGet(request);
+    }
     if (request.method == "tools/call") {
         return HandleToolsCall(request);
     }
@@ -96,7 +109,13 @@ nlohmann::json Server::HandleInitialize(const jsonrpc::Request& request) {
     return jsonrpc::MakeResult(
         request.id, nlohmann::json{
                         {"protocolVersion", kProtocolVersion},
-                        {"capabilities", {{"tools", {{"listChanged", false}}}}},
+                        {"capabilities",
+                         {{"tools", {{"listChanged", false}}},
+                          // SCCG travels as resources and prompts so an agent has
+                          // the house rules before it writes, rather than being
+                          // corrected afterwards. See mcp/guidance.h.
+                          {"resources", {{"subscribe", false}, {"listChanged", false}}},
+                          {"prompts", {{"listChanged", false}}}}},
                         {"serverInfo", {{"name", kServerName}, {"version", kServerVersion}}},
                     });
 }
@@ -109,6 +128,94 @@ nlohmann::json Server::HandleToolsList(const jsonrpc::Request& request) {
                                        {"inputSchema", tool.input_schema}});
     }
     return jsonrpc::MakeResult(request.id, nlohmann::json{{"tools", std::move(tools)}});
+}
+
+nlohmann::json Server::HandleResourcesList(const jsonrpc::Request& request) {
+    nlohmann::json resources = nlohmann::json::array();
+    for (const ResourceDefinition& resource : BuiltinResources()) {
+        resources.push_back(nlohmann::json{{"uri", resource.uri},
+                                           {"name", resource.name},
+                                           {"description", resource.description},
+                                           {"mimeType", resource.mime_type}});
+    }
+    return jsonrpc::MakeResult(request.id, nlohmann::json{{"resources", std::move(resources)}});
+}
+
+nlohmann::json Server::HandleResourcesRead(const jsonrpc::Request& request) {
+    if (!request.params.is_object()) {
+        return jsonrpc::MakeError(request.id, jsonrpc::kInvalidParams,
+                                  "\"params\" must be an object with a \"uri\".");
+    }
+    const nlohmann::json::const_iterator uri = request.params.find("uri");
+    if (uri == request.params.end() || !uri->is_string()) {
+        return jsonrpc::MakeError(request.id, jsonrpc::kInvalidParams,
+                                  "\"params.uri\" is required and must be a string.");
+    }
+
+    bool        found = false;
+    std::string error;
+    const std::string text = ReadResource(uri->get<std::string>(), found, error);
+    if (!found) {
+        return jsonrpc::MakeError(request.id, jsonrpc::kInvalidParams,
+                                  "Unknown resource: " + uri->get<std::string>());
+    }
+    if (!error.empty()) {
+        return jsonrpc::MakeError(request.id, jsonrpc::kInternalError, error);
+    }
+
+    return jsonrpc::MakeResult(
+        request.id,
+        nlohmann::json{{"contents", nlohmann::json::array({nlohmann::json{
+                                        {"uri", uri->get<std::string>()},
+                                        {"mimeType", "text/markdown"},
+                                        {"text", text}}})}});
+}
+
+nlohmann::json Server::HandlePromptsList(const jsonrpc::Request& request) {
+    nlohmann::json prompts = nlohmann::json::array();
+    for (const PromptDefinition& prompt : BuiltinPrompts()) {
+        nlohmann::json arguments = nlohmann::json::array();
+        for (const PromptArgument& argument : prompt.arguments) {
+            arguments.push_back(nlohmann::json{{"name", argument.name},
+                                               {"description", argument.description},
+                                               {"required", argument.required}});
+        }
+        prompts.push_back(nlohmann::json{{"name", prompt.name},
+                                         {"description", prompt.description},
+                                         {"arguments", std::move(arguments)}});
+    }
+    return jsonrpc::MakeResult(request.id, nlohmann::json{{"prompts", std::move(prompts)}});
+}
+
+nlohmann::json Server::HandlePromptsGet(const jsonrpc::Request& request) {
+    if (!request.params.is_object()) {
+        return jsonrpc::MakeError(request.id, jsonrpc::kInvalidParams,
+                                  "\"params\" must be an object with a \"name\".");
+    }
+    const nlohmann::json::const_iterator name = request.params.find("name");
+    if (name == request.params.end() || !name->is_string()) {
+        return jsonrpc::MakeError(request.id, jsonrpc::kInvalidParams,
+                                  "\"params.name\" is required and must be a string.");
+    }
+
+    nlohmann::json                       arguments = nlohmann::json::object();
+    const nlohmann::json::const_iterator supplied  = request.params.find("arguments");
+    if (supplied != request.params.end() && supplied->is_object()) {
+        arguments = *supplied;
+    }
+
+    const std::string text = BuildPrompt(name->get<std::string>(), arguments);
+    if (text.empty()) {
+        return jsonrpc::MakeError(request.id, jsonrpc::kInvalidParams,
+                                  "Unknown prompt: " + name->get<std::string>());
+    }
+
+    return jsonrpc::MakeResult(
+        request.id,
+        nlohmann::json{
+            {"messages", nlohmann::json::array({nlohmann::json{
+                             {"role", "user"},
+                             {"content", {{"type", "text"}, {"text", text}}}}})}});
 }
 
 nlohmann::json Server::HandleToolsCall(const jsonrpc::Request& request) {

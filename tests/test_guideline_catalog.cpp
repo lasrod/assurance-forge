@@ -1,4 +1,4 @@
-#include "app/guideline_catalog.h"
+#include "core/guideline_catalog.h"
 
 #include <gtest/gtest.h>
 #include <string>
@@ -29,7 +29,7 @@ TEST(GuidelineCatalogTest, BuildsFlatEntriesAndLookupIds) {
     profile.description = "Reviews claim wording.";
     document.review_profiles.push_back(profile);
 
-    app::GuidelineCatalog catalog = app::BuildGuidelineCatalog(std::move(document), "sccg.full.yaml");
+    core::GuidelineCatalog catalog = core::BuildGuidelineCatalog(std::move(document), "sccg.full.yaml");
 
     ASSERT_EQ(catalog.entries.size(), 2u);
     EXPECT_EQ(catalog.entries[0].id, "CL.1");
@@ -45,10 +45,10 @@ TEST(GuidelineCatalogTest, BuildsFlatEntriesAndLookupIds) {
 }
 
 TEST(GuidelineCatalogTest, LoadsRepositoryGuidelines) {
-    app::GuidelineCatalog catalog;
+    core::GuidelineCatalog catalog;
     std::string error;
 
-    ASSERT_TRUE(app::LoadGuidelineCatalog(catalog, error)) << error;
+    ASSERT_TRUE(core::LoadGuidelineCatalog(catalog, error)) << error;
     EXPECT_FALSE(catalog.entries.empty());
     EXPECT_TRUE(catalog.ids.count("CL.1") > 0);
     EXPECT_EQ(catalog.source_path.filename().string(), "dist");

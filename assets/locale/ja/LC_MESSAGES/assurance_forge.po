@@ -1913,6 +1913,10 @@ msgid "This term value appears {0} time in the current SACM model."
 msgid_plural "This term value appears {0} times in the current SACM model."
 msgstr[0] "この用語値は現在の SACM モデルに {0} 回出現します。"
 
+msgid "{0} SCCG finding"
+msgid_plural "{0} SCCG findings"
+msgstr[0] "SCCG 指摘 {0} 件"
+
 msgid "{0} confidence assessment was marked inactive because its target element changed."
 msgid_plural "{0} confidence assessments were marked inactive because their target elements changed."
 msgstr[0] "対象要素が変更されたため、{0} 件の信頼度評価が非アクティブとしてマークされました。"

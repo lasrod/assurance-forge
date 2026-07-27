@@ -410,7 +410,7 @@ void ShowAgentChangeSets(const ReviewPanelModel& model, const ReviewPanelCallbac
             clients += clients.empty() ? client : (", " + client);
         }
         ImGui::TextUnformatted(ui::i18n::trnf("AI client connected: {0}", "AI clients connected: {0}",
-                                              static_cast<unsigned long>(model.connected_agents.size()),
+                                              static_cast<int>(model.connected_agents.size()),
                                               clients)
                                    .c_str());
     }
@@ -448,6 +448,17 @@ void ShowAgentChangeSets(const ReviewPanelModel& model, const ReviewPanelCallbac
                           .c_str());
             if (!row.problem.empty()) {
                 ImGui::TextDisabled("%s", row.problem.c_str());
+            }
+        }
+
+        if (!row.sccg_findings.empty()) {
+            ImGui::TextUnformatted(
+                ui::i18n::trnf("{0} SCCG finding", "{0} SCCG findings",
+                               static_cast<int>(row.sccg_findings.size()),
+                               std::to_string(row.sccg_findings.size()))
+                    .c_str());
+            for (const std::string& finding : row.sccg_findings) {
+                ImGui::BulletText("%s", finding.c_str());
             }
         }
 
