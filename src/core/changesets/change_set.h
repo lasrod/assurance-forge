@@ -20,6 +20,7 @@
 
 #include "core/reviews/review_proposal.h"
 
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -50,6 +51,16 @@ struct ChangeSet {
     // apart and attribution survives into the audit trail.
     std::string client_label;
     std::string created_utc;
+
+    // The argument file this was built against.
+    //
+    // A patch is only meaningful against the document it was written for, and
+    // element ids repeat across a project's arguments -- every argument starts
+    // with a G1. Without this, a change set built against `main2.sacm` decorated
+    // `main.sacm`'s G1 as well, and Accept refused with a staleness message,
+    // because the hashes it compared came from the wrong document. Both were
+    // reported as separate defects and are one.
+    std::filesystem::path argument_file;
 
     ChangeSetState state = ChangeSetState::Building;
 
@@ -99,5 +110,30 @@ struct ChangeSetDiff {
 // reports what they would do. Never mutates `committed`.
 ChangeSetDiff ComputeChangeSetDiff(const ChangeSet&             change_set,
                                    const parser::AssuranceCase& committed);
+
+// Whether `change_set` was written against `argument_file`. A change set with no
+// recorded file belongs to whatever is open -- there is nothing to contradict.
+bool ChangeSetTargetsArgumentFile(const ChangeSet&             change_set,
+                                  const std::filesystem::path& argument_file);
+
+// Whether a change set can be accepted against what the application has open
+// right now, and why not when it cannot.
+//
+// Computed every frame rather than only when the button is pressed, so the
+// Review panel can say why *before* the user clicks. The reported failure was
+// "Accept does nothing": the refusal existed, went to the status bar, and was
+// invisible next to the change set it was about.
+struct ChangeSetAcceptability {
+    bool        can_accept = false;
+    std::string reason;
+    // The obstacle is a different argument being open, not a patch that has gone
+    // stale. Worth telling apart because the remedy is different: open that
+    // argument, rather than ask the agent to rebuild.
+    bool        wrong_argument_file = false;
+};
+
+ChangeSetAcceptability EvaluateChangeSetAcceptability(const ChangeSet&             change_set,
+                                                      const std::filesystem::path& loaded_file,
+                                                      const parser::AssuranceCase& loaded_case);
 
 } // namespace core::changesets

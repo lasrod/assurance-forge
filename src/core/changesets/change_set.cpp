@@ -123,4 +123,49 @@ ChangeSetDiff ComputeChangeSetDiff(const ChangeSet&             change_set,
     return diff;
 }
 
+bool ChangeSetTargetsArgumentFile(const ChangeSet&             change_set,
+                                  const std::filesystem::path& argument_file) {
+    if (change_set.argument_file.empty()) {
+        return true;
+    }
+    return change_set.argument_file.lexically_normal() == argument_file.lexically_normal();
+}
+
+ChangeSetAcceptability EvaluateChangeSetAcceptability(const ChangeSet&             change_set,
+                                                      const std::filesystem::path& loaded_file,
+                                                      const parser::AssuranceCase& loaded_case) {
+    ChangeSetAcceptability acceptability;
+
+    // Checked before staleness, because staleness is what a mismatched file
+    // *looks* like: the operations name ids that exist in both documents with
+    // different content, so the hash comparison fails and reports that the
+    // argument moved. It did not. A different argument is open.
+    if (!ChangeSetTargetsArgumentFile(change_set, loaded_file)) {
+        acceptability.wrong_argument_file = true;
+        acceptability.reason =
+            "This change was written against " +
+            change_set.argument_file.filename().string() + ", and " +
+            (loaded_file.empty() ? std::string("no argument") : loaded_file.filename().string()) +
+            " is open. Open that argument to review it.";
+        return acceptability;
+    }
+
+    if (change_set.proposal.operations.empty()) {
+        acceptability.reason = "This change set stages no operations yet.";
+        return acceptability;
+    }
+
+    const reviews::ProposalValidityResult validity =
+        reviews::EvaluateReviewProposalValidity(change_set.proposal, loaded_case);
+    if (validity.validity != reviews::ProposalValidity::Valid) {
+        acceptability.reason =
+            "The argument changed while this was being prepared, so it no longer applies: " +
+            validity.reason;
+        return acceptability;
+    }
+
+    acceptability.can_accept = true;
+    return acceptability;
+}
+
 } // namespace core::changesets

@@ -161,15 +161,32 @@ ui::panels::ReviewPanelModel BuildReviewPanelModel(AppRuntimeState& state) {
         row.state           = core::changesets::ChangeSetStateToString(change_set->state);
         row.operation_count = static_cast<int>(change_set->proposal.operations.size());
         row.shown_on_canvas = ui_state.agent_change_set_id == change_set->id;
+        row.argument_file   = change_set->argument_file.filename().generic_string();
+        row.argument_file_is_open = core::changesets::ChangeSetTargetsArgumentFile(
+            *change_set, state.app_state.loaded_file_path);
 
         if (state.app_state.loaded_case.has_value()) {
-            const core::changesets::ChangeSetDiff diff = core::changesets::ComputeChangeSetDiff(
-                *change_set, state.app_state.loaded_case.value());
-            row.applies        = diff.success;
-            row.problem        = diff.error;
-            row.added_count    = diff.added_count;
-            row.modified_count = diff.modified_count;
-            row.removed_count  = diff.removed_count;
+            // The same check acceptance runs, run every frame, so the reason a
+            // change set will not accept is on the change set before the user
+            // reaches for the button rather than in the status bar afterwards.
+            const core::changesets::ChangeSetAcceptability acceptability =
+                core::changesets::EvaluateChangeSetAcceptability(
+                    *change_set, state.app_state.loaded_file_path,
+                    state.app_state.loaded_case.value());
+            row.applies = acceptability.can_accept;
+            row.problem = acceptability.reason;
+
+            // Counting what it would do only means something against the
+            // document it was written for. Against another of the project's
+            // arguments the operations land on ids that merely happen to match.
+            if (row.argument_file_is_open) {
+                const core::changesets::ChangeSetDiff diff = core::changesets::ComputeChangeSetDiff(
+                    *change_set, state.app_state.loaded_case.value());
+                row.added_count    = diff.added_count;
+                row.modified_count = diff.modified_count;
+                row.removed_count  = diff.removed_count;
+                row.sccg_findings  = DescribeStagedSccgFindings(diff);
+            }
         }
         model.agent_change_sets.push_back(std::move(row));
     }
@@ -260,6 +277,39 @@ ui::panels::ReviewPanelModel BuildReviewPanelModel(AppRuntimeState& state) {
 }
 
 } // namespace
+
+// The SCCG findings against what a change set would produce, as the reviewer
+// reads them.
+//
+// The agent has been getting these in the result of every staging call since the
+// checks were written; the reviewer was not, because nothing ever filled the row
+// the panel renders them from. So the panel had a findings section that could
+// not appear, and a person deciding whether to accept an agent's change to a
+// safety argument saw less about it than the agent did.
+//
+// Only what this change set touched: findings about the rest of the argument are
+// the user's own business and not this proposal's to answer for.
+std::vector<std::string> DescribeStagedSccgFindings(const core::changesets::ChangeSetDiff& diff) {
+    std::vector<std::string> touched;
+    for (const std::pair<const std::string, core::changesets::ElementChange>& entry :
+         diff.status_by_id) {
+        if (entry.second != core::changesets::ElementChange::Unchanged &&
+            entry.second != core::changesets::ElementChange::Removed) {
+            touched.push_back(entry.first);
+        }
+    }
+
+    std::vector<std::string> described;
+    for (const core::sccg::StagedFinding& finding :
+         core::sccg::CheckStagedArgument(diff.preview_model, touched)) {
+        std::string line = finding.guideline_id;
+        if (!finding.element_id.empty()) {
+            line += " " + finding.element_id;
+        }
+        described.push_back(line + ": " + finding.detail);
+    }
+    return described;
+}
 
 void RenderReviewPanelContent(AppRuntimeState& state, const ReviewPanelAreaCallbacks& callbacks) {
     ui::panels::ReviewPanelModel model = BuildReviewPanelModel(state);

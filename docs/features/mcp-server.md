@@ -86,6 +86,21 @@ guarantees an agent cannot make a change the application could not make itself.
 
 There is deliberately **no `apply` tool**. Acceptance is a human action.
 
+### One change set, one argument
+
+A change set records the argument file it was begun against, and everything
+afterwards is checked against it. Staging, submitting and accepting are refused
+while a different one of the project's arguments is open; `describe_change_set`
+reports the mismatch rather than refusing, because a read is still owed an
+answer. The refusal names the file and says to call `open_case_file`.
+
+This is not bookkeeping. Every argument in a project is seeded from the same
+template, so every argument has a `G1`, and an operation naming `G1` resolves
+just as cleanly against the wrong document as the right one. Without the binding
+a change set built against `main2.sacm` decorated `main.sacm`'s `G1` on the
+canvas, and Accept refused it as stale — reporting the wrong cause, because the
+element hashes it compared came from a document nobody had asked about.
+
 ### Watching it happen
 
 While a change set is open the canvas draws the preview — the argument as it
@@ -94,6 +109,15 @@ REMOVE, each by border *and* badge so the cue survives colour-blindness. An
 element the change set removes is put back for display only: a reviewer
 approving a deletion should see what is being deleted rather than infer it from
 a gap.
+
+The per-package canvas projects an argument package through the ids that package
+holds, and a staged element is in no package at all — nothing has been applied.
+So the preview projection takes in an addition when it is connected to the
+package, directly or through other additions; one connected to nothing goes on
+the document's first argument package, which is where applying it would put it.
+Without that, the canvas drew the committed argument while the Argument
+Navigator, which builds from the preview directly, showed all of the staged
+work — the two views of one change set disagreeing.
 
 ## SCCG
 
@@ -158,7 +182,16 @@ version control.
   supported-by pairs, which works but loses the intent in the diff. A `MoveUnder`
   operation is designed and not yet built.
 - **One change set is drawn at a time.** Concurrent clients are supported and all
-  their change sets are listed, but the canvas shows the most recent.
+  their change sets are listed, but the canvas shows the most recent of those
+  written against the argument that is open.
+- **A change set is held in memory.** Restarting Assurance Forge discards an
+  agent's staged work — expected from "not project data", and not obviously what
+  a user wants after a large restructure.
+- **Applying collapses argument packages.** The preview places each staged
+  addition on the package it attaches to; `ApplyProposalCommand` writes every
+  element into the document's first argument package. Pre-existing, shared with
+  the interactive proposal flow, and only visible in a document that has more
+  than one.
 - **SCCG binding is a named subset plus advisory prose**, not "SCCG compliance".
 
 ## Verification

@@ -438,10 +438,16 @@ void ShowAgentChangeSets(const ReviewPanelModel& model, const ReviewPanelCallbac
                                              std::to_string(row.removed_count))
                                    .c_str());
 
-        if (!row.applies) {
-            // The argument moved while this was being read. Accepting is refused
-            // rather than forced: the alternative is applying a patch built
-            // against an argument that no longer exists.
+        // Why this cannot be accepted, where the reviewer is looking when they
+        // wonder. Accepting is refused rather than forced: the alternative is
+        // applying a patch to an argument it was not written against, or to one
+        // that has moved underneath it.
+        if (!row.argument_file_is_open) {
+            ImGui::TextWrapped("%s", ui::i18n::trf("This change was written against {0}. Open that "
+                                                   "argument to review it.",
+                                                   row.argument_file)
+                                         .c_str());
+        } else if (!row.applies && row.operation_count > 0) {
             ImGui::TextWrapped(
                 "%s", AF_TR("The argument changed while this was being prepared, so it no longer "
                             "applies. Ask the AI client to rebuild it.")

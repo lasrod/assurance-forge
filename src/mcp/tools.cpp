@@ -88,7 +88,9 @@ nlohmann::json OperationTypeEnum() {
 nlohmann::json OperationsSchema() {
     return nlohmann::json{
         {"type", "array"},
-        {"description", "Patch operations, applied in order."},
+        {"description", "Patch operations, applied in order. Support runs upwards: "
+                        "{\"type\":\"AddSupportedBy\",\"source\":{\"ref\":\"$sub\"},"
+                        "\"target\":{\"id\":\"G1\"}} puts the new element UNDER G1."},
         {"items",
          {{"type", "object"},
           {"properties",
@@ -101,8 +103,20 @@ nlohmann::json OperationsSchema() {
              {{"type", "object"},
               {"description", "Target of an update or removal: {\"id\": \"G1\"} or "
                               "{\"ref\": \"$goal\"}."}}},
-            {"source", {{"type", "object"}, {"description", "Relationship source."}}},
-            {"target", {{"type", "object"}, {"description", "Relationship target."}}},
+            // The direction, spelled out. It was "Relationship source." and
+            // "Relationship target.", which says nothing, and a client given
+            // that has even odds of hanging the case's top goal underneath a
+            // claim it has just invented -- an upside-down safety argument, from
+            // one ambiguous word.
+            {"source",
+             {{"type", "object"},
+              {"description", "The SUPPORTING element -- the one that ends up BELOW. For "
+                              "AddSupportedBy, the new sub-claim, strategy or solution."}}},
+            {"target",
+             {{"type", "object"},
+              {"description", "The SUPPORTED element -- the one that ends up ABOVE. For "
+                              "AddSupportedBy, the existing goal you are developing. Read it as "
+                              "\"target is supported by source\"."}}},
             {"field",
              {{"type", "string"},
               {"description", "For UpdateElementText: which field, e.g. \"content\"."}}},

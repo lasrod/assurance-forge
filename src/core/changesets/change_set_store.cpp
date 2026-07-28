@@ -57,7 +57,8 @@ void RefreshAffectedElements(reviews::ReviewProposal&     proposal,
 
 std::string ChangeSetStore::Begin(std::uint64_t connection_id, std::string title,
                                   std::string summary, std::string intent,
-                                  std::string client_label) {
+                                  std::string client_label,
+                                  std::filesystem::path argument_file) {
     // One open change set per connection. A second `begin` means the agent has
     // moved on; keeping the first would leave an orphan on the canvas that
     // nobody is going to finish.
@@ -72,9 +73,10 @@ std::string ChangeSetStore::Begin(std::uint64_t connection_id, std::string title
     change_set.title        = std::move(title);
     change_set.summary      = std::move(summary);
     change_set.intent       = std::move(intent);
-    change_set.client_label = std::move(client_label);
-    change_set.created_utc  = NowUtcString();
-    change_set.state        = ChangeSetState::Building;
+    change_set.client_label  = std::move(client_label);
+    change_set.created_utc   = NowUtcString();
+    change_set.argument_file = std::move(argument_file);
+    change_set.state         = ChangeSetState::Building;
 
     change_set.proposal.id          = change_set.id;
     change_set.proposal.title       = change_set.title;

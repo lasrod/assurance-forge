@@ -1648,6 +1648,9 @@ msgstr "この要素が変更されたため、保存された信頼度評価の
 msgid "Theme"
 msgstr "テーマ"
 
+msgid "This change was written against {0}. Open that argument to review it."
+msgstr "この変更は {0} に対して作成されました。レビューするにはその論証を開いてください。"
+
 msgid "This confidence assessment may be stale because the element changed after the value was stored."
 msgstr "この信頼度評価は古い可能性があります — 値が保存された後に要素が変更されました。"
 

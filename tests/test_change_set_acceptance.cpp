@@ -94,8 +94,8 @@ std::vector<core::reviews::PatchOperation> AddSubGoalUnder(const std::string& pa
     const nlohmann::json operations = nlohmann::json::array(
         {nlohmann::json{{"type", "CreateClaim"}, {"create_ref", "$sub"}, {"text", text}},
          nlohmann::json{{"type", "AddSupportedBy"},
-                        {"source", {{"id", parent_id}}},
-                        {"target", {{"ref", "$sub"}}}}});
+                        {"source", {{"ref", "$sub"}}},
+                        {"target", {{"id", parent_id}}}}});
 
     std::vector<core::reviews::PatchOperation> parsed;
     std::string                                error;
@@ -146,7 +146,16 @@ TEST(ChangeSetAcceptance, AppliesThroughTheAuditedCommandBus) {
     const core::audit::AuditTransaction& transaction = bus->Store().Transactions().back();
     EXPECT_EQ(transaction.command_name, "ApplyProposal");
     // Attributed to the client that proposed it, not to "the AI".
+    //
+    // Note what this does and does not prove: the author is passed to `Execute`
+    // here, so this pins the bus recording what it is given. It says nothing
+    // about the application passing it. It did not -- `DispatchAuditedCommand`
+    // sent an empty author and the log read `system` -- and this test was green
+    // throughout. Found by accepting a change set in the running application and
+    // reading the transaction log, which is the only place that wiring shows.
     EXPECT_EQ(transaction.author, "MCP: claude-ai 0.1.0");
+    EXPECT_EQ(store.Find(id)->proposal.author_name, "MCP: claude-ai 0.1.0")
+        << "the change set must carry the author the application hands to the bus";
 
     // `ApplyProposalCommand` runs the patch through the library bridge on a
     // scratch projection, and the application re-derives its render model from
@@ -197,6 +206,63 @@ TEST(ChangeSetAcceptance, AppliesExactlyWhatThePreviewShowed) {
         EXPECT_EQ(applied->name, previewed->name);
     }
     EXPECT_EQ(ClaimCount(after), ClaimCount(preview.preview_model));
+}
+
+// Restructuring a real argument is not two operations. The change sets reported
+// from live use carried eighty, and Accept reported nothing at all -- so the
+// size is what is under test here, not the mechanism. The two-operation cases
+// above pass either way and did not catch it.
+TEST(ChangeSetAcceptance, AcceptsALargeMultiOperationChangeSet) {
+    ProjectFixture f = MakeFixture("large");
+
+    core::changesets::ChangeSetStore store;
+    const std::string id = store.Begin(1, "Restructure into hazard categories", "", "", "claude-ai");
+
+    nlohmann::json operations = nlohmann::json::array();
+    for (int index = 0; index < 20; ++index) {
+        const std::string suffix   = std::to_string(index);
+        const std::string strategy = "$strategy" + suffix;
+        const std::string sub_goal = "$goal" + suffix;
+        operations.push_back(nlohmann::json{{"type", "CreateStrategy"},
+                                            {"create_ref", strategy},
+                                            {"text", "Argue over hazard " + suffix}});
+        operations.push_back(nlohmann::json{{"type", "AddSupportedBy"},
+                                            {"source", {{"ref", strategy}}},
+                                            {"target", {{"id", "G1"}}}});
+        operations.push_back(nlohmann::json{{"type", "CreateClaim"},
+                                            {"create_ref", sub_goal},
+                                            {"text", "Hazard " + suffix + " is mitigated"}});
+        operations.push_back(nlohmann::json{{"type", "AddSupportedBy"},
+                                            {"source", {{"ref", sub_goal}}},
+                                            {"target", {{"ref", strategy}}}});
+    }
+    ASSERT_EQ(operations.size(), 80u);
+
+    std::vector<core::reviews::PatchOperation> parsed;
+    std::string                                error;
+    ASSERT_TRUE(agent::ParsePatchOperations(operations, parsed, error)) << error;
+    ASSERT_TRUE(store.Stage(id, parsed, f.model, error)) << error;
+
+    // The gate acceptance runs before it dispatches. A refusal here and a
+    // refusal in the command are indistinguishable to a user watching nothing
+    // happen, so they are asserted apart.
+    const core::reviews::ProposalValidityResult validity =
+        core::reviews::EvaluateReviewProposalValidity(store.Find(id)->proposal, f.model);
+    ASSERT_EQ(validity.validity, core::reviews::ProposalValidity::Valid) << validity.reason;
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
+    ASSERT_TRUE(loaded.ok);
+    std::unique_ptr<core::commands::CommandBus> bus =
+        core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_NE(bus, nullptr) << error;
+
+    core::commands::ApplyProposalCommand command(store.Find(id)->proposal);
+    core::commands::CommandContext       ctx{f.model, f.package, loaded.document.get()};
+    const core::commands::CommandResult   result = bus->Execute(command, ctx, "MCP: claude-ai");
+    ASSERT_TRUE(result.success) << result.error;
+
+    const parser::AssuranceCase applied = sacm_adapter::project_case(*loaded.document);
+    EXPECT_EQ(ClaimCount(applied), 21u);
 }
 
 // The user may edit the argument while reading a proposal. Acceptance re-checks

@@ -1,10 +1,12 @@
 #pragma once
 
+#include "core/changesets/change_set.h"
 #include "core/problems/problem_item.h"
 #include "core/reviews/review_item.h"
 
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace app {
 struct AppRuntimeState;
@@ -33,5 +35,13 @@ struct ReviewPanelAreaCallbacks {
 };
 
 void RenderReviewPanelContent(AppRuntimeState& state, const ReviewPanelAreaCallbacks& callbacks);
+
+// The SCCG findings against a change set, as the reviewer reads them on it.
+//
+// Exposed for the same reason the canvas projection is: the checks were tested,
+// the panel that renders them was written, and nothing connected the two -- so
+// the section could never appear and no test noticed, because no test crossed
+// the seam.
+std::vector<std::string> DescribeStagedSccgFindings(const core::changesets::ChangeSetDiff& diff);
 
 } // namespace app::areas

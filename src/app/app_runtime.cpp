@@ -433,13 +433,23 @@ const parser::AssuranceCase& AppRuntime::RefreshAgentChangePreview(
     const parser::AssuranceCase& committed) {
     ui::UiState& ui_state = ui::GetUiState();
 
-    const std::vector<const core::changesets::ChangeSet*> open =
-        impl_->agent_change_sets.Open();
+    // Only change sets written against the argument that is open. Element ids
+    // repeat across a project's arguments, and without this filter a change set
+    // built against `main2.sacm` decorated `main.sacm`'s G1 -- the overlay
+    // pointing at an element the agent had never looked at.
+    std::vector<const core::changesets::ChangeSet*> open;
+    for (const core::changesets::ChangeSet* candidate : impl_->agent_change_sets.Open()) {
+        if (core::changesets::ChangeSetTargetsArgumentFile(*candidate,
+                                                           impl_->app_state.loaded_file_path)) {
+            open.push_back(candidate);
+        }
+    }
     if (open.empty()) {
         ui_state.agent_change_status.clear();
         ui_state.agent_change_set_id.clear();
         ui_state.agent_change_set_title.clear();
         impl_->agent_preview_case.reset();
+        impl_->agent_preview_added_ids.clear();
         return committed;
     }
 
@@ -456,6 +466,7 @@ const parser::AssuranceCase& AppRuntime::RefreshAgentChangePreview(
         // why.
         ui_state.agent_change_status.clear();
         impl_->agent_preview_case.reset();
+        impl_->agent_preview_added_ids.clear();
         ui_state.agent_change_set_id    = shown.id;
         ui_state.agent_change_set_title = shown.title;
         return committed;
@@ -464,10 +475,14 @@ const parser::AssuranceCase& AppRuntime::RefreshAgentChangePreview(
     ui_state.agent_change_set_id    = shown.id;
     ui_state.agent_change_set_title = shown.title;
     ui_state.agent_change_status.clear();
+    impl_->agent_preview_added_ids.clear();
     for (const std::pair<const std::string, core::changesets::ElementChange>& entry :
          diff.status_by_id) {
         if (entry.second != core::changesets::ElementChange::Unchanged) {
             ui_state.agent_change_status[entry.first] = entry.second;
+        }
+        if (entry.second == core::changesets::ElementChange::Added) {
+            impl_->agent_preview_added_ids.push_back(entry.first);
         }
     }
 

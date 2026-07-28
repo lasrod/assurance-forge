@@ -183,12 +183,39 @@ nlohmann::json ChangeSetJson(const core::changesets::ChangeSet& change_set) {
         {"intent", change_set.intent},
         {"state", core::changesets::ChangeSetStateToString(change_set.state)},
         {"client", change_set.client_label},
+        // Which argument it is being written against. Reported so an agent
+        // holding several conversations can tell them apart, and so the refusal
+        // it gets after switching files is not a surprise.
+        {"argument_file", change_set.argument_file.filename().generic_string()},
         {"operation_count", static_cast<int>(change_set.proposal.operations.size())},
     };
 }
 
 Result NoCase() {
     return Result::Error("No assurance case is loaded, so there is nothing to change.");
+}
+
+// A change set is bound to the argument it was written against. If the
+// application has moved to another one -- the user clicked a different argument,
+// or this agent called `open_case_file` -- every id in the staged operations now
+// means something else, or nothing.
+//
+// Refused rather than silently retargeted. Element ids repeat across a project's
+// arguments, so "G1" resolves in both documents and the operations would apply
+// cleanly to the wrong one.
+// Empty when the change set belongs to the argument that is open; otherwise what
+// the agent needs to be told.
+std::string WrongArgumentRefusal(const ChangeContext&               context,
+                                 const core::changesets::ChangeSet& change_set) {
+    if (core::changesets::ChangeSetTargetsArgumentFile(change_set,
+                                                       context.state.loaded_file_path)) {
+        return {};
+    }
+    return "This change set was started against " +
+           change_set.argument_file.filename().generic_string() + ", and " +
+           context.state.loaded_file_path.filename().generic_string() +
+           " is now open. Call open_case_file to go back to it, or begin_change_set to start a "
+           "new change against the argument that is open.";
 }
 
 // Every reply about a change set carries the same reminder. An agent that
@@ -238,7 +265,8 @@ Result BeginChangeSet(const ChangeContext& context, const nlohmann::json& argume
 
     const std::string id =
         context.store.Begin(context.connection_id, title, StringArgument(arguments, "summary"),
-                            StringArgument(arguments, "intent"), context.client_label);
+                            StringArgument(arguments, "intent"), context.client_label,
+                            context.state.loaded_file_path);
 
     const core::changesets::ChangeSet* change_set = context.store.Find(id);
     nlohmann::json                     payload    = ChangeSetJson(*change_set);
@@ -264,6 +292,14 @@ Result StageOperations(const ChangeContext& context, const nlohmann::json& argum
                                  "begin_change_set first.");
         }
         id = open->id;
+    }
+
+    const core::changesets::ChangeSet* existing = context.store.Find(id);
+    if (existing == nullptr) {
+        return Result::Error("No change set has the id \"" + id + "\".");
+    }
+    if (const std::string refusal = WrongArgumentRefusal(context, *existing); !refusal.empty()) {
+        return Result::Error(refusal);
     }
 
     std::vector<core::reviews::PatchOperation> operations;
@@ -301,6 +337,14 @@ Result UnstageOperations(const ChangeContext& context, const nlohmann::json& arg
             return Result::Error("No change set is open for this connection.");
         }
         id = open->id;
+    }
+
+    const core::changesets::ChangeSet* existing = context.store.Find(id);
+    if (existing == nullptr) {
+        return Result::Error("No change set has the id \"" + id + "\".");
+    }
+    if (const std::string refusal = WrongArgumentRefusal(context, *existing); !refusal.empty()) {
+        return Result::Error(refusal);
     }
 
     const nlohmann::json::const_iterator count = arguments.find("count");
@@ -342,6 +386,16 @@ Result DescribeChangeSet(const ChangeContext& context, const nlohmann::json& arg
         return Result::Error("No change set has the id \"" + id + "\".");
     }
 
+    // Describing is a read, so a change set for another argument is reported
+    // rather than refused -- an agent that has switched files is still entitled
+    // to be told what it staged, and why it cannot be worked on from here.
+    if (const std::string refusal = WrongArgumentRefusal(context, *change_set); !refusal.empty()) {
+        nlohmann::json payload = ChangeSetJson(*change_set);
+        payload["applies"]     = false;
+        payload["problem"]     = refusal;
+        return Result::Ok(std::move(payload));
+    }
+
     const core::changesets::ChangeSetDiff diff =
         core::changesets::ComputeChangeSetDiff(*change_set, context.state.loaded_case.value());
 
@@ -371,6 +425,17 @@ Result SubmitChangeSet(const ChangeContext& context, const nlohmann::json& argum
             return Result::Error("No change set is open for this connection.");
         }
         id = open->id;
+    }
+
+    const core::changesets::ChangeSet* existing = context.store.Find(id);
+    if (existing == nullptr) {
+        return Result::Error("No change set has the id \"" + id + "\".");
+    }
+    // Handing a change set to the user for a decision while a different argument
+    // is open would put it in front of them with an Accept that can only be
+    // refused.
+    if (const std::string refusal = WrongArgumentRefusal(context, *existing); !refusal.empty()) {
+        return Result::Error(refusal);
     }
 
     std::string error;

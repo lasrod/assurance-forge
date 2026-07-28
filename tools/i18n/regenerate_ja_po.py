@@ -303,6 +303,8 @@ TRANSLATIONS = {
     "Shown on the canvas as you watch it build.": "作成の様子がキャンバスに表示されています。",
     "The argument changed while this was being prepared, so it no longer applies. Ask the AI client to rebuild it.":
         "準備中に論証が変更されたため、この提案は適用できません。AI クライアントに再作成を依頼してください。",
+    "This change was written against {0}. Open that argument to review it.":
+        "この変更は {0} に対して作成されました。レビューするにはその論証を開いてください。",
     "Manual review OK": "手動レビュー OK",
     "Mark review OK manually": "レビュー OK を手動で記録",
     "Mark this element as manually reviewed OK.": "この要素を手動でレビュー OK としてマークします。",

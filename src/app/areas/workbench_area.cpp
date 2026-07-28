@@ -38,6 +38,11 @@ std::unordered_map<std::string, ui::gsn::GsnCanvas> g_argument_package_canvas_re
 // `renderer.SetTree` (~3.7 ms, dominated by LayoutEngine::ComputeLayout).
 struct ArgumentPackageTabCache {
     std::uint64_t case_revision = ~0ull;
+    // Staging is deliberately not a model mutation, so it never moves
+    // `case_revision`. Without this the first build that included an agent's
+    // preview would be cached and never refreshed, and the canvas would freeze
+    // on whatever the change set happened to contain at that moment.
+    std::uint64_t change_set_revision = ~0ull;
     std::string argument_package_id;
     std::string argument_package_gid;
     std::string tab_title;
@@ -58,6 +63,13 @@ void AddElementIdentity(const ElementT& element,
         ids.insert(element.id);
     if (!element.gid.empty())
         gids.insert(element.gid);
+}
+
+// The renderer keys its own caches on one revision number, and the canvas has
+// two inputs that move independently: the committed model, and the change set an
+// agent is building against it. Combined so either one advancing invalidates.
+std::uint64_t CombineRevisions(std::uint64_t case_revision, std::uint64_t change_set_revision) {
+    return case_revision * 1000003ull + change_set_revision;
 }
 
 const sacm::ArgumentPackage* FindArgumentPackage(const sacm::AssuranceCasePackage& package,
@@ -185,8 +197,10 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
 
     ArgumentPackageTabCache& cache = g_argument_package_canvas_caches[tab.key];
     const std::uint64_t current_revision = state.app_state.case_revision;
+    const std::uint64_t change_set_revision = state.agent_change_sets.revision();
     const ui::UiState& ui_state_for_lang = ui::GetUiState();
     const bool inputs_match = cache.valid && cache.case_revision == current_revision &&
+                              cache.change_set_revision == change_set_revision &&
                               cache.argument_package_id == argument_package->id &&
                               cache.argument_package_gid == argument_package->gid && cache.tab_title == tab.title &&
                               cache.show_secondary_language == ui_state_for_lang.show_secondary_language &&
@@ -195,8 +209,10 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
     if (!inputs_match) {
         {
             core::perf::ScopedTimer perf_scope("app.wb.build_visible_case");
-            cache.visible_case =
-                BuildArgumentPackageProjection(state.app_state.loaded_case.value(), *argument_package, tab.title);
+            cache.visible_case = BuildArgumentPackageCanvasCase(
+                state.app_state.loaded_case.value(), state.agent_preview_case,
+                state.agent_preview_added_ids, state.app_state.projected_package(),
+                *argument_package, tab.title);
         }
         {
             core::perf::ScopedTimer perf_scope("app.wb.build_assurance_tree");
@@ -204,6 +220,7 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
             core::ApplyTreeDisplayOrder(cache.visible_tree, state.tree_display_order);
         }
         cache.case_revision = current_revision;
+        cache.change_set_revision = change_set_revision;
         cache.argument_package_id = argument_package->id;
         cache.argument_package_gid = argument_package->gid;
         cache.tab_title = tab.title;
@@ -216,7 +233,7 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
     ui::ElementContextActions actions = MakeCanvasContextActions(callbacks);
     ui_state.proposal_canvas_active = false;
     ui::gsn::GsnCanvas& renderer = g_argument_package_canvas_renderers[tab.key];
-    renderer.SetCaseRevision(state.app_state.case_revision);
+    renderer.SetCaseRevision(CombineRevisions(state.app_state.case_revision, change_set_revision));
     if (!cache.renderer_seeded) {
         core::perf::ScopedTimer perf_scope("app.wb.set_tree");
         renderer.SetTree(cache.visible_tree, ui_state.selected_element_id);
@@ -456,6 +473,27 @@ void RenderWorkbenchArea(AppRuntimeState& state,
     }
 
     ImGui::End();
+}
+
+parser::AssuranceCase BuildArgumentPackageCanvasCase(
+    const parser::AssuranceCase&                committed,
+    const std::optional<parser::AssuranceCase>& agent_preview,
+    const std::vector<std::string>&             agent_preview_added_ids,
+    const sacm::AssuranceCasePackage&           package,
+    const sacm::ArgumentPackage&                argument_package,
+    std::string_view                            fallback_title) {
+    // While an agent has a change set open against the argument on screen, the
+    // canvas draws its preview -- the argument as it would be if accepted --
+    // rather than the committed model. The preview needs its own projection
+    // because a staged element is in no SACM package at all; the plain
+    // ownership filter would drop every one of them and draw the committed
+    // argument back, which is indistinguishable from not having asked.
+    if (agent_preview.has_value()) {
+        return core::BuildArgumentPackagePreviewProjection(
+            agent_preview.value(), package, argument_package, agent_preview_added_ids,
+            fallback_title);
+    }
+    return core::BuildArgumentPackageProjection(committed, argument_package, fallback_title);
 }
 
 } // namespace app::areas

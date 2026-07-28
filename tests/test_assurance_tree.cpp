@@ -1,4 +1,5 @@
 ﻿#include "core/assurance_tree.h"
+#include "ui/tree_view.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_model.h"
 
@@ -359,4 +360,42 @@ TEST(MultiLangTextTest, EmptyTextReturnsEmpty) {
     EXPECT_EQ(ml.get("en"), "");
     EXPECT_EQ(ml.get_primary(), "");
     EXPECT_FALSE(ml.has_secondary());
+}
+
+// ----- Argument Navigator row text -----
+//
+// The navigator has room for one line, and a tree label is "ID: name" with the
+// element's text below it. Nothing in Assurance Forge fills `name` when it
+// creates an element, so every element the tool has ever made -- and every one
+// an agent stages -- rendered as a bare "G2:" there. Reported as "staged
+// elements have empty names"; it was never only staged ones.
+
+TEST(TreeNodeDisplayNameTest, FallsBackToTheElementTextWhenTheNameIsEmpty) {
+    const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="urn:test" id="T" name="T">
+  <argumentPackage id="AP" name="AP">
+    <claim id="G2" content="Thermal runaway is mitigated" assertionDeclaration="asserted"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+    const AssuranceTree tree = build_tree_from_xml(xml);
+    const TreeNode* node = FindTreeNode(tree, "G2");
+    ASSERT_NE(node, nullptr);
+
+    ui::UiState state;
+    EXPECT_EQ(ui::TreeNodeDisplayName(*node, state), "G2: Thermal runaway is mitigated");
+}
+
+TEST(TreeNodeDisplayNameTest, PrefersTheNameWhenThereIsOne) {
+    const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="urn:test" id="T" name="T">
+  <argumentPackage id="AP" name="AP">
+    <claim id="G1" name="Top goal" content="The system is safe" assertionDeclaration="asserted"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+    const AssuranceTree tree = build_tree_from_xml(xml);
+    const TreeNode* node = FindTreeNode(tree, "G1");
+    ASSERT_NE(node, nullptr);
+
+    ui::UiState state;
+    EXPECT_EQ(ui::TreeNodeDisplayName(*node, state), "G1: Top goal");
 }

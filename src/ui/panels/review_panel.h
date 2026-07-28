@@ -42,10 +42,19 @@ struct AgentChangeSetRow {
     int         modified_count = 0;
     int         removed_count  = 0;
     int         operation_count = 0;
-    // False when the argument has moved under the change set, in which case
-    // `problem` says how and accepting is refused.
+    // False when the change set cannot be accepted against what is open right
+    // now, in which case `problem` says why and the Accept button is disabled.
+    //
+    // Computed every frame rather than when the button is pressed. The reported
+    // symptom was "Accept does nothing": the refusal was real, went to the status
+    // bar, and was nowhere near the change set it was about.
     bool        applies = true;
     std::string problem;
+    // Which of the project's arguments this was written against. Shown whenever
+    // it is not the one on screen, because that is the whole explanation for a
+    // change set that will not accept.
+    std::string argument_file;
+    bool        argument_file_is_open = true;
     // True for the one currently drawn on the canvas.
     bool        shown_on_canvas = false;
     // SCCG findings against what this change set would produce. Advisory: they

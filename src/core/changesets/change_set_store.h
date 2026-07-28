@@ -14,6 +14,7 @@
 #include "core/changesets/change_set.h"
 
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -23,8 +24,15 @@ class ChangeSetStore {
   public:
     // Starts a change set for `connection_id`, replacing whatever that
     // connection had open. Returns its id.
+    //
+    // `argument_file` is the document it is being written against. Recorded at
+    // this moment because it is the only moment it is unambiguous: the user or
+    // the agent may switch arguments before anyone accepts, and a patch applied
+    // to the wrong one of a project's arguments would land on ids that happen to
+    // match.
     std::string Begin(std::uint64_t connection_id, std::string title, std::string summary,
-                      std::string intent, std::string client_label);
+                      std::string intent, std::string client_label,
+                      std::filesystem::path argument_file = {});
 
     // Null when no change set has that id, or it is no longer open.
     ChangeSet*       FindOpen(const std::string& id);

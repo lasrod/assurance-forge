@@ -212,6 +212,11 @@ struct AppRuntimeState {
     // back for display so a deletion can be seen rather than inferred from a gap.
     // Empty when nothing is open, and never saved.
     std::optional<parser::AssuranceCase> agent_preview_case;
+    // The ids the preview adds. The canvas projects an argument package through
+    // the ids that package holds, and a staged addition is in no package at all
+    // -- nothing has been applied -- so without these the projection drops every
+    // new element and the preview draws as the committed argument.
+    std::vector<std::string>             agent_preview_added_ids;
     std::optional<core::GuidelineCatalog> guideline_catalog;
     bool guideline_catalog_load_attempted = false;
     std::string guideline_catalog_error;

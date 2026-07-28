@@ -21,6 +21,14 @@ struct DispatchOutcome {
 // bus or no loaded model is available. Emits `AutosaveFailedEvent` to
 // surface (or clear) the autosave banner; does NOT emit DocumentDirty /
 // TreeDirty / StatusMessage events — callers decide whether to do so.
-DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state, core::commands::ICommand& command);
+//
+// `author` is who the audit log records. Empty means the person at the
+// keyboard, which is what an ordinary menu action wants. Accepting an AI
+// client's change set passes the client, because "who changed this" is the
+// question the audit log of a safety argument exists to answer, and an edge
+// case where the answer is "an agent proposed it and a person approved it" is
+// the one it must not silently record as `system`.
+DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state, core::commands::ICommand& command,
+                                       const std::string& author = {});
 
 } // namespace app::commands

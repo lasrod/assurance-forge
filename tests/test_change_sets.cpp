@@ -2,6 +2,8 @@
 
 #include "agent/operations.h"
 #include "core/app_state.h"
+#include "core/assurance_tree.h"
+#include "core/project_service.h"
 #include "parser/model_utils.h"
 
 #include <gtest/gtest.h>
@@ -59,13 +61,19 @@ std::string FirstClaimId(const parser::AssuranceCase& model) {
     return {};
 }
 
+// Support runs upwards: the SOURCE supports the TARGET, so the new sub-goal is
+// the source and the goal it develops is the target. This helper had it the
+// other way round while calling itself `...Under`, which made every change-set
+// test build an argument with the case's top goal hanging beneath a claim the
+// test had just invented. Nothing noticed, because the assertions counted
+// elements and never looked at the shape.
 std::vector<core::reviews::PatchOperation> AddSubGoalUnder(const std::string& parent_id,
                                                            const std::string& text) {
     const nlohmann::json operations = nlohmann::json::array(
         {nlohmann::json{{"type", "CreateClaim"}, {"create_ref", "$sub"}, {"text", text}},
          nlohmann::json{{"type", "AddSupportedBy"},
-                        {"source", {{"id", parent_id}}},
-                        {"target", {{"ref", "$sub"}}}}});
+                        {"source", {{"ref", "$sub"}}},
+                        {"target", {{"id", parent_id}}}}});
 
     std::vector<core::reviews::PatchOperation> parsed;
     std::string                                error;
@@ -320,6 +328,147 @@ TEST(ChangeSets, AdvancesARevisionSoTheCanvasKnowsToRedraw) {
 
     ASSERT_TRUE(fixture->store.Discard(id, error)) << error;
     EXPECT_NE(fixture->store.revision(), after_unstage) << "discarding must repaint";
+}
+
+// Which way support runs.
+//
+// `AddSupportedBy` names a source and a target, and the published schema said
+// only "Relationship source" and "Relationship target". Driving the real server
+// against a real case, the direction was guessed wrong on the first attempt and
+// the result was the case's top goal drawn as a sub-claim of the strategy that
+// was meant to develop it -- an inverted safety argument, from one undocumented
+// word. The direction is now stated in the schema and pinned here.
+TEST(ChangeSets, PutsTheNewSubGoalUnderTheGoalItDevelops) {
+    std::unique_ptr<Fixture> fixture = MakeFixture("direction");
+    ASSERT_NE(fixture, nullptr);
+    const std::string parent = FirstClaimId(fixture->state.loaded_case.value());
+
+    const std::string id = fixture->store.Begin(1, "Develop the top goal", "", "", "claude-ai",
+                                                fixture->state.loaded_file_path);
+    std::string       error;
+    ASSERT_TRUE(fixture->store.Stage(id, AddSubGoalUnder(parent, "Cleaning is safe"),
+                                     fixture->state.loaded_case.value(), error))
+        << error;
+
+    const core::changesets::ChangeSetDiff diff = core::changesets::ComputeChangeSetDiff(
+        *fixture->store.Find(id), fixture->state.loaded_case.value());
+    ASSERT_TRUE(diff.success) << diff.error;
+
+    const core::AssuranceTree tree = core::AssuranceTree::Build(diff.preview_model, "ja");
+    ASSERT_NE(tree.root, nullptr);
+    // The argument still has the same top goal. Getting this backwards does not
+    // fail to apply -- it applies perfectly, and re-roots the safety case.
+    EXPECT_EQ(tree.root->id, parent) << "the change set re-rooted the argument";
+
+    const std::string sub_goal = diff.generated_ids.at("$sub");
+    const core::TreeNode* node = core::FindTreeNode(tree, sub_goal);
+    ASSERT_NE(node, nullptr);
+    ASSERT_NE(node->parent, nullptr);
+    EXPECT_EQ(node->parent->id, parent);
+}
+
+// Element ids repeat across a project's arguments -- each is seeded from the
+// same template, so each starts with the same top goal. A change set that does
+// not record which document it was written against is therefore ambiguous the
+// moment a project holds two, and the ambiguity is not academic: reported from
+// live use, a change set built against `main2.sacm` decorated `main.sacm`'s G1,
+// and Accept did nothing, because the check acceptance runs compared the staged
+// element hashes against the wrong document and called it staleness.
+TEST(ChangeSets, BelongsToTheArgumentItWasWrittenAgainst) {
+    std::unique_ptr<Fixture> fixture = MakeFixture("twoarguments");
+    ASSERT_NE(fixture, nullptr);
+    const std::filesystem::path first_file  = fixture->state.loaded_file_path;
+    const parser::AssuranceCase first_case  = fixture->state.loaded_case.value();
+    const std::string           shared_id   = FirstClaimId(first_case);
+
+    core::ProjectFileEntry second;
+    std::string            error;
+    ASSERT_TRUE(core::ProjectService::AddSacmFile(fixture->state.current_project.value(), "second",
+                                                  second, error))
+        << error;
+    ASSERT_TRUE(fixture->state.open_project_file(second));
+    const std::filesystem::path second_file = fixture->state.loaded_file_path;
+    ASSERT_NE(first_file, second_file);
+
+    // The premise. Without colliding ids the operations would simply fail to
+    // resolve and the defect could not happen.
+    ASSERT_NE(parser::FindElementById(fixture->state.loaded_case.value(), shared_id), nullptr)
+        << "the two arguments do not share an id, so this fixture proves nothing";
+
+    const std::string id = fixture->store.Begin(1, "Argue about the second file", "", "",
+                                                "claude-ai", second_file);
+    ASSERT_TRUE(fixture->store.Stage(id, AddSubGoalUnder(shared_id, "Only true of the second file"),
+                                     fixture->state.loaded_case.value(), error))
+        << error;
+
+    EXPECT_TRUE(core::changesets::ChangeSetTargetsArgumentFile(*fixture->store.Find(id),
+                                                               second_file));
+    EXPECT_FALSE(core::changesets::ChangeSetTargetsArgumentFile(*fixture->store.Find(id),
+                                                                first_file));
+
+    // Against the argument it was written for, it accepts.
+    const core::changesets::ChangeSetAcceptability here =
+        core::changesets::EvaluateChangeSetAcceptability(*fixture->store.Find(id), second_file,
+                                                         fixture->state.loaded_case.value());
+    EXPECT_TRUE(here.can_accept) << here.reason;
+
+    // Against the other one it does not -- and says so as "a different argument
+    // is open", not as staleness. The remedies differ: open that argument,
+    // versus ask the agent to rebuild against an argument that has moved.
+    const core::changesets::ChangeSetAcceptability there =
+        core::changesets::EvaluateChangeSetAcceptability(*fixture->store.Find(id), first_file,
+                                                         first_case);
+    EXPECT_FALSE(there.can_accept);
+    EXPECT_TRUE(there.wrong_argument_file);
+    EXPECT_NE(there.reason.find(second_file.filename().generic_string()), std::string::npos)
+        << there.reason;
+}
+
+// The agent's half of the same rule. An agent that stages against whichever
+// argument happens to be open would build a change set out of two documents.
+TEST(ChangeSets, RefusesToStageAgainstADifferentArgumentThanItStarted) {
+    std::unique_ptr<Fixture> fixture = MakeFixture("stagewrongfile");
+    ASSERT_NE(fixture, nullptr);
+    const std::string shared_id = FirstClaimId(fixture->state.loaded_case.value());
+
+    core::ProjectFileEntry second;
+    std::string            error;
+    ASSERT_TRUE(core::ProjectService::AddSacmFile(fixture->state.current_project.value(), "second",
+                                                  second, error))
+        << error;
+    ASSERT_TRUE(fixture->state.open_project_file(second));
+
+    const agent::ChangeContext context{fixture->state, fixture->store, 1, "claude-ai"};
+    const agent::Result        begun =
+        agent::BeginChangeSet(context, nlohmann::json{{"title", "Argue about the second file"}});
+    ASSERT_FALSE(begun.is_error) << begun.payload.dump();
+    // Which argument it belongs to is reported, so the refusal below is not a
+    // surprise to the agent that gets it.
+    EXPECT_EQ(begun.payload["argument_file"], second.relativePath.filename().generic_string());
+
+    // The user clicks back to the first argument while the agent is working.
+    for (const core::ProjectFileEntry& entry : fixture->state.current_project->files) {
+        if (entry.role == core::ProjectFileRole::SacmArgument &&
+            entry.relativePath != second.relativePath) {
+            ASSERT_TRUE(fixture->state.open_project_file(entry));
+        }
+    }
+
+    const nlohmann::json operations = nlohmann::json::array(
+        {nlohmann::json{{"type", "CreateClaim"}, {"create_ref", "$sub"}, {"text", "Wrong file"}},
+         nlohmann::json{{"type", "AddSupportedBy"},
+                        {"source", {{"id", shared_id}}},
+                        {"target", {{"ref", "$sub"}}}}});
+    const agent::Result staged =
+        agent::StageOperations(context, nlohmann::json{{"operations", operations}});
+
+    // The ids resolve in this document too, so without the check the operations
+    // would apply cleanly to the wrong argument.
+    EXPECT_TRUE(staged.is_error) << staged.payload.dump();
+    EXPECT_NE(staged.payload["error"].get<std::string>().find("open_case_file"), std::string::npos)
+        << staged.payload.dump();
+    EXPECT_TRUE(fixture->store.Find(begun.payload["change_set_id"].get<std::string>())
+                    ->proposal.operations.empty());
 }
 
 // Reading must not advance it, or the canvas rebuilds every frame a panel

@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace ui {
@@ -52,16 +53,29 @@ static ImVec4 RoleColor(core::NodeRole role) {
     }
 }
 
-// Extract the short display name from a TreeNode label (text before the first newline).
 // Picks the secondary-language label when the canvas language toggle is active and
 // a translation exists, so the navigator stays in lockstep with the GSN canvas.
-static std::string ShortName(const core::TreeNode* node, const UiState& state) {
-    const bool use_secondary = state.show_secondary_language && !node->label_secondary.empty();
-    const std::string& label = use_secondary ? node->label_secondary : node->label;
-    auto pos = label.find('\n');
-    if (pos != std::string::npos)
-        return label.substr(0, pos);
-    return label;
+std::string TreeNodeDisplayName(const core::TreeNode& node, const UiState& state) {
+    const bool use_secondary = state.show_secondary_language && !node.label_secondary.empty();
+    const std::string& label = use_secondary ? node.label_secondary : node.label;
+    const std::string::size_type first_break = label.find('\n');
+    if (first_break == std::string::npos)
+        return label;
+
+    const std::string first_line = label.substr(0, first_break);
+    static constexpr std::string_view kEmptyNameSuffix = ": ";
+    if (first_line.size() < kEmptyNameSuffix.size() ||
+        first_line.compare(first_line.size() - kEmptyNameSuffix.size(), kEmptyNameSuffix.size(),
+                           kEmptyNameSuffix) != 0) {
+        return first_line;
+    }
+
+    const std::string::size_type detail_break = label.find('\n', first_break + 1);
+    const std::string            detail =
+        detail_break == std::string::npos
+                       ? label.substr(first_break + 1)
+                       : label.substr(first_break + 1, detail_break - first_break - 1);
+    return detail.empty() ? first_line : first_line + detail;
 }
 
 static core::TreeDropMode DetectDropMode(const ImVec2& item_min, const ImVec2& item_size) {
@@ -137,7 +151,7 @@ static bool RenderSingleTreeNode(const core::TreeNode* node,
     if (tree_edit_actions && tree_edit_actions->enabled()) {
         if (ImGui::BeginDragDropSource()) {
             ImGui::SetDragDropPayload(core::AF_TREE_NODE_PAYLOAD, node->id.c_str(), node->id.size() + 1);
-            ImGui::TextUnformatted(ShortName(node, state).c_str());
+            ImGui::TextUnformatted(TreeNodeDisplayName(*node, state).c_str());
             ImGui::EndDragDropSource();
         }
 
@@ -187,7 +201,7 @@ static bool RenderSingleTreeNode(const core::TreeNode* node,
         float tag_w = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, role_icon).x;
         float space_w = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, " ").x;
 
-        std::string name = ShortName(node, state);
+        std::string name = TreeNodeDisplayName(*node, state);
         ImU32 name_col = ImGui::GetColorU32(ImGuiCol_Text);
         dl->AddText(font, font_size, ImVec2(label_x + tag_w + space_w, text_y), name_col, name.c_str());
     }

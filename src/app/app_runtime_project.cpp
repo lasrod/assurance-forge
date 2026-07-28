@@ -1210,14 +1210,17 @@ bool AppRuntime::AcceptAgentChangeSet(const std::string& change_set_id, std::str
     }
 
     // Re-checked at the moment of acceptance, not at the moment it was staged.
-    // The user may have edited the argument while reading the proposal, and a
-    // patch that no longer applies must be refused rather than forced.
-    const core::reviews::ProposalValidityResult validity =
-        core::reviews::EvaluateReviewProposalValidity(change_set->proposal,
-                                                      impl_->app_state.loaded_case.value());
-    if (validity.validity != core::reviews::ProposalValidity::Valid) {
-        error = "The argument changed while this was being reviewed, so it no longer applies: " +
-                validity.reason;
+    // The user may have edited the argument while reading the proposal, or moved
+    // to a different one of the project's arguments, and a patch that no longer
+    // applies must be refused rather than forced. The Review panel runs the same
+    // check every frame, so this is the second time the user sees the reason
+    // rather than the first.
+    const core::changesets::ChangeSetAcceptability acceptability =
+        core::changesets::EvaluateChangeSetAcceptability(*change_set,
+                                                         impl_->app_state.loaded_file_path,
+                                                         impl_->app_state.loaded_case.value());
+    if (!acceptability.can_accept) {
+        error = acceptability.reason;
         return false;
     }
 
@@ -1226,8 +1229,12 @@ bool AppRuntime::AcceptAgentChangeSet(const std::string& change_set_id, std::str
     // the mouse. No new command type exists for agent-authored changes, which is
     // what guarantees they cannot do anything the application could not.
     core::commands::ApplyProposalCommand command(change_set->proposal);
+    // Attributed to the client that proposed it. Without the author the bus
+    // records `system`, and a reader of the audit log a year later cannot tell
+    // an agent-authored change from one somebody typed -- which is the single
+    // most useful thing the log could have told them about it.
     const app::commands::DispatchOutcome outcome =
-        app::commands::DispatchAuditedCommand(*impl_, command);
+        app::commands::DispatchAuditedCommand(*impl_, command, change_set->proposal.author_name);
     if (!outcome.success) {
         error = outcome.error;
         return false;

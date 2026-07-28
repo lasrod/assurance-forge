@@ -1300,14 +1300,17 @@
       "evidence": [
         "src/core/changesets/change_set.cpp",
         "src/core/changesets/change_set_store.cpp",
+        "src/core/argument_package_projection.cpp",
         "src/agent/change_operations.cpp",
-        "src/app/app_runtime_project.cpp"
+        "src/app/app_runtime_project.cpp",
+        "src/app/areas/workbench_area.cpp"
       ],
       "tests": [
         "tests/test_change_sets.cpp",
-        "tests/test_change_set_acceptance.cpp"
+        "tests/test_change_set_acceptance.cpp",
+        "tests/test_argument_package_projection.cpp"
       ],
-      "notes": "An agent builds a **change set** the user watches take shape: from its first staged operation the GSN canvas draws the argument as it would be if accepted, with additions, edits and removals marked in place by border and badge (never colour alone). Staging changes nothing — no SACM write, no command, no audit transaction — and a change set that would not apply is refused at staging time, so the canvas can always draw one. **Acceptance is an ordinary audited edit**: it goes through the unchanged `ApplyProposalCommand`, so it is undoable, replayable and attributed to the connecting client. No agent-specific command type exists, which is what guarantees an agent cannot make a change the application could not make itself. Staleness is re-checked at acceptance, not at staging, because the user may edit the argument while reading the proposal. Accept and Reject live in the Review panel; there is no tool an agent can call to apply its own work. Replaces the earlier design in which the adapter wrote proposal files into the project, making it a second writer of `af.proj` and `review-items.af.json` that the application overwrote from its own older copy on the next save."
+      "notes": "An agent builds a **change set** the user watches take shape: from its first staged operation the GSN canvas draws the argument as it would be if accepted, with additions, edits and removals marked in place by border and badge (never colour alone). **A change set belongs to the argument file it was written against.** Element ids repeat across a project's arguments — each is seeded from the same template, so each starts with the same top goal — so without that binding a change set built against one argument decorated another's identically-named elements, and Accept refused with a staleness message that named the wrong cause. Staging, submitting and accepting are all refused while a different argument is open, and the Review panel says which one to open. Staging changes nothing — no SACM write, no command, no audit transaction — and a change set that would not apply is refused at staging time, so the canvas can always draw one. **Acceptance is an ordinary audited edit**: it goes through the unchanged `ApplyProposalCommand`, so it is undoable, replayable and attributed to the connecting client -- the transaction author reads `MCP: <client>`, verified by accepting in the running application and reading the log, which is the only place that wiring shows. No agent-specific command type exists, which is what guarantees an agent cannot make a change the application could not make itself. Staleness is re-checked at acceptance, not at staging, because the user may edit the argument while reading the proposal. Accept and Reject live in the Review panel, which shows why a change set cannot be accepted before the user reaches for the button rather than reporting it to the status bar afterwards; there is no tool an agent can call to apply its own work. Replaces the earlier design in which the adapter wrote proposal files into the project, making it a second writer of `af.proj` and `review-items.af.json` that the application overwrote from its own older copy on the next save. Known limit: when a change set is drawn, the canvas places a staged addition on the argument package it is connected to, and one connected to nothing goes on the first package; applying it puts every element on the first package regardless, because `RebuildSacmArgumentPackageFromParser` collapses them — pre-existing and shared with the interactive proposal flow, tracked separately."
     },
     {
       "id": "AF-AI-010",
@@ -1317,13 +1320,15 @@
       "evidence": [
         "src/mcp/guidance.cpp",
         "src/core/sccg/staged_checks.cpp",
-        "src/core/guideline_catalog.cpp"
+        "src/core/guideline_catalog.cpp",
+        "src/app/areas/review_panel_area.cpp"
       ],
       "tests": [
         "tests/test_sccg_staged_checks.cpp",
-        "tests/test_mcp_server.cpp"
+        "tests/test_mcp_server.cpp",
+        "tests/test_agent_change_canvas.cpp"
       ],
-      "notes": "Three mechanisms. **Resources**: `sccg://guidelines` publishes the catalog over MCP. **Prompts**: `draft_argument_from_standard`, `add_argumentation` and `restructure_case` each carry the guidance for that job, quoted from the catalog so prompt and guideline cannot drift — this is what makes an agent aware of the rules before it writes. **Checks**: findings returned in the result of every staging call and shown on the change set. The mechanical set is deliberately narrow and individually tested — EV.1 (claim with no support and no undeveloped marker), AR.2 (strategy developing into nothing), AR.1 (solution with children; support cycles), CL.5 (unbounded qualifier from the list SCCG names). Most of SCCG is prose only a reader can judge, so this is **not** \"SCCG compliance\": findings are advisory and never block acceptance."
+      "notes": "Three mechanisms. **Resources**: `sccg://guidelines` publishes the catalog over MCP. **Prompts**: `draft_argument_from_standard`, `add_argumentation` and `restructure_case` each carry the guidance for that job, quoted from the catalog so prompt and guideline cannot drift — this is what makes an agent aware of the rules before it writes. **Checks**: findings returned in the result of every staging call and shown on the change set in the Review panel. The reviewer's half of that was claimed before it worked: the panel had the section and nothing ever filled the row it renders from, so only the agent ever saw a finding. The mechanical set is deliberately narrow and individually tested — EV.1 (claim with no support and no undeveloped marker), AR.2 (strategy developing into nothing), AR.1 (solution with children; support cycles), CL.5 (unbounded qualifier from the list SCCG names). Most of SCCG is prose only a reader can judge, so this is **not** \"SCCG compliance\": findings are advisory and never block acceptance."
     },
     {
       "id": "AF-AI-011",
