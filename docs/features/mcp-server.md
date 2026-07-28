@@ -86,6 +86,21 @@ guarantees an agent cannot make a change the application could not make itself.
 
 There is deliberately **no `apply` tool**. Acceptance is a human action.
 
+### Naming what you have already staged
+
+`stage_operations` answers with `created_element_ids` -- `"$topGoal" -> "G3"` --
+so a later call can develop what an earlier one made, by id. Acceptance used to
+check every reference against the *committed* model alone, where G3 does not
+exist and was never meant to, so a change set built over more than one call
+staged cleanly, drew on the canvas, counted correctly in the Review panel, and
+then could not be accepted at all. The gate was stricter than the thing it
+guards. It now checks against the model the patch produces, which is what
+applying it does.
+
+Reading still answers from the committed case: `find_elements` and `get_element`
+do not see staged work. An agent developing its own proposal refers to it by
+`create_ref` or by the id it was given, not by searching for it.
+
 ### One change set, one argument
 
 A change set records the argument file it was begun against, and everything

@@ -195,14 +195,31 @@ bool ChangeSetStore::MarkApplied(const std::string& id) {
 
 bool ChangeSetStore::Discard(const std::string& id, std::string& error) {
     error.clear();
-    ChangeSet* change_set = FindOpen(id);
-    if (change_set == nullptr) {
-        error = "No open change set has the id \"" + id + "\".";
-        return false;
+    // Looked up across every state, not only the open ones. Reported: a client
+    // listed a change set as `ready`, then could not discard the same id, and
+    // read that as the two calls disagreeing about the store. They never do --
+    // it had been closed in between, most often by the client's own
+    // `begin_change_set` -- but "no open change set has that id" cannot be told
+    // apart from "no such id", so the state of the store looked incoherent.
+    for (ChangeSet& change_set : change_sets_) {
+        if (change_set.id != id) {
+            continue;
+        }
+        if (change_set.state == ChangeSetState::Applied) {
+            error = "That change set was accepted and is part of the case now. Only the user can "
+                    "reverse it, with undo in Assurance Forge.";
+            return false;
+        }
+        if (change_set.state == ChangeSetState::Discarded) {
+            // Already withdrawn. Withdrawing it again is what the caller wanted.
+            return true;
+        }
+        change_set.state = ChangeSetState::Discarded;
+        ++revision_;
+        return true;
     }
-    change_set->state = ChangeSetState::Discarded;
-    ++revision_;
-    return true;
+    error = "No change set has the id \"" + id + "\".";
+    return false;
 }
 
 std::vector<const ChangeSet*> ChangeSetStore::Open() const {

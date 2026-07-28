@@ -263,6 +263,15 @@ Result BeginChangeSet(const ChangeContext& context, const nlohmann::json& argume
                              "canvas while you build this change.");
     }
 
+    // Beginning a second change set discards whatever this connection had open.
+    // Reported as the store contradicting itself: a client listed a change set as
+    // `ready`, began another, and then could not discard the first. Said here, at
+    // the moment it happens, so the agent can tell the user it has abandoned work
+    // they may have been about to accept.
+    const core::changesets::ChangeSet* replaced = context.store.OpenFor(context.connection_id);
+    const std::string                  replaced_id    = replaced != nullptr ? replaced->id : "";
+    const std::string                  replaced_title = replaced != nullptr ? replaced->title : "";
+
     const std::string id =
         context.store.Begin(context.connection_id, title, StringArgument(arguments, "summary"),
                             StringArgument(arguments, "intent"), context.client_label,
@@ -270,6 +279,11 @@ Result BeginChangeSet(const ChangeContext& context, const nlohmann::json& argume
 
     const core::changesets::ChangeSet* change_set = context.store.Find(id);
     nlohmann::json                     payload    = ChangeSetJson(*change_set);
+    if (!replaced_id.empty()) {
+        payload["replaced_change_set"] = nlohmann::json{{"change_set_id", replaced_id},
+                                                        {"title", replaced_title},
+                                                        {"state", "discarded"}};
+    }
     payload["note"] =
         std::string("The user can now see this change set in Assurance Forge and will watch it "
                     "take shape as you stage operations. ") +

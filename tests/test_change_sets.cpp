@@ -240,6 +240,55 @@ TEST(ChangeSets, ReplacesAConnectionsPreviousChangeSet) {
     EXPECT_EQ(fixture->store.OpenFor(1)->id, second);
 }
 
+// Discarding says what happened rather than "no open change set has that id",
+// which reads as the store having lost track of something `list_change_sets`
+// had just reported. It had not; the change set had been closed in between.
+TEST(ChangeSets, AnswersHonestlyWhenDiscardingSomethingAlreadyClosed) {
+    std::unique_ptr<Fixture> fixture = MakeFixture("discardclosed");
+    ASSERT_NE(fixture, nullptr);
+
+    const std::string first = fixture->store.Begin(1, "First idea", "", "", "claude-ai");
+    // A second `begin` on one connection closes the first. That is the sequence
+    // behind the report, and it is the client's own call that causes it.
+    const std::string second = fixture->store.Begin(1, "Better idea", "", "", "claude-ai");
+    ASSERT_NE(first, second);
+
+    std::string error;
+    // Withdrawing something already withdrawn is what the caller wanted.
+    EXPECT_TRUE(fixture->store.Discard(first, error)) << error;
+    EXPECT_TRUE(error.empty());
+
+    // An id the store has never held is a different thing and still an error.
+    EXPECT_FALSE(fixture->store.Discard("proposal-never-existed", error));
+    EXPECT_NE(error.find("proposal-never-existed"), std::string::npos) << error;
+
+    // An accepted change is not withdrawable, and the refusal names the remedy.
+    ASSERT_TRUE(fixture->store.MarkApplied(second));
+    EXPECT_FALSE(fixture->store.Discard(second, error));
+    EXPECT_NE(error.find("undo"), std::string::npos) << error;
+}
+
+// The agent is told what its own `begin_change_set` threw away, at the moment it
+// happens, rather than discovering it later through a refusal.
+TEST(ChangeSets, ReportsTheChangeSetANewOneReplaced) {
+    std::unique_ptr<Fixture> fixture = MakeFixture("reportsreplaced");
+    ASSERT_NE(fixture, nullptr);
+
+    const agent::ChangeContext context{fixture->state, fixture->store, 1, "claude-ai"};
+    const agent::Result        first =
+        agent::BeginChangeSet(context, nlohmann::json{{"title", "First idea"}});
+    ASSERT_FALSE(first.is_error) << first.payload.dump();
+    EXPECT_FALSE(first.payload.contains("replaced_change_set"));
+
+    const agent::Result second =
+        agent::BeginChangeSet(context, nlohmann::json{{"title", "Better idea"}});
+    ASSERT_FALSE(second.is_error) << second.payload.dump();
+    ASSERT_TRUE(second.payload.contains("replaced_change_set")) << second.payload.dump();
+    EXPECT_EQ(second.payload["replaced_change_set"]["change_set_id"],
+              first.payload["change_set_id"]);
+    EXPECT_EQ(second.payload["replaced_change_set"]["title"], "First idea");
+}
+
 TEST(ChangeSets, RefusesToSubmitAnEmptyChangeSet) {
     std::unique_ptr<Fixture> fixture = MakeFixture("empty");
     ASSERT_NE(fixture, nullptr);
@@ -365,6 +414,61 @@ TEST(ChangeSets, PutsTheNewSubGoalUnderTheGoalItDevelops) {
     ASSERT_NE(node, nullptr);
     ASSERT_NE(node->parent, nullptr);
     EXPECT_EQ(node->parent->id, parent);
+}
+
+// An agent refers to what it has already created, by the id it was given.
+//
+// `stage_operations` answers with `created_element_ids` -- "$topGoal became G3"
+// -- precisely so a later call can name it. Reported from live use: a change set
+// of eighty operations staged cleanly, drew on the canvas, counted correctly in
+// the Review panel, and then refused to accept with "The proposal refers to G3,
+// but that element no longer exists."
+//
+// It never existed in the committed model and was never meant to: the change set
+// creates it. Staging checks feasibility by applying the operations in order to a
+// scratch copy, where G3 exists by the time it is named; acceptance checked each
+// reference against the committed model alone. So the gate was stricter than the
+// thing it guards, and the work an agent had done was unacceptable by
+// construction the moment it spanned two staging calls.
+TEST(ChangeSets, AcceptsAChangeSetThatNamesItsOwnEarlierCreationsById) {
+    std::unique_ptr<Fixture> fixture = MakeFixture("selfreference");
+    ASSERT_NE(fixture, nullptr);
+    const std::string parent = FirstClaimId(fixture->state.loaded_case.value());
+
+    const std::string id = fixture->store.Begin(1, "Build it in two passes", "", "", "claude-ai",
+                                                fixture->state.loaded_file_path);
+    std::string       error;
+    ASSERT_TRUE(fixture->store.Stage(id, AddSubGoalUnder(parent, "Hazards are mitigated"),
+                                     fixture->state.loaded_case.value(), error))
+        << error;
+
+    // What the agent is told the first call produced.
+    const core::changesets::ChangeSetDiff first = core::changesets::ComputeChangeSetDiff(
+        *fixture->store.Find(id), fixture->state.loaded_case.value());
+    ASSERT_TRUE(first.success) << first.error;
+    ASSERT_TRUE(first.generated_ids.count("$sub"));
+    const std::string created = first.generated_ids.at("$sub");
+
+    // A second call that develops it, naming it the way the reply named it.
+    const nlohmann::json more = nlohmann::json::array(
+        {nlohmann::json{{"type", "CreateSolution"},
+                        {"create_ref", "$evidence"},
+                        {"text", "Hazard analysis report"}},
+         nlohmann::json{{"type", "AddSupportedBy"},
+                        {"source", {{"ref", "$evidence"}}},
+                        {"target", {{"id", created}}}}});
+    std::vector<core::reviews::PatchOperation> parsed;
+    ASSERT_TRUE(agent::ParsePatchOperations(more, parsed, error)) << error;
+    ASSERT_TRUE(fixture->store.Stage(id, parsed, fixture->state.loaded_case.value(), error))
+        << error;
+
+    // Staging accepted it, so the canvas is showing it and the reviewer has been
+    // offered a decision. Acceptance has to be able to honour that.
+    const core::changesets::ChangeSetAcceptability acceptability =
+        core::changesets::EvaluateChangeSetAcceptability(*fixture->store.Find(id),
+                                                         fixture->state.loaded_file_path,
+                                                         fixture->state.loaded_case.value());
+    EXPECT_TRUE(acceptability.can_accept) << acceptability.reason;
 }
 
 // Element ids repeat across a project's arguments -- each is seeded from the
