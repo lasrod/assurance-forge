@@ -382,6 +382,28 @@ ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& prop
         }
     }
 
+    // Feasibility first, and against what the patch actually produces.
+    //
+    // The per-operation checks below exist for their messages, not for their
+    // verdict: this is the authority on whether the patch applies, because it
+    // applies it, in order, to a scratch copy. Running it first also gives the
+    // reference checks a model that holds what earlier operations create --
+    // without which an operation naming an element this same change set made,
+    // by the id `stage_operations` reported for it, is rejected for referring to
+    // something that "no longer exists". It never existed in the committed
+    // model; that is what creating it means. Staging accepted such a change set,
+    // the canvas drew it and the Review panel counted it, and only acceptance
+    // refused -- so the gate was stricter than the thing it guards, and an
+    // eighty-operation argument built over two calls could not be accepted at
+    // all.
+    ReviewProposalPatchService patch_service;
+    ProposalPreviewResult      preview = patch_service.BuildPreviewModel(proposal, current_model);
+    if (!preview.success) {
+        result.reason = preview.error;
+        return result;
+    }
+    const parser::AssuranceCase& reachable = preview.preview_model;
+
     for (const PatchOperation& operation : proposal.operations) {
         std::string reason;
         if (IsCreateOperation(operation.type))
@@ -397,7 +419,7 @@ ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& prop
                     "Operation " + std::string(PatchOperationTypeToString(operation.type)) + " is missing element_id.";
                 return result;
             }
-            if (!ValidateElementRef(operation.element.value(), current_model, create_refs, reason)) {
+            if (!ValidateElementRef(operation.element.value(), reachable, create_refs, reason)) {
                 result.reason = reason;
                 return result;
             }
@@ -410,8 +432,8 @@ ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& prop
                 result.reason = "Relationship operations require source and target references.";
                 return result;
             }
-            if (!ValidateElementRef(operation.source.value(), current_model, create_refs, reason) ||
-                !ValidateElementRef(operation.target.value(), current_model, create_refs, reason)) {
+            if (!ValidateElementRef(operation.source.value(), reachable, create_refs, reason) ||
+                !ValidateElementRef(operation.target.value(), reachable, create_refs, reason)) {
                 result.reason = reason;
                 return result;
             }
@@ -424,13 +446,6 @@ ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& prop
             result.reason = "UpdateElementText operations must specify a field.";
             return result;
         }
-    }
-
-    ReviewProposalPatchService patch_service;
-    ProposalPreviewResult preview = patch_service.BuildPreviewModel(proposal, current_model);
-    if (!preview.success) {
-        result.reason = preview.error;
-        return result;
     }
 
     result.validity = ProposalValidity::Valid;

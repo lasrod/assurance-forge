@@ -4,7 +4,7 @@
 #include "ai/ai_service.h"
 #include "ai/ai_task_runner.h"
 #include "app/app_events.h"
-#include "app/guideline_catalog.h"
+#include "core/guideline_catalog.h"
 #include "app/controllers/review_controller.h"
 #include "core/assurance_tree.h"
 #include "core/problems/problems_manager.h"
@@ -24,8 +24,8 @@ struct AiReviewGuidelineSelection {
     std::string error_message;
 };
 
-AiReviewGuidelineSelection SelectClaimReviewGuidelines(const GuidelineCatalog& guideline_catalog);
-AiReviewGuidelineSelection SelectReviewProfileGuidelines(const GuidelineCatalog& guideline_catalog,
+AiReviewGuidelineSelection SelectClaimReviewGuidelines(const core::GuidelineCatalog& guideline_catalog);
+AiReviewGuidelineSelection SelectReviewProfileGuidelines(const core::GuidelineCatalog& guideline_catalog,
                                                          const std::string& review_profile_id);
 
 class AiReviewController {

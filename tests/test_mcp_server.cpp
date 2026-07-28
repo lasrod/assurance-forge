@@ -144,6 +144,9 @@ TEST(McpServer, ProducesNoResponseForANotification) {
     EXPECT_TRUE(session->initialized());
 }
 
+// `resources/list` used to stand in for "unknown method" here. It is a real
+// method now, which is why this asks about one the server genuinely does not
+// implement.
 TEST(McpServer, ReportsMethodNotFoundForAnUnknownMethod) {
     std::unique_ptr<mcp::Session> session = OpenConsentingSession();
     ASSERT_NE(session, nullptr);
@@ -151,7 +154,7 @@ TEST(McpServer, ReportsMethodNotFoundForAnUnknownMethod) {
     Initialize(server);
 
     const std::optional<nlohmann::json> response =
-        server.HandleMessage(Request("resources/list", nullptr, 2));
+        server.HandleMessage(Request("completion/complete", nullptr, 2));
 
     ASSERT_TRUE(response.has_value());
     ASSERT_TRUE(response->contains("error"));
@@ -359,3 +362,85 @@ TEST(McpServer, GetArgumentTreeMarksTruncatedBranchesRatherThanFakingLeaves) {
 }
 
 } // namespace
+
+// SCCG reaches an agent as MCP resources and prompts so it has the house rules
+// before it writes, rather than being corrected afterwards.
+TEST(McpServer, PublishesTheSccgCatalogAsAResource) {
+    std::unique_ptr<mcp::Session> session = OpenConsentingSession();
+    ASSERT_NE(session, nullptr);
+    mcp::Server server(*session);
+    Initialize(server);
+
+    const std::optional<nlohmann::json> listed =
+        server.HandleMessage(Request("resources/list", nullptr, 2));
+    ASSERT_TRUE(listed.has_value());
+    ASSERT_TRUE(listed->contains("result")) << listed->dump();
+    ASSERT_FALSE((*listed)["result"]["resources"].empty());
+
+    const std::string uri = (*listed)["result"]["resources"][0]["uri"].get<std::string>();
+    const std::optional<nlohmann::json> read =
+        server.HandleMessage(Request("resources/read", {{"uri", uri}}, 3));
+    ASSERT_TRUE(read.has_value());
+    ASSERT_TRUE(read->contains("result")) << read->dump();
+
+    const std::string text =
+        (*read)["result"]["contents"][0]["text"].get<std::string>();
+    // Real guideline text, not a placeholder: an agent that reads this is
+    // reading what reviews actually apply.
+    EXPECT_NE(text.find("CL.1"), std::string::npos) << text.substr(0, 400);
+}
+
+TEST(McpServer, ReportsAnUnknownResourceRatherThanEmptyContent) {
+    std::unique_ptr<mcp::Session> session = OpenConsentingSession();
+    ASSERT_NE(session, nullptr);
+    mcp::Server server(*session);
+    Initialize(server);
+
+    const std::optional<nlohmann::json> response =
+        server.HandleMessage(Request("resources/read", {{"uri", "sccg://nope"}}, 2));
+    ASSERT_TRUE(response.has_value());
+    EXPECT_TRUE(response->contains("error")) << response->dump();
+}
+
+// The prompts are the mechanism that answers "be aware of the rules before it
+// starts": the user picks one in their client and the guidance arrives with it.
+TEST(McpServer, CarriesSccgGuidanceInsideEachPrompt) {
+    std::unique_ptr<mcp::Session> session = OpenConsentingSession();
+    ASSERT_NE(session, nullptr);
+    mcp::Server server(*session);
+    Initialize(server);
+
+    const std::optional<nlohmann::json> listed =
+        server.HandleMessage(Request("prompts/list", nullptr, 2));
+    ASSERT_TRUE(listed.has_value());
+    ASSERT_TRUE(listed->contains("result")) << listed->dump();
+    EXPECT_EQ((*listed)["result"]["prompts"].size(), 3u);
+
+    const std::optional<nlohmann::json> got = server.HandleMessage(
+        Request("prompts/get",
+                {{"name", "draft_argument_from_standard"},
+                 {"arguments", {{"standard", "ISO 26262 part 6"}}}},
+                3));
+    ASSERT_TRUE(got.has_value());
+    ASSERT_TRUE(got->contains("result")) << got->dump();
+
+    const std::string text =
+        (*got)["result"]["messages"][0]["content"]["text"].get<std::string>();
+    EXPECT_NE(text.find("ISO 26262 part 6"), std::string::npos);
+    // The guidance itself, quoted from the catalog rather than paraphrased.
+    EXPECT_NE(text.find("CL.1"), std::string::npos);
+    // And the standing reminder that staging is not editing.
+    EXPECT_NE(text.find("not editing the safety case"), std::string::npos) << text;
+}
+
+TEST(McpServer, ReportsAnUnknownPrompt) {
+    std::unique_ptr<mcp::Session> session = OpenConsentingSession();
+    ASSERT_NE(session, nullptr);
+    mcp::Server server(*session);
+    Initialize(server);
+
+    const std::optional<nlohmann::json> response =
+        server.HandleMessage(Request("prompts/get", {{"name", "no_such_prompt"}}, 2));
+    ASSERT_TRUE(response.has_value());
+    EXPECT_TRUE(response->contains("error")) << response->dump();
+}

@@ -1,13 +1,17 @@
 #pragma once
 
 #include "core/element_factory.h"
+#include "core/sacm_model.h"
 #include "core/terminology_package_service.h"
 #include "imgui.h"
+#include "sacm/sacm_model.h"
 #include "ui/element_context_menu.h"
 #include "ui/panels/terminology_package_panel.h"
 
 #include <functional>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace app {
@@ -61,5 +65,21 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                          const frame::AppLayoutRegion& region,
                          ImGuiWindowFlags panel_flags,
                          const WorkbenchAreaCallbacks& callbacks);
+
+// What the argument-package canvas draws for one package: the committed
+// argument, or the preview of the change set an agent has open against it.
+//
+// Split out because this is the seam the live canvas got wrong. The Argument
+// Navigator was fed the preview and the canvas was not, so one view of a change
+// set showed eighty staged elements and the other showed none -- and unit tests
+// of both halves passed throughout, because each half worked. Choosing the model
+// and choosing the projection are one decision and are tested as one.
+parser::AssuranceCase BuildArgumentPackageCanvasCase(
+    const parser::AssuranceCase&                committed,
+    const std::optional<parser::AssuranceCase>& agent_preview,
+    const std::vector<std::string>&             agent_preview_added_ids,
+    const sacm::AssuranceCasePackage&           package,
+    const sacm::ArgumentPackage&                argument_package,
+    std::string_view                            fallback_title);
 
 } // namespace app::areas

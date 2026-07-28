@@ -28,7 +28,8 @@ bool IsActiveCanvasInHistoricalPreview(const AppRuntimeState& state) {
 
 } // namespace
 
-DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state, core::commands::ICommand& command) {
+DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state, core::commands::ICommand& command,
+                                       const std::string& author) {
     if (!state.app_state.sacm_package.has_value()) {
         return {false, "No SACM model loaded."};
     }
@@ -88,7 +89,7 @@ DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state, core::commands::I
     // flip engaged we re-derive the live views from the library at the next frame
     // boundary, the same deferred-to-next-frame remedy `pending_reconcile_audit_store`
     // uses for the identical mid-render container-teardown hazard.
-    const auto result = state.command_bus->Execute(command, ctx, {});
+    const auto result = state.command_bus->Execute(command, ctx, author);
     if (ctx.library_primary) {
         state.rederive_views_from_library = true;
         state.tree_needs_rebuild = true;

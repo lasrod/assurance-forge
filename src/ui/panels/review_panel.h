@@ -24,8 +24,53 @@ struct ProposalTextChangePreview {
     std::string new_value;
 };
 
+// One change an AI client is building or has submitted, as the reviewer sees it.
+struct AgentChangeSetRow {
+    std::string id;
+    std::string title;
+    std::string summary;
+    // Why the agent says it is making this change. A reviewer is being asked to
+    // accept a change to a safety argument and needs the reasoning, not only the
+    // diff.
+    std::string intent;
+    std::string client_label;
+    // "building" while the agent is still working, "ready" once it has asked for
+    // a decision. Accepting is offered either way -- the user is not obliged to
+    // wait for an agent to declare itself finished.
+    std::string state;
+    int         added_count    = 0;
+    int         modified_count = 0;
+    int         removed_count  = 0;
+    int         operation_count = 0;
+    // False when the change set cannot be accepted against what is open right
+    // now, in which case `problem` says why and the Accept button is disabled.
+    //
+    // Computed every frame rather than when the button is pressed. The reported
+    // symptom was "Accept does nothing": the refusal was real, went to the status
+    // bar, and was nowhere near the change set it was about.
+    bool        applies = true;
+    std::string problem;
+    // Which of the project's arguments this was written against. Shown whenever
+    // it is not the one on screen, because that is the whole explanation for a
+    // change set that will not accept.
+    std::string argument_file;
+    bool        argument_file_is_open = true;
+    // True for the one currently drawn on the canvas.
+    bool        shown_on_canvas = false;
+    // SCCG findings against what this change set would produce. Advisory: they
+    // never block acceptance, because the reviewer is the authority on a safety
+    // argument and only a named, mechanically-decidable subset of SCCG can be
+    // checked at all.
+    std::vector<std::string> sccg_findings;
+};
+
 struct ReviewPanelModel {
     std::string selected_element_id;
+    // Change sets connected AI clients are building against this project.
+    std::vector<AgentChangeSetRow> agent_change_sets;
+    // Clients attached right now, so something reading the project is never
+    // invisible to the person responsible for it.
+    std::vector<std::string>       connected_agents;
     std::string focus_review_item_id;
     std::vector<core::reviews::ReviewItem> review_items;
     std::vector<core::ProblemItem> problem_items;
@@ -60,6 +105,11 @@ struct ReviewPanelCallbacks {
     std::function<void(const core::ProblemItem& problem)> quick_fix_problem;
     std::function<void(const core::ProblemItem& problem)> delete_problem;
     std::function<void(bool manual_ok)> set_manual_review_ok;
+    // Accepting is the only path from an agent's staged work to the safety case,
+    // and it is a person's action. There is no tool an agent can call to reach
+    // it.
+    std::function<void(const std::string& change_set_id)> accept_agent_change_set;
+    std::function<void(const std::string& change_set_id)> reject_agent_change_set;
 };
 
 void ShowReviewPanel(const ReviewPanelModel& model, const ReviewPanelCallbacks& callbacks);

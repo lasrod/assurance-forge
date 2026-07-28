@@ -118,6 +118,9 @@ msgstr "API キーを削除しました。"
 msgid "API key saved securely."
 msgstr "API キーを安全に保存しました。"
 
+msgid "Accept change"
+msgstr "変更を受け入れる"
+
 msgid "Active"
 msgstr "アクティブ"
 
@@ -1240,6 +1243,9 @@ msgstr "提案プレビューが有効です。要素プロパティを編集す
 msgid "Proposal: {0}"
 msgstr "提案: {0}"
 
+msgid "Proposed by {0}"
+msgstr "{0} による提案"
+
 msgid "Proposed change: Broken"
 msgstr "提案変更: 破損"
 
@@ -1284,6 +1290,9 @@ msgstr "参照: {0}"
 
 msgid "Register assessments could not be loaded, so edits cannot be saved: {0}"
 msgstr "登録簿の評価を読み込めなかったため、編集を保存できません: {0}"
+
+msgid "Reject change"
+msgstr "変更を却下する"
 
 msgid "Relationship not found: {0}"
 msgstr "関係が見つかりません: {0}"
@@ -1474,6 +1483,9 @@ msgstr "FPS を表示"
 msgid "Show cycle"
 msgstr "循環を表示"
 
+msgid "Shown on the canvas as you watch it build."
+msgstr "作成の様子がキャンバスに表示されています。"
+
 msgid "Snapshot created at sequence {0}."
 msgstr "スナップショットをシーケンス {0} で作成しました。"
 
@@ -1609,6 +1621,9 @@ msgstr "Assurance Forge の隣に MCP サーバープログラムが見つかり
 msgid "The SACM library could not preview this removal."
 msgstr "SACM ライブラリはこの削除をプレビューできませんでした。"
 
+msgid "The argument changed while this was being prepared, so it no longer applies. Ask the AI client to rebuild it."
+msgstr "準備中に論証が変更されたため、この提案は適用できません。AI クライアントに再作成を依頼してください。"
+
 msgid "The assessment of evidence {0} is kept, but that evidence is no longer in the argument. Stored: {1}"
 msgstr "エビデンス {0} の評価は保持されていますが、そのエビデンスは論証にありません。保存内容: {1}"
 
@@ -1632,6 +1647,9 @@ msgstr "この要素が変更されたため、保存された信頼度評価の
 
 msgid "Theme"
 msgstr "テーマ"
+
+msgid "This change was written against {0}. Open that argument to review it."
+msgstr "この変更は {0} に対して作成されました。レビューするにはその論証を開いてください。"
 
 msgid "This confidence assessment may be stale because the element changed after the value was stored."
 msgstr "この信頼度評価は古い可能性があります — 値が保存された後に要素が変更されました。"
@@ -1759,6 +1777,9 @@ msgstr "ようこそ!"
 msgid "When this is on, an AI client you launch yourself (such as Claude Desktop) can read the open project's safety case and save proposed changes for you to review. Proposals never change the case until you accept them. While this is off, nothing is shared."
 msgstr "これを有効にすると、自分で起動した AI クライアント（Claude Desktop など）が開いているプロジェクトのセーフティケースを読み取り、変更提案を保存できます。提案は承認するまでケースを変更しません。無効の間は何も共有されません。"
 
+msgid "Why: {0}"
+msgstr "理由: {0}"
+
 msgid "Will be modified (references removed):"
 msgstr "変更されるもの (参照が削除されます):"
 
@@ -1849,6 +1870,9 @@ msgstr "{0}  作業者 {1}"
 msgid "{0} ({1})"
 msgstr "{0} ({1})"
 
+msgid "{0} added, {1} changed, {2} removed"
+msgstr "追加 {0}、変更 {1}、削除 {2}"
+
 msgid "{0} claims · {1} strategies · {2} evidence · {3} undeveloped"
 msgstr "主張 {0} 件 · 戦略 {1} 件 · エビデンス {2} 件 · 未展開 {3} 件"
 
@@ -1876,6 +1900,10 @@ msgstr "{0} 件の問題 · トップ {1}: {2}"
 msgid "● PAUSED"
 msgstr "● 一時停止中"
 
+msgid "AI client connected: {0}"
+msgid_plural "AI clients connected: {0}"
+msgstr[0] "接続中の AI クライアント: {0}"
+
 msgid "Proposal draft: {0} operation"
 msgid_plural "Proposal draft: {0} operations"
 msgstr[0] "提案ドラフト: {0} 件の操作"
@@ -1887,6 +1915,10 @@ msgstr[0] "この分類は {0} 件の用語に割り当てられています。�
 msgid "This term value appears {0} time in the current SACM model."
 msgid_plural "This term value appears {0} times in the current SACM model."
 msgstr[0] "この用語値は現在の SACM モデルに {0} 回出現します。"
+
+msgid "{0} SCCG finding"
+msgid_plural "{0} SCCG findings"
+msgstr[0] "SCCG 指摘 {0} 件"
 
 msgid "{0} confidence assessment was marked inactive because its target element changed."
 msgid_plural "{0} confidence assessments were marked inactive because their target elements changed."

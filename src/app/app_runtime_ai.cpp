@@ -2,7 +2,7 @@
 
 #include "app/actions/ai_review_actions.h"
 #include "app/app_runtime_state.h"
-#include "app/guideline_catalog.h"
+#include "core/guideline_catalog.h"
 #include "ui/i18n/localization.h"
 #include "ui/ui_state.h"
 
@@ -17,9 +17,9 @@ void EnsureAiGuidelineCatalogLoaded(AppRuntimeState& state) {
     if (state.guideline_catalog_load_attempted)
         return;
 
-    GuidelineCatalog catalog;
+    core::GuidelineCatalog catalog;
     std::string error;
-    if (LoadGuidelineCatalog(catalog, error)) {
+    if (core::LoadGuidelineCatalog(catalog, error)) {
         state.guideline_catalog = std::move(catalog);
         state.guideline_catalog_error.clear();
     } else {

@@ -5,6 +5,8 @@
 #include <filesystem>
 #include <gtest/gtest.h>
 
+#include <fstream>
+
 namespace {
 
 struct TempDir {
@@ -184,6 +186,35 @@ TEST(ReviewItemManagerTest, SavesLoadsElementReviewStates) {
     EXPECT_TRUE(loaded.GetElementReviewState("G1").manual_ok);
     EXPECT_TRUE(loaded.GetElementReviewState("G1").ai_ok);
     EXPECT_EQ(loaded.GetElementReviewState("G1").reviewed_by, "Reviewer");
+}
+
+// A failed load keeps what it had.
+//
+// The review file has a second writer -- another Assurance Forge process, or a
+// text editor -- and the controller polls it for external changes, so a read
+// that lands mid-flush parses as garbage. `Load` cleared its contents before it
+// knew whether it could replace them, so the user's review comments disappeared
+// from the panel because of a read, and stayed gone until the next poll that
+// happened to succeed. Nothing on disk had changed.
+TEST(ReviewItemManagerTest, KeepsWhatItHasWhenALoadFails) {
+    TempDir temp(MakeTempDir());
+    const std::filesystem::path review_path = temp.path / "reviews" / "review-items.af.json";
+
+    core::reviews::ReviewItemManager manager;
+    manager.SetFilePath(review_path);
+    ASSERT_TRUE(manager.AddOrUpdateItem(MakeItem("review-1", "G1")));
+    std::string error;
+    ASSERT_TRUE(manager.Save(error)) << error;
+    ASSERT_EQ(manager.GetItems().size(), 1u);
+
+    // Half a flush: valid JSON up to the point the writer got to.
+    std::ofstream(review_path, std::ios::trunc) << R"({"format":"assurance-forge-rev)";
+
+    EXPECT_FALSE(manager.Load(error));
+    EXPECT_FALSE(error.empty());
+    EXPECT_EQ(manager.GetItems().size(), 1u)
+        << "a read that failed emptied the review items";
+    EXPECT_EQ(manager.GetItemsForElement("G1").size(), 1u);
 }
 
 TEST(ReviewItemManagerTest, UpdatesAndRemovesItems) {

@@ -177,6 +177,17 @@ void DrawGsnNode(const GsnNode& node,
     ImVec2 bottom_right = ImVec2(top_left.x + node.size.x * zoom, top_left.y + node.size.y * zoom);
     ImVec2 scaled_size = ImVec2(node.size.x * zoom, node.size.y * zoom);
 
+    // An agent's open change set. Looked up once per node; the map is empty in
+    // the ordinary case, so this costs a hash of nothing.
+    core::changesets::ElementChange agent_change = core::changesets::ElementChange::Unchanged;
+    if (!ui_state.agent_change_status.empty()) {
+        const std::unordered_map<std::string, core::changesets::ElementChange>::const_iterator
+            found = ui_state.agent_change_status.find(node.id);
+        if (found != ui_state.agent_change_status.end()) {
+            agent_change = found->second;
+        }
+    }
+
     const bool proposal_dim_active = ui_state.dim_non_proposal_nodes && !ui_state.proposal_highlight_ids.empty();
     const bool proposal_highlighted = proposal_dim_active && ui_state.proposal_highlight_ids.count(node.id) > 0;
     const bool proposal_dimmed = proposal_dim_active && !proposal_highlighted;
@@ -227,6 +238,15 @@ void DrawGsnNode(const GsnNode& node,
         if (node.is_counter) {
             const bool circular = (node.type == "Solution" || node.type == "Evidence");
             DrawCounterChallengeDecoration(draw_list, top_left, bottom_right, circular, zoom);
+        }
+
+        // What a connected AI client is proposing, drawn as it stages it. This
+        // is the difference between watching the argument take shape and being
+        // handed a finished patch to decode.
+        if (agent_change != core::changesets::ElementChange::Unchanged) {
+            const bool circular = (node.type == "Solution" || node.type == "Evidence");
+            DrawProposedChangeDecoration(draw_list, top_left, bottom_right, circular, zoom,
+                                         agent_change);
         }
     }
 

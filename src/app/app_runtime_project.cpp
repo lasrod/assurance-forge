@@ -1,5 +1,7 @@
 #include "app/app_runtime.h"
+
 #include "app/actions/terminology_actions.h"
+#include "app/agent_request_handler.h"
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
 #include "app/commands/dispatch.h"
@@ -17,6 +19,7 @@
 #include "core/audit/audit_store.h"
 #include "core/audit/strategy_migration.h"
 #include "core/commands/command_bus.h"
+#include "core/commands/proposal_commands.h"
 #include "core/commands/package_commands.h"
 #include "core/problems/problem_utils.h"
 #include "core/project_service.h"
@@ -1128,6 +1131,172 @@ void AppRuntime::EnsureProjectSideStorage() {
     EnsureReviewItemStorage();
     EnsureConfidenceStorage();
     EnsureRegisterStorage();
+    UpdateAgentBridgeForProject();
+}
+
+void AppRuntime::UpdateAgentBridgeForProject() {
+    if (impl_->agent_bridge == nullptr) {
+        return;
+    }
+    if (!impl_->app_state.current_project.has_value()) {
+        // Includes a bare SACM file opened outside a project: there is no root
+        // to key an endpoint record on, and no proposals directory to work
+        // against, so there is nothing useful to serve.
+        impl_->agent_bridge->Stop();
+        return;
+    }
+
+    std::string error;
+    if (!impl_->agent_bridge->Start(impl_->app_state.current_project->rootPath, kAppVersion,
+                                    error)) {
+        // Not fatal. The application is perfectly usable without an AI client
+        // attached, and failing an project open over it would be a poor trade.
+        SetStatus("AI clients cannot connect to this project: " + error);
+    }
+}
+
+bool AppRuntime::PollAgentBridge() {
+    if (impl_->agent_bridge == nullptr || !impl_->agent_bridge->listening()) {
+        return false;
+    }
+
+    // Anything an agent staged since the last frame has to reach the canvas, and
+    // staging deliberately mutates no model, so nothing else marks the derived
+    // views dirty. Checked before the poll as well as after: a change set left
+    // open when the user switched argument files must be redrawn on the way back.
+    const auto mark_dirty_if_changed = [this]() {
+        const std::uint64_t revision = impl_->agent_change_sets.revision();
+        if (revision != impl_->agent_change_revision_drawn) {
+            impl_->agent_change_revision_drawn = revision;
+            impl_->tree_needs_rebuild          = true;
+        }
+    };
+    mark_dirty_if_changed();
+
+    const std::string project_path =
+        impl_->app_state.current_project.has_value()
+            ? impl_->app_state.current_project->rootPath.generic_string()
+            : std::string();
+
+    const int handled = impl_->agent_bridge->PollPendingRequests(
+        [this, &project_path](const bridge::Request&              request,
+                              const controllers::AgentConnection& connection) {
+            const AgentRequestContext context{
+                impl_->app_state,
+                project_path,
+                connection.client_label,
+                [this](const std::string& relative_path, std::string& error) {
+                    return OpenAgentRequestedCaseFile(relative_path, error);
+                },
+                &impl_->agent_change_sets,
+                connection.id};
+            return HandleAgentRequest(request, context);
+        });
+
+    mark_dirty_if_changed();
+    return handled > 0;
+}
+
+bool AppRuntime::AcceptAgentChangeSet(const std::string& change_set_id, std::string& error) {
+    error.clear();
+    const core::changesets::ChangeSet* change_set = impl_->agent_change_sets.Find(change_set_id);
+    if (change_set == nullptr || !change_set->open()) {
+        error = "That change set is no longer open.";
+        return false;
+    }
+    if (!impl_->app_state.loaded_case.has_value()) {
+        error = "No assurance case is loaded.";
+        return false;
+    }
+
+    // Re-checked at the moment of acceptance, not at the moment it was staged.
+    // The user may have edited the argument while reading the proposal, or moved
+    // to a different one of the project's arguments, and a patch that no longer
+    // applies must be refused rather than forced. The Review panel runs the same
+    // check every frame, so this is the second time the user sees the reason
+    // rather than the first.
+    const core::changesets::ChangeSetAcceptability acceptability =
+        core::changesets::EvaluateChangeSetAcceptability(*change_set,
+                                                         impl_->app_state.loaded_file_path,
+                                                         impl_->app_state.loaded_case.value());
+    if (!acceptability.can_accept) {
+        error = acceptability.reason;
+        return false;
+    }
+
+    // The same audited command an accepted proposal has always gone through, so
+    // this edit is recorded, undoable and attributed exactly like one made with
+    // the mouse. No new command type exists for agent-authored changes, which is
+    // what guarantees they cannot do anything the application could not.
+    core::commands::ApplyProposalCommand command(change_set->proposal);
+    // Attributed to the client that proposed it. Without the author the bus
+    // records `system`, and a reader of the audit log a year later cannot tell
+    // an agent-authored change from one somebody typed -- which is the single
+    // most useful thing the log could have told them about it.
+    const app::commands::DispatchOutcome outcome =
+        app::commands::DispatchAuditedCommand(*impl_, command, change_set->proposal.author_name);
+    if (!outcome.success) {
+        error = outcome.error;
+        return false;
+    }
+
+    impl_->agent_change_sets.MarkApplied(change_set_id);
+    impl_->app_state.mark_dirty();
+    impl_->tree_needs_rebuild = true;
+    return true;
+}
+
+bool AppRuntime::RejectAgentChangeSet(const std::string& change_set_id, std::string& error) {
+    if (!impl_->agent_change_sets.Discard(change_set_id, error)) {
+        return false;
+    }
+    impl_->tree_needs_rebuild = true;
+    return true;
+}
+
+bool AppRuntime::OpenAgentRequestedCaseFile(const std::string& relative_path, std::string& error) {
+    error.clear();
+    if (!impl_->app_state.current_project.has_value()) {
+        error = "No project is open.";
+        return false;
+    }
+
+    for (const core::ProjectFileEntry& entry : impl_->app_state.current_project->files) {
+        if (entry.role != core::ProjectFileRole::SacmArgument ||
+            entry.relativePath.generic_string() != relative_path) {
+            continue;
+        }
+        // Goes through the same path a user's click takes, so the command bus,
+        // the audit store and every side-storage controller are reconfigured for
+        // the new file exactly as they would be otherwise.
+        const std::filesystem::path wanted =
+            impl_->app_state.current_project->rootPath / entry.relativePath;
+        OpenProjectFile(entry);
+
+        // `OpenProjectFile` returns normally in cases where it did NOT open the
+        // file: unsaved changes raise a save-first modal and defer the open, and
+        // a load failure returns void. Reporting success then would tell the
+        // agent it had switched while every subsequent read answered from the
+        // previous document -- an agent reasoning confidently about a file
+        // nobody is looking at, which is the whole failure this design exists to
+        // remove. So the result is taken from the state, not from the call.
+        if (impl_->app_state.loaded_file_path == wanted) {
+            return true;
+        }
+        if (impl_->project_controller->show_save_before_project_file_open_modal) {
+            error = "The argument currently open has unsaved changes, so Assurance Forge is asking "
+                    "the user whether to save before switching. Ask them to answer that prompt, "
+                    "then try again.";
+            return false;
+        }
+        error = impl_->app_state.status_message.empty()
+                    ? ("Assurance Forge could not open " + relative_path + ".")
+                    : impl_->app_state.status_message;
+        return false;
+    }
+
+    error = "No argument file in this project has the path \"" + relative_path + "\".";
+    return false;
 }
 
 bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {

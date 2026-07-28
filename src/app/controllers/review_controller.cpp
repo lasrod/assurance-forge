@@ -9,7 +9,69 @@
 
 namespace app::controllers {
 
+namespace {
+
+// How often the review file is stat'd. Slow enough to be free at frame rates,
+// fast enough that a proposal arriving from another process feels immediate.
+constexpr auto kExternalCheckInterval = std::chrono::milliseconds(750);
+
+} // namespace
+
 ReviewController::ReviewController(AppEvents& events) : events_(events) {}
+
+void ReviewController::RestampReviewFile() {
+    stamp_ = FileStamp{};
+    const std::filesystem::path& path = manager_.FilePath();
+    if (path.empty()) {
+        return;
+    }
+    std::error_code ec;
+    if (!std::filesystem::exists(path, ec) || ec) {
+        return;
+    }
+    stamp_.exists = true;
+    stamp_.mtime = std::filesystem::last_write_time(path, ec);
+    if (ec) {
+        stamp_.exists = false;
+        return;
+    }
+    stamp_.size = std::filesystem::file_size(path, ec);
+    if (ec) {
+        stamp_.size = 0;
+    }
+}
+
+bool ReviewController::ReloadIfChangedExternally() {
+    if (manager_.FilePath().empty()) {
+        return false;
+    }
+    // Unsaved edits win. They exist only in memory, so reloading would discard
+    // them silently; an incoming comment can wait until the user saves.
+    if (dirty_) {
+        return false;
+    }
+
+    const auto now = std::chrono::steady_clock::now();
+    if ((now - last_external_check_) < kExternalCheckInterval) {
+        return false;
+    }
+    last_external_check_ = now;
+
+    const FileStamp previous = stamp_;
+    RestampReviewFile();
+    if (stamp_ == previous) {
+        return false;
+    }
+
+    std::string error;
+    if (!manager_.Load(error)) {
+        // A half-written file from a writer mid-flush reads as a parse failure.
+        // Leaving the stamp as the failed one means we retry on its next change
+        // rather than sitting on a corrupt read forever.
+        return false;
+    }
+    return true;
+}
 
 bool ReviewController::ConfigureStorage(const std::filesystem::path& review_path, std::string& error) {
     if (dirty_ && !manager_.FilePath().empty() && manager_.FilePath() == review_path) {
@@ -18,16 +80,24 @@ bool ReviewController::ConfigureStorage(const std::filesystem::path& review_path
     }
 
     manager_.SetFilePath(review_path);
-    if (manager_.Load(error))
+    if (manager_.Load(error)) {
+        RestampReviewFile();
         return true;
+    }
 
     std::error_code exists_error;
     if (!std::filesystem::exists(review_path, exists_error)) {
         manager_.Clear();
         manager_.SetFilePath(review_path);
+        RestampReviewFile();
         return true;
     }
 
+    // A file that exists and will not parse. `Load` no longer empties itself on
+    // failure, so say it here: these are a different project's review items and
+    // keeping them would attach one project's comments to another's elements.
+    manager_.Clear();
+    manager_.SetFilePath(review_path);
     return false;
 }
 
@@ -59,6 +129,9 @@ bool ReviewController::SaveIfDirty(core::AssuranceProject& project, std::string&
 
     manager_.SetFilePath(project.rootPath / entry.relativePath);
     dirty_ = false;
+    // Our own write, so record it as the baseline rather than detecting it as
+    // somebody else's change on the next poll.
+    RestampReviewFile();
     return true;
 }
 

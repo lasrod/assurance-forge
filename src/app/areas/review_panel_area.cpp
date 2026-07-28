@@ -2,7 +2,8 @@
 
 #include "app/app_runtime_state.h"
 #include "app/controllers/review_controller.h"
-#include "app/guideline_catalog.h"
+#include "core/guideline_catalog.h"
+#include "core/sccg/staged_checks.h"
 #include "core/problems/problem_utils.h"
 #include "core/time_utils.h"
 #include "ui/panels/review_panel.h"
@@ -32,9 +33,9 @@ void EnsureReviewGuidelineCatalogLoaded(AppRuntimeState& state) {
     if (state.guideline_catalog_load_attempted)
         return;
 
-    GuidelineCatalog catalog;
+    core::GuidelineCatalog catalog;
     std::string error;
-    if (LoadGuidelineCatalog(catalog, error)) {
+    if (core::LoadGuidelineCatalog(catalog, error)) {
         state.guideline_catalog = std::move(catalog);
         state.guideline_catalog_error.clear();
     } else {
@@ -141,9 +142,57 @@ ui::panels::ReviewPanelModel BuildReviewPanelModel(AppRuntimeState& state) {
         proposals.creator_active ? proposals.draft.anchor_element_id : ui_state.selected_element_id;
     model.focus_review_item_id = state.workbench.focus_review_item_id;
     model.has_project = state.app_state.current_project.has_value();
+
+    // What connected AI clients are proposing. Assembled here rather than in the
+    // panel so the panel stays a renderer: it receives rows, not a change-set
+    // store and a model to diff against.
+    if (state.agent_bridge != nullptr) {
+        for (const controllers::AgentConnection& connection : state.agent_bridge->connections()) {
+            model.connected_agents.push_back(connection.client_label);
+        }
+    }
+    for (const core::changesets::ChangeSet* change_set : state.agent_change_sets.Open()) {
+        ui::panels::AgentChangeSetRow row;
+        row.id              = change_set->id;
+        row.title           = change_set->title;
+        row.summary         = change_set->summary;
+        row.intent          = change_set->intent;
+        row.client_label    = change_set->client_label;
+        row.state           = core::changesets::ChangeSetStateToString(change_set->state);
+        row.operation_count = static_cast<int>(change_set->proposal.operations.size());
+        row.shown_on_canvas = ui_state.agent_change_set_id == change_set->id;
+        row.argument_file   = change_set->argument_file.filename().generic_string();
+        row.argument_file_is_open = core::changesets::ChangeSetTargetsArgumentFile(
+            *change_set, state.app_state.loaded_file_path);
+
+        if (state.app_state.loaded_case.has_value()) {
+            // The same check acceptance runs, run every frame, so the reason a
+            // change set will not accept is on the change set before the user
+            // reaches for the button rather than in the status bar afterwards.
+            const core::changesets::ChangeSetAcceptability acceptability =
+                core::changesets::EvaluateChangeSetAcceptability(
+                    *change_set, state.app_state.loaded_file_path,
+                    state.app_state.loaded_case.value());
+            row.applies = acceptability.can_accept;
+            row.problem = acceptability.reason;
+
+            // Counting what it would do only means something against the
+            // document it was written for. Against another of the project's
+            // arguments the operations land on ids that merely happen to match.
+            if (row.argument_file_is_open) {
+                const core::changesets::ChangeSetDiff diff = core::changesets::ComputeChangeSetDiff(
+                    *change_set, state.app_state.loaded_case.value());
+                row.added_count    = diff.added_count;
+                row.modified_count = diff.modified_count;
+                row.removed_count  = diff.removed_count;
+                row.sccg_findings  = DescribeStagedSccgFindings(diff);
+            }
+        }
+        model.agent_change_sets.push_back(std::move(row));
+    }
     EnsureReviewGuidelineCatalogLoaded(state);
     if (state.guideline_catalog.has_value()) {
-        for (const GuidelineCatalogEntry& entry : state.guideline_catalog->entries) {
+        for (const core::GuidelineCatalogEntry& entry : state.guideline_catalog->entries) {
             model.guideline_options.push_back(ui::panels::ReviewGuidelineOption{
                 entry.id,
                 entry.category,
@@ -229,6 +278,39 @@ ui::panels::ReviewPanelModel BuildReviewPanelModel(AppRuntimeState& state) {
 
 } // namespace
 
+// The SCCG findings against what a change set would produce, as the reviewer
+// reads them.
+//
+// The agent has been getting these in the result of every staging call since the
+// checks were written; the reviewer was not, because nothing ever filled the row
+// the panel renders them from. So the panel had a findings section that could
+// not appear, and a person deciding whether to accept an agent's change to a
+// safety argument saw less about it than the agent did.
+//
+// Only what this change set touched: findings about the rest of the argument are
+// the user's own business and not this proposal's to answer for.
+std::vector<std::string> DescribeStagedSccgFindings(const core::changesets::ChangeSetDiff& diff) {
+    std::vector<std::string> touched;
+    for (const std::pair<const std::string, core::changesets::ElementChange>& entry :
+         diff.status_by_id) {
+        if (entry.second != core::changesets::ElementChange::Unchanged &&
+            entry.second != core::changesets::ElementChange::Removed) {
+            touched.push_back(entry.first);
+        }
+    }
+
+    std::vector<std::string> described;
+    for (const core::sccg::StagedFinding& finding :
+         core::sccg::CheckStagedArgument(diff.preview_model, touched)) {
+        std::string line = finding.guideline_id;
+        if (!finding.element_id.empty()) {
+            line += " " + finding.element_id;
+        }
+        described.push_back(line + ": " + finding.detail);
+    }
+    return described;
+}
+
 void RenderReviewPanelContent(AppRuntimeState& state, const ReviewPanelAreaCallbacks& callbacks) {
     ui::panels::ReviewPanelModel model = BuildReviewPanelModel(state);
 
@@ -293,6 +375,14 @@ void RenderReviewPanelContent(AppRuntimeState& state, const ReviewPanelAreaCallb
     panel_callbacks.set_manual_review_ok = [&callbacks, element_id = model.selected_element_id](bool manual_ok) {
         if (callbacks.set_manual_review_ok)
             callbacks.set_manual_review_ok(element_id, manual_ok);
+    };
+    panel_callbacks.accept_agent_change_set = [&callbacks](const std::string& change_set_id) {
+        if (callbacks.accept_agent_change_set)
+            callbacks.accept_agent_change_set(change_set_id);
+    };
+    panel_callbacks.reject_agent_change_set = [&callbacks](const std::string& change_set_id) {
+        if (callbacks.reject_agent_change_set)
+            callbacks.reject_agent_change_set(change_set_id);
     };
     ui::panels::ShowReviewPanel(model, panel_callbacks);
     state.workbench.focus_review_item_id.clear();

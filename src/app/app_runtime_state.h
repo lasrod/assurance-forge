@@ -6,6 +6,8 @@
 #include "ai/secret_store.h"
 #include "app/areas/baseline_modal.h"
 #include "app/app_events.h"
+#include "app/controllers/agent_bridge_controller.h"
+#include "core/changesets/change_set_store.h"
 #include "app/controllers/ai_review_controller.h"
 #include "app/controllers/acp_controller.h"
 #include "app/controllers/confidence_controller.h"
@@ -15,7 +17,7 @@
 #include "app/controllers/proposal_controller.h"
 #include "app/controllers/register_controller.h"
 #include "app/controllers/review_controller.h"
-#include "app/guideline_catalog.h"
+#include "core/guideline_catalog.h"
 #include "core/app_state.h"
 #include "core/user_settings.h"
 #include "core/assurance_tree.h"
@@ -193,7 +195,29 @@ struct AppRuntimeState {
     std::unique_ptr<controllers::ConfidenceController> confidence_controller;
     std::unique_ptr<controllers::RegisterController> register_controller;
     std::unique_ptr<controllers::AcpController> acp_controller;
-    std::optional<GuidelineCatalog> guideline_catalog;
+    // Serves connected AI clients. Requests it queues are executed on the frame
+    // thread by AppRuntime::PollAgentBridge, against the model the user is
+    // looking at.
+    std::unique_ptr<controllers::AgentBridgeController> agent_bridge;
+    // Changes connected clients are building. Held in memory and never written
+    // into the project: a change set is a proposal in progress, not project
+    // data, and a second writer in that directory is what this design removed.
+    core::changesets::ChangeSetStore agent_change_sets;
+    // The store revision the canvas was last built against. Staging is not a
+    // model mutation and so marks nothing dirty; comparing this each frame is
+    // what turns an agent's staged operation into a repaint.
+    std::uint64_t                    agent_change_revision_drawn = 0;
+    // The preview the canvas draws while a change set is open: the argument as
+    // it would be if the user accepted, plus the elements it would remove put
+    // back for display so a deletion can be seen rather than inferred from a gap.
+    // Empty when nothing is open, and never saved.
+    std::optional<parser::AssuranceCase> agent_preview_case;
+    // The ids the preview adds. The canvas projects an argument package through
+    // the ids that package holds, and a staged addition is in no package at all
+    // -- nothing has been applied -- so without these the projection drops every
+    // new element and the preview draws as the committed argument.
+    std::vector<std::string>             agent_preview_added_ids;
+    std::optional<core::GuidelineCatalog> guideline_catalog;
     bool guideline_catalog_load_attempted = false;
     std::string guideline_catalog_error;
     bool document_dirty = false;

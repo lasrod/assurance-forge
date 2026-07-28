@@ -119,6 +119,20 @@ void AppRuntime::RenderFrame(bool& done) {
     }
 
     {
+        // Whatever a connected AI client asked for runs here, on this thread,
+        // against the model the user is looking at. That is what makes an
+        // agent's view of the argument the same as the user's, and it is why no
+        // lock is needed around the model.
+        //
+        // Deliberately BEFORE the derived views are rebuilt. An agent can switch
+        // which argument file is open, which replaces the loaded case; running
+        // this after the rebuild left the frame drawing a tree built from the
+        // document that had just been navigated away from.
+        core::perf::ScopedTimer s("app.agent_bridge");
+        PollAgentBridge();
+    }
+
+    {
         core::perf::ScopedTimer s("app.derived_views");
         // Building the tree / GSN layout for a very large case can exhaust memory. Catch it here
         // so an allocation failure reports to the user and drops the case instead of escaping the
@@ -147,6 +161,21 @@ void AppRuntime::RenderFrame(bool& done) {
     {
         core::perf::ScopedTimer s("app.ai_poll");
         PollAiReviewTask();
+    }
+    {
+        // Review items can be written by another process -- a second instance, a
+        // git checkout under a running app -- and were previously read only on
+        // project open, so an incoming comment stayed invisible until the project
+        // was reopened. The controller self-throttles and refuses to reload over
+        // unsaved edits, so calling it every frame is safe.
+        core::perf::ScopedTimer s("app.review_external_poll");
+        if (impl_->review_controller->ReloadIfChangedExternally()) {
+            impl_->problems_dirty.review = true;
+            // The proposal list is keyed off the loaded case and cached on a
+            // directory signature; an item arriving with a new proposal file means
+            // that cache is stale too.
+            impl_->proposal_controller->manager.InvalidateProposalCache();
+        }
     }
 
     {
@@ -249,6 +278,22 @@ void AppRuntime::RenderFrame(bool& done) {
     };
     review_panel_callbacks.set_manual_review_ok = [this](const std::string& element_id, bool manual_ok) {
         return SetManualReviewOk(element_id, manual_ok);
+    };
+    review_panel_callbacks.accept_agent_change_set = [this](const std::string& change_set_id) {
+        std::string error;
+        if (!AcceptAgentChangeSet(change_set_id, error)) {
+            SetStatus("Change could not be accepted: " + error);
+            return;
+        }
+        SetStatus("Change accepted. Undo reverses it like any other edit.");
+    };
+    review_panel_callbacks.reject_agent_change_set = [this](const std::string& change_set_id) {
+        std::string error;
+        if (!RejectAgentChangeSet(change_set_id, error)) {
+            SetStatus("Change could not be rejected: " + error);
+            return;
+        }
+        SetStatus("Change rejected.");
     };
 
     areas::FeedbackDockAreaCallbacks feedback_dock_callbacks;

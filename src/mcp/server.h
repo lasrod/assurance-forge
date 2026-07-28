@@ -39,6 +39,13 @@ class Server {
     nlohmann::json Dispatch(const jsonrpc::Request& request);
     nlohmann::json HandleInitialize(const jsonrpc::Request& request);
     nlohmann::json HandleToolsList(const jsonrpc::Request& request);
+    // SCCG as MCP resources and prompts. Not gated on consent: these are the
+    // published guidelines, not the user's safety case, and an agent that reads
+    // them before connecting to a project is exactly the point.
+    nlohmann::json HandleResourcesList(const jsonrpc::Request& request);
+    nlohmann::json HandleResourcesRead(const jsonrpc::Request& request);
+    nlohmann::json HandlePromptsList(const jsonrpc::Request& request);
+    nlohmann::json HandlePromptsGet(const jsonrpc::Request& request);
     nlohmann::json HandleToolsCall(const jsonrpc::Request& request);
 
     Session& session_;

@@ -1,6 +1,6 @@
 #include "app/controllers/ai_review_controller.h"
 
-#include "app/guideline_catalog.h"
+#include "core/guideline_catalog.h"
 #include "core/reviews/review_text_utils.h"
 #include "core/time_utils.h"
 #include "parser/guidelines_parser.h"
@@ -151,7 +151,7 @@ void ReplaceAiReviewWithSingleItem(ReviewController& review_controller,
 
 } // namespace
 
-AiReviewGuidelineSelection SelectReviewProfileGuidelines(const GuidelineCatalog& guideline_catalog,
+AiReviewGuidelineSelection SelectReviewProfileGuidelines(const core::GuidelineCatalog& guideline_catalog,
                                                          const std::string& review_profile_id) {
     AiReviewGuidelineSelection selection;
     selection.review_profile = guideline_catalog.document.FindReviewProfileById(review_profile_id);
@@ -167,7 +167,7 @@ AiReviewGuidelineSelection SelectReviewProfileGuidelines(const GuidelineCatalog&
     return selection;
 }
 
-AiReviewGuidelineSelection SelectClaimReviewGuidelines(const GuidelineCatalog& guideline_catalog) {
+AiReviewGuidelineSelection SelectClaimReviewGuidelines(const core::GuidelineCatalog& guideline_catalog) {
     AiReviewGuidelineSelection selection;
     selection.review_profile = guideline_catalog.document.FindReviewProfileById(kDefaultClaimReviewProfileId);
     selection.guidelines = selection.review_profile
@@ -279,9 +279,9 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
         return;
     }
 
-    GuidelineCatalog guideline_catalog;
+    core::GuidelineCatalog guideline_catalog;
     std::string guideline_error;
-    if (!LoadGuidelineCatalog(guideline_catalog, guideline_error)) {
+    if (!core::LoadGuidelineCatalog(guideline_catalog, guideline_error)) {
         ReplaceAiReviewWithSingleItem(review_controller_,
                                       selected_element_id,
                                       ReviewCommentPrefix(selected_element_id, review_profile_id),

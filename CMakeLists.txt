@@ -217,7 +217,7 @@ add_custom_target(check_layer_gates ALL
 # is linked in via the per-layer af_* targets.
 hello_imgui_add_app(assurance-forge src/app/main.cpp)
 target_link_libraries(assurance-forge PRIVATE
-    af_app af_ui af_ai af_export af_core af_sacm_adapter af_sacm af_parser
+    af_app af_ui af_ai af_export af_agent af_bridge af_core af_sacm_adapter af_sacm af_parser
 )
 if(WIN32)
     target_link_libraries(assurance-forge PRIVATE bcrypt advapi32 ole32 shell32 dwmapi)
@@ -233,7 +233,7 @@ af_copy_sccg_data(assurance-forge)
 # review from growing a shared inference path (docs/features/mcp-server.md).
 add_executable(assurance-forge-mcp src/mcp/main.cpp)
 target_link_libraries(assurance-forge-mcp PRIVATE
-    af_mcp af_core af_sacm_adapter af_sacm af_parser
+    af_mcp af_agent af_bridge af_core af_sacm_adapter af_sacm af_parser
 )
 if(WIN32)
     target_link_libraries(assurance-forge-mcp PRIVATE bcrypt advapi32)
@@ -274,6 +274,7 @@ add_executable(tests
     tests/test_save_from_library.cpp
     tests/test_acp_controller.cpp
     tests/test_xml_parser.cpp
+    tests/test_multilingual_round_trip.cpp
     tests/test_argument_cycles.cpp
     tests/test_register_model.cpp
     tests/test_assurance_tree.cpp
@@ -311,6 +312,7 @@ add_executable(tests
     tests/test_ai_review_controller.cpp
     tests/test_review_problem_sync.cpp
     tests/test_review_controller.cpp
+    tests/test_review_external_reload.cpp
     tests/test_register_controller.cpp
     tests/test_register_problem_sync.cpp
     tests/test_element_edit_controller.cpp
@@ -356,9 +358,18 @@ add_executable(tests
     tests/test_undo_command.cpp
     tests/test_dialectic_challenge.cpp
     tests/test_projection_coverage.cpp
+    tests/test_bridge_protocol.cpp
+    tests/test_bridge_endpoint.cpp
+    tests/test_bridge_transport.cpp
+    tests/test_agent_request_handler.cpp
+    tests/test_agent_bridge_controller.cpp
+    tests/test_change_sets.cpp
+    tests/test_agent_change_canvas.cpp
+    tests/test_change_set_acceptance.cpp
+    tests/test_sccg_staged_checks.cpp
     tests/test_mcp_jsonrpc.cpp
     tests/test_mcp_server.cpp
-    tests/test_mcp_proposals.cpp
+    tests/test_mcp_modes.cpp
     tests/test_mcp_client_config.cpp
     tests/test_user_settings_path.cpp
 )
@@ -369,7 +380,7 @@ target_compile_definitions(tests PRIVATE AF_REPO_ROOT="${CMAKE_SOURCE_DIR}")
 target_link_libraries(tests PRIVATE
     GTest::gtest_main
     hello_imgui
-    af_app af_ui af_ai af_export af_mcp af_core af_sacm_adapter af_sacm af_parser
+    af_app af_ui af_ai af_export af_mcp af_agent af_bridge af_core af_sacm_adapter af_sacm af_parser
 )
 if(WIN32)
     target_link_libraries(tests PRIVATE bcrypt advapi32 dwmapi)

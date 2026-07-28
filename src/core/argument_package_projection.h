@@ -5,6 +5,7 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 // Argument-package projection. Given the full project model, build a filtered
 // `parser::AssuranceCase` containing only the elements (and ACPs) belonging to
@@ -35,5 +36,26 @@ const sacm::ArgumentPackage* FindArgumentPackageByIdentity(const sacm::Assurance
 parser::AssuranceCase BuildArgumentPackageProjection(const parser::AssuranceCase& source_model,
                                                      const sacm::ArgumentPackage& argument_package,
                                                      std::string_view fallback_name);
+
+// Project a change-set preview down to one argument package.
+//
+// The filter above works from the ids the SACM package holds, and an element an
+// agent has staged is in no package at all -- nothing has been applied, which is
+// the whole point of a preview. Projecting a preview through the plain filter
+// therefore drops every staged addition and draws the committed argument, which
+// is what "the canvas never shows staged elements" was.
+//
+// `added_element_ids` are the ids the preview adds. One joins this package when
+// it is connected to it, directly or through other additions: a new claim is
+// reached by way of the new relationship that attaches it to an existing goal.
+// An addition connected to nothing that already exists -- the first goal of an
+// empty argument -- joins the document's first argument package, which is where
+// applying the change set would put it.
+parser::AssuranceCase BuildArgumentPackagePreviewProjection(
+    const parser::AssuranceCase&      preview_model,
+    const sacm::AssuranceCasePackage& package,
+    const sacm::ArgumentPackage&      argument_package,
+    const std::vector<std::string>&   added_element_ids,
+    std::string_view                  fallback_name);
 
 } // namespace core
