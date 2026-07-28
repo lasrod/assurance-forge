@@ -78,16 +78,32 @@ TEST_F(BridgeEndpointTest, GivesTwoProjectsTwoDifferentKeys) {
     EXPECT_NE(bridge::ProjectKey("C:/cases/alpha"), bridge::ProjectKey("C:/cases/beta"));
 }
 
-TEST_F(BridgeEndpointTest, TreatsSeparatorStylesAsOneProject) {
+#ifdef _WIN32
+// Windows accepts either separator for the same path, so `C:\cases\alpha` and
+// `C:/cases/alpha` are one project. Keying them differently would publish two
+// endpoint records for one open project and let the adapter connect to neither.
+TEST_F(BridgeEndpointTest, TreatsSeparatorStylesAsOneProjectOnWindows) {
     EXPECT_EQ(bridge::ProjectKey("C:/cases/alpha"), bridge::ProjectKey("C:\\cases\\alpha"));
 }
 
-#ifdef _WIN32
 // Windows paths are case-insensitive, so `C:\Cases\X` and `c:\cases\x` are the
-// same project. Keying them differently would publish two endpoint records for
-// one open project and let the adapter connect to neither.
+// same project.
 TEST_F(BridgeEndpointTest, TreatsCaseVariantsAsOneProjectOnWindows) {
     EXPECT_EQ(bridge::ProjectKey("C:/Cases/Alpha"), bridge::ProjectKey("c:/cases/alpha"));
+}
+#else
+// The same two claims are false on POSIX, and asserting them there is what had
+// CI red on every commit of this branch. A backslash is an ordinary character in
+// a POSIX filename and case is significant, so `a\b` and `a/b` name different
+// things and must key differently -- folding them together would point two
+// projects at one endpoint record, which is the failure the key exists to
+// prevent.
+TEST_F(BridgeEndpointTest, TreatsSeparatorStylesAsDifferentProjectsOnPosix) {
+    EXPECT_NE(bridge::ProjectKey("/cases/alpha"), bridge::ProjectKey("/cases\\alpha"));
+}
+
+TEST_F(BridgeEndpointTest, TreatsCaseVariantsAsDifferentProjectsOnPosix) {
+    EXPECT_NE(bridge::ProjectKey("/Cases/Alpha"), bridge::ProjectKey("/cases/alpha"));
 }
 #endif
 

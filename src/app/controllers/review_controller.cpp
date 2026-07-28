@@ -93,6 +93,11 @@ bool ReviewController::ConfigureStorage(const std::filesystem::path& review_path
         return true;
     }
 
+    // A file that exists and will not parse. `Load` no longer empties itself on
+    // failure, so say it here: these are a different project's review items and
+    // keeping them would attach one project's comments to another's elements.
+    manager_.Clear();
+    manager_.SetFilePath(review_path);
     return false;
 }
 

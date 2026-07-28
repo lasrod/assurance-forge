@@ -51,9 +51,16 @@ void ReviewItemManager::SetFilePath(std::filesystem::path file_path) {
     file_path_ = std::move(file_path);
 }
 
+// All or nothing.
+//
+// This used to clear what it held before it knew whether it could replace it, so
+// a failed load emptied the review items as a side effect of failing. The review
+// file has a second writer -- another Assurance Forge process, or a text
+// editor -- and `ReviewController::ReloadIfChangedExternally` polls it, so a
+// read that lands mid-flush parses as garbage. The user's review comments then
+// vanished from the panel until the next successful poll, from a read that
+// changed nothing on disk. A caller that wants them gone says `Clear`.
 bool ReviewItemManager::Load(std::string& error) {
-    items_.clear();
-    element_states_.clear();
     if (file_path_.empty()) {
         error = "Review item file path is not set.";
         return false;
@@ -63,7 +70,15 @@ bool ReviewItemManager::Load(std::string& error) {
         error = "Review item file does not exist: " + file_path_.string();
         return false;
     }
-    return DeserializeReviewItems(ReadTextFile(file_path_, error), items_, element_states_, error);
+
+    std::vector<ReviewItem> items;
+    ElementReviewStateMap   element_states;
+    if (!DeserializeReviewItems(ReadTextFile(file_path_, error), items, element_states, error)) {
+        return false;
+    }
+    items_          = std::move(items);
+    element_states_ = std::move(element_states);
+    return true;
 }
 
 bool ReviewItemManager::Save(std::string& error) const {

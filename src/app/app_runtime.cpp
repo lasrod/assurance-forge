@@ -467,8 +467,14 @@ const parser::AssuranceCase& AppRuntime::RefreshAgentChangePreview(
         ui_state.agent_change_status.clear();
         impl_->agent_preview_case.reset();
         impl_->agent_preview_added_ids.clear();
-        ui_state.agent_change_set_id    = shown.id;
-        ui_state.agent_change_set_title = shown.title;
+        // Nothing of this change set is on the canvas, so nothing may claim it
+        // is. These two fields are how the Review panel decides to print "Shown
+        // on the canvas as you watch it build", and setting them here told the
+        // reviewer a change set was being drawn while the canvas showed the
+        // committed argument. The panel says why it does not apply from the
+        // acceptability check, which does not go through here.
+        ui_state.agent_change_set_id.clear();
+        ui_state.agent_change_set_title.clear();
         return committed;
     }
 
