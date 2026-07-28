@@ -6,6 +6,9 @@
 
 #include <cstdlib>
 #include <filesystem>
+#ifndef _WIN32
+#include <sys/un.h>
+#endif
 #include <fstream>
 #include <map>
 #include <set>
@@ -49,12 +52,6 @@ class BridgeEndpointTest : public ::testing::Test {
 
     std::filesystem::path root_;
 
-  private:
-    void Remember(const std::string& name) {
-        const char* value = std::getenv(name.c_str());
-        saved_[name]      = value == nullptr ? std::string() : std::string(value);
-    }
-
     static void Set(const std::string& name, const std::string& value) {
 #ifdef _WIN32
         _putenv_s(name.c_str(), value.c_str());
@@ -69,6 +66,12 @@ class BridgeEndpointTest : public ::testing::Test {
 #else
         unsetenv(name.c_str());
 #endif
+    }
+
+  private:
+    void Remember(const std::string& name) {
+        const char* value = std::getenv(name.c_str());
+        saved_[name]      = value == nullptr ? std::string() : std::string(value);
     }
 
     std::map<std::string, std::string> saved_;
@@ -104,6 +107,36 @@ TEST_F(BridgeEndpointTest, TreatsSeparatorStylesAsDifferentProjectsOnPosix) {
 
 TEST_F(BridgeEndpointTest, TreatsCaseVariantsAsDifferentProjectsOnPosix) {
     EXPECT_NE(bridge::ProjectKey("/Cases/Alpha"), bridge::ProjectKey("/cases/alpha"));
+}
+#endif
+
+#ifndef _WIN32
+// The whole address has to fit `sockaddr_un::sun_path` -- 108 bytes on Linux,
+// 104 on macOS -- and a short key is not on its own enough, because the runtime
+// directory in front of it is the part that varies.
+//
+// This is asserted against the fallback the product picks when the user has set
+// no `XDG_RUNTIME_DIR`, since that is the path a real macOS user gets. The class
+// of failure it guards was found the expensive way: the controller tests pointed
+// the runtime directory at `temp_directory_path()`, which is `/tmp` on Linux and
+// `/var/folders/<16>/<28>/T` on a macOS runner, and `bind` refused the 116-byte
+// result. Nothing here failed until CI ran on a platform with a long temp
+// directory.
+TEST_F(BridgeEndpointTest, KeepsTheWholeAddressWithinTheSocketPathLimit) {
+    Unset("XDG_RUNTIME_DIR");
+    Set("HOME", "/Users/a-reasonably-long-user-name");
+
+    // Checked against the *tightest* limit of the platforms this ships on, not
+    // against the one this build happens to have. `sun_path` is 108 bytes on
+    // Linux and 104 on macOS, so a Linux-only assertion would let a macOS break
+    // through -- which is precisely how the failure this guards reached CI.
+    constexpr std::size_t kTightestSunPath = 104;
+    static_assert(kTightestSunPath <= sizeof(sockaddr_un::sun_path),
+                  "this platform is tighter than macOS; lower the bound");
+
+    const std::string address = bridge::EndpointAddressFor("/Users/a-reasonably-long-user-name/"
+                                                           "Documents/cases/a-project-with-a-name");
+    EXPECT_LT(address.size(), kTightestSunPath) << address;
 }
 #endif
 

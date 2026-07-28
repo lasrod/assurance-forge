@@ -29,10 +29,28 @@ namespace {
 
 class AgentBridgeControllerTest : public ::testing::Test {
   protected:
+    // A POSIX socket path has to fit `sockaddr_un::sun_path` -- 108 bytes on
+    // Linux, 104 on macOS -- and this root is the front of one, because the
+    // fixture points the runtime directory at it.
+    //
+    // `temp_directory_path()` is not short enough to assume. On Linux it is
+    // `/tmp` and the address came to 73 bytes; on a macOS runner it is
+    // `/var/folders/<16>/<28>/T` and the same address came to 116, so `bind`
+    // refused it and every test in this file failed there while Linux and
+    // Windows stayed green. `/tmp` is required to exist by POSIX and is the
+    // conventional home for sockets for exactly this reason.
+    static std::filesystem::path ShortTempRoot(const std::string& name) {
+#ifdef _WIN32
+        return std::filesystem::temp_directory_path() / name;
+#else
+        return std::filesystem::path("/tmp") / name;
+#endif
+    }
+
     void SetUp() override {
-        root_ = std::filesystem::temp_directory_path() /
-                ("af-bridge-controller-" +
-                 std::to_string(::testing::UnitTest::GetInstance()->current_test_info()->line()));
+        root_ = ShortTempRoot(
+            "af-bridge-controller-" +
+            std::to_string(::testing::UnitTest::GetInstance()->current_test_info()->line()));
         std::filesystem::remove_all(root_);
         std::filesystem::create_directories(root_);
 
