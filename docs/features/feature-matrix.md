@@ -12,6 +12,12 @@ That matrix answers "does the library implement the standard". This one answers
 "can a user do the thing". Rows here may cite a `SACM23-*` requirement ID to link
 the two.
 
+For GSN v3 conformance, see
+[`docs/gsn/gsn-v3-conformance-matrix.md`](../gsn/gsn-v3-conformance-matrix.md).
+It assesses model/import, authoring, rendering, validation, and interchange
+separately. A product capability below must not be interpreted as full GSN
+conformance when only some of those dimensions are implemented.
+
 ## Why this is a gated artifact
 
 A capability matrix nobody can check drifts into fiction. The version this
@@ -87,10 +93,12 @@ partial — say so in Notes rather than downgrading the row.
 | AF-STD-009 | SACM model validation and diagnostics | supported | libs/sacm/src | libs/sacm/tests | SACM23-VAL-001, SACM23-VAL-002. Diagnostics catalog: docs/sacm/sacm-diagnostics-catalog.md. |
 | AF-STD-010 | Editing through SACM-native commands | supported | libs/sacm/src/commands, src/sacm_adapter/document_edit.cpp | tests/test_sacm_library_edit.cpp, tests/test_library_primary_edit_flip.cpp | SACM23-CMD-001..006. |
 | AF-STD-011 | Refusal to lose unrepresentable SACM on edit | supported | src/sacm_adapter/projection_diff.cpp | tests/test_projection_coverage.cpp | SACM23-LIB-002. Bridged edits that would delete unrepresentable SACM are refused, not silently applied. |
-| AF-STD-012 | GSN-typed SACM files read as GSN | supported | libs/sacm/src/io/name_tables.cpp | libs/sacm/tests | SACM23-COMPAT-001. See docs/sacm/sacm-gsn-mapping.md for the transformation and its evidence. |
-| AF-STD-013 | Preserve the original GSN type through round-trip | supported | libs/sacm/src/io/xmi_reader.cpp, libs/sacm/src/io/name_tables.cpp | libs/sacm/tests/test_roundtrip.cpp | SACM23-COMPAT-002. The GSN type is recorded as `sacm.import.extensionType` (`{ns}Goal`) and Assumption/Justification get their SACM declaration, so they no longer collapse into identical Claims. A save normalizes to SACM types — the information round-trips, the GSN syntax does not. |
+| AF-STD-012 | Mapped GSN v2.2 and legacy types project as GSN | supported | libs/sacm/src/io/name_tables.cpp | libs/sacm/tests | SACM23-COMPAT-001. Applies where a concrete SACM mapping exists. Abstract or contested types such as Choice and Away Context are preserved but cannot yet be rendered or edited as GSN. |
+| AF-STD-013 | Preserve original GSN type provenance through SACM round-trip | supported | libs/sacm/src/io/xmi_reader.cpp, libs/sacm/src/io/name_tables.cpp | libs/sacm/tests/test_roundtrip.cpp | SACM23-COMPAT-002. The source type is recorded as `sacm.import.extensionType`; Assumption and Justification retain their distinct roles. Save output uses SACM syntax, so this is provenance preservation rather than GSN-syntax round-trip. |
 | AF-STD-014 | Standalone SACM library, reusable outside the app | supported | libs/sacm/CMakeLists.txt, cmake/check_layer_gates.cmake | cmake/check_layer_gates.cmake, libs/sacm/tests | SACM23-LIB-001. The reverse gate scans quoted and angle includes and bans pugixml from public headers; it runs at configure time, so it cannot be skipped. |
 | AF-STD-015 | SACM 2.4 alignment | candidate | | | Tracked in docs/sacm/sacm-2.4-watch.md. RTF active; `metaClaim` and `defeated` removal would affect AF-ACP-* and AF-DIA-*. |
+| AF-STD-016 | SACM argument packages as a substrate for GSN modularity | supported | src/sacm/sacm_package_tree.cpp, src/core/library_package_projection.cpp | tests/test_sacm_package_tree.cpp, tests/test_package_commands.cpp | Packages exist and are editable, but this is infrastructure rather than support for GSN Module notation. See GSN3-MOD-001. |
+| AF-STD-017 | GSN-native export and syntax-preserving round-trip | planned | | | Compatibility saves preserve source-type provenance but normalize output to SACM syntax. GSN v3 has no published complete metamodel, so any project extension dialect must be clearly identified as non-normative. See GSN3-XMI-003. |
 
 ## GSN — Core GSN
 
@@ -105,31 +113,31 @@ partial — say so in Notes rather than downgrading the row.
 | AF-GSN-007 | SupportedBy relationship | supported | src/ui/gsn/gsn_edge_renderer.cpp, src/core/tree_editing.cpp | tests/test_tree_editing.cpp, tests/test_assurance_tree.cpp | Endpoints are swapped against SACM `AssertedInference` on import. |
 | AF-GSN-008 | InContextOf relationship | supported | src/ui/gsn/gsn_edge_renderer.cpp, src/core/tree_editing.cpp | tests/test_tree_editing.cpp | Endpoints swapped against SACM `AssertedContext`. |
 | AF-GSN-009 | Undeveloped decorator | supported | src/ui/gsn/gsn_model.h, src/ui/gsn/gsn_shapes.cpp | tests/test_assurance_tree.cpp | |
-| AF-GSN-010 | Automatic diagram layout | supported | src/core/gsn_layout.cpp, src/ui/gsn/gsn_layout.cpp | tests/test_layout.cpp | Deterministic; no manual node positioning. Policy: docs/sacm/sacm-layout-policy.md. |
-| AF-GSN-011 | Canvas navigation, selection and hit testing | supported | src/ui/gsn/gsn_canvas.cpp, src/ui/gsn/gsn_hit_tester.cpp | tests/test_ui_state.cpp | |
-| AF-GSN-012 | GSN element identifier (G1, S1, Sn1 …) | supported | src/core/element_factory.cpp, src/core/assurance_tree.cpp | tests/test_element_factory.cpp | GSN v3 makes the identifier mandatory. New elements are minted with the GSN prefix for their node type, unique within the case, and rendered as `id: name` on the canvas and in exported SVG. See AF-GSN-015 for the remaining limitation. |
-| AF-GSN-015 | Identifier independent of the storage id | planned | | | The identifier *is* the SACM `xmi:id`, so it cannot be renumbered without changing element identity and every reference to it, and a file imported with opaque ids (`generated_3`) shows those on the diagram instead of GSN identifiers. |
-| AF-GSN-013 | Off-diagram decorators for reports | planned | | | Needed by AF-ENG-004; a report page cannot show an unbounded diagram. |
-| AF-GSN-014 | Choice node | planned | | | v2.2 models `Choice` with no attributes; "m of n" cardinality is a GSN v3 concept with no metamodel. See docs/sacm/sacm-gsn-metamodel-gaps.md row 9. |
+| AF-GSN-012 | Conventional GSN identifier generation for new elements | supported | src/core/element_factory.cpp, src/core/assurance_tree.cpp | tests/test_element_factory.cpp | New elements are minted with a type-specific prefix, unique within the case, and rendered as `id: name`. This does not satisfy the complete mandatory-identifier requirement for imported elements; see AF-GSN-015 and GSN3-CORE-010. |
+| AF-GSN-015 | GSN identifier independent of storage identity | planned | | | The displayed identifier is currently the SACM `xmi:id`, so it cannot be renumbered independently and opaque imported ids such as `generated_3` remain visible. |
+| AF-GSN-013 | Core off-diagram element and reference notation | planned | | | Core GSN notation needed both for bounded diagrams/reports and for following argument structure across diagrams. See GSN3-CORE-012. |
 
 ## PAT — GSN Pattern Extension
 
 | ID | Capability | Status | Evidence | Tests | Notes |
 |---|---|---|---|---|---|
-| AF-PAT-001 | Uninstantiated decorator | supported | src/sacm_adapter/case_projection.cpp, src/ui/gsn/gsn_shapes.cpp, src/export/svg_writer.cpp | tests/test_sacm_library_parallel_load.cpp, tests/test_layout.cpp, tests/test_gsn_svg_exporter.cpp | Maps SACM `isAbstract` to the GSN hollow-triangle decorator on the canvas and in SVG export. |
-| AF-PAT-002 | Undeveloped-and-uninstantiated decorator | supported | src/ui/gsn/gsn_shapes.cpp, src/export/svg_writer.cpp | tests/test_gsn_svg_exporter.cpp | Overlays the undeveloped diamond and uninstantiated triangle as the standard bisected-diamond marker when both flags apply. |
+| AF-PAT-001 | Import, preserve, render and export the Uninstantiated decorator | supported | src/sacm_adapter/case_projection.cpp, src/ui/gsn/gsn_shapes.cpp, src/export/svg_writer.cpp | tests/test_sacm_library_parallel_load.cpp, tests/test_layout.cpp, tests/test_gsn_svg_exporter.cpp | Maps SACM `isAbstract` to the GSN hollow-triangle decorator. The tool cannot yet author or clear this state; see AF-PAT-009. |
+| AF-PAT-002 | Render the combined Undeveloped-and-Uninstantiated decorator | supported | src/ui/gsn/gsn_shapes.cpp, src/export/svg_writer.cpp | tests/test_gsn_svg_exporter.cpp | Draws the standard bisected marker when both flags are present; authoring Uninstantiated remains absent. |
 | AF-PAT-003 | Multiplicity decorator | planned | | | GSN `isMany`; no SACM feature exists to carry it. |
 | AF-PAT-004 | Optionality decorator | planned | | | GSN `isOptional`; no SACM feature exists to carry it. |
-| AF-PAT-005 | Pattern template arguments | planned | | | |
+| AF-PAT-005 | Pattern and Template argument model | planned | | | Covers the normative Pattern and Template concepts, separate from any product catalogue UI. |
 | AF-PAT-006 | Instantiation data reference | planned | | | |
-| AF-PAT-007 | Pattern catalogue and instantiation workflow | candidate | | | Pattern Definition has no GSN or SACM class; see docs/sacm/sacm-gsn-metamodel-gaps.md row 13. |
+| AF-PAT-007 | Pattern Definition and Catalogue data | planned | | | Pattern Definition is normative in GSN v3 §1:3.4 even though the published GSN and SACM metamodels provide no class for it. |
+| AF-PAT-008 | Choice structural abstraction and cardinality | planned | | | Choice is part of the Pattern Extension. GSN v2.2 models the structural abstraction without attributes; v3 adds optional "m of n" cardinality, with SACM 2.4 draft `Join` bounds as the intended carrier. |
+| AF-PAT-009 | Author and edit Uninstantiated state | planned | | | Rendering and preservation are supported by AF-PAT-001; no editor command currently sets or clears SACM `isAbstract`. |
+| AF-PAT-010 | Pattern instantiation, related-pattern links and lifecycle state | planned | | | Covers `instantiationOf`, related patterns, and published/final states. |
 
 ## MOD — GSN Modular Extension
 
 | ID | Capability | Status | Evidence | Tests | Notes |
 |---|---|---|---|---|---|
-| AF-MOD-001 | Argument modules as packages | supported | src/sacm/sacm_package_tree.cpp, src/core/library_package_projection.cpp | tests/test_sacm_package_tree.cpp, tests/test_package_commands.cpp | Modules exist and are editable; the modular *notation* below is not yet drawn. |
-| AF-MOD-002 | Package details and navigation | supported | src/ui/panels/package_details_panel.cpp, src/ui/panels/project_explorer_panel.cpp | tests/test_argument_package_projection.cpp | |
+| AF-MOD-001 | GSN Module and Argument View notation | planned | | | SACM package infrastructure is supported by AF-STD-016, but the standard GSN Module symbol and Argument View are not drawn or editable. |
+| AF-MOD-002 | Cross-module relationships and module dependency view | planned | | | Includes module-level SupportedBy/InContextOf dependencies distinct from package containment. |
 | AF-MOD-003 | Away Goal | planned | | | |
 | AF-MOD-004 | Away Solution | planned | | | |
 | AF-MOD-005 | Away Context | planned | | | Metamodel is contested; decided 2026-07-20 to preserve rather than retype. See docs/sacm/sacm-gsn-mapping.md. |
@@ -140,6 +148,8 @@ partial — say so in Notes rather than downgrading the row.
 | AF-MOD-010 | Architecture view | planned | | | Diagrammatic; lands in the SACM 2.4 draft. |
 | AF-MOD-011 | Public decorator | planned | | | |
 | AF-MOD-012 | To-be-supported-by-contract decorator | planned | | | |
+| AF-MOD-013 | Cross-module context consistency and justification substitution | planned | | | Covers the normative consistency assertion around Away Goals and substituting an Away Goal for a Justification. |
+| AF-MOD-014 | Contract and circular module dependency validation | planned | | | Part of GSN modular semantics, separate from general SACM package validation. |
 
 ## ACP — Assurance Claim Points and confidence
 
@@ -147,12 +157,12 @@ partial — say so in Notes rather than downgrading the row.
 |---|---|---|---|---|---|
 | AF-ACP-001 | ACP on a SupportedBy relationship | supported | src/core/acp/assurance_claim_point.cpp, src/ui/gsn/gsn_acp_decorator.cpp | tests/test_assurance_claim_point.cpp, tests/test_acp_editing.cpp | |
 | AF-ACP-002 | ACP on an InContextOf relationship | supported | src/core/acp/acp_relationship_index.cpp, src/ui/gsn/gsn_acp_decorator.cpp | tests/test_acp_relationship_index.cpp | |
-| AF-ACP-003 | ACP identifiers | supported | src/core/acp/assurance_claim_point.cpp | tests/test_assurance_claim_point.cpp | GSN v3 §1:5.2.3. Carried in a TaggedValue; v2.2 Base OCL forbids TaggedValue, so this is not GSN-metamodel-conformant. |
+| AF-ACP-003 | ACP identifiers | supported | src/core/acp/assurance_claim_point.cpp | tests/test_assurance_claim_point.cpp | Generates unique `ACP<n>` identifiers. Module-qualified display is a separate gap tracked by AF-ACP-009. Carried in a TaggedValue because the published GSN metamodel has no v3 ACP representation. |
 | AF-ACP-004 | ACP editing and management panel | supported | src/ui/panels/acp_panel.cpp, src/app/controllers | tests/test_acp_controller.cpp, tests/test_acp_problem_sync.cpp | |
-| AF-ACP-005 | ACP on a Solution or Context | not-planned | | | Structurally unrepresentable in SACM 2.3 — those extend `ArgumentAsset`, which has no `metaClaim`. Open at OMG as SACM24-83. Revisit when 2.4 lands. |
-| AF-ACP-006 | Confidence model and store | prototype | src/core/confidence/confidence_store.cpp, src/ui/confidence_model.cpp | tests/test_confidence_store.cpp, tests/test_confidence_model.cpp | Prototype: see docs/features/confidence-panel-prototype.md. Scoring model is not final. |
-| AF-ACP-007 | Confidence panel | prototype | src/ui/panels/confidence_panel.cpp | tests/test_confidence_problem_sync.cpp | |
-| AF-ACP-008 | Confidence argument module linking | planned | | | Links an ACP to the module holding its confidence argument. |
+| AF-ACP-005 | ACP on a Solution or artefact-backed Context | supported | src/core/acp/acp_editing.cpp, src/ui/gsn/gsn_acp_decorator.cpp | tests/test_acp_editing.cpp, tests/test_gsn_svg_exporter.cpp | GSN v3 §1:5.2.2. Implemented for SACM `ArtifactReference` targets using vendor TaggedValues because SACM 2.3 has no `metaClaim` on those elements. |
+| AF-ACP-008 | Create and link a separate confidence argument tree | supported | src/core/acp/acp_editing.cpp, src/ui/panels/acp_panel.cpp | tests/test_acp_editing.cpp, tests/test_acp_controller.cpp | Creates a confidence ArgumentPackage and top Goal, links it to the ACP, and supports opening or selecting an existing confidence tree. |
+| AF-ACP-009 | Module-qualified ACP notation | planned | | | Render notation such as `ACP1[Confidence]` when the linked confidence argument lives in another module, as required by GSN v3 §1:5.2.3. |
+| AF-ACP-010 | Explicit risk-versus-confidence argument classification | planned | | | Confidence packages currently use an Assurance Forge purpose tag; a general GSN argument-type model and interchange representation remain absent. |
 
 ## DIA — Dialectic arguments
 
@@ -163,7 +173,9 @@ partial — say so in Notes rather than downgrading the row.
 | AF-DIA-003 | Challenge targeting a relationship | supported | src/ui/gsn/gsn_model.h, src/ui/gsn/gsn_edge_renderer.cpp | tests/test_dialectic_challenge.cpp | Arrow lands on the target relationship's midpoint. |
 | AF-DIA-004 | Challenge-to-challenge | supported | src/ui/gsn/gsn_model.h | tests/test_dialectic_challenge.cpp | A challenge relationship is itself challengeable. |
 | AF-DIA-005 | Defeated decorator | planned | | | SACM `AssertionDeclaration::defeated` exists but SACM24-12 proposes removing it. |
-| AF-DIA-006 | Defeat on Strategy, Solution or Context | not-planned | | | Normatively required by GSN v3 §1:6.3.12 but structurally unrepresentable in SACM 2.3. See docs/sacm/sacm-gsn-metamodel-gaps.md row 3. |
+| AF-DIA-006 | Defeat on Strategy, Solution or Context | planned | | | Normatively required by GSN v3 §1:6.3.12 but structurally unrepresentable in SACM 2.3. Full GSN support therefore requires an explicit extension carrier outside the independent SACM library. |
+| AF-DIA-007 | In-doubt state for unresolved challenges | planned | | | A canvas attention cue exists, but no normative `inDoubt` model, edit or validation state exists. |
+| AF-DIA-008 | Challenge resolution and defeat propagation semantics | planned | | | Must distinguish an unresolved challenge from a successful defeater without reinterpreting it as support. |
 
 ## METH — Guided development methods
 
@@ -178,6 +190,7 @@ partial — say so in Notes rather than downgrading the row.
 | AF-METH-007 | Missing-support detection | planned | | | |
 | AF-METH-008 | Circular-argument detection | supported | src/core/problems/argument_cycles.cpp, src/app/structure_problem_sync.cpp | tests/test_argument_cycles.cpp | Reports every distinct loop in the support graph as an error, naming the strategy on it. InContextOf and GSN v3 challenges are excluded — both point "backwards" without being support, and following either would flag sound arguments. |
 | AF-METH-009 | Common GSN mistake detection | planned | | | Would report through AF-METH-001. |
+| AF-METH-010 | Requirement-traceable GSN v3 well-formedness validation | planned | | | Covers allowed element/relationship combinations, mandatory identifiers, statement constraints, extension rules and diagnostics linked to `GSN3-*` requirements. |
 
 ## ENG — Assurance case engineering
 
@@ -199,6 +212,10 @@ partial — say so in Notes rather than downgrading the row.
 | AF-ENG-014 | Conformance tracking surfaced in the app | candidate | | | This matrix and the SACM one are repo artifacts today, not app features. |
 | AF-ENG-016 | Register assessments persist with the project | supported | src/app/controllers/register_controller.cpp, src/app/register_problem_sync.cpp, src/core/project_service.cpp | tests/test_register_controller.cpp, tests/test_register_problem_sync.cpp | Owners, criteria, assessment status and notes are held by `RegisterController`, saved to `registers/register-assessments.af.json` on project save, and tracked in the manifest. A file that fails to load is reported in the register tab, editing is disabled and saving is refused, so a bad read cannot overwrite what is on disk. Only rows a user edited are stored. An assessment whose CSE or evidence id leaves the argument is kept, never auto-deleted, and raised as a warning in the Problems panel carrying the stored content — the row is gone from the table, so the problem is the only place left to read it. Its "Discard assessment" quick fix drops it in memory; the file is only rewritten on save, so closing without saving takes it back. |
 | AF-ENG-015 | SVG export renders decorators and challenge edges | supported | src/export/gsn_projection.cpp, src/export/svg_writer.cpp | tests/test_gsn_svg_exporter.cpp | Undeveloped diamonds, ACP badges and dashed open-arrow Challenges edges now export. Previously a counter relationship projected as a `SupportedBy` edge, drawing counter-evidence as support for the claim it attacks. |
+| AF-ENG-017 | Automatic GSN diagram layout | supported | src/core/gsn_layout.cpp, src/ui/gsn/gsn_layout.cpp | tests/test_layout.cpp | Deterministic product behavior; not a normative Core GSN construct. No manual node positioning. Policy: docs/sacm/sacm-layout-policy.md. |
+| AF-ENG-018 | Pattern catalogue and guided instantiation workflow | candidate | | | Product workflow built on the normative Pattern Definition and Catalogue data tracked by AF-PAT-007. |
+| AF-ENG-019 | Confidence analysis model and store | prototype | src/core/confidence/confidence_store.cpp, src/ui/confidence_model.cpp | tests/test_confidence_store.cpp, tests/test_confidence_model.cpp | Assurance Forge analysis feature, not normative GSN confidence notation. Scoring model is not final. |
+| AF-ENG-020 | Confidence analysis panel | prototype | src/ui/panels/confidence_panel.cpp | tests/test_confidence_problem_sync.cpp | Product UI for AF-ENG-019; not part of the GSN Confidence Argument Extension. |
 
 ## AI — AI assistance
 
@@ -230,3 +247,5 @@ partial — say so in Notes rather than downgrading the row.
 | AF-PLAT-006 | Command bus and undo-aware mutation | supported | src/core/commands, src/app/app_runtime.cpp | tests/test_command_bus.cpp, tests/test_app_events.cpp | |
 | AF-PLAT-007 | Layered architecture enforced at build time | supported | cmake/check_layer_gates.cmake | cmake/check_layer_gates.cmake | ADR 0002. The gate is its own evidence: a configure-time FATAL_ERROR that runs on every build, not a lint. |
 | AF-PLAT-008 | Crash-resilient project recovery | supported | src/core/audit/audit_recovery.cpp | tests/test_audit_recovery.cpp | |
+| AF-PLAT-009 | GSN canvas navigation, selection and hit testing | supported | src/ui/gsn/gsn_canvas.cpp, src/ui/gsn/gsn_hit_tester.cpp | tests/test_ui_state.cpp | Product interaction capability, not a normative Core GSN construct. |
+| AF-PLAT-010 | Package details and navigation | supported | src/ui/panels/package_details_panel.cpp, src/ui/panels/project_explorer_panel.cpp | tests/test_argument_package_projection.cpp | UI for SACM packages; does not imply support for GSN Module notation. |

@@ -58,9 +58,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev
 
-      # The i18n_catalog_check and sacm_matrix_check gates only register when
-      # CMake finds a Python interpreter. Pin one explicitly rather than relying
-      # on the runner image shipping it, so the gates cannot silently disappear.
+      # The catalog and SACM/GSN/capability matrix gates only register when CMake
+      # finds a Python interpreter. Pin one explicitly rather than relying on the
+      # runner image shipping it, so the gates cannot silently disappear.
       - name: Set up Python
         uses: actions/setup-python@v6
         with:

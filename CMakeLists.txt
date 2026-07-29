@@ -247,7 +247,7 @@ endif()
 set(AF_JA_PO "${CMAKE_SOURCE_DIR}/assets/locale/ja/LC_MESSAGES/assurance_forge.po")
 set(AF_JA_MO "${CMAKE_SOURCE_DIR}/assets/locale/ja/LC_MESSAGES/assurance_forge.mo")
 # Python is used both for the optional catalog compile fallback and for the
-# i18n_catalog_check CTest below, so look for it once up front.
+# catalog/conformance-matrix CTest gates below, so look for it once up front.
 find_package(Python3 COMPONENTS Interpreter QUIET)
 find_program(MSGFMT_EXECUTABLE msgfmt)
 if(MSGFMT_EXECUTABLE)
@@ -447,6 +447,14 @@ if(Python3_Interpreter_FOUND)
         COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/sacm/check_conformance_matrix.py"
     )
 
+    # GSN v3 conformance matrix gate: verifies the five-part standard taxonomy,
+    # per-operation status vocabulary, test evidence, cited paths, and links from
+    # the product capability matrix.
+    add_test(
+        NAME gsn_matrix_check
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/gsn/check_conformance_matrix.py"
+    )
+
     # Capability matrix gate: fails if a `supported` row cites no existing test,
     # if a `planned` row already has tests (the signature of a status reality has
     # overtaken), if a cited path has moved, or if the exported JSON the
@@ -460,8 +468,8 @@ else()
     # These are compliance gates, not conveniences. A silently absent gate reads
     # as a passing one, so say so loudly rather than skipping in silence.
     message(WARNING
-        "Python3 not found: the i18n_catalog_check, sacm_matrix_check and "
+        "Python3 not found: the i18n_catalog_check, sacm_matrix_check, gsn_matrix_check and "
         "feature_matrix_check gates will NOT run. CI installs Python explicitly; "
         "a local build without it cannot verify the translation catalog, the SACM "
-        "conformance matrix, or the capability matrix.")
+        "or GSN conformance matrices, or the capability matrix.")
 endif()
