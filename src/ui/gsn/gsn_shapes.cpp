@@ -223,9 +223,11 @@ void DrawElementAbstractionMarker(
         marker[3] = ImVec2(center.x - radius, center.y);
         marker_point_count = 4;
     } else {
+        // The standalone triangle is the upper half of the combined diamond:
+        // its base is the same horizontal edge drawn as the combined divider.
         marker[0] = ImVec2(center.x, center.y - radius);
-        marker[1] = ImVec2(center.x + radius, center.y + radius);
-        marker[2] = ImVec2(center.x - radius, center.y + radius);
+        marker[1] = ImVec2(center.x + radius, center.y);
+        marker[2] = ImVec2(center.x - radius, center.y);
         marker_point_count = 3;
     }
     if (ShouldDrawShadows(zoom)) {

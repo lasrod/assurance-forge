@@ -199,8 +199,8 @@ void WriteElementAbstractionMarker(std::ostringstream& out, const GsnNode& node)
     }
 
     out << "    <polygon class=\"gsn-uninstantiated\" points=\"" << cx << "," << cy - kUndevelopedRadius << " "
-        << cx + kUndevelopedRadius << "," << cy + kUndevelopedRadius << " " << cx - kUndevelopedRadius << ","
-        << cy + kUndevelopedRadius << "\" fill=\"white\" stroke=\"black\" stroke-width=\"1.2\"/>\n";
+        << cx + kUndevelopedRadius << "," << cy << " " << cx - kUndevelopedRadius << "," << cy
+        << "\" fill=\"white\" stroke=\"black\" stroke-width=\"1.2\"/>\n";
 }
 
 // The ACP badge: a small square carrying the Assurance Claim Point identifier,
