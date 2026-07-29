@@ -262,6 +262,24 @@ TEST(XmlParserTest, ParseUndevelopedOnlyForClaimAndStrategy) {
     EXPECT_FALSE(result.value().elements[2].undeveloped);
 }
 
+TEST(XmlParserTest, ParseIsAbstractForGsnPatternElements) {
+    const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage
+    xmlns:sacm="http://www.omg.org/spec/SACM/2.3"
+    id="TEST" name="Test">
+    <argumentPackage id="AP1" name="Pattern">
+        <claim id="G1" name="Pattern goal" isAbstract="true"/>
+        <artifactReference id="C1" name="Pattern context" isAbstract="true"/>
+    </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    auto result = parse_sacm_xml_string(xml);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->elements.size(), 2u);
+    EXPECT_TRUE(result->elements[0].is_abstract);
+    EXPECT_TRUE(result->elements[1].is_abstract);
+}
+
 // Test parsing href attributes with # prefix (OASC-style XML)
 TEST(XmlParserTest, ParseHrefWithHashPrefix) {
     const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>

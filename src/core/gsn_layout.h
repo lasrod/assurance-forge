@@ -29,6 +29,7 @@ struct GsnLayoutInputNode {
     std::string label;
     std::string label_secondary;
     bool undeveloped = false;
+    bool uninstantiated = false;
     std::string parent_id;
     std::vector<std::string> group1_children;
     std::vector<std::string> group2_attachments;
@@ -60,6 +61,7 @@ struct GsnLayoutNode {
     std::string label;
     std::string label_secondary;
     bool undeveloped = false;
+    bool uninstantiated = false;
     std::string parent_id;
     double x = 0.0;
     double y = 0.0;

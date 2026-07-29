@@ -162,6 +162,7 @@ void MirrorClaim(sacm::ArgumentPackage* ap, const parser::SacmElement& src) {
     c.id = src.id;
     c.name = src.name;
     c.name_ml.set("en", src.name);
+    c.isAbstract = src.is_abstract;
     c.assertionDeclaration = src.assertion_declaration;
     c.undeveloped = src.undeveloped;
     ap->claims.push_back(std::move(c));
@@ -174,6 +175,7 @@ void MirrorReasoning(sacm::ArgumentPackage* ap, const parser::SacmElement& src) 
     r.id = src.id;
     r.name = src.name;
     r.name_ml.set("en", src.name);
+    r.isAbstract = src.is_abstract;
     ap->argumentReasonings.push_back(std::move(r));
 }
 
@@ -184,6 +186,7 @@ void MirrorArtifactReference(sacm::ArgumentPackage* ap, const parser::SacmElemen
     ar.id = src.id;
     ar.name = src.name;
     ar.name_ml.set("en", src.name);
+    ar.isAbstract = src.is_abstract;
     ap->artifactReferences.push_back(std::move(ar));
 }
 
@@ -192,6 +195,7 @@ void MirrorInference(sacm::ArgumentPackage* ap, const parser::SacmElement& rel) 
         return;
     sacm::AssertedInference ai;
     ai.id = rel.id;
+    ai.isAbstract = rel.is_abstract;
     ai.sources = rel.source_refs;
     ai.targets = rel.target_refs;
     ai.reasoning = rel.reasoning_ref;
@@ -204,6 +208,7 @@ void MirrorContext(sacm::ArgumentPackage* ap, const parser::SacmElement& rel) {
         return;
     sacm::AssertedContext ac;
     ac.id = rel.id;
+    ac.isAbstract = rel.is_abstract;
     ac.sources = rel.source_refs;
     ac.targets = rel.target_refs;
     ap->assertedContexts.push_back(std::move(ac));
@@ -214,6 +219,7 @@ void MirrorEvidence(sacm::ArgumentPackage* ap, const parser::SacmElement& rel) {
         return;
     sacm::AssertedEvidence ae;
     ae.id = rel.id;
+    ae.isAbstract = rel.is_abstract;
     ae.sources = rel.source_refs;
     ae.targets = rel.target_refs;
     ae.isCounter = rel.is_counter;

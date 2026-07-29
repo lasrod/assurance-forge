@@ -677,6 +677,24 @@ TEST(LayoutTest, UndevelopedFlagPropagatesToLayoutNode) {
     EXPECT_TRUE(layout[0].undeveloped);
 }
 
+TEST(LayoutTest, UninstantiatedFlagPropagatesToLayoutNode) {
+    const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="urn:test" id="T" name="T">
+  <argumentPackage id="AP" name="AP">
+    <claim id="Top" name="Top" isAbstract="true" assertionDeclaration="asserted"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    auto tree = build_tree(xml);
+    ASSERT_NE(tree.root, nullptr);
+
+    ui::gsn::LayoutEngine engine;
+    auto layout = engine.ComputeLayout(tree);
+    ASSERT_EQ(layout.size(), 1u);
+    EXPECT_EQ(layout[0].id, "Top");
+    EXPECT_TRUE(layout[0].uninstantiated);
+}
+
 // Builds a deep parent->child chain via AssertedInference relationships (source = child,
 // target = parent), i.e. the structure that produces a very deep AssuranceTree.
 static std::string make_deep_chain_xml(int chain_length) {

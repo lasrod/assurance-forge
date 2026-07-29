@@ -508,6 +508,7 @@ void GsnCanvas::Render(UiState& ui_state,
             gsn_node.label = node.label;
             gsn_node.label_secondary = node.label_secondary;
             gsn_node.undeveloped = node.undeveloped;
+            gsn_node.uninstantiated = node.uninstantiated;
             gsn_node.is_counter = node.is_counter_source;
             {
                 core::perf::ScopedTimer perf_scope("gsn.node.draw");

@@ -18,8 +18,8 @@ namespace {
 bool DiffersMeaningfully(const parser::SacmElement& before, const parser::SacmElement& after) {
     return before.name != after.name || before.content != after.content ||
            before.description != after.description || before.undeveloped != after.undeveloped ||
-           before.type != after.type || before.source_refs != after.source_refs ||
-           before.target_refs != after.target_refs ||
+           before.is_abstract != after.is_abstract || before.type != after.type ||
+           before.source_refs != after.source_refs || before.target_refs != after.target_refs ||
            before.reasoning_ref != after.reasoning_ref ||
            before.assertion_declaration != after.assertion_declaration ||
            before.is_counter != after.is_counter || before.name_langs != after.name_langs ||

@@ -31,6 +31,7 @@ struct GsnNode {
     std::string label;
     std::string label_secondary; // secondary language label
     bool undeveloped = false;
+    bool uninstantiated = false;
     bool is_counter = false; // GSN v3 dialectic counter argument / counter evidence
 };
 

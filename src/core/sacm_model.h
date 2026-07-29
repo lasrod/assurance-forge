@@ -23,6 +23,9 @@ struct SacmElement {
     std::string content;
     std::string description;
     bool undeveloped = false;
+    // SACMElement::isAbstract, used by GSN pattern notation to mean the
+    // element remains to be instantiated.
+    bool is_abstract = false;
 
     // Multi-language maps: lang code -> text (e.g. "en" -> "...", "ja" -> "...")
     std::map<std::string, std::string> name_langs;

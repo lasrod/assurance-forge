@@ -564,6 +564,47 @@ TEST(GsnSvgExporterTest, SvgOmitsTheUndevelopedDiamondWhenNotUndeveloped) {
     EXPECT_EQ(svg.find("class=\"gsn-undeveloped\""), std::string::npos);
 }
 
+TEST(GsnSvgExporterTest, ProjectionCarriesUninstantiatedFlagToTheDiagram) {
+    parser::AssuranceCase model;
+    parser::SacmElement pattern_goal = Element("G1", "claim", "Pattern goal", "{System} is acceptably safe.");
+    pattern_goal.is_abstract = true;
+    model.elements = {pattern_goal};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+
+    ASSERT_NE(FindNode(projection.diagram, "G1"), nullptr);
+    EXPECT_TRUE(FindNode(projection.diagram, "G1")->uninstantiated);
+}
+
+TEST(GsnSvgExporterTest, SvgDrawsTheUninstantiatedTriangle) {
+    parser::AssuranceCase model;
+    parser::SacmElement pattern_goal = Element("G1", "claim", "Pattern goal", "{System} is acceptably safe.");
+    pattern_goal.is_abstract = true;
+    model.elements = {pattern_goal};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+    const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
+
+    EXPECT_NE(svg.find("class=\"gsn-uninstantiated\""), std::string::npos);
+    EXPECT_EQ(svg.find("class=\"gsn-undeveloped\""), std::string::npos);
+}
+
+TEST(GsnSvgExporterTest, SvgDrawsTheCombinedUndevelopedAndUninstantiatedDecorator) {
+    parser::AssuranceCase model;
+    parser::SacmElement pattern_goal = Element("G1", "claim", "Incomplete pattern goal", "{Hazard} is mitigated.");
+    pattern_goal.is_abstract = true;
+    pattern_goal.undeveloped = true;
+    model.elements = {pattern_goal};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+    const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
+
+    EXPECT_NE(svg.find("gsn-undeveloped-uninstantiated"), std::string::npos);
+    EXPECT_NE(svg.find("gsn-undeveloped-uninstantiated-divider"), std::string::npos);
+}
+
 TEST(GsnSvgExporterTest, AcpOnAnElementIsProjectedAndDrawn) {
     parser::AssuranceCase model;
     model.elements = {Element("G1", "claim", "Goal", "System is acceptably safe.")};

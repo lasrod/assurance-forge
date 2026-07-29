@@ -21,6 +21,7 @@ void CopyCommonSacmFields(sacm::SacmElement& target, const parser::SacmElement& 
     target.gid = source.gid;
     target.name = source.name;
     target.description = source.description;
+    target.isAbstract = source.is_abstract;
     target.name_ml.texts = source.name_langs;
     target.description_ml.texts = source.description_langs;
     if (target.name_ml.texts.empty() && !source.name.empty())

@@ -198,8 +198,12 @@ void ComputeSacmHashes(ProjectFileEntry& entry, const std::filesystem::path& abs
 
     for (const auto& element : result->elements) {
         element_ids.push_back(element.id);
-        semantic_lines.push_back(element.id + "|" + element.type + "|" + element.name + "|" + element.content + "|" +
-                                 element.assertion_declaration);
+        std::string semantic_line =
+            element.id + "|" + element.type + "|" + element.name + "|" + element.content + "|" +
+            element.assertion_declaration;
+        if (element.is_abstract)
+            semantic_line += "|abstract";
+        semantic_lines.push_back(std::move(semantic_line));
         if (!element.source_refs.empty() || !element.target_refs.empty()) {
             for (const auto& source : element.source_refs) {
                 for (const auto& target : element.target_refs) {
