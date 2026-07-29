@@ -186,6 +186,7 @@ LayoutNode ConvertPlacedNode(const core::GsnLayoutNode& placed, const core::Tree
     ln.label = placed.label;
     ln.label_secondary = placed.label_secondary;
     ln.undeveloped = placed.undeveloped;
+    ln.uninstantiated = placed.uninstantiated;
     ln.size = ImVec2(static_cast<float>(placed.width), static_cast<float>(placed.height));
     ln.parent_id = placed.parent_id;
     ln.is_left_side = placed.is_left_side;
@@ -210,6 +211,7 @@ core::GsnLayoutInputNode MakeInputNode(const core::TreeNode& tn) {
     node.label = tn.label;
     node.label_secondary = tn.label_secondary;
     node.undeveloped = tn.undeveloped;
+    node.uninstantiated = tn.uninstantiated;
     // Counters are cluster roots reached only via their host's challenge_children,
     // so they never carry a structural parent in the layout input.
     node.parent_id = (tn.parent && !tn.is_counter_source) ? tn.parent->id : "";
@@ -320,6 +322,7 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const std::vector<CanvasElem
         layout_node.label = claims[i].label;
         layout_node.label_secondary = claims[i].label_secondary;
         layout_node.undeveloped = claims[i].undeveloped;
+        layout_node.uninstantiated = claims[i].uninstantiated;
         layout_node.size = default_size;
         layout_node.position = ImVec2(left_margin + (float)i * (node_width + h_spacing), top_margin);
         layout_node.parent_id = claims[i].parent_id;
@@ -340,6 +343,7 @@ std::vector<LayoutNode> LayoutEngine::ComputeLayout(const std::vector<CanvasElem
             layout_node.label = row_elements[i].label;
             layout_node.label_secondary = row_elements[i].label_secondary;
             layout_node.undeveloped = row_elements[i].undeveloped;
+            layout_node.uninstantiated = row_elements[i].uninstantiated;
             layout_node.size = default_size;
             layout_node.position = ImVec2(left_margin + (float)i * (node_width + h_spacing),
                                           top_margin + (float)row_index * (node_height + v_spacing));

@@ -152,6 +152,24 @@ TEST(SacmLibraryParallelLoad, SACM23_INT_001_ProjectionSynthesizesAcpsLikeLegacy
     EXPECT_EQ(acp2->top_goal_id, "CONF_TOP");
 }
 
+TEST(SacmLibraryParallelLoad, ProjectionPreservesIsAbstractForGsnPatternRendering) {
+    const std::filesystem::path path = repo_root() / "tests" / "data" / "fixture_pattern_decorator.sacm.xml";
+    ASSERT_TRUE(std::filesystem::exists(path));
+
+    const auto legacy = parser::parse_sacm_xml(path.string());
+    ASSERT_TRUE(legacy.has_value()) << legacy.error();
+    ASSERT_EQ(legacy->elements.size(), 1u);
+    ASSERT_TRUE(legacy->elements.front().is_abstract) << "the fixture must exercise SACM isAbstract";
+
+    const sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+    const core::AssuranceCase projected = sacm_adapter::project_case(*loaded.document);
+
+    ASSERT_EQ(projected.elements.size(), 1u);
+    EXPECT_TRUE(projected.elements.front().is_abstract) << "library projection dropped the GSN uninstantiated state";
+}
+
 TEST(SacmLibraryParallelLoad, SACM23_INT_001_ProjectionMatchesLegacyWithinBaseline) {
     const std::map<BaselineKey, std::size_t> baseline = load_baseline();
     std::map<BaselineKey, std::size_t> observed;

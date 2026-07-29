@@ -13,3 +13,6 @@
 [submodule "external/safety-case-core-guidelines"]
 	path = external/safety-case-core-guidelines
 	url = https://github.com/lasrod/safety-case-core-guidelines.git
+[submodule "examples"]
+	path = examples
+	url = https://github.com/lasrod/assurance-forge-examples.git

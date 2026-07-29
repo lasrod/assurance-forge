@@ -146,7 +146,7 @@ static void RenderProposalOriginalTextCard(const std::vector<ProposalTextChangeP
 }
 
 // Node shape primitives (`DrawParallelogram`, `DrawStadium`, `DrawCircle`,
-// `DrawRoundedRect`, `DrawUndevelopedMarker`, `DrawReviewScopeHighlight`) plus
+// `DrawRoundedRect`, `DrawElementAbstractionMarker`, `DrawReviewScopeHighlight`) plus
 // their private shadow/shading helpers live in `ui/gsn/gsn_shapes.{h,cpp}`.
 // `BadgeRect`, `ComputeBadgeRect`, `DrawProblemBadge`, and `DrawAiSpinnerBadge`
 // live in `ui/gsn/gsn_badges.{h,cpp}`.
@@ -277,7 +277,7 @@ void DrawGsnNode(const GsnNode& node,
     }
     HandleTerminologySpanInteractions(
         terminology_regions, terminology_card_state, terminology_package, actions, overlay_hovered);
-    DrawUndevelopedMarker(draw_list, node, top_left, bottom_right, zoom);
+    DrawElementAbstractionMarker(draw_list, node, top_left, bottom_right, zoom);
 
     // Invisible button for hit-testing.
     // SetNextItemAllowOverlap lets overlay buttons (zoom/language) receive clicks

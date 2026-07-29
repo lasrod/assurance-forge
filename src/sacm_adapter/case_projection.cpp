@@ -128,6 +128,10 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
     projected.id = element.id().value();
     projected.gid = element.gid().value_or("");
     projected.type = lowercase_kind_name(element.kind());
+    // SACM isAbstract is the standard carrier for GSN's uninstantiated
+    // decorator. Dropping it here made a library-loaded pattern look like a
+    // finished instance even though the source document still held the flag.
+    projected.is_abstract = element.is_abstract();
 
     if (const auto* model_element = dynamic_cast<const sacm::model::ModelElement*>(&element)) {
         projected.name = model_element->name().content;
@@ -318,6 +322,7 @@ namespace {
 void copy_common_legacy_fields(sacm::SacmElement& target, const sacm::model::SACMElement& source) {
     target.id = source.id().value();
     target.gid = source.gid().value_or("");
+    target.isAbstract = source.is_abstract();
     const auto* model_element = dynamic_cast<const sacm::model::ModelElement*>(&source);
     if (model_element == nullptr) {
         return;

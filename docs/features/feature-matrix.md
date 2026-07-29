@@ -116,8 +116,8 @@ partial — say so in Notes rather than downgrading the row.
 
 | ID | Capability | Status | Evidence | Tests | Notes |
 |---|---|---|---|---|---|
-| AF-PAT-001 | Uninstantiated decorator | planned | | | Maps to SACM `isAbstract`. |
-| AF-PAT-002 | Undeveloped-and-uninstantiated decorator | planned | | | |
+| AF-PAT-001 | Uninstantiated decorator | supported | src/sacm_adapter/case_projection.cpp, src/ui/gsn/gsn_shapes.cpp, src/export/svg_writer.cpp | tests/test_sacm_library_parallel_load.cpp, tests/test_layout.cpp, tests/test_gsn_svg_exporter.cpp | Maps SACM `isAbstract` to the GSN hollow-triangle decorator on the canvas and in SVG export. |
+| AF-PAT-002 | Undeveloped-and-uninstantiated decorator | supported | src/ui/gsn/gsn_shapes.cpp, src/export/svg_writer.cpp | tests/test_gsn_svg_exporter.cpp | Overlays the undeveloped diamond and uninstantiated triangle as the standard bisected-diamond marker when both flags apply. |
 | AF-PAT-003 | Multiplicity decorator | planned | | | GSN `isMany`; no SACM feature exists to carry it. |
 | AF-PAT-004 | Optionality decorator | planned | | | GSN `isOptional`; no SACM feature exists to carry it. |
 | AF-PAT-005 | Pattern template arguments | planned | | | |

@@ -24,8 +24,10 @@ void DrawCircle(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU
 // Rounded rectangle (Claim / default shape).
 void DrawRoundedRect(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, ImU32 fill_color, float zoom);
 
-// Diamond marker with optional "UND" label drawn below the node when undeveloped.
-void DrawUndevelopedMarker(
+// GSN element-abstraction marker below the node: a hollow diamond for
+// undeveloped, a hollow triangle for uninstantiated, or the standard overlaid
+// diamond with a horizontal divider when both apply.
+void DrawElementAbstractionMarker(
     ImDrawList* draw_list, const GsnNode& node, ImVec2 top_left, ImVec2 bottom_right, float zoom);
 
 // Pulsing outline drawn around nodes that are inside the active review scope.

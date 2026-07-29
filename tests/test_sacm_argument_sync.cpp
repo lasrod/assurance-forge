@@ -35,8 +35,11 @@ TEST(SacmArgumentSyncTest, MirrorsClaimsAndReasoningsIntoFirstArgumentPackage) {
     parser::AssuranceCase model;
     parser::SacmElement goal = Element("G1", "claim");
     goal.content = "Top goal content.";
+    goal.is_abstract = true;
     model.elements.push_back(goal);
-    model.elements.push_back(Element("S1", "argumentreasoning"));
+    parser::SacmElement strategy = Element("S1", "argumentreasoning");
+    strategy.is_abstract = true;
+    model.elements.push_back(strategy);
 
     sacm::AssuranceCasePackage package;
     core::RebuildSacmArgumentPackageFromParser(model, package);
@@ -46,8 +49,10 @@ TEST(SacmArgumentSyncTest, MirrorsClaimsAndReasoningsIntoFirstArgumentPackage) {
     ASSERT_EQ(ap.claims.size(), 1u);
     EXPECT_EQ(ap.claims.front().id, "G1");
     EXPECT_EQ(ap.claims.front().content, "Top goal content.");
+    EXPECT_TRUE(ap.claims.front().isAbstract);
     ASSERT_EQ(ap.argumentReasonings.size(), 1u);
     EXPECT_EQ(ap.argumentReasonings.front().id, "S1");
+    EXPECT_TRUE(ap.argumentReasonings.front().isAbstract);
 }
 
 TEST(SacmArgumentSyncTest, MapsRelationshipElementsToAssertedTypes) {

@@ -39,6 +39,23 @@ Feel free to drop an idea in the [Discussion forum](https://github.com/lasrod/as
 
 ---
 
+## Example Projects
+
+Versioned demonstration and manual-test projects live in the
+[`assurance-forge-examples`](https://github.com/lasrod/assurance-forge-examples)
+repository, pinned here as the `examples` submodule.
+
+Initialize the submodule, then open any `examples/projects/<name>/af.proj` file
+from **File → Open Project**:
+
+```bash
+git submodule update --init examples
+```
+
+Each example documents its intended behavior and test procedure.
+
+---
+
 ## 📦 Releases
 
 Pre-built Windows binaries are published on the [Releases page](https://github.com/lasrod/assurance-forge/releases).

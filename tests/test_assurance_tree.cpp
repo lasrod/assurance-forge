@@ -283,6 +283,19 @@ TEST(AssuranceTreeTest, UndevelopedCarriesToClaimAndStrategyNodes) {
     EXPECT_FALSE(tree.root->group1_children[0]->group1_children[0]->undeveloped);
 }
 
+TEST(AssuranceTreeTest, UninstantiatedCarriesFromSacmIsAbstract) {
+    const char* xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="urn:test" id="T" name="T">
+  <argumentPackage id="AP" name="AP">
+    <claim id="cl_top" name="Top" isAbstract="true" assertionDeclaration="asserted"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    auto tree = build_tree_from_xml(xml);
+    ASSERT_NE(tree.root, nullptr);
+    EXPECT_TRUE(tree.root->uninstantiated);
+}
+
 // ----- Multi-language label_secondary -----
 
 TEST(AssuranceTreeTest, SecondaryLabelFromDescriptionLangs) {

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AssuranceCasePackage xmlns="http://www.omg.org/spec/SACM/20220301"
+                      id="PATTERN_CASE"
+                      name="Pattern Decorator Case">
+  <argumentPackage id="AP1" name="Reusable Argument Pattern">
+    <claim id="G1"
+           name="Parameterized Goal"
+           content="{System} is acceptably safe."
+           isAbstract="true"
+           assertionDeclaration="asserted"/>
+  </argumentPackage>
+</AssuranceCasePackage>

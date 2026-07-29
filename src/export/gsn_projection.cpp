@@ -451,6 +451,7 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
         node.title = element.name;
         node.text = TextFor(element);
         node.undeveloped = element.undeveloped;
+        node.uninstantiated = element.is_abstract;
         AttachAcpLabels(node.acp_labels, element_acp_labels, element.id, element.gid);
         if (node.title.empty() && node.text.empty()) {
             node.title = "(no title)";

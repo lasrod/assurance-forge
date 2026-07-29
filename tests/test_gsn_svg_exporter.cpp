@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
+#include <regex>
 #include <string>
 
 namespace {
@@ -562,6 +563,79 @@ TEST(GsnSvgExporterTest, SvgOmitsTheUndevelopedDiamondWhenNotUndeveloped) {
     const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
 
     EXPECT_EQ(svg.find("class=\"gsn-undeveloped\""), std::string::npos);
+}
+
+TEST(GsnSvgExporterTest, ProjectionCarriesUninstantiatedFlagToTheDiagram) {
+    parser::AssuranceCase model;
+    parser::SacmElement pattern_goal = Element("G1", "claim", "Pattern goal", "{System} is acceptably safe.");
+    pattern_goal.is_abstract = true;
+    model.elements = {pattern_goal};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+
+    ASSERT_NE(FindNode(projection.diagram, "G1"), nullptr);
+    EXPECT_TRUE(FindNode(projection.diagram, "G1")->uninstantiated);
+}
+
+TEST(GsnSvgExporterTest, SvgDrawsTheUninstantiatedTriangle) {
+    parser::AssuranceCase model;
+    parser::SacmElement pattern_goal = Element("G1", "claim", "Pattern goal", "{System} is acceptably safe.");
+    pattern_goal.is_abstract = true;
+    model.elements = {pattern_goal};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+    const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
+
+    EXPECT_NE(svg.find("class=\"gsn-uninstantiated\""), std::string::npos);
+    EXPECT_EQ(svg.find("class=\"gsn-undeveloped\""), std::string::npos);
+}
+
+TEST(GsnSvgExporterTest, SvgDrawsTheCombinedUndevelopedAndUninstantiatedDecorator) {
+    parser::AssuranceCase model;
+    parser::SacmElement pattern_goal = Element("G1", "claim", "Incomplete pattern goal", "{Hazard} is mitigated.");
+    pattern_goal.is_abstract = true;
+    pattern_goal.undeveloped = true;
+    model.elements = {pattern_goal};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+    const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
+
+    EXPECT_NE(svg.find("gsn-undeveloped-uninstantiated"), std::string::npos);
+    EXPECT_NE(svg.find("gsn-undeveloped-uninstantiated-divider"), std::string::npos);
+}
+
+TEST(GsnSvgExporterTest, StandaloneTriangleBaseMatchesCombinedDivider) {
+    parser::SacmElement pattern_goal = Element("G1", "claim", "Pattern goal", "{Hazard} is mitigated.");
+    pattern_goal.is_abstract = true;
+
+    parser::AssuranceCase standalone_model;
+    standalone_model.elements = {pattern_goal};
+    export_gsn::GsnProjectionResult standalone_projection = export_gsn::BuildGsnProjection(standalone_model);
+    export_gsn::LayoutGsnSvgDiagram(standalone_projection.diagram);
+    const std::string standalone_svg = export_gsn::GenerateGsnSvg(standalone_projection.diagram);
+
+    pattern_goal.undeveloped = true;
+    parser::AssuranceCase combined_model;
+    combined_model.elements = {pattern_goal};
+    export_gsn::GsnProjectionResult combined_projection = export_gsn::BuildGsnProjection(combined_model);
+    export_gsn::LayoutGsnSvgDiagram(combined_projection.diagram);
+    const std::string combined_svg = export_gsn::GenerateGsnSvg(combined_projection.diagram);
+
+    const std::regex triangle_points(
+        R"regex(class="gsn-uninstantiated" points="[^,]+,[^ ]+ [^,]+,([^ ]+) [^,]+,([^"]+)")regex");
+    const std::regex combined_divider(
+        R"regex(class="gsn-undeveloped-uninstantiated-divider" x1="[^"]+" y1="([^"]+)" x2="[^"]+" y2="([^"]+)")regex");
+    std::smatch triangle_match;
+    std::smatch divider_match;
+    ASSERT_TRUE(std::regex_search(standalone_svg, triangle_match, triangle_points));
+    ASSERT_TRUE(std::regex_search(combined_svg, divider_match, combined_divider));
+    ASSERT_EQ(triangle_match.size(), 3u);
+    ASSERT_EQ(divider_match.size(), 3u);
+    EXPECT_EQ(triangle_match[1].str(), triangle_match[2].str());
+    EXPECT_EQ(triangle_match[1].str(), divider_match[1].str());
+    EXPECT_EQ(divider_match[1].str(), divider_match[2].str());
 }
 
 TEST(GsnSvgExporterTest, AcpOnAnElementIsProjectedAndDrawn) {

@@ -206,29 +206,51 @@ void DrawRoundedRect(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right
     draw_list->AddRect(top_left, bottom_right, OutlineColor(), rounding, 0, outline);
 }
 
-void DrawUndevelopedMarker(
+void DrawElementAbstractionMarker(
     ImDrawList* draw_list, const GsnNode& node, ImVec2 top_left, ImVec2 bottom_right, float zoom) {
-    if (!node.undeveloped)
+    if (!node.undeveloped && !node.uninstantiated)
         return;
 
     float radius = DpiSize(kUndDiamondRadius) * zoom;
     float gap = DpiSize(kUndGap) * zoom;
     ImVec2 center((top_left.x + bottom_right.x) * 0.5f, bottom_right.y + gap + radius);
-    ImVec2 diamond[4] = {ImVec2(center.x, center.y - radius),
-                         ImVec2(center.x + radius, center.y),
-                         ImVec2(center.x, center.y + radius),
-                         ImVec2(center.x - radius, center.y)};
+    ImVec2 marker[4];
+    int marker_point_count = 0;
+    if (node.undeveloped) {
+        marker[0] = ImVec2(center.x, center.y - radius);
+        marker[1] = ImVec2(center.x + radius, center.y);
+        marker[2] = ImVec2(center.x, center.y + radius);
+        marker[3] = ImVec2(center.x - radius, center.y);
+        marker_point_count = 4;
+    } else {
+        // The standalone triangle is the upper half of the combined diamond:
+        // its base is the same horizontal edge drawn as the combined divider.
+        marker[0] = ImVec2(center.x, center.y - radius);
+        marker[1] = ImVec2(center.x + radius, center.y);
+        marker[2] = ImVec2(center.x - radius, center.y);
+        marker_point_count = 3;
+    }
     if (ShouldDrawShadows(zoom)) {
-        DrawPolyShadow(draw_list, diamond, 4, zoom);
+        DrawPolyShadow(draw_list, marker, marker_point_count, zoom);
         if (auto* stats = CurrentRenderStats())
             ++stats->shadows_drawn;
     }
-    ImU32 und_fill = IM_COL32(245, 247, 252, 255); // near-white for high contrast
-    ImU32 und_ink = InkOn(und_fill);
-    draw_list->AddConvexPolyFilled(diamond, 4, und_fill);
-    draw_list->AddPolyline(diamond, 4, OutlineColor(), ImDrawFlags_Closed, DpiSize(kOutlineThickness) * zoom);
+    ImU32 marker_fill = IM_COL32(245, 247, 252, 255); // near-white for high contrast
+    ImU32 marker_ink = InkOn(marker_fill);
+    const float outline = DpiSize(kOutlineThickness) * zoom;
+    draw_list->AddConvexPolyFilled(marker, marker_point_count, marker_fill);
+    draw_list->AddPolyline(marker, marker_point_count, OutlineColor(), ImDrawFlags_Closed, outline);
 
-    if (zoom < kUndLabelZoom)
+    if (node.undeveloped && node.uninstantiated) {
+        // GSN overlays the triangle and diamond for the combined state. Its
+        // canonical simplified appearance is a hollow diamond bisected by the
+        // triangle's horizontal edge.
+        draw_list->AddLine(
+            ImVec2(center.x - radius, center.y), ImVec2(center.x + radius, center.y), OutlineColor(), outline);
+        return;
+    }
+
+    if (!node.undeveloped || zoom < kUndLabelZoom)
         return;
 
     const char* und = "UND";
@@ -248,7 +270,7 @@ void DrawUndevelopedMarker(
     float font_size = std::clamp(desired_font_size, min_font_size, max_font_size);
     ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, und);
     ImVec2 text_pos(center.x - text_size.x * 0.5f, center.y - text_size.y * 0.5f);
-    draw_list->AddText(font, font_size, text_pos, und_ink, und);
+    draw_list->AddText(font, font_size, text_pos, marker_ink, und);
 }
 
 // Draw dashes along a (optionally closed) polyline with a continuous on/off

@@ -220,6 +220,14 @@ std::vector<ProjectionDifference> diff_cases(const core::AssuranceCase& legacy,
                                        other.undeveloped),
             });
         }
+        if (legacy_element->is_abstract != other.is_abstract) {
+            differences.push_back(ProjectionDifference{
+                .category = "field",
+                .path = std::format("{}.is_abstract", id),
+                .message = std::format("legacy {} vs projected {}", legacy_element->is_abstract,
+                                       other.is_abstract),
+            });
+        }
     }
 
     return differences;

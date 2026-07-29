@@ -33,6 +33,10 @@ struct GsnNode {
     // The element requires support that has not been provided. Drawn as the GSN
     // hollow diamond below the shape.
     bool undeveloped = false;
+    // The element is an abstract pattern element that remains to be
+    // instantiated. Drawn as the GSN hollow triangle below the shape; when
+    // combined with undeveloped, the two markers overlap.
+    bool uninstantiated = false;
     // Identifiers of Assurance Claim Points attached to this element.
     std::vector<std::string> acp_labels;
 

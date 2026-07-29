@@ -47,8 +47,8 @@ std::string EscapeXml(const std::string& value) {
     return out.str();
 }
 
-// Decorator geometry. The undeveloped diamond hangs below bottom-centre, as GSN
-// requires; an ACP badge sits beside it so a node carrying both stays readable.
+// Decorator geometry. GSN element-abstraction markers hang below bottom-centre;
+// an ACP badge sits beside them so a node carrying both stays readable.
 constexpr double kUndevelopedRadius = 9.0;
 constexpr double kUndevelopedGap = 6.0;
 constexpr double kAcpBoxHalf = 8.0;
@@ -174,17 +174,32 @@ std::string JoinAcpLabels(const std::vector<std::string>& labels) {
     return joined;
 }
 
-// The GSN undeveloped decorator: a hollow diamond below bottom-centre, meaning
-// the element requires support that has not been provided. Omitting it from an
-// export makes an incomplete argument read as a finished one.
-void WriteUndevelopedMarker(std::ostringstream& out, const GsnNode& node) {
-    if (!node.undeveloped)
+// GSN element abstraction: undeveloped is a hollow diamond, uninstantiated is a
+// hollow triangle, and the combined state overlays the two as a bisected
+// diamond. Omitting these from an export makes a pattern look like a finished
+// assurance argument.
+void WriteElementAbstractionMarker(std::ostringstream& out, const GsnNode& node) {
+    if (!node.undeveloped && !node.uninstantiated)
         return;
     const double cx = node.x + node.width / 2.0;
     const double cy = node.y + node.height + kUndevelopedGap + kUndevelopedRadius;
-    out << "    <polygon class=\"gsn-undeveloped\" points=\"" << cx << "," << cy - kUndevelopedRadius << " "
-        << cx + kUndevelopedRadius << "," << cy << " " << cx << "," << cy + kUndevelopedRadius << " "
-        << cx - kUndevelopedRadius << "," << cy
+    if (node.undeveloped) {
+        const char* css_class = node.uninstantiated
+                                    ? "gsn-undeveloped gsn-uninstantiated gsn-undeveloped-uninstantiated"
+                                    : "gsn-undeveloped";
+        out << "    <polygon class=\"" << css_class << "\" points=\"" << cx << "," << cy - kUndevelopedRadius << " "
+            << cx + kUndevelopedRadius << "," << cy << " " << cx << "," << cy + kUndevelopedRadius << " "
+            << cx - kUndevelopedRadius << "," << cy << "\" fill=\"white\" stroke=\"black\" stroke-width=\"1.2\"/>\n";
+        if (node.uninstantiated) {
+            out << "    <line class=\"gsn-undeveloped-uninstantiated-divider\" x1=\"" << cx - kUndevelopedRadius
+                << "\" y1=\"" << cy << "\" x2=\"" << cx + kUndevelopedRadius << "\" y2=\"" << cy
+                << "\" stroke=\"black\" stroke-width=\"1.2\"/>\n";
+        }
+        return;
+    }
+
+    out << "    <polygon class=\"gsn-uninstantiated\" points=\"" << cx << "," << cy - kUndevelopedRadius << " "
+        << cx + kUndevelopedRadius << "," << cy << " " << cx - kUndevelopedRadius << "," << cy
         << "\" fill=\"white\" stroke=\"black\" stroke-width=\"1.2\"/>\n";
 }
 
@@ -204,8 +219,8 @@ void WriteAcpBadge(std::ostringstream& out, double center_x, double center_y, co
 void WriteElementAcpBadge(std::ostringstream& out, const GsnNode& node) {
     if (node.acp_labels.empty())
         return;
-    // Sit clear of the undeveloped diamond when the element carries both.
-    const double offset = node.undeveloped ? kUndevelopedRadius + kAcpBoxHalf + kAcpGap : 0.0;
+    // Sit clear of the element-abstraction marker when the element carries both.
+    const double offset = (node.undeveloped || node.uninstantiated) ? kUndevelopedRadius + kAcpBoxHalf + kAcpGap : 0.0;
     const double cx = node.x + node.width / 2.0 + offset;
     const double cy = node.y + node.height + kAcpGap + kAcpBoxHalf;
     WriteAcpBadge(out, cx, cy, node.acp_labels);
@@ -253,7 +268,7 @@ void WriteNode(std::ostringstream& out, const GsnNode& node) {
         break;
     }
     }
-    WriteUndevelopedMarker(out, node);
+    WriteElementAbstractionMarker(out, node);
     WriteElementAcpBadge(out, node);
     out << "  </g>\n";
 }
