@@ -260,6 +260,9 @@ void AppRuntime::RegisterAppEventListeners() {
         switch (event.view) {
         case CenterViewRequest::Preserve:
             break;
+        case CenterViewRequest::ProjectOverview:
+            ui_state.center_view = ui::CenterView::ProjectOverview;
+            break;
         case CenterViewRequest::GsnCanvas:
             ui_state.center_view = ui::CenterView::GsnCanvas;
             break;

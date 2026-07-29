@@ -6,11 +6,13 @@
 #include "app/frame/app_shell.h"
 #include "core/argument_package_projection.h"
 #include "core/perf/frame_profiler.h"
+#include "core/project_summary.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/i18n/localization.h"
 #include "ui/panels/package_details_panel.h"
+#include "ui/panels/project_overview_panel.h"
 #include "ui/panels/terminology_package_panel.h"
 #include "ui/register_views.h"
 #include "sacm/sacm_model.h"
@@ -321,6 +323,48 @@ void RenderRegisterTable(AppRuntimeState& state, bool (*show_table)(core::regist
     ImGui::EndDisabled();
 }
 
+ui::panels::ProjectOverviewPanelModel BuildProjectOverviewPanelModel(AppRuntimeState& state) {
+    ui::panels::ProjectOverviewPanelModel model;
+    model.project = state.app_state.current_project.has_value() ? &state.app_state.current_project.value() : nullptr;
+    const parser::AssuranceCase* loaded_case =
+        state.app_state.loaded_case.has_value() ? &state.app_state.loaded_case.value() : nullptr;
+    std::vector<core::reviews::ProposalValidityResult> proposal_validities;
+    for (const core::reviews::ReviewProposalSummary& proposal :
+         state.proposal_controller->manager.ListProposals(loaded_case)) {
+        proposal_validities.push_back(proposal.validity);
+    }
+    model.summary = core::BuildProjectSummary(model.project,
+                                              loaded_case,
+                                              loaded_case ? &state.current_tree : nullptr,
+                                              state.problems_manager.GetProblems(),
+                                              state.review_controller->Items(),
+                                              proposal_validities);
+    if (loaded_case)
+        model.active_case_name = loaded_case->name;
+    return model;
+}
+
+ui::panels::ProjectOverviewPanelCallbacks MakeProjectOverviewCallbacks(AppRuntimeState& state) {
+    ui::panels::ProjectOverviewPanelCallbacks callbacks;
+    callbacks.open_arguments = [&state]() {
+        state.workbench.show_gsn_tab = true;
+        ui::GetUiState().center_view = ui::CenterView::GsnCanvas;
+        state.workbench.force_center_tab_selection = true;
+    };
+    callbacks.open_evidence = [&state]() {
+        state.workbench.show_evidence_tab = true;
+        ui::GetUiState().center_view = ui::CenterView::EvidenceRegister;
+        state.workbench.force_center_tab_selection = true;
+    };
+    callbacks.open_reviews = [&state]() { state.workbench.focus_review_tab = true; };
+    callbacks.open_conformance = [&state]() {
+        state.workbench.show_cse_tab = true;
+        ui::GetUiState().center_view = ui::CenterView::CseRegister;
+        state.workbench.force_center_tab_selection = true;
+    };
+    return callbacks;
+}
+
 } // namespace
 
 void RenderWorkbenchArea(AppRuntimeState& state,
@@ -348,6 +392,21 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                     it->title + "###argument_package_canvas_" + std::to_string(std::hash<std::string>{}(it->key));
                 if (ImGuiTabBar* tb = ImGui::GetCurrentTabBar())
                     ImGui::TabBarQueueFocus(tb, target_label.c_str());
+            }
+        }
+
+        if (state.workbench.show_overview_tab) {
+            const ImGuiTabItemFlags overview_flags =
+                (state.workbench.force_center_tab_selection &&
+                 ui_state.center_view == ui::CenterView::ProjectOverview)
+                    ? ImGuiTabItemFlags_SetSelected
+                    : 0;
+            if (ImGui::BeginTabItem(
+                    (AF_TR("Project Overview") + "###project_overview_tab").c_str(), nullptr, overview_flags)) {
+                ui_state.center_view = ui::CenterView::ProjectOverview;
+                ui::panels::ShowProjectOverviewPanel(BuildProjectOverviewPanelModel(state),
+                                                     MakeProjectOverviewCallbacks(state));
+                ImGui::EndTabItem();
             }
         }
 

@@ -55,6 +55,7 @@ add_library(af_core OBJECT
     project_file_io.cpp
     project_manifest.cpp
     project_service.cpp
+    project_summary.cpp
     registers/register_model.cpp
     reviews/review_item.cpp
     reviews/review_item_manager.cpp

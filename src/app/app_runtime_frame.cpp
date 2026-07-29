@@ -193,6 +193,23 @@ void AppRuntime::RenderFrame(bool& done) {
 
     areas::ProjectExplorerAreaCallbacks project_explorer_callbacks{
         [this]() { RefreshSacmPackageTreeCache(); },
+        [this]() {
+            impl_->workbench.show_overview_tab = true;
+            ui::GetUiState().center_view = ui::CenterView::ProjectOverview;
+            impl_->workbench.force_center_tab_selection = true;
+        },
+        [this]() { impl_->workbench.focus_review_tab = true; },
+        [this]() {
+            impl_->workbench.show_cse_tab = true;
+            ui::GetUiState().center_view = ui::CenterView::CseRegister;
+            impl_->workbench.force_center_tab_selection = true;
+        },
+        [this]() {
+            impl_->workbench.show_evidence_tab = true;
+            ui::GetUiState().center_view = ui::CenterView::EvidenceRegister;
+            impl_->workbench.force_center_tab_selection = true;
+        },
+        [this](const char* feature) { ShowNotImplementedModal(feature); },
         [this]() { BeginCreateProjectSacmFile(); },
         [this]() { BeginCreateProjectEvidenceRegister(); },
         [this]() { BeginCreateProjectJ3377CaeRegister(); },

@@ -86,6 +86,7 @@ struct AiReviewProposalSuggestionsEvent {
 
 enum class CenterViewRequest {
     Preserve,
+    ProjectOverview,
     GsnCanvas,
     CseRegister,
     EvidenceRegister,

@@ -97,6 +97,7 @@ struct WorkbenchState {
     // Exact command_name filter applied to the History panel (matches
     // AuditTransaction::command_name). Empty = no command filter.
     std::string history_filter_command;
+    bool show_overview_tab = true;
     bool show_gsn_tab = true;
     bool show_cse_tab = false;
     bool show_evidence_tab = false;

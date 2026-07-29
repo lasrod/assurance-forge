@@ -124,6 +124,9 @@ msgstr "変更を受け入れる"
 msgid "Active"
 msgstr "アクティブ"
 
+msgid "Active assurance case: {0}"
+msgstr "アクティブな保証ケース: {0}"
+
 msgid "Add"
 msgstr "追加"
 
@@ -181,11 +184,17 @@ msgstr "コンテキストとして追加"
 msgid "Add fixed confidence"
 msgstr "固定信頼度を追加"
 
+msgid "Advanced"
+msgstr "詳細"
+
 msgid "All"
 msgstr "すべて"
 
 msgid "All categories"
 msgstr "すべての分類"
+
+msgid "All evidence is linked"
+msgstr "すべてのエビデンスがリンクされています"
 
 msgid "Allow AI clients to read and propose changes"
 msgstr "AI クライアントに読み取りと変更提案を許可する"
@@ -211,11 +220,17 @@ msgstr "論証パッケージ"
 msgid "Argument package was not found in the loaded SACM model."
 msgstr "読み込まれた SACM モデルに論証パッケージが見つかりませんでした。"
 
+msgid "Arguments"
+msgstr "議論"
+
 msgid "Artifact Packages"
 msgstr "成果物パッケージ"
 
 msgid "Assessment Status"
 msgstr "評価ステータス"
+
+msgid "Assessment workspace available"
+msgstr "評価ワークスペースを利用できます"
 
 msgid "Assumption"
 msgstr "仮定"
@@ -298,6 +313,9 @@ msgstr "キャンセル"
 msgid "Canvas render stats"
 msgstr "キャンバス描画統計"
 
+msgid "Case Explorer"
+msgstr "ケースエクスプローラー"
+
 msgid "Categories"
 msgstr "分類"
 
@@ -318,6 +336,9 @@ msgstr "分類: {0}"
 
 msgid "Challenge"
 msgstr "チャレンジ"
+
+msgid "Change Proposals"
+msgstr "変更提案"
 
 msgid "Changed since baseline"
 msgstr "ベースライン以降に変更"
@@ -345,6 +366,9 @@ msgstr "主張 ID"
 
 msgid "Claim Owner"
 msgstr "主張責任者"
+
+msgid "Claim-Evidence Traceability"
+msgstr "主張–エビデンスのトレーサビリティ"
 
 msgid "Claims"
 msgstr "主張"
@@ -390,6 +414,9 @@ msgstr "信頼度の保存に失敗しました: {0}"
 
 msgid "Confidence update failed: {0}"
 msgstr "信頼度の更新に失敗しました: {0}"
+
+msgid "Conformance"
+msgstr "適合性"
 
 msgid "Content"
 msgstr "内容"
@@ -736,6 +763,9 @@ msgstr "GSN SVG"
 msgid "GSN structure, SACM imports, evidence, and registers"
 msgstr "GSN 構造、SACM インポート、エビデンス、登録簿を学びます"
 
+msgid "Generated reports: {0}"
+msgstr "生成済みレポート: {0}"
+
 msgid "Get started with Assurance Forge"
 msgstr "Assurance Forge の開始ガイド"
 
@@ -928,6 +958,9 @@ msgstr "ネイティブ主張:"
 msgid "Native text confidence claim is missing."
 msgstr "ネイティブのテキスト信頼度主張がありません。"
 
+msgid "Needs Attention"
+msgstr "要確認"
+
 msgid "New"
 msgstr "新規"
 
@@ -970,6 +1003,9 @@ msgstr "利用可能な TerminologyPackage がありません。"
 msgid "No XML files found"
 msgstr "XML ファイルが見つかりません"
 
+msgid "No arguments yet."
+msgstr "議論はまだありません。"
+
 msgid "No categories"
 msgstr "分類なし"
 
@@ -999,6 +1035,9 @@ msgstr "無視された用語はありません。"
 
 msgid "No matching SCCG guideline IDs."
 msgstr "一致する SCCG ガイドライン ID がありません。"
+
+msgid "No open project alerts."
+msgstr "未解決のプロジェクト警告はありません。"
 
 msgid "No problems found."
 msgstr "問題は見つかりませんでした。"
@@ -1039,11 +1078,17 @@ msgstr "安全ケースが読み込まれていません。"
 msgid "No terminology package selected."
 msgstr "用語パッケージが選択されていません。"
 
+msgid "No terminology packages."
+msgstr "用語パッケージはありません。"
+
 msgid "No terms"
 msgstr "用語なし"
 
 msgid "No transactions have been recorded yet."
 msgstr "トランザクションはまだ記録されていません。"
+
+msgid "No undeveloped elements"
+msgstr "未展開の要素はありません"
 
 msgid "No usages found."
 msgstr "使用箇所が見つかりません。"
@@ -1056,6 +1101,9 @@ msgstr "ノードのドロップシャドウ"
 
 msgid "Not Implemented"
 msgstr "未実装"
+
+msgid "Not assessed"
+msgstr "未評価"
 
 msgid "Not reviewed"
 msgstr "未レビュー"
@@ -1071,6 +1119,9 @@ msgstr "オープン"
 
 msgid "Open ACP"
 msgstr "ACP を開く"
+
+msgid "Open Findings"
+msgstr "未解決の指摘"
 
 msgid "Open Performance overlay"
 msgstr "パフォーマンスオーバーレイを開く"
@@ -1153,6 +1204,9 @@ msgstr "その他のパッケージ"
 msgid "Other Problems ({0})"
 msgstr "その他の問題 ({0})"
 
+msgid "Overview"
+msgstr "概要"
+
 msgid "Overwrite File?"
 msgstr "ファイルを上書きしますか?"
 
@@ -1216,14 +1270,26 @@ msgstr "問題"
 msgid "Problems"
 msgstr "問題"
 
+msgid "Project Details"
+msgstr "プロジェクト詳細"
+
 msgid "Project Explorer"
 msgstr "プロジェクトエクスプローラー"
 
 msgid "Project Loading Status"
 msgstr "プロジェクト読み込み状況"
 
+msgid "Project Overview"
+msgstr "プロジェクト概要"
+
+msgid "Project Readiness"
+msgstr "プロジェクトの準備状況"
+
 msgid "Project Summary"
 msgstr "プロジェクト概要"
+
+msgid "Project files: {0}"
+msgstr "プロジェクトファイル: {0}"
 
 msgid "Project name"
 msgstr "プロジェクト名"
@@ -1321,8 +1387,14 @@ msgstr "対象から SACM ベースの ACP メタデータを除去します。"
 msgid "Remove {0}?"
 msgstr "{0} を除去しますか?"
 
+msgid "Report Builder"
+msgstr "レポートビルダー"
+
 msgid "Reported by the SACM library:"
 msgstr "SACM ライブラリからの報告:"
+
+msgid "Reports"
+msgstr "レポート"
 
 msgid "Reset toggles"
 msgstr "切替をリセット"
@@ -1380,6 +1452,9 @@ msgstr "新しいレビューにはレビュー担当者名が必要です。"
 
 msgid "Reviewer name saved."
 msgstr "レビュー担当者名を保存しました。"
+
+msgid "Reviews"
+msgstr "レビュー"
 
 msgid "Run Find usages from a term card or glossary row."
 msgstr "用語カードまたは用語表の行から使用箇所検索を実行してください。"
@@ -1440,6 +1515,9 @@ msgstr "保存しました: {0}"
 
 msgid "Search"
 msgstr "検索"
+
+msgid "Search project..."
+msgstr "プロジェクトを検索..."
 
 msgid "Secure storage is unavailable on this platform."
 msgstr "このプラットフォームでは安全な保存を使用できません。"
@@ -1510,6 +1588,9 @@ msgstr "ソース:"
 msgid "Start"
 msgstr "開始"
 
+msgid "Start Conformance Assessment"
+msgstr "適合性評価を開始"
+
 msgid "Start with a blank assurance project workspace"
 msgstr "空の保証プロジェクトワークスペースから開始します"
 
@@ -1566,6 +1647,9 @@ msgstr "用語参照を解決できませんでした。"
 
 msgid "Term value is required."
 msgstr "用語の値は必須です。"
+
+msgid "Terminology"
+msgstr "用語"
 
 msgid "Terminology Package"
 msgstr "用語パッケージ"
@@ -1816,6 +1900,9 @@ msgstr "作成者"
 msgid "disabled"
 msgstr "無効"
 
+msgid "elements"
+msgstr "要素"
+
 msgid "error"
 msgstr "エラー"
 
@@ -1828,8 +1915,14 @@ msgstr "hello_imgui FpsIdling: UI が静かなときに {0:.0f} FPS にスロッ
 msgid "info"
 msgstr "情報"
 
+msgid "items"
+msgstr "項目"
+
 msgid "not recorded"
 msgstr "未記録"
+
+msgid "open"
+msgstr "未解決"
 
 msgid "problem"
 msgstr "問題"
@@ -1873,8 +1966,23 @@ msgstr "{0} ({1})"
 msgid "{0} added, {1} changed, {2} removed"
 msgstr "追加 {0}、変更 {1}、削除 {2}"
 
+msgid "{0} argument elements are undeveloped"
+msgstr "{0} 件の議論要素が未展開です"
+
+msgid "{0} broken"
+msgstr "{0} 件破損"
+
+msgid "{0} change proposals no longer apply cleanly"
+msgstr "{0} 件の変更提案を正常に適用できません"
+
 msgid "{0} claims · {1} strategies · {2} evidence · {3} undeveloped"
 msgstr "主張 {0} 件 · 戦略 {1} 件 · エビデンス {2} 件 · 未展開 {3} 件"
+
+msgid "{0} errors require attention"
+msgstr "{0} 件のエラーに対応が必要です"
+
+msgid "{0} evidence items are not linked to a claim"
+msgstr "{0} 件のエビデンスが主張にリンクされていません"
 
 msgid "{0} has multiple meanings."
 msgstr "{0} には複数の意味があります。"
@@ -1896,6 +2004,18 @@ msgstr "{0} は未定義の用語項目のように見えます。"
 
 msgid "{0} problems · top {1}: {2}"
 msgstr "{0} 件の問題 · トップ {1}: {2}"
+
+msgid "{0} proposals"
+msgstr "{0} 件の提案"
+
+msgid "{0} undeveloped"
+msgstr "{0} 件未展開"
+
+msgid "{0} unlinked"
+msgstr "{0} 件未リンク"
+
+msgid "{0} warnings require review"
+msgstr "{0} 件の警告を確認する必要があります"
 
 msgid "● PAUSED"
 msgstr "● 一時停止中"
@@ -1924,6 +2044,10 @@ msgid "{0} confidence assessment was marked inactive because its target element 
 msgid_plural "{0} confidence assessments were marked inactive because their target elements changed."
 msgstr[0] "対象要素が変更されたため、{0} 件の信頼度評価が非アクティブとしてマークされました。"
 
+msgid "{0} element"
+msgid_plural "{0} elements"
+msgstr[0] "{0} 要素"
+
 msgid "{0} element will be deleted (highlighted in red)."
 msgid_plural "{0} elements will be deleted (highlighted in red)."
 msgstr[0] "{0} 個の要素が削除されます (赤でハイライト)。"
@@ -1932,6 +2056,10 @@ msgid "{0} item"
 msgid_plural "{0} items"
 msgstr[0] "{0} 個"
 
+msgid "{0} item needs attention"
+msgid_plural "{0} items need attention"
+msgstr[0] "{0} 件の項目に対応が必要です"
+
 msgid "{0} legacy expression entry is present and shown read-only by older tooling."
 msgid_plural "{0} legacy expression entries are present and shown read-only by older tooling."
 msgstr[0] "{0} 件のレガシー表現項目があり、旧ツールにより読み取り専用で表示されます。"
@@ -1939,6 +2067,10 @@ msgstr[0] "{0} 件のレガシー表現項目があり、旧ツールにより�
 msgid "{0} more candidate."
 msgid_plural "{0} more candidates."
 msgstr[0] "他に {0} 件の候補"
+
+msgid "{0} open finding"
+msgid_plural "{0} open findings"
+msgstr[0] "未解決の指摘 {0} 件"
 
 msgid "{0} operation"
 msgid_plural "{0} operations"

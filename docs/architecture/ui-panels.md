@@ -26,7 +26,8 @@ flowchart TD
 | Element panel | `ui::panels::ShowElementPanel` | Selected parser element and SACM package | Direct in-panel edits plus `sync_to_sacm()`, then AppRuntime emits dirty events. |
 | Problems panel | `ui::panels::ShowProblemsPanel` | `core::ProblemsManager`, `ui::UiState` | Problem activation and AI review callbacks. |
 | Review panel | `ui::panels::ShowReviewPanel` | Review items, guidelines, proposal validity | Review/proposal callbacks. |
-| Project explorer panel | `ui::panels::ShowProjectExplorerPanel` | `core::AssuranceProject` | Add/open file callbacks. |
+| Case Explorer panel | `ui::panels::ShowProjectExplorerPanel` | `core::AssuranceProject`, `core::ProjectSummary`, SACM package trees | Workflow navigation, add/open file callbacks, and advanced package actions. |
+| Project overview panel | `ui::panels::ShowProjectOverviewPanel` | `core::ProjectSummary` | Navigation to arguments, evidence, reviews, and conformance. |
 | SACM viewer panel | `ui::panels::ShowSacmViewerPanel` | `core::AppState`, directory buffers, XML file list | Scan/load callbacks. Defined in the codebase, but not mounted in the current `RenderFrame()` layout. |
 | Preferences window | `ui::panels::ShowPreferencesWindow` | AI settings, language, FPS, reviewer name | Settings, API key, language, FPS callbacks. |
 | Welcome modal | `ui::panels::ShowWelcomeModal` | Recent project list | Create/open/import callbacks. |
@@ -37,7 +38,7 @@ flowchart TD
 
 | Area | Current panels and views |
 | --- | --- |
-| `ProjectExplorerArea` | Project explorer panel and SACM package tree entries. |
+| `ProjectExplorerArea` | Role-based Case Explorer; raw SACM package tree and files appear under Advanced. |
 | `ArgumentNavigatorArea` | Argument navigator tree view. |
 | `WorkbenchArea` | GSN canvas, CSE register, evidence register, package details, and terminology package tabs. |
 | `InspectorArea` | Element properties panel and proposal element editor. |
@@ -107,13 +108,16 @@ flowchart LR
 
 ## Center Views
 
-The center area has three views:
+The center area has these primary views:
 
 | View | Source |
 | --- | --- |
+| Project overview | Project, argument, evidence, review, proposal, problem, conformance, and report summary counts. |
 | GSN canvas | `core::AssuranceTree` pushed through `ui::gsn::SetCanvasTree`. |
 | CSE register | Rows rebuilt from `parser::AssuranceCase`. |
 | Evidence register | Rows rebuilt from `parser::AssuranceCase`. |
+| Package details | The selected SACM package-tree node. |
+| Terminology package | The selected SACM terminology package. |
 
 `CenterRequestEvent` can force a tab and optionally center on the current selection or marked proposal nodes.
 
@@ -132,7 +136,7 @@ Panels do not own project or document state. They render current state, collect 
 
 The current main-frame layout is:
 
-- Project explorer: project explorer panel
+- Project explorer: role-based Case Explorer
 - Argument navigator: argument tree
 - Workbench: GSN canvas, register tabs, package details, or terminology package tabs
 - Inspector: element properties

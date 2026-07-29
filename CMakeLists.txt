@@ -308,6 +308,7 @@ add_executable(tests
     tests/test_package_commands.cpp
     tests/test_sacm_identity.cpp
     tests/test_project_model.cpp
+    tests/test_project_summary.cpp
     tests/test_confidence_problem_sync.cpp
     tests/test_ai_review_controller.cpp
     tests/test_review_problem_sync.cpp
