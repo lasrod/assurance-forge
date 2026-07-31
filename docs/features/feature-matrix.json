@@ -1020,10 +1020,15 @@
       "id": "AF-METH-010",
       "area": "METH",
       "name": "Requirement-traceable GSN v3 well-formedness validation",
-      "status": "planned",
-      "evidence": [],
-      "tests": [],
-      "notes": "Covers allowed element/relationship combinations, mandatory identifiers, statement constraints, extension rules and diagnostics linked to `GSN3-*` requirements."
+      "status": "supported",
+      "evidence": [
+        "src/core/problems/gsn_wellformedness.cpp",
+        "src/app/structure_problem_sync.cpp"
+      ],
+      "tests": [
+        "tests/test_gsn_wellformedness.cpp"
+      ],
+      "notes": "Every finding carries the `GSN3-*` requirement it enforces in the Problems panel's Guideline column, so a reader can take a diagnostic back to docs/gsn/gsn-v3-conformance-matrix.md and the standard instead of trusting the tool. Eight Core and Dialectic rules are checked: an unresolved relationship endpoint, an unresolved challenge target, the permitted element/relationship combinations (a Solution, Context, Assumption or Justification is a leaf), a Strategy wired as an end of an inference rather than as its reasoning, a non-Solution standing in the evidence position, two elements sharing a notation identifier, and an undeveloped decorator left on an element that has since been supported. The same connection rules now gate authoring, so the Add menu no longer offers a sub-argument under an Assumption — it did, and SACM could store the result. **Not a complete GSN v3 validator**: statement constraints (proposition and noun-phrase form) and the Pattern, Modular and Confidence extension rules are not checked. Content whose GSN role is undecidable — an unrecognized element type, a Context that may be either a Claim or an ArtifactReference — is passed over rather than guessed at, because a false structural error against an imported safety argument is worse than a missing one. Argument *quality* stays in the SCCG catalog (AF-AI-010), where a human resolves it."
     },
     {
       "id": "AF-ENG-001",

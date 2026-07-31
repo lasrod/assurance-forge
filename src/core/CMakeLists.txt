@@ -47,6 +47,7 @@ add_library(af_core OBJECT
     ignored_terminology_store.cpp
     perf/frame_profiler.cpp
     problems/argument_cycles.cpp
+    problems/gsn_wellformedness.cpp
     problems/problem_attention.cpp
     problems/problem_item.cpp
     problems/problem_utils.cpp

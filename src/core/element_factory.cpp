@@ -1,6 +1,7 @@
 #include "core/element_factory.h"
 
 #include "core/acp/assurance_claim_point.h"
+#include "core/problems/gsn_wellformedness.h"
 #include "sacm_adapter/gsn_role_tag.h"
 
 #include <algorithm>
@@ -377,6 +378,34 @@ bool InstallSubGoalUnderStrategy(parser::AssuranceCase& ac,
     return true;
 }
 
+} // namespace
+
+bool CanAddChildElement(const parser::SacmElement& parent, NewElementKind kind, std::string& out_error) {
+    const GsnElementKind parent_kind = GsnKindOf(parent);
+
+    // GSN v3: an Assumption and a Justification are leaves. Both are Claims in
+    // SACM, so a test on the SACM type alone cannot tell either from a Goal —
+    // which is how the Add menu came to offer a whole sub-argument under an
+    // Assumption, a structure the notation has no way to draw or mean.
+    if (parent_kind == GsnElementKind::Assumption || parent_kind == GsnElementKind::Justification) {
+        out_error = "Cannot add a child to an Assumption or a Justification; both are leaves in GSN.";
+        return false;
+    }
+    // Only a Goal or a Strategy takes children, whether by SupportedBy or by
+    // InContextOf. A Solution and a Context are leaves too.
+    if (!GsnCanBeSupported(parent_kind)) {
+        out_error = "Cannot add a child to a leaf element (" + parent.type + ").";
+        return false;
+    }
+    if (kind == NewElementKind::Strategy && parent_kind != GsnElementKind::Goal) {
+        out_error = "Strategy can only be added under a Claim.";
+        return false;
+    }
+    return true;
+}
+
+namespace {
+
 // Shared installation logic: validate parent, then build the new element +
 // relationship using the supplied ids and install into both models. Both the
 // id-generating `AddChildElement` and the replay-only `AddChildElementWithIds`
@@ -410,15 +439,8 @@ bool InstallChildElement(parser::AssuranceCase& ac,
     }
 
     const std::string& ptype = parent->type;
-    const bool parent_is_container = (ptype == "claim" || ptype == "argumentreasoning");
-    if (!parent_is_container) {
-        out_error = "Cannot add a child to a leaf element (" + ptype + ").";
+    if (!CanAddChildElement(*parent, kind, out_error))
         return false;
-    }
-    if (kind == NewElementKind::Strategy && ptype != "claim") {
-        out_error = "Strategy can only be added under a Claim.";
-        return false;
-    }
 
     sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, parent_id);
 
@@ -633,16 +655,8 @@ bool PlanChildElementIds(const parser::AssuranceCase& ac,
         out_error = "Selected element not found in model.";
         return false;
     }
-    const std::string& ptype = parent->type;
-    const bool parent_is_container = (ptype == "claim" || ptype == "argumentreasoning");
-    if (!parent_is_container) {
-        out_error = "Cannot add a child to a leaf element (" + ptype + ").";
+    if (!CanAddChildElement(*parent, kind, out_error))
         return false;
-    }
-    if (kind == NewElementKind::Strategy && ptype != "claim") {
-        out_error = "Strategy can only be added under a Claim.";
-        return false;
-    }
 
     std::unordered_set<std::string> existing_ids = CollectIds(ac);
     const sacm::ArgumentPackage* ap = FindOwningArgumentPackageConst(pkg, parent_id);

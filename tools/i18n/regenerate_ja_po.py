@@ -787,6 +787,37 @@ TRANSLATIONS = {
         "{0} は自分自身によって支持されているため、何も立証しません。",
     "Show cycle": "循環を表示",
 
+    # ===== GSN v3 well-formedness diagnostics (app/structure_problem_sync) =====
+    "Relationship {0} refers to {1}, which is not in this case. The relationship is not drawn, "
+    "so the argument shown is smaller than the one stored.":
+        "関係 {0} はこのケースに存在しない {1} を参照しています。この関係は描画されないため、"
+        "表示される議論は保存されている議論より小さくなります。",
+    "Challenge {0} targets {1}, which is not in this case. The challenge is stored but never "
+    "shown against anything.":
+        "反証 {0} はこのケースに存在しない {1} を対象にしています。この反証は保存されていますが、"
+        "どの要素に対しても表示されません。",
+    "{0} is supported by relationship {1}, but only a Goal or a Strategy can be supported in GSN.":
+        "{0} は関係 {1} によって支持されていますが、GSN で支持を受けられるのはゴールまたは戦略のみです。",
+    "{0} is given context by relationship {1}, but only a Goal or a Strategy is declared in "
+    "context in GSN.":
+        "{0} は関係 {1} によってコンテキストを与えられていますが、GSN でコンテキストの中で述べられるのは "
+        "ゴールまたは戦略のみです。",
+    "Strategy {0} is wired as an end of relationship {1}. A Strategy is the reasoning of an "
+    "inference, not one of its ends.":
+        "戦略 {0} が関係 {1} の端点として接続されています。戦略は推論の理由付けであり、"
+        "その端点ではありません。",
+    "{0} discharges a goal through relationship {1}, but it is not a Solution. Only a reference "
+    "to evidence can discharge a goal.":
+        "{0} は関係 {1} を通じてゴールを立証していますが、ソリューションではありません。"
+        "ゴールを立証できるのは証拠への参照のみです。",
+    "{0} and {1} both use the GSN identifier {2}, so neither can be referred to unambiguously.":
+        "{0} と {1} が同じ GSN 識別子 {2} を使用しているため、どちらも一意に参照できません。",
+    "{0} is marked undeveloped but is supported through relationship {1}. Either the decorator "
+    "or the support is out of date.":
+        "{0} は未展開と示されていますが、関係 {1} によって支持されています。"
+        "装飾か支持のいずれかが古くなっています。",
+    "Show element": "要素を表示",
+
     # ===== Static problem messages (translated at display via AF_TR) =====
     "The stored confidence assessment needs review because this element changed. Review the value "
     "and reactivate confidence if it is still valid.":
