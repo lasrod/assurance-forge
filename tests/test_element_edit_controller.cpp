@@ -91,6 +91,49 @@ TEST(ElementEditControllerTest, GSN3_CORE_010_CommitsNotationIdentifierWithoutRe
     EXPECT_EQ(stored.taggedValues.front().value, "SYS-GOAL");
 }
 
+// Regression: the controller reverts the panel's in-place edit before
+// dispatching the audited command. Reverting the SACM package too would upsert
+// the vendor TaggedValue onto an element that carries none, so a rejected edit
+// left a tag behind in the document — a silent modification of the argument for
+// an edit the user never landed.
+TEST(ElementEditControllerTest, GSN3_CORE_010_RejectedIdentifierEditLeavesPackageUntouched) {
+    app::AppRuntimeState state;
+    parser::SacmElement goal;
+    goal.id = "generated_3";
+    goal.gsn_identifier = "G1";
+    goal.type = "claim";
+    parser::SacmElement sibling;
+    sibling.id = "generated_4";
+    sibling.gsn_identifier = "G2";
+    sibling.type = "claim";
+    state.app_state.loaded_case = parser::AssuranceCase{};
+    state.app_state.loaded_case->elements.push_back(goal);
+    state.app_state.loaded_case->elements.push_back(sibling);
+
+    // Both claims are imported without the vendor tag, as a third-party SACM
+    // document would be.
+    sacm::ArgumentPackage argument_package;
+    sacm::Claim stored_goal;
+    stored_goal.id = "generated_3";
+    argument_package.claims.push_back(stored_goal);
+    sacm::Claim stored_sibling;
+    stored_sibling.id = "generated_4";
+    argument_package.claims.push_back(stored_sibling);
+    state.app_state.sacm_package = sacm::AssuranceCasePackage{};
+    state.app_state.sacm_package->argumentPackages.push_back(argument_package);
+
+    // The user retypes G1 as G2, which the sibling already owns.
+    parser::SacmElement& edited = state.app_state.loaded_case->elements.front();
+    edited.gsn_identifier = "G2";
+    EXPECT_FALSE(state.element_edit_controller->CommitElementTextEdit(
+        state, edited.id, "gsn_identifier", "none", "G1", edited.gsn_identifier));
+
+    EXPECT_EQ(edited.gsn_identifier, "G1");
+    const sacm::ArgumentPackage& package = state.app_state.sacm_package->argumentPackages.front();
+    EXPECT_TRUE(package.claims.front().taggedValues.empty());
+    EXPECT_TRUE(package.claims.back().taggedValues.empty());
+}
+
 // Regression: the panel passes `new_value` as a reference into the parser
 // model's own string (ImGui's per-keystroke binding mutates the model in
 // place). The controller's revert step writes through the same memory.

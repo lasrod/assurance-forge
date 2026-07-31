@@ -55,7 +55,26 @@ TEST(ProjectSummaryTest, DerivesWorkflowCountsWithoutExposingFolderLayout) {
     EXPECT_EQ(summary.broken_proposals, 1u);
     EXPECT_EQ(summary.conformance_files, 1u);
     EXPECT_EQ(summary.exported_reports, 1u);
-    EXPECT_EQ(summary.attention_count(), 3u);
+    EXPECT_EQ(summary.attention_count(), 5u);
+}
+
+// Regression: the Case Explorer header renders "No open project alerts." when
+// attention_count() is zero, while the overview lists undeveloped elements and
+// unlinked evidence as "Needs Attention" rows. Omitting them from the count let
+// the header deny alerts the UI was displaying directly below it.
+TEST(ProjectSummaryTest, AttentionCountCoversEveryRenderedAttentionRow) {
+    const core::AssuranceCase model = MakeCase();
+    const core::AssuranceTree tree = core::AssuranceTree::Build(model);
+
+    const core::ProjectSummary summary = core::BuildProjectSummary(nullptr, &model, &tree, {}, {}, {});
+
+    // No problems and no proposals — only the argument itself needs attention.
+    EXPECT_EQ(summary.warning_problems, 0u);
+    EXPECT_EQ(summary.error_problems, 0u);
+    EXPECT_EQ(summary.broken_proposals, 0u);
+    EXPECT_EQ(summary.undeveloped, 1u);
+    EXPECT_EQ(summary.unlinked_evidence, 1u);
+    EXPECT_EQ(summary.attention_count(), 2u);
 }
 
 } // namespace

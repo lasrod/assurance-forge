@@ -312,9 +312,15 @@ bool ElementEditController::CommitElementTextEdit(AppRuntimeState& state,
         if (!TryGetWorkingModel(state, "Edit", events_, model, package))
             return false;
 
+        // Revert the parser model only — pass no package. The panel's in-place
+        // edit never touched the SACM package, so the package still holds the
+        // pre-edit state; reverting it too would upsert the vendor TaggedValue
+        // on an element that may not carry one yet, leaving a tag behind in the
+        // document if the audited command below then fails. The command applies
+        // the change to both, so the two stay in step either way.
         std::string discarded;
         std::string revert_error;
-        if (!core::SetGsnIdentifier(*model, package, element_id, original_copy, discarded, revert_error)) {
+        if (!core::SetGsnIdentifier(*model, nullptr, element_id, original_copy, discarded, revert_error)) {
             events_.Emit(StatusMessageEvent{"Edit failed: " + revert_error});
             return false;
         }
@@ -322,6 +328,10 @@ bool ElementEditController::CommitElementTextEdit(AppRuntimeState& state,
         core::commands::UpdateGsnIdentifierCommand command(element_id, new_copy);
         const auto outcome = app::commands::DispatchAuditedCommand(state, command);
         if (!outcome.success) {
+            // Deliberately no best-effort restore of the typed value here: a
+            // rejected identifier is invalid (empty, padded, or a duplicate),
+            // so leaving it in the field would show an identifier the document
+            // does not have. Model and package both hold the pre-edit value.
             events_.Emit(StatusMessageEvent{"Edit failed: " + outcome.error});
             return false;
         }

@@ -7,9 +7,13 @@
 namespace core {
 
 std::size_t ProjectSummary::attention_count() const {
+    // Must stay in step with the rows the overview renders under "Needs
+    // Attention" — a header claiming no alerts above a list of them is worse
+    // than either number alone.
+    //
     // Problems already include review findings, so do not add open review items
     // again. Broken proposals are not represented in ProblemsManager.
-    return warning_problems + error_problems + broken_proposals;
+    return warning_problems + error_problems + undeveloped + unlinked_evidence + broken_proposals;
 }
 
 ProjectSummary BuildProjectSummary(
