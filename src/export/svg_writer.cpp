@@ -124,7 +124,7 @@ std::vector<TextLine> WrappedTextLines(const GsnNode& node) {
     const double available_width = node.kind == GsnNodeKind::Solution ? node.width * 0.62 : node.width - 32.0;
     const size_t max_chars = std::max<size_t>(8, static_cast<size_t>(available_width / 7.0));
     std::vector<TextLine> lines;
-    std::string title_line = node.id;
+    std::string title_line = node.display_id.empty() ? node.id : node.display_id;
     if (!node.title.empty())
         title_line += ": " + node.title;
     for (const std::string& line : WrapParagraph(title_line, max_chars))

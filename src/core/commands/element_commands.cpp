@@ -363,4 +363,29 @@ bool UpdateElementTextCommand::Apply(CommandContext& ctx, audit::AuditEvent& out
     return true;
 }
 
+bool UpdateGsnIdentifierCommand::Apply(CommandContext& ctx,
+                                       audit::AuditEvent& out_event,
+                                       std::string& out_error) {
+    if (element_id_.empty()) {
+        out_error = "UpdateGsnIdentifierCommand requires an element id";
+        return false;
+    }
+
+    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase& model,
+                                            sacm::AssuranceCasePackage& package,
+                                            std::string& error) {
+        return core::SetGsnIdentifier(model, &package, element_id_, new_identifier_, old_identifier_, error);
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        return false;
+
+    was_no_op_ = old_identifier_ == new_identifier_;
+    out_event.event_type = "UpdateGsnIdentifier";
+    out_event.payload = nlohmann::ordered_json::object();
+    out_event.payload["element_id"] = element_id_;
+    out_event.payload["old_identifier"] = old_identifier_;
+    out_event.payload["new_identifier"] = new_identifier_;
+    return true;
+}
+
 } // namespace core::commands

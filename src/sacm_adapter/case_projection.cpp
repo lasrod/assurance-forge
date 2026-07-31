@@ -135,6 +135,7 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
 
     if (const auto* model_element = dynamic_cast<const sacm::model::ModelElement*>(&element)) {
         projected.name = model_element->name().content;
+        projected.gsn_identifier = tagged_value_for(*model_element, core::kGsnIdentifierTagKey);
         if (!projected.name.empty()) {
             const std::string& lang = model_element->name().lang;
             projected.name_langs[lang.empty() ? "en" : lang] = projected.name;

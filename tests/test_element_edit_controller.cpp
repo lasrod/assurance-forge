@@ -62,6 +62,35 @@ TEST(ElementEditControllerTest, AddChildWithoutSelectionEmitsStatusOnly) {
     EXPECT_EQ(status, "No element selected.");
 }
 
+TEST(ElementEditControllerTest, GSN3_CORE_010_CommitsNotationIdentifierWithoutRenamingStorageId) {
+    app::AppRuntimeState state;
+    parser::SacmElement goal;
+    goal.id = "generated_3";
+    goal.gsn_identifier = "G1";
+    goal.type = "claim";
+    state.app_state.loaded_case = parser::AssuranceCase{};
+    state.app_state.loaded_case->elements.push_back(goal);
+
+    sacm::Claim stored_goal;
+    stored_goal.id = "generated_3";
+    sacm::ArgumentPackage argument_package;
+    argument_package.claims.push_back(stored_goal);
+    state.app_state.sacm_package = sacm::AssuranceCasePackage{};
+    state.app_state.sacm_package->argumentPackages.push_back(argument_package);
+
+    parser::SacmElement& edited = state.app_state.loaded_case->elements.front();
+    edited.gsn_identifier = "SYS-GOAL";
+    ASSERT_TRUE(state.element_edit_controller->CommitElementTextEdit(
+        state, edited.id, "gsn_identifier", "none", "G1", edited.gsn_identifier));
+
+    EXPECT_EQ(edited.id, "generated_3");
+    EXPECT_EQ(edited.gsn_identifier, "SYS-GOAL");
+    const sacm::Claim& stored = state.app_state.sacm_package->argumentPackages.front().claims.front();
+    EXPECT_EQ(stored.id, "generated_3");
+    ASSERT_EQ(stored.taggedValues.size(), 1u);
+    EXPECT_EQ(stored.taggedValues.front().value, "SYS-GOAL");
+}
+
 // Regression: the panel passes `new_value` as a reference into the parser
 // model's own string (ImGui's per-keystroke binding mutates the model in
 // place). The controller's revert step writes through the same memory.

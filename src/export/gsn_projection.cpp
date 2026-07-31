@@ -1,6 +1,7 @@
 #include "export/gsn_projection.h"
 
 #include "core/string_utils.h"
+#include "core/element_factory.h"
 #include "core/terminology_package_service.h"
 
 #include <algorithm>
@@ -446,6 +447,7 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
 
         GsnNode node;
         node.id = MakeUniqueSvgId(source_id, node_id_counts, result.warnings);
+        node.display_id = is_visible_terminology_context ? source_id : core::GsnIdentifierFor(element);
         node.source_gid = element.gid;
         node.kind = is_visible_terminology_context ? GsnNodeKind::Context : InitialKindFor(element);
         node.title = element.name;

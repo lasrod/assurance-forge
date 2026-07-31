@@ -125,4 +125,25 @@ private:
     bool             was_no_op_ = false;
 };
 
+// Change the user-facing GSN notation identifier without renaming the SACM
+// element or rewriting graph references. The independent identifier is stored
+// in a vendor TaggedValue and the edit is replayable like every other mutation.
+class UpdateGsnIdentifierCommand final : public ICommand {
+public:
+    UpdateGsnIdentifierCommand(std::string element_id, std::string new_identifier)
+        : element_id_(std::move(element_id)), new_identifier_(std::move(new_identifier)) {}
+
+    std::string Name() const override { return "UpdateGsnIdentifier"; }
+    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+    const std::string& OldIdentifier() const { return old_identifier_; }
+    bool               WasNoOp() const { return was_no_op_; }
+
+private:
+    std::string element_id_;
+    std::string new_identifier_;
+    std::string old_identifier_;
+    bool        was_no_op_ = false;
+};
+
 } // namespace core::commands

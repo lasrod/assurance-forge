@@ -213,6 +213,21 @@ bool SetElementTextField(parser::AssuranceCase& ac,
                          std::string& out_old_value,
                          std::string& out_error);
 
+// Returns the user-facing GSN notation identifier. Untagged legacy/imported
+// elements fall back to their SACM storage id until explicitly renumbered.
+std::string GsnIdentifierFor(const parser::SacmElement& element);
+
+// Renumber one GSN node without changing its SACM storage identity or any
+// relationship references. The identifier must be non-empty and unique among
+// the case's non-relationship elements. The independent value is mirrored to
+// the SACM package as a vendor TaggedValue for lossless save/reload.
+bool SetGsnIdentifier(parser::AssuranceCase& ac,
+                      sacm::AssuranceCasePackage* pkg,
+                      const std::string& element_id,
+                      const std::string& new_identifier,
+                      std::string& out_old_identifier,
+                      std::string& out_error);
+
 // Returns true if the element carries a secondary-language translation, i.e. any
 // of its name/description/content localized maps has a non-"en" entry with
 // non-empty text. Used to decide whether editing the element should flag it for

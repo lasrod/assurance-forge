@@ -331,6 +331,8 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddTopGoalReproducesLegacyStructure) {
     EXPECT_EQ(library_goal->type, "claim");
     EXPECT_EQ(library_goal->type, legacy_goal->type);
     EXPECT_EQ(library_goal->name, legacy_goal->name);
+    EXPECT_EQ(library_goal->gsn_identifier, "TG1");
+    EXPECT_EQ(legacy_goal->gsn_identifier, "TG1");
     for (const core::SacmElement& element : after.elements) {
         EXPECT_EQ(std::find(element.source_refs.begin(), element.source_refs.end(), "TG1"),
                   element.source_refs.end());

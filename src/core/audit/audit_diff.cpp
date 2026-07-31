@@ -39,7 +39,7 @@ void AddAddedFromEvent(const AuditEvent& event, AuditChangeSet& out) {
         }
         return;
     }
-    if (type == "UpdateElementText") {
+    if (type == "UpdateElementText" || type == "UpdateGsnIdentifier") {
         auto el_it = payload.find("element_id");
         if (el_it != payload.end() && el_it->is_string())
             out.modified.insert(el_it->get<std::string>());

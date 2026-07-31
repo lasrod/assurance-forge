@@ -393,7 +393,8 @@ void AppRuntime::RenderFrame(bool& done) {
             if (committed) {
                 // A text edit on a translated element may have desynced the other
                 // language; flag it for review until the user confirms both match.
-                MarkTranslationReviewPending(element_id);
+                if (field_token != "gsn_identifier")
+                    MarkTranslationReviewPending(element_id);
                 impl_->events.Emit(TreeDirtyEvent{});
             }
         },

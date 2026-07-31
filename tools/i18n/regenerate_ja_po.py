@@ -200,6 +200,7 @@ TRANSLATIONS = {
     "ID:": "ID:",
     "ID: {0}": "ID: {0}",
     "GID: {0}": "GID: {0}",
+    "GSN identifier": "GSN 識別子",
     "Type": "種別",
     "Type:": "種別:",
     "Type: {0}": "種別: {0}",

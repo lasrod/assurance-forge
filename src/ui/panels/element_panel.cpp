@@ -1,5 +1,6 @@
 ﻿#include "ui/panels/element_panel.h"
 
+#include "core/element_factory.h"
 #include "core/terminology_scope_service.h"
 #include "imgui.h"
 #include "imgui_stdlib.h"
@@ -452,6 +453,20 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
                                                   commit.original_value, commit.new_value);
         }
     };
+
+    // GSN notation identifier (editable independently of the read-only SACM id).
+    ImGui::Text("%s", AF_TR("GSN identifier").c_str());
+    ImGui::Separator();
+    {
+        std::string displayed_identifier = core::GsnIdentifierFor(*elem);
+        ImGuiID widget_id = 0;
+        if (EditableSingleLine("gsn_identifier", displayed_identifier, &widget_id)) {
+            elem->gsn_identifier = displayed_identifier;
+            modified = true;
+        }
+        commit_if_finished(widget_id, displayed_identifier, "gsn_identifier", "none");
+    }
+    ImGui::Spacing();
 
     // Name (editable)
     ImGui::Text("%s", AF_TR("Name").c_str());

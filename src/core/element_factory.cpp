@@ -165,6 +165,9 @@ void MirrorClaim(sacm::ArgumentPackage* ap, const parser::SacmElement& src) {
     c.isAbstract = src.is_abstract;
     c.assertionDeclaration = src.assertion_declaration;
     c.undeveloped = src.undeveloped;
+    c.taggedValues.push_back(sacm::TaggedValue{.id = src.id + "__gsnIdentifier",
+                                               .key = kGsnIdentifierTagKey,
+                                               .value = GsnIdentifierFor(src)});
     ap->claims.push_back(std::move(c));
 }
 
@@ -176,6 +179,9 @@ void MirrorReasoning(sacm::ArgumentPackage* ap, const parser::SacmElement& src) 
     r.name = src.name;
     r.name_ml.set("en", src.name);
     r.isAbstract = src.is_abstract;
+    r.taggedValues.push_back(sacm::TaggedValue{.id = src.id + "__gsnIdentifier",
+                                               .key = kGsnIdentifierTagKey,
+                                               .value = GsnIdentifierFor(src)});
     ap->argumentReasonings.push_back(std::move(r));
 }
 
@@ -187,6 +193,9 @@ void MirrorArtifactReference(sacm::ArgumentPackage* ap, const parser::SacmElemen
     ar.name = src.name;
     ar.name_ml.set("en", src.name);
     ar.isAbstract = src.is_abstract;
+    ar.taggedValues.push_back(sacm::TaggedValue{.id = src.id + "__gsnIdentifier",
+                                                .key = kGsnIdentifierTagKey,
+                                                .value = GsnIdentifierFor(src)});
     ap->artifactReferences.push_back(std::move(ar));
 }
 
@@ -242,6 +251,7 @@ bool InstallStrategy(parser::AssuranceCase& ac,
                      const std::string& element_id) {
     parser::SacmElement reasoning;
     reasoning.id = element_id;
+    reasoning.gsn_identifier = element_id;
     reasoning.type = "argumentreasoning";
     reasoning.name = DefaultNameFor(NewElementKind::Strategy);
 
@@ -297,6 +307,7 @@ bool InstallSubGoalUnderStrategy(parser::AssuranceCase& ac,
 
     parser::SacmElement goal;
     goal.id = element_id;
+    goal.gsn_identifier = element_id;
     goal.type = "claim";
     goal.name = DefaultNameFor(NewElementKind::Goal);
 
@@ -428,6 +439,7 @@ bool InstallChildElement(parser::AssuranceCase& ac,
 
     parser::SacmElement new_elem;
     new_elem.id = element_id;
+    new_elem.gsn_identifier = element_id;
     new_elem.name = DefaultNameFor(kind);
 
     parser::SacmElement rel;
@@ -512,6 +524,7 @@ bool InstallTopGoal(parser::AssuranceCase& ac,
     }
     parser::SacmElement goal;
     goal.id = element_id;
+    goal.gsn_identifier = element_id;
     goal.type = "claim";
     goal.name = DefaultNameFor(NewElementKind::Goal);
 
@@ -560,6 +573,7 @@ bool InstallChallenge(parser::AssuranceCase& ac,
 
     parser::SacmElement new_elem;
     new_elem.id = element_id;
+    new_elem.gsn_identifier = element_id;
     new_elem.name = "";
 
     parser::SacmElement rel;
@@ -1267,6 +1281,82 @@ bool UpdateSacmElementText(sacm::AssuranceCasePackage& pkg,
     return false;
 }
 
+void UpsertGsnIdentifierTag(sacm::SacmElement& element, const std::string& identifier) {
+    for (sacm::TaggedValue& tag : element.taggedValues) {
+        if (tag.key == kGsnIdentifierTagKey) {
+            tag.value = identifier;
+            return;
+        }
+    }
+    element.taggedValues.push_back(sacm::TaggedValue{
+        .id = element.id + "__gsnIdentifier",
+        .key = kGsnIdentifierTagKey,
+        .value = identifier,
+    });
+}
+
+bool UpdateSacmGsnIdentifier(sacm::AssuranceCasePackage& pkg,
+                             const std::string& element_id,
+                             const std::string& identifier) {
+    for (sacm::ArgumentPackage& ap : pkg.argumentPackages) {
+        for (sacm::Claim& element : ap.claims) {
+            if (element.id == element_id) {
+                UpsertGsnIdentifierTag(element, identifier);
+                return true;
+            }
+        }
+        for (sacm::ArgumentReasoning& element : ap.argumentReasonings) {
+            if (element.id == element_id) {
+                UpsertGsnIdentifierTag(element, identifier);
+                return true;
+            }
+        }
+        for (sacm::ArtifactReference& element : ap.artifactReferences) {
+            if (element.id == element_id) {
+                UpsertGsnIdentifierTag(element, identifier);
+                return true;
+            }
+        }
+        for (sacm::TerminologyPackage& terminology : ap.terminologyPackages) {
+            for (sacm::Expression& element : terminology.expressions) {
+                if (element.id == element_id) {
+                    UpsertGsnIdentifierTag(element, identifier);
+                    return true;
+                }
+            }
+            for (sacm::Term& element : terminology.terms) {
+                if (element.id == element_id) {
+                    UpsertGsnIdentifierTag(element, identifier);
+                    return true;
+                }
+            }
+        }
+    }
+    for (sacm::ArtifactPackage& artifacts : pkg.artifactPackages) {
+        for (sacm::Artifact& element : artifacts.artifacts) {
+            if (element.id == element_id) {
+                UpsertGsnIdentifierTag(element, identifier);
+                return true;
+            }
+        }
+    }
+    for (sacm::TerminologyPackage& terminology : pkg.terminologyPackages) {
+        for (sacm::Expression& element : terminology.expressions) {
+            if (element.id == element_id) {
+                UpsertGsnIdentifierTag(element, identifier);
+                return true;
+            }
+        }
+        for (sacm::Term& element : terminology.terms) {
+            if (element.id == element_id) {
+                UpsertGsnIdentifierTag(element, identifier);
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 } // namespace
 
 bool SetElementTextField(parser::AssuranceCase& ac,
@@ -1310,6 +1400,74 @@ bool SetElementTextField(parser::AssuranceCase& ac,
     WriteParserField(*elem, field, language, new_value);
     if (pkg)
         UpdateSacmElementText(*pkg, element_id, field, language, new_value);
+    return true;
+}
+
+std::string GsnIdentifierFor(const parser::SacmElement& element) {
+    if (!element.gsn_identifier.empty())
+        return element.gsn_identifier;
+    return element.id;
+}
+
+bool SetGsnIdentifier(parser::AssuranceCase& ac,
+                      sacm::AssuranceCasePackage* pkg,
+                      const std::string& element_id,
+                      const std::string& new_identifier,
+                      std::string& out_old_identifier,
+                      std::string& out_error) {
+    out_old_identifier.clear();
+    out_error.clear();
+
+    const auto first_non_space = std::find_if_not(new_identifier.begin(), new_identifier.end(), [](unsigned char ch) {
+        return std::isspace(ch) != 0;
+    });
+    const auto last_non_space = std::find_if_not(new_identifier.rbegin(), new_identifier.rend(), [](unsigned char ch) {
+        return std::isspace(ch) != 0;
+    }).base();
+    if (first_non_space == new_identifier.end()) {
+        out_error = "GSN identifier must be non-empty.";
+        return false;
+    }
+    const std::string normalized_identifier(first_non_space, last_non_space);
+    if (normalized_identifier != new_identifier) {
+        out_error = "GSN identifier must not start or end with whitespace.";
+        return false;
+    }
+
+    parser::SacmElement* target = nullptr;
+    for (parser::SacmElement& element : ac.elements) {
+        if (element.id == element_id) {
+            target = &element;
+            break;
+        }
+    }
+    if (target == nullptr) {
+        out_error = "Element not found: " + element_id;
+        return false;
+    }
+    if (IsRelationshipType(target->type)) {
+        out_error = "GSN notation identifiers can only be edited on nodes.";
+        return false;
+    }
+
+    for (const parser::SacmElement& element : ac.elements) {
+        if (&element == target || IsRelationshipType(element.type))
+            continue;
+        if (GsnIdentifierFor(element) == normalized_identifier) {
+            out_error = "GSN identifier '" + normalized_identifier + "' is already used by element " + element.id + ".";
+            return false;
+        }
+    }
+
+    out_old_identifier = GsnIdentifierFor(*target);
+    if (out_old_identifier == normalized_identifier)
+        return true;
+
+    if (pkg != nullptr && !UpdateSacmGsnIdentifier(*pkg, element_id, normalized_identifier)) {
+        out_error = "SACM element not found for GSN identifier update: " + element_id;
+        return false;
+    }
+    target->gsn_identifier = normalized_identifier;
     return true;
 }
 

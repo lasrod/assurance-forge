@@ -48,7 +48,7 @@ NodeSizeLimits SizeLimitsFor(GsnNodeKind kind) {
 }
 
 std::string DisplayTextForLayout(const GsnNode& node) {
-    std::string label = node.id;
+    std::string label = node.display_id.empty() ? node.id : node.display_id;
     if (!node.title.empty())
         label += ": " + node.title;
     if (!node.text.empty()) {

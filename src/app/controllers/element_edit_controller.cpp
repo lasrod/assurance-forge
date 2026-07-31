@@ -301,9 +301,35 @@ bool ElementEditController::CommitElementTextEdit(AppRuntimeState& state,
     const std::string original_copy = original_value;
     const std::string new_copy      = new_value;
 
-    if (element_id.empty() || language.empty())
+    if (element_id.empty())
         return false;
     if (original_copy == new_copy)
+        return false;
+
+    if (field_token == "gsn_identifier") {
+        parser::AssuranceCase* model = nullptr;
+        sacm::AssuranceCasePackage* package = nullptr;
+        if (!TryGetWorkingModel(state, "Edit", events_, model, package))
+            return false;
+
+        std::string discarded;
+        std::string revert_error;
+        if (!core::SetGsnIdentifier(*model, package, element_id, original_copy, discarded, revert_error)) {
+            events_.Emit(StatusMessageEvent{"Edit failed: " + revert_error});
+            return false;
+        }
+
+        core::commands::UpdateGsnIdentifierCommand command(element_id, new_copy);
+        const auto outcome = app::commands::DispatchAuditedCommand(state, command);
+        if (!outcome.success) {
+            events_.Emit(StatusMessageEvent{"Edit failed: " + outcome.error});
+            return false;
+        }
+        events_.Emit(DocumentDirtyEvent{});
+        return true;
+    }
+
+    if (language.empty())
         return false;
     core::ElementTextField field;
     if (!core::ElementTextFieldFromToken(field_token, field)) {

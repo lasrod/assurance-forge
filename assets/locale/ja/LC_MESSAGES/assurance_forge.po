@@ -760,6 +760,9 @@ msgstr "GSN キャンバス"
 msgid "GSN SVG"
 msgstr "GSN SVG"
 
+msgid "GSN identifier"
+msgstr "GSN 識別子"
+
 msgid "GSN structure, SACM imports, evidence, and registers"
 msgstr "GSN 構造、SACM インポート、エビデンス、登録簿を学びます"
 

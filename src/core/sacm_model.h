@@ -14,10 +14,16 @@
 
 namespace core {
 
+// SACM has storage identity (`id` / `gid`) but no native GSN notation
+// identifier. Assurance Forge preserves that independent GSN value in a
+// vendor TaggedValue while keeping all graph references on the SACM id.
+inline constexpr char kGsnIdentifierTagKey[] = "assuranceForge.gsn.identifier";
+
 // Represents a SACM element (claim, strategy, evidence, etc.)
 struct SacmElement {
     std::string id;
     std::string gid;
+    std::string gsn_identifier;
     std::string name;
     std::string type; // "claim", "argumentreasoning", "artifact", etc. (lowercased local-name)
     std::string content;

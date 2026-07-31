@@ -697,6 +697,23 @@ bool ApplyEvent(ReplayState& state,
         return true;
     }
 
+    if (type == "UpdateGsnIdentifier") {
+        std::string element_id, new_identifier;
+        if (!require_string("element_id", element_id))
+            return false;
+        if (!require_string("new_identifier", new_identifier))
+            return false;
+        std::string old_identifier_unused;
+        std::string error;
+        if (!core::SetGsnIdentifier(state.model, &state.package, element_id, new_identifier,
+                                    old_identifier_unused, error)) {
+            out_error = "SetGsnIdentifier failed at " +
+                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + error;
+            return false;
+        }
+        return true;
+    }
+
     if (type == "ApplyProposal") {
         std::string proposal_json;
         if (!require_string("proposal_json", proposal_json))
@@ -1129,6 +1146,27 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             if (!core::SetElementTextField(model, &package, element_id, field, language, new_value,
                                            old_value_unused, set_error)) {
                 err = "SetElementTextField (bridge) failed at " + location + ": " + set_error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
+    }
+
+    if (type == "UpdateGsnIdentifier") {
+        std::string element_id, new_identifier;
+        if (!require_string("element_id", element_id))
+            return false;
+        if (!require_string("new_identifier", new_identifier))
+            return false;
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate = [&](parser::AssuranceCase& model,
+                                         sacm::AssuranceCasePackage& package,
+                                         std::string& error) {
+            std::string old_identifier_unused;
+            if (!core::SetGsnIdentifier(model, &package, element_id, new_identifier,
+                                        old_identifier_unused, error)) {
+                error = "SetGsnIdentifier (bridge) failed at " + location + ": " + error;
                 return false;
             }
             return true;

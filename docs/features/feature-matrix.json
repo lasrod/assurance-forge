@@ -451,16 +451,27 @@
       "tests": [
         "tests/test_element_factory.cpp"
       ],
-      "notes": "New elements are minted with a type-specific prefix, unique within the case, and rendered as `id: name`. This does not satisfy the complete mandatory-identifier requirement for imported elements; see AF-GSN-015 and GSN3-CORE-010."
+      "notes": "New nodes receive a type-specific notation identifier, unique within the case, and render as `identifier: name`; storage identity remains independently stable."
     },
     {
       "id": "AF-GSN-015",
       "area": "GSN",
       "name": "GSN identifier independent of storage identity",
-      "status": "planned",
-      "evidence": [],
-      "tests": [],
-      "notes": "The displayed identifier is currently the SACM `xmi:id`, so it cannot be renumbered independently and opaque imported ids such as `generated_3` remain visible."
+      "status": "supported",
+      "evidence": [
+        "src/core/element_factory.cpp",
+        "src/core/assurance_tree.cpp",
+        "src/ui/panels/element_panel.cpp",
+        "src/export/gsn_projection.cpp"
+      ],
+      "tests": [
+        "tests/test_element_factory.cpp",
+        "tests/test_element_edit_controller.cpp",
+        "tests/test_event_replayer.cpp",
+        "tests/test_gsn_svg_exporter.cpp",
+        "tests/test_xml_parser.cpp"
+      ],
+      "notes": "Imported opaque storage ids remain graph keys while the editable GSN identifier is persisted in `assuranceForge.gsn.identifier`, rendered on the canvas, and used as the SVG display label. The vendor tag is an Assurance Forge interchange convention, not a normative GSN XMI mapping."
     },
     {
       "id": "AF-GSN-013",
