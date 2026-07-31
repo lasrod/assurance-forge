@@ -115,6 +115,16 @@ TEST(AuditDiff, UpdateElementTextMarksElementModified) {
     EXPECT_TRUE(cs.modified.count("G1"));
 }
 
+TEST(AuditDiff, GSN3_CORE_010_UpdateGsnIdentifierMarksElementModified) {
+    auto tx = MakeTx(1, {MakeEvent("UpdateGsnIdentifier",
+                                  {{"element_id", "G1"},
+                                   {"old_identifier", "G1"},
+                                   {"new_identifier", "SYS-GOAL"}})});
+    const core::audit::AuditChangeSet changes = core::audit::ComputeChangeSet(tx);
+    EXPECT_EQ(changes.modified.size(), 1u);
+    EXPECT_EQ(changes.modified.count("G1"), 1u);
+}
+
 TEST(AuditDiff, AggregateDoesNotMarkNewlyAddedElementAsModified) {
     auto create = MakeTx(1, {MakeEvent("CreateTopGoal", {{"generated_id", "G1"}})});
     auto edit = MakeTx(2, {MakeEvent("UpdateElementText",

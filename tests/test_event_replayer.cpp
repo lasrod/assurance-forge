@@ -413,6 +413,33 @@ TEST(EventReplayer, ReplaysUpdateElementTextToMatchLiveState) {
     EXPECT_TRUE(found);
 }
 
+TEST(EventReplayer, GSN3_CORE_010_ReplaysIndependentNotationIdentifierEdit) {
+    auto f = MakeFixture("update_gsn_identifier");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+
+    core::commands::CommandContext ctx{f.model, f.package};
+    core::commands::UpdateGsnIdentifierCommand edit("G1", "SYS-GOAL");
+    const auto live_result = bus->Execute(edit, ctx, "tester");
+    ASSERT_TRUE(live_result.success) << live_result.error;
+    EXPECT_EQ(edit.OldIdentifier(), "G1");
+    ASSERT_EQ(bus->Store().Transactions().size(), 1u);
+    EXPECT_EQ(bus->Store().Transactions().front().events.front().event_type, "UpdateGsnIdentifier");
+
+    auto snapshot = LoadSnapshotState(f.project.rootPath, core::audit::kInitialSnapshotId);
+    auto replayed = core::audit::Replayer::ReplayFrom(
+        snapshot.model, snapshot.package, bus->Store().Transactions(),
+        std::numeric_limits<std::uint64_t>::max());
+    ASSERT_TRUE(replayed.has_value()) << (replayed.has_value() ? "" : replayed.error());
+    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package),
+              core::audit::CanonicalModelHash(f.package));
+    ASSERT_EQ(replayed->model.elements.size(), 1u);
+    EXPECT_EQ(replayed->model.elements.front().id, "G1");
+    EXPECT_EQ(replayed->model.elements.front().gsn_identifier, "SYS-GOAL");
+}
+
 TEST(EventReplayer, ReplaysUpdateElementTextSecondaryLanguage) {
     auto f = MakeFixture("update_text_lang");
 

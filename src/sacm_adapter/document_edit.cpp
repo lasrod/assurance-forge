@@ -3,6 +3,7 @@
 #include "sacm_adapter/gsn_role_tag.h"
 #include "sacm_adapter/library_document_access.h"
 
+#include "core/sacm_model.h"
 #include "sacm/commands/mutation.h"
 #include "sacm/commands/operations.h"
 #include "sacm/io/xmi.h"
@@ -321,6 +322,15 @@ std::string strategy_target_of(const sacm::model::ModelElement& strategy) {
     return {};
 }
 
+sacm::commands::MutationResult add_gsn_identifier_tag(sacm::model::Document& document,
+                                                       const sacm::model::ElementId& element) {
+    return document.apply(sacm::commands::AddTaggedValue{
+        .element = element,
+        .key = core::kGsnIdentifierTagKey,
+        .value = element.value(),
+    });
+}
+
 // A sub-goal added under a strategy is a source of the strategy's single
 // inference (the standard one-inference GSN->SACM encoding, not the legacy
 // per-sub-goal inference). Materialize `{target = the goal the strategy supports,
@@ -340,6 +350,11 @@ AddChildOutcome apply_add_subgoal_under_strategy(sacm::model::Document& doc,
         return failed_child(created);
     }
     const sacm::model::ElementId goal_id = created.created_ids().front();
+    const sacm::commands::MutationResult identifier_tagged = add_gsn_identifier_tag(doc, goal_id);
+    if (!identifier_tagged.applied) {
+        rollback_element(doc, goal_id);
+        return failed_child(identifier_tagged);
+    }
 
     // Re-fetch the package after the create (the element vector may have grown).
     const auto* package = doc.find_as<sacm::model::ArgumentPackage>(package_id);
@@ -431,6 +446,11 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
             rollback_element(doc, strategy_id);
             return failed_child(tagged);
         }
+        const sacm::commands::MutationResult identifier_tagged = add_gsn_identifier_tag(doc, strategy_id);
+        if (!identifier_tagged.applied) {
+            rollback_element(doc, strategy_id);
+            return failed_child(identifier_tagged);
+        }
         AddChildOutcome outcome;
         outcome.supported = true;
         outcome.applied = true;
@@ -460,6 +480,11 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
         return failed_child(created);
     }
     const sacm::model::ElementId created_id = created.created_ids().front();
+    const sacm::commands::MutationResult identifier_tagged = add_gsn_identifier_tag(doc, created_id);
+    if (!identifier_tagged.applied) {
+        rollback_element(doc, created_id);
+        return failed_child(identifier_tagged);
+    }
 
     // 2. Assumption/Justification set an assertion declaration.
     if (plan->assertion.has_value()) {
@@ -519,10 +544,16 @@ AddChildOutcome apply_add_top_goal(LibraryDocument& document, const std::string&
     if (!created.applied || created.created_ids().empty()) {
         return failed_child(created);
     }
+    const sacm::model::ElementId created_id = created.created_ids().front();
+    const sacm::commands::MutationResult identifier_tagged = add_gsn_identifier_tag(doc, created_id);
+    if (!identifier_tagged.applied) {
+        rollback_element(doc, created_id);
+        return failed_child(identifier_tagged);
+    }
     AddChildOutcome outcome;
     outcome.supported = true;
     outcome.applied = true;
-    outcome.new_element_id = created.created_ids().front().value();
+    outcome.new_element_id = created_id.value();
     return outcome;  // a top goal has no parent, so no relationship
 }
 
@@ -562,6 +593,11 @@ AddChildOutcome apply_challenge(LibraryDocument& document, const std::string& ta
         return failed_child(created);
     }
     const sacm::model::ElementId counter_id = created.created_ids().front();
+    const sacm::commands::MutationResult identifier_tagged = add_gsn_identifier_tag(doc, counter_id);
+    if (!identifier_tagged.applied) {
+        rollback_element(doc, counter_id);
+        return failed_child(identifier_tagged);
+    }
 
     const sacm::commands::MutationResult linked = doc.apply(sacm::commands::CreateAssertedRelationship{
         .parent = package_id,

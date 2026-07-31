@@ -24,7 +24,10 @@ enum class GsnEdgeKind {
 };
 
 struct GsnNode {
+    // Stable technical id used by graph edges and the SVG DOM.
     std::string id;
+    // User-facing GSN notation identifier rendered inside the node.
+    std::string display_id;
     std::string source_gid;
     GsnNodeKind kind = GsnNodeKind::Goal;
     std::string title;

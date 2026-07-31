@@ -443,3 +443,22 @@ TEST(XmlParserTest, ParseDescriptionDefaultLang) {
     const auto& claim = result.value().elements[0];
     EXPECT_EQ(claim.description, "Simple description");
 }
+
+TEST(XmlParserTest, GSN3_CORE_010_ParsesNotationIdentifierIndependentlyFromStorageId) {
+    const char* xml = R"(
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.3" id="case">
+  <argumentPackage id="argument">
+    <claim id="generated_3" name="Top goal">
+      <taggedValue id="generated_3__gsnIdentifier"
+                   key="assuranceForge.gsn.identifier"
+                   value="G1"/>
+    </claim>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>)";
+
+    auto result = parse_sacm_xml_string(xml);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->elements.size(), 1u);
+    EXPECT_EQ(result->elements.front().id, "generated_3");
+    EXPECT_EQ(result->elements.front().gsn_identifier, "G1");
+}

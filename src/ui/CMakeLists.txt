@@ -22,6 +22,7 @@ add_library(af_ui OBJECT
     panels/preferences_panel.cpp
     panels/problems_panel.cpp
     panels/project_explorer_panel.cpp
+    panels/project_overview_panel.cpp
     panels/relationship_panel.cpp
     panels/review_panel.cpp
     panels/sacm_viewer_panel.cpp

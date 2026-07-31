@@ -15,6 +15,7 @@
 namespace ui {
 
 enum class CenterView {
+    ProjectOverview,
     GsnCanvas,
     CseRegister,
     EvidenceRegister,

@@ -17,6 +17,11 @@ namespace app::areas {
 
 struct ProjectExplorerAreaCallbacks {
     std::function<void()> refresh_sacm_package_tree_cache;
+    std::function<void()> open_overview;
+    std::function<void()> open_reviews;
+    std::function<void()> open_cse_register;
+    std::function<void()> open_evidence_register;
+    std::function<void(const char*)> show_not_implemented;
     std::function<void()> create_sacm_file;
     std::function<void()> create_evidence_register;
     std::function<void()> create_j3377_cae_register;

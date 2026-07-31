@@ -236,6 +236,7 @@ void extract_elements_recursive(pugi::xml_node node, AssuranceCase& assurance_ca
             element.name = child.attribute("name").as_string();
             element.type = local_name;
             element.content = child.attribute("content").as_string();
+            element.gsn_identifier = tagged_value(child, core::kGsnIdentifierTagKey);
             element.is_abstract = read_bool_attr(child, "isAbstract", false);
             element.assertion_declaration = child.attribute("assertionDeclaration").as_string();
             if (local_name == "claim" || local_name == "argumentreasoning") {

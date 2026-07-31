@@ -7,7 +7,7 @@ Assurance Forge uses a named application shell to keep the frame layout separate
 | Area | Responsibility |
 | --- | --- |
 | `AppShell` | Persistent outer frame, main menu, future toolbar, splitters, and layout region calculation. |
-| `ProjectExplorerArea` | Project files, SACM package nodes, registers, proposal patch files, and project-level navigation. |
+| `ProjectExplorerArea` | Role-based Case Explorer for overview, arguments, evidence, reviews, conformance, reports, terminology, and advanced SACM/file navigation. |
 | `ArgumentNavigatorArea` | Argument tree navigation and tree editing commands. |
 | `WorkbenchArea` | Main editable/viewing surface, including the GSN canvas, register views, package details, and terminology package view. |
 | `InspectorArea` | Right-side details and selected element editing. |
@@ -31,6 +31,11 @@ flowchart TD
 ```
 
 `AppRuntime` remains responsible for lifecycle coordination, event registration, derived view rebuilds, proposal preview refresh, AI task polling, and close/save-before-exit flow. Area renderers should focus on building panel models, wiring callbacks, and invoking lower-level UI panels.
+
+The Case Explorer is deliberately a projection over `core::AssuranceProject`
+and the active SACM model. Physical paths and package internals remain
+available under **Advanced**, but the default hierarchy follows assurance
+workflows rather than the project directory layout.
 
 `AppRuntimeState` keeps shared runtime data in responsibility-oriented groups where the ownership is stable: `layout` for splitter ratios and dock sizing, `workbench` for center-tab visibility and focus requests, `terminology` for terminology package/editor/usage UI state, and `ai` for AI service handles, settings, connection test state, and AI review coordination.
 

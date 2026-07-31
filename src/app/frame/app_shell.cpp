@@ -100,13 +100,16 @@ void RenderAppSplitters(AppRuntimeState& state,
 } // namespace
 
 void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center_view) {
-    if (!state.workbench.show_gsn_tab && !state.workbench.show_cse_tab && !state.workbench.show_evidence_tab &&
+    if (!state.workbench.show_overview_tab && !state.workbench.show_gsn_tab && !state.workbench.show_cse_tab &&
+        !state.workbench.show_evidence_tab &&
         !state.workbench.show_package_details_tab && !state.workbench.show_terminology_package_tab) {
-        state.workbench.show_gsn_tab = true;
+        state.workbench.show_overview_tab = true;
     }
 
     auto is_tab_visible = [&](ui::CenterView view) {
         switch (view) {
+        case ui::CenterView::ProjectOverview:
+            return state.workbench.show_overview_tab;
         case ui::CenterView::GsnCanvas:
             return state.workbench.show_gsn_tab;
         case ui::CenterView::CseRegister:
@@ -122,7 +125,9 @@ void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center
     };
 
     if (!is_tab_visible(center_view)) {
-        if (state.workbench.show_gsn_tab) {
+        if (state.workbench.show_overview_tab) {
+            center_view = ui::CenterView::ProjectOverview;
+        } else if (state.workbench.show_gsn_tab) {
             center_view = ui::CenterView::GsnCanvas;
         } else if (state.workbench.show_cse_tab) {
             center_view = ui::CenterView::CseRegister;

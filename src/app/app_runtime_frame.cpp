@@ -193,6 +193,23 @@ void AppRuntime::RenderFrame(bool& done) {
 
     areas::ProjectExplorerAreaCallbacks project_explorer_callbacks{
         [this]() { RefreshSacmPackageTreeCache(); },
+        [this]() {
+            impl_->workbench.show_overview_tab = true;
+            ui::GetUiState().center_view = ui::CenterView::ProjectOverview;
+            impl_->workbench.force_center_tab_selection = true;
+        },
+        [this]() { impl_->workbench.focus_review_tab = true; },
+        [this]() {
+            impl_->workbench.show_cse_tab = true;
+            ui::GetUiState().center_view = ui::CenterView::CseRegister;
+            impl_->workbench.force_center_tab_selection = true;
+        },
+        [this]() {
+            impl_->workbench.show_evidence_tab = true;
+            ui::GetUiState().center_view = ui::CenterView::EvidenceRegister;
+            impl_->workbench.force_center_tab_selection = true;
+        },
+        [this](const char* feature) { ShowNotImplementedModal(feature); },
         [this]() { BeginCreateProjectSacmFile(); },
         [this]() { BeginCreateProjectEvidenceRegister(); },
         [this]() { BeginCreateProjectJ3377CaeRegister(); },
@@ -376,7 +393,8 @@ void AppRuntime::RenderFrame(bool& done) {
             if (committed) {
                 // A text edit on a translated element may have desynced the other
                 // language; flag it for review until the user confirms both match.
-                MarkTranslationReviewPending(element_id);
+                if (field_token != "gsn_identifier")
+                    MarkTranslationReviewPending(element_id);
                 impl_->events.Emit(TreeDirtyEvent{});
             }
         },

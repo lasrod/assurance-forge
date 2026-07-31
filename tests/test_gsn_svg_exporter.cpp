@@ -700,3 +700,20 @@ TEST(GsnSvgExporterTest, ExportWritesStandaloneSvgAndUsesUniqueNames) {
     EXPECT_TRUE(std::filesystem::exists(first.output_path));
     EXPECT_TRUE(std::filesystem::exists(second.output_path));
 }
+
+TEST(GsnSvgExporterTest, GSN3_CORE_010_UsesNotationIdentifierWithoutRewritingReferences) {
+    parser::AssuranceCase model;
+    parser::SacmElement goal = Element("generated_3", "claim", "Goal", "System is acceptably safe.");
+    goal.gsn_identifier = "G1";
+    model.elements = {goal};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+    ASSERT_EQ(projection.diagram.nodes.size(), 1u);
+    EXPECT_EQ(projection.diagram.nodes.front().id, "generated_3");
+    EXPECT_EQ(projection.diagram.nodes.front().display_id, "G1");
+
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+    const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
+    EXPECT_NE(svg.find("G1: Goal"), std::string::npos);
+    EXPECT_NE(svg.find("id=\"generated_3\""), std::string::npos);
+}

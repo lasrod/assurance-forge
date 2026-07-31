@@ -211,6 +211,7 @@ float RenderAppMenuBar(AppRuntimeState& state, bool& done, const AppMenuBarCallb
 
     if (ImGui::BeginMenu(AF_TR("View").c_str())) {
         ui::UiState& ui_state = ui::GetUiState();
+        ImGui::MenuItem(AF_TR("Project Overview").c_str(), nullptr, &state.workbench.show_overview_tab);
         ImGui::MenuItem(AF_TR("GSN Canvas").c_str(), nullptr, &state.workbench.show_gsn_tab);
         ImGui::MenuItem(AF_TR("CSE Register").c_str(), nullptr, &state.workbench.show_cse_tab);
         ImGui::MenuItem(AF_TR("Evidence Register").c_str(), nullptr, &state.workbench.show_evidence_tab);

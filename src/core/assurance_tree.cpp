@@ -1,5 +1,7 @@
 ﻿#include "core/assurance_tree.h"
 
+#include "core/element_factory.h"
+
 #include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
@@ -254,6 +256,7 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
 
         auto node = std::make_unique<TreeNode>();
         node->id = element.id.empty() ? element.name : element.id;
+        const std::string display_identifier = core::GsnIdentifierFor(element);
         node->undeveloped = element.undeveloped;
         node->uninstantiated = element.is_abstract;
 
@@ -263,7 +266,7 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
         // etc.) inherit descriptive text from the SACMElement 'description' field.
         bool uses_content = (element.type == "claim" || element.type == "argumentreasoning");
         std::string detail = uses_content ? element.content : element.description;
-        node->label = node->id + ": " + element.name;
+        node->label = display_identifier + ": " + element.name;
         if (!detail.empty()) {
             node->label += "\n" + detail;
         }
@@ -289,7 +292,7 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
             auto nit = element.name_langs.find(sec_lang);
             const std::string& sec_name =
                 (nit != element.name_langs.end() && !nit->second.empty()) ? nit->second : element.name;
-            node->label_secondary = node->id + ": " + sec_name;
+            node->label_secondary = display_identifier + ": " + sec_name;
             if (!sec_detail.empty()) {
                 node->label_secondary += "\n" + sec_detail;
             }

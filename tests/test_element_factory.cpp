@@ -744,10 +744,8 @@ TEST(ElementFactoryRemove, RemovalPlannerIgnoresDanglingReasoningAndSourceRefs) 
 // ===== AF-GSN-012: the GSN element identifier contract =====
 //
 // GSN v3 makes the element identifier mandatory, and the diagram shows it on
-// every node. In this codebase the identifier *is* the element's storage id, so
-// these tests pin the three properties users depend on: the identifier follows
-// the GSN prefix convention for its node type, it is unique within the case,
-// and it reaches the label the canvas and the SVG export both render.
+// every node. Storage identity remains the stable key used by SACM references;
+// the notation identifier is independently editable and is what users see.
 
 TEST(ElementIdentifierTest, NewElementsGetGsnConventionalPrefixes) {
     MiniCase mc = MakeRootGoalCase();
@@ -811,4 +809,48 @@ TEST(ElementIdentifierTest, IdentifierIsRenderedInTheNodeLabel) {
     ASSERT_NE(node, nullptr);
     EXPECT_EQ(node->label.rfind(goal_id + ":", 0), 0u)
         << "identifier missing from the rendered label: '" << node->label << "'";
+}
+
+TEST(ElementIdentifierTest, GSN3_CORE_010_NotationIdentifierCanChangeWithoutChangingStorageIdentity) {
+    MiniCase mc = MakeRootGoalCase();
+    mc.ac.elements.front().gsn_identifier = "G1";
+
+    std::string old_identifier;
+    std::string error;
+    ASSERT_TRUE(core::SetGsnIdentifier(mc.ac, &mc.pkg, "G1", "SYS-GOAL", old_identifier, error)) << error;
+
+    EXPECT_EQ(old_identifier, "G1");
+    EXPECT_EQ(mc.ac.elements.front().id, "G1");
+    EXPECT_EQ(mc.ac.elements.front().gsn_identifier, "SYS-GOAL");
+    ASSERT_EQ(mc.pkg.argumentPackages.front().claims.size(), 1u);
+    const sacm::Claim& claim = mc.pkg.argumentPackages.front().claims.front();
+    EXPECT_EQ(claim.id, "G1");
+    ASSERT_EQ(claim.taggedValues.size(), 1u);
+    EXPECT_EQ(claim.taggedValues.front().key, core::kGsnIdentifierTagKey);
+    EXPECT_EQ(claim.taggedValues.front().value, "SYS-GOAL");
+
+    core::AssuranceTree tree = core::AssuranceTree::Build(mc.ac);
+    ASSERT_NE(tree.root, nullptr);
+    EXPECT_EQ(tree.root->id, "G1");
+    EXPECT_EQ(tree.root->label, "SYS-GOAL: Top Goal");
+}
+
+TEST(ElementIdentifierTest, GSN3_CORE_010_NotationIdentifiersMustBeNonEmptyAndUnique) {
+    MiniCase mc = MakeRootGoalCase();
+    mc.ac.elements.front().gsn_identifier = "G1";
+    parser::SacmElement second;
+    second.id = "storage-2";
+    second.gsn_identifier = "G2";
+    second.type = "claim";
+    mc.ac.elements.push_back(second);
+
+    std::string old_identifier;
+    std::string error;
+    EXPECT_FALSE(core::SetGsnIdentifier(mc.ac, &mc.pkg, "G1", " ", old_identifier, error));
+    EXPECT_NE(error.find("non-empty"), std::string::npos);
+
+    error.clear();
+    EXPECT_FALSE(core::SetGsnIdentifier(mc.ac, &mc.pkg, "G1", "G2", old_identifier, error));
+    EXPECT_NE(error.find("already used"), std::string::npos);
+    EXPECT_EQ(mc.ac.elements.front().gsn_identifier, "G1");
 }
