@@ -46,8 +46,10 @@ param(
     [int]$Notches = -3,
     [string]$Keys,
     [int]$WaitMs = 1200,
-    [int]$Width = 1600,
-    [int]$Height = 1000,
+    # 0 = derive a 1080p-equivalent window from the display's DPI scaling; see
+    # Resolve-DefaultSize. Pass explicit values to pin some other size.
+    [int]$Width = 0,
+    [int]$Height = 0,
     [string]$Exe = "build\Release\assurance-forge.exe",
 
     # batch only: ';'-separated steps, run in one process with one focus steal.
@@ -61,6 +63,10 @@ using System;
 using System.Runtime.InteropServices;
 
 public class AfDriver {
+    [DllImport("user32.dll")] public static extern IntPtr GetDC(IntPtr h);
+    [DllImport("gdi32.dll")]  public static extern int GetDeviceCaps(IntPtr hdc, int index);
+    [DllImport("user32.dll")] public static extern int ReleaseDC(IntPtr h, IntPtr dc);
+    [DllImport("user32.dll")] public static extern int GetSystemMetrics(int index);
     [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
     [DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr ctx);
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
@@ -145,6 +151,33 @@ Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.Windows.Forms
 [AfDriver]::MakeDpiAware()
 
+# Reviewing the UI means reviewing what a user sees, and that is a function of
+# *logical* space, not pixels. The driver is DPI-aware, so it pins physical
+# pixels: on a 3840x2160 display at 175% scaling a 1600x1000 window is only
+# ~914x571 logical pixels, a quarter of a 1080p screen -- while ImGui still
+# renders fonts at 1.75x. Panels then look hopelessly cramped and labels
+# truncate for reasons the application is not responsible for.
+#
+# So the default targets a 1080p-equivalent: 1920x1080 logical, scaled up by the
+# display's DPI factor, clamped to the working area so capture never reads
+# off-screen (which would come back black).
+function Resolve-DefaultSize([int]$requestedWidth, [int]$requestedHeight) {
+    $dc = [AfDriver]::GetDC([IntPtr]::Zero)
+    $dpi = [AfDriver]::GetDeviceCaps($dc, 88) # LOGPIXELSX
+    [void][AfDriver]::ReleaseDC([IntPtr]::Zero, $dc)
+    if ($dpi -le 0) { $dpi = 96 }
+    $scale = $dpi / 96.0
+
+    $width = if ($requestedWidth -gt 0) { $requestedWidth } else { [int](1920 * $scale) }
+    $height = if ($requestedHeight -gt 0) { $requestedHeight } else { [int](1080 * $scale) }
+
+    $screenW = [AfDriver]::GetSystemMetrics(0) # SM_CXSCREEN
+    $screenH = [AfDriver]::GetSystemMetrics(1) # SM_CYSCREEN
+    if ($screenW -gt 0) { $width = [Math]::Min($width, $screenW) }
+    if ($screenH -gt 0) { $height = [Math]::Min($height, $screenH - 40) }
+    return @($width, $height)
+}
+
 function Get-AppProcess {
     return Get-Process -Name 'assurance-forge' -ErrorAction SilentlyContinue |
         Where-Object { $_.MainWindowHandle -ne 0 } |
@@ -213,7 +246,10 @@ function Save-WindowPng($handle, $path, $crop = $null, [int]$zoom = 1) {
     return $result
 }
 
-function Start-App([int]$w, [int]$h) {
+function Start-App([int]$requested_w, [int]$requested_h) {
+    $size = Resolve-DefaultSize $requested_w $requested_h
+    $w = $size[0]
+    $h = $size[1]
     $existing = Get-AppProcess
     if ($existing) {
         # Still pin the geometry: a window left at another size from a previous

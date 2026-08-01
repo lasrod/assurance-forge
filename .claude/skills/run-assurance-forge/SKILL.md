@@ -80,9 +80,31 @@ raise, another minute. Instead:
 3. Run **one** batch that exercises everything you need to see.
 4. Read the PNGs and decide.
 
-`launch` pins the window to **0,0 at 1600x1000**, so screenshot pixels and click
-coordinates are the same space (window-relative, `0,0` = the window's top-left
-including its title bar). Coordinates are only reproducible at that pinned size.
+### Window size: review logical space, not pixels
+
+`launch` pins the window at 0,0 and derives its size from the display's DPI
+scaling, targeting a **1080p-equivalent** (1920x1080 logical). On a 3840x2160
+display at 175% that is 3360x1890 physical; `launch` prints what it used.
+
+This matters more than it sounds. The driver is DPI-aware, so it pins *physical*
+pixels, while ImGui renders fonts scaled by DPI. A 1600x1000 window on a 175%
+display is only ~914x571 logical pixels — a quarter of a 1080p screen — with
+text still drawn at 1.75x. Panels are then hopelessly cramped and labels
+truncate for reasons the application is not responsible for.
+
+**A UI review done in an undersized window will manufacture findings.** Reviewing
+this app at 1600x1000 produced "the Problems table columns are badly
+proportioned, Message collapses to `Me…`" — which is simply untrue at
+1080p-equivalent, where Message gets the majority of the width and renders a
+full sentence. Three attempts were spent "fixing" a non-problem before the
+window size was checked. Check `launch`'s printed size against the display
+before concluding anything is too narrow.
+
+Pass `-Width`/`-Height` to pin a different size deliberately — e.g. to test how
+panels behave when genuinely cramped. Coordinates are only reproducible at a
+given pinned size, and the recent-projects list reorders by last-opened, so
+**verify the project name in the status bar before sending input** rather than
+trusting a remembered click position.
 
 ### Single actions
 
