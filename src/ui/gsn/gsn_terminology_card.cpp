@@ -108,14 +108,20 @@ BuildAndDrawTerminologySpansForText(ImDrawList* draw_list,
     float line_y = text_pos.y;
     const float underline_offset = std::max(1.0f, DpiSize(1.0f) * zoom);
     const float underline_thickness = std::max(1.0f, DpiSize(1.4f) * zoom);
-    const float font_scale = zoom;
 
     while (line_start < text_end) {
         const char* hard_break = static_cast<const char*>(memchr(line_start, '\n', text_end - line_start));
         const char* line_limit = hard_break ? hard_break : text_end;
         const char* line_end = line_limit;
         if (text_wrap > 0.0f && line_start < line_limit) {
-            const char* wrap_end = font->CalcWordWrapPositionA(font_scale, line_start, line_limit, text_wrap);
+            // Must wrap at `font_size`, the size the label is actually drawn at.
+            // The `...A` overload takes a *scale* and resolves to
+            // `LegacySize * scale` — the size the font was loaded at, not the
+            // size in use. Where those differ the pass splits lines differently
+            // from ImGui's own wrapping, so an occurrence lands on the wrong
+            // line and its x offset is measured from the wrong line start,
+            // putting the underline outside the node.
+            const char* wrap_end = font->CalcWordWrapPosition(font_size, line_start, line_limit, text_wrap);
             if (wrap_end && wrap_end > line_start && wrap_end < line_limit)
                 line_end = wrap_end;
         }
