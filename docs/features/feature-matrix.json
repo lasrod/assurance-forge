@@ -1660,7 +1660,7 @@
       "tests": [
         "tests/test_status_bar.cpp"
       ],
-      "notes": "Saved and unsaved render as distinct labels plus a dot, never as the absence of one — an ambiguous save indicator is a trust problem when the artifact is a safety argument. Also the sink for `core::AppState::status_message`: roughly twenty call sites set it and, before this, only the SACM viewer panel rendered it, so most feedback (load warnings, save failures) was produced and discarded. Reports state, does not track it — the flag itself is `AppState::has_unsaved_changes`. No last-saved timestamp yet."
+      "notes": "Saved and unsaved render as distinct labels plus a dot, never as the absence of one — an ambiguous save indicator is a trust problem when the artifact is a safety argument. Also the sink for `core::AppState::status_message`: roughly twenty call sites set it and, before this, only the SACM viewer panel rendered it, so most feedback (load warnings, save failures) was produced and discarded. Save state is reported from `AppState::has_unsaved_changes`, which the audited dispatch clears when `CommandResult::sacm_written` confirms the command bus wrote the file — before this, an autosaved edit stayed marked unsaved forever because the ~30 `DocumentDirtyEvent` emitters run after the dispatch and cannot know it was persisted. **Only command-bus edits autosave**; paths that bypass the bus mutate in memory and are genuinely unsaved until an explicit save, so the indicator is not a claim that every edit is persisted. No last-saved timestamp yet."
     }
   ]
 }

@@ -87,6 +87,16 @@ struct CommandResult {
     std::uint64_t transaction_sequence = 0;
     std::string raw_file_hash_after;
     std::string canonical_model_hash_after;
+
+    // True once the SACM file on disk has been written with this command's
+    // result. This is the only field that may be used to tell a user their work
+    // is saved:
+    //   * `success` stays true when the edit and the audit entry committed but
+    //     the autosave write then failed, so it over-reports.
+    //   * `error.empty()` under-reports, because the manifest and library
+    //     re-derive warnings are raised *after* the write, when the file is
+    //     already correct.
+    bool sacm_written = false;
 };
 
 class CommandBus {

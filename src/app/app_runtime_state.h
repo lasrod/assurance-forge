@@ -224,6 +224,17 @@ struct AppRuntimeState {
     bool guideline_catalog_load_attempted = false;
     std::string guideline_catalog_error;
     bool document_dirty = false;
+
+    // Set by DispatchAuditedCommand when the command bus confirmed it wrote the
+    // SACM file, and consumed by the DocumentDirtyEvent listener.
+    //
+    // Callers emit DocumentDirtyEvent *after* the dispatch returns and cannot
+    // know whether the bus already persisted the edit, so without this the
+    // event would re-mark a model that is already on disk — leaving the app
+    // permanently claiming unsaved work. Consumed once: any edit that follows
+    // marks the model dirty again in the normal way.
+    bool autosave_persisted_pending_edit = false;
+
     std::string reviewer_name;
     char reviewer_name_buf[128] = {};
 

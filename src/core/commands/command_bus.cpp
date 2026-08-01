@@ -1,4 +1,4 @@
-#include "core/commands/command_bus.h"
+﻿#include "core/commands/command_bus.h"
 
 #include "core/audit/audit_paths.h"
 #include "core/audit/canonical_model_hash.h"
@@ -133,7 +133,7 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     }
 
     // Step 1: append to the audit log FIRST and fsync. The log is the
-    // canonical record of intent — if we crash after this point the next
+    // canonical record of intent â€” if we crash after this point the next
     // open can re-derive SACM from replay. If we crashed *before* this
     // point, no committed state exists yet and the next open sees the
     // previous SACM unchanged.
@@ -210,6 +210,9 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
         result.error = "Autosave failed (audit log entry was committed): " + write.error();
         return result;
     }
+    // From here the file on disk matches this command's model. Everything below
+    // is cache maintenance whose failure does not invalidate that.
+    result.sacm_written = true;
 
     // Step 3: update manifest atomically. The manifest is a cache; if this
     // fails the next open rebuilds it from the log + SACM. We still

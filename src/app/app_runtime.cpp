@@ -204,7 +204,13 @@ void AppRuntime::RegisterAppEventListeners() {
     });
     impl_->events.Subscribe<DocumentDirtyEvent>([this](const DocumentDirtyEvent& event) {
         impl_->document_dirty = event.dirty;
-        if (event.mark_app_dirty)
+        // The command bus autosaves, but callers emit this event afterwards and
+        // cannot know that. Honouring `mark_app_dirty` unconditionally is what
+        // made the app report unsaved work that was already on disk. The
+        // revision still bumps, so derived views rebuild either way.
+        const bool already_persisted = impl_->autosave_persisted_pending_edit;
+        impl_->autosave_persisted_pending_edit = false;
+        if (event.mark_app_dirty && !already_persisted)
             impl_->app_state.mark_dirty();
         else
             impl_->app_state.bump_case_revision();
