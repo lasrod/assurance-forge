@@ -53,8 +53,7 @@ void RenderThemeMenu() {
 }
 
 void RenderMenuBarStats() {
-    HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();
-    if (!runner_params || !runner_params->imGuiWindowParams.showStatus_Fps)
+    if (!ui::GetUiState().show_developer_tools)
         return;
 
     ui::gsn::CanvasRenderStats stats = ui::gsn::GetLastCanvasRenderStats();
@@ -231,7 +230,15 @@ float RenderAppMenuBar(AppRuntimeState& state, bool& done, const AppMenuBarCallb
         }
 
         ImGui::Separator();
-        ImGui::MenuItem(AF_TR("Performance overlay").c_str(), nullptr, &ui_state.show_perf_overlay);
+        if (ImGui::BeginMenu(AF_TR("Developer").c_str())) {
+            ImGui::MenuItem(AF_TR("Developer tools").c_str(), nullptr, &ui_state.show_developer_tools);
+            if (!ui_state.show_developer_tools)
+                ImGui::BeginDisabled();
+            ImGui::MenuItem(AF_TR("Performance overlay").c_str(), nullptr, &ui_state.show_perf_overlay);
+            if (!ui_state.show_developer_tools)
+                ImGui::EndDisabled();
+            ImGui::EndMenu();
+        }
 
         ImGui::EndMenu();
     }

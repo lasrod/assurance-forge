@@ -2,6 +2,7 @@
 
 #include "app/app_runtime_state.h"
 #include "ui/gsn/gsn_dpi.h"
+#include "ui/panels/status_bar_panel.h"
 #include "ui/widgets/splitter.h"
 
 #include <algorithm>
@@ -148,7 +149,10 @@ void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center
 
 AppLayoutRegions RenderAppShell(AppRuntimeState& state, float menu_height, ImGuiWindowFlags panel_flags) {
     const ImVec2 display = ImGui::GetIO().DisplaySize;
-    const float content_h = std::max(0.0f, display.y - menu_height);
+    // Panels stop above the status bar rather than running under it — every
+    // height below is derived from content_h, so subtracting once is enough.
+    const float status_bar_height = ui::panels::StatusBarHeight();
+    const float content_h = std::max(0.0f, display.y - menu_height - status_bar_height);
 
     float left_w = display.x * state.layout.left_ratio;
     float right_w = display.x * state.layout.right_ratio;
@@ -175,6 +179,7 @@ AppLayoutRegions RenderAppShell(AppRuntimeState& state, float menu_height, ImGui
 
     AppLayoutRegions regions;
     regions.menu_height = menu_height;
+    regions.status_bar_height = status_bar_height;
     regions.project_explorer = {{0.0f, menu_height}, {left_w, project_h}};
     regions.argument_navigator = {{0.0f, argument_navigator_y}, {left_w, argument_navigator_h}};
     regions.workbench = {{center_x, menu_height}, {center_w, workbench_h}};

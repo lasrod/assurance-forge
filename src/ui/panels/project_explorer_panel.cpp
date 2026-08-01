@@ -1,7 +1,9 @@
 #include "ui/panels/project_explorer_panel.h"
 
+#include "ui/fonts.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
+#include "ui/widgets/text_ellipsis.h"
 
 #include "hello_imgui/icons_font_awesome_4.h"
 
@@ -51,6 +53,16 @@ std::string CountText(std::size_t count) {
     return std::to_string(count);
 }
 
+// X at which the trailing badge starts. Derived from the *measured* item rect
+// rather than predicted from style metrics, so the label budget below can never
+// drift out of step with where the badge actually lands.
+float TrailingTextLeft(std::string_view text, float right_padding) {
+    const float right = ImGui::GetItemRectMax().x - ImGui::GetStyle().FramePadding.x - right_padding;
+    if (text.empty())
+        return right;
+    return right - ImGui::CalcTextSize(text.data(), text.data() + text.size()).x;
+}
+
 void DrawTrailingText(std::string_view text, ImU32 color, float right_padding = 0.0f) {
     if (text.empty())
         return;
@@ -58,11 +70,31 @@ void DrawTrailingText(std::string_view text, ImU32 color, float right_padding = 
     const ImVec2 item_min = ImGui::GetItemRectMin();
     const ImVec2 item_max = ImGui::GetItemRectMax();
     const ImVec2 size = ImGui::CalcTextSize(text.data(), text.data() + text.size());
-    draw_list->AddText(ImVec2(item_max.x - size.x - ImGui::GetStyle().FramePadding.x - right_padding,
-                              item_min.y + (item_max.y - item_min.y - size.y) * 0.5f),
-                       color,
-                       text.data(),
-                       text.data() + text.size());
+    draw_list->AddText(
+        ImVec2(TrailingTextLeft(text, right_padding), item_min.y + (item_max.y - item_min.y - size.y) * 0.5f),
+        color,
+        text.data(),
+        text.data() + text.size());
+}
+
+// Draws "<icon>  <label>" over a row whose widget was rendered with an empty
+// label, shortening the label so it stops before `limit_x`. Drawing it here
+// rather than passing it to the widget means the budget is computed against the
+// row's real rect, and it adds no ImGui item that could steal the row's clicks.
+// Returns true when the label was shortened.
+bool DrawRowLabel(const char* icon, const std::string& label, float label_x, float limit_x) {
+    const ImVec2 item_min = ImGui::GetItemRectMin();
+    const ImVec2 item_max = ImGui::GetItemRectMax();
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    const ImU32 color = ImGui::GetColorU32(ImGuiCol_Text);
+    const float text_y = item_min.y + (item_max.y - item_min.y - ImGui::GetTextLineHeight()) * 0.5f;
+
+    float x = label_x;
+    if (icon != nullptr && icon[0] != '\0') {
+        draw_list->AddText(ImVec2(x, text_y), color, icon);
+        x += ImGui::CalcTextSize(icon).x + ImGui::CalcTextSize("  ").x;
+    }
+    return ui::widgets::AddTextEllipsized(draw_list, ImVec2(x, text_y), color, label, limit_x - x);
 }
 
 bool NavigationRow(const char* id,
@@ -72,12 +104,17 @@ bool NavigationRow(const char* id,
                    std::string_view trailing = {},
                    ImU32 trailing_color = 0) {
     ImGui::PushID(id);
-    const std::string row_label = std::string(icon) + "  " + label;
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float label_x = ImGui::GetCursorScreenPos().x + style.FramePadding.x;
     ImGui::PushStyleColor(ImGuiCol_Header, ImGui::ColorConvertU32ToFloat4(ui::WithAlpha(ui::GetTheme().accent, 0.22f)));
     ImGui::PushStyleColor(ImGuiCol_HeaderHovered,
                           ImGui::ColorConvertU32ToFloat4(ui::WithAlpha(ui::GetTheme().accent_hover, 0.18f)));
-    const bool clicked = ImGui::Selectable(row_label.c_str(), selected, 0, ImVec2(0.0f, 28.0f));
+    const bool clicked = ImGui::Selectable("##row", selected, 0, ImVec2(0.0f, 28.0f));
     ImGui::PopStyleColor(2);
+
+    const float limit_x = TrailingTextLeft(trailing, 0.0f) - (trailing.empty() ? 0.0f : style.ItemSpacing.x);
+    const bool truncated = DrawRowLabel(icon, label, label_x, limit_x);
+    ui::widgets::TooltipWhenTruncated(truncated, label);
     DrawTrailingText(trailing, trailing_color == 0 ? ui::GetTheme().text_muted : trailing_color);
     ImGui::PopID();
     return clicked;
@@ -95,12 +132,28 @@ bool BeginSection(const char* id,
         flags |= ImGuiTreeNodeFlags_DefaultOpen;
 
     ImGui::PushID(id);
-    const std::string section_label = std::string(icon) + "  " + label;
-    const bool open = ImGui::TreeNodeEx("section", flags, "%s", section_label.c_str());
+    const float label_x = ImGui::GetCursorScreenPos().x + ImGui::GetTreeNodeToLabelSpacing();
+    const bool open = ImGui::TreeNodeEx("section", flags, "%s", "");
     const ImVec2 child_cursor = ImGui::GetCursorPos();
-    const float count_right_padding = add_action ? ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.x : 0.0f;
-    DrawTrailingText(CountText(count), ui::GetTheme().text_muted, count_right_padding);
-    if (add_action) {
+    // Geometric rather than IsItemHovered(): the add button is drawn over this
+    // row, so once the pointer reaches it ImGui reports the button as hovered
+    // and the row as not — which would make the button flicker out from under
+    // the cursor that is trying to click it.
+    const bool row_hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) &&
+                             ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+
+    // The count and the add button share one right-hand slot — the count reads
+    // as status, the button replaces it on hover. Sharing keeps the label's
+    // budget constant, so the label cannot re-truncate as the pointer moves
+    // onto the row, and it hands ~a button's width back to the label.
+    const std::string count_text = CountText(count);
+    const float slot_width = std::max(ImGui::CalcTextSize(count_text.c_str()).x, ImGui::GetFrameHeight());
+    const float limit_x =
+        ImGui::GetItemRectMax().x - ImGui::GetStyle().FramePadding.x - slot_width - ImGui::GetStyle().ItemSpacing.x;
+    ui::widgets::TooltipWhenTruncated(DrawRowLabel(icon, label, label_x, limit_x), label);
+
+    const bool show_add_button = static_cast<bool>(add_action) && row_hovered;
+    if (show_add_button) {
         ImGui::SameLine();
         const float button_width = ImGui::GetFrameHeight();
         ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - button_width));
@@ -112,6 +165,8 @@ bool BeginSection(const char* id,
         // Restore the cursor TreeNodeEx prepared for its children so opening,
         // closing, and reopening a section cannot flatten its indentation.
         ImGui::SetCursorPos(child_cursor);
+    } else {
+        DrawTrailingText(count_text, ui::GetTheme().text_muted);
     }
     ImGui::PopID();
     if (open)
@@ -379,7 +434,7 @@ void RenderReviews(const ProjectExplorerPanelModel& model, const ProjectExplorer
 
 void RenderConformance(const ProjectExplorerPanelModel& model, const ProjectExplorerPanelCallbacks& callbacks) {
     if (!BeginSection("conformance",
-                      ICON_FA_CLIPBOARD_CHECK,
+                      ICON_FA_TASKS,
                       AF_TR("Conformance"),
                       model.summary.conformance_files,
                       false,
@@ -520,17 +575,34 @@ void RenderProjectHeader(const ProjectExplorerPanelModel& model) {
     const core::AssuranceProject& project = *model.project;
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(ui::GetTheme().surface_2));
     ImGui::BeginChild("##case_header", ImVec2(0.0f, 66.0f), true, ImGuiWindowFlags_NoScrollbar);
-    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::GetTheme().accent), "%s", ICON_FA_SHIELD_ALT);
+    // ICON_FA_CERTIFICATE, not ICON_FA_SHIELD_ALT: the latter is a FontAwesome 5
+    // name that the bundled 4.x font has no glyph for, so it rendered as the
+    // missing-glyph box rather than an icon.
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::GetTheme().accent), "%s", ICON_FA_CERTIFICATE);
     ImGui::SameLine();
-    ImGui::TextWrapped("%s", project.name.c_str());
-    ImGui::TextDisabled("%s",
-                        model.summary.attention_count() == 0
-                            ? AF_TR("No open project alerts.").c_str()
-                            : ui::i18n::trnf("{0} item needs attention",
-                                             "{0} items need attention",
-                                             static_cast<int>(model.summary.attention_count()),
-                                             model.summary.attention_count())
-                                  .c_str());
+    {
+        ui::fonts::Scoped strong(ui::fonts::Role::BodyStrong);
+        ImGui::TextWrapped("%s", project.name.c_str());
+    }
+
+    // Attention needs to look different from "all clear" — both were TextDisabled,
+    // so an alert count read as quietly as its absence.
+    // Braced so the font is popped before EndChild — an ImGui child must be
+    // closed with the font stack at the depth it was opened with.
+    {
+        const std::size_t attention = model.summary.attention_count();
+        ui::fonts::Scoped caption(ui::fonts::Role::Caption);
+        if (attention == 0) {
+            ImGui::TextDisabled("%s", AF_TR("No open project alerts.").c_str());
+        } else {
+            ImGui::TextColored(
+                ui::GetAttentionColor(),
+                "%s",
+                ui::i18n::trnf(
+                    "{0} item needs attention", "{0} items need attention", static_cast<int>(attention), attention)
+                    .c_str());
+        }
+    }
     ImGui::EndChild();
     ImGui::PopStyleColor();
 }
@@ -573,7 +645,9 @@ void ShowProjectExplorerPanel(float width,
                               const ProjectExplorerPanelCallbacks& callbacks) {
     ImGui::SetNextWindowPos(ImVec2(0.0f, top_y));
     ImGui::SetNextWindowSize(ImVec2(width, height));
+    ui::fonts::Push(ui::fonts::Role::Title);
     ImGui::Begin((AF_TR("Case Explorer") + "###" + kCaseExplorerTitle).c_str(), nullptr, panel_flags);
+    ui::fonts::Pop();
 
     if (ImGui::BeginChild("CaseExplorerTree", ImVec2(0.0f, 0.0f), false)) {
         if (model.project) {

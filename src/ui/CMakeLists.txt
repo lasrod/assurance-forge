@@ -1,6 +1,7 @@
 add_library(af_ui OBJECT
     confidence_model.cpp
     element_context_menu.cpp
+    fonts.cpp
     gsn/gsn_adapter.cpp
     gsn/gsn_acp_decorator.cpp
     gsn/gsn_badges.cpp
@@ -26,6 +27,7 @@ add_library(af_ui OBJECT
     panels/relationship_panel.cpp
     panels/review_panel.cpp
     panels/sacm_viewer_panel.cpp
+    panels/status_bar_panel.cpp
     panels/terminology_package_panel.cpp
     panels/terminology_usages_panel.cpp
     panels/welcome_modal.cpp
@@ -36,5 +38,6 @@ add_library(af_ui OBJECT
     tree_view.cpp
     ui_state.cpp
     widgets/splitter.cpp
+    widgets/text_ellipsis.cpp
 )
 target_link_libraries(af_ui PUBLIC af_common hello_imgui)

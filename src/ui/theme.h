@@ -78,8 +78,9 @@ struct Theme {
     float rounding_panel;    // Windows, child cards
     float rounding_node;     // Rectangular GSN node corners
     float outline_thickness; // Hairline outline on shapes
-    float shadow_alpha_top;  // First (closest) shadow layer alpha [0..1]
-    float shadow_offset;     // Vertical offset of shadow stack (px)
+    float shadow_alpha_top;  // Innermost (darkest) shadow layer alpha [0..1]
+    float shadow_offset;     // Vertical offset of the shadow stack (px)
+    float shadow_spread;     // How far each successive layer expands (px)
 
     // ===== Canvas =====
     ImU32 canvas_bg;

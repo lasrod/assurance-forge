@@ -84,7 +84,9 @@ TRANSLATIONS = {
     "Appearance": "外観",
     "Theme": "テーマ",
     "Language": "言語",
-    "Show FPS": "FPS を表示",
+    "Developer": "開発者",
+    "Developer tools": "開発者ツール",
+    "Shows frame and culling counters in the menu bar, and the AI Debug tab.": "メニューバーにフレームおよびカリングのカウンターを表示し、AI デバッグタブを表示します。",
     "High culling": "高カリング",
     "Medium culling": "中カリング",
     "Low culling": "低カリング",
@@ -626,6 +628,13 @@ TRANSLATIONS = {
     "Problem": "問題",
     "Source": "ソース",
     "Source: {0}": "ソース: {0}",
+
+    # ===== Status bar =====
+    "No project open": "プロジェクトが開かれていません",
+    "Unsaved changes": "未保存の変更",
+    "Saved": "保存済み",
+    "Selected: {0}": "選択中: {0}",
+    "Open the Problems panel": "問題パネルを開く",
 
     # ===== Problems panel =====
     "Problems": "問題",

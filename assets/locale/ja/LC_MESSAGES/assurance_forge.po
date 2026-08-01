@@ -571,6 +571,12 @@ msgstr "説明 ({0})"
 msgid "Detach this ACP from its current confidence argument tree."
 msgstr "この ACP を現在の信頼度論証ツリーから切り離します。"
 
+msgid "Developer"
+msgstr "開発者"
+
+msgid "Developer tools"
+msgstr "開発者ツール"
+
 msgid "Direct value"
 msgstr "直接値"
 
@@ -1063,6 +1069,9 @@ msgstr "現在のフィルターに一致する問題はありません。"
 msgid "No project is currently open."
 msgstr "現在開いているプロジェクトはありません。"
 
+msgid "No project open"
+msgstr "プロジェクトが開かれていません"
+
 msgid "No project open."
 msgstr "プロジェクトが開かれていません。"
 
@@ -1194,6 +1203,9 @@ msgstr "この要素のレビューコメントまたは AI レビュー失敗�
 
 msgid "Open term"
 msgstr "用語を開く"
+
+msgid "Open the Problems panel"
+msgstr "問題パネルを開く"
 
 msgid "Opinion triangle"
 msgstr "意見三角形"
@@ -1537,6 +1549,9 @@ msgstr "レビュー担当者名を保存"
 msgid "Save report to file"
 msgstr "レポートをファイルに保存"
 
+msgid "Saved"
+msgstr "保存済み"
+
 msgid "Saved: {0}"
 msgstr "保存しました: {0}"
 
@@ -1567,6 +1582,9 @@ msgstr "{0} を選択"
 msgid "Selected"
 msgstr "選択済み"
 
+msgid "Selected: {0}"
+msgstr "選択中: {0}"
+
 msgid "Selection glow"
 msgstr "選択時のグロー"
 
@@ -1582,14 +1600,14 @@ msgstr "個別の信頼度論証ツリー"
 msgid "Severity"
 msgstr "重大度"
 
-msgid "Show FPS"
-msgstr "FPS を表示"
-
 msgid "Show cycle"
 msgstr "循環を表示"
 
 msgid "Shown on the canvas as you watch it build."
 msgstr "作成の様子がキャンバスに表示されています。"
+
+msgid "Shows frame and culling counters in the menu bar, and the AI Debug tab."
+msgstr "メニューバーにフレームおよびカリングのカウンターを表示し、AI デバッグタブを表示します。"
 
 msgid "Snapshot created at sequence {0}."
 msgstr "スナップショットをシーケンス {0} で作成しました。"
@@ -1838,6 +1856,9 @@ msgid "Unresolved review"
 msgstr "未解決のレビュー"
 
 msgid "Unsaved Changes"
+msgstr "未保存の変更"
+
+msgid "Unsaved changes"
 msgstr "未保存の変更"
 
 msgid "Update Key"

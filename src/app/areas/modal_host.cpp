@@ -75,9 +75,7 @@ void ModalHost::RenderPreferencesWindow() {
     model.reviewerNameBufferSize = sizeof(state_.reviewer_name_buf);
     model.theme = ui::GetCurrentAppTheme();
     model.language = ui::i18n::CurrentLanguage();
-    if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams()) {
-        model.showFps = runner_params->imGuiWindowParams.showStatus_Fps;
-    }
+    model.showDeveloperTools = ui::GetUiState().show_developer_tools;
 
     model.mcpEnabled = state_.mcp_settings.enabled;
     model.mcpStatus = state_.mcp_status;
@@ -156,10 +154,8 @@ void ModalHost::RenderPreferencesWindow() {
     };
     callbacks.set_theme = [](ui::AppTheme theme) { ui::ApplyAppTheme(theme); };
     callbacks.set_language = [](ui::i18n::Language language) { ui::i18n::SetLanguage(language); };
-    callbacks.set_show_fps = [](bool show_fps) {
-        if (HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams()) {
-            runner_params->imGuiWindowParams.showStatus_Fps = show_fps;
-        }
+    callbacks.set_show_developer_tools = [](bool show_developer_tools) {
+        ui::GetUiState().show_developer_tools = show_developer_tools;
     };
     callbacks.save_reviewer_name = [this](const char* reviewer_name) {
         state_.reviewer_name = TrimWhitespace(reviewer_name ? reviewer_name : "");

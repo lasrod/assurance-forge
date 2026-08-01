@@ -42,47 +42,77 @@ ImU32 OutlineColor() {
     return WithAlpha(GetTheme().border_strong, 0.85f);
 }
 
-// Soft 3-layer drop shadow under a rounded rectangle.
+// One layer of the shadow stack, outermost first.
+//
+// The stack fakes a blur by drawing progressively LARGER and FAINTER copies of
+// the shape from the outside in, all at the same small vertical offset. Stacking
+// equal-sized copies at increasing offsets instead — the previous approach —
+// cannot produce a gradient: every layer has the same hard edge, so the result
+// is a solid band below the node rather than a soft shadow.
+struct ShadowLayer {
+    float grow; // How far this layer expands beyond the shape.
+    float offset_y;
+    ImU32 color;
+};
+
+ShadowLayer ShadowLayerAt(int index, float zoom) {
+    const Theme& th = GetTheme();
+    const float scale = DpiScale() * zoom;
+    const float step = static_cast<float>(index + 1);
+    ShadowLayer layer;
+    layer.grow = step * th.shadow_spread * scale;
+    layer.offset_y = th.shadow_offset * scale;
+    // Quadratic falloff: the outermost layer is a ninth of the innermost, which
+    // is what makes the accumulated edge read as soft rather than stepped.
+    layer.color = WithAlpha(IM_COL32(0, 0, 0, 255), th.shadow_alpha_top / (step * step));
+    return layer;
+}
+
 void DrawRectShadow(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, float rounding, float zoom) {
-    const Theme& th = GetTheme();
-    float scale = DpiScale() * zoom;
-    for (int i = 0; i < kShadowLayers; ++i) {
-        float oy = (i + 1) * th.shadow_offset * scale;
-        float ox = oy * 0.25f;
-        float alpha_mul = th.shadow_alpha_top * (1.0f - (float)i / (float)kShadowLayers);
-        ImU32 col = WithAlpha(IM_COL32(0, 0, 0, 255), alpha_mul);
-        draw_list->AddRectFilled(
-            ImVec2(top_left.x + ox, top_left.y + oy), ImVec2(bottom_right.x + ox, bottom_right.y + oy), col, rounding);
+    for (int i = kShadowLayers - 1; i >= 0; --i) {
+        const ShadowLayer layer = ShadowLayerAt(i, zoom);
+        draw_list->AddRectFilled(ImVec2(top_left.x - layer.grow, top_left.y - layer.grow + layer.offset_y),
+                                 ImVec2(bottom_right.x + layer.grow, bottom_right.y + layer.grow + layer.offset_y),
+                                 layer.color,
+                                 rounding + layer.grow);
     }
 }
 
-// Soft 3-layer drop shadow under a circle.
 void DrawCircleShadow(ImDrawList* draw_list, ImVec2 center, float radius, float zoom) {
-    const Theme& th = GetTheme();
-    float scale = DpiScale() * zoom;
-    for (int i = 0; i < kShadowLayers; ++i) {
-        float oy = (i + 1) * th.shadow_offset * scale;
-        float ox = oy * 0.25f;
-        float alpha_mul = th.shadow_alpha_top * (1.0f - (float)i / (float)kShadowLayers);
-        ImU32 col = WithAlpha(IM_COL32(0, 0, 0, 255), alpha_mul);
-        draw_list->AddCircleFilled(ImVec2(center.x + ox, center.y + oy), radius, col, kCircleSegments);
+    for (int i = kShadowLayers - 1; i >= 0; --i) {
+        const ShadowLayer layer = ShadowLayerAt(i, zoom);
+        draw_list->AddCircleFilled(
+            ImVec2(center.x, center.y + layer.offset_y), radius + layer.grow, layer.color, kCircleSegments);
     }
 }
 
-// Soft drop shadow under an arbitrary convex polygon (up to 8 verts).
+// Convex polygons have no rounding parameter to grow, so each vertex is pushed
+// out along its own ray from the centroid. Exact for regular shapes and close
+// enough for the parallelograms and trapezoids GSN uses.
 void DrawPolyShadow(ImDrawList* draw_list, const ImVec2* points, int count, float zoom) {
-    const Theme& th = GetTheme();
-    float scale = DpiScale() * zoom;
-    for (int i = 0; i < kShadowLayers; ++i) {
-        float oy = (i + 1) * th.shadow_offset * scale;
-        float ox = oy * 0.25f;
-        float alpha_mul = th.shadow_alpha_top * (1.0f - (float)i / (float)kShadowLayers);
-        ImU32 col = WithAlpha(IM_COL32(0, 0, 0, 255), alpha_mul);
-        ImVec2 shifted[8];
-        int n = count > 8 ? 8 : count;
-        for (int k = 0; k < n; ++k)
-            shifted[k] = ImVec2(points[k].x + ox, points[k].y + oy);
-        draw_list->AddConvexPolyFilled(shifted, n, col);
+    const int n = count > 8 ? 8 : count;
+    if (n <= 0)
+        return;
+
+    ImVec2 centroid(0.0f, 0.0f);
+    for (int k = 0; k < n; ++k) {
+        centroid.x += points[k].x;
+        centroid.y += points[k].y;
+    }
+    centroid.x /= static_cast<float>(n);
+    centroid.y /= static_cast<float>(n);
+
+    for (int i = kShadowLayers - 1; i >= 0; --i) {
+        const ShadowLayer layer = ShadowLayerAt(i, zoom);
+        ImVec2 grown[8];
+        for (int k = 0; k < n; ++k) {
+            const float dx = points[k].x - centroid.x;
+            const float dy = points[k].y - centroid.y;
+            const float length = std::sqrt(dx * dx + dy * dy);
+            const float factor = length > 0.0f ? (length + layer.grow) / length : 1.0f;
+            grown[k] = ImVec2(centroid.x + dx * factor, centroid.y + dy * factor + layer.offset_y);
+        }
+        draw_list->AddConvexPolyFilled(grown, n, layer.color);
     }
 }
 

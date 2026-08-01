@@ -14,6 +14,7 @@
 #include "app/areas/project_explorer_area.h"
 #include "app/areas/proposal_editor_area.h"
 #include "app/areas/review_panel_area.h"
+#include "app/areas/status_bar_area.h"
 #include "app/areas/workbench_area.h"
 #include "app/frame/app_layout_regions.h"
 #include "app/frame/app_menu_bar.h"
@@ -411,6 +412,13 @@ void AppRuntime::RenderFrame(bool& done) {
     {
         core::perf::ScopedTimer s("app.area.inspector");
         areas::RenderInspectorArea(*impl_, regions.inspector, kPanelFlags, inspector_callbacks);
+    }
+
+    // After the panels, before the modals: the bar is chrome the modal dim
+    // layer should still cover.
+    {
+        core::perf::ScopedTimer s("app.area.status_bar");
+        areas::RenderStatusBarArea(*impl_);
     }
 
     areas::ModalHostCallbacks modal_callbacks;

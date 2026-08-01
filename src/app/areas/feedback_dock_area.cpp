@@ -49,7 +49,9 @@ void RenderFeedbackDockArea(AppRuntimeState& state,
         }
         state.workbench.focus_history_tab = false;
 
-        if (ImGui::BeginTabItem((AF_TR("AI Debug") + "###ai_debug_tab").c_str())) {
+        // Diagnostic surface for developing the tool, not for building an
+        // argument — shown only when developer tools are switched on.
+        if (ui_state.show_developer_tools && ImGui::BeginTabItem((AF_TR("AI Debug") + "###ai_debug_tab").c_str())) {
             if (callbacks.render_ai_debug_content)
                 callbacks.render_ai_debug_content();
             ImGui::EndTabItem();

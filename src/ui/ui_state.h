@@ -117,6 +117,13 @@ struct UiState {
     // true, the perf overlay window is shown with profiler buckets, render
     // stats, and feature toggles.
     bool show_perf_overlay = false;
+
+    // Reveals the diagnostic surfaces — the menu-bar frame/cull counters and the
+    // AI Debug tab. Off by default: they are instrumentation for developing the
+    // tool, not part of building a safety argument, and shipping them in the
+    // primary chrome makes the application read as unfinished. Persisted as a
+    // user preference.
+    bool show_developer_tools = false;
 };
 
 // Global shared UI state accessible from all panels.

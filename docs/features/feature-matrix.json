@@ -1569,12 +1569,15 @@
       "name": "Dark and light themes",
       "status": "prototype",
       "evidence": [
-        "src/ui/theme.cpp"
+        "src/ui/theme.cpp",
+        "src/ui/fonts.cpp",
+        "src/ui/widgets/text_ellipsis.cpp"
       ],
       "tests": [
-        "tests/test_theme.cpp"
+        "tests/test_theme.cpp",
+        "tests/test_text_ellipsis.cpp"
       ],
-      "notes": "Prototype 2; the styling model is expected to evolve."
+      "notes": "Prototype 2; the styling model is expected to evolve. Beyond colour the model now carries a four-role typographic scale (`ui::fonts`) and shared label truncation (`ui::widgets::Ellipsize`), which panels use so a narrow panel ellipsizes with a tooltip instead of cutting text mid-glyph. Diagnostic surfaces — the menu-bar frame/cull counters, the AI Debug tab and the performance overlay — are off by default behind View ▸ Developer."
     },
     {
       "id": "AF-PLAT-006",
@@ -1644,6 +1647,20 @@
         "tests/test_argument_package_projection.cpp"
       ],
       "notes": "UI for SACM packages; does not imply support for GSN Module notation."
+    },
+    {
+      "id": "AF-PLAT-011",
+      "area": "PLAT",
+      "name": "Status bar: save state, active document, problem counts",
+      "status": "supported",
+      "evidence": [
+        "src/ui/panels/status_bar_panel.cpp",
+        "src/app/areas/status_bar_area.cpp"
+      ],
+      "tests": [
+        "tests/test_status_bar.cpp"
+      ],
+      "notes": "Saved and unsaved render as distinct labels plus a dot, never as the absence of one — an ambiguous save indicator is a trust problem when the artifact is a safety argument. Also the sink for `core::AppState::status_message`: roughly twenty call sites set it and, before this, only the SACM viewer panel rendered it, so most feedback (load warnings, save failures) was produced and discarded. Reports state, does not track it — the flag itself is `AppState::has_unsaved_changes`. No last-saved timestamp yet."
     }
   ]
 }
