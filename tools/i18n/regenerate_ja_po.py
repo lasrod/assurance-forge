@@ -646,6 +646,8 @@ TRANSLATIONS = {
     "Validation": "検証",
     "Warnings": "警告",
     "Info": "情報",
+    "Warning": "警告",
+    "Error": "エラー",
     "No problems found.": "問題は見つかりませんでした。",
     "No problems match the current filter.": "現在のフィルターに一致する問題はありません。",
     "Severity": "重大度",

@@ -673,6 +673,9 @@ msgstr "保存する前に API キーを入力してください。"
 msgid "Enter the name to use for review comments."
 msgstr "レビューコメントに使用する名前を入力してください。"
 
+msgid "Error"
+msgstr "エラー"
+
 msgid "Evidence"
 msgstr "エビデンス"
 
@@ -1905,6 +1908,9 @@ msgstr "ウォークスルー"
 
 msgid "Walkthroughs are not yet implemented."
 msgstr "ウォークスルーは未実装です。"
+
+msgid "Warning"
+msgstr "警告"
 
 msgid "Warnings"
 msgstr "警告"
