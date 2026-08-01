@@ -1,4 +1,4 @@
-﻿#include "ui/panels/element_panel.h"
+#include "ui/panels/element_panel.h"
 
 #include "core/element_factory.h"
 #include "core/terminology_scope_service.h"
@@ -9,6 +9,7 @@
 #include "ui/panels/confidence_panel.h"
 #include "ui/text_edit_session.h"
 #include "ui/theme.h"
+#include "ui/widgets/empty_state.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
@@ -423,12 +424,12 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     bool modified = false;
 
     if (state.selected_element_id.empty()) {
-        ImGui::TextDisabled("%s", AF_TR("No element selected.").c_str());
+        ui::widgets::EmptyState(AF_TR("No element selected."));
         return false;
     }
 
     if (!ac) {
-        ImGui::TextDisabled("%s", AF_TR("No safety case loaded.").c_str());
+        ui::widgets::EmptyState(AF_TR("No safety case loaded."));
         return false;
     }
 

@@ -39,6 +39,7 @@ add_library(af_ui OBJECT
     tree_view.cpp
     ui_state.cpp
     widgets/danger_button.cpp
+    widgets/empty_state.cpp
     widgets/splitter.cpp
     widgets/text_ellipsis.cpp
 )

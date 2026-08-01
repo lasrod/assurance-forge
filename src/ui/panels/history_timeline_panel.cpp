@@ -3,6 +3,7 @@
 #include "core/audit/audit_diff.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
+#include "ui/widgets/empty_state.h"
 
 #include "imgui.h"
 
@@ -44,7 +45,7 @@ void RenderEmptyState(const HistoryTimelinePanelModel& model) {
                                .c_str());
         return;
     }
-    ImGui::TextDisabled("%s", AF_TR("No transactions have been recorded yet.").c_str());
+    ui::widgets::EmptyState(AF_TR("No transactions have been recorded yet."));
     ImGui::TextWrapped("%s",
                        AF_TR("Open a SACM model and use any model-mutating action (add or remove a node) — "
                              "each command will appear here.")

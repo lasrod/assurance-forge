@@ -2,6 +2,7 @@
 
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
+#include "ui/widgets/empty_state.h"
 
 #include <algorithm>
 #include <string>
@@ -327,13 +328,13 @@ void ShowProblemsPanelContent(ProblemsPanelModel model, const ProblemsPanelCallb
     ImGui::Separator();
 
     if (problems.empty()) {
-        ImGui::TextDisabled("%s", AF_TR("No problems found.").c_str());
+        ui::widgets::EmptyState(AF_TR("No problems found."));
         return;
     }
 
     int visible_count = CountMatches(problems, model.ui_state.active_problem_filter);
     if (visible_count == 0) {
-        ImGui::TextDisabled("%s", AF_TR("No problems match the current filter.").c_str());
+        ui::widgets::EmptyState(AF_TR("No problems match the current filter."));
         return;
     }
 
