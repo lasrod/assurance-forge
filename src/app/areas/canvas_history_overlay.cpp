@@ -86,7 +86,7 @@ CanvasHistoryState& GetOrCreateHistoryState(const std::string& tab_key) {
 }
 
 const std::vector<core::audit::AuditTransaction>& LoadTransactions(const core::AssuranceProject& project,
-                                                                  std::string& error_out) {
+                                                                   std::string& error_out) {
     return GetCachedTransactions(project.rootPath, error_out);
 }
 
@@ -110,8 +110,7 @@ void RebuildFilteredTransactions(FilteredTransactionsCache& cache,
     cache.package_id = argument_package.id;
     cache.package_gid = argument_package.gid;
 
-    core::audit::ArgumentPackageScope scope =
-        core::audit::CollectArgumentPackageScope(argument_package);
+    core::audit::ArgumentPackageScope scope = core::audit::CollectArgumentPackageScope(argument_package);
     cache.filtered.reserve(source.size());
     for (const core::audit::AuditTransaction& tx : source) {
         if (core::audit::TransactionTouchesScope(tx, scope))
@@ -123,8 +122,7 @@ void RebuildFilteredTransactions(FilteredTransactionsCache& cache,
             if (parent_it == event.payload.end() || !parent_it->is_string())
                 continue;
             const std::string parent = parent_it->get<std::string>();
-            const bool parent_in_scope =
-                scope.element_ids.count(parent) > 0 || scope.element_gids.count(parent) > 0;
+            const bool parent_in_scope = scope.element_ids.count(parent) > 0 || scope.element_gids.count(parent) > 0;
             if (!parent_in_scope)
                 continue;
             auto add_if_string = [&](const char* key) {
@@ -157,8 +155,7 @@ void RefreshReconstruction(ReconstructionCache& cache,
     tab_state.historical_seeded = false;
     tab_state.historical_seeded_sequence.reset();
 
-    auto state = core::audit::ReconstructAtSequence(project, target_seq, argument_package.id,
-                                                    argument_package.gid);
+    auto state = core::audit::ReconstructAtSequence(project, target_seq, argument_package.id, argument_package.gid);
     if (!state) {
         cache.error = state.error();
         cache.valid = true;
@@ -185,8 +182,8 @@ void RenderHistoricalCanvas(CanvasHistoryState& tab_state,
             ImGui::TextDisabled("%s", AF_TR("No reconstructed model to display.").c_str());
         return;
     }
-    const bool sequence_changed = !tab_state.historical_seeded ||
-                                  tab_state.historical_seeded_sequence != tab_state.reconstruction.sequence;
+    const bool sequence_changed =
+        !tab_state.historical_seeded || tab_state.historical_seeded_sequence != tab_state.reconstruction.sequence;
     if (sequence_changed) {
         tab_state.historical_renderer.SetTree(tab_state.reconstruction.tree);
         tab_state.historical_seeded = true;
@@ -203,10 +200,10 @@ void RenderHistoricalCanvas(CanvasHistoryState& tab_state,
         //      best we can do without an extra reconstruction at seq-1 is
         //      fit the entire visible package into the viewport).
         std::unordered_set<std::string> focus_ids;
-        auto tx_it = std::find_if(transactions.begin(), transactions.end(),
-                                  [target_seq](const core::audit::AuditTransaction& tx) {
-                                      return tx.transaction_sequence == target_seq;
-                                  });
+        auto tx_it = std::find_if(
+            transactions.begin(), transactions.end(), [target_seq](const core::audit::AuditTransaction& tx) {
+                return tx.transaction_sequence == target_seq;
+            });
         if (tx_it != transactions.end()) {
             const core::audit::AuditChangeSet cs = core::audit::ComputeChangeSet(*tx_it);
             const auto& model = tab_state.reconstruction.state.model;
@@ -235,8 +232,7 @@ void RenderHistoricalCanvas(CanvasHistoryState& tab_state,
     if (tab_state.filtered.valid) {
         const auto& scope = tab_state.filtered.scope;
         for (auto it = highlights.begin(); it != highlights.end();) {
-            const bool in_scope =
-                scope.element_ids.count(it->first) > 0 || scope.element_gids.count(it->first) > 0;
+            const bool in_scope = scope.element_ids.count(it->first) > 0 || scope.element_gids.count(it->first) > 0;
             if (in_scope)
                 ++it;
             else
@@ -246,9 +242,12 @@ void RenderHistoricalCanvas(CanvasHistoryState& tab_state,
     tab_state.historical_renderer.SetHistoryHighlights(std::move(highlights));
 
     ui::ElementContextActions readonly_actions;
-    ui::gsn::ShowGsnCanvasContentWithRenderer(tab_state.historical_renderer, ui_state,
+    ui::gsn::ShowGsnCanvasContentWithRenderer(tab_state.historical_renderer,
+                                              ui_state,
                                               &tab_state.reconstruction.state.model,
-                                              readonly_actions, nullptr, overlay_buttons);
+                                              readonly_actions,
+                                              nullptr,
+                                              overlay_buttons);
 }
 
 } // namespace
@@ -262,8 +261,8 @@ bool ProjectHasAuditStore(const AppRuntimeState& state) {
 bool ProjectAuditLogHasTransactions(const AppRuntimeState& state) {
     if (!ProjectHasAuditStore(state))
         return false;
-    const auto         log = core::audit::EventLogPath(state.app_state.current_project->rootPath);
-    std::error_code    ec;
+    const auto log = core::audit::EventLogPath(state.app_state.current_project->rootPath);
+    std::error_code ec;
     if (!std::filesystem::exists(log, ec))
         return false;
     // The log is JSON-Lines; one committed transaction == at least one
@@ -275,23 +274,20 @@ bool ProjectAuditLogHasTransactions(const AppRuntimeState& state) {
     return size > 0;
 }
 
-void RenderCanvasDivergenceBanner(AppRuntimeState& state,
-                                  const WorkbenchAreaCallbacks& callbacks) {
+void RenderCanvasDivergenceBanner(AppRuntimeState& state, const WorkbenchAreaCallbacks& callbacks) {
     if (!state.last_audit_verification.has_value() || !state.last_audit_verification->ran ||
         state.last_audit_verification->success) {
         return;
     }
     const auto& v = *state.last_audit_verification;
     ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(80, 50, 0, 255));
-    ImGui::BeginChild("##audit_warning_banner",
-                      ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 7.0f), true);
+    ImGui::BeginChild("##audit_warning_banner", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 7.0f), true);
     ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s", AF_TR("Audit log divergence detected").c_str());
-    ImGui::TextWrapped(
-        "%s",
-        AF_TR("The replayed audit history does not reproduce the on-disk SACM. This usually means "
-              "edits were applied through a path that did not record transactions. Pinned historical "
-              "views may be inaccurate.")
-            .c_str());
+    ImGui::TextWrapped("%s",
+                       AF_TR("The replayed audit history does not reproduce the on-disk SACM. This usually means "
+                             "edits were applied through a path that did not record transactions. Pinned historical "
+                             "views may be inaccurate.")
+                           .c_str());
     if (!v.replayed_canonical_hash.empty() && !v.on_disk_canonical_hash.empty()) {
         ImGui::TextWrapped("%s",
                            ui::i18n::trf("replay={0}  on_disk={1}",
@@ -316,7 +312,8 @@ void RenderCanvasDivergenceBanner(AppRuntimeState& state,
     // font-size relative so it scales with DPI.
     const float popup_width = ImGui::GetFontSize() * 40.0f;
     ImGui::SetNextWindowSizeConstraints(ImVec2(popup_width, 0.0f), ImVec2(popup_width, FLT_MAX));
-    if (ImGui::BeginPopupModal((AF_TR("Reconcile audit log") + "###reconcile_confirm").c_str(), nullptr,
+    if (ImGui::BeginPopupModal((AF_TR("Reconcile audit log") + "###reconcile_confirm").c_str(),
+                               nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s", AF_TR("This will rebuild the audit store.").c_str());
         ImGui::Spacing();
@@ -371,8 +368,7 @@ void RenderCanvasAutosaveErrorBanner(AppRuntimeState& state) {
     if (state.last_autosave_error.empty())
         return;
     ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(96, 16, 16, 255));
-    ImGui::BeginChild("##autosave_error_banner",
-                      ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 3.5f), true);
+    ImGui::BeginChild("##autosave_error_banner", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 3.5f), true);
     ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.55f, 1.0f), "%s", AF_TR("Autosave write failed").c_str());
     ImGui::TextWrapped("%s", state.last_autosave_error.c_str());
     ImGui::TextWrapped("%s",
@@ -386,26 +382,24 @@ void RenderCanvasAutosaveErrorBanner(AppRuntimeState& state) {
     ImGui::PopStyleColor();
 }
 
-void RenderArgumentPackageCanvasWithTimeline(
-    AppRuntimeState& state,
-    ui::UiState& ui_state,
-    const WorkbenchAreaCallbacks& /*callbacks*/,
-    WorkbenchState::ArgumentPackageCanvasTab& tab,
-    const sacm::ArgumentPackage& argument_package,
-    const parser::AssuranceCase& live_projection,
-    ui::gsn::GsnCanvas& live_renderer,
-    const ui::ElementContextActions& live_actions,
-    const sacm::AssuranceCasePackage* terminology_package) {
+void RenderArgumentPackageCanvasWithTimeline(AppRuntimeState& state,
+                                             ui::UiState& ui_state,
+                                             const WorkbenchAreaCallbacks& /*callbacks*/,
+                                             WorkbenchState::ArgumentPackageCanvasTab& tab,
+                                             const sacm::ArgumentPackage& argument_package,
+                                             const parser::AssuranceCase& live_projection,
+                                             ui::gsn::GsnCanvas& live_renderer,
+                                             const ui::ElementContextActions& live_actions,
+                                             const sacm::AssuranceCasePackage* terminology_package) {
     // No project / no audit store → render the live canvas without any
     // timeline rail. (Keeps Phase-1 fall-back behaviour symmetrical to the
     // old early-returns.)
-    const bool has_audit = state.app_state.current_project.has_value() &&
-                           std::filesystem::exists(
-                               core::audit::ManifestPath(
-                                   state.app_state.current_project->rootPath));
+    const bool has_audit =
+        state.app_state.current_project.has_value() &&
+        std::filesystem::exists(core::audit::ManifestPath(state.app_state.current_project->rootPath));
     if (!has_audit) {
-        ui::gsn::ShowGsnCanvasContentWithRenderer(live_renderer, ui_state, &live_projection,
-                                                  live_actions, terminology_package, nullptr);
+        ui::gsn::ShowGsnCanvasContentWithRenderer(
+            live_renderer, ui_state, &live_projection, live_actions, terminology_package, nullptr);
         return;
     }
 
@@ -418,22 +412,19 @@ void RenderArgumentPackageCanvasWithTimeline(
     std::string store_error;
     tab_state.source_transactions = LoadTransactions(project, store_error);
     RebuildFilteredTransactions(tab_state.filtered, tab_state.source_transactions, argument_package);
-    const std::vector<core::audit::AuditTransaction>& visible_transactions =
-        tab_state.filtered.filtered;
+    const std::vector<core::audit::AuditTransaction>& visible_transactions = tab_state.filtered.filtered;
 
     // Load baselines (best-effort: warnings are ignored at this layer; the
     // timeline still renders with whatever loaded successfully). Cached so
     // the manifest + per-baseline sidecar reads only run when the files
     // actually change.
-    const std::vector<core::audit::BaselineMetadata>& baselines =
-        GetCachedBaselines(project.rootPath, nullptr);
+    const std::vector<core::audit::BaselineMetadata>& baselines = GetCachedBaselines(project.rootPath, nullptr);
 
     // Enumerate snapshots from disk (snapshot/<id>/snapshot.json). The
     // manifest only records `initial_snapshot_id`, so we walk the directory
     // and read each metadata file. Cached so the per-frame directory walk
     // + metadata reads only run when the snapshots directory changes.
-    const std::vector<core::audit::SnapshotMetadata>& snapshots =
-        GetCachedSnapshots(project.rootPath);
+    const std::vector<core::audit::SnapshotMetadata>& snapshots = GetCachedSnapshots(project.rootPath);
 
     // Read the manifest so the unified timeline builder can flag the
     // initial snapshot (sorts first at sequence 0, labelled "S0"). The
@@ -452,8 +443,7 @@ void RenderArgumentPackageCanvasWithTimeline(
     // Clamp + decide live-vs-preview.
     const std::uint64_t latest_seq =
         visible_transactions.empty() ? 0 : visible_transactions.back().transaction_sequence;
-    if (tab.timeline.preview_sequence.has_value() &&
-        *tab.timeline.preview_sequence > latest_seq) {
+    if (tab.timeline.preview_sequence.has_value() && *tab.timeline.preview_sequence > latest_seq) {
         tab.timeline.preview_sequence.reset();
     }
     const bool live = !tab.timeline.preview_sequence.has_value();
@@ -462,17 +452,14 @@ void RenderArgumentPackageCanvasWithTimeline(
     tab.selected_transaction_sequence = tab.timeline.preview_sequence;
 
     if (!live) {
-        RefreshReconstruction(tab_state.reconstruction, tab_state, project, target_seq,
-                              argument_package);
+        RefreshReconstruction(tab_state.reconstruction, tab_state, project, target_seq, argument_package);
     }
 
     // Build the overlay buttons: timeline strip always; Live pill only when
     // a preview is active.
     ui::gsn::CanvasOverlayButtons overlay;
     if (!live) {
-        overlay.on_return_to_live = [&tab]() {
-            tab.timeline.preview_sequence.reset();
-        };
+        overlay.on_return_to_live = [&tab]() { tab.timeline.preview_sequence.reset(); };
         overlay.historical_badge_text = ui::i18n::trf("Preview: Tx {0} (read-only)", target_seq);
     }
 
@@ -485,47 +472,46 @@ void RenderArgumentPackageCanvasWithTimeline(
         query.package_id = argument_package.id;
         query.package_gid = argument_package.gid;
         query.initial_snapshot_id = manifest_initial_snapshot_id;
-        core::audit::TimelineModel model = core::audit::BuildTimelineModel(
-            visible_transactions, baselines, snapshots, query);
+        core::audit::TimelineModel model =
+            core::audit::BuildTimelineModel(visible_transactions, baselines, snapshots, query);
 
         ui::timeline::TimelineAction act =
             ui::timeline::RenderTimelineWidget(tab.timeline, model, mn, mx, tab.key.c_str());
 
         using ui::timeline::TimelineActionType;
         switch (act.type) {
-            case TimelineActionType::PreviewSequence:
-                if (act.sequence.has_value()) {
-                    if (*act.sequence >= latest_seq)
-                        tab.timeline.preview_sequence.reset();
-                    else
-                        tab.timeline.preview_sequence = act.sequence;
-                }
-                break;
-            case TimelineActionType::ReturnToLatest:
-                tab.timeline.preview_sequence.reset();
-                break;
-            case TimelineActionType::ChangeViewMode:
-                if (act.view_mode.has_value())
-                    tab.timeline.view_mode = *act.view_mode;
-                break;
-            case TimelineActionType::CreateBaseline:
-                app::areas::OpenBaselineModal(tab.baseline_modal, latest_seq, std::string());
-                break;
-            case TimelineActionType::CreateSnapshot: {
-                core::audit::SnapshotMetadata created;
-                std::string err;
-                const std::string reason = "User-initiated snapshot from timeline";
-                if (core::audit::CreateUserSnapshot(project.rootPath, reason,
-                                                    state.reviewer_name, created, err)) {
-                    state.app_state.status_message =
-                        ui::i18n::trf("Snapshot created at sequence {0}.", created.transaction_sequence);
-                } else {
-                    state.app_state.status_message = ui::i18n::trf("Failed to create snapshot: {0}", err);
-                }
-                break;
+        case TimelineActionType::PreviewSequence:
+            if (act.sequence.has_value()) {
+                if (*act.sequence >= latest_seq)
+                    tab.timeline.preview_sequence.reset();
+                else
+                    tab.timeline.preview_sequence = act.sequence;
             }
-            default:
-                break;
+            break;
+        case TimelineActionType::ReturnToLatest:
+            tab.timeline.preview_sequence.reset();
+            break;
+        case TimelineActionType::ChangeViewMode:
+            if (act.view_mode.has_value())
+                tab.timeline.view_mode = *act.view_mode;
+            break;
+        case TimelineActionType::CreateBaseline:
+            app::areas::OpenBaselineModal(tab.baseline_modal, latest_seq, std::string());
+            break;
+        case TimelineActionType::CreateSnapshot: {
+            core::audit::SnapshotMetadata created;
+            std::string err;
+            const std::string reason = "User-initiated snapshot from timeline";
+            if (core::audit::CreateUserSnapshot(project.rootPath, reason, state.reviewer_name, created, err)) {
+                state.app_state.status_message =
+                    ui::i18n::trf("Snapshot created at sequence {0}.", created.transaction_sequence);
+            } else {
+                state.app_state.status_message = ui::i18n::trf("Failed to create snapshot: {0}", err);
+            }
+            break;
+        }
+        default:
+            break;
         }
     };
     overlay.on_render_timeline_strip = strip_cb;
@@ -533,16 +519,17 @@ void RenderArgumentPackageCanvasWithTimeline(
     // Render the chosen canvas (live or historical) with overlay attached.
     if (live) {
         live_renderer.ClearHistoryHighlights();
-        ui::gsn::ShowGsnCanvasContentWithRenderer(live_renderer, ui_state, &live_projection,
-                                                  live_actions, terminology_package, &overlay);
+        ui::gsn::ShowGsnCanvasContentWithRenderer(
+            live_renderer, ui_state, &live_projection, live_actions, terminology_package, &overlay);
     } else {
         RenderHistoricalCanvas(tab_state, ui_state, visible_transactions, target_seq, &overlay);
     }
 
     // Baseline-creation modal (opened by the timeline's actions menu).
-    app::areas::RenderBaselineModal(
-        tab.baseline_modal, project.rootPath, state.reviewer_name,
-        [&state](const std::string& message) { state.app_state.status_message = message; });
+    app::areas::RenderBaselineModal(tab.baseline_modal,
+                                    project.rootPath,
+                                    state.reviewer_name,
+                                    [&state](const std::string& message) { state.app_state.status_message = message; });
 }
 
 void ForgetCanvasHistoryTab(const std::string& tab_key) {

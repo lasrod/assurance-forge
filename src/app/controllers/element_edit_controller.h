@@ -7,7 +7,9 @@
 #include <string>
 #include <vector>
 
-namespace app { struct AppRuntimeState; }
+namespace app {
+struct AppRuntimeState;
+}
 
 namespace app::controllers {
 
@@ -21,20 +23,15 @@ public:
     // directly (no audit transaction). Methods early-return without dispatch
     // when a precondition (selection, model presence, ...) is not met.
 
-    bool AddChildToSelected(AppRuntimeState& state,
-                            const std::string& selected_id,
-                            core::NewElementKind kind);
+    bool AddChildToSelected(AppRuntimeState& state, const std::string& selected_id, core::NewElementKind kind);
     bool AddTopGoal(AppRuntimeState& state);
 
     // Create a GSN v3 dialectic challenge (counter argument / counter evidence)
     // against `target` (an element or a relationship). Selects the new counter
     // node so the user can immediately edit its text in the element panel.
-    bool AddChallenge(AppRuntimeState& state,
-                      const core::ArgumentTarget& target,
-                      core::ChallengeSourceType source_type);
-    bool RemoveSelected(AppRuntimeState& state,
-                        const std::string& selected_id,
-                        core::RemoveMode mode);
+    bool
+    AddChallenge(AppRuntimeState& state, const core::ArgumentTarget& target, core::ChallengeSourceType source_type);
+    bool RemoveSelected(AppRuntimeState& state, const std::string& selected_id, core::RemoveMode mode);
     bool ConfirmPendingRemoval(AppRuntimeState& state);
     void CancelPendingRemoval();
 
@@ -48,12 +45,10 @@ public:
     // single-relationship edits with undo behind them, unlike node removal which
     // can take a subtree.
     bool RemoveRelationship(AppRuntimeState& state, const std::string& relationship_id);
-    bool DropRelationshipReference(AppRuntimeState& state,
-                                   const std::string& relationship_id,
-                                   const std::string& reference);
-    bool MoveStrategyToReasoning(AppRuntimeState& state,
-                                 const std::string& relationship_id,
-                                 const std::string& strategy_id);
+    bool
+    DropRelationshipReference(AppRuntimeState& state, const std::string& relationship_id, const std::string& reference);
+    bool
+    MoveStrategyToReasoning(AppRuntimeState& state, const std::string& relationship_id, const std::string& strategy_id);
     bool SetElementUndeveloped(AppRuntimeState& state, const std::string& element_id, bool undeveloped);
     // Give `element_id` the next identifier free under its own prefix, the
     // repair for two nodes answering to the same one.
@@ -93,8 +88,8 @@ public:
     // translates the surrounding sentence, not these.
     struct RemovalEffect {
         std::string element_id;
-        std::string kind;  // SACM class name, e.g. "Claim"
-        std::string name;  // may be empty
+        std::string kind; // SACM class name, e.g. "Claim"
+        std::string name; // may be empty
         bool is_relationship = false;
         bool deleted = true; // false: survives, changed (a scrubbed relationship)
     };
@@ -125,9 +120,8 @@ private:
     // it in fact survives, retargeted. No preview is produced for NodeOnly
     // until the library can express the retarget; the modal says so rather than
     // showing a confident wrong answer.
-    void BuildRemovalPreview(AppRuntimeState& state,
-                             const std::vector<std::string>& planned_ids,
-                             core::RemoveMode mode);
+    void
+    BuildRemovalPreview(AppRuntimeState& state, const std::vector<std::string>& planned_ids, core::RemoveMode mode);
 
     // Adds the Assurance Claim Points that die with the elements already in the
     // preview. ACPs live in vendor TaggedValues, which the seam filters out as

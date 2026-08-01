@@ -37,10 +37,8 @@ parser::SacmElement Solution(std::string id) {
 
 // SACM AssertedInference: sources are the premises, target the conclusion. In
 // GSN terms the target is supported by the sources.
-parser::SacmElement Inference(std::string id,
-                              std::vector<std::string> sources,
-                              std::string target,
-                              std::string reasoning = {}) {
+parser::SacmElement
+Inference(std::string id, std::vector<std::string> sources, std::string target, std::string reasoning = {}) {
     parser::SacmElement element;
     element.id = std::move(id);
     element.type = "assertedinference";
@@ -69,9 +67,8 @@ parser::SacmElement Context(std::string id, std::string source, std::string targ
 }
 
 bool HasCycle(const std::vector<core::ArgumentCycle>& cycles, const std::vector<std::string>& expected) {
-    return std::any_of(cycles.begin(), cycles.end(), [&](const core::ArgumentCycle& cycle) {
-        return cycle.element_ids == expected;
-    });
+    return std::any_of(
+        cycles.begin(), cycles.end(), [&](const core::ArgumentCycle& cycle) { return cycle.element_ids == expected; });
 }
 
 } // namespace
@@ -127,11 +124,8 @@ TEST(ArgumentCyclesTest, DetectsAnElementThatSupportsItself) {
 // usually the step the author has to break.
 TEST(ArgumentCyclesTest, CycleThroughAStrategyNamesTheStrategy) {
     parser::AssuranceCase model;
-    model.elements = {Claim("G1"),
-                      Claim("G2"),
-                      Strategy("S1"),
-                      Inference("R1", {"G2"}, "G1", "S1"),
-                      Inference("R2", {"G1"}, "G2")};
+    model.elements = {
+        Claim("G1"), Claim("G2"), Strategy("S1"), Inference("R1", {"G2"}, "G1", "S1"), Inference("R2", {"G1"}, "G2")};
 
     const std::vector<core::ArgumentCycle> cycles = core::FindSupportCycles(model);
 
@@ -162,8 +156,7 @@ TEST(ArgumentCyclesTest, ChallengesAreNotSupport) {
                       Inference("R1", {"G1"}, "G9"), // G9 is supported by G1
                       challenge};                    // G9 challenges G1
 
-    EXPECT_TRUE(core::FindSupportCycles(model).empty())
-        << "a challenge was followed as if it were support";
+    EXPECT_TRUE(core::FindSupportCycles(model).empty()) << "a challenge was followed as if it were support";
 
     // Sanity: the same shape *without* the counter flag really is a cycle, so
     // the assertion above is about `is_counter` and not about the fixture.

@@ -37,15 +37,16 @@ std::string idrefs(const std::vector<ElementId>& ids) {
     return joined;
 }
 
-void write_element(pugi::xml_node parent, const SACMElement& element, std::string_view node_name,
+void write_element(pugi::xml_node parent,
+                   const SACMElement& element,
+                   std::string_view node_name,
                    std::optional<ElementKind> declared_kind);
 std::string qualified_class_name_for_expression_lang_string();
 
 const std::map<std::string, std::string> kNoForeignNamespaces;
 
 // <value lang=".." content=".."/> entries of a MultiLangString.
-void write_multi_lang(pugi::xml_node owner, std::string_view wrapper_name,
-                      const model::MultiLangString& value) {
+void write_multi_lang(pugi::xml_node owner, std::string_view wrapper_name, const model::MultiLangString& value) {
     if (value.values.empty()) {
         return;
     }
@@ -53,8 +54,7 @@ void write_multi_lang(pugi::xml_node owner, std::string_view wrapper_name,
     for (const model::LangString& entry : value.values) {
         pugi::xml_node node = wrapper.append_child("value");
         if (entry.expression_ref.has_value()) {
-            node.append_attribute("xsi:type") =
-                qualified_class_name_for_expression_lang_string().c_str();
+            node.append_attribute("xsi:type") = qualified_class_name_for_expression_lang_string().c_str();
         }
         if (!entry.lang.empty()) {
             node.append_attribute("lang") = entry.lang.c_str();
@@ -95,8 +95,7 @@ void write_kind_specific_attributes(pugi::xml_node node, const SACMElement& elem
     if (const auto* assertion = dynamic_cast<const model::Assertion*>(&element)) {
         if (assertion->assertion_declaration() != model::AssertionDeclaration::Asserted) {
             node.append_attribute("assertionDeclaration") =
-                std::string(model::assertion_declaration_name(assertion->assertion_declaration()))
-                    .c_str();
+                std::string(model::assertion_declaration_name(assertion->assertion_declaration())).c_str();
         }
         if (!assertion->meta_claims().empty()) {
             node.append_attribute("metaClaim") = idrefs(assertion->meta_claims()).c_str();
@@ -147,8 +146,7 @@ void write_kind_specific_attributes(pugi::xml_node node, const SACMElement& elem
     }
     if (const auto* group = dynamic_cast<const model::TerminologyGroup*>(&element)) {
         if (!group->terminology_elements().empty()) {
-            node.append_attribute("terminologyElement") =
-                idrefs(group->terminology_elements()).c_str();
+            node.append_attribute("terminologyElement") = idrefs(group->terminology_elements()).c_str();
         }
     }
     if (const auto* category = dynamic_cast<const model::Category*>(&element)) {
@@ -230,8 +228,7 @@ void write_kind_specific_attributes(pugi::xml_node node, const SACMElement& elem
         write_implements(iface->implements());
     } else if (const auto* iface = dynamic_cast<const model::ArtifactPackageInterface*>(&element)) {
         write_implements(iface->implements());
-    } else if (const auto* iface =
-                   dynamic_cast<const model::TerminologyPackageInterface*>(&element)) {
+    } else if (const auto* iface = dynamic_cast<const model::TerminologyPackageInterface*>(&element)) {
         write_implements(iface->implements());
     }
     if (const auto* binding = dynamic_cast<const model::AssuranceCasePackageBinding*>(&element)) {
@@ -240,14 +237,12 @@ void write_kind_specific_attributes(pugi::xml_node node, const SACMElement& elem
         write_participants(binding->participant_packages());
     } else if (const auto* binding = dynamic_cast<const model::ArtifactPackageBinding*>(&element)) {
         write_participants(binding->participant_packages());
-    } else if (const auto* binding =
-                   dynamic_cast<const model::TerminologyPackageBinding*>(&element)) {
+    } else if (const auto* binding = dynamic_cast<const model::TerminologyPackageBinding*>(&element)) {
         write_participants(binding->participant_packages());
     }
 }
 
-void write_utility(pugi::xml_node parent, std::string_view role,
-                   const model::UtilityElement& element) {
+void write_utility(pugi::xml_node parent, std::string_view role, const model::UtilityElement& element) {
     pugi::xml_node node = parent.append_child(std::string(role).c_str());
     write_common_attributes(node, element);
     if (const auto* tagged = dynamic_cast<const model::TaggedValue*>(&element)) {
@@ -413,8 +408,7 @@ void write_preserved_content(pugi::xml_node node, const SACMElement& element) {
 // attribute stops looking foreign and is skipped -- the vendor data survives one
 // save and is lost on the next (SACM23-COMPAT-001). Prefixes the writer already
 // declared win, so a foreign document cannot rebind `sacm`, `xmi` or `xsi`.
-void write_namespace_declarations(pugi::xml_node node,
-                                  const std::map<std::string, std::string>& foreign_namespaces) {
+void write_namespace_declarations(pugi::xml_node node, const std::map<std::string, std::string>& foreign_namespaces) {
     for (const auto& [prefix, uri] : foreign_namespaces) {
         if (prefix.empty()) {
             continue;
@@ -427,7 +421,9 @@ void write_namespace_declarations(pugi::xml_node node,
     }
 }
 
-void write_element(pugi::xml_node parent, const SACMElement& element, std::string_view node_name,
+void write_element(pugi::xml_node parent,
+                   const SACMElement& element,
+                   std::string_view node_name,
                    std::optional<ElementKind> declared_kind) {
     pugi::xml_node node = parent.append_child(std::string(node_name).c_str());
     // xsi:type whenever the concrete class differs from the declared role
@@ -445,7 +441,9 @@ void write_element(pugi::xml_node parent, const SACMElement& element, std::strin
     write_preserved_content(node, element);
 }
 
-void write_root(pugi::xml_node parent, const SACMElement& element, bool declare_namespaces,
+void write_root(pugi::xml_node parent,
+                const SACMElement& element,
+                bool declare_namespaces,
                 std::string_view sacm_namespace,
                 const std::map<std::string, std::string>& foreign_namespaces) {
     pugi::xml_node node = parent.append_child(qualified_class_name(element.kind()).c_str());
@@ -473,7 +471,7 @@ struct StringWriter final : pugi::xml_writer {
     }
 };
 
-}  // namespace
+} // namespace
 
 SaveResult save_xmi_string(const model::Document& document, const SaveOptions& options) {
     SaveResult result;
@@ -510,8 +508,7 @@ SaveResult save_xmi_string(const model::Document& document, const SaveOptions& o
     // stays free of them, and a document carrying nothing unknown serializes
     // exactly as before.
     const std::map<std::string, std::string>& foreign_namespaces =
-        g_emit_preserved_content && !carriers.empty() ? document.foreign_namespaces()
-                                                      : kNoForeignNamespaces;
+        g_emit_preserved_content && !carriers.empty() ? document.foreign_namespaces() : kNoForeignNamespaces;
 
     // An empty override means the pinned default. SACM 2.3 determines no
     // instance namespace, so this is a project choice a caller may override.
@@ -528,8 +525,7 @@ SaveResult save_xmi_string(const model::Document& document, const SaveOptions& o
         if (!document.roots().empty()) {
             write_root(xml, *document.roots().front(), true, sacm_namespace, foreign_namespaces);
         } else {
-            write_root(xml, *document.other_roots().front(), true, sacm_namespace,
-                       foreign_namespaces);
+            write_root(xml, *document.other_roots().front(), true, sacm_namespace, foreign_namespaces);
         }
     } else {
         pugi::xml_node wrapper = xml.append_child("xmi:XMI");
@@ -553,8 +549,8 @@ SaveResult save_xmi_string(const model::Document& document, const SaveOptions& o
     return result;
 }
 
-SaveResult save_xmi_file(const std::filesystem::path& path, const model::Document& document,
-                         const SaveOptions& options) {
+SaveResult
+save_xmi_file(const std::filesystem::path& path, const model::Document& document, const SaveOptions& options) {
     SaveResult result = save_xmi_string(document, options);
     if (!result.ok) {
         return result;
@@ -577,4 +573,4 @@ SaveResult save_xmi_file(const std::filesystem::path& path, const model::Documen
     return result;
 }
 
-}  // namespace sacm::io
+} // namespace sacm::io

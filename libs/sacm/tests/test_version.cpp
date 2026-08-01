@@ -9,4 +9,4 @@ TEST(Sacm23Library, SACM23_LIB_001_ExposesSacm23VersionMetadata) {
     EXPECT_FALSE(sacm::library_version().empty());
 }
 
-}  // namespace
+} // namespace

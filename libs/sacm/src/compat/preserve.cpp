@@ -12,7 +12,7 @@ namespace {
 using detail::Access;
 using model::SACMElement;
 
-}  // namespace
+} // namespace
 
 std::size_t adopt_preserved_content(model::Document& target, const model::Document& source) {
     // Index the source's carriers first. Walking the source once and the target
@@ -40,15 +40,12 @@ std::size_t adopt_preserved_content(model::Document& target, const model::Docume
             // is part of the load-side story, restoring what a load produced.
             SACMElement& mutable_element = const_cast<SACMElement&>(element);
             bool received = false;
-            if (mutable_element.preserved_content().empty() &&
-                !found->second->preserved_content().empty()) {
+            if (mutable_element.preserved_content().empty() && !found->second->preserved_content().empty()) {
                 Access::preserved_content(mutable_element) = found->second->preserved_content();
                 received = true;
             }
-            if (mutable_element.preserved_attributes().empty() &&
-                !found->second->preserved_attributes().empty()) {
-                Access::preserved_attributes(mutable_element) =
-                    found->second->preserved_attributes();
+            if (mutable_element.preserved_attributes().empty() && !found->second->preserved_attributes().empty()) {
+                Access::preserved_attributes(mutable_element) = found->second->preserved_attributes();
                 received = true;
             }
             if (received) {
@@ -85,4 +82,4 @@ std::size_t adopt_preserved_content(model::Document& target, const model::Docume
     return adopted;
 }
 
-}  // namespace sacm::compat
+} // namespace sacm::compat

@@ -81,8 +81,7 @@ void AppendReferences(const parser::SacmElement& element, std::vector<std::strin
 // Undirected "mentions" adjacency over the model. Undirected because attachment
 // runs both ways: the new relationship names the existing goal, and the new
 // claim is named by that relationship.
-std::unordered_map<std::string, std::vector<std::string>> BuildMentionGraph(
-    const parser::AssuranceCase& model) {
+std::unordered_map<std::string, std::vector<std::string>> BuildMentionGraph(const parser::AssuranceCase& model) {
     std::unordered_map<std::string, std::vector<std::string>> graph;
     for (const parser::SacmElement& element : model.elements) {
         if (element.id.empty())
@@ -103,12 +102,12 @@ std::unordered_map<std::string, std::vector<std::string>> BuildMentionGraph(
 // addition two hops out -- a claim attached by a new relationship to a new
 // strategy -- is reached; a committed element belonging to another package is
 // never traversed, so one package's additions cannot leak into another's canvas.
-std::unordered_set<std::string> AdditionsReachableFrom(
-    const std::unordered_map<std::string, std::vector<std::string>>& graph,
-    const std::unordered_set<std::string>&                           seeds,
-    const std::unordered_set<std::string>&                           additions) {
+std::unordered_set<std::string>
+AdditionsReachableFrom(const std::unordered_map<std::string, std::vector<std::string>>& graph,
+                       const std::unordered_set<std::string>& seeds,
+                       const std::unordered_set<std::string>& additions) {
     std::unordered_set<std::string> reached;
-    std::vector<std::string>        frontier(seeds.begin(), seeds.end());
+    std::vector<std::string> frontier(seeds.begin(), seeds.end());
     while (!frontier.empty()) {
         const std::string current = frontier.back();
         frontier.pop_back();
@@ -131,12 +130,12 @@ std::unordered_set<std::string> AdditionsReachableFrom(
 const sacm::ArgumentPackage* FindArgumentPackageByIdentity(const sacm::AssuranceCasePackage& package,
                                                            std::string_view package_id,
                                                            std::string_view package_gid) {
-    auto found = std::find_if(package.argumentPackages.begin(), package.argumentPackages.end(),
-                              [&](const sacm::ArgumentPackage& pkg) {
-                                  const bool id_matches = !package_id.empty() && pkg.id == package_id;
-                                  const bool gid_matches = !package_gid.empty() && pkg.gid == package_gid;
-                                  return id_matches || gid_matches;
-                              });
+    auto found = std::find_if(
+        package.argumentPackages.begin(), package.argumentPackages.end(), [&](const sacm::ArgumentPackage& pkg) {
+            const bool id_matches = !package_id.empty() && pkg.id == package_id;
+            const bool gid_matches = !package_gid.empty() && pkg.gid == package_gid;
+            return id_matches || gid_matches;
+        });
     return found == package.argumentPackages.end() ? nullptr : &*found;
 }
 
@@ -146,28 +145,23 @@ parser::AssuranceCase BuildArgumentPackageProjection(const parser::AssuranceCase
     std::unordered_set<std::string> element_ids;
     std::unordered_set<std::string> element_gids;
     CollectPackageIdentity(argument_package, element_ids, element_gids);
-    return ProjectOntoPackage(source_model, argument_package, element_ids, element_gids,
-                              fallback_name);
+    return ProjectOntoPackage(source_model, argument_package, element_ids, element_gids, fallback_name);
 }
 
-parser::AssuranceCase BuildArgumentPackagePreviewProjection(
-    const parser::AssuranceCase&      preview_model,
-    const sacm::AssuranceCasePackage& package,
-    const sacm::ArgumentPackage&      argument_package,
-    const std::vector<std::string>&   added_element_ids,
-    std::string_view                  fallback_name) {
+parser::AssuranceCase BuildArgumentPackagePreviewProjection(const parser::AssuranceCase& preview_model,
+                                                            const sacm::AssuranceCasePackage& package,
+                                                            const sacm::ArgumentPackage& argument_package,
+                                                            const std::vector<std::string>& added_element_ids,
+                                                            std::string_view fallback_name) {
     std::unordered_set<std::string> element_ids;
     std::unordered_set<std::string> element_gids;
     CollectPackageIdentity(argument_package, element_ids, element_gids);
 
-    const std::unordered_set<std::string> additions(added_element_ids.begin(),
-                                                    added_element_ids.end());
+    const std::unordered_set<std::string> additions(added_element_ids.begin(), added_element_ids.end());
     if (additions.empty())
-        return ProjectOntoPackage(preview_model, argument_package, element_ids, element_gids,
-                                  fallback_name);
+        return ProjectOntoPackage(preview_model, argument_package, element_ids, element_gids, fallback_name);
 
-    const std::unordered_map<std::string, std::vector<std::string>> graph =
-        BuildMentionGraph(preview_model);
+    const std::unordered_map<std::string, std::vector<std::string>> graph = BuildMentionGraph(preview_model);
 
     for (const std::string& reached : AdditionsReachableFrom(graph, element_ids, additions))
         element_ids.insert(reached);
@@ -184,16 +178,14 @@ parser::AssuranceCase BuildArgumentPackagePreviewProjection(
             if (!element.id.empty() && additions.count(element.id) == 0)
                 committed.insert(element.id);
         }
-        const std::unordered_set<std::string> attached_somewhere =
-            AdditionsReachableFrom(graph, committed, additions);
+        const std::unordered_set<std::string> attached_somewhere = AdditionsReachableFrom(graph, committed, additions);
         for (const std::string& addition : additions) {
             if (attached_somewhere.count(addition) == 0)
                 element_ids.insert(addition);
         }
     }
 
-    return ProjectOntoPackage(preview_model, argument_package, element_ids, element_gids,
-                              fallback_name);
+    return ProjectOntoPackage(preview_model, argument_package, element_ids, element_gids, fallback_name);
 }
 
 } // namespace core

@@ -21,11 +21,13 @@ std::string SummarizeTransaction(const core::audit::AuditTransaction& tx) {
     if (!cs.added.empty())
         summary += "+" + std::to_string(cs.added.size());
     if (!cs.modified.empty()) {
-        if (!summary.empty()) summary += " ";
+        if (!summary.empty())
+            summary += " ";
         summary += "~" + std::to_string(cs.modified.size());
     }
     if (!cs.deleted.empty()) {
-        if (!summary.empty()) summary += " ";
+        if (!summary.empty())
+            summary += " ";
         summary += "-" + std::to_string(cs.deleted.size());
     }
     if (summary.empty())
@@ -52,8 +54,7 @@ void RenderEmptyState(const HistoryTimelinePanelModel& model) {
 // Compact int slider modeled on `DrawOpinionSliderBar` in confidence_panel.cpp.
 // Label on the left, "N / M" value on the right, draggable rounded bar with a
 // circular handle. Snaps to integer values.
-void DrawTransactionSliderBar(int& value, int min_v, int max_v,
-                              const HistoryTimelinePanelCallbacks& callbacks) {
+void DrawTransactionSliderBar(int& value, int min_v, int max_v, const HistoryTimelinePanelCallbacks& callbacks) {
     const Theme& theme = GetTheme();
     value = std::clamp(value, min_v, max_v);
 
@@ -73,8 +74,7 @@ void DrawTransactionSliderBar(int& value, int min_v, int max_v,
     const bool value_fits_on_label_line =
         label_width + ImGui::GetStyle().ItemSpacing.x + value_width <= available_width;
     if (value_fits_on_label_line) {
-        const float value_x =
-            std::max(label_width + ImGui::GetStyle().ItemSpacing.x, available_width - value_width);
+        const float value_x = std::max(label_width + ImGui::GetStyle().ItemSpacing.x, available_width - value_width);
         ImGui::SameLine(value_x);
     }
     ImGui::TextUnformatted(value_text);
@@ -86,10 +86,8 @@ void DrawTransactionSliderBar(int& value, int min_v, int max_v,
     const bool active = ImGui::IsItemActive();
 
     if (active && ImGui::IsMouseDown(ImGuiMouseButton_Left) && max_v > min_v) {
-        const float t = std::clamp((ImGui::GetIO().MousePos.x - cursor.x) / std::max(1.0f, size.x),
-                                   0.0f, 1.0f);
-        const int next_value =
-            min_v + static_cast<int>(t * static_cast<float>(max_v - min_v) + 0.5f);
+        const float t = std::clamp((ImGui::GetIO().MousePos.x - cursor.x) / std::max(1.0f, size.x), 0.0f, 1.0f);
+        const int next_value = min_v + static_cast<int>(t * static_cast<float>(max_v - min_v) + 0.5f);
         if (next_value != value) {
             value = next_value;
             if (callbacks.on_select_sequence)
@@ -100,23 +98,17 @@ void DrawTransactionSliderBar(int& value, int min_v, int max_v,
     if (hovered || active)
         ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
 
-    const float t = (max_v > min_v)
-        ? static_cast<float>(value - min_v) / static_cast<float>(max_v - min_v)
-        : 1.0f;
+    const float t = (max_v > min_v) ? static_cast<float>(value - min_v) / static_cast<float>(max_v - min_v) : 1.0f;
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     const float y = cursor.y + (line_height - bar_height) * 0.5f;
     const ImVec2 mn(cursor.x, y);
     const ImVec2 mx(cursor.x + size.x, y + bar_height);
     const float fill_x = mn.x + size.x * t;
     const ImU32 color = theme.accent;
-    draw_list->AddRectFilled(
-        mn, mx, WithAlpha(theme.surface_3, hovered || active ? 0.86f : 0.60f), bar_height * 0.5f);
-    draw_list->AddRectFilled(mn, ImVec2(fill_x, mx.y), WithAlpha(color, active ? 1.0f : 0.88f),
-                             bar_height * 0.5f);
-    draw_list->AddCircleFilled(ImVec2(fill_x, (mn.y + mx.y) * 0.5f), active ? 6.0f : 4.8f,
-                               theme.text_primary, 18);
-    draw_list->AddCircleFilled(ImVec2(fill_x, (mn.y + mx.y) * 0.5f), active ? 4.0f : 3.0f, color,
-                               18);
+    draw_list->AddRectFilled(mn, mx, WithAlpha(theme.surface_3, hovered || active ? 0.86f : 0.60f), bar_height * 0.5f);
+    draw_list->AddRectFilled(mn, ImVec2(fill_x, mx.y), WithAlpha(color, active ? 1.0f : 0.88f), bar_height * 0.5f);
+    draw_list->AddCircleFilled(ImVec2(fill_x, (mn.y + mx.y) * 0.5f), active ? 6.0f : 4.8f, theme.text_primary, 18);
+    draw_list->AddCircleFilled(ImVec2(fill_x, (mn.y + mx.y) * 0.5f), active ? 4.0f : 3.0f, color, 18);
 
     if (hovered || active)
         ImGui::SetTooltip("%s", AF_TR("Drag to scrub transaction history").c_str());
@@ -126,8 +118,7 @@ void DrawTransactionSliderBar(int& value, int min_v, int max_v,
 
 } // namespace
 
-void ShowHistoryTimelineHeader(const HistoryTimelinePanelModel& model,
-                               const HistoryTimelinePanelCallbacks& callbacks) {
+void ShowHistoryTimelineHeader(const HistoryTimelinePanelModel& model, const HistoryTimelinePanelCallbacks& callbacks) {
     if (!model.has_audit_store || !model.transactions || model.transactions->empty()) {
         RenderEmptyState(model);
         return;
@@ -150,9 +141,8 @@ void ShowHistoryTimelineTransactions(const HistoryTimelinePanelModel& model,
     const std::uint64_t latest_seq = transactions.back().transaction_sequence;
     const std::uint64_t selected = model.selected_sequence.value_or(latest_seq);
 
-    const ImGuiTableFlags table_flags =
-        ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_ScrollY |
-        ImGuiTableFlags_SizingStretchProp;
+    const ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH |
+                                        ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
     if (ImGui::BeginTable("##history_transactions", 5, table_flags)) {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("#", ImGuiTableColumnFlags_WidthFixed, 40.0f);
@@ -171,8 +161,7 @@ void ShowHistoryTimelineTransactions(const HistoryTimelinePanelModel& model,
             ImGui::TableSetColumnIndex(0);
             ImGui::PushID(static_cast<int>(tx.transaction_sequence));
             char label[32];
-            std::snprintf(label, sizeof(label), "%llu",
-                          static_cast<unsigned long long>(tx.transaction_sequence));
+            std::snprintf(label, sizeof(label), "%llu", static_cast<unsigned long long>(tx.transaction_sequence));
             if (ImGui::Selectable(label, is_selected, ImGuiSelectableFlags_SpanAllColumns)) {
                 if (callbacks.on_select_sequence)
                     callbacks.on_select_sequence(tx.transaction_sequence);

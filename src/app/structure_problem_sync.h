@@ -25,6 +25,6 @@ struct GsnRepairPayload {
 };
 
 std::string EncodeGsnRepairPayload(const GsnRepairPayload& payload);
-bool        DecodeGsnRepairPayload(const std::string& encoded, GsnRepairPayload& out);
+bool DecodeGsnRepairPayload(const std::string& encoded, GsnRepairPayload& out);
 
 } // namespace app

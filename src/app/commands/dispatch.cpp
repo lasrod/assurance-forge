@@ -17,7 +17,8 @@ namespace {
 // hazard the inspector read-only guard already prevents for text fields.
 bool IsActiveCanvasInHistoricalPreview(const AppRuntimeState& state) {
     const std::string& active = state.workbench.active_argument_package_canvas_key;
-    if (active.empty()) return false;
+    if (active.empty())
+        return false;
     for (const auto& tab : state.workbench.argument_package_canvas_tabs) {
         if (tab.key == active) {
             return tab.timeline.preview_sequence.has_value();
@@ -28,15 +29,14 @@ bool IsActiveCanvasInHistoricalPreview(const AppRuntimeState& state) {
 
 } // namespace
 
-DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state, core::commands::ICommand& command,
-                                       const std::string& author) {
+DispatchOutcome
+DispatchAuditedCommand(AppRuntimeState& state, core::commands::ICommand& command, const std::string& author) {
     if (!state.app_state.sacm_package.has_value()) {
         return {false, "No SACM model loaded."};
     }
 
     if (IsActiveCanvasInHistoricalPreview(state)) {
-        return {false,
-                "Cannot edit while viewing history. Return to Latest to make changes."};
+        return {false, "Cannot edit while viewing history. Return to Latest to make changes."};
     }
 
     // No bus available (e.g. unit tests, or a SACM file opened outside of a
@@ -49,8 +49,8 @@ DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state, core::commands::I
         parser::AssuranceCase& model_ref =
             state.app_state.loaded_case.has_value() ? state.app_state.loaded_case.value() : scratch_model;
         core::commands::CommandContext ctx{model_ref, state.app_state.sacm_package.value()};
-        core::audit::AuditEvent        unused_event;
-        std::string                    apply_error;
+        core::audit::AuditEvent unused_event;
+        std::string apply_error;
         if (!command.Apply(ctx, unused_event, apply_error)) {
             return {false, apply_error};
         }

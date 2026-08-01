@@ -52,8 +52,10 @@ nlohmann::json ReadUserSettingsSection(const std::filesystem::path& path, const 
 // document is replaced rather than propagated -- there is nothing to preserve in
 // something that cannot be parsed, and refusing to save would leave the user
 // unable to fix it from the UI.
-bool UpdateUserSettingsSection(const std::filesystem::path& path, const std::string& section,
-                               const nlohmann::json& value, std::string& error);
+bool UpdateUserSettingsSection(const std::filesystem::path& path,
+                               const std::string& section,
+                               const nlohmann::json& value,
+                               std::string& error);
 
 // The `"mcp"` section: whether the user has allowed an external AI client to
 // read this machine's assurance cases over the MCP server.
@@ -71,7 +73,6 @@ struct McpUserSettings {
 // user never approved.
 McpUserSettings LoadMcpUserSettings(const std::filesystem::path& path);
 
-bool SaveMcpUserSettings(const std::filesystem::path& path, const McpUserSettings& settings,
-                         std::string& error);
+bool SaveMcpUserSettings(const std::filesystem::path& path, const McpUserSettings& settings, std::string& error);
 
 } // namespace core

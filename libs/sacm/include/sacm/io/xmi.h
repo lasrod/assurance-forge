@@ -20,7 +20,7 @@ LoadResult load_xmi_string(std::string_view xml, const LoadOptions& options = {}
 // child order, two-space indent, LF newlines, UTF-8). Compatibility-only
 // content makes a strict save fail (SACM-XMI-006).
 SaveResult save_xmi_string(const model::Document& document, const SaveOptions& options = {});
-SaveResult save_xmi_file(const std::filesystem::path& path, const model::Document& document,
-                         const SaveOptions& options = {});
+SaveResult
+save_xmi_file(const std::filesystem::path& path, const model::Document& document, const SaveOptions& options = {});
 
-}  // namespace sacm::io
+} // namespace sacm::io

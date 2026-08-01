@@ -52,8 +52,8 @@ bool WriteMigrationBaselineSnapshot(const std::filesystem::path& project_root,
                                     std::string& out_snapshot_id,
                                     std::string& error) {
     char id_buf[48];
-    std::snprintf(id_buf, sizeof(id_buf), "snapshot_migration_%06llu",
-                  static_cast<unsigned long long>(transaction_sequence));
+    std::snprintf(
+        id_buf, sizeof(id_buf), "snapshot_migration_%06llu", static_cast<unsigned long long>(transaction_sequence));
     const std::string snapshot_id = id_buf;
 
     const std::filesystem::path snapshot_dir = SnapshotDir(project_root, snapshot_id);
@@ -90,7 +90,7 @@ bool PackageHasLegacyStrategyEncoding(const sacm::AssuranceCasePackage& package)
     for (const sacm::ArgumentPackage& ap : package.argumentPackages) {
         for (const sacm::ArgumentReasoning& strategy : ap.argumentReasonings) {
             if (ReasoningHasStrategyTargetTag(strategy))
-                continue;  // already single-inference encoded
+                continue; // already single-inference encoded
             if (HasBareInference(ap, strategy.id))
                 return true;
         }
@@ -114,7 +114,7 @@ bool NormalizeStrategyEncoding(sacm::AssuranceCasePackage& package) {
                 }
             }
             if (bare == nullptr)
-                continue;  // not the legacy encoding
+                continue; // not the legacy encoding
 
             const std::string bare_id = bare->id;
             const std::string target_goal = bare->targets.empty() ? std::string() : bare->targets.front();
@@ -150,7 +150,7 @@ bool NormalizeStrategyEncoding(sacm::AssuranceCasePackage& package) {
             // a render-only placeholder synthesized on load.
             if (!subgoals.empty() && !target_goal.empty()) {
                 sacm::AssertedInference single;
-                single.id = bare_id;  // reuse the strategy's original inference id
+                single.id = bare_id; // reuse the strategy's original inference id
                 single.reasoning = strategy.id;
                 single.targets.push_back(target_goal);
                 single.sources = std::move(subgoals);
@@ -169,7 +169,7 @@ bool MigrateStrategyEncodingIfNeeded(const AssuranceProject& project,
     out_result = StrategyMigrationResult{};
 
     if (project.rootPath.empty() || sacm_relative_path.empty())
-        return true;  // nothing to migrate
+        return true; // nothing to migrate
 
     // Migration only matters for an audited project (verify replays against the
     // manifest); a bare file has no divergence to prevent.
@@ -201,11 +201,11 @@ bool MigrateStrategyEncodingIfNeeded(const AssuranceProject& project,
     // which the legacy parser reads near-empty), preserving vendor tags.
     sacm_adapter::LoadOutcome outcome = sacm_adapter::load_document(sacm_abs);
     if (!outcome.ok || outcome.document == nullptr)
-        return true;  // unreadable by the library: leave it to the load-time fallback
+        return true; // unreadable by the library: leave it to the load-time fallback
     sacm::AssuranceCasePackage package = core::project_library_package_with_tags(*outcome.document);
 
     if (!PackageHasLegacyStrategyEncoding(package))
-        return true;  // already single-inference: nothing to migrate
+        return true; // already single-inference: nothing to migrate
 
     // Bridge the normalization onto the DOCUMENT rather than writing the
     // projection out. This is the same shape as every other legacy mutation the
@@ -226,8 +226,8 @@ bool MigrateStrategyEncodingIfNeeded(const AssuranceProject& project,
         NormalizeStrategyEncoding(scratch);
         return true;
     };
-    if (!core::commands::BridgeLegacyMutationToLibrary(*outcome.document, normalize, error,
-                                                       "the strategy-encoding migration")) {
+    if (!core::commands::BridgeLegacyMutationToLibrary(
+            *outcome.document, normalize, error, "the strategy-encoding migration")) {
         error = "Strategy migration could not re-derive the library document: " + error;
         return false;
     }
@@ -272,12 +272,17 @@ bool MigrateStrategyEncodingIfNeeded(const AssuranceProject& project,
     const std::string& baseline_xml = migrated_xml;
     const std::string baseline_raw_hash = raw_hash;
     std::string baseline_snapshot_id;
-    if (!WriteMigrationBaselineSnapshot(project.rootPath, baseline_xml,
+    if (!WriteMigrationBaselineSnapshot(project.rootPath,
+                                        baseline_xml,
                                         manifest.latest_transaction_sequence,
-                                        manifest.latest_event_sequence, baseline_raw_hash, canonical_hash,
-                                        baseline_snapshot_id, error)) {
+                                        manifest.latest_event_sequence,
+                                        baseline_raw_hash,
+                                        canonical_hash,
+                                        baseline_snapshot_id,
+                                        error)) {
         error = "Strategy migration wrote the migrated SACM but could not record the trusted "
-                "baseline: " + error;
+                "baseline: " +
+                error;
         return false;
     }
 
@@ -287,7 +292,8 @@ bool MigrateStrategyEncodingIfNeeded(const AssuranceProject& project,
         manifest.last_known_canonical_model_hash = canonical_hash;
     if (!WriteAuditManifest(project.rootPath, manifest, error)) {
         error = "Strategy migration wrote the migrated SACM and baseline but could not update the "
-                "manifest: " + error;
+                "manifest: " +
+                error;
         return false;
     }
 

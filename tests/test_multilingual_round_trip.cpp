@@ -84,15 +84,13 @@ struct TempFile {
 TempFile WriteFixture(const std::string& stem, std::string_view content) {
     const std::filesystem::path path =
         std::filesystem::temp_directory_path() /
-        ("af_multilang_" + stem + "_" +
-         std::to_string(::testing::UnitTest::GetInstance()->random_seed()) + ".sacm");
+        ("af_multilang_" + stem + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()) + ".sacm");
     std::ofstream out(path, std::ios::binary | std::ios::trunc);
     out.write(content.data(), static_cast<std::streamsize>(content.size()));
     return TempFile{path};
 }
 
-const parser::SacmElement& RequireElement(const parser::AssuranceCase& model,
-                                          const std::string&          id) {
+const parser::SacmElement& RequireElement(const parser::AssuranceCase& model, const std::string& id) {
     const parser::SacmElement* element = parser::FindElementById(model, id);
     EXPECT_NE(element, nullptr) << "element " << id << " is missing";
     static const parser::SacmElement kEmpty;
@@ -138,10 +136,9 @@ TEST(MultilingualRoundTrip, KeepsEachTranslationUnderItsOwnLanguage) {
     ASSERT_TRUE(sacm_adapter::reload_document(reloaded, xml));
 
     const parser::AssuranceCase before = sacm_adapter::project_case(*loaded.document);
-    const parser::AssuranceCase after  = sacm_adapter::project_case(reloaded);
+    const parser::AssuranceCase after = sacm_adapter::project_case(reloaded);
 
-    EXPECT_EQ(RequireElement(after, "G1").description_langs,
-              RequireElement(before, "G1").description_langs);
+    EXPECT_EQ(RequireElement(after, "G1").description_langs, RequireElement(before, "G1").description_langs);
     EXPECT_EQ(RequireElement(after, "G1").name_langs, RequireElement(before, "G1").name_langs);
 }
 
@@ -158,8 +155,7 @@ TEST(MultilingualRoundTrip, HashesTheSameThroughEitherPipeline) {
 
     const std::optional<std::string> round_tripped =
         core::library_canonical_hash(core::project_library_package(*loaded.document));
-    const std::optional<std::string> from_file =
-        core::library_canonical_hash_from_file(fixture.path);
+    const std::optional<std::string> from_file = core::library_canonical_hash_from_file(fixture.path);
 
     ASSERT_TRUE(round_tripped.has_value());
     ASSERT_TRUE(from_file.has_value());
@@ -195,8 +191,7 @@ TEST(MultilingualRoundTrip, LeavesASingleLanguageCaseAlone) {
 
     const std::optional<std::string> round_tripped =
         core::library_canonical_hash(core::project_library_package(*loaded.document));
-    const std::optional<std::string> from_file =
-        core::library_canonical_hash_from_file(fixture.path);
+    const std::optional<std::string> from_file = core::library_canonical_hash_from_file(fixture.path);
 
     ASSERT_TRUE(round_tripped.has_value());
     ASSERT_TRUE(from_file.has_value());
@@ -256,8 +251,7 @@ TEST(MultilingualRoundTrip, EveryFixtureHashesTheSameThroughEitherPipeline) {
         if (!std::filesystem::exists(root, ec)) {
             continue;
         }
-        for (const std::filesystem::directory_entry& entry :
-             std::filesystem::recursive_directory_iterator(root, ec)) {
+        for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator(root, ec)) {
             if (!entry.is_regular_file()) {
                 continue;
             }
@@ -275,8 +269,7 @@ TEST(MultilingualRoundTrip, EveryFixtureHashesTheSameThroughEitherPipeline) {
 
             const std::optional<std::string> round_tripped =
                 core::library_canonical_hash(core::project_library_package(*loaded.document));
-            const std::optional<std::string> from_file =
-                core::library_canonical_hash_from_file(entry.path());
+            const std::optional<std::string> from_file = core::library_canonical_hash_from_file(entry.path());
             if (!round_tripped.has_value() || !from_file.has_value()) {
                 continue;
             }

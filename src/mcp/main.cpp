@@ -24,7 +24,7 @@
 
 namespace {
 
-constexpr int kExitOk    = 0;
+constexpr int kExitOk = 0;
 constexpr int kExitUsage = 2;
 
 void PrintUsage() {
@@ -58,8 +58,7 @@ int main(int argc, char** argv) {
             return kExitOk;
         }
         if (argument == "--version") {
-            std::cerr << mcp::kServerName << ' ' << mcp::kServerVersion << " (MCP "
-                      << mcp::kProtocolVersion << ")\n";
+            std::cerr << mcp::kServerName << ' ' << mcp::kServerVersion << " (MCP " << mcp::kProtocolVersion << ")\n";
             return kExitOk;
         }
         if (argument == "--project" && index + 1 < args.size()) {
@@ -81,7 +80,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    std::string                    error;
+    std::string error;
     std::unique_ptr<mcp::Session> session = mcp::Session::Open(std::move(config), error);
     if (session == nullptr) {
         std::cerr << "assurance-forge-mcp: " << error << '\n';

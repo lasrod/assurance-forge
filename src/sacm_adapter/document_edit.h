@@ -35,7 +35,7 @@
 // Description, which SetDescription's front-only edit cannot target), and
 // Term/Expression `value`.
 
-#include "sacm_adapter/library_load.h"  // LibraryDocument, LoadDiagnostic
+#include "sacm_adapter/library_load.h" // LibraryDocument, LoadDiagnostic
 
 #include <string>
 #include <vector>
@@ -71,8 +71,11 @@ struct EditOutcome {
 // language overwrites the stored name rather than accumulating a map the way
 // the legacy POD does -- callers editing secondary-language names must not rely
 // on this until that impedance is handled in a later slice.
-EditOutcome apply_text_edit(LibraryDocument& document, const std::string& element_id,
-                            TextField field, const std::string& language, const std::string& value);
+EditOutcome apply_text_edit(LibraryDocument& document,
+                            const std::string& element_id,
+                            TextField field,
+                            const std::string& language,
+                            const std::string& value);
 
 // The kind of child element to add, mirroring core::NewElementKind. Each maps
 // to a new element plus an asserted relationship linking it to the parent.
@@ -118,8 +121,10 @@ struct AddChildOutcome {
 // applies only when a relationship is created; a Strategy creates none yet (its
 // inference is deferred to the first sub-goal), so it is ignored for
 // `ChildKind::Strategy`.
-AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& parent_id,
-                                ChildKind kind, const std::string& element_id = {},
+AddChildOutcome apply_add_child(LibraryDocument& document,
+                                const std::string& parent_id,
+                                ChildKind kind,
+                                const std::string& element_id = {},
                                 const std::string& relationship_id = {});
 
 // Adds a top goal, mirroring `core::AddTopGoal`: creates a Claim with no parent
@@ -146,8 +151,10 @@ enum class ChallengeSource {
 // result is likewise a new element plus a new relationship.
 // `element_id`/`relationship_id`: see apply_add_child -- non-empty ids are used
 // verbatim for id-deterministic replay.
-AddChildOutcome apply_challenge(LibraryDocument& document, const std::string& target_id,
-                                ChallengeSource source, const std::string& element_id = {},
+AddChildOutcome apply_challenge(LibraryDocument& document,
+                                const std::string& target_id,
+                                ChallengeSource source,
+                                const std::string& element_id = {},
                                 const std::string& relationship_id = {});
 
 // Result of adding an Assurance Claim Point. `acp_id` is the id the seam
@@ -175,8 +182,8 @@ struct AcpOutcome {
 // When `requested_acp_id` is non-empty it is the `ACP<n>` id used verbatim (so an
 // audited/replayed ACP add reproduces the id the legacy generator recorded);
 // empty generates the next free one.
-AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id,
-                         const std::string& requested_acp_id = {});
+AcpOutcome
+apply_add_acp(LibraryDocument& document, const std::string& target_id, const std::string& requested_acp_id = {});
 
 // Result of deleting an element.
 struct DeleteOutcome {
@@ -195,8 +202,8 @@ struct DeleteOutcome {
 // tell them apart before confirming.
 struct DeleteEffect {
     std::string element_id;
-    std::string kind;  // SACM class name ("Claim", "AssertedInference", ...)
-    std::string name;  // display name; empty when the element has none
+    std::string kind; // SACM class name ("Claim", "AssertedInference", ...)
+    std::string name; // display name; empty when the element has none
     bool is_relationship = false;
     bool deleted = true;
 };
@@ -230,8 +237,7 @@ struct DeletePreview {
 // not resolve are skipped rather than reported: the caller's removal plan is
 // computed over the app's GSN projection, which legitimately contains ids with
 // no library counterpart.
-DeletePreview preview_delete_elements(const LibraryDocument& document,
-                                      const std::vector<std::string>& element_ids);
+DeletePreview preview_delete_elements(const LibraryDocument& document, const std::vector<std::string>& element_ids);
 
 // Deletes a single element and scrubs it out of the relationships that
 // reference it, the primitive `core::RemoveElement` composes. Uses the
@@ -336,18 +342,18 @@ struct TerminologyContextOutcome {
 // is used verbatim. Reports `supported == false` only if the document has no root
 // AssuranceCasePackage.
 TerminologyCreateOutcome apply_create_terminology_package(LibraryDocument& document,
-                                                         const std::string& name,
-                                                         const std::string& description,
-                                                         const std::string& package_id = {});
+                                                          const std::string& name,
+                                                          const std::string& description,
+                                                          const std::string& package_id = {});
 
 // (2) Create a Category inside terminology package `package_id`, mirroring
 // `core::CreateTerminologyCategoryWithIds`. `category_id` when non-empty is used
 // verbatim.
 TerminologyCreateOutcome apply_create_terminology_category(LibraryDocument& document,
-                                                          const std::string& package_id,
-                                                          const std::string& name,
-                                                          const std::string& description,
-                                                          const std::string& category_id = {});
+                                                           const std::string& package_id,
+                                                           const std::string& name,
+                                                           const std::string& description,
+                                                           const std::string& category_id = {});
 
 // (3) Create a Term inside terminology package `package_id`, mirroring
 // `core::CreateTerminologyTermWithIds`. Composes CreateTerm (name/value/external
@@ -357,24 +363,24 @@ TerminologyCreateOutcome apply_create_terminology_category(LibraryDocument& docu
 // unlike the legacy POD which stored any string). `term_id` when non-empty is
 // used verbatim.
 TerminologyCreateOutcome apply_create_terminology_term(LibraryDocument& document,
-                                                      const std::string& package_id,
-                                                      const TerminologyTermFields& fields,
-                                                      const std::string& term_id = {});
+                                                       const std::string& package_id,
+                                                       const TerminologyTermFields& fields,
+                                                       const std::string& term_id = {});
 
 // (4) Update a TerminologyPackage's name/description, mirroring
 // `core::UpdateTerminologyPackage` (SetName + SetDescription; empty description
 // clears it).
 TerminologyEditOutcome apply_update_terminology_package(LibraryDocument& document,
-                                                       const std::string& package_id,
-                                                       const std::string& name,
-                                                       const std::string& description);
+                                                        const std::string& package_id,
+                                                        const std::string& name,
+                                                        const std::string& description);
 
 // (5) Update a Category's name/description, mirroring
 // `core::UpdateTerminologyCategory`.
 TerminologyEditOutcome apply_update_terminology_category(LibraryDocument& document,
-                                                        const std::string& category_id,
-                                                        const std::string& name,
-                                                        const std::string& description);
+                                                         const std::string& category_id,
+                                                         const std::string& name,
+                                                         const std::string& description);
 
 // (6) Update a Term's fields, mirroring `core::UpdateTerminologyTerm`. Composes
 // SetName + SetExpressionValue + SetDescription + SetExpressionCategories +
@@ -383,8 +389,8 @@ TerminologyEditOutcome apply_update_terminology_category(LibraryDocument& docume
 // mid-sequence failure leaves the earlier sets applied -- unlike the atomic
 // legacy mutator).
 TerminologyEditOutcome apply_update_terminology_term(LibraryDocument& document,
-                                                    const std::string& term_id,
-                                                    const TerminologyTermFields& fields);
+                                                     const std::string& term_id,
+                                                     const TerminologyTermFields& fields);
 
 // (7) Delete a terminology package, category, or term, mirroring the primitive
 // the legacy delete mutators compose: `DeleteElement` with the
@@ -393,8 +399,7 @@ TerminologyEditOutcome apply_update_terminology_term(LibraryDocument& document,
 // package or an in-use category) -- those are UI safety checks, not model
 // invariants; the library's own RejectIfNonEmpty package policy still rejects a
 // non-empty package.
-TerminologyEditOutcome apply_delete_terminology_element(LibraryDocument& document,
-                                                       const std::string& element_id);
+TerminologyEditOutcome apply_delete_terminology_element(LibraryDocument& document, const std::string& element_id);
 
 // (8) Associate term `term_id` with element `target_element_id`, mirroring
 // `core::AssociateTerminologyTermWithElementWithIds`: creates an ArtifactReference
@@ -405,10 +410,10 @@ TerminologyEditOutcome apply_delete_terminology_element(LibraryDocument& documen
 // solution (ArtifactReference) in an argument package. Caller-supplied ids are
 // consulted only when the corresponding entity is newly created.
 TerminologyContextOutcome apply_associate_terminology_term(LibraryDocument& document,
-                                                          const std::string& target_element_id,
-                                                          const std::string& term_id,
-                                                          const std::string& artifact_reference_id = {},
-                                                          const std::string& asserted_context_id = {});
+                                                           const std::string& target_element_id,
+                                                           const std::string& term_id,
+                                                           const std::string& artifact_reference_id = {},
+                                                           const std::string& asserted_context_id = {});
 
 // (9) Add term `term_id` as a visible context on `target_element_id`, mirroring
 // `core::AddTerminologyTermAsVisibleContextWithIds`: like (8) plus the visible-
@@ -417,9 +422,9 @@ TerminologyContextOutcome apply_associate_terminology_term(LibraryDocument& docu
 // duplicate when one is promotable. The target must be a claim or strategy. Caller
 // -supplied ids are consulted only when a new reference/context is created.
 TerminologyContextOutcome apply_add_terminology_visible_context(LibraryDocument& document,
-                                                               const std::string& target_element_id,
-                                                               const std::string& term_id,
-                                                               const std::string& artifact_reference_id = {},
-                                                               const std::string& asserted_context_id = {});
+                                                                const std::string& target_element_id,
+                                                                const std::string& term_id,
+                                                                const std::string& artifact_reference_id = {},
+                                                                const std::string& asserted_context_id = {});
 
 } // namespace sacm_adapter

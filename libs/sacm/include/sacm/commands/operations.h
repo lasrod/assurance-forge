@@ -41,7 +41,7 @@ struct CreateClaim {
     std::optional<model::ElementId> id;
     std::string name;
     std::string description;
-    std::string language;  // language tag for name/description; may be empty
+    std::string language; // language tag for name/description; may be empty
 };
 
 // Create an ArtifactPackage inside an AssuranceCasePackage or (nested)
@@ -81,7 +81,7 @@ struct CreateArgumentReasoning {
     model::ElementId parent;
     std::optional<model::ElementId> id;
     std::string name;
-    std::optional<model::ElementId> structure;  // detailing ArgumentPackage
+    std::optional<model::ElementId> structure; // detailing ArgumentPackage
 };
 
 // Create an ArtifactReference inside an ArgumentPackage (clause 11.9).
@@ -182,7 +182,7 @@ struct SetGid {
 struct SetName {
     model::ElementId element;
     std::string name;
-    std::string language;  // may be empty
+    std::string language; // may be empty
 };
 
 // Set the description text for one language, creating the Description when
@@ -190,7 +190,7 @@ struct SetName {
 struct SetDescription {
     model::ElementId element;
     std::string text;
-    std::string language;  // may be empty
+    std::string language; // may be empty
 };
 
 // Set the description text for one language at ordinal slot `index` in a
@@ -205,7 +205,7 @@ struct SetDescriptionAt {
     model::ElementId element;
     std::size_t index = 0;
     std::string text;
-    std::string language;  // may be empty
+    std::string language; // may be empty
 };
 
 // Set the value text of a Term or Expression (clause 10.7 / 10.10).
@@ -239,7 +239,7 @@ struct AddTaggedValue {
     std::optional<model::ElementId> id;
     std::string key;
     std::string value;
-    std::string language;  // may be empty
+    std::string language; // may be empty
 };
 
 // Delete any element by ID. Destructive consequences are governed by the
@@ -248,22 +248,39 @@ struct DeleteElement {
     model::ElementId target;
     ReferenceDeletePolicy reference_policy = ReferenceDeletePolicy::RejectIfReferenced;
     PackageDeletePolicy package_policy = PackageDeletePolicy::RejectIfNonEmpty;
-    CrossPackageReferencePolicy cross_package_policy =
-        CrossPackageReferencePolicy::RejectIfExternalReferencesExist;
+    CrossPackageReferencePolicy cross_package_policy = CrossPackageReferencePolicy::RejectIfExternalReferencesExist;
 };
 
-using Operation =
-    std::variant<CreateAssuranceCasePackage, CreateArgumentPackage, CreateClaim,
-                 CreateArgumentReasoning, CreateArtifactReference, CreateAssertedRelationship,
-                 CreateTerminologyPackage, CreateCategory, CreateTerm, CreateExpression,
-                 CreateArtifactPackage, CreateArtifactAsset, CreateArtifactAssetRelationship,
-                 SetCitation, SetGid, SetName, SetDescription, SetDescriptionAt,
-                 SetAssertionDeclaration, AddMetaClaim,
-                 AddRelationshipSource, SetExpressionValue, SetTermExternalReference,
-                 SetTermOrigin, SetExpressionCategories, AddTaggedValue, DeleteElement>;
+using Operation = std::variant<CreateAssuranceCasePackage,
+                               CreateArgumentPackage,
+                               CreateClaim,
+                               CreateArgumentReasoning,
+                               CreateArtifactReference,
+                               CreateAssertedRelationship,
+                               CreateTerminologyPackage,
+                               CreateCategory,
+                               CreateTerm,
+                               CreateExpression,
+                               CreateArtifactPackage,
+                               CreateArtifactAsset,
+                               CreateArtifactAssetRelationship,
+                               SetCitation,
+                               SetGid,
+                               SetName,
+                               SetDescription,
+                               SetDescriptionAt,
+                               SetAssertionDeclaration,
+                               AddMetaClaim,
+                               AddRelationshipSource,
+                               SetExpressionValue,
+                               SetTermExternalReference,
+                               SetTermOrigin,
+                               SetExpressionCategories,
+                               AddTaggedValue,
+                               DeleteElement>;
 
 // Stable operation name ("CreateClaim", "DeleteElement", ...) used in
 // previews, results, and diagnostics.
 std::string_view operation_name(const Operation& operation);
 
-}  // namespace sacm::commands
+} // namespace sacm::commands

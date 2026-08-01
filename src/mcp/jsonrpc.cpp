@@ -43,15 +43,14 @@ ParseOutcome ParseRequest(const std::string& message) {
     }
 
     Request request;
-    request.method          = method->get<std::string>();
-    request.id              = id;
+    request.method = method->get<std::string>();
+    request.id = id;
     request.is_notification = !has_id;
 
     const nlohmann::json::const_iterator params = parsed.find("params");
     if (params != parsed.end() && !params->is_null()) {
         if (!params->is_object() && !params->is_array()) {
-            outcome.error_response =
-                MakeError(id, kInvalidParams, "\"params\" must be an object or an array");
+            outcome.error_response = MakeError(id, kInvalidParams, "\"params\" must be an object or an array");
             return outcome;
         }
         request.params = *params;
@@ -66,9 +65,7 @@ nlohmann::json MakeResult(const nlohmann::json& id, nlohmann::json result) {
 }
 
 nlohmann::json MakeError(const nlohmann::json& id, int code, const std::string& message) {
-    return nlohmann::json{{"jsonrpc", "2.0"},
-                          {"id", id},
-                          {"error", {{"code", code}, {"message", message}}}};
+    return nlohmann::json{{"jsonrpc", "2.0"}, {"id", id}, {"error", {{"code", code}, {"message", message}}}};
 }
 
 bool ReadMessage(std::istream& in, std::string& out_message) {

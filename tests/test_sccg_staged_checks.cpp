@@ -13,29 +13,28 @@
 
 namespace {
 
-parser::SacmElement Claim(const std::string& id, const std::string& text,
-                          bool undeveloped = false) {
+parser::SacmElement Claim(const std::string& id, const std::string& text, bool undeveloped = false) {
     parser::SacmElement element;
-    element.id          = id;
-    element.type        = "claim";
-    element.name        = id;
-    element.content     = text;
+    element.id = id;
+    element.type = "claim";
+    element.name = id;
+    element.content = text;
     element.undeveloped = undeveloped;
     return element;
 }
 
 parser::SacmElement Strategy(const std::string& id, const std::string& text) {
     parser::SacmElement element;
-    element.id      = id;
-    element.type    = "argumentreasoning";
-    element.name    = id;
+    element.id = id;
+    element.type = "argumentreasoning";
+    element.name = id;
     element.content = text;
     return element;
 }
 
 parser::SacmElement Solution(const std::string& id) {
     parser::SacmElement element;
-    element.id   = id;
+    element.id = id;
     element.type = "artifactreference";
     element.name = id;
     return element;
@@ -43,11 +42,10 @@ parser::SacmElement Solution(const std::string& id) {
 
 // An AssertedInference: SACM's source is the premise and its target the
 // conclusion, so support runs from the child up to the parent.
-parser::SacmElement Supports(const std::string& id, const std::string& child,
-                             const std::string& parent) {
+parser::SacmElement Supports(const std::string& id, const std::string& child, const std::string& parent) {
     parser::SacmElement element;
-    element.id          = id;
-    element.type        = "assertedinference";
+    element.id = id;
+    element.type = "assertedinference";
     element.source_refs = {child};
     element.target_refs = {parent};
     return element;
@@ -56,18 +54,18 @@ parser::SacmElement Supports(const std::string& id, const std::string& child,
 // An AssertedEvidence: this is what gives an artifact the Solution role, and it
 // is the only relationship that does. Using an inference here would leave the
 // artifact a generic node and the test would pass for the wrong reason.
-parser::SacmElement Evidences(const std::string& id, const std::string& artifact,
-                              const std::string& claim) {
+parser::SacmElement Evidences(const std::string& id, const std::string& artifact, const std::string& claim) {
     parser::SacmElement element;
-    element.id          = id;
-    element.type        = "assertedevidence";
+    element.id = id;
+    element.type = "assertedevidence";
     element.source_refs = {artifact};
     element.target_refs = {claim};
     return element;
 }
 
 bool Mentions(const std::vector<core::sccg::StagedFinding>& findings,
-              const std::string& guideline_id, const std::string& element_id) {
+              const std::string& guideline_id,
+              const std::string& element_id) {
     for (const core::sccg::StagedFinding& finding : findings) {
         if (finding.guideline_id == guideline_id && finding.element_id == element_id) {
             return true;
@@ -85,8 +83,7 @@ TEST(SccgStagedChecks, EV1_FlagsAClaimWithNoSupportAndNoUndevelopedMarker) {
     parser::AssuranceCase model;
     model.elements.push_back(Claim("G1", "The braking function meets its requirements"));
 
-    const std::vector<core::sccg::StagedFinding> findings =
-        core::sccg::CheckStagedArgument(model, {"G1"});
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"G1"});
 
     EXPECT_TRUE(Mentions(findings, "EV.1", "G1"));
 }
@@ -95,8 +92,7 @@ TEST(SccgStagedChecks, EV1_AcceptsAClaimDeliberatelyMarkedUndeveloped) {
     parser::AssuranceCase model;
     model.elements.push_back(Claim("G1", "The braking function meets its requirements", true));
 
-    const std::vector<core::sccg::StagedFinding> findings =
-        core::sccg::CheckStagedArgument(model, {"G1"});
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"G1"});
 
     // Marking a goal undeveloped is an honest statement of work remaining, not
     // a defect. Flagging it would train the agent to hide open work.
@@ -111,8 +107,7 @@ TEST(SccgStagedChecks, AR2_FlagsAStrategyThatDevelopsIntoNothing) {
     model.elements.push_back(Strategy("S1", "Argue over hazards"));
     model.elements.push_back(Supports("R1", "S1", "G1"));
 
-    const std::vector<core::sccg::StagedFinding> findings =
-        core::sccg::CheckStagedArgument(model, {"S1"});
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"S1"});
 
     ASSERT_TRUE(Mentions(findings, "AR.2", "S1"));
     for (const core::sccg::StagedFinding& finding : findings) {
@@ -130,8 +125,7 @@ TEST(SccgStagedChecks, AR2_AcceptsAStrategyWithASubGoal) {
     model.elements.push_back(Supports("R1", "S1", "G1"));
     model.elements.push_back(Supports("R2", "G2", "S1"));
 
-    const std::vector<core::sccg::StagedFinding> findings =
-        core::sccg::CheckStagedArgument(model, {"S1"});
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"S1"});
 
     EXPECT_FALSE(Mentions(findings, "AR.2", "S1"));
 }
@@ -142,8 +136,7 @@ TEST(SccgStagedChecks, CL5_FlagsAnUnboundedQualifier) {
     parser::AssuranceCase model;
     model.elements.push_back(Claim("G1", "The vehicle is safe", true));
 
-    const std::vector<core::sccg::StagedFinding> findings =
-        core::sccg::CheckStagedArgument(model, {"G1"});
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"G1"});
 
     ASSERT_TRUE(Mentions(findings, "CL.5", "G1"));
     for (const core::sccg::StagedFinding& finding : findings) {
@@ -158,11 +151,9 @@ TEST(SccgStagedChecks, CL5_FlagsAnUnboundedQualifier) {
 // having it: "install" is not "all", and "safety" is not "safe".
 TEST(SccgStagedChecks, CL5_DoesNotFireOnSubstringsOfLongerWords) {
     parser::AssuranceCase model;
-    model.elements.push_back(
-        Claim("G1", "The safety case installation procedure was followed", true));
+    model.elements.push_back(Claim("G1", "The safety case installation procedure was followed", true));
 
-    const std::vector<core::sccg::StagedFinding> findings =
-        core::sccg::CheckStagedArgument(model, {"G1"});
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"G1"});
 
     EXPECT_FALSE(Mentions(findings, "CL.5", "G1"));
 }
@@ -177,8 +168,7 @@ TEST(SccgStagedChecks, AR1_FlagsASolutionWithChildren) {
     model.elements.push_back(Evidences("R1", "Sn1", "G1"));
     model.elements.push_back(Supports("R2", "G2", "Sn1"));
 
-    const std::vector<core::sccg::StagedFinding> findings =
-        core::sccg::CheckStagedArgument(model, {"Sn1"});
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"Sn1"});
 
     EXPECT_TRUE(Mentions(findings, "AR.1", "Sn1"));
 }
@@ -191,8 +181,7 @@ TEST(SccgStagedChecks, ReportsOnlyWhatTheChangeSetTouched) {
     model.elements.push_back(Claim("G1", "An untouched claim with no support"));
     model.elements.push_back(Claim("G2", "A claim this change set added"));
 
-    const std::vector<core::sccg::StagedFinding> findings =
-        core::sccg::CheckStagedArgument(model, {"G2"});
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"G2"});
 
     EXPECT_TRUE(Mentions(findings, "EV.1", "G2"));
     EXPECT_FALSE(Mentions(findings, "EV.1", "G1"));
@@ -211,8 +200,7 @@ TEST(SccgStagedChecks, EveryFindingCitesTheGuidelineItServes) {
     parser::AssuranceCase model;
     model.elements.push_back(Claim("G1", "The vehicle is safe"));
 
-    const std::vector<core::sccg::StagedFinding> findings =
-        core::sccg::CheckStagedArgument(model, {"G1"});
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"G1"});
 
     ASSERT_FALSE(findings.empty());
     for (const core::sccg::StagedFinding& finding : findings) {

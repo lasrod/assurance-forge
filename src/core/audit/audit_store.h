@@ -12,8 +12,8 @@
 namespace core::audit {
 
 struct EnsureAuditStoreResult {
-    bool        created = false;       // true if the store was freshly created
-    std::string snapshot_id;           // populated on success
+    bool created = false;    // true if the store was freshly created
+    std::string snapshot_id; // populated on success
     std::string raw_file_hash;
     std::string canonical_model_hash;
 };

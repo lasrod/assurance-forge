@@ -337,9 +337,10 @@ bool RenderAcpRelationshipContextMenu(const core::acp::AcpRelationshipTarget* ta
             target && target->eligible_for_acp && static_cast<bool>(actions.add_acp_to_relationship);
         const bool can_warn_for_blocked_acp =
             (!target || !target->eligible_for_acp) && static_cast<bool>(actions.set_status);
-        if (ImGui::MenuItem(
-                AF_TR("Add ACP").c_str(), nullptr, false,
-                !has_existing_acp && (can_create_acp || can_warn_for_blocked_acp))) {
+        if (ImGui::MenuItem(AF_TR("Add ACP").c_str(),
+                            nullptr,
+                            false,
+                            !has_existing_acp && (can_create_acp || can_warn_for_blocked_acp))) {
             if (can_create_acp) {
                 actions.add_acp_to_relationship(target->relationship_id);
             } else if (actions.set_status) {
@@ -352,17 +353,23 @@ bool RenderAcpRelationshipContextMenu(const core::acp::AcpRelationshipTarget* ta
         // GSN v3 dialectic: challenge the relationship itself (not its endpoints).
         if (target) {
             ImGui::Separator();
-            if (ImGui::MenuItem(AF_TR("Add Counter Argument").c_str(), nullptr, false,
+            if (ImGui::MenuItem(AF_TR("Add Counter Argument").c_str(),
+                                nullptr,
+                                false,
                                 static_cast<bool>(actions.add_counter_argument_to_relationship)))
                 actions.add_counter_argument_to_relationship(target->relationship_id);
-            if (ImGui::MenuItem(AF_TR("Add Counter Evidence").c_str(), nullptr, false,
+            if (ImGui::MenuItem(AF_TR("Add Counter Evidence").c_str(),
+                                nullptr,
+                                false,
                                 static_cast<bool>(actions.add_counter_evidence_to_relationship)))
                 actions.add_counter_evidence_to_relationship(target->relationship_id);
             // Withdrawing the relationship is what corrects a wrongly-connected
             // argument. Without it the tool could report that an edge breaks a
             // GSN rule and leave no way to act on it.
             ImGui::Separator();
-            if (ImGui::MenuItem(AF_TR("Remove relationship").c_str(), nullptr, false,
+            if (ImGui::MenuItem(AF_TR("Remove relationship").c_str(),
+                                nullptr,
+                                false,
                                 static_cast<bool>(actions.remove_relationship)))
                 actions.remove_relationship(target->relationship_id);
         }

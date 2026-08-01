@@ -13,13 +13,11 @@
 namespace {
 
 std::filesystem::path FixturePath() {
-    return std::filesystem::path(AF_REPO_ROOT) / "tests" / "data" /
-           "fixture_roundtrip_core_argument.sacm.xml";
+    return std::filesystem::path(AF_REPO_ROOT) / "tests" / "data" / "fixture_roundtrip_core_argument.sacm.xml";
 }
 
 std::filesystem::path TestSettingsDirectory() {
-    const std::filesystem::path directory =
-        std::filesystem::temp_directory_path() / "af_mcp_server_tests";
+    const std::filesystem::path directory = std::filesystem::temp_directory_path() / "af_mcp_server_tests";
     std::filesystem::create_directories(directory);
     return directory;
 }
@@ -28,17 +26,17 @@ std::filesystem::path TestSettingsDirectory() {
 // enabled would pass a consent test that fails everywhere else.
 std::filesystem::path WriteSettings(const std::string& name, const nlohmann::json& document) {
     const std::filesystem::path path = TestSettingsDirectory() / name;
-    std::ofstream               out(path, std::ios::trunc);
+    std::ofstream out(path, std::ios::trunc);
     out << document.dump();
     return path;
 }
 
 std::unique_ptr<mcp::Session> OpenSession(const std::filesystem::path& settings_path) {
     mcp::Session::Config config;
-    config.project_path  = FixturePath();
+    config.project_path = FixturePath();
     config.settings_path = settings_path;
 
-    std::string                   error;
+    std::string error;
     std::unique_ptr<mcp::Session> session = mcp::Session::Open(std::move(config), error);
     EXPECT_NE(session, nullptr) << error;
     return session;
@@ -58,19 +56,19 @@ std::string Request(const std::string& method, const nlohmann::json& params, int
 
 // Drives the handshake so a test can get to the interesting call in one line.
 void Initialize(mcp::Server& server) {
-    const std::optional<nlohmann::json> response = server.HandleMessage(
-        Request("initialize", {{"clientInfo", {{"name", "TestClient"}, {"version", "9.9"}}}}, 1));
+    const std::optional<nlohmann::json> response =
+        server.HandleMessage(Request("initialize", {{"clientInfo", {{"name", "TestClient"}, {"version", "9.9"}}}}, 1));
     ASSERT_TRUE(response.has_value());
     ASSERT_TRUE(response->contains("result")) << response->dump();
 }
 
 struct ToolCall {
     nlohmann::json payload;
-    bool           is_error = false;
+    bool is_error = false;
 };
 
-ToolCall CallTool(mcp::Server& server, const std::string& name,
-                  const nlohmann::json& arguments = nlohmann::json::object()) {
+ToolCall
+CallTool(mcp::Server& server, const std::string& name, const nlohmann::json& arguments = nlohmann::json::object()) {
     const std::optional<nlohmann::json> response =
         server.HandleMessage(Request("tools/call", {{"name", name}, {"arguments", arguments}}, 42));
     if (!response.has_value() || !response->contains("result")) {
@@ -79,10 +77,11 @@ ToolCall CallTool(mcp::Server& server, const std::string& name,
         return {};
     }
     const nlohmann::json& result = (*response)["result"];
-    ToolCall              call;
+    ToolCall call;
     call.is_error = result.value("isError", false);
-    call.payload  = nlohmann::json::parse(result["content"][0]["text"].get<std::string>(), nullptr,
-                                          /*allow_exceptions=*/false);
+    call.payload = nlohmann::json::parse(result["content"][0]["text"].get<std::string>(),
+                                         nullptr,
+                                         /*allow_exceptions=*/false);
     return call;
 }
 
@@ -95,8 +94,8 @@ TEST(McpServer, InitializeReportsPinnedProtocolVersionAndServerInfo) {
     ASSERT_NE(session, nullptr);
     mcp::Server server(*session);
 
-    const std::optional<nlohmann::json> response = server.HandleMessage(
-        Request("initialize", {{"clientInfo", {{"name", "TestClient"}, {"version", "9.9"}}}}, 1));
+    const std::optional<nlohmann::json> response =
+        server.HandleMessage(Request("initialize", {{"clientInfo", {{"name", "TestClient"}, {"version", "9.9"}}}}, 1));
 
     ASSERT_TRUE(response.has_value());
     const nlohmann::json& result = (*response)["result"];
@@ -112,8 +111,7 @@ TEST(McpServer, RefusesToolCallsBeforeInitialize) {
     ASSERT_NE(session, nullptr);
     mcp::Server server(*session);
 
-    const std::optional<nlohmann::json> response =
-        server.HandleMessage(Request("tools/list", nullptr, 1));
+    const std::optional<nlohmann::json> response = server.HandleMessage(Request("tools/list", nullptr, 1));
 
     ASSERT_TRUE(response.has_value());
     ASSERT_TRUE(response->contains("error"));
@@ -125,8 +123,7 @@ TEST(McpServer, AnswersPingBeforeInitialize) {
     ASSERT_NE(session, nullptr);
     mcp::Server server(*session);
 
-    const std::optional<nlohmann::json> response =
-        server.HandleMessage(Request("ping", nullptr, 1));
+    const std::optional<nlohmann::json> response = server.HandleMessage(Request("ping", nullptr, 1));
 
     ASSERT_TRUE(response.has_value());
     EXPECT_TRUE(response->contains("result"));
@@ -137,8 +134,8 @@ TEST(McpServer, ProducesNoResponseForANotification) {
     ASSERT_NE(session, nullptr);
     mcp::Server server(*session);
 
-    const std::optional<nlohmann::json> response = server.HandleMessage(
-        R"({"jsonrpc":"2.0","method":"notifications/initialized"})");
+    const std::optional<nlohmann::json> response =
+        server.HandleMessage(R"({"jsonrpc":"2.0","method":"notifications/initialized"})");
 
     EXPECT_FALSE(response.has_value());
     EXPECT_TRUE(session->initialized());
@@ -153,8 +150,7 @@ TEST(McpServer, ReportsMethodNotFoundForAnUnknownMethod) {
     mcp::Server server(*session);
     Initialize(server);
 
-    const std::optional<nlohmann::json> response =
-        server.HandleMessage(Request("completion/complete", nullptr, 2));
+    const std::optional<nlohmann::json> response = server.HandleMessage(Request("completion/complete", nullptr, 2));
 
     ASSERT_TRUE(response.has_value());
     ASSERT_TRUE(response->contains("error"));
@@ -167,8 +163,7 @@ TEST(McpServer, ToolsListAdvertisesEveryBuiltinToolWithASchema) {
     mcp::Server server(*session);
     Initialize(server);
 
-    const std::optional<nlohmann::json> response =
-        server.HandleMessage(Request("tools/list", nullptr, 2));
+    const std::optional<nlohmann::json> response = server.HandleMessage(Request("tools/list", nullptr, 2));
 
     ASSERT_TRUE(response.has_value());
     const nlohmann::json& tools = (*response)["result"]["tools"];
@@ -240,15 +235,13 @@ TEST(McpServer, ConsentFailsClosedOnAMalformedSettingsFile) {
 // case for as long as the client happened to leave the process running, which is
 // exactly the window a user revoking permission is trying to close.
 TEST(McpServer, RevokingConsentTakesEffectWithoutReopeningTheSession) {
-    const std::filesystem::path settings =
-        WriteSettings("revocable.json", {{"mcp", {{"enabled", true}}}});
+    const std::filesystem::path settings = WriteSettings("revocable.json", {{"mcp", {{"enabled", true}}}});
     std::unique_ptr<mcp::Session> session = OpenSession(settings);
     ASSERT_NE(session, nullptr);
     mcp::Server server(*session);
     Initialize(server);
 
-    ASSERT_FALSE(CallTool(server, "get_case_overview").is_error)
-        << "consent was granted but the tool refused";
+    ASSERT_FALSE(CallTool(server, "get_case_overview").is_error) << "consent was granted but the tool refused";
 
     // Same session, same server object; only the file changes underneath.
     WriteSettings("revocable.json", {{"mcp", {{"enabled", false}}}});
@@ -324,8 +317,7 @@ TEST(McpServer, GetElementReportsAnUnknownIdAsAToolError) {
     const ToolCall call = CallTool(server, "get_element", {{"id", "no-such-element"}});
 
     EXPECT_TRUE(call.is_error);
-    EXPECT_NE(call.payload.value("error", std::string{}).find("no-such-element"),
-              std::string::npos);
+    EXPECT_NE(call.payload.value("error", std::string{}).find("no-such-element"), std::string::npos);
 }
 
 TEST(McpServer, GetElementRequiresAnId) {
@@ -347,8 +339,7 @@ TEST(McpServer, GetArgumentTreeMarksTruncatedBranchesRatherThanFakingLeaves) {
 
     const ToolCall deep = CallTool(server, "get_argument_tree", {{"depth", 12}});
     ASSERT_FALSE(deep.is_error) << deep.payload.dump();
-    ASSERT_TRUE(deep.payload["tree"].contains("supported_by"))
-        << "fixture root has no support to truncate";
+    ASSERT_TRUE(deep.payload["tree"].contains("supported_by")) << "fixture root has no support to truncate";
 
     // At depth 1 the root's children must be reported as truncated, carrying a
     // count, so an agent cannot conclude the goal is unsupported.
@@ -371,20 +362,17 @@ TEST(McpServer, PublishesTheSccgCatalogAsAResource) {
     mcp::Server server(*session);
     Initialize(server);
 
-    const std::optional<nlohmann::json> listed =
-        server.HandleMessage(Request("resources/list", nullptr, 2));
+    const std::optional<nlohmann::json> listed = server.HandleMessage(Request("resources/list", nullptr, 2));
     ASSERT_TRUE(listed.has_value());
     ASSERT_TRUE(listed->contains("result")) << listed->dump();
     ASSERT_FALSE((*listed)["result"]["resources"].empty());
 
     const std::string uri = (*listed)["result"]["resources"][0]["uri"].get<std::string>();
-    const std::optional<nlohmann::json> read =
-        server.HandleMessage(Request("resources/read", {{"uri", uri}}, 3));
+    const std::optional<nlohmann::json> read = server.HandleMessage(Request("resources/read", {{"uri", uri}}, 3));
     ASSERT_TRUE(read.has_value());
     ASSERT_TRUE(read->contains("result")) << read->dump();
 
-    const std::string text =
-        (*read)["result"]["contents"][0]["text"].get<std::string>();
+    const std::string text = (*read)["result"]["contents"][0]["text"].get<std::string>();
     // Real guideline text, not a placeholder: an agent that reads this is
     // reading what reviews actually apply.
     EXPECT_NE(text.find("CL.1"), std::string::npos) << text.substr(0, 400);
@@ -410,22 +398,19 @@ TEST(McpServer, CarriesSccgGuidanceInsideEachPrompt) {
     mcp::Server server(*session);
     Initialize(server);
 
-    const std::optional<nlohmann::json> listed =
-        server.HandleMessage(Request("prompts/list", nullptr, 2));
+    const std::optional<nlohmann::json> listed = server.HandleMessage(Request("prompts/list", nullptr, 2));
     ASSERT_TRUE(listed.has_value());
     ASSERT_TRUE(listed->contains("result")) << listed->dump();
     EXPECT_EQ((*listed)["result"]["prompts"].size(), 3u);
 
     const std::optional<nlohmann::json> got = server.HandleMessage(
         Request("prompts/get",
-                {{"name", "draft_argument_from_standard"},
-                 {"arguments", {{"standard", "ISO 26262 part 6"}}}},
+                {{"name", "draft_argument_from_standard"}, {"arguments", {{"standard", "ISO 26262 part 6"}}}},
                 3));
     ASSERT_TRUE(got.has_value());
     ASSERT_TRUE(got->contains("result")) << got->dump();
 
-    const std::string text =
-        (*got)["result"]["messages"][0]["content"]["text"].get<std::string>();
+    const std::string text = (*got)["result"]["messages"][0]["content"]["text"].get<std::string>();
     EXPECT_NE(text.find("ISO 26262 part 6"), std::string::npos);
     // The guidance itself, quoted from the catalog rather than paraphrased.
     EXPECT_NE(text.find("CL.1"), std::string::npos);

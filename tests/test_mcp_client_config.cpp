@@ -27,9 +27,8 @@ nlohmann::json ParsedConfig(const std::string& config) {
 
 TEST(McpClientConfig, NamesTheServerBinaryAndTheRequestedProject) {
     const std::string config = app::BuildMcpClientConfig("C:/cases/MyCase");
-    ASSERT_FALSE(config.empty())
-        << "expected assurance-forge-mcp beside the test executable at "
-        << app::McpServerExecutablePath().string();
+    ASSERT_FALSE(config.empty()) << "expected assurance-forge-mcp beside the test executable at "
+                                 << app::McpServerExecutablePath().string();
 
     const nlohmann::json parsed = ParsedConfig(config);
     ASSERT_FALSE(parsed.is_discarded()) << config;
@@ -60,8 +59,7 @@ TEST(McpClientConfig, ServerPathSitsBesideTheRunningExecutable) {
 // same typed settings, so a round-trip through them is what guarantees the
 // checkbox reflects what the server will actually do.
 TEST(McpUserSettingsRoundTrip, TogglingPersistsAndReadsBack) {
-    const std::filesystem::path directory =
-        std::filesystem::temp_directory_path() / "af_mcp_client_config_tests";
+    const std::filesystem::path directory = std::filesystem::temp_directory_path() / "af_mcp_client_config_tests";
     std::filesystem::create_directories(directory);
     const std::filesystem::path path = directory / "settings.json";
     std::filesystem::remove(path);

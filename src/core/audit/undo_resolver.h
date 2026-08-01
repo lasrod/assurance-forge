@@ -22,13 +22,12 @@ namespace core::audit {
 
 // Set of transaction sequences whose effects are cancelled by an active
 // (i.e. not-itself-cancelled) Undo event.
-std::unordered_set<std::uint64_t> ComputeUndoSkipSet(
-    const std::vector<AuditTransaction>& transactions);
+std::unordered_set<std::uint64_t> ComputeUndoSkipSet(const std::vector<AuditTransaction>& transactions);
 
 struct UndoTarget {
-    bool          has_target            = false;
-    std::uint64_t target_sequence       = 0;   // transaction the next Ctrl+Z would undo
-    std::string   target_command_name;          // for the audit event payload + UI hint
+    bool has_target = false;
+    std::uint64_t target_sequence = 0; // transaction the next Ctrl+Z would undo
+    std::string target_command_name;   // for the audit event payload + UI hint
 };
 
 // Find the most recent transaction that is currently in-force and is not

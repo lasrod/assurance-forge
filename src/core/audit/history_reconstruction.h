@@ -28,7 +28,7 @@ namespace core::audit {
 // content no projection carries); the History Timeline needs the views.
 struct ReconstructedState {
     std::unique_ptr<sacm_adapter::LibraryDocument> document;
-    ReplayState                                    views;
+    ReplayState views;
 };
 
 // Reconstruct the state of the project as of (immediately after) the
@@ -57,10 +57,9 @@ struct ReconstructedState {
 // Returns an error string when the audit store is missing, the snapshot
 // cannot be loaded, the event log cannot be opened or a single event fails
 // to replay.
-std::expected<ReconstructedState, std::string> ReconstructAtSequence(
-    const AssuranceProject& project,
-    std::uint64_t target_transaction_sequence,
-    const std::string& argument_package_id = {},
-    const std::string& argument_package_gid = {});
+std::expected<ReconstructedState, std::string> ReconstructAtSequence(const AssuranceProject& project,
+                                                                     std::uint64_t target_transaction_sequence,
+                                                                     const std::string& argument_package_id = {},
+                                                                     const std::string& argument_package_gid = {});
 
 } // namespace core::audit

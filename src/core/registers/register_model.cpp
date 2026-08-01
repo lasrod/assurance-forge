@@ -112,9 +112,8 @@ std::vector<std::string> DeriveEvidenceIds(const parser::AssuranceCase& model) {
 }
 
 int CountCseUses(const std::vector<CseLink>& links, const std::string& evidence_id) {
-    return static_cast<int>(std::count_if(links.begin(), links.end(), [&](const CseLink& link) {
-        return link.evidence_id == evidence_id;
-    }));
+    return static_cast<int>(std::count_if(
+        links.begin(), links.end(), [&](const CseLink& link) { return link.evidence_id == evidence_id; }));
 }
 
 std::string SerializeRegisterStore(const RegisterStore& store) {

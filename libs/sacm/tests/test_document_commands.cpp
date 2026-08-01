@@ -25,23 +25,20 @@ using sacm::model::ElementId;
 // added later is covered automatically instead of silently escaping the check.
 template <std::size_t... I>
 std::vector<std::string_view> all_operation_names(std::index_sequence<I...>) {
-    return {sacm::commands::operation_name(
-        sacm::commands::Operation{std::in_place_index<I>,
-                                  std::variant_alternative_t<I, sacm::commands::Operation>{}})...};
+    return {sacm::commands::operation_name(sacm::commands::Operation{
+        std::in_place_index<I>, std::variant_alternative_t<I, sacm::commands::Operation>{}})...};
 }
 
 TEST(Sacm23Commands, SACM23_CMD_001_OperationsAreSacmNativeWithStructuredResults) {
     constexpr std::size_t kOperationCount = std::variant_size_v<sacm::commands::Operation>;
-    const std::vector<std::string_view> names =
-        all_operation_names(std::make_index_sequence<kOperationCount>{});
+    const std::vector<std::string_view> names = all_operation_names(std::make_index_sequence<kOperationCount>{});
     ASSERT_EQ(names.size(), kOperationCount);
 
     // GSN/UI vocabulary must not appear in the SACM-native command surface;
     // Goal/Strategy/Solution belong to the Assurance Forge adapter, not here.
     for (const std::string_view name : names) {
         EXPECT_FALSE(name.empty()) << "operation_name returned an empty name";
-        for (const std::string_view banned :
-             {"Goal", "Strategy", "Solution", "Node", "Canvas", "Tree", "Layout"}) {
+        for (const std::string_view banned : {"Goal", "Strategy", "Solution", "Node", "Canvas", "Tree", "Layout"}) {
             EXPECT_EQ(name.find(banned), std::string_view::npos)
                 << "operation " << name << " leaks GSN/UI terminology: " << banned;
         }
@@ -54,8 +51,7 @@ TEST(Sacm23Commands, SACM23_CMD_001_OperationsAreSacmNativeWithStructuredResults
     // Structured mutation results: a create reports the operation and a change
     // record naming what was created, not just a success flag.
     Document document;
-    const MutationResult result = document.apply(
-        CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "Case"});
+    const MutationResult result = document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "Case"});
     ASSERT_TRUE(result.applied);
     EXPECT_EQ(result.operation, "CreateAssuranceCasePackage");
     ASSERT_FALSE(result.changes.empty());
@@ -86,9 +82,7 @@ TEST(Sacm23Commands, SACM23_CMD_002_CreatesDocumentWithAssuranceCasePackage) {
 
 TEST(Sacm23Commands, SACM23_CMD_003_CreatesArgumentPackageAndClaim) {
     Document document;
-    ASSERT_TRUE(document
-                    .apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "Case"})
-                    .applied);
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "Case"}).applied);
     ASSERT_TRUE(document
                     .apply(CreateArgumentPackage{
                         .parent = ElementId{"acp_1"},
@@ -132,10 +126,8 @@ TEST(Sacm23Commands, SACM23_CMD_002_SupportsCallerProvidedAndGeneratedIds) {
     EXPECT_EQ(second.created_ids().front().value(), "assurance_case_package_2");
 
     // Generated ids never collide with caller-provided ones.
-    ASSERT_TRUE(document
-                    .apply(CreateAssuranceCasePackage{
-                        .id = ElementId{"assurance_case_package_3"}, .name = "C"})
-                    .applied);
+    ASSERT_TRUE(
+        document.apply(CreateAssuranceCasePackage{.id = ElementId{"assurance_case_package_3"}, .name = "C"}).applied);
     const MutationResult fourth = document.apply(CreateAssuranceCasePackage{.name = "D"});
     ASSERT_TRUE(fourth.applied);
     EXPECT_EQ(fourth.created_ids().front().value(), "assurance_case_package_4");
@@ -143,10 +135,8 @@ TEST(Sacm23Commands, SACM23_CMD_002_SupportsCallerProvidedAndGeneratedIds) {
 
 TEST(Sacm23Commands, SACM23_CMD_002_RejectsDuplicateCallerProvidedId) {
     Document document;
-    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"})
-                    .applied);
-    const MutationResult result =
-        document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "B"});
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"}).applied);
+    const MutationResult result = document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "B"});
 
     EXPECT_FALSE(result.applied);
     ASSERT_FALSE(result.diagnostics.empty());
@@ -157,8 +147,7 @@ TEST(Sacm23Commands, SACM23_CMD_002_RejectsDuplicateCallerProvidedId) {
 
 TEST(Sacm23Commands, SACM23_VAL_002_MutationsLeaveDocumentValidOrUnchanged) {
     Document document;
-    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"})
-                    .applied);
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"}).applied);
     const std::uint64_t revision_before = document.revision();
     const std::size_t count_before = document.element_count();
 
@@ -176,8 +165,7 @@ TEST(Sacm23Commands, SACM23_VAL_002_MutationsLeaveDocumentValidOrUnchanged) {
         .name = "Claim",
     });
     EXPECT_FALSE(missing_parent.applied);
-    EXPECT_EQ(missing_parent.diagnostics.front().code,
-              sacm::validation::codes::kCmdTargetNotFound);
+    EXPECT_EQ(missing_parent.diagnostics.front().code, sacm::validation::codes::kCmdTargetNotFound);
 
     EXPECT_EQ(document.revision(), revision_before);
     EXPECT_EQ(document.element_count(), count_before);
@@ -186,12 +174,10 @@ TEST(Sacm23Commands, SACM23_VAL_002_MutationsLeaveDocumentValidOrUnchanged) {
 
 TEST(Sacm23Commands, SACM23_CMD_006_MutationResultCarriesAuditData) {
     Document document;
-    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"})
-                    .applied);
-    ASSERT_TRUE(document
-                    .apply(CreateArgumentPackage{
-                        .parent = ElementId{"acp_1"}, .id = ElementId{"argpkg_1"}, .name = "Arg"})
-                    .applied);
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"}).applied);
+    ASSERT_TRUE(
+        document.apply(CreateArgumentPackage{.parent = ElementId{"acp_1"}, .id = ElementId{"argpkg_1"}, .name = "Arg"})
+            .applied);
     const MutationResult result = document.apply(CreateClaim{
         .parent = ElementId{"argpkg_1"},
         .id = ElementId{"claim_1"},
@@ -217,4 +203,4 @@ TEST(Sacm23Commands, SACM23_CMD_006_MutationResultCarriesAuditData) {
     EXPECT_EQ(result.document_revision, document.revision());
 }
 
-}  // namespace
+} // namespace

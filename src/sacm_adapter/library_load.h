@@ -33,7 +33,7 @@ struct LoadDiagnostic {
 };
 
 class LibraryDocument {
-  public:
+public:
     LibraryDocument();
     ~LibraryDocument();
     LibraryDocument(LibraryDocument&&) noexcept;
@@ -41,17 +41,17 @@ class LibraryDocument {
     LibraryDocument(const LibraryDocument&) = delete;
     LibraryDocument& operator=(const LibraryDocument&) = delete;
 
-  private:
+private:
     friend struct LibraryDocumentAccess;
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };
 
 struct LoadOutcome {
-    std::unique_ptr<LibraryDocument> document;  // null when the load failed
+    std::unique_ptr<LibraryDocument> document; // null when the load failed
     std::vector<LoadDiagnostic> diagnostics;
     std::string source_namespace;
-    std::string source_version;  // "2.3", "2.2", ... or "unknown"
+    std::string source_version; // "2.3", "2.2", ... or "unknown"
     bool ok = false;
 };
 
@@ -88,8 +88,7 @@ bool reload_document(LibraryDocument& document, std::string_view xml);
 // breaks it just as surely as a lossy save does.
 //
 // Returns false (leaving `document` unchanged) if the XML could not be loaded.
-bool reload_document_keeping_compatibility_content(LibraryDocument& document,
-                                                   std::string_view xml);
+bool reload_document_keeping_compatibility_content(LibraryDocument& document, std::string_view xml);
 
 // Result of serializing a library document to SACM XMI.
 struct SaveOutcome {

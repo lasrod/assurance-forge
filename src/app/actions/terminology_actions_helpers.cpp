@@ -191,8 +191,7 @@ QuickDefineTargetPackageResult EnsureQuickDefineTargetPackage(AppRuntimeState& s
         return target;
     }
 
-    core::commands::CreateTerminologyPackageCommand command("Terminology Package",
-                                                            "Terms used by this safety case.");
+    core::commands::CreateTerminologyPackageCommand command("Terminology Package", "Terms used by this safety case.");
     const auto outcome = app::commands::DispatchAuditedCommand(state, command);
     if (!outcome.success) {
         target.error = outcome.error;
@@ -258,8 +257,8 @@ bool SyncVisibleTerminologyContextToParser(core::AppState& app_state,
                                            const core::TerminologyContextAssociationResult& result) {
     if (!app_state.loaded_case.has_value() || !app_state.has_projected_package())
         return false;
-    return core::SyncVisibleTerminologyContextToParser(app_state.loaded_case.value(),
-                                                       app_state.projected_package(), result);
+    return core::SyncVisibleTerminologyContextToParser(
+        app_state.loaded_case.value(), app_state.projected_package(), result);
 }
 
 std::string TermStatusLabel(const sacm::AssuranceCasePackage& package,

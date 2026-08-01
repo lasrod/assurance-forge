@@ -16,8 +16,7 @@ namespace {
 // under-declared would be handed weaker staleness checking than it deserves,
 // which is exactly the failure that lets a patch apply cleanly to an argument
 // that has moved underneath it.
-void RefreshAffectedElements(reviews::ReviewProposal&     proposal,
-                             const parser::AssuranceCase& committed) {
+void RefreshAffectedElements(reviews::ReviewProposal& proposal, const parser::AssuranceCase& committed) {
     std::set<std::string> affected;
     if (!proposal.anchor_element_id.empty()) {
         affected.insert(proposal.anchor_element_id);
@@ -25,8 +24,7 @@ void RefreshAffectedElements(reviews::ReviewProposal&     proposal,
     for (const reviews::PatchOperation& operation : proposal.operations) {
         for (const std::optional<reviews::ElementRef>* ref :
              {&operation.element, &operation.source, &operation.target}) {
-            if (ref->has_value() && (*ref)->existing_id.has_value() &&
-                !(*ref)->existing_id->empty()) {
+            if (ref->has_value() && (*ref)->existing_id.has_value() && !(*ref)->existing_id->empty()) {
                 affected.insert(*(*ref)->existing_id);
             }
         }
@@ -55,8 +53,10 @@ void RefreshAffectedElements(reviews::ReviewProposal&     proposal,
 
 } // namespace
 
-std::string ChangeSetStore::Begin(std::uint64_t connection_id, std::string title,
-                                  std::string summary, std::string intent,
+std::string ChangeSetStore::Begin(std::uint64_t connection_id,
+                                  std::string title,
+                                  std::string summary,
+                                  std::string intent,
                                   std::string client_label,
                                   std::filesystem::path argument_file) {
     // One open change set per connection. A second `begin` means the agent has
@@ -69,18 +69,18 @@ std::string ChangeSetStore::Begin(std::uint64_t connection_id, std::string title
     }
 
     ChangeSet change_set;
-    change_set.id           = reviews::GenerateReviewProposalId();
-    change_set.title        = std::move(title);
-    change_set.summary      = std::move(summary);
-    change_set.intent       = std::move(intent);
-    change_set.client_label  = std::move(client_label);
-    change_set.created_utc   = NowUtcString();
+    change_set.id = reviews::GenerateReviewProposalId();
+    change_set.title = std::move(title);
+    change_set.summary = std::move(summary);
+    change_set.intent = std::move(intent);
+    change_set.client_label = std::move(client_label);
+    change_set.created_utc = NowUtcString();
     change_set.argument_file = std::move(argument_file);
-    change_set.state         = ChangeSetState::Building;
+    change_set.state = ChangeSetState::Building;
 
-    change_set.proposal.id          = change_set.id;
-    change_set.proposal.title       = change_set.title;
-    change_set.proposal.summary     = change_set.summary;
+    change_set.proposal.id = change_set.id;
+    change_set.proposal.title = change_set.title;
+    change_set.proposal.summary = change_set.summary;
     change_set.proposal.created_utc = change_set.created_utc;
     // Attribution the reviewer sees and the audit trail keeps, so an accepted
     // change is traceable to the client that proposed it rather than to "the AI".
@@ -121,9 +121,10 @@ ChangeSet* ChangeSetStore::OpenFor(std::uint64_t connection_id) {
     return nullptr;
 }
 
-bool ChangeSetStore::Stage(const std::string&                          id,
+bool ChangeSetStore::Stage(const std::string& id,
                            const std::vector<reviews::PatchOperation>& operations,
-                           const parser::AssuranceCase& committed, std::string& error) {
+                           const parser::AssuranceCase& committed,
+                           std::string& error) {
     error.clear();
     ChangeSet* change_set = FindOpen(id);
     if (change_set == nullptr) {
@@ -138,8 +139,7 @@ bool ChangeSetStore::Stage(const std::string&                          id,
     // Staged as a unit against a copy: half-applying a set the agent thought was
     // atomic would leave the canvas showing something nobody asked for.
     ChangeSet candidate = *change_set;
-    candidate.proposal.operations.insert(candidate.proposal.operations.end(), operations.begin(),
-                                         operations.end());
+    candidate.proposal.operations.insert(candidate.proposal.operations.end(), operations.begin(), operations.end());
     RefreshAffectedElements(candidate.proposal, committed);
 
     const ChangeSetDiff diff = ComputeChangeSetDiff(candidate, committed);

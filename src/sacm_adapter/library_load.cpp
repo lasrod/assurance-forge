@@ -22,8 +22,7 @@ sacm::model::Document& LibraryDocumentAccess::mutable_document(LibraryDocument& 
     return wrapper.impl_->document;
 }
 
-void LibraryDocumentAccess::set_document(LibraryDocument& wrapper,
-                                         sacm::model::Document&& document) {
+void LibraryDocumentAccess::set_document(LibraryDocument& wrapper, sacm::model::Document&& document) {
     wrapper.impl_->document = std::move(document);
 }
 
@@ -43,8 +42,7 @@ LoadOutcome load_document(const std::filesystem::path& path) {
         });
     }
     outcome.source_namespace = result.source_namespace;
-    outcome.source_version =
-        std::string(sacm::metadata::namespaces::standard_version_name(result.source_version));
+    outcome.source_version = std::string(sacm::metadata::namespaces::standard_version_name(result.source_version));
     outcome.ok = result.ok;
 
     if (result.ok && result.document.has_value()) {
@@ -73,16 +71,14 @@ bool reload_document(LibraryDocument& document, std::string_view xml) {
     return true;
 }
 
-bool reload_document_keeping_compatibility_content(LibraryDocument& document,
-                                                   std::string_view xml) {
+bool reload_document_keeping_compatibility_content(LibraryDocument& document, std::string_view xml) {
     sacm::io::LoadResult result = sacm::io::load_xmi_string(xml);
     if (!result.ok || !result.document.has_value()) {
         return false;
     }
     // Adopt BEFORE the swap: the outgoing document is still the one holding the
     // preserved content, and after set_document it is gone.
-    sacm::compat::adopt_preserved_content(*result.document,
-                                          LibraryDocumentAccess::document(document));
+    sacm::compat::adopt_preserved_content(*result.document, LibraryDocumentAccess::document(document));
     LibraryDocumentAccess::set_document(document, std::move(*result.document));
     return true;
 }
@@ -90,8 +86,7 @@ bool reload_document_keeping_compatibility_content(LibraryDocument& document,
 SaveOutcome save_document(const LibraryDocument& document, bool tolerant) {
     sacm::io::SaveOptions options;
     options.mode = tolerant ? sacm::io::Mode::Tolerant : sacm::io::Mode::Strict;
-    sacm::io::SaveResult result =
-        sacm::io::save_xmi_string(LibraryDocumentAccess::document(document), options);
+    sacm::io::SaveResult result = sacm::io::save_xmi_string(LibraryDocumentAccess::document(document), options);
 
     SaveOutcome outcome;
     outcome.ok = result.ok;
@@ -120,15 +115,12 @@ SaveOutcome new_case_document_xmi(std::string_view case_name) {
         outcome.diagnostics.push_back(LoadDiagnostic{
             .code = "AF-SEED-001",
             .severity = "Error",
-            .message = std::string("could not build the new-case seed document: ") +
-                       std::string(step),
+            .message = std::string("could not build the new-case seed document: ") + std::string(step),
         });
         return outcome;
     };
 
-    if (!document
-             .apply(sacm::commands::CreateAssuranceCasePackage{.id = package_id,
-                                                              .name = std::string(case_name)})
+    if (!document.apply(sacm::commands::CreateAssuranceCasePackage{.id = package_id, .name = std::string(case_name)})
              .applied) {
         return fail("CreateAssuranceCasePackage");
     }
@@ -139,9 +131,8 @@ SaveOutcome new_case_document_xmi(std::string_view case_name) {
         return fail("CreateArgumentPackage");
     }
     if (!document
-             .apply(sacm::commands::CreateClaim{.parent = argument_id,
-                                                .id = sacm::model::ElementId{"G1"},
-                                                .name = "New Goal"})
+             .apply(sacm::commands::CreateClaim{
+                 .parent = argument_id, .id = sacm::model::ElementId{"G1"}, .name = "New Goal"})
              .applied) {
         return fail("CreateClaim");
     }

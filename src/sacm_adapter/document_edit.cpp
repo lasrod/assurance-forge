@@ -59,8 +59,7 @@ EditOutcome unsupported_outcome() {
 // 8.9). Other kinds carry their text elsewhere (Term/Expression `value`), where
 // SetDescription would be wrong, so Content is only mapped for these kinds.
 bool content_maps_to_description(sacm::metadata::ElementKind kind) {
-    return kind == sacm::metadata::ElementKind::Claim ||
-           kind == sacm::metadata::ElementKind::ArgumentReasoning;
+    return kind == sacm::metadata::ElementKind::Claim || kind == sacm::metadata::ElementKind::ArgumentReasoning;
 }
 
 // The library language a primary-language edit must overwrite at Description
@@ -72,8 +71,7 @@ bool content_maps_to_description(sacm::metadata::ElementKind kind) {
 // round-trips identically).
 std::string description_slot_language(const sacm::model::ModelElement& element, std::size_t index) {
     if (index < element.descriptions().size()) {
-        const std::vector<sacm::model::LangString>& values =
-            element.descriptions()[index]->content().values;
+        const std::vector<sacm::model::LangString>& values = element.descriptions()[index]->content().values;
         if (!values.empty()) {
             return values.front().lang;
         }
@@ -87,8 +85,10 @@ std::string primary_description_language(const sacm::model::ModelElement& elemen
 
 } // namespace
 
-EditOutcome apply_text_edit(LibraryDocument& document, const std::string& element_id,
-                            TextField field, const std::string& language,
+EditOutcome apply_text_edit(LibraryDocument& document,
+                            const std::string& element_id,
+                            TextField field,
+                            const std::string& language,
                             const std::string& value) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::model::ElementId id(element_id);
@@ -171,10 +171,8 @@ namespace {
 // which is where a new claim/reasoning/reference and the linking relationship
 // are created (mirroring core::FindOwningArgumentPackage). Null if the element
 // is not inside one.
-const sacm::model::ArgumentPackage* owning_argument_package(
-    const sacm::model::SACMElement* element) {
-    for (const sacm::model::SACMElement* cursor = element; cursor != nullptr;
-         cursor = cursor->parent()) {
+const sacm::model::ArgumentPackage* owning_argument_package(const sacm::model::SACMElement* element) {
+    for (const sacm::model::SACMElement* cursor = element; cursor != nullptr; cursor = cursor->parent()) {
         if (const auto* package = dynamic_cast<const sacm::model::ArgumentPackage*>(cursor)) {
             return package;
         }
@@ -217,12 +215,12 @@ AddChildOutcome failed_child(const sacm::commands::MutationResult& result) {
 // The new element and the relationship linking it to the parent, per kind.
 struct ChildPlan {
     sacm::commands::Operation create_element;
-    std::optional<sacm::model::AssertionDeclaration> assertion;  // set for Assumption/Justification
+    std::optional<sacm::model::AssertionDeclaration> assertion; // set for Assumption/Justification
     // GSN node role to record as a vendor TaggedValue (e.g. "Justification"),
     // preserving a GSN type SACM's AssertionDeclaration cannot express on its own.
     std::optional<std::string> gsn_role;
     sacm::metadata::ElementKind relationship_kind;
-    bool attach_via_reasoning = false;  // Strategy: the reasoning end, not a source
+    bool attach_via_reasoning = false; // Strategy: the reasoning end, not a source
 };
 
 // Builds the create operations for `kind` under argument package `package_id`.
@@ -236,15 +234,15 @@ std::optional<sacm::model::ElementId> to_optional_id(const std::string& id) {
     return sacm::model::ElementId(id);
 }
 
-std::optional<ChildPlan> plan_child(ChildKind kind, const sacm::model::ElementId& package_id,
+std::optional<ChildPlan> plan_child(ChildKind kind,
+                                    const sacm::model::ElementId& package_id,
                                     const std::optional<sacm::model::ElementId>& element_id) {
     using sacm::metadata::ElementKind;
     switch (kind) {
     case ChildKind::Goal:
-        return ChildPlan{
-            .create_element = sacm::commands::CreateClaim{.parent = package_id, .id = element_id},
-            .assertion = std::nullopt,
-            .relationship_kind = ElementKind::AssertedInference};
+        return ChildPlan{.create_element = sacm::commands::CreateClaim{.parent = package_id, .id = element_id},
+                         .assertion = std::nullopt,
+                         .relationship_kind = ElementKind::AssertedInference};
     case ChildKind::Strategy:
         // Unreachable: apply_add_child intercepts Strategy before calling
         // plan_child, because a strategy is added before any sub-goal exists and
@@ -254,22 +252,19 @@ std::optional<ChildPlan> plan_child(ChildKind kind, const sacm::model::ElementId
         // docs/sacm/sacm-gsn-metamodel-gaps.md.
         return std::nullopt;
     case ChildKind::Solution:
-        return ChildPlan{
-            .create_element =
-                sacm::commands::CreateArtifactReference{.parent = package_id, .id = element_id},
-            .assertion = std::nullopt,
-            .relationship_kind = ElementKind::AssertedEvidence};
+        return ChildPlan{.create_element =
+                             sacm::commands::CreateArtifactReference{.parent = package_id, .id = element_id},
+                         .assertion = std::nullopt,
+                         .relationship_kind = ElementKind::AssertedEvidence};
     case ChildKind::Context:
-        return ChildPlan{
-            .create_element =
-                sacm::commands::CreateArtifactReference{.parent = package_id, .id = element_id},
-            .assertion = std::nullopt,
-            .relationship_kind = ElementKind::AssertedContext};
+        return ChildPlan{.create_element =
+                             sacm::commands::CreateArtifactReference{.parent = package_id, .id = element_id},
+                         .assertion = std::nullopt,
+                         .relationship_kind = ElementKind::AssertedContext};
     case ChildKind::Assumption:
-        return ChildPlan{
-            .create_element = sacm::commands::CreateClaim{.parent = package_id, .id = element_id},
-            .assertion = sacm::model::AssertionDeclaration::Assumed,
-            .relationship_kind = ElementKind::AssertedContext};
+        return ChildPlan{.create_element = sacm::commands::CreateClaim{.parent = package_id, .id = element_id},
+                         .assertion = sacm::model::AssertionDeclaration::Assumed,
+                         .relationship_kind = ElementKind::AssertedContext};
     case ChildKind::Justification:
         // A GSN Justification maps to a Claim with assertionDeclaration =
         // axiomatic (the standards-correct mapping, docs/sacm/sacm-gsn-mapping.md
@@ -277,11 +272,10 @@ std::optional<ChildPlan> plan_child(ChildKind kind, const sacm::model::ElementId
         // distinguish a Justification from an axiomatically-asserted Goal, so the
         // GSN role is preserved in a vendor TaggedValue and translated back by
         // the projection.
-        return ChildPlan{
-            .create_element = sacm::commands::CreateClaim{.parent = package_id, .id = element_id},
-            .assertion = sacm::model::AssertionDeclaration::Axiomatic,
-            .gsn_role = std::string(kGsnRoleJustification),
-            .relationship_kind = ElementKind::AssertedContext};
+        return ChildPlan{.create_element = sacm::commands::CreateClaim{.parent = package_id, .id = element_id},
+                         .assertion = sacm::model::AssertionDeclaration::Axiomatic,
+                         .gsn_role = std::string(kGsnRoleJustification),
+                         .relationship_kind = ElementKind::AssertedContext};
     }
     return std::nullopt;
 }
@@ -298,11 +292,10 @@ void rollback_element(sacm::model::Document& doc, const sacm::model::ElementId& 
 
 // The strategy's single inference, if it has been materialized: the
 // AssertedRelationship in `package` whose reasoning end is `strategy`.
-const sacm::model::AssertedRelationship* find_strategy_inference(
-    const sacm::model::ArgumentPackage& package, const sacm::model::ElementId& strategy) {
+const sacm::model::AssertedRelationship* find_strategy_inference(const sacm::model::ArgumentPackage& package,
+                                                                 const sacm::model::ElementId& strategy) {
     for (const auto& element : package.argument_elements()) {
-        const auto* relationship =
-            dynamic_cast<const sacm::model::AssertedRelationship*>(element.get());
+        const auto* relationship = dynamic_cast<const sacm::model::AssertedRelationship*>(element.get());
         if (relationship != nullptr && relationship->reasoning().has_value() &&
             *relationship->reasoning() == strategy) {
             return relationship;
@@ -323,7 +316,7 @@ std::string strategy_target_of(const sacm::model::ModelElement& strategy) {
 }
 
 sacm::commands::MutationResult add_gsn_identifier_tag(sacm::model::Document& document,
-                                                       const sacm::model::ElementId& element) {
+                                                      const sacm::model::ElementId& element) {
     return document.apply(sacm::commands::AddTaggedValue{
         .element = element,
         .key = core::kGsnIdentifierTagKey,
@@ -363,12 +356,11 @@ AddChildOutcome apply_add_subgoal_under_strategy(sacm::model::Document& doc,
         return unsupported_child();
     }
 
-    if (const sacm::model::AssertedRelationship* inference =
-            find_strategy_inference(*package, strategy)) {
+    if (const sacm::model::AssertedRelationship* inference = find_strategy_inference(*package, strategy)) {
         // Later sub-goal: extend the existing inference's sources.
         const sacm::model::ElementId inference_id = inference->id();
-        const sacm::commands::MutationResult extended = doc.apply(
-            sacm::commands::AddRelationshipSource{.relationship = inference_id, .source = goal_id});
+        const sacm::commands::MutationResult extended =
+            doc.apply(sacm::commands::AddRelationshipSource{.relationship = inference_id, .source = goal_id});
         if (!extended.applied) {
             rollback_element(doc, goal_id);
             return failed_child(extended);
@@ -393,13 +385,12 @@ AddChildOutcome apply_add_subgoal_under_strategy(sacm::model::Document& doc,
         return unsupported_child();
     }
     const sacm::commands::MutationResult materialized =
-        doc.apply(sacm::commands::CreateAssertedRelationship{
-            .parent = package_id,
-            .kind = sacm::metadata::ElementKind::AssertedInference,
-            .id = to_optional_id(relationship_id),
-            .sources = {goal_id},
-            .targets = {sacm::model::ElementId(target)},
-            .reasoning = strategy});
+        doc.apply(sacm::commands::CreateAssertedRelationship{.parent = package_id,
+                                                             .kind = sacm::metadata::ElementKind::AssertedInference,
+                                                             .id = to_optional_id(relationship_id),
+                                                             .sources = {goal_id},
+                                                             .targets = {sacm::model::ElementId(target)},
+                                                             .reasoning = strategy});
     if (!materialized.applied || materialized.created_ids().empty()) {
         rollback_element(doc, goal_id);
         return failed_child(materialized);
@@ -414,8 +405,10 @@ AddChildOutcome apply_add_subgoal_under_strategy(sacm::model::Document& doc,
 
 } // namespace
 
-AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& parent_id,
-                                ChildKind kind, const std::string& element_id,
+AddChildOutcome apply_add_child(LibraryDocument& document,
+                                const std::string& parent_id,
+                                ChildKind kind,
+                                const std::string& element_id,
                                 const std::string& relationship_id) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::model::ElementId parent(parent_id);
@@ -434,8 +427,7 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
     // sources for the second and later sub-goals needs a new library op).
     if (kind == ChildKind::Strategy) {
         const sacm::commands::MutationResult created_strategy =
-            doc.apply(sacm::commands::CreateArgumentReasoning{.parent = package_id,
-                                                              .id = to_optional_id(element_id)});
+            doc.apply(sacm::commands::CreateArgumentReasoning{.parent = package_id, .id = to_optional_id(element_id)});
         if (!created_strategy.applied || created_strategy.created_ids().empty()) {
             return failed_child(created_strategy);
         }
@@ -455,7 +447,7 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
         outcome.supported = true;
         outcome.applied = true;
         outcome.new_element_id = strategy_id.value();
-        return outcome;  // no relationship yet -- materialized on the first sub-goal
+        return outcome; // no relationship yet -- materialized on the first sub-goal
     }
 
     // A Goal added under a strategy (ArgumentReasoning) is a source of the
@@ -463,8 +455,7 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
     // materialize that inference on the first sub-goal, extend it on later ones.
     // Other kinds under a strategy keep the normal path (they attach to the
     // strategy node itself, e.g. a context via AssertedContext).
-    if (kind == ChildKind::Goal &&
-        doc.find(parent) != nullptr &&
+    if (kind == ChildKind::Goal && doc.find(parent) != nullptr &&
         doc.find(parent)->kind() == sacm::metadata::ElementKind::ArgumentReasoning) {
         return apply_add_subgoal_under_strategy(doc, parent, package_id, element_id, relationship_id);
     }
@@ -488,8 +479,8 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
 
     // 2. Assumption/Justification set an assertion declaration.
     if (plan->assertion.has_value()) {
-        const sacm::commands::MutationResult declared = doc.apply(sacm::commands::SetAssertionDeclaration{
-            .element = created_id, .declaration = *plan->assertion});
+        const sacm::commands::MutationResult declared =
+            doc.apply(sacm::commands::SetAssertionDeclaration{.element = created_id, .declaration = *plan->assertion});
         if (!declared.applied) {
             rollback_element(doc, created_id);
             return failed_child(declared);
@@ -498,8 +489,8 @@ AddChildOutcome apply_add_child(LibraryDocument& document, const std::string& pa
 
     // 2b. Preserve a GSN role (Justification) SACM cannot express, as a vendor tag.
     if (plan->gsn_role.has_value()) {
-        const sacm::commands::MutationResult tagged = doc.apply(sacm::commands::AddTaggedValue{
-            .element = created_id, .key = kGsnRoleTagKey, .value = *plan->gsn_role});
+        const sacm::commands::MutationResult tagged = doc.apply(
+            sacm::commands::AddTaggedValue{.element = created_id, .key = kGsnRoleTagKey, .value = *plan->gsn_role});
         if (!tagged.applied) {
             rollback_element(doc, created_id);
             return failed_child(tagged);
@@ -539,8 +530,8 @@ AddChildOutcome apply_add_top_goal(LibraryDocument& document, const std::string&
     if (package == nullptr) {
         return unsupported_child();
     }
-    const sacm::commands::MutationResult created = doc.apply(
-        sacm::commands::CreateClaim{.parent = package->id(), .id = to_optional_id(element_id)});
+    const sacm::commands::MutationResult created =
+        doc.apply(sacm::commands::CreateClaim{.parent = package->id(), .id = to_optional_id(element_id)});
     if (!created.applied || created.created_ids().empty()) {
         return failed_child(created);
     }
@@ -554,11 +545,13 @@ AddChildOutcome apply_add_top_goal(LibraryDocument& document, const std::string&
     outcome.supported = true;
     outcome.applied = true;
     outcome.new_element_id = created_id.value();
-    return outcome;  // a top goal has no parent, so no relationship
+    return outcome; // a top goal has no parent, so no relationship
 }
 
-AddChildOutcome apply_challenge(LibraryDocument& document, const std::string& target_id,
-                                ChallengeSource source, const std::string& element_id,
+AddChildOutcome apply_challenge(LibraryDocument& document,
+                                const std::string& target_id,
+                                ChallengeSource source,
+                                const std::string& element_id,
                                 const std::string& relationship_id) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::model::ElementId target(target_id);
@@ -582,8 +575,7 @@ AddChildOutcome apply_challenge(LibraryDocument& document, const std::string& ta
         relationship_kind = sacm::metadata::ElementKind::AssertedInference;
         break;
     case ChallengeSource::CounterEvidence:
-        create_counter =
-            sacm::commands::CreateArtifactReference{.parent = package_id, .id = counter_id_hint};
+        create_counter = sacm::commands::CreateArtifactReference{.parent = package_id, .id = counter_id_hint};
         relationship_kind = sacm::metadata::ElementKind::AssertedEvidence;
         break;
     }
@@ -678,25 +670,24 @@ AcpOutcome failed_acp(const sacm::commands::MutationResult& result) {
 // caller can stop on the first failure and leave the document unchanged beyond
 // what already applied.
 sacm::commands::MutationResult add_tag(sacm::model::Document& doc,
-                                       const sacm::model::ElementId& element, const std::string& key,
+                                       const sacm::model::ElementId& element,
+                                       const std::string& key,
                                        const std::string& value,
                                        std::optional<sacm::model::ElementId> tag_id = {}) {
-    return doc.apply(sacm::commands::AddTaggedValue{
-        .element = element, .id = std::move(tag_id), .key = key, .value = value});
+    return doc.apply(
+        sacm::commands::AddTaggedValue{.element = element, .id = std::move(tag_id), .key = key, .value = value});
 }
 
 } // namespace
 
-AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id,
-                         const std::string& requested_acp_id) {
+AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id, const std::string& requested_acp_id) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::model::ElementId target(target_id);
 
     const sacm::model::SACMElement* element = doc.find(target);
     // Element ACPs are eligible only on an ArtifactReference (core's
     // ElementEligibleForAcp); claims and relationships are later slices.
-    if (element == nullptr ||
-        element->kind() != sacm::metadata::ElementKind::ArtifactReference) {
+    if (element == nullptr || element->kind() != sacm::metadata::ElementKind::ArtifactReference) {
         return unsupported_acp();
     }
 
@@ -736,8 +727,8 @@ AcpOutcome apply_add_acp(LibraryDocument& document, const std::string& target_id
     if (!name.applied) {
         return failed_acp(name);
     }
-    const sacm::commands::MutationResult resolution = add_tag(
-        doc, target, std::string(kAcpMarkerKey) + "." + acp_id + ".resolutionKind", "none");
+    const sacm::commands::MutationResult resolution =
+        add_tag(doc, target, std::string(kAcpMarkerKey) + "." + acp_id + ".resolutionKind", "none");
     if (!resolution.applied) {
         return failed_acp(resolution);
     }
@@ -775,8 +766,7 @@ DeleteOutcome apply_delete_element(LibraryDocument& document, const std::string&
     return outcome;
 }
 
-DeletePreview preview_delete_elements(const LibraryDocument& document,
-                                      const std::vector<std::string>& element_ids) {
+DeletePreview preview_delete_elements(const LibraryDocument& document, const std::vector<std::string>& element_ids) {
     DeletePreview preview;
     preview.supported = true;
 
@@ -830,8 +820,7 @@ DeletePreview preview_delete_elements(const LibraryDocument& document,
     const auto is_attachment = [](sacm::metadata::ElementKind kind) {
         return kind == sacm::metadata::ElementKind::Description ||
                kind == sacm::metadata::ElementKind::ImplementationConstraint ||
-               kind == sacm::metadata::ElementKind::Note ||
-               kind == sacm::metadata::ElementKind::TaggedValue;
+               kind == sacm::metadata::ElementKind::Note || kind == sacm::metadata::ElementKind::TaggedValue;
     };
 
     const auto record = [&](const sacm::commands::ChangeRecord& change) {
@@ -843,11 +832,9 @@ DeletePreview preview_delete_elements(const LibraryDocument& document,
         // each element once, and let an outright deletion win over a scrub
         // recorded for the same element earlier in the sequence.
         const bool deleted = change.change == sacm::commands::ChangeRecord::Change::Deleted ||
-                             change.change ==
-                                 sacm::commands::ChangeRecord::Change::RelationshipDeleted;
+                             change.change == sacm::commands::ChangeRecord::Change::RelationshipDeleted;
         if (!reported.insert(id).second) {
-            std::vector<DeleteEffect>& bucket =
-                requested_ids.contains(id) ? preview.requested : preview.consequential;
+            std::vector<DeleteEffect>& bucket = requested_ids.contains(id) ? preview.requested : preview.consequential;
             for (DeleteEffect& existing : bucket) {
                 if (existing.element_id == id && deleted) {
                     existing.deleted = true;
@@ -860,10 +847,9 @@ DeletePreview preview_delete_elements(const LibraryDocument& document,
             .element_id = id,
             .kind = std::string(sacm::metadata::kind_name(change.kind)),
             .name = name != names.end() ? name->second : std::string{},
-            .is_relationship =
-                change.change == sacm::commands::ChangeRecord::Change::RelationshipDeleted ||
-                sacm::metadata::is_asserted_relationship_kind(change.kind) ||
-                change.kind == sacm::metadata::ElementKind::ArtifactAssetRelationship,
+            .is_relationship = change.change == sacm::commands::ChangeRecord::Change::RelationshipDeleted ||
+                               sacm::metadata::is_asserted_relationship_kind(change.kind) ||
+                               change.kind == sacm::metadata::ElementKind::ArtifactAssetRelationship,
             .deleted = deleted,
         };
         if (requested_ids.contains(id)) {
@@ -880,13 +866,12 @@ DeletePreview preview_delete_elements(const LibraryDocument& document,
             // earlier delete in this set). Both are ordinary, not errors.
             continue;
         }
-        const sacm::commands::MutationResult result =
-            scratch.document->apply(sacm::commands::DeleteElement{
-                .target = id,
-                // Same policy as apply_delete_element, or the preview would
-                // describe an operation the caller never performs.
-                .reference_policy = sacm::commands::ReferenceDeletePolicy::ScrubReferences,
-            });
+        const sacm::commands::MutationResult result = scratch.document->apply(sacm::commands::DeleteElement{
+            .target = id,
+            // Same policy as apply_delete_element, or the preview would
+            // describe an operation the caller never performs.
+            .reference_policy = sacm::commands::ReferenceDeletePolicy::ScrubReferences,
+        });
         any_applied = any_applied || result.applied;
         for (const sacm::commands::ChangeRecord& change : result.changes) {
             record(change);
@@ -974,8 +959,7 @@ std::vector<std::string> normalize_category_refs(const std::vector<std::string>&
         if (!ref.empty() && ref.front() == '#') {
             ref.erase(ref.begin());
         }
-        if (ref.empty() ||
-            std::find(normalized.begin(), normalized.end(), ref) != normalized.end()) {
+        if (ref.empty() || std::find(normalized.begin(), normalized.end(), ref) != normalized.end()) {
             continue;
         }
         normalized.push_back(std::move(ref));
@@ -990,8 +974,7 @@ const sacm::model::AssuranceCasePackage* root_case_package(const sacm::model::Do
     return doc.roots().empty() ? nullptr : doc.roots().front().get();
 }
 
-void fill_diagnostics(std::vector<LoadDiagnostic>& out,
-                      const std::vector<sacm::validation::Diagnostic>& diagnostics) {
+void fill_diagnostics(std::vector<LoadDiagnostic>& out, const std::vector<sacm::validation::Diagnostic>& diagnostics) {
     out.reserve(out.size() + diagnostics.size());
     for (const sacm::validation::Diagnostic& diagnostic : diagnostics) {
         out.push_back(LoadDiagnostic{
@@ -1002,8 +985,7 @@ void fill_diagnostics(std::vector<LoadDiagnostic>& out,
     }
 }
 
-void fill_diagnostics(std::vector<LoadDiagnostic>& out,
-                      const sacm::commands::MutationResult& result) {
+void fill_diagnostics(std::vector<LoadDiagnostic>& out, const sacm::commands::MutationResult& result) {
     fill_diagnostics(out, result.diagnostics);
 }
 
@@ -1049,8 +1031,7 @@ TerminologyContextOutcome failed_terminology_context(const sacm::commands::Mutat
     return outcome;
 }
 
-TerminologyContextOutcome terminology_context_error(const std::string& code,
-                                                    const std::string& message) {
+TerminologyContextOutcome terminology_context_error(const std::string& code, const std::string& message) {
     TerminologyContextOutcome outcome;
     outcome.supported = true;
     outcome.applied = false;
@@ -1062,9 +1043,8 @@ TerminologyContextOutcome terminology_context_error(const std::string& code,
 // existing language (or lang-less for a new one), matching the reader convention
 // and `apply_text_edit`'s Content/Description handling. Empty text clears it.
 // Returns the library result so the caller can stop on failure.
-sacm::commands::MutationResult set_terminology_description(sacm::model::Document& doc,
-                                                          const sacm::model::ElementId& id,
-                                                          const std::string& text) {
+sacm::commands::MutationResult
+set_terminology_description(sacm::model::Document& doc, const sacm::model::ElementId& id, const std::string& text) {
     std::string language;
     if (const auto* element = doc.find_as<sacm::model::ModelElement>(id)) {
         language = primary_description_language(*element);
@@ -1079,8 +1059,7 @@ sacm::commands::MutationResult set_terminology_description(sacm::model::Document
 // the base `gid-<id>` never collides and the legacy disambiguation suffix
 // (`-2`, `-3`, ...) is unreachable here -- the replayed forced ids are exactly
 // the ids the live path generated, whose gids were this same base form.
-sacm::commands::MutationResult assign_legacy_gid(sacm::model::Document& doc,
-                                                 const sacm::model::ElementId& id) {
+sacm::commands::MutationResult assign_legacy_gid(sacm::model::Document& doc, const sacm::model::ElementId& id) {
     return doc.apply(sacm::commands::SetGid{.element = id, .gid = "gid-" + id.value()});
 }
 
@@ -1104,8 +1083,7 @@ bool ids_contain(const std::vector<sacm::model::ElementId>& ids, const sacm::mod
 
 // An ArtifactReference whose referencedArtifact resolves to `term_id` (the term's
 // id; library-created terminology references carry no gid).
-bool reference_targets_term(const sacm::model::ArtifactReference& reference,
-                            const sacm::model::ElementId& term_id) {
+bool reference_targets_term(const sacm::model::ArtifactReference& reference, const sacm::model::ElementId& term_id) {
     return ids_contain(reference.referenced_artifact_elements(), term_id);
 }
 
@@ -1116,8 +1094,7 @@ bool is_visible_terminology_context(const sacm::model::AssertedContext& context)
 }
 
 // Collects the AssertedContexts directly contained in `package`.
-std::vector<const sacm::model::AssertedContext*> package_contexts(
-    const sacm::model::ArgumentPackage& package) {
+std::vector<const sacm::model::AssertedContext*> package_contexts(const sacm::model::ArgumentPackage& package) {
     std::vector<const sacm::model::AssertedContext*> contexts;
     for (const auto& element : package.argument_elements()) {
         if (const auto* context = dynamic_cast<const sacm::model::AssertedContext*>(element.get())) {
@@ -1177,17 +1154,17 @@ bool is_visible_context_target(const sacm::model::SACMElement* element) {
 } // namespace
 
 TerminologyCreateOutcome apply_create_terminology_package(LibraryDocument& document,
-                                                         const std::string& name,
-                                                         const std::string& description,
-                                                         const std::string& package_id) {
+                                                          const std::string& name,
+                                                          const std::string& description,
+                                                          const std::string& package_id) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::model::AssuranceCasePackage* root = root_case_package(doc);
     if (root == nullptr) {
         return TerminologyCreateOutcome{.supported = false};
     }
     // Legacy CreateTerminologyPackage stores the name/description unmodified.
-    const sacm::commands::MutationResult created = doc.apply(sacm::commands::CreateTerminologyPackage{
-        .parent = root->id(), .id = to_optional_id(package_id), .name = name});
+    const sacm::commands::MutationResult created = doc.apply(
+        sacm::commands::CreateTerminologyPackage{.parent = root->id(), .id = to_optional_id(package_id), .name = name});
     if (!created.applied || created.created_ids().empty()) {
         return failed_terminology_create(created);
     }
@@ -1199,8 +1176,7 @@ TerminologyCreateOutcome apply_create_terminology_package(LibraryDocument& docum
         return failed_terminology_create(gid);
     }
     if (!description.empty()) {
-        const sacm::commands::MutationResult described =
-            set_terminology_description(doc, new_id, description);
+        const sacm::commands::MutationResult described = set_terminology_description(doc, new_id, description);
         if (!described.applied) {
             rollback_element(doc, new_id);
             return failed_terminology_create(described);
@@ -1213,16 +1189,16 @@ TerminologyCreateOutcome apply_create_terminology_package(LibraryDocument& docum
 }
 
 TerminologyCreateOutcome apply_create_terminology_category(LibraryDocument& document,
-                                                          const std::string& package_id,
-                                                          const std::string& name,
-                                                          const std::string& description,
-                                                          const std::string& category_id) {
+                                                           const std::string& package_id,
+                                                           const std::string& name,
+                                                           const std::string& description,
+                                                           const std::string& category_id) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     // Legacy ApplyCategoryDraft trims the name/description.
-    const sacm::commands::MutationResult created = doc.apply(sacm::commands::CreateCategory{
-        .parent = sacm::model::ElementId(package_id),
-        .id = to_optional_id(category_id),
-        .name = trim_whitespace(name)});
+    const sacm::commands::MutationResult created =
+        doc.apply(sacm::commands::CreateCategory{.parent = sacm::model::ElementId(package_id),
+                                                 .id = to_optional_id(category_id),
+                                                 .name = trim_whitespace(name)});
     if (!created.applied || created.created_ids().empty()) {
         return failed_terminology_create(created);
     }
@@ -1234,8 +1210,7 @@ TerminologyCreateOutcome apply_create_terminology_category(LibraryDocument& docu
     }
     const std::string trimmed_description = trim_whitespace(description);
     if (!trimmed_description.empty()) {
-        const sacm::commands::MutationResult described =
-            set_terminology_description(doc, new_id, trimmed_description);
+        const sacm::commands::MutationResult described = set_terminology_description(doc, new_id, trimmed_description);
         if (!described.applied) {
             rollback_element(doc, new_id);
             return failed_terminology_create(described);
@@ -1248,9 +1223,9 @@ TerminologyCreateOutcome apply_create_terminology_category(LibraryDocument& docu
 }
 
 TerminologyCreateOutcome apply_create_terminology_term(LibraryDocument& document,
-                                                      const std::string& package_id,
-                                                      const TerminologyTermFields& fields,
-                                                      const std::string& term_id) {
+                                                       const std::string& package_id,
+                                                       const TerminologyTermFields& fields,
+                                                       const std::string& term_id) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     // Legacy ApplyTermDraft trims value/name/externalReference/origin and
     // normalizes the category refs; reproduce that so the projection matches.
@@ -1274,8 +1249,7 @@ TerminologyCreateOutcome apply_create_terminology_term(LibraryDocument& document
 
     const std::string description = trim_whitespace(fields.description);
     if (!description.empty()) {
-        const sacm::commands::MutationResult described =
-            set_terminology_description(doc, new_id, description);
+        const sacm::commands::MutationResult described = set_terminology_description(doc, new_id, description);
         if (!described.applied) {
             rollback_element(doc, new_id);
             return failed_terminology_create(described);
@@ -1289,9 +1263,8 @@ TerminologyCreateOutcome apply_create_terminology_term(LibraryDocument& document
         for (const std::string& category : categories) {
             category_ids.emplace_back(category);
         }
-        const sacm::commands::MutationResult classified =
-            doc.apply(sacm::commands::SetExpressionCategories{.element = new_id,
-                                                              .categories = std::move(category_ids)});
+        const sacm::commands::MutationResult classified = doc.apply(
+            sacm::commands::SetExpressionCategories{.element = new_id, .categories = std::move(category_ids)});
         if (!classified.applied) {
             rollback_element(doc, new_id);
             return failed_terminology_create(classified);
@@ -1305,9 +1278,9 @@ TerminologyCreateOutcome apply_create_terminology_term(LibraryDocument& document
 }
 
 TerminologyEditOutcome apply_update_terminology_package(LibraryDocument& document,
-                                                       const std::string& package_id,
-                                                       const std::string& name,
-                                                       const std::string& description) {
+                                                        const std::string& package_id,
+                                                        const std::string& name,
+                                                        const std::string& description) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::model::ElementId id(package_id);
     const sacm::commands::MutationResult named =
@@ -1315,8 +1288,7 @@ TerminologyEditOutcome apply_update_terminology_package(LibraryDocument& documen
     if (!named.applied) {
         return failed_terminology_edit(named);
     }
-    const sacm::commands::MutationResult described =
-        set_terminology_description(doc, id, description);
+    const sacm::commands::MutationResult described = set_terminology_description(doc, id, description);
     if (!described.applied) {
         return failed_terminology_edit(described);
     }
@@ -1324,9 +1296,9 @@ TerminologyEditOutcome apply_update_terminology_package(LibraryDocument& documen
 }
 
 TerminologyEditOutcome apply_update_terminology_category(LibraryDocument& document,
-                                                        const std::string& category_id,
-                                                        const std::string& name,
-                                                        const std::string& description) {
+                                                         const std::string& category_id,
+                                                         const std::string& name,
+                                                         const std::string& description) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     if (doc.find_as<sacm::model::Category>(sacm::model::ElementId(category_id)) == nullptr) {
         return terminology_edit_error("SACM-CMD-002", "'" + category_id + "' is not a Category");
@@ -1338,8 +1310,7 @@ TerminologyEditOutcome apply_update_terminology_category(LibraryDocument& docume
     if (!named.applied) {
         return failed_terminology_edit(named);
     }
-    const sacm::commands::MutationResult described =
-        set_terminology_description(doc, id, trim_whitespace(description));
+    const sacm::commands::MutationResult described = set_terminology_description(doc, id, trim_whitespace(description));
     if (!described.applied) {
         return failed_terminology_edit(described);
     }
@@ -1347,8 +1318,8 @@ TerminologyEditOutcome apply_update_terminology_category(LibraryDocument& docume
 }
 
 TerminologyEditOutcome apply_update_terminology_term(LibraryDocument& document,
-                                                    const std::string& term_id,
-                                                    const TerminologyTermFields& fields) {
+                                                     const std::string& term_id,
+                                                     const TerminologyTermFields& fields) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::model::ElementId id(term_id);
     if (doc.find_as<sacm::model::Term>(id) == nullptr) {
@@ -1363,13 +1334,13 @@ TerminologyEditOutcome apply_update_terminology_term(LibraryDocument& document,
     for (const std::string& category : normalize_category_refs(fields.category_refs)) {
         pending_categories.emplace_back(category);
     }
-    const sacm::commands::OperationPreview category_preview = doc.preview(
-        sacm::commands::SetExpressionCategories{.element = id, .categories = pending_categories});
+    const sacm::commands::OperationPreview category_preview =
+        doc.preview(sacm::commands::SetExpressionCategories{.element = id, .categories = pending_categories});
     if (!category_preview.can_apply) {
         return preview_failed_terminology_edit(category_preview);
     }
-    const sacm::commands::OperationPreview origin_preview = doc.preview(sacm::commands::SetTermOrigin{
-        .element = id, .origin = to_optional_id(normalize_ref(fields.origin))});
+    const sacm::commands::OperationPreview origin_preview = doc.preview(
+        sacm::commands::SetTermOrigin{.element = id, .origin = to_optional_id(normalize_ref(fields.origin))});
     if (!origin_preview.can_apply) {
         return preview_failed_terminology_edit(origin_preview);
     }
@@ -1395,8 +1366,8 @@ TerminologyEditOutcome apply_update_terminology_term(LibraryDocument& document,
     for (const std::string& category : normalize_category_refs(fields.category_refs)) {
         category_ids.emplace_back(category);
     }
-    const sacm::commands::MutationResult classified = doc.apply(
-        sacm::commands::SetExpressionCategories{.element = id, .categories = std::move(category_ids)});
+    const sacm::commands::MutationResult classified =
+        doc.apply(sacm::commands::SetExpressionCategories{.element = id, .categories = std::move(category_ids)});
     if (!classified.applied) {
         return failed_terminology_edit(classified);
     }
@@ -1405,16 +1376,15 @@ TerminologyEditOutcome apply_update_terminology_term(LibraryDocument& document,
     if (!referenced.applied) {
         return failed_terminology_edit(referenced);
     }
-    const sacm::commands::MutationResult origin = doc.apply(sacm::commands::SetTermOrigin{
-        .element = id, .origin = to_optional_id(normalize_ref(fields.origin))});
+    const sacm::commands::MutationResult origin =
+        doc.apply(sacm::commands::SetTermOrigin{.element = id, .origin = to_optional_id(normalize_ref(fields.origin))});
     if (!origin.applied) {
         return failed_terminology_edit(origin);
     }
     return TerminologyEditOutcome{.applied = true};
 }
 
-TerminologyEditOutcome apply_delete_terminology_element(LibraryDocument& document,
-                                                       const std::string& element_id) {
+TerminologyEditOutcome apply_delete_terminology_element(LibraryDocument& document, const std::string& element_id) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::commands::MutationResult result = doc.apply(sacm::commands::DeleteElement{
         .target = sacm::model::ElementId(element_id),
@@ -1427,10 +1397,10 @@ TerminologyEditOutcome apply_delete_terminology_element(LibraryDocument& documen
 }
 
 TerminologyContextOutcome apply_associate_terminology_term(LibraryDocument& document,
-                                                          const std::string& target_element_id,
-                                                          const std::string& term_id,
-                                                          const std::string& artifact_reference_id,
-                                                          const std::string& asserted_context_id) {
+                                                           const std::string& target_element_id,
+                                                           const std::string& term_id,
+                                                           const std::string& artifact_reference_id,
+                                                           const std::string& asserted_context_id) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::model::ElementId term_ref(term_id);
     const auto* term = doc.find_as<sacm::model::Term>(term_ref);
@@ -1442,8 +1412,7 @@ TerminologyContextOutcome apply_associate_terminology_term(LibraryDocument& docu
     const sacm::model::ArgumentPackage* package = owning_argument_package(target_element);
     if (package == nullptr || !is_association_target(target_element)) {
         return terminology_context_error(
-            "SACM-CMD-002",
-            "Selected element is not a claim, strategy, or solution in an argument package.");
+            "SACM-CMD-002", "Selected element is not a claim, strategy, or solution in an argument package.");
     }
     const sacm::model::ElementId package_id = package->id();
 
@@ -1459,8 +1428,7 @@ TerminologyContextOutcome apply_associate_terminology_term(LibraryDocument& docu
             reusable_reference = reference;
         }
         for (const sacm::model::AssertedContext* context : package_contexts(*package)) {
-            if (ids_contain(context->sources(), reference->id()) &&
-                ids_contain(context->targets(), target)) {
+            if (ids_contain(context->sources(), reference->id()) && ids_contain(context->targets(), target)) {
                 TerminologyContextOutcome associated;
                 associated.applied = true;
                 associated.already_associated = true;
@@ -1475,11 +1443,10 @@ TerminologyContextOutcome apply_associate_terminology_term(LibraryDocument& docu
     std::string reference_id;
     if (reusable_reference == nullptr) {
         const sacm::commands::MutationResult created_reference =
-            doc.apply(sacm::commands::CreateArtifactReference{
-                .parent = package_id,
-                .id = to_optional_id(artifact_reference_id),
-                .name = term_context_label(*term),
-                .referenced_artifact_elements = {term_ref}});
+            doc.apply(sacm::commands::CreateArtifactReference{.parent = package_id,
+                                                              .id = to_optional_id(artifact_reference_id),
+                                                              .name = term_context_label(*term),
+                                                              .referenced_artifact_elements = {term_ref}});
         if (!created_reference.applied || created_reference.created_ids().empty()) {
             return failed_terminology_context(created_reference);
         }
@@ -1488,8 +1455,7 @@ TerminologyContextOutcome apply_associate_terminology_term(LibraryDocument& docu
         // Legacy AssociateTerminologyTermWithElementWithIds stamps
         // GenerateUniqueGid on a newly created reference (a reused one keeps its
         // gid); mint the same so replay converges on the raw hash.
-        if (const sacm::commands::MutationResult gid =
-                assign_legacy_gid(doc, sacm::model::ElementId(reference_id));
+        if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, sacm::model::ElementId(reference_id));
             !gid.applied) {
             rollback_element(doc, sacm::model::ElementId(reference_id));
             return failed_terminology_context(gid);
@@ -1499,13 +1465,12 @@ TerminologyContextOutcome apply_associate_terminology_term(LibraryDocument& docu
     }
 
     const sacm::commands::MutationResult created_context =
-        doc.apply(sacm::commands::CreateAssertedRelationship{
-            .parent = package_id,
-            .kind = sacm::metadata::ElementKind::AssertedContext,
-            .id = to_optional_id(asserted_context_id),
-            .name = "Context: " + term_context_label(*term),
-            .sources = {sacm::model::ElementId(reference_id)},
-            .targets = {target}});
+        doc.apply(sacm::commands::CreateAssertedRelationship{.parent = package_id,
+                                                             .kind = sacm::metadata::ElementKind::AssertedContext,
+                                                             .id = to_optional_id(asserted_context_id),
+                                                             .name = "Context: " + term_context_label(*term),
+                                                             .sources = {sacm::model::ElementId(reference_id)},
+                                                             .targets = {target}});
     if (!created_context.applied || created_context.created_ids().empty()) {
         if (outcome.created_artifact_reference) {
             rollback_element(doc, sacm::model::ElementId(reference_id));
@@ -1555,8 +1520,7 @@ VisibleContextCandidates find_visible_context_candidates(const sacm::model::Argu
             continue;
         }
         for (const sacm::model::AssertedContext* context : package_contexts(package)) {
-            if (!ids_contain(context->sources(), reference->id()) ||
-                !ids_contain(context->targets(), target)) {
+            if (!ids_contain(context->sources(), reference->id()) || !ids_contain(context->targets(), target)) {
                 continue;
             }
             if (is_visible_terminology_context(*context)) {
@@ -1591,8 +1555,7 @@ void remove_unreferenced_term_artifacts(sacm::model::Document& doc,
     std::vector<sacm::model::ElementId> doomed;
     for (const auto& element : package->argument_elements()) {
         const auto* reference = dynamic_cast<const sacm::model::ArtifactReference*>(element.get());
-        if (reference == nullptr || reference->id() == keep ||
-            !reference_targets_term(*reference, term_ref)) {
+        if (reference == nullptr || reference->id() == keep || !reference_targets_term(*reference, term_ref)) {
             continue;
         }
         bool referenced = false;
@@ -1617,10 +1580,10 @@ void remove_unreferenced_term_artifacts(sacm::model::Document& doc,
 } // namespace
 
 TerminologyContextOutcome apply_add_terminology_visible_context(LibraryDocument& document,
-                                                               const std::string& target_element_id,
-                                                               const std::string& term_id,
-                                                               const std::string& artifact_reference_id,
-                                                               const std::string& asserted_context_id) {
+                                                                const std::string& target_element_id,
+                                                                const std::string& term_id,
+                                                                const std::string& artifact_reference_id,
+                                                                const std::string& asserted_context_id) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::model::ElementId term_ref(term_id);
     const auto* term = doc.find_as<sacm::model::Term>(term_ref);
@@ -1631,13 +1594,12 @@ TerminologyContextOutcome apply_add_terminology_visible_context(LibraryDocument&
     const sacm::model::SACMElement* target_element = doc.find(target);
     const sacm::model::ArgumentPackage* package = owning_argument_package(target_element);
     if (package == nullptr || !is_visible_context_target(target_element)) {
-        return terminology_context_error(
-            "SACM-CMD-002", "Selected element is not a claim or strategy in an argument package.");
+        return terminology_context_error("SACM-CMD-002",
+                                         "Selected element is not a claim or strategy in an argument package.");
     }
     const sacm::model::ElementId package_id = package->id();
 
-    const VisibleContextCandidates candidates =
-        find_visible_context_candidates(*package, term_ref, target);
+    const VisibleContextCandidates candidates = find_visible_context_candidates(*package, term_ref, target);
 
     // Already a visible context linking the term to the target.
     if (candidates.has_existing_visible) {
@@ -1651,8 +1613,8 @@ TerminologyContextOutcome apply_add_terminology_visible_context(LibraryDocument&
 
     // Promote a non-visible context in place by marking it visible.
     if (candidates.has_promotable) {
-        const sacm::commands::MutationResult promoted = set_terminology_description(
-            doc, candidates.promotable_context, kVisibleTerminologyContextMarker);
+        const sacm::commands::MutationResult promoted =
+            set_terminology_description(doc, candidates.promotable_context, kVisibleTerminologyContextMarker);
         if (!promoted.applied) {
             return failed_terminology_context(promoted);
         }
@@ -1665,11 +1627,10 @@ TerminologyContextOutcome apply_add_terminology_visible_context(LibraryDocument&
 
     // Create a fresh terminology reference and a visible context.
     const sacm::commands::MutationResult created_reference =
-        doc.apply(sacm::commands::CreateArtifactReference{
-            .parent = package_id,
-            .id = to_optional_id(artifact_reference_id),
-            .name = term_context_label(*term),
-            .referenced_artifact_elements = {term_ref}});
+        doc.apply(sacm::commands::CreateArtifactReference{.parent = package_id,
+                                                          .id = to_optional_id(artifact_reference_id),
+                                                          .name = term_context_label(*term),
+                                                          .referenced_artifact_elements = {term_ref}});
     if (!created_reference.applied || created_reference.created_ids().empty()) {
         return failed_terminology_context(created_reference);
     }
@@ -1682,13 +1643,12 @@ TerminologyContextOutcome apply_add_terminology_visible_context(LibraryDocument&
     }
 
     const sacm::commands::MutationResult created_context =
-        doc.apply(sacm::commands::CreateAssertedRelationship{
-            .parent = package_id,
-            .kind = sacm::metadata::ElementKind::AssertedContext,
-            .id = to_optional_id(asserted_context_id),
-            .name = "Context: " + term_context_label(*term),
-            .sources = {reference_id},
-            .targets = {target}});
+        doc.apply(sacm::commands::CreateAssertedRelationship{.parent = package_id,
+                                                             .kind = sacm::metadata::ElementKind::AssertedContext,
+                                                             .id = to_optional_id(asserted_context_id),
+                                                             .name = "Context: " + term_context_label(*term),
+                                                             .sources = {reference_id},
+                                                             .targets = {target}});
     if (!created_context.applied || created_context.created_ids().empty()) {
         rollback_element(doc, reference_id);
         return failed_terminology_context(created_context);

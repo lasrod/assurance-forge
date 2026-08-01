@@ -39,17 +39,17 @@ struct TempDir {
 };
 
 std::filesystem::path UniqueTempPath(const std::string& stem) {
-    static int                  counter = 0;
-    const std::filesystem::path path    = std::filesystem::temp_directory_path() /
-                                       ("af_agent_canvas_" + stem + "_" + std::to_string(++counter));
+    static int counter = 0;
+    const std::filesystem::path path =
+        std::filesystem::temp_directory_path() / ("af_agent_canvas_" + stem + "_" + std::to_string(++counter));
     std::filesystem::remove_all(path);
     std::filesystem::create_directories(path);
     return path;
 }
 
 struct Fixture {
-    TempDir                          workspace;
-    core::AppState                   state;
+    TempDir workspace;
+    core::AppState state;
     core::changesets::ChangeSetStore store;
 };
 
@@ -86,25 +86,21 @@ std::string FirstClaimId(const parser::AssuranceCase& model) {
 // goal, and sub-goals under the strategy.
 std::vector<core::reviews::PatchOperation> Restructure(const std::string& top_goal_id, int goals) {
     nlohmann::json operations = nlohmann::json::array(
-        {nlohmann::json{{"type", "CreateStrategy"},
-                        {"create_ref", "$strategy"},
-                        {"text", "Argue over identified hazards"}},
-         nlohmann::json{{"type", "AddSupportedBy"},
-                        {"source", {{"ref", "$strategy"}}},
-                        {"target", {{"id", top_goal_id}}}}});
+        {nlohmann::json{
+             {"type", "CreateStrategy"}, {"create_ref", "$strategy"}, {"text", "Argue over identified hazards"}},
+         nlohmann::json{
+             {"type", "AddSupportedBy"}, {"source", {{"ref", "$strategy"}}}, {"target", {{"id", top_goal_id}}}}});
     for (int index = 0; index < goals; ++index) {
         const std::string ref = "$goal" + std::to_string(index);
-        operations.push_back(nlohmann::json{
-            {"type", "CreateClaim"},
-            {"create_ref", ref},
-            {"text", "Hazard " + std::to_string(index) + " is mitigated"}});
-        operations.push_back(nlohmann::json{{"type", "AddSupportedBy"},
-                                            {"source", {{"ref", ref}}},
-                                            {"target", {{"ref", "$strategy"}}}});
+        operations.push_back(nlohmann::json{{"type", "CreateClaim"},
+                                            {"create_ref", ref},
+                                            {"text", "Hazard " + std::to_string(index) + " is mitigated"}});
+        operations.push_back(
+            nlohmann::json{{"type", "AddSupportedBy"}, {"source", {{"ref", ref}}}, {"target", {{"ref", "$strategy"}}}});
     }
 
     std::vector<core::reviews::PatchOperation> parsed;
-    std::string                                error;
+    std::string error;
     if (!agent::ParsePatchOperations(operations, parsed, error)) {
         ADD_FAILURE() << "could not parse operations: " << error;
     }
@@ -113,20 +109,17 @@ std::vector<core::reviews::PatchOperation> Restructure(const std::string& top_go
 
 // What `AppRuntime::RefreshAgentChangePreview` hands the canvas each frame.
 struct Preview {
-    parser::AssuranceCase    model;
+    parser::AssuranceCase model;
     std::vector<std::string> added_ids;
 };
 
-Preview ComputePreview(const core::changesets::ChangeSet& change_set,
-                       const parser::AssuranceCase&       committed) {
-    const core::changesets::ChangeSetDiff diff =
-        core::changesets::ComputeChangeSetDiff(change_set, committed);
+Preview ComputePreview(const core::changesets::ChangeSet& change_set, const parser::AssuranceCase& committed) {
+    const core::changesets::ChangeSetDiff diff = core::changesets::ComputeChangeSetDiff(change_set, committed);
     EXPECT_TRUE(diff.success) << diff.error;
 
     Preview preview;
     preview.model = diff.preview_model;
-    for (const std::pair<const std::string, core::changesets::ElementChange>& entry :
-         diff.status_by_id) {
+    for (const std::pair<const std::string, core::changesets::ElementChange>& entry : diff.status_by_id) {
         if (entry.second == core::changesets::ElementChange::Added) {
             preview.added_ids.push_back(entry.first);
         }
@@ -142,22 +135,22 @@ TEST(AgentChangeCanvas, DrawsWhatTheAgentHasStagedRatherThanTheCommittedArgument
     ASSERT_TRUE(fixture->state.has_projected_package());
     const std::string top_goal = FirstClaimId(fixture->state.loaded_case.value());
 
-    const std::string id = fixture->store.Begin(1, "Restructure by hazard", "", "", "claude-ai",
-                                                fixture->state.loaded_file_path);
-    std::string       error;
-    ASSERT_TRUE(fixture->store.Stage(id, Restructure(top_goal, 4),
-                                     fixture->state.loaded_case.value(), error))
-        << error;
+    const std::string id =
+        fixture->store.Begin(1, "Restructure by hazard", "", "", "claude-ai", fixture->state.loaded_file_path);
+    std::string error;
+    ASSERT_TRUE(fixture->store.Stage(id, Restructure(top_goal, 4), fixture->state.loaded_case.value(), error)) << error;
 
-    const Preview preview =
-        ComputePreview(*fixture->store.Find(id), fixture->state.loaded_case.value());
+    const Preview preview = ComputePreview(*fixture->store.Find(id), fixture->state.loaded_case.value());
     ASSERT_FALSE(preview.added_ids.empty());
 
     const sacm::AssuranceCasePackage& package = fixture->state.projected_package();
     ASSERT_FALSE(package.argumentPackages.empty());
-    const parser::AssuranceCase drawn = app::areas::BuildArgumentPackageCanvasCase(
-        fixture->state.loaded_case.value(), preview.model, preview.added_ids, package,
-        package.argumentPackages.front(), "Argument");
+    const parser::AssuranceCase drawn = app::areas::BuildArgumentPackageCanvasCase(fixture->state.loaded_case.value(),
+                                                                                   preview.model,
+                                                                                   preview.added_ids,
+                                                                                   package,
+                                                                                   package.argumentPackages.front(),
+                                                                                   "Argument");
 
     for (const std::string& added : preview.added_ids) {
         EXPECT_NE(parser::FindElementById(drawn, added), nullptr)
@@ -190,14 +183,13 @@ TEST(AgentChangeCanvas, DrawsTheCommittedArgumentWhenNoAgentIsWorking) {
     const sacm::AssuranceCasePackage& package = fixture->state.projected_package();
     ASSERT_FALSE(package.argumentPackages.empty());
     const parser::AssuranceCase drawn = app::areas::BuildArgumentPackageCanvasCase(
-        fixture->state.loaded_case.value(), std::nullopt, {}, package,
-        package.argumentPackages.front(), "Argument");
+        fixture->state.loaded_case.value(), std::nullopt, {}, package, package.argumentPackages.front(), "Argument");
 
     EXPECT_NE(parser::FindElementById(drawn, top_goal), nullptr);
-    EXPECT_EQ(drawn.elements.size(), core::BuildArgumentPackageProjection(
-                                         fixture->state.loaded_case.value(),
-                                         package.argumentPackages.front(), "Argument")
-                                         .elements.size());
+    EXPECT_EQ(drawn.elements.size(),
+              core::BuildArgumentPackageProjection(
+                  fixture->state.loaded_case.value(), package.argumentPackages.front(), "Argument")
+                  .elements.size());
 }
 
 // The reviewer sees what the agent sees.
@@ -217,23 +209,19 @@ TEST(AgentChangeCanvas, ShowsTheReviewerTheSameSccgFindingsTheAgentGot) {
     // A claim with no support and no undeveloped marker: EV.1, and the one an
     // agent is most likely to leave behind mid-draft.
     const nlohmann::json operations = nlohmann::json::array(
-        {nlohmann::json{{"type", "CreateStrategy"},
-                        {"create_ref", "$strategy"},
-                        {"text", "Argue over misuse"}},
-         nlohmann::json{{"type", "AddSupportedBy"},
-                        {"source", {{"ref", "$strategy"}}},
-                        {"target", {{"id", top_goal}}}}});
+        {nlohmann::json{{"type", "CreateStrategy"}, {"create_ref", "$strategy"}, {"text", "Argue over misuse"}},
+         nlohmann::json{
+             {"type", "AddSupportedBy"}, {"source", {{"ref", "$strategy"}}}, {"target", {{"id", top_goal}}}}});
     std::vector<core::reviews::PatchOperation> parsed;
-    std::string                                error;
+    std::string error;
     ASSERT_TRUE(agent::ParsePatchOperations(operations, parsed, error)) << error;
 
-    const std::string id = fixture->store.Begin(1, "Leave a strategy hanging", "", "", "claude-ai",
-                                                fixture->state.loaded_file_path);
-    ASSERT_TRUE(fixture->store.Stage(id, parsed, fixture->state.loaded_case.value(), error))
-        << error;
+    const std::string id =
+        fixture->store.Begin(1, "Leave a strategy hanging", "", "", "claude-ai", fixture->state.loaded_file_path);
+    ASSERT_TRUE(fixture->store.Stage(id, parsed, fixture->state.loaded_case.value(), error)) << error;
 
-    const core::changesets::ChangeSetDiff diff = core::changesets::ComputeChangeSetDiff(
-        *fixture->store.Find(id), fixture->state.loaded_case.value());
+    const core::changesets::ChangeSetDiff diff =
+        core::changesets::ComputeChangeSetDiff(*fixture->store.Find(id), fixture->state.loaded_case.value());
     ASSERT_TRUE(diff.success) << diff.error;
 
     const std::vector<std::string> described = app::areas::DescribeStagedSccgFindings(diff);

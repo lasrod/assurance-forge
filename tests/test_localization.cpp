@@ -19,8 +19,7 @@ namespace i18n = ui::i18n;
 // Writes a minimal little-endian gettext .mo file from raw key/value entries.
 // Keys may already contain context/plural separators; lengths exclude the
 // terminating NUL (gettext convention) but the NUL is present in the blob.
-void WriteMoFile(const std::filesystem::path& path,
-                 const std::vector<std::pair<std::string, std::string>>& entries) {
+void WriteMoFile(const std::filesystem::path& path, const std::vector<std::pair<std::string, std::string>>& entries) {
     std::filesystem::create_directories(path.parent_path());
 
     const auto append_u32 = [](std::string& out, std::uint32_t value) {
@@ -79,8 +78,8 @@ void WriteMoFile(const std::filesystem::path& path,
 std::filesystem::path MakeTempLocaleRoot() {
     // Two samples so parallel ctest runs can't collide on a shared temp path.
     std::random_device rd;
-    const std::filesystem::path root = std::filesystem::temp_directory_path() /
-                                       ("af_i18n_" + std::to_string(rd()) + "_" + std::to_string(rd()));
+    const std::filesystem::path root =
+        std::filesystem::temp_directory_path() / ("af_i18n_" + std::to_string(rd()) + "_" + std::to_string(rd()));
     return root;
 }
 

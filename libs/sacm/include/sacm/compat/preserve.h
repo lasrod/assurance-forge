@@ -33,4 +33,4 @@ namespace sacm::compat {
 // Returns the number of elements that received content.
 std::size_t adopt_preserved_content(model::Document& target, const model::Document& source);
 
-}  // namespace sacm::compat
+} // namespace sacm::compat

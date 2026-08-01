@@ -42,7 +42,7 @@ std::filesystem::path BridgeDirectory() {
 }
 
 std::string NormalizedProjectPath(const std::filesystem::path& project_root) {
-    std::error_code       ec;
+    std::error_code ec;
     std::filesystem::path canonical = std::filesystem::weakly_canonical(project_root, ec);
     if (ec) {
         canonical = project_root;
@@ -79,10 +79,10 @@ std::string EndpointAddressFor(const std::filesystem::path& project_root) {
 }
 
 std::string GenerateToken() {
-    std::random_device      device;
-    std::ostringstream      hex;
-    constexpr int           kTokenBytes = 32;
-    static const char       kDigits[]   = "0123456789abcdef";
+    std::random_device device;
+    std::ostringstream hex;
+    constexpr int kTokenBytes = 32;
+    static const char kDigits[] = "0123456789abcdef";
     for (int index = 0; index < kTokenBytes; ++index) {
         const unsigned int byte = device() & 0xFFu;
         hex << kDigits[(byte >> 4) & 0x0Fu] << kDigits[byte & 0x0Fu];
@@ -102,9 +102,12 @@ bool WriteEndpointRecord(const EndpointRecord& record, std::string& error) {
     }
 
     const nlohmann::json document{
-        {"protocol", record.protocol},   {"pid", record.pid},
-        {"address", record.address},     {"token", record.token},
-        {"projectRoot", record.project_root}, {"appVersion", record.app_version},
+        {"protocol", record.protocol},
+        {"pid", record.pid},
+        {"address", record.address},
+        {"token", record.token},
+        {"projectRoot", record.project_root},
+        {"appVersion", record.app_version},
     };
 
     std::ofstream file(path, std::ios::binary | std::ios::trunc);
@@ -124,15 +127,14 @@ bool WriteEndpointRecord(const EndpointRecord& record, std::string& error) {
     // application; the containing directory is already user-only, and this makes
     // the file itself say so too.
     std::filesystem::permissions(path,
-                                 std::filesystem::perms::owner_read |
-                                     std::filesystem::perms::owner_write,
-                                 std::filesystem::perm_options::replace, ec);
+                                 std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
+                                 std::filesystem::perm_options::replace,
+                                 ec);
 #endif
     return true;
 }
 
-bool ReadEndpointRecord(const std::filesystem::path& project_root, EndpointRecord& out,
-                        std::string& error) {
+bool ReadEndpointRecord(const std::filesystem::path& project_root, EndpointRecord& out, std::string& error) {
     error.clear();
     const std::filesystem::path path = EndpointRecordPath(project_root);
 
@@ -151,12 +153,12 @@ bool ReadEndpointRecord(const std::filesystem::path& project_root, EndpointRecor
         return false;
     }
 
-    out.protocol     = document.value("protocol", 0);
-    out.pid          = document.value("pid", 0LL);
-    out.address      = document.value("address", std::string());
-    out.token        = document.value("token", std::string());
+    out.protocol = document.value("protocol", 0);
+    out.pid = document.value("pid", 0LL);
+    out.address = document.value("address", std::string());
+    out.token = document.value("token", std::string());
     out.project_root = document.value("projectRoot", std::string());
-    out.app_version  = document.value("appVersion", std::string());
+    out.app_version = document.value("appVersion", std::string());
 
     if (out.address.empty() || out.token.empty()) {
         error = "The bridge endpoint record is incomplete: " + path.string();

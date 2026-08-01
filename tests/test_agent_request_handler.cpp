@@ -25,9 +25,9 @@ struct TempDir {
 };
 
 std::filesystem::path UniqueTempPath(const std::string& stem) {
-    static int                  counter = 0;
-    const std::filesystem::path path    = std::filesystem::temp_directory_path() /
-                                       ("af_agent_handler_" + stem + "_" + std::to_string(++counter));
+    static int counter = 0;
+    const std::filesystem::path path =
+        std::filesystem::temp_directory_path() / ("af_agent_handler_" + stem + "_" + std::to_string(++counter));
     std::filesystem::remove_all(path);
     std::filesystem::create_directories(path);
     return path;
@@ -53,8 +53,8 @@ bool OpenProjectWithArgument(core::AppState& state, const std::filesystem::path&
 
 bridge::Request MakeRequest(const std::string& op, const nlohmann::json& args = {}) {
     bridge::Request request;
-    request.id   = 7;
-    request.op   = op;
+    request.id = 7;
+    request.op = op;
     request.args = args.is_object() ? args : nlohmann::json::object();
     return request;
 }
@@ -62,13 +62,12 @@ bridge::Request MakeRequest(const std::string& op, const nlohmann::json& args = 
 } // namespace
 
 TEST(AgentRequestHandler, AnswersAnOverviewFromTheLoadedModel) {
-    TempDir        workspace{UniqueTempPath("overview")};
+    TempDir workspace{UniqueTempPath("overview")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
     const app::AgentRequestContext context{state, workspace.path.string(), "test client", {}};
-    const bridge::Response response = app::HandleAgentRequest(MakeRequest("get_case_overview"),
-                                                              context);
+    const bridge::Response response = app::HandleAgentRequest(MakeRequest("get_case_overview"), context);
 
     ASSERT_TRUE(response.ok) << response.error_message;
     EXPECT_FALSE(response.result.value("isError", true));
@@ -79,13 +78,12 @@ TEST(AgentRequestHandler, AnswersAnOverviewFromTheLoadedModel) {
 // failure. The distinction matters: a model that sees a faulted connection stops,
 // where one that sees a tool error corrects itself and tries again.
 TEST(AgentRequestHandler, ReportsAnUnknownElementAsAToolErrorNotATransportError) {
-    TempDir        workspace{UniqueTempPath("unknown")};
+    TempDir workspace{UniqueTempPath("unknown")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
     const app::AgentRequestContext context{state, workspace.path.string(), "test client", {}};
-    const bridge::Response         response =
-        app::HandleAgentRequest(MakeRequest("get_element", {{"id", "NOPE"}}), context);
+    const bridge::Response response = app::HandleAgentRequest(MakeRequest("get_element", {{"id", "NOPE"}}), context);
 
     EXPECT_TRUE(response.ok);
     EXPECT_TRUE(response.result.value("isError", false));
@@ -95,13 +93,12 @@ TEST(AgentRequestHandler, ReportsAnUnknownElementAsAToolErrorNotATransportError)
 // An unknown operation is a genuine protocol failure, and its message has to
 // point at the likely cause: two binaries from different builds.
 TEST(AgentRequestHandler, RefusesAnUnknownOperationWithAVersionHint) {
-    TempDir        workspace{UniqueTempPath("unknownop")};
+    TempDir workspace{UniqueTempPath("unknownop")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
     const app::AgentRequestContext context{state, workspace.path.string(), "test client", {}};
-    const bridge::Response response = app::HandleAgentRequest(MakeRequest("do_something_new"),
-                                                              context);
+    const bridge::Response response = app::HandleAgentRequest(MakeRequest("do_something_new"), context);
 
     EXPECT_FALSE(response.ok);
     EXPECT_EQ(response.error_code, bridge::error_code::kUnknownOperation);
@@ -112,51 +109,48 @@ TEST(AgentRequestHandler, RefusesAnUnknownOperationWithAVersionHint) {
 // handler must refuse rather than pretend when the caller supplied no way to do
 // it.
 TEST(AgentRequestHandler, RefusesToSwitchFilesWithoutACallback) {
-    TempDir        workspace{UniqueTempPath("noswitch")};
+    TempDir workspace{UniqueTempPath("noswitch")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
     const app::AgentRequestContext context{state, workspace.path.string(), "test client", {}};
-    const bridge::Response         response =
-        app::HandleAgentRequest(MakeRequest("open_case_file", {{"path", "arguments/main.sacm"}}),
-                                context);
+    const bridge::Response response =
+        app::HandleAgentRequest(MakeRequest("open_case_file", {{"path", "arguments/main.sacm"}}), context);
 
     EXPECT_TRUE(response.ok);
     EXPECT_TRUE(response.result.value("isError", false));
 }
 
 TEST(AgentRequestHandler, PassesTheRequestedPathToTheRuntime) {
-    TempDir        workspace{UniqueTempPath("switch")};
+    TempDir workspace{UniqueTempPath("switch")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
-    std::string                  asked_for;
-    app::AgentRequestContext     context{state, workspace.path.string(), "test client",
-                                     [&asked_for](const std::string& path, std::string&) {
-                                         asked_for = path;
-                                         return true;
-                                     }};
+    std::string asked_for;
+    app::AgentRequestContext context{
+        state, workspace.path.string(), "test client", [&asked_for](const std::string& path, std::string&) {
+            asked_for = path;
+            return true;
+        }};
     const bridge::Response response =
-        app::HandleAgentRequest(MakeRequest("open_case_file", {{"path", "arguments/main2.sacm"}}),
-                                context);
+        app::HandleAgentRequest(MakeRequest("open_case_file", {{"path", "arguments/main2.sacm"}}), context);
 
     EXPECT_EQ(asked_for, "arguments/main2.sacm");
     EXPECT_TRUE(response.ok);
 }
 
 TEST(AgentRequestHandler, RequiresAPathToSwitchFiles) {
-    TempDir        workspace{UniqueTempPath("nopath")};
+    TempDir workspace{UniqueTempPath("nopath")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
-    bool                     called = false;
-    app::AgentRequestContext context{state, workspace.path.string(), "test client",
-                                     [&called](const std::string&, std::string&) {
-                                         called = true;
-                                         return true;
-                                     }};
-    const bridge::Response   response =
-        app::HandleAgentRequest(MakeRequest("open_case_file"), context);
+    bool called = false;
+    app::AgentRequestContext context{
+        state, workspace.path.string(), "test client", [&called](const std::string&, std::string&) {
+            called = true;
+            return true;
+        }};
+    const bridge::Response response = app::HandleAgentRequest(MakeRequest("open_case_file"), context);
 
     EXPECT_FALSE(called);
     EXPECT_TRUE(response.result.value("isError", false));

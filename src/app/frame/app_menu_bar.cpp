@@ -191,7 +191,8 @@ float RenderAppMenuBar(AppRuntimeState& state, bool& done, const AppMenuBarCallb
 
     if (ImGui::BeginMenu(AF_TR("Edit").c_str())) {
         const bool can_undo = callbacks.can_undo && callbacks.can_undo();
-        if (!can_undo) ImGui::BeginDisabled();
+        if (!can_undo)
+            ImGui::BeginDisabled();
         if (ImGui::MenuItem(AF_TR("Undo").c_str(), "Ctrl+Z") && callbacks.undo) {
             callbacks.undo();
         }

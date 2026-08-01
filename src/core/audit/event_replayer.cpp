@@ -49,29 +49,40 @@ std::string FormatLocation(std::uint64_t tx_seq, std::uint64_t ev_seq, const std
 
 sacm_adapter::ChildKind ToAdapterChildKind(core::NewElementKind kind) {
     switch (kind) {
-    case core::NewElementKind::Goal:          return sacm_adapter::ChildKind::Goal;
-    case core::NewElementKind::Strategy:      return sacm_adapter::ChildKind::Strategy;
-    case core::NewElementKind::Solution:      return sacm_adapter::ChildKind::Solution;
-    case core::NewElementKind::Context:       return sacm_adapter::ChildKind::Context;
-    case core::NewElementKind::Assumption:    return sacm_adapter::ChildKind::Assumption;
-    case core::NewElementKind::Justification: return sacm_adapter::ChildKind::Justification;
+    case core::NewElementKind::Goal:
+        return sacm_adapter::ChildKind::Goal;
+    case core::NewElementKind::Strategy:
+        return sacm_adapter::ChildKind::Strategy;
+    case core::NewElementKind::Solution:
+        return sacm_adapter::ChildKind::Solution;
+    case core::NewElementKind::Context:
+        return sacm_adapter::ChildKind::Context;
+    case core::NewElementKind::Assumption:
+        return sacm_adapter::ChildKind::Assumption;
+    case core::NewElementKind::Justification:
+        return sacm_adapter::ChildKind::Justification;
     }
     return sacm_adapter::ChildKind::Goal;
 }
 
 sacm_adapter::ChallengeSource ToAdapterChallengeSource(core::ChallengeSourceType type) {
     switch (type) {
-    case core::ChallengeSourceType::CounterArgument: return sacm_adapter::ChallengeSource::CounterArgument;
-    case core::ChallengeSourceType::CounterEvidence: return sacm_adapter::ChallengeSource::CounterEvidence;
+    case core::ChallengeSourceType::CounterArgument:
+        return sacm_adapter::ChallengeSource::CounterArgument;
+    case core::ChallengeSourceType::CounterEvidence:
+        return sacm_adapter::ChallengeSource::CounterEvidence;
     }
     return sacm_adapter::ChallengeSource::CounterArgument;
 }
 
 sacm_adapter::TextField ToAdapterTextField(core::ElementTextField field) {
     switch (field) {
-    case core::ElementTextField::Name:        return sacm_adapter::TextField::Name;
-    case core::ElementTextField::Description: return sacm_adapter::TextField::Description;
-    case core::ElementTextField::Content:     return sacm_adapter::TextField::Content;
+    case core::ElementTextField::Name:
+        return sacm_adapter::TextField::Name;
+    case core::ElementTextField::Description:
+        return sacm_adapter::TextField::Description;
+    case core::ElementTextField::Content:
+        return sacm_adapter::TextField::Content;
     }
     return sacm_adapter::TextField::Name;
 }
@@ -91,8 +102,11 @@ std::string SummarizeDiagnostics(const std::vector<sacm_adapter::LoadDiagnostic>
 // Formats the "FAILED at <location>" diagnostic for an unsuccessful seam call,
 // echoing the supported/applied flags and any library diagnostics so a
 // convergence failure names precisely which seam diverged.
-std::string FormatSeamFailure(const std::string& seam, std::uint64_t tx_seq, const AuditEvent& event,
-                              bool supported, bool applied,
+std::string FormatSeamFailure(const std::string& seam,
+                              std::uint64_t tx_seq,
+                              const AuditEvent& event,
+                              bool supported,
+                              bool applied,
                               const std::vector<sacm_adapter::LoadDiagnostic>& diagnostics) {
     return seam + " failed at " + FormatLocation(tx_seq, event.event_sequence, event.event_type) +
            " (supported=" + (supported ? "true" : "false") + ", applied=" + (applied ? "true" : "false") +
@@ -109,11 +123,12 @@ std::string FormatSeamFailure(const std::string& seam, std::uint64_t tx_seq, con
 // false (setting `out_error`, already formatted with the event location) to
 // abort. On success the wrapper serializes the mutated package and reloads it
 // back into `document` in place.
-using BridgeMutator =
-    std::function<bool(parser::AssuranceCase&, sacm::AssuranceCasePackage&, std::string&)>;
+using BridgeMutator = std::function<bool(parser::AssuranceCase&, sacm::AssuranceCasePackage&, std::string&)>;
 
-bool BridgeViaLegacy(sacm_adapter::LibraryDocument& document, const std::string& location,
-                     const BridgeMutator& mutate, std::string& out_error) {
+bool BridgeViaLegacy(sacm_adapter::LibraryDocument& document,
+                     const std::string& location,
+                     const BridgeMutator& mutate,
+                     std::string& out_error) {
     // Delegates rather than duplicating. This WAS a second copy of
     // `core::commands::BridgeLegacyMutationToLibrary`, and the copy is what made
     // fixing the live path insufficient: the live bridge stopped dropping vendor
@@ -126,10 +141,7 @@ bool BridgeViaLegacy(sacm_adapter::LibraryDocument& document, const std::string&
     return core::commands::BridgeLegacyMutationToLibrary(document, mutate, out_error, location);
 }
 
-bool ApplyEvent(ReplayState& state,
-                std::uint64_t tx_seq,
-                const AuditEvent& event,
-                std::string& out_error) {
+bool ApplyEvent(ReplayState& state, std::uint64_t tx_seq, const AuditEvent& event, std::string& out_error) {
     const std::string& type = event.event_type;
     const auto& payload = event.payload;
 
@@ -150,8 +162,7 @@ bool ApplyEvent(ReplayState& state,
             return false;
         std::string err;
         if (!core::AddTopGoalWithId(state.model, &state.package, element_id, err)) {
-            out_error = "AddTopGoalWithId failed at " + FormatLocation(tx_seq, event.event_sequence, type) +
-                        ": " + err;
+            out_error = "AddTopGoalWithId failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;
@@ -169,15 +180,15 @@ bool ApplyEvent(ReplayState& state,
             return false;
         core::NewElementKind kind;
         if (!commands::NewElementKindFromToken(kind_token, kind)) {
-            out_error = "Unknown kind token '" + kind_token + "' at " +
-                        FormatLocation(tx_seq, event.event_sequence, type);
+            out_error =
+                "Unknown kind token '" + kind_token + "' at " + FormatLocation(tx_seq, event.event_sequence, type);
             return false;
         }
         std::string err;
-        if (!core::AddChildElementWithIds(state.model, &state.package, parent_id, kind, element_id,
-                                          relationship_id, err)) {
-            out_error = "AddChildElementWithIds failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+        if (!core::AddChildElementWithIds(
+                state.model, &state.package, parent_id, kind, element_id, relationship_id, err)) {
+            out_error =
+                "AddChildElementWithIds failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;
@@ -209,10 +220,10 @@ bool ApplyEvent(ReplayState& state,
         }
         core::ArgumentTarget target{target_kind, target_id};
         std::string err;
-        if (!core::AddChallengeWithIds(state.model, &state.package, target, source_type, element_id, relationship_id,
-                                       err)) {
-            out_error = "AddChallengeWithIds failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+        if (!core::AddChallengeWithIds(
+                state.model, &state.package, target, source_type, element_id, relationship_id, err)) {
+            out_error =
+                "AddChallengeWithIds failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;
@@ -232,8 +243,7 @@ bool ApplyEvent(ReplayState& state,
         }
         std::string err;
         if (!core::RemoveElement(state.model, &state.package, element_id, mode, err)) {
-            out_error = "RemoveElement failed at " + FormatLocation(tx_seq, event.event_sequence, type) +
-                        ": " + err;
+            out_error = "RemoveElement failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;
@@ -245,8 +255,8 @@ bool ApplyEvent(ReplayState& state,
             return false;
         std::string err;
         if (!core::RemoveRelationship(state.model, &state.package, relationship_id, err)) {
-            out_error = "RemoveRelationship failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+            out_error =
+                "RemoveRelationship failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;
@@ -264,10 +274,10 @@ bool ApplyEvent(ReplayState& state,
         // reach the same outcome. The recorded value exists so the event
         // describes what happened without a reader having to replay it.
         bool removed_relationship = false;
-        if (!core::DropRelationshipReference(state.model, &state.package, relationship_id, reference,
-                                             removed_relationship, err)) {
-            out_error = "DropRelationshipReference failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+        if (!core::DropRelationshipReference(
+                state.model, &state.package, relationship_id, reference, removed_relationship, err)) {
+            out_error = "DropRelationshipReference failed at " + FormatLocation(tx_seq, event.event_sequence, type) +
+                        ": " + err;
             return false;
         }
         return true;
@@ -281,8 +291,8 @@ bool ApplyEvent(ReplayState& state,
             return false;
         std::string err;
         if (!core::MoveStrategyToReasoning(state.model, &state.package, relationship_id, strategy_id, err)) {
-            out_error = "MoveStrategyToReasoning failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+            out_error =
+                "MoveStrategyToReasoning failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;
@@ -300,10 +310,10 @@ bool ApplyEvent(ReplayState& state,
         }
         std::string err;
         bool old_value_unused = false;
-        if (!core::SetElementUndeveloped(state.model, &state.package, element_id, new_value->get<bool>(),
-                                         old_value_unused, err)) {
-            out_error = "SetElementUndeveloped failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+        if (!core::SetElementUndeveloped(
+                state.model, &state.package, element_id, new_value->get<bool>(), old_value_unused, err)) {
+            out_error =
+                "SetElementUndeveloped failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;
@@ -320,8 +330,7 @@ bool ApplyEvent(ReplayState& state,
         // so live and replay converge. An event only exists because a gid WAS
         // assigned, so a false return here is always a real failure to abort on.
         if (!core::SetElementGid(state.model, &state.package, element_id, gid, err)) {
-            out_error = "SetElementGid failed at " + FormatLocation(tx_seq, event.event_sequence, type) +
-                        ": " + err;
+            out_error = "SetElementGid failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;
@@ -342,17 +351,20 @@ bool ApplyEvent(ReplayState& state,
             return false;
         }
         const core::AssuranceTree tree = core::AssuranceTree::Build(state.model, "");
-        core::TreeDisplayOrder    scratch_order;
-        std::string               err;
+        core::TreeDisplayOrder scratch_order;
+        std::string err;
         // `ReorderSiblings` returns false on a genuine no-op (nothing to reorder)
         // AND on error, distinguished by whether `err` is set. A non-empty `err`
         // is a real failure; an empty `err` is an idempotent no-op, so replay
         // succeeds either way except on a true error.
-        if (!core::ReorderSiblings(state.model, &state.package, tree, scratch_order,
-                                   core::ReorderSiblingsCommand{dragged_id, target_id, drop_mode}, err) &&
+        if (!core::ReorderSiblings(state.model,
+                                   &state.package,
+                                   tree,
+                                   scratch_order,
+                                   core::ReorderSiblingsCommand{dragged_id, target_id, drop_mode},
+                                   err) &&
             !err.empty()) {
-            out_error = "ReorderSiblings failed at " + FormatLocation(tx_seq, event.event_sequence, type) +
-                        ": " + err;
+            out_error = "ReorderSiblings failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;
@@ -365,13 +377,12 @@ bool ApplyEvent(ReplayState& state,
         if (!require_string("new_parent_id", new_parent_id))
             return false;
         const core::AssuranceTree tree = core::AssuranceTree::Build(state.model, "");
-        std::string               err;
+        std::string err;
         // Same no-op-vs-error distinction as ReorderSiblings above.
-        if (!core::MoveSubtree(state.model, &state.package, tree,
-                               core::MoveSubtreeCommand{dragged_id, new_parent_id}, err) &&
+        if (!core::MoveSubtree(
+                state.model, &state.package, tree, core::MoveSubtreeCommand{dragged_id, new_parent_id}, err) &&
             !err.empty()) {
-            out_error = "MoveSubtree failed at " + FormatLocation(tx_seq, event.event_sequence, type) +
-                        ": " + err;
+            out_error = "MoveSubtree failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;
@@ -401,10 +412,9 @@ bool ApplyEvent(ReplayState& state,
     auto require_identity = [&](std::string& id, std::string& gid) -> bool {
         auto id_it = payload.find("package_id");
         auto gid_it = payload.find("package_gid");
-        if (id_it == payload.end() || !id_it->is_string() ||
-            gid_it == payload.end() || !gid_it->is_string()) {
-            out_error = "Missing or non-string identity payload at " +
-                        FormatLocation(tx_seq, event.event_sequence, type);
+        if (id_it == payload.end() || !id_it->is_string() || gid_it == payload.end() || !gid_it->is_string()) {
+            out_error =
+                "Missing or non-string identity payload at " + FormatLocation(tx_seq, event.event_sequence, type);
             return false;
         }
         id = id_it->get<std::string>();
@@ -418,8 +428,8 @@ bool ApplyEvent(ReplayState& state,
             return false;
         std::string err;
         if (!core::DeleteTerminologyPackage(state.package, core::TerminologyPackageRef{id, gid}, err)) {
-            out_error = "DeleteTerminologyPackage failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+            out_error =
+                "DeleteTerminologyPackage failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;
@@ -435,8 +445,8 @@ bool ApplyEvent(ReplayState& state,
             return false;
         if (!require_string("generated_gid", generated_gid))
             return false;
-        const core::TerminologyPackageCreateResult result = core::CreateTerminologyPackageWithIds(
-            state.package, name, description, generated_id, generated_gid);
+        const core::TerminologyPackageCreateResult result =
+            core::CreateTerminologyPackageWithIds(state.package, name, description, generated_id, generated_gid);
         if (!result.success) {
             out_error = "CreateTerminologyPackageWithIds failed at " +
                         FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
@@ -454,10 +464,10 @@ bool ApplyEvent(ReplayState& state,
         if (!require_string("description", description))
             return false;
         std::string err;
-        if (!core::UpdateTerminologyPackage(state.package, core::TerminologyPackageRef{id, gid},
-                                            name, description, err)) {
-            out_error = "UpdateTerminologyPackage failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+        if (!core::UpdateTerminologyPackage(
+                state.package, core::TerminologyPackageRef{id, gid}, name, description, err)) {
+            out_error =
+                "UpdateTerminologyPackage failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;
@@ -481,8 +491,7 @@ bool ApplyEvent(ReplayState& state,
         draft.name = name;
         draft.description = description;
         const core::TerminologyCategoryCreateResult result = core::CreateTerminologyCategoryWithIds(
-            state.package, core::TerminologyPackageRef{package_id, package_gid}, draft, generated_id,
-            generated_gid);
+            state.package, core::TerminologyPackageRef{package_id, package_gid}, draft, generated_id, generated_gid);
         if (!result.success) {
             out_error = "CreateTerminologyCategoryWithIds failed at " +
                         FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
@@ -512,9 +521,10 @@ bool ApplyEvent(ReplayState& state,
         if (!core::UpdateTerminologyCategory(state.package,
                                              core::TerminologyPackageRef{package_id, package_gid},
                                              core::TerminologyCategoryRef{category_id, category_gid},
-                                             draft, err)) {
-            out_error = "UpdateTerminologyCategory failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+                                             draft,
+                                             err)) {
+            out_error = "UpdateTerminologyCategory failed at " + FormatLocation(tx_seq, event.event_sequence, type) +
+                        ": " + err;
             return false;
         }
         return true;
@@ -535,8 +545,8 @@ bool ApplyEvent(ReplayState& state,
                                              core::TerminologyPackageRef{package_id, package_gid},
                                              core::TerminologyCategoryRef{category_id, category_gid},
                                              err)) {
-            out_error = "DeleteTerminologyCategory failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+            out_error = "DeleteTerminologyCategory failed at " + FormatLocation(tx_seq, event.event_sequence, type) +
+                        ": " + err;
             return false;
         }
         return true;
@@ -548,16 +558,16 @@ bool ApplyEvent(ReplayState& state,
             return false;
         std::string err;
         if (!core::DeleteArgumentPackage(state.package, state.model, id, gid, err)) {
-            out_error = "DeleteArgumentPackage failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+            out_error =
+                "DeleteArgumentPackage failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;
     }
 
     if (type == "CreateTerminologyTerm") {
-        std::string package_id, package_gid, value, name, description, external_reference, origin,
-            generated_id, generated_gid;
+        std::string package_id, package_gid, value, name, description, external_reference, origin, generated_id,
+            generated_gid;
         if (!require_string("package_id", package_id))
             return false;
         if (!require_string("package_gid", package_gid))
@@ -577,12 +587,12 @@ bool ApplyEvent(ReplayState& state,
         if (!require_string("generated_gid", generated_gid))
             return false;
         core::TerminologyTermDraft draft;
-        draft.value             = value;
-        draft.name              = name;
-        draft.description       = description;
+        draft.value = value;
+        draft.name = name;
+        draft.description = description;
         draft.externalReference = external_reference;
-        draft.origin            = origin;
-        auto category_refs_it   = payload.find("category_refs");
+        draft.origin = origin;
+        auto category_refs_it = payload.find("category_refs");
         if (category_refs_it != payload.end() && category_refs_it->is_array()) {
             for (const auto& entry : *category_refs_it) {
                 if (entry.is_string())
@@ -590,19 +600,17 @@ bool ApplyEvent(ReplayState& state,
             }
         }
         const core::TerminologyTermCreateResult result = core::CreateTerminologyTermWithIds(
-            state.package, core::TerminologyPackageRef{package_id, package_gid}, draft, generated_id,
-            generated_gid);
+            state.package, core::TerminologyPackageRef{package_id, package_gid}, draft, generated_id, generated_gid);
         if (!result.success) {
-            out_error = "CreateTerminologyTermWithIds failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
+            out_error = "CreateTerminologyTermWithIds failed at " + FormatLocation(tx_seq, event.event_sequence, type) +
+                        ": " + result.error;
             return false;
         }
         return true;
     }
 
     if (type == "UpdateTerminologyTerm") {
-        std::string package_id, package_gid, term_id, term_gid, value, name, description,
-            external_reference, origin;
+        std::string package_id, package_gid, term_id, term_gid, value, name, description, external_reference, origin;
         if (!require_string("package_id", package_id))
             return false;
         if (!require_string("package_gid", package_gid))
@@ -622,12 +630,12 @@ bool ApplyEvent(ReplayState& state,
         if (!require_string("origin", origin))
             return false;
         core::TerminologyTermDraft draft;
-        draft.value             = value;
-        draft.name              = name;
-        draft.description       = description;
+        draft.value = value;
+        draft.name = name;
+        draft.description = description;
         draft.externalReference = external_reference;
-        draft.origin            = origin;
-        auto category_refs_it   = payload.find("category_refs");
+        draft.origin = origin;
+        auto category_refs_it = payload.find("category_refs");
         if (category_refs_it != payload.end() && category_refs_it->is_array()) {
             for (const auto& entry : *category_refs_it) {
                 if (entry.is_string())
@@ -637,9 +645,11 @@ bool ApplyEvent(ReplayState& state,
         std::string err;
         if (!core::UpdateTerminologyTerm(state.package,
                                          core::TerminologyPackageRef{package_id, package_gid},
-                                         core::TerminologyTermRef{term_id, term_gid}, draft, err)) {
-            out_error = "UpdateTerminologyTerm failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+                                         core::TerminologyTermRef{term_id, term_gid},
+                                         draft,
+                                         err)) {
+            out_error =
+                "UpdateTerminologyTerm failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         core::RefreshVisibleTerminologyContextProjection(state.model, state.package);
@@ -659,17 +669,20 @@ bool ApplyEvent(ReplayState& state,
         std::string err;
         if (!core::DeleteTerminologyTerm(state.package,
                                          core::TerminologyPackageRef{package_id, package_gid},
-                                         core::TerminologyTermRef{term_id, term_gid}, err)) {
-            out_error = "DeleteTerminologyTerm failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+                                         core::TerminologyTermRef{term_id, term_gid},
+                                         err)) {
+            out_error =
+                "DeleteTerminologyTerm failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         core::RefreshVisibleTerminologyContextProjection(state.model, state.package);
         return true;
     }
 
-    auto read_context_association = [&](std::string& element_id, std::string& package_id,
-                                        std::string& package_gid, std::string& term_id,
+    auto read_context_association = [&](std::string& element_id,
+                                        std::string& package_id,
+                                        std::string& package_gid,
+                                        std::string& term_id,
                                         std::string& term_gid,
                                         core::TerminologyContextForcedIds& forced) -> bool {
         if (!require_string("element_id", element_id))
@@ -699,9 +712,11 @@ bool ApplyEvent(ReplayState& state,
         if (!read_context_association(element_id, package_id, package_gid, term_id, term_gid, forced))
             return false;
         const core::TerminologyContextAssociationResult result =
-            core::AssociateTerminologyTermWithElementWithIds(
-                state.package, element_id, core::TerminologyPackageRef{package_id, package_gid},
-                core::TerminologyTermRef{term_id, term_gid}, forced);
+            core::AssociateTerminologyTermWithElementWithIds(state.package,
+                                                             element_id,
+                                                             core::TerminologyPackageRef{package_id, package_gid},
+                                                             core::TerminologyTermRef{term_id, term_gid},
+                                                             forced);
         if (!result.success) {
             out_error = "AssociateTerminologyTermWithElementWithIds failed at " +
                         FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
@@ -716,9 +731,11 @@ bool ApplyEvent(ReplayState& state,
         if (!read_context_association(element_id, package_id, package_gid, term_id, term_gid, forced))
             return false;
         const core::TerminologyContextAssociationResult result =
-            core::AddTerminologyTermAsVisibleContextWithIds(
-                state.package, element_id, core::TerminologyPackageRef{package_id, package_gid},
-                core::TerminologyTermRef{term_id, term_gid}, forced);
+            core::AddTerminologyTermAsVisibleContextWithIds(state.package,
+                                                            element_id,
+                                                            core::TerminologyPackageRef{package_id, package_gid},
+                                                            core::TerminologyTermRef{term_id, term_gid},
+                                                            forced);
         if (!result.success) {
             out_error = "AddTerminologyTermAsVisibleContextWithIds failed at " +
                         FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
@@ -734,8 +751,8 @@ bool ApplyEvent(ReplayState& state,
             return false;
         std::string err;
         if (!core::DeleteArtifactPackage(state.package, id, gid, err)) {
-            out_error = "DeleteArtifactPackage failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+            out_error =
+                "DeleteArtifactPackage failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;
@@ -759,10 +776,10 @@ bool ApplyEvent(ReplayState& state,
         }
         std::string old_value_unused;
         std::string err;
-        if (!core::SetElementTextField(state.model, &state.package, element_id, field, language,
-                                       new_value, old_value_unused, err)) {
-            out_error = "SetElementTextField failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+        if (!core::SetElementTextField(
+                state.model, &state.package, element_id, field, language, new_value, old_value_unused, err)) {
+            out_error =
+                "SetElementTextField failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;
@@ -776,10 +793,10 @@ bool ApplyEvent(ReplayState& state,
             return false;
         std::string old_identifier_unused;
         std::string error;
-        if (!core::SetGsnIdentifier(state.model, &state.package, element_id, new_identifier,
-                                    old_identifier_unused, error)) {
-            out_error = "SetGsnIdentifier failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + error;
+        if (!core::SetGsnIdentifier(
+                state.model, &state.package, element_id, new_identifier, old_identifier_unused, error)) {
+            out_error =
+                "SetGsnIdentifier failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + error;
             return false;
         }
         return true;
@@ -790,33 +807,33 @@ bool ApplyEvent(ReplayState& state,
         if (!require_string("proposal_json", proposal_json))
             return false;
         reviews::ReviewProposal proposal;
-        std::string             parse_error;
+        std::string parse_error;
         if (!reviews::DeserializeReviewProposal(proposal_json, proposal, parse_error)) {
-            out_error = "Failed to deserialize proposal at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + parse_error;
+            out_error = "Failed to deserialize proposal at " + FormatLocation(tx_seq, event.event_sequence, type) +
+                        ": " + parse_error;
             return false;
         }
         std::map<std::string, std::string> predetermined_ids;
-        auto                               generated_it = payload.find("generated_ids");
+        auto generated_it = payload.find("generated_ids");
         if (generated_it == payload.end() || !generated_it->is_object()) {
-            out_error = "Missing or non-object 'generated_ids' at " +
-                        FormatLocation(tx_seq, event.event_sequence, type);
+            out_error =
+                "Missing or non-object 'generated_ids' at " + FormatLocation(tx_seq, event.event_sequence, type);
             return false;
         }
         for (auto it = generated_it->begin(); it != generated_it->end(); ++it) {
             if (!it->is_string()) {
-                out_error = "Non-string value in 'generated_ids' at " +
-                            FormatLocation(tx_seq, event.event_sequence, type);
+                out_error =
+                    "Non-string value in 'generated_ids' at " + FormatLocation(tx_seq, event.event_sequence, type);
                 return false;
             }
             predetermined_ids[it.key()] = it->get<std::string>();
         }
         reviews::ReviewProposalPatchService patch_service;
-        reviews::ApplyProposalResult        result =
+        reviews::ApplyProposalResult result =
             patch_service.ApplyProposalWithIds(proposal, state.model, predetermined_ids);
         if (!result.success) {
-            out_error = "ApplyProposalWithIds failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
+            out_error = "ApplyProposalWithIds failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " +
+                        result.error;
             return false;
         }
         core::RebuildSacmArgumentPackageFromParser(state.model, state.package);
@@ -839,8 +856,8 @@ bool ApplyEvent(ReplayState& state,
         const core::acp::AcpEditResult result =
             core::acp::AddAcpWithId(state.model, &state.package, target_kind, target_id, generated_acp_id);
         if (!result.error.empty()) {
-            out_error = "AddAcpWithId failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
+            out_error =
+                "AddAcpWithId failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
             return false;
         }
         return true;
@@ -852,8 +869,8 @@ bool ApplyEvent(ReplayState& state,
             return false;
         const core::acp::AcpEditResult result = core::acp::RemoveAcp(state.model, &state.package, acp_id);
         if (!result.error.empty()) {
-            out_error = "RemoveAcp failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
+            out_error =
+                "RemoveAcp failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
             return false;
         }
         return true;
@@ -866,16 +883,16 @@ bool ApplyEvent(ReplayState& state,
             return false;
         }
         parser::AcpRecord record;
-        std::string       parse_error;
+        std::string parse_error;
         if (!commands::DeserializeAcpRecord(*acp_it, record, parse_error)) {
-            out_error = "Failed to deserialize ACP record at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + parse_error;
+            out_error = "Failed to deserialize ACP record at " + FormatLocation(tx_seq, event.event_sequence, type) +
+                        ": " + parse_error;
             return false;
         }
         const core::acp::AcpEditResult result = core::acp::UpsertAcp(state.model, &state.package, record);
         if (!result.error.empty()) {
-            out_error = "UpsertAcp failed at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
+            out_error =
+                "UpsertAcp failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + result.error;
             return false;
         }
         return true;
@@ -899,17 +916,16 @@ bool ApplyEvent(ReplayState& state,
         return true;
     }
 
-    out_error = "Unknown event type '" + type + "' at " +
-                FormatLocation(tx_seq, event.event_sequence, type);
+    out_error = "Unknown event type '" + type + "' at " + FormatLocation(tx_seq, event.event_sequence, type);
     return false;
 }
 
 } // namespace
 
 bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
-                         std::uint64_t                  tx_seq,
-                         const AuditEvent&              event,
-                         std::string&                   out_error) {
+                         std::uint64_t tx_seq,
+                         const AuditEvent& event,
+                         std::string& out_error) {
     const std::string& type = event.event_type;
     const auto& payload = event.payload;
 
@@ -930,8 +946,8 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         const sacm_adapter::AddChildOutcome outcome = sacm_adapter::apply_add_top_goal(document, element_id);
         if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure("apply_add_top_goal", tx_seq, event, outcome.supported,
-                                          outcome.applied, outcome.diagnostics);
+            out_error = FormatSeamFailure(
+                "apply_add_top_goal", tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
             return false;
         }
         return true;
@@ -949,15 +965,15 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         core::NewElementKind kind;
         if (!commands::NewElementKindFromToken(kind_token, kind)) {
-            out_error = "Unknown kind token '" + kind_token + "' at " +
-                        FormatLocation(tx_seq, event.event_sequence, type);
+            out_error =
+                "Unknown kind token '" + kind_token + "' at " + FormatLocation(tx_seq, event.event_sequence, type);
             return false;
         }
-        const sacm_adapter::AddChildOutcome outcome = sacm_adapter::apply_add_child(
-            document, parent_id, ToAdapterChildKind(kind), element_id, relationship_id);
+        const sacm_adapter::AddChildOutcome outcome =
+            sacm_adapter::apply_add_child(document, parent_id, ToAdapterChildKind(kind), element_id, relationship_id);
         if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure("apply_add_child", tx_seq, event, outcome.supported,
-                                          outcome.applied, outcome.diagnostics);
+            out_error = FormatSeamFailure(
+                "apply_add_child", tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
             return false;
         }
         return true;
@@ -994,8 +1010,8 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         const sacm_adapter::AddChildOutcome outcome = sacm_adapter::apply_challenge(
             document, target_id, ToAdapterChallengeSource(source_type), element_id, relationship_id);
         if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure("apply_challenge", tx_seq, event, outcome.supported,
-                                          outcome.applied, outcome.diagnostics);
+            out_error = FormatSeamFailure(
+                "apply_challenge", tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
             return false;
         }
         return true;
@@ -1023,9 +1039,9 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         // reload), which recomputes the same PlanRemoval the live path recorded --
         // exactly as the legacy replay does.
         if (mode == core::RemoveMode::NodeOnly) {
-            const std::string   location = FormatLocation(tx_seq, event.event_sequence, type);
-            const BridgeMutator mutate   = [&](parser::AssuranceCase& model,
-                                             sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+            const BridgeMutator mutate =
+                [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
                 return core::RemoveElement(model, &package, element_id, core::RemoveMode::NodeOnly, err);
             };
             return BridgeViaLegacy(document, location, mutate, out_error);
@@ -1040,21 +1056,24 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         // remain, rather than cascading away).
         auto deleted_it = payload.find("deleted_ids");
         if (deleted_it == payload.end() || !deleted_it->is_array()) {
-            out_error = "Missing or non-array 'deleted_ids' at " +
-                        FormatLocation(tx_seq, event.event_sequence, type);
+            out_error = "Missing or non-array 'deleted_ids' at " + FormatLocation(tx_seq, event.event_sequence, type);
             return false;
         }
         for (const auto& entry : *deleted_it) {
             if (!entry.is_string()) {
-                out_error = "Non-string value in 'deleted_ids' at " +
-                            FormatLocation(tx_seq, event.event_sequence, type);
+                out_error =
+                    "Non-string value in 'deleted_ids' at " + FormatLocation(tx_seq, event.event_sequence, type);
                 return false;
             }
             const std::string id = entry.get<std::string>();
             const sacm_adapter::DeleteOutcome outcome = sacm_adapter::apply_delete_element(document, id);
             if (!outcome.supported || !outcome.applied) {
-                out_error = FormatSeamFailure("apply_delete_element(" + id + ")", tx_seq, event,
-                                              outcome.supported, outcome.applied, outcome.diagnostics);
+                out_error = FormatSeamFailure("apply_delete_element(" + id + ")",
+                                              tx_seq,
+                                              event,
+                                              outcome.supported,
+                                              outcome.applied,
+                                              outcome.diagnostics);
                 return false;
             }
         }
@@ -1072,9 +1091,9 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         // the payload). Bridge: run the same legacy core::SetElementGid onto a
         // projected package -- forcing the recorded gid -- then re-derive the
         // library, so this converges with the legacy replay by construction.
-        const std::string   location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate   = [&](parser::AssuranceCase&         model,
-                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             std::string set_error;
             if (!core::SetElementGid(model, &package, element_id, gid, set_error)) {
                 err = "SetElementGid (bridge) failed at " + location + ": " + set_error;
@@ -1106,15 +1125,18 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
                         FormatLocation(tx_seq, event.event_sequence, type);
             return false;
         }
-        const std::string   location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate   = [&](parser::AssuranceCase&         model,
-                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             const core::AssuranceTree tree = core::AssuranceTree::Build(model, "");
-            core::TreeDisplayOrder    scratch_order;
-            std::string               reorder_error;
+            core::TreeDisplayOrder scratch_order;
+            std::string reorder_error;
             // Non-empty `reorder_error` is a real failure; a false-with-empty is an
             // idempotent no-op (mirrors the legacy replay branch).
-            if (!core::ReorderSiblings(model, &package, tree, scratch_order,
+            if (!core::ReorderSiblings(model,
+                                       &package,
+                                       tree,
+                                       scratch_order,
                                        core::ReorderSiblingsCommand{dragged_id, target_id, drop_mode},
                                        reorder_error) &&
                 !reorder_error.empty()) {
@@ -1132,13 +1154,13 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         if (!require_string("new_parent_id", new_parent_id))
             return false;
-        const std::string   location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate   = [&](parser::AssuranceCase&         model,
-                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             const core::AssuranceTree tree = core::AssuranceTree::Build(model, "");
-            std::string               move_error;
-            if (!core::MoveSubtree(model, &package, tree,
-                                   core::MoveSubtreeCommand{dragged_id, new_parent_id}, move_error) &&
+            std::string move_error;
+            if (!core::MoveSubtree(
+                    model, &package, tree, core::MoveSubtreeCommand{dragged_id, new_parent_id}, move_error) &&
                 !move_error.empty()) {
                 err = "MoveSubtree (bridge) failed at " + location + ": " + move_error;
                 return false;
@@ -1200,22 +1222,22 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         //   LIVE library-primary edit path (apply_text_edit), where the
         //   description-only claim's text is correctly a statement.
         if (field == core::ElementTextField::Name) {
-            const sacm_adapter::EditOutcome outcome = sacm_adapter::apply_text_edit(
-                document, element_id, ToAdapterTextField(field), language, new_value);
+            const sacm_adapter::EditOutcome outcome =
+                sacm_adapter::apply_text_edit(document, element_id, ToAdapterTextField(field), language, new_value);
             if (!outcome.supported || !outcome.applied) {
-                out_error = FormatSeamFailure("apply_text_edit", tx_seq, event, outcome.supported,
-                                              outcome.applied, outcome.diagnostics);
+                out_error = FormatSeamFailure(
+                    "apply_text_edit", tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
                 return false;
             }
             return true;
         }
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate = [&](parser::AssuranceCase& model,
-                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        const BridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             std::string old_value_unused;
             std::string set_error;
-            if (!core::SetElementTextField(model, &package, element_id, field, language, new_value,
-                                           old_value_unused, set_error)) {
+            if (!core::SetElementTextField(
+                    model, &package, element_id, field, language, new_value, old_value_unused, set_error)) {
                 err = "SetElementTextField (bridge) failed at " + location + ": " + set_error;
                 return false;
             }
@@ -1235,8 +1257,7 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
                                          sacm::AssuranceCasePackage& package,
                                          std::string& error) {
             std::string old_identifier_unused;
-            if (!core::SetGsnIdentifier(model, &package, element_id, new_identifier,
-                                        old_identifier_unused, error)) {
+            if (!core::SetGsnIdentifier(model, &package, element_id, new_identifier, old_identifier_unused, error)) {
                 error = "SetGsnIdentifier (bridge) failed at " + location + ": " + error;
                 return false;
             }
@@ -1257,15 +1278,14 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         if (!require_string("relationship_id", relationship_id))
             return false;
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate = [&](parser::AssuranceCase& model,
-                                         sacm::AssuranceCasePackage& package,
-                                         std::string& error) {
-            if (!core::RemoveRelationship(model, &package, relationship_id, error)) {
-                error = "RemoveRelationship (bridge) failed at " + location + ": " + error;
-                return false;
-            }
-            return true;
-        };
+        const BridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
+                if (!core::RemoveRelationship(model, &package, relationship_id, error)) {
+                    error = "RemoveRelationship (bridge) failed at " + location + ": " + error;
+                    return false;
+                }
+                return true;
+            };
         return BridgeViaLegacy(document, location, mutate, out_error);
     }
 
@@ -1276,17 +1296,16 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         if (!require_string("reference", reference))
             return false;
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate = [&](parser::AssuranceCase& model,
-                                         sacm::AssuranceCasePackage& package,
-                                         std::string& error) {
-            bool removed_relationship_unused = false;
-            if (!core::DropRelationshipReference(model, &package, relationship_id, reference,
-                                                 removed_relationship_unused, error)) {
-                error = "DropRelationshipReference (bridge) failed at " + location + ": " + error;
-                return false;
-            }
-            return true;
-        };
+        const BridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
+                bool removed_relationship_unused = false;
+                if (!core::DropRelationshipReference(
+                        model, &package, relationship_id, reference, removed_relationship_unused, error)) {
+                    error = "DropRelationshipReference (bridge) failed at " + location + ": " + error;
+                    return false;
+                }
+                return true;
+            };
         return BridgeViaLegacy(document, location, mutate, out_error);
     }
 
@@ -1297,15 +1316,14 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         if (!require_string("strategy_id", strategy_id))
             return false;
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate = [&](parser::AssuranceCase& model,
-                                         sacm::AssuranceCasePackage& package,
-                                         std::string& error) {
-            if (!core::MoveStrategyToReasoning(model, &package, relationship_id, strategy_id, error)) {
-                error = "MoveStrategyToReasoning (bridge) failed at " + location + ": " + error;
-                return false;
-            }
-            return true;
-        };
+        const BridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
+                if (!core::MoveStrategyToReasoning(model, &package, relationship_id, strategy_id, error)) {
+                    error = "MoveStrategyToReasoning (bridge) failed at " + location + ": " + error;
+                    return false;
+                }
+                return true;
+            };
         return BridgeViaLegacy(document, location, mutate, out_error);
     }
 
@@ -1321,17 +1339,15 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         }
         const bool undeveloped = new_value->get<bool>();
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate = [&](parser::AssuranceCase& model,
-                                         sacm::AssuranceCasePackage& package,
-                                         std::string& error) {
-            bool old_value_unused = false;
-            if (!core::SetElementUndeveloped(model, &package, element_id, undeveloped, old_value_unused,
-                                             error)) {
-                error = "SetElementUndeveloped (bridge) failed at " + location + ": " + error;
-                return false;
-            }
-            return true;
-        };
+        const BridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
+                bool old_value_unused = false;
+                if (!core::SetElementUndeveloped(model, &package, element_id, undeveloped, old_value_unused, error)) {
+                    error = "SetElementUndeveloped (bridge) failed at " + location + ": " + error;
+                    return false;
+                }
+                return true;
+            };
         return BridgeViaLegacy(document, location, mutate, out_error);
     }
 
@@ -1346,8 +1362,8 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         // so this is seam-mapped rather than bridged.
         const sacm_adapter::DeleteOutcome outcome = sacm_adapter::apply_delete_package(document, id);
         if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure("apply_delete_package", tx_seq, event, outcome.supported,
-                                          outcome.applied, outcome.diagnostics);
+            out_error = FormatSeamFailure(
+                "apply_delete_package", tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
             return false;
         }
         return true;
@@ -1377,8 +1393,12 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         const sacm_adapter::TerminologyCreateOutcome outcome =
             sacm_adapter::apply_create_terminology_package(document, name, description, generated_id);
         if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure("apply_create_terminology_package", tx_seq, event,
-                                          outcome.supported, outcome.applied, outcome.diagnostics);
+            out_error = FormatSeamFailure("apply_create_terminology_package",
+                                          tx_seq,
+                                          event,
+                                          outcome.supported,
+                                          outcome.applied,
+                                          outcome.diagnostics);
             return false;
         }
         return true;
@@ -1397,8 +1417,12 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         const sacm_adapter::TerminologyEditOutcome outcome =
             sacm_adapter::apply_update_terminology_package(document, id, name, description);
         if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure("apply_update_terminology_package", tx_seq, event,
-                                          outcome.supported, outcome.applied, outcome.diagnostics);
+            out_error = FormatSeamFailure("apply_update_terminology_package",
+                                          tx_seq,
+                                          event,
+                                          outcome.supported,
+                                          outcome.applied,
+                                          outcome.diagnostics);
             return false;
         }
         return true;
@@ -1419,11 +1443,14 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         if (!require_string("generated_gid", generated_gid))
             return false;
         const sacm_adapter::TerminologyCreateOutcome outcome =
-            sacm_adapter::apply_create_terminology_category(document, package_id, name, description,
-                                                            generated_id);
+            sacm_adapter::apply_create_terminology_category(document, package_id, name, description, generated_id);
         if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure("apply_create_terminology_category", tx_seq, event,
-                                          outcome.supported, outcome.applied, outcome.diagnostics);
+            out_error = FormatSeamFailure("apply_create_terminology_category",
+                                          tx_seq,
+                                          event,
+                                          outcome.supported,
+                                          outcome.applied,
+                                          outcome.diagnostics);
             return false;
         }
         return true;
@@ -1446,8 +1473,12 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         const sacm_adapter::TerminologyEditOutcome outcome =
             sacm_adapter::apply_update_terminology_category(document, category_id, name, description);
         if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure("apply_update_terminology_category", tx_seq, event,
-                                          outcome.supported, outcome.applied, outcome.diagnostics);
+            out_error = FormatSeamFailure("apply_update_terminology_category",
+                                          tx_seq,
+                                          event,
+                                          outcome.supported,
+                                          outcome.applied,
+                                          outcome.diagnostics);
             return false;
         }
         return true;
@@ -1466,16 +1497,20 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         const sacm_adapter::TerminologyEditOutcome outcome =
             sacm_adapter::apply_delete_terminology_element(document, category_id);
         if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure("apply_delete_terminology_element(category)", tx_seq, event,
-                                          outcome.supported, outcome.applied, outcome.diagnostics);
+            out_error = FormatSeamFailure("apply_delete_terminology_element(category)",
+                                          tx_seq,
+                                          event,
+                                          outcome.supported,
+                                          outcome.applied,
+                                          outcome.diagnostics);
             return false;
         }
         return true;
     }
 
     if (type == "CreateTerminologyTerm") {
-        std::string package_id, package_gid, value, name, description, external_reference, origin,
-            generated_id, generated_gid;
+        std::string package_id, package_gid, value, name, description, external_reference, origin, generated_id,
+            generated_gid;
         if (!require_string("package_id", package_id))
             return false;
         if (!require_string("package_gid", package_gid))
@@ -1495,12 +1530,12 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         if (!require_string("generated_gid", generated_gid))
             return false;
         sacm_adapter::TerminologyTermFields fields;
-        fields.value              = value;
-        fields.name               = name;
-        fields.description        = description;
+        fields.value = value;
+        fields.name = name;
+        fields.description = description;
         fields.external_reference = external_reference;
-        fields.origin             = origin;
-        auto category_refs_it     = payload.find("category_refs");
+        fields.origin = origin;
+        auto category_refs_it = payload.find("category_refs");
         if (category_refs_it != payload.end() && category_refs_it->is_array()) {
             for (const auto& entry : *category_refs_it) {
                 if (entry.is_string())
@@ -1510,16 +1545,19 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         const sacm_adapter::TerminologyCreateOutcome outcome =
             sacm_adapter::apply_create_terminology_term(document, package_id, fields, generated_id);
         if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure("apply_create_terminology_term", tx_seq, event,
-                                          outcome.supported, outcome.applied, outcome.diagnostics);
+            out_error = FormatSeamFailure("apply_create_terminology_term",
+                                          tx_seq,
+                                          event,
+                                          outcome.supported,
+                                          outcome.applied,
+                                          outcome.diagnostics);
             return false;
         }
         return true;
     }
 
     if (type == "UpdateTerminologyTerm") {
-        std::string package_id, package_gid, term_id, term_gid, value, name, description,
-            external_reference, origin;
+        std::string package_id, package_gid, term_id, term_gid, value, name, description, external_reference, origin;
         if (!require_string("package_id", package_id))
             return false;
         if (!require_string("package_gid", package_gid))
@@ -1539,12 +1577,12 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         if (!require_string("origin", origin))
             return false;
         sacm_adapter::TerminologyTermFields fields;
-        fields.value             = value;
-        fields.name              = name;
-        fields.description       = description;
+        fields.value = value;
+        fields.name = name;
+        fields.description = description;
         fields.external_reference = external_reference;
-        fields.origin            = origin;
-        auto category_refs_it    = payload.find("category_refs");
+        fields.origin = origin;
+        auto category_refs_it = payload.find("category_refs");
         if (category_refs_it != payload.end() && category_refs_it->is_array()) {
             for (const auto& entry : *category_refs_it) {
                 if (entry.is_string())
@@ -1554,8 +1592,12 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         const sacm_adapter::TerminologyEditOutcome outcome =
             sacm_adapter::apply_update_terminology_term(document, term_id, fields);
         if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure("apply_update_terminology_term", tx_seq, event,
-                                          outcome.supported, outcome.applied, outcome.diagnostics);
+            out_error = FormatSeamFailure("apply_update_terminology_term",
+                                          tx_seq,
+                                          event,
+                                          outcome.supported,
+                                          outcome.applied,
+                                          outcome.diagnostics);
             return false;
         }
         return true;
@@ -1574,8 +1616,12 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         const sacm_adapter::TerminologyEditOutcome outcome =
             sacm_adapter::apply_delete_terminology_element(document, term_id);
         if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure("apply_delete_terminology_element(term)", tx_seq, event,
-                                          outcome.supported, outcome.applied, outcome.diagnostics);
+            out_error = FormatSeamFailure("apply_delete_terminology_element(term)",
+                                          tx_seq,
+                                          event,
+                                          outcome.supported,
+                                          outcome.applied,
+                                          outcome.diagnostics);
             return false;
         }
         return true;
@@ -1584,8 +1630,10 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
     // Reads the association payload including the FORCED artifact-reference /
     // asserted-context ids AND gids. The bridged legacy mutators reproduce those
     // gids verbatim -- the exact data the library seams could not assign.
-    auto read_context_association = [&](std::string& element_id, std::string& package_id,
-                                        std::string& package_gid, std::string& term_id,
+    auto read_context_association = [&](std::string& element_id,
+                                        std::string& package_id,
+                                        std::string& package_gid,
+                                        std::string& term_id,
                                         std::string& term_gid,
                                         core::TerminologyContextForcedIds& forced) -> bool {
         if (!require_string("element_id", element_id))
@@ -1617,13 +1665,15 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         // The forced element ids are passed to the seam verbatim; the seam mints
         // each created element's `gid-<id>` from its id, reproducing the legacy
         // forced gids exactly.
-        const sacm_adapter::TerminologyContextOutcome outcome =
-            sacm_adapter::apply_associate_terminology_term(document, element_id, term_id,
-                                                           forced.artifact_reference_id,
-                                                           forced.asserted_context_id);
+        const sacm_adapter::TerminologyContextOutcome outcome = sacm_adapter::apply_associate_terminology_term(
+            document, element_id, term_id, forced.artifact_reference_id, forced.asserted_context_id);
         if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure("apply_associate_terminology_term", tx_seq, event,
-                                          outcome.supported, outcome.applied, outcome.diagnostics);
+            out_error = FormatSeamFailure("apply_associate_terminology_term",
+                                          tx_seq,
+                                          event,
+                                          outcome.supported,
+                                          outcome.applied,
+                                          outcome.diagnostics);
             return false;
         }
         return true;
@@ -1634,13 +1684,15 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         core::TerminologyContextForcedIds forced;
         if (!read_context_association(element_id, package_id, package_gid, term_id, term_gid, forced))
             return false;
-        const sacm_adapter::TerminologyContextOutcome outcome =
-            sacm_adapter::apply_add_terminology_visible_context(document, element_id, term_id,
-                                                                forced.artifact_reference_id,
-                                                                forced.asserted_context_id);
+        const sacm_adapter::TerminologyContextOutcome outcome = sacm_adapter::apply_add_terminology_visible_context(
+            document, element_id, term_id, forced.artifact_reference_id, forced.asserted_context_id);
         if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure("apply_add_terminology_visible_context", tx_seq, event,
-                                          outcome.supported, outcome.applied, outcome.diagnostics);
+            out_error = FormatSeamFailure("apply_add_terminology_visible_context",
+                                          tx_seq,
+                                          event,
+                                          outcome.supported,
+                                          outcome.applied,
+                                          outcome.diagnostics);
             return false;
         }
         return true;
@@ -1660,8 +1712,8 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         if (!require_string("package_gid", gid))
             return false;
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate = [&](parser::AssuranceCase& /*model*/,
-                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        const BridgeMutator mutate =
+            [&](parser::AssuranceCase& /*model*/, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             std::string delete_error;
             if (!core::DeleteArtifactPackage(package, id, gid, delete_error)) {
                 err = "DeleteArtifactPackage (bridge) failed at " + location + ": " + delete_error;
@@ -1679,11 +1731,10 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         if (!require_string("package_gid", gid))
             return false;
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate = [&](parser::AssuranceCase& /*model*/,
-                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        const BridgeMutator mutate =
+            [&](parser::AssuranceCase& /*model*/, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             std::string delete_error;
-            if (!core::DeleteTerminologyPackage(package, core::TerminologyPackageRef{id, gid},
-                                                delete_error)) {
+            if (!core::DeleteTerminologyPackage(package, core::TerminologyPackageRef{id, gid}, delete_error)) {
                 err = "DeleteTerminologyPackage (bridge) failed at " + location + ": " + delete_error;
                 return false;
             }
@@ -1697,32 +1748,32 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         if (!require_string("proposal_json", proposal_json))
             return false;
         reviews::ReviewProposal proposal;
-        std::string             parse_error;
+        std::string parse_error;
         if (!reviews::DeserializeReviewProposal(proposal_json, proposal, parse_error)) {
-            out_error = "Failed to deserialize proposal at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + parse_error;
+            out_error = "Failed to deserialize proposal at " + FormatLocation(tx_seq, event.event_sequence, type) +
+                        ": " + parse_error;
             return false;
         }
         std::map<std::string, std::string> predetermined_ids;
-        auto                               generated_it = payload.find("generated_ids");
+        auto generated_it = payload.find("generated_ids");
         if (generated_it == payload.end() || !generated_it->is_object()) {
-            out_error = "Missing or non-object 'generated_ids' at " +
-                        FormatLocation(tx_seq, event.event_sequence, type);
+            out_error =
+                "Missing or non-object 'generated_ids' at " + FormatLocation(tx_seq, event.event_sequence, type);
             return false;
         }
         for (auto it = generated_it->begin(); it != generated_it->end(); ++it) {
             if (!it->is_string()) {
-                out_error = "Non-string value in 'generated_ids' at " +
-                            FormatLocation(tx_seq, event.event_sequence, type);
+                out_error =
+                    "Non-string value in 'generated_ids' at " + FormatLocation(tx_seq, event.event_sequence, type);
                 return false;
             }
             predetermined_ids[it.key()] = it->get<std::string>();
         }
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate = [&](parser::AssuranceCase& model,
-                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        const BridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             reviews::ReviewProposalPatchService patch_service;
-            reviews::ApplyProposalResult        result =
+            reviews::ApplyProposalResult result =
                 patch_service.ApplyProposalWithIds(proposal, model, predetermined_ids);
             if (!result.success) {
                 err = "ApplyProposalWithIds (bridge) failed at " + location + ": " + result.error;
@@ -1747,9 +1798,9 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         if (!require_string("generated_acp_id", generated_acp_id))
             return false;
-        const std::string   location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate   = [&](parser::AssuranceCase&         model,
-                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             const core::acp::AcpEditResult result =
                 core::acp::AddAcpWithId(model, &package, target_kind, target_id, generated_acp_id);
             if (!result.error.empty()) {
@@ -1765,9 +1816,9 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         std::string acp_id;
         if (!require_string("acp_id", acp_id))
             return false;
-        const std::string   location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate   = [&](parser::AssuranceCase&         model,
-                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             const core::acp::AcpEditResult result = core::acp::RemoveAcp(model, &package, acp_id);
             if (!result.error.empty()) {
                 err = "RemoveAcp (bridge) failed at " + location + ": " + result.error;
@@ -1785,15 +1836,15 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         }
         parser::AcpRecord record;
-        std::string       parse_error;
+        std::string parse_error;
         if (!commands::DeserializeAcpRecord(*acp_it, record, parse_error)) {
-            out_error = "Failed to deserialize ACP record at " +
-                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + parse_error;
+            out_error = "Failed to deserialize ACP record at " + FormatLocation(tx_seq, event.event_sequence, type) +
+                        ": " + parse_error;
             return false;
         }
-        const std::string   location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate   = [&](parser::AssuranceCase&         model,
-                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             const core::acp::AcpEditResult result = core::acp::UpsertAcp(model, &package, record);
             if (!result.error.empty()) {
                 err = "UpsertAcp (bridge) failed at " + location + ": " + result.error;
@@ -1812,14 +1863,13 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         if (!require_string("top_goal_id", top_goal_id))
             return false;
-        const std::string   location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate   = [&](parser::AssuranceCase&         model,
-                                         sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             const core::acp::AcpEditResult result = core::acp::CreateConfidenceArgumentTreeForAcpWithIds(
                 model, &package, acp_id, argument_package_id, top_goal_id);
             if (!result.error.empty()) {
-                err = "CreateConfidenceArgumentTreeForAcpWithIds (bridge) failed at " + location + ": " +
-                      result.error;
+                err = "CreateConfidenceArgumentTreeForAcpWithIds (bridge) failed at " + location + ": " + result.error;
                 return false;
             }
             return true;
@@ -1834,17 +1884,15 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         return true;
     }
 
-    out_error = "Unknown event type '" + type + "' at " +
-                FormatLocation(tx_seq, event.event_sequence, type);
+    out_error = "Unknown event type '" + type + "' at " + FormatLocation(tx_seq, event.event_sequence, type);
     return false;
 }
 
-std::expected<ReplayState, std::string> Replayer::ReplayFrom(
-    const parser::AssuranceCase&         snapshot_model,
-    const sacm::AssuranceCasePackage&    snapshot_package,
-    const std::vector<AuditTransaction>& transactions,
-    std::uint64_t                        up_to_transaction_sequence,
-    std::uint64_t                        from_transaction_sequence) {
+std::expected<ReplayState, std::string> Replayer::ReplayFrom(const parser::AssuranceCase& snapshot_model,
+                                                             const sacm::AssuranceCasePackage& snapshot_package,
+                                                             const std::vector<AuditTransaction>& transactions,
+                                                             std::uint64_t up_to_transaction_sequence,
+                                                             std::uint64_t from_transaction_sequence) {
 
     ReplayState state{snapshot_model, snapshot_package};
 
@@ -1886,11 +1934,11 @@ std::expected<ReplayState, std::string> Replayer::ReplayFrom(
     return state;
 }
 
-std::expected<std::unique_ptr<sacm_adapter::LibraryDocument>, std::string> Replayer::ReplayToLibrary(
-    std::unique_ptr<sacm_adapter::LibraryDocument> snapshot_document,
-    const std::vector<AuditTransaction>&           transactions,
-    std::uint64_t                                  up_to_transaction_sequence,
-    std::uint64_t                                  from_transaction_sequence) {
+std::expected<std::unique_ptr<sacm_adapter::LibraryDocument>, std::string>
+Replayer::ReplayToLibrary(std::unique_ptr<sacm_adapter::LibraryDocument> snapshot_document,
+                          const std::vector<AuditTransaction>& transactions,
+                          std::uint64_t up_to_transaction_sequence,
+                          std::uint64_t from_transaction_sequence) {
 
     if (snapshot_document == nullptr)
         return std::unexpected(std::string("ReplayToLibrary: snapshot document is null"));

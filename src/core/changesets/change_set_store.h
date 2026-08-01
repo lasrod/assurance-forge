@@ -21,7 +21,7 @@
 namespace core::changesets {
 
 class ChangeSetStore {
-  public:
+public:
     // Starts a change set for `connection_id`, replacing whatever that
     // connection had open. Returns its id.
     //
@@ -30,12 +30,15 @@ class ChangeSetStore {
     // the agent may switch arguments before anyone accepts, and a patch applied
     // to the wrong one of a project's arguments would land on ids that happen to
     // match.
-    std::string Begin(std::uint64_t connection_id, std::string title, std::string summary,
-                      std::string intent, std::string client_label,
+    std::string Begin(std::uint64_t connection_id,
+                      std::string title,
+                      std::string summary,
+                      std::string intent,
+                      std::string client_label,
                       std::filesystem::path argument_file = {});
 
     // Null when no change set has that id, or it is no longer open.
-    ChangeSet*       FindOpen(const std::string& id);
+    ChangeSet* FindOpen(const std::string& id);
     const ChangeSet* Find(const std::string& id) const;
 
     // The change set `connection_id` is building, if any.
@@ -44,8 +47,10 @@ class ChangeSetStore {
     // Appends operations. Rejected as a whole if the result would not apply, so
     // a change set never holds a patch that cannot be previewed -- which is what
     // lets the canvas render one at any moment.
-    bool Stage(const std::string& id, const std::vector<reviews::PatchOperation>& operations,
-               const parser::AssuranceCase& committed, std::string& error);
+    bool Stage(const std::string& id,
+               const std::vector<reviews::PatchOperation>& operations,
+               const parser::AssuranceCase& committed,
+               std::string& error);
 
     // Drops staged operations from the end, so an agent can respond to "not
     // there" without starting over. `count` larger than what is staged clears it.
@@ -58,7 +63,7 @@ class ChangeSetStore {
     // Everything still open, oldest first.
     std::vector<const ChangeSet*> Open() const;
     // Whether anything is open, so the canvas can skip diffing entirely.
-    bool                          has_open() const;
+    bool has_open() const;
 
     // Bumped by every call that changes what a reader would see. The
     // application compares it each frame to decide whether the canvas needs
@@ -69,15 +74,17 @@ class ChangeSetStore {
     // appeared when something unrelated happened to rebuild the tree -- which
     // presented as an agent's work being invisible until the user clicked away
     // to another argument file and back.
-    std::uint64_t revision() const { return revision_; }
+    std::uint64_t revision() const {
+        return revision_;
+    }
 
     void Clear();
 
-  private:
+private:
     std::vector<ChangeSet> change_sets_;
     std::vector<std::uint64_t> owners_;
-    std::uint64_t              next_serial_ = 1;
-    std::uint64_t              revision_    = 0;
+    std::uint64_t next_serial_ = 1;
+    std::uint64_t revision_ = 0;
 };
 
 } // namespace core::changesets

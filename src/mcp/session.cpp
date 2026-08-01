@@ -44,9 +44,8 @@ bool LooksLikeAssuranceCaseFile(const std::filesystem::path& path) {
 // Reads only. Anything that changes a safety case needs a command bus, an audit
 // log and a human to accept it -- so it is available exactly where those are.
 bool IsOfflineOperation(const std::string& op) {
-    return op == "get_case_overview" || op == "find_elements" || op == "get_element" ||
-           op == "get_argument_tree" || op == "list_case_files" || op == "open_case_file" ||
-           op == "suggest_placement";
+    return op == "get_case_overview" || op == "find_elements" || op == "get_element" || op == "get_argument_tree" ||
+           op == "list_case_files" || op == "open_case_file" || op == "suggest_placement";
 }
 
 } // namespace
@@ -85,22 +84,20 @@ bool Session::ConnectToApplication(std::string& error) {
     token_ = record.token;
 
     bridge::Request hello;
-    hello.id    = next_request_id_++;
-    hello.op    = bridge::kHelloOperation;
+    hello.id = next_request_id_++;
+    hello.op = bridge::kHelloOperation;
     hello.token = token_;
-    hello.args  = nlohmann::json{{"client", client_label_.empty() ? "assurance-forge-mcp"
-                                                                 : client_label_}};
+    hello.args = nlohmann::json{{"client", client_label_.empty() ? "assurance-forge-mcp" : client_label_}};
 
     std::string reply;
-    if (!connection_->WriteMessage(bridge::EncodeRequest(hello)) ||
-        !connection_->ReadMessage(reply)) {
-        error       = "Assurance Forge accepted the connection but did not complete a handshake.";
+    if (!connection_->WriteMessage(bridge::EncodeRequest(hello)) || !connection_->ReadMessage(reply)) {
+        error = "Assurance Forge accepted the connection but did not complete a handshake.";
         connection_.reset();
         return false;
     }
 
     bridge::Response response;
-    std::string      decode_error;
+    std::string decode_error;
     if (!bridge::DecodeResponse(reply, response, decode_error) || !response.ok) {
         error = response.error_message.empty() ? decode_error : response.error_message;
         connection_.reset();
@@ -113,26 +110,23 @@ bool Session::ConnectToApplication(std::string& error) {
 
 bool Session::OpenOffline(std::string& error) {
     std::error_code ec;
-    const bool      is_directory = std::filesystem::is_directory(project_path_, ec);
-    const bool      opened = (is_directory || !LooksLikeAssuranceCaseFile(project_path_))
-                                 ? state_.open_project(project_path_.string())
-                                 : state_.load_file(project_path_.string());
+    const bool is_directory = std::filesystem::is_directory(project_path_, ec);
+    const bool opened = (is_directory || !LooksLikeAssuranceCaseFile(project_path_))
+                            ? state_.open_project(project_path_.string())
+                            : state_.load_file(project_path_.string());
     if (!opened) {
-        error = state_.status_message.empty() ? ("Could not open " + project_path_.string())
-                                              : state_.status_message;
+        error = state_.status_message.empty() ? ("Could not open " + project_path_.string()) : state_.status_message;
         return false;
     }
 
-    if (state_.current_project.has_value() && !state_.loaded_case.has_value() &&
-        !OpenProjectArgumentFile(state_)) {
+    if (state_.current_project.has_value() && !state_.loaded_case.has_value() && !OpenProjectArgumentFile(state_)) {
         // Not fatal: the project may legitimately hold no argument yet, and a
         // session that can still describe the project is more useful than none.
         // The read tools report the absence rather than pretending to an empty
         // case.
         state_.load_warnings.push_back(
             "The project's assurance case could not be opened: " +
-            (state_.status_message.empty() ? std::string("no SACM argument file")
-                                           : state_.status_message));
+            (state_.status_message.empty() ? std::string("no SACM argument file") : state_.status_message));
     }
     return true;
 }
@@ -153,8 +147,7 @@ std::unique_ptr<Session> Session::Open(Config config, std::string& error) {
 
     std::unique_ptr<Session> session(new Session());
     session->project_path_ = config.project_path;
-    session->settings_path_ =
-        config.settings_path.empty() ? core::UserSettingsFilePath() : config.settings_path;
+    session->settings_path_ = config.settings_path.empty() ? core::UserSettingsFilePath() : config.settings_path;
 
     // The running application first. It has the argument the user is looking at,
     // including edits that have not reached disk, so any copy this process could
@@ -172,44 +165,43 @@ std::unique_ptr<Session> Session::Open(Config config, std::string& error) {
     return session;
 }
 
-Session::OperationResult Session::RunOverBridge(const std::string&    op,
-                                                const nlohmann::json& args) {
+Session::OperationResult Session::RunOverBridge(const std::string& op, const nlohmann::json& args) {
     OperationResult result;
 
     bridge::Request request;
-    request.id    = next_request_id_++;
-    request.op    = op;
+    request.id = next_request_id_++;
+    request.op = op;
     request.token = token_;
-    request.args  = args;
+    request.args = args;
 
     std::string reply;
-    if (!connection_->WriteMessage(bridge::EncodeRequest(request)) ||
-        !connection_->ReadMessage(reply)) {
+    if (!connection_->WriteMessage(bridge::EncodeRequest(request)) || !connection_->ReadMessage(reply)) {
         result.is_error = true;
-        result.payload  = nlohmann::json{
-            {"error", "Lost the connection to Assurance Forge. It may have closed the project or "
-                      "exited. Reconnect this AI client to continue."}};
+        result.payload = nlohmann::json{{"error",
+                                         "Lost the connection to Assurance Forge. It may have closed the project or "
+                                         "exited. Reconnect this AI client to continue."}};
         return result;
     }
 
     bridge::Response response;
-    std::string      decode_error;
+    std::string decode_error;
     if (!bridge::DecodeResponse(reply, response, decode_error)) {
         result.is_error = true;
-        result.payload  = nlohmann::json{{"error", "Assurance Forge sent a reply this version "
-                                                   "could not read: " +
-                                                       decode_error}};
+        result.payload = nlohmann::json{{"error",
+                                         "Assurance Forge sent a reply this version "
+                                         "could not read: " +
+                                             decode_error}};
         return result;
     }
     if (!response.ok) {
         result.is_error = true;
-        result.payload  = nlohmann::json{{"error", response.error_message}};
+        result.payload = nlohmann::json{{"error", response.error_message}};
         return result;
     }
 
     // The application marks a domain failure inside a successful response, the
     // same distinction MCP draws between a tool error and a protocol error.
-    result.payload  = response.result;
+    result.payload = response.result;
     result.is_error = response.result.value("isError", false);
     result.payload.erase("isError");
     return result;
@@ -219,14 +211,13 @@ Session::OperationResult Session::RunOffline(const std::string& op, const nlohma
     OperationResult result;
 
     if (!IsOfflineOperation(op)) {
-        result.is_error          = true;
+        result.is_error = true;
         result.needs_application = true;
-        result.payload           = nlohmann::json{
-            {"error",
-                       "This needs Assurance Forge to be running with the project open. Changing a "
-                       "safety case goes through the same audited, undoable path as an edit made in "
-                       "the application, and a human accepts it there -- none of which exists in a "
-                       "headless process. Open the project in Assurance Forge and reconnect."}};
+        result.payload = nlohmann::json{{"error",
+                                         "This needs Assurance Forge to be running with the project open. Changing a "
+                                         "safety case goes through the same audited, undoable path as an edit made in "
+                                         "the application, and a human accepts it there -- none of which exists in a "
+                                         "headless process. Open the project in Assurance Forge and reconnect."}};
         return result;
     }
 
@@ -261,30 +252,28 @@ Session::OperationResult Session::RunOffline(const std::string& op, const nlohma
     const nlohmann::json::const_iterator path = args.find("path");
     if (path == args.end() || !path->is_string() || path->get<std::string>().empty()) {
         result.is_error = true;
-        result.payload  = nlohmann::json{
-            {"error",
-              "Argument \"path\" is required; call list_case_files for the paths this project "
-                       "holds."}};
+        result.payload =
+            nlohmann::json{{"error",
+                            "Argument \"path\" is required; call list_case_files for the paths this project "
+                            "holds."}};
         return result;
     }
     if (!state_.current_project.has_value()) {
         result.is_error = true;
-        result.payload  = nlohmann::json{
-            {"error", "This is a standalone SACM file, so there is nothing to switch between."}};
+        result.payload =
+            nlohmann::json{{"error", "This is a standalone SACM file, so there is nothing to switch between."}};
         return result;
     }
 
     const std::string wanted = path->get<std::string>();
     for (const core::ProjectFileEntry& entry : state_.current_project->files) {
-        if (entry.role != core::ProjectFileRole::SacmArgument ||
-            entry.relativePath.generic_string() != wanted) {
+        if (entry.role != core::ProjectFileRole::SacmArgument || entry.relativePath.generic_string() != wanted) {
             continue;
         }
         if (!state_.open_project_file(entry)) {
             result.is_error = true;
-            result.payload  = nlohmann::json{
-                {"error", state_.status_message.empty() ? ("Could not open " + wanted)
-                                                         : state_.status_message}};
+            result.payload = nlohmann::json{
+                {"error", state_.status_message.empty() ? ("Could not open " + wanted) : state_.status_message}};
             return result;
         }
         // Re-read after the switch so the caller sees the case it moved to.
@@ -293,8 +282,7 @@ Session::OperationResult Session::RunOffline(const std::string& op, const nlohma
     }
 
     result.is_error = true;
-    result.payload  = nlohmann::json{
-        {"error", "No argument file in this project has the path \"" + wanted + "\"."}};
+    result.payload = nlohmann::json{{"error", "No argument file in this project has the path \"" + wanted + "\"."}};
     return result;
 }
 

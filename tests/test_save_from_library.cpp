@@ -99,7 +99,9 @@ constexpr const char* kCounterArgumentSacm = R"(<?xml version="1.0" encoding="UT
 struct TempDir {
     std::filesystem::path path;
     explicit TempDir(std::filesystem::path value) : path(std::move(value)) {}
-    TempDir(TempDir&& other) noexcept : path(std::move(other.path)) { other.path.clear(); }
+    TempDir(TempDir&& other) noexcept : path(std::move(other.path)) {
+        other.path.clear();
+    }
     TempDir& operator=(TempDir&& other) noexcept {
         path = std::move(other.path);
         other.path.clear();
@@ -117,8 +119,8 @@ struct TempDir {
 
 std::filesystem::path MakeTempDir(const std::string& tag) {
     const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::filesystem::path path = std::filesystem::temp_directory_path() /
-                                 ("af_save_from_library_" + tag + "_" + std::to_string(stamp));
+    std::filesystem::path path =
+        std::filesystem::temp_directory_path() / ("af_save_from_library_" + tag + "_" + std::to_string(stamp));
     std::filesystem::remove_all(path);
     std::filesystem::create_directories(path);
     return path;
@@ -144,10 +146,10 @@ bool Contains(const std::string& haystack, std::string_view needle) {
 // A project whose tracked SACM file carries the vendor content above, with an
 // initialized audit store so a `CommandBus` can be opened over it.
 struct ProjectFixture {
-    TempDir                 temp;
-    core::AssuranceProject  project;
-    std::filesystem::path   sacm_relative = "argument.sacm";
-    std::filesystem::path   sacm_absolute;
+    TempDir temp;
+    core::AssuranceProject project;
+    std::filesystem::path sacm_relative = "argument.sacm";
+    std::filesystem::path sacm_absolute;
 };
 
 // Number of non-overlapping occurrences of `needle` in `haystack`.
@@ -175,8 +177,7 @@ ProjectFixture MakeProject(const std::string& tag, const char* sacm_xml = kVendo
 
     core::audit::EnsureAuditStoreResult ensure;
     std::string error;
-    EXPECT_TRUE(core::audit::EnsureAuditStore(fixture.project, fixture.sacm_relative, ensure, error))
-        << error;
+    EXPECT_TRUE(core::audit::EnsureAuditStore(fixture.project, fixture.sacm_relative, ensure, error)) << error;
 
     fixture.sacm_absolute = fixture.temp.path / fixture.sacm_relative;
     return fixture;
@@ -203,8 +204,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_LegacyPackageSavePathDropsUnknownContent) {
     ASSERT_NE(state.library_document, nullptr);
 
     // What Stage 6 wrote: serialize the projected legacy package, reload, save.
-    const sacm::AssuranceCasePackage projected =
-        core::project_library_package_with_tags(*state.library_document);
+    const sacm::AssuranceCasePackage projected = core::project_library_package_with_tags(*state.library_document);
     const std::optional<std::string> via_package = core::library_xmi_from_package(projected);
     ASSERT_TRUE(via_package.has_value());
     EXPECT_FALSE(Contains(*via_package, kVendorAttributeMarker))
@@ -240,8 +240,8 @@ TEST(SaveFromLibrary, SACM23_LIB_002_UnknownContentSurvivesLoadEditSaveReload) {
     ASSERT_TRUE(bus) << error;
 
     core::commands::CreateChildElementCommand command("G1", core::NewElementKind::Goal);
-    core::commands::CommandContext ctx{state.loaded_case.value(), state.sacm_package.value(),
-                                       state.library_document.get()};
+    core::commands::CommandContext ctx{
+        state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
     const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
     ASSERT_TRUE(result.success) << result.error;
     EXPECT_TRUE(result.error.empty()) << result.error;
@@ -256,17 +256,15 @@ TEST(SaveFromLibrary, SACM23_LIB_002_UnknownContentSurvivesLoadEditSaveReload) {
 
     // The runtime re-derives the legacy views from the library at the next frame
     // boundary after a flipped command; mirror that before saving explicitly.
-    core::RebuildDerivedViewsFromLibrary(*state.library_document, state.loaded_case.value(),
-                                         state.sacm_package.value());
+    core::RebuildDerivedViewsFromLibrary(
+        *state.library_document, state.loaded_case.value(), state.sacm_package.value());
 
     // Save site #1 (explicit save).
     const std::filesystem::path explicit_path = fixture.temp.path / "explicit-save.sacm";
     ASSERT_TRUE(state.save_file(explicit_path.string())) << state.status_message;
     const std::string explicitly_saved = ReadFile(explicit_path);
-    EXPECT_TRUE(Contains(explicitly_saved, kVendorAttributeMarker))
-        << "explicit save dropped the vendor attribute";
-    EXPECT_TRUE(Contains(explicitly_saved, kVendorElementMarker))
-        << "explicit save dropped the vendor element";
+    EXPECT_TRUE(Contains(explicitly_saved, kVendorAttributeMarker)) << "explicit save dropped the vendor attribute";
+    EXPECT_TRUE(Contains(explicitly_saved, kVendorElementMarker)) << "explicit save dropped the vendor element";
 
     // Reloading the autosaved file through the application yields both the edit
     // and the preserved content -- so the content is not merely echoed into the
@@ -276,8 +274,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_UnknownContentSurvivesLoadEditSaveReload) {
     ASSERT_NE(reopened.library_document, nullptr);
     const core::AssuranceCase reprojected = sacm_adapter::project_case(*reopened.library_document);
     EXPECT_TRUE(HasProjectedElement(reprojected, "G1"));
-    EXPECT_TRUE(HasProjectedElement(reprojected, command.GeneratedId()))
-        << "the audited edit did not survive the save";
+    EXPECT_TRUE(HasProjectedElement(reprojected, command.GeneratedId())) << "the audited edit did not survive the save";
 
     const sacm_adapter::SaveOutcome resaved = sacm_adapter::save_document(*reopened.library_document);
     ASSERT_TRUE(resaved.ok);
@@ -313,13 +310,13 @@ TEST(SaveFromLibrary, SACM23_LIB_002_AutosaveAndExplicitSaveProduceIdenticalByte
     ASSERT_TRUE(bus) << error;
 
     core::commands::CreateChildElementCommand command("G1", core::NewElementKind::Solution);
-    core::commands::CommandContext ctx{state.loaded_case.value(), state.sacm_package.value(),
-                                       state.library_document.get()};
+    core::commands::CommandContext ctx{
+        state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
     const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
     ASSERT_TRUE(result.success) << result.error;
 
-    core::RebuildDerivedViewsFromLibrary(*state.library_document, state.loaded_case.value(),
-                                         state.sacm_package.value());
+    core::RebuildDerivedViewsFromLibrary(
+        *state.library_document, state.loaded_case.value(), state.sacm_package.value());
 
     const std::filesystem::path explicit_path = fixture.temp.path / "explicit-save.sacm";
     ASSERT_TRUE(state.save_file(explicit_path.string())) << state.status_message;
@@ -381,8 +378,8 @@ TEST(SaveFromLibrary, SACM23_LIB_002_RestoreFromAuditPreservesUnknownContent) {
     ASSERT_TRUE(bus) << error;
 
     core::commands::CreateChildElementCommand command("G1", core::NewElementKind::Goal);
-    core::commands::CommandContext ctx{state.loaded_case.value(), state.sacm_package.value(),
-                                       state.library_document.get()};
+    core::commands::CommandContext ctx{
+        state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
     ASSERT_TRUE(bus->Execute(command, ctx, "tester").success);
 
     // Something outside the bus overwrites the file, losing both the edit and
@@ -393,8 +390,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_RestoreFromAuditPreservesUnknownContent) {
     ASSERT_FALSE(before.success);
 
     core::audit::RestoreSacmFromAuditResult restored;
-    ASSERT_TRUE(core::audit::RestoreSacmFromAudit(fixture.project, fixture.sacm_relative, "tester",
-                                                  restored, error))
+    ASSERT_TRUE(core::audit::RestoreSacmFromAudit(fixture.project, fixture.sacm_relative, "tester", restored, error))
         << error;
 
     // The restore took the library-document path, not the lossy projection
@@ -410,8 +406,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_RestoreFromAuditPreservesUnknownContent) {
     core::AppState reopened;
     ASSERT_TRUE(reopened.load_file(fixture.sacm_absolute.string())) << reopened.status_message;
     ASSERT_NE(reopened.library_document, nullptr);
-    EXPECT_TRUE(HasProjectedElement(sacm_adapter::project_case(*reopened.library_document),
-                                    command.GeneratedId()));
+    EXPECT_TRUE(HasProjectedElement(sacm_adapter::project_case(*reopened.library_document), command.GeneratedId()));
 
     const core::audit::ReplayVerificationResult after = core::audit::VerifyProject(fixture.project);
     EXPECT_TRUE(after.success) << (after.diagnostics.empty() ? "" : after.diagnostics.front());
@@ -483,7 +478,8 @@ namespace {
 
 // A bridged edit: `UpdateElementTextCommand` goes through
 // ApplyLibraryPrimaryOrLegacy, not through a native library operation.
-core::commands::CommandResult RunBridgedRename(ProjectFixture& fixture, core::AppState& state,
+core::commands::CommandResult RunBridgedRename(ProjectFixture& fixture,
+                                               core::AppState& state,
                                                const std::string& element_id,
                                                const std::string& new_name,
                                                bool& out_library_primary) {
@@ -494,10 +490,9 @@ core::commands::CommandResult RunBridgedRename(ProjectFixture& fixture, core::Ap
     if (!bus) {
         return core::commands::CommandResult{};
     }
-    core::commands::UpdateElementTextCommand command(element_id, core::ElementTextField::Name, "en",
-                                                     new_name);
-    core::commands::CommandContext ctx{state.loaded_case.value(), state.sacm_package.value(),
-                                       state.library_document.get()};
+    core::commands::UpdateElementTextCommand command(element_id, core::ElementTextField::Name, "en", new_name);
+    core::commands::CommandContext ctx{
+        state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
     const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
     out_library_primary = ctx.library_primary;
     return result;
@@ -520,10 +515,10 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesUnknownContent) {
         << "the rename did not take the bridged library-primary path; this test measures nothing";
 
     const std::string autosaved = ReadFile(fixture.sacm_absolute);
-    EXPECT_TRUE(Contains(autosaved, kVendorAttributeMarker))
-        << "a bridged edit dropped the vendor attribute:\n" << autosaved;
-    EXPECT_TRUE(Contains(autosaved, kVendorElementMarker))
-        << "a bridged edit dropped the vendor element:\n" << autosaved;
+    EXPECT_TRUE(Contains(autosaved, kVendorAttributeMarker)) << "a bridged edit dropped the vendor attribute:\n"
+                                                             << autosaved;
+    EXPECT_TRUE(Contains(autosaved, kVendorElementMarker)) << "a bridged edit dropped the vendor element:\n"
+                                                           << autosaved;
     EXPECT_TRUE(Contains(autosaved, "Renamed goal")) << autosaved;
 }
 
@@ -579,9 +574,8 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesCounterRelationships) {
 // Asserted on the saved bytes: the refusal is worth nothing if the file changed
 // anyway.
 TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditRefusesRatherThanDeleteUnrepresentableElements) {
-    const std::string full_case =
-        ReadFile(std::filesystem::path(AF_REPO_ROOT) / "libs" / "sacm" / "tests" / "data" / "sacm23" /
-                 "argumentation-full-valid.sacm.xmi");
+    const std::string full_case = ReadFile(std::filesystem::path(AF_REPO_ROOT) / "libs" / "sacm" / "tests" / "data" /
+                                           "sacm23" / "argumentation-full-valid.sacm.xmi");
     ASSERT_FALSE(full_case.empty());
     ProjectFixture fixture = MakeProject("bridged-unrepresentable", full_case.c_str());
 
@@ -604,14 +598,12 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditRefusesRatherThanDeleteUnreprese
 
     // The case is untouched -- a refusal that still rewrote the file would be the
     // same data loss with a worse message.
-    EXPECT_EQ(ReadFile(fixture.sacm_absolute), before)
-        << "the refused edit still rewrote the tracked file";
+    EXPECT_EQ(ReadFile(fixture.sacm_absolute), before) << "the refused edit still rewrote the tracked file";
 }
 
 TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesAcpTaggedValues) {
     const std::string acp_case =
-        ReadFile(std::filesystem::path(AF_REPO_ROOT) / "tests" / "data" /
-                 "fixture_acp_parity.sacm.xml");
+        ReadFile(std::filesystem::path(AF_REPO_ROOT) / "tests" / "data" / "fixture_acp_parity.sacm.xml");
     ASSERT_FALSE(acp_case.empty());
     ProjectFixture fixture = MakeProject("bridged-acp", acp_case.c_str());
 
@@ -650,8 +642,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditSucceedsOnMultiArgumentPackageCa
     ASSERT_NE(state.library_document, nullptr);
 
     const std::size_t packages_before = state.sacm_package->argumentPackages.size();
-    ASSERT_GT(packages_before, 1u)
-        << "fixture no longer has several argument packages; this test measures nothing";
+    ASSERT_GT(packages_before, 1u) << "fixture no longer has several argument packages; this test measures nothing";
 
     // Rename whatever the first claim is, so the test does not depend on the
     // case's content beyond its package structure.
@@ -667,12 +658,11 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditSucceedsOnMultiArgumentPackageCa
     bool library_primary = false;
     const core::commands::CommandResult result =
         RunBridgedRename(fixture, state, target_id, "Renamed", library_primary);
-    ASSERT_TRUE(result.success)
-        << "a bridged edit failed on a multi-argument-package case: " << result.error;
+    ASSERT_TRUE(result.success) << "a bridged edit failed on a multi-argument-package case: " << result.error;
     ASSERT_TRUE(library_primary);
 
-    core::RebuildDerivedViewsFromLibrary(*state.library_document, state.loaded_case.value(),
-                                         state.sacm_package.value());
+    core::RebuildDerivedViewsFromLibrary(
+        *state.library_document, state.loaded_case.value(), state.sacm_package.value());
     EXPECT_EQ(state.sacm_package->argumentPackages.size(), packages_before)
         << "the bridged edit collapsed the case's argument packages";
 }
@@ -695,7 +685,8 @@ namespace {
 // Runs a bridged content edit through the bus, tampers with the file so the
 // verifier sees divergence, and restores from the audit log. Returns the
 // restored bytes.
-std::string EditTamperAndRestore(ProjectFixture& fixture, core::AppState& state,
+std::string EditTamperAndRestore(ProjectFixture& fixture,
+                                 core::AppState& state,
                                  const std::string& element_id,
                                  core::audit::RestoreSacmFromAuditResult& restored,
                                  std::string& error) {
@@ -705,10 +696,10 @@ std::string EditTamperAndRestore(ProjectFixture& fixture, core::AppState& state,
     if (!bus) {
         return {};
     }
-    core::commands::UpdateElementTextCommand command(element_id, core::ElementTextField::Content,
-                                                     "en", "Edited through the bridge.");
-    core::commands::CommandContext ctx{state.loaded_case.value(), state.sacm_package.value(),
-                                       state.library_document.get()};
+    core::commands::UpdateElementTextCommand command(
+        element_id, core::ElementTextField::Content, "en", "Edited through the bridge.");
+    core::commands::CommandContext ctx{
+        state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
     const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
     EXPECT_TRUE(result.success) << result.error;
     if (!result.success) {
@@ -717,8 +708,7 @@ std::string EditTamperAndRestore(ProjectFixture& fixture, core::AppState& state,
     bus.reset();
 
     WriteFile(fixture.sacm_absolute, kTamperedSacm);
-    if (!core::audit::RestoreSacmFromAudit(fixture.project, fixture.sacm_relative, "tester",
-                                           restored, error)) {
+    if (!core::audit::RestoreSacmFromAudit(fixture.project, fixture.sacm_relative, "tester", restored, error)) {
         return {};
     }
     return ReadFile(fixture.sacm_absolute);
@@ -727,15 +717,14 @@ std::string EditTamperAndRestore(ProjectFixture& fixture, core::AppState& state,
 } // namespace
 
 TEST(SaveFromLibrary, SACM23_LIB_002_RestoreAfterBridgedEditPreservesAcpTaggedValues) {
-    const std::string acp_case = ReadFile(std::filesystem::path(AF_REPO_ROOT) / "tests" / "data" /
-                                          "fixture_acp_parity.sacm.xml");
+    const std::string acp_case =
+        ReadFile(std::filesystem::path(AF_REPO_ROOT) / "tests" / "data" / "fixture_acp_parity.sacm.xml");
     ASSERT_FALSE(acp_case.empty());
     ProjectFixture fixture = MakeProject("restore-acp", acp_case.c_str());
 
     core::AppState state;
     ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
-    const std::size_t before =
-        CountOccurrences(ReadFile(fixture.sacm_absolute), "assuranceForge.acp");
+    const std::size_t before = CountOccurrences(ReadFile(fixture.sacm_absolute), "assuranceForge.acp");
     ASSERT_GT(before, 0u) << "fixture carries no ACP tags; this test measures nothing";
 
     core::audit::RestoreSacmFromAuditResult restored;
@@ -761,10 +750,8 @@ TEST(SaveFromLibrary, SACM23_LIB_002_RestoreAfterBridgedEditPreservesUnknownCont
     ASSERT_FALSE(bytes.empty()) << error;
     EXPECT_TRUE(restored.lossy_fallback_warning.empty()) << restored.lossy_fallback_warning;
 
-    EXPECT_TRUE(Contains(bytes, kVendorAttributeMarker))
-        << "the restore dropped the vendor attribute:\n" << bytes;
-    EXPECT_TRUE(Contains(bytes, kVendorElementMarker))
-        << "the restore dropped the vendor element:\n" << bytes;
+    EXPECT_TRUE(Contains(bytes, kVendorAttributeMarker)) << "the restore dropped the vendor attribute:\n" << bytes;
+    EXPECT_TRUE(Contains(bytes, kVendorElementMarker)) << "the restore dropped the vendor element:\n" << bytes;
 }
 
 // A project whose log contains one bridged content edit must be recoverable at
@@ -772,8 +759,8 @@ TEST(SaveFromLibrary, SACM23_LIB_002_RestoreAfterBridgedEditPreservesUnknownCont
 // collapsed its four argument packages and duplicated artifact-reference ids, so
 // the re-derive was rejected and the flagship case could not be restored.
 TEST(SaveFromLibrary, SACM23_LIB_002_RestoreAfterBridgedEditSucceedsOnMultiArgumentPackageCase) {
-    const std::string big_case = ReadFile(std::filesystem::path(AF_REPO_ROOT) / "data" /
-                                          "open-autonomy-safety-case.sacm.xml");
+    const std::string big_case =
+        ReadFile(std::filesystem::path(AF_REPO_ROOT) / "data" / "open-autonomy-safety-case.sacm.xml");
     ASSERT_FALSE(big_case.empty());
     ProjectFixture fixture = MakeProject("restore-multipackage", big_case.c_str());
 
@@ -792,8 +779,8 @@ TEST(SaveFromLibrary, SACM23_LIB_002_RestoreAfterBridgedEditSucceedsOnMultiArgum
     core::audit::RestoreSacmFromAuditResult restored;
     std::string error;
     const std::string bytes = EditTamperAndRestore(fixture, state, target_id, restored, error);
-    ASSERT_FALSE(bytes.empty())
-        << "a project with one bridged content edit in its log could not be restored: " << error;
+    ASSERT_FALSE(bytes.empty()) << "a project with one bridged content edit in its log could not be restored: "
+                                << error;
 
     core::AppState reopened;
     ASSERT_TRUE(reopened.load_file(fixture.sacm_absolute.string())) << reopened.status_message;
@@ -820,9 +807,14 @@ TEST(SaveFromLibrary, SACM23_INT_001_NoBusEditPreservesUnknownContentThroughSync
     // Mutate the legacy package the way the no-bus path does, then sync.
     std::string discarded;
     std::string error;
-    ASSERT_TRUE(core::SetElementTextField(state.loaded_case.value(), &state.sacm_package.value(),
-                                          "G1", core::ElementTextField::Name, "en",
-                                          "Renamed without a bus", discarded, error))
+    ASSERT_TRUE(core::SetElementTextField(state.loaded_case.value(),
+                                          &state.sacm_package.value(),
+                                          "G1",
+                                          core::ElementTextField::Name,
+                                          "en",
+                                          "Renamed without a bus",
+                                          discarded,
+                                          error))
         << error;
     state.sync_library_document();
 
@@ -833,9 +825,11 @@ TEST(SaveFromLibrary, SACM23_INT_001_NoBusEditPreservesUnknownContentThroughSync
     const std::string bytes = ReadFile(saved_path);
 
     EXPECT_TRUE(Contains(bytes, kVendorAttributeMarker))
-        << "syncing the library from the legacy package dropped the vendor attribute:\n" << bytes;
+        << "syncing the library from the legacy package dropped the vendor attribute:\n"
+        << bytes;
     EXPECT_TRUE(Contains(bytes, kVendorElementMarker))
-        << "syncing the library from the legacy package dropped the vendor element:\n" << bytes;
+        << "syncing the library from the legacy package dropped the vendor element:\n"
+        << bytes;
     EXPECT_TRUE(Contains(bytes, "Renamed without a bus")) << bytes;
 }
 
@@ -865,8 +859,8 @@ TEST(SaveFromLibrary, SACM23_INT_001_UnflippedBusCommandPreservesUnknownContentI
     // NodeOnly reparents rather than deletes, so it has no library seam and
     // stays unflipped -- which is exactly the branch under test.
     core::commands::RemoveElementCommand command("G1", core::RemoveMode::NodeOnly);
-    core::commands::CommandContext ctx{state.loaded_case.value(), state.sacm_package.value(),
-                                       state.library_document.get()};
+    core::commands::CommandContext ctx{
+        state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
     const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
     ASSERT_TRUE(result.success) << result.error;
     ASSERT_FALSE(ctx.library_primary)
@@ -881,9 +875,11 @@ TEST(SaveFromLibrary, SACM23_INT_001_UnflippedBusCommandPreservesUnknownContentI
     const std::string bytes = ReadFile(explicit_path);
 
     EXPECT_TRUE(Contains(bytes, kVendorAttributeMarker))
-        << "the Stage-5 net dropped the vendor attribute from the library document:\n" << bytes;
+        << "the Stage-5 net dropped the vendor attribute from the library document:\n"
+        << bytes;
     EXPECT_TRUE(Contains(bytes, kVendorElementMarker))
-        << "the Stage-5 net dropped the vendor element from the library document:\n" << bytes;
+        << "the Stage-5 net dropped the vendor element from the library document:\n"
+        << bytes;
 }
 
 // A load can SUCCEED and still have told us something the user must know. The
@@ -892,9 +888,8 @@ TEST(SaveFromLibrary, SACM23_INT_001_UnflippedBusCommandPreservesUnknownContentI
 // library reports SACM-XMI-009; AppState used to discard every diagnostic on
 // the success path, so the warning existed and reached nobody.
 TEST(SaveFromLibrary, SACM23_INT_001_LoadSurfacesNonConformanceWarningToTheUser) {
-    const std::filesystem::path container = std::filesystem::path(AF_REPO_ROOT) / "libs" / "sacm" /
-                                            "tests" / "data" / "interop-thirdparty" /
-                                            "mobstr-safetycase.integration";
+    const std::filesystem::path container = std::filesystem::path(AF_REPO_ROOT) / "libs" / "sacm" / "tests" / "data" /
+                                            "interop-thirdparty" / "mobstr-safetycase.integration";
     ASSERT_TRUE(std::filesystem::exists(container)) << container.string();
 
     core::AppState state;
@@ -906,10 +901,9 @@ TEST(SaveFromLibrary, SACM23_INT_001_LoadSurfacesNonConformanceWarningToTheUser)
     EXPECT_TRUE(Contains(state.status_message, "does not conform")) << state.status_message;
 
     ASSERT_FALSE(state.load_warnings.empty());
-    EXPECT_TRUE(std::any_of(state.load_warnings.begin(), state.load_warnings.end(),
-                            [](const std::string& warning) {
-                                return warning.find("SACM-XMI-009") != std::string::npos;
-                            }));
+    EXPECT_TRUE(std::any_of(state.load_warnings.begin(), state.load_warnings.end(), [](const std::string& warning) {
+        return warning.find("SACM-XMI-009") != std::string::npos;
+    }));
 
     // A conformant file must not be decorated with warnings it did not earn --
     // a status line that always says something alarming says nothing.
@@ -919,9 +913,9 @@ TEST(SaveFromLibrary, SACM23_INT_001_LoadSurfacesNonConformanceWarningToTheUser)
     EXPECT_FALSE(Contains(ordinary.status_message, "SACM-XMI-009")) << ordinary.status_message;
 
     // And the warning is cleared by the next load rather than persisting.
-    EXPECT_TRUE(ordinary.load_warnings.empty() ||
-                std::none_of(ordinary.load_warnings.begin(), ordinary.load_warnings.end(),
-                             [](const std::string& warning) {
-                                 return warning.find("SACM-XMI-009") != std::string::npos;
-                             }));
+    EXPECT_TRUE(
+        ordinary.load_warnings.empty() ||
+        std::none_of(ordinary.load_warnings.begin(), ordinary.load_warnings.end(), [](const std::string& warning) {
+            return warning.find("SACM-XMI-009") != std::string::npos;
+        }));
 }

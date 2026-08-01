@@ -153,17 +153,17 @@ ui::panels::ReviewPanelModel BuildReviewPanelModel(AppRuntimeState& state) {
     }
     for (const core::changesets::ChangeSet* change_set : state.agent_change_sets.Open()) {
         ui::panels::AgentChangeSetRow row;
-        row.id              = change_set->id;
-        row.title           = change_set->title;
-        row.summary         = change_set->summary;
-        row.intent          = change_set->intent;
-        row.client_label    = change_set->client_label;
-        row.state           = core::changesets::ChangeSetStateToString(change_set->state);
+        row.id = change_set->id;
+        row.title = change_set->title;
+        row.summary = change_set->summary;
+        row.intent = change_set->intent;
+        row.client_label = change_set->client_label;
+        row.state = core::changesets::ChangeSetStateToString(change_set->state);
         row.operation_count = static_cast<int>(change_set->proposal.operations.size());
         row.shown_on_canvas = ui_state.agent_change_set_id == change_set->id;
-        row.argument_file   = change_set->argument_file.filename().generic_string();
-        row.argument_file_is_open = core::changesets::ChangeSetTargetsArgumentFile(
-            *change_set, state.app_state.loaded_file_path);
+        row.argument_file = change_set->argument_file.filename().generic_string();
+        row.argument_file_is_open =
+            core::changesets::ChangeSetTargetsArgumentFile(*change_set, state.app_state.loaded_file_path);
 
         if (state.app_state.loaded_case.has_value()) {
             // The same check acceptance runs, run every frame, so the reason a
@@ -171,8 +171,7 @@ ui::panels::ReviewPanelModel BuildReviewPanelModel(AppRuntimeState& state) {
             // reaches for the button rather than in the status bar afterwards.
             const core::changesets::ChangeSetAcceptability acceptability =
                 core::changesets::EvaluateChangeSetAcceptability(
-                    *change_set, state.app_state.loaded_file_path,
-                    state.app_state.loaded_case.value());
+                    *change_set, state.app_state.loaded_file_path, state.app_state.loaded_case.value());
             row.applies = acceptability.can_accept;
             row.problem = acceptability.reason;
 
@@ -180,12 +179,12 @@ ui::panels::ReviewPanelModel BuildReviewPanelModel(AppRuntimeState& state) {
             // document it was written for. Against another of the project's
             // arguments the operations land on ids that merely happen to match.
             if (row.argument_file_is_open) {
-                const core::changesets::ChangeSetDiff diff = core::changesets::ComputeChangeSetDiff(
-                    *change_set, state.app_state.loaded_case.value());
-                row.added_count    = diff.added_count;
+                const core::changesets::ChangeSetDiff diff =
+                    core::changesets::ComputeChangeSetDiff(*change_set, state.app_state.loaded_case.value());
+                row.added_count = diff.added_count;
                 row.modified_count = diff.modified_count;
-                row.removed_count  = diff.removed_count;
-                row.sccg_findings  = DescribeStagedSccgFindings(diff);
+                row.removed_count = diff.removed_count;
+                row.sccg_findings = DescribeStagedSccgFindings(diff);
             }
         }
         model.agent_change_sets.push_back(std::move(row));
@@ -291,8 +290,7 @@ ui::panels::ReviewPanelModel BuildReviewPanelModel(AppRuntimeState& state) {
 // the user's own business and not this proposal's to answer for.
 std::vector<std::string> DescribeStagedSccgFindings(const core::changesets::ChangeSetDiff& diff) {
     std::vector<std::string> touched;
-    for (const std::pair<const std::string, core::changesets::ElementChange>& entry :
-         diff.status_by_id) {
+    for (const std::pair<const std::string, core::changesets::ElementChange>& entry : diff.status_by_id) {
         if (entry.second != core::changesets::ElementChange::Unchanged &&
             entry.second != core::changesets::ElementChange::Removed) {
             touched.push_back(entry.first);
@@ -300,8 +298,7 @@ std::vector<std::string> DescribeStagedSccgFindings(const core::changesets::Chan
     }
 
     std::vector<std::string> described;
-    for (const core::sccg::StagedFinding& finding :
-         core::sccg::CheckStagedArgument(diff.preview_model, touched)) {
+    for (const core::sccg::StagedFinding& finding : core::sccg::CheckStagedArgument(diff.preview_model, touched)) {
         std::string line = finding.guideline_id;
         if (!finding.element_id.empty()) {
             line += " " + finding.element_id;

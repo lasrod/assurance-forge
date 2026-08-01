@@ -36,21 +36,21 @@ sacm::AssuranceCasePackage MakeCase(std::vector<sacm::ArgumentPackage> args) {
 } // namespace
 
 TEST(CanonicalModelHash, IsStableUnderClaimReordering) {
-    auto a = MakeCase({MakePackage("p1", {MakeClaim("G1", "Goal 1", "desc 1"),
-                                          MakeClaim("G2", "Goal 2", "desc 2"),
-                                          MakeClaim("G3", "Goal 3", "desc 3")})});
-    auto b = MakeCase({MakePackage("p1", {MakeClaim("G3", "Goal 3", "desc 3"),
-                                          MakeClaim("G1", "Goal 1", "desc 1"),
-                                          MakeClaim("G2", "Goal 2", "desc 2")})});
+    auto a = MakeCase({MakePackage("p1",
+                                   {MakeClaim("G1", "Goal 1", "desc 1"),
+                                    MakeClaim("G2", "Goal 2", "desc 2"),
+                                    MakeClaim("G3", "Goal 3", "desc 3")})});
+    auto b = MakeCase({MakePackage("p1",
+                                   {MakeClaim("G3", "Goal 3", "desc 3"),
+                                    MakeClaim("G1", "Goal 1", "desc 1"),
+                                    MakeClaim("G2", "Goal 2", "desc 2")})});
 
     EXPECT_EQ(core::audit::CanonicalModelHash(a), core::audit::CanonicalModelHash(b));
 }
 
 TEST(CanonicalModelHash, IsStableUnderPackageReordering) {
-    auto a = MakeCase({MakePackage("pA", {MakeClaim("G1", "n", "d")}),
-                       MakePackage("pB", {MakeClaim("G2", "n", "d")})});
-    auto b = MakeCase({MakePackage("pB", {MakeClaim("G2", "n", "d")}),
-                       MakePackage("pA", {MakeClaim("G1", "n", "d")})});
+    auto a = MakeCase({MakePackage("pA", {MakeClaim("G1", "n", "d")}), MakePackage("pB", {MakeClaim("G2", "n", "d")})});
+    auto b = MakeCase({MakePackage("pB", {MakeClaim("G2", "n", "d")}), MakePackage("pA", {MakeClaim("G1", "n", "d")})});
 
     EXPECT_EQ(core::audit::CanonicalModelHash(a), core::audit::CanonicalModelHash(b));
 }

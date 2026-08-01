@@ -330,8 +330,8 @@ void ComputeGroup2EdgeBounds(
     out_max.y += pad;
 }
 
-void DrawGroup1EdgeHighlight(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 child_top, float zoom,
-                             float straight_drop) {
+void DrawGroup1EdgeHighlight(
+    ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 child_top, float zoom, float straight_drop) {
     const float scale = DpiScale() * zoom;
     const float thickness = 5.0f * scale;
     const Group1EdgePath p = ComputeGroup1Path(parent_bottom, child_top, zoom, straight_drop);

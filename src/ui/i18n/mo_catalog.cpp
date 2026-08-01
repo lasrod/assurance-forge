@@ -31,8 +31,7 @@ bool MoCatalog::Load(const std::filesystem::path& path) {
     if (!stream)
         return false;
 
-    const std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(stream)),
-                                            std::istreambuf_iterator<char>());
+    const std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
     // 28-byte header: magic, revision, count, originals table, translations table.
     if (bytes.size() < 28)
         return false;

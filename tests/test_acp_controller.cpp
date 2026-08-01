@@ -28,7 +28,9 @@
 
 namespace {
 
-std::filesystem::path repo_root() { return std::filesystem::path(AF_REPO_ROOT); }
+std::filesystem::path repo_root() {
+    return std::filesystem::path(AF_REPO_ROOT);
+}
 
 std::string ReadFileText(const std::filesystem::path& path) {
     std::ifstream in(path, std::ios::binary);
@@ -81,7 +83,7 @@ void SetUpAuditedState(app::AppRuntimeState& state) {
     ASSERT_TRUE(loaded.ok);
     ASSERT_NE(loaded.document, nullptr);
 
-    parser::AssuranceCase      model;
+    parser::AssuranceCase model;
     sacm::AssuranceCasePackage package;
     core::RebuildDerivedViewsFromLibrary(*loaded.document, model, package);
 

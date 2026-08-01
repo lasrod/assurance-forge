@@ -25,7 +25,6 @@ CheckOutcome check(const model::Document& document, const Operation& operation);
 
 // Executes the effects planned by a successful check. Must not fail; any
 // precondition belongs in check.
-void perform(model::Document& document, const Operation& operation,
-             const std::vector<ChangeRecord>& effects);
+void perform(model::Document& document, const Operation& operation, const std::vector<ChangeRecord>& effects);
 
-}  // namespace sacm::commands::detail
+} // namespace sacm::commands::detail

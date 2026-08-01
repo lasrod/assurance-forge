@@ -84,9 +84,7 @@ bool ReadAuditManifest(const std::filesystem::path& project_root, AuditManifest&
     return ParseAuditManifest(*text, out, error);
 }
 
-bool WriteAuditManifest(const std::filesystem::path& project_root,
-                        const AuditManifest& manifest,
-                        std::string& error) {
+bool WriteAuditManifest(const std::filesystem::path& project_root, const AuditManifest& manifest, std::string& error) {
     std::error_code ec;
     std::filesystem::create_directories(AfDir(project_root), ec);
     if (ec) {

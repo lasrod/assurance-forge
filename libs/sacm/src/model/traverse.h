@@ -20,8 +20,7 @@ void for_each_child(const SACMElement& element, const std::function<void(const S
 void for_each_child(SACMElement& element, const std::function<void(SACMElement&)>& fn);
 
 // Visits `element` and all descendants (pre-order, document order).
-void for_each_descendant(const SACMElement& element,
-                         const std::function<void(const SACMElement&)>& fn);
+void for_each_descendant(const SACMElement& element, const std::function<void(const SACMElement&)>& fn);
 
 // One outgoing reference of an element: containment-role name and target id.
 struct ReferenceUse {
@@ -32,18 +31,16 @@ struct ReferenceUse {
 // Visits every outgoing reference of `element` (not of its descendants),
 // including ExpressionLangString expression references inside the name,
 // descriptions, and utility content.
-void for_each_reference(const SACMElement& element,
-                        const std::function<void(const ReferenceUse&)>& fn);
+void for_each_reference(const SACMElement& element, const std::function<void(const ReferenceUse&)>& fn);
 
 // Removes every reference from `referrer` whose target is in `doomed`
 // (membership entries, citations, interface lists, ...). Returns the number
 // of removed/cleared references. Used by delete cascades so no reference is
 // ever left dangling.
-std::size_t remove_references_to(SACMElement& referrer,
-                                 const std::unordered_set<ElementId>& doomed);
+std::size_t remove_references_to(SACMElement& referrer, const std::unordered_set<ElementId>& doomed);
 
 // Nearest ancestor (including `element` itself) that is a package kind;
 // nullptr when the element is not inside any package.
 const SACMElement* nearest_package(const SACMElement& element);
 
-}  // namespace sacm::model::traverse
+} // namespace sacm::model::traverse

@@ -21,7 +21,6 @@ struct ProjectOverviewPanelCallbacks {
     std::function<void()> open_conformance;
 };
 
-void ShowProjectOverviewPanel(const ProjectOverviewPanelModel& model,
-                              const ProjectOverviewPanelCallbacks& callbacks);
+void ShowProjectOverviewPanel(const ProjectOverviewPanelModel& model, const ProjectOverviewPanelCallbacks& callbacks);
 
 } // namespace ui::panels

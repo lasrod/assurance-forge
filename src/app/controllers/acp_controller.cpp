@@ -10,9 +10,10 @@ namespace app::controllers {
 
 AcpController::AcpController(AppEvents& events) : events_(events) {}
 
-bool AcpController::DispatchAddAcp(AppRuntimeState& state, const std::string& target_kind,
+bool AcpController::DispatchAddAcp(AppRuntimeState& state,
+                                   const std::string& target_kind,
                                    const std::string& target_id) {
-    core::commands::AddAcpCommand        command(target_kind, target_id);
+    core::commands::AddAcpCommand command(target_kind, target_id);
     const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(state, command);
     if (!outcome.success) {
         // An empty error is a benign no-op (nothing to record); only surface a
@@ -22,7 +23,7 @@ bool AcpController::DispatchAddAcp(AppRuntimeState& state, const std::string& ta
         return false;
     }
     const std::string& acp_id = command.GeneratedAcpId();
-    ui::UiState&       ui_state = ui::GetUiState();
+    ui::UiState& ui_state = ui::GetUiState();
     ui_state.selected_acp_id = acp_id;
     ui_state.selected_element_id.clear();
     ui_state.selected_relationship_id.clear();
@@ -45,7 +46,7 @@ bool AcpController::AddRelationshipAcp(AppRuntimeState& state, const std::string
 }
 
 bool AcpController::RemoveAcp(AppRuntimeState& state, const std::string& acp_id) {
-    core::commands::RemoveAcpCommand     command(acp_id);
+    core::commands::RemoveAcpCommand command(acp_id);
     const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(state, command);
     if (!outcome.success) {
         if (!outcome.error.empty())
@@ -64,7 +65,7 @@ bool AcpController::RemoveAcp(AppRuntimeState& state, const std::string& acp_id)
 }
 
 bool AcpController::UpsertAcp(AppRuntimeState& state, const parser::AcpRecord& acp) {
-    core::commands::UpsertAcpCommand     command(acp);
+    core::commands::UpsertAcpCommand command(acp);
     const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(state, command);
     if (!outcome.success) {
         if (!outcome.error.empty())
@@ -85,7 +86,7 @@ bool AcpController::CreateConfidenceArgumentTreeForAcp(AppRuntimeState& state, c
         return false;
     }
     const std::string& argument_package_id = command.GeneratedArgumentPackageId();
-    const std::string& top_goal_id         = command.GeneratedTopGoalId();
+    const std::string& top_goal_id = command.GeneratedTopGoalId();
 
     ui::UiState& ui_state = ui::GetUiState();
     ui_state.selected_acp_id.clear();
@@ -99,8 +100,7 @@ bool AcpController::CreateConfidenceArgumentTreeForAcp(AppRuntimeState& state, c
     events_.Emit(ProjectFilesChangedEvent{});
     events_.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
     events_.Emit(ArgumentPackageCanvasRequestEvent{argument_package_id, {}, "Confidence argument", top_goal_id});
-    events_.Emit(
-        StatusMessageEvent{"Created confidence argument tree " + argument_package_id + " for " + acp_id});
+    events_.Emit(StatusMessageEvent{"Created confidence argument tree " + argument_package_id + " for " + acp_id});
     // The frame-boundary re-derive refreshes the ACP-decorated views; ACP problems
     // re-sync from the fresh model when this dirty flag is serviced next frame.
     state.problems_dirty.acp = true;
@@ -117,8 +117,8 @@ bool AcpController::OpenConfidenceArgumentTreeForAcp(const parser::AssuranceCase
         events_.Emit(StatusMessageEvent{"Open confidence argument tree failed: ACP is not linked to a tree."});
         return false;
     }
-    const std::string title = (acp->name.empty() || acp->name == acp->id) ? "Confidence argument for " + acp->id
-                                                                          : acp->id + ": " + acp->name;
+    const std::string title =
+        (acp->name.empty() || acp->name == acp->id) ? "Confidence argument for " + acp->id : acp->id + ": " + acp->name;
     events_.Emit(ArgumentPackageCanvasRequestEvent{acp->argument_package_id, {}, title, acp->top_goal_id});
     events_.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
     return true;

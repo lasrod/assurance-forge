@@ -22,11 +22,11 @@ namespace mcp {
 // than echoing whatever the client asks for -- means a protocol change surfaces
 // as an explicit mismatch instead of as subtly wrong behaviour.
 inline constexpr const char* kProtocolVersion = "2025-06-18";
-inline constexpr const char* kServerName      = "assurance-forge";
-inline constexpr const char* kServerVersion   = "0.1.0";
+inline constexpr const char* kServerName = "assurance-forge";
+inline constexpr const char* kServerVersion = "0.1.0";
 
 class Server {
-  public:
+public:
     explicit Server(Session& session) : session_(session) {}
 
     // Returns nullopt when nothing should be written back, which is the case for
@@ -35,7 +35,7 @@ class Server {
 
     void Run(std::istream& in, std::ostream& out);
 
-  private:
+private:
     nlohmann::json Dispatch(const jsonrpc::Request& request);
     nlohmann::json HandleInitialize(const jsonrpc::Request& request);
     nlohmann::json HandleToolsList(const jsonrpc::Request& request);

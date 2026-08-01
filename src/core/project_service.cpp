@@ -77,7 +77,6 @@ std::string GenerateId(const char* prefix) {
     return out.str();
 }
 
-
 std::filesystem::path
 NormalizeFileName(const std::string& requested_file_name, const char* default_name, const char* extension) {
     std::string trimmed = TrimWhitespace(requested_file_name);
@@ -227,8 +226,7 @@ bool WriteTrackedFile(AssuranceProject& project,
     // Refuse before writing when something else already owns the path: an
     // overwrite here would destroy a file of a different kind.
     if (found != project.files.end() && found->role != role) {
-        error = std::string("Tracked file is not ") + role_mismatch_description + ": " +
-                relative_path.generic_string();
+        error = std::string("Tracked file is not ") + role_mismatch_description + ": " + relative_path.generic_string();
         return false;
     }
 
@@ -378,8 +376,7 @@ bool ProjectService::AddSacmFile(AssuranceProject& project,
         error = "Could not generate a SACM 2.3 seed document";
         return false;
     }
-    return AddTrackedFile(
-        project, "arguments", file_name, ProjectFileRole::SacmArgument, seed, entry, error);
+    return AddTrackedFile(project, "arguments", file_name, ProjectFileRole::SacmArgument, seed, entry, error);
 }
 
 bool ProjectService::AddEvidenceRegister(AssuranceProject& project,

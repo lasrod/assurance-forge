@@ -36,10 +36,11 @@ namespace core::commands {
 // Removes a terminology package by (id, gid) via `core::DeleteTerminologyPackage`.
 class RemoveTerminologyPackageCommand : public ICommand {
 public:
-    RemoveTerminologyPackageCommand(std::string id, std::string gid)
-        : id_(std::move(id)), gid_(std::move(gid)) {}
+    RemoveTerminologyPackageCommand(std::string id, std::string gid) : id_(std::move(id)), gid_(std::move(gid)) {}
 
-    std::string Name() const override { return "RemoveTerminologyPackage"; }
+    std::string Name() const override {
+        return "RemoveTerminologyPackage";
+    }
     bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
 private:
@@ -50,10 +51,11 @@ private:
 // Removes an argument package by (id, gid) via `core::DeleteArgumentPackage`.
 class RemoveArgumentPackageCommand : public ICommand {
 public:
-    RemoveArgumentPackageCommand(std::string id, std::string gid)
-        : id_(std::move(id)), gid_(std::move(gid)) {}
+    RemoveArgumentPackageCommand(std::string id, std::string gid) : id_(std::move(id)), gid_(std::move(gid)) {}
 
-    std::string Name() const override { return "RemoveArgumentPackage"; }
+    std::string Name() const override {
+        return "RemoveArgumentPackage";
+    }
     bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
 private:
@@ -64,10 +66,11 @@ private:
 // Removes an artifact package by (id, gid) via `core::DeleteArtifactPackage`.
 class RemoveArtifactPackageCommand : public ICommand {
 public:
-    RemoveArtifactPackageCommand(std::string id, std::string gid)
-        : id_(std::move(id)), gid_(std::move(gid)) {}
+    RemoveArtifactPackageCommand(std::string id, std::string gid) : id_(std::move(id)), gid_(std::move(gid)) {}
 
-    std::string Name() const override { return "RemoveArtifactPackage"; }
+    std::string Name() const override {
+        return "RemoveArtifactPackage";
+    }
     bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
 private:

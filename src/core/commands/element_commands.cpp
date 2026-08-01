@@ -38,20 +38,28 @@ namespace {
 
 sacm_adapter::ChildKind ToAdapterChildKind(NewElementKind kind) {
     switch (kind) {
-    case NewElementKind::Goal:          return sacm_adapter::ChildKind::Goal;
-    case NewElementKind::Strategy:      return sacm_adapter::ChildKind::Strategy;
-    case NewElementKind::Solution:      return sacm_adapter::ChildKind::Solution;
-    case NewElementKind::Context:       return sacm_adapter::ChildKind::Context;
-    case NewElementKind::Assumption:    return sacm_adapter::ChildKind::Assumption;
-    case NewElementKind::Justification: return sacm_adapter::ChildKind::Justification;
+    case NewElementKind::Goal:
+        return sacm_adapter::ChildKind::Goal;
+    case NewElementKind::Strategy:
+        return sacm_adapter::ChildKind::Strategy;
+    case NewElementKind::Solution:
+        return sacm_adapter::ChildKind::Solution;
+    case NewElementKind::Context:
+        return sacm_adapter::ChildKind::Context;
+    case NewElementKind::Assumption:
+        return sacm_adapter::ChildKind::Assumption;
+    case NewElementKind::Justification:
+        return sacm_adapter::ChildKind::Justification;
     }
     return sacm_adapter::ChildKind::Goal;
 }
 
 sacm_adapter::ChallengeSource ToAdapterChallengeSource(ChallengeSourceType type) {
     switch (type) {
-    case ChallengeSourceType::CounterArgument: return sacm_adapter::ChallengeSource::CounterArgument;
-    case ChallengeSourceType::CounterEvidence: return sacm_adapter::ChallengeSource::CounterEvidence;
+    case ChallengeSourceType::CounterArgument:
+        return sacm_adapter::ChallengeSource::CounterArgument;
+    case ChallengeSourceType::CounterEvidence:
+        return sacm_adapter::ChallengeSource::CounterEvidence;
     }
     return sacm_adapter::ChallengeSource::CounterArgument;
 }
@@ -70,8 +78,7 @@ std::string FormatLibraryDiagnostics(const std::vector<sacm_adapter::LoadDiagnos
     return summary;
 }
 
-std::string LibraryRejection(const std::string& seam,
-                             const std::vector<sacm_adapter::LoadDiagnostic>& diagnostics) {
+std::string LibraryRejection(const std::string& seam, const std::vector<sacm_adapter::LoadDiagnostic>& diagnostics) {
     return "The SACM library rejected " + seam + ": " + FormatLibraryDiagnostics(diagnostics);
 }
 
@@ -79,65 +86,113 @@ std::string LibraryRejection(const std::string& seam,
 
 std::string NewElementKindToToken(NewElementKind kind) {
     switch (kind) {
-    case NewElementKind::Goal:           return "Goal";
-    case NewElementKind::Strategy:       return "Strategy";
-    case NewElementKind::Solution:       return "Solution";
-    case NewElementKind::Context:        return "Context";
-    case NewElementKind::Assumption:     return "Assumption";
-    case NewElementKind::Justification:  return "Justification";
+    case NewElementKind::Goal:
+        return "Goal";
+    case NewElementKind::Strategy:
+        return "Strategy";
+    case NewElementKind::Solution:
+        return "Solution";
+    case NewElementKind::Context:
+        return "Context";
+    case NewElementKind::Assumption:
+        return "Assumption";
+    case NewElementKind::Justification:
+        return "Justification";
     }
     return "Goal";
 }
 
 bool NewElementKindFromToken(const std::string& token, NewElementKind& out) {
-    if (token == "Goal")          { out = NewElementKind::Goal; return true; }
-    if (token == "Strategy")      { out = NewElementKind::Strategy; return true; }
-    if (token == "Solution")      { out = NewElementKind::Solution; return true; }
-    if (token == "Context")       { out = NewElementKind::Context; return true; }
-    if (token == "Assumption")    { out = NewElementKind::Assumption; return true; }
-    if (token == "Justification") { out = NewElementKind::Justification; return true; }
+    if (token == "Goal") {
+        out = NewElementKind::Goal;
+        return true;
+    }
+    if (token == "Strategy") {
+        out = NewElementKind::Strategy;
+        return true;
+    }
+    if (token == "Solution") {
+        out = NewElementKind::Solution;
+        return true;
+    }
+    if (token == "Context") {
+        out = NewElementKind::Context;
+        return true;
+    }
+    if (token == "Assumption") {
+        out = NewElementKind::Assumption;
+        return true;
+    }
+    if (token == "Justification") {
+        out = NewElementKind::Justification;
+        return true;
+    }
     return false;
 }
 
 std::string RemoveModeToToken(RemoveMode mode) {
     switch (mode) {
-    case RemoveMode::NodeOnly:           return "NodeOnly";
-    case RemoveMode::NodeAndDescendants: return "NodeAndDescendants";
+    case RemoveMode::NodeOnly:
+        return "NodeOnly";
+    case RemoveMode::NodeAndDescendants:
+        return "NodeAndDescendants";
     }
     return "NodeOnly";
 }
 
 bool RemoveModeFromToken(const std::string& token, RemoveMode& out) {
-    if (token == "NodeOnly")           { out = RemoveMode::NodeOnly; return true; }
-    if (token == "NodeAndDescendants") { out = RemoveMode::NodeAndDescendants; return true; }
+    if (token == "NodeOnly") {
+        out = RemoveMode::NodeOnly;
+        return true;
+    }
+    if (token == "NodeAndDescendants") {
+        out = RemoveMode::NodeAndDescendants;
+        return true;
+    }
     return false;
 }
 
 std::string ChallengeSourceTypeToToken(ChallengeSourceType type) {
     switch (type) {
-    case ChallengeSourceType::CounterArgument: return "CounterArgument";
-    case ChallengeSourceType::CounterEvidence: return "CounterEvidence";
+    case ChallengeSourceType::CounterArgument:
+        return "CounterArgument";
+    case ChallengeSourceType::CounterEvidence:
+        return "CounterEvidence";
     }
     return "CounterArgument";
 }
 
 bool ChallengeSourceTypeFromToken(const std::string& token, ChallengeSourceType& out) {
-    if (token == "CounterArgument") { out = ChallengeSourceType::CounterArgument; return true; }
-    if (token == "CounterEvidence") { out = ChallengeSourceType::CounterEvidence; return true; }
+    if (token == "CounterArgument") {
+        out = ChallengeSourceType::CounterArgument;
+        return true;
+    }
+    if (token == "CounterEvidence") {
+        out = ChallengeSourceType::CounterEvidence;
+        return true;
+    }
     return false;
 }
 
 std::string ArgumentTargetKindToToken(ArgumentTarget::Kind kind) {
     switch (kind) {
-    case ArgumentTarget::Kind::Element:      return "Element";
-    case ArgumentTarget::Kind::Relationship: return "Relationship";
+    case ArgumentTarget::Kind::Element:
+        return "Element";
+    case ArgumentTarget::Kind::Relationship:
+        return "Relationship";
     }
     return "Element";
 }
 
 bool ArgumentTargetKindFromToken(const std::string& token, ArgumentTarget::Kind& out) {
-    if (token == "Element")      { out = ArgumentTarget::Kind::Element; return true; }
-    if (token == "Relationship") { out = ArgumentTarget::Kind::Relationship; return true; }
+    if (token == "Element") {
+        out = ArgumentTarget::Kind::Element;
+        return true;
+    }
+    if (token == "Relationship") {
+        out = ArgumentTarget::Kind::Relationship;
+        return true;
+    }
     return false;
 }
 
@@ -176,12 +231,11 @@ bool CreateChildElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& ou
     if (ctx.library_document != nullptr && ctx.allow_library_primary) {
         std::string planned_element_id;
         std::string planned_relationship_id;
-        if (!core::PlanChildElementIds(ctx.model, &ctx.package, parent_id_, kind_, planned_element_id,
-                                       planned_relationship_id, out_error))
+        if (!core::PlanChildElementIds(
+                ctx.model, &ctx.package, parent_id_, kind_, planned_element_id, planned_relationship_id, out_error))
             return false;
-        const sacm_adapter::AddChildOutcome outcome =
-            sacm_adapter::apply_add_child(*ctx.library_document, parent_id_, ToAdapterChildKind(kind_),
-                                          planned_element_id, planned_relationship_id);
+        const sacm_adapter::AddChildOutcome outcome = sacm_adapter::apply_add_child(
+            *ctx.library_document, parent_id_, ToAdapterChildKind(kind_), planned_element_id, planned_relationship_id);
         if (outcome.supported && !outcome.applied) {
             out_error = LibraryRejection("the new child element", outcome.diagnostics);
             return false;
@@ -198,8 +252,8 @@ bool CreateChildElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& ou
         }
     }
     if (!applied_to_library &&
-        !core::AddChildElement(ctx.model, &ctx.package, parent_id_, kind_, generated_id_,
-                               generated_relationship_id_, out_error))
+        !core::AddChildElement(
+            ctx.model, &ctx.package, parent_id_, kind_, generated_id_, generated_relationship_id_, out_error))
         return false;
 
     out_event.event_type = "CreateChildElement";
@@ -221,15 +275,18 @@ bool CreateChallengeCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_e
     if (ctx.library_document != nullptr && ctx.allow_library_primary) {
         std::string planned_element_id;
         std::string planned_relationship_id;
-        if (!core::PlanChallengeIds(ctx.model, &ctx.package, target_, source_type_, planned_element_id,
-                                    planned_relationship_id, out_error))
+        if (!core::PlanChallengeIds(
+                ctx.model, &ctx.package, target_, source_type_, planned_element_id, planned_relationship_id, out_error))
             return false;
         // The seam resolves an element vs relationship target itself (the
         // library gives every contained element a parent), so `target_.kind` is
         // only used above, for the anchor the legacy id prefix is scoped to.
-        const sacm_adapter::AddChildOutcome outcome = sacm_adapter::apply_challenge(
-            *ctx.library_document, target_.id, ToAdapterChallengeSource(source_type_),
-            planned_element_id, planned_relationship_id);
+        const sacm_adapter::AddChildOutcome outcome =
+            sacm_adapter::apply_challenge(*ctx.library_document,
+                                          target_.id,
+                                          ToAdapterChallengeSource(source_type_),
+                                          planned_element_id,
+                                          planned_relationship_id);
         if (outcome.supported && !outcome.applied) {
             out_error = LibraryRejection("the new challenge", outcome.diagnostics);
             return false;
@@ -242,8 +299,8 @@ bool CreateChallengeCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_e
         }
     }
     if (!applied_to_library &&
-        !core::AddChallenge(ctx.model, &ctx.package, target_, source_type_, generated_id_,
-                            generated_relationship_id_, out_error))
+        !core::AddChallenge(
+            ctx.model, &ctx.package, target_, source_type_, generated_id_, generated_relationship_id_, out_error))
         return false;
 
     out_event.event_type = "CreateChallenge";
@@ -290,14 +347,12 @@ bool RemoveElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
     // re-derives the library from the mutated package). A native retarget op would
     // let the seam take it too.
     bool applied_to_library = false;
-    if (ctx.library_document != nullptr && ctx.allow_library_primary &&
-        mode_ == RemoveMode::NodeAndDescendants) {
+    if (ctx.library_document != nullptr && ctx.allow_library_primary && mode_ == RemoveMode::NodeAndDescendants) {
         // Exactly the ids `PlanRemoval` produced -- the same set the audit event
         // records, walked in the same sorted order `ApplyEventToLibrary` replays,
         // so the live document and the replayed document agree by construction.
         for (const std::string& id : deleted_ids) {
-            const sacm_adapter::DeleteOutcome outcome =
-                sacm_adapter::apply_delete_element(*ctx.library_document, id);
+            const sacm_adapter::DeleteOutcome outcome = sacm_adapter::apply_delete_element(*ctx.library_document, id);
             if (!outcome.applied) {
                 // Mid-cascade failure: earlier ids are already gone, so the bus
                 // re-derives the views from the library on the failure path
@@ -323,8 +378,7 @@ bool RemoveElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
     return true;
 }
 
-bool UpdateElementTextCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event,
-                                     std::string& out_error) {
+bool UpdateElementTextCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
     if (element_id_.empty()) {
         out_error = "UpdateElementTextCommand requires an element id";
         return false;
@@ -344,10 +398,9 @@ bool UpdateElementTextCommand::Apply(CommandContext& ctx, audit::AuditEvent& out
     // recorded hash and the replayed hash converge by construction with no migration.
     // `old_value_` is captured whether the bridge runs it on the scratch projection
     // (the library's last committed value) or the legacy fallback runs it in place.
-    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase& model,
-                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-        return core::SetElementTextField(model, &package, element_id_, field_, language_, new_value_,
-                                         old_value_, err);
+    const LibraryBridgeMutator mutate =
+        [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+        return core::SetElementTextField(model, &package, element_id_, field_, language_, new_value_, old_value_, err);
     };
     if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
@@ -364,19 +417,16 @@ bool UpdateElementTextCommand::Apply(CommandContext& ctx, audit::AuditEvent& out
     return true;
 }
 
-bool UpdateGsnIdentifierCommand::Apply(CommandContext& ctx,
-                                       audit::AuditEvent& out_event,
-                                       std::string& out_error) {
+bool UpdateGsnIdentifierCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
     if (element_id_.empty()) {
         out_error = "UpdateGsnIdentifierCommand requires an element id";
         return false;
     }
 
-    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase& model,
-                                            sacm::AssuranceCasePackage& package,
-                                            std::string& error) {
-        return core::SetGsnIdentifier(model, &package, element_id_, new_identifier_, old_identifier_, error);
-    };
+    const LibraryBridgeMutator mutate =
+        [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
+            return core::SetGsnIdentifier(model, &package, element_id_, new_identifier_, old_identifier_, error);
+        };
     if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
 
@@ -411,8 +461,7 @@ bool RemoveRelationshipCommand::Apply(CommandContext& ctx, audit::AuditEvent& ou
             applied_to_library = true;
         }
     }
-    if (!applied_to_library &&
-        !core::RemoveRelationship(ctx.model, &ctx.package, relationship_id_, out_error))
+    if (!applied_to_library && !core::RemoveRelationship(ctx.model, &ctx.package, relationship_id_, out_error))
         return false;
 
     out_event.event_type = "RemoveRelationship";
@@ -432,12 +481,11 @@ bool DropRelationshipReferenceCommand::Apply(CommandContext& ctx,
     // Bridged rather than routed to a native seam: the library has no operation
     // for "drop one reference", and its delete seam would remove the referenced
     // element -- which here does not exist, that being the whole defect.
-    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase& model,
-                                            sacm::AssuranceCasePackage& package,
-                                            std::string& error) {
-        return core::DropRelationshipReference(model, &package, relationship_id_, reference_,
-                                               removed_relationship_, error);
-    };
+    const LibraryBridgeMutator mutate =
+        [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
+            return core::DropRelationshipReference(
+                model, &package, relationship_id_, reference_, removed_relationship_, error);
+        };
     if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
 
@@ -449,19 +497,16 @@ bool DropRelationshipReferenceCommand::Apply(CommandContext& ctx,
     return true;
 }
 
-bool MoveStrategyToReasoningCommand::Apply(CommandContext& ctx,
-                                           audit::AuditEvent& out_event,
-                                           std::string& out_error) {
+bool MoveStrategyToReasoningCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
     if (relationship_id_.empty() || strategy_id_.empty()) {
         out_error = "MoveStrategyToReasoningCommand requires a relationship id and a strategy id";
         return false;
     }
 
-    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase& model,
-                                            sacm::AssuranceCasePackage& package,
-                                            std::string& error) {
-        return core::MoveStrategyToReasoning(model, &package, relationship_id_, strategy_id_, error);
-    };
+    const LibraryBridgeMutator mutate =
+        [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
+            return core::MoveStrategyToReasoning(model, &package, relationship_id_, strategy_id_, error);
+        };
     if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
 
@@ -472,19 +517,16 @@ bool MoveStrategyToReasoningCommand::Apply(CommandContext& ctx,
     return true;
 }
 
-bool SetElementUndevelopedCommand::Apply(CommandContext& ctx,
-                                         audit::AuditEvent& out_event,
-                                         std::string& out_error) {
+bool SetElementUndevelopedCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
     if (element_id_.empty()) {
         out_error = "SetElementUndevelopedCommand requires an element id";
         return false;
     }
 
-    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase& model,
-                                            sacm::AssuranceCasePackage& package,
-                                            std::string& error) {
-        return core::SetElementUndeveloped(model, &package, element_id_, undeveloped_, old_value_, error);
-    };
+    const LibraryBridgeMutator mutate =
+        [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
+            return core::SetElementUndeveloped(model, &package, element_id_, undeveloped_, old_value_, error);
+        };
     if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
 

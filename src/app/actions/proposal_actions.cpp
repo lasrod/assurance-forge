@@ -38,8 +38,8 @@ using core::NowUtcString;
 using core::TrimWhitespace;
 using core::reviews::BuildDraftReviewProposal;
 using detail::ApplyProposalPreviewVisualState;
-using detail::CreateOperationFor;
 using detail::CreatedElementRef;
+using detail::CreateOperationFor;
 using detail::DeleteProposalPatchFile;
 using detail::ElementTextTarget;
 using detail::GenerateCreateRef;
@@ -458,8 +458,8 @@ void ProposalActions::CancelActive() {
     ClearProposalHighlightState(ui::GetUiState());
 
     if (state_.app_state.loaded_case.has_value()) {
-        state_.current_tree = ui::gsn::BuildAssuranceTree(state_.app_state.loaded_case.value(),
-                                                          ui::GetUiState().active_secondary_lang);
+        state_.current_tree =
+            ui::gsn::BuildAssuranceTree(state_.app_state.loaded_case.value(), ui::GetUiState().active_secondary_lang);
         ui::gsn::SetCanvasTree(state_.current_tree);
     } else {
         state_.tree_needs_rebuild = true;

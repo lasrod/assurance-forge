@@ -44,10 +44,8 @@ parser::SacmElement ArtifactReference(std::string id) {
     return element;
 }
 
-parser::SacmElement Inference(std::string id,
-                              std::vector<std::string> sources,
-                              std::string target,
-                              std::string reasoning = {}) {
+parser::SacmElement
+Inference(std::string id, std::vector<std::string> sources, std::string target, std::string reasoning = {}) {
     parser::SacmElement element;
     element.id = std::move(id);
     element.type = "assertedinference";
@@ -82,9 +80,8 @@ const parser::SacmElement* Find(const parser::AssuranceCase& model, const std::s
 
 bool HasFindingOfRule(const parser::AssuranceCase& model, core::GsnRule rule) {
     const std::vector<core::GsnFinding> findings = core::CheckGsnWellFormedness(model);
-    return std::any_of(findings.begin(), findings.end(), [&](const core::GsnFinding& finding) {
-        return finding.rule == rule;
-    });
+    return std::any_of(
+        findings.begin(), findings.end(), [&](const core::GsnFinding& finding) { return finding.rule == rule; });
 }
 
 } // namespace
@@ -119,8 +116,8 @@ TEST(GsnRepairTest, RemovingARelationshipRejectsANodeId) {
 TEST(GsnRepairTest, GSN3_CORE_015_RemovingTheRelationshipClearsTheFinding) {
     parser::AssuranceCase model;
     // A sub-goal argued beneath a Solution: GSN says a Solution is a leaf.
-    model.elements = {Goal("G1"), Goal("G2"), ArtifactReference("Sn1"), Evidence("R1", "Sn1", "G1"),
-                      Inference("R2", {"G2"}, "Sn1")};
+    model.elements = {
+        Goal("G1"), Goal("G2"), ArtifactReference("Sn1"), Evidence("R1", "Sn1", "G1"), Inference("R2", {"G2"}, "Sn1")};
     ASSERT_TRUE(HasFindingOfRule(model, core::GsnRule::SupportedElementIsALeaf));
 
     std::string error;
@@ -175,8 +172,7 @@ TEST(GsnRepairTest, DroppingAReferenceTheRelationshipDoesNotHaveIsRefused) {
 
     bool removed_relationship = false;
     std::string error;
-    EXPECT_FALSE(
-        core::DropRelationshipReference(model, nullptr, "R1", "G-elsewhere", removed_relationship, error));
+    EXPECT_FALSE(core::DropRelationshipReference(model, nullptr, "R1", "G-elsewhere", removed_relationship, error));
     EXPECT_FALSE(error.empty());
     ASSERT_NE(Find(model, "R1"), nullptr);
     EXPECT_EQ(Find(model, "R1")->source_refs, std::vector<std::string>{"G2"});
@@ -206,8 +202,8 @@ TEST(GsnRepairTest, GSN3_CORE_002_MovingTheStrategyPreservesTheArgument) {
 // the argument, and the tool does not get to make it.
 TEST(GsnRepairTest, MovingAStrategyIsRefusedWhenTheInferenceAlreadyHasReasoning) {
     parser::AssuranceCase model;
-    model.elements = {Goal("G1"), Goal("G2"), Strategy("S1"), Strategy("S2"),
-                      Inference("R1", {"G2", "S1"}, "G1", "S2")};
+    model.elements = {
+        Goal("G1"), Goal("G2"), Strategy("S1"), Strategy("S2"), Inference("R1", {"G2", "S1"}, "G1", "S2")};
 
     std::string error;
     EXPECT_FALSE(core::MoveStrategyToReasoning(model, nullptr, "R1", "S1", error));
@@ -290,8 +286,12 @@ TEST(GsnRepairTest, RenumberingAnAcpScopedIdentifierStaysInItsScope) {
 
 TEST(GsnRepairSyncTest, EveryFindingOffersARepair) {
     parser::AssuranceCase model;
-    model.elements = {Goal("G1"), Goal("G2"), ArtifactReference("Sn1"), Evidence("R1", "Sn1", "G1"),
-                      Inference("R2", {"G2"}, "Sn1"), Inference("R3", {"G-missing"}, "G1")};
+    model.elements = {Goal("G1"),
+                      Goal("G2"),
+                      ArtifactReference("Sn1"),
+                      Evidence("R1", "Sn1", "G1"),
+                      Inference("R2", {"G2"}, "Sn1"),
+                      Inference("R3", {"G-missing"}, "G1")};
 
     core::ProblemsManager problems;
     app::SyncStructureProblems(problems, &model);

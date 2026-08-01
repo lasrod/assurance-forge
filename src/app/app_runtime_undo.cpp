@@ -22,7 +22,8 @@ namespace {
 // model. Mirrors the dispatch-layer guard in `app::commands::dispatch`.
 bool ActiveCanvasInHistoricalPreview(const AppRuntimeState& state) {
     const std::string& active = state.workbench.active_argument_package_canvas_key;
-    if (active.empty()) return false;
+    if (active.empty())
+        return false;
     for (const auto& tab : state.workbench.argument_package_canvas_tabs) {
         if (tab.key == active) {
             return tab.timeline.preview_sequence.has_value();
@@ -35,20 +36,26 @@ bool ActiveCanvasInHistoricalPreview(const AppRuntimeState& state) {
 
 bool AppRuntime::CanUndo() const {
     const AppRuntimeState& state = *impl_;
-    if (!state.command_bus) return false;
-    if (!state.app_state.current_project.has_value()) return false;
-    if (!state.app_state.loaded_case.has_value()) return false;
-    if (!state.app_state.has_projected_package()) return false;
-    if (ActiveCanvasInHistoricalPreview(state)) return false;
+    if (!state.command_bus)
+        return false;
+    if (!state.app_state.current_project.has_value())
+        return false;
+    if (!state.app_state.loaded_case.has_value())
+        return false;
+    if (!state.app_state.has_projected_package())
+        return false;
+    if (ActiveCanvasInHistoricalPreview(state))
+        return false;
 
     const auto& transactions = state.command_bus->Store().Transactions();
-    const auto target        = core::audit::FindUndoTarget(transactions);
-    if (!target.has_target) return false;
+    const auto target = core::audit::FindUndoTarget(transactions);
+    if (!target.has_target)
+        return false;
 
-    const auto& project   = state.app_state.current_project.value();
+    const auto& project = state.app_state.current_project.value();
     const auto& snapshots = areas::GetCachedSnapshots(project.rootPath);
     const auto& baselines = areas::GetCachedBaselines(project.rootPath);
-    const auto boundary   = core::audit::FindUndoBoundary(snapshots, baselines, target.target_sequence);
+    const auto boundary = core::audit::FindUndoBoundary(snapshots, baselines, target.target_sequence);
     return core::audit::CanUndo(target.target_sequence, boundary);
 }
 
@@ -59,32 +66,29 @@ bool AppRuntime::Undo() {
         state.app_state.status_message = "Undo unavailable: no project audit bus.";
         return false;
     }
-    if (!state.app_state.current_project.has_value() ||
-        !state.app_state.loaded_case.has_value() ||
+    if (!state.app_state.current_project.has_value() || !state.app_state.loaded_case.has_value() ||
         !state.app_state.has_projected_package()) {
         state.app_state.status_message = "Undo unavailable: no project loaded.";
         return false;
     }
     if (ActiveCanvasInHistoricalPreview(state)) {
-        state.app_state.status_message =
-            "Cannot undo while viewing history. Return to Latest to make changes.";
+        state.app_state.status_message = "Cannot undo while viewing history. Return to Latest to make changes.";
         return false;
     }
 
     const auto& transactions = state.command_bus->Store().Transactions();
-    const auto target        = core::audit::FindUndoTarget(transactions);
+    const auto target = core::audit::FindUndoTarget(transactions);
     if (!target.has_target) {
         state.app_state.status_message = "Nothing to undo.";
         return false;
     }
 
-    const auto& project   = state.app_state.current_project.value();
+    const auto& project = state.app_state.current_project.value();
     const auto& snapshots = areas::GetCachedSnapshots(project.rootPath);
     const auto& baselines = areas::GetCachedBaselines(project.rootPath);
-    const auto boundary   = core::audit::FindUndoBoundary(snapshots, baselines, target.target_sequence);
+    const auto boundary = core::audit::FindUndoBoundary(snapshots, baselines, target.target_sequence);
     if (!core::audit::CanUndo(target.target_sequence, boundary)) {
-        state.app_state.status_message =
-            "Reached snapshot or baseline — restore from history to go further back.";
+        state.app_state.status_message = "Reached snapshot or baseline — restore from history to go further back.";
         return false;
     }
 
@@ -102,10 +106,11 @@ bool AppRuntime::Undo() {
     // serializes it, preserving the unknown/foreign content no projection can
     // carry. The views come along for the legacy path (a context with no
     // library document).
-    core::commands::UndoLastTransactionCommand cmd(
-        target.target_sequence, target.target_command_name,
-        std::move(prior.value().views.model), std::move(prior.value().views.package),
-        std::move(prior.value().document));
+    core::commands::UndoLastTransactionCommand cmd(target.target_sequence,
+                                                   target.target_command_name,
+                                                   std::move(prior.value().views.model),
+                                                   std::move(prior.value().views.package),
+                                                   std::move(prior.value().document));
 
     const auto outcome = commands::DispatchAuditedCommand(state, cmd);
     if (!outcome.success) {

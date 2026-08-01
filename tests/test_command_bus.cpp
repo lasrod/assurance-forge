@@ -47,9 +47,9 @@ void WriteFile(const std::filesystem::path& path, std::string_view content) {
 
 struct ProjectFixture {
     core::AssuranceProject project;
-    std::filesystem::path  sacm_abs;
+    std::filesystem::path sacm_abs;
     sacm::AssuranceCasePackage package;
-    parser::AssuranceCase      model;
+    parser::AssuranceCase model;
 };
 
 ProjectFixture MakeFixture(const std::string& tag) {
@@ -81,8 +81,7 @@ ProjectFixture MakeFixture(const std::string& tag) {
     return f;
 }
 
-const core::SacmElement* FindProjected(const core::AssuranceCase& assurance_case,
-                                       const std::string& id) {
+const core::SacmElement* FindProjected(const core::AssuranceCase& assurance_case, const std::string& id) {
     for (const core::SacmElement& element : assurance_case.elements) {
         if (element.id == id) {
             return &element;
@@ -114,8 +113,7 @@ TEST(CommandBus, SACM23_INT_001_UpdateElementTextIsLibraryPrimary) {
     ASSERT_TRUE(loaded.ok);
     ASSERT_NE(loaded.document, nullptr);
 
-    core::commands::UpdateElementTextCommand cmd("G1", core::ElementTextField::Name, "en",
-                                                 "Renamed Goal");
+    core::commands::UpdateElementTextCommand cmd("G1", core::ElementTextField::Name, "en", "Renamed Goal");
     core::commands::CommandContext ctx{f.model, f.package, loaded.document.get()};
     core::audit::AuditEvent event;
     std::string error;
@@ -144,8 +142,7 @@ TEST(CommandBus, SACM23_INT_001_NoOpTextEditIsDetected) {
     ASSERT_NE(loaded.document, nullptr);
 
     // "Top goal" is already G1's name, so this edit is a no-op.
-    core::commands::UpdateElementTextCommand cmd("G1", core::ElementTextField::Name, "en",
-                                                 "Top goal");
+    core::commands::UpdateElementTextCommand cmd("G1", core::ElementTextField::Name, "en", "Top goal");
     core::commands::CommandContext ctx{f.model, f.package, loaded.document.get()};
     core::audit::AuditEvent event;
     std::string error;
@@ -164,7 +161,7 @@ TEST(CommandBus, SACM23_INT_001_UncoveredCommandRederivesLibraryDocument) {
     sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
     ASSERT_TRUE(loaded.ok);
     ASSERT_NE(loaded.document, nullptr);
-    ASSERT_EQ(ClaimCount(sacm_adapter::project_case(*loaded.document)), 1u);  // just G1
+    ASSERT_EQ(ClaimCount(sacm_adapter::project_case(*loaded.document)), 1u); // just G1
 
     std::string error;
     auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
@@ -220,7 +217,10 @@ TEST(CommandBus, AppendsTransactionAndUpdatesManifestOnCreateChildElement) {
     const auto& ap = on_disk.argumentPackages.front();
     bool found = false;
     for (const auto& reasoning : ap.argumentReasonings) {
-        if (reasoning.id == cmd.GeneratedId()) { found = true; break; }
+        if (reasoning.id == cmd.GeneratedId()) {
+            found = true;
+            break;
+        }
     }
     EXPECT_TRUE(found) << "newly-added strategy " << cmd.GeneratedId() << " not present on disk";
 }
@@ -312,18 +312,16 @@ TEST(CommandBus, CreateUserSnapshotAfterExecuteKeepsManifestConsistent) {
 
     // Take the close-time snapshot. Mirrors what AppRuntime::RequestExit does.
     core::audit::SnapshotMetadata snap;
-    ASSERT_TRUE(core::audit::CreateUserSnapshot(
-        f.project.rootPath, "automatic close snapshot", "tester", snap, error)) << error;
+    ASSERT_TRUE(core::audit::CreateUserSnapshot(f.project.rootPath, "automatic close snapshot", "tester", snap, error))
+        << error;
     EXPECT_FALSE(snap.snapshot_id.empty());
 
     // CreateUserSnapshot must not have mutated the audit manifest's hash
     // chain — only the snapshots/ directory is touched.
     core::audit::AuditManifest manifest_after_snapshot;
     ASSERT_TRUE(core::audit::ReadAuditManifest(f.project.rootPath, manifest_after_snapshot, error)) << error;
-    EXPECT_EQ(manifest_after_snapshot.latest_transaction_sequence,
-              manifest_after_exec.latest_transaction_sequence);
-    EXPECT_EQ(manifest_after_snapshot.last_known_raw_file_hash,
-              manifest_after_exec.last_known_raw_file_hash);
+    EXPECT_EQ(manifest_after_snapshot.latest_transaction_sequence, manifest_after_exec.latest_transaction_sequence);
+    EXPECT_EQ(manifest_after_snapshot.last_known_raw_file_hash, manifest_after_exec.last_known_raw_file_hash);
     EXPECT_EQ(manifest_after_snapshot.last_known_canonical_model_hash,
               manifest_after_exec.last_known_canonical_model_hash);
 
@@ -353,13 +351,13 @@ TEST(CommandBus, CreateUserSnapshotIsRejectedAtSameSequence) {
     ASSERT_TRUE(bus->Execute(add, ctx, "tester").success);
 
     core::audit::SnapshotMetadata first;
-    ASSERT_TRUE(core::audit::CreateUserSnapshot(
-        f.project.rootPath, "automatic close snapshot", "tester", first, error)) << error;
+    ASSERT_TRUE(core::audit::CreateUserSnapshot(f.project.rootPath, "automatic close snapshot", "tester", first, error))
+        << error;
 
     core::audit::SnapshotMetadata second;
     std::string second_error;
-    const bool ok = core::audit::CreateUserSnapshot(
-        f.project.rootPath, "automatic close snapshot", "tester", second, second_error);
+    const bool ok =
+        core::audit::CreateUserSnapshot(f.project.rootPath, "automatic close snapshot", "tester", second, second_error);
     EXPECT_FALSE(ok) << "second snapshot at the same sequence should be rejected";
     EXPECT_FALSE(second_error.empty());
 }

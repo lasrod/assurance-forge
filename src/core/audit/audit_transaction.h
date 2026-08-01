@@ -16,23 +16,19 @@ namespace core::audit {
 inline constexpr int kAuditTransactionSchemaVersion = 1;
 
 struct AuditTransaction {
-    int           transaction_schema_version = kAuditTransactionSchemaVersion;
+    int transaction_schema_version = kAuditTransactionSchemaVersion;
     std::uint64_t transaction_sequence = 0;
-    std::string   transaction_id;   // UUID-like opaque identifier
-    std::string   timestamp;        // ISO-8601 UTC
-    std::string   author;           // "system" or display name
-    std::string   command_name;     // Originating command, e.g. "CreateClaim"
-    std::string   previous_transaction_hash; // sha256 hex of previous tx line; empty for first
+    std::string transaction_id;            // UUID-like opaque identifier
+    std::string timestamp;                 // ISO-8601 UTC
+    std::string author;                    // "system" or display name
+    std::string command_name;              // Originating command, e.g. "CreateClaim"
+    std::string previous_transaction_hash; // sha256 hex of previous tx line; empty for first
     std::vector<AuditEvent> events;
 };
 
 nlohmann::ordered_json SerializeAuditTransaction(const AuditTransaction& tx);
-std::string            SerializeAuditTransactionLine(const AuditTransaction& tx);
-bool                   ParseAuditTransaction(const nlohmann::ordered_json& j,
-                                             AuditTransaction& out,
-                                             std::string& error);
-bool                   ParseAuditTransactionLine(const std::string& line,
-                                                 AuditTransaction& out,
-                                                 std::string& error);
+std::string SerializeAuditTransactionLine(const AuditTransaction& tx);
+bool ParseAuditTransaction(const nlohmann::ordered_json& j, AuditTransaction& out, std::string& error);
+bool ParseAuditTransactionLine(const std::string& line, AuditTransaction& out, std::string& error);
 
 } // namespace core::audit

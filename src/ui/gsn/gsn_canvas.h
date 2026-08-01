@@ -104,7 +104,7 @@ struct CanvasOverlayButtons {
     std::function<void(ImVec2, ImVec2)> on_render_timeline_strip;
     // Small "Live" pill rendered immediately to the left of the zoom strip
     // when set, used to return to the live model from a historical preview.
-    std::function<void()>       on_return_to_live;
+    std::function<void()> on_return_to_live;
     // When non-empty, the canvas paints a small badge at the top-left of the
     // viewport (e.g. "Preview: Tx 42") so the user always knows the canvas
     // is showing a historical reconstruction rather than the live model.

@@ -67,17 +67,14 @@ TEST(EventScope, CollectArgumentPackageScopeIncludesAllElementKinds) {
 
 TEST(EventScope, CollectEventElementIdsReadsKnownPayloadFields) {
     auto event = MakeEvent("CreateChildElement",
-                           {{"parent_id", "G1"},
-                            {"generated_id", "S1"},
-                            {"generated_relationship_id", "AI1"}});
+                           {{"parent_id", "G1"}, {"generated_id", "S1"}, {"generated_relationship_id", "AI1"}});
     const auto ids = core::audit::CollectEventElementIds(event);
     EXPECT_EQ(ids.size(), 3u);
 }
 
 TEST(EventScope, CollectEventElementIdsReadsDeletedIdsArray) {
-    auto event = MakeEvent("RemoveElement",
-                           {{"element_id", "S1"},
-                            {"deleted_ids", nlohmann::ordered_json::array({"S1", "AI1", "Sn1"})}});
+    auto event = MakeEvent(
+        "RemoveElement", {{"element_id", "S1"}, {"deleted_ids", nlohmann::ordered_json::array({"S1", "AI1", "Sn1"})}});
     const auto ids = core::audit::CollectEventElementIds(event);
     // element_id + 3 deleted_ids = 4
     EXPECT_EQ(ids.size(), 4u);
@@ -86,19 +83,19 @@ TEST(EventScope, CollectEventElementIdsReadsDeletedIdsArray) {
 TEST(EventScope, TransactionTouchesScopeMatchesById) {
     const auto pkg = MakePackageWithClaim("G1", "G1.gid");
     const auto scope = core::audit::CollectArgumentPackageScope(pkg);
-    auto tx = MakeTx(1, {MakeEvent("CreateChildElement",
-                                   {{"parent_id", "G1"},
-                                    {"generated_id", "S1"},
-                                    {"generated_relationship_id", "AI1"}})});
+    auto tx = MakeTx(1,
+                     {MakeEvent("CreateChildElement",
+                                {{"parent_id", "G1"}, {"generated_id", "S1"}, {"generated_relationship_id", "AI1"}})});
     EXPECT_TRUE(core::audit::TransactionTouchesScope(tx, scope));
 }
 
 TEST(EventScope, TransactionTouchesScopeMatchesByGid) {
     const auto pkg = MakePackageWithClaim("G1", "G1.gid");
     const auto scope = core::audit::CollectArgumentPackageScope(pkg);
-    auto tx = MakeTx(1, {MakeEvent("RemoveElement",
-                                   {{"element_id", "G1.gid"},
-                                    {"deleted_ids", nlohmann::ordered_json::array({"G1.gid"})}})});
+    auto tx =
+        MakeTx(1,
+               {MakeEvent("RemoveElement",
+                          {{"element_id", "G1.gid"}, {"deleted_ids", nlohmann::ordered_json::array({"G1.gid"})}})});
     EXPECT_TRUE(core::audit::TransactionTouchesScope(tx, scope));
 }
 

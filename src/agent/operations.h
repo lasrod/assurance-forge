@@ -29,8 +29,8 @@
 namespace agent {
 
 struct Result {
-    nlohmann::json payload  = nlohmann::json::object();
-    bool           is_error = false;
+    nlohmann::json payload = nlohmann::json::object();
+    bool is_error = false;
 
     static Result Ok(nlohmann::json payload);
     // Worded for a model to read and act on, not for a log.
@@ -45,7 +45,7 @@ struct ReadContext {
     const core::AppState& state;
     // How this case was addressed: the project directory, or the file itself
     // when a bare SACM document was opened outside a project.
-    std::string           project_path;
+    std::string project_path;
 };
 
 Result GetCaseOverview(const ReadContext& context);
@@ -73,12 +73,12 @@ Result SuggestPlacement(const ReadContext& context, const nlohmann::json& argume
 // ---------------------------------------------------------------------------
 
 struct ChangeContext {
-    const core::AppState&              state;
-    core::changesets::ChangeSetStore&  store;
+    const core::AppState& state;
+    core::changesets::ChangeSetStore& store;
     // Which connection is asking, so a client's operations reach its own change
     // set and not another client's.
-    std::uint64_t                      connection_id = 0;
-    std::string                        client_label;
+    std::uint64_t connection_id = 0;
+    std::string client_label;
 };
 
 Result BeginChangeSet(const ChangeContext& context, const nlohmann::json& arguments);
@@ -91,8 +91,9 @@ Result ListChangeSets(const ChangeContext& context);
 
 // Parses the operation vocabulary an agent sends. Exposed so the operation
 // schema published over MCP and the parser that enforces it stay one thing.
-bool ParsePatchOperations(const nlohmann::json&                       source,
-                          std::vector<core::reviews::PatchOperation>& out, std::string& error);
+bool ParsePatchOperations(const nlohmann::json& source,
+                          std::vector<core::reviews::PatchOperation>& out,
+                          std::string& error);
 
 // The operation type names an agent may use, in schema order.
 const std::vector<std::string>& PatchOperationTypeNames();
@@ -102,8 +103,8 @@ const std::vector<std::string>& PatchOperationTypeNames();
 // rather than a nicety: an unbounded search would spend the whole conversation
 // on one call. Exposed so the tool descriptions can quote the real numbers.
 inline constexpr int kDefaultResultLimit = 50;
-inline constexpr int kMaxResultLimit     = 200;
-inline constexpr int kDefaultTreeDepth   = 4;
-inline constexpr int kMaxTreeDepth       = 12;
+inline constexpr int kMaxResultLimit = 200;
+inline constexpr int kDefaultTreeDepth = 4;
+inline constexpr int kMaxTreeDepth = 12;
 
 } // namespace agent

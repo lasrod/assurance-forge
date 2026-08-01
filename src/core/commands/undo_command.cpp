@@ -2,9 +2,7 @@
 
 namespace core::commands {
 
-bool UndoLastTransactionCommand::Apply(CommandContext& ctx,
-                                       audit::AuditEvent& out_event,
-                                       std::string& out_error) {
+bool UndoLastTransactionCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
     if (undone_transaction_sequence_ == 0) {
         out_error = "Cannot undo: no transaction sequence specified";
         return false;
@@ -40,13 +38,13 @@ bool UndoLastTransactionCommand::Apply(CommandContext& ctx,
         // rendering from this frame -- the hazard the bus stopped taking for
         // every other flipped command, which undo was still taking here.
     } else {
-        ctx.model   = std::move(prior_model_);
+        ctx.model = std::move(prior_model_);
         ctx.package = std::move(prior_package_);
     }
 
-    out_event.event_type                          = "Undo";
+    out_event.event_type = "Undo";
     out_event.payload["undone_transaction_sequence"] = undone_transaction_sequence_;
-    out_event.payload["undone_command_name"]         = undone_command_name_;
+    out_event.payload["undone_command_name"] = undone_command_name_;
     return true;
 }
 

@@ -125,10 +125,12 @@ void RenderTermCategoryPicker(AppRuntimeState& state) {
 
 void RenderTermTextFields(AppRuntimeState& state) {
     ImGui::SetNextItemWidth(460.0f);
-    ImGui::InputText((AF_TR("Term") + "##term_value").c_str(), state.terminology.term_value_buf,
+    ImGui::InputText((AF_TR("Term") + "##term_value").c_str(),
+                     state.terminology.term_value_buf,
                      sizeof(state.terminology.term_value_buf));
     ImGui::SetNextItemWidth(460.0f);
-    ImGui::InputText((AF_TR("Full Name / Display Name") + "##term_name").c_str(), state.terminology.term_name_buf,
+    ImGui::InputText((AF_TR("Full Name / Display Name") + "##term_name").c_str(),
+                     state.terminology.term_name_buf,
                      sizeof(state.terminology.term_name_buf));
     ImGui::SetNextItemWidth(460.0f);
     ImGui::InputTextMultiline((AF_TR("Definition") + "##term_definition").c_str(),
@@ -295,7 +297,8 @@ void ModalHost::RenderTerminologyTermEditorModal() {
         RenderTermCategoryPicker(state_);
         RenderTermExternalReferenceField(state_);
         ImGui::SetNextItemWidth(460.0f);
-        ImGui::InputText((AF_TR("Origin") + "##term_origin").c_str(), state_.terminology.term_origin_buf,
+        ImGui::InputText((AF_TR("Origin") + "##term_origin").c_str(),
+                         state_.terminology.term_origin_buf,
                          sizeof(state_.terminology.term_origin_buf));
 
         const std::string value = TrimWhitespace(state_.terminology.term_value_buf);
@@ -342,9 +345,8 @@ void ModalHost::RenderQuickDefineTermModal() {
     }
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal((AF_TR("Create Term") + "###quick_define_term").c_str(),
-                               nullptr,
-                               ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal(
+            (AF_TR("Create Term") + "###quick_define_term").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         RenderTermTextFields(state_);
 
         ImGui::TextUnformatted(AF_TR("Store in").c_str());
@@ -423,7 +425,8 @@ void ModalHost::RenderDeleteTerminologyTermModal() {
         return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal((AF_TR("Delete Term") + "###Delete Term").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal(
+            (AF_TR("Delete Term") + "###Delete Term").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextWrapped("%s", AF_TR("Delete this term?").c_str());
         if (state_.terminology.pending_delete_term_usage_count > 0) {
             ImGui::TextWrapped("%s",
@@ -501,16 +504,16 @@ void ModalHost::RenderDeleteTerminologyCategoryModal() {
         return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal((AF_TR("Delete Category") + "###Delete Category").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal(
+            (AF_TR("Delete Category") + "###Delete Category").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextWrapped("%s", AF_TR("Delete this category?").c_str());
         if (state_.terminology.pending_delete_category_term_count > 0) {
             ImGui::TextWrapped(
                 "%s",
-                ui::i18n::trnf(
-                    "This category is assigned to {0} term. Remove those assignments before deleting it.",
-                    "This category is assigned to {0} terms. Remove those assignments before deleting it.",
-                    state_.terminology.pending_delete_category_term_count,
-                    state_.terminology.pending_delete_category_term_count)
+                ui::i18n::trnf("This category is assigned to {0} term. Remove those assignments before deleting it.",
+                               "This category is assigned to {0} terms. Remove those assignments before deleting it.",
+                               state_.terminology.pending_delete_category_term_count,
+                               state_.terminology.pending_delete_category_term_count)
                     .c_str());
         }
         ImGui::Spacing();

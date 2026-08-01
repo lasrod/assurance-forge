@@ -15,8 +15,7 @@ void ShowPackageDetailsPanel(const sacm::SacmPackageTreeNode* package_node,
     ImGui::TextUnformatted(sacm::SacmPackageNodeTypeToDisplayString(package_node->type));
     ImGui::Separator();
 
-    const std::string display_name =
-        package_node->displayName.empty() ? AF_TR("(unnamed)") : package_node->displayName;
+    const std::string display_name = package_node->displayName.empty() ? AF_TR("(unnamed)") : package_node->displayName;
     ImGui::TextUnformatted(ui::i18n::trf("Name: {0}", display_name).c_str());
     ImGui::TextUnformatted(ui::i18n::trf("Type: {0}", sacm::SacmPackageNodeTypeToString(package_node->type)).c_str());
     if (!package_node->xmlLocalName.empty()) {

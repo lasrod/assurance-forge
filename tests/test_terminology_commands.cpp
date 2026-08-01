@@ -160,8 +160,7 @@ TEST(TerminologyCommandsTest, AssociateTermWithElementPopulatesResult) {
     std::string error;
     ASSERT_TRUE(create_term.Apply(ctx, term_event, error)) << error;
 
-    core::commands::AssociateTerminologyTermWithElementCommand associate(
-        "G1", package_ref, create_term.GeneratedRef());
+    core::commands::AssociateTerminologyTermWithElementCommand associate("G1", package_ref, create_term.GeneratedRef());
     core::audit::AuditEvent event;
     ASSERT_TRUE(associate.Apply(ctx, event, error)) << error;
 
@@ -199,8 +198,7 @@ TEST(TerminologyCommandsTest, AddVisibleContextSyncsParserProjection) {
     ASSERT_TRUE(create_term.Apply(ctx, term_event, error)) << error;
 
     const std::size_t elements_before = model.elements.size();
-    core::commands::AddTerminologyTermAsVisibleContextCommand command(
-        "G1", package_ref, create_term.GeneratedRef());
+    core::commands::AddTerminologyTermAsVisibleContextCommand command("G1", package_ref, create_term.GeneratedRef());
     core::audit::AuditEvent event;
     ASSERT_TRUE(command.Apply(ctx, event, error)) << error;
 

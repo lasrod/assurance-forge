@@ -36,17 +36,17 @@ struct ResourceDefinition {
 struct PromptArgument {
     std::string name;
     std::string description;
-    bool        required = false;
+    bool required = false;
 };
 
 struct PromptDefinition {
-    std::string                 name;
-    std::string                 description;
+    std::string name;
+    std::string description;
     std::vector<PromptArgument> arguments;
 };
 
 const std::vector<ResourceDefinition>& BuiltinResources();
-const std::vector<PromptDefinition>&   BuiltinPrompts();
+const std::vector<PromptDefinition>& BuiltinPrompts();
 
 // Reads one resource. `found` distinguishes "no such uri" from "the catalog
 // could not be loaded", which are different problems with different fixes.

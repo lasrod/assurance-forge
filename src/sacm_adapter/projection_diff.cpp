@@ -18,8 +18,10 @@ std::map<std::string, const core::SacmElement*> index_by_id(const core::Assuranc
     return index;
 }
 
-void compare_field(std::vector<ProjectionDifference>& out, const std::string& id,
-                   std::string_view field, const std::string& legacy,
+void compare_field(std::vector<ProjectionDifference>& out,
+                   const std::string& id,
+                   std::string_view field,
+                   const std::string& legacy,
                    const std::string& projected) {
     if (legacy == projected) {
         return;
@@ -31,8 +33,10 @@ void compare_field(std::vector<ProjectionDifference>& out, const std::string& id
     });
 }
 
-void compare_lang_map(std::vector<ProjectionDifference>& out, const std::string& id,
-                      std::string_view field, const std::map<std::string, std::string>& legacy,
+void compare_lang_map(std::vector<ProjectionDifference>& out,
+                      const std::string& id,
+                      std::string_view field,
+                      const std::map<std::string, std::string>& legacy,
                       const std::map<std::string, std::string>& projected) {
     if (legacy == projected) {
         return;
@@ -69,8 +73,10 @@ void compare_lang_map(std::vector<ProjectionDifference>& out, const std::string&
 
 // Reference lists are compared as sets: SACM does not order association ends,
 // so a different order is not a difference.
-void compare_refs(std::vector<ProjectionDifference>& out, const std::string& id,
-                  std::string_view field, const std::vector<std::string>& legacy,
+void compare_refs(std::vector<ProjectionDifference>& out,
+                  const std::string& id,
+                  std::string_view field,
+                  const std::vector<std::string>& legacy,
                   const std::vector<std::string>& projected) {
     const std::set<std::string> legacy_set(legacy.begin(), legacy.end());
     const std::set<std::string> projected_set(projected.begin(), projected.end());
@@ -80,15 +86,13 @@ void compare_refs(std::vector<ProjectionDifference>& out, const std::string& id,
     out.push_back(ProjectionDifference{
         .category = "field",
         .path = std::format("{}.{}", id, field),
-        .message = std::format("legacy {} refs vs projected {} refs", legacy_set.size(),
-                               projected_set.size()),
+        .message = std::format("legacy {} refs vs projected {} refs", legacy_set.size(), projected_set.size()),
     });
 }
 
 } // namespace
 
-std::vector<ProjectionDifference> diff_cases(const core::AssuranceCase& legacy,
-                                             const core::AssuranceCase& projected) {
+std::vector<ProjectionDifference> diff_cases(const core::AssuranceCase& legacy, const core::AssuranceCase& projected) {
     std::vector<ProjectionDifference> differences;
 
     if (legacy.id != projected.id) {
@@ -120,25 +124,27 @@ std::vector<ProjectionDifference> diff_cases(const core::AssuranceCase& legacy,
     const auto acp_fields_equal = [](const core::AcpRecord& a, const core::AcpRecord& b) {
         return a.name == b.name && a.target_kind == b.target_kind && a.target_id == b.target_id &&
                a.resolution_kind == b.resolution_kind && a.text == b.text &&
-               a.confidence_claim_id == b.confidence_claim_id &&
-               a.argument_package_id == b.argument_package_id && a.top_goal_id == b.top_goal_id;
+               a.confidence_claim_id == b.confidence_claim_id && a.argument_package_id == b.argument_package_id &&
+               a.top_goal_id == b.top_goal_id;
     };
     for (const auto& [id, acp] : legacy_acps) {
         const auto found = projected_acps.find(id);
         if (found == projected_acps.end()) {
-            differences.push_back(ProjectionDifference{
-                .category = "acp-missing", .path = id,
-                .message = std::format("legacy has ACP '{}'; projection does not", id)});
+            differences.push_back(
+                ProjectionDifference{.category = "acp-missing",
+                                     .path = id,
+                                     .message = std::format("legacy has ACP '{}'; projection does not", id)});
         } else if (!acp_fields_equal(*acp, *found->second)) {
-            differences.push_back(ProjectionDifference{
-                .category = "acp-field", .path = id, .message = "ACP fields differ"});
+            differences.push_back(
+                ProjectionDifference{.category = "acp-field", .path = id, .message = "ACP fields differ"});
         }
     }
     for (const auto& [id, acp] : projected_acps) {
         if (!legacy_acps.contains(id)) {
-            differences.push_back(ProjectionDifference{
-                .category = "acp-extra", .path = id,
-                .message = std::format("projection has ACP '{}'; legacy does not", id)});
+            differences.push_back(
+                ProjectionDifference{.category = "acp-extra",
+                                     .path = id,
+                                     .message = std::format("projection has ACP '{}'; legacy does not", id)});
         }
     }
 
@@ -150,8 +156,7 @@ std::vector<ProjectionDifference> diff_cases(const core::AssuranceCase& legacy,
             differences.push_back(ProjectionDifference{
                 .category = "element-missing",
                 .path = id,
-                .message = std::format("legacy has {} '{}'; projection does not", element->type,
-                                       element->name),
+                .message = std::format("legacy has {} '{}'; projection does not", element->type, element->name),
             });
         }
     }
@@ -160,8 +165,7 @@ std::vector<ProjectionDifference> diff_cases(const core::AssuranceCase& legacy,
             differences.push_back(ProjectionDifference{
                 .category = "element-extra",
                 .path = id,
-                .message = std::format("projection has {} '{}'; legacy does not", element->type,
-                                       element->name),
+                .message = std::format("projection has {} '{}'; legacy does not", element->type, element->name),
             });
         }
     }
@@ -178,8 +182,7 @@ std::vector<ProjectionDifference> diff_cases(const core::AssuranceCase& legacy,
         compare_field(differences, id, "type", legacy_element->type, other.type);
         compare_field(differences, id, "name", legacy_element->name, other.name);
         compare_field(differences, id, "content", legacy_element->content, other.content);
-        compare_field(differences, id, "description", legacy_element->description,
-                      other.description);
+        compare_field(differences, id, "description", legacy_element->description, other.description);
         compare_field(differences, id, "gid", legacy_element->gid, other.gid);
         // The legacy parser leaves assertionDeclaration empty when the attribute
         // is absent; the library makes the clause-11.10 default ("asserted")
@@ -187,45 +190,38 @@ std::vector<ProjectionDifference> diff_cases(const core::AssuranceCase& legacy,
         const auto normalize_declaration = [](const std::string& value) {
             return value.empty() ? std::string("asserted") : value;
         };
-        compare_field(differences, id, "assertion_declaration",
+        compare_field(differences,
+                      id,
+                      "assertion_declaration",
                       normalize_declaration(legacy_element->assertion_declaration),
                       normalize_declaration(other.assertion_declaration));
-        compare_field(differences, id, "reasoning_ref", legacy_element->reasoning_ref,
-                      other.reasoning_ref);
-        compare_refs(differences, id, "source_refs", legacy_element->source_refs,
-                     other.source_refs);
-        compare_refs(differences, id, "target_refs", legacy_element->target_refs,
-                     other.target_refs);
-        compare_refs(differences, id, "meta_claim_refs", legacy_element->meta_claim_refs,
-                     other.meta_claim_refs);
-        compare_lang_map(differences, id, "name_langs", legacy_element->name_langs,
-                         other.name_langs);
-        compare_lang_map(differences, id, "description_langs", legacy_element->description_langs,
-                         other.description_langs);
-        compare_lang_map(differences, id, "content_langs", legacy_element->content_langs,
-                         other.content_langs);
+        compare_field(differences, id, "reasoning_ref", legacy_element->reasoning_ref, other.reasoning_ref);
+        compare_refs(differences, id, "source_refs", legacy_element->source_refs, other.source_refs);
+        compare_refs(differences, id, "target_refs", legacy_element->target_refs, other.target_refs);
+        compare_refs(differences, id, "meta_claim_refs", legacy_element->meta_claim_refs, other.meta_claim_refs);
+        compare_lang_map(differences, id, "name_langs", legacy_element->name_langs, other.name_langs);
+        compare_lang_map(
+            differences, id, "description_langs", legacy_element->description_langs, other.description_langs);
+        compare_lang_map(differences, id, "content_langs", legacy_element->content_langs, other.content_langs);
         if (legacy_element->is_counter != other.is_counter) {
             differences.push_back(ProjectionDifference{
                 .category = "field",
                 .path = std::format("{}.is_counter", id),
-                .message = std::format("legacy {} vs projected {}", legacy_element->is_counter,
-                                       other.is_counter),
+                .message = std::format("legacy {} vs projected {}", legacy_element->is_counter, other.is_counter),
             });
         }
         if (legacy_element->undeveloped != other.undeveloped) {
             differences.push_back(ProjectionDifference{
                 .category = "field",
                 .path = std::format("{}.undeveloped", id),
-                .message = std::format("legacy {} vs projected {}", legacy_element->undeveloped,
-                                       other.undeveloped),
+                .message = std::format("legacy {} vs projected {}", legacy_element->undeveloped, other.undeveloped),
             });
         }
         if (legacy_element->is_abstract != other.is_abstract) {
             differences.push_back(ProjectionDifference{
                 .category = "field",
                 .path = std::format("{}.is_abstract", id),
-                .message = std::format("legacy {} vs projected {}", legacy_element->is_abstract,
-                                       other.is_abstract),
+                .message = std::format("legacy {} vs projected {}", legacy_element->is_abstract, other.is_abstract),
             });
         }
     }

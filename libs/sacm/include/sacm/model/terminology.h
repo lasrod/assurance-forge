@@ -6,25 +6,27 @@ namespace sacm::model {
 
 // Abstract base of all Terminology package elements (clause 10.2).
 class TerminologyElement : public ArtifactElement {
-  protected:
+protected:
     using ArtifactElement::ArtifactElement;
 };
 
 // Abstract base of the terminology assets contained in packages (clause 10.5).
 class TerminologyAsset : public TerminologyElement {
-  protected:
+protected:
     using TerminologyElement::TerminologyElement;
 };
 
 // Category for organizing terminology concepts (clause 10.8). Categories may
 // reference sub-categories (SACM 2.3 addition).
 class Category final : public TerminologyAsset {
-  public:
+public:
     explicit Category(ElementId id) : TerminologyAsset(ElementKind::Category, std::move(id)) {}
 
-    const std::vector<ElementId>& categories() const { return categories_; }
+    const std::vector<ElementId>& categories() const {
+        return categories_;
+    }
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     std::vector<ElementId> categories_;
@@ -33,14 +35,18 @@ class Category final : public TerminologyAsset {
 // Abstract base of Term and Expression (clause 10.6): a value string plus
 // category references.
 class ExpressionElement : public TerminologyAsset {
-  public:
-    const std::string& value() const { return value_; }
-    const std::vector<ElementId>& categories() const { return categories_; }
+public:
+    const std::string& value() const {
+        return value_;
+    }
+    const std::vector<ElementId>& categories() const {
+        return categories_;
+    }
 
-  protected:
+protected:
     using TerminologyAsset::TerminologyAsset;
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     std::string value_;
@@ -49,12 +55,14 @@ class ExpressionElement : public TerminologyAsset {
 
 // Structured expression composed of other ExpressionElements (clause 10.10).
 class Expression final : public ExpressionElement {
-  public:
+public:
     explicit Expression(ElementId id) : ExpressionElement(ElementKind::Expression, std::move(id)) {}
 
-    const std::vector<ElementId>& elements() const { return elements_; }
+    const std::vector<ElementId>& elements() const {
+        return elements_;
+    }
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     std::vector<ElementId> elements_;
@@ -63,13 +71,17 @@ class Expression final : public ExpressionElement {
 // Terminology term (clause 10.7) with an optional external reference and an
 // origin ModelElement reference.
 class Term final : public ExpressionElement {
-  public:
+public:
     explicit Term(ElementId id) : ExpressionElement(ElementKind::Term, std::move(id)) {}
 
-    const std::string& external_reference() const { return external_reference_; }
-    const std::optional<ElementId>& origin() const { return origin_; }
+    const std::string& external_reference() const {
+        return external_reference_;
+    }
+    const std::optional<ElementId>& origin() const {
+        return origin_;
+    }
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     std::string external_reference_;
@@ -79,13 +91,14 @@ class Term final : public ExpressionElement {
 // Group referencing member TerminologyElements (clause 10.3); membership is
 // by reference, containment stays with the package.
 class TerminologyGroup final : public TerminologyElement {
-  public:
-    explicit TerminologyGroup(ElementId id)
-        : TerminologyElement(ElementKind::TerminologyGroup, std::move(id)) {}
+public:
+    explicit TerminologyGroup(ElementId id) : TerminologyElement(ElementKind::TerminologyGroup, std::move(id)) {}
 
-    const std::vector<ElementId>& terminology_elements() const { return terminology_elements_; }
+    const std::vector<ElementId>& terminology_elements() const {
+        return terminology_elements_;
+    }
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     std::vector<ElementId> terminology_elements_;
@@ -93,19 +106,20 @@ class TerminologyGroup final : public TerminologyElement {
 
 // Terminology interchange package (clause 10.4).
 class TerminologyPackage : public TerminologyElement {
-  public:
-    explicit TerminologyPackage(ElementId id)
-        : TerminologyPackage(ElementKind::TerminologyPackage, std::move(id)) {}
+public:
+    explicit TerminologyPackage(ElementId id) : TerminologyPackage(ElementKind::TerminologyPackage, std::move(id)) {}
 
-    const std::vector<ElementId>& interfaces() const { return interfaces_; }
+    const std::vector<ElementId>& interfaces() const {
+        return interfaces_;
+    }
     const std::vector<std::unique_ptr<TerminologyElement>>& terminology_elements() const {
         return terminology_elements_;
     }
 
-  protected:
+protected:
     TerminologyPackage(ElementKind kind, ElementId id) : TerminologyElement(kind, std::move(id)) {}
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     std::vector<ElementId> interfaces_;
@@ -113,30 +127,34 @@ class TerminologyPackage : public TerminologyElement {
 };
 
 class TerminologyPackageInterface final : public TerminologyPackage {
-  public:
+public:
     explicit TerminologyPackageInterface(ElementId id)
         : TerminologyPackage(ElementKind::TerminologyPackageInterface, std::move(id)) {}
 
-    const std::optional<ElementId>& implements() const { return implements_; }
+    const std::optional<ElementId>& implements() const {
+        return implements_;
+    }
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     std::optional<ElementId> implements_;
 };
 
 class TerminologyPackageBinding final : public TerminologyPackage {
-  public:
+public:
     explicit TerminologyPackageBinding(ElementId id)
         : TerminologyPackage(ElementKind::TerminologyPackageBinding, std::move(id)) {}
 
     // participantPackage: TerminologyPackage[2..*]
-    const std::vector<ElementId>& participant_packages() const { return participant_packages_; }
+    const std::vector<ElementId>& participant_packages() const {
+        return participant_packages_;
+    }
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     std::vector<ElementId> participant_packages_;
 };
 
-}  // namespace sacm::model
+} // namespace sacm::model

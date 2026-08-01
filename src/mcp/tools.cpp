@@ -88,21 +88,24 @@ nlohmann::json OperationTypeEnum() {
 nlohmann::json OperationsSchema() {
     return nlohmann::json{
         {"type", "array"},
-        {"description", "Patch operations, applied in order. Support runs upwards: "
-                        "{\"type\":\"AddSupportedBy\",\"source\":{\"ref\":\"$sub\"},"
-                        "\"target\":{\"id\":\"G1\"}} puts the new element UNDER G1."},
+        {"description",
+         "Patch operations, applied in order. Support runs upwards: "
+         "{\"type\":\"AddSupportedBy\",\"source\":{\"ref\":\"$sub\"},"
+         "\"target\":{\"id\":\"G1\"}} puts the new element UNDER G1."},
         {"items",
          {{"type", "object"},
           {"properties",
            {{"type", {{"type", "string"}, {"enum", OperationTypeEnum()}}},
             {"create_ref",
              {{"type", "string"},
-              {"description", "For Create* operations: a name starting with '$' that later "
-                              "operations refer to as {\"ref\": \"$name\"}."}}},
+              {"description",
+               "For Create* operations: a name starting with '$' that later "
+               "operations refer to as {\"ref\": \"$name\"}."}}},
             {"element",
              {{"type", "object"},
-              {"description", "Target of an update or removal: {\"id\": \"G1\"} or "
-                              "{\"ref\": \"$goal\"}."}}},
+              {"description",
+               "Target of an update or removal: {\"id\": \"G1\"} or "
+               "{\"ref\": \"$goal\"}."}}},
             // The direction, spelled out. It was "Relationship source." and
             // "Relationship target.", which says nothing, and a client given
             // that has even odds of hanging the case's top goal underneath a
@@ -110,27 +113,25 @@ nlohmann::json OperationsSchema() {
             // one ambiguous word.
             {"source",
              {{"type", "object"},
-              {"description", "The SUPPORTING element -- the one that ends up BELOW. For "
-                              "AddSupportedBy, the new sub-claim, strategy or solution."}}},
+              {"description",
+               "The SUPPORTING element -- the one that ends up BELOW. For "
+               "AddSupportedBy, the new sub-claim, strategy or solution."}}},
             {"target",
              {{"type", "object"},
-              {"description", "The SUPPORTED element -- the one that ends up ABOVE. For "
-                              "AddSupportedBy, the existing goal you are developing. Read it as "
-                              "\"target is supported by source\"."}}},
-            {"field",
-             {{"type", "string"},
-              {"description", "For UpdateElementText: which field, e.g. \"content\"."}}},
+              {"description",
+               "The SUPPORTED element -- the one that ends up ABOVE. For "
+               "AddSupportedBy, the existing goal you are developing. Read it as "
+               "\"target is supported by source\"."}}},
+            {"field", {{"type", "string"}, {"description", "For UpdateElementText: which field, e.g. \"content\"."}}},
             {"old_value", {{"type", "string"}}},
             {"new_value", {{"type", "string"}}},
-            {"text",
-             {{"type", "string"}, {"description", "Initial text for a Create* operation."}}}}}}}};
+            {"text", {{"type", "string"}, {"description", "Initial text for a Create* operation."}}}}}}}};
 }
 
 nlohmann::json ChangeSetIdSchema() {
     return nlohmann::json{
         {"change_set_id",
-         {{"type", "string"},
-          {"description", "Defaults to the change set this connection has open."}}}};
+         {{"type", "string"}, {"description", "Defaults to the change set this connection has open."}}}};
 }
 
 std::vector<ToolDefinition> BuildTools() {
@@ -154,13 +155,12 @@ std::vector<ToolDefinition> BuildTools() {
             {"properties",
              {{"query", {{"type", "string"}, {"description", "Case-insensitive substring."}}},
               {"type",
-               {{"type", "string"},
-                {"description", "SACM type filter, e.g. \"claim\", \"argumentreasoning\"."}}},
+               {{"type", "string"}, {"description", "SACM type filter, e.g. \"claim\", \"argumentreasoning\"."}}},
               {"limit",
                {{"type", "integer"},
-                {"description", "Maximum elements to return (default " +
-                                    std::to_string(agent::kDefaultResultLimit) + ", maximum " +
-                                    std::to_string(agent::kMaxResultLimit) + ")."}}}}}},
+                {"description",
+                 "Maximum elements to return (default " + std::to_string(agent::kDefaultResultLimit) + ", maximum " +
+                     std::to_string(agent::kMaxResultLimit) + ")."}}}}}},
         true,
         &FindElements,
     });
@@ -170,8 +170,7 @@ std::vector<ToolDefinition> BuildTools() {
         "Fetch one element by id with its full fields, its incoming and outgoing SACM "
         "relationships, and its GSN role and immediate neighbours.",
         nlohmann::json{{"type", "object"},
-                       {"properties",
-                        {{"id", {{"type", "string"}, {"description", "Element id."}}}}},
+                       {"properties", {{"id", {{"type", "string"}, {"description", "Element id."}}}}},
                        {"required", nlohmann::json::array({"id"})}},
         true,
         &GetElement,
@@ -195,8 +194,7 @@ std::vector<ToolDefinition> BuildTools() {
             {"type", "object"},
             {"properties",
              {{"path",
-               {{"type", "string"},
-                {"description", "Project-relative path, e.g. \"arguments/main2.sacm\"."}}}}},
+               {{"type", "string"}, {"description", "Project-relative path, e.g. \"arguments/main2.sacm\"."}}}}},
             {"required", nlohmann::json::array({"path"})}},
         true,
         &OpenCaseFile,
@@ -211,13 +209,12 @@ std::vector<ToolDefinition> BuildTools() {
             {"type", "object"},
             {"properties",
              {{"root_id",
-               {{"type", "string"},
-                {"description", "Element to root the tree at. Defaults to the case's top goal."}}},
+               {{"type", "string"}, {"description", "Element to root the tree at. Defaults to the case's top goal."}}},
               {"depth",
                {{"type", "integer"},
-                {"description", "Levels to descend (default " +
-                                    std::to_string(agent::kDefaultTreeDepth) + ", maximum " +
-                                    std::to_string(agent::kMaxTreeDepth) + ")."}}}}}},
+                {"description",
+                 "Levels to descend (default " + std::to_string(agent::kDefaultTreeDepth) + ", maximum " +
+                     std::to_string(agent::kMaxTreeDepth) + ")."}}}}}},
         true,
         &GetArgumentTree,
     });
@@ -231,12 +228,9 @@ std::vector<ToolDefinition> BuildTools() {
         nlohmann::json{
             {"type", "object"},
             {"properties",
-             {{"topic",
-               {{"type", "string"},
-                {"description", "What the new argument would establish."}}},
+             {{"topic", {{"type", "string"}, {"description", "What the new argument would establish."}}},
               {"limit",
-               {{"type", "integer"},
-                {"description", "Maximum candidates to return (default 5, maximum 20)."}}}}},
+               {{"type", "integer"}, {"description", "Maximum candidates to return (default 5, maximum 20)."}}}}},
             {"required", nlohmann::json::array({"topic"})}},
         true,
         &SuggestPlacement,
@@ -260,14 +254,13 @@ std::vector<ToolDefinition> BuildTools() {
         nlohmann::json{
             {"type", "object"},
             {"properties",
-             {{"title",
-               {{"type", "string"},
-                {"description", "Short title the user sees while you build this."}}},
+             {{"title", {{"type", "string"}, {"description", "Short title the user sees while you build this."}}},
               {"summary", {{"type", "string"}, {"description", "What the change does."}}},
               {"intent",
                {{"type", "string"},
-                {"description", "Why you are making it. The reviewer is being asked to accept a "
-                                "change to a safety argument and needs the reasoning."}}}}},
+                {"description",
+                 "Why you are making it. The reviewer is being asked to accept a "
+                 "change to a safety argument and needs the reasoning."}}}}},
             {"required", nlohmann::json::array({"title"})}},
         true,
         &BeginChangeSet,
@@ -283,7 +276,7 @@ std::vector<ToolDefinition> BuildTools() {
                        {"properties",
                         [&] {
                             nlohmann::json properties = ChangeSetIdSchema();
-                            properties["operations"]  = OperationsSchema();
+                            properties["operations"] = OperationsSchema();
                             return properties;
                         }()},
                        {"required", nlohmann::json::array({"operations"})}},
@@ -300,8 +293,7 @@ std::vector<ToolDefinition> BuildTools() {
                         [&] {
                             nlohmann::json properties = ChangeSetIdSchema();
                             properties["count"] = nlohmann::json{
-                                {"type", "integer"},
-                                {"description", "How many to drop from the end (default 1)."}};
+                                {"type", "integer"}, {"description", "How many to drop from the end (default 1)."}};
                             return properties;
                         }()}},
         true,

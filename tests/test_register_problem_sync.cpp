@@ -153,8 +153,7 @@ TEST(RegisterProblemSyncTest, NoModelOrNoStoreLeavesNoWarningsStanding) {
 TEST(RegisterProblemSyncTest, PayloadRoundTripsKeysThatContainSeparators) {
     // A CSE key is itself "CSE:<claim>-><evidence>", so a decoder that split on
     // every ':' would hand back a truncated key and discard the wrong entry.
-    const app::RegisterAssessmentRef cse{app::RegisterAssessmentKind::Cse,
-                                        core::registers::MakeCseId("G1:a", "Sn1:b")};
+    const app::RegisterAssessmentRef cse{app::RegisterAssessmentKind::Cse, core::registers::MakeCseId("G1:a", "Sn1:b")};
     app::RegisterAssessmentRef decoded;
     ASSERT_TRUE(app::DecodeRegisterAssessmentPayload(app::EncodeRegisterAssessmentPayload(cse), decoded));
     EXPECT_EQ(decoded.kind, app::RegisterAssessmentKind::Cse);

@@ -21,10 +21,10 @@ namespace bridge {
 // One end of an established connection. Both the application and the adapter
 // use this class; only how they obtain it differs.
 class Connection {
-  public:
+public:
     ~Connection();
 
-    Connection(const Connection&)            = delete;
+    Connection(const Connection&) = delete;
     Connection& operator=(const Connection&) = delete;
 
     // Connects to a listener at `address`. Fails rather than blocking forever
@@ -39,7 +39,7 @@ class Connection {
 
     void Close();
 
-  private:
+private:
     friend class Listener;
     struct Impl;
 
@@ -49,10 +49,10 @@ class Connection {
 
 // The application's side. Accepts connections until stopped.
 class Listener {
-  public:
+public:
     ~Listener();
 
-    Listener(const Listener&)            = delete;
+    Listener(const Listener&) = delete;
     Listener& operator=(const Listener&) = delete;
 
     static std::unique_ptr<Listener> Start(const std::string& address, std::string& error);
@@ -68,7 +68,7 @@ class Listener {
 
     const std::string& address() const;
 
-  private:
+private:
     struct Impl;
 
     explicit Listener(std::unique_ptr<Impl> impl);

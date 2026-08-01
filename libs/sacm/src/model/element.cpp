@@ -7,4 +7,4 @@ const MultiLangString& ModelElement::description() const {
     return descriptions_.empty() ? kEmpty : descriptions_.front()->content();
 }
 
-}  // namespace sacm::model
+} // namespace sacm::model

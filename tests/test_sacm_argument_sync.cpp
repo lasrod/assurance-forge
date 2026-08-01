@@ -135,7 +135,8 @@ TEST(SacmArgumentSyncTest, PreservesReferencedArtifactTargetForRebuiltArtifactRe
     core::RebuildSacmArgumentPackageFromParser(model, package);
 
     const sacm::ArgumentPackage& ap = package.argumentPackages.front();
-    auto found = std::find_if(ap.artifactReferences.begin(), ap.artifactReferences.end(),
+    auto found = std::find_if(ap.artifactReferences.begin(),
+                              ap.artifactReferences.end(),
                               [](const sacm::ArtifactReference& ref) { return ref.id == "AR1"; });
     ASSERT_NE(found, ap.artifactReferences.end());
     // The referenced-term target recorded before the rebuild must be restored.
@@ -176,11 +177,9 @@ TEST(SacmArgumentSyncTest, PreservesUserAuthoredTermContextWhenTargetElementSurv
     EXPECT_TRUE(ContainsId(ap.artifactReferences, "AR1"))
         << "User-authored term artifact reference should survive the rebuild.";
     const bool context_preserved =
-        std::any_of(ap.assertedContexts.begin(), ap.assertedContexts.end(),
-                    [](const sacm::AssertedContext& c) {
-                        return c.sources == std::vector<std::string>{"AR1"} &&
-                               c.targets == std::vector<std::string>{"G1"};
-                    });
+        std::any_of(ap.assertedContexts.begin(), ap.assertedContexts.end(), [](const sacm::AssertedContext& c) {
+            return c.sources == std::vector<std::string>{"AR1"} && c.targets == std::vector<std::string>{"G1"};
+        });
     EXPECT_TRUE(context_preserved) << "Asserted context for a surviving target should be preserved.";
 }
 
@@ -215,7 +214,8 @@ TEST(SacmArgumentSyncTest, DropsTermContextWhenTargetElementRemoved) {
 
     const sacm::ArgumentPackage& ap = package.argumentPackages.front();
     const bool context_present =
-        std::any_of(ap.assertedContexts.begin(), ap.assertedContexts.end(),
-                    [](const sacm::AssertedContext& c) { return c.targets == std::vector<std::string>{"G1"}; });
+        std::any_of(ap.assertedContexts.begin(), ap.assertedContexts.end(), [](const sacm::AssertedContext& c) {
+            return c.targets == std::vector<std::string>{"G1"};
+        });
     EXPECT_FALSE(context_present) << "Context targeting a removed element should be dropped.";
 }

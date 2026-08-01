@@ -88,12 +88,10 @@ parser::AssuranceCase BuildRepresentativeCase() {
     return model;
 }
 
-parser::SacmElement Challenge(std::string id,
-                              std::string type,
-                              std::vector<std::string> sources,
-                              std::vector<std::string> targets) {
-    parser::SacmElement relationship = Relationship(std::move(id), std::move(type), std::move(sources),
-                                                    std::move(targets));
+parser::SacmElement
+Challenge(std::string id, std::string type, std::vector<std::string> sources, std::vector<std::string> targets) {
+    parser::SacmElement relationship =
+        Relationship(std::move(id), std::move(type), std::move(sources), std::move(targets));
     relationship.is_counter = true;
     return relationship;
 }
@@ -106,9 +104,8 @@ parser::AcpRecord Acp(std::string id, std::string target_kind, std::string targe
     return acp;
 }
 
-const export_gsn::GsnEdge* FindEdgeBetween(const export_gsn::GsnDiagram& diagram,
-                                           const std::string& from_id,
-                                           const std::string& to_id) {
+const export_gsn::GsnEdge*
+FindEdgeBetween(const export_gsn::GsnDiagram& diagram, const std::string& from_id, const std::string& to_id) {
     for (const export_gsn::GsnEdge& edge : diagram.edges) {
         if (edge.from_id == from_id && edge.to_id == to_id)
             return &edge;

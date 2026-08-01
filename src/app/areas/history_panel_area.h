@@ -18,7 +18,6 @@ struct HistoryPanelAreaCallbacks {
 // Selecting a row pins the active package canvas to that transaction
 // sequence via `tab.timeline.preview_sequence`. "Return to live" clears
 // the selection.
-void RenderHistoryPanelContent(AppRuntimeState& state,
-                               const HistoryPanelAreaCallbacks& callbacks);
+void RenderHistoryPanelContent(AppRuntimeState& state, const HistoryPanelAreaCallbacks& callbacks);
 
 } // namespace app::areas

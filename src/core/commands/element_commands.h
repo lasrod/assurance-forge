@@ -13,23 +13,27 @@ namespace core::commands {
 
 // Helpers shared with replay: convert NewElementKind / RemoveMode to and
 // from short stable string tokens used in event payloads.
-std::string             NewElementKindToToken(NewElementKind kind);
-bool                    NewElementKindFromToken(const std::string& token, NewElementKind& out);
-std::string             RemoveModeToToken(RemoveMode mode);
-bool                    RemoveModeFromToken(const std::string& token, RemoveMode& out);
-std::string             ChallengeSourceTypeToToken(ChallengeSourceType type);
-bool                    ChallengeSourceTypeFromToken(const std::string& token, ChallengeSourceType& out);
-std::string             ArgumentTargetKindToToken(ArgumentTarget::Kind kind);
-bool                    ArgumentTargetKindFromToken(const std::string& token, ArgumentTarget::Kind& out);
+std::string NewElementKindToToken(NewElementKind kind);
+bool NewElementKindFromToken(const std::string& token, NewElementKind& out);
+std::string RemoveModeToToken(RemoveMode mode);
+bool RemoveModeFromToken(const std::string& token, RemoveMode& out);
+std::string ChallengeSourceTypeToToken(ChallengeSourceType type);
+bool ChallengeSourceTypeFromToken(const std::string& token, ChallengeSourceType& out);
+std::string ArgumentTargetKindToToken(ArgumentTarget::Kind kind);
+bool ArgumentTargetKindFromToken(const std::string& token, ArgumentTarget::Kind& out);
 
 // Add a new top-level Goal (root claim). The id is assigned by the underlying
 // `core::AddTopGoal` mutator and captured into the event payload on success.
 class CreateTopGoalCommand final : public ICommand {
 public:
-    std::string Name() const override { return "CreateTopGoal"; }
-    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+    std::string Name() const override {
+        return "CreateTopGoal";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
-    const std::string& GeneratedId() const { return generated_id_; }
+    const std::string& GeneratedId() const {
+        return generated_id_;
+    }
 
 private:
     std::string generated_id_;
@@ -41,17 +45,23 @@ public:
     CreateChildElementCommand(std::string parent_id, NewElementKind kind)
         : parent_id_(std::move(parent_id)), kind_(kind) {}
 
-    std::string Name() const override { return "CreateChildElement"; }
-    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+    std::string Name() const override {
+        return "CreateChildElement";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
-    const std::string& GeneratedId() const { return generated_id_; }
-    const std::string& GeneratedRelationshipId() const { return generated_relationship_id_; }
+    const std::string& GeneratedId() const {
+        return generated_id_;
+    }
+    const std::string& GeneratedRelationshipId() const {
+        return generated_relationship_id_;
+    }
 
 private:
-    std::string    parent_id_;
+    std::string parent_id_;
     NewElementKind kind_;
-    std::string    generated_id_;
-    std::string    generated_relationship_id_;
+    std::string generated_id_;
+    std::string generated_relationship_id_;
 };
 
 // Create a GSN v3 dialectic challenge (counter argument / counter evidence)
@@ -63,33 +73,42 @@ public:
     CreateChallengeCommand(ArgumentTarget target, ChallengeSourceType source_type)
         : target_(std::move(target)), source_type_(source_type) {}
 
-    std::string Name() const override { return "CreateChallenge"; }
-    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+    std::string Name() const override {
+        return "CreateChallenge";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
-    const std::string& GeneratedId() const { return generated_id_; }
-    const std::string& GeneratedRelationshipId() const { return generated_relationship_id_; }
+    const std::string& GeneratedId() const {
+        return generated_id_;
+    }
+    const std::string& GeneratedRelationshipId() const {
+        return generated_relationship_id_;
+    }
 
 private:
-    ArgumentTarget      target_;
+    ArgumentTarget target_;
     ChallengeSourceType source_type_;
-    std::string         generated_id_;
-    std::string         generated_relationship_id_;
+    std::string generated_id_;
+    std::string generated_relationship_id_;
 };
 
 // Remove an element (and optionally its descendants) from the case.
 class RemoveElementCommand final : public ICommand {
 public:
-    RemoveElementCommand(std::string element_id, RemoveMode mode)
-        : element_id_(std::move(element_id)), mode_(mode) {}
+    RemoveElementCommand(std::string element_id, RemoveMode mode) : element_id_(std::move(element_id)), mode_(mode) {}
 
-    std::string Name() const override { return "RemoveElement"; }
-    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+    std::string Name() const override {
+        return "RemoveElement";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
-    std::size_t RemovedCount() const { return removed_count_; }
+    std::size_t RemovedCount() const {
+        return removed_count_;
+    }
 
 private:
     std::string element_id_;
-    RemoveMode  mode_;
+    RemoveMode mode_;
     std::size_t removed_count_ = 0;
 };
 
@@ -110,19 +129,25 @@ public:
           language_(std::move(language)),
           new_value_(std::move(new_value)) {}
 
-    std::string Name() const override { return "UpdateElementText"; }
-    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+    std::string Name() const override {
+        return "UpdateElementText";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
-    const std::string& OldValue() const { return old_value_; }
-    bool               WasNoOp() const { return was_no_op_; }
+    const std::string& OldValue() const {
+        return old_value_;
+    }
+    bool WasNoOp() const {
+        return was_no_op_;
+    }
 
 private:
-    std::string      element_id_;
+    std::string element_id_;
     ElementTextField field_;
-    std::string      language_;
-    std::string      new_value_;
-    std::string      old_value_;
-    bool             was_no_op_ = false;
+    std::string language_;
+    std::string new_value_;
+    std::string old_value_;
+    bool was_no_op_ = false;
 };
 
 // Change the user-facing GSN notation identifier without renaming the SACM
@@ -133,17 +158,23 @@ public:
     UpdateGsnIdentifierCommand(std::string element_id, std::string new_identifier)
         : element_id_(std::move(element_id)), new_identifier_(std::move(new_identifier)) {}
 
-    std::string Name() const override { return "UpdateGsnIdentifier"; }
-    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+    std::string Name() const override {
+        return "UpdateGsnIdentifier";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
-    const std::string& OldIdentifier() const { return old_identifier_; }
-    bool               WasNoOp() const { return was_no_op_; }
+    const std::string& OldIdentifier() const {
+        return old_identifier_;
+    }
+    bool WasNoOp() const {
+        return was_no_op_;
+    }
 
 private:
     std::string element_id_;
     std::string new_identifier_;
     std::string old_identifier_;
-    bool        was_no_op_ = false;
+    bool was_no_op_ = false;
 };
 
 // Remove one relationship, leaving both endpoints in place. Distinct from
@@ -152,11 +183,12 @@ private:
 // meaningful for an edge.
 class RemoveRelationshipCommand final : public ICommand {
 public:
-    explicit RemoveRelationshipCommand(std::string relationship_id)
-        : relationship_id_(std::move(relationship_id)) {}
+    explicit RemoveRelationshipCommand(std::string relationship_id) : relationship_id_(std::move(relationship_id)) {}
 
-    std::string Name() const override { return "RemoveRelationship"; }
-    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+    std::string Name() const override {
+        return "RemoveRelationship";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
 private:
     std::string relationship_id_;
@@ -171,15 +203,19 @@ public:
     DropRelationshipReferenceCommand(std::string relationship_id, std::string reference)
         : relationship_id_(std::move(relationship_id)), reference_(std::move(reference)) {}
 
-    std::string Name() const override { return "DropRelationshipReference"; }
-    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+    std::string Name() const override {
+        return "DropRelationshipReference";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
-    bool RemovedRelationship() const { return removed_relationship_; }
+    bool RemovedRelationship() const {
+        return removed_relationship_;
+    }
 
 private:
     std::string relationship_id_;
     std::string reference_;
-    bool        removed_relationship_ = false;
+    bool removed_relationship_ = false;
 };
 
 // Re-wire a Strategy from an inference's source list into its reasoning slot.
@@ -188,8 +224,10 @@ public:
     MoveStrategyToReasoningCommand(std::string relationship_id, std::string strategy_id)
         : relationship_id_(std::move(relationship_id)), strategy_id_(std::move(strategy_id)) {}
 
-    std::string Name() const override { return "MoveStrategyToReasoning"; }
-    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+    std::string Name() const override {
+        return "MoveStrategyToReasoning";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
 private:
     std::string relationship_id_;
@@ -203,16 +241,20 @@ public:
     SetElementUndevelopedCommand(std::string element_id, bool undeveloped)
         : element_id_(std::move(element_id)), undeveloped_(undeveloped) {}
 
-    std::string Name() const override { return "SetElementUndeveloped"; }
-    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+    std::string Name() const override {
+        return "SetElementUndeveloped";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
-    bool WasNoOp() const { return was_no_op_; }
+    bool WasNoOp() const {
+        return was_no_op_;
+    }
 
 private:
     std::string element_id_;
-    bool        undeveloped_ = false;
-    bool        old_value_ = false;
-    bool        was_no_op_ = false;
+    bool undeveloped_ = false;
+    bool old_value_ = false;
+    bool was_no_op_ = false;
 };
 
 } // namespace core::commands

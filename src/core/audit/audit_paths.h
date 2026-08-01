@@ -28,7 +28,6 @@ std::filesystem::path SnapshotMetadataPath(const std::filesystem::path& project_
 std::filesystem::path AuditDir(const std::filesystem::path& project_root);
 std::filesystem::path EventLogPath(const std::filesystem::path& project_root);
 std::filesystem::path BaselinesDir(const std::filesystem::path& project_root);
-std::filesystem::path BaselineMetadataPath(const std::filesystem::path& project_root,
-                                           const std::string& baseline_id);
+std::filesystem::path BaselineMetadataPath(const std::filesystem::path& project_root, const std::string& baseline_id);
 
 } // namespace core::audit

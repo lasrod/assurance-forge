@@ -140,11 +140,9 @@ bool ElementActions::PerformTreeDrop(const std::string& dragged_id,
     // pre-check behavior). This was the last bus-bypassing writer of `sacm_package`.
     if (drop_mode == core::TreeDropMode::Before || drop_mode == core::TreeDropMode::After) {
         core::commands::ReorderSiblingsCommand command(dragged_id, target_id, drop_mode);
-        const app::commands::DispatchOutcome outcome =
-            app::commands::DispatchAuditedCommand(state_, command);
+        const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(state_, command);
         if (!outcome.success) {
-            SetStatus(state_,
-                      outcome.error.empty() ? "Tree move failed." : "Tree move failed: " + outcome.error);
+            SetStatus(state_, outcome.error.empty() ? "Tree move failed." : "Tree move failed: " + outcome.error);
             return false;
         }
         // Refresh the transient render-order override immediately so the reorder is
@@ -154,11 +152,9 @@ bool ElementActions::PerformTreeDrop(const std::string& dragged_id,
             state_.tree_display_order.children_by_parent[parent_id] = order;
     } else {
         core::commands::MoveSubtreeCommand command(dragged_id, target_id);
-        const app::commands::DispatchOutcome outcome =
-            app::commands::DispatchAuditedCommand(state_, command);
+        const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(state_, command);
         if (!outcome.success) {
-            SetStatus(state_,
-                      outcome.error.empty() ? "Tree move failed." : "Tree move failed: " + outcome.error);
+            SetStatus(state_, outcome.error.empty() ? "Tree move failed." : "Tree move failed: " + outcome.error);
             return false;
         }
     }

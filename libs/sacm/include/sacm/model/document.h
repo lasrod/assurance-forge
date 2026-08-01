@@ -39,7 +39,7 @@ namespace sacm::model {
 // It CAN change save behaviour (a document that would strict-save may
 // afterwards refuse with SACM-XMI-006), because that is the point.
 class Document {
-  public:
+public:
     Document();
     ~Document();
     Document(Document&&) noexcept;
@@ -48,11 +48,15 @@ class Document {
     Document& operator=(const Document&) = delete;
 
     // Strict interchange roots (AssuranceCasePackages, clause 2.4).
-    const std::vector<std::unique_ptr<AssuranceCasePackage>>& roots() const { return roots_; }
+    const std::vector<std::unique_ptr<AssuranceCasePackage>>& roots() const {
+        return roots_;
+    }
 
     // Roots of other kinds accepted by tolerant loads (bare ArgumentPackage/
     // ArtifactPackage/TerminologyPackage interchange units, clauses 2.2/2.3).
-    const std::vector<std::unique_ptr<SACMElement>>& other_roots() const { return other_roots_; }
+    const std::vector<std::unique_ptr<SACMElement>>& other_roots() const {
+        return other_roots_;
+    }
 
     // Namespace declarations carried by the source document whose URIs this
     // library does not itself emit, keyed by prefix. Preserved compatibility
@@ -88,17 +92,23 @@ class Document {
         return dynamic_cast<const T*>(find(id));
     }
 
-    bool contains(const ElementId& id) const { return find(id) != nullptr; }
+    bool contains(const ElementId& id) const {
+        return find(id) != nullptr;
+    }
 
     // Number of elements in the document (all kinds, including utility
     // elements).
-    std::size_t element_count() const { return index_.size(); }
+    std::size_t element_count() const {
+        return index_.size();
+    }
 
     // Visits every element (roots and descendants) in document order.
     void for_each_element(const std::function<void(const SACMElement&)>& fn) const;
 
     // Monotonic revision; bumped by every successful apply.
-    std::uint64_t revision() const { return revision_; }
+    std::uint64_t revision() const {
+        return revision_;
+    }
 
     // Computes what applying `operation` would do, without mutating.
     commands::OperationPreview preview(const commands::Operation& operation) const;
@@ -109,7 +119,7 @@ class Document {
     commands::MutationResult apply(const commands::Operation& operation,
                                    std::optional<std::uint64_t> expected_revision = {});
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     std::vector<std::unique_ptr<AssuranceCasePackage>> roots_;
@@ -121,4 +131,4 @@ class Document {
     std::uint64_t revision_ = 0;
 };
 
-}  // namespace sacm::model
+} // namespace sacm::model

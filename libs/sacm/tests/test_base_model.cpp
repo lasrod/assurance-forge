@@ -31,16 +31,13 @@ std::filesystem::path fixture(std::string_view name) {
     return std::filesystem::path(SACM_TEST_DATA_DIR) / "sacm23" / name;
 }
 
-bool has_code(const std::vector<sacm::validation::Diagnostic>& diagnostics,
-              std::string_view code) {
-    return std::ranges::any_of(diagnostics, [&](const auto& diagnostic) {
-        return diagnostic.code == code;
-    });
+bool has_code(const std::vector<sacm::validation::Diagnostic>& diagnostics, std::string_view code) {
+    return std::ranges::any_of(diagnostics, [&](const auto& diagnostic) { return diagnostic.code == code; });
 }
 
 TEST(Sacm23BaseModel, SACM23_BASE_001_InheritedMetadataRoundTrips) {
-    const LoadResult first = sacm::io::load_xmi_file(fixture("base-metadata-valid.sacm.xmi"),
-                                                     LoadOptions{.mode = Mode::Strict});
+    const LoadResult first =
+        sacm::io::load_xmi_file(fixture("base-metadata-valid.sacm.xmi"), LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(first.ok) << (first.diagnostics.empty() ? "" : first.diagnostics.front().message);
     const auto& document = *first.document;
 
@@ -76,8 +73,8 @@ TEST(Sacm23BaseModel, SACM23_BASE_001_InheritedMetadataRoundTrips) {
 }
 
 TEST(Sacm23BaseModel, SACM23_BASE_002_CitationWithoutFlagIsInvalid) {
-    const LoadResult result = sacm::io::load_xmi_file(
-        fixture("invalid/citation-flag-invalid.sacm.xmi"), LoadOptions{.mode = Mode::Strict});
+    const LoadResult result =
+        sacm::io::load_xmi_file(fixture("invalid/citation-flag-invalid.sacm.xmi"), LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(result.document.has_value());
     const auto diagnostics = sacm::validation::validate(*result.document);
     EXPECT_TRUE(has_code(diagnostics, sacm::validation::codes::kCitationInvalid));
@@ -85,17 +82,12 @@ TEST(Sacm23BaseModel, SACM23_BASE_002_CitationWithoutFlagIsInvalid) {
 
 TEST(Sacm23BaseModel, SACM23_BASE_002_ImplementationConstraintRequiresAbstract) {
     Document document;
-    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"})
-                    .applied);
-    ASSERT_TRUE(document
-                    .apply(CreateArgumentPackage{
-                        .parent = ElementId{"acp_1"}, .id = ElementId{"argpkg_1"}, .name = "Arg"})
-                    .applied);
-    ASSERT_TRUE(document
-                    .apply(CreateClaim{.parent = ElementId{"argpkg_1"},
-                                       .id = ElementId{"claim_1"},
-                                       .name = "C"})
-                    .applied);
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"}).applied);
+    ASSERT_TRUE(
+        document.apply(CreateArgumentPackage{.parent = ElementId{"acp_1"}, .id = ElementId{"argpkg_1"}, .name = "Arg"})
+            .applied);
+    ASSERT_TRUE(
+        document.apply(CreateClaim{.parent = ElementId{"argpkg_1"}, .id = ElementId{"claim_1"}, .name = "C"}).applied);
     // Build the invalid state via a fixture-load instead: commands cannot
     // create implementation constraints yet, so exercise the validator on
     // the abstract-pattern fixture with the flag flipped through XML.
@@ -166,8 +158,7 @@ TEST(Sacm23BaseModel, SACM23_XMI_003_UnknownUnprefixedAttributeIsPreservedNotIgn
 
     // Strict save refuses; compatibility save round-trips it.
     EXPECT_FALSE(sacm::io::save_xmi_string(*loaded.document).ok);
-    const auto compat =
-        sacm::io::save_xmi_string(*loaded.document, SaveOptions{.mode = Mode::Tolerant});
+    const auto compat = sacm::io::save_xmi_string(*loaded.document, SaveOptions{.mode = Mode::Tolerant});
     ASSERT_TRUE(compat.ok);
     EXPECT_NE(compat.xml.find(R"(confidenceScore="0.87")"), std::string::npos);
 
@@ -208,8 +199,7 @@ TEST(Sacm23BaseModel, SACM23_COMPAT_001_VendorAttributesPreservedAndStrictSaveRe
     EXPECT_TRUE(has_code(strict.diagnostics, sacm::validation::codes::kXmiStrictSaveRefused));
 
     // Compatibility save re-emits it verbatim and stays semantically stable.
-    const auto compat =
-        sacm::io::save_xmi_string(*loaded.document, SaveOptions{.mode = Mode::Tolerant});
+    const auto compat = sacm::io::save_xmi_string(*loaded.document, SaveOptions{.mode = Mode::Tolerant});
     ASSERT_TRUE(compat.ok);
     EXPECT_NE(compat.xml.find(R"(acme:owner="alice")"), std::string::npos);
     const LoadResult reloaded = sacm::io::load_xmi_string(compat.xml);
@@ -230,8 +220,7 @@ TEST(Sacm23BaseModel, SACM23_COMPAT_001_VendorContentPreservedAndStrictSaveRefus
     EXPECT_TRUE(has_code(strict.diagnostics, sacm::validation::codes::kXmiStrictSaveRefused));
 
     // Compatibility save re-emits the fragment and stays semantically stable.
-    const auto compat =
-        sacm::io::save_xmi_string(*loaded.document, SaveOptions{.mode = Mode::Tolerant});
+    const auto compat = sacm::io::save_xmi_string(*loaded.document, SaveOptions{.mode = Mode::Tolerant});
     ASSERT_TRUE(compat.ok);
     EXPECT_NE(compat.xml.find("vendorMetadata"), std::string::npos);
     const LoadResult reloaded = sacm::io::load_xmi_string(compat.xml);
@@ -280,12 +269,12 @@ TEST(Sacm23BaseModel, SACM23_XMI_001_LegacyContentStatementIsThePrimaryDescripti
 // is exactly the kind of quiet edit the source-of-truth rule forbids.
 TEST(Sacm23BaseModel, SACM23_BASE_001_EmptyGidIsDistinctFromAbsentGid) {
     const auto load = [](std::string_view gid_attribute) {
-        return sacm::io::load_xmi_string(std::format(
-            R"(<?xml version="1.0" encoding="UTF-8"?>)"
-            R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
-            R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:version="2.0" )"
-            R"(xmi:id="acp_1"{}/>)",
-            gid_attribute));
+        return sacm::io::load_xmi_string(
+            std::format(R"(<?xml version="1.0" encoding="UTF-8"?>)"
+                        R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+                        R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:version="2.0" )"
+                        R"(xmi:id="acp_1"{}/>)",
+                        gid_attribute));
     };
 
     const LoadResult absent = load("");
@@ -294,8 +283,7 @@ TEST(Sacm23BaseModel, SACM23_BASE_001_EmptyGidIsDistinctFromAbsentGid) {
 
     const LoadResult empty = load(R"( gid="")");
     ASSERT_TRUE(empty.ok);
-    ASSERT_TRUE(empty.document->roots().front()->gid().has_value())
-        << "an explicit empty gid was read as absent";
+    ASSERT_TRUE(empty.document->roots().front()->gid().has_value()) << "an explicit empty gid was read as absent";
     EXPECT_EQ(*empty.document->roots().front()->gid(), "");
 
     // The distinction must survive export, not just import.
@@ -304,8 +292,7 @@ TEST(Sacm23BaseModel, SACM23_BASE_001_EmptyGidIsDistinctFromAbsentGid) {
     ASSERT_TRUE(saved_absent.ok);
     ASSERT_TRUE(saved_empty.ok);
     EXPECT_EQ(saved_absent.xml.find("gid="), std::string::npos);
-    EXPECT_NE(saved_empty.xml.find(R"(gid="")"), std::string::npos)
-        << "an explicit empty gid was dropped on save";
+    EXPECT_NE(saved_empty.xml.find(R"(gid="")"), std::string::npos) << "an explicit empty gid was dropped on save";
 }
 
 // LangString identity is an explicit, tested scope exclusion rather than an
@@ -340,28 +327,17 @@ TEST(Sacm23BaseModel, SACM23_XMI_001_LangStringIdIsNotPreservedButIsReported) {
 
 TEST(Sacm23BaseModel, SACM23_BASE_001_SetNameSetDescriptionAddTaggedValue) {
     Document document;
-    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"})
-                    .applied);
-    ASSERT_TRUE(document
-                    .apply(SetName{.element = ElementId{"acp_1"},
-                                   .name = "Renamed Case",
-                                   .language = "en"})
-                    .applied);
-    ASSERT_TRUE(document
-                    .apply(SetDescription{.element = ElementId{"acp_1"},
-                                          .text = "A description.",
-                                          .language = "en"})
-                    .applied);
-    ASSERT_TRUE(document
-                    .apply(SetDescription{.element = ElementId{"acp_1"},
-                                          .text = "説明。",
-                                          .language = "ja"})
-                    .applied);
-    ASSERT_TRUE(document
-                    .apply(AddTaggedValue{.element = ElementId{"acp_1"},
-                                          .key = "reviewStatus",
-                                          .value = "approved"})
-                    .applied);
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"}).applied);
+    ASSERT_TRUE(
+        document.apply(SetName{.element = ElementId{"acp_1"}, .name = "Renamed Case", .language = "en"}).applied);
+    ASSERT_TRUE(
+        document.apply(SetDescription{.element = ElementId{"acp_1"}, .text = "A description.", .language = "en"})
+            .applied);
+    ASSERT_TRUE(
+        document.apply(SetDescription{.element = ElementId{"acp_1"}, .text = "説明。", .language = "ja"}).applied);
+    ASSERT_TRUE(
+        document.apply(AddTaggedValue{.element = ElementId{"acp_1"}, .key = "reviewStatus", .value = "approved"})
+            .applied);
 
     const auto& acp = *document.roots().front();
     EXPECT_EQ(acp.name().content, "Renamed Case");
@@ -386,18 +362,17 @@ TEST(Sacm23BaseModel, SACM23_BASE_001_SetNameSetDescriptionAddTaggedValue) {
 // `gid-<id>` at create time.
 TEST(Sacm23BaseModel, SACM23_BASE_001_SetGidAssignsElementGid) {
     Document document;
-    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"})
-                    .applied);
-    ASSERT_TRUE(document.apply(CreateArgumentPackage{.parent = ElementId{"acp_1"},
-                                                     .id = ElementId{"ap_1"},
-                                                     .name = "Args"})
-                    .applied);
-    ASSERT_TRUE(document
-                    .apply(CreateClaim{.parent = ElementId{"ap_1"}, .id = ElementId{"c_1"},
-                                       .name = "G", .description = "d", .language = "en"})
-                    .applied);
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"}).applied);
+    ASSERT_TRUE(
+        document.apply(CreateArgumentPackage{.parent = ElementId{"acp_1"}, .id = ElementId{"ap_1"}, .name = "Args"})
+            .applied);
+    ASSERT_TRUE(
+        document
+            .apply(CreateClaim{
+                .parent = ElementId{"ap_1"}, .id = ElementId{"c_1"}, .name = "G", .description = "d", .language = "en"})
+            .applied);
 
-    EXPECT_FALSE(document.find(ElementId{"acp_1"})->gid().has_value());  // vacuity guard
+    EXPECT_FALSE(document.find(ElementId{"acp_1"})->gid().has_value()); // vacuity guard
 
     const sacm::commands::MutationResult set_pkg =
         document.apply(SetGid{.element = ElementId{"acp_1"}, .gid = "gid-acp_1"});
@@ -432,8 +407,7 @@ TEST(Sacm23BaseModel, SACM23_BASE_001_SetGidAssignsElementGid) {
     EXPECT_FALSE(document.find(ElementId{"acp_1"})->gid().has_value());
 
     // A missing target fails, unchanged.
-    const sacm::commands::MutationResult missing =
-        document.apply(SetGid{.element = ElementId{"nope"}, .gid = "gid-x"});
+    const sacm::commands::MutationResult missing = document.apply(SetGid{.element = ElementId{"nope"}, .gid = "gid-x"});
     EXPECT_FALSE(missing.applied);
 }
 
@@ -445,43 +419,38 @@ TEST(Sacm23BaseModel, SACM23_BASE_001_SetGidAssignsElementGid) {
 // a note in the second Description without disturbing the front statement.
 TEST(Sacm23BaseModel, SACM23_BASE_001_SetDescriptionAtAddressesDescriptionSlots) {
     Document document;
-    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"})
-                    .applied);
-    ASSERT_TRUE(document.apply(CreateArgumentPackage{.parent = ElementId{"acp_1"},
-                                                     .id = ElementId{"ap_1"},
-                                                     .name = "Args"})
-                    .applied);
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"}).applied);
+    ASSERT_TRUE(
+        document.apply(CreateArgumentPackage{.parent = ElementId{"acp_1"}, .id = ElementId{"ap_1"}, .name = "Args"})
+            .applied);
     ASSERT_TRUE(document
-                    .apply(CreateClaim{.parent = ElementId{"ap_1"}, .id = ElementId{"c_1"},
-                                       .name = "G", .description = "The statement.",
+                    .apply(CreateClaim{.parent = ElementId{"ap_1"},
+                                       .id = ElementId{"c_1"},
+                                       .name = "G",
+                                       .description = "The statement.",
                                        .language = "en"})
                     .applied);
     const auto& claim = *document.find_as<sacm::model::ModelElement>(ElementId{"c_1"});
-    ASSERT_EQ(claim.descriptions().size(), 1u);  // vacuity guard: only the statement
+    ASSERT_EQ(claim.descriptions().size(), 1u); // vacuity guard: only the statement
 
     // A gap (index 2 when there is 1 description) is rejected, unchanged.
-    const sacm::commands::MutationResult gap = document.apply(
-        SetDescriptionAt{.element = ElementId{"c_1"}, .index = 2, .text = "x", .language = "en"});
+    const sacm::commands::MutationResult gap =
+        document.apply(SetDescriptionAt{.element = ElementId{"c_1"}, .index = 2, .text = "x", .language = "en"});
     EXPECT_FALSE(gap.applied);
     EXPECT_EQ(claim.descriptions().size(), 1u);
 
     // Appending at index 1 creates the second Description (the note).
-    ASSERT_TRUE(document
-                    .apply(SetDescriptionAt{.element = ElementId{"c_1"},
-                                            .index = 1,
-                                            .text = "A note.",
-                                            .language = "en"})
-                    .applied);
+    ASSERT_TRUE(
+        document.apply(SetDescriptionAt{.element = ElementId{"c_1"}, .index = 1, .text = "A note.", .language = "en"})
+            .applied);
     ASSERT_EQ(claim.descriptions().size(), 2u);
     EXPECT_EQ(*claim.descriptions().front()->content().find("en"), "The statement.");
     EXPECT_EQ(*claim.descriptions()[1]->content().find("en"), "A note.");
 
     // An in-range index edits that slot without touching the other.
     ASSERT_TRUE(document
-                    .apply(SetDescriptionAt{.element = ElementId{"c_1"},
-                                            .index = 1,
-                                            .text = "A revised note.",
-                                            .language = "en"})
+                    .apply(SetDescriptionAt{
+                        .element = ElementId{"c_1"}, .index = 1, .text = "A revised note.", .language = "en"})
                     .applied);
     ASSERT_EQ(claim.descriptions().size(), 2u);
     EXPECT_EQ(*claim.descriptions().front()->content().find("en"), "The statement.");
@@ -491,8 +460,8 @@ TEST(Sacm23BaseModel, SACM23_BASE_001_SetDescriptionAtAddressesDescriptionSlots)
     // as absent (not as an empty string) so audit/undo consumers can tell a clear
     // from a set-to-empty -- the same convention SetGid uses.
     {
-        const sacm::commands::MutationResult cleared = document.apply(SetDescriptionAt{
-            .element = ElementId{"c_1"}, .index = 1, .text = "", .language = "en"});
+        const sacm::commands::MutationResult cleared =
+            document.apply(SetDescriptionAt{.element = ElementId{"c_1"}, .index = 1, .text = "", .language = "en"});
         ASSERT_TRUE(cleared.applied);
         ASSERT_EQ(cleared.changes.size(), 1u);
         EXPECT_FALSE(cleared.changes.front().after.has_value());
@@ -500,10 +469,8 @@ TEST(Sacm23BaseModel, SACM23_BASE_001_SetDescriptionAtAddressesDescriptionSlots)
     }
     // Restore the note for the round-trip below.
     ASSERT_TRUE(document
-                    .apply(SetDescriptionAt{.element = ElementId{"c_1"},
-                                            .index = 1,
-                                            .text = "A revised note.",
-                                            .language = "en"})
+                    .apply(SetDescriptionAt{
+                        .element = ElementId{"c_1"}, .index = 1, .text = "A revised note.", .language = "en"})
                     .applied);
 
     // A second Description is valid in the machine model (Description[0..*]);
@@ -519,10 +486,9 @@ TEST(Sacm23BaseModel, SACM23_BASE_001_SetDescriptionAtAddressesDescriptionSlots)
     ASSERT_TRUE(saved.ok);
     const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(reloaded.ok);
-    const auto& reloaded_claim =
-        *reloaded.document->find_as<sacm::model::ModelElement>(ElementId{"c_1"});
+    const auto& reloaded_claim = *reloaded.document->find_as<sacm::model::ModelElement>(ElementId{"c_1"});
     ASSERT_EQ(reloaded_claim.descriptions().size(), 2u);
     EXPECT_EQ(*reloaded_claim.descriptions()[1]->content().find("en"), "A revised note.");
 }
 
-}  // namespace
+} // namespace

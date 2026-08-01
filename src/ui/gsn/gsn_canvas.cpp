@@ -181,8 +181,8 @@ void DrawGsnNode(const GsnNode& node,
     // the ordinary case, so this costs a hash of nothing.
     core::changesets::ElementChange agent_change = core::changesets::ElementChange::Unchanged;
     if (!ui_state.agent_change_status.empty()) {
-        const std::unordered_map<std::string, core::changesets::ElementChange>::const_iterator
-            found = ui_state.agent_change_status.find(node.id);
+        const std::unordered_map<std::string, core::changesets::ElementChange>::const_iterator found =
+            ui_state.agent_change_status.find(node.id);
         if (found != ui_state.agent_change_status.end()) {
             agent_change = found->second;
         }
@@ -245,8 +245,7 @@ void DrawGsnNode(const GsnNode& node,
         // handed a finished patch to decode.
         if (agent_change != core::changesets::ElementChange::Unchanged) {
             const bool circular = (node.type == "Solution" || node.type == "Evidence");
-            DrawProposedChangeDecoration(draw_list, top_left, bottom_right, circular, zoom,
-                                         agent_change);
+            DrawProposedChangeDecoration(draw_list, top_left, bottom_right, circular, zoom, agent_change);
         }
     }
 
@@ -564,8 +563,8 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
             float h_pill_left = h_pill_right - h_pill_w;
             float h_pill_top = zy - DpiSize(2.0f);
             float h_pill_bot = h_pill_top + h_pill_h;
-            if (mouse_pos.x >= h_pill_left && mouse_pos.x <= h_pill_right &&
-                mouse_pos.y >= h_pill_top && mouse_pos.y <= h_pill_bot) {
+            if (mouse_pos.x >= h_pill_left && mouse_pos.x <= h_pill_right && mouse_pos.y >= h_pill_top &&
+                mouse_pos.y <= h_pill_bot) {
                 overlay_hovered = true;
             }
             live_pill_left = h_pill_left;
@@ -575,8 +574,8 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
             float strip_right = live_pill_left - DpiSize(6.0f);
             float strip_top = zy - DpiSize(2.0f);
             float strip_bot = zy + btn_sz + DpiSize(2.0f);
-            if (mouse_pos.x >= strip_left && mouse_pos.x <= strip_right &&
-                mouse_pos.y >= strip_top && mouse_pos.y <= strip_bot) {
+            if (mouse_pos.x >= strip_left && mouse_pos.x <= strip_right && mouse_pos.y >= strip_top &&
+                mouse_pos.y <= strip_bot) {
                 overlay_hovered = true;
             }
         }
@@ -687,10 +686,14 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
             ImDrawList* fg_hist = ImGui::GetWindowDrawList();
             fg_hist->AddRectFilled(ImVec2(h_pill_left, h_pill_top),
                                    ImVec2(h_pill_left + h_pill_w, h_pill_top + h_pill_h),
-                                   WithAlpha(th_hist.surface_2, 0.85f), DpiSize(8.0f));
+                                   WithAlpha(th_hist.surface_2, 0.85f),
+                                   DpiSize(8.0f));
             fg_hist->AddRect(ImVec2(h_pill_left, h_pill_top),
                              ImVec2(h_pill_left + h_pill_w, h_pill_top + h_pill_h),
-                             th_hist.border, DpiSize(8.0f), 0, DpiSize(1.0f));
+                             th_hist.border,
+                             DpiSize(8.0f),
+                             0,
+                             DpiSize(1.0f));
 
             ImGui::SetCursorScreenPos(ImVec2(h_pill_left + h_pad, buttons_y));
             if (ImGui::Button((AF_TR("Live") + "##return_to_live").c_str(), ImVec2(button_size, button_size)))
@@ -710,9 +713,8 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
             float strip_top = buttons_y - DpiSize(2.0f);
             float strip_bottom = buttons_y + button_size + DpiSize(2.0f);
             if (strip_right - strip_left >= DpiSize(120.0f)) {
-                overlay_buttons->on_render_timeline_strip(
-                    ImVec2(strip_left, strip_top),
-                    ImVec2(strip_right, strip_bottom));
+                overlay_buttons->on_render_timeline_strip(ImVec2(strip_left, strip_top),
+                                                          ImVec2(strip_right, strip_bottom));
             }
         }
 
@@ -728,10 +730,14 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
             ImDrawList* fg_b = ImGui::GetWindowDrawList();
             fg_b->AddRectFilled(ImVec2(bx, by),
                                 ImVec2(bx + ts.x + pad_x * 2.0f, by + ts.y + pad_y * 2.0f),
-                                WithAlpha(th_b.accent, 0.85f), DpiSize(6.0f));
+                                WithAlpha(th_b.accent, 0.85f),
+                                DpiSize(6.0f));
             fg_b->AddRect(ImVec2(bx, by),
                           ImVec2(bx + ts.x + pad_x * 2.0f, by + ts.y + pad_y * 2.0f),
-                          th_b.border, DpiSize(6.0f), 0, DpiSize(1.0f));
+                          th_b.border,
+                          DpiSize(6.0f),
+                          0,
+                          DpiSize(1.0f));
             fg_b->AddText(ImVec2(bx + pad_x, by + pad_y), th_b.text_primary, txt);
         }
     }

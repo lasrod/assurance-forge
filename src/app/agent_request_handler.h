@@ -34,9 +34,9 @@ struct AgentRequestContext {
     const core::AppState& state;
     // How this project was addressed, echoed back so a client can confirm it is
     // talking to the project it meant.
-    std::string           project_path;
+    std::string project_path;
     // The connected client, for attribution on anything a request produces.
-    std::string           client_label;
+    std::string client_label;
     // Switches the application to another of the project's argument files.
     // Supplied by the caller rather than performed here because opening a file
     // touches controllers, the command bus and the audit store -- all of which
@@ -49,10 +49,9 @@ struct AgentRequestContext {
     core::changesets::ChangeSetStore* change_sets = nullptr;
     // Which connection is asking, so an agent's operations reach its own change
     // set rather than another client's.
-    std::uint64_t                     connection_id = 0;
+    std::uint64_t connection_id = 0;
 };
 
-bridge::Response HandleAgentRequest(const bridge::Request& request,
-                                    const AgentRequestContext& context);
+bridge::Response HandleAgentRequest(const bridge::Request& request, const AgentRequestContext& context);
 
 } // namespace app

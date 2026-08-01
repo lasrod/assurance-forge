@@ -99,8 +99,7 @@ void ShowRelationshipPanel(parser::AssuranceCase* model, const RelationshipPanel
     MetadataRow(AF_TR("Targets:").c_str(), JoinRefs(relationship->target_refs));
     if (!relationship->reasoning_ref.empty())
         MetadataRow(AF_TR("Reasoning:").c_str(), relationship->reasoning_ref);
-    MetadataRow(AF_TR("ACP target:").c_str(),
-                selected_target->eligible_for_acp ? AF_TR("Eligible") : AF_TR("Blocked"));
+    MetadataRow(AF_TR("ACP target:").c_str(), selected_target->eligible_for_acp ? AF_TR("Eligible") : AF_TR("Blocked"));
     if (!selected_target->eligible_for_acp) {
         ImGui::Spacing();
         ImGui::TextWrapped("%s", selected_target->blocked_reason.c_str());

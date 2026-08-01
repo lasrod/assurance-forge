@@ -54,8 +54,7 @@ std::vector<std::filesystem::path> corpus_files() {
     if (!std::filesystem::is_directory(directory, ec)) {
         return files;
     }
-    for (const std::filesystem::directory_entry& entry :
-         std::filesystem::directory_iterator(directory, ec)) {
+    for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(directory, ec)) {
         if (entry.is_regular_file(ec)) {
             files.push_back(entry.path());
         }
@@ -63,7 +62,7 @@ std::vector<std::filesystem::path> corpus_files() {
     return files;
 }
 
-}  // namespace
+} // namespace
 
 // Every corpus file must at least PARSE into SACM elements. The failure this
 // guards is the one that motivated COMPAT-002: a file that reports VALID while
@@ -84,20 +83,17 @@ TEST(Sacm23InteropCorpus, SACM23_COMPAT_002_ThirdPartyFilesParseIntoSacmElements
             // document -- an ODE container, for instance, embeds SACM under a
             // root this library does not accept. Report rather than fail, so a
             // mixed directory stays usable.
-            const std::string reason =
-                loaded.diagnostics.empty() ? "load failed" : loaded.diagnostics.front().message;
+            const std::string reason = loaded.diagnostics.empty() ? "load failed" : loaded.diagnostics.front().message;
             GTEST_LOG_(INFO) << path.filename().string() << ": not loadable (" << reason << ")";
             continue;
         }
         ASSERT_TRUE(loaded.document.has_value()) << path.string();
         std::size_t elements = 0;
-        loaded.document->for_each_element([&elements](const sacm::model::SACMElement&) {
-            ++elements;
-        });
-        EXPECT_GT(elements, 0u)
-            << path.string() << " loaded but produced no SACM elements -- the file parsed as XML "
-                                "and yielded nothing, which is the silent-failure mode this "
-                                "requirement exists to catch";
+        loaded.document->for_each_element([&elements](const sacm::model::SACMElement&) { ++elements; });
+        EXPECT_GT(elements, 0u) << path.string()
+                                << " loaded but produced no SACM elements -- the file parsed as XML "
+                                   "and yielded nothing, which is the silent-failure mode this "
+                                   "requirement exists to catch";
         ++parsed;
     }
     EXPECT_GT(parsed, 0) << "no file in the corpus directory was a loadable SACM document";
@@ -117,7 +113,7 @@ TEST(Sacm23InteropCorpus, SACM23_COMPAT_002_ThirdPartyFilesSemanticallyRoundTrip
     for (const std::filesystem::path& path : files) {
         const LoadResult first = sacm::io::load_xmi_file(path);
         if (!first.ok) {
-            continue;  // see the note in the parse test
+            continue; // see the note in the parse test
         }
         const sacm::io::SaveResult saved = sacm::io::save_xmi_string(*first.document, compat);
         ASSERT_TRUE(saved.ok) << path.string() << ": compatibility save failed";
@@ -126,17 +122,15 @@ TEST(Sacm23InteropCorpus, SACM23_COMPAT_002_ThirdPartyFilesSemanticallyRoundTrip
 
         for (const sacm::compare::SemanticDifference& difference :
              sacm::compare::semantic_compare(*first.document, *second.document)) {
-            ADD_FAILURE() << path.filename().string() << " [" << difference.category << "] "
-                          << difference.path << ": " << difference.message;
+            ADD_FAILURE() << path.filename().string() << " [" << difference.category << "] " << difference.path << ": "
+                          << difference.message;
         }
 
         // Validation diagnostics are reported, not asserted clean: a real file
         // may violate SACM rules, and saying so is the library working. What
         // must not happen is a crash or a silent pass.
-        const std::vector<sacm::validation::Diagnostic> problems =
-            sacm::validation::validate(*first.document);
-        GTEST_LOG_(INFO) << path.filename().string() << ": " << problems.size()
-                         << " validation diagnostics";
+        const std::vector<sacm::validation::Diagnostic> problems = sacm::validation::validate(*first.document);
+        GTEST_LOG_(INFO) << path.filename().string() << ": " << problems.size() << " validation diagnostics";
     }
 }
 
@@ -155,13 +149,12 @@ std::filesystem::path third_party(std::string_view name) {
     return std::filesystem::path(SACM_TEST_DATA_DIR) / "interop-thirdparty" / name;
 }
 
-std::size_t count_code(const std::vector<sacm::validation::Diagnostic>& diagnostics,
-                       std::string_view code) {
-    return static_cast<std::size_t>(std::ranges::count_if(
-        diagnostics, [&](const auto& diagnostic) { return diagnostic.code == code; }));
+std::size_t count_code(const std::vector<sacm::validation::Diagnostic>& diagnostics, std::string_view code) {
+    return static_cast<std::size_t>(
+        std::ranges::count_if(diagnostics, [&](const auto& diagnostic) { return diagnostic.code == code; }));
 }
 
-}  // namespace
+} // namespace
 
 // An ODE DDIPackage whose sole child is the SACM assurance case: it declares
 // the architecture_ and failureLogic_ prefixes but never uses them, so what the
@@ -176,8 +169,7 @@ TEST(Sacm23InteropCorpus, SACM23_COMPAT_002_ThirdPartyOdeContainerImportsWithNon
     ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
 
     const LoadResult loaded = sacm::io::load_xmi_file(path);
-    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
-                                                          : loaded.diagnostics.front().message);
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed" : loaded.diagnostics.front().message);
 
     // The user is told, in one diagnostic, all three things they need: the file
     // is not conformant, content outside the SACM packages is not represented,
@@ -219,8 +211,7 @@ TEST(Sacm23InteropCorpus, SACM23_COMPAT_002_ThirdPartyOdeContainerImportsWithNon
     ASSERT_TRUE(reloaded.ok);
     for (const sacm::compare::SemanticDifference& difference :
          sacm::compare::semantic_compare(*loaded.document, *reloaded.document)) {
-        ADD_FAILURE() << "[" << difference.category << "] " << difference.path << ": "
-                      << difference.message;
+        ADD_FAILURE() << "[" << difference.category << "] " << difference.path << ": " << difference.message;
     }
 
     // The promise the warning makes: what we write IS a conformant SACM
@@ -244,8 +235,7 @@ TEST(Sacm23InteropCorpus, SACM23_COMPAT_002_ThirdPartyEmfFileImportsAndReportsIt
     ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
 
     const LoadResult loaded = sacm::io::load_xmi_file(path);
-    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
-                                                          : loaded.diagnostics.front().message);
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed" : loaded.diagnostics.front().message);
     ASSERT_EQ(loaded.document->roots().size(), 1u);
 
     // GSN types layered via xsi:type resolve to the SACM classes they specialize.
@@ -258,12 +248,10 @@ TEST(Sacm23InteropCorpus, SACM23_COMPAT_002_ThirdPartyEmfFileImportsAndReportsIt
     EXPECT_GT(claims, 0) << "no argument was read from a file that is nothing but an argument";
 
     // The violations are real and are reported, not smoothed over.
-    const std::vector<sacm::validation::Diagnostic> problems =
-        sacm::validation::validate(*loaded.document);
-    EXPECT_FALSE(problems.empty())
-        << "this file carries genuine SACM rule violations (implementationConstraint on "
-           "non-abstract elements, duplicate language tags); reporting none would mean the "
-           "validator is not looking";
+    const std::vector<sacm::validation::Diagnostic> problems = sacm::validation::validate(*loaded.document);
+    EXPECT_FALSE(problems.empty()) << "this file carries genuine SACM rule violations (implementationConstraint on "
+                                      "non-abstract elements, duplicate language tags); reporting none would mean the "
+                                      "validator is not looking";
     // Both codes, with counts, rather than an `||` over two generic codes:
     // losing SACM-CITE-001 entirely would satisfy an `||` and go unnoticed.
     // The file has 46 implementationConstraints and no isAbstract attribute at
@@ -276,11 +264,9 @@ TEST(Sacm23InteropCorpus, SACM23_COMPAT_002_ThirdPartyEmfFileImportsAndReportsIt
     // preserved subtree (54 here), which is an artefact of how deep the
     // subtrees are. Six is the number of gsn_:Context elements this file has.
     std::size_t fragments = 0;
-    loaded.document->for_each_element([&fragments](const sacm::model::SACMElement& element) {
-        fragments += element.preserved_content().size();
-    });
-    EXPECT_EQ(fragments, 6u)
-        << "the gsn_:Context subtrees this file carries were not preserved";
+    loaded.document->for_each_element(
+        [&fragments](const sacm::model::SACMElement& element) { fragments += element.preserved_content().size(); });
+    EXPECT_EQ(fragments, 6u) << "the gsn_:Context subtrees this file carries were not preserved";
 
     // Invalid content still has to survive a round trip -- refusing to lose a
     // user's data does not depend on their data being correct.
@@ -291,8 +277,7 @@ TEST(Sacm23InteropCorpus, SACM23_COMPAT_002_ThirdPartyEmfFileImportsAndReportsIt
     ASSERT_TRUE(reloaded.ok);
     for (const sacm::compare::SemanticDifference& difference :
          sacm::compare::semantic_compare(*loaded.document, *reloaded.document)) {
-        ADD_FAILURE() << "[" << difference.category << "] " << difference.path << ": "
-                      << difference.message;
+        ADD_FAILURE() << "[" << difference.category << "] " << difference.path << ": " << difference.message;
     }
 }
 
@@ -309,14 +294,12 @@ TEST(Sacm23InteropCorpus, SACM23_COMPAT_002_ThirdPartyContainerLosesItsNonSacmSi
     // really does carry non-SACM models. If upstream ever trims them, this test
     // stops proving anything and should say so rather than pass quietly.
     std::ifstream stream(path, std::ios::binary);
-    const std::string source((std::istreambuf_iterator<char>(stream)),
-                             std::istreambuf_iterator<char>());
+    const std::string source((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
     ASSERT_NE(source.find("odeProductPackages"), std::string::npos)
         << "fixture no longer carries non-SACM sibling models; the loss this test measures is gone";
 
     const LoadResult loaded = sacm::io::load_xmi_file(path);
-    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
-                                                          : loaded.diagnostics.front().message);
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed" : loaded.diagnostics.front().message);
     EXPECT_TRUE(std::ranges::any_of(loaded.diagnostics, [](const auto& diagnostic) {
         return diagnostic.code == sacm::validation::codes::kXmiForeignContainerRoot;
     })) << "the container was read with no warning that its other models are being dropped";
@@ -350,7 +333,6 @@ TEST(Sacm23InteropCorpus, SACM23_COMPAT_002_ThirdPartyContainerLosesItsNonSacmSi
     ASSERT_TRUE(reloaded.ok);
     for (const sacm::compare::SemanticDifference& difference :
          sacm::compare::semantic_compare(*loaded.document, *reloaded.document)) {
-        ADD_FAILURE() << "[" << difference.category << "] " << difference.path << ": "
-                      << difference.message;
+        ADD_FAILURE() << "[" << difference.category << "] " << difference.path << ": " << difference.message;
     }
 }

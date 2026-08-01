@@ -33,7 +33,7 @@ core::AssuranceCase project_case(const LibraryDocument& document);
 // those two exclusions are the only ones it is entitled to make.
 struct DocumentElement {
     std::string id;
-    std::string kind;  // lowercased SACM class name, matching SacmElement::type
+    std::string kind; // lowercased SACM class name, matching SacmElement::type
     bool is_package = false;
     bool is_utility = false;
 };
@@ -68,8 +68,7 @@ std::vector<sacm::ArtifactPackage> project_artifact_packages(const LibraryDocume
 // library-derived `sacm_package` must carry them or those features break after
 // loading a library-XMI file (which the legacy parser reads as near-empty).
 // Additive: existing tags on `package` are kept.
-void copy_library_tags_onto_package(const LibraryDocument& document,
-                                    sacm::AssuranceCasePackage& package);
+void copy_library_tags_onto_package(const LibraryDocument& document, sacm::AssuranceCasePackage& package);
 
 // The per-argument-package grouping the faithful `sacm_package` projection needs.
 // `project_case` flattens every package into one element list, which would

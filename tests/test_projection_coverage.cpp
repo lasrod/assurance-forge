@@ -41,10 +41,10 @@ namespace {
 // things that are WRONG -- shrinking it is the goal.
 const std::set<std::string>& KnownUnrepresentableKinds() {
     static const std::set<std::string> kinds = {
-        "argumentgroup",            // clause 11.2
-        "assertedartifactsupport",  // clause 11.17
-        "assertedartifactcontext",  // clause 11.18
-        "terminologygroup",         // clause 10.3
+        "argumentgroup",           // clause 11.2
+        "assertedartifactsupport", // clause 11.17
+        "assertedartifactcontext", // clause 11.18
+        "terminologygroup",        // clause 10.3
     };
     return kinds;
 }
@@ -59,7 +59,7 @@ const std::set<std::string>& KnownUnrepresentableKinds() {
 // precondition for trusting the lost-kind list above to be complete.
 const std::set<std::string>& KnownRejectedFixtures() {
     static const std::set<std::string> files = {
-        "artifact-full-valid.sacm.xmi",  // full clause 12 artifact model
+        "artifact-full-valid.sacm.xmi", // full clause 12 artifact model
     };
     return files;
 }
@@ -129,8 +129,7 @@ TEST(ProjectionCoverage, SACM23_INT_001_ProjectionEmitsEveryNonContainerElement)
         for (const core::SacmElement& element : sacm_adapter::project_case(*loaded.document).elements)
             projected_ids.insert(element.id);
 
-        for (const sacm_adapter::DocumentElement& element :
-             sacm_adapter::list_document_elements(*loaded.document)) {
+        for (const sacm_adapter::DocumentElement& element : sacm_adapter::list_document_elements(*loaded.document)) {
             // A fixture may legitimately contribute nothing -- vendor-extension-valid
             // is packages plus preserved content -- so non-vacuity is checked over the
             // corpus below rather than per file.
@@ -139,8 +138,8 @@ TEST(ProjectionCoverage, SACM23_INT_001_ProjectionEmitsEveryNonContainerElement)
             ++checked;
             covered_kinds.insert(element.kind);
             EXPECT_TRUE(projected_ids.count(element.id) > 0)
-                << fixture.filename().string() << ": the projection drops " << element.kind << " '"
-                << element.id << "', which is neither a package nor a utility element";
+                << fixture.filename().string() << ": the projection drops " << element.kind << " '" << element.id
+                << "', which is neither a package nor a utility element";
         }
     }
 
@@ -173,10 +172,9 @@ TEST(ProjectionCoverage, SACM23_LIB_002_BridgeRoundTripLosesOnlyTheKnownKinds) {
             observed_kinds.insert(kind);
 
         // Exactly what the bridge does to the live document.
-        const sacm::AssuranceCasePackage package =
-            core::project_library_package_with_tags(*loaded.document);
-        if (!sacm_adapter::reload_document_keeping_compatibility_content(
-                *loaded.document, sacm::serialize_sacm(package))) {
+        const sacm::AssuranceCasePackage package = core::project_library_package_with_tags(*loaded.document);
+        if (!sacm_adapter::reload_document_keeping_compatibility_content(*loaded.document,
+                                                                         sacm::serialize_sacm(package))) {
             // A different failure mode from silent loss, and a less bad one: the
             // command fails visibly rather than corrupting. Still a defect --
             // every bridged edit is impossible on such a document -- so it is
@@ -210,8 +208,7 @@ TEST(ProjectionCoverage, SACM23_LIB_002_BridgeRoundTripLosesOnlyTheKnownKinds) {
     // Non-vacuity: the sweep has to have seen the kinds it claims to be checking.
     for (const std::string& known : KnownUnrepresentableKinds()) {
         EXPECT_TRUE(observed_kinds.count(known) > 0)
-            << "no fixture contains a '" << known
-            << "', so listing it as known-unrepresentable is unfalsifiable here";
+            << "no fixture contains a '" << known << "', so listing it as known-unrepresentable is unfalsifiable here";
     }
 
     for (const std::string& lost : lost_kinds) {

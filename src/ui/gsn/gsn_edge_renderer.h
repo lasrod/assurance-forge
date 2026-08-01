@@ -59,7 +59,8 @@ void ComputeGroup2EdgeBounds(
     ImVec2 parent_side, ImVec2 attachment_edge, bool is_left_side, float zoom, ImVec2& out_min, ImVec2& out_max);
 
 // Draw a Group1 structural edge between two node anchor points.
-void DrawGroup1Edge(ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 child_top, float zoom, float straight_drop = 0.0f);
+void DrawGroup1Edge(
+    ImDrawList* draw_list, ImVec2 parent_bottom, ImVec2 child_top, float zoom, float straight_drop = 0.0f);
 
 // Draw a Group2 contextual edge between a parent side and an attachment side.
 void DrawGroup2Edge(ImDrawList* draw_list, ImVec2 parent_side, ImVec2 attachment_edge, bool is_left_side, float zoom);

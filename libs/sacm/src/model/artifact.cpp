@@ -7,9 +7,8 @@ namespace sacm::model {
 // vector<unique_ptr<Property>> member operations cleanly here. Both are
 // declared in the header to keep those instantiations out of translation
 // units where Property is only forward-declared.
-ArtifactAsset::ArtifactAsset(ElementKind kind, ElementId id)
-    : ArtifactElement(kind, std::move(id)) {}
+ArtifactAsset::ArtifactAsset(ElementKind kind, ElementId id) : ArtifactElement(kind, std::move(id)) {}
 
 ArtifactAsset::~ArtifactAsset() = default;
 
-}  // namespace sacm::model
+} // namespace sacm::model

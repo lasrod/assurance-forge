@@ -13,7 +13,7 @@
 namespace app::commands {
 
 struct DispatchOutcome {
-    bool        success = false;
+    bool success = false;
     std::string error;
 };
 
@@ -28,7 +28,7 @@ struct DispatchOutcome {
 // question the audit log of a safety argument exists to answer, and an edge
 // case where the answer is "an agent proposed it and a person approved it" is
 // the one it must not silently record as `system`.
-DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state, core::commands::ICommand& command,
-                                       const std::string& author = {});
+DispatchOutcome
+DispatchAuditedCommand(AppRuntimeState& state, core::commands::ICommand& command, const std::string& author = {});
 
 } // namespace app::commands

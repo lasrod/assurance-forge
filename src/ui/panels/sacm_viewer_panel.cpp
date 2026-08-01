@@ -97,7 +97,8 @@ void ShowOverwriteModal(SacmViewerPanelModel& model) {
         model.show_overwrite_confirm = false;
     }
 
-    if (ImGui::BeginPopupModal((AF_TR("Overwrite File?") + "###Overwrite File?").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal(
+            (AF_TR("Overwrite File?") + "###Overwrite File?").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted(ui::i18n::trf("File already exists:\n{0}", model.file_path_buf).c_str());
         ImGui::Separator();
         ImGui::Text("%s", AF_TR("Are you sure you want to overwrite it?").c_str());

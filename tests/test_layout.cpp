@@ -339,12 +339,10 @@ TEST(LayoutTest, WideNodesAreCenteredWithinExpandedColumns) {
 
     const GsnLayoutGraphResult layout = LayoutGsnGraph(input, sizes, options);
 
-    const auto wide_it = std::find_if(layout.nodes.begin(), layout.nodes.end(), [](const GsnLayoutNode& node) {
-        return node.id == "Wide";
-    });
-    const auto narrow_it = std::find_if(layout.nodes.begin(), layout.nodes.end(), [](const GsnLayoutNode& node) {
-        return node.id == "Narrow";
-    });
+    const auto wide_it = std::find_if(
+        layout.nodes.begin(), layout.nodes.end(), [](const GsnLayoutNode& node) { return node.id == "Wide"; });
+    const auto narrow_it = std::find_if(
+        layout.nodes.begin(), layout.nodes.end(), [](const GsnLayoutNode& node) { return node.id == "Narrow"; });
     ASSERT_NE(wide_it, layout.nodes.end());
     ASSERT_NE(narrow_it, layout.nodes.end());
     // The two roots are packed side by side in input order without overlapping
@@ -609,10 +607,10 @@ TEST(LayoutTest, AdjacentSiblingsWithFacingGroup2AttachmentsDoNotOverlap) {
 
     EXPECT_FALSE(rects_overlap(ctx_left2->position, ctx_left2->size, ctx_right1->position, ctx_right1->size))
         << "Right attachment of Left sibling overlaps left attachment of Right sibling!"
-        << " CtxLeft2=(" << ctx_left2->position.x << "," << ctx_left2->position.y
-        << " " << ctx_left2->size.x << "x" << ctx_left2->size.y << ")"
-        << " CtxRight1=(" << ctx_right1->position.x << "," << ctx_right1->position.y
-        << " " << ctx_right1->size.x << "x" << ctx_right1->size.y << ")";
+        << " CtxLeft2=(" << ctx_left2->position.x << "," << ctx_left2->position.y << " " << ctx_left2->size.x << "x"
+        << ctx_left2->size.y << ")"
+        << " CtxRight1=(" << ctx_right1->position.x << "," << ctx_right1->position.y << " " << ctx_right1->size.x << "x"
+        << ctx_right1->size.y << ")";
 }
 
 TEST(LayoutTest, AsymmetricOddChildrenUseCompactSpan) {
@@ -774,11 +772,11 @@ TEST(LayoutTest, DeepLinearChainDoesNotOverflowStack) {
     EXPECT_EQ(layout.nodes.size(), static_cast<size_t>(kChainLength));
     EXPECT_TRUE(layout.warnings.empty());
 
-    const auto first = std::find_if(
-        layout.nodes.begin(), layout.nodes.end(), [](const GsnLayoutNode& n) { return n.id == "n0"; });
+    const auto first =
+        std::find_if(layout.nodes.begin(), layout.nodes.end(), [](const GsnLayoutNode& n) { return n.id == "n0"; });
     const std::string last_id = "n" + std::to_string(kChainLength - 1);
-    const auto last = std::find_if(
-        layout.nodes.begin(), layout.nodes.end(), [&](const GsnLayoutNode& n) { return n.id == last_id; });
+    const auto last =
+        std::find_if(layout.nodes.begin(), layout.nodes.end(), [&](const GsnLayoutNode& n) { return n.id == last_id; });
     ASSERT_NE(first, layout.nodes.end());
     ASSERT_NE(last, layout.nodes.end());
     // The chain descends one row per link, so the last node must sit far below the first.

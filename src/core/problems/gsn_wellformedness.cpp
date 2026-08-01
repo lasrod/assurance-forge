@@ -75,11 +75,8 @@ void AddFinding(std::vector<GsnFinding>& findings,
                 std::string related_id,
                 std::string relationship_id,
                 std::string detail) {
-    findings.push_back(GsnFinding{rule,
-                                  std::move(element_id),
-                                  std::move(related_id),
-                                  std::move(relationship_id),
-                                  std::move(detail)});
+    findings.push_back(
+        GsnFinding{rule, std::move(element_id), std::move(related_id), std::move(relationship_id), std::move(detail)});
 }
 
 // Every reference a relationship makes must name something in the case. An
@@ -144,8 +141,7 @@ void CheckConnectionRules(const parser::SacmElement& relationship,
         if (support && !GsnCanBeSupported(kind))
             AddFinding(findings, GsnRule::SupportedElementIsALeaf, target->id, std::string(), relationship.id, {});
         if (!support && !GsnCanBeContextualized(kind))
-            AddFinding(
-                findings, GsnRule::ContextualizedElementIsALeaf, target->id, std::string(), relationship.id, {});
+            AddFinding(findings, GsnRule::ContextualizedElementIsALeaf, target->id, std::string(), relationship.id, {});
     }
 
     for (const std::string& reference : relationship.source_refs) {
@@ -348,12 +344,11 @@ std::vector<GsnFinding> CheckGsnWellFormedness(const parser::AssuranceCase& mode
     std::sort(findings.begin(), findings.end(), [](const GsnFinding& lhs, const GsnFinding& rhs) {
         return SortKey(lhs) < SortKey(rhs);
     });
-    findings.erase(std::unique(findings.begin(),
-                               findings.end(),
-                               [](const GsnFinding& lhs, const GsnFinding& rhs) {
-                                   return SortKey(lhs) == SortKey(rhs);
-                               }),
-                   findings.end());
+    findings.erase(
+        std::unique(findings.begin(),
+                    findings.end(),
+                    [](const GsnFinding& lhs, const GsnFinding& rhs) { return SortKey(lhs) == SortKey(rhs); }),
+        findings.end());
     return findings;
 }
 

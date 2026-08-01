@@ -39,13 +39,13 @@ const char* FindingSeverityToString(FindingSeverity severity);
 struct StagedFinding {
     // The SCCG guideline this serves, e.g. "AR-02". Carried so a reviewer can
     // look up the rule rather than take the tool's word for it.
-    std::string     guideline_id;
+    std::string guideline_id;
     // The guideline's own wording, so the finding is readable without the
     // catalog to hand.
-    std::string     statement;
+    std::string statement;
     // What is wrong with this particular element.
-    std::string     detail;
-    std::string     element_id;
+    std::string detail;
+    std::string element_id;
     FindingSeverity severity = FindingSeverity::Advisory;
 };
 
@@ -57,7 +57,7 @@ struct StagedFinding {
 // `changed_element_ids` limits reporting to what this change set touched: an
 // agent should not be handed findings about parts of the argument it did not
 // write, which are the user's business and not the agent's to fix.
-std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase&    preview,
+std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& preview,
                                                const std::vector<std::string>& changed_element_ids);
 
 } // namespace core::sccg

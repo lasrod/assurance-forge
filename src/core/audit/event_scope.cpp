@@ -12,8 +12,7 @@ void InsertElementIdentity(const ElementT& element, ArgumentPackageScope& out) {
         out.element_gids.insert(element.gid);
 }
 
-void AppendIfString(const nlohmann::ordered_json& payload, const char* key,
-                    std::vector<std::string>& out) {
+void AppendIfString(const nlohmann::ordered_json& payload, const char* key, std::vector<std::string>& out) {
     auto it = payload.find(key);
     if (it == payload.end() || !it->is_string())
         return;
@@ -22,8 +21,7 @@ void AppendIfString(const nlohmann::ordered_json& payload, const char* key,
         out.push_back(std::move(value));
 }
 
-void AppendStringArray(const nlohmann::ordered_json& payload, const char* key,
-                       std::vector<std::string>& out) {
+void AppendStringArray(const nlohmann::ordered_json& payload, const char* key, std::vector<std::string>& out) {
     auto it = payload.find(key);
     if (it == payload.end() || !it->is_array())
         return;

@@ -65,6 +65,8 @@ StandardVersion detect_standard_version(std::string_view uri);
 bool is_accepted_sacm_namespace(std::string_view uri);
 
 // True only for the pinned strict namespace.
-inline bool is_strict_sacm_namespace(std::string_view uri) { return uri == kSacm; }
+inline bool is_strict_sacm_namespace(std::string_view uri) {
+    return uri == kSacm;
+}
 
-}  // namespace sacm::metadata::namespaces
+} // namespace sacm::metadata::namespaces

@@ -20,21 +20,44 @@ namespace {
 using sacm::metadata::ElementKind;
 
 constexpr ElementKind kAllKinds[] = {
-    ElementKind::Description, ElementKind::ImplementationConstraint, ElementKind::Note,
-    ElementKind::TaggedValue, ElementKind::AssuranceCasePackage,
-    ElementKind::AssuranceCasePackageInterface, ElementKind::AssuranceCasePackageBinding,
-    ElementKind::TerminologyPackage, ElementKind::TerminologyPackageInterface,
-    ElementKind::TerminologyPackageBinding, ElementKind::TerminologyGroup, ElementKind::Category,
-    ElementKind::Expression, ElementKind::Term, ElementKind::ArgumentPackage,
-    ElementKind::ArgumentPackageInterface, ElementKind::ArgumentPackageBinding,
-    ElementKind::ArgumentGroup, ElementKind::Claim, ElementKind::ArgumentReasoning,
-    ElementKind::ArtifactReference, ElementKind::AssertedInference, ElementKind::AssertedEvidence,
-    ElementKind::AssertedContext, ElementKind::AssertedArtifactSupport,
-    ElementKind::AssertedArtifactContext, ElementKind::ArtifactPackage,
-    ElementKind::ArtifactPackageInterface, ElementKind::ArtifactPackageBinding,
-    ElementKind::ArtifactGroup, ElementKind::Artifact, ElementKind::ArtifactAssetRelationship,
-    ElementKind::Activity, ElementKind::Event, ElementKind::Participant, ElementKind::Technique,
-    ElementKind::Resource, ElementKind::Property,
+    ElementKind::Description,
+    ElementKind::ImplementationConstraint,
+    ElementKind::Note,
+    ElementKind::TaggedValue,
+    ElementKind::AssuranceCasePackage,
+    ElementKind::AssuranceCasePackageInterface,
+    ElementKind::AssuranceCasePackageBinding,
+    ElementKind::TerminologyPackage,
+    ElementKind::TerminologyPackageInterface,
+    ElementKind::TerminologyPackageBinding,
+    ElementKind::TerminologyGroup,
+    ElementKind::Category,
+    ElementKind::Expression,
+    ElementKind::Term,
+    ElementKind::ArgumentPackage,
+    ElementKind::ArgumentPackageInterface,
+    ElementKind::ArgumentPackageBinding,
+    ElementKind::ArgumentGroup,
+    ElementKind::Claim,
+    ElementKind::ArgumentReasoning,
+    ElementKind::ArtifactReference,
+    ElementKind::AssertedInference,
+    ElementKind::AssertedEvidence,
+    ElementKind::AssertedContext,
+    ElementKind::AssertedArtifactSupport,
+    ElementKind::AssertedArtifactContext,
+    ElementKind::ArtifactPackage,
+    ElementKind::ArtifactPackageInterface,
+    ElementKind::ArtifactPackageBinding,
+    ElementKind::ArtifactGroup,
+    ElementKind::Artifact,
+    ElementKind::ArtifactAssetRelationship,
+    ElementKind::Activity,
+    ElementKind::Event,
+    ElementKind::Participant,
+    ElementKind::Technique,
+    ElementKind::Resource,
+    ElementKind::Property,
 };
 
 // Value types in the inventory's concrete-class table that are not
@@ -45,9 +68,8 @@ TEST(Sacm23Metamodel, SACM23_LIB_001_ElementKindsMatchNormativeInventory) {
 #ifndef SACM_REPO_FIXTURES_DIR
     GTEST_SKIP() << "repository inventory unavailable in standalone builds";
 #else
-    const std::filesystem::path inventory_path = std::filesystem::path(SACM_REPO_FIXTURES_DIR) /
-                                                 "docs" / "sacm" /
-                                                 "sacm-2.3-metamodel-inventory.md";
+    const std::filesystem::path inventory_path =
+        std::filesystem::path(SACM_REPO_FIXTURES_DIR) / "docs" / "sacm" / "sacm-2.3-metamodel-inventory.md";
     if (!std::filesystem::exists(inventory_path)) {
         GTEST_SKIP() << "inventory not found: " << inventory_path.string();
     }
@@ -81,8 +103,7 @@ TEST(Sacm23Metamodel, SACM23_LIB_001_ElementKindsMatchNormativeInventory) {
         if (kValueTypes.contains(class_name)) {
             continue;
         }
-        EXPECT_TRUE(library_kinds.contains(class_name))
-            << "inventory class not covered by the library: " << class_name;
+        EXPECT_TRUE(library_kinds.contains(class_name)) << "inventory class not covered by the library: " << class_name;
     }
     for (const std::string& kind_name : library_kinds) {
         EXPECT_TRUE(inventory_classes.contains(kind_name))
@@ -101,9 +122,8 @@ TEST(Sacm23Metamodel, SACM23_XMI_003_KnownAttributesCoverTheNormativeInventory) 
 #ifndef SACM_REPO_FIXTURES_DIR
     GTEST_SKIP() << "repository inventory unavailable in standalone builds";
 #else
-    const std::filesystem::path inventory_path = std::filesystem::path(SACM_REPO_FIXTURES_DIR) /
-                                                 "docs" / "sacm" /
-                                                 "sacm-2.3-metamodel-inventory.md";
+    const std::filesystem::path inventory_path =
+        std::filesystem::path(SACM_REPO_FIXTURES_DIR) / "docs" / "sacm" / "sacm-2.3-metamodel-inventory.md";
     if (!std::filesystem::exists(inventory_path)) {
         GTEST_SKIP() << "inventory not found: " << inventory_path.string();
     }
@@ -142,4 +162,4 @@ TEST(Sacm23Metamodel, SACM23_XMI_003_KnownAttributesCoverTheNormativeInventory) 
 #endif
 }
 
-}  // namespace
+} // namespace

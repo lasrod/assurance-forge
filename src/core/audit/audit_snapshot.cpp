@@ -98,8 +98,8 @@ bool WriteSnapshotMetadata(const std::filesystem::path& project_root,
         error = "Could not create snapshot directory: " + ec.message();
         return false;
     }
-    auto r = WriteTextFile(SnapshotMetadataPath(project_root, metadata.snapshot_id),
-                           SerializeSnapshotMetadata(metadata));
+    auto r =
+        WriteTextFile(SnapshotMetadataPath(project_root, metadata.snapshot_id), SerializeSnapshotMetadata(metadata));
     if (!r) {
         error = std::move(r.error());
         return false;
@@ -135,8 +135,8 @@ bool CreateInitialSnapshot(const std::filesystem::path& project_root,
         return false;
     }
 
-    auto write = WriteTextFile(snapshot_sacm,
-                               std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()));
+    auto write =
+        WriteTextFile(snapshot_sacm, std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()));
     if (!write) {
         error = std::move(write.error());
         return false;
@@ -198,7 +198,9 @@ bool CreateUserSnapshot(const std::filesystem::path& project_root,
     // snapshot uses `snapshot_000000` (sequence 0); user snapshots reuse the
     // same zero-padded scheme so they sort lexically alongside it.
     char id_buf[32];
-    std::snprintf(id_buf, sizeof(id_buf), "snapshot_%06llu",
+    std::snprintf(id_buf,
+                  sizeof(id_buf),
+                  "snapshot_%06llu",
                   static_cast<unsigned long long>(manifest.latest_transaction_sequence));
     const std::string snapshot_id = id_buf;
 
@@ -223,8 +225,8 @@ bool CreateUserSnapshot(const std::filesystem::path& project_root,
         return false;
     }
 
-    auto write = WriteTextFile(snapshot_sacm,
-                               std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()));
+    auto write =
+        WriteTextFile(snapshot_sacm, std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()));
     if (!write) {
         error = std::move(write.error());
         return false;
@@ -270,7 +272,7 @@ ReplayRoot ResolveReplayRoot(const std::filesystem::path& project_root,
     }
 
     SnapshotMetadata metadata;
-    std::string      error;
+    std::string error;
     if (ReadSnapshotMetadata(project_root, root.snapshot_id, metadata, error)) {
         root.from_transaction_sequence = metadata.transaction_sequence;
     } else {
@@ -313,8 +315,7 @@ bool LoadSnapshotModels(const std::filesystem::path& sacm_path,
     }
     auto ac = parser::parse_sacm_xml(sacm_path.string());
     if (!ac) {
-        error = "Failed to parse snapshot parser model at " + sacm_path.string() + ": " + ac.error() +
-                library_suffix;
+        error = "Failed to parse snapshot parser model at " + sacm_path.string() + ": " + ac.error() + library_suffix;
         return false;
     }
     out_package = std::move(*pkg);

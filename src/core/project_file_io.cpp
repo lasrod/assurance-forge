@@ -49,20 +49,22 @@ namespace {
 // is too restrictive (we want to fsync an already-written file), so we
 // open the path with GENERIC_WRITE and call FlushFileBuffers.
 bool FlushPathBuffers(const std::filesystem::path& path, std::string& error) {
-    HANDLE h = CreateFileW(path.wstring().c_str(), GENERIC_WRITE,
-                           FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    HANDLE h = CreateFileW(path.wstring().c_str(),
+                           GENERIC_WRITE,
+                           FILE_SHARE_READ | FILE_SHARE_WRITE,
+                           nullptr,
+                           OPEN_EXISTING,
+                           FILE_ATTRIBUTE_NORMAL,
+                           nullptr);
     if (h == INVALID_HANDLE_VALUE) {
-        error = "Could not open for fsync: " + path.string() +
-                " (err=" + std::to_string(GetLastError()) + ")";
+        error = "Could not open for fsync: " + path.string() + " (err=" + std::to_string(GetLastError()) + ")";
         return false;
     }
     const BOOL ok = FlushFileBuffers(h);
     const DWORD last = ok ? 0u : GetLastError();
     CloseHandle(h);
     if (!ok) {
-        error = "FlushFileBuffers failed for " + path.string() +
-                " (err=" + std::to_string(last) + ")";
+        error = "FlushFileBuffers failed for " + path.string() + " (err=" + std::to_string(last) + ")";
         return false;
     }
     return true;
@@ -90,8 +92,7 @@ bool FsyncFile(const std::filesystem::path& path, std::string& error) {
     return FlushPathBuffers(path, error);
 }
 
-std::expected<void, std::string> WriteTextFileAtomic(const std::filesystem::path& path,
-                                                     std::string_view content) {
+std::expected<void, std::string> WriteTextFileAtomic(const std::filesystem::path& path, std::string_view content) {
     // Write to `<path>.tmp` in the same directory, fsync, then atomically
     // rename over `path`. Same-directory rename is required for atomicity on
     // most filesystems.
@@ -122,12 +123,11 @@ std::expected<void, std::string> WriteTextFileAtomic(const std::filesystem::path
     }
 
 #if defined(_WIN32)
-    if (!MoveFileExW(tmp.wstring().c_str(), path.wstring().c_str(),
-                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+    if (!MoveFileExW(
+            tmp.wstring().c_str(), path.wstring().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
         const DWORD err = GetLastError();
         std::filesystem::remove(tmp, ec);
-        return std::unexpected("Atomic rename failed for " + path.string() +
-                               " (err=" + std::to_string(err) + ")");
+        return std::unexpected("Atomic rename failed for " + path.string() + " (err=" + std::to_string(err) + ")");
     }
 #else
     std::filesystem::rename(tmp, path, ec);
@@ -198,9 +198,8 @@ void ComputeSacmHashes(ProjectFileEntry& entry, const std::filesystem::path& abs
 
     for (const auto& element : result->elements) {
         element_ids.push_back(element.id);
-        std::string semantic_line =
-            element.id + "|" + element.type + "|" + element.name + "|" + element.content + "|" +
-            element.assertion_declaration;
+        std::string semantic_line = element.id + "|" + element.type + "|" + element.name + "|" + element.content + "|" +
+                                    element.assertion_declaration;
         if (element.is_abstract)
             semantic_line += "|abstract";
         semantic_lines.push_back(std::move(semantic_line));

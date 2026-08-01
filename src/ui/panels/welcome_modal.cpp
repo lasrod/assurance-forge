@@ -92,7 +92,10 @@ void DrawText(ImDrawList* draw_list, const ImVec2& pos, ImU32 color, std::string
 
 std::string FormatRecentStats(const RecentProjectEntry& entry) {
     return ui::i18n::trf("{0} claims · {1} strategies · {2} evidence · {3} undeveloped",
-                         entry.claims, entry.strategies, entry.evidence, entry.undeveloped);
+                         entry.claims,
+                         entry.strategies,
+                         entry.evidence,
+                         entry.undeveloped);
 }
 
 void SectionTitle(std::string_view label) {
@@ -265,8 +268,8 @@ void ShowWelcomeModal(bool& is_open,
         if (has_welcome_title_icon) {
             const float start_y = ImGui::GetCursorPosY();
             ImGui::SetCursorPosY(start_y + Px(kWelcomeTitleIconTopOffset));
-            HelloImGui::ImageFromAsset(
-                kWelcomeTitleIconAsset, ImVec2(Px(kWelcomeTitleIconSize), Px(kWelcomeTitleIconSize)));
+            HelloImGui::ImageFromAsset(kWelcomeTitleIconAsset,
+                                       ImVec2(Px(kWelcomeTitleIconSize), Px(kWelcomeTitleIconSize)));
             ImGui::SameLine(0.0f, Px(kWelcomeTitleIconSpacing));
             ImGui::SetCursorPosY(start_y);
         }
@@ -317,15 +320,12 @@ void ShowWelcomeModal(bool& is_open,
                     callbacks.create_project_from_template();
                 show_template_not_implemented = true;
             }
-            if (ActionLink("##open_project",
-                           AF_TR("Open Project"),
-                           AF_TR("Open an existing Assurance Forge project"))) {
+            if (ActionLink(
+                    "##open_project", AF_TR("Open Project"), AF_TR("Open an existing Assurance Forge project"))) {
                 if (callbacks.open_project)
                     callbacks.open_project();
             }
-            if (ActionLink("##import_sacm",
-                           AF_TR("Import SACM"),
-                           AF_TR("Import a SACM XML assurance case"))) {
+            if (ActionLink("##import_sacm", AF_TR("Import SACM"), AF_TR("Import a SACM XML assurance case"))) {
                 if (callbacks.import_sacm)
                     callbacks.import_sacm();
                 show_import_sacm_not_implemented = true;

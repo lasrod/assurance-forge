@@ -46,8 +46,7 @@ void SyncTranslationReviewProblems(core::ProblemsManager& problems_manager,
         problem.source = core::ProblemSource::ModelValidation;
         problem.element_id = element_id;
         problem.type = "TranslationReviewNeeded";
-        problem.message =
-            ui::i18n::tr("Text changed — review the secondary-language translation for consistency.");
+        problem.message = ui::i18n::tr("Text changed — review the secondary-language translation for consistency.");
         problem.quick_fix_label = "Review element";
         problem.quick_fix_payload = element_id;
         problems_manager.AddOrUpdateProblem(problem);

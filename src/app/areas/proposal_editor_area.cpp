@@ -188,9 +188,8 @@ void RenderProposalElementEditor(AppRuntimeState& state, const ProposalEditorAre
         }
     }
 
-    ImGui::TextDisabled("%s  %s",
-                        (ref->existing_id.has_value() ? AF_TR("Existing") : AF_TR("New")).c_str(),
-                        selected_id.c_str());
+    ImGui::TextDisabled(
+        "%s  %s", (ref->existing_id.has_value() ? AF_TR("Existing") : AF_TR("New")).c_str(), selected_id.c_str());
     if (ImGui::Button(AF_TR("Remove").c_str())) {
         if (callbacks.remove_selected)
             callbacks.remove_selected(core::RemoveMode::NodeOnly);
@@ -208,9 +207,10 @@ void RenderProposalElementEditor(AppRuntimeState& state, const ProposalEditorAre
     ImGui::SetNextItemWidth(-1.0f);
     const bool name_changed = ImGui::InputText((AF_TR("Name") + "##proposal_name").c_str(), name_buf, sizeof(name_buf));
     ImGui::SetNextItemWidth(-1.0f);
-    const bool text_changed =
-        ImGui::InputTextMultiline((AF_TR("Text") + "##proposal_text").c_str(), text_buf, sizeof(text_buf),
-                                  ImVec2(-1.0f, ImGui::GetTextLineHeight() * 5.0f));
+    const bool text_changed = ImGui::InputTextMultiline((AF_TR("Text") + "##proposal_text").c_str(),
+                                                        text_buf,
+                                                        sizeof(text_buf),
+                                                        ImVec2(-1.0f, ImGui::GetTextLineHeight() * 5.0f));
     bool undeveloped_value = element_snapshot.undeveloped;
     const bool undeveloped_changed =
         ImGui::Checkbox((AF_TR("Undeveloped") + "##proposal_undeveloped").c_str(), &undeveloped_value);

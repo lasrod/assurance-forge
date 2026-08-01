@@ -51,11 +51,10 @@ parser::AssuranceCase BuildArgumentPackageProjection(const parser::AssuranceCase
 // An addition connected to nothing that already exists -- the first goal of an
 // empty argument -- joins the document's first argument package, which is where
 // applying the change set would put it.
-parser::AssuranceCase BuildArgumentPackagePreviewProjection(
-    const parser::AssuranceCase&      preview_model,
-    const sacm::AssuranceCasePackage& package,
-    const sacm::ArgumentPackage&      argument_package,
-    const std::vector<std::string>&   added_element_ids,
-    std::string_view                  fallback_name);
+parser::AssuranceCase BuildArgumentPackagePreviewProjection(const parser::AssuranceCase& preview_model,
+                                                            const sacm::AssuranceCasePackage& package,
+                                                            const sacm::ArgumentPackage& argument_package,
+                                                            const std::vector<std::string>& added_element_ids,
+                                                            std::string_view fallback_name);
 
 } // namespace core

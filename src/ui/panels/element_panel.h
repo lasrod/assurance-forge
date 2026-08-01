@@ -59,15 +59,15 @@ struct ElementTextEditCallbacks {
 // The app layer is responsible for producing the summary from the project's
 // audit store (transactions + latest baseline). The UI is presentation-only.
 struct ElementHistoryModel {
-    bool          available = false;             // false → audit data not loaded; section is hidden
-    bool          ever_seen = false;             // element has appeared in any transaction
+    bool available = false; // false → audit data not loaded; section is hidden
+    bool ever_seen = false; // element has appeared in any transaction
     std::uint64_t change_count = 0;
     std::uint64_t last_sequence = 0;
-    std::string   last_changed_at;
-    std::string   last_changed_by;
-    bool          has_baseline = false;
-    std::string   baseline_label;                // e.g. "B2 — v1.2 release"
-    bool          changed_since_baseline = false;
+    std::string last_changed_at;
+    std::string last_changed_by;
+    bool has_baseline = false;
+    std::string baseline_label; // e.g. "B2 — v1.2 release"
+    bool changed_since_baseline = false;
 };
 
 struct ElementHistoryCallbacks {

@@ -46,8 +46,11 @@ bool ParseObject(const std::string& text, nlohmann::json& out, std::string& erro
 
 std::string EncodeRequest(const Request& request) {
     return nlohmann::json{
-        {"protocol", request.protocol}, {"id", request.id},     {"op", request.op},
-        {"token", request.token},       {"args", request.args},
+        {"protocol", request.protocol},
+        {"id", request.id},
+        {"op", request.op},
+        {"token", request.token},
+        {"args", request.args},
     }
         .dump();
 }
@@ -61,8 +64,7 @@ std::string EncodeResponse(const Response& response) {
     if (response.ok) {
         message["result"] = response.result;
     } else {
-        message["error"] = nlohmann::json{{"code", response.error_code},
-                                          {"message", response.error_message}};
+        message["error"] = nlohmann::json{{"code", response.error_code}, {"message", response.error_message}};
     }
     return message.dump();
 }
@@ -74,10 +76,10 @@ bool DecodeRequest(const std::string& text, Request& out, std::string& error) {
     }
 
     out.protocol = ValueOr<int>(message, "protocol", 0);
-    out.id       = ValueOr<std::uint64_t>(message, "id", 0);
-    out.op       = ValueOr<std::string>(message, "op", std::string());
-    out.token    = ValueOr<std::string>(message, "token", std::string());
-    out.args     = ObjectOrEmpty(message, "args");
+    out.id = ValueOr<std::uint64_t>(message, "id", 0);
+    out.op = ValueOr<std::string>(message, "op", std::string());
+    out.token = ValueOr<std::string>(message, "token", std::string());
+    out.args = ObjectOrEmpty(message, "args");
 
     if (out.op.empty()) {
         error = "Request is missing \"op\".";
@@ -93,12 +95,12 @@ bool DecodeResponse(const std::string& text, Response& out, std::string& error) 
     }
 
     out.protocol = ValueOr<int>(message, "protocol", 0);
-    out.id       = ValueOr<std::uint64_t>(message, "id", 0);
-    out.ok       = ValueOr<bool>(message, "ok", false);
-    out.result   = ObjectOrEmpty(message, "result");
+    out.id = ValueOr<std::uint64_t>(message, "id", 0);
+    out.ok = ValueOr<bool>(message, "ok", false);
+    out.result = ObjectOrEmpty(message, "result");
 
     const nlohmann::json failure = ObjectOrEmpty(message, "error");
-    out.error_code    = ValueOr<std::string>(failure, "code", std::string());
+    out.error_code = ValueOr<std::string>(failure, "code", std::string());
     out.error_message = ValueOr<std::string>(failure, "message", std::string());
 
     if (!out.ok && out.error_code.empty()) {
@@ -112,17 +114,17 @@ bool DecodeResponse(const std::string& text, Response& out, std::string& error) 
 
 Response MakeResult(std::uint64_t id, nlohmann::json result) {
     Response response;
-    response.id     = id;
-    response.ok     = true;
+    response.id = id;
+    response.ok = true;
     response.result = std::move(result);
     return response;
 }
 
 Response MakeError(std::uint64_t id, std::string code, std::string message) {
     Response response;
-    response.id            = id;
-    response.ok            = false;
-    response.error_code    = std::move(code);
+    response.id = id;
+    response.ok = false;
+    response.error_code = std::move(code);
     response.error_message = std::move(message);
     return response;
 }

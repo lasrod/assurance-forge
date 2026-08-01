@@ -120,7 +120,8 @@ void RenderProposalBanner(AppRuntimeState& state, const WorkbenchAreaCallbacks& 
     auto& proposals = *state.proposal_controller;
     ImGui::TextUnformatted((proposals.creator_active ? AF_TR("PROPOSAL CREATOR") : AF_TR("PROPOSAL PREVIEW")).c_str());
     if (proposals.creator_active) {
-        ImGui::TextDisabled("%s", AF_TR("Changes are recorded in the proposal draft. Save it from the review panel.").c_str());
+        ImGui::TextDisabled(
+            "%s", AF_TR("Changes are recorded in the proposal draft. Save it from the review panel.").c_str());
     } else {
         ImGui::TextDisabled("%s", AF_TR("This is a preview. The project model has not been changed.").c_str());
     }
@@ -201,24 +202,26 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
     const std::uint64_t current_revision = state.app_state.case_revision;
     const std::uint64_t change_set_revision = state.agent_change_sets.revision();
     const ui::UiState& ui_state_for_lang = ui::GetUiState();
-    const bool inputs_match = cache.valid && cache.case_revision == current_revision &&
-                              cache.change_set_revision == change_set_revision &&
-                              cache.argument_package_id == argument_package->id &&
-                              cache.argument_package_gid == argument_package->gid && cache.tab_title == tab.title &&
-                              cache.show_secondary_language == ui_state_for_lang.show_secondary_language &&
-                              cache.secondary_language == ui_state_for_lang.active_secondary_lang;
+    const bool inputs_match =
+        cache.valid && cache.case_revision == current_revision && cache.change_set_revision == change_set_revision &&
+        cache.argument_package_id == argument_package->id && cache.argument_package_gid == argument_package->gid &&
+        cache.tab_title == tab.title && cache.show_secondary_language == ui_state_for_lang.show_secondary_language &&
+        cache.secondary_language == ui_state_for_lang.active_secondary_lang;
 
     if (!inputs_match) {
         {
             core::perf::ScopedTimer perf_scope("app.wb.build_visible_case");
-            cache.visible_case = BuildArgumentPackageCanvasCase(
-                state.app_state.loaded_case.value(), state.agent_preview_case,
-                state.agent_preview_added_ids, state.app_state.projected_package(),
-                *argument_package, tab.title);
+            cache.visible_case = BuildArgumentPackageCanvasCase(state.app_state.loaded_case.value(),
+                                                                state.agent_preview_case,
+                                                                state.agent_preview_added_ids,
+                                                                state.app_state.projected_package(),
+                                                                *argument_package,
+                                                                tab.title);
         }
         {
             core::perf::ScopedTimer perf_scope("app.wb.build_assurance_tree");
-            cache.visible_tree = ui::gsn::BuildAssuranceTree(cache.visible_case, ui_state_for_lang.active_secondary_lang);
+            cache.visible_tree =
+                ui::gsn::BuildAssuranceTree(cache.visible_case, ui_state_for_lang.active_secondary_lang);
             core::ApplyTreeDisplayOrder(cache.visible_tree, state.tree_display_order);
         }
         cache.case_revision = current_revision;
@@ -244,9 +247,8 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
 
     const sacm::AssuranceCasePackage* terminology_package =
         state.app_state.has_projected_package() ? &state.app_state.projected_package() : nullptr;
-    RenderArgumentPackageCanvasWithTimeline(state, ui_state, callbacks, tab, *argument_package,
-                                            cache.visible_case, renderer, actions,
-                                            terminology_package);
+    RenderArgumentPackageCanvasWithTimeline(
+        state, ui_state, callbacks, tab, *argument_package, cache.visible_case, renderer, actions, terminology_package);
 }
 
 void RenderTerminologyPackageTab(AppRuntimeState& state, const WorkbenchAreaCallbacks& callbacks) {
@@ -397,8 +399,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
 
         if (state.workbench.show_overview_tab) {
             const ImGuiTabItemFlags overview_flags =
-                (state.workbench.force_center_tab_selection &&
-                 ui_state.center_view == ui::CenterView::ProjectOverview)
+                (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::ProjectOverview)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
             if (ImGui::BeginTabItem(
@@ -463,8 +464,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 if (state.app_state.active_project_file_role == core::ProjectFileRole::J3377CaeRegister) {
                     ImGui::TextWrapped(
                         "%s",
-                        ui::i18n::trf("J3377 CAE register file: {0}",
-                                      state.app_state.active_project_file_path.string())
+                        ui::i18n::trf("J3377 CAE register file: {0}", state.app_state.active_project_file_path.string())
                             .c_str());
                     ImGui::TextDisabled(
                         "%s", AF_TR("Editable CAE register content will be implemented in a later workflow.").c_str());
@@ -480,14 +480,13 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::EvidenceRegister)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
-            if (ImGui::BeginTabItem((AF_TR("Evidence Register") + "###evidence_register_tab").c_str(), nullptr,
-                                    evidence_flags)) {
+            if (ImGui::BeginTabItem(
+                    (AF_TR("Evidence Register") + "###evidence_register_tab").c_str(), nullptr, evidence_flags)) {
                 ui_state.center_view = ui::CenterView::EvidenceRegister;
                 if (state.app_state.active_project_file_role == core::ProjectFileRole::EvidenceRegister) {
                     ImGui::TextWrapped(
                         "%s",
-                        ui::i18n::trf("Evidence register file: {0}",
-                                      state.app_state.active_project_file_path.string())
+                        ui::i18n::trf("Evidence register file: {0}", state.app_state.active_project_file_path.string())
                             .c_str());
                     ImGui::TextDisabled(
                         "%s",
@@ -504,8 +503,8 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::PackageDetails)
                     ? ImGuiTabItemFlags_SetSelected
                     : 0;
-            if (ImGui::BeginTabItem((AF_TR("Package Details") + "###package_details_tab").c_str(), nullptr,
-                                    package_flags)) {
+            if (ImGui::BeginTabItem(
+                    (AF_TR("Package Details") + "###package_details_tab").c_str(), nullptr, package_flags)) {
                 ui_state.center_view = ui::CenterView::PackageDetails;
                 ui::panels::ShowPackageDetailsPanel(state.selected_package_node ? &state.selected_package_node.value()
                                                                                 : nullptr,
@@ -519,7 +518,8 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                                                    ui_state.center_view == ui::CenterView::TerminologyPackage)
                                                       ? ImGuiTabItemFlags_SetSelected
                                                       : 0;
-            if (ImGui::BeginTabItem((AF_TR("Terminology Package") + "###terminology_package_tab").c_str(), nullptr,
+            if (ImGui::BeginTabItem((AF_TR("Terminology Package") + "###terminology_package_tab").c_str(),
+                                    nullptr,
                                     terminology_flags)) {
                 ui_state.center_view = ui::CenterView::TerminologyPackage;
                 RenderTerminologyPackageTab(state, callbacks);
@@ -534,13 +534,12 @@ void RenderWorkbenchArea(AppRuntimeState& state,
     ImGui::End();
 }
 
-parser::AssuranceCase BuildArgumentPackageCanvasCase(
-    const parser::AssuranceCase&                committed,
-    const std::optional<parser::AssuranceCase>& agent_preview,
-    const std::vector<std::string>&             agent_preview_added_ids,
-    const sacm::AssuranceCasePackage&           package,
-    const sacm::ArgumentPackage&                argument_package,
-    std::string_view                            fallback_title) {
+parser::AssuranceCase BuildArgumentPackageCanvasCase(const parser::AssuranceCase& committed,
+                                                     const std::optional<parser::AssuranceCase>& agent_preview,
+                                                     const std::vector<std::string>& agent_preview_added_ids,
+                                                     const sacm::AssuranceCasePackage& package,
+                                                     const sacm::ArgumentPackage& argument_package,
+                                                     std::string_view fallback_title) {
     // While an agent has a change set open against the argument on screen, the
     // canvas draws its preview -- the argument as it would be if accepted --
     // rather than the committed model. The preview needs its own projection
@@ -549,8 +548,7 @@ parser::AssuranceCase BuildArgumentPackageCanvasCase(
     // argument back, which is indistinguishable from not having asked.
     if (agent_preview.has_value()) {
         return core::BuildArgumentPackagePreviewProjection(
-            agent_preview.value(), package, argument_package, agent_preview_added_ids,
-            fallback_title);
+            agent_preview.value(), package, argument_package, agent_preview_added_ids, fallback_title);
     }
     return core::BuildArgumentPackageProjection(committed, argument_package, fallback_title);
 }

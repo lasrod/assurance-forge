@@ -11,79 +11,91 @@ namespace sacm::model::traverse {
 void for_each_child(const SACMElement& element, const std::function<void(const SACMElement&)>& fn) {
     // ModelElement utility containment (name is a value type, not a child).
     if (const auto* model_element = dynamic_cast<const ModelElement*>(&element)) {
-        for (const auto& child : model_element->descriptions()) fn(*child);
-        for (const auto& child : model_element->implementation_constraints()) fn(*child);
-        for (const auto& child : model_element->notes()) fn(*child);
-        for (const auto& child : model_element->tagged_values()) fn(*child);
+        for (const auto& child : model_element->descriptions())
+            fn(*child);
+        for (const auto& child : model_element->implementation_constraints())
+            fn(*child);
+        for (const auto& child : model_element->notes())
+            fn(*child);
+        for (const auto& child : model_element->tagged_values())
+            fn(*child);
     }
     if (const auto* asset = dynamic_cast<const ArtifactAsset*>(&element)) {
-        for (const auto& child : asset->properties()) fn(*child);
+        for (const auto& child : asset->properties())
+            fn(*child);
     }
     if (const auto* acp = dynamic_cast<const AssuranceCasePackage*>(&element)) {
-        for (const auto& child : acp->assurance_case_packages()) fn(*child);
-        for (const auto& child : acp->argument_packages()) fn(*child);
-        for (const auto& child : acp->artifact_packages()) fn(*child);
-        for (const auto& child : acp->terminology_packages()) fn(*child);
+        for (const auto& child : acp->assurance_case_packages())
+            fn(*child);
+        for (const auto& child : acp->argument_packages())
+            fn(*child);
+        for (const auto& child : acp->artifact_packages())
+            fn(*child);
+        for (const auto& child : acp->terminology_packages())
+            fn(*child);
     }
     if (const auto* pkg = dynamic_cast<const ArgumentPackage*>(&element)) {
-        for (const auto& child : pkg->argument_elements()) fn(*child);
+        for (const auto& child : pkg->argument_elements())
+            fn(*child);
     }
     if (const auto* pkg = dynamic_cast<const ArtifactPackage*>(&element)) {
-        for (const auto& child : pkg->artifact_elements()) fn(*child);
+        for (const auto& child : pkg->artifact_elements())
+            fn(*child);
     }
     if (const auto* pkg = dynamic_cast<const TerminologyPackage*>(&element)) {
-        for (const auto& child : pkg->terminology_elements()) fn(*child);
+        for (const auto& child : pkg->terminology_elements())
+            fn(*child);
     }
 }
 
 void for_each_child(SACMElement& element, const std::function<void(SACMElement&)>& fn) {
     // Children are owned by `element`; the const walk visits the same
     // objects, so casting constness away here is sound.
-    for_each_child(std::as_const(element), [&fn](const SACMElement& child) {
-        fn(const_cast<SACMElement&>(child));
-    });
+    for_each_child(std::as_const(element), [&fn](const SACMElement& child) { fn(const_cast<SACMElement&>(child)); });
 }
 
-void for_each_descendant(const SACMElement& element,
-                         const std::function<void(const SACMElement&)>& fn) {
+void for_each_descendant(const SACMElement& element, const std::function<void(const SACMElement&)>& fn) {
     fn(element);
     for_each_child(element, [&fn](const SACMElement& child) { for_each_descendant(child, fn); });
 }
 
 namespace {
 
-void visit_lang_string_refs(const LangString& value, std::string_view role,
+void visit_lang_string_refs(const LangString& value,
+                            std::string_view role,
                             const std::function<void(const ReferenceUse&)>& fn) {
     if (value.expression_ref.has_value()) {
         fn(ReferenceUse{role, &*value.expression_ref});
     }
 }
 
-void visit_multi_lang_refs(const MultiLangString& value, std::string_view role,
+void visit_multi_lang_refs(const MultiLangString& value,
+                           std::string_view role,
                            const std::function<void(const ReferenceUse&)>& fn) {
     for (const LangString& entry : value.values) {
         visit_lang_string_refs(entry, role, fn);
     }
 }
 
-void emit(const std::optional<ElementId>& target, std::string_view role,
+void emit(const std::optional<ElementId>& target,
+          std::string_view role,
           const std::function<void(const ReferenceUse&)>& fn) {
     if (target.has_value()) {
         fn(ReferenceUse{role, &*target});
     }
 }
 
-void emit_all(const std::vector<ElementId>& targets, std::string_view role,
+void emit_all(const std::vector<ElementId>& targets,
+              std::string_view role,
               const std::function<void(const ReferenceUse&)>& fn) {
     for (const ElementId& target : targets) {
         fn(ReferenceUse{role, &target});
     }
 }
 
-}  // namespace
+} // namespace
 
-void for_each_reference(const SACMElement& element,
-                        const std::function<void(const ReferenceUse&)>& fn) {
+void for_each_reference(const SACMElement& element, const std::function<void(const ReferenceUse&)>& fn) {
     emit(element.cited_element(), "citedElement", fn);
     emit(element.abstract_form(), "abstractForm", fn);
 
@@ -98,125 +110,119 @@ void for_each_reference(const SACMElement& element,
     }
 
     switch (element.kind()) {
-        case ElementKind::AssuranceCasePackage:
-        case ElementKind::AssuranceCasePackageInterface:
-        case ElementKind::AssuranceCasePackageBinding: {
-            const auto& acp = static_cast<const AssuranceCasePackage&>(element);
-            emit_all(acp.interfaces(), "interface", fn);
-            if (element.kind() == ElementKind::AssuranceCasePackageInterface) {
-                emit(static_cast<const AssuranceCasePackageInterface&>(element).implements(),
-                     "implements", fn);
-            }
-            if (element.kind() == ElementKind::AssuranceCasePackageBinding) {
-                emit_all(
-                    static_cast<const AssuranceCasePackageBinding&>(element).participant_packages(),
-                    "participantPackage", fn);
-            }
-            break;
+    case ElementKind::AssuranceCasePackage:
+    case ElementKind::AssuranceCasePackageInterface:
+    case ElementKind::AssuranceCasePackageBinding: {
+        const auto& acp = static_cast<const AssuranceCasePackage&>(element);
+        emit_all(acp.interfaces(), "interface", fn);
+        if (element.kind() == ElementKind::AssuranceCasePackageInterface) {
+            emit(static_cast<const AssuranceCasePackageInterface&>(element).implements(), "implements", fn);
         }
-        case ElementKind::TerminologyPackage:
-        case ElementKind::TerminologyPackageInterface:
-        case ElementKind::TerminologyPackageBinding: {
-            const auto& pkg = static_cast<const TerminologyPackage&>(element);
-            emit_all(pkg.interfaces(), "interface", fn);
-            if (element.kind() == ElementKind::TerminologyPackageInterface) {
-                emit(static_cast<const TerminologyPackageInterface&>(element).implements(),
-                     "implements", fn);
-            }
-            if (element.kind() == ElementKind::TerminologyPackageBinding) {
-                emit_all(
-                    static_cast<const TerminologyPackageBinding&>(element).participant_packages(),
-                    "participantPackage", fn);
-            }
-            break;
+        if (element.kind() == ElementKind::AssuranceCasePackageBinding) {
+            emit_all(static_cast<const AssuranceCasePackageBinding&>(element).participant_packages(),
+                     "participantPackage",
+                     fn);
         }
-        case ElementKind::TerminologyGroup:
-            emit_all(static_cast<const TerminologyGroup&>(element).terminology_elements(),
-                     "terminologyElement", fn);
-            break;
-        case ElementKind::Category:
-            emit_all(static_cast<const Category&>(element).categories(), "category", fn);
-            break;
-        case ElementKind::Expression: {
-            const auto& expression = static_cast<const Expression&>(element);
-            emit_all(expression.categories(), "category", fn);
-            emit_all(expression.elements(), "element", fn);
-            break;
+        break;
+    }
+    case ElementKind::TerminologyPackage:
+    case ElementKind::TerminologyPackageInterface:
+    case ElementKind::TerminologyPackageBinding: {
+        const auto& pkg = static_cast<const TerminologyPackage&>(element);
+        emit_all(pkg.interfaces(), "interface", fn);
+        if (element.kind() == ElementKind::TerminologyPackageInterface) {
+            emit(static_cast<const TerminologyPackageInterface&>(element).implements(), "implements", fn);
         }
-        case ElementKind::Term: {
-            const auto& term = static_cast<const Term&>(element);
-            emit_all(term.categories(), "category", fn);
-            emit(term.origin(), "origin", fn);
-            break;
+        if (element.kind() == ElementKind::TerminologyPackageBinding) {
+            emit_all(static_cast<const TerminologyPackageBinding&>(element).participant_packages(),
+                     "participantPackage",
+                     fn);
         }
-        case ElementKind::ArgumentPackage:
-        case ElementKind::ArgumentPackageInterface:
-        case ElementKind::ArgumentPackageBinding: {
-            const auto& pkg = static_cast<const ArgumentPackage&>(element);
-            emit_all(pkg.interfaces(), "interface", fn);
-            if (element.kind() == ElementKind::ArgumentPackageInterface) {
-                emit(static_cast<const ArgumentPackageInterface&>(element).implements(),
-                     "implements", fn);
-            }
-            if (element.kind() == ElementKind::ArgumentPackageBinding) {
-                emit_all(static_cast<const ArgumentPackageBinding&>(element).participant_packages(),
-                         "participantPackage", fn);
-            }
-            break;
+        break;
+    }
+    case ElementKind::TerminologyGroup:
+        emit_all(static_cast<const TerminologyGroup&>(element).terminology_elements(), "terminologyElement", fn);
+        break;
+    case ElementKind::Category:
+        emit_all(static_cast<const Category&>(element).categories(), "category", fn);
+        break;
+    case ElementKind::Expression: {
+        const auto& expression = static_cast<const Expression&>(element);
+        emit_all(expression.categories(), "category", fn);
+        emit_all(expression.elements(), "element", fn);
+        break;
+    }
+    case ElementKind::Term: {
+        const auto& term = static_cast<const Term&>(element);
+        emit_all(term.categories(), "category", fn);
+        emit(term.origin(), "origin", fn);
+        break;
+    }
+    case ElementKind::ArgumentPackage:
+    case ElementKind::ArgumentPackageInterface:
+    case ElementKind::ArgumentPackageBinding: {
+        const auto& pkg = static_cast<const ArgumentPackage&>(element);
+        emit_all(pkg.interfaces(), "interface", fn);
+        if (element.kind() == ElementKind::ArgumentPackageInterface) {
+            emit(static_cast<const ArgumentPackageInterface&>(element).implements(), "implements", fn);
         }
-        case ElementKind::ArgumentGroup:
-            emit_all(static_cast<const ArgumentGroup&>(element).argument_elements(),
-                     "argumentElement", fn);
-            break;
-        case ElementKind::ArgumentReasoning:
-            emit(static_cast<const ArgumentReasoning&>(element).structure(), "structure", fn);
-            break;
-        case ElementKind::ArtifactReference:
-            emit_all(static_cast<const ArtifactReference&>(element).referenced_artifact_elements(),
-                     "referencedArtifactElement", fn);
-            break;
-        case ElementKind::Claim:
-        case ElementKind::AssertedInference:
-        case ElementKind::AssertedEvidence:
-        case ElementKind::AssertedContext:
-        case ElementKind::AssertedArtifactSupport:
-        case ElementKind::AssertedArtifactContext: {
-            const auto& assertion = static_cast<const Assertion&>(element);
-            emit_all(assertion.meta_claims(), "metaClaim", fn);
-            if (const auto* rel = dynamic_cast<const AssertedRelationship*>(&element)) {
-                emit(rel->reasoning(), "reasoning", fn);
-                emit_all(rel->sources(), "source", fn);
-                emit_all(rel->targets(), "target", fn);
-            }
-            break;
+        if (element.kind() == ElementKind::ArgumentPackageBinding) {
+            emit_all(
+                static_cast<const ArgumentPackageBinding&>(element).participant_packages(), "participantPackage", fn);
         }
-        case ElementKind::ArtifactAssetRelationship: {
-            const auto& rel = static_cast<const ArtifactAssetRelationship&>(element);
-            emit_all(rel.sources(), "source", fn);
-            emit_all(rel.targets(), "target", fn);
-            break;
+        break;
+    }
+    case ElementKind::ArgumentGroup:
+        emit_all(static_cast<const ArgumentGroup&>(element).argument_elements(), "argumentElement", fn);
+        break;
+    case ElementKind::ArgumentReasoning:
+        emit(static_cast<const ArgumentReasoning&>(element).structure(), "structure", fn);
+        break;
+    case ElementKind::ArtifactReference:
+        emit_all(static_cast<const ArtifactReference&>(element).referenced_artifact_elements(),
+                 "referencedArtifactElement",
+                 fn);
+        break;
+    case ElementKind::Claim:
+    case ElementKind::AssertedInference:
+    case ElementKind::AssertedEvidence:
+    case ElementKind::AssertedContext:
+    case ElementKind::AssertedArtifactSupport:
+    case ElementKind::AssertedArtifactContext: {
+        const auto& assertion = static_cast<const Assertion&>(element);
+        emit_all(assertion.meta_claims(), "metaClaim", fn);
+        if (const auto* rel = dynamic_cast<const AssertedRelationship*>(&element)) {
+            emit(rel->reasoning(), "reasoning", fn);
+            emit_all(rel->sources(), "source", fn);
+            emit_all(rel->targets(), "target", fn);
         }
-        case ElementKind::ArtifactGroup:
-            emit_all(static_cast<const ArtifactGroup&>(element).artifact_elements(),
-                     "artifactElement", fn);
-            break;
-        case ElementKind::ArtifactPackage:
-        case ElementKind::ArtifactPackageInterface:
-        case ElementKind::ArtifactPackageBinding: {
-            const auto& pkg = static_cast<const ArtifactPackage&>(element);
-            emit_all(pkg.interfaces(), "interface", fn);
-            if (element.kind() == ElementKind::ArtifactPackageInterface) {
-                emit(static_cast<const ArtifactPackageInterface&>(element).implements(),
-                     "implements", fn);
-            }
-            if (element.kind() == ElementKind::ArtifactPackageBinding) {
-                emit_all(static_cast<const ArtifactPackageBinding&>(element).participant_packages(),
-                         "participantPackage", fn);
-            }
-            break;
+        break;
+    }
+    case ElementKind::ArtifactAssetRelationship: {
+        const auto& rel = static_cast<const ArtifactAssetRelationship&>(element);
+        emit_all(rel.sources(), "source", fn);
+        emit_all(rel.targets(), "target", fn);
+        break;
+    }
+    case ElementKind::ArtifactGroup:
+        emit_all(static_cast<const ArtifactGroup&>(element).artifact_elements(), "artifactElement", fn);
+        break;
+    case ElementKind::ArtifactPackage:
+    case ElementKind::ArtifactPackageInterface:
+    case ElementKind::ArtifactPackageBinding: {
+        const auto& pkg = static_cast<const ArtifactPackage&>(element);
+        emit_all(pkg.interfaces(), "interface", fn);
+        if (element.kind() == ElementKind::ArtifactPackageInterface) {
+            emit(static_cast<const ArtifactPackageInterface&>(element).implements(), "implements", fn);
         }
-        default:
-            break;
+        if (element.kind() == ElementKind::ArtifactPackageBinding) {
+            emit_all(
+                static_cast<const ArtifactPackageBinding&>(element).participant_packages(), "participantPackage", fn);
+        }
+        break;
+    }
+    default:
+        break;
     }
 }
 
@@ -252,10 +258,9 @@ std::size_t clear_multi_lang(MultiLangString& value, const std::unordered_set<El
     return removed;
 }
 
-}  // namespace
+} // namespace
 
-std::size_t remove_references_to(SACMElement& referrer,
-                                 const std::unordered_set<ElementId>& doomed) {
+std::size_t remove_references_to(SACMElement& referrer, const std::unordered_set<ElementId>& doomed) {
     using detail::Access;
     std::size_t removed = 0;
     removed += clear_doomed(Access::cited_element(referrer), doomed);
@@ -358,4 +363,4 @@ const SACMElement* nearest_package(const SACMElement& element) {
     return nullptr;
 }
 
-}  // namespace sacm::model::traverse
+} // namespace sacm::model::traverse

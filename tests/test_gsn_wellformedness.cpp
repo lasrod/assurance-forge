@@ -57,10 +57,8 @@ parser::SacmElement Justification(std::string id) {
 
 // SACM AssertedInference runs premise -> conclusion: the sources support the
 // target. GSN's SupportedBy runs the other way; see sacm-gsn-mapping.md.
-parser::SacmElement Inference(std::string id,
-                              std::vector<std::string> sources,
-                              std::string target,
-                              std::string reasoning = {}) {
+parser::SacmElement
+Inference(std::string id, std::vector<std::string> sources, std::string target, std::string reasoning = {}) {
     parser::SacmElement element;
     element.id = std::move(id);
     element.type = "assertedinference";
@@ -119,9 +117,8 @@ std::vector<core::GsnFinding> FindingsOfRule(const parser::AssuranceCase& model,
 
 bool HasProblemOfType(const core::ProblemsManager& problems, const std::string& type) {
     const std::vector<core::ProblemItem>& items = problems.GetProblems();
-    return std::any_of(items.begin(), items.end(), [&](const core::ProblemItem& problem) {
-        return problem.type == type;
-    });
+    return std::any_of(
+        items.begin(), items.end(), [&](const core::ProblemItem& problem) { return problem.type == type; });
 }
 
 } // namespace
@@ -157,8 +154,7 @@ TEST(GsnWellFormednessTest, GSN3_CORE_015_ASolutionCannotBeSupported) {
     model.elements.push_back(Goal("G3"));
     model.elements.push_back(Inference("R4", {"G3"}, "Sn1"));
 
-    const std::vector<core::GsnFinding> findings =
-        FindingsOfRule(model, core::GsnRule::SupportedElementIsALeaf);
+    const std::vector<core::GsnFinding> findings = FindingsOfRule(model, core::GsnRule::SupportedElementIsALeaf);
     ASSERT_EQ(findings.size(), 1u);
     EXPECT_EQ(findings.front().element_id, "Sn1");
     EXPECT_EQ(findings.front().relationship_id, "R4");
@@ -167,22 +163,20 @@ TEST(GsnWellFormednessTest, GSN3_CORE_015_ASolutionCannotBeSupported) {
 
 TEST(GsnWellFormednessTest, GSN3_CORE_015_AnAssumptionCannotBeSupported) {
     parser::AssuranceCase model;
-    model.elements = {Goal("G1"), Assumption("A1"), Goal("G2"), Context("R1", "A1", "G1"),
-                      Inference("R2", {"G2"}, "A1")};
+    model.elements = {
+        Goal("G1"), Assumption("A1"), Goal("G2"), Context("R1", "A1", "G1"), Inference("R2", {"G2"}, "A1")};
 
-    const std::vector<core::GsnFinding> findings =
-        FindingsOfRule(model, core::GsnRule::SupportedElementIsALeaf);
+    const std::vector<core::GsnFinding> findings = FindingsOfRule(model, core::GsnRule::SupportedElementIsALeaf);
     ASSERT_EQ(findings.size(), 1u);
     EXPECT_EQ(findings.front().element_id, "A1");
 }
 
 TEST(GsnWellFormednessTest, GSN3_CORE_015_AJustificationCannotCarryContext) {
     parser::AssuranceCase model;
-    model.elements = {Goal("G1"), Justification("J1"), ArtifactReference("C1"), Context("R1", "J1", "G1"),
-                      Context("R2", "C1", "J1")};
+    model.elements = {
+        Goal("G1"), Justification("J1"), ArtifactReference("C1"), Context("R1", "J1", "G1"), Context("R2", "C1", "J1")};
 
-    const std::vector<core::GsnFinding> findings =
-        FindingsOfRule(model, core::GsnRule::ContextualizedElementIsALeaf);
+    const std::vector<core::GsnFinding> findings = FindingsOfRule(model, core::GsnRule::ContextualizedElementIsALeaf);
     ASSERT_EQ(findings.size(), 1u);
     EXPECT_EQ(findings.front().element_id, "J1");
     EXPECT_EQ(findings.front().relationship_id, "R2");
@@ -206,8 +200,7 @@ TEST(GsnWellFormednessTest, GSN3_CORE_002_AStrategyWiredAsAnInferenceEndIsReport
     // source it is also invalid SACM: clause 11.13 requires an Assertion there.
     model.elements = {Goal("G1"), Strategy("S1"), Inference("R1", {"S1"}, "G1")};
 
-    const std::vector<core::GsnFinding> findings =
-        FindingsOfRule(model, core::GsnRule::StrategyUsedAsAssertion);
+    const std::vector<core::GsnFinding> findings = FindingsOfRule(model, core::GsnRule::StrategyUsedAsAssertion);
     ASSERT_EQ(findings.size(), 1u);
     EXPECT_EQ(findings.front().element_id, "S1");
     EXPECT_STREQ(core::GsnRequirementId(findings.front().rule), "GSN3-CORE-002");
@@ -225,8 +218,7 @@ TEST(GsnWellFormednessTest, GSN3_CORE_003_AGoalCannotStandInForEvidence) {
     // artifact that does not exist.
     model.elements = {Goal("G1"), Goal("G2"), Evidence("R1", "G2", "G1")};
 
-    const std::vector<core::GsnFinding> findings =
-        FindingsOfRule(model, core::GsnRule::EvidenceSourceIsNotASolution);
+    const std::vector<core::GsnFinding> findings = FindingsOfRule(model, core::GsnRule::EvidenceSourceIsNotASolution);
     ASSERT_EQ(findings.size(), 1u);
     EXPECT_EQ(findings.front().element_id, "G2");
     EXPECT_STREQ(core::GsnRequirementId(findings.front().rule), "GSN3-CORE-003");
@@ -275,8 +267,7 @@ TEST(GsnWellFormednessTest, GSN3_CORE_009_AnUndevelopedElementWithSupportIsRepor
     top.undeveloped = true;
     model.elements = {top, Goal("G2"), Inference("R1", {"G2"}, "G1")};
 
-    const std::vector<core::GsnFinding> findings =
-        FindingsOfRule(model, core::GsnRule::UndevelopedElementHasSupport);
+    const std::vector<core::GsnFinding> findings = FindingsOfRule(model, core::GsnRule::UndevelopedElementHasSupport);
     ASSERT_EQ(findings.size(), 1u);
     EXPECT_EQ(findings.front().element_id, "G1");
     EXPECT_STREQ(core::GsnRequirementId(findings.front().rule), "GSN3-CORE-009");
@@ -314,8 +305,7 @@ TEST(GsnWellFormednessTest, GSN3_CORE_010_TwoElementsSharingANotationIdentifierA
     renumbered.gsn_identifier = "G1";
     model.elements = {Goal("G1"), renumbered};
 
-    const std::vector<core::GsnFinding> findings =
-        FindingsOfRule(model, core::GsnRule::DuplicateNotationIdentifier);
+    const std::vector<core::GsnFinding> findings = FindingsOfRule(model, core::GsnRule::DuplicateNotationIdentifier);
     ASSERT_EQ(findings.size(), 1u);
     EXPECT_EQ(findings.front().element_id, "G2");
     EXPECT_EQ(findings.front().related_id, "G1");
@@ -333,8 +323,7 @@ TEST(GsnWellFormednessTest, GSN3_DIA_003_AChallengeWithAMissingTargetIsReported)
     parser::AssuranceCase model;
     model.elements = {Goal("CG1"), Counter(Inference("R1", {"CG1"}, "G-missing"))};
 
-    const std::vector<core::GsnFinding> findings =
-        FindingsOfRule(model, core::GsnRule::ChallengeTargetUnresolved);
+    const std::vector<core::GsnFinding> findings = FindingsOfRule(model, core::GsnRule::ChallengeTargetUnresolved);
     ASSERT_EQ(findings.size(), 1u);
     EXPECT_EQ(findings.front().detail, "G-missing");
     EXPECT_STREQ(core::GsnRequirementId(findings.front().rule), "GSN3-DIA-003");
@@ -362,8 +351,8 @@ TEST(GsnWellFormednessTest, GSN3_DIA_003_AWellFormedChallengeProducesNoFindings)
 // that depended on that order would make a diff of the problems panel useless.
 TEST(GsnWellFormednessTest, FindingsDoNotDependOnDocumentOrder) {
     parser::AssuranceCase forward;
-    forward.elements = {Goal("G1"), Goal("G2"), ArtifactReference("Sn1"), Inference("R1", {"G2"}, "Sn1"),
-                        Evidence("R2", "G2", "G1")};
+    forward.elements = {
+        Goal("G1"), Goal("G2"), ArtifactReference("Sn1"), Inference("R1", {"G2"}, "Sn1"), Evidence("R2", "G2", "G1")};
 
     parser::AssuranceCase reversed;
     reversed.elements = forward.elements;
@@ -384,8 +373,8 @@ TEST(GsnWellFormednessTest, FindingsDoNotDependOnDocumentOrder) {
 
 TEST(GsnWellFormednessSyncTest, ReportsAViolationWithItsGsnRequirementId) {
     parser::AssuranceCase model;
-    model.elements = {Goal("G1"), Goal("G2"), ArtifactReference("Sn1"), Evidence("R1", "Sn1", "G1"),
-                      Inference("R2", {"G2"}, "Sn1")};
+    model.elements = {
+        Goal("G1"), Goal("G2"), ArtifactReference("Sn1"), Evidence("R1", "Sn1", "G1"), Inference("R2", {"G2"}, "Sn1")};
 
     core::ProblemsManager problems;
     app::SyncStructureProblems(problems, &model);
@@ -419,8 +408,8 @@ TEST(GsnWellFormednessSyncTest, AStaleUndevelopedDecoratorIsAWarningNotAnError) 
 
 TEST(GsnWellFormednessSyncTest, ClearsTheProblemWhenTheStructureIsCorrected) {
     parser::AssuranceCase model;
-    model.elements = {Goal("G1"), Goal("G2"), ArtifactReference("Sn1"), Evidence("R1", "Sn1", "G1"),
-                      Inference("R2", {"G2"}, "Sn1")};
+    model.elements = {
+        Goal("G1"), Goal("G2"), ArtifactReference("Sn1"), Evidence("R1", "Sn1", "G1"), Inference("R2", {"G2"}, "Sn1")};
 
     core::ProblemsManager problems;
     app::SyncStructureProblems(problems, &model);

@@ -38,12 +38,11 @@ struct ProjectSummary {
     std::size_t attention_count() const;
 };
 
-ProjectSummary BuildProjectSummary(
-    const AssuranceProject* project,
-    const AssuranceCase* assurance_case,
-    const AssuranceTree* assurance_tree,
-    const std::vector<ProblemItem>& problems,
-    const std::vector<reviews::ReviewItem>& review_items,
-    const std::vector<reviews::ProposalValidityResult>& proposal_validities);
+ProjectSummary BuildProjectSummary(const AssuranceProject* project,
+                                   const AssuranceCase* assurance_case,
+                                   const AssuranceTree* assurance_tree,
+                                   const std::vector<ProblemItem>& problems,
+                                   const std::vector<reviews::ReviewItem>& review_items,
+                                   const std::vector<reviews::ProposalValidityResult>& proposal_validities);
 
 } // namespace core

@@ -74,12 +74,11 @@ void RenderWorkbenchArea(AppRuntimeState& state,
 // set showed eighty staged elements and the other showed none -- and unit tests
 // of both halves passed throughout, because each half worked. Choosing the model
 // and choosing the projection are one decision and are tested as one.
-parser::AssuranceCase BuildArgumentPackageCanvasCase(
-    const parser::AssuranceCase&                committed,
-    const std::optional<parser::AssuranceCase>& agent_preview,
-    const std::vector<std::string>&             agent_preview_added_ids,
-    const sacm::AssuranceCasePackage&           package,
-    const sacm::ArgumentPackage&                argument_package,
-    std::string_view                            fallback_title);
+parser::AssuranceCase BuildArgumentPackageCanvasCase(const parser::AssuranceCase& committed,
+                                                     const std::optional<parser::AssuranceCase>& agent_preview,
+                                                     const std::vector<std::string>& agent_preview_added_ids,
+                                                     const sacm::AssuranceCasePackage& package,
+                                                     const sacm::ArgumentPackage& argument_package,
+                                                     std::string_view fallback_title);
 
 } // namespace app::areas

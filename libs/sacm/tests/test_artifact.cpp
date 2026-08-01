@@ -27,8 +27,8 @@ std::filesystem::path fixture(std::string_view name) {
 }
 
 TEST(Sacm23Artifact, SACM23_ART_001_FullArtifactFixtureRoundTrips) {
-    const LoadResult first = sacm::io::load_xmi_file(fixture("artifact-full-valid.sacm.xmi"),
-                                                     LoadOptions{.mode = Mode::Strict});
+    const LoadResult first =
+        sacm::io::load_xmi_file(fixture("artifact-full-valid.sacm.xmi"), LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(first.ok) << (first.diagnostics.empty() ? "" : first.diagnostics.front().message);
     const auto& document = *first.document;
 
@@ -47,19 +47,16 @@ TEST(Sacm23Artifact, SACM23_ART_001_FullArtifactFixtureRoundTrips) {
     const auto* event = document.find_as<sacm::model::Event>(ElementId{"event_release"});
     ASSERT_NE(event, nullptr);
     EXPECT_EQ(event->date(), "2026-02-02");
-    EXPECT_NE(document.find_as<sacm::model::Participant>(ElementId{"participant_assessor"}),
-              nullptr);
+    EXPECT_NE(document.find_as<sacm::model::Participant>(ElementId{"participant_assessor"}), nullptr);
     EXPECT_NE(document.find_as<sacm::model::Technique>(ElementId{"technique_stpa"}), nullptr);
     EXPECT_NE(document.find_as<sacm::model::Resource>(ElementId{"resource_lab"}), nullptr);
 
-    const auto* relationship =
-        document.find_as<sacm::model::ArtifactAssetRelationship>(ElementId{"rel_produced"});
+    const auto* relationship = document.find_as<sacm::model::ArtifactAssetRelationship>(ElementId{"rel_produced"});
     ASSERT_NE(relationship, nullptr);
     EXPECT_EQ(relationship->sources().front().value(), "activity_review");
 
     // ptc/22-03-13 alias spelling resolves to the specification-text class.
-    const auto* alias =
-        document.find_as<sacm::model::ArtifactAssetRelationship>(ElementId{"rel_alias"});
+    const auto* alias = document.find_as<sacm::model::ArtifactAssetRelationship>(ElementId{"rel_alias"});
     ASSERT_NE(alias, nullptr);
     EXPECT_EQ(alias->kind(), ElementKind::ArtifactAssetRelationship);
 
@@ -77,12 +74,10 @@ TEST(Sacm23Artifact, SACM23_ART_001_FullArtifactFixtureRoundTrips) {
 
 TEST(Sacm23Artifact, SACM23_ART_001_CreatesArtifactModelWithCommands) {
     Document document;
-    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "Case"})
-                    .applied);
-    ASSERT_TRUE(document
-                    .apply(CreateArtifactPackage{
-                        .parent = ElementId{"acp_1"}, .id = ElementId{"artpkg_1"}, .name = "Ev"})
-                    .applied);
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "Case"}).applied);
+    ASSERT_TRUE(
+        document.apply(CreateArtifactPackage{.parent = ElementId{"acp_1"}, .id = ElementId{"artpkg_1"}, .name = "Ev"})
+            .applied);
     ASSERT_TRUE(document
                     .apply(CreateArtifactAsset{.parent = ElementId{"artpkg_1"},
                                                .kind = ElementKind::Artifact,
@@ -106,31 +101,27 @@ TEST(Sacm23Artifact, SACM23_ART_001_CreatesArtifactModelWithCommands) {
                                                .name = "confidentiality"})
                     .applied);
     ASSERT_TRUE(document
-                    .apply(CreateArtifactAssetRelationship{
-                        .parent = ElementId{"artpkg_1"},
-                        .id = ElementId{"rel_1"},
-                        .name = "producedBy",
-                        .sources = {ElementId{"activity_1"}},
-                        .targets = {ElementId{"artifact_1"}}})
+                    .apply(CreateArtifactAssetRelationship{.parent = ElementId{"artpkg_1"},
+                                                           .id = ElementId{"rel_1"},
+                                                           .name = "producedBy",
+                                                           .sources = {ElementId{"activity_1"}},
+                                                           .targets = {ElementId{"artifact_1"}}})
                     .applied);
 
     EXPECT_TRUE(sacm::validation::validate(document).empty());
     const auto saved = sacm::io::save_xmi_string(document);
     ASSERT_TRUE(saved.ok);
-    const LoadResult reloaded =
-        sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(reloaded.ok);
     EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
 }
 
 TEST(Sacm23Artifact, SACM23_ART_001_RejectsRelationshipToNonAsset) {
     Document document;
-    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "Case"})
-                    .applied);
-    ASSERT_TRUE(document
-                    .apply(CreateArtifactPackage{
-                        .parent = ElementId{"acp_1"}, .id = ElementId{"artpkg_1"}, .name = "Ev"})
-                    .applied);
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "Case"}).applied);
+    ASSERT_TRUE(
+        document.apply(CreateArtifactPackage{.parent = ElementId{"acp_1"}, .id = ElementId{"artpkg_1"}, .name = "Ev"})
+            .applied);
     ASSERT_TRUE(document
                     .apply(CreateArtifactAsset{.parent = ElementId{"artpkg_1"},
                                                .kind = ElementKind::Artifact,
@@ -140,7 +131,7 @@ TEST(Sacm23Artifact, SACM23_ART_001_RejectsRelationshipToNonAsset) {
     const auto result = document.apply(CreateArtifactAssetRelationship{
         .parent = ElementId{"artpkg_1"},
         .sources = {ElementId{"artifact_1"}},
-        .targets = {ElementId{"artpkg_1"}},  // a package is not an ArtifactAsset
+        .targets = {ElementId{"artpkg_1"}}, // a package is not an ArtifactAsset
     });
     EXPECT_FALSE(result.applied);
     EXPECT_TRUE(std::ranges::any_of(result.diagnostics, [](const auto& diagnostic) {
@@ -148,4 +139,4 @@ TEST(Sacm23Artifact, SACM23_ART_001_RejectsRelationshipToNonAsset) {
     }));
 }
 
-}  // namespace
+} // namespace

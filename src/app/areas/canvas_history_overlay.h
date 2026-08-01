@@ -6,9 +6,18 @@
 
 #include <string>
 
-namespace ui { class UiState; struct ElementContextActions; }
-namespace ui::gsn { class GsnCanvas; struct CanvasOverlayButtons; }
-namespace sacm { struct ArgumentPackage; struct AssuranceCasePackage; }
+namespace ui {
+class UiState;
+struct ElementContextActions;
+} // namespace ui
+namespace ui::gsn {
+class GsnCanvas;
+struct CanvasOverlayButtons;
+} // namespace ui::gsn
+namespace sacm {
+struct ArgumentPackage;
+struct AssuranceCasePackage;
+} // namespace sacm
 
 namespace app::areas {
 
@@ -17,8 +26,7 @@ namespace app::areas {
 // audit store or when verification succeeded. Drawn at the top of every
 // ArgumentPackage canvas tab so the warning is always visible regardless of
 // which package the user is looking at.
-void RenderCanvasDivergenceBanner(::app::AppRuntimeState& state,
-                                  const WorkbenchAreaCallbacks& callbacks);
+void RenderCanvasDivergenceBanner(::app::AppRuntimeState& state, const WorkbenchAreaCallbacks& callbacks);
 
 // Render the autosave-failure banner if `state.last_autosave_error` is
 // non-empty. The banner is sticky (no auto-dismiss) until the user clicks
@@ -44,16 +52,15 @@ void RenderCanvasAutosaveErrorBanner(::app::AppRuntimeState& state);
 //
 // Per-tab reconstruction and filtered-transaction caches are keyed on
 // `tab.key` and pruned via `ForgetCanvasHistoryTab`.
-void RenderArgumentPackageCanvasWithTimeline(
-    ::app::AppRuntimeState& state,
-    ui::UiState& ui_state,
-    const WorkbenchAreaCallbacks& callbacks,
-    ::app::WorkbenchState::ArgumentPackageCanvasTab& tab,
-    const sacm::ArgumentPackage& argument_package,
-    const parser::AssuranceCase& live_projection,
-    ui::gsn::GsnCanvas& live_renderer,
-    const ui::ElementContextActions& live_actions,
-    const sacm::AssuranceCasePackage* terminology_package);
+void RenderArgumentPackageCanvasWithTimeline(::app::AppRuntimeState& state,
+                                             ui::UiState& ui_state,
+                                             const WorkbenchAreaCallbacks& callbacks,
+                                             ::app::WorkbenchState::ArgumentPackageCanvasTab& tab,
+                                             const sacm::ArgumentPackage& argument_package,
+                                             const parser::AssuranceCase& live_projection,
+                                             ui::gsn::GsnCanvas& live_renderer,
+                                             const ui::ElementContextActions& live_actions,
+                                             const sacm::AssuranceCasePackage* terminology_package);
 
 // Drop overlay state for a closed tab.
 void ForgetCanvasHistoryTab(const std::string& tab_key);

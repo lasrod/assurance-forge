@@ -50,8 +50,11 @@ void DrawCounterChallengeDecoration(
 // short badge, never colour alone, so what is being proposed is legible to
 // someone who cannot distinguish the colours. `circular` traces round
 // Solution/Evidence shapes rather than the rounded rectangle.
-void DrawProposedChangeDecoration(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right,
-                                  bool circular, float zoom,
+void DrawProposedChangeDecoration(ImDrawList* draw_list,
+                                  ImVec2 top_left,
+                                  ImVec2 bottom_right,
+                                  bool circular,
+                                  float zoom,
                                   core::changesets::ElementChange change);
 
 } // namespace ui::gsn

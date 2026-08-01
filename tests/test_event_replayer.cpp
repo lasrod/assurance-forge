@@ -47,10 +47,10 @@ void WriteFile(const std::filesystem::path& path, std::string_view content) {
 }
 
 struct ProjectFixture {
-    core::AssuranceProject     project;
-    std::filesystem::path      sacm_abs;
+    core::AssuranceProject project;
+    std::filesystem::path sacm_abs;
     sacm::AssuranceCasePackage package;
-    parser::AssuranceCase      model;
+    parser::AssuranceCase model;
 };
 
 ProjectFixture MakeFixture(const std::string& tag) {
@@ -113,17 +113,18 @@ TEST(EventReplayer, ReplaysSingleCreateChildToMatchLiveState) {
     // Replay from snapshot zero.
     auto snapshot = LoadSnapshotState(f.project.rootPath, core::audit::kInitialSnapshotId);
     auto replayed = core::audit::Replayer::ReplayFrom(
-        snapshot.model, snapshot.package, bus->Store().Transactions(),
-        std::numeric_limits<std::uint64_t>::max());
+        snapshot.model, snapshot.package, bus->Store().Transactions(), std::numeric_limits<std::uint64_t>::max());
     ASSERT_TRUE(replayed.has_value()) << (replayed.has_value() ? "" : replayed.error());
 
-    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package),
-              core::audit::CanonicalModelHash(f.package));
+    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package), core::audit::CanonicalModelHash(f.package));
 
     // The replayed element keeps the id captured in the event payload.
     bool found = false;
     for (const auto& e : replayed->model.elements) {
-        if (e.id == cmd.GeneratedId() && e.type == "argumentreasoning") { found = true; break; }
+        if (e.id == cmd.GeneratedId() && e.type == "argumentreasoning") {
+            found = true;
+            break;
+        }
     }
     EXPECT_TRUE(found) << "replayed strategy " << cmd.GeneratedId() << " missing";
 }
@@ -176,8 +177,7 @@ TEST(EventReplayer, ReplaysStrategyWithSubGoalsMatchesCanonicalHash) {
     // (record and replay both route through the single-inference factory).
     auto snapshot = LoadSnapshotState(f.project.rootPath, core::audit::kInitialSnapshotId);
     auto replayed = core::audit::Replayer::ReplayFrom(
-        snapshot.model, snapshot.package, bus->Store().Transactions(),
-        std::numeric_limits<std::uint64_t>::max());
+        snapshot.model, snapshot.package, bus->Store().Transactions(), std::numeric_limits<std::uint64_t>::max());
     ASSERT_TRUE(replayed.has_value()) << (replayed.has_value() ? "" : replayed.error());
 
     EXPECT_EQ(CountStrategyInferences(replayed->package, strategy_id), 1)
@@ -185,8 +185,7 @@ TEST(EventReplayer, ReplaysStrategyWithSubGoalsMatchesCanonicalHash) {
 
     // Both the legacy canonical hash and the library-derived hash (the one the
     // audit chain actually records) converge across live and replay.
-    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package),
-              core::audit::CanonicalModelHash(f.package));
+    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package), core::audit::CanonicalModelHash(f.package));
     const auto live_library_hash = core::library_canonical_hash(f.package);
     const auto replayed_library_hash = core::library_canonical_hash(replayed->package);
     ASSERT_TRUE(live_library_hash.has_value());
@@ -216,18 +215,18 @@ TEST(EventReplayer, ReplaysCreateChainThenRemoveAndMatchesCanonicalHash) {
 
     auto snapshot = LoadSnapshotState(f.project.rootPath, core::audit::kInitialSnapshotId);
     auto replayed = core::audit::Replayer::ReplayFrom(
-        snapshot.model, snapshot.package, bus->Store().Transactions(),
-        std::numeric_limits<std::uint64_t>::max());
+        snapshot.model, snapshot.package, bus->Store().Transactions(), std::numeric_limits<std::uint64_t>::max());
     ASSERT_TRUE(replayed.has_value()) << (replayed.has_value() ? "" : replayed.error());
 
-    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package),
-              core::audit::CanonicalModelHash(f.package));
+    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package), core::audit::CanonicalModelHash(f.package));
 
     // Strategy survived (still in the model); solution was removed.
     bool has_strategy = false, has_solution = false;
     for (const auto& e : replayed->model.elements) {
-        if (e.id == strategy_id) has_strategy = true;
-        if (e.id == solution_id) has_solution = true;
+        if (e.id == strategy_id)
+            has_strategy = true;
+        if (e.id == solution_id)
+            has_solution = true;
     }
     EXPECT_TRUE(has_strategy);
     EXPECT_FALSE(has_solution);
@@ -248,14 +247,16 @@ TEST(EventReplayer, StopsAtRequestedTransactionSequence) {
     ASSERT_TRUE(bus->Execute(b, ctx, "tester").success);
 
     auto snapshot = LoadSnapshotState(f.project.rootPath, core::audit::kInitialSnapshotId);
-    auto replayed_only_first = core::audit::Replayer::ReplayFrom(
-        snapshot.model, snapshot.package, bus->Store().Transactions(), /*up_to=*/1);
+    auto replayed_only_first =
+        core::audit::Replayer::ReplayFrom(snapshot.model, snapshot.package, bus->Store().Transactions(), /*up_to=*/1);
     ASSERT_TRUE(replayed_only_first.has_value());
 
     bool has_a = false, has_b = false;
     for (const auto& e : replayed_only_first->model.elements) {
-        if (e.id == a.GeneratedId()) has_a = true;
-        if (e.id == b.GeneratedId()) has_b = true;
+        if (e.id == a.GeneratedId())
+            has_a = true;
+        if (e.id == b.GeneratedId())
+            has_b = true;
     }
     EXPECT_TRUE(has_a);
     EXPECT_FALSE(has_b);
@@ -296,7 +297,8 @@ TEST(ReplayVerifier, ReportsSuccessForCleanProject) {
     EXPECT_TRUE(result.ran);
     EXPECT_TRUE(result.success) << [&] {
         std::string s;
-        for (const auto& d : result.diagnostics) s += "\n  - " + d;
+        for (const auto& d : result.diagnostics)
+            s += "\n  - " + d;
         return s;
     }();
     EXPECT_EQ(result.replayed_canonical_hash, result.manifest_canonical_hash);
@@ -325,7 +327,8 @@ TEST(ReplayVerifier, RebuildsStaleManifestSilentlyWhenReplayMatchesOnDiskSacm) {
     EXPECT_TRUE(result.ran);
     EXPECT_TRUE(result.success) << [&] {
         std::string s;
-        for (const auto& d : result.diagnostics) s += "\n  - " + d;
+        for (const auto& d : result.diagnostics)
+            s += "\n  - " + d;
         return s;
     }();
     EXPECT_EQ(result.manifest_canonical_hash, result.replayed_canonical_hash);
@@ -364,7 +367,8 @@ TEST(ReplayVerifier, ReportsMismatchWhenOnDiskSacmDivergesFromLog) {
     EXPECT_FALSE(result.success);
     bool mentions_on_disk = false;
     for (const auto& d : result.diagnostics) {
-        if (d.find("on-disk") != std::string::npos) mentions_on_disk = true;
+        if (d.find("on-disk") != std::string::npos)
+            mentions_on_disk = true;
     }
     EXPECT_TRUE(mentions_on_disk);
 }
@@ -387,8 +391,7 @@ TEST(EventReplayer, ReplaysUpdateElementTextToMatchLiveState) {
     ASSERT_TRUE(bus) << error;
 
     core::commands::CommandContext ctx{f.model, f.package};
-    core::commands::UpdateElementTextCommand edit("G1", core::ElementTextField::Description, "en",
-                                                  "Updated by test.");
+    core::commands::UpdateElementTextCommand edit("G1", core::ElementTextField::Description, "en", "Updated by test.");
     const auto live_result = bus->Execute(edit, ctx, "tester");
     ASSERT_TRUE(live_result.success) << live_result.error;
     EXPECT_EQ(edit.OldValue(), "The system is safe.");
@@ -396,11 +399,9 @@ TEST(EventReplayer, ReplaysUpdateElementTextToMatchLiveState) {
 
     auto snapshot = LoadSnapshotState(f.project.rootPath, core::audit::kInitialSnapshotId);
     auto replayed = core::audit::Replayer::ReplayFrom(
-        snapshot.model, snapshot.package, bus->Store().Transactions(),
-        std::numeric_limits<std::uint64_t>::max());
+        snapshot.model, snapshot.package, bus->Store().Transactions(), std::numeric_limits<std::uint64_t>::max());
     ASSERT_TRUE(replayed.has_value()) << (replayed.has_value() ? "" : replayed.error());
-    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package),
-              core::audit::CanonicalModelHash(f.package));
+    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package), core::audit::CanonicalModelHash(f.package));
 
     bool found = false;
     for (const auto& e : replayed->model.elements) {
@@ -430,11 +431,9 @@ TEST(EventReplayer, GSN3_CORE_010_ReplaysIndependentNotationIdentifierEdit) {
 
     auto snapshot = LoadSnapshotState(f.project.rootPath, core::audit::kInitialSnapshotId);
     auto replayed = core::audit::Replayer::ReplayFrom(
-        snapshot.model, snapshot.package, bus->Store().Transactions(),
-        std::numeric_limits<std::uint64_t>::max());
+        snapshot.model, snapshot.package, bus->Store().Transactions(), std::numeric_limits<std::uint64_t>::max());
     ASSERT_TRUE(replayed.has_value()) << (replayed.has_value() ? "" : replayed.error());
-    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package),
-              core::audit::CanonicalModelHash(f.package));
+    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package), core::audit::CanonicalModelHash(f.package));
     ASSERT_EQ(replayed->model.elements.size(), 1u);
     EXPECT_EQ(replayed->model.elements.front().id, "G1");
     EXPECT_EQ(replayed->model.elements.front().gsn_identifier, "SYS-GOAL");
@@ -448,17 +447,15 @@ TEST(EventReplayer, ReplaysUpdateElementTextSecondaryLanguage) {
     ASSERT_TRUE(bus) << error;
 
     core::commands::CommandContext ctx{f.model, f.package};
-    core::commands::UpdateElementTextCommand edit("G1", core::ElementTextField::Name, "ja",
-                                                  "\xe3\x83\x88\xe3\x83\x83\xe3\x83\x97");
+    core::commands::UpdateElementTextCommand edit(
+        "G1", core::ElementTextField::Name, "ja", "\xe3\x83\x88\xe3\x83\x83\xe3\x83\x97");
     ASSERT_TRUE(bus->Execute(edit, ctx, "tester").success);
 
     auto snapshot = LoadSnapshotState(f.project.rootPath, core::audit::kInitialSnapshotId);
     auto replayed = core::audit::Replayer::ReplayFrom(
-        snapshot.model, snapshot.package, bus->Store().Transactions(),
-        std::numeric_limits<std::uint64_t>::max());
+        snapshot.model, snapshot.package, bus->Store().Transactions(), std::numeric_limits<std::uint64_t>::max());
     ASSERT_TRUE(replayed.has_value()) << (replayed.has_value() ? "" : replayed.error());
-    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package),
-              core::audit::CanonicalModelHash(f.package));
+    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package), core::audit::CanonicalModelHash(f.package));
 
     for (const auto& e : replayed->model.elements) {
         if (e.id == "G1") {
@@ -478,8 +475,8 @@ TEST(UpdateElementTextCommand, NoOpWhenValueUnchangedStillAppendsAuditEvent) {
     ASSERT_TRUE(bus) << error;
 
     core::commands::CommandContext ctx{f.model, f.package};
-    core::commands::UpdateElementTextCommand edit("G1", core::ElementTextField::Description, "en",
-                                                  "The system is safe.");
+    core::commands::UpdateElementTextCommand edit(
+        "G1", core::ElementTextField::Description, "en", "The system is safe.");
     const auto result = bus->Execute(edit, ctx, "tester");
     ASSERT_TRUE(result.success) << result.error;
     EXPECT_TRUE(edit.WasNoOp());
@@ -509,18 +506,15 @@ TEST(EventReplayer, ReplaysTerminologyCommandChainToMatchLiveState) {
     core::commands::CreateTerminologyTermCommand create_term(package_ref, draft);
     ASSERT_TRUE(bus->Execute(create_term, ctx, "tester").success);
 
-    core::commands::AssociateTerminologyTermWithElementCommand associate(
-        "G1", package_ref, create_term.GeneratedRef());
+    core::commands::AssociateTerminologyTermWithElementCommand associate("G1", package_ref, create_term.GeneratedRef());
     ASSERT_TRUE(bus->Execute(associate, ctx, "tester").success);
 
     auto snapshot = LoadSnapshotState(f.project.rootPath, core::audit::kInitialSnapshotId);
     auto replayed = core::audit::Replayer::ReplayFrom(
-        snapshot.model, snapshot.package, bus->Store().Transactions(),
-        std::numeric_limits<std::uint64_t>::max());
+        snapshot.model, snapshot.package, bus->Store().Transactions(), std::numeric_limits<std::uint64_t>::max());
     ASSERT_TRUE(replayed.has_value()) << (replayed.has_value() ? "" : replayed.error());
 
-    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package),
-              core::audit::CanonicalModelHash(f.package));
+    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package), core::audit::CanonicalModelHash(f.package));
 }
 
 TEST(UpdateElementTextCommand, RejectsContentFieldOnNonClaimElement) {
@@ -536,8 +530,7 @@ TEST(UpdateElementTextCommand, RejectsContentFieldOnNonClaimElement) {
     ASSERT_TRUE(bus->Execute(add_ctx, ctx, "tester").success);
     const std::string context_id = add_ctx.GeneratedId();
 
-    core::commands::UpdateElementTextCommand bad(context_id, core::ElementTextField::Content, "en",
-                                                 "should fail");
+    core::commands::UpdateElementTextCommand bad(context_id, core::ElementTextField::Content, "en", "should fail");
     const auto result = bus->Execute(bad, ctx, "tester");
     EXPECT_FALSE(result.success);
     EXPECT_NE(result.error.find("content"), std::string::npos);

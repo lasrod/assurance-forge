@@ -33,8 +33,9 @@ parser::SacmElement MakeElement(const std::string& id, const std::string& type) 
 }
 
 const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const std::string& id) {
-    const auto it = std::find_if(model.elements.begin(), model.elements.end(),
-                                 [&](const parser::SacmElement& element) { return element.id == id; });
+    const auto it = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
+        return element.id == id;
+    });
     return it == model.elements.end() ? nullptr : &*it;
 }
 
@@ -46,9 +47,8 @@ sacm::ArgumentPackage MakePackageWithBareStrategy() {
     sacm::ArgumentReasoning reasoning;
     reasoning.id = "S1";
     reasoning.gid = "S1.gid";
-    reasoning.taggedValues.push_back(sacm::TaggedValue{.id = "S1__strategyTarget",
-                                                       .key = sacm_adapter::kGsnStrategyTargetTagKey,
-                                                       .value = "G1"});
+    reasoning.taggedValues.push_back(
+        sacm::TaggedValue{.id = "S1__strategyTarget", .key = sacm_adapter::kGsnStrategyTargetTagKey, .value = "G1"});
     pkg.argumentReasonings.push_back(std::move(reasoning));
     return pkg;
 }
@@ -78,8 +78,7 @@ TEST(ArgumentPackageProjection, FindByIdMatchesIdField) {
     acp.argumentPackages.push_back(MakePackage("AP1", {"G1"}));
     acp.argumentPackages.push_back(MakePackage("AP2", {"G2"}));
 
-    const sacm::ArgumentPackage* found =
-        core::FindArgumentPackageByIdentity(acp, "AP2", "");
+    const sacm::ArgumentPackage* found = core::FindArgumentPackageByIdentity(acp, "AP2", "");
     ASSERT_NE(found, nullptr);
     EXPECT_EQ(found->id, "AP2");
 }
@@ -110,8 +109,7 @@ TEST(ArgumentPackageProjection, BuildProjectionKeepsOnlyOwnedElements) {
     reasoning.gid = "S1.gid";
     pkg.argumentReasonings.push_back(reasoning);
 
-    const parser::AssuranceCase projection =
-        core::BuildArgumentPackageProjection(source, pkg, "fallback");
+    const parser::AssuranceCase projection = core::BuildArgumentPackageProjection(source, pkg, "fallback");
     EXPECT_EQ(projection.id, "AP-A");
     ASSERT_EQ(projection.elements.size(), 2u);
     EXPECT_EQ(projection.elements[0].id, "G1");
@@ -126,8 +124,7 @@ TEST(ArgumentPackageProjection, BuildProjectionKeepsBareStrategyPlacedUnderItsGo
     const parser::AssuranceCase source = MakeSourceWithBareStrategy();
     const sacm::ArgumentPackage pkg = MakePackageWithBareStrategy();
 
-    const parser::AssuranceCase projection =
-        core::BuildArgumentPackageProjection(source, pkg, "fallback");
+    const parser::AssuranceCase projection = core::BuildArgumentPackageProjection(source, pkg, "fallback");
 
     const parser::SacmElement* placement = FindElement(projection, "S1__pending_inference");
     ASSERT_NE(placement, nullptr) << "bare strategy lost its placement in the package projection";
@@ -152,16 +149,13 @@ TEST(ArgumentPackageProjection, BuildProjectionDoesNotDuplicateExistingPlacement
     const parser::AssuranceCase source = MakeSourceWithBareStrategy();
     const sacm::ArgumentPackage pkg = MakePackageWithBareStrategy();
 
-    const parser::AssuranceCase once =
-        core::BuildArgumentPackageProjection(source, pkg, "fallback");
-    const parser::AssuranceCase twice =
-        core::BuildArgumentPackageProjection(once, pkg, "fallback");
+    const parser::AssuranceCase once = core::BuildArgumentPackageProjection(source, pkg, "fallback");
+    const parser::AssuranceCase twice = core::BuildArgumentPackageProjection(once, pkg, "fallback");
 
     const auto count_placements = [](const parser::AssuranceCase& model) {
-        return std::count_if(model.elements.begin(), model.elements.end(),
-                             [](const parser::SacmElement& element) {
-                                 return element.id == "S1__pending_inference";
-                             });
+        return std::count_if(model.elements.begin(), model.elements.end(), [](const parser::SacmElement& element) {
+            return element.id == "S1__pending_inference";
+        });
     };
     EXPECT_EQ(count_placements(once), 1);
     EXPECT_EQ(count_placements(twice), 1);
@@ -193,8 +187,7 @@ TEST(ArgumentPackageProjection, BuildProjectionSynthesizesNothingForMaterialized
     package_inference.sources.push_back("G2");
     pkg.assertedInferences.push_back(std::move(package_inference));
 
-    const parser::AssuranceCase projection =
-        core::BuildArgumentPackageProjection(source, pkg, "fallback");
+    const parser::AssuranceCase projection = core::BuildArgumentPackageProjection(source, pkg, "fallback");
     EXPECT_EQ(FindElement(projection, "S1__pending_inference"), nullptr);
     EXPECT_EQ(projection.elements.size(), 4u);
 }
@@ -225,7 +218,7 @@ TEST(ArgumentPackageProjection, PreviewProjectionKeepsStagedAdditionsAttachedToT
     package.argumentPackages.push_back(MakePackage("AP-A", {"G1"}));
 
     const std::vector<std::string> added{"S1", "R1", "G2", "R2"};
-    const parser::AssuranceCase    projection = core::BuildArgumentPackagePreviewProjection(
+    const parser::AssuranceCase projection = core::BuildArgumentPackagePreviewProjection(
         preview, package, package.argumentPackages.front(), added, "fallback");
 
     for (const std::string& id : added) {
@@ -253,7 +246,7 @@ TEST(ArgumentPackageProjection, PreviewProjectionLeavesAnotherPackagesAdditionsA
     package.argumentPackages.push_back(MakePackage("AP-B", {"C1"}));
 
     const std::vector<std::string> added{"G9", "R9"};
-    const parser::AssuranceCase    first = core::BuildArgumentPackagePreviewProjection(
+    const parser::AssuranceCase first = core::BuildArgumentPackagePreviewProjection(
         preview, package, package.argumentPackages.front(), added, "fallback");
     const parser::AssuranceCase second = core::BuildArgumentPackagePreviewProjection(
         preview, package, package.argumentPackages.back(), added, "fallback");
@@ -284,7 +277,6 @@ TEST(ArgumentPackageProjection, BuildProjectionUsesFallbackNameWhenPackageEmpty)
     sacm::ArgumentPackage pkg;
     pkg.id = "AP-X";
     // pkg.name intentionally empty
-    const parser::AssuranceCase projection =
-        core::BuildArgumentPackageProjection(source, pkg, "Fallback Title");
+    const parser::AssuranceCase projection = core::BuildArgumentPackageProjection(source, pkg, "Fallback Title");
     EXPECT_EQ(projection.name, "Fallback Title");
 }

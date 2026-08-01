@@ -114,9 +114,8 @@ TEST(TerminologyProblemSyncTest, ReportsAmbiguousTermUsageInElementText) {
 
     sacm::AssuranceCasePackage package;
     // Two case-level terms sharing the value "ODD" make the occurrence ambiguous.
-    package.terminologyPackages.push_back(
-        TerminologyPackage("TP1", {Term("T1", "ODD", "Operational Design Domain"),
-                                   Term("T2", "ODD", "Object Detection Dataset")}));
+    package.terminologyPackages.push_back(TerminologyPackage(
+        "TP1", {Term("T1", "ODD", "Operational Design Domain"), Term("T2", "ODD", "Object Detection Dataset")}));
 
     core::ProblemsManager manager;
     app::SyncTerminologyProblems(manager, &model, &package, NeverIgnored);
@@ -132,16 +131,14 @@ TEST(TerminologyProblemSyncTest, IgnoredSuggestionsAreSuppressed) {
     model.elements.push_back(Element("G1", "claim", "The ODD is well defined."));
 
     sacm::AssuranceCasePackage package;
-    package.terminologyPackages.push_back(
-        TerminologyPackage("TP1", {Term("T1", "ODD", "Operational Design Domain"),
-                                   Term("T2", "ODD", "Object Detection Dataset")}));
+    package.terminologyPackages.push_back(TerminologyPackage(
+        "TP1", {Term("T1", "ODD", "Operational Design Domain"), Term("T2", "ODD", "Object Detection Dataset")}));
 
     core::ProblemsManager manager;
     // Ignoring the suggestion for this element/text must suppress the ambiguity warning.
-    app::SyncTerminologyProblems(manager, &model, &package,
-                                 [](const std::string& element_id, const std::string& text) {
-                                     return element_id == "G1" && text == "ODD";
-                                 });
+    app::SyncTerminologyProblems(manager, &model, &package, [](const std::string& element_id, const std::string& text) {
+        return element_id == "G1" && text == "ODD";
+    });
 
     EXPECT_FALSE(HasProblemType(manager, "TerminologyAmbiguity"));
 }

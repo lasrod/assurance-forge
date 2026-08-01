@@ -2,7 +2,9 @@
 
 #include <string>
 
-namespace app { struct AppRuntimeState; }
+namespace app {
+struct AppRuntimeState;
+}
 
 namespace app::actions {
 

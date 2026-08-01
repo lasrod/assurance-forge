@@ -100,8 +100,7 @@ bool RemoveRelationship(parser::AssuranceCase& ac,
         return false;
     }
 
-    std::erase_if(ac.elements,
-                  [&](const parser::SacmElement& element) { return element.id == relationship_id; });
+    std::erase_if(ac.elements, [&](const parser::SacmElement& element) { return element.id == relationship_id; });
     ErasePackageRelationship(pkg, relationship_id);
     return true;
 }
@@ -165,13 +164,11 @@ bool MoveStrategyToReasoning(parser::AssuranceCase& ac,
         return false;
     }
     if (relationship->type != "assertedinference") {
-        out_error = "Only an inference carries a reasoning; " + relationship_id + " is a " +
-                    relationship->type + ".";
+        out_error = "Only an inference carries a reasoning; " + relationship_id + " is a " + relationship->type + ".";
         return false;
     }
     if (!relationship->reasoning_ref.empty()) {
-        out_error = "Inference " + relationship_id + " already has the reasoning " +
-                    relationship->reasoning_ref + ".";
+        out_error = "Inference " + relationship_id + " already has the reasoning " + relationship->reasoning_ref + ".";
         return false;
     }
 

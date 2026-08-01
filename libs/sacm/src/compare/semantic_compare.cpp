@@ -23,9 +23,10 @@ std::string canonical_multi_lang(const model::MultiLangString& value) {
     std::vector<std::string> entries;
     entries.reserve(value.values.size());
     for (const model::LangString& entry : value.values) {
-        entries.push_back(std::format(
-            "{}={}{}", entry.lang, entry.content,
-            entry.expression_ref.has_value() ? "@" + entry.expression_ref->value() : ""));
+        entries.push_back(std::format("{}={}{}",
+                                      entry.lang,
+                                      entry.content,
+                                      entry.expression_ref.has_value() ? "@" + entry.expression_ref->value() : ""));
     }
     std::ranges::sort(entries);
     std::string joined;
@@ -159,14 +160,16 @@ std::map<std::string, std::vector<std::string>> reference_snapshot(const SACMEle
     return snapshot;
 }
 
-void compare_elements(const std::string& path, const SACMElement& left, const SACMElement& right,
+void compare_elements(const std::string& path,
+                      const SACMElement& left,
+                      const SACMElement& right,
                       std::vector<SemanticDifference>& differences) {
     if (left.kind() != right.kind()) {
         differences.push_back(SemanticDifference{
             .path = path,
             .category = "kind",
-            .message = std::format("kind differs: {} vs {}", metadata::kind_name(left.kind()),
-                                   metadata::kind_name(right.kind())),
+            .message = std::format(
+                "kind differs: {} vs {}", metadata::kind_name(left.kind()), metadata::kind_name(right.kind())),
         });
         return;
     }
@@ -181,8 +184,7 @@ void compare_elements(const std::string& path, const SACMElement& left, const SA
                     path, "attribute", std::format("'{}' missing on right (left: '{}')", key, value)});
             } else if (it->second != value) {
                 differences.push_back(SemanticDifference{
-                    path, "attribute",
-                    std::format("'{}' differs: '{}' vs '{}'", key, value, it->second)});
+                    path, "attribute", std::format("'{}' differs: '{}' vs '{}'", key, value, it->second)});
             }
         }
         for (const auto& [key, value] : right_attrs) {
@@ -196,25 +198,21 @@ void compare_elements(const std::string& path, const SACMElement& left, const SA
     const auto left_refs = reference_snapshot(left);
     const auto right_refs = reference_snapshot(right);
     if (left_refs != right_refs) {
-        differences.push_back(SemanticDifference{
-            path, "reference", "reference targets differ"});
+        differences.push_back(SemanticDifference{path, "reference", "reference targets differ"});
     }
 
     // Children paired by id, order-insensitive.
     std::map<std::string, const SACMElement*> left_children;
     std::map<std::string, const SACMElement*> right_children;
-    model::traverse::for_each_child(left, [&](const SACMElement& child) {
-        left_children[child.id().value()] = &child;
-    });
-    model::traverse::for_each_child(right, [&](const SACMElement& child) {
-        right_children[child.id().value()] = &child;
-    });
+    model::traverse::for_each_child(left,
+                                    [&](const SACMElement& child) { left_children[child.id().value()] = &child; });
+    model::traverse::for_each_child(right,
+                                    [&](const SACMElement& child) { right_children[child.id().value()] = &child; });
     for (const auto& [id, child] : left_children) {
         const auto it = right_children.find(id);
         if (it == right_children.end()) {
             differences.push_back(SemanticDifference{
-                path, "missing",
-                std::format("{} '{}' missing on right", metadata::kind_name(child->kind()), id)});
+                path, "missing", std::format("{} '{}' missing on right", metadata::kind_name(child->kind()), id)});
             continue;
         }
         compare_elements(path.empty() ? id : path + "/" + id, *child, *it->second, differences);
@@ -222,16 +220,14 @@ void compare_elements(const std::string& path, const SACMElement& left, const SA
     for (const auto& [id, child] : right_children) {
         if (!left_children.contains(id)) {
             differences.push_back(SemanticDifference{
-                path, "extra",
-                std::format("{} '{}' missing on left", metadata::kind_name(child->kind()), id)});
+                path, "extra", std::format("{} '{}' missing on left", metadata::kind_name(child->kind()), id)});
         }
     }
 }
 
-}  // namespace
+} // namespace
 
-std::vector<SemanticDifference> semantic_compare(const model::Document& left,
-                                                 const model::Document& right) {
+std::vector<SemanticDifference> semantic_compare(const model::Document& left, const model::Document& right) {
     std::vector<SemanticDifference> differences;
 
     std::map<std::string, const SACMElement*> left_roots;
@@ -253,9 +249,7 @@ std::vector<SemanticDifference> semantic_compare(const model::Document& left,
         const auto it = right_roots.find(id);
         if (it == right_roots.end()) {
             differences.push_back(SemanticDifference{
-                "", "missing",
-                std::format("root {} '{}' missing on right", metadata::kind_name(root->kind()),
-                            id)});
+                "", "missing", std::format("root {} '{}' missing on right", metadata::kind_name(root->kind()), id)});
             continue;
         }
         compare_elements(id, *root, *it->second, differences);
@@ -263,12 +257,10 @@ std::vector<SemanticDifference> semantic_compare(const model::Document& left,
     for (const auto& [id, root] : right_roots) {
         if (!left_roots.contains(id)) {
             differences.push_back(SemanticDifference{
-                "", "extra",
-                std::format("root {} '{}' missing on left", metadata::kind_name(root->kind()),
-                            id)});
+                "", "extra", std::format("root {} '{}' missing on left", metadata::kind_name(root->kind()), id)});
         }
     }
     return differences;
 }
 
-}  // namespace sacm::compare
+} // namespace sacm::compare

@@ -43,8 +43,7 @@ TEST(UserSettingsPath, IsAbsoluteAndNamesTheSettingsFile) {
 namespace {
 
 std::filesystem::path SettingsScratchFile(const std::string& stem) {
-    const std::filesystem::path directory =
-        std::filesystem::temp_directory_path() / "af_user_settings_tests";
+    const std::filesystem::path directory = std::filesystem::temp_directory_path() / "af_user_settings_tests";
     std::filesystem::create_directories(directory);
     const std::filesystem::path path = directory / (stem + ".json");
     std::filesystem::remove(path);
@@ -55,7 +54,7 @@ std::filesystem::path SettingsScratchFile(const std::string& stem) {
 
 TEST(UserSettings, UpdateSectionPreservesSiblingSections) {
     const std::filesystem::path path = SettingsScratchFile("siblings");
-    std::string                 error;
+    std::string error;
 
     ASSERT_TRUE(core::UpdateUserSettingsSection(path, "mcp", {{"enabled", true}}, error)) << error;
     ASSERT_TRUE(core::UpdateUserSettingsSection(path, "ai", {{"model", "gpt-5.5"}}, error)) << error;
@@ -68,7 +67,7 @@ TEST(UserSettings, ReadSectionFailsSoftlyForMissingFileSectionAndMalformedDocume
     EXPECT_TRUE(core::ReadUserSettingsSection(SettingsScratchFile("absent"), "mcp").is_null());
 
     const std::filesystem::path no_section = SettingsScratchFile("no_section");
-    std::string                 error;
+    std::string error;
     ASSERT_TRUE(core::UpdateUserSettingsSection(no_section, "ai", {{"model", "x"}}, error)) << error;
     EXPECT_TRUE(core::ReadUserSettingsSection(no_section, "mcp").is_null());
 
@@ -81,14 +80,14 @@ TEST(UserSettings, ReadSectionFailsSoftlyForMissingFileSectionAndMalformedDocume
 // preferences panel does, and MCP must still be enabled.
 TEST(UserSettings, SavingAiSettingsDoesNotDisableMcp) {
     const std::filesystem::path path = SettingsScratchFile("ai_save_keeps_mcp");
-    std::string                 error;
+    std::string error;
     ASSERT_TRUE(core::UpdateUserSettingsSection(path, "mcp", {{"enabled", true}}, error)) << error;
 
     ai::AiSettingsStore store(path);
     ai::AiProviderSettings settings;
     settings.provider = ai::AiProviderId::OpenAI;
-    settings.model    = "gpt-5.5";
-    settings.enabled  = true;
+    settings.model = "gpt-5.5";
+    settings.enabled = true;
     ASSERT_TRUE(store.Save(settings, error)) << error;
 
     EXPECT_EQ(core::ReadUserSettingsSection(path, "mcp")["enabled"], true)

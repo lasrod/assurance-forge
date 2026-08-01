@@ -171,10 +171,9 @@ std::optional<core::ProblemItem> BuildTerminologyOccurrenceProblem(const core::T
         problem.type = "TerminologyAmbiguity";
         // Translate at sync time. Terminology problems are re-synced when the
         // model or terminology changes, so this picks up the current UI language.
-        problem.message =
-            ui::i18n::trf("{0} has {1} visible meanings. Choose the intended terminology entry.",
-                          occurrence.text,
-                          occurrence.resolution.candidates.size());
+        problem.message = ui::i18n::trf("{0} has {1} visible meanings. Choose the intended terminology entry.",
+                                        occurrence.text,
+                                        occurrence.resolution.candidates.size());
         problem.quick_fix_label = "Open glossary";
         problem.quick_fix_payload = occurrence.text;
         return problem;

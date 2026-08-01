@@ -34,11 +34,12 @@ TEST(AuditDiff, CreateTopGoalAddsGeneratedId) {
 }
 
 TEST(AuditDiff, CreateChildElementAddsElementAndRelationship) {
-    auto tx = MakeTx(1, {MakeEvent("CreateChildElement",
-                                   {{"parent_id", "G1"},
-                                    {"kind", "Strategy"},
-                                    {"generated_id", "AP1_S1"},
-                                    {"generated_relationship_id", "AP1_AI1"}})});
+    auto tx = MakeTx(1,
+                     {MakeEvent("CreateChildElement",
+                                {{"parent_id", "G1"},
+                                 {"kind", "Strategy"},
+                                 {"generated_id", "AP1_S1"},
+                                 {"generated_relationship_id", "AP1_AI1"}})});
     const auto cs = core::audit::ComputeChangeSet(tx);
     EXPECT_EQ(cs.added.size(), 2u);
     EXPECT_TRUE(cs.added.count("AP1_S1"));
@@ -46,10 +47,11 @@ TEST(AuditDiff, CreateChildElementAddsElementAndRelationship) {
 }
 
 TEST(AuditDiff, RemoveElementUsesDeletedIdsArray) {
-    auto tx = MakeTx(1, {MakeEvent("RemoveElement",
-                                   {{"element_id", "G1"},
-                                    {"mode", "NodeAndDescendants"},
-                                    {"deleted_ids", nlohmann::ordered_json::array({"G1", "S1", "AI1"})}})});
+    auto tx = MakeTx(1,
+                     {MakeEvent("RemoveElement",
+                                {{"element_id", "G1"},
+                                 {"mode", "NodeAndDescendants"},
+                                 {"deleted_ids", nlohmann::ordered_json::array({"G1", "S1", "AI1"})}})});
     const auto cs = core::audit::ComputeChangeSet(tx);
     EXPECT_EQ(cs.deleted.size(), 3u);
     EXPECT_TRUE(cs.deleted.count("G1"));
@@ -59,8 +61,7 @@ TEST(AuditDiff, RemoveElementUsesDeletedIdsArray) {
 }
 
 TEST(AuditDiff, RemoveElementFallsBackToElementIdWhenArrayMissing) {
-    auto tx = MakeTx(1, {MakeEvent("RemoveElement",
-                                   {{"element_id", "G1"}, {"mode", "NodeOnly"}})});
+    auto tx = MakeTx(1, {MakeEvent("RemoveElement", {{"element_id", "G1"}, {"mode", "NodeOnly"}})});
     const auto cs = core::audit::ComputeChangeSet(tx);
     EXPECT_EQ(cs.deleted.size(), 1u);
     EXPECT_TRUE(cs.deleted.count("G1"));
@@ -68,10 +69,11 @@ TEST(AuditDiff, RemoveElementFallsBackToElementIdWhenArrayMissing) {
 
 TEST(AuditDiff, AggregateMergesAdditionsThenDeletionsCancelOut) {
     auto t1 = MakeTx(1, {MakeEvent("CreateTopGoal", {{"generated_id", "G7"}})});
-    auto t2 = MakeTx(2, {MakeEvent("RemoveElement",
-                                   {{"element_id", "G7"},
-                                    {"mode", "NodeOnly"},
-                                    {"deleted_ids", nlohmann::ordered_json::array({"G7"})}})});
+    auto t2 = MakeTx(
+        2,
+        {MakeEvent(
+            "RemoveElement",
+            {{"element_id", "G7"}, {"mode", "NodeOnly"}, {"deleted_ids", nlohmann::ordered_json::array({"G7"})}})});
     const auto cs = core::audit::ComputeChangeSet(std::vector{t1, t2});
     EXPECT_TRUE(cs.added.empty());
     EXPECT_TRUE(cs.modified.empty());
@@ -80,11 +82,12 @@ TEST(AuditDiff, AggregateMergesAdditionsThenDeletionsCancelOut) {
 }
 
 TEST(AuditDiff, AggregatePreservesAddWhenLaterTransactionDoesNotDelete) {
-    auto t1 = MakeTx(1, {MakeEvent("CreateChildElement",
-                                   {{"parent_id", "G1"},
-                                    {"kind", "Solution"},
-                                    {"generated_id", "AP1_Sn1"},
-                                    {"generated_relationship_id", "AP1_AE1"}})});
+    auto t1 = MakeTx(1,
+                     {MakeEvent("CreateChildElement",
+                                {{"parent_id", "G1"},
+                                 {"kind", "Solution"},
+                                 {"generated_id", "AP1_Sn1"},
+                                 {"generated_relationship_id", "AP1_AE1"}})});
     auto t2 = MakeTx(2, {MakeEvent("CreateTopGoal", {{"generated_id", "G8"}})});
     const auto cs = core::audit::ComputeChangeSet(std::vector{t1, t2});
     EXPECT_EQ(cs.added.size(), 3u);
@@ -102,12 +105,13 @@ TEST(AuditDiff, UnknownEventTypeIsIgnored) {
 }
 
 TEST(AuditDiff, UpdateElementTextMarksElementModified) {
-    auto tx = MakeTx(1, {MakeEvent("UpdateElementText",
-                                   {{"element_id", "G1"},
-                                    {"field", "description"},
-                                    {"language", "en"},
-                                    {"old_value", "before"},
-                                    {"new_value", "after"}})});
+    auto tx = MakeTx(1,
+                     {MakeEvent("UpdateElementText",
+                                {{"element_id", "G1"},
+                                 {"field", "description"},
+                                 {"language", "en"},
+                                 {"old_value", "before"},
+                                 {"new_value", "after"}})});
     const auto cs = core::audit::ComputeChangeSet(tx);
     EXPECT_TRUE(cs.added.empty());
     EXPECT_TRUE(cs.deleted.empty());
@@ -116,10 +120,9 @@ TEST(AuditDiff, UpdateElementTextMarksElementModified) {
 }
 
 TEST(AuditDiff, GSN3_CORE_010_UpdateGsnIdentifierMarksElementModified) {
-    auto tx = MakeTx(1, {MakeEvent("UpdateGsnIdentifier",
-                                  {{"element_id", "G1"},
-                                   {"old_identifier", "G1"},
-                                   {"new_identifier", "SYS-GOAL"}})});
+    auto tx = MakeTx(1,
+                     {MakeEvent("UpdateGsnIdentifier",
+                                {{"element_id", "G1"}, {"old_identifier", "G1"}, {"new_identifier", "SYS-GOAL"}})});
     const core::audit::AuditChangeSet changes = core::audit::ComputeChangeSet(tx);
     EXPECT_EQ(changes.modified.size(), 1u);
     EXPECT_EQ(changes.modified.count("G1"), 1u);
@@ -127,12 +130,11 @@ TEST(AuditDiff, GSN3_CORE_010_UpdateGsnIdentifierMarksElementModified) {
 
 TEST(AuditDiff, AggregateDoesNotMarkNewlyAddedElementAsModified) {
     auto create = MakeTx(1, {MakeEvent("CreateTopGoal", {{"generated_id", "G1"}})});
-    auto edit = MakeTx(2, {MakeEvent("UpdateElementText",
-                                     {{"element_id", "G1"},
-                                      {"field", "name"},
-                                      {"language", "en"},
-                                      {"old_value", ""},
-                                      {"new_value", "Top"}})});
+    auto edit = MakeTx(
+        2,
+        {MakeEvent(
+            "UpdateElementText",
+            {{"element_id", "G1"}, {"field", "name"}, {"language", "en"}, {"old_value", ""}, {"new_value", "Top"}})});
     const auto cs = core::audit::ComputeChangeSet({create, edit});
     EXPECT_TRUE(cs.added.count("G1"));
     EXPECT_FALSE(cs.modified.count("G1"));
@@ -142,9 +144,9 @@ TEST(AuditDiff, AggregateDoesNotMarkNewlyAddedElementAsModified) {
 namespace {
 
 core::audit::AuditTransaction MakeTxWithMeta(std::uint64_t seq,
-                                              const char* timestamp,
-                                              const char* author,
-                                              std::vector<core::audit::AuditEvent> events) {
+                                             const char* timestamp,
+                                             const char* author,
+                                             std::vector<core::audit::AuditEvent> events) {
     core::audit::AuditTransaction tx = MakeTx(seq, std::move(events));
     tx.timestamp = timestamp;
     tx.author = author;
@@ -161,15 +163,15 @@ TEST(ElementHistorySummary, NoTransactionsReportsNotSeen) {
 }
 
 TEST(ElementHistorySummary, CreateAndEditCountsAndCapturesMetadata) {
-    auto create = MakeTxWithMeta(1, "2026-01-01T00:00:00Z", "alice",
-                                 {MakeEvent("CreateTopGoal", {{"generated_id", "G1"}})});
-    auto edit = MakeTxWithMeta(2, "2026-01-02T00:00:00Z", "bob",
-                               {MakeEvent("UpdateElementText",
-                                          {{"element_id", "G1"},
-                                           {"field", "name"},
-                                           {"language", "en"},
-                                           {"old_value", ""},
-                                           {"new_value", "Top"}})});
+    auto create =
+        MakeTxWithMeta(1, "2026-01-01T00:00:00Z", "alice", {MakeEvent("CreateTopGoal", {{"generated_id", "G1"}})});
+    auto edit = MakeTxWithMeta(
+        2,
+        "2026-01-02T00:00:00Z",
+        "bob",
+        {MakeEvent(
+            "UpdateElementText",
+            {{"element_id", "G1"}, {"field", "name"}, {"language", "en"}, {"old_value", ""}, {"new_value", "Top"}})});
     const auto s = core::audit::SummarizeElementHistory("G1", {create, edit});
     EXPECT_TRUE(s.ever_seen);
     EXPECT_TRUE(s.exists);
@@ -194,26 +196,26 @@ TEST(ElementHistorySummary, DeletedElementExistsFalse) {
 
 TEST(ElementHistorySummary, ChangedSinceBaselineWhenLaterEditExists) {
     auto create = MakeTxWithMeta(1, "t1", "a", {MakeEvent("CreateTopGoal", {{"generated_id", "G1"}})});
-    auto edit = MakeTxWithMeta(3, "t3", "b",
-                               {MakeEvent("UpdateElementText",
-                                          {{"element_id", "G1"},
-                                           {"field", "name"},
-                                           {"language", "en"},
-                                           {"old_value", "x"},
-                                           {"new_value", "y"}})});
+    auto edit = MakeTxWithMeta(
+        3,
+        "t3",
+        "b",
+        {MakeEvent(
+            "UpdateElementText",
+            {{"element_id", "G1"}, {"field", "name"}, {"language", "en"}, {"old_value", "x"}, {"new_value", "y"}})});
     const auto s = core::audit::SummarizeElementHistory("G1", {create, edit}, /*baseline=*/2u);
     EXPECT_TRUE(s.changed_since_baseline);
 }
 
 TEST(ElementHistorySummary, NotChangedSinceBaselineWhenAllChangesBeforeBaseline) {
     auto create = MakeTxWithMeta(1, "t1", "a", {MakeEvent("CreateTopGoal", {{"generated_id", "G1"}})});
-    auto edit = MakeTxWithMeta(2, "t2", "b",
-                               {MakeEvent("UpdateElementText",
-                                          {{"element_id", "G1"},
-                                           {"field", "name"},
-                                           {"language", "en"},
-                                           {"old_value", "x"},
-                                           {"new_value", "y"}})});
+    auto edit = MakeTxWithMeta(
+        2,
+        "t2",
+        "b",
+        {MakeEvent(
+            "UpdateElementText",
+            {{"element_id", "G1"}, {"field", "name"}, {"language", "en"}, {"old_value", "x"}, {"new_value", "y"}})});
     const auto s = core::audit::SummarizeElementHistory("G1", {create, edit}, /*baseline=*/5u);
     EXPECT_FALSE(s.changed_since_baseline);
 }
@@ -226,4 +228,3 @@ TEST(ElementHistorySummary, IgnoresUnrelatedElements) {
     EXPECT_EQ(s.change_count, 1u);
     EXPECT_EQ(s.last_sequence, 1u);
 }
-

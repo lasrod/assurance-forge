@@ -109,8 +109,7 @@ std::string StrategyTargetTag(const sacm::AssuranceCasePackage& pkg, const std::
     return {};
 }
 
-const parser::SacmElement* FindModelStrategyInference(const parser::AssuranceCase& ac,
-                                                      const std::string& strategy_id) {
+const parser::SacmElement* FindModelStrategyInference(const parser::AssuranceCase& ac, const std::string& strategy_id) {
     for (const auto& element : ac.elements)
         if (element.type == "assertedinference" && element.reasoning_ref == strategy_id)
             return &element;
@@ -785,8 +784,8 @@ TEST(ElementIdentifierTest, PlannedIdMatchesTheIdActuallyMinted) {
     std::string err;
     std::string planned_element;
     std::string planned_relationship;
-    ASSERT_TRUE(core::PlanChildElementIds(mc.ac, &mc.pkg, "G1", core::NewElementKind::Goal, planned_element,
-                                          planned_relationship, err))
+    ASSERT_TRUE(core::PlanChildElementIds(
+        mc.ac, &mc.pkg, "G1", core::NewElementKind::Goal, planned_element, planned_relationship, err))
         << err;
 
     std::string actual;

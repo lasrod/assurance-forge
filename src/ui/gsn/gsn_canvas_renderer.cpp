@@ -452,10 +452,14 @@ void GsnCanvas::Render(UiState& ui_state,
                 frame_stats.relationship_context_menu_active = true;
                 ImGui::TextUnformatted(AF_TR("Challenge").c_str());
                 ImGui::Separator();
-                if (ImGui::MenuItem(AF_TR("Add Counter Argument").c_str(), nullptr, false,
+                if (ImGui::MenuItem(AF_TR("Add Counter Argument").c_str(),
+                                    nullptr,
+                                    false,
                                     static_cast<bool>(actions.add_counter_argument_to_relationship)))
                     actions.add_counter_argument_to_relationship(counter.challenge_relationship_id);
-                if (ImGui::MenuItem(AF_TR("Add Counter Evidence").c_str(), nullptr, false,
+                if (ImGui::MenuItem(AF_TR("Add Counter Evidence").c_str(),
+                                    nullptr,
+                                    false,
                                     static_cast<bool>(actions.add_counter_evidence_to_relationship)))
                     actions.add_counter_evidence_to_relationship(counter.challenge_relationship_id);
                 ImGui::EndPopup();

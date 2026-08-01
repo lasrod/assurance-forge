@@ -39,8 +39,7 @@ constexpr const char* kTamperedSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
 
 std::filesystem::path MakeTempProjectRoot(const std::string& tag) {
     auto root = std::filesystem::temp_directory_path() /
-                ("af_test_" + tag + "_" +
-                 std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
+                ("af_test_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(root);
     return root;
@@ -52,8 +51,7 @@ void WriteFile(const std::filesystem::path& path, std::string_view content) {
     out.write(content.data(), static_cast<std::streamsize>(content.size()));
 }
 
-core::AssuranceProject MakeProject(const std::filesystem::path& root,
-                                   const std::filesystem::path& sacm_rel) {
+core::AssuranceProject MakeProject(const std::filesystem::path& root, const std::filesystem::path& sacm_rel) {
     core::AssuranceProject project;
     project.id = "p";
     project.rootPath = root;
@@ -154,8 +152,7 @@ TEST(AuditRecovery, RestoreSacmFromAuditPreservesPriorTransactionsOnReplay) {
         ASSERT_TRUE(model);
         core::commands::CommandContext ctx{*model, *pkg};
 
-        core::commands::UpdateElementTextCommand cmd{
-            "G1", core::ElementTextField::Description, "en", "Audited edit."};
+        core::commands::UpdateElementTextCommand cmd{"G1", core::ElementTextField::Description, "en", "Audited edit."};
         auto res = bus->Execute(cmd, ctx, "alice");
         ASSERT_TRUE(res.success) << res.error;
     }

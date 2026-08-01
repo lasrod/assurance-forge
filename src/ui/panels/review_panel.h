@@ -38,25 +38,25 @@ struct AgentChangeSetRow {
     // a decision. Accepting is offered either way -- the user is not obliged to
     // wait for an agent to declare itself finished.
     std::string state;
-    int         added_count    = 0;
-    int         modified_count = 0;
-    int         removed_count  = 0;
-    int         operation_count = 0;
+    int added_count = 0;
+    int modified_count = 0;
+    int removed_count = 0;
+    int operation_count = 0;
     // False when the change set cannot be accepted against what is open right
     // now, in which case `problem` says why and the Accept button is disabled.
     //
     // Computed every frame rather than when the button is pressed. The reported
     // symptom was "Accept does nothing": the refusal was real, went to the status
     // bar, and was nowhere near the change set it was about.
-    bool        applies = true;
+    bool applies = true;
     std::string problem;
     // Which of the project's arguments this was written against. Shown whenever
     // it is not the one on screen, because that is the whole explanation for a
     // change set that will not accept.
     std::string argument_file;
-    bool        argument_file_is_open = true;
+    bool argument_file_is_open = true;
     // True for the one currently drawn on the canvas.
-    bool        shown_on_canvas = false;
+    bool shown_on_canvas = false;
     // SCCG findings against what this change set would produce. Advisory: they
     // never block acceptance, because the reviewer is the authority on a safety
     // argument and only a named, mechanically-decidable subset of SCCG can be
@@ -70,7 +70,7 @@ struct ReviewPanelModel {
     std::vector<AgentChangeSetRow> agent_change_sets;
     // Clients attached right now, so something reading the project is never
     // invisible to the person responsible for it.
-    std::vector<std::string>       connected_agents;
+    std::vector<std::string> connected_agents;
     std::string focus_review_item_id;
     std::vector<core::reviews::ReviewItem> review_items;
     std::vector<core::ProblemItem> problem_items;

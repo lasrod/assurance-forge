@@ -150,8 +150,7 @@ TEST(ElementEditControllerTest, CommitElementTextEditHandlesAliasedNewValueRefer
 </sacm:AssuranceCasePackage>
 )";
     const fs::path root = fs::temp_directory_path() /
-                          ("af_text_alias_" +
-                           std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
+                          ("af_text_alias_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
     fs::remove_all(root);
     fs::create_directories(root);
     const fs::path sacm_rel = "argument.sacm";
@@ -184,15 +183,18 @@ TEST(ElementEditControllerTest, CommitElementTextEditHandlesAliasedNewValueRefer
     ASSERT_TRUE(bus) << error;
 
     app::AppRuntimeState state;
-    state.app_state.loaded_case  = std::move(parsed.value());
+    state.app_state.loaded_case = std::move(parsed.value());
     state.app_state.sacm_package = std::move(pkg.value());
-    state.command_bus            = std::move(bus);
+    state.command_bus = std::move(bus);
 
     // Locate the element and snapshot its original description.
     parser::AssuranceCase& model = state.app_state.loaded_case.value();
     parser::SacmElement* elem = nullptr;
     for (auto& e : model.elements) {
-        if (e.id == "G1") { elem = &e; break; }
+        if (e.id == "G1") {
+            elem = &e;
+            break;
+        }
     }
     ASSERT_NE(elem, nullptr);
     const std::string original_value = elem->description;
@@ -251,8 +253,7 @@ TEST(ElementEditControllerTest, FlushPendingTextEditsCommitsUncommittedEditWitho
 </sacm:AssuranceCasePackage>
 )";
     const fs::path root = fs::temp_directory_path() /
-                          ("af_flush_pending_" +
-                           std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
+                          ("af_flush_pending_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
     fs::remove_all(root);
     fs::create_directories(root);
     const fs::path sacm_rel = "argument.sacm";
@@ -291,7 +292,10 @@ TEST(ElementEditControllerTest, FlushPendingTextEditsCommitsUncommittedEditWitho
     parser::AssuranceCase& model = state.app_state.loaded_case.value();
     parser::SacmElement* elem = nullptr;
     for (auto& e : model.elements) {
-        if (e.id == "G1") { elem = &e; break; }
+        if (e.id == "G1") {
+            elem = &e;
+            break;
+        }
     }
     ASSERT_NE(elem, nullptr);
     const std::string original_value = elem->description;
@@ -346,8 +350,7 @@ TEST(ElementEditControllerTest, SACM23_INT_002_RemoveConfirmDisclosesLibraryCons
 
     // G2 is a leaf: the legacy plan is one element, so this used to delete
     // straight away with no dialog at all.
-    ASSERT_TRUE(state.element_edit_controller->RemoveSelected(state, "G2",
-                                                             core::RemoveMode::NodeAndDescendants));
+    ASSERT_TRUE(state.element_edit_controller->RemoveSelected(state, "G2", core::RemoveMode::NodeAndDescendants));
     ASSERT_TRUE(state.element_edit_controller->ShouldShowRemoveConfirm())
         << "a delete with consequences went through without asking";
     EXPECT_TRUE(state.element_edit_controller->PendingRemovePreviewAvailable());
@@ -364,8 +367,8 @@ TEST(ElementEditControllerTest, SACM23_INT_002_RemoveConfirmDisclosesLibraryCons
     // disappear with nothing on screen having mentioned them.
     const auto& consequences = state.element_edit_controller->PendingRemoveConsequences();
     const auto consequence_for = [&consequences](const std::string& id) {
-        return std::find_if(consequences.begin(), consequences.end(),
-                            [&id](const auto& effect) { return effect.element_id == id; });
+        return std::find_if(
+            consequences.begin(), consequences.end(), [&id](const auto& effect) { return effect.element_id == id; });
     };
 
     const auto inference = consequence_for("R1");
@@ -375,8 +378,7 @@ TEST(ElementEditControllerTest, SACM23_INT_002_RemoveConfirmDisclosesLibraryCons
     EXPECT_TRUE(inference->deleted);
 
     const auto acp = consequence_for("ACP2");
-    ASSERT_NE(acp, consequences.end())
-        << "the Assurance Claim Point on the cascaded inference was not disclosed";
+    ASSERT_NE(acp, consequences.end()) << "the Assurance Claim Point on the cascaded inference was not disclosed";
     EXPECT_EQ(acp->kind, "AssuranceClaimPoint");
     EXPECT_EQ(acp->name, "Confidence in the inference");
     EXPECT_TRUE(acp->deleted);
@@ -409,13 +411,11 @@ TEST(ElementEditControllerTest, SACM23_INT_002_RemoveWithoutConsequencesStillDel
     // Confirm through, leaving G2 an unreferenced, ACP-free leaf. The dispatch
     // path re-derives the library document, so the second preview sees the
     // post-removal state rather than a stale one.
-    ASSERT_TRUE(state.element_edit_controller->RemoveSelected(state, "R1",
-                                                             core::RemoveMode::NodeAndDescendants));
+    ASSERT_TRUE(state.element_edit_controller->RemoveSelected(state, "R1", core::RemoveMode::NodeAndDescendants));
     ASSERT_TRUE(state.element_edit_controller->ConfirmPendingRemoval(state));
     ASSERT_EQ(parser::FindElementById(state.app_state.loaded_case.value(), "R1"), nullptr);
 
-    ASSERT_TRUE(state.element_edit_controller->RemoveSelected(state, "G2",
-                                                             core::RemoveMode::NodeAndDescendants));
+    ASSERT_TRUE(state.element_edit_controller->RemoveSelected(state, "G2", core::RemoveMode::NodeAndDescendants));
     EXPECT_FALSE(state.element_edit_controller->ShouldShowRemoveConfirm())
         << "a delete with no consequences should not interrupt the user";
     EXPECT_EQ(parser::FindElementById(state.app_state.loaded_case.value(), "G2"), nullptr);
@@ -447,14 +447,12 @@ TEST(ElementEditControllerTest, SACM23_INT_002_NodeOnlyOffersNoPreviewRatherThan
     ASSERT_TRUE(state.app_state.load_file(path.string())) << state.app_state.status_message;
 
     // NodeOnly on the interior goal: R2 must NOT be advertised as removed.
-    ASSERT_TRUE(
-        state.element_edit_controller->RemoveSelected(state, "G2", core::RemoveMode::NodeOnly));
+    ASSERT_TRUE(state.element_edit_controller->RemoveSelected(state, "G2", core::RemoveMode::NodeOnly));
     EXPECT_FALSE(state.element_edit_controller->PendingRemovePreviewAvailable())
         << "a preview was offered for a removal the library cannot model; it would have claimed "
            "the promoted child's inference is deleted when it survives, retargeted";
     for (const auto& effect : state.element_edit_controller->PendingRemoveConsequences()) {
-        EXPECT_NE(effect.element_id, "R2")
-            << "the preview claimed the retargeted inference is removed";
+        EXPECT_NE(effect.element_id, "R2") << "the preview claimed the retargeted inference is removed";
     }
 
     // With no preview and a single-element plan there is nothing to confirm, so
@@ -485,8 +483,7 @@ TEST(ElementEditControllerTest, SACM23_INT_002_ConfirmedRemovalMatchesThePreview
     app::AppRuntimeState state;
     ASSERT_TRUE(state.app_state.load_file(fixture.string())) << state.app_state.status_message;
 
-    ASSERT_TRUE(state.element_edit_controller->RemoveSelected(state, "G2",
-                                                             core::RemoveMode::NodeAndDescendants));
+    ASSERT_TRUE(state.element_edit_controller->RemoveSelected(state, "G2", core::RemoveMode::NodeAndDescendants));
     ASSERT_TRUE(state.element_edit_controller->ShouldShowRemoveConfirm());
     ASSERT_TRUE(state.element_edit_controller->PendingRemovePreviewAvailable());
 
@@ -517,8 +514,7 @@ TEST(ElementEditControllerTest, SACM23_INT_002_ConfirmedRemovalMatchesThePreview
     }
     std::sort(promised_gone.begin(), promised_gone.end());
     std::sort(actually_gone.begin(), actually_gone.end());
-    EXPECT_EQ(promised_gone, actually_gone)
-        << "the confirmed removal did not match what the dialog promised";
+    EXPECT_EQ(promised_gone, actually_gone) << "the confirmed removal did not match what the dialog promised";
 
     // Anything the preview said would merely be modified must still exist.
     for (const std::string& id : promised_kept) {
@@ -532,14 +528,13 @@ TEST(ElementEditControllerTest, SACM23_INT_002_ConfirmedRemovalMatchesThePreview
     // projection's `acps` vector is a cache that this path does not rebuild.
     // The document is what the user's file will contain.
     ASSERT_NE(state.app_state.library_document, nullptr);
-    const core::AssuranceCase reprojected =
-        sacm_adapter::project_case(*state.app_state.library_document);
-    EXPECT_EQ(std::find_if(reprojected.acps.begin(), reprojected.acps.end(),
-                           [](const auto& acp) { return acp.id == "ACP2"; }),
+    const core::AssuranceCase reprojected = sacm_adapter::project_case(*state.app_state.library_document);
+    EXPECT_EQ(std::find_if(
+                  reprojected.acps.begin(), reprojected.acps.end(), [](const auto& acp) { return acp.id == "ACP2"; }),
               reprojected.acps.end())
         << "ACP2 was announced as removed but survives in the library document";
-    EXPECT_NE(std::find_if(reprojected.acps.begin(), reprojected.acps.end(),
-                           [](const auto& acp) { return acp.id == "ACP1"; }),
+    EXPECT_NE(std::find_if(
+                  reprojected.acps.begin(), reprojected.acps.end(), [](const auto& acp) { return acp.id == "ACP1"; }),
               reprojected.acps.end())
         << "ACP1 belongs to a surviving element and must not have been destroyed";
 }

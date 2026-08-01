@@ -27,9 +27,7 @@ std::string FilenameSafeNowUtc() {
 // Move `source` (a file or directory) into `target`, falling back to a
 // recursive copy + remove when `rename` is not supported across the
 // underlying filesystem boundary. Missing source is a no-op.
-bool MoveIntoBackup(const std::filesystem::path& source,
-                    const std::filesystem::path& target,
-                    std::string& error) {
+bool MoveIntoBackup(const std::filesystem::path& source, const std::filesystem::path& target, std::string& error) {
     std::error_code ec;
     if (!std::filesystem::exists(source, ec))
         return true;
@@ -39,9 +37,9 @@ bool MoveIntoBackup(const std::filesystem::path& source,
         return true;
 
     std::error_code copy_ec;
-    std::filesystem::copy(source, target,
-                          std::filesystem::copy_options::recursive |
-                              std::filesystem::copy_options::overwrite_existing,
+    std::filesystem::copy(source,
+                          target,
+                          std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing,
                           copy_ec);
     if (copy_ec) {
         error = "Could not back up " + source.string() + ": " + copy_ec.message();

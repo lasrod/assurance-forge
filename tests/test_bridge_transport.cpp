@@ -15,9 +15,8 @@ namespace {
 // name entirely different kinds of object, which is the whole reason the
 // transport is behind an interface.
 std::string UniqueAddress(const std::string& label) {
-    const std::string unique =
-        label + "-" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()) + "-" +
-        std::to_string(reinterpret_cast<std::uintptr_t>(&label));
+    const std::string unique = label + "-" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()) + "-" +
+                               std::to_string(reinterpret_cast<std::uintptr_t>(&label));
 #ifdef _WIN32
     return "\\\\.\\pipe\\af-test-" + unique;
 #else
@@ -29,7 +28,7 @@ std::string UniqueAddress(const std::string& label) {
 // prefix, so the test can tell a real round trip from an accidental echo of its
 // own buffer.
 void ServeOneEchoConnection(bridge::Listener& listener, std::atomic<bool>& accepted) {
-    std::string                          error;
+    std::string error;
     const std::unique_ptr<bridge::Connection> connection = listener.Accept(error);
     if (connection == nullptr) {
         return;
@@ -47,12 +46,12 @@ void ServeOneEchoConnection(bridge::Listener& listener, std::atomic<bool>& accep
 TEST(BridgeTransport, CarriesAMessageInBothDirections) {
     const std::string address = UniqueAddress("roundtrip");
 
-    std::string                            error;
+    std::string error;
     const std::unique_ptr<bridge::Listener> listener = bridge::Listener::Start(address, error);
     ASSERT_NE(listener, nullptr) << error;
 
     std::atomic<bool> accepted{false};
-    std::thread       server([&] { ServeOneEchoConnection(*listener, accepted); });
+    std::thread server([&] { ServeOneEchoConnection(*listener, accepted); });
 
     const std::unique_ptr<bridge::Connection> client = bridge::Connection::Connect(address, error);
     ASSERT_NE(client, nullptr) << error;
@@ -74,12 +73,12 @@ TEST(BridgeTransport, CarriesAMessageInBothDirections) {
 TEST(BridgeTransport, ReassemblesAMessageLargerThanOneReadChunk) {
     const std::string address = UniqueAddress("large");
 
-    std::string                            error;
+    std::string error;
     const std::unique_ptr<bridge::Listener> listener = bridge::Listener::Start(address, error);
     ASSERT_NE(listener, nullptr) << error;
 
     std::atomic<bool> accepted{false};
-    std::thread       server([&] { ServeOneEchoConnection(*listener, accepted); });
+    std::thread server([&] { ServeOneEchoConnection(*listener, accepted); });
 
     const std::unique_ptr<bridge::Connection> client = bridge::Connection::Connect(address, error);
     ASSERT_NE(client, nullptr) << error;
@@ -101,12 +100,12 @@ TEST(BridgeTransport, ReassemblesAMessageLargerThanOneReadChunk) {
 TEST(BridgeTransport, KeepsBackToBackMessagesSeparate) {
     const std::string address = UniqueAddress("framing");
 
-    std::string                            error;
+    std::string error;
     const std::unique_ptr<bridge::Listener> listener = bridge::Listener::Start(address, error);
     ASSERT_NE(listener, nullptr) << error;
 
     std::atomic<bool> accepted{false};
-    std::thread       server([&] { ServeOneEchoConnection(*listener, accepted); });
+    std::thread server([&] { ServeOneEchoConnection(*listener, accepted); });
 
     const std::unique_ptr<bridge::Connection> client = bridge::Connection::Connect(address, error);
     ASSERT_NE(client, nullptr) << error;
@@ -131,13 +130,13 @@ TEST(BridgeTransport, KeepsBackToBackMessagesSeparate) {
 TEST(BridgeTransport, StopUnblocksAWaitingAccept) {
     const std::string address = UniqueAddress("stop");
 
-    std::string                            error;
+    std::string error;
     const std::unique_ptr<bridge::Listener> listener = bridge::Listener::Start(address, error);
     ASSERT_NE(listener, nullptr) << error;
 
     std::atomic<bool> returned{false};
-    std::string       accept_error = "not-yet-set";
-    std::thread       waiter([&] {
+    std::string accept_error = "not-yet-set";
+    std::thread waiter([&] {
         const std::unique_ptr<bridge::Connection> connection = listener->Accept(accept_error);
         EXPECT_EQ(connection, nullptr);
         returned.store(true);
@@ -158,9 +157,8 @@ TEST(BridgeTransport, StopUnblocksAWaitingAccept) {
 // The normal case for the MCP adapter is that Assurance Forge is not running.
 // That must fail promptly and say so, not hang waiting for a peer.
 TEST(BridgeTransport, ConnectingToNothingFailsWithAMessage) {
-    std::string                                error;
-    const std::unique_ptr<bridge::Connection> connection =
-        bridge::Connection::Connect(UniqueAddress("absent"), error);
+    std::string error;
+    const std::unique_ptr<bridge::Connection> connection = bridge::Connection::Connect(UniqueAddress("absent"), error);
 
     EXPECT_EQ(connection, nullptr);
     EXPECT_FALSE(error.empty());
@@ -171,12 +169,12 @@ TEST(BridgeTransport, ConnectingToNothingFailsWithAMessage) {
 TEST(BridgeTransport, ReportsAClosedPeerAsAReadFailure) {
     const std::string address = UniqueAddress("hangup");
 
-    std::string                            error;
+    std::string error;
     const std::unique_ptr<bridge::Listener> listener = bridge::Listener::Start(address, error);
     ASSERT_NE(listener, nullptr) << error;
 
     std::thread server([&] {
-        std::string                          accept_error;
+        std::string accept_error;
         std::unique_ptr<bridge::Connection> connection = listener->Accept(accept_error);
         if (connection != nullptr) {
             connection->Close();

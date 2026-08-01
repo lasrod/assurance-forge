@@ -14,9 +14,8 @@
 
 namespace core::commands {
 
-std::unique_ptr<CommandBus> CommandBus::Open(AssuranceProject project,
-                                             std::filesystem::path sacm_absolute_path,
-                                             std::string& error) {
+std::unique_ptr<CommandBus>
+CommandBus::Open(AssuranceProject project, std::filesystem::path sacm_absolute_path, std::string& error) {
     auto bus = std::unique_ptr<CommandBus>(new CommandBus());
     bus->project_ = std::move(project);
     bus->sacm_path_ = std::move(sacm_absolute_path);
@@ -69,12 +68,11 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     // the same safe point every other derived-view refresh uses. For an UNFLIPPED
     // command `source_package` is just the authoritative, in-place-mutated legacy
     // ctx.package, so serialization/hashing/autosave below are untouched.
-    parser::AssuranceCase      flipped_scratch_model;
+    parser::AssuranceCase flipped_scratch_model;
     sacm::AssuranceCasePackage flipped_scratch_package;
     const bool library_primary_flip = ctx.library_primary && ctx.library_document != nullptr;
     if (library_primary_flip)
-        core::RebuildDerivedViewsFromLibrary(*ctx.library_document, flipped_scratch_model,
-                                             flipped_scratch_package);
+        core::RebuildDerivedViewsFromLibrary(*ctx.library_document, flipped_scratch_model, flipped_scratch_package);
     sacm::AssuranceCasePackage& source_package = library_primary_flip ? flipped_scratch_package : ctx.package;
 
     // Serialize once so the bytes we write, the bytes we hash, and the
@@ -194,8 +192,7 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     // (NodeOnly removal, an unseamed command) -- from the in-memory document
     // and, through the next save, from disk.
     if (ctx.library_document != nullptr && !ctx.library_synced && !ctx.library_primary) {
-        if (!sacm_adapter::reload_document_keeping_compatibility_content(*ctx.library_document,
-                                                                         xml) &&
+        if (!sacm_adapter::reload_document_keeping_compatibility_content(*ctx.library_document, xml) &&
             result.error.empty()) {
             // Soft warning: the edit is committed and the saved package is
             // authoritative, but the library-backed view could not be

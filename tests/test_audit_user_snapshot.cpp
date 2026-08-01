@@ -21,8 +21,7 @@
 namespace {
 
 std::filesystem::path MakeTempProjectRoot(const std::string& suffix) {
-    auto root = std::filesystem::temp_directory_path() /
-                ("af_user_snapshot_test_" + suffix);
+    auto root = std::filesystem::temp_directory_path() / ("af_user_snapshot_test_" + suffix);
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(core::audit::AfDir(root));
     return root;
@@ -38,9 +37,8 @@ void WriteSacm(const std::filesystem::path& path, const std::string& body) {
 // avoided here because gtest's fatal-assert macros inside a void helper
 // only return from the helper, leaving the caller to continue with
 // half-initialized state. The caller is expected to assert on the result.
-[[nodiscard]] bool WriteManifest(const std::filesystem::path& project_root,
-                                 std::uint64_t                latest_seq,
-                                 std::string&                 error) {
+[[nodiscard]] bool
+WriteManifest(const std::filesystem::path& project_root, std::uint64_t latest_seq, std::string& error) {
     core::audit::AuditManifest m;
     m.project_id = "test-project";
     m.created_at = "2025-01-01T00:00:00Z";
@@ -52,10 +50,9 @@ void WriteSacm(const std::filesystem::path& path, const std::string& body) {
     return core::audit::WriteAuditManifest(project_root, m, error);
 }
 
-constexpr const char* kMinimalSacm =
-    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-    "<sacm:AssuranceCasePackage xmlns:sacm=\"http://www.omg.org/sacm/2.3\" "
-    "xmi:id=\"acp1\" xmlns:xmi=\"http://www.omg.org/spec/XMI/20131001\"/>";
+constexpr const char* kMinimalSacm = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                                     "<sacm:AssuranceCasePackage xmlns:sacm=\"http://www.omg.org/sacm/2.3\" "
+                                     "xmi:id=\"acp1\" xmlns:xmi=\"http://www.omg.org/spec/XMI/20131001\"/>";
 
 TEST(CreateUserSnapshot, WritesSidecarAndCopiesSacm) {
     auto root = MakeTempProjectRoot("writes");
@@ -77,8 +74,7 @@ TEST(CreateUserSnapshot, WritesSidecarAndCopiesSacm) {
     auto copied = core::audit::SnapshotSacmPath(root, md.snapshot_id);
     ASSERT_TRUE(std::filesystem::exists(copied));
     std::ifstream in(copied, std::ios::binary);
-    std::string contents((std::istreambuf_iterator<char>(in)),
-                         std::istreambuf_iterator<char>());
+    std::string contents((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     EXPECT_EQ(contents, std::string(kMinimalSacm));
 
     // Sidecar readable round-trip.

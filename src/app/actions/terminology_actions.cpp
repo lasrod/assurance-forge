@@ -124,10 +124,9 @@ bool TerminologyActions::ApplyPackageEdits() {
     if (!state_.app_state.has_projected_package())
         return false;
 
-    core::commands::UpdateTerminologyPackageCommand command(
-        state_.terminology.selected_package_ref,
-        TrimWhitespace(state_.terminology.package_name_buf),
-        TrimWhitespace(state_.terminology.package_description_buf));
+    core::commands::UpdateTerminologyPackageCommand command(state_.terminology.selected_package_ref,
+                                                            TrimWhitespace(state_.terminology.package_name_buf),
+                                                            TrimWhitespace(state_.terminology.package_description_buf));
     const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
     if (!outcome.success) {
         SetStatus(state_, "Terminology package update failed: " + outcome.error);
@@ -157,9 +156,9 @@ bool TerminologyActions::ConfirmDeletePackage() {
     if (!outcome.success) {
         // Always surface a failure (the modal stays open otherwise); fall back to a
         // generic message if the dispatch reported no error string.
-        SetStatus(state_, "Terminology package delete failed: " +
-                              (outcome.error.empty() ? std::string("the delete could not be completed.")
-                                                     : outcome.error));
+        SetStatus(state_,
+                  "Terminology package delete failed: " +
+                      (outcome.error.empty() ? std::string("the delete could not be completed.") : outcome.error));
         return false;
     }
 
@@ -375,8 +374,8 @@ bool TerminologyActions::ConfirmDeleteTerm() {
     if (!state_.app_state.has_projected_package())
         return false;
 
-    core::commands::DeleteTerminologyTermCommand command(
-        state_.terminology.selected_package_ref, state_.terminology.selected_term_ref);
+    core::commands::DeleteTerminologyTermCommand command(state_.terminology.selected_package_ref,
+                                                         state_.terminology.selected_term_ref);
     const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
     if (!outcome.success) {
         SetStatus(state_, "Term delete failed: " + outcome.error);
@@ -443,8 +442,7 @@ void TerminologyActions::ConfirmCategoryEdit() {
         }
         SetStatus(state_, "Updated category " + draft.name + ".");
     } else {
-        core::commands::CreateTerminologyCategoryCommand command(
-            state_.terminology.selected_package_ref, draft);
+        core::commands::CreateTerminologyCategoryCommand command(state_.terminology.selected_package_ref, draft);
         const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
         if (!outcome.success) {
             SetStatus(state_, "Category create failed: " + outcome.error);
@@ -483,8 +481,8 @@ void TerminologyActions::ConfirmDeleteCategory() {
     if (!state_.app_state.has_projected_package())
         return;
 
-    core::commands::DeleteTerminologyCategoryCommand command(
-        state_.terminology.selected_package_ref, state_.terminology.selected_category_ref);
+    core::commands::DeleteTerminologyCategoryCommand command(state_.terminology.selected_package_ref,
+                                                             state_.terminology.selected_category_ref);
     const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
     if (!outcome.success) {
         SetStatus(state_, "Category delete failed: " + outcome.error);
@@ -523,8 +521,7 @@ void TerminologyActions::SeedRecommendedCategories() {
             continue;
         core::TerminologyCategoryDraft draft;
         draft.name = name;
-        core::commands::CreateTerminologyCategoryCommand command(
-            state_.terminology.selected_package_ref, draft);
+        core::commands::CreateTerminologyCategoryCommand command(state_.terminology.selected_package_ref, draft);
         const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
         if (outcome.success)
             ++added;

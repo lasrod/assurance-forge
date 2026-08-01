@@ -33,10 +33,14 @@ public:
     AddAcpCommand(std::string target_kind, std::string target_id)
         : target_kind_(std::move(target_kind)), target_id_(std::move(target_id)) {}
 
-    std::string Name() const override { return "AddAcp"; }
-    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+    std::string Name() const override {
+        return "AddAcp";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
-    const std::string& GeneratedAcpId() const { return generated_acp_id_; }
+    const std::string& GeneratedAcpId() const {
+        return generated_acp_id_;
+    }
 
 private:
     std::string target_kind_;
@@ -49,8 +53,10 @@ class RemoveAcpCommand final : public ICommand {
 public:
     explicit RemoveAcpCommand(std::string acp_id) : acp_id_(std::move(acp_id)) {}
 
-    std::string Name() const override { return "RemoveAcp"; }
-    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+    std::string Name() const override {
+        return "RemoveAcp";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
 private:
     std::string acp_id_;
@@ -61,8 +67,10 @@ class UpsertAcpCommand final : public ICommand {
 public:
     explicit UpsertAcpCommand(parser::AcpRecord acp) : acp_(std::move(acp)) {}
 
-    std::string Name() const override { return "UpsertAcp"; }
-    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+    std::string Name() const override {
+        return "UpsertAcp";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
 private:
     parser::AcpRecord acp_;
@@ -76,12 +84,20 @@ class CreateConfidenceArgumentTreeForAcpCommand final : public ICommand {
 public:
     explicit CreateConfidenceArgumentTreeForAcpCommand(std::string acp_id) : acp_id_(std::move(acp_id)) {}
 
-    std::string Name() const override { return "CreateConfidenceArgumentTree"; }
-    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+    std::string Name() const override {
+        return "CreateConfidenceArgumentTree";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
-    const std::string& AcpId() const { return acp_id_; }
-    const std::string& GeneratedArgumentPackageId() const { return argument_package_id_; }
-    const std::string& GeneratedTopGoalId() const { return top_goal_id_; }
+    const std::string& AcpId() const {
+        return acp_id_;
+    }
+    const std::string& GeneratedArgumentPackageId() const {
+        return argument_package_id_;
+    }
+    const std::string& GeneratedTopGoalId() const {
+        return top_goal_id_;
+    }
 
 private:
     std::string acp_id_;

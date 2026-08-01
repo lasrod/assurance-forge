@@ -642,8 +642,7 @@ TEST(TerminologyPackageService, CreatedTermsSerializeAndParse) {
     auto parsed = sacm::parse_sacm_string(xml);
     ASSERT_TRUE(parsed.has_value()) << (parsed ? "" : parsed.error());
 
-    const sacm::TerminologyPackage* reparsed =
-        core::FindTerminologyPackage(*parsed, terminology_package.package_ref);
+    const sacm::TerminologyPackage* reparsed = core::FindTerminologyPackage(*parsed, terminology_package.package_ref);
     ASSERT_NE(reparsed, nullptr);
     ASSERT_EQ(reparsed->terms.size(), 2u);
     EXPECT_EQ(reparsed->terms[0].value, "hazard");
@@ -682,8 +681,7 @@ TEST(TerminologyPackageService, CreatedCategoriesSerializeAndParseWithTermAssign
     auto parsed = sacm::parse_sacm_string(xml);
     ASSERT_TRUE(parsed.has_value()) << (parsed ? "" : parsed.error());
 
-    const sacm::TerminologyPackage* reparsed =
-        core::FindTerminologyPackage(*parsed, terminology_package.package_ref);
+    const sacm::TerminologyPackage* reparsed = core::FindTerminologyPackage(*parsed, terminology_package.package_ref);
     ASSERT_NE(reparsed, nullptr);
     ASSERT_EQ(reparsed->categories.size(), 1u);
     EXPECT_EQ(reparsed->categories.front().id, category.category_ref.id);

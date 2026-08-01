@@ -15,13 +15,13 @@ constexpr const char* kGuidelinePrefix = "sccg://guideline/";
 // while the process runs.
 const core::GuidelineCatalog* Catalog(std::string& error) {
     static core::GuidelineCatalog catalog;
-    static bool                   loaded = false;
-    static std::string            load_error;
-    static bool                   attempted = false;
+    static bool loaded = false;
+    static std::string load_error;
+    static bool attempted = false;
 
     if (!attempted) {
         attempted = true;
-        loaded    = core::LoadGuidelineCatalog(catalog, load_error);
+        loaded = core::LoadGuidelineCatalog(catalog, load_error);
     }
     if (!loaded) {
         error = load_error.empty() ? "The SCCG catalog could not be loaded." : load_error;
@@ -59,7 +59,7 @@ void AppendGuideline(std::ostringstream& out, const parser::Guideline& guideline
 // than paraphrasing it keeps the prompt and the published guideline the same
 // text, so one cannot drift from the other.
 std::string GuidelinesFor(const std::vector<std::string>& ids) {
-    std::string                  error;
+    std::string error;
     const core::GuidelineCatalog* catalog = Catalog(error);
     if (catalog == nullptr) {
         return "(The SCCG catalog is unavailable: " + error + ")";
@@ -75,8 +75,7 @@ std::string GuidelinesFor(const std::vector<std::string>& ids) {
     return out.str();
 }
 
-std::string Argument(const nlohmann::json& arguments, const char* key,
-                     const std::string& fallback) {
+std::string Argument(const nlohmann::json& arguments, const char* key, const std::string& fallback) {
     const nlohmann::json::const_iterator found = arguments.find(key);
     if (found == arguments.end() || !found->is_string() || found->get<std::string>().empty()) {
         return fallback;
@@ -103,7 +102,8 @@ constexpr const char* kWorkflow =
 
 const std::vector<ResourceDefinition>& BuiltinResources() {
     static const std::vector<ResourceDefinition> resources{
-        ResourceDefinition{kAllGuidelines, "Safety Case Core Guidelines",
+        ResourceDefinition{kAllGuidelines,
+                           "Safety Case Core Guidelines",
                            "The full SCCG catalog: the claim, argument, evidence, sufficiency and "
                            "fallacy rules this project's reviews are held to. Read this before "
                            "proposing argument structure.",
@@ -117,17 +117,14 @@ const std::vector<PromptDefinition>& BuiltinPrompts() {
         PromptDefinition{
             "draft_argument_from_standard",
             "Draft safety-case argument structure that applies a named standard, following SCCG.",
-            {PromptArgument{"standard",
-                            "The standard or standards to apply, e.g. \"ISO 26262 part 6\".", true},
+            {PromptArgument{"standard", "The standard or standards to apply, e.g. \"ISO 26262 part 6\".", true},
              PromptArgument{"scope", "What the argument should cover.", false}}},
-        PromptDefinition{
-            "add_argumentation",
-            "Add argument about a topic where it best fits in the existing structure.",
-            {PromptArgument{"topic", "What the new argument should establish.", true}}},
-        PromptDefinition{
-            "restructure_case",
-            "Reorganize the argument so named categories become its main branches.",
-            {PromptArgument{"categories", "The top-level branches to organize under.", true}}},
+        PromptDefinition{"add_argumentation",
+                         "Add argument about a topic where it best fits in the existing structure.",
+                         {PromptArgument{"topic", "What the new argument should establish.", true}}},
+        PromptDefinition{"restructure_case",
+                         "Reorganize the argument so named categories become its main branches.",
+                         {PromptArgument{"categories", "The top-level branches to organize under.", true}}},
     };
     return prompts;
 }
@@ -136,7 +133,7 @@ std::string ReadResource(const std::string& uri, bool& found, std::string& error
     found = false;
     error.clear();
 
-    std::string                  load_error;
+    std::string load_error;
     const core::GuidelineCatalog* catalog = Catalog(load_error);
 
     if (uri == kAllGuidelines) {
@@ -155,8 +152,8 @@ std::string ReadResource(const std::string& uri, bool& found, std::string& error
     }
 
     if (uri.rfind(kGuidelinePrefix, 0) == 0) {
-        found                 = true;
-        const std::string id  = uri.substr(std::string(kGuidelinePrefix).size());
+        found = true;
+        const std::string id = uri.substr(std::string(kGuidelinePrefix).size());
         if (catalog == nullptr) {
             error = load_error;
             return {};
@@ -179,9 +176,8 @@ std::string BuildPrompt(const std::string& name, const nlohmann::json& arguments
 
     if (name == "draft_argument_from_standard") {
         const std::string standard = Argument(arguments, "standard", "the applicable standard");
-        const std::string scope    = Argument(arguments, "scope", "the system this project covers");
-        out << "Draft assurance argument structure for " << scope << ", applying " << standard
-            << ".\n\n"
+        const std::string scope = Argument(arguments, "scope", "the system this project covers");
+        out << "Draft assurance argument structure for " << scope << ", applying " << standard << ".\n\n"
             << "Work top-down: state what the standard requires to be shown, make each requirement "
                "a claim that could in principle be falsified, and give each one a strategy saying "
                "how it will be argued. Leave leaves undeveloped rather than inventing evidence "

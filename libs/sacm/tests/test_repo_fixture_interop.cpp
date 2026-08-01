@@ -34,8 +34,7 @@ void expect_repo_roundtrip(std::string_view relative) {
     }
     const LoadResult first = sacm::io::load_xmi_file(path);
     ASSERT_TRUE(first.ok) << (first.diagnostics.empty() ? "" : first.diagnostics.front().message);
-    const auto saved =
-        sacm::io::save_xmi_string(*first.document, SaveOptions{.mode = Mode::Tolerant});
+    const auto saved = sacm::io::save_xmi_string(*first.document, SaveOptions{.mode = Mode::Tolerant});
     ASSERT_TRUE(saved.ok);
     const LoadResult second = sacm::io::load_xmi_string(saved.xml);
     ASSERT_TRUE(second.ok);
@@ -70,4 +69,4 @@ TEST(Sacm23Interop, SACM23_RT_001_RepoFullSafetyCaseRoundTrips) {
     expect_repo_roundtrip("data/open-autonomy-safety-case.sacm.xml");
 }
 
-}  // namespace
+} // namespace

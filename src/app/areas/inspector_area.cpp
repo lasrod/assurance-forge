@@ -125,8 +125,7 @@ void RenderInspectorArea(AppRuntimeState& state,
             bool generated_gid = false;
             if (element.gid.empty()) {
                 if (!loaded_case) {
-                    state.events.Emit(
-                        StatusMessageEvent{AF_TR("Could not assign a SACM gid for confidence storage.")});
+                    state.events.Emit(StatusMessageEvent{AF_TR("Could not assign a SACM gid for confidence storage.")});
                     return false;
                 }
                 core::commands::EnsureElementGidCommand cmd(element.id);
@@ -138,8 +137,7 @@ void RenderInspectorArea(AppRuntimeState& state,
                     element.gid = cmd.GeneratedGid();
                     generated_gid = true;
                 } else if (!outcome.error.empty()) {
-                    state.events.Emit(
-                        StatusMessageEvent{ui::i18n::trf("Confidence save failed: {0}", outcome.error)});
+                    state.events.Emit(StatusMessageEvent{ui::i18n::trf("Confidence save failed: {0}", outcome.error)});
                     return false;
                 } else {
                     // A false outcome with NO error is the benign no-op the command
@@ -205,22 +203,21 @@ void RenderInspectorArea(AppRuntimeState& state,
                 if (element_id.empty())
                     return hm;
                 std::string err;
-                const std::vector<core::audit::AuditTransaction>& txs =
-                    GetCachedTransactions(project_root, err);
+                const std::vector<core::audit::AuditTransaction>& txs = GetCachedTransactions(project_root, err);
                 if (!err.empty() && txs.empty())
                     return hm;
                 hm.available = true;
 
                 // Determine the latest baseline (if any) by transaction_sequence.
-                const std::vector<core::audit::BaselineMetadata>& baselines =
-                    GetCachedBaselines(project_root, nullptr);
+                const std::vector<core::audit::BaselineMetadata>& baselines = GetCachedBaselines(project_root, nullptr);
                 std::optional<std::uint64_t> baseline_seq;
                 if (!baselines.empty()) {
-                    auto it = std::max_element(baselines.begin(), baselines.end(),
-                                               [](const core::audit::BaselineMetadata& a,
-                                                  const core::audit::BaselineMetadata& b) {
-                                                   return a.transaction_sequence < b.transaction_sequence;
-                                               });
+                    auto it = std::max_element(
+                        baselines.begin(),
+                        baselines.end(),
+                        [](const core::audit::BaselineMetadata& a, const core::audit::BaselineMetadata& b) {
+                            return a.transaction_sequence < b.transaction_sequence;
+                        });
                     baseline_seq = it->transaction_sequence;
                     hm.has_baseline = true;
                     hm.baseline_label = it->name.empty() ? it->baseline_id : it->name;
@@ -254,9 +251,14 @@ void RenderInspectorArea(AppRuntimeState& state,
             }
         }
 
-        if (ui::panels::ShowElementPanel(loaded_case, sacm_package, &terminology_callbacks, &confidence_callbacks,
-                                          &text_edit_callbacks, &history_callbacks, &translation_review_callbacks,
-                                          inspector_read_only)) {
+        if (ui::panels::ShowElementPanel(loaded_case,
+                                         sacm_package,
+                                         &terminology_callbacks,
+                                         &confidence_callbacks,
+                                         &text_edit_callbacks,
+                                         &history_callbacks,
+                                         &translation_review_callbacks,
+                                         inspector_read_only)) {
             if (state.confidence_controller && loaded_case) {
                 const bool confidence_changed = state.confidence_controller->RefreshStaleFlags(*loaded_case);
                 if (confidence_changed) {

@@ -63,12 +63,11 @@ void RenderHistoryPanelContent(AppRuntimeState& state, const HistoryPanelAreaCal
     const core::AssuranceProject& project = state.app_state.current_project.value();
 
     std::string error;
-    const std::vector<core::audit::AuditTransaction>& transactions =
-        GetCachedTransactions(project.rootPath, error);
+    const std::vector<core::audit::AuditTransaction>& transactions = GetCachedTransactions(project.rootPath, error);
     const bool has_audit = error.empty();
     if (!has_audit) {
-        ImGui::TextColored(ImVec4(0.95f, 0.55f, 0.45f, 1.0f), "%s",
-                           ui::i18n::trf("Audit store error: {0}", error).c_str());
+        ImGui::TextColored(
+            ImVec4(0.95f, 0.55f, 0.45f, 1.0f), "%s", ui::i18n::trf("Audit store error: {0}", error).c_str());
     }
 
     WorkbenchState::ArgumentPackageCanvasTab* active_tab = FindActiveCanvasTab(state);
@@ -133,8 +132,7 @@ void RenderHistoryPanelContent(AppRuntimeState& state, const HistoryPanelAreaCal
     const std::string& filter_element = state.workbench.history_filter_element_id;
     const std::string& filter_author = state.workbench.history_filter_author;
     const std::string& filter_command = state.workbench.history_filter_command;
-    const bool filter_active =
-        !filter_element.empty() || !filter_author.empty() || !filter_command.empty();
+    const bool filter_active = !filter_element.empty() || !filter_author.empty() || !filter_command.empty();
     std::vector<core::audit::AuditTransaction> filtered_transactions;
     if (filter_active) {
         filtered_transactions.reserve(transactions.size());
@@ -175,11 +173,11 @@ void RenderHistoryPanelContent(AppRuntimeState& state, const HistoryPanelAreaCal
         }
         if (filter_active) {
             ImGui::SameLine();
-            ImGui::TextColored(ImVec4(0.7f, 0.85f, 1.0f, 1.0f), "%s",
-                               ui::i18n::trf(" | Showing {0} of {1} (filtered)",
-                                             filtered_transactions.size(),
-                                             transactions.size())
-                                   .c_str());
+            ImGui::TextColored(
+                ImVec4(0.7f, 0.85f, 1.0f, 1.0f),
+                "%s",
+                ui::i18n::trf(" | Showing {0} of {1} (filtered)", filtered_transactions.size(), transactions.size())
+                    .c_str());
         }
         ImGui::Separator();
     }
@@ -190,12 +188,8 @@ void RenderHistoryPanelContent(AppRuntimeState& state, const HistoryPanelAreaCal
     model.selected_sequence = selected_seq;
 
     ui::panels::HistoryTimelinePanelCallbacks callbacks_in;
-    callbacks_in.on_select_sequence = [&state](std::uint64_t seq) {
-        SetPreviewSequenceOnActiveTab(state, seq);
-    };
-    callbacks_in.on_return_to_live = [&state]() {
-        SetPreviewSequenceOnActiveTab(state, std::nullopt);
-    };
+    callbacks_in.on_select_sequence = [&state](std::uint64_t seq) { SetPreviewSequenceOnActiveTab(state, seq); };
+    callbacks_in.on_return_to_live = [&state]() { SetPreviewSequenceOnActiveTab(state, std::nullopt); };
 
     ui::panels::ShowHistoryTimelineTransactions(model, callbacks_in);
 }

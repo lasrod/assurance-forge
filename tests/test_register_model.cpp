@@ -138,8 +138,8 @@ TEST(RegisterModelTest, AssessmentsRoundTripThroughJson) {
 
     RegisterStore reloaded;
     std::string error;
-    ASSERT_TRUE(core::registers::DeserializeRegisterStore(core::registers::SerializeRegisterStore(store), reloaded,
-                                                          error))
+    ASSERT_TRUE(
+        core::registers::DeserializeRegisterStore(core::registers::SerializeRegisterStore(store), reloaded, error))
         << error;
 
     ASSERT_EQ(reloaded.cse.size(), 1u);
@@ -176,7 +176,8 @@ TEST(RegisterModelTest, DefaultAssessmentStatusSurvivesAnAbsentField) {
     RegisterStore store;
     std::string error;
     ASSERT_TRUE(core::registers::DeserializeRegisterStore(
-        R"({"format":"assurance-forge-register-assessments","cseAssessments":[{"cseId":"CSE:G1->Sn1"}]})", store,
+        R"({"format":"assurance-forge-register-assessments","cseAssessments":[{"cseId":"CSE:G1->Sn1"}]})",
+        store,
         error))
         << error;
 
@@ -195,8 +196,8 @@ TEST(RegisterModelTest, MalformedJsonIsRefusedRatherThanPartiallyLoaded) {
 TEST(RegisterModelTest, AForeignFormatIsRefusedRatherThanGuessedAt) {
     RegisterStore store;
     std::string error;
-    EXPECT_FALSE(core::registers::DeserializeRegisterStore(R"({"format":"something-else","cseAssessments":[]})", store,
-                                                           error));
+    EXPECT_FALSE(
+        core::registers::DeserializeRegisterStore(R"({"format":"something-else","cseAssessments":[]})", store, error));
     EXPECT_FALSE(error.empty());
 }
 
@@ -226,8 +227,8 @@ TEST(RegisterModelTest, FindingOrphansDoesNotRemoveThem) {
     store.cse[core::registers::MakeCseId("GONE", "Sn1")].notes = "hours of review";
 
     const parser::AssuranceCase model = TwoClaimsSharingEvidence();
-    core::registers::FindOrphanedMetadata(store, core::registers::DeriveCseLinks(model),
-                                          core::registers::DeriveEvidenceIds(model));
+    core::registers::FindOrphanedMetadata(
+        store, core::registers::DeriveCseLinks(model), core::registers::DeriveEvidenceIds(model));
 
     EXPECT_EQ(store.cse.size(), 1u);
     EXPECT_EQ(store.cse.at("CSE:GONE->Sn1").notes, "hours of review");

@@ -179,8 +179,7 @@ TEST(TerminologyScopeService, ArgumentPackageTerminologyRoundTrips) {
     ASSERT_TRUE(parsed.has_value()) << (parsed ? "" : parsed.error());
     ASSERT_EQ(parsed->argumentPackages.size(), 1u);
     ASSERT_EQ(parsed->argumentPackages.front().terminologyPackages.size(), 1u);
-    const sacm::TerminologyPackage& terminology_package =
-        parsed->argumentPackages.front().terminologyPackages.front();
+    const sacm::TerminologyPackage& terminology_package = parsed->argumentPackages.front().terminologyPackages.front();
     EXPECT_EQ(terminology_package.id, "TP_ARG");
     ASSERT_EQ(terminology_package.terms.size(), 1u);
     EXPECT_EQ(terminology_package.terms.front().id, "T_ARG");

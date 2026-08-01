@@ -37,13 +37,13 @@ enum class DivergenceCause {
 const char* ToString(DivergenceCause cause);
 
 struct ReplayVerificationResult {
-    bool                     success = false;
-    bool                     ran = false;
-    DivergenceCause          cause = DivergenceCause::None;
-    std::string              snapshot_canonical_hash;
-    std::string              replayed_canonical_hash;
-    std::string              on_disk_canonical_hash;
-    std::string              manifest_canonical_hash;
+    bool success = false;
+    bool ran = false;
+    DivergenceCause cause = DivergenceCause::None;
+    std::string snapshot_canonical_hash;
+    std::string replayed_canonical_hash;
+    std::string on_disk_canonical_hash;
+    std::string manifest_canonical_hash;
     std::vector<std::string> diagnostics;
 };
 

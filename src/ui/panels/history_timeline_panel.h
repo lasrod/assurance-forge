@@ -40,8 +40,7 @@ struct HistoryTimelinePanelCallbacks {
 };
 
 // Render the compact transaction slider above the canvas.
-void ShowHistoryTimelineHeader(const HistoryTimelinePanelModel& model,
-                               const HistoryTimelinePanelCallbacks& callbacks);
+void ShowHistoryTimelineHeader(const HistoryTimelinePanelModel& model, const HistoryTimelinePanelCallbacks& callbacks);
 
 // Render the transactions table. Pair with `ShowHistoryTimelineHeader`.
 void ShowHistoryTimelineTransactions(const HistoryTimelinePanelModel& model,

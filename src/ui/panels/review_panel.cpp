@@ -138,7 +138,8 @@ void OpenGuidelineStub(const std::string& guideline_id, std::string& popup_guide
 }
 
 void DrawGuidelineStubPopup(const ReviewPanelModel& model, std::string& popup_guideline_id) {
-    if (!ImGui::BeginPopupModal((AF_TR("SCCG Guideline") + "###SCCG Guideline").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    if (!ImGui::BeginPopupModal(
+            (AF_TR("SCCG Guideline") + "###SCCG Guideline").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         return;
 
     if (popup_guideline_id == "__browse__") {
@@ -224,15 +225,15 @@ void DrawGuidelineSelector(const ReviewPanelModel& model,
     if (!has_options)
         ImGui::BeginDisabled();
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::InputTextWithHint("##guideline_filter", AF_TR("Filter SCCG IDs or titles").c_str(), filter_buffer,
-                             filter_buffer_size);
+    ImGui::InputTextWithHint(
+        "##guideline_filter", AF_TR("Filter SCCG IDs or titles").c_str(), filter_buffer, filter_buffer_size);
 
     const float list_height = ImGui::GetTextLineHeightWithSpacing() * 6.0f;
     if (ImGui::BeginChild("##guideline_options", ImVec2(0.0f, list_height), true)) {
         if (!has_options) {
             ImGui::TextDisabled("%s",
                                 model.guideline_status.empty() ? AF_TR("SCCG guidelines are not available.").c_str()
-                                                                : model.guideline_status.c_str());
+                                                               : model.guideline_status.c_str());
         } else {
             const std::string filter(filter_buffer);
             const std::string lowered_filter = core::ToLower(filter);
@@ -409,7 +410,8 @@ void ShowAgentChangeSets(const ReviewPanelModel& model, const ReviewPanelCallbac
         for (const std::string& client : model.connected_agents) {
             clients += clients.empty() ? client : (", " + client);
         }
-        ImGui::TextUnformatted(ui::i18n::trnf("AI client connected: {0}", "AI clients connected: {0}",
+        ImGui::TextUnformatted(ui::i18n::trnf("AI client connected: {0}",
+                                              "AI clients connected: {0}",
                                               static_cast<int>(model.connected_agents.size()),
                                               clients)
                                    .c_str());
@@ -443,26 +445,27 @@ void ShowAgentChangeSets(const ReviewPanelModel& model, const ReviewPanelCallbac
         // applying a patch to an argument it was not written against, or to one
         // that has moved underneath it.
         if (!row.argument_file_is_open) {
-            ImGui::TextWrapped("%s", ui::i18n::trf("This change was written against {0}. Open that "
-                                                   "argument to review it.",
-                                                   row.argument_file)
-                                         .c_str());
+            ImGui::TextWrapped("%s",
+                               ui::i18n::trf("This change was written against {0}. Open that "
+                                             "argument to review it.",
+                                             row.argument_file)
+                                   .c_str());
         } else if (!row.applies && row.operation_count > 0) {
-            ImGui::TextWrapped(
-                "%s", AF_TR("The argument changed while this was being prepared, so it no longer "
-                            "applies. Ask the AI client to rebuild it.")
-                          .c_str());
+            ImGui::TextWrapped("%s",
+                               AF_TR("The argument changed while this was being prepared, so it no longer "
+                                     "applies. Ask the AI client to rebuild it.")
+                                   .c_str());
             if (!row.problem.empty()) {
                 ImGui::TextDisabled("%s", row.problem.c_str());
             }
         }
 
         if (!row.sccg_findings.empty()) {
-            ImGui::TextUnformatted(
-                ui::i18n::trnf("{0} SCCG finding", "{0} SCCG findings",
-                               static_cast<int>(row.sccg_findings.size()),
-                               std::to_string(row.sccg_findings.size()))
-                    .c_str());
+            ImGui::TextUnformatted(ui::i18n::trnf("{0} SCCG finding",
+                                                  "{0} SCCG findings",
+                                                  static_cast<int>(row.sccg_findings.size()),
+                                                  std::to_string(row.sccg_findings.size()))
+                                       .c_str());
             for (const std::string& finding : row.sccg_findings) {
                 ImGui::BulletText("%s", finding.c_str());
             }

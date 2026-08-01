@@ -397,7 +397,7 @@ ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& prop
     // eighty-operation argument built over two calls could not be accepted at
     // all.
     ReviewProposalPatchService patch_service;
-    ProposalPreviewResult      preview = patch_service.BuildPreviewModel(proposal, current_model);
+    ProposalPreviewResult preview = patch_service.BuildPreviewModel(proposal, current_model);
     if (!preview.success) {
         result.reason = preview.error;
         return result;

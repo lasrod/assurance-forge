@@ -107,8 +107,7 @@ bool AppState::load_file(const std::string& file_path) {
 
         if (!load_warnings.empty()) {
             status_message += " -- " + std::to_string(load_warnings.size()) +
-                              (load_warnings.size() == 1 ? " warning: " : " warning kinds: ") +
-                              load_warnings.front();
+                              (load_warnings.size() == 1 ? " warning: " : " warning kinds: ") + load_warnings.front();
         }
 
         return true;
@@ -151,7 +150,7 @@ bool AppState::save_file(const std::string& file_path) {
     // loaded file always has a document. It is lossy for unknown content (see
     // core::library_xmi_from_package).
     std::string bytes;
-    bool        serialized_from_library = false;
+    bool serialized_from_library = false;
     if (library_document != nullptr) {
         sacm_adapter::SaveOutcome saved = sacm_adapter::save_document(*library_document);
         if (saved.ok) {
@@ -160,8 +159,8 @@ bool AppState::save_file(const std::string& file_path) {
         }
     }
     if (!serialized_from_library) {
-        bytes = core::library_xmi_from_package(sacm_package.value())
-                    .value_or(sacm::serialize_sacm(sacm_package.value()));
+        bytes =
+            core::library_xmi_from_package(sacm_package.value()).value_or(sacm::serialize_sacm(sacm_package.value()));
     }
     if (WriteTextFileAtomic(file_path, bytes)) {
         loaded_file_path = std::filesystem::path(file_path);
@@ -350,8 +349,7 @@ bool AppState::open_project_file(const ProjectFileEntry& entry) {
     const auto previous_sacm_package = sacm_package;
     // The library document is move-only, so it is moved out and restored on
     // failure rather than copied.
-    std::unique_ptr<sacm_adapter::LibraryDocument> previous_library_document =
-        std::move(library_document);
+    std::unique_ptr<sacm_adapter::LibraryDocument> previous_library_document = std::move(library_document);
 
     if (!load_file(project_file_path.string())) {
         active_project_file_role = previous_active_project_file_role;

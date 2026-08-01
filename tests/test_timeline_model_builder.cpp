@@ -16,8 +16,8 @@ namespace {
 using core::audit::AuditTransaction;
 using core::audit::BaselineMetadata;
 using core::audit::SnapshotMetadata;
-using core::audit::TimelineQuery;
 using core::audit::TimelinePointType;
+using core::audit::TimelineQuery;
 
 AuditTransaction MakeTx(std::uint64_t seq) {
     AuditTransaction tx;
@@ -107,7 +107,7 @@ TEST(TimelineModelBuilder, InitialSnapshotSortsBeforeBaselineAtSameSequence) {
 TEST(TimelineModelBuilder, InitialFlagOptionalWhenIdUnknown) {
     // No initial_snapshot_id supplied — snapshot is treated as regular.
     std::vector<SnapshotMetadata> snapshots{MakeSnapshot("snapshot_000000", 0)};
-    TimelineQuery q;  // initial_snapshot_id empty
+    TimelineQuery q; // initial_snapshot_id empty
     auto model = core::audit::BuildTimelineModel({}, {}, snapshots, q);
 
     ASSERT_EQ(model.points.size(), 2u);
@@ -118,7 +118,7 @@ TEST(TimelineModelBuilder, InitialFlagOptionalWhenIdUnknown) {
 TEST(TimelineModelBuilder, TwoBaselinesAtSameSequenceAreDistinct) {
     std::vector<BaselineMetadata> baselines{
         MakeBaseline("b_alpha", 5),
-        MakeBaseline("b_beta", 5),  // same seq as b_alpha
+        MakeBaseline("b_beta", 5), // same seq as b_alpha
     };
     TimelineQuery q;
     auto model = core::audit::BuildTimelineModel({MakeTx(5)}, baselines, {}, q);

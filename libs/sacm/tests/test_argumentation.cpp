@@ -38,20 +38,19 @@ using sacm::model::AssertionDeclaration;
 // a non-standard boolean, and so strict export stays clean.
 TEST(Sacm23Argumentation, SACM23_ARG_001_LegacyUndevelopedNormalizesToNeedsSupport) {
     const auto load = [](std::string_view claim_attrs) {
-        return sacm::io::load_xmi_string(std::format(
-            R"(<?xml version="1.0" encoding="UTF-8"?>)"
-            R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
-            R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
-            R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">)"
-            R"(<argumentPackage xmi:id="ap_1">)"
-            R"(<argumentElement xsi:type="sacm:Claim" xmi:id="G1" {}><name content="G1"/>)"
-            R"(</argumentElement></argumentPackage></sacm:AssuranceCasePackage>)",
-            claim_attrs));
+        return sacm::io::load_xmi_string(
+            std::format(R"(<?xml version="1.0" encoding="UTF-8"?>)"
+                        R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+                        R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+                        R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">)"
+                        R"(<argumentPackage xmi:id="ap_1">)"
+                        R"(<argumentElement xsi:type="sacm:Claim" xmi:id="G1" {}><name content="G1"/>)"
+                        R"(</argumentElement></argumentPackage></sacm:AssuranceCasePackage>)",
+                        claim_attrs));
     };
 
     const auto declaration_of = [](const LoadResult& result) {
-        return result.document->find_as<sacm::model::Claim>(sacm::model::ElementId{"G1"})
-            ->assertion_declaration();
+        return result.document->find_as<sacm::model::Claim>(sacm::model::ElementId{"G1"})->assertion_declaration();
     };
 
     // Legacy undeveloped attribute -> needsSupport.
@@ -94,8 +93,7 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_LegacyJustificationNormalizesToAxiomati
 
     bool has_role_tag = false;
     for (const auto& tag : claim->tagged_values()) {
-        if (tag->key().primary() == "sacm.import.assertionDeclaration" &&
-            tag->content().primary() == "justification") {
+        if (tag->key().primary() == "sacm.import.assertionDeclaration" && tag->content().primary() == "justification") {
             has_role_tag = true;
         }
     }
@@ -104,8 +102,7 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_LegacyJustificationNormalizesToAxiomati
     // Normalized, not opaque -- strict save accepts it and it round-trips.
     const auto saved = sacm::io::save_xmi_string(*legacy.document);
     ASSERT_TRUE(saved.ok);
-    const LoadResult reloaded =
-        sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(reloaded.ok);
     EXPECT_TRUE(sacm::compare::semantic_compare(*legacy.document, *reloaded.document).empty());
 }
@@ -137,8 +134,7 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_ChallengeAndAcpEncodingsSurviveStrictRo
 </sacm:AssuranceCasePackage>)";
 
     const LoadResult loaded = sacm::io::load_xmi_string(xml, LoadOptions{.mode = Mode::Strict});
-    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
-                                                          : loaded.diagnostics.front().message);
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed" : loaded.diagnostics.front().message);
 
     // Challenge: isCounter is SACM-native and must survive as model state.
     const auto* relationship =
@@ -151,8 +147,7 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_ChallengeAndAcpEncodingsSurviveStrictRo
     const sacm::io::SaveResult saved = sacm::io::save_xmi_string(*loaded.document);
     ASSERT_TRUE(saved.ok) << "strict save refused a document using standard extension points";
     EXPECT_NE(saved.xml.find("isCounter=\"true\""), std::string::npos);
-    EXPECT_NE(saved.xml.find("assuranceForge.acp"), std::string::npos)
-        << "ACP TaggedValue was dropped on strict save";
+    EXPECT_NE(saved.xml.find("assuranceForge.acp"), std::string::npos) << "ACP TaggedValue was dropped on strict save";
 
     const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml);
     ASSERT_TRUE(reloaded.ok);
@@ -165,16 +160,13 @@ std::filesystem::path fixture(std::string_view name) {
     return std::filesystem::path(SACM_TEST_DATA_DIR) / "sacm23" / name;
 }
 
-bool has_code(const std::vector<sacm::validation::Diagnostic>& diagnostics,
-              std::string_view code) {
-    return std::ranges::any_of(diagnostics, [&](const auto& diagnostic) {
-        return diagnostic.code == code;
-    });
+bool has_code(const std::vector<sacm::validation::Diagnostic>& diagnostics, std::string_view code) {
+    return std::ranges::any_of(diagnostics, [&](const auto& diagnostic) { return diagnostic.code == code; });
 }
 
 TEST(Sacm23Argumentation, SACM23_ARG_001_FullArgumentationFixtureRoundTrips) {
-    const LoadResult first = sacm::io::load_xmi_file(fixture("argumentation-full-valid.sacm.xmi"),
-                                                     LoadOptions{.mode = Mode::Strict});
+    const LoadResult first =
+        sacm::io::load_xmi_file(fixture("argumentation-full-valid.sacm.xmi"), LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(first.ok) << (first.diagnostics.empty() ? "" : first.diagnostics.front().message);
     const auto& document = *first.document;
 
@@ -182,8 +174,7 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_FullArgumentationFixtureRoundTrips) {
     const auto* claim_top = document.find_as<sacm::model::Claim>(ElementId{"claim_top"});
     ASSERT_NE(claim_top, nullptr);
     EXPECT_EQ(claim_top->assertion_declaration(), AssertionDeclaration::NeedsSupport);
-    const auto* claim_counter =
-        document.find_as<sacm::model::Claim>(ElementId{"claim_counter"});
+    const auto* claim_counter = document.find_as<sacm::model::Claim>(ElementId{"claim_counter"});
     ASSERT_NE(claim_counter, nullptr);
     EXPECT_EQ(claim_counter->assertion_declaration(), AssertionDeclaration::Defeated);
 
@@ -201,11 +192,9 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_FullArgumentationFixtureRoundTrips) {
     EXPECT_TRUE(counter->is_counter());
 
     // Artifact support/context families and the reasoning structure ref.
-    EXPECT_NE(document.find_as<sacm::model::AssertedArtifactSupport>(ElementId{"support_1"}),
-              nullptr);
+    EXPECT_NE(document.find_as<sacm::model::AssertedArtifactSupport>(ElementId{"support_1"}), nullptr);
     EXPECT_NE(document.find_as<sacm::model::AssertedArtifactContext>(ElementId{"actx_1"}), nullptr);
-    const auto* reasoning =
-        document.find_as<sacm::model::ArgumentReasoning>(ElementId{"ar_decompose"});
+    const auto* reasoning = document.find_as<sacm::model::ArgumentReasoning>(ElementId{"ar_decompose"});
     ASSERT_NE(reasoning, nullptr);
     ASSERT_TRUE(reasoning->structure().has_value());
     EXPECT_EQ(reasoning->structure()->value(), "argpkg_detail");
@@ -227,15 +216,13 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_FullArgumentationFixtureRoundTrips) {
 }
 
 TEST(Sacm23Argumentation, SACM23_ARG_001_InvalidAssertionDeclarationIsDiagnosed) {
-    const LoadResult result =
-        sacm::io::load_xmi_file(fixture("invalid/assertion-declaration-invalid.sacm.xmi"));
+    const LoadResult result = sacm::io::load_xmi_file(fixture("invalid/assertion-declaration-invalid.sacm.xmi"));
     EXPECT_TRUE(has_code(result.diagnostics, sacm::validation::codes::kEnumInvalidLiteral));
 }
 
 TEST(Sacm23Argumentation, SACM23_ARG_002_RelationshipTargetTypingIsValidated) {
     const LoadResult result = sacm::io::load_xmi_file(
-        fixture("invalid/relationship-target-wrong-type-invalid.sacm.xmi"),
-        LoadOptions{.mode = Mode::Strict});
+        fixture("invalid/relationship-target-wrong-type-invalid.sacm.xmi"), LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(result.document.has_value());
     const auto diagnostics = sacm::validation::validate(*result.document);
     EXPECT_TRUE(has_code(diagnostics, sacm::validation::codes::kRefWrongType));
@@ -243,31 +230,24 @@ TEST(Sacm23Argumentation, SACM23_ARG_002_RelationshipTargetTypingIsValidated) {
 
 Document build_argument_case() {
     Document document;
-    EXPECT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "Case"})
-                    .applied);
-    EXPECT_TRUE(document
-                    .apply(CreateArgumentPackage{
-                        .parent = ElementId{"acp_1"}, .id = ElementId{"argpkg_1"}, .name = "Arg"})
-                    .applied);
-    EXPECT_TRUE(document
-                    .apply(CreateClaim{.parent = ElementId{"argpkg_1"},
-                                       .id = ElementId{"claim_top"},
-                                       .name = "Top"})
-                    .applied);
-    EXPECT_TRUE(document
-                    .apply(CreateClaim{.parent = ElementId{"argpkg_1"},
-                                       .id = ElementId{"claim_sub"},
-                                       .name = "Sub"})
-                    .applied);
+    EXPECT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "Case"}).applied);
+    EXPECT_TRUE(
+        document.apply(CreateArgumentPackage{.parent = ElementId{"acp_1"}, .id = ElementId{"argpkg_1"}, .name = "Arg"})
+            .applied);
+    EXPECT_TRUE(
+        document.apply(CreateClaim{.parent = ElementId{"argpkg_1"}, .id = ElementId{"claim_top"}, .name = "Top"})
+            .applied);
+    EXPECT_TRUE(
+        document.apply(CreateClaim{.parent = ElementId{"argpkg_1"}, .id = ElementId{"claim_sub"}, .name = "Sub"})
+            .applied);
     return document;
 }
 
 TEST(Sacm23Argumentation, SACM23_ARG_001_CreatesRelationshipsWithCommands) {
     Document document = build_argument_case();
     ASSERT_TRUE(document
-                    .apply(CreateArgumentReasoning{.parent = ElementId{"argpkg_1"},
-                                                   .id = ElementId{"ar_1"},
-                                                   .name = "Decomposition"})
+                    .apply(CreateArgumentReasoning{
+                        .parent = ElementId{"argpkg_1"}, .id = ElementId{"ar_1"}, .name = "Decomposition"})
                     .applied);
     ASSERT_TRUE(document
                     .apply(CreateAssertedRelationship{
@@ -281,25 +261,19 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_CreatesRelationshipsWithCommands) {
                     })
                     .applied);
     ASSERT_TRUE(document
-                    .apply(SetAssertionDeclaration{
-                        .element = ElementId{"claim_top"},
-                        .declaration = AssertionDeclaration::NeedsSupport})
+                    .apply(SetAssertionDeclaration{.element = ElementId{"claim_top"},
+                                                   .declaration = AssertionDeclaration::NeedsSupport})
                     .applied);
-    ASSERT_TRUE(document
-                    .apply(CreateClaim{.parent = ElementId{"argpkg_1"},
-                                       .id = ElementId{"claim_meta"},
-                                       .name = "Meta"})
-                    .applied);
-    ASSERT_TRUE(document
-                    .apply(AddMetaClaim{.element = ElementId{"inf_1"},
-                                        .meta_claim = ElementId{"claim_meta"}})
-                    .applied);
+    ASSERT_TRUE(
+        document.apply(CreateClaim{.parent = ElementId{"argpkg_1"}, .id = ElementId{"claim_meta"}, .name = "Meta"})
+            .applied);
+    ASSERT_TRUE(
+        document.apply(AddMetaClaim{.element = ElementId{"inf_1"}, .meta_claim = ElementId{"claim_meta"}}).applied);
 
     EXPECT_TRUE(sacm::validation::validate(document).empty());
     const auto saved = sacm::io::save_xmi_string(document);
     ASSERT_TRUE(saved.ok);
-    const LoadResult reloaded =
-        sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(reloaded.ok);
     EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
 }
@@ -311,9 +285,8 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_CreatesRelationshipsWithCommands) {
 TEST(Sacm23Argumentation, SACM23_ARG_001_AddsSourceToExistingRelationship) {
     Document document = build_argument_case();
     ASSERT_TRUE(document
-                    .apply(CreateArgumentReasoning{.parent = ElementId{"argpkg_1"},
-                                                   .id = ElementId{"ar_1"},
-                                                   .name = "Strategy"})
+                    .apply(CreateArgumentReasoning{
+                        .parent = ElementId{"argpkg_1"}, .id = ElementId{"ar_1"}, .name = "Strategy"})
                     .applied);
     ASSERT_TRUE(document
                     .apply(CreateAssertedRelationship{
@@ -325,14 +298,12 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_AddsSourceToExistingRelationship) {
                         .reasoning = ElementId{"ar_1"},
                     })
                     .applied);
-    ASSERT_TRUE(document
-                    .apply(CreateClaim{.parent = ElementId{"argpkg_1"},
-                                       .id = ElementId{"claim_sub2"},
-                                       .name = "Sub2"})
-                    .applied);
+    ASSERT_TRUE(
+        document.apply(CreateClaim{.parent = ElementId{"argpkg_1"}, .id = ElementId{"claim_sub2"}, .name = "Sub2"})
+            .applied);
 
-    const auto added = document.apply(
-        AddRelationshipSource{.relationship = ElementId{"inf_1"}, .source = ElementId{"claim_sub2"}});
+    const auto added =
+        document.apply(AddRelationshipSource{.relationship = ElementId{"inf_1"}, .source = ElementId{"claim_sub2"}});
     ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
     ASSERT_EQ(added.changes.size(), 1u);
     EXPECT_EQ(added.changes.front().property.value_or(""), "source");
@@ -346,8 +317,7 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_AddsSourceToExistingRelationship) {
     EXPECT_TRUE(sacm::validation::validate(document).empty());
     const auto saved = sacm::io::save_xmi_string(document);
     ASSERT_TRUE(saved.ok);
-    const LoadResult reloaded =
-        sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(reloaded.ok);
     EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
 }
@@ -368,20 +338,20 @@ TEST(Sacm23Argumentation, SACM23_ARG_002_AddSourceValidatesTargetAndDuplicate) {
                     .applied);
 
     // The relationship id must resolve to an AssertedRelationship.
-    const auto not_relationship = document.apply(
-        AddRelationshipSource{.relationship = ElementId{"claim_top"}, .source = ElementId{"claim_sub"}});
+    const auto not_relationship =
+        document.apply(AddRelationshipSource{.relationship = ElementId{"claim_top"}, .source = ElementId{"claim_sub"}});
     EXPECT_FALSE(not_relationship.applied);
     EXPECT_TRUE(has_code(not_relationship.diagnostics, sacm::validation::codes::kCmdTargetNotFound));
 
     // A source must be an ArgumentAsset (a package is not).
-    const auto wrong_type = document.apply(
-        AddRelationshipSource{.relationship = ElementId{"inf_1"}, .source = ElementId{"argpkg_1"}});
+    const auto wrong_type =
+        document.apply(AddRelationshipSource{.relationship = ElementId{"inf_1"}, .source = ElementId{"argpkg_1"}});
     EXPECT_FALSE(wrong_type.applied);
     EXPECT_TRUE(has_code(wrong_type.diagnostics, sacm::validation::codes::kRefWrongType));
 
     // A source already present is rejected.
-    const auto duplicate = document.apply(
-        AddRelationshipSource{.relationship = ElementId{"inf_1"}, .source = ElementId{"claim_sub"}});
+    const auto duplicate =
+        document.apply(AddRelationshipSource{.relationship = ElementId{"inf_1"}, .source = ElementId{"claim_sub"}});
     EXPECT_FALSE(duplicate.applied);
     EXPECT_TRUE(has_code(duplicate.diagnostics, sacm::validation::codes::kMultiplicityViolation));
 }
@@ -392,7 +362,7 @@ TEST(Sacm23Argumentation, SACM23_ARG_002_RejectsRelationshipWithWrongTargetKind)
         .parent = ElementId{"argpkg_1"},
         .kind = ElementKind::AssertedInference,
         .sources = {ElementId{"claim_sub"}},
-        .targets = {ElementId{"argpkg_1"}},  // a package is not an ArgumentAsset
+        .targets = {ElementId{"argpkg_1"}}, // a package is not an ArgumentAsset
     });
     EXPECT_FALSE(result.applied);
     EXPECT_TRUE(has_code(result.diagnostics, sacm::validation::codes::kRefWrongType));
@@ -403,8 +373,7 @@ TEST(Sacm23Argumentation, SACM23_ARG_002_RejectsRelationshipWithWrongTargetKind)
         .targets = {ElementId{"claim_top"}},
     });
     EXPECT_FALSE(empty_sources.applied);
-    EXPECT_TRUE(has_code(empty_sources.diagnostics,
-                         sacm::validation::codes::kMultiplicityViolation));
+    EXPECT_TRUE(has_code(empty_sources.diagnostics, sacm::validation::codes::kMultiplicityViolation));
 }
 
 TEST(Sacm23Argumentation, SACM23_ARG_003_ClaimDeletePreviewListsAffectedRelationships) {
@@ -426,15 +395,14 @@ TEST(Sacm23Argumentation, SACM23_ARG_003_ClaimDeletePreviewListsAffectedRelation
     });
     ASSERT_TRUE(preview.can_apply);
     EXPECT_TRUE(std::ranges::any_of(preview.effects, [](const ChangeRecord& record) {
-        return record.id.value() == "inf_1" &&
-               record.change == ChangeRecord::Change::RelationshipDeleted;
+        return record.id.value() == "inf_1" && record.change == ChangeRecord::Change::RelationshipDeleted;
     }));
 
     // Applying leaves no dangling references.
-    const auto result = document.apply(
-        DeleteElement{.target = ElementId{"claim_sub"},
-                      .reference_policy = ReferenceDeletePolicy::DeleteReferencingRelationships},
-        preview.document_revision);
+    const auto result =
+        document.apply(DeleteElement{.target = ElementId{"claim_sub"},
+                                     .reference_policy = ReferenceDeletePolicy::DeleteReferencingRelationships},
+                       preview.document_revision);
     ASSERT_TRUE(result.applied);
     EXPECT_EQ(document.find(ElementId{"inf_1"}), nullptr);
     EXPECT_TRUE(sacm::validation::validate(document).empty());
@@ -450,11 +418,9 @@ TEST(Sacm23Argumentation, SACM23_ARG_003_ClaimDeletePreviewListsAffectedRelation
 TEST(Sacm23Argumentation, SACM23_CMD_005_ScrubReferencesKeepsMultiSourceInference) {
     Document document = build_argument_case();
     // A second sub-goal so the inference has two sources.
-    ASSERT_TRUE(document
-                    .apply(CreateClaim{.parent = ElementId{"argpkg_1"},
-                                       .id = ElementId{"claim_sub2"},
-                                       .name = "Sub2"})
-                    .applied);
+    ASSERT_TRUE(
+        document.apply(CreateClaim{.parent = ElementId{"argpkg_1"}, .id = ElementId{"claim_sub2"}, .name = "Sub2"})
+            .applied);
     ASSERT_TRUE(document
                     .apply(CreateAssertedRelationship{
                         .parent = ElementId{"argpkg_1"},
@@ -476,17 +442,14 @@ TEST(Sacm23Argumentation, SACM23_CMD_005_ScrubReferencesKeepsMultiSourceInferenc
         return record.id.value() == "inf_1" && record.change == ChangeRecord::Change::Modified;
     }));
     EXPECT_FALSE(std::ranges::any_of(preview.effects, [](const ChangeRecord& record) {
-        return record.id.value() == "inf_1" &&
-               record.change == ChangeRecord::Change::RelationshipDeleted;
+        return record.id.value() == "inf_1" && record.change == ChangeRecord::Change::RelationshipDeleted;
     }));
 
     const auto scrubbed = document.apply(
-        DeleteElement{.target = ElementId{"claim_sub"},
-                      .reference_policy = ReferenceDeletePolicy::ScrubReferences},
+        DeleteElement{.target = ElementId{"claim_sub"}, .reference_policy = ReferenceDeletePolicy::ScrubReferences},
         preview.document_revision);
     ASSERT_TRUE(scrubbed.applied);
-    const auto* inference =
-        document.find_as<sacm::model::AssertedRelationship>(ElementId{"inf_1"});
+    const auto* inference = document.find_as<sacm::model::AssertedRelationship>(ElementId{"inf_1"});
     ASSERT_NE(inference, nullptr) << "scrub dropped an inference that still had a source";
     ASSERT_EQ(inference->sources().size(), 1u);
     EXPECT_EQ(inference->sources().front(), ElementId{"claim_sub2"});
@@ -496,24 +459,20 @@ TEST(Sacm23Argumentation, SACM23_CMD_005_ScrubReferencesKeepsMultiSourceInferenc
     // The scrubbed inference round-trips through strict save.
     const auto saved = sacm::io::save_xmi_string(document);
     ASSERT_TRUE(saved.ok);
-    const LoadResult reloaded =
-        sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(reloaded.ok);
     EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
 
     // Removing the LAST source empties the inference, so scrubbing now DROPS it.
-    const auto emptied = document.apply(DeleteElement{
-        .target = ElementId{"claim_sub2"},
-        .reference_policy = ReferenceDeletePolicy::ScrubReferences});
+    const auto emptied = document.apply(
+        DeleteElement{.target = ElementId{"claim_sub2"}, .reference_policy = ReferenceDeletePolicy::ScrubReferences});
     ASSERT_TRUE(emptied.applied);
-    EXPECT_EQ(document.find(ElementId{"inf_1"}), nullptr)
-        << "scrub kept an inference with no remaining source";
+    EXPECT_EQ(document.find(ElementId{"inf_1"}), nullptr) << "scrub kept an inference with no remaining source";
     EXPECT_TRUE(std::ranges::any_of(emptied.changes, [](const ChangeRecord& record) {
-        return record.id.value() == "inf_1" &&
-               record.change == ChangeRecord::Change::RelationshipDeleted;
+        return record.id.value() == "inf_1" && record.change == ChangeRecord::Change::RelationshipDeleted;
     }));
     EXPECT_EQ(document.find(ElementId{"claim_sub2"}), nullptr);
     EXPECT_TRUE(sacm::validation::validate(document).empty());
 }
 
-}  // namespace
+} // namespace

@@ -28,8 +28,7 @@ bool TransactionIsPureUndo(const AuditTransaction& tx) {
 
 } // namespace
 
-std::unordered_set<std::uint64_t> ComputeUndoSkipSet(
-    const std::vector<AuditTransaction>& transactions) {
+std::unordered_set<std::uint64_t> ComputeUndoSkipSet(const std::vector<AuditTransaction>& transactions) {
     std::unordered_set<std::uint64_t> skipped;
 
     // Reverse iteration: an Undo only takes effect if the transaction
@@ -57,8 +56,8 @@ UndoTarget FindUndoTarget(const std::vector<AuditTransaction>& transactions) {
             continue;
         if (TransactionIsPureUndo(tx))
             continue;
-        result.has_target          = true;
-        result.target_sequence     = tx.transaction_sequence;
+        result.has_target = true;
+        result.target_sequence = tx.transaction_sequence;
         result.target_command_name = tx.command_name;
         return result;
     }

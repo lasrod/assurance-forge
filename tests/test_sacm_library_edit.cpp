@@ -39,7 +39,9 @@
 
 namespace {
 
-std::filesystem::path repo_root() { return std::filesystem::path(AF_REPO_ROOT); }
+std::filesystem::path repo_root() {
+    return std::filesystem::path(AF_REPO_ROOT);
+}
 
 // fixture_acp_parity carries claim `G1` ("Top Goal", content "The system is
 // acceptably safe.") and asserted inference `R1`, and loads cleanly through
@@ -49,8 +51,7 @@ std::filesystem::path fixture_path() {
     return repo_root() / "tests" / "data" / "fixture_acp_parity.sacm.xml";
 }
 
-const core::SacmElement* find_element(const core::AssuranceCase& assurance_case,
-                                      const std::string& id) {
+const core::SacmElement* find_element(const core::AssuranceCase& assurance_case, const std::string& id) {
     for (const core::SacmElement& element : assurance_case.elements) {
         if (element.id == id) {
             return &element;
@@ -69,8 +70,10 @@ sacm_adapter::LoadOutcome load_fixture() {
 
 // Runs the same field edit through the legacy models and returns the edited
 // element, so a test can compare it against the library-projected result.
-core::AssuranceCase legacy_edit(const std::string& element_id, core::ElementTextField field,
-                                const std::string& language, const std::string& value) {
+core::AssuranceCase legacy_edit(const std::string& element_id,
+                                core::ElementTextField field,
+                                const std::string& language,
+                                const std::string& value) {
     const auto legacy_case = parser::parse_sacm_xml(fixture_path().string());
     EXPECT_TRUE(legacy_case.has_value());
     const auto legacy_package = sacm::parse_sacm(fixture_path().string());
@@ -80,8 +83,7 @@ core::AssuranceCase legacy_edit(const std::string& element_id, core::ElementText
     sacm::AssuranceCasePackage package = *legacy_package;
     std::string old_value;
     std::string error;
-    EXPECT_TRUE(core::SetElementTextField(edited, &package, element_id, field, language, value,
-                                          old_value, error))
+    EXPECT_TRUE(core::SetElementTextField(edited, &package, element_id, field, language, value, old_value, error))
         << error;
     return edited;
 }
@@ -92,7 +94,7 @@ core::AssuranceCase legacy_edit(const std::string& element_id, core::ElementText
 // the new element, not its id.
 struct ChildShape {
     std::string element_type;
-    std::string element_assertion;  // "" and "asserted" both normalize to "asserted"
+    std::string element_assertion; // "" and "asserted" both normalize to "asserted"
     std::string relationship_type;
     bool targets_parent = false;
     bool source_is_new_element = false;
@@ -125,8 +127,10 @@ const core::AcpRecord* find_acp(const core::AssuranceCase& assurance_case, const
     return nullptr;
 }
 
-ChildShape describe_child(const core::AssuranceCase& assurance_case, const std::string& parent_id,
-                          const std::string& element_id, const std::string& relationship_id) {
+ChildShape describe_child(const core::AssuranceCase& assurance_case,
+                          const std::string& parent_id,
+                          const std::string& element_id,
+                          const std::string& relationship_id) {
     ChildShape shape;
     const core::SacmElement* element = find_element(assurance_case, element_id);
     const core::SacmElement* relationship = find_element(assurance_case, relationship_id);
@@ -137,8 +141,7 @@ ChildShape describe_child(const core::AssuranceCase& assurance_case, const std::
     shape.element_assertion = normalize_assertion(element->assertion_declaration);
     shape.relationship_type = relationship->type;
     shape.targets_parent = (relationship->target_refs == std::vector<std::string>{parent_id});
-    shape.source_is_new_element =
-        (relationship->source_refs == std::vector<std::string>{element_id});
+    shape.source_is_new_element = (relationship->source_refs == std::vector<std::string>{element_id});
     shape.reasoning_is_new_element = (relationship->reasoning_ref == element_id);
     shape.is_counter = relationship->is_counter;
     return shape;
@@ -157,12 +160,11 @@ TEST(SacmLibraryEdit, SACM23_INT_001_SetNameReproducesLegacyNameEdit) {
     const core::AssuranceCase before = sacm_adapter::project_case(*loaded.document);
     const core::SacmElement* before_g1 = find_element(before, "G1");
     ASSERT_NE(before_g1, nullptr);
-    ASSERT_EQ(before_g1->name, "Top Goal");   // guards against a vacuous edit
+    ASSERT_EQ(before_g1->name, "Top Goal"); // guards against a vacuous edit
     ASSERT_NE(before_g1->name, kNewName);
 
     const sacm_adapter::EditOutcome edit =
-        sacm_adapter::apply_text_edit(*loaded.document, "G1", sacm_adapter::TextField::Name, "en",
-                                      kNewName);
+        sacm_adapter::apply_text_edit(*loaded.document, "G1", sacm_adapter::TextField::Name, "en", kNewName);
     ASSERT_TRUE(edit.supported);
     ASSERT_TRUE(edit.applied) << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
 
@@ -193,11 +195,11 @@ TEST(SacmLibraryEdit, SACM23_INT_001_ContentEditReproducesLegacyStatementEdit) {
     const core::AssuranceCase before = sacm_adapter::project_case(*loaded.document);
     const core::SacmElement* before_g1 = find_element(before, "G1");
     ASSERT_NE(before_g1, nullptr);
-    ASSERT_EQ(before_g1->content, "The system is acceptably safe.");  // vacuity guard
+    ASSERT_EQ(before_g1->content, "The system is acceptably safe."); // vacuity guard
     ASSERT_NE(before_g1->content, kNewContent);
 
-    const sacm_adapter::EditOutcome edit = sacm_adapter::apply_text_edit(
-        *loaded.document, "G1", sacm_adapter::TextField::Content, "en", kNewContent);
+    const sacm_adapter::EditOutcome edit =
+        sacm_adapter::apply_text_edit(*loaded.document, "G1", sacm_adapter::TextField::Content, "en", kNewContent);
     ASSERT_TRUE(edit.supported);
     ASSERT_TRUE(edit.applied) << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
 
@@ -208,8 +210,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_ContentEditReproducesLegacyStatementEdit) {
     ASSERT_TRUE(after_g1->content_langs.contains("en"));
     EXPECT_EQ(after_g1->content_langs.at("en"), kNewContent);
 
-    const core::AssuranceCase legacy =
-        legacy_edit("G1", core::ElementTextField::Content, "en", kNewContent);
+    const core::AssuranceCase legacy = legacy_edit("G1", core::ElementTextField::Content, "en", kNewContent);
     const core::SacmElement* legacy_g1 = find_element(legacy, "G1");
     ASSERT_NE(legacy_g1, nullptr);
     EXPECT_EQ(after_g1->content, legacy_g1->content);
@@ -225,8 +226,8 @@ TEST(SacmLibraryEdit, SACM23_INT_001_ContentEditUnsupportedForRelationship) {
     sacm_adapter::LoadOutcome loaded = load_fixture();
     ASSERT_NE(loaded.document, nullptr);
 
-    const sacm_adapter::EditOutcome edit = sacm_adapter::apply_text_edit(
-        *loaded.document, "R1", sacm_adapter::TextField::Content, "en", "not applicable");
+    const sacm_adapter::EditOutcome edit =
+        sacm_adapter::apply_text_edit(*loaded.document, "R1", sacm_adapter::TextField::Content, "en", "not applicable");
     EXPECT_FALSE(edit.supported);
     EXPECT_FALSE(edit.applied);
 }
@@ -244,18 +245,23 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildReproducesLegacyStructure) {
         ChildShape expected;
     };
     const std::vector<Scenario> scenarios = {
-        {sacm_adapter::ChildKind::Goal, core::NewElementKind::Goal,
+        {sacm_adapter::ChildKind::Goal,
+         core::NewElementKind::Goal,
          {"claim", "asserted", "assertedinference", true, true, false}},
-        {sacm_adapter::ChildKind::Solution, core::NewElementKind::Solution,
+        {sacm_adapter::ChildKind::Solution,
+         core::NewElementKind::Solution,
          {"artifactreference", "asserted", "assertedevidence", true, true, false}},
-        {sacm_adapter::ChildKind::Context, core::NewElementKind::Context,
+        {sacm_adapter::ChildKind::Context,
+         core::NewElementKind::Context,
          {"artifactreference", "asserted", "assertedcontext", true, true, false}},
-        {sacm_adapter::ChildKind::Assumption, core::NewElementKind::Assumption,
+        {sacm_adapter::ChildKind::Assumption,
+         core::NewElementKind::Assumption,
          {"claim", "assumed", "assertedcontext", true, true, false}},
         // Justification: stored as axiomatic + a gsn.role tag, translated back to
         // the app's internal "justification" by the projection -- so it now
         // reproduces the legacy structure.
-        {sacm_adapter::ChildKind::Justification, core::NewElementKind::Justification,
+        {sacm_adapter::ChildKind::Justification,
+         core::NewElementKind::Justification,
          {"claim", "justification", "assertedcontext", true, true, false}},
     };
 
@@ -268,11 +274,9 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildReproducesLegacyStructure) {
         const sacm_adapter::AddChildOutcome added =
             sacm_adapter::apply_add_child(*loaded.document, "G1", scenario.library_kind);
         ASSERT_TRUE(added.supported);
-        ASSERT_TRUE(added.applied)
-            << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+        ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
         const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
-        const ChildShape library_shape =
-            describe_child(after, "G1", added.new_element_id, added.new_relationship_id);
+        const ChildShape library_shape = describe_child(after, "G1", added.new_element_id, added.new_relationship_id);
 
         // Legacy path.
         const auto legacy_case = parser::parse_sacm_xml(fixture_path().string());
@@ -284,11 +288,10 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildReproducesLegacyStructure) {
         std::string legacy_element_id;
         std::string legacy_relationship_id;
         std::string error;
-        ASSERT_TRUE(core::AddChildElement(legacy, &package, "G1", scenario.legacy_kind,
-                                          legacy_element_id, legacy_relationship_id, error))
+        ASSERT_TRUE(core::AddChildElement(
+            legacy, &package, "G1", scenario.legacy_kind, legacy_element_id, legacy_relationship_id, error))
             << error;
-        const ChildShape legacy_shape =
-            describe_child(legacy, "G1", legacy_element_id, legacy_relationship_id);
+        const ChildShape legacy_shape = describe_child(legacy, "G1", legacy_element_id, legacy_relationship_id);
 
         // Both match the expected structure, and each other.
         EXPECT_EQ(library_shape, scenario.expected);
@@ -305,8 +308,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddTopGoalReproducesLegacyStructure) {
     // Library path.
     sacm_adapter::LoadOutcome loaded = load_fixture();
     ASSERT_NE(loaded.document, nullptr);
-    const sacm_adapter::AddChildOutcome added =
-        sacm_adapter::apply_add_top_goal(*loaded.document, "TG1");
+    const sacm_adapter::AddChildOutcome added = sacm_adapter::apply_add_top_goal(*loaded.document, "TG1");
     ASSERT_TRUE(added.supported);
     ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
     EXPECT_EQ(added.new_element_id, "TG1");
@@ -334,10 +336,8 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddTopGoalReproducesLegacyStructure) {
     EXPECT_EQ(library_goal->gsn_identifier, "TG1");
     EXPECT_EQ(legacy_goal->gsn_identifier, "TG1");
     for (const core::SacmElement& element : after.elements) {
-        EXPECT_EQ(std::find(element.source_refs.begin(), element.source_refs.end(), "TG1"),
-                  element.source_refs.end());
-        EXPECT_EQ(std::find(element.target_refs.begin(), element.target_refs.end(), "TG1"),
-                  element.target_refs.end());
+        EXPECT_EQ(std::find(element.source_refs.begin(), element.source_refs.end(), "TG1"), element.source_refs.end());
+        EXPECT_EQ(std::find(element.target_refs.begin(), element.target_refs.end(), "TG1"), element.target_refs.end());
     }
 }
 
@@ -353,17 +353,23 @@ TEST(SacmLibraryEdit, SACM23_INT_001_ChallengeReproducesLegacyStructure) {
         core::ArgumentTarget::Kind target_kind;
         sacm_adapter::ChallengeSource library_source;
         core::ChallengeSourceType legacy_source;
-        ChildShape expected;  // targets_parent means "targets the challenged id"
+        ChildShape expected; // targets_parent means "targets the challenged id"
     };
     const std::vector<Scenario> scenarios = {
-        {"G1", core::ArgumentTarget::Kind::Element, sacm_adapter::ChallengeSource::CounterArgument,
+        {"G1",
+         core::ArgumentTarget::Kind::Element,
+         sacm_adapter::ChallengeSource::CounterArgument,
          core::ChallengeSourceType::CounterArgument,
          {"claim", "asserted", "assertedinference", true, true, false, true}},
-        {"G1", core::ArgumentTarget::Kind::Element, sacm_adapter::ChallengeSource::CounterEvidence,
+        {"G1",
+         core::ArgumentTarget::Kind::Element,
+         sacm_adapter::ChallengeSource::CounterEvidence,
          core::ChallengeSourceType::CounterEvidence,
          {"artifactreference", "asserted", "assertedevidence", true, true, false, true}},
-        {"R1", core::ArgumentTarget::Kind::Relationship,
-         sacm_adapter::ChallengeSource::CounterArgument, core::ChallengeSourceType::CounterArgument,
+        {"R1",
+         core::ArgumentTarget::Kind::Relationship,
+         sacm_adapter::ChallengeSource::CounterArgument,
+         core::ChallengeSourceType::CounterArgument,
          {"claim", "asserted", "assertedinference", true, true, false, true}},
     };
 
@@ -374,15 +380,12 @@ TEST(SacmLibraryEdit, SACM23_INT_001_ChallengeReproducesLegacyStructure) {
         sacm_adapter::LoadOutcome loaded = load_fixture();
         ASSERT_NE(loaded.document, nullptr);
         const sacm_adapter::AddChildOutcome added =
-            sacm_adapter::apply_challenge(*loaded.document, scenario.target_id,
-                                          scenario.library_source);
+            sacm_adapter::apply_challenge(*loaded.document, scenario.target_id, scenario.library_source);
         ASSERT_TRUE(added.supported);
-        ASSERT_TRUE(added.applied)
-            << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+        ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
         const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
         const ChildShape library_shape =
-            describe_child(after, scenario.target_id, added.new_element_id,
-                           added.new_relationship_id);
+            describe_child(after, scenario.target_id, added.new_element_id, added.new_relationship_id);
 
         // Legacy path.
         const auto legacy_case = parser::parse_sacm_xml(fixture_path().string());
@@ -395,8 +398,8 @@ TEST(SacmLibraryEdit, SACM23_INT_001_ChallengeReproducesLegacyStructure) {
         std::string legacy_element_id;
         std::string legacy_relationship_id;
         std::string error;
-        ASSERT_TRUE(core::AddChallenge(legacy, &package, target, scenario.legacy_source,
-                                       legacy_element_id, legacy_relationship_id, error))
+        ASSERT_TRUE(core::AddChallenge(
+            legacy, &package, target, scenario.legacy_source, legacy_element_id, legacy_relationship_id, error))
             << error;
         const ChildShape legacy_shape =
             describe_child(legacy, scenario.target_id, legacy_element_id, legacy_relationship_id);
@@ -415,19 +418,17 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildStrategyCreatesPendingReasoning) {
     sacm_adapter::LoadOutcome loaded = load_fixture();
     ASSERT_NE(loaded.document, nullptr);
 
-    const sacm_adapter::AddChildOutcome added = sacm_adapter::apply_add_child(
-        *loaded.document, "G1", sacm_adapter::ChildKind::Strategy, "STRAT1");
+    const sacm_adapter::AddChildOutcome added =
+        sacm_adapter::apply_add_child(*loaded.document, "G1", sacm_adapter::ChildKind::Strategy, "STRAT1");
     ASSERT_TRUE(added.supported);
-    ASSERT_TRUE(added.applied)
-        << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
     EXPECT_EQ(added.new_element_id, "STRAT1");
     EXPECT_TRUE(added.new_relationship_id.empty()) << "no inference until the first sub-goal";
 
     // The render model: project + the render-layer placement synthesis (the same
     // steps the load path runs). project_case itself stays pure.
     core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
-    const sacm::AssuranceCasePackage render_package =
-        core::project_library_package_with_tags(*loaded.document);
+    const sacm::AssuranceCasePackage render_package = core::project_library_package_with_tags(*loaded.document);
     core::SynthesizeBareStrategyPlacements(after, render_package);
 
     const core::SacmElement* strategy = find_element(after, "STRAT1");
@@ -470,19 +471,18 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildStrategyCreatesPendingReasoning) {
 // inference's sources -- the standard one-inference GSN->SACM encoding, with no
 // per-sub-goal inference.
 TEST(SacmLibraryEdit, SACM23_INT_001_SubGoalUnderStrategyMaterializesThenExtendsInference) {
-    sacm_adapter::LoadOutcome loaded = load_fixture();  // fixture claim G1
+    sacm_adapter::LoadOutcome loaded = load_fixture(); // fixture claim G1
     ASSERT_NE(loaded.document, nullptr);
 
     // A strategy under G1 -- bare, no inference yet.
-    const sacm_adapter::AddChildOutcome strategy = sacm_adapter::apply_add_child(
-        *loaded.document, "G1", sacm_adapter::ChildKind::Strategy, "S1");
-    ASSERT_TRUE(strategy.applied)
-        << (strategy.diagnostics.empty() ? "" : strategy.diagnostics.front().message);
+    const sacm_adapter::AddChildOutcome strategy =
+        sacm_adapter::apply_add_child(*loaded.document, "G1", sacm_adapter::ChildKind::Strategy, "S1");
+    ASSERT_TRUE(strategy.applied) << (strategy.diagnostics.empty() ? "" : strategy.diagnostics.front().message);
     ASSERT_TRUE(strategy.new_relationship_id.empty());
 
     // First sub-goal under S1 -> materialize the inference with the caller id.
-    const sacm_adapter::AddChildOutcome first = sacm_adapter::apply_add_child(
-        *loaded.document, "S1", sacm_adapter::ChildKind::Goal, "SG1", "R_INF");
+    const sacm_adapter::AddChildOutcome first =
+        sacm_adapter::apply_add_child(*loaded.document, "S1", sacm_adapter::ChildKind::Goal, "SG1", "R_INF");
     ASSERT_TRUE(first.applied) << (first.diagnostics.empty() ? "" : first.diagnostics.front().message);
     EXPECT_EQ(first.new_element_id, "SG1");
     EXPECT_EQ(first.new_relationship_id, "R_INF") << "the inference is materialized on the first sub-goal";
@@ -496,8 +496,8 @@ TEST(SacmLibraryEdit, SACM23_INT_001_SubGoalUnderStrategyMaterializesThenExtends
     EXPECT_EQ(inference->source_refs, (std::vector<std::string>{"SG1"}));
 
     // Second sub-goal -> extend the SAME inference (no new relationship created).
-    const sacm_adapter::AddChildOutcome second = sacm_adapter::apply_add_child(
-        *loaded.document, "S1", sacm_adapter::ChildKind::Goal, "SG2");
+    const sacm_adapter::AddChildOutcome second =
+        sacm_adapter::apply_add_child(*loaded.document, "S1", sacm_adapter::ChildKind::Goal, "SG2");
     ASSERT_TRUE(second.applied) << (second.diagnostics.empty() ? "" : second.diagnostics.front().message);
     EXPECT_TRUE(second.new_relationship_id.empty())
         << "extending an existing inference creates no relationship (contract: id only set when created)";
@@ -523,10 +523,9 @@ TEST(SacmLibraryEdit, SACM23_INT_001_JustificationRoundTripsViaGsnRoleTag) {
     sacm_adapter::LoadOutcome loaded = load_fixture();
     ASSERT_NE(loaded.document, nullptr);
 
-    const sacm_adapter::AddChildOutcome added = sacm_adapter::apply_add_child(
-        *loaded.document, "G1", sacm_adapter::ChildKind::Justification, "JUST1", "JREL1");
-    ASSERT_TRUE(added.applied)
-        << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    const sacm_adapter::AddChildOutcome added =
+        sacm_adapter::apply_add_child(*loaded.document, "G1", sacm_adapter::ChildKind::Justification, "JUST1", "JREL1");
+    ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
 
     const core::AssuranceCase before_case = sacm_adapter::project_case(*loaded.document);
     const core::SacmElement* before = find_element(before_case, "JUST1");
@@ -553,8 +552,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildUsesCallerSuppliedIds) {
 
     const sacm_adapter::AddChildOutcome added = sacm_adapter::apply_add_child(
         *loaded.document, "G1", sacm_adapter::ChildKind::Goal, "CALLER_GOAL", "CALLER_REL");
-    ASSERT_TRUE(added.applied)
-        << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+    ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
     EXPECT_EQ(added.new_element_id, "CALLER_GOAL");
     EXPECT_EQ(added.new_relationship_id, "CALLER_REL");
 
@@ -570,10 +568,8 @@ TEST(SacmLibraryEdit, SACM23_INT_001_ChallengeUsesCallerSuppliedIds) {
     ASSERT_NE(loaded.document, nullptr);
 
     const sacm_adapter::AddChildOutcome added = sacm_adapter::apply_challenge(
-        *loaded.document, "G1", sacm_adapter::ChallengeSource::CounterArgument, "CALLER_COUNTER",
-        "CALLER_CREL");
-    ASSERT_TRUE(added.applied)
-        << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+        *loaded.document, "G1", sacm_adapter::ChallengeSource::CounterArgument, "CALLER_COUNTER", "CALLER_CREL");
+    ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
     EXPECT_EQ(added.new_element_id, "CALLER_COUNTER");
     EXPECT_EQ(added.new_relationship_id, "CALLER_CREL");
 
@@ -597,7 +593,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddChildUnderMissingParentUnsupported) {
 // front Description; the projected content_langs entry must match the legacy
 // per-language content map, and the primary content must be untouched.
 TEST(SacmLibraryEdit, SACM23_INT_001_ContentEditReproducesLegacyForNonPrimaryLanguage) {
-    const std::string kJa = "安全";  // Japanese for "safety"
+    const std::string kJa = "安全"; // Japanese for "safety"
 
     sacm_adapter::LoadOutcome loaded = load_fixture();
     ASSERT_NE(loaded.document, nullptr);
@@ -606,8 +602,8 @@ TEST(SacmLibraryEdit, SACM23_INT_001_ContentEditReproducesLegacyForNonPrimaryLan
     ASSERT_NE(before_g1, nullptr);
     const std::string english_before = before_g1->content;
 
-    const sacm_adapter::EditOutcome edit = sacm_adapter::apply_text_edit(
-        *loaded.document, "G1", sacm_adapter::TextField::Content, "ja", kJa);
+    const sacm_adapter::EditOutcome edit =
+        sacm_adapter::apply_text_edit(*loaded.document, "G1", sacm_adapter::TextField::Content, "ja", kJa);
     ASSERT_TRUE(edit.supported);
     ASSERT_TRUE(edit.applied) << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
 
@@ -632,8 +628,8 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditReproducesLegacyForNonClaim)
 
     sacm_adapter::LoadOutcome loaded = load_fixture();
     ASSERT_NE(loaded.document, nullptr);
-    const sacm_adapter::EditOutcome edit = sacm_adapter::apply_text_edit(
-        *loaded.document, "R1", sacm_adapter::TextField::Description, "en", kNote);
+    const sacm_adapter::EditOutcome edit =
+        sacm_adapter::apply_text_edit(*loaded.document, "R1", sacm_adapter::TextField::Description, "en", kNote);
     ASSERT_TRUE(edit.supported);
     ASSERT_TRUE(edit.applied) << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
 
@@ -644,8 +640,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditReproducesLegacyForNonClaim)
     ASSERT_TRUE(after_r1->description_langs.contains("en"));
     EXPECT_EQ(after_r1->description_langs.at("en"), kNote);
 
-    const core::AssuranceCase legacy =
-        legacy_edit("R1", core::ElementTextField::Description, "en", kNote);
+    const core::AssuranceCase legacy = legacy_edit("R1", core::ElementTextField::Description, "en", kNote);
     const core::SacmElement* legacy_r1 = find_element(legacy, "R1");
     ASSERT_NE(legacy_r1, nullptr);
     EXPECT_EQ(after_r1->description, legacy_r1->description);
@@ -689,11 +684,11 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditWritesClaimNoteToSecondDescr
     const core::AssuranceCase before = sacm_adapter::project_case(*loaded.document);
     const core::SacmElement* before_g1 = find_element(before, "G1");
     ASSERT_NE(before_g1, nullptr);
-    ASSERT_EQ(before_g1->content, "The system is acceptably safe.");  // statement, slot 0
-    ASSERT_NE(before_g1->description, kNote);                          // vacuity guard
+    ASSERT_EQ(before_g1->content, "The system is acceptably safe."); // statement, slot 0
+    ASSERT_NE(before_g1->description, kNote);                        // vacuity guard
 
-    const sacm_adapter::EditOutcome edit = sacm_adapter::apply_text_edit(
-        *loaded.document, "G1", sacm_adapter::TextField::Description, "en", kNote);
+    const sacm_adapter::EditOutcome edit =
+        sacm_adapter::apply_text_edit(*loaded.document, "G1", sacm_adapter::TextField::Description, "en", kNote);
     ASSERT_TRUE(edit.supported);
     ASSERT_TRUE(edit.applied) << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
 
@@ -706,8 +701,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditWritesClaimNoteToSecondDescr
     ASSERT_TRUE(after_g1->description_langs.contains("en"));
     EXPECT_EQ(after_g1->description_langs.at("en"), kNote);
 
-    const core::AssuranceCase legacy =
-        legacy_edit("G1", core::ElementTextField::Description, "en", kNote);
+    const core::AssuranceCase legacy = legacy_edit("G1", core::ElementTextField::Description, "en", kNote);
     const core::SacmElement* legacy_g1 = find_element(legacy, "G1");
     ASSERT_NE(legacy_g1, nullptr);
     EXPECT_EQ(after_g1->description, legacy_g1->description);
@@ -724,8 +718,8 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditUnsupportedForStatementlessC
         R"(</sacm:AssuranceCasePackage>)";
     sacm_adapter::LibraryDocument document;
     ASSERT_TRUE(sacm_adapter::reload_document(document, xml));
-    const sacm_adapter::EditOutcome edit = sacm_adapter::apply_text_edit(
-        document, "G9", sacm_adapter::TextField::Description, "en", "a note");
+    const sacm_adapter::EditOutcome edit =
+        sacm_adapter::apply_text_edit(document, "G9", sacm_adapter::TextField::Description, "en", "a note");
     EXPECT_FALSE(edit.supported);
     EXPECT_FALSE(edit.applied);
 }
@@ -734,8 +728,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditUnsupportedForStatementlessC
 // force the marker tag's element id to the ACP id, which would collide with the
 // library's global element-id uniqueness when a real element already uses it.
 TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpDoesNotCollideWithElementId) {
-    const std::filesystem::path path =
-        repo_root() / "tests" / "data" / "fixture_acp_id_collision.sacm.xml";
+    const std::filesystem::path path = repo_root() / "tests" / "data" / "fixture_acp_id_collision.sacm.xml";
     ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
 
     sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
@@ -763,8 +756,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpUsesCallerSuppliedId) {
     ASSERT_TRUE(loaded.ok);
     ASSERT_NE(loaded.document, nullptr);
 
-    const sacm_adapter::AcpOutcome added =
-        sacm_adapter::apply_add_acp(*loaded.document, "S1", "ACP5");
+    const sacm_adapter::AcpOutcome added = sacm_adapter::apply_add_acp(*loaded.document, "S1", "ACP5");
     ASSERT_TRUE(added.supported);
     ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
     EXPECT_EQ(added.acp_id, "ACP5") << "the supplied id must be used verbatim, not regenerated";
@@ -787,8 +779,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpRejectsDuplicateRequestedId) {
     ASSERT_TRUE(first.applied) << (first.diagnostics.empty() ? "" : first.diagnostics.front().message);
     ASSERT_EQ(first.acp_id, "ACP1");
 
-    const sacm_adapter::AcpOutcome duplicate =
-        sacm_adapter::apply_add_acp(*loaded.document, "S1", "ACP1");
+    const sacm_adapter::AcpOutcome duplicate = sacm_adapter::apply_add_acp(*loaded.document, "S1", "ACP1");
     EXPECT_TRUE(duplicate.supported);
     EXPECT_FALSE(duplicate.applied) << "a duplicate requested ACP id must be rejected";
 }
@@ -809,7 +800,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpReproducesLegacyRecord) {
     const sacm_adapter::AcpOutcome added = sacm_adapter::apply_add_acp(*loaded.document, "S1");
     ASSERT_TRUE(added.supported);
     ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
-    EXPECT_EQ(added.acp_id, "ACP1");  // no ACPs pre-exist, so the first id is ACP1
+    EXPECT_EQ(added.acp_id, "ACP1"); // no ACPs pre-exist, so the first id is ACP1
 
     const core::AssuranceCase projected = sacm_adapter::project_case(*loaded.document);
     const core::AcpRecord* library_acp = find_acp(projected, added.acp_id);
@@ -845,8 +836,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpReproducesLegacyRecord) {
 // relationship target is likewise unsupported for now (relationship-ACP
 // eligibility is a later slice).
 TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpRefusesIneligibleTargets) {
-    const std::filesystem::path path =
-        repo_root() / "tests" / "data" / "fixture_acp_parity.sacm.xml";
+    const std::filesystem::path path = repo_root() / "tests" / "data" / "fixture_acp_parity.sacm.xml";
     ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
 
     sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
@@ -869,8 +859,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpRefusesIneligibleTargets) {
     EXPECT_FALSE(result.error.empty());
 
     // R1 is a relationship -> not yet wired.
-    const sacm_adapter::AcpOutcome on_relationship =
-        sacm_adapter::apply_add_acp(*loaded.document, "R1");
+    const sacm_adapter::AcpOutcome on_relationship = sacm_adapter::apply_add_acp(*loaded.document, "R1");
     EXPECT_FALSE(on_relationship.supported);
     EXPECT_FALSE(on_relationship.applied);
 }
@@ -882,8 +871,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddAcpRefusesIneligibleTargets) {
 // unambiguous. Ids are preserved by deletion, so the remaining sets compare
 // directly.
 TEST(SacmLibraryEdit, SACM23_INT_001_DeleteLeafReproducesLegacyRemoval) {
-    const std::filesystem::path path =
-        repo_root() / "tests" / "data" / "fixture_acp_parity.sacm.xml";
+    const std::filesystem::path path = repo_root() / "tests" / "data" / "fixture_acp_parity.sacm.xml";
     ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
 
     // Library path: delete the leaf sub-goal G2 (source of R1, no children).
@@ -891,14 +879,12 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DeleteLeafReproducesLegacyRemoval) {
     ASSERT_TRUE(loaded.ok);
     ASSERT_NE(loaded.document, nullptr);
     const core::AssuranceCase before = sacm_adapter::project_case(*loaded.document);
-    ASSERT_NE(find_element(before, "G2"), nullptr);  // vacuity: the leaf and its
-    ASSERT_NE(find_element(before, "R1"), nullptr);  // relationship start present
+    ASSERT_NE(find_element(before, "G2"), nullptr); // vacuity: the leaf and its
+    ASSERT_NE(find_element(before, "R1"), nullptr); // relationship start present
 
-    const sacm_adapter::DeleteOutcome deleted =
-        sacm_adapter::apply_delete_element(*loaded.document, "G2");
+    const sacm_adapter::DeleteOutcome deleted = sacm_adapter::apply_delete_element(*loaded.document, "G2");
     ASSERT_TRUE(deleted.supported);
-    ASSERT_TRUE(deleted.applied)
-        << (deleted.diagnostics.empty() ? "" : deleted.diagnostics.front().message);
+    ASSERT_TRUE(deleted.applied) << (deleted.diagnostics.empty() ? "" : deleted.diagnostics.front().message);
 
     const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
     // G2 and the now-empty relationship R1 are both gone; G1 remains.
@@ -914,9 +900,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DeleteLeafReproducesLegacyRemoval) {
     core::AssuranceCase legacy = *legacy_case;
     sacm::AssuranceCasePackage package = *legacy_package;
     std::string error;
-    ASSERT_TRUE(core::RemoveElement(legacy, &package, "G2",
-                                    core::RemoveMode::NodeAndDescendants, error))
-        << error;
+    ASSERT_TRUE(core::RemoveElement(legacy, &package, "G2", core::RemoveMode::NodeAndDescendants, error)) << error;
 
     // The two paths leave the same set of elements.
     EXPECT_EQ(sorted_element_ids(after), sorted_element_ids(legacy));
@@ -926,15 +910,13 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DeleteLeafReproducesLegacyRemoval) {
 // -> DeleteElement + DeleteRecursively) leaves the same element set as the legacy
 // core::DeleteArgumentPackage. Phase 1b (SACM23-INT-001).
 TEST(SacmLibraryEdit, SACM23_INT_001_DeleteArgumentPackageReproducesLegacy) {
-    const std::filesystem::path path =
-        repo_root() / "tests" / "data" / "fixture_roundtrip_open_autonomy.sacm.xml";
+    const std::filesystem::path path = repo_root() / "tests" / "data" / "fixture_roundtrip_open_autonomy.sacm.xml";
     ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
 
     sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
     ASSERT_TRUE(loaded.ok);
     ASSERT_NE(loaded.document, nullptr);
-    const sacm_adapter::DeleteOutcome deleted =
-        sacm_adapter::apply_delete_package(*loaded.document, "ARG_OrgTrust");
+    const sacm_adapter::DeleteOutcome deleted = sacm_adapter::apply_delete_package(*loaded.document, "ARG_OrgTrust");
     ASSERT_TRUE(deleted.supported);
     ASSERT_TRUE(deleted.applied) << (deleted.diagnostics.empty() ? "" : deleted.diagnostics.front().message);
     const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
@@ -959,8 +941,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DeleteArgumentPackageReproducesLegacy) {
 // artifact-package-delete event would not converge under library-primary replay
 // without a migration), recorded here so the difference is explicit. Phase 1b.
 TEST(SacmLibraryEdit, SACM23_INT_001_DeleteArtifactPackageRemovesItCleanly) {
-    const std::filesystem::path path =
-        repo_root() / "tests" / "data" / "fixture_roundtrip_open_autonomy.sacm.xml";
+    const std::filesystem::path path = repo_root() / "tests" / "data" / "fixture_roundtrip_open_autonomy.sacm.xml";
     ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
 
     sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
@@ -968,8 +949,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DeleteArtifactPackageRemovesItCleanly) {
     ASSERT_NE(loaded.document, nullptr);
     const core::AssuranceCase before = sacm_adapter::project_case(*loaded.document);
 
-    const sacm_adapter::DeleteOutcome deleted =
-        sacm_adapter::apply_delete_package(*loaded.document, "AP_Evidence");
+    const sacm_adapter::DeleteOutcome deleted = sacm_adapter::apply_delete_package(*loaded.document, "AP_Evidence");
     ASSERT_TRUE(deleted.supported);
     ASSERT_TRUE(deleted.applied) << (deleted.diagnostics.empty() ? "" : deleted.diagnostics.front().message);
 
@@ -993,8 +973,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DeleteArtifactPackageRemovesItCleanly) {
 // helper lacks). Assert it removes the package and leaves the argument tree intact.
 // Phase 1b (SACM23-INT-001).
 TEST(SacmLibraryEdit, SACM23_INT_001_DeleteTerminologyPackageRemovesItRecursively) {
-    const std::filesystem::path path =
-        repo_root() / "tests" / "data" / "fixture_roundtrip_open_autonomy.sacm.xml";
+    const std::filesystem::path path = repo_root() / "tests" / "data" / "fixture_roundtrip_open_autonomy.sacm.xml";
     ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
 
     // Vacuity: the legacy helper rejects this non-empty package.
@@ -1002,14 +981,13 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DeleteTerminologyPackageRemovesItRecursivel
     ASSERT_TRUE(legacy_package.has_value()) << legacy_package.error();
     sacm::AssuranceCasePackage package = *legacy_package;
     std::string legacy_error;
-    EXPECT_FALSE(core::DeleteTerminologyPackage(package, core::TerminologyPackageRef{"TP_Standards", ""},
-                                                legacy_error));
+    EXPECT_FALSE(
+        core::DeleteTerminologyPackage(package, core::TerminologyPackageRef{"TP_Standards", ""}, legacy_error));
 
     sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
     ASSERT_TRUE(loaded.ok);
     ASSERT_NE(loaded.document, nullptr);
-    const sacm_adapter::DeleteOutcome deleted =
-        sacm_adapter::apply_delete_package(*loaded.document, "TP_Standards");
+    const sacm_adapter::DeleteOutcome deleted = sacm_adapter::apply_delete_package(*loaded.document, "TP_Standards");
     ASSERT_TRUE(deleted.supported);
     ASSERT_TRUE(deleted.applied) << (deleted.diagnostics.empty() ? "" : deleted.diagnostics.front().message);
 
@@ -1025,8 +1003,8 @@ TEST(SacmLibraryEdit, SACM23_INT_001_SetNameOnMissingElementFailsUnchanged) {
     sacm_adapter::LoadOutcome loaded = load_fixture();
     ASSERT_NE(loaded.document, nullptr);
 
-    const sacm_adapter::EditOutcome edit = sacm_adapter::apply_text_edit(
-        *loaded.document, "NO_SUCH_ID", sacm_adapter::TextField::Name, "en", "whatever");
+    const sacm_adapter::EditOutcome edit =
+        sacm_adapter::apply_text_edit(*loaded.document, "NO_SUCH_ID", sacm_adapter::TextField::Name, "en", "whatever");
     EXPECT_TRUE(edit.supported);
     EXPECT_FALSE(edit.applied);
     EXPECT_FALSE(edit.diagnostics.empty());
@@ -1069,8 +1047,8 @@ sacm::AssuranceCasePackage load_legacy_terminology() {
     return parsed.has_value() ? *parsed : sacm::AssuranceCasePackage{};
 }
 
-const sacm::TerminologyPackage* find_terminology_package(
-    const std::vector<sacm::TerminologyPackage>& packages, const std::string& id) {
+const sacm::TerminologyPackage* find_terminology_package(const std::vector<sacm::TerminologyPackage>& packages,
+                                                         const std::string& id) {
     for (const sacm::TerminologyPackage& package : packages) {
         if (package.id == id) {
             return &package;
@@ -1109,8 +1087,7 @@ struct TermFields {
 };
 
 TermFields term_fields(const sacm::Term& term) {
-    return TermFields{term.value,          term.name,   term.description,
-                      term.externalReference, term.origin, term.category_refs};
+    return TermFields{term.value, term.name, term.description, term.externalReference, term.origin, term.category_refs};
 }
 
 // The sorted ids of every element a terminology package contains, for delete
@@ -1153,7 +1130,8 @@ struct ContextLink {
 };
 
 ContextLink extract_context_link(const sacm::AssuranceCasePackage& package,
-                                 const std::string& reference_id, const std::string& context_id) {
+                                 const std::string& reference_id,
+                                 const std::string& context_id) {
     const sacm::ArtifactReference* reference = nullptr;
     const sacm::AssertedContext* context = nullptr;
     for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
@@ -1193,10 +1171,8 @@ TEST(SacmLibraryEdit, SACM23_INT_001_CreateTerminologyPackageMatchesLegacy) {
     sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
     ASSERT_NE(loaded.document, nullptr);
     const sacm_adapter::TerminologyCreateOutcome created =
-        sacm_adapter::apply_create_terminology_package(*loaded.document, "Glossary",
-                                                       "Project glossary", "TP_NEW");
-    ASSERT_TRUE(created.applied)
-        << (created.diagnostics.empty() ? "" : created.diagnostics.front().message);
+        sacm_adapter::apply_create_terminology_package(*loaded.document, "Glossary", "Project glossary", "TP_NEW");
+    ASSERT_TRUE(created.applied) << (created.diagnostics.empty() ? "" : created.diagnostics.front().message);
     EXPECT_EQ(created.element_id, "TP_NEW");
     const std::vector<sacm::TerminologyPackage> library_packages =
         sacm_adapter::project_terminology_packages(*loaded.document);
@@ -1207,8 +1183,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_CreateTerminologyPackageMatchesLegacy) {
     const core::TerminologyPackageCreateResult legacy_result =
         core::CreateTerminologyPackageWithIds(legacy, "Glossary", "Project glossary", "TP_NEW", "");
     ASSERT_TRUE(legacy_result.success) << legacy_result.error;
-    const sacm::TerminologyPackage* legacy_tp =
-        find_terminology_package(legacy.terminologyPackages, "TP_NEW");
+    const sacm::TerminologyPackage* legacy_tp = find_terminology_package(legacy.terminologyPackages, "TP_NEW");
     ASSERT_NE(legacy_tp, nullptr);
 
     EXPECT_EQ(library_tp->name, legacy_tp->name);
@@ -1222,11 +1197,9 @@ TEST(SacmLibraryEdit, SACM23_INT_001_CreateTerminologyPackageMatchesLegacy) {
 TEST(SacmLibraryEdit, SACM23_INT_001_CreateTerminologyCategoryMatchesLegacy) {
     sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
     ASSERT_NE(loaded.document, nullptr);
-    const sacm_adapter::TerminologyCreateOutcome created =
-        sacm_adapter::apply_create_terminology_category(*loaded.document, "TP1", "Metrics",
-                                                        "Safety metrics", "CAT_NEW");
-    ASSERT_TRUE(created.applied)
-        << (created.diagnostics.empty() ? "" : created.diagnostics.front().message);
+    const sacm_adapter::TerminologyCreateOutcome created = sacm_adapter::apply_create_terminology_category(
+        *loaded.document, "TP1", "Metrics", "Safety metrics", "CAT_NEW");
+    ASSERT_TRUE(created.applied) << (created.diagnostics.empty() ? "" : created.diagnostics.front().message);
     EXPECT_EQ(created.element_id, "CAT_NEW");
     const std::vector<sacm::TerminologyPackage> library_packages =
         sacm_adapter::project_terminology_packages(*loaded.document);
@@ -1240,8 +1213,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_CreateTerminologyCategoryMatchesLegacy) {
     const core::TerminologyCategoryCreateResult legacy_result =
         core::CreateTerminologyCategoryWithIds(legacy, package_ref("TP1"), draft, "CAT_NEW", "");
     ASSERT_TRUE(legacy_result.success) << legacy_result.error;
-    const sacm::TerminologyPackage* legacy_tp =
-        find_terminology_package(legacy.terminologyPackages, "TP1");
+    const sacm::TerminologyPackage* legacy_tp = find_terminology_package(legacy.terminologyPackages, "TP1");
     ASSERT_NE(legacy_tp, nullptr);
     const sacm::Category* legacy_category = find_category(*legacy_tp, "CAT_NEW");
     ASSERT_NE(legacy_category, nullptr);
@@ -1256,20 +1228,18 @@ TEST(SacmLibraryEdit, SACM23_INT_001_CreateTerminologyCategoryMatchesLegacy) {
 // SetDescription + SetExpressionCategories) must reproduce the legacy
 // CreateTerminologyTermWithIds content across every draft field.
 TEST(SacmLibraryEdit, SACM23_INT_001_CreateTerminologyTermMatchesLegacy) {
-    const sacm_adapter::TerminologyTermFields fields{
-        .value = "Hazard",
-        .name = "Hazard",
-        .description = "A potential source of harm.",
-        .category_refs = {"CAT1", "CAT2"},
-        .external_reference = "ISO-99999",
-        .origin = "E1"};
+    const sacm_adapter::TerminologyTermFields fields{.value = "Hazard",
+                                                     .name = "Hazard",
+                                                     .description = "A potential source of harm.",
+                                                     .category_refs = {"CAT1", "CAT2"},
+                                                     .external_reference = "ISO-99999",
+                                                     .origin = "E1"};
 
     sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
     ASSERT_NE(loaded.document, nullptr);
     const sacm_adapter::TerminologyCreateOutcome created =
         sacm_adapter::apply_create_terminology_term(*loaded.document, "TP1", fields, "T_NEW");
-    ASSERT_TRUE(created.applied)
-        << (created.diagnostics.empty() ? "" : created.diagnostics.front().message);
+    ASSERT_TRUE(created.applied) << (created.diagnostics.empty() ? "" : created.diagnostics.front().message);
     EXPECT_EQ(created.element_id, "T_NEW");
     const std::vector<sacm::TerminologyPackage> library_packages =
         sacm_adapter::project_terminology_packages(*loaded.document);
@@ -1279,13 +1249,12 @@ TEST(SacmLibraryEdit, SACM23_INT_001_CreateTerminologyTermMatchesLegacy) {
     ASSERT_NE(library_term, nullptr);
 
     sacm::AssuranceCasePackage legacy = load_legacy_terminology();
-    const core::TerminologyTermDraft draft{"Hazard", "Hazard", "A potential source of harm.",
-                                           {"CAT1", "CAT2"}, "ISO-99999", "E1"};
+    const core::TerminologyTermDraft draft{
+        "Hazard", "Hazard", "A potential source of harm.", {"CAT1", "CAT2"}, "ISO-99999", "E1"};
     const core::TerminologyTermCreateResult legacy_result =
         core::CreateTerminologyTermWithIds(legacy, package_ref("TP1"), draft, "T_NEW", "");
     ASSERT_TRUE(legacy_result.success) << legacy_result.error;
-    const sacm::TerminologyPackage* legacy_tp =
-        find_terminology_package(legacy.terminologyPackages, "TP1");
+    const sacm::TerminologyPackage* legacy_tp = find_terminology_package(legacy.terminologyPackages, "TP1");
     ASSERT_NE(legacy_tp, nullptr);
     const sacm::Term* legacy_term = find_term(*legacy_tp, "T_NEW");
     ASSERT_NE(legacy_term, nullptr);
@@ -1304,8 +1273,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_UpdateTerminologyPackageMatchesLegacy) {
     ASSERT_NE(loaded.document, nullptr);
     const sacm_adapter::TerminologyEditOutcome edit = sacm_adapter::apply_update_terminology_package(
         *loaded.document, "TP1", "Renamed Terminology", "Updated description");
-    ASSERT_TRUE(edit.applied)
-        << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
+    ASSERT_TRUE(edit.applied) << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
     const std::vector<sacm::TerminologyPackage> library_packages =
         sacm_adapter::project_terminology_packages(*loaded.document);
     const sacm::TerminologyPackage* library_tp = find_terminology_package(library_packages, "TP1");
@@ -1313,11 +1281,10 @@ TEST(SacmLibraryEdit, SACM23_INT_001_UpdateTerminologyPackageMatchesLegacy) {
 
     sacm::AssuranceCasePackage legacy = load_legacy_terminology();
     std::string error;
-    ASSERT_TRUE(core::UpdateTerminologyPackage(legacy, package_ref("TP1"), "Renamed Terminology",
-                                               "Updated description", error))
+    ASSERT_TRUE(
+        core::UpdateTerminologyPackage(legacy, package_ref("TP1"), "Renamed Terminology", "Updated description", error))
         << error;
-    const sacm::TerminologyPackage* legacy_tp =
-        find_terminology_package(legacy.terminologyPackages, "TP1");
+    const sacm::TerminologyPackage* legacy_tp = find_terminology_package(legacy.terminologyPackages, "TP1");
     ASSERT_NE(legacy_tp, nullptr);
 
     EXPECT_EQ(library_tp->name, legacy_tp->name);
@@ -1333,8 +1300,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_UpdateTerminologyCategoryMatchesLegacy) {
     ASSERT_NE(loaded.document, nullptr);
     const sacm_adapter::TerminologyEditOutcome edit = sacm_adapter::apply_update_terminology_category(
         *loaded.document, "CAT1", "Renamed Concept", "Concept category");
-    ASSERT_TRUE(edit.applied)
-        << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
+    ASSERT_TRUE(edit.applied) << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
     const std::vector<sacm::TerminologyPackage> library_packages =
         sacm_adapter::project_terminology_packages(*loaded.document);
     const sacm::TerminologyPackage* library_tp = find_terminology_package(library_packages, "TP1");
@@ -1345,12 +1311,10 @@ TEST(SacmLibraryEdit, SACM23_INT_001_UpdateTerminologyCategoryMatchesLegacy) {
     sacm::AssuranceCasePackage legacy = load_legacy_terminology();
     const core::TerminologyCategoryDraft draft{"Renamed Concept", "Concept category"};
     std::string error;
-    ASSERT_TRUE(core::UpdateTerminologyCategory(legacy, package_ref("TP1"),
-                                                core::TerminologyCategoryRef{"CAT1", ""}, draft,
-                                                error))
+    ASSERT_TRUE(core::UpdateTerminologyCategory(
+        legacy, package_ref("TP1"), core::TerminologyCategoryRef{"CAT1", ""}, draft, error))
         << error;
-    const sacm::TerminologyPackage* legacy_tp =
-        find_terminology_package(legacy.terminologyPackages, "TP1");
+    const sacm::TerminologyPackage* legacy_tp = find_terminology_package(legacy.terminologyPackages, "TP1");
     ASSERT_NE(legacy_tp, nullptr);
     const sacm::Category* legacy_category = find_category(*legacy_tp, "CAT1");
     ASSERT_NE(legacy_category, nullptr);
@@ -1366,20 +1330,18 @@ TEST(SacmLibraryEdit, SACM23_INT_001_UpdateTerminologyCategoryMatchesLegacy) {
 // UpdateTerminologyTerm content across every draft field, leaving other
 // terminology elements (CAT1/CAT2/E1) intact.
 TEST(SacmLibraryEdit, SACM23_INT_001_UpdateTerminologyTermMatchesLegacy) {
-    const sacm_adapter::TerminologyTermFields fields{
-        .value = "Revised safety",
-        .name = "Safety (revised)",
-        .description = "Updated definition.",
-        .category_refs = {"CAT2"},
-        .external_reference = "ISO-54321",
-        .origin = "E1"};
+    const sacm_adapter::TerminologyTermFields fields{.value = "Revised safety",
+                                                     .name = "Safety (revised)",
+                                                     .description = "Updated definition.",
+                                                     .category_refs = {"CAT2"},
+                                                     .external_reference = "ISO-54321",
+                                                     .origin = "E1"};
 
     sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
     ASSERT_NE(loaded.document, nullptr);
     const sacm_adapter::TerminologyEditOutcome edit =
         sacm_adapter::apply_update_terminology_term(*loaded.document, "T1", fields);
-    ASSERT_TRUE(edit.applied)
-        << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
+    ASSERT_TRUE(edit.applied) << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
     const std::vector<sacm::TerminologyPackage> library_packages =
         sacm_adapter::project_terminology_packages(*loaded.document);
     const sacm::TerminologyPackage* library_tp = find_terminology_package(library_packages, "TP1");
@@ -1388,14 +1350,13 @@ TEST(SacmLibraryEdit, SACM23_INT_001_UpdateTerminologyTermMatchesLegacy) {
     ASSERT_NE(library_term, nullptr);
 
     sacm::AssuranceCasePackage legacy = load_legacy_terminology();
-    const core::TerminologyTermDraft draft{"Revised safety", "Safety (revised)",
-                                           "Updated definition.", {"CAT2"}, "ISO-54321", "E1"};
+    const core::TerminologyTermDraft draft{
+        "Revised safety", "Safety (revised)", "Updated definition.", {"CAT2"}, "ISO-54321", "E1"};
     std::string error;
-    ASSERT_TRUE(core::UpdateTerminologyTerm(legacy, package_ref("TP1"),
-                                            core::TerminologyTermRef{"T1", ""}, draft, error))
+    ASSERT_TRUE(
+        core::UpdateTerminologyTerm(legacy, package_ref("TP1"), core::TerminologyTermRef{"T1", ""}, draft, error))
         << error;
-    const sacm::TerminologyPackage* legacy_tp =
-        find_terminology_package(legacy.terminologyPackages, "TP1");
+    const sacm::TerminologyPackage* legacy_tp = find_terminology_package(legacy.terminologyPackages, "TP1");
     ASSERT_NE(legacy_tp, nullptr);
     const sacm::Term* legacy_term = find_term(*legacy_tp, "T1");
     ASSERT_NE(legacy_term, nullptr);
@@ -1418,15 +1379,13 @@ TEST(SacmLibraryEdit, SACM23_INT_001_UpdateTerminologyTermIsAtomicOnBadRef) {
     sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
     ASSERT_NE(loaded.document, nullptr);
 
-    const sacm_adapter::TerminologyTermFields fields{.value = "changed value",
-                                                     .name = "changed name",
-                                                     .category_refs = {"NO_SUCH_CATEGORY"}};
+    const sacm_adapter::TerminologyTermFields fields{
+        .value = "changed value", .name = "changed name", .category_refs = {"NO_SUCH_CATEGORY"}};
     const sacm_adapter::TerminologyEditOutcome edit =
         sacm_adapter::apply_update_terminology_term(*loaded.document, "T1", fields);
     EXPECT_FALSE(edit.applied) << "an unresolvable category ref must reject the update";
 
-    const std::vector<sacm::TerminologyPackage> after =
-        sacm_adapter::project_terminology_packages(*loaded.document);
+    const std::vector<sacm::TerminologyPackage> after = sacm_adapter::project_terminology_packages(*loaded.document);
     const sacm::TerminologyPackage* after_tp = find_terminology_package(after, "TP1");
     ASSERT_NE(after_tp, nullptr);
     const sacm::Term* term = find_term(*after_tp, "T1");
@@ -1446,12 +1405,11 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DeleteTerminologyTermMatchesLegacy) {
             sacm_adapter::project_terminology_packages(*loaded.document);
         const sacm::TerminologyPackage* before_tp = find_terminology_package(before, "TP1");
         ASSERT_NE(before_tp, nullptr);
-        ASSERT_NE(find_term(*before_tp, "T1"), nullptr);  // vacuity guard
+        ASSERT_NE(find_term(*before_tp, "T1"), nullptr); // vacuity guard
     }
     const sacm_adapter::TerminologyEditOutcome deleted =
         sacm_adapter::apply_delete_terminology_element(*loaded.document, "T1");
-    ASSERT_TRUE(deleted.applied)
-        << (deleted.diagnostics.empty() ? "" : deleted.diagnostics.front().message);
+    ASSERT_TRUE(deleted.applied) << (deleted.diagnostics.empty() ? "" : deleted.diagnostics.front().message);
     const std::vector<sacm::TerminologyPackage> library_packages =
         sacm_adapter::project_terminology_packages(*loaded.document);
     const sacm::TerminologyPackage* library_tp = find_terminology_package(library_packages, "TP1");
@@ -1460,17 +1418,14 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DeleteTerminologyTermMatchesLegacy) {
 
     sacm::AssuranceCasePackage legacy = load_legacy_terminology();
     std::string error;
-    ASSERT_TRUE(core::DeleteTerminologyTerm(legacy, package_ref("TP1"),
-                                            core::TerminologyTermRef{"T1", ""}, error))
+    ASSERT_TRUE(core::DeleteTerminologyTerm(legacy, package_ref("TP1"), core::TerminologyTermRef{"T1", ""}, error))
         << error;
-    const sacm::TerminologyPackage* legacy_tp =
-        find_terminology_package(legacy.terminologyPackages, "TP1");
+    const sacm::TerminologyPackage* legacy_tp = find_terminology_package(legacy.terminologyPackages, "TP1");
     ASSERT_NE(legacy_tp, nullptr);
 
     // Both paths remove T1 and keep CAT1, CAT2, E1.
     EXPECT_EQ(terminology_element_ids(*library_tp), terminology_element_ids(*legacy_tp));
-    EXPECT_EQ(terminology_element_ids(*library_tp),
-              (std::vector<std::string>{"CAT1", "CAT2", "E1"}));
+    EXPECT_EQ(terminology_element_ids(*library_tp), (std::vector<std::string>{"CAT1", "CAT2", "E1"}));
 }
 
 // SACM23-INT-001, terminology slice: associating a term with a visible element
@@ -1483,23 +1438,20 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AssociateTerminologyTermMatchesLegacy) {
     ASSERT_NE(loaded.document, nullptr);
     const sacm_adapter::TerminologyContextOutcome associated =
         sacm_adapter::apply_associate_terminology_term(*loaded.document, "G1", "T1", "AR_X", "AC_X");
-    ASSERT_TRUE(associated.applied)
-        << (associated.diagnostics.empty() ? "" : associated.diagnostics.front().message);
+    ASSERT_TRUE(associated.applied) << (associated.diagnostics.empty() ? "" : associated.diagnostics.front().message);
     EXPECT_TRUE(associated.created_artifact_reference);
     EXPECT_TRUE(associated.created_asserted_context);
     EXPECT_FALSE(associated.already_associated);
     EXPECT_EQ(associated.artifact_reference_id, "AR_X");
     EXPECT_EQ(associated.asserted_context_id, "AC_X");
-    const sacm::AssuranceCasePackage library_package =
-        core::project_library_package_with_tags(*loaded.document);
+    const sacm::AssuranceCasePackage library_package = core::project_library_package_with_tags(*loaded.document);
     const ContextLink library_link = extract_context_link(library_package, "AR_X", "AC_X");
     ASSERT_TRUE(library_link.found);
 
     sacm::AssuranceCasePackage legacy = load_legacy_terminology();
     const core::TerminologyContextForcedIds forced{"AR_X", "", "AC_X", ""};
-    const core::TerminologyContextAssociationResult legacy_result =
-        core::AssociateTerminologyTermWithElementWithIds(
-            legacy, "G1", package_ref("TP1"), core::TerminologyTermRef{"T1", ""}, forced);
+    const core::TerminologyContextAssociationResult legacy_result = core::AssociateTerminologyTermWithElementWithIds(
+        legacy, "G1", package_ref("TP1"), core::TerminologyTermRef{"T1", ""}, forced);
     ASSERT_TRUE(legacy_result.success) << legacy_result.error;
     EXPECT_TRUE(legacy_result.created_artifact_reference);
     EXPECT_TRUE(legacy_result.created_asserted_context);
@@ -1521,23 +1473,19 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddTerminologyVisibleContextMatchesLegacy) 
     sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
     ASSERT_NE(loaded.document, nullptr);
     const sacm_adapter::TerminologyContextOutcome added =
-        sacm_adapter::apply_add_terminology_visible_context(*loaded.document, "G1", "T1", "VR_X",
-                                                            "VC_X");
-    ASSERT_TRUE(added.applied)
-        << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
+        sacm_adapter::apply_add_terminology_visible_context(*loaded.document, "G1", "T1", "VR_X", "VC_X");
+    ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
     EXPECT_TRUE(added.created_artifact_reference);
     EXPECT_TRUE(added.created_asserted_context);
     EXPECT_FALSE(added.already_associated);
-    const sacm::AssuranceCasePackage library_package =
-        core::project_library_package_with_tags(*loaded.document);
+    const sacm::AssuranceCasePackage library_package = core::project_library_package_with_tags(*loaded.document);
     const ContextLink library_link = extract_context_link(library_package, "VR_X", "VC_X");
     ASSERT_TRUE(library_link.found);
 
     sacm::AssuranceCasePackage legacy = load_legacy_terminology();
     const core::TerminologyContextForcedIds forced{"VR_X", "", "VC_X", ""};
-    const core::TerminologyContextAssociationResult legacy_result =
-        core::AddTerminologyTermAsVisibleContextWithIds(
-            legacy, "G1", package_ref("TP1"), core::TerminologyTermRef{"T1", ""}, forced);
+    const core::TerminologyContextAssociationResult legacy_result = core::AddTerminologyTermAsVisibleContextWithIds(
+        legacy, "G1", package_ref("TP1"), core::TerminologyTermRef{"T1", ""}, forced);
     ASSERT_TRUE(legacy_result.success) << legacy_result.error;
     EXPECT_TRUE(legacy_result.created_artifact_reference);
     EXPECT_TRUE(legacy_result.created_asserted_context);
@@ -1558,8 +1506,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AssociateTerminologyTermReusesExisting) {
     ASSERT_NE(loaded.document, nullptr);
     const sacm_adapter::TerminologyContextOutcome first =
         sacm_adapter::apply_associate_terminology_term(*loaded.document, "G1", "T1");
-    ASSERT_TRUE(first.applied)
-        << (first.diagnostics.empty() ? "" : first.diagnostics.front().message);
+    ASSERT_TRUE(first.applied) << (first.diagnostics.empty() ? "" : first.diagnostics.front().message);
     ASSERT_TRUE(first.created_asserted_context);
     const sacm_adapter::TerminologyContextOutcome second =
         sacm_adapter::apply_associate_terminology_term(*loaded.document, "G1", "T1");
@@ -1572,12 +1519,10 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AssociateTerminologyTermReusesExisting) {
 
     sacm::AssuranceCasePackage legacy = load_legacy_terminology();
     const core::TerminologyContextAssociationResult legacy_first =
-        core::AssociateTerminologyTermWithElement(legacy, "G1", package_ref("TP1"),
-                                                  core::TerminologyTermRef{"T1", ""});
+        core::AssociateTerminologyTermWithElement(legacy, "G1", package_ref("TP1"), core::TerminologyTermRef{"T1", ""});
     ASSERT_TRUE(legacy_first.success) << legacy_first.error;
     const core::TerminologyContextAssociationResult legacy_second =
-        core::AssociateTerminologyTermWithElement(legacy, "G1", package_ref("TP1"),
-                                                  core::TerminologyTermRef{"T1", ""});
+        core::AssociateTerminologyTermWithElement(legacy, "G1", package_ref("TP1"), core::TerminologyTermRef{"T1", ""});
     ASSERT_TRUE(legacy_second.success) << legacy_second.error;
     EXPECT_TRUE(legacy_second.already_associated);
     EXPECT_FALSE(legacy_second.created_asserted_context);
@@ -1597,14 +1542,12 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddTerminologyVisibleContextPromotesExistin
         << (associated.diagnostics.empty() ? "" : associated.diagnostics.front().message);
     const sacm_adapter::TerminologyContextOutcome promoted =
         sacm_adapter::apply_add_terminology_visible_context(*loaded.document, "G1", "T1");
-    ASSERT_TRUE(promoted.applied)
-        << (promoted.diagnostics.empty() ? "" : promoted.diagnostics.front().message);
+    ASSERT_TRUE(promoted.applied) << (promoted.diagnostics.empty() ? "" : promoted.diagnostics.front().message);
     EXPECT_FALSE(promoted.created_artifact_reference) << "the existing reference is reused";
     EXPECT_FALSE(promoted.created_asserted_context) << "the existing context is promoted in place";
     EXPECT_EQ(promoted.artifact_reference_id, "AR_X");
     EXPECT_EQ(promoted.asserted_context_id, "AC_X");
-    const sacm::AssuranceCasePackage library_package =
-        core::project_library_package_with_tags(*loaded.document);
+    const sacm::AssuranceCasePackage library_package = core::project_library_package_with_tags(*loaded.document);
     const ContextLink library_link = extract_context_link(library_package, "AR_X", "AC_X");
     ASSERT_TRUE(library_link.found);
     EXPECT_TRUE(library_link.visible) << "the promoted context must read back as visible";
@@ -1615,8 +1558,7 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AddTerminologyVisibleContextPromotesExistin
                     legacy, "G1", package_ref("TP1"), core::TerminologyTermRef{"T1", ""}, forced)
                     .success);
     const core::TerminologyContextAssociationResult legacy_promoted =
-        core::AddTerminologyTermAsVisibleContext(legacy, "G1", package_ref("TP1"),
-                                                 core::TerminologyTermRef{"T1", ""});
+        core::AddTerminologyTermAsVisibleContext(legacy, "G1", package_ref("TP1"), core::TerminologyTermRef{"T1", ""});
     ASSERT_TRUE(legacy_promoted.success) << legacy_promoted.error;
     EXPECT_FALSE(legacy_promoted.created_artifact_reference);
     EXPECT_FALSE(legacy_promoted.created_asserted_context);
@@ -1670,8 +1612,7 @@ TEST(SacmLibraryEdit, SACM23_INT_002_DeletePreviewReportsConsequencesWithoutMuta
     ASSERT_TRUE(loaded.ok);
     ASSERT_NE(loaded.document, nullptr);
 
-    const sacm_adapter::DeletePreview preview =
-        sacm_adapter::preview_delete_elements(*loaded.document, {"G2"});
+    const sacm_adapter::DeletePreview preview = sacm_adapter::preview_delete_elements(*loaded.document, {"G2"});
     ASSERT_TRUE(preview.supported);
     EXPECT_TRUE(preview.can_apply);
 
@@ -1705,8 +1646,7 @@ TEST(SacmLibraryEdit, SACM23_INT_002_DeletePreviewUsesSetSemanticsNotPerElementU
     ASSERT_TRUE(sacm_adapter::reload_document(document, kMultiSourceInferenceXml));
 
     // One of three sources: the inference survives, scrubbed of G2.
-    const sacm_adapter::DeletePreview one =
-        sacm_adapter::preview_delete_elements(document, {"G2"});
+    const sacm_adapter::DeletePreview one = sacm_adapter::preview_delete_elements(document, {"G2"});
     ASSERT_TRUE(one.supported);
     const sacm_adapter::DeleteEffect* survives = find_effect(one.consequential, "R1");
     ASSERT_NE(survives, nullptr) << "the preview said nothing about the affected inference";
@@ -1715,14 +1655,12 @@ TEST(SacmLibraryEdit, SACM23_INT_002_DeletePreviewUsesSetSemanticsNotPerElementU
            "deleted would overstate the damage";
 
     // All three: the inference has no sources left and is removed.
-    const sacm_adapter::DeletePreview all =
-        sacm_adapter::preview_delete_elements(document, {"G2", "G3", "G4"});
+    const sacm_adapter::DeletePreview all = sacm_adapter::preview_delete_elements(document, {"G2", "G3", "G4"});
     ASSERT_TRUE(all.supported);
     const sacm_adapter::DeleteEffect* removed = find_effect(all.consequential, "R1");
     ASSERT_NE(removed, nullptr);
-    EXPECT_TRUE(removed->deleted)
-        << "deleting every source leaves the inference structurally empty, so it must be "
-           "reported as going away; a per-element preview would have missed this";
+    EXPECT_TRUE(removed->deleted) << "deleting every source leaves the inference structurally empty, so it must be "
+                                     "reported as going away; a per-element preview would have missed this";
     EXPECT_EQ(all.requested.size(), 3u);
 }
 
@@ -1733,13 +1671,11 @@ TEST(SacmLibraryEdit, SACM23_INT_002_DeletePreviewMatchesWhatApplyDoes) {
     ASSERT_TRUE(loaded.ok);
     ASSERT_NE(loaded.document, nullptr);
 
-    const sacm_adapter::DeletePreview preview =
-        sacm_adapter::preview_delete_elements(*loaded.document, {"G2"});
+    const sacm_adapter::DeletePreview preview = sacm_adapter::preview_delete_elements(*loaded.document, {"G2"});
     ASSERT_TRUE(preview.supported);
 
     std::vector<std::string> predicted_gone;
-    for (const std::vector<sacm_adapter::DeleteEffect>* bucket :
-         {&preview.requested, &preview.consequential}) {
+    for (const std::vector<sacm_adapter::DeleteEffect>* bucket : {&preview.requested, &preview.consequential}) {
         for (const sacm_adapter::DeleteEffect& effect : *bucket) {
             if (effect.deleted) {
                 predicted_gone.push_back(effect.element_id);
@@ -1749,8 +1685,7 @@ TEST(SacmLibraryEdit, SACM23_INT_002_DeletePreviewMatchesWhatApplyDoes) {
     std::sort(predicted_gone.begin(), predicted_gone.end());
 
     const core::AssuranceCase before = sacm_adapter::project_case(*loaded.document);
-    const sacm_adapter::DeleteOutcome applied =
-        sacm_adapter::apply_delete_element(*loaded.document, "G2");
+    const sacm_adapter::DeleteOutcome applied = sacm_adapter::apply_delete_element(*loaded.document, "G2");
     ASSERT_TRUE(applied.applied);
     const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
 

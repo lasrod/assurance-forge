@@ -48,8 +48,7 @@ namespace {
 // handle stays overlapped once connected, so every read and write on it must
 // pass an OVERLAPPED too -- hence the client opens overlapped as well, and both
 // ends share one I/O path rather than two that drift.
-bool OverlappedIo(HANDLE handle, HANDLE io_event, void* buffer, DWORD size, DWORD& transferred,
-                  bool writing) {
+bool OverlappedIo(HANDLE handle, HANDLE io_event, void* buffer, DWORD size, DWORD& transferred, bool writing) {
     OVERLAPPED overlapped{};
     overlapped.hEvent = io_event;
     ResetEvent(io_event);
@@ -69,8 +68,8 @@ std::string LastErrorText(const char* what) {
 } // namespace
 
 struct Connection::Impl {
-    HANDLE      handle   = INVALID_HANDLE_VALUE;
-    HANDLE      io_event = nullptr;
+    HANDLE handle = INVALID_HANDLE_VALUE;
+    HANDLE io_event = nullptr;
     std::string pending;
 
     ~Impl() {
@@ -84,14 +83,14 @@ struct Connection::Impl {
 };
 
 struct Listener::Impl {
-    std::string       address;
-    HANDLE            stop_event = nullptr;
+    std::string address;
+    HANDLE stop_event = nullptr;
     // The instance currently waiting for a client. One always exists between
     // `Start` and the connection that consumes it, so "the listener started"
     // and "a client can connect" mean the same thing. Creating it lazily inside
     // `Accept` instead left a window in which a client connecting immediately
     // after startup got ERROR_FILE_NOT_FOUND.
-    HANDLE            pending = INVALID_HANDLE_VALUE;
+    HANDLE pending = INVALID_HANDLE_VALUE;
     std::atomic<bool> stopping{false};
 
     ~Impl() {
@@ -111,10 +110,14 @@ namespace {
 // That is the access control; the per-connection token in `bridge/protocol.h` is
 // the second gate, against another process running as the same user.
 HANDLE CreatePipeInstance(const std::string& address) {
-    return CreateNamedPipeA(address.c_str(), PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
+    return CreateNamedPipeA(address.c_str(),
+                            PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
                             PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
-                            PIPE_UNLIMITED_INSTANCES, static_cast<DWORD>(kReadChunk),
-                            static_cast<DWORD>(kReadChunk), 0, nullptr);
+                            PIPE_UNLIMITED_INSTANCES,
+                            static_cast<DWORD>(kReadChunk),
+                            static_cast<DWORD>(kReadChunk),
+                            0,
+                            nullptr);
 }
 
 } // namespace
@@ -127,13 +130,13 @@ std::unique_ptr<Connection> Connection::Connect(const std::string& address, std:
     // instant sees no instance at all. Both outcomes are momentary and worth a
     // short retry; neither is worth hanging on, because "no application running"
     // is the ordinary case for the adapter and must stay fast.
-    constexpr int kAttempts   = 5;
+    constexpr int kAttempts = 5;
     constexpr DWORD kBackoffMs = 20;
 
     HANDLE handle = INVALID_HANDLE_VALUE;
     for (int attempt = 0; attempt < kAttempts; ++attempt) {
-        handle = CreateFileA(address.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr,
-                             OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
+        handle = CreateFileA(
+            address.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
         if (handle != INVALID_HANDLE_VALUE) {
             break;
         }
@@ -160,8 +163,8 @@ std::unique_ptr<Connection> Connection::Connect(const std::string& address, std:
     }
 
     std::unique_ptr<Impl> impl = std::make_unique<Impl>();
-    impl->handle               = handle;
-    impl->io_event             = CreateEventA(nullptr, TRUE, FALSE, nullptr);
+    impl->handle = handle;
+    impl->io_event = CreateEventA(nullptr, TRUE, FALSE, nullptr);
     if (impl->io_event == nullptr) {
         error = LastErrorText("CreateEvent");
         return nullptr;
@@ -173,8 +176,8 @@ std::unique_ptr<Listener> Listener::Start(const std::string& address, std::strin
     error.clear();
 
     std::unique_ptr<Impl> impl = std::make_unique<Impl>();
-    impl->address              = address;
-    impl->stop_event           = CreateEventA(nullptr, TRUE, FALSE, nullptr);
+    impl->address = address;
+    impl->stop_event = CreateEventA(nullptr, TRUE, FALSE, nullptr);
     if (impl->stop_event == nullptr) {
         error = LastErrorText("CreateEvent");
         return nullptr;
@@ -196,7 +199,7 @@ std::unique_ptr<Connection> Listener::Accept(std::string& error) {
     // Consume the waiting instance and put a fresh one in its place before
     // returning, so the address never stops being connectable.
     const HANDLE pipe = impl_->pending;
-    impl_->pending    = INVALID_HANDLE_VALUE;
+    impl_->pending = INVALID_HANDLE_VALUE;
     if (pipe == INVALID_HANDLE_VALUE) {
         error = "The bridge listener has no pipe instance.";
         return nullptr;
@@ -220,10 +223,10 @@ std::unique_ptr<Connection> Listener::Accept(std::string& error) {
             connected = true;
         } else if (status == ERROR_IO_PENDING) {
             const HANDLE waits[] = {connect_event, impl_->stop_event};
-            const DWORD  which   = WaitForMultipleObjects(2, waits, FALSE, INFINITE);
+            const DWORD which = WaitForMultipleObjects(2, waits, FALSE, INFINITE);
             if (which == WAIT_OBJECT_0) {
                 DWORD ignored = 0;
-                connected     = GetOverlappedResult(pipe, &overlapped, &ignored, FALSE) != FALSE;
+                connected = GetOverlappedResult(pipe, &overlapped, &ignored, FALSE) != FALSE;
             } else {
                 // Stopped, or the wait itself failed. Either way this listener is
                 // finished; an empty `error` marks the clean case.
@@ -253,8 +256,8 @@ std::unique_ptr<Connection> Listener::Accept(std::string& error) {
     impl_->pending = CreatePipeInstance(impl_->address);
 
     std::unique_ptr<Connection::Impl> impl = std::make_unique<Connection::Impl>();
-    impl->handle                           = pipe;
-    impl->io_event                         = CreateEventA(nullptr, TRUE, FALSE, nullptr);
+    impl->handle = pipe;
+    impl->io_event = CreateEventA(nullptr, TRUE, FALSE, nullptr);
     if (impl->io_event == nullptr) {
         error = LastErrorText("CreateEvent");
         return nullptr;
@@ -288,10 +291,9 @@ bool Connection::ReadMessage(std::string& out_message) {
             return false;
         }
 
-        char        buffer[kReadChunk];
-        DWORD       read = 0;
-        if (!OverlappedIo(impl_->handle, impl_->io_event, buffer, static_cast<DWORD>(kReadChunk),
-                          read, false) ||
+        char buffer[kReadChunk];
+        DWORD read = 0;
+        if (!OverlappedIo(impl_->handle, impl_->io_event, buffer, static_cast<DWORD>(kReadChunk), read, false) ||
             read == 0) {
             return false;
         }
@@ -309,8 +311,12 @@ bool Connection::WriteMessage(const std::string& message) {
     std::size_t offset = 0;
     while (offset < framed.size()) {
         DWORD written = 0;
-        if (!OverlappedIo(impl_->handle, impl_->io_event, framed.data() + offset,
-                          static_cast<DWORD>(framed.size() - offset), written, true) ||
+        if (!OverlappedIo(impl_->handle,
+                          impl_->io_event,
+                          framed.data() + offset,
+                          static_cast<DWORD>(framed.size() - offset),
+                          written,
+                          true) ||
             written == 0) {
             return false;
         }
@@ -351,7 +357,7 @@ std::string ErrnoText(const char* what) {
 } // namespace
 
 struct Connection::Impl {
-    int         fd = -1;
+    int fd = -1;
     std::string pending;
 
     ~Impl() {
@@ -362,10 +368,10 @@ struct Connection::Impl {
 };
 
 struct Listener::Impl {
-    int               fd         = -1;
-    int               stop_read  = -1;
-    int               stop_write = -1;
-    std::string       address;
+    int fd = -1;
+    int stop_read = -1;
+    int stop_write = -1;
+    std::string address;
     std::atomic<bool> stopping{false};
 
     ~Impl() {
@@ -404,7 +410,7 @@ std::unique_ptr<Connection> Connection::Connect(const std::string& address, std:
     }
 
     std::unique_ptr<Impl> impl = std::make_unique<Impl>();
-    impl->fd                   = fd;
+    impl->fd = fd;
     return std::unique_ptr<Connection>(new Connection(std::move(impl)));
 }
 
@@ -459,10 +465,10 @@ std::unique_ptr<Listener> Listener::Start(const std::string& address, std::strin
     }
 
     std::unique_ptr<Impl> impl = std::make_unique<Impl>();
-    impl->fd                   = fd;
-    impl->stop_read            = stop_pipe[0];
-    impl->stop_write           = stop_pipe[1];
-    impl->address              = address;
+    impl->fd = fd;
+    impl->stop_read = stop_pipe[0];
+    impl->stop_write = stop_pipe[1];
+    impl->address = address;
     return std::unique_ptr<Listener>(new Listener(std::move(impl)));
 }
 
@@ -472,9 +478,9 @@ std::unique_ptr<Connection> Listener::Accept(std::string& error) {
         // `accept` cannot be interrupted portably, so the wait happens in `poll`
         // over both the listening socket and a self-pipe `Stop` writes to.
         pollfd waits[2]{};
-        waits[0].fd     = impl_->fd;
+        waits[0].fd = impl_->fd;
         waits[0].events = POLLIN;
-        waits[1].fd     = impl_->stop_read;
+        waits[1].fd = impl_->stop_read;
         waits[1].events = POLLIN;
 
         const int ready = ::poll(waits, 2, -1);
@@ -502,7 +508,7 @@ std::unique_ptr<Connection> Listener::Accept(std::string& error) {
         }
 
         std::unique_ptr<Connection::Impl> impl = std::make_unique<Connection::Impl>();
-        impl->fd                               = accepted;
+        impl->fd = accepted;
         return std::unique_ptr<Connection>(new Connection(std::move(impl)));
     }
     return nullptr;
@@ -536,7 +542,7 @@ bool Connection::ReadMessage(std::string& out_message) {
             return false;
         }
 
-        char          buffer[kReadChunk];
+        char buffer[kReadChunk];
         const ssize_t read = ::read(impl_->fd, buffer, kReadChunk);
         if (read < 0) {
             if (errno == EINTR) {

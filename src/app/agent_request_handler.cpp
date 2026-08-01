@@ -23,11 +23,10 @@ bridge::Response FromAgentResult(std::uint64_t id, const agent::Result& result) 
 // alternative, which is an agent silently reasoning about a document nobody is
 // looking at -- the fault that made an earlier design propose changes against
 // the wrong file.
-agent::Result OpenCaseFile(const agent::ReadContext& read, const nlohmann::json& args,
-                           const AgentRequestContext& context) {
+agent::Result
+OpenCaseFile(const agent::ReadContext& read, const nlohmann::json& args, const AgentRequestContext& context) {
     if (!context.state.current_project.has_value()) {
-        return agent::Result::Error(
-            "This is a standalone SACM file, so there is nothing to switch between.");
+        return agent::Result::Error("This is a standalone SACM file, so there is nothing to switch between.");
     }
     const nlohmann::json::const_iterator path = args.find("path");
     if (path == args.end() || !path->is_string() || path->get<std::string>().empty()) {
@@ -48,14 +47,13 @@ agent::Result OpenCaseFile(const agent::ReadContext& read, const nlohmann::json&
 
 bool IsChangeOperation(const std::string& op) {
     return op == "begin_change_set" || op == "stage_operations" || op == "unstage_operations" ||
-           op == "describe_change_set" || op == "submit_change_set" ||
-           op == "discard_change_set" || op == "list_change_sets";
+           op == "describe_change_set" || op == "submit_change_set" || op == "discard_change_set" ||
+           op == "list_change_sets";
 }
 
 } // namespace
 
-bridge::Response HandleAgentRequest(const bridge::Request& request,
-                                    const AgentRequestContext& context) {
+bridge::Response HandleAgentRequest(const bridge::Request& request, const AgentRequestContext& context) {
     const agent::ReadContext read{context.state, context.project_path};
 
     if (request.op == "get_case_overview") {
@@ -82,13 +80,12 @@ bridge::Response HandleAgentRequest(const bridge::Request& request,
 
     if (IsChangeOperation(request.op)) {
         if (context.change_sets == nullptr) {
-            return FromAgentResult(
-                request.id,
-                agent::Result::Error("This is a standalone SACM file rather than a project, so "
-                                     "there is nowhere to record a proposed change."));
+            return FromAgentResult(request.id,
+                                   agent::Result::Error("This is a standalone SACM file rather than a project, so "
+                                                        "there is nowhere to record a proposed change."));
         }
-        const agent::ChangeContext change{context.state, *context.change_sets,
-                                          context.connection_id, context.client_label};
+        const agent::ChangeContext change{
+            context.state, *context.change_sets, context.connection_id, context.client_label};
 
         if (request.op == "begin_change_set") {
             return FromAgentResult(request.id, agent::BeginChangeSet(change, request.args));
@@ -111,7 +108,8 @@ bridge::Response HandleAgentRequest(const bridge::Request& request,
         return FromAgentResult(request.id, agent::ListChangeSets(change));
     }
 
-    return bridge::MakeError(request.id, bridge::error_code::kUnknownOperation,
+    return bridge::MakeError(request.id,
+                             bridge::error_code::kUnknownOperation,
                              "Assurance Forge does not support the operation \"" + request.op +
                                  "\". It may come from a newer assurance-forge-mcp than this "
                                  "application.");

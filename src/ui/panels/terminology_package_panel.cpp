@@ -196,8 +196,8 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
         ImGui::PushID(static_cast<int>(term_index));
         const ImGuiSelectableFlags selectable_flags =
             ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
-        if (ImGui::Selectable(term.value.empty() ? AF_TR("<empty>").c_str() : term.value.c_str(), selected,
-                              selectable_flags) &&
+        if (ImGui::Selectable(
+                term.value.empty() ? AF_TR("<empty>").c_str() : term.value.c_str(), selected, selectable_flags) &&
             callbacks.select_term) {
             callbacks.select_term(ref);
         }
@@ -337,15 +337,17 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     ImGui::Spacing();
 
     ImGui::SetNextItemWidth(-1.0f);
-    if (ImGui::InputText((AF_TR("Package name") + "##package_name").c_str(), model.name_buffer,
-                         model.name_buffer_size) &&
+    if (ImGui::InputText(
+            (AF_TR("Package name") + "##package_name").c_str(), model.name_buffer, model.name_buffer_size) &&
         callbacks.apply_changes) {
         callbacks.apply_changes();
     }
 
     ImGui::SetNextItemWidth(-1.0f);
     if (ImGui::InputTextMultiline((AF_TR("Package description") + "##package_description").c_str(),
-                                  model.description_buffer, model.description_buffer_size, ImVec2(-1.0f, 96.0f)) &&
+                                  model.description_buffer,
+                                  model.description_buffer_size,
+                                  ImVec2(-1.0f, 96.0f)) &&
         callbacks.apply_changes) {
         callbacks.apply_changes();
     }

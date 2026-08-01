@@ -20,16 +20,13 @@ std::filesystem::path fixture(std::string_view name) {
     return std::filesystem::path(SACM_TEST_DATA_DIR) / "sacm23" / name;
 }
 
-bool has_code(const std::vector<sacm::validation::Diagnostic>& diagnostics,
-              std::string_view code) {
-    return std::ranges::any_of(diagnostics, [&](const auto& diagnostic) {
-        return diagnostic.code == code;
-    });
+bool has_code(const std::vector<sacm::validation::Diagnostic>& diagnostics, std::string_view code) {
+    return std::ranges::any_of(diagnostics, [&](const auto& diagnostic) { return diagnostic.code == code; });
 }
 
 TEST(Sacm23XmiConformance, SACM23_XMI_001_ImportsMinimalAssuranceCasePackage) {
-    const LoadResult result = sacm::io::load_xmi_file(fixture("package-minimal-valid.sacm.xmi"),
-                                                      LoadOptions{.mode = Mode::Strict});
+    const LoadResult result =
+        sacm::io::load_xmi_file(fixture("package-minimal-valid.sacm.xmi"), LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(result.ok) << (result.diagnostics.empty() ? "" : result.diagnostics.front().message);
     ASSERT_TRUE(result.document.has_value());
     const auto& document = *result.document;
@@ -45,12 +42,11 @@ TEST(Sacm23XmiConformance, SACM23_XMI_001_ImportsMinimalAssuranceCasePackage) {
 }
 
 TEST(Sacm23XmiConformance, SACM23_XMI_001_AcceptsXmiWrapperAndXsiType) {
-    const LoadResult result = sacm::io::load_xmi_file(
-        fixture("argument-claim-xsitype-valid.sacm.xmi"), LoadOptions{.mode = Mode::Strict});
+    const LoadResult result =
+        sacm::io::load_xmi_file(fixture("argument-claim-xsitype-valid.sacm.xmi"), LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(result.ok) << (result.diagnostics.empty() ? "" : result.diagnostics.front().message);
     const auto& document = *result.document;
-    const auto* inference =
-        document.find_as<sacm::model::AssertedInference>(ElementId{"inf_1"});
+    const auto* inference = document.find_as<sacm::model::AssertedInference>(ElementId{"inf_1"});
     ASSERT_NE(inference, nullptr);
     ASSERT_EQ(inference->sources().size(), 1u);
     EXPECT_EQ(inference->sources().front().value(), "claim_sub");
@@ -80,15 +76,15 @@ TEST(Sacm23XmiConformance, SACM23_XMI_002_ImportIsPrefixIndependent) {
 }
 
 TEST(Sacm23Validation, SACM23_XMI_003_ReportsBrokenReference) {
-    const LoadResult result = sacm::io::load_xmi_file(
-        fixture("invalid/ref-dangling-invalid.sacm.xmi"), LoadOptions{.mode = Mode::Strict});
+    const LoadResult result =
+        sacm::io::load_xmi_file(fixture("invalid/ref-dangling-invalid.sacm.xmi"), LoadOptions{.mode = Mode::Strict});
     EXPECT_FALSE(result.ok);
     EXPECT_TRUE(has_code(result.diagnostics, sacm::validation::codes::kRefDangling));
 }
 
 TEST(Sacm23Validation, SACM23_XMI_003_ReportsDuplicateIds) {
-    const LoadResult result = sacm::io::load_xmi_file(
-        fixture("invalid/ids-duplicate-invalid.sacm.xmi"), LoadOptions{.mode = Mode::Strict});
+    const LoadResult result =
+        sacm::io::load_xmi_file(fixture("invalid/ids-duplicate-invalid.sacm.xmi"), LoadOptions{.mode = Mode::Strict});
     EXPECT_FALSE(result.ok);
     EXPECT_TRUE(has_code(result.diagnostics, sacm::validation::codes::kIdDuplicate));
 }
@@ -165,15 +161,14 @@ TEST(Sacm23Validation, SACM23_XMI_001_RejectsNonPackageRoot) {
 }
 
 TEST(Sacm23Validation, SACM23_SEC_001_RejectsDoctype) {
-    const LoadResult result =
-        sacm::io::load_xmi_file(fixture("invalid/sec-doctype-invalid.sacm.xmi"));
+    const LoadResult result = sacm::io::load_xmi_file(fixture("invalid/sec-doctype-invalid.sacm.xmi"));
     EXPECT_FALSE(result.ok);
     EXPECT_TRUE(has_code(result.diagnostics, sacm::validation::codes::kXmlDoctypeRejected));
 }
 
 TEST(Sacm23Validation, SACM23_VAL_001_DiagnosticsAreMachineReadable) {
-    const LoadResult result = sacm::io::load_xmi_file(
-        fixture("invalid/ref-dangling-invalid.sacm.xmi"), LoadOptions{.mode = Mode::Strict});
+    const LoadResult result =
+        sacm::io::load_xmi_file(fixture("invalid/ref-dangling-invalid.sacm.xmi"), LoadOptions{.mode = Mode::Strict});
     ASSERT_FALSE(result.diagnostics.empty());
     const auto it = std::ranges::find_if(result.diagnostics, [](const auto& diagnostic) {
         return diagnostic.code == sacm::validation::codes::kRefDangling;
@@ -193,16 +188,21 @@ TEST(Sacm23Library, SACM23_LIB_003_PublicApiDoesNotExposeLayoutOrGoalTerminology
         std::filesystem::path(SACM_TEST_DATA_DIR).parent_path().parent_path() / "include";
     ASSERT_TRUE(std::filesystem::is_directory(include_dir));
     constexpr std::string_view kForbidden[] = {
-        "Goal",   "Strategy", "Solution",  "Canvas",
-        "TreeItem", "ImGui",  "coordinate", "layout",
+        "Goal",
+        "Strategy",
+        "Solution",
+        "Canvas",
+        "TreeItem",
+        "ImGui",
+        "coordinate",
+        "layout",
     };
     for (const auto& entry : std::filesystem::recursive_directory_iterator(include_dir)) {
         if (!entry.is_regular_file() || entry.path().extension() != ".h") {
             continue;
         }
         std::ifstream stream(entry.path());
-        std::string content((std::istreambuf_iterator<char>(stream)),
-                            std::istreambuf_iterator<char>());
+        std::string content((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
         for (const std::string_view term : kForbidden) {
             EXPECT_EQ(content.find(term), std::string::npos)
                 << entry.path().string() << " contains forbidden term '" << term << "'";
@@ -210,4 +210,4 @@ TEST(Sacm23Library, SACM23_LIB_003_PublicApiDoesNotExposeLayoutOrGoalTerminology
     }
 }
 
-}  // namespace
+} // namespace
