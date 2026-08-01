@@ -117,3 +117,29 @@ Assurance Forge uses C++23 with the standard library. Keep modern C++ usage cons
 ### Formatting
 
 The repository root contains `.clang-format` and `.editorconfig` for project-owned files. Formatting should be mechanical and separate from behavior changes when practical. Do not reformat files under `external` unless intentionally updating vendored code according to that upstream's rules.
+
+Formatting is applied **at commit time**, not checked in CI. Configuring the
+build (`cmake --preset default`) points `core.hooksPath` at `.githooks`, whose
+`pre-commit` hook runs `clang-format` over the staged C/C++ files and restages
+them. You should never need to think about it; a commit is simply already in
+style.
+
+Three things worth knowing:
+
+- **A file staged with unstaged changes alongside it is not rewritten.** The
+  hook would otherwise sweep your work-in-progress into the commit as a side
+  effect of formatting. It tells you, and you either stage the whole file or
+  format the staged part yourself.
+- **No clang-format on PATH means no formatting**, with a warning. The hook does
+  not block a commit over a missing tool.
+- `git commit --no-verify` skips it when you need to.
+
+If `core.hooksPath` is already set to something of your own, CMake leaves it
+alone and says so — run `git config --local core.hooksPath .githooks` if you
+want the project's hooks.
+
+To reformat the whole tree after a `.clang-format` change:
+
+```bash
+clang-format -i --style=file $(git ls-files '*.c' '*.cc' '*.cpp' '*.h' '*.hh' '*.hpp' | grep -v '^external/')
+```

@@ -1,3 +1,7 @@
 *.sh text eol=lf
+# Git hooks are run by sh, including Git for Windows' sh. Checked out with CRLF
+# the shebang becomes `#!/bin/sh\r` and every hook fails with "bad interpreter",
+# so a Windows clone would silently lose commit-time formatting.
+.githooks/** text eol=lf
 # SACM XMI fixtures are byte-compared against writer output (LF).
 *.xmi text eol=lf

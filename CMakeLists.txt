@@ -197,6 +197,16 @@ endfunction()
 
 add_subdirectory(src)
 
+# --- Git hooks ---
+# Points core.hooksPath at the checked-in .githooks so staged C/C++ is formatted
+# on commit. Configure time, because everyone builds and nobody remembers a
+# separate setup step.
+# Deliberately NOT named AF_SOURCE_DIR: check_layer_gates.cmake below reads that
+# name and defaults it to <repo>/src, so setting it here would silently point the
+# layer gate at the repository root instead.
+set(AF_REPO_ROOT ${CMAKE_SOURCE_DIR})
+include(${CMAKE_SOURCE_DIR}/cmake/install_git_hooks.cmake)
+
 # --- Layer-gate check ---
 # Standalone CMake script enforces src/ include-direction rules.
 # Runs at configure time so violations fail fast.

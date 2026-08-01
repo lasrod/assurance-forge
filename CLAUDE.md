@@ -75,7 +75,7 @@ Every user-visible string goes through `ui::i18n`. Catalog source of truth: `too
 
 ## C++ Style
 
-- C++23, standard library. Column limit: 120. Format with `clang-format` (LLVM-based, config in `.clang-format`).
+- C++23, standard library. Column limit: 120. Formatting is applied on commit by the `.githooks/pre-commit` hook, which `cmake --preset default` installs via `core.hooksPath`. There is no CI format gate. A file staged with unstaged changes alongside it is reported rather than rewritten, so formatting never sweeps work-in-progress into a commit.
 - Prefer explicit types over `auto` unless the type is noisy or impractical to spell.
 - Prefer named helper functions over non-trivial lambdas.
 - Full words for names; abbreviations only for established domain terms (SACM, GSN, SCCG, ACP).

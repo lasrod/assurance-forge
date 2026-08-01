@@ -1,0 +1,76 @@
+#!/bin/sh
+#
+# Format staged C/C++ sources so every commit is already in project style.
+#
+# We format at commit time rather than gating in CI: the point is that the tree
+# stays formatted, not that contributors get told off after the fact. `git
+# commit --no-verify` skips this when you need it.
+#
+# Installed by `cmake/install_git_hooks.cmake` at configure time, which points
+# `core.hooksPath` at this directory. Hooks in `.git/hooks` are not checked in,
+# so that indirection is what lets everyone get the same hook.
+
+set -e
+
+if ! command -v clang-format >/dev/null 2>&1; then
+    echo "pre-commit: clang-format not found on PATH; committing without formatting." >&2
+    echo "pre-commit: install LLVM to keep sources in project style." >&2
+    exit 0
+fi
+
+# `external/` is third-party and follows its own upstream style (CONTRIBUTING).
+# Keep this filter in step with the one in cmake/install_git_hooks.cmake's docs.
+staged=$(git diff --cached --name-only --diff-filter=ACMR \
+    | grep -E '\.(c|cc|cpp|h|hh|hpp)$' \
+    | grep -v '^external/' || true)
+
+if [ -z "$staged" ]; then
+    exit 0
+fi
+
+tmp_staged=$(mktemp)
+tmp_formatted=$(mktemp)
+trap 'rm -f "$tmp_staged" "$tmp_formatted"' EXIT
+
+formatted_count=0
+blocked=""
+
+for file in $staged; do
+    # A file can be staged in one state and present in the working tree in
+    # another. Formatting the working tree and re-adding it would sweep the
+    # unstaged edits into the commit as a side effect of formatting -- a
+    # surprise the author never asked for and would not see in the diff they
+    # reviewed. So for a partially staged file we check rather than rewrite.
+    if ! git diff --quiet -- "$file"; then
+        git show ":$file" > "$tmp_staged"
+        clang-format --style=file --assume-filename="$file" < "$tmp_staged" > "$tmp_formatted"
+        if ! cmp -s "$tmp_staged" "$tmp_formatted"; then
+            blocked="$blocked  $file\n"
+        fi
+        continue
+    fi
+
+    before=$(git hash-object "$file")
+    clang-format -i --style=file "$file"
+    after=$(git hash-object "$file")
+    if [ "$before" != "$after" ]; then
+        git add -- "$file"
+        formatted_count=$((formatted_count + 1))
+    fi
+done
+
+if [ -n "$blocked" ]; then
+    echo "pre-commit: these files are staged with unstaged changes alongside," >&2
+    echo "and what you staged is not formatted:" >&2
+    printf "%b" "$blocked" >&2
+    echo "Formatting them here would also commit the unstaged edits, so it is" >&2
+    echo "left to you. Either stage the whole file, or format the staged part:" >&2
+    echo "  clang-format -i --style=file <file> && git add <file>" >&2
+    exit 1
+fi
+
+if [ "$formatted_count" -gt 0 ]; then
+    echo "pre-commit: formatted $formatted_count staged file(s) and restaged them."
+fi
+
+exit 0
