@@ -800,8 +800,8 @@ TRANSLATIONS = {
         "{0} は関係 {1} によって支持されていますが、GSN で支持を受けられるのはゴールまたは戦略のみです。",
     "{0} is given context by relationship {1}, but only a Goal or a Strategy is declared in "
     "context in GSN.":
-        "{0} は関係 {1} によってコンテキストを与えられていますが、GSN でコンテキストの中で述べられるのは "
-        "ゴールまたは戦略のみです。",
+        "{0} は関係 {1} によってコンテキストを与えられていますが、"
+        "GSN でコンテキストの中で述べられるのはゴールまたは戦略のみです。",
     "Strategy {0} is wired as an end of relationship {1}. A Strategy is the reasoning of an "
     "inference, not one of its ends.":
         "戦略 {0} が関係 {1} の端点として接続されています。戦略は推論の理由付けであり、"

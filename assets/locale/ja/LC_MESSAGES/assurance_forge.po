@@ -2030,7 +2030,7 @@ msgid "{0} has {1} visible meanings. Choose the intended terminology entry."
 msgstr "{0} には {1} 件の表示可能な意味があります。意図する用語項目を選択してください。"
 
 msgid "{0} is given context by relationship {1}, but only a Goal or a Strategy is declared in context in GSN."
-msgstr "{0} は関係 {1} によってコンテキストを与えられていますが、GSN でコンテキストの中で述べられるのは ゴールまたは戦略のみです。"
+msgstr "{0} は関係 {1} によってコンテキストを与えられていますが、GSN でコンテキストの中で述べられるのはゴールまたは戦略のみです。"
 
 msgid "{0} is marked undeveloped but is already supported. Either the decorator or the support is out of date."
 msgstr "{0} は未展開と示されていますが、すでに支持されています。装飾か支持のいずれかが古くなっています。"

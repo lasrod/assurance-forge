@@ -236,6 +236,98 @@ TEST(LibraryReplayConvergence, MultiEditElementSequenceConvergesWithLegacyReplay
     EXPECT_EQ(*library_hash, *legacy_hash);
 }
 
+// The GSN repair events must replay into a library document, not just through
+// the legacy mutators. They were added to `ApplyEvent` and missed in
+// `ApplyEventToLibrary`, which ends in "Unknown event type" -- so any project
+// where a user had repaired a reported GSN defect would have failed to replay,
+// restore or verify. Nothing caught it, because no test replayed a repair.
+TEST(LibraryReplayConvergence, GsnRepairEventsConvergeWithLegacyReplay) {
+    auto f = MakeFixture("gsn_repair");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package};
+
+    // Build something to repair: a strategy over two sub-goals, plus a context.
+    core::commands::CreateChildElementCommand add_strategy("G1", core::NewElementKind::Strategy);
+    ASSERT_TRUE(bus->Execute(add_strategy, ctx, "tester").success);
+    const std::string strategy_id = add_strategy.GeneratedId();
+
+    core::commands::CreateChildElementCommand add_sub1(strategy_id, core::NewElementKind::Goal);
+    ASSERT_TRUE(bus->Execute(add_sub1, ctx, "tester").success);
+    const std::string sub1_id = add_sub1.GeneratedId();
+    const std::string inference_id = add_sub1.GeneratedRelationshipId();
+    ASSERT_FALSE(inference_id.empty());
+
+    core::commands::CreateChildElementCommand add_sub2(strategy_id, core::NewElementKind::Goal);
+    ASSERT_TRUE(bus->Execute(add_sub2, ctx, "tester").success);
+
+    core::commands::CreateChildElementCommand add_context("G1", core::NewElementKind::Context);
+    ASSERT_TRUE(bus->Execute(add_context, ctx, "tester").success);
+    const std::string context_relationship_id = add_context.GeneratedRelationshipId();
+    ASSERT_FALSE(context_relationship_id.empty());
+
+    // Withdraw the context relationship: the context element itself survives.
+    core::commands::RemoveRelationshipCommand remove_relationship(context_relationship_id);
+    ASSERT_TRUE(bus->Execute(remove_relationship, ctx, "tester").success);
+
+    // Drop one source from the strategy's inference. It keeps its reasoning and
+    // its other sub-goal, so the relationship survives the scrub.
+    core::commands::DropRelationshipReferenceCommand drop_reference(inference_id, sub1_id);
+    ASSERT_TRUE(bus->Execute(drop_reference, ctx, "tester").success);
+    EXPECT_FALSE(drop_reference.RemovedRelationship());
+
+    core::commands::SetElementUndevelopedCommand set_undeveloped("G1", true);
+    ASSERT_TRUE(bus->Execute(set_undeveloped, ctx, "tester").success);
+
+    const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
+
+    const core::audit::ReplayState legacy = LegacyReplay(f, txns);
+    const std::unique_ptr<sacm_adapter::LibraryDocument> library_doc = LibraryReplay(f, txns);
+    ASSERT_NE(library_doc, nullptr);
+
+    const std::optional<std::string> library_hash =
+        core::library_canonical_hash(core::project_library_package(*library_doc));
+    const std::optional<std::string> legacy_hash = core::library_canonical_hash(legacy.package);
+    ASSERT_TRUE(library_hash.has_value());
+    ASSERT_TRUE(legacy_hash.has_value());
+    EXPECT_EQ(*library_hash, *legacy_hash);
+}
+
+// `MoveStrategyToReasoning` repairs a structure the tool cannot create, so no
+// bus-built sequence reaches it. Replay it anyway and assert the failure comes
+// from the mutator rather than from the dispatcher: that distinguishes "this
+// event does not apply here" from "this event type is unknown", which is the
+// defect the test above exists to prevent.
+TEST(LibraryReplayConvergence, MoveStrategyToReasoningIsDispatchedNotRejectedAsUnknown) {
+    auto f = MakeFixture("move_strategy_dispatch");
+
+    core::audit::AuditEvent event;
+    event.event_sequence = 1;
+    event.event_type = "MoveStrategyToReasoning";
+    event.payload = nlohmann::ordered_json::object();
+    event.payload["relationship_id"] = "R-nonexistent";
+    event.payload["strategy_id"] = "S-nonexistent";
+
+    core::audit::AuditTransaction transaction;
+    transaction.transaction_sequence = 1;
+    transaction.events.push_back(event);
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.snapshot_abs);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+
+    auto replayed = core::audit::Replayer::ReplayToLibrary(
+        std::move(loaded.document), {transaction}, std::numeric_limits<std::uint64_t>::max());
+
+    ASSERT_FALSE(replayed.has_value());
+    EXPECT_EQ(replayed.error().find("Unknown event type"), std::string::npos)
+        << "the repair events must be dispatched by the library replay path: " << replayed.error();
+    EXPECT_NE(replayed.error().find("R-nonexistent"), std::string::npos)
+        << "the failure should be the mutator's, naming what it could not find: " << replayed.error();
+}
+
 // Focused convergence for the create-child / challenge encoding in isolation:
 // a strategy with two sub-goals uses the single-inference encoding, so the
 // library replay must produce exactly one inference for the strategy, matching

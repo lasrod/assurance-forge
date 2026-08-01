@@ -54,7 +54,11 @@ void SyncCycleProblems(core::ProblemsManager& problems_manager, const parser::As
                 : ui::i18n::trf("Circular support: {0}. An argument that assumes its own conclusion "
                                 "establishes nothing.",
                                 DescribeCycle(cycle));
-        problem.quick_fix_label = ui::i18n::tr("Show cycle");
+        // Stored as an English msgid, not as translated text: the panel calls
+        // AF_TR on this at render (problems_panel.cpp), so baking the current
+        // language in here leaves the button stuck in the old one after a
+        // language switch until something forces the sync to re-run.
+        problem.quick_fix_label = "Show cycle";
         problem.quick_fix_payload = cycle.element_ids.front();
         problems_manager.AddOrUpdateProblem(problem);
     }

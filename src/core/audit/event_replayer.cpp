@@ -391,7 +391,7 @@ bool ApplyEvent(ReplayState& state,
         // Provenance event for the non-destructive remediation flow. The
         // SACM file was rewritten on disk to match the replayed state at
         // the moment this event was appended. The replayer does not need
-        // to mutate `state` — by construction, replaying transactions up
+        // to mutate `state` â€” by construction, replaying transactions up
         // to and including this event yields exactly the model that was
         // written to disk, so subsequent events apply on top of the same
         // model the user observed live.
@@ -1245,6 +1245,96 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         return BridgeViaLegacy(document, location, mutate, out_error);
     }
 
+    // The GSN repair events. Bridged rather than routed to a native seam for the
+    // same reason the live commands are: the library has no operation for "drop
+    // one reference" or "move a reasoning", and its delete seam would remove the
+    // referenced element, which for a broken endpoint does not exist -- that
+    // being the whole defect. `RemoveRelationship` could use apply_delete_element
+    // directly, but bridging all four keeps live and replay on one mutator each,
+    // which is what makes them converge by construction.
+    if (type == "RemoveRelationship") {
+        std::string relationship_id;
+        if (!require_string("relationship_id", relationship_id))
+            return false;
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate = [&](parser::AssuranceCase& model,
+                                         sacm::AssuranceCasePackage& package,
+                                         std::string& error) {
+            if (!core::RemoveRelationship(model, &package, relationship_id, error)) {
+                error = "RemoveRelationship (bridge) failed at " + location + ": " + error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
+    }
+
+    if (type == "DropRelationshipReference") {
+        std::string relationship_id, reference;
+        if (!require_string("relationship_id", relationship_id))
+            return false;
+        if (!require_string("reference", reference))
+            return false;
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate = [&](parser::AssuranceCase& model,
+                                         sacm::AssuranceCasePackage& package,
+                                         std::string& error) {
+            bool removed_relationship_unused = false;
+            if (!core::DropRelationshipReference(model, &package, relationship_id, reference,
+                                                 removed_relationship_unused, error)) {
+                error = "DropRelationshipReference (bridge) failed at " + location + ": " + error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
+    }
+
+    if (type == "MoveStrategyToReasoning") {
+        std::string relationship_id, strategy_id;
+        if (!require_string("relationship_id", relationship_id))
+            return false;
+        if (!require_string("strategy_id", strategy_id))
+            return false;
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate = [&](parser::AssuranceCase& model,
+                                         sacm::AssuranceCasePackage& package,
+                                         std::string& error) {
+            if (!core::MoveStrategyToReasoning(model, &package, relationship_id, strategy_id, error)) {
+                error = "MoveStrategyToReasoning (bridge) failed at " + location + ": " + error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
+    }
+
+    if (type == "SetElementUndeveloped") {
+        std::string element_id;
+        if (!require_string("element_id", element_id))
+            return false;
+        const auto new_value = payload.find("new_value");
+        if (new_value == payload.end() || !new_value->is_boolean()) {
+            out_error = "Missing or non-boolean payload field 'new_value' at " +
+                        FormatLocation(tx_seq, event.event_sequence, type);
+            return false;
+        }
+        const bool undeveloped = new_value->get<bool>();
+        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        const BridgeMutator mutate = [&](parser::AssuranceCase& model,
+                                         sacm::AssuranceCasePackage& package,
+                                         std::string& error) {
+            bool old_value_unused = false;
+            if (!core::SetElementUndeveloped(model, &package, element_id, undeveloped, old_value_unused,
+                                             error)) {
+                error = "SetElementUndeveloped (bridge) failed at " + location + ": " + error;
+                return false;
+            }
+            return true;
+        };
+        return BridgeViaLegacy(document, location, mutate, out_error);
+    }
+
     if (type == "RemoveArgumentPackage") {
         std::string id, gid;
         if (!require_string("package_id", id))
@@ -1760,7 +1850,7 @@ std::expected<ReplayState, std::string> Replayer::ReplayFrom(
 
     // Pre-pass: compute the set of transactions cancelled by an active
     // Undo event (see `undo_resolver.h`). We do this over the replayed
-    // window `(from, up_to]` — not just up to `up_to_seq` — so that an Undo
+    // window `(from, up_to]` â€” not just up to `up_to_seq` â€” so that an Undo
     // emitted *after* `up_to_transaction_sequence` does not retroactively
     // suppress an earlier transaction when the user navigates back to a
     // past point. Honest audit semantics: at any historical point, only
