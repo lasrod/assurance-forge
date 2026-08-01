@@ -44,7 +44,10 @@ std::string DocumentLabel(const StatusBarModel& model) {
 }
 
 std::string SaveStateLabel(const StatusBarModel& model) {
-    if (!model.has_project && model.document_name.empty())
+    // Save state is a claim about a file. With a project open but no document,
+    // there is no file the claim could be about, so "Saved" would be asserting
+    // something untrue rather than merely unhelpful.
+    if (model.document_name.empty())
         return {};
     return model.has_unsaved_changes ? AF_TR("Unsaved changes") : AF_TR("Saved");
 }

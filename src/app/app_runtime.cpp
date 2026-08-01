@@ -203,13 +203,16 @@ void AppRuntime::RegisterAppEventListeners() {
             impl_->workbench.pending_focus_root = true;
     });
     impl_->events.Subscribe<DocumentDirtyEvent>([this](const DocumentDirtyEvent& event) {
-        impl_->document_dirty = event.dirty;
         // The command bus autosaves, but callers emit this event afterwards and
         // cannot know that. Honouring `mark_app_dirty` unconditionally is what
         // made the app report unsaved work that was already on disk. The
         // revision still bumps, so derived views rebuild either way.
         const bool already_persisted = impl_->autosave_persisted_pending_edit;
         impl_->autosave_persisted_pending_edit = false;
+        // document_dirty gates the save-before-open/close prompts and the
+        // needs_sacm_save check, so it has to respect the autosave too --
+        // otherwise the user is asked to save work the bus already wrote.
+        impl_->document_dirty = already_persisted ? false : event.dirty;
         if (event.mark_app_dirty && !already_persisted)
             impl_->app_state.mark_dirty();
         else

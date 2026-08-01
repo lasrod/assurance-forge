@@ -631,6 +631,7 @@ TRANSLATIONS = {
 
     # ===== Toolbar =====
     "Fit to view": "全体を表示",
+    "Export GSN SVG": "GSN SVG をエクスポート",
     "Unavailable right now.": "現在は利用できません。",
 
     # ===== Status bar =====

@@ -38,7 +38,14 @@ EllipsizedText Ellipsize(std::string_view text, float max_width) {
     // codepoint that still fits. Cutting on a byte index instead would split
     // multi-byte glyphs and render mojibake in the Japanese catalog.
     const float ellipsis_width = TextWidth(font, font_size, kEllipsis);
-    const float budget = std::max(0.0f, max_width - ellipsis_width);
+    // Narrower than the ellipsis itself: drawing one would overrun `max_width`
+    // and reintroduce exactly the overlap this helper exists to prevent, so
+    // draw nothing. The caller still learns the text was shortened.
+    if (ellipsis_width > max_width) {
+        result.truncated = true;
+        return result;
+    }
+    const float budget = max_width - ellipsis_width;
 
     const char* begin = text.data();
     const char* end = begin + text.size();

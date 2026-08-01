@@ -1,4 +1,4 @@
-﻿#include "ui/panels/toolbar_panel.h"
+#include "ui/panels/toolbar_panel.h"
 
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
@@ -21,8 +21,31 @@ constexpr float kSeparatorPadding = 6.0f;
 struct ToolbarButton {
     ToolbarAction action;
     const char* icon;
-    const char* tooltip; // English msgid; translated at draw time.
 };
+
+// Literal AF_TR per action so tools/i18n/extract_msgids.py can discover the
+// strings. Routing a msgid through a `const char*` field and calling
+// AF_TR(field) compiles and reads fine, but the extractor only sees literals --
+// so the catalog check passes while the tooltip stays permanently English.
+std::string TranslateTooltip(ToolbarAction action) {
+    switch (action) {
+    case ToolbarAction::OpenProject:
+        return AF_TR("Open Project");
+    case ToolbarAction::SaveProject:
+        return AF_TR("Save Project");
+    case ToolbarAction::Undo:
+        return AF_TR("Undo");
+    case ToolbarAction::NewSacmFile:
+        return AF_TR("New GSN / SACM File");
+    case ToolbarAction::FitToView:
+        return AF_TR("Fit to view");
+    case ToolbarAction::ExportGsnSvg:
+        return AF_TR("Export GSN SVG");
+    case ToolbarAction::Preferences:
+        return AF_TR("Preferences...");
+    }
+    return {};
+}
 
 // Draws one icon button. Returns true when clicked and enabled.
 bool DrawButton(const ToolbarButton& button, bool enabled, float height, const char* shortcut) {
@@ -37,7 +60,7 @@ bool DrawButton(const ToolbarButton& button, bool enabled, float height, const c
         ImGui::EndDisabled();
 
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        std::string tip = AF_TR(button.tooltip);
+        std::string tip = TranslateTooltip(button.action);
         if (shortcut != nullptr)
             tip += "  (" + std::string(shortcut) + ")";
         if (!enabled)
@@ -65,7 +88,7 @@ bool IsActionEnabled(const ToolbarModel& model, ToolbarAction action) {
     switch (action) {
     case ToolbarAction::OpenProject:
     case ToolbarAction::Preferences:
-        // Always reachable â€” they are how a user gets out of having no project.
+        // Always reachable — they are how a user gets out of having no project.
         return true;
     case ToolbarAction::SaveProject:
     case ToolbarAction::NewSacmFile:
@@ -108,35 +131,31 @@ void ShowToolbar(const ToolbarModel& model, const ToolbarCallbacks& callbacks, f
 
     const float button_height = ImGui::GetFrameHeight();
     bool first = true;
-    auto run = [&](ToolbarAction action,
-                   const char* icon,
-                   const char* tooltip,
-                   const char* shortcut,
-                   const std::function<void()>& handler) {
+    auto run = [&](ToolbarAction action, const char* icon, const char* shortcut, const std::function<void()>& handler) {
         // Buttons sit on one row; without this each would start a new line and
         // only the first would be inside the bar's height.
         if (!first)
             ImGui::SameLine(0.0f, 2.0f);
         first = false;
-        if (DrawButton({action, icon, tooltip}, IsActionEnabled(model, action), button_height, shortcut) && handler)
+        if (DrawButton({action, icon}, IsActionEnabled(model, action), button_height, shortcut) && handler)
             handler();
     };
 
-    run(ToolbarAction::OpenProject, ICON_FA_FOLDER_OPEN, "Open Project", nullptr, callbacks.open_project);
-    run(ToolbarAction::SaveProject, ICON_FA_SAVE, "Save Project", nullptr, callbacks.save_project);
-    run(ToolbarAction::Undo, ICON_FA_UNDO, "Undo", "Ctrl+Z", callbacks.undo);
+    run(ToolbarAction::OpenProject, ICON_FA_FOLDER_OPEN, nullptr, callbacks.open_project);
+    run(ToolbarAction::SaveProject, ICON_FA_SAVE, nullptr, callbacks.save_project);
+    run(ToolbarAction::Undo, ICON_FA_UNDO, "Ctrl+Z", callbacks.undo);
 
     DrawSeparator(height);
-    run(ToolbarAction::NewSacmFile, ICON_FA_PLUS, "New GSN / SACM File", nullptr, callbacks.new_sacm_file);
-    run(ToolbarAction::FitToView, ICON_FA_EXPAND, "Fit to view", nullptr, callbacks.fit_to_view);
-    run(ToolbarAction::ExportGsnSvg, ICON_FA_DOWNLOAD, "Export GSN SVG", nullptr, callbacks.export_gsn_svg);
+    run(ToolbarAction::NewSacmFile, ICON_FA_PLUS, nullptr, callbacks.new_sacm_file);
+    run(ToolbarAction::FitToView, ICON_FA_EXPAND, nullptr, callbacks.fit_to_view);
+    run(ToolbarAction::ExportGsnSvg, ICON_FA_DOWNLOAD, nullptr, callbacks.export_gsn_svg);
 
     // Preferences sits at the far right, away from the document actions.
     ImGui::SameLine();
     const float right = ImGui::GetWindowContentRegionMax().x - ImGui::GetFrameHeight();
     ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), right));
     first = true; // Already positioned; do not let `run` add another SameLine.
-    run(ToolbarAction::Preferences, ICON_FA_COG, "Preferences...", nullptr, callbacks.open_preferences);
+    run(ToolbarAction::Preferences, ICON_FA_COG, nullptr, callbacks.open_preferences);
 
     // Hairline below, matching the status bar's rule above it.
     const ImVec2 origin = ImGui::GetWindowPos();

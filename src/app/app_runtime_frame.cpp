@@ -196,6 +196,7 @@ void AppRuntime::RenderFrame(bool& done) {
     // Same handlers as the menu items above, so a button and its menu entry
     // cannot drift apart.
     ui::panels::ToolbarCallbacks toolbar_callbacks;
+    toolbar_callbacks.can_undo = menu_callbacks.can_undo;
     toolbar_callbacks.open_project = menu_callbacks.begin_open_project;
     toolbar_callbacks.save_project = [this]() { SaveProject(); };
     toolbar_callbacks.undo = menu_callbacks.undo;

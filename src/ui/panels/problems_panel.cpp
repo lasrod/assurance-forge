@@ -1,4 +1,4 @@
-﻿#include "ui/panels/problems_panel.h"
+#include "ui/panels/problems_panel.h"
 
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"

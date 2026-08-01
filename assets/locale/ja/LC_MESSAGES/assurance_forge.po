@@ -709,6 +709,9 @@ msgstr "プレビューを終了"
 msgid "Export"
 msgstr "エクスポート"
 
+msgid "Export GSN SVG"
+msgstr "GSN SVG をエクスポート"
+
 msgid "External Reference"
 msgstr "外部参照"
 

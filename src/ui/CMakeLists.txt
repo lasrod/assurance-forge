@@ -1,4 +1,4 @@
-﻿add_library(af_ui OBJECT
+add_library(af_ui OBJECT
     confidence_model.cpp
     element_context_menu.cpp
     fonts.cpp

@@ -11,6 +11,7 @@ void RenderToolbarArea(AppRuntimeState& state, const ui::panels::ToolbarCallback
     model.has_loaded_case = state.app_state.loaded_case.has_value();
     model.has_unsaved_changes = state.app_state.has_unsaved_changes;
     model.gsn_canvas_active = ui::GetUiState().center_view == ui::CenterView::GsnCanvas;
+    model.can_undo = callbacks.can_undo && callbacks.can_undo();
 
     ui::panels::ShowToolbar(model, callbacks, top_y);
 }

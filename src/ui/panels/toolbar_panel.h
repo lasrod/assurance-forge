@@ -29,6 +29,9 @@ struct ToolbarModel {
 };
 
 struct ToolbarCallbacks {
+    // Undo availability lives in AppRuntime's command history, not in the
+    // runtime state the area can see, so it is asked for rather than read.
+    std::function<bool()> can_undo;
     std::function<void()> open_project;
     std::function<void()> save_project;
     std::function<void()> undo;

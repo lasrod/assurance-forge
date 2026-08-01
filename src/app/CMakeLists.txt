@@ -1,4 +1,4 @@
-﻿# Note: src/app/main.cpp is intentionally excluded â€” it is compiled
+# Note: src/app/main.cpp is intentionally excluded — it is compiled
 # directly into the executable target via hello_imgui_add_app().
 add_library(af_app OBJECT
     acp_problem_sync.cpp

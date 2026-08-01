@@ -62,4 +62,16 @@ TEST(StatusBarSaveState, ClaimsNothingWhenNothingIsOpen) {
     EXPECT_TRUE(ui::panels::SaveStateLabel(ui::panels::StatusBarModel{}).empty());
 }
 
+// A project can be open with no document loaded. The save state is a claim
+// about a file, so there is still nothing to claim.
+TEST(StatusBarSaveState, ClaimsNothingForAProjectWithNoDocument) {
+    ui::panels::StatusBarModel model;
+    model.has_project = true;
+    model.project_name = "MySafetyCase";
+    EXPECT_TRUE(ui::panels::SaveStateLabel(model).empty());
+
+    model.has_unsaved_changes = true;
+    EXPECT_TRUE(ui::panels::SaveStateLabel(model).empty());
+}
+
 } // namespace

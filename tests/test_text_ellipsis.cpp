@@ -87,7 +87,12 @@ TEST(TextEllipsis, CutsMultiByteTextOnACodepointBoundary) {
 
     for (float fraction = 0.1f; fraction < 1.0f; fraction += 0.1f) {
         const ui::widgets::EllipsizedText fitted = ui::widgets::Ellipsize(label, WidthOf(label) * fraction);
-        ASSERT_TRUE(EndsWithEllipsis(fitted.text) || !fitted.truncated);
+        // Shortened text always ends with the ellipsis, unless the budget was so
+        // narrow that not even the ellipsis fits, in which case nothing is drawn.
+        ASSERT_TRUE(!fitted.truncated || fitted.text.empty() || EndsWithEllipsis(fitted.text))
+            << "at fraction " << fraction << ", got: " << fitted.text;
+        if (fitted.text.empty())
+            continue;
 
         const std::string body =
             fitted.truncated ? fitted.text.substr(0, fitted.text.size() - kEllipsis.size()) : fitted.text;
@@ -101,6 +106,21 @@ TEST(TextEllipsis, CutsMultiByteTextOnACodepointBoundary) {
             const unsigned char next = static_cast<unsigned char>(label[body.size()]);
             EXPECT_NE(next & 0xC0u, 0x80u) << "cut mid-codepoint at fraction " << fraction;
         }
+    }
+}
+
+// Regression: a budget narrower than the ellipsis glyph used to still emit the
+// ellipsis, so the result was wider than the caller asked for -- the overlap
+// this helper exists to prevent.
+TEST(TextEllipsis, NeverExceedsABudgetNarrowerThanTheEllipsis) {
+    ScopedImGuiFrame frame;
+    const std::string label = "Arguments";
+    const float ellipsis_width = WidthOf(kEllipsis);
+
+    for (float budget = 0.5f; budget < ellipsis_width; budget += 1.0f) {
+        const ui::widgets::EllipsizedText fitted = ui::widgets::Ellipsize(label, budget);
+        EXPECT_LE(WidthOf(fitted.text), budget) << "overran a " << budget << "px budget with: " << fitted.text;
+        EXPECT_TRUE(fitted.truncated) << "at budget " << budget;
     }
 }
 
