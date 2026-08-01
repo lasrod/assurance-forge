@@ -806,8 +806,15 @@ TEST(ElementIdentifierTest, IdentifierIsRenderedInTheNodeLabel) {
             node = owned.get();
     }
     ASSERT_NE(node, nullptr);
-    EXPECT_EQ(node->label.rfind(goal_id + ":", 0), 0u)
+    EXPECT_EQ(node->label.rfind(goal_id, 0), 0u)
         << "identifier missing from the rendered label: '" << node->label << "'";
+
+    // A freshly added element has no name yet, so the label must be the bare
+    // identifier: the ": " separator belongs to the name, and emitting it here
+    // renders on the canvas as an identifier trailing a colon into nothing.
+    EXPECT_FALSE(node->has_name);
+    const std::string first_line = node->label.substr(0, node->label.find('\n'));
+    EXPECT_EQ(first_line, goal_id) << "expected a bare identifier, got: '" << first_line << "'";
 }
 
 TEST(ElementIdentifierTest, GSN3_CORE_010_NotationIdentifierCanChangeWithoutChangingStorageIdentity) {

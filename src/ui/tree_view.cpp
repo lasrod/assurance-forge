@@ -59,23 +59,23 @@ static ImVec4 RoleColor(core::NodeRole role) {
 std::string TreeNodeDisplayName(const core::TreeNode& node, const UiState& state) {
     const bool use_secondary = state.show_secondary_language && !node.label_secondary.empty();
     const std::string& label = use_secondary ? node.label_secondary : node.label;
+    const bool has_name = use_secondary ? node.has_name_secondary : node.has_name;
     const std::string::size_type first_break = label.find('\n');
     if (first_break == std::string::npos)
         return label;
 
     const std::string first_line = label.substr(0, first_break);
-    static constexpr std::string_view kEmptyNameSuffix = ": ";
-    if (first_line.size() < kEmptyNameSuffix.size() ||
-        first_line.compare(first_line.size() - kEmptyNameSuffix.size(), kEmptyNameSuffix.size(), kEmptyNameSuffix) !=
-            0) {
+    // A named element shows "<id>: <name>" and stops there. An unnamed one would
+    // otherwise show a bare identifier, so its text stands in for the name --
+    // one row of a tree is the only place that text is visible.
+    if (has_name)
         return first_line;
-    }
 
     const std::string::size_type detail_break = label.find('\n', first_break + 1);
     const std::string detail = detail_break == std::string::npos
                                    ? label.substr(first_break + 1)
                                    : label.substr(first_break + 1, detail_break - first_break - 1);
-    return detail.empty() ? first_line : first_line + detail;
+    return detail.empty() ? first_line : first_line + ": " + detail;
 }
 
 // Width of the fixed right-hand column holding the per-element problem badge.
