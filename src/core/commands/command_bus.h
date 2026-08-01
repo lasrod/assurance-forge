@@ -38,8 +38,8 @@ namespace core::commands {
 class ICommand;
 
 struct CommandContext {
-    parser::AssuranceCase&        model;
-    sacm::AssuranceCasePackage&   package;
+    parser::AssuranceCase& model;
+    sacm::AssuranceCasePackage& package;
 
     // Phase 9 Stage 5: the library-owned document (null when the file was
     // loaded through the legacy-parser fallback). A command that routes its
@@ -47,7 +47,7 @@ struct CommandContext {
     // the bus re-derives it from the authoritative package for any command
     // that did not, so it never drifts. See src/sacm_adapter/document_edit.h.
     sacm_adapter::LibraryDocument* library_document = nullptr;
-    bool                          library_synced = false;
+    bool library_synced = false;
 
     // Phase 2 slice 2b-1: the LIVE edit flip, inverted per command. A command
     // sets this when it mutated the LIBRARY natively (rather than the legacy
@@ -62,7 +62,7 @@ struct CommandContext {
     // document to mutate) leaves this false and keeps the Stage 5 net, which
     // re-derives the library FROM the authoritative package. Exactly one of the
     // two directions runs per command.
-    bool                          library_primary = false;
+    bool library_primary = false;
 
     // Kill switch for the library-primary live edit flip. When false, flipped
     // commands take the legacy-mutator path regardless of `library_document`, so
@@ -77,16 +77,16 @@ struct CommandContext {
     // `app::commands::DispatchAuditedCommand`. It remains a kill switch: set it
     // false and flipped commands take the legacy-mutator path regardless of
     // `library_document`.
-    bool                          allow_library_primary = true;
+    bool allow_library_primary = true;
 };
 
 struct CommandResult {
-    bool          success = false;
-    std::string   error;
-    std::string   transaction_id;
+    bool success = false;
+    std::string error;
+    std::string transaction_id;
     std::uint64_t transaction_sequence = 0;
-    std::string   raw_file_hash_after;
-    std::string   canonical_model_hash_after;
+    std::string raw_file_hash_after;
+    std::string canonical_model_hash_after;
 };
 
 class CommandBus {
@@ -96,9 +96,8 @@ public:
     // project open). `sacm_absolute_path` is the file the bus will auto-save
     // to after each successful command — it should match
     // `<project.rootPath>/<manifest.current_sacm>`.
-    static std::unique_ptr<CommandBus> Open(AssuranceProject project,
-                                            std::filesystem::path sacm_absolute_path,
-                                            std::string& error);
+    static std::unique_ptr<CommandBus>
+    Open(AssuranceProject project, std::filesystem::path sacm_absolute_path, std::string& error);
 
     // Execute one command. On `Apply` failure or audit-log append failure
     // returns `{success=false, error}` with no audit-log mutation. Once the
@@ -111,17 +110,23 @@ public:
     // cases.
     CommandResult Execute(ICommand& command, CommandContext& ctx, const std::string& author);
 
-    const audit::AuditManifest&        Manifest() const { return manifest_; }
-    const audit::EventStore&           Store() const { return *store_; }
-    const std::filesystem::path&       SacmPath() const { return sacm_path_; }
+    const audit::AuditManifest& Manifest() const {
+        return manifest_;
+    }
+    const audit::EventStore& Store() const {
+        return *store_;
+    }
+    const std::filesystem::path& SacmPath() const {
+        return sacm_path_;
+    }
 
 private:
     CommandBus() = default;
 
-    AssuranceProject                     project_;
-    std::filesystem::path                sacm_path_;
-    audit::AuditManifest                 manifest_;
-    std::unique_ptr<audit::EventStore>   store_;
+    AssuranceProject project_;
+    std::filesystem::path sacm_path_;
+    audit::AuditManifest manifest_;
+    std::unique_ptr<audit::EventStore> store_;
 };
 
 // Base class for every audited command. Implementations describe what

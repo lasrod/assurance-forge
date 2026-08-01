@@ -35,9 +35,9 @@ struct TempDir {
 };
 
 std::filesystem::path UniqueTempPath(const std::string& stem) {
-    static int                  counter = 0;
-    const std::filesystem::path path    = std::filesystem::temp_directory_path() /
-                                       ("af_mcp_modes_" + stem + "_" + std::to_string(++counter));
+    static int counter = 0;
+    const std::filesystem::path path =
+        std::filesystem::temp_directory_path() / ("af_mcp_modes_" + stem + "_" + std::to_string(++counter));
     std::filesystem::remove_all(path);
     std::filesystem::create_directories(path);
     return path;
@@ -50,8 +50,8 @@ std::filesystem::path WriteConsentingSettings(const std::filesystem::path& direc
 }
 
 struct Fixture {
-    TempDir                       workspace;
-    std::filesystem::path         project_root;
+    TempDir workspace;
+    std::filesystem::path project_root;
     std::unique_ptr<mcp::Session> session;
 };
 
@@ -70,7 +70,7 @@ std::unique_ptr<Fixture> MakeOfflineFixture(const std::string& stem) {
     fixture->project_root = builder.current_project->rootPath;
 
     mcp::Session::Config config;
-    config.project_path  = fixture->project_root;
+    config.project_path = fixture->project_root;
     config.settings_path = WriteConsentingSettings(fixture->workspace.path);
     config.never_connect = true;
 
@@ -92,31 +92,31 @@ std::string Request(const std::string& method, const nlohmann::json& params, int
 }
 
 void Initialize(mcp::Server& server) {
-    const std::optional<nlohmann::json> response = server.HandleMessage(
-        Request("initialize", {{"clientInfo", {{"name", "TestClient"}, {"version", "2.0"}}}}, 1));
+    const std::optional<nlohmann::json> response =
+        server.HandleMessage(Request("initialize", {{"clientInfo", {{"name", "TestClient"}, {"version", "2.0"}}}}, 1));
     ASSERT_TRUE(response.has_value());
     ASSERT_TRUE(response->contains("result")) << response->dump();
 }
 
 struct ToolCall {
     nlohmann::json payload;
-    bool           is_error = false;
+    bool is_error = false;
 };
 
-ToolCall CallTool(mcp::Server& server, const std::string& name,
-                  const nlohmann::json& arguments = nlohmann::json::object()) {
+ToolCall
+CallTool(mcp::Server& server, const std::string& name, const nlohmann::json& arguments = nlohmann::json::object()) {
     const std::optional<nlohmann::json> response =
         server.HandleMessage(Request("tools/call", {{"name", name}, {"arguments", arguments}}, 9));
     if (!response.has_value() || !response->contains("result")) {
-        ADD_FAILURE() << "tools/call returned no result: "
-                      << (response.has_value() ? response->dump() : "<none>");
+        ADD_FAILURE() << "tools/call returned no result: " << (response.has_value() ? response->dump() : "<none>");
         return {};
     }
     const nlohmann::json& result = (*response)["result"];
-    ToolCall              call;
+    ToolCall call;
     call.is_error = result.value("isError", false);
-    call.payload  = nlohmann::json::parse(result["content"][0]["text"].get<std::string>(), nullptr,
-                                          /*allow_exceptions=*/false);
+    call.payload = nlohmann::json::parse(result["content"][0]["text"].get<std::string>(),
+                                         nullptr,
+                                         /*allow_exceptions=*/false);
     return call;
 }
 
@@ -125,17 +125,15 @@ ToolCall CallTool(mcp::Server& server, const std::string& name,
 // files it happened to think of.
 std::map<std::string, std::string> SnapshotTree(const std::filesystem::path& root) {
     std::map<std::string, std::string> snapshot;
-    std::error_code                    ec;
-    for (const std::filesystem::directory_entry& entry :
-         std::filesystem::recursive_directory_iterator(root, ec)) {
+    std::error_code ec;
+    for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator(root, ec)) {
         if (!entry.is_regular_file()) {
             continue;
         }
-        std::ifstream      file(entry.path(), std::ios::binary);
+        std::ifstream file(entry.path(), std::ios::binary);
         std::ostringstream contents;
         contents << file.rdbuf();
-        snapshot[std::filesystem::relative(entry.path(), root, ec).generic_string()] =
-            contents.str();
+        snapshot[std::filesystem::relative(entry.path(), root, ec).generic_string()] = contents.str();
     }
     return snapshot;
 }
@@ -165,8 +163,8 @@ TEST(McpOffline, SearchesAndFetchesElements) {
     ASSERT_FALSE(claims.is_error) << claims.payload.dump();
     ASSERT_FALSE(claims.payload["matches"].empty());
 
-    const std::string id      = claims.payload["matches"][0]["id"].get<std::string>();
-    const ToolCall    element = CallTool(server, "get_element", {{"id", id}});
+    const std::string id = claims.payload["matches"][0]["id"].get<std::string>();
+    const ToolCall element = CallTool(server, "get_element", {{"id", id}});
     ASSERT_FALSE(element.is_error) << element.payload.dump();
     EXPECT_EQ(element.payload["element"]["id"], id);
 }
@@ -179,8 +177,7 @@ TEST(McpOffline, RefusesToChangeAnythingAndSaysWhy) {
     std::unique_ptr<Fixture> fixture = MakeOfflineFixture("readonly");
     ASSERT_NE(fixture, nullptr);
 
-    const mcp::Session::OperationResult result =
-        fixture->session->Run("stage_operations", nlohmann::json::object());
+    const mcp::Session::OperationResult result = fixture->session->Run("stage_operations", nlohmann::json::object());
 
     EXPECT_TRUE(result.is_error);
     EXPECT_TRUE(result.needs_application);
@@ -246,8 +243,7 @@ TEST(McpOffline, StopsServingWhenConsentIsWithdrawn) {
 
     ASSERT_FALSE(CallTool(server, "get_case_overview").is_error);
 
-    std::ofstream(fixture->workspace.path / "settings.json", std::ios::trunc)
-        << R"({"mcp":{"enabled":false}})";
+    std::ofstream(fixture->workspace.path / "settings.json", std::ios::trunc) << R"({"mcp":{"enabled":false}})";
 
     const ToolCall refused = CallTool(server, "get_case_overview");
     EXPECT_TRUE(refused.is_error);
@@ -268,8 +264,7 @@ TEST(McpOffline, SuggestsWhereNewArgumentWouldFit) {
     ASSERT_FALSE(overview.is_error) << overview.payload.dump();
     const std::string case_name = overview.payload.value("case_name", std::string("safety"));
 
-    const ToolCall placed =
-        CallTool(server, "suggest_placement", {{"topic", case_name + " thermal hazards"}});
+    const ToolCall placed = CallTool(server, "suggest_placement", {{"topic", case_name + " thermal hazards"}});
     ASSERT_FALSE(placed.is_error) << placed.payload.dump();
     ASSERT_TRUE(placed.payload.contains("suggestions"));
 
@@ -308,16 +303,13 @@ TEST(McpOffline, SwitchesToASecondArgumentAndKeepsReadingIt) {
     core::AppState builder;
     ASSERT_TRUE(builder.open_project(fixture->project_root.string())) << builder.status_message;
     core::ProjectFileEntry added;
-    std::string            error;
-    ASSERT_TRUE(core::ProjectService::AddSacmFile(builder.current_project.value(), "second", added,
-                                                  error))
-        << error;
-    ASSERT_TRUE(core::ProjectService::WriteManifestSafely(builder.current_project.value(), error))
-        << error;
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::AddSacmFile(builder.current_project.value(), "second", added, error)) << error;
+    ASSERT_TRUE(core::ProjectService::WriteManifestSafely(builder.current_project.value(), error)) << error;
 
     // Reopen so the session sees the manifest the project now has.
     mcp::Session::Config config;
-    config.project_path  = fixture->project_root;
+    config.project_path = fixture->project_root;
     config.settings_path = WriteConsentingSettings(fixture->workspace.path);
     config.never_connect = true;
     std::unique_ptr<mcp::Session> session = mcp::Session::Open(std::move(config), error);
@@ -343,8 +335,7 @@ TEST(McpOffline, SwitchesToASecondArgumentAndKeepsReadingIt) {
     // The overview must describe the file it moved TO. Returning the previous
     // one would have an agent reason about a document it just navigated away
     // from, which is indistinguishable from the switch not happening.
-    EXPECT_NE(switched.payload["loaded_file"].get<std::string>().find(other),
-              std::string::npos)
+    EXPECT_NE(switched.payload["loaded_file"].get<std::string>().find(other), std::string::npos)
         << switched.payload.dump();
 
     // And the switch sticks for subsequent calls.

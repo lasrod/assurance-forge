@@ -31,7 +31,9 @@
 
 namespace {
 
-std::filesystem::path repo_root() { return std::filesystem::path(AF_REPO_ROOT); }
+std::filesystem::path repo_root() {
+    return std::filesystem::path(AF_REPO_ROOT);
+}
 
 // The same six files libs/sacm already round-trips, so any difference here is a
 // projection gap rather than a parse failure.
@@ -63,8 +65,7 @@ struct BaselineKey {
 // Baseline lives beside the test as JSON so updating it is a reviewable diff
 // rather than a code edit buried in a test body.
 std::map<BaselineKey, std::size_t> load_baseline() {
-    const std::filesystem::path path =
-        repo_root() / "tests" / "data" / "sacm_parallel_load_baseline.json";
+    const std::filesystem::path path = repo_root() / "tests" / "data" / "sacm_parallel_load_baseline.json";
     std::map<BaselineKey, std::size_t> baseline;
     if (!std::filesystem::exists(path)) {
         return baseline;
@@ -78,8 +79,7 @@ std::map<BaselineKey, std::size_t> load_baseline() {
     try {
         stream >> json;
     } catch (const nlohmann::json::exception& error) {
-        ADD_FAILURE() << "baseline is not valid JSON (" << path.string()
-                      << "): " << error.what();
+        ADD_FAILURE() << "baseline is not valid JSON (" << path.string() << "): " << error.what();
         return baseline;
     }
     for (const auto& [fixture, categories] : json.items()) {
@@ -90,8 +90,8 @@ std::map<BaselineKey, std::size_t> load_baseline() {
     return baseline;
 }
 
-std::map<std::string, std::size_t> count_by_category(
-    const std::vector<sacm_adapter::ProjectionDifference>& differences) {
+std::map<std::string, std::size_t>
+count_by_category(const std::vector<sacm_adapter::ProjectionDifference>& differences) {
     std::map<std::string, std::size_t> counts;
     for (const sacm_adapter::ProjectionDifference& difference : differences) {
         ++counts[difference.category];
@@ -119,12 +119,10 @@ TEST(SacmLibraryParallelLoad, SACM23_INT_001_ProjectionSynthesizesAcpsLikeLegacy
     ASSERT_NE(loaded.document, nullptr);
     const core::AssuranceCase projected = sacm_adapter::project_case(*loaded.document);
 
-    const std::vector<sacm_adapter::ProjectionDifference> differences =
-        sacm_adapter::diff_cases(*legacy, projected);
+    const std::vector<sacm_adapter::ProjectionDifference> differences = sacm_adapter::diff_cases(*legacy, projected);
     for (const sacm_adapter::ProjectionDifference& difference : differences) {
         if (difference.category.rfind("acp", 0) == 0) {
-            ADD_FAILURE() << difference.category << " " << difference.path << ": "
-                          << difference.message;
+            ADD_FAILURE() << difference.category << " " << difference.path << ": " << difference.message;
         }
     }
     ASSERT_EQ(projected.acps.size(), 2u) << "projection dropped ACPs";
@@ -187,11 +185,10 @@ TEST(SacmLibraryParallelLoad, SACM23_INT_001_ProjectionMatchesLegacyWithinBaseli
             // surface why the library declined the file rather than a bare flag.
             std::string detail;
             for (const sacm_adapter::LoadDiagnostic& diagnostic : loaded.diagnostics) {
-                detail += "\n    " + diagnostic.severity + " " + diagnostic.code + ": " +
-                          diagnostic.message;
+                detail += "\n    " + diagnostic.severity + " " + diagnostic.code + ": " + diagnostic.message;
             }
-            FAIL() << relative << ": library load failed (namespace '" << loaded.source_namespace
-                   << "', version " << loaded.source_version << ")" << detail;
+            FAIL() << relative << ": library load failed (namespace '" << loaded.source_namespace << "', version "
+                   << loaded.source_version << ")" << detail;
         }
 
         const core::AssuranceCase projected = sacm_adapter::project_case(*loaded.document);
@@ -209,8 +206,8 @@ TEST(SacmLibraryParallelLoad, SACM23_INT_001_ProjectionMatchesLegacyWithinBaseli
             if (printed++ >= 5) {
                 break;
             }
-            std::cout << "  [" << relative << "] " << difference.category << " "
-                      << difference.path << ": " << difference.message << "\n";
+            std::cout << "  [" << relative << "] " << difference.category << " " << difference.path << ": "
+                      << difference.message << "\n";
         }
     }
 
@@ -219,14 +216,13 @@ TEST(SacmLibraryParallelLoad, SACM23_INT_001_ProjectionMatchesLegacyWithinBaseli
     for (const auto& [key, count] : observed) {
         const auto recorded = baseline.find(key);
         if (recorded == baseline.end()) {
-            ADD_FAILURE() << "new difference category '" << key.category << "' in " << key.fixture
-                          << " (" << count << " occurrences); the projection regressed or the "
+            ADD_FAILURE() << "new difference category '" << key.category << "' in " << key.fixture << " (" << count
+                          << " occurrences); the projection regressed or the "
                           << "baseline needs a deliberate update";
             continue;
         }
-        EXPECT_LE(count, recorded->second)
-            << key.fixture << " / " << key.category << ": " << count
-            << " differences, baseline allows " << recorded->second;
+        EXPECT_LE(count, recorded->second) << key.fixture << " / " << key.category << ": " << count
+                                           << " differences, baseline allows " << recorded->second;
     }
 
     // A baseline entry that no longer occurs must be removed, so the list can

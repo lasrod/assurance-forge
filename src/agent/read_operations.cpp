@@ -123,8 +123,7 @@ nlohmann::json TreeNodeJson(const core::TreeNode& node, int remaining_depth) {
         // Say so rather than returning a leaf: a truncated tree that looks
         // complete would have an agent conclude a goal has no support.
         serialized["truncated"] = true;
-        serialized["child_count"] =
-            static_cast<int>(node.group1_children.size() + node.group2_attachments.size());
+        serialized["child_count"] = static_cast<int>(node.group1_children.size() + node.group2_attachments.size());
         return serialized;
     }
 
@@ -200,11 +199,11 @@ Result FindElements(const ReadContext& context, const nlohmann::json& arguments)
     }
 
     const std::string query = Lowercased(StringArgument(arguments, "query"));
-    const std::string type  = Lowercased(StringArgument(arguments, "type"));
-    const int         limit = ClampedInt(arguments, "limit", kDefaultResultLimit, kMaxResultLimit);
+    const std::string type = Lowercased(StringArgument(arguments, "type"));
+    const int limit = ClampedInt(arguments, "limit", kDefaultResultLimit, kMaxResultLimit);
 
     nlohmann::json matches = nlohmann::json::array();
-    int            total   = 0;
+    int total = 0;
     for (const parser::SacmElement& element : context.state.loaded_case->elements) {
         if (!type.empty() && Lowercased(element.type) != type) {
             continue;
@@ -247,8 +246,8 @@ Result GetElement(const ReadContext& context, const nlohmann::json& arguments) {
         return Result::Error("Argument \"id\" is required.");
     }
 
-    const parser::AssuranceCase& model   = context.state.loaded_case.value();
-    const parser::SacmElement*   element = parser::FindElementById(model, id);
+    const parser::AssuranceCase& model = context.state.loaded_case.value();
+    const parser::SacmElement* element = parser::FindElementById(model, id);
     if (element == nullptr) {
         return Result::Error("No element with id \"" + id + "\".");
     }
@@ -263,10 +262,10 @@ Result GetElement(const ReadContext& context, const nlohmann::json& arguments) {
         if (!IsRelationship(candidate)) {
             continue;
         }
-        const bool is_source = std::find(candidate.source_refs.begin(), candidate.source_refs.end(),
-                                         id) != candidate.source_refs.end();
-        const bool is_target = std::find(candidate.target_refs.begin(), candidate.target_refs.end(),
-                                         id) != candidate.target_refs.end();
+        const bool is_source =
+            std::find(candidate.source_refs.begin(), candidate.source_refs.end(), id) != candidate.source_refs.end();
+        const bool is_target =
+            std::find(candidate.target_refs.begin(), candidate.target_refs.end(), id) != candidate.target_refs.end();
         if (is_source) {
             outgoing.push_back(ElementDetail(candidate));
         }
@@ -275,7 +274,7 @@ Result GetElement(const ReadContext& context, const nlohmann::json& arguments) {
         }
     }
     result["relationships_from_here"] = std::move(outgoing);
-    result["relationships_to_here"]   = std::move(incoming);
+    result["relationships_to_here"] = std::move(incoming);
 
     const core::AssuranceTree tree = core::AssuranceTree::Build(model);
     if (const core::TreeNode* node = core::FindTreeNode(tree, id)) {
@@ -295,7 +294,7 @@ Result GetElement(const ReadContext& context, const nlohmann::json& arguments) {
                 attachments.push_back(attachment->id);
             }
         }
-        result["supported_by_ids"]  = std::move(children);
+        result["supported_by_ids"] = std::move(children);
         result["in_context_of_ids"] = std::move(attachments);
     }
 
@@ -308,7 +307,7 @@ Result GetArgumentTree(const ReadContext& context, const nlohmann::json& argumen
     }
 
     const std::string root_id = StringArgument(arguments, "root_id");
-    const int         depth   = ClampedInt(arguments, "depth", kDefaultTreeDepth, kMaxTreeDepth);
+    const int depth = ClampedInt(arguments, "depth", kDefaultTreeDepth, kMaxTreeDepth);
 
     const core::AssuranceTree tree = core::AssuranceTree::Build(context.state.loaded_case.value());
 
@@ -338,7 +337,7 @@ Result ListCaseFiles(const ReadContext& context) {
     }
 
     const core::AssuranceProject& project = context.state.current_project.value();
-    const std::string             loaded  = context.state.loaded_file_path.generic_string();
+    const std::string loaded = context.state.loaded_file_path.generic_string();
 
     nlohmann::json files = nlohmann::json::array();
     for (const core::ProjectFileEntry& entry : project.files) {
@@ -351,9 +350,8 @@ Result ListCaseFiles(const ReadContext& context) {
             {"loaded", absolute.generic_string() == loaded},
         });
     }
-    return Result::Ok(nlohmann::json{
-        {"case_files", std::move(files)},
-        {"note", "Use open_case_file to switch which one the other tools read."}});
+    return Result::Ok(nlohmann::json{{"case_files", std::move(files)},
+                                     {"note", "Use open_case_file to switch which one the other tools read."}});
 }
 
 } // namespace agent

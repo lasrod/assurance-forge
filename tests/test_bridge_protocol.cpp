@@ -8,18 +8,17 @@ namespace {
 
 bridge::Request SampleRequest() {
     bridge::Request request;
-    request.id    = 42;
-    request.op    = "get_case_overview";
+    request.id = 42;
+    request.op = "get_case_overview";
     request.token = "abcdef";
-    request.args  = nlohmann::json{{"depth", 3}};
+    request.args = nlohmann::json{{"depth", 3}};
     return request;
 }
 
 TEST(BridgeProtocol, RoundTripsARequest) {
     bridge::Request decoded;
-    std::string     error;
-    ASSERT_TRUE(bridge::DecodeRequest(bridge::EncodeRequest(SampleRequest()), decoded, error))
-        << error;
+    std::string error;
+    ASSERT_TRUE(bridge::DecodeRequest(bridge::EncodeRequest(SampleRequest()), decoded, error)) << error;
 
     EXPECT_EQ(decoded.protocol, bridge::kProtocolVersion);
     EXPECT_EQ(decoded.id, 42u);
@@ -29,11 +28,10 @@ TEST(BridgeProtocol, RoundTripsARequest) {
 }
 
 TEST(BridgeProtocol, RoundTripsASuccessfulResponse) {
-    const bridge::Response encoded =
-        bridge::MakeResult(42, nlohmann::json{{"elementCount", 108}});
+    const bridge::Response encoded = bridge::MakeResult(42, nlohmann::json{{"elementCount", 108}});
 
     bridge::Response decoded;
-    std::string      error;
+    std::string error;
     ASSERT_TRUE(bridge::DecodeResponse(bridge::EncodeResponse(encoded), decoded, error)) << error;
 
     EXPECT_TRUE(decoded.ok);
@@ -43,11 +41,10 @@ TEST(BridgeProtocol, RoundTripsASuccessfulResponse) {
 }
 
 TEST(BridgeProtocol, RoundTripsAFailedResponse) {
-    const bridge::Response encoded =
-        bridge::MakeError(7, bridge::error_code::kUnauthorized, "Token does not match.");
+    const bridge::Response encoded = bridge::MakeError(7, bridge::error_code::kUnauthorized, "Token does not match.");
 
     bridge::Response decoded;
-    std::string      error;
+    std::string error;
     ASSERT_TRUE(bridge::DecodeResponse(bridge::EncodeResponse(encoded), decoded, error)) << error;
 
     EXPECT_FALSE(decoded.ok);
@@ -66,14 +63,14 @@ TEST(BridgeProtocol, EncodesWithoutEmbeddedNewlines) {
     EXPECT_EQ(encoded.find('\n'), std::string::npos);
 
     bridge::Request decoded;
-    std::string     error;
+    std::string error;
     ASSERT_TRUE(bridge::DecodeRequest(encoded, decoded, error)) << error;
     EXPECT_EQ(decoded.args["summary"], "first line\nsecond line");
 }
 
 TEST(BridgeProtocol, RejectsTextThatIsNotAJsonObject) {
     bridge::Request decoded;
-    std::string     error;
+    std::string error;
 
     EXPECT_FALSE(bridge::DecodeRequest("not json at all", decoded, error));
     EXPECT_FALSE(error.empty());
@@ -84,7 +81,7 @@ TEST(BridgeProtocol, RejectsTextThatIsNotAJsonObject) {
 
 TEST(BridgeProtocol, RejectsARequestWithNoOperation) {
     bridge::Request decoded;
-    std::string     error;
+    std::string error;
     EXPECT_FALSE(bridge::DecodeRequest(R"({"protocol":1,"id":1})", decoded, error));
     EXPECT_FALSE(error.empty());
 }
@@ -93,7 +90,7 @@ TEST(BridgeProtocol, RejectsARequestWithNoOperation) {
 // would hand an empty result to something that edits a safety case.
 TEST(BridgeProtocol, RejectsAFailureWithNoErrorCode) {
     bridge::Response decoded;
-    std::string      error;
+    std::string error;
     EXPECT_FALSE(bridge::DecodeResponse(R"({"protocol":1,"id":1,"ok":false})", decoded, error));
     EXPECT_FALSE(error.empty());
 }
@@ -102,9 +99,9 @@ TEST(BridgeProtocol, RejectsAFailureWithNoErrorCode) {
 // A wrongly-typed field must not throw out of the decoder.
 TEST(BridgeProtocol, SurvivesWronglyTypedFields) {
     bridge::Request decoded;
-    std::string     error;
-    ASSERT_TRUE(bridge::DecodeRequest(
-        R"({"protocol":"one","id":"seven","op":"ping","token":5,"args":"nope"})", decoded, error))
+    std::string error;
+    ASSERT_TRUE(
+        bridge::DecodeRequest(R"({"protocol":"one","id":"seven","op":"ping","token":5,"args":"nope"})", decoded, error))
         << error;
 
     EXPECT_EQ(decoded.protocol, 0);

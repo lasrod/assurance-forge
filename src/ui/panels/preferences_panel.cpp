@@ -174,10 +174,8 @@ void RenderMcpSection(const PreferencesPanelModel& model, const PreferencesPanel
     }
 
     ImGui::TextUnformatted(AF_TR("Client configuration").c_str());
-    ImGui::BeginChild("##mcp_client_config",
-                      ImVec2(0.0f, ui::gsn::DpiSize(96.0f)),
-                      true,
-                      ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::BeginChild(
+        "##mcp_client_config", ImVec2(0.0f, ui::gsn::DpiSize(96.0f)), true, ImGuiWindowFlags_HorizontalScrollbar);
     ImGui::TextUnformatted(model.mcpClientConfig.c_str());
     ImGui::EndChild();
 

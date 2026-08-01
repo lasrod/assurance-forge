@@ -49,8 +49,7 @@ void SyncCycleProblems(core::ProblemsManager& problems_manager, const parser::As
         problem.guideline_id = "GSN3-CORE-014";
         problem.message =
             cycle.element_ids.size() == 1
-                ? ui::i18n::trf("{0} is supported by itself, so it establishes nothing.",
-                                cycle.element_ids.front())
+                ? ui::i18n::trf("{0} is supported by itself, so it establishes nothing.", cycle.element_ids.front())
                 : ui::i18n::trf("Circular support: {0}. An argument that assumes its own conclusion "
                                 "establishes nothing.",
                                 DescribeCycle(cycle));
@@ -167,8 +166,7 @@ void SyncWellFormednessProblems(core::ProblemsManager& problems_manager, const p
         // like every other quick fix, so it survives a language change without
         // the sync re-running.
         problem.quick_fix_label = RepairLabelFor(finding.rule);
-        problem.quick_fix_payload =
-            EncodeGsnRepairPayload(GsnRepairPayload{finding.relationship_id, finding.detail});
+        problem.quick_fix_payload = EncodeGsnRepairPayload(GsnRepairPayload{finding.relationship_id, finding.detail});
         problems_manager.AddOrUpdateProblem(problem);
     }
 }

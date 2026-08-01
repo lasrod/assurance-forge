@@ -108,12 +108,13 @@ TEST(AcpEditingTest, AddsUpdatesAndRemovesRelationshipAcpInParserAndSacm) {
 
     ASSERT_EQ(fixture.package.argumentPackages.size(), 1u);
     const sacm::ArgumentPackage& main_package = fixture.package.argumentPackages.front();
-    auto text_claim = std::find_if(main_package.claims.begin(), main_package.claims.end(), [](const sacm::Claim& claim) {
-        return claim.id == "CC1";
-    });
+    auto text_claim = std::find_if(main_package.claims.begin(),
+                                   main_package.claims.end(),
+                                   [](const sacm::Claim& claim) { return claim.id == "CC1"; });
     ASSERT_NE(text_claim, main_package.claims.end());
     EXPECT_EQ(text_claim->content, edited.text);
-    const sacm::AssertedInference& updated_inference = fixture.package.argumentPackages.front().assertedInferences.front();
+    const sacm::AssertedInference& updated_inference =
+        fixture.package.argumentPackages.front().assertedInferences.front();
     ASSERT_EQ(updated_inference.metaClaims.size(), 1u);
     EXPECT_EQ(updated_inference.metaClaims.front(), "CC1");
 

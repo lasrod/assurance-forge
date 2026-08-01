@@ -38,10 +38,8 @@ bool DrawMetricCard(const MetricCard& card, float width) {
     const bool clicked = ImGui::IsItemClicked();
 
     const ImU32 fill = hovered ? theme.surface_3 : theme.surface_2;
-    draw_list->AddRectFilled(position,
-                             ImVec2(position.x + width, position.y + kCardHeight),
-                             fill,
-                             theme.rounding_panel);
+    draw_list->AddRectFilled(
+        position, ImVec2(position.x + width, position.y + kCardHeight), fill, theme.rounding_panel);
     draw_list->AddRect(position,
                        ImVec2(position.x + width, position.y + kCardHeight),
                        hovered ? theme.border_strong : theme.border,
@@ -63,11 +61,8 @@ bool DrawMetricCard(const MetricCard& card, float width) {
     return clicked;
 }
 
-void AttentionRow(const char* icon,
-                  const std::string& message,
-                  ImU32 color,
-                  const std::function<void()>& action,
-                  const char* id) {
+void AttentionRow(
+    const char* icon, const std::string& message, ImU32 color, const std::function<void()>& action, const char* id) {
     ImGui::PushID(id);
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(color), "%s", icon);
     ImGui::SameLine();
@@ -82,8 +77,7 @@ void AttentionRow(const char* icon,
 
 } // namespace
 
-void ShowProjectOverviewPanel(const ProjectOverviewPanelModel& model,
-                              const ProjectOverviewPanelCallbacks& callbacks) {
+void ShowProjectOverviewPanel(const ProjectOverviewPanelModel& model, const ProjectOverviewPanelCallbacks& callbacks) {
     if (!model.project) {
         ImGui::TextDisabled("%s", AF_TR("No project open.").c_str());
         return;
@@ -109,34 +103,29 @@ void ShowProjectOverviewPanel(const ProjectOverviewPanelModel& model,
     ImGui::Separator();
     ImGui::Dummy(ImVec2(0.0f, 6.0f));
 
-    const std::string argument_detail =
-        summary.undeveloped == 0 ? AF_TR("No undeveloped elements")
-                                 : ui::i18n::trf("{0} undeveloped", summary.undeveloped);
-    const std::string evidence_detail =
-        summary.unlinked_evidence == 0 ? AF_TR("All evidence is linked")
-                                       : ui::i18n::trf("{0} unlinked", summary.unlinked_evidence);
+    const std::string argument_detail = summary.undeveloped == 0
+                                            ? AF_TR("No undeveloped elements")
+                                            : ui::i18n::trf("{0} undeveloped", summary.undeveloped);
+    const std::string evidence_detail = summary.unlinked_evidence == 0
+                                            ? AF_TR("All evidence is linked")
+                                            : ui::i18n::trf("{0} unlinked", summary.unlinked_evidence);
     const std::string review_detail =
         ui::i18n::trf("{0} proposals", summary.valid_proposals + summary.broken_proposals);
     const std::string conformance_detail =
-        summary.conformance_files == 0 ? AF_TR("Not assessed")
-                                       : AF_TR("Assessment workspace available");
+        summary.conformance_files == 0 ? AF_TR("Not assessed") : AF_TR("Assessment workspace available");
 
     std::array<MetricCard, 4> cards = {{
         {"arguments",
          ICON_FA_BULLSEYE,
          AF_TR("Arguments"),
-         ui::i18n::trnf("{0} element",
-                        "{0} elements",
-                        static_cast<int>(summary.elements),
-                        summary.elements),
+         ui::i18n::trnf("{0} element", "{0} elements", static_cast<int>(summary.elements), summary.elements),
          argument_detail,
          theme.accent,
          callbacks.open_arguments},
         {"evidence",
          ICON_FA_DATABASE,
          AF_TR("Evidence"),
-         ui::i18n::trnf(
-             "{0} item", "{0} items", static_cast<int>(summary.evidence), summary.evidence),
+         ui::i18n::trnf("{0} item", "{0} items", static_cast<int>(summary.evidence), summary.evidence),
          evidence_detail,
          summary.unlinked_evidence == 0 ? theme.success : theme.warning,
          callbacks.open_evidence},
@@ -162,8 +151,8 @@ void ShowProjectOverviewPanel(const ProjectOverviewPanelModel& model,
     const float spacing = ImGui::GetStyle().ItemSpacing.x;
     const float available_width = ImGui::GetContentRegionAvail().x;
     const int columns = available_width >= 760.0f ? 4 : (available_width >= 380.0f ? 2 : 1);
-    const float card_width = (available_width - spacing * static_cast<float>(columns - 1)) /
-                             static_cast<float>(columns);
+    const float card_width =
+        (available_width - spacing * static_cast<float>(columns - 1)) / static_cast<float>(columns);
     for (std::size_t index = 0; index < cards.size(); ++index) {
         if (index > 0 && static_cast<int>(index) % columns != 0)
             ImGui::SameLine();
@@ -218,11 +207,7 @@ void ShowProjectOverviewPanel(const ProjectOverviewPanelModel& model,
                      "broken_proposals");
     }
     if (!has_attention) {
-        AttentionRow(ICON_FA_CHECK_CIRCLE,
-                     AF_TR("No open project alerts."),
-                     theme.success,
-                     {},
-                     "no_attention");
+        AttentionRow(ICON_FA_CHECK_CIRCLE, AF_TR("No open project alerts."), theme.success, {}, "no_attention");
     }
 
     ImGui::Dummy(ImVec2(0.0f, 18.0f));

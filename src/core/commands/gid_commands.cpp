@@ -28,17 +28,17 @@ bool EnsureElementGidCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_
     if (generated_gid_.empty())
         generated_gid_ = core::GenerateUniqueElementGid(ctx.model);
 
-    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase&         model,
-                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+    const LibraryBridgeMutator mutate =
+        [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
         return core::SetElementGid(model, &package, element_id_, generated_gid_, err);
     };
     if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
 
-    out_event.event_type            = "SetElementGid";
-    out_event.payload               = nlohmann::ordered_json::object();
+    out_event.event_type = "SetElementGid";
+    out_event.payload = nlohmann::ordered_json::object();
     out_event.payload["element_id"] = element_id_;
-    out_event.payload["gid"]        = generated_gid_;
+    out_event.payload["gid"] = generated_gid_;
     return true;
 }
 

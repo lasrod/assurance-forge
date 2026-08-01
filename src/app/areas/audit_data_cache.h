@@ -24,20 +24,18 @@ namespace app::areas {
 // log only when its mtime or size has changed. Returns an empty vector and
 // fills `error_out` if the store cannot be opened; on transient errors the
 // previously-cached vector is returned so the UI does not flicker.
-const std::vector<core::audit::AuditTransaction>&
-GetCachedTransactions(const std::filesystem::path& project_root, std::string& error_out);
+const std::vector<core::audit::AuditTransaction>& GetCachedTransactions(const std::filesystem::path& project_root,
+                                                                        std::string& error_out);
 
 // Cached list of baselines for `project_root`. Invalidated by changes to
 // either the audit manifest (where the id list lives) or the baselines
 // directory (where sidecar files live).
-const std::vector<core::audit::BaselineMetadata>&
-GetCachedBaselines(const std::filesystem::path& project_root,
-                   std::vector<std::string>* warnings_out = nullptr);
+const std::vector<core::audit::BaselineMetadata>& GetCachedBaselines(const std::filesystem::path& project_root,
+                                                                     std::vector<std::string>* warnings_out = nullptr);
 
 // Cached enumeration of snapshot metadata for `project_root`. Invalidated
 // by changes to the `.af/snapshots/` directory mtime.
-const std::vector<core::audit::SnapshotMetadata>&
-GetCachedSnapshots(const std::filesystem::path& project_root);
+const std::vector<core::audit::SnapshotMetadata>& GetCachedSnapshots(const std::filesystem::path& project_root);
 
 // Clear all caches. Call this when a project is closed so a subsequent
 // open of a different project starts fresh.

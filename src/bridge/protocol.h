@@ -35,14 +35,14 @@ inline constexpr int kProtocolVersion = 1;
 // self-describing in a log where `-32004` is not.
 namespace error_code {
 inline constexpr const char* kUnsupportedProtocol = "unsupported_protocol";
-inline constexpr const char* kUnauthorized        = "unauthorized";
-inline constexpr const char* kNotInitialized      = "not_initialized";
-inline constexpr const char* kUnknownOperation    = "unknown_operation";
-inline constexpr const char* kBadRequest          = "bad_request";
-inline constexpr const char* kNoProject           = "no_project";
-inline constexpr const char* kNoCase              = "no_case";
-inline constexpr const char* kConsentWithheld     = "consent_withheld";
-inline constexpr const char* kInternal            = "internal";
+inline constexpr const char* kUnauthorized = "unauthorized";
+inline constexpr const char* kNotInitialized = "not_initialized";
+inline constexpr const char* kUnknownOperation = "unknown_operation";
+inline constexpr const char* kBadRequest = "bad_request";
+inline constexpr const char* kNoProject = "no_project";
+inline constexpr const char* kNoCase = "no_case";
+inline constexpr const char* kConsentWithheld = "consent_withheld";
+inline constexpr const char* kInternal = "internal";
 } // namespace error_code
 
 // The handshake operation. Must be the first request on a connection; every
@@ -50,24 +50,24 @@ inline constexpr const char* kInternal            = "internal";
 inline constexpr const char* kHelloOperation = "hello";
 
 struct Request {
-    int            protocol = kProtocolVersion;
-    std::uint64_t  id       = 0;
-    std::string    op;
+    int protocol = kProtocolVersion;
+    std::uint64_t id = 0;
+    std::string op;
     // Proves the caller read the endpoint record, which lives in the user's own
     // runtime directory. Without it any local process could drive the
     // application; the transport's access control is the first gate and this is
     // the second.
-    std::string    token;
+    std::string token;
     nlohmann::json args = nlohmann::json::object();
 };
 
 struct Response {
-    int            protocol = kProtocolVersion;
-    std::uint64_t  id       = 0;
-    bool           ok       = false;
-    nlohmann::json result   = nlohmann::json::object();
-    std::string    error_code;
-    std::string    error_message;
+    int protocol = kProtocolVersion;
+    std::uint64_t id = 0;
+    bool ok = false;
+    nlohmann::json result = nlohmann::json::object();
+    std::string error_code;
+    std::string error_message;
 };
 
 std::string EncodeRequest(const Request& request);

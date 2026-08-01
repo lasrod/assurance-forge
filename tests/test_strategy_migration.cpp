@@ -49,19 +49,19 @@ sacm::AssuranceCasePackage MakeLegacyStrategyPackage() {
     b.id = "B";
     ap.claims.push_back(b);
 
-    sacm::AssertedInference bare;  // {reasoning=S1, target=G1, no source}
+    sacm::AssertedInference bare; // {reasoning=S1, target=G1, no source}
     bare.id = "R_bare";
     bare.reasoning = "S1";
     bare.targets = {"G1"};
     ap.assertedInferences.push_back(bare);
 
-    sacm::AssertedInference ia;  // {target=S1, source=A}
+    sacm::AssertedInference ia; // {target=S1, source=A}
     ia.id = "R_A";
     ia.targets = {"S1"};
     ia.sources = {"A"};
     ap.assertedInferences.push_back(ia);
 
-    sacm::AssertedInference ib;  // {target=S1, source=B}
+    sacm::AssertedInference ib; // {target=S1, source=B}
     ib.id = "R_B";
     ib.targets = {"S1"};
     ib.sources = {"B"};
@@ -198,11 +198,11 @@ void WriteFile(const std::filesystem::path& path, std::string_view content) {
 }
 
 struct Fixture {
-    core::AssuranceProject     project;
-    std::filesystem::path      sacm_abs;
-    std::filesystem::path      sacm_rel;
+    core::AssuranceProject project;
+    std::filesystem::path sacm_abs;
+    std::filesystem::path sacm_rel;
     sacm::AssuranceCasePackage package;
-    parser::AssuranceCase      model;
+    parser::AssuranceCase model;
 };
 
 Fixture MakeFixture(const std::string& tag) {
@@ -402,8 +402,7 @@ TEST(StrategyMigration, SACM23_LIB_002_StrategyMigrationPreservesUnknownContent)
     core::commands::CreateChildElementCommand add_sub2(strategy_id, core::NewElementKind::Goal);
     ASSERT_TRUE(bus->Execute(add_sub2, ctx, "tester").success);
 
-    WriteLegacyStrategyOnDiskWithVendorContent(f.sacm_abs, strategy_id, add_sub1.GeneratedId(),
-                                               add_sub2.GeneratedId());
+    WriteLegacyStrategyOnDiskWithVendorContent(f.sacm_abs, strategy_id, add_sub1.GeneratedId(), add_sub2.GeneratedId());
 
     // Non-vacuity: the pre-migration file really does carry the vendor content,
     // so a pass cannot come from never having had anything to lose.
@@ -412,8 +411,7 @@ TEST(StrategyMigration, SACM23_LIB_002_StrategyMigrationPreservesUnknownContent)
     ASSERT_NE(before.find(kVendorAttributeMarker), std::string::npos);
 
     core::audit::StrategyMigrationResult migration;
-    ASSERT_TRUE(core::audit::MigrateStrategyEncodingIfNeeded(f.project, f.sacm_rel, migration, error))
-        << error;
+    ASSERT_TRUE(core::audit::MigrateStrategyEncodingIfNeeded(f.project, f.sacm_rel, migration, error)) << error;
     ASSERT_TRUE(migration.migrated) << "nothing was migrated, so this test proves nothing";
     ASSERT_FALSE(migration.baseline_snapshot_id.empty());
 
@@ -464,8 +462,7 @@ TEST(StrategyMigration, SkipsWhenPathIsNotTheAuditedSacm) {
     // A path that is not the manifest's current_sacm must never be migrated -- the
     // audit store does not cover it, so rewriting it would corrupt an unrelated file.
     core::audit::StrategyMigrationResult migration;
-    ASSERT_TRUE(core::audit::MigrateStrategyEncodingIfNeeded(f.project, "some-other-argument.sacm",
-                                                            migration, error))
+    ASSERT_TRUE(core::audit::MigrateStrategyEncodingIfNeeded(f.project, "some-other-argument.sacm", migration, error))
         << error;
     EXPECT_FALSE(migration.migrated);
     EXPECT_TRUE(migration.baseline_snapshot_id.empty());

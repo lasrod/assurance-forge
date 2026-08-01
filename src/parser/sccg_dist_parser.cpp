@@ -190,7 +190,8 @@ bool ParseReviewProfiles(const std::filesystem::path& path, GuidelinesDocument& 
         profile.sccg_version = sccg_version;
         if (profile.id.empty() || profile.display_name.empty() || profile.applies_to.empty() ||
             profile.guideline_ids.empty()) {
-            error = path.filename().string() + " contains a review profile missing id, display_name, applies_to, or guideline_ids.";
+            error = path.filename().string() +
+                    " contains a review profile missing id, display_name, applies_to, or guideline_ids.";
             return false;
         }
         document.review_profiles.push_back(std::move(profile));
@@ -297,19 +298,22 @@ bool ValidateConsistency(const GuidelinesDocument& document, std::string& error)
         }
         for (const std::string& guideline_id : profile.guideline_ids) {
             if (rule_ids.count(guideline_id) == 0) {
-                error = "SCCG review profile '" + profile.id + "' references unknown guideline id '" + guideline_id + "'.";
+                error =
+                    "SCCG review profile '" + profile.id + "' references unknown guideline id '" + guideline_id + "'.";
                 return false;
             }
         }
         for (const std::string& package_id : profile.required_data) {
             if (data_package_ids.count(package_id) == 0) {
-                error = "SCCG review profile '" + profile.id + "' references unknown required data package '" + package_id + "'.";
+                error = "SCCG review profile '" + profile.id + "' references unknown required data package '" +
+                        package_id + "'.";
                 return false;
             }
         }
         for (const std::string& package_id : profile.optional_data) {
             if (data_package_ids.count(package_id) == 0) {
-                error = "SCCG review profile '" + profile.id + "' references unknown optional data package '" + package_id + "'.";
+                error = "SCCG review profile '" + profile.id + "' references unknown optional data package '" +
+                        package_id + "'.";
                 return false;
             }
         }
@@ -351,11 +355,9 @@ GuidelinesParseResult SccgDistParser::ParseDirectory(const std::filesystem::path
 
     GuidelinesDocument document;
     std::string error;
-    if (!ParseRulesJsonl(rules_path, document, error) ||
-        !ParseReviewProfiles(review_profiles_path, document, error) ||
+    if (!ParseRulesJsonl(rules_path, document, error) || !ParseReviewProfiles(review_profiles_path, document, error) ||
         !ParseDataPackages(data_packages_path, document, error) ||
-        !ParsePrechecks(dist_dir / "prechecks.json", document, error) ||
-        !ValidateConsistency(document, error)) {
+        !ParsePrechecks(dist_dir / "prechecks.json", document, error) || !ValidateConsistency(document, error)) {
         return std::unexpected(std::move(error));
     }
 

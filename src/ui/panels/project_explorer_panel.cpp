@@ -59,7 +59,7 @@ void DrawTrailingText(std::string_view text, ImU32 color, float right_padding = 
     const ImVec2 item_max = ImGui::GetItemRectMax();
     const ImVec2 size = ImGui::CalcTextSize(text.data(), text.data() + text.size());
     draw_list->AddText(ImVec2(item_max.x - size.x - ImGui::GetStyle().FramePadding.x - right_padding,
-                             item_min.y + (item_max.y - item_min.y - size.y) * 0.5f),
+                              item_min.y + (item_max.y - item_min.y - size.y) * 0.5f),
                        color,
                        text.data(),
                        text.data() + text.size());
@@ -89,8 +89,8 @@ bool BeginSection(const char* id,
                   std::size_t count,
                   bool default_open,
                   const std::function<void()>& add_action = {}) {
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_OpenOnArrow |
-                               ImGuiTreeNodeFlags_OpenOnDoubleClick;
+    ImGuiTreeNodeFlags flags =
+        ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
     if (default_open)
         flags |= ImGuiTreeNodeFlags_DefaultOpen;
 
@@ -98,8 +98,7 @@ bool BeginSection(const char* id,
     const std::string section_label = std::string(icon) + "  " + label;
     const bool open = ImGui::TreeNodeEx("section", flags, "%s", section_label.c_str());
     const ImVec2 child_cursor = ImGui::GetCursorPos();
-    const float count_right_padding =
-        add_action ? ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.x : 0.0f;
+    const float count_right_padding = add_action ? ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.x : 0.0f;
     DrawTrailingText(CountText(count), ui::GetTheme().text_muted, count_right_padding);
     if (add_action) {
         ImGui::SameLine();
@@ -204,12 +203,8 @@ void RenderPackageChildren(const core::ProjectFileEntry& entry,
 
     RenderPackageGroup("##grp_argument", AF_TR("Argument Packages"), argument_packages, entry, callbacks, parent_path);
     RenderPackageGroup("##grp_artifact", AF_TR("Artifact Packages"), artifact_packages, entry, callbacks, parent_path);
-    RenderPackageGroup("##grp_terminology",
-                       AF_TR("Terminology Packages"),
-                       terminology_packages,
-                       entry,
-                       callbacks,
-                       parent_path);
+    RenderPackageGroup(
+        "##grp_terminology", AF_TR("Terminology Packages"), terminology_packages, entry, callbacks, parent_path);
     RenderPackageGroup("##grp_interfaces", AF_TR("Interfaces"), interfaces, entry, callbacks, parent_path);
     RenderPackageGroup("##grp_bindings", AF_TR("Bindings"), bindings, entry, callbacks, parent_path);
     RenderPackageGroup("##grp_other", AF_TR("Other Packages"), other_packages, entry, callbacks, parent_path);
@@ -220,8 +215,8 @@ void RenderPackageNode(const core::ProjectFileEntry& entry,
                        const ProjectExplorerPanelCallbacks& callbacks,
                        const std::string& tree_path) {
     const bool has_children = !node.children.empty();
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick |
-                               ImGuiTreeNodeFlags_SpanAvailWidth;
+    ImGuiTreeNodeFlags flags =
+        ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
     if (!has_children)
         flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 
@@ -293,7 +288,7 @@ void RenderSimpleFile(const core::ProjectFileEntry& entry,
 }
 
 std::vector<const core::ProjectFileEntry*> EntriesWithRole(const core::AssuranceProject& project,
-                                                          core::ProjectFileRole role) {
+                                                           core::ProjectFileRole role) {
     std::vector<const core::ProjectFileEntry*> entries;
     for (const core::ProjectFileEntry& entry : project.files) {
         if (entry.role == role)
@@ -311,8 +306,7 @@ void RenderArguments(const ProjectExplorerPanelModel& model, const ProjectExplor
                       callbacks.add_sacm_file)) {
         return;
     }
-    for (const core::ProjectFileEntry* entry :
-         EntriesWithRole(*model.project, core::ProjectFileRole::SacmArgument)) {
+    for (const core::ProjectFileEntry* entry : EntriesWithRole(*model.project, core::ProjectFileRole::SacmArgument)) {
         RenderSimpleFile(*entry, model, callbacks, ICON_FA_BULLSEYE, FriendlyArgumentName(*entry, model));
     }
     if (model.summary.argument_files == 0)
@@ -322,13 +316,16 @@ void RenderArguments(const ProjectExplorerPanelModel& model, const ProjectExplor
 
 void RenderEvidence(const ProjectExplorerPanelModel& model, const ProjectExplorerPanelCallbacks& callbacks) {
     const std::size_t evidence_attention = model.summary.unlinked_evidence;
-    if (!BeginSection("evidence", ICON_FA_DATABASE, AF_TR("Evidence"), model.summary.evidence, true,
+    if (!BeginSection("evidence",
+                      ICON_FA_DATABASE,
+                      AF_TR("Evidence"),
+                      model.summary.evidence,
+                      true,
                       callbacks.add_evidence_register)) {
         return;
     }
     const std::string evidence_badge =
-        evidence_attention == 0 ? CountText(model.summary.evidence)
-                                : ui::i18n::trf("{0} unlinked", evidence_attention);
+        evidence_attention == 0 ? CountText(model.summary.evidence) : ui::i18n::trf("{0} unlinked", evidence_attention);
     if (NavigationRow("evidence_register",
                       ICON_FA_TABLE,
                       AF_TR("Evidence Register"),
@@ -350,11 +347,7 @@ void RenderEvidence(const ProjectExplorerPanelModel& model, const ProjectExplore
 }
 
 void RenderReviews(const ProjectExplorerPanelModel& model, const ProjectExplorerPanelCallbacks& callbacks) {
-    if (!BeginSection("reviews",
-                      ICON_FA_COMMENTS,
-                      AF_TR("Reviews"),
-                      model.summary.open_review_items,
-                      true)) {
+    if (!BeginSection("reviews", ICON_FA_COMMENTS, AF_TR("Reviews"), model.summary.open_review_items, true)) {
         return;
     }
     const ImU32 finding_color =
@@ -375,9 +368,8 @@ void RenderReviews(const ProjectExplorerPanelModel& model, const ProjectExplorer
                       ICON_FA_FILE_ALT,
                       AF_TR("Change Proposals"),
                       false,
-                      model.summary.broken_proposals == 0
-                          ? CountText(proposal_count)
-                          : ui::i18n::trf("{0} broken", model.summary.broken_proposals),
+                      model.summary.broken_proposals == 0 ? CountText(proposal_count)
+                                                          : ui::i18n::trf("{0} broken", model.summary.broken_proposals),
                       proposal_color) &&
         callbacks.open_reviews) {
         callbacks.open_reviews();
@@ -401,17 +393,10 @@ void RenderConformance(const ProjectExplorerPanelModel& model, const ProjectExpl
             continue;
         }
         rendered = true;
-        RenderSimpleFile(entry,
-                         model,
-                         callbacks,
-                         ICON_FA_CHECK_SQUARE,
-                         entry.relativePath.stem().generic_string());
+        RenderSimpleFile(entry, model, callbacks, ICON_FA_CHECK_SQUARE, entry.relativePath.stem().generic_string());
     }
     if (!rendered && MatchesSearch(AF_TR("Start Conformance Assessment"))) {
-        if (NavigationRow("start_conformance",
-                          ICON_FA_PLUS_SQUARE,
-                          AF_TR("Start Conformance Assessment"),
-                          false) &&
+        if (NavigationRow("start_conformance", ICON_FA_PLUS_SQUARE, AF_TR("Start Conformance Assessment"), false) &&
             callbacks.add_j3377_cae_register) {
             callbacks.add_j3377_cae_register();
         }
@@ -420,23 +405,18 @@ void RenderConformance(const ProjectExplorerPanelModel& model, const ProjectExpl
 }
 
 void RenderReports(const ProjectExplorerPanelModel& model, const ProjectExplorerPanelCallbacks& callbacks) {
-    if (!BeginSection(
-            "reports", ICON_FA_FILE_PDF, AF_TR("Reports"), model.summary.exported_reports, false)) {
+    if (!BeginSection("reports", ICON_FA_FILE_PDF, AF_TR("Reports"), model.summary.exported_reports, false)) {
         return;
     }
     if (NavigationRow("report_builder", ICON_FA_FILE_ALT, AF_TR("Report Builder"), false) &&
         callbacks.show_not_implemented) {
         callbacks.show_not_implemented("Report Builder");
     }
-    for (const core::ProjectFileEntry* entry :
-         EntriesWithRole(*model.project, core::ProjectFileRole::ExportedReport)) {
+    for (const core::ProjectFileEntry* entry : EntriesWithRole(*model.project, core::ProjectFileRole::ExportedReport)) {
         if (!EntryMatchesSearch(*entry))
             continue;
         ImGui::PushID(entry->relativePath.generic_string().c_str());
-        if (NavigationRow("report",
-                          ICON_FA_FILE_PDF,
-                          entry->relativePath.filename().generic_string(),
-                          false) &&
+        if (NavigationRow("report", ICON_FA_FILE_PDF, entry->relativePath.filename().generic_string(), false) &&
             callbacks.reveal_in_file_explorer) {
             callbacks.reveal_in_file_explorer(*entry);
         }
@@ -493,8 +473,8 @@ void RenderAdvancedFile(const core::ProjectFileEntry& entry,
     const bool has_tree = entry.role == core::ProjectFileRole::SacmArgument &&
                           tree != model.sacm_package_trees_by_path.end() && tree->second.success &&
                           !tree->second.root.children.empty();
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_OpenOnArrow |
-                               ImGuiTreeNodeFlags_OpenOnDoubleClick;
+    ImGuiTreeNodeFlags flags =
+        ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
     if (!has_tree)
         flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 
@@ -504,8 +484,7 @@ void RenderAdvancedFile(const core::ProjectFileEntry& entry,
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen() && callbacks.open_file)
         callbacks.open_file(entry);
 
-    if ((entry.role == core::ProjectFileRole::ReviewProposal ||
-         entry.role == core::ProjectFileRole::ExportedReport) &&
+    if ((entry.role == core::ProjectFileRole::ReviewProposal || entry.role == core::ProjectFileRole::ExportedReport) &&
         ImGui::BeginPopupContextItem("##advanced_file_context")) {
         if (callbacks.remove_file && ImGui::MenuItem(AF_TR("Delete").c_str()))
             callbacks.remove_file(entry);
@@ -544,15 +523,14 @@ void RenderProjectHeader(const ProjectExplorerPanelModel& model) {
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::GetTheme().accent), "%s", ICON_FA_SHIELD_ALT);
     ImGui::SameLine();
     ImGui::TextWrapped("%s", project.name.c_str());
-    ImGui::TextDisabled(
-        "%s",
-        model.summary.attention_count() == 0
-            ? AF_TR("No open project alerts.").c_str()
-            : ui::i18n::trnf("{0} item needs attention",
-                              "{0} items need attention",
-                              static_cast<int>(model.summary.attention_count()),
-                              model.summary.attention_count())
-                  .c_str());
+    ImGui::TextDisabled("%s",
+                        model.summary.attention_count() == 0
+                            ? AF_TR("No open project alerts.").c_str()
+                            : ui::i18n::trnf("{0} item needs attention",
+                                             "{0} items need attention",
+                                             static_cast<int>(model.summary.attention_count()),
+                                             model.summary.attention_count())
+                                  .c_str());
     ImGui::EndChild();
     ImGui::PopStyleColor();
 }
@@ -566,15 +544,12 @@ void ShowCaseExplorer(const ProjectExplorerPanelModel& model, const ProjectExplo
 
     RenderProjectHeader(model);
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::InputTextWithHint("##case_search", AF_TR("Search project...").c_str(), g_search_buffer.data(),
-                             g_search_buffer.size());
+    ImGui::InputTextWithHint(
+        "##case_search", AF_TR("Search project...").c_str(), g_search_buffer.data(), g_search_buffer.size());
     ImGui::Separator();
 
-    if (NavigationRow("overview",
-                      ICON_FA_HOME,
-                      AF_TR("Overview"),
-                      model.overview_selected,
-                      CountText(model.summary.elements)) &&
+    if (NavigationRow(
+            "overview", ICON_FA_HOME, AF_TR("Overview"), model.overview_selected, CountText(model.summary.elements)) &&
         callbacks.open_overview) {
         callbacks.open_overview();
     }

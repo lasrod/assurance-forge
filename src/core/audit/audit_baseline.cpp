@@ -32,8 +32,7 @@ T ReadOr(const json& j, const char* key, T fallback) {
 
 std::string MakeBaselineId(std::uint64_t transaction_sequence) {
     char buf[32];
-    std::snprintf(buf, sizeof(buf), "baseline_%06llu",
-                  static_cast<unsigned long long>(transaction_sequence));
+    std::snprintf(buf, sizeof(buf), "baseline_%06llu", static_cast<unsigned long long>(transaction_sequence));
     return buf;
 }
 
@@ -65,8 +64,7 @@ bool ParseBaselineMetadata(const std::string& text, BaselineMetadata& out, std::
         return false;
     }
     out = BaselineMetadata{};
-    out.baseline_schema_version =
-        ReadOr<int>(j, "baseline_schema_version", kBaselineSchemaVersion);
+    out.baseline_schema_version = ReadOr<int>(j, "baseline_schema_version", kBaselineSchemaVersion);
     out.baseline_id = ReadOr<std::string>(j, "baseline_id", {});
     out.name = ReadOr<std::string>(j, "name", {});
     out.description = ReadOr<std::string>(j, "description", {});
@@ -142,8 +140,7 @@ bool CreateBaseline(const std::filesystem::path& project_root,
     if (!ReadAuditManifest(project_root, manifest, error))
         return false;
 
-    const std::uint64_t at_seq =
-        request.at_transaction_sequence.value_or(manifest.latest_transaction_sequence);
+    const std::uint64_t at_seq = request.at_transaction_sequence.value_or(manifest.latest_transaction_sequence);
 
     // Allocate a unique id. Collision can happen if two baselines pin to the
     // same sequence; in that case append `_<n>` until unique.

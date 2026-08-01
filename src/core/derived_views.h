@@ -39,13 +39,11 @@ void RebuildDerivedViewsFromLibrary(const sacm_adapter::LibraryDocument& documen
 // Remove terminology artifact references (and the contexts sourcing them) that
 // are not a *visible* terminology context from the render model, so a term shows
 // as inline underlined clickable text rather than a drawn context node.
-void HideTerminologyArtifactReferences(parser::AssuranceCase& model,
-                                       const sacm::AssuranceCasePackage& package);
+void HideTerminologyArtifactReferences(parser::AssuranceCase& model, const sacm::AssuranceCasePackage& package);
 
 // Repoint each visible terminology artifact reference's display fields at its
 // term, so the inline term chip renders the term's label and definition.
-void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model,
-                                             const sacm::AssuranceCasePackage& package);
+void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model, const sacm::AssuranceCasePackage& package);
 
 // A GSN strategy is created as an ArgumentReasoning carrying a `strategyTarget`
 // tag (the goal it will support) with no inference until its first sub-goal
@@ -57,8 +55,7 @@ void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model,
 // the render model, NOT the projection (which feeds the saved package + audit
 // hash), so the placeholder is never serialized. Once a real inference
 // (reasoning=strategy) exists, none is synthesized.
-void SynthesizeBareStrategyPlacements(parser::AssuranceCase& model,
-                                      const sacm::AssuranceCasePackage& package);
+void SynthesizeBareStrategyPlacements(parser::AssuranceCase& model, const sacm::AssuranceCasePackage& package);
 
 // Same pass scoped to ONE ArgumentPackage, for a render view that was projected
 // down to a single package (`core::BuildArgumentPackageProjection`, which feeds
@@ -67,7 +64,6 @@ void SynthesizeBareStrategyPlacements(parser::AssuranceCase& model,
 // the bare strategy loses its placement -- it has to be re-synthesized on the
 // projected view. Both overloads are idempotent: an existing placeholder counts
 // as a placement, so re-running adds nothing.
-void SynthesizeBareStrategyPlacements(parser::AssuranceCase& model,
-                                      const sacm::ArgumentPackage& argument_package);
+void SynthesizeBareStrategyPlacements(parser::AssuranceCase& model, const sacm::ArgumentPackage& argument_package);
 
 } // namespace core

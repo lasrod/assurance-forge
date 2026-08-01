@@ -40,36 +40,38 @@ struct AgentConnection {
     std::uint64_t id = 0;
     // From the adapter's handshake, e.g. "claude-ai 0.1.0". Used for
     // attribution on anything the connection produces.
-    std::string   client_label;
-    std::string   connected_utc;
+    std::string client_label;
+    std::string connected_utc;
 };
 
 class AgentBridgeController {
-  public:
+public:
     // Executes one operation against the live model. Called on the frame
     // thread, once per queued request.
-    using OperationHandler =
-        std::function<bridge::Response(const bridge::Request&, const AgentConnection&)>;
+    using OperationHandler = std::function<bridge::Response(const bridge::Request&, const AgentConnection&)>;
 
     AgentBridgeController() = default;
     ~AgentBridgeController();
 
-    AgentBridgeController(const AgentBridgeController&)            = delete;
+    AgentBridgeController(const AgentBridgeController&) = delete;
     AgentBridgeController& operator=(const AgentBridgeController&) = delete;
 
     // Starts listening for `project_root` and publishes the endpoint record so
     // an adapter can find it. Starting for a project already being served is a
     // no-op; starting for a different one stops the previous listener first, so
     // switching projects cannot leave two records pointing at one application.
-    bool Start(const std::filesystem::path& project_root, std::string app_version,
-               std::string& error);
+    bool Start(const std::filesystem::path& project_root, std::string app_version, std::string& error);
 
     // Stops listening, unwinds every thread, and removes the endpoint record.
     // Safe to call when not listening, and safe to call twice.
     void Stop();
 
-    bool                         listening() const { return listening_.load(); }
-    const std::filesystem::path& project_root() const { return project_root_; }
+    bool listening() const {
+        return listening_.load();
+    }
+    const std::filesystem::path& project_root() const {
+        return project_root_;
+    }
 
     // Runs every queued request through `handler`. Call once per frame.
     // Returns how many ran, so the caller can mark derived views dirty only
@@ -78,7 +80,7 @@ class AgentBridgeController {
 
     std::vector<AgentConnection> connections() const;
 
-  private:
+private:
     struct PendingRequest;
 
     // A connection and the thread serving it. The connection is held so that
@@ -86,32 +88,31 @@ class AgentBridgeController {
     // that has nothing to say would otherwise never return, and joining it would
     // hang the application on exit.
     struct ServedConnection {
-        AgentConnection                     descriptor;
+        AgentConnection descriptor;
         std::shared_ptr<bridge::Connection> connection;
-        std::thread                         thread;
+        std::thread thread;
     };
 
     void AcceptLoop();
     void ServeConnection(std::shared_ptr<bridge::Connection> connection, AgentConnection descriptor);
     // Protocol version, token and handshake ordering, checked on the connection
     // thread so the frame thread only ever sees requests worth running.
-    bool CheckEnvelope(const bridge::Request& request, bool initialized,
-                       bridge::Response& refusal) const;
+    bool CheckEnvelope(const bridge::Request& request, bool initialized, bridge::Response& refusal) const;
     void MarkInitialized(std::uint64_t id, const std::string& client_label);
     void ForgetConnection(std::uint64_t id);
 
     std::unique_ptr<bridge::Listener> listener_;
-    std::thread                       accept_thread_;
+    std::thread accept_thread_;
 
     std::filesystem::path project_root_;
-    std::string           app_version_;
-    std::string           token_;
-    std::atomic<bool>     listening_{false};
-    std::atomic<bool>     stopping_{false};
+    std::string app_version_;
+    std::string token_;
+    std::atomic<bool> listening_{false};
+    std::atomic<bool> stopping_{false};
     std::atomic<uint64_t> next_connection_id_{1};
 
-    mutable std::mutex                          mutex_;
-    std::condition_variable                     queued_;
+    mutable std::mutex mutex_;
+    std::condition_variable queued_;
     std::deque<std::shared_ptr<PendingRequest>> pending_;
     // Every connection ever served this session, including finished ones whose
     // thread is still joinable. Cleared on `Stop`.

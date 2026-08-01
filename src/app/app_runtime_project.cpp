@@ -284,12 +284,10 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
     // single-inference form and open-verify converges. No-op for non-audited or
     // already-migrated files. (Phase 9 Stage 7, slice 3.)
     core::audit::StrategyMigrationResult strategy_migration;
-    if (entry.role == core::ProjectFileRole::SacmArgument &&
-        impl_->app_state.current_project.has_value()) {
+    if (entry.role == core::ProjectFileRole::SacmArgument && impl_->app_state.current_project.has_value()) {
         std::string migration_error;
-        if (!core::audit::MigrateStrategyEncodingIfNeeded(impl_->app_state.current_project.value(),
-                                                          entry.relativePath, strategy_migration,
-                                                          migration_error)) {
+        if (!core::audit::MigrateStrategyEncodingIfNeeded(
+                impl_->app_state.current_project.value(), entry.relativePath, strategy_migration, migration_error)) {
             SetStatus("Strategy encoding migration failed: " + migration_error);
         }
     }
@@ -323,8 +321,8 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
         impl_->command_bus.reset();
         if (impl_->app_state.current_project.has_value()) {
             std::string bus_error;
-            auto bus = core::commands::CommandBus::Open(impl_->app_state.current_project.value(),
-                                                        ProjectFilePath(impl_->app_state, entry), bus_error);
+            auto bus = core::commands::CommandBus::Open(
+                impl_->app_state.current_project.value(), ProjectFilePath(impl_->app_state, entry), bus_error);
             if (!bus) {
                 SetStatus("Audit bus init failed: " + bus_error);
             } else {
@@ -337,8 +335,7 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
         // user's working state.
         impl_->last_audit_verification.reset();
         if (impl_->app_state.current_project.has_value()) {
-            auto verification =
-                core::audit::VerifyProject(impl_->app_state.current_project.value());
+            auto verification = core::audit::VerifyProject(impl_->app_state.current_project.value());
             if (verification.ran && !verification.success) {
                 std::string msg = "Audit replay verification failed — the recorded "
                                   "history no longer reproduces the on-disk SACM. "
@@ -855,8 +852,8 @@ void AppRuntime::SyncTranslationReviewProblems() {
     const parser::AssuranceCase* model =
         impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
     bool pending_changed = false;
-    app::SyncTranslationReviewProblems(impl_->problems_manager, model, impl_->translation_review_pending_ids,
-                                       pending_changed);
+    app::SyncTranslationReviewProblems(
+        impl_->problems_manager, model, impl_->translation_review_pending_ids, pending_changed);
     if (pending_changed)
         SaveTranslationReviewSidecar(*impl_);
 }
@@ -919,8 +916,7 @@ void AppRuntime::DiscardOrphanedRegisterAssessment(const core::ProblemItem& prob
 
     // The file is only rewritten on save, so say so: this is the one undo the
     // register store has.
-    SetStatus("Discarded the assessment of " + ref.key +
-              ". Close the project without saving to keep it after all.");
+    SetStatus("Discarded the assessment of " + ref.key + ". Close the project without saving to keep it after all.");
 }
 
 // Applies the repair a GSN v3 well-formedness finding offers. Returns false when
@@ -1187,8 +1183,7 @@ void AppRuntime::UpdateAgentBridgeForProject() {
     }
 
     std::string error;
-    if (!impl_->agent_bridge->Start(impl_->app_state.current_project->rootPath, kAppVersion,
-                                    error)) {
+    if (!impl_->agent_bridge->Start(impl_->app_state.current_project->rootPath, kAppVersion, error)) {
         // Not fatal. The application is perfectly usable without an AI client
         // attached, and failing an project open over it would be a poor trade.
         SetStatus("AI clients cannot connect to this project: " + error);
@@ -1208,28 +1203,25 @@ bool AppRuntime::PollAgentBridge() {
         const std::uint64_t revision = impl_->agent_change_sets.revision();
         if (revision != impl_->agent_change_revision_drawn) {
             impl_->agent_change_revision_drawn = revision;
-            impl_->tree_needs_rebuild          = true;
+            impl_->tree_needs_rebuild = true;
         }
     };
     mark_dirty_if_changed();
 
-    const std::string project_path =
-        impl_->app_state.current_project.has_value()
-            ? impl_->app_state.current_project->rootPath.generic_string()
-            : std::string();
+    const std::string project_path = impl_->app_state.current_project.has_value()
+                                         ? impl_->app_state.current_project->rootPath.generic_string()
+                                         : std::string();
 
     const int handled = impl_->agent_bridge->PollPendingRequests(
-        [this, &project_path](const bridge::Request&              request,
-                              const controllers::AgentConnection& connection) {
-            const AgentRequestContext context{
-                impl_->app_state,
-                project_path,
-                connection.client_label,
-                [this](const std::string& relative_path, std::string& error) {
-                    return OpenAgentRequestedCaseFile(relative_path, error);
-                },
-                &impl_->agent_change_sets,
-                connection.id};
+        [this, &project_path](const bridge::Request& request, const controllers::AgentConnection& connection) {
+            const AgentRequestContext context{impl_->app_state,
+                                              project_path,
+                                              connection.client_label,
+                                              [this](const std::string& relative_path, std::string& error) {
+                                                  return OpenAgentRequestedCaseFile(relative_path, error);
+                                              },
+                                              &impl_->agent_change_sets,
+                                              connection.id};
             return HandleAgentRequest(request, context);
         });
 
@@ -1255,10 +1247,8 @@ bool AppRuntime::AcceptAgentChangeSet(const std::string& change_set_id, std::str
     // applies must be refused rather than forced. The Review panel runs the same
     // check every frame, so this is the second time the user sees the reason
     // rather than the first.
-    const core::changesets::ChangeSetAcceptability acceptability =
-        core::changesets::EvaluateChangeSetAcceptability(*change_set,
-                                                         impl_->app_state.loaded_file_path,
-                                                         impl_->app_state.loaded_case.value());
+    const core::changesets::ChangeSetAcceptability acceptability = core::changesets::EvaluateChangeSetAcceptability(
+        *change_set, impl_->app_state.loaded_file_path, impl_->app_state.loaded_case.value());
     if (!acceptability.can_accept) {
         error = acceptability.reason;
         return false;
@@ -1302,15 +1292,13 @@ bool AppRuntime::OpenAgentRequestedCaseFile(const std::string& relative_path, st
     }
 
     for (const core::ProjectFileEntry& entry : impl_->app_state.current_project->files) {
-        if (entry.role != core::ProjectFileRole::SacmArgument ||
-            entry.relativePath.generic_string() != relative_path) {
+        if (entry.role != core::ProjectFileRole::SacmArgument || entry.relativePath.generic_string() != relative_path) {
             continue;
         }
         // Goes through the same path a user's click takes, so the command bus,
         // the audit store and every side-storage controller are reconfigured for
         // the new file exactly as they would be otherwise.
-        const std::filesystem::path wanted =
-            impl_->app_state.current_project->rootPath / entry.relativePath;
+        const std::filesystem::path wanted = impl_->app_state.current_project->rootPath / entry.relativePath;
         OpenProjectFile(entry);
 
         // `OpenProjectFile` returns normally in cases where it did NOT open the
@@ -1329,9 +1317,8 @@ bool AppRuntime::OpenAgentRequestedCaseFile(const std::string& relative_path, st
                     "then try again.";
             return false;
         }
-        error = impl_->app_state.status_message.empty()
-                    ? ("Assurance Forge could not open " + relative_path + ".")
-                    : impl_->app_state.status_message;
+        error = impl_->app_state.status_message.empty() ? ("Assurance Forge could not open " + relative_path + ".")
+                                                        : impl_->app_state.status_message;
         return false;
     }
 

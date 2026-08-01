@@ -39,4 +39,4 @@ struct Diagnostic {
 
 bool has_errors(std::span<const Diagnostic> diagnostics);
 
-}  // namespace sacm::validation
+} // namespace sacm::validation

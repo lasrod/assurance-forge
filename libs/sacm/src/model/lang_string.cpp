@@ -26,4 +26,4 @@ void MultiLangString::set(std::string_view lang, std::string_view content) {
     values.push_back(LangString{std::string(lang), std::string(content), std::nullopt});
 }
 
-}  // namespace sacm::model
+} // namespace sacm::model

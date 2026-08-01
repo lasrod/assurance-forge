@@ -80,7 +80,8 @@ void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
             else if (!selected_element)
                 tooltip = AF_TR("Select a GSN/SACM element before running SCCG profile reviews.");
             else if (!compatible)
-                tooltip = profile.description + "\n\n" + AF_TR("This profile does not apply to the selected element type.");
+                tooltip =
+                    profile.description + "\n\n" + AF_TR("This profile does not apply to the selected element type.");
 
             ImGui::PushID(profile.id.c_str());
             if (!enabled)

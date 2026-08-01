@@ -88,9 +88,13 @@ void RenderAppSplitters(AppRuntimeState& state,
     clamp_problems_height();
     const float center_panel_h = std::max(0.0f, available_h - state.layout.problems_panel_height);
     const float center_splitter_y = top_y + center_panel_h;
-    const float delta_center = ui::widgets::DrawHorizontalSplitter(
-        "##center_problems_splitter", center_x, center_splitter_y, center_w, kSplitterThickness, hit_padding,
-        panel_flags);
+    const float delta_center = ui::widgets::DrawHorizontalSplitter("##center_problems_splitter",
+                                                                   center_x,
+                                                                   center_splitter_y,
+                                                                   center_w,
+                                                                   kSplitterThickness,
+                                                                   hit_padding,
+                                                                   panel_flags);
     if (delta_center != 0.0f) {
         state.layout.problems_panel_height -= delta_center;
         clamp_problems_height();
@@ -101,8 +105,8 @@ void RenderAppSplitters(AppRuntimeState& state,
 
 void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center_view) {
     if (!state.workbench.show_overview_tab && !state.workbench.show_gsn_tab && !state.workbench.show_cse_tab &&
-        !state.workbench.show_evidence_tab &&
-        !state.workbench.show_package_details_tab && !state.workbench.show_terminology_package_tab) {
+        !state.workbench.show_evidence_tab && !state.workbench.show_package_details_tab &&
+        !state.workbench.show_terminology_package_tab) {
         state.workbench.show_overview_tab = true;
     }
 

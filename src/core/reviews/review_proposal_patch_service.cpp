@@ -553,10 +553,10 @@ ApplyProposalResult ReviewProposalPatchService::ApplyProposal(const ReviewPropos
     return result;
 }
 
-ApplyProposalResult ReviewProposalPatchService::ApplyProposalWithIds(
-    const ReviewProposal& proposal,
-    parser::AssuranceCase& current_model,
-    const std::map<std::string, std::string>& predetermined_ids) const {
+ApplyProposalResult
+ReviewProposalPatchService::ApplyProposalWithIds(const ReviewProposal& proposal,
+                                                 parser::AssuranceCase& current_model,
+                                                 const std::map<std::string, std::string>& predetermined_ids) const {
     ApplyProposalResult result;
     result.generated_ids = predetermined_ids;
 

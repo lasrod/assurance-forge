@@ -5,22 +5,21 @@ namespace sacm::metadata::namespaces {
 bool is_xmi_namespace(std::string_view uri) {
     // Matches http://www.omg.org/spec/XMI/<date> and the older
     // http://www.omg.org/XMI, without matching a SACM namespace.
-    return uri == kXmi || uri == "http://www.omg.org/XMI" ||
-           uri.find("/spec/XMI/") != std::string_view::npos;
+    return uri == kXmi || uri == "http://www.omg.org/XMI" || uri.find("/spec/XMI/") != std::string_view::npos;
 }
 
 std::string_view standard_version_name(StandardVersion version) {
     switch (version) {
-        case StandardVersion::V2_0:
-            return "2.0";
-        case StandardVersion::V2_1:
-            return "2.1";
-        case StandardVersion::V2_2:
-            return "2.2";
-        case StandardVersion::V2_3:
-            return "2.3";
-        case StandardVersion::Unknown:
-            break;
+    case StandardVersion::V2_0:
+        return "2.0";
+    case StandardVersion::V2_1:
+        return "2.1";
+    case StandardVersion::V2_2:
+        return "2.2";
+    case StandardVersion::V2_3:
+        return "2.3";
+    case StandardVersion::Unknown:
+        break;
     }
     return "unknown";
 }
@@ -33,8 +32,7 @@ StandardVersion detect_standard_version(std::string_view uri) {
     // Every other family in the wild spells the revision in the path:
     // http://omg.sacm/2.2/argumentation, http://www.omg.org/spec/SACM/2.2/...,
     // http://example.org/sacm/2.3.
-    for (const auto& [needle, version] :
-         std::initializer_list<std::pair<std::string_view, StandardVersion>>{
+    for (const auto& [needle, version] : std::initializer_list<std::pair<std::string_view, StandardVersion>>{
              {"/2.3", StandardVersion::V2_3},
              {"/2.2", StandardVersion::V2_2},
              {"/2.1", StandardVersion::V2_1},
@@ -69,4 +67,4 @@ bool is_accepted_sacm_namespace(std::string_view uri) {
     return uri == "http://example.org/sacm/2.3";
 }
 
-}  // namespace sacm::metadata::namespaces
+} // namespace sacm::metadata::namespaces

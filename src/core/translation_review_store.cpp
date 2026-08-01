@@ -26,9 +26,7 @@ std::string SerializeTranslationReview(const std::vector<std::string>& element_i
     return root.dump(2) + "\n";
 }
 
-bool ParseTranslationReview(const std::string& json,
-                            std::vector<std::string>& out_element_ids,
-                            std::string& error) {
+bool ParseTranslationReview(const std::string& json, std::vector<std::string>& out_element_ids, std::string& error) {
     out_element_ids.clear();
     error.clear();
 

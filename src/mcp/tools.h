@@ -22,20 +22,20 @@ class Session;
 // see what went wrong and adjust rather than the connection faulting.
 struct ToolResult {
     nlohmann::json payload;
-    bool           is_error = false;
+    bool is_error = false;
 
     static ToolResult Ok(nlohmann::json payload);
     static ToolResult Error(std::string message);
 };
 
 struct ToolDefinition {
-    std::string    name;
-    std::string    description;
+    std::string name;
+    std::string description;
     nlohmann::json input_schema;
     // True when the tool returns assurance-case content, and must therefore be
     // refused until the user has enabled MCP. Set this on every new tool that
     // reads the model -- it is the whole consent gate.
-    bool           returns_case_content = true;
+    bool returns_case_content = true;
 
     std::function<ToolResult(Session&, const nlohmann::json& arguments)> handler;
 };

@@ -12,9 +12,7 @@ namespace core {
 namespace {
 
 // Match an SACM element by id (preferred) or gid.
-bool MatchesIdentity(const sacm::SacmElement& element,
-                     const std::string& id,
-                     const std::string& gid) {
+bool MatchesIdentity(const sacm::SacmElement& element, const std::string& id, const std::string& gid) {
     return (!id.empty() && element.id == id) || (!gid.empty() && element.gid == gid);
 }
 
@@ -70,8 +68,7 @@ bool DeleteArgumentPackage(sacm::AssuranceCasePackage& package,
                                         [&](const parser::SacmElement& element) {
                                             if (removed_element_ids.count(element.id) > 0)
                                                 return true;
-                                            if (!element.gid.empty() &&
-                                                removed_element_gids.count(element.gid) > 0)
+                                            if (!element.gid.empty() && removed_element_gids.count(element.gid) > 0)
                                                 return true;
                                             return false;
                                         }),
@@ -123,15 +120,13 @@ void FillIdentityPayload(audit::AuditEvent& out_event,
 
 } // namespace
 
-bool RemoveTerminologyPackageCommand::Apply(CommandContext& ctx,
-                                            audit::AuditEvent& out_event,
-                                            std::string& out_error) {
+bool RemoveTerminologyPackageCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
     if (id_.empty() && gid_.empty()) {
         out_error = "RemoveTerminologyPackageCommand requires an id or gid.";
         return false;
     }
-    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase&,
-                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+    const LibraryBridgeMutator mutate =
+        [&](parser::AssuranceCase&, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
         return core::DeleteTerminologyPackage(package, core::TerminologyPackageRef{id_, gid_}, err);
     };
     if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
@@ -140,15 +135,13 @@ bool RemoveTerminologyPackageCommand::Apply(CommandContext& ctx,
     return true;
 }
 
-bool RemoveArgumentPackageCommand::Apply(CommandContext& ctx,
-                                         audit::AuditEvent& out_event,
-                                         std::string& out_error) {
+bool RemoveArgumentPackageCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
     if (id_.empty() && gid_.empty()) {
         out_error = "RemoveArgumentPackageCommand requires an id or gid.";
         return false;
     }
-    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase&         model,
-                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+    const LibraryBridgeMutator mutate =
+        [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
         return core::DeleteArgumentPackage(package, model, id_, gid_, err);
     };
     if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
@@ -157,15 +150,13 @@ bool RemoveArgumentPackageCommand::Apply(CommandContext& ctx,
     return true;
 }
 
-bool RemoveArtifactPackageCommand::Apply(CommandContext& ctx,
-                                         audit::AuditEvent& out_event,
-                                         std::string& out_error) {
+bool RemoveArtifactPackageCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
     if (id_.empty() && gid_.empty()) {
         out_error = "RemoveArtifactPackageCommand requires an id or gid.";
         return false;
     }
-    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase&,
-                                            sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+    const LibraryBridgeMutator mutate =
+        [&](parser::AssuranceCase&, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
         return core::DeleteArtifactPackage(package, id_, gid_, err);
     };
     if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))

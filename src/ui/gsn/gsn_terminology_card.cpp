@@ -256,9 +256,8 @@ void RenderTermDetails(const sacm::AssuranceCasePackage* package,
     if (!term->origin.empty())
         ImGui::TextDisabled("%s", ui::i18n::trf("Origin: {0}", term->origin).c_str());
     if (package)
-        ImGui::TextDisabled("%s", ui::i18n::trf("Usage count: {0}",
-                                                core::CountTerminologyTermUsage(*package, *term))
-                                      .c_str());
+        ImGui::TextDisabled(
+            "%s", ui::i18n::trf("Usage count: {0}", core::CountTerminologyTermUsage(*package, *term)).c_str());
 }
 
 void RenderTerminologyCardContents(const TerminologyCardState& card_state,
@@ -278,8 +277,8 @@ void RenderTerminologyCardContents(const TerminologyCardState& card_state,
     }
 
     if (card_state.kind == TerminologyCardKind::Ambiguous) {
-        ImGui::TextColored(GetWarningColor(), "%s",
-                           ui::i18n::trf("{0} has multiple meanings.", card_state.text).c_str());
+        ImGui::TextColored(
+            GetWarningColor(), "%s", ui::i18n::trf("{0} has multiple meanings.", card_state.text).c_str());
         int shown = 0;
         for (const auto& candidate : card_state.candidates) {
             ImGui::PushID(shown);
@@ -302,7 +301,8 @@ void RenderTerminologyCardContents(const TerminologyCardState& card_state,
             }
         }
         if (interactive) {
-            if (actions.define_terminology_term && ImGui::Button(AF_TR("Create new meaning").c_str(), ImVec2(165.0f, 0.0f)))
+            if (actions.define_terminology_term &&
+                ImGui::Button(AF_TR("Create new meaning").c_str(), ImVec2(165.0f, 0.0f)))
                 actions.define_terminology_term(card_state.element_id, card_state.text);
         }
         ImGui::PopTextWrapPos();

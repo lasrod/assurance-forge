@@ -38,8 +38,7 @@ std::filesystem::path BaselinesDir(const std::filesystem::path& project_root) {
     return AfDir(project_root) / kBaselinesDirName;
 }
 
-std::filesystem::path BaselineMetadataPath(const std::filesystem::path& project_root,
-                                           const std::string& baseline_id) {
+std::filesystem::path BaselineMetadataPath(const std::filesystem::path& project_root, const std::string& baseline_id) {
     return BaselinesDir(project_root) / (baseline_id + kBaselineFileNameSuffix);
 }
 

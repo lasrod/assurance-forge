@@ -23,7 +23,10 @@ std::string GenerateUniqueElementGid(const parser::AssuranceCase& model);
 //
 // Generation is deliberately split out (`GenerateUniqueElementGid`) so an audited
 // command can mint the gid ONCE, record it, and force the SAME value on replay.
-bool SetElementGid(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package,
-                   const std::string& element_id, const std::string& gid, std::string& error);
+bool SetElementGid(parser::AssuranceCase& model,
+                   sacm::AssuranceCasePackage* package,
+                   const std::string& element_id,
+                   const std::string& gid,
+                   std::string& error);
 
 } // namespace core

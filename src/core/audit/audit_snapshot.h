@@ -16,7 +16,7 @@ namespace core::audit {
 inline constexpr int kSnapshotSchemaVersion = 1;
 
 struct SnapshotMetadata {
-    int         snapshot_schema_version = kSnapshotSchemaVersion;
+    int snapshot_schema_version = kSnapshotSchemaVersion;
     std::string snapshot_id;
     std::string created_at;
     std::string created_by;
@@ -69,8 +69,8 @@ bool CreateUserSnapshot(const std::filesystem::path& project_root,
 
 // The trusted replay root a project should replay forward from.
 struct ReplayRoot {
-    std::string   snapshot_id;                     // the snapshot to load as the base state
-    std::uint64_t from_transaction_sequence = 0;   // exclusive floor: replay events after this
+    std::string snapshot_id;                     // the snapshot to load as the base state
+    std::uint64_t from_transaction_sequence = 0; // exclusive floor: replay events after this
 };
 
 // Resolve the trusted replay root. Prefers `replay_root_snapshot_id` (a promoted

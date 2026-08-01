@@ -118,8 +118,11 @@ std::string GenerateUniqueElementGid(const parser::AssuranceCase& model) {
     return gid;
 }
 
-bool SetElementGid(parser::AssuranceCase& model, sacm::AssuranceCasePackage* package,
-                   const std::string& element_id, const std::string& gid, std::string& error) {
+bool SetElementGid(parser::AssuranceCase& model,
+                   sacm::AssuranceCasePackage* package,
+                   const std::string& element_id,
+                   const std::string& gid,
+                   std::string& error) {
     error.clear();
     parser::SacmElement* element = parser::FindElementById(model, element_id);
     if (element == nullptr) {

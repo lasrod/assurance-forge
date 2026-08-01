@@ -29,7 +29,7 @@ namespace core::commands {
 // (De)serialize a `core::TreeDropMode` to/from a stable payload token (mirrors
 // `RemoveModeToToken`). Not user-visible -- used only in the audit payload.
 std::string TreeDropModeToToken(core::TreeDropMode mode);
-bool        TreeDropModeFromToken(const std::string& token, core::TreeDropMode& out);
+bool TreeDropModeFromToken(const std::string& token, core::TreeDropMode& out);
 
 // Reorder a dragged element above/below a target sibling (same parent, same tree
 // group -- enforced by the underlying `core::ReorderSiblings` validation).
@@ -38,19 +38,23 @@ public:
     ReorderSiblingsCommand(std::string dragged_id, std::string target_id, core::TreeDropMode drop_mode)
         : dragged_id_(std::move(dragged_id)), target_id_(std::move(target_id)), drop_mode_(drop_mode) {}
 
-    std::string Name() const override { return "ReorderSiblings"; }
-    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+    std::string Name() const override {
+        return "ReorderSiblings";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
     // The reordered per-parent child order captured from the mutation, so the app
     // can refresh its transient render-order override (`TreeDisplayOrder`)
     // immediately; the frame-boundary re-derive rebuilds the tree from the
     // reordered SACM.
-    const core::TreeDisplayOrder& ReorderedOrder() const { return reordered_; }
+    const core::TreeDisplayOrder& ReorderedOrder() const {
+        return reordered_;
+    }
 
 private:
-    std::string           dragged_id_;
-    std::string           target_id_;
-    core::TreeDropMode    drop_mode_;
+    std::string dragged_id_;
+    std::string target_id_;
+    core::TreeDropMode drop_mode_;
     core::TreeDisplayOrder reordered_;
 };
 
@@ -61,8 +65,10 @@ public:
     MoveSubtreeCommand(std::string dragged_id, std::string new_parent_id)
         : dragged_id_(std::move(dragged_id)), new_parent_id_(std::move(new_parent_id)) {}
 
-    std::string Name() const override { return "MoveSubtree"; }
-    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+    std::string Name() const override {
+        return "MoveSubtree";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
 private:
     std::string dragged_id_;

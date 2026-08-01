@@ -58,4 +58,4 @@ struct OperationPreview {
     std::uint64_t document_revision = 0;
 };
 
-}  // namespace sacm::commands
+} // namespace sacm::commands

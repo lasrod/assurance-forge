@@ -308,8 +308,8 @@ bool ShowAcpPanel(parser::AssuranceCase* model,
                     modified = callbacks->create_confidence_argument_tree(edited.id) || modified;
             }
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s",
-                                  AF_TR("Create a new SACM argument package and link this ACP to its top goal.").c_str());
+                ImGui::SetTooltip(
+                    "%s", AF_TR("Create a new SACM argument package and link this ACP to its top goal.").c_str());
 
             ImGui::Spacing();
             if (options.empty()) {

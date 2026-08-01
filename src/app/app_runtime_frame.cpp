@@ -56,8 +56,8 @@ void AppRuntime::RenderFrame(bool& done) {
     menu_callbacks.begin_create_project_sacm_file = [this]() { BeginCreateProjectSacmFile(); };
     menu_callbacks.begin_create_project_evidence_register = [this]() { BeginCreateProjectEvidenceRegister(); };
     menu_callbacks.begin_create_project_j3377_cae_register = [this]() { BeginCreateProjectJ3377CaeRegister(); };
-    menu_callbacks.undo                                    = [this]() { Undo(); };
-    menu_callbacks.can_undo                                = [this]() { return CanUndo(); };
+    menu_callbacks.undo = [this]() { Undo(); };
+    menu_callbacks.can_undo = [this]() { return CanUndo(); };
     const float menu_height = frame::RenderAppMenuBar(*impl_, done, menu_callbacks);
 
     // Global Ctrl+Z shortcut — fires once per key chord even when the
@@ -384,8 +384,11 @@ void AppRuntime::RenderFrame(bool& done) {
             impl_->events.Emit(TreeDirtyEvent{});
             impl_->events.Emit(DocumentDirtyEvent{});
         },
-        [this](const std::string& element_id, const std::string& field_token, const std::string& language,
-               const std::string& original_value, const std::string& new_value) {
+        [this](const std::string& element_id,
+               const std::string& field_token,
+               const std::string& language,
+               const std::string& original_value,
+               const std::string& new_value) {
             if (!impl_->app_state.loaded_case.has_value())
                 return;
             const bool committed = impl_->element_edit_controller->CommitElementTextEdit(

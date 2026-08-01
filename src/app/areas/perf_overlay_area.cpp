@@ -522,8 +522,7 @@ void DrawSubsystemStackedBar(const std::array<SubsystemAccum, static_cast<size_t
     float row_max_h = chip_h;
 
     for (const auto& v : views) {
-        const std::string label =
-            std::format("{}  {:.2f} ms", SubsystemLabel(v.id), static_cast<float>(v.ns) / 1.0e6f);
+        const std::string label = std::format("{}  {:.2f} ms", SubsystemLabel(v.id), static_cast<float>(v.ns) / 1.0e6f);
         const float lbl_w = ImGui::CalcTextSize(label.c_str()).x;
         const float dot_r = 4.0f;
         const float chip_w = chip_pad_x + dot_r * 2.0f + 6.0f + lbl_w + chip_pad_x;
@@ -537,7 +536,8 @@ void DrawSubsystemStackedBar(const std::array<SubsystemAccum, static_cast<size_t
         dl2->AddRectFilled(c0, c1, th.surface_2, 10.0f);
         dl2->AddRect(c0, c1, th.border, 10.0f);
         dl2->AddCircleFilled(ImVec2(c0.x + chip_pad_x + dot_r, c0.y + chip_h * 0.5f), dot_r, SubsystemColor(v.id));
-        dl2->AddText(ImVec2(c0.x + chip_pad_x + dot_r * 2.0f + 6.0f, c0.y + chip_pad_y), th.text_secondary, label.c_str());
+        dl2->AddText(
+            ImVec2(c0.x + chip_pad_x + dot_r * 2.0f + 6.0f, c0.y + chip_pad_y), th.text_secondary, label.c_str());
         row_x += chip_w + chip_spacing;
     }
     ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvail().x, row_max_h + 2.0f));
@@ -638,9 +638,8 @@ void DrawTreeNodeRow(const BucketNode& node, std::uint64_t frame_total_ns, int d
         frame_total_ns > 0 ? static_cast<float>(node.total_ns) / static_cast<float>(frame_total_ns) : 0.0f;
     const float ms = static_cast<float>(node.total_ns) / 1.0e6f;
 
-    const std::string header = (node.is_leaf && node.children.empty())
-                                    ? node.segment
-                                    : std::format("{}  ({:.2f} ms)", node.segment, ms);
+    const std::string header =
+        (node.is_leaf && node.children.empty()) ? node.segment : std::format("{}  ({:.2f} ms)", node.segment, ms);
 
     // Sort children by descending total_ns
     std::vector<const BucketNode*> sorted_children;
@@ -722,13 +721,13 @@ void DrawTreeNodeRow(const BucketNode& node, std::uint64_t frame_total_ns, int d
 // advanced to the full pill size via Dummy.
 void DrawPill(const char* text, std::optional<ImU32> leading_dot_col = std::nullopt) {
     const ui::Theme& th = ui::GetTheme();
-    ImDrawList*      dl = ImGui::GetWindowDrawList();
-    const ImVec2     ts = ImGui::CalcTextSize(text);
-    const float      pad_x   = 8.0f;
-    const float      pad_y   = 3.0f;
-    const float      dot_off = leading_dot_col.has_value() ? 6.0f : 0.0f;
-    const ImVec2     p0      = ImGui::GetCursorScreenPos();
-    const ImVec2     p1      = ImVec2(p0.x + ts.x + pad_x * 2 + dot_off, p0.y + ts.y + pad_y * 2);
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const ImVec2 ts = ImGui::CalcTextSize(text);
+    const float pad_x = 8.0f;
+    const float pad_y = 3.0f;
+    const float dot_off = leading_dot_col.has_value() ? 6.0f : 0.0f;
+    const ImVec2 p0 = ImGui::GetCursorScreenPos();
+    const ImVec2 p1 = ImVec2(p0.x + ts.x + pad_x * 2 + dot_off, p0.y + ts.y + pad_y * 2);
     dl->AddRectFilled(p0, p1, th.surface_2, 10.0f);
     dl->AddRect(p0, p1, th.border, 10.0f);
     if (leading_dot_col.has_value()) {
@@ -743,7 +742,7 @@ void DrawCounterChip(const char* label, int value) {
 }
 
 void DrawCullChip(const char* label, int drawn, int culled) {
-    const int   total = drawn + culled;
+    const int total = drawn + culled;
     const float ratio = total > 0 ? static_cast<float>(culled) / static_cast<float>(total) : 0.0f;
     const std::string text = std::format("{} {}/{}  {:.0f}% culled", label, drawn, total, ratio * 100.0f);
     const ImU32 dot_col = ImGui::ColorConvertFloat4ToU32(ui::CullRatioColor(ratio));
@@ -777,8 +776,7 @@ std::string BuildReport(float total_ms,
     for (const auto& s : sorted_samples) {
         const float ms = static_cast<float>(s.total_ns) / 1.0e6f;
         const float pct = total_ns > 0 ? 100.0f * static_cast<float>(s.total_ns) / static_cast<float>(total_ns) : 0.0f;
-        out += std::format(
-            "  {:<44} {:8.3f} {:7.1f}% {:6}\n", s.name ? s.name : "(null)", ms, pct, s.hit_count);
+        out += std::format("  {:<44} {:8.3f} {:7.1f}% {:6}\n", s.name ? s.name : "(null)", ms, pct, s.hit_count);
     }
 
     out += "\nCanvas render stats:\n";
@@ -908,9 +906,8 @@ void RenderPerfOverlay(bool& open) {
             if (ImGui::Checkbox(AF_TR("VSync").c_str(), &vsync))
                 rp->fpsIdling.vsyncToMonitor = vsync;
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s",
-                                  AF_TR("Disable to uncap the frame rate (useful for measuring raw render cost).")
-                                      .c_str());
+                ImGui::SetTooltip(
+                    "%s", AF_TR("Disable to uncap the frame rate (useful for measuring raw render cost).").c_str());
 
             // Idling control + live indicator. hello_imgui's FpsIdling throttles
             // the main loop to fpsIdle (default 9 FPS) when the UI is quiet,
@@ -977,32 +974,31 @@ void RenderPerfOverlay(bool& open) {
     // Section 1: KPI cards row
     // =================================================================
     {
-        const float avail   = ImGui::GetContentRegionAvail().x;
-        const int   cards   = 6;
+        const float avail = ImGui::GetContentRegionAvail().x;
+        const int cards = 6;
         const float spacing = 6.0f;
-        const float card_w  = std::max(64.0f, (avail - spacing * (cards - 1)) / cards);
+        const float card_w = std::max(64.0f, (avail - spacing * (cards - 1)) / cards);
         // Card height scales with font so the label (~font height) + value
         // (1.45x font) + paddings fit cleanly at any DPI.
         const float pad_y_card = 6.0f;
-        const float card_h  =
-            std::max(72.0f, ImGui::GetFontSize() * (1.0f + 1.45f) + pad_y_card * 3.0f);
+        const float card_h = std::max(72.0f, ImGui::GetFontSize() * (1.0f + 1.45f) + pad_y_card * 3.0f);
 
         // Driven by a small table so all six metrics use identical layout
         // and adding/removing a KPI is a one-line change.
         struct Kpi {
             const char* label;
             const char* fmt;
-            double      value;
+            double value;
             const char* unit;
-            ImU32       color;
+            ImU32 color;
         };
         const Kpi kpis[cards] = {
-            {"FPS",      "%.1f",  fps,          "",   FpsStatusColor(fps)},
-            {"FRAME",    "%.2f",  total_ms,     "ms", FrameTimeStatusColor(total_ms)},
-            {"AVG",      "%.2f",  avg_ms,       "ms", FrameTimeStatusColor(avg_ms)},
-            {"MAX",      "%.2f",  max_ms,       "ms", FrameTimeStatusColor(max_ms)},
-            {"HEADROOM", "%.0f%%", headroom_pct, "",   HeadroomStatusColor(headroom_pct)},
-            {"SPIKES",   "%.0f",  (double)spikes.count, "/4s", SpikeStatusColor(spikes.count)},
+            {"FPS", "%.1f", fps, "", FpsStatusColor(fps)},
+            {"FRAME", "%.2f", total_ms, "ms", FrameTimeStatusColor(total_ms)},
+            {"AVG", "%.2f", avg_ms, "ms", FrameTimeStatusColor(avg_ms)},
+            {"MAX", "%.2f", max_ms, "ms", FrameTimeStatusColor(max_ms)},
+            {"HEADROOM", "%.0f%%", headroom_pct, "", HeadroomStatusColor(headroom_pct)},
+            {"SPIKES", "%.0f", (double)spikes.count, "/4s", SpikeStatusColor(spikes.count)},
         };
         char buf[32];
         for (int i = 0; i < cards; ++i) {

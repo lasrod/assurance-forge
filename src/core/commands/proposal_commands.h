@@ -18,13 +18,17 @@ class ApplyProposalCommand final : public ICommand {
 public:
     explicit ApplyProposalCommand(reviews::ReviewProposal proposal) : proposal_(std::move(proposal)) {}
 
-    std::string Name() const override { return "ApplyProposal"; }
-    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+    std::string Name() const override {
+        return "ApplyProposal";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
-    const std::map<std::string, std::string>& GeneratedIds() const { return generated_ids_; }
+    const std::map<std::string, std::string>& GeneratedIds() const {
+        return generated_ids_;
+    }
 
 private:
-    reviews::ReviewProposal            proposal_;
+    reviews::ReviewProposal proposal_;
     std::map<std::string, std::string> generated_ids_;
 };
 

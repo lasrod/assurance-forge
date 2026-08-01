@@ -28,8 +28,8 @@ std::string GenerateTransactionId() {
     oss << std::setw(16) << a << std::setw(16) << b;
     std::string hex = oss.str();
     // 8-4-4-4-12 layout
-    return hex.substr(0, 8) + "-" + hex.substr(8, 4) + "-" + hex.substr(12, 4) + "-" +
-           hex.substr(16, 4) + "-" + hex.substr(20, 12);
+    return hex.substr(0, 8) + "-" + hex.substr(8, 4) + "-" + hex.substr(12, 4) + "-" + hex.substr(16, 4) + "-" +
+           hex.substr(20, 12);
 }
 
 bool EnsureAuditDirExists(const std::filesystem::path& project_root, std::string& error) {
@@ -80,12 +80,12 @@ std::unique_ptr<EventStore> EventStore::Open(const std::filesystem::path& projec
     std::string previous_line_hash;
     std::size_t pos = 0;
     std::size_t last_good_end = 0; // byte offset one past the last good '\n'
-    bool        truncated_recovery_needed = false;
+    bool truncated_recovery_needed = false;
     std::string truncated_diag;
     while (pos < content.size()) {
         const std::size_t eol = content.find('\n', pos);
-        const bool        has_newline = (eol != std::string::npos);
-        std::string       line = content.substr(pos, has_newline ? eol - pos : std::string::npos);
+        const bool has_newline = (eol != std::string::npos);
+        std::string line = content.substr(pos, has_newline ? eol - pos : std::string::npos);
         const std::size_t next_pos = has_newline ? eol + 1 : content.size();
 
         if (line.empty()) {
@@ -136,7 +136,7 @@ std::unique_ptr<EventStore> EventStore::Open(const std::filesystem::path& projec
         // so subsequent appends chain cleanly. Do this via temp-file +
         // atomic rename so the repair itself is crash-safe.
         const std::string repaired(content.data(), last_good_end);
-        auto              w = WriteTextFileAtomic(store->log_path_, repaired);
+        auto w = WriteTextFileAtomic(store->log_path_, repaired);
         if (!w) {
             error = "Failed to truncate torn tail of event log: " + w.error();
             return nullptr;
@@ -144,8 +144,7 @@ std::unique_ptr<EventStore> EventStore::Open(const std::filesystem::path& projec
         // Re-read for hash; cheaper than tracking a running hash here.
         auto repaired_bytes = ReadFileBytes(store->log_path_);
         if (repaired_bytes)
-            store->event_store_hash_ =
-                repaired_bytes->empty() ? std::string{} : Sha256::HexDigest(*repaired_bytes);
+            store->event_store_hash_ = repaired_bytes->empty() ? std::string{} : Sha256::HexDigest(*repaired_bytes);
         store->latest_transaction_hash_ = previous_line_hash;
         // Emit a single recovery diagnostic so callers (VerifyProject /
         // status bar) can surface it; we intentionally do not fail Open.

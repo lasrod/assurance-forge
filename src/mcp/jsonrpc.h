@@ -20,26 +20,26 @@
 namespace mcp::jsonrpc {
 
 // Standard JSON-RPC 2.0 error codes (specification section 5.1).
-inline constexpr int kParseError     = -32700;
+inline constexpr int kParseError = -32700;
 inline constexpr int kInvalidRequest = -32600;
 inline constexpr int kMethodNotFound = -32601;
-inline constexpr int kInvalidParams  = -32602;
-inline constexpr int kInternalError  = -32603;
+inline constexpr int kInvalidParams = -32602;
+inline constexpr int kInternalError = -32603;
 
 // A well-formed request. A notification is a request carrying no `id` member;
 // the specification forbids replying to one, which is why this is tracked
 // explicitly rather than inferred from a null id (an explicit `"id": null` is a
 // request, badly formed, and still gets an error response).
 struct Request {
-    std::string    method;
-    nlohmann::json params          = nlohmann::json::object();
-    nlohmann::json id              = nullptr;
-    bool           is_notification = false;
+    std::string method;
+    nlohmann::json params = nlohmann::json::object();
+    nlohmann::json id = nullptr;
+    bool is_notification = false;
 };
 
 // Exactly one of `request` / `error_response` is set.
 struct ParseOutcome {
-    std::optional<Request>        request;
+    std::optional<Request> request;
     std::optional<nlohmann::json> error_response;
 };
 

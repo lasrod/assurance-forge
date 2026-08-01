@@ -21,7 +21,9 @@ struct FileStamp {
     bool operator==(const FileStamp& other) const {
         return exists == other.exists && mtime == other.mtime && size == other.size;
     }
-    bool operator!=(const FileStamp& other) const { return !(*this == other); }
+    bool operator!=(const FileStamp& other) const {
+        return !(*this == other);
+    }
 };
 
 FileStamp StatFile(const std::filesystem::path& path) {
@@ -84,8 +86,8 @@ std::unordered_map<std::string, SnapshotCache>& SnapshotCacheMap() {
 
 } // namespace
 
-const std::vector<core::audit::AuditTransaction>&
-GetCachedTransactions(const std::filesystem::path& project_root, std::string& error_out) {
+const std::vector<core::audit::AuditTransaction>& GetCachedTransactions(const std::filesystem::path& project_root,
+                                                                        std::string& error_out) {
     const std::string key = project_root.string();
     TransactionCache& cache = TxCacheMap()[key];
 
@@ -115,8 +117,8 @@ GetCachedTransactions(const std::filesystem::path& project_root, std::string& er
     return cache.transactions;
 }
 
-const std::vector<core::audit::BaselineMetadata>&
-GetCachedBaselines(const std::filesystem::path& project_root, std::vector<std::string>* warnings_out) {
+const std::vector<core::audit::BaselineMetadata>& GetCachedBaselines(const std::filesystem::path& project_root,
+                                                                     std::vector<std::string>* warnings_out) {
     const std::string key = project_root.string();
     BaselineCache& cache = BaselineCacheMap()[key];
 
@@ -142,8 +144,7 @@ GetCachedBaselines(const std::filesystem::path& project_root, std::vector<std::s
     return cache.baselines;
 }
 
-const std::vector<core::audit::SnapshotMetadata>&
-GetCachedSnapshots(const std::filesystem::path& project_root) {
+const std::vector<core::audit::SnapshotMetadata>& GetCachedSnapshots(const std::filesystem::path& project_root) {
     const std::string key = project_root.string();
     SnapshotCache& cache = SnapshotCacheMap()[key];
 

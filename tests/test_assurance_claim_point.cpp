@@ -160,7 +160,7 @@ TEST(AssuranceClaimPointTest, FlatParserProjectsSacmBackedAcpRecords) {
 }
 
 TEST(AssuranceClaimPointTest, FlatParserProjectsRelationshipMetaClaims) {
-        const char* xml = R"xml(
+    const char* xml = R"xml(
 <sacm:AssuranceCasePackage xmlns:sacm="http://example.org/sacm/2.3" id="CASE1">
     <argumentPackage id="AP1">
         <claim id="G1" />
@@ -175,15 +175,15 @@ TEST(AssuranceClaimPointTest, FlatParserProjectsRelationshipMetaClaims) {
 </sacm:AssuranceCasePackage>
 )xml";
 
-        auto parsed = parser::parse_sacm_xml_string(xml);
-        ASSERT_TRUE(parsed.has_value()) << (parsed ? "" : parsed.error());
+    auto parsed = parser::parse_sacm_xml_string(xml);
+    ASSERT_TRUE(parsed.has_value()) << (parsed ? "" : parsed.error());
 
-        auto relationship = std::find_if(parsed->elements.begin(),
-                                                                         parsed->elements.end(),
-                                                                         [](const parser::SacmElement& element) { return element.id == "R1"; });
-        ASSERT_NE(relationship, parsed->elements.end());
-        ASSERT_EQ(relationship->meta_claim_refs.size(), 1u);
-        EXPECT_EQ(relationship->meta_claim_refs.front(), "CC1");
+    auto relationship = std::find_if(parsed->elements.begin(),
+                                     parsed->elements.end(),
+                                     [](const parser::SacmElement& element) { return element.id == "R1"; });
+    ASSERT_NE(relationship, parsed->elements.end());
+    ASSERT_EQ(relationship->meta_claim_refs.size(), 1u);
+    EXPECT_EQ(relationship->meta_claim_refs.front(), "CC1");
 }
 
 TEST(AssuranceClaimPointTest, ConfidenceArgumentPackagePurposeUsesSacmTaggedValue) {

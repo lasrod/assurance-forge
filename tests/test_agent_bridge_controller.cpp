@@ -28,7 +28,7 @@
 namespace {
 
 class AgentBridgeControllerTest : public ::testing::Test {
-  protected:
+protected:
     // A POSIX socket path has to fit `sockaddr_un::sun_path` -- 108 bytes on
     // Linux, 104 on macOS -- and this root is the front of one, because the
     // fixture points the runtime directory at it.
@@ -48,9 +48,8 @@ class AgentBridgeControllerTest : public ::testing::Test {
     }
 
     void SetUp() override {
-        root_ = ShortTempRoot(
-            "af-bridge-controller-" +
-            std::to_string(::testing::UnitTest::GetInstance()->current_test_info()->line()));
+        root_ = ShortTempRoot("af-bridge-controller-" +
+                              std::to_string(::testing::UnitTest::GetInstance()->current_test_info()->line()));
         std::filesystem::remove_all(root_);
         std::filesystem::create_directories(root_);
 
@@ -78,15 +77,12 @@ class AgentBridgeControllerTest : public ::testing::Test {
     // Runs the controller's queue until `stop` is set, the way a frame loop
     // would. Every request is answered by echoing the operation name back, which
     // is enough to prove the round trip without dragging a model in.
-    static void DriveFrames(app::controllers::AgentBridgeController& controller,
-                            std::atomic<bool>&                       stop) {
+    static void DriveFrames(app::controllers::AgentBridgeController& controller, std::atomic<bool>& stop) {
         while (!stop.load()) {
             controller.PollPendingRequests(
-                [](const bridge::Request&                         request,
-                   const app::controllers::AgentConnection& connection) {
-                    return bridge::MakeResult(request.id,
-                                              nlohmann::json{{"ranOperation", request.op},
-                                                             {"client", connection.client_label}});
+                [](const bridge::Request& request, const app::controllers::AgentConnection& connection) {
+                    return bridge::MakeResult(
+                        request.id, nlohmann::json{{"ranOperation", request.op}, {"client", connection.client_label}});
                 });
             std::this_thread::sleep_for(std::chrono::milliseconds(2));
         }
@@ -94,22 +90,20 @@ class AgentBridgeControllerTest : public ::testing::Test {
 
     std::unique_ptr<bridge::Connection> ConnectToController(std::string& token) {
         bridge::EndpointRecord record;
-        std::string            error;
+        std::string error;
         if (!bridge::ReadEndpointRecord(project_, record, error)) {
             ADD_FAILURE() << "no endpoint record was published: " << error;
             return nullptr;
         }
         token = record.token;
-        std::unique_ptr<bridge::Connection> connection =
-            bridge::Connection::Connect(record.address, error);
+        std::unique_ptr<bridge::Connection> connection = bridge::Connection::Connect(record.address, error);
         if (connection == nullptr) {
             ADD_FAILURE() << "could not connect: " << error;
         }
         return connection;
     }
 
-    static bridge::Response Exchange(bridge::Connection& connection,
-                                     const bridge::Request& request) {
+    static bridge::Response Exchange(bridge::Connection& connection, const bridge::Request& request) {
         bridge::Response response;
         if (!connection.WriteMessage(bridge::EncodeRequest(request))) {
             ADD_FAILURE() << "could not send the request";
@@ -125,11 +119,10 @@ class AgentBridgeControllerTest : public ::testing::Test {
         return response;
     }
 
-    static bridge::Request Say(const std::string& op, const std::string& token,
-                               std::uint64_t id = 1) {
+    static bridge::Request Say(const std::string& op, const std::string& token, std::uint64_t id = 1) {
         bridge::Request request;
-        request.id    = id;
-        request.op    = op;
+        request.id = id;
+        request.op = op;
         request.token = token;
         return request;
     }
@@ -137,10 +130,10 @@ class AgentBridgeControllerTest : public ::testing::Test {
     std::filesystem::path root_;
     std::filesystem::path project_;
 
-  private:
+private:
     void Remember(const std::string& name) {
         const char* value = std::getenv(name.c_str());
-        saved_[name]      = value == nullptr ? std::string() : std::string(value);
+        saved_[name] = value == nullptr ? std::string() : std::string(value);
     }
 
     static void Set(const std::string& name, const std::string& value) {
@@ -156,7 +149,7 @@ class AgentBridgeControllerTest : public ::testing::Test {
 
 TEST_F(AgentBridgeControllerTest, PublishesAnEndpointRecordAClientCanFind) {
     app::controllers::AgentBridgeController controller;
-    std::string                             error;
+    std::string error;
     ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
     EXPECT_TRUE(controller.listening());
 
@@ -172,7 +165,7 @@ TEST_F(AgentBridgeControllerTest, PublishesAnEndpointRecordAClientCanFind) {
 // listening on, which presents as a hang rather than as "no app running".
 TEST_F(AgentBridgeControllerTest, RemovesTheEndpointRecordOnStop) {
     app::controllers::AgentBridgeController controller;
-    std::string                             error;
+    std::string error;
     ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
     ASSERT_TRUE(std::filesystem::exists(bridge::EndpointRecordPath(project_)));
 
@@ -184,18 +177,18 @@ TEST_F(AgentBridgeControllerTest, RemovesTheEndpointRecordOnStop) {
 
 TEST_F(AgentBridgeControllerTest, RunsAnOperationOnTheFrameThreadAndAnswers) {
     app::controllers::AgentBridgeController controller;
-    std::string                             error;
+    std::string error;
     ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
 
     std::atomic<bool> stop{false};
-    std::thread       frames([&] { DriveFrames(controller, stop); });
+    std::thread frames([&] { DriveFrames(controller, stop); });
 
-    std::string                               token;
+    std::string token;
     const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
     ASSERT_NE(client, nullptr);
 
     bridge::Request hello = Say(bridge::kHelloOperation, token, 1);
-    hello.args            = nlohmann::json{{"client", "claude-ai 0.1.0"}};
+    hello.args = nlohmann::json{{"client", "claude-ai 0.1.0"}};
     const bridge::Response greeting = Exchange(*client, hello);
     ASSERT_TRUE(greeting.ok) << greeting.error_message;
     EXPECT_EQ(greeting.result["appVersion"], "0.1.0");
@@ -213,16 +206,16 @@ TEST_F(AgentBridgeControllerTest, RunsAnOperationOnTheFrameThreadAndAnswers) {
 
 TEST_F(AgentBridgeControllerTest, ShowsAConnectedClientToTheApplication) {
     app::controllers::AgentBridgeController controller;
-    std::string                             error;
+    std::string error;
     ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
     EXPECT_TRUE(controller.connections().empty());
 
-    std::string                               token;
+    std::string token;
     const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
     ASSERT_NE(client, nullptr);
 
     bridge::Request hello = Say(bridge::kHelloOperation, token, 1);
-    hello.args            = nlohmann::json{{"client", "claude-ai 0.1.0"}};
+    hello.args = nlohmann::json{{"client", "claude-ai 0.1.0"}};
     ASSERT_TRUE(Exchange(*client, hello).ok);
 
     const std::vector<app::controllers::AgentConnection> connected = controller.connections();
@@ -235,10 +228,10 @@ TEST_F(AgentBridgeControllerTest, ShowsAConnectedClientToTheApplication) {
 // not read it is not the adapter this application published for.
 TEST_F(AgentBridgeControllerTest, RefusesAConnectionWithTheWrongToken) {
     app::controllers::AgentBridgeController controller;
-    std::string                             error;
+    std::string error;
     ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
 
-    std::string                               token;
+    std::string token;
     const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
     ASSERT_NE(client, nullptr);
 
@@ -249,10 +242,10 @@ TEST_F(AgentBridgeControllerTest, RefusesAConnectionWithTheWrongToken) {
 
 TEST_F(AgentBridgeControllerTest, RefusesWorkBeforeTheHandshake) {
     app::controllers::AgentBridgeController controller;
-    std::string                             error;
+    std::string error;
     ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
 
-    std::string                               token;
+    std::string token;
     const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
     ASSERT_NE(client, nullptr);
 
@@ -266,21 +259,20 @@ TEST_F(AgentBridgeControllerTest, RefusesWorkBeforeTheHandshake) {
 // actionable message.
 TEST_F(AgentBridgeControllerTest, RefusesAnUnsupportedProtocolByName) {
     app::controllers::AgentBridgeController controller;
-    std::string                             error;
+    std::string error;
     ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
 
-    std::string                               token;
+    std::string token;
     const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
     ASSERT_NE(client, nullptr);
 
     bridge::Request stale = Say(bridge::kHelloOperation, token);
-    stale.protocol        = bridge::kProtocolVersion + 41;
+    stale.protocol = bridge::kProtocolVersion + 41;
 
     const bridge::Response refused = Exchange(*client, stale);
     EXPECT_FALSE(refused.ok);
     EXPECT_EQ(refused.error_code, bridge::error_code::kUnsupportedProtocol);
-    EXPECT_NE(refused.error_message.find(std::to_string(bridge::kProtocolVersion + 41)),
-              std::string::npos);
+    EXPECT_NE(refused.error_message.find(std::to_string(bridge::kProtocolVersion + 41)), std::string::npos);
 }
 
 // Switching projects must leave exactly one record. Two would send adapters to a
@@ -290,7 +282,7 @@ TEST_F(AgentBridgeControllerTest, MovesItsRecordWhenTheProjectChanges) {
     std::filesystem::create_directories(second);
 
     app::controllers::AgentBridgeController controller;
-    std::string                             error;
+    std::string error;
     ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
     ASSERT_TRUE(controller.Start(second, "0.1.0", error)) << error;
 

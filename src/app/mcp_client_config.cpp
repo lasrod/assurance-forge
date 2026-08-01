@@ -23,8 +23,8 @@ namespace {
 // when each platform gets its own function body.
 #ifdef _WIN32
 std::filesystem::path RunningExecutablePath() {
-    char        path[MAX_PATH] = {};
-    const DWORD length         = GetModuleFileNameA(nullptr, path, MAX_PATH);
+    char path[MAX_PATH] = {};
+    const DWORD length = GetModuleFileNameA(nullptr, path, MAX_PATH);
     if (length == 0 || length >= MAX_PATH) {
         return {};
     }
@@ -35,7 +35,7 @@ std::filesystem::path RunningExecutablePath() {
     // Never called with a null buffer: a too-small buffer returns non-zero and
     // writes the required size back, so one grow-and-retry is enough.
     std::vector<char> buffer(1024, '\0');
-    std::uint32_t     size = static_cast<std::uint32_t>(buffer.size());
+    std::uint32_t size = static_cast<std::uint32_t>(buffer.size());
     if (_NSGetExecutablePath(buffer.data(), &size) != 0) {
         buffer.assign(static_cast<std::size_t>(size) + 1, '\0');
         size = static_cast<std::uint32_t>(buffer.size());
@@ -43,13 +43,13 @@ std::filesystem::path RunningExecutablePath() {
             return {};
         }
     }
-    std::error_code             ec;
+    std::error_code ec;
     const std::filesystem::path resolved = std::filesystem::weakly_canonical(buffer.data(), ec);
     return ec ? std::filesystem::path(buffer.data()) : resolved;
 }
 #elif defined(__linux__)
 std::filesystem::path RunningExecutablePath() {
-    std::error_code             ec;
+    std::error_code ec;
     const std::filesystem::path self = std::filesystem::read_symlink("/proc/self/exe", ec);
     return ec ? std::filesystem::path{} : self;
 }
@@ -72,7 +72,7 @@ std::filesystem::path ExecutableDirectory() {
     if (!self.empty()) {
         return self.parent_path();
     }
-    std::error_code             ec;
+    std::error_code ec;
     const std::filesystem::path working = std::filesystem::current_path(ec);
     return ec ? std::filesystem::path{} : working;
 }
@@ -106,11 +106,10 @@ std::string BuildMcpClientConfig(const std::filesystem::path& project_root) {
     // generic_string() so Windows paths use forward slashes. Backslashes would
     // need escaping in JSON, and a config a user hand-edits later is one more
     // place for a stray escape to break the launch.
-    const nlohmann::json config{
-        {"mcpServers",
-         {{"assurance-forge",
-           {{"command", server.generic_string()},
-            {"args", nlohmann::json::array({"--project", project_root.generic_string()})}}}}}};
+    const nlohmann::json config{{"mcpServers",
+                                 {{"assurance-forge",
+                                   {{"command", server.generic_string()},
+                                    {"args", nlohmann::json::array({"--project", project_root.generic_string()})}}}}}};
 
     return config.dump(2);
 }

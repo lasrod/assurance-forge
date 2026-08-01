@@ -57,4 +57,4 @@ inline constexpr std::string_view kCmdInvalidParent = "SACM-CMD-005";
 inline constexpr std::string_view kCmdPackageNotEmpty = "SACM-CMD-006";
 inline constexpr std::string_view kCmdExternalReferences = "SACM-CMD-007";
 
-}  // namespace sacm::validation::codes
+} // namespace sacm::validation::codes

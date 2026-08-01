@@ -14,4 +14,4 @@ std::string_view standard_version() {
 #endif
 }
 
-}  // namespace sacm
+} // namespace sacm

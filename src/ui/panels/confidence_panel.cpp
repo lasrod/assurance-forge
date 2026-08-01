@@ -115,13 +115,13 @@ void DrawModeSelector(ElementConfidence& confidence) {
     const float available = ImGui::GetContentRegionAvail().x;
     const float button_width = std::max(92.0f, (available - gap) * 0.5f);
 
-    if (DrawSegmentButton(AF_TR("Direct value").c_str(), confidence.mode == ConfidenceInputMode::DirectValue,
-                          button_width)) {
+    if (DrawSegmentButton(
+            AF_TR("Direct value").c_str(), confidence.mode == ConfidenceInputMode::DirectValue, button_width)) {
         confidence.mode = ConfidenceInputMode::DirectValue;
     }
     ImGui::SameLine();
-    if (DrawSegmentButton(AF_TR("Opinion triangle").c_str(), confidence.mode == ConfidenceInputMode::OpinionTriangle,
-                          button_width)) {
+    if (DrawSegmentButton(
+            AF_TR("Opinion triangle").c_str(), confidence.mode == ConfidenceInputMode::OpinionTriangle, button_width)) {
         confidence.mode = ConfidenceInputMode::OpinionTriangle;
     }
 }
@@ -403,8 +403,7 @@ bool ShowConfidencePanel(const ConfidencePanelModel& model, const ConfidencePane
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.warning));
         ImGui::TextWrapped("%s", model.storage_warning.c_str());
         ImGui::PopStyleColor();
-        if (callbacks.backup_invalid_and_reset &&
-            ImGui::Button(AF_TR("Back up and start new confidence file").c_str()))
+        if (callbacks.backup_invalid_and_reset && ImGui::Button(AF_TR("Back up and start new confidence file").c_str()))
             changed = callbacks.backup_invalid_and_reset() || changed;
         return changed;
     }

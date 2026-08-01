@@ -56,13 +56,12 @@ constexpr std::array<std::pair<std::string_view, ElementKind>, 39> kClassNames{{
 
 std::string to_lower(std::string_view text) {
     std::string lowered(text);
-    std::ranges::transform(lowered, lowered.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    std::ranges::transform(
+        lowered, lowered.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return lowered;
 }
 
-}  // namespace
+} // namespace
 
 std::optional<ElementKind> kind_from_class_name(std::string_view name) {
     for (const auto& [class_name, kind] : kClassNames) {
@@ -85,88 +84,88 @@ std::optional<ElementKind> kind_from_class_name_ci(std::string_view name) {
 
 bool kind_is_argumentation_element(ElementKind kind) {
     switch (kind) {
-        case ElementKind::ArgumentPackage:
-        case ElementKind::ArgumentPackageInterface:
-        case ElementKind::ArgumentPackageBinding:
-        case ElementKind::ArgumentGroup:
-        case ElementKind::Claim:
-        case ElementKind::ArgumentReasoning:
-        case ElementKind::ArtifactReference:
-        case ElementKind::AssertedInference:
-        case ElementKind::AssertedEvidence:
-        case ElementKind::AssertedContext:
-        case ElementKind::AssertedArtifactSupport:
-        case ElementKind::AssertedArtifactContext:
-            return true;
-        default:
-            return false;
+    case ElementKind::ArgumentPackage:
+    case ElementKind::ArgumentPackageInterface:
+    case ElementKind::ArgumentPackageBinding:
+    case ElementKind::ArgumentGroup:
+    case ElementKind::Claim:
+    case ElementKind::ArgumentReasoning:
+    case ElementKind::ArtifactReference:
+    case ElementKind::AssertedInference:
+    case ElementKind::AssertedEvidence:
+    case ElementKind::AssertedContext:
+    case ElementKind::AssertedArtifactSupport:
+    case ElementKind::AssertedArtifactContext:
+        return true;
+    default:
+        return false;
     }
 }
 
 bool kind_is_artifact_element_in_artifact_package(ElementKind kind) {
     switch (kind) {
-        case ElementKind::ArtifactPackage:
-        case ElementKind::ArtifactPackageInterface:
-        case ElementKind::ArtifactPackageBinding:
-        case ElementKind::ArtifactGroup:
-        case ElementKind::Artifact:
-        case ElementKind::ArtifactAssetRelationship:
-        case ElementKind::Activity:
-        case ElementKind::Event:
-        case ElementKind::Participant:
-        case ElementKind::Technique:
-        case ElementKind::Resource:
-        case ElementKind::Property:
-            return true;
-        default:
-            return false;
+    case ElementKind::ArtifactPackage:
+    case ElementKind::ArtifactPackageInterface:
+    case ElementKind::ArtifactPackageBinding:
+    case ElementKind::ArtifactGroup:
+    case ElementKind::Artifact:
+    case ElementKind::ArtifactAssetRelationship:
+    case ElementKind::Activity:
+    case ElementKind::Event:
+    case ElementKind::Participant:
+    case ElementKind::Technique:
+    case ElementKind::Resource:
+    case ElementKind::Property:
+        return true;
+    default:
+        return false;
     }
 }
 
 bool kind_is_terminology_element(ElementKind kind) {
     switch (kind) {
-        case ElementKind::TerminologyPackage:
-        case ElementKind::TerminologyPackageInterface:
-        case ElementKind::TerminologyPackageBinding:
-        case ElementKind::TerminologyGroup:
-        case ElementKind::Category:
-        case ElementKind::Expression:
-        case ElementKind::Term:
-            return true;
-        default:
-            return false;
+    case ElementKind::TerminologyPackage:
+    case ElementKind::TerminologyPackageInterface:
+    case ElementKind::TerminologyPackageBinding:
+    case ElementKind::TerminologyGroup:
+    case ElementKind::Category:
+    case ElementKind::Expression:
+    case ElementKind::Term:
+        return true;
+    default:
+        return false;
     }
 }
 
 bool kind_is_artifact_asset(ElementKind kind) {
     switch (kind) {
-        case ElementKind::Artifact:
-        case ElementKind::ArtifactAssetRelationship:
-        case ElementKind::Activity:
-        case ElementKind::Event:
-        case ElementKind::Participant:
-        case ElementKind::Technique:
-        case ElementKind::Resource:
-        case ElementKind::Property:
-            return true;
-        default:
-            return false;
+    case ElementKind::Artifact:
+    case ElementKind::ArtifactAssetRelationship:
+    case ElementKind::Activity:
+    case ElementKind::Event:
+    case ElementKind::Participant:
+    case ElementKind::Technique:
+    case ElementKind::Resource:
+    case ElementKind::Property:
+        return true;
+    default:
+        return false;
     }
 }
 
 bool kind_is_argument_asset(ElementKind kind) {
     switch (kind) {
-        case ElementKind::Claim:
-        case ElementKind::ArgumentReasoning:
-        case ElementKind::ArtifactReference:
-        case ElementKind::AssertedInference:
-        case ElementKind::AssertedEvidence:
-        case ElementKind::AssertedContext:
-        case ElementKind::AssertedArtifactSupport:
-        case ElementKind::AssertedArtifactContext:
-            return true;
-        default:
-            return false;
+    case ElementKind::Claim:
+    case ElementKind::ArgumentReasoning:
+    case ElementKind::ArtifactReference:
+    case ElementKind::AssertedInference:
+    case ElementKind::AssertedEvidence:
+    case ElementKind::AssertedContext:
+    case ElementKind::AssertedArtifactSupport:
+    case ElementKind::AssertedArtifactContext:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -241,13 +240,13 @@ constexpr GsnType kGsnTypes[] = {
     // while the v2.2 prose and the ACWG transformation rules say
     // ArtifactReference. Preserved until the project settles it, because
     // guessing here would silently retype evidence.
-    {"ChoiceNode", std::nullopt},  // spelled Choice in scsc.acwg.gsn/2.0
+    {"ChoiceNode", std::nullopt}, // spelled Choice in scsc.acwg.gsn/2.0
     {"Choice", std::nullopt},
     {"Context", std::nullopt},
     {"AwayContext", std::nullopt},
 };
 
-}  // namespace
+} // namespace
 
 namespace {
 
@@ -257,54 +256,87 @@ namespace {
 // machine-readable model carries for Event.date.
 constexpr std::string_view kKnownAttributes[] = {
     // Attributes from the normative model.
-    "assertionDeclaration", "content", "date", "endTime", "externalReference", "gid",
-    "isAbstract", "isCitation", "isCounter", "lang", "value", "version", "startTime",
+    "assertionDeclaration",
+    "content",
+    "date",
+    "endTime",
+    "externalReference",
+    "gid",
+    "isAbstract",
+    "isCitation",
+    "isCounter",
+    "lang",
+    "value",
+    "version",
+    "startTime",
     // Association ends, which serialize as idref-style attributes.
-    "abstractForm", "argumentElement", "artifactElement", "category", "citedElement",
-    "element", "expression", "implements", "interface", "metaClaim", "origin",
-    "participantPackage", "reasoning", "referencedArtifactElement", "source", "structure",
-    "target", "terminologyElement",
+    "abstractForm",
+    "argumentElement",
+    "artifactElement",
+    "category",
+    "citedElement",
+    "element",
+    "expression",
+    "implements",
+    "interface",
+    "metaClaim",
+    "origin",
+    "participantPackage",
+    "reasoning",
+    "referencedArtifactElement",
+    "source",
+    "structure",
+    "target",
+    "terminologyElement",
     // Tolerant-mode shorthands the reader accepts in place of a child element:
     // `name="x"` and `description="x"` for the LangString forms, `key` for a
     // TaggedValue key.
-    "name", "description", "key",
+    "name",
+    "description",
+    "key",
     // Alias the reader accepts for referencedArtifactElement.
     "referencedArtifact",
     // Legacy GSN shorthand normalized to assertionDeclaration=needsSupport on
     // read; recognized rather than preserved as opaque vendor content.
     "undeveloped",
     // XMI serialization infrastructure.
-    "id", "idref", "type", "href", "ref", "uuid", "label",
+    "id",
+    "idref",
+    "type",
+    "href",
+    "ref",
+    "uuid",
+    "label",
     // ptc/22-03-13 spells Event.date as `occurece`; accept both misspellings.
-    "occurece", "occurence",
+    "occurece",
+    "occurence",
 };
 
-}  // namespace
+} // namespace
 
-std::span<const std::string_view> known_sacm_attributes() { return kKnownAttributes; }
+std::span<const std::string_view> known_sacm_attributes() {
+    return kKnownAttributes;
+}
 
 bool is_known_sacm_attribute(std::string_view name) {
     return std::ranges::find(kKnownAttributes, name) != std::ranges::end(kKnownAttributes);
 }
 
 bool is_sacm_extension_namespace(std::string_view namespace_uri) {
-    return std::ranges::any_of(kGsnNamespaces, [&](std::string_view known) {
-        return namespace_uri == known;
-    });
+    return std::ranges::any_of(kGsnNamespaces, [&](std::string_view known) { return namespace_uri == known; });
 }
 
-std::optional<ExtensionType> resolve_extension_type(std::string_view namespace_uri,
-                                                    std::string_view type_name) {
+std::optional<ExtensionType> resolve_extension_type(std::string_view namespace_uri, std::string_view type_name) {
     if (!is_sacm_extension_namespace(namespace_uri)) {
         return std::nullopt;
     }
     for (const GsnType& known : kGsnTypes) {
         if (known.name == type_name) {
-            return ExtensionType{namespace_uri, known.name, known.kind, known.reverse_endpoints,
-                                 known.assertion_declaration};
+            return ExtensionType{
+                namespace_uri, known.name, known.kind, known.reverse_endpoints, known.assertion_declaration};
         }
     }
     return std::nullopt;
 }
 
-}  // namespace sacm::io::detail
+} // namespace sacm::io::detail

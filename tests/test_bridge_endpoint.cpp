@@ -21,12 +21,11 @@ namespace {
 // environment variable first, so redirecting them all points the whole module at
 // a temporary directory for the lifetime of one test.
 class BridgeEndpointTest : public ::testing::Test {
-  protected:
+protected:
     void SetUp() override {
-        root_ = std::filesystem::temp_directory_path() /
-                ("af-bridge-endpoint-" + std::to_string(::testing::UnitTest::GetInstance()
-                                                            ->current_test_info()
-                                                            ->line()));
+        root_ =
+            std::filesystem::temp_directory_path() /
+            ("af-bridge-endpoint-" + std::to_string(::testing::UnitTest::GetInstance()->current_test_info()->line()));
         std::filesystem::remove_all(root_);
         std::filesystem::create_directories(root_);
 
@@ -68,10 +67,10 @@ class BridgeEndpointTest : public ::testing::Test {
 #endif
     }
 
-  private:
+private:
     void Remember(const std::string& name) {
         const char* value = std::getenv(name.c_str());
-        saved_[name]      = value == nullptr ? std::string() : std::string(value);
+        saved_[name] = value == nullptr ? std::string() : std::string(value);
     }
 
     std::map<std::string, std::string> saved_;
@@ -163,12 +162,12 @@ TEST_F(BridgeEndpointTest, PutsTheRecordOutsideTheProject) {
 
 TEST_F(BridgeEndpointTest, RoundTripsARecord) {
     bridge::EndpointRecord written;
-    written.protocol     = bridge::kProtocolVersion;
-    written.pid          = 4242;
-    written.address      = bridge::EndpointAddressFor("C:/cases/alpha");
-    written.token        = bridge::GenerateToken();
+    written.protocol = bridge::kProtocolVersion;
+    written.pid = 4242;
+    written.address = bridge::EndpointAddressFor("C:/cases/alpha");
+    written.token = bridge::GenerateToken();
     written.project_root = "C:/cases/alpha";
-    written.app_version  = "0.1.0";
+    written.app_version = "0.1.0";
 
     std::string error;
     ASSERT_TRUE(bridge::WriteEndpointRecord(written, error)) << error;
@@ -185,7 +184,7 @@ TEST_F(BridgeEndpointTest, RoundTripsARecord) {
 
 TEST_F(BridgeEndpointTest, ReportsAnAbsentRecordRatherThanInventingOne) {
     bridge::EndpointRecord read;
-    std::string            error;
+    std::string error;
     EXPECT_FALSE(bridge::ReadEndpointRecord("C:/cases/never-opened", read, error));
     EXPECT_FALSE(error.empty());
 }
@@ -198,7 +197,7 @@ TEST_F(BridgeEndpointTest, RejectsARecordMissingItsAddressOrToken) {
     std::ofstream(record) << R"({"protocol":1,"pid":1,"address":"","token":""})";
 
     bridge::EndpointRecord read;
-    std::string            error;
+    std::string error;
     EXPECT_FALSE(bridge::ReadEndpointRecord("C:/cases/partial", read, error));
     EXPECT_FALSE(error.empty());
 }
@@ -209,15 +208,15 @@ TEST_F(BridgeEndpointTest, RejectsARecordThatIsNotJson) {
     std::ofstream(record) << "{ this is not json";
 
     bridge::EndpointRecord read;
-    std::string            error;
+    std::string error;
     EXPECT_FALSE(bridge::ReadEndpointRecord("C:/cases/corrupt", read, error));
 }
 
 TEST_F(BridgeEndpointTest, RemovesTheRecordOnShutdown) {
     bridge::EndpointRecord written;
-    written.protocol     = bridge::kProtocolVersion;
-    written.address      = "addr";
-    written.token        = "token";
+    written.protocol = bridge::kProtocolVersion;
+    written.address = "addr";
+    written.token = "token";
     written.project_root = "C:/cases/alpha";
 
     std::string error;
@@ -242,8 +241,7 @@ TEST_F(BridgeEndpointTest, GeneratesLongDistinctTokens) {
 }
 
 TEST_F(BridgeEndpointTest, GivesTwoProjectsDifferentAddresses) {
-    EXPECT_NE(bridge::EndpointAddressFor("C:/cases/alpha"),
-              bridge::EndpointAddressFor("C:/cases/beta"));
+    EXPECT_NE(bridge::EndpointAddressFor("C:/cases/alpha"), bridge::EndpointAddressFor("C:/cases/beta"));
 }
 
 } // namespace

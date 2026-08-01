@@ -203,7 +203,7 @@ enum class ElementTextField {
 };
 
 const char* ElementTextFieldToToken(ElementTextField field);
-bool        ElementTextFieldFromToken(const std::string& token, ElementTextField& out);
+bool ElementTextFieldFromToken(const std::string& token, ElementTextField& out);
 
 // Update one localized text field on the element with id `element_id`. The
 // language code is typically "en" (the primary editor language) but the

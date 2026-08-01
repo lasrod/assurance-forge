@@ -38,11 +38,8 @@ std::string read_file(const std::filesystem::path& path) {
     return buffer.str();
 }
 
-bool has_code(const std::vector<sacm::validation::Diagnostic>& diagnostics,
-              std::string_view code) {
-    return std::ranges::any_of(diagnostics, [&](const auto& diagnostic) {
-        return diagnostic.code == code;
-    });
+bool has_code(const std::vector<sacm::validation::Diagnostic>& diagnostics, std::string_view code) {
+    return std::ranges::any_of(diagnostics, [&](const auto& diagnostic) { return diagnostic.code == code; });
 }
 
 // Loads (tolerant), saves strict, reloads, and expects semantic equality.
@@ -53,12 +50,11 @@ void expect_semantic_roundtrip(const std::filesystem::path& path) {
     const sacm::io::SaveResult saved = sacm::io::save_xmi_string(*first.document);
     ASSERT_TRUE(saved.ok);
     const LoadResult second = sacm::io::load_xmi_string(saved.xml);
-    ASSERT_TRUE(second.ok) << (second.diagnostics.empty() ? saved.xml
-                                                          : second.diagnostics.front().message);
+    ASSERT_TRUE(second.ok) << (second.diagnostics.empty() ? saved.xml : second.diagnostics.front().message);
     const auto differences = sacm::compare::semantic_compare(*first.document, *second.document);
     for (const auto& difference : differences) {
-        ADD_FAILURE() << path.string() << " [" << difference.category << "] " << difference.path
-                      << ": " << difference.message;
+        ADD_FAILURE() << path.string() << " [" << difference.category << "] " << difference.path << ": "
+                      << difference.message;
     }
 }
 
@@ -79,15 +75,13 @@ TEST(Sacm23RoundTrip, SACM23_RT_001_LegacyElementNameFixtureRoundTripsSemantical
 TEST(Sacm23RoundTrip, SACM23_COMPAT_002_EmfGsnFileWithoutIdsParsesIntoSacmElements) {
     const std::filesystem::path path = fixture("interop-emf-gsn-noids-valid.sacm.xmi");
     const LoadResult loaded = sacm::io::load_xmi_file(path);
-    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
-                                                          : loaded.diagnostics.front().message);
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed" : loaded.diagnostics.front().message);
 
     // GSN types resolve to the SACM classes they specialize, per gsn.ecore's
     // own eSuperTypes: Goal -> Claim, Strategy -> ArgumentReasoning,
     // Solution -> ArtifactReference, SupportedBy -> AssertedInference.
     std::map<sacm::metadata::ElementKind, int> counts;
-    loaded.document->for_each_element(
-        [&](const sacm::model::SACMElement& element) { ++counts[element.kind()]; });
+    loaded.document->for_each_element([&](const sacm::model::SACMElement& element) { ++counts[element.kind()]; });
     EXPECT_EQ(counts[sacm::metadata::ElementKind::Claim], 2);
     EXPECT_EQ(counts[sacm::metadata::ElementKind::ArgumentReasoning], 1);
     EXPECT_EQ(counts[sacm::metadata::ElementKind::ArtifactReference], 1);
@@ -138,8 +132,7 @@ TEST(Sacm23XmiConformance, SACM23_XMI_002_ExportNamespaceCanBeOverridden) {
 // 2.3 conformance claim.
 TEST(Sacm23RoundTrip, SACM23_COMPAT_001_OlderStandardRevisionIsDetectedAndReported) {
     // The EMF reference fixture declares http://omg.sacm/2.2/*.
-    const LoadResult older =
-        sacm::io::load_xmi_file(fixture("interop-emf-reference-dialect-valid.sacm.xmi"));
+    const LoadResult older = sacm::io::load_xmi_file(fixture("interop-emf-reference-dialect-valid.sacm.xmi"));
     ASSERT_TRUE(older.ok);
     EXPECT_EQ(older.source_version, sacm::metadata::namespaces::StandardVersion::V2_2);
     EXPECT_TRUE(has_code(older.diagnostics, sacm::validation::codes::kXmiOlderStandardVersion));
@@ -158,15 +151,12 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_001_OlderStandardRevisionIsDetectedAndReport
 // against the current specification must be recognized, including the two
 // Away* types that only exist in this revision.
 TEST(Sacm23RoundTrip, SACM23_COMPAT_002_CurrentGsnNamespaceAndAwayTypesAreRecognized) {
-    const std::filesystem::path path =
-        fixture("interop-gsn20-current-namespace-valid.sacm.xmi");
+    const std::filesystem::path path = fixture("interop-gsn20-current-namespace-valid.sacm.xmi");
     const LoadResult loaded = sacm::io::load_xmi_file(path);
-    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
-                                                          : loaded.diagnostics.front().message);
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed" : loaded.diagnostics.front().message);
 
     std::map<sacm::metadata::ElementKind, int> counts;
-    loaded.document->for_each_element(
-        [&](const sacm::model::SACMElement& element) { ++counts[element.kind()]; });
+    loaded.document->for_each_element([&](const sacm::model::SACMElement& element) { ++counts[element.kind()]; });
     // Goal + AwayAssumption + AwayJustification all specialize Claim.
     EXPECT_EQ(counts[sacm::metadata::ElementKind::Claim], 3);
     EXPECT_EQ(counts[sacm::metadata::ElementKind::ArtifactReference], 1);
@@ -178,11 +168,10 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_CurrentGsnNamespaceAndAwayTypesAreRecogn
     EXPECT_FALSE(has_code(loaded.diagnostics, sacm::validation::codes::kXmiUnknownNamespace));
 
     // Context has no concrete SACM equivalent, so it is preserved and said so.
-    const bool context_reported =
-        std::ranges::any_of(loaded.diagnostics, [](const auto& diagnostic) {
-            return diagnostic.message.find("Context") != std::string::npos &&
-                   diagnostic.message.find("abstract") != std::string::npos;
-        });
+    const bool context_reported = std::ranges::any_of(loaded.diagnostics, [](const auto& diagnostic) {
+        return diagnostic.message.find("Context") != std::string::npos &&
+               diagnostic.message.find("abstract") != std::string::npos;
+    });
     EXPECT_TRUE(context_reported) << "GSN Context was dropped without explanation";
 }
 
@@ -197,8 +186,7 @@ std::string tagged_value_for(const sacm::model::SACMElement& element, std::strin
         return {};
     }
     for (const auto& tag : model_element->tagged_values()) {
-        if (!tag->key().values.empty() && tag->key().values.front().content == key &&
-            !tag->content().values.empty()) {
+        if (!tag->key().values.empty() && tag->key().values.front().content == key && !tag->content().values.empty()) {
             return tag->content().values.front().content;
         }
     }
@@ -221,14 +209,12 @@ std::map<std::string, std::string> gsn_types_by_name(const Document& document) {
     return types;
 }
 
-std::map<std::string, sacm::model::AssertionDeclaration> declarations_by_name(
-    const Document& document) {
+std::map<std::string, sacm::model::AssertionDeclaration> declarations_by_name(const Document& document) {
     std::map<std::string, sacm::model::AssertionDeclaration> declarations;
     document.for_each_element([&](const sacm::model::SACMElement& element) {
         const auto* assertion = dynamic_cast<const sacm::model::Assertion*>(&element);
         const auto* model_element = dynamic_cast<const sacm::model::ModelElement*>(&element);
-        if (assertion == nullptr || model_element == nullptr ||
-            model_element->name().content.empty()) {
+        if (assertion == nullptr || model_element == nullptr || model_element->name().content.empty()) {
             return;
         }
         declarations[model_element->name().content] = assertion->assertion_declaration();
@@ -242,10 +228,8 @@ std::map<std::string, sacm::model::AssertionDeclaration> declarations_by_name(
 // Justification all become Claim. Recording the original type keeps the
 // information recoverable.
 TEST(Sacm23RoundTrip, SACM23_COMPAT_002_OriginalGsnTypeIsRecordedOnImport) {
-    const LoadResult loaded =
-        sacm::io::load_xmi_file(fixture("interop-gsn20-current-namespace-valid.sacm.xmi"));
-    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
-                                                          : loaded.diagnostics.front().message);
+    const LoadResult loaded = sacm::io::load_xmi_file(fixture("interop-gsn20-current-namespace-valid.sacm.xmi"));
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed" : loaded.diagnostics.front().message);
 
     const std::map<std::string, std::string> types = gsn_types_by_name(*loaded.document);
     EXPECT_EQ(types.at("G1"), "{http://scsc.acwg.gsn/2.0}Goal");
@@ -257,8 +241,7 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_OriginalGsnTypeIsRecordedOnImport) {
 // The defect: three distinct GSN node types collapsing into identical Claims,
 // so an argument's assumptions and justifications read as plain goals.
 TEST(Sacm23RoundTrip, SACM23_COMPAT_002_GsnAssumptionAndJustificationAreNotPlainGoals) {
-    const LoadResult loaded =
-        sacm::io::load_xmi_file(fixture("interop-gsn20-current-namespace-valid.sacm.xmi"));
+    const LoadResult loaded = sacm::io::load_xmi_file(fixture("interop-gsn20-current-namespace-valid.sacm.xmi"));
     ASSERT_TRUE(loaded.ok);
 
     const auto declarations = declarations_by_name(*loaded.document);
@@ -271,8 +254,7 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_GsnAssumptionAndJustificationAreNotPlain
 }
 
 TEST(Sacm23RoundTrip, SACM23_COMPAT_002_RecordedGsnTypeSurvivesSaveAndReload) {
-    const LoadResult loaded =
-        sacm::io::load_xmi_file(fixture("interop-gsn20-current-namespace-valid.sacm.xmi"));
+    const LoadResult loaded = sacm::io::load_xmi_file(fixture("interop-gsn20-current-namespace-valid.sacm.xmi"));
     ASSERT_TRUE(loaded.ok);
 
     const sacm::io::SaveResult saved =
@@ -304,11 +286,9 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_ExplicitAssertionDeclarationBeatsTheGsnT
         R"(</assuranceCase_:AssuranceCasePackage>)";
 
     const LoadResult loaded = sacm::io::load_xmi_string(std::string(kDocument));
-    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
-                                                          : loaded.diagnostics.front().message);
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed" : loaded.diagnostics.front().message);
 
-    EXPECT_EQ(declarations_by_name(*loaded.document).at("A1"),
-              sacm::model::AssertionDeclaration::Defeated);
+    EXPECT_EQ(declarations_by_name(*loaded.document).at("A1"), sacm::model::AssertionDeclaration::Defeated);
     // The GSN type is still recorded, so nothing is lost by deferring to the file.
     EXPECT_EQ(gsn_types_by_name(*loaded.document).at("A1"), "{http://scsc.acwg.gsn/2.0}Assumption");
 }
@@ -357,8 +337,7 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_ExtensionTypedElementIsPreservedNotDropp
            "the test measures nothing";
 
     const LoadResult loaded = sacm::io::load_xmi_file(path);
-    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
-                                                          : loaded.diagnostics.front().message);
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed" : loaded.diagnostics.front().message);
 
     // The subtree lands verbatim on its parent, so nothing about it is
     // reinterpreted -- not its type, not its name, not its children.
@@ -395,8 +374,8 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_ExtensionTypedElementIsPreservedNotDropp
     // preserving the element would let strict output be produced from input
     // strict does not admit. The prefix here is `gsn`, not the fixture's
     // `gsn_` -- the reader resolves the namespace, never the prefix spelling.
-    const LoadResult strict_load = sacm::io::load_xmi_string(kStrictNamespaceExtensionDocument,
-                                                             LoadOptions{.mode = Mode::Strict});
+    const LoadResult strict_load =
+        sacm::io::load_xmi_string(kStrictNamespaceExtensionDocument, LoadOptions{.mode = Mode::Strict});
     EXPECT_FALSE(strict_load.ok) << "strict accepted a type it cannot represent";
     EXPECT_TRUE(std::ranges::any_of(strict_load.diagnostics, [](const auto& diagnostic) {
         return diagnostic.requirement_id == "SACM23-COMPAT-002" &&
@@ -409,8 +388,7 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_ExtensionTypedElementIsPreservedNotDropp
     const sacm::io::SaveResult tolerant_saved =
         sacm::io::save_xmi_string(*tolerant.document, sacm::io::SaveOptions{.mode = Mode::Tolerant});
     ASSERT_TRUE(tolerant_saved.ok);
-    EXPECT_NE(tolerant_saved.xml.find(R"(xsi:type="gsn:Context")"), std::string::npos)
-        << tolerant_saved.xml;
+    EXPECT_NE(tolerant_saved.xml.find(R"(xsi:type="gsn:Context")"), std::string::npos) << tolerant_saved.xml;
 }
 
 // The same loss that SACM23-COMPAT-001 fixed for vendor prefixes applies to
@@ -418,15 +396,12 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_ExtensionTypedElementIsPreservedNotDropp
 // content: a fragment re-emitted under an undeclared prefix is not
 // namespace-well-formed, and the next load resolves the prefix to no namespace.
 TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedExtensionFragmentDeclaresItsNamespace) {
-    const LoadResult loaded =
-        sacm::io::load_xmi_file(fixture("interop-gsn20-current-namespace-valid.sacm.xmi"));
-    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
-                                                          : loaded.diagnostics.front().message);
+    const LoadResult loaded = sacm::io::load_xmi_file(fixture("interop-gsn20-current-namespace-valid.sacm.xmi"));
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed" : loaded.diagnostics.front().message);
 
     const auto& declarations = loaded.document->foreign_namespaces();
     const auto gsn = declarations.find("gsn_");
-    ASSERT_NE(gsn, declarations.end())
-        << "the prefix the preserved fragment uses was not recorded for re-declaration";
+    ASSERT_NE(gsn, declarations.end()) << "the prefix the preserved fragment uses was not recorded for re-declaration";
     EXPECT_EQ(gsn->second, "http://scsc.acwg.gsn/2.0");
 
     const sacm::io::SaveResult compat =
@@ -439,12 +414,10 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedExtensionFragmentDeclaresItsNam
     // The declaration exists to make the fragment readable again, so a reload
     // must classify it exactly as the first load did.
     const LoadResult reloaded = sacm::io::load_xmi_string(compat.xml);
-    ASSERT_TRUE(reloaded.ok) << (reloaded.diagnostics.empty() ? compat.xml
-                                                             : reloaded.diagnostics.front().message);
+    ASSERT_TRUE(reloaded.ok) << (reloaded.diagnostics.empty() ? compat.xml : reloaded.diagnostics.front().message);
     const auto differences = sacm::compare::semantic_compare(*loaded.document, *reloaded.document);
     for (const auto& difference : differences) {
-        ADD_FAILURE() << "[" << difference.category << "] " << difference.path << ": "
-                      << difference.message;
+        ADD_FAILURE() << "[" << difference.category << "] " << difference.path << ": " << difference.message;
     }
 }
 
@@ -472,15 +445,13 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_LocallyDeclaredExtensionPrefixIsPreserve
 // reader that produced it.
 TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedExtensionContentSurvivesTwoRoundTrips) {
     const sacm::io::SaveOptions compat_options{.mode = Mode::Tolerant};
-    const LoadResult first =
-        sacm::io::load_xmi_file(fixture("interop-gsn20-current-namespace-valid.sacm.xmi"));
+    const LoadResult first = sacm::io::load_xmi_file(fixture("interop-gsn20-current-namespace-valid.sacm.xmi"));
     ASSERT_TRUE(first.ok);
 
     const sacm::io::SaveResult once = sacm::io::save_xmi_string(*first.document, compat_options);
     ASSERT_TRUE(once.ok);
     const LoadResult second = sacm::io::load_xmi_string(once.xml);
-    ASSERT_TRUE(second.ok) << (second.diagnostics.empty() ? once.xml
-                                                          : second.diagnostics.front().message);
+    ASSERT_TRUE(second.ok) << (second.diagnostics.empty() ? once.xml : second.diagnostics.front().message);
 
     int preserved_fragments = 0;
     second.document->for_each_element([&](const sacm::model::SACMElement& element) {
@@ -490,8 +461,7 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedExtensionContentSurvivesTwoRoun
             }
         }
     });
-    EXPECT_EQ(preserved_fragments, 1) << "the re-emitted fragment was lost when read back:\n"
-                                      << once.xml;
+    EXPECT_EQ(preserved_fragments, 1) << "the re-emitted fragment was lost when read back:\n" << once.xml;
 
     const sacm::io::SaveResult twice = sacm::io::save_xmi_string(*second.document, compat_options);
     ASSERT_TRUE(twice.ok);
@@ -523,8 +493,7 @@ constexpr std::string_view kReferenceToPreservedElementDocument =
 
 TEST(Sacm23RoundTrip, SACM23_COMPAT_002_ReferenceToPreservedElementIsNotDangling) {
     const LoadResult loaded = sacm::io::load_xmi_string(kReferenceToPreservedElementDocument);
-    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
-                                                          : loaded.diagnostics.front().message);
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed" : loaded.diagnostics.front().message);
 
     // Precondition: the Context really is preserved rather than parsed, so the
     // reference really does point outside the index.
@@ -540,8 +509,7 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_ReferenceToPreservedElementIsNotDangling
         << "a reference into preserved content was reported as dangling";
     EXPECT_TRUE(has_code(loaded.diagnostics, sacm::validation::codes::kRefPreservedTarget));
 
-    const std::vector<sacm::validation::Diagnostic> problems =
-        sacm::validation::validate(*loaded.document);
+    const std::vector<sacm::validation::Diagnostic> problems = sacm::validation::validate(*loaded.document);
     EXPECT_FALSE(has_code(problems, sacm::validation::codes::kRefDangling))
         << "validation still calls the preserved target missing";
     for (const auto& problem : problems) {
@@ -556,8 +524,7 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_ReferenceToPreservedElementIsNotDangling
     // preserved element and the reference to it, and the pair still holds
     // together on the way back in.
     const sacm::io::SaveOptions compat_options{.mode = Mode::Tolerant};
-    const sacm::io::SaveResult saved =
-        sacm::io::save_xmi_string(*loaded.document, compat_options);
+    const sacm::io::SaveResult saved = sacm::io::save_xmi_string(*loaded.document, compat_options);
     ASSERT_TRUE(saved.ok);
     EXPECT_NE(saved.xml.find(R"(target="c1")"), std::string::npos)
         << "the reference to the preserved element was dropped on save:\n"
@@ -566,13 +533,11 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_ReferenceToPreservedElementIsNotDangling
     const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml);
     ASSERT_TRUE(reloaded.ok);
     EXPECT_TRUE(reloaded.document->has_preserved_element(ElementId{"c1"}));
-    EXPECT_FALSE(has_code(sacm::validation::validate(*reloaded.document),
-                          sacm::validation::codes::kRefDangling))
+    EXPECT_FALSE(has_code(sacm::validation::validate(*reloaded.document), sacm::validation::codes::kRefDangling))
         << "the endpoint became dangling once the saved file was read back";
     const auto differences = sacm::compare::semantic_compare(*loaded.document, *reloaded.document);
     for (const auto& difference : differences) {
-        ADD_FAILURE() << "[" << difference.category << "] " << difference.path << ": "
-                      << difference.message;
+        ADD_FAILURE() << "[" << difference.category << "] " << difference.path << ": " << difference.message;
     }
 }
 
@@ -611,8 +576,7 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedTargetDowngradeDoesNotMaskRealD
         << "a foreign attribute whose local name is 'id' was treated as the element's XMI "
            "identity, which would demote a genuinely dangling reference to a warning";
 
-    const std::vector<sacm::validation::Diagnostic> problems =
-        sacm::validation::validate(*loaded.document);
+    const std::vector<sacm::validation::Diagnostic> problems = sacm::validation::validate(*loaded.document);
     const auto code_for = [&problems](std::string_view target) -> std::string {
         for (const auto& problem : problems) {
             if (problem.message.find(target) != std::string::npos) {
@@ -646,8 +610,8 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedTargetDowngradeDoesNotMaskRealD
     EXPECT_TRUE(legacy_xmi_prefix.document->has_preserved_element(ElementId{"c9"}))
         << "XMI identity was matched on the prefix spelling rather than the namespace, so an EMF "
            "document binding the legacy XMI URI to another prefix loses preserved-element identity";
-    EXPECT_FALSE(has_code(sacm::validation::validate(*legacy_xmi_prefix.document),
-                          sacm::validation::codes::kRefDangling))
+    EXPECT_FALSE(
+        has_code(sacm::validation::validate(*legacy_xmi_prefix.document), sacm::validation::codes::kRefDangling))
         << "the reference into preserved content was reported as broken again";
 
     // The real breakage still fails the document.
@@ -657,8 +621,7 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedTargetDowngradeDoesNotMaskRealD
 
     // Strict mode preserves nothing, so every unresolved target is plain
     // SACM-REF-001 there -- the downgrade is a tolerant-path concept only.
-    const LoadResult strict =
-        sacm::io::load_xmi_string(kMixedTargetDocument, LoadOptions{.mode = Mode::Strict});
+    const LoadResult strict = sacm::io::load_xmi_string(kMixedTargetDocument, LoadOptions{.mode = Mode::Strict});
     EXPECT_FALSE(has_code(strict.diagnostics, sacm::validation::codes::kRefPreservedTarget))
         << "strict mode produced a preserved-target diagnostic despite preserving nothing";
 
@@ -682,8 +645,7 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedTargetDowngradeDoesNotMaskRealD
     EXPECT_FALSE(rebound.document->has_preserved_element(ElementId{"c_r"}))
         << "a document that rebound xmlns:xmi to a non-XMI namespace was still allowed to confer "
            "preserved-element identity, so it could mask a real dangling reference";
-    EXPECT_TRUE(has_code(sacm::validation::validate(*rebound.document),
-                         sacm::validation::codes::kRefDangling))
+    EXPECT_TRUE(has_code(sacm::validation::validate(*rebound.document), sacm::validation::codes::kRefDangling))
         << "the reference should be reported as genuinely dangling, since nothing in this document "
            "establishes XMI identity for the preserved element";
 }
@@ -696,10 +658,8 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedTargetDowngradeDoesNotMaskRealD
 // element. Our own reload is immune (the reader assigns ids first), which is
 // exactly why this has to be asserted on the bytes.
 TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedFragmentKeepsItsSiblingPosition) {
-    const LoadResult loaded =
-        sacm::io::load_xmi_file(fixture("interop-gsn20-current-namespace-valid.sacm.xmi"));
-    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
-                                                          : loaded.diagnostics.front().message);
+    const LoadResult loaded = sacm::io::load_xmi_file(fixture("interop-gsn20-current-namespace-valid.sacm.xmi"));
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed" : loaded.diagnostics.front().message);
 
     const sacm::io::SaveResult compat =
         sacm::io::save_xmi_string(*loaded.document, sacm::io::SaveOptions{.mode = Mode::Tolerant});
@@ -714,12 +674,10 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedFragmentKeepsItsSiblingPosition
     ASSERT_NE(solution, std::string::npos) << compat.xml;
     ASSERT_NE(context, std::string::npos) << compat.xml;
     ASSERT_NE(inference, std::string::npos) << compat.xml;
-    EXPECT_LT(solution, context) << "the preserved fragment was hoisted above its siblings:\n"
-                                 << compat.xml;
-    EXPECT_LT(context, inference)
-        << "the preserved fragment was appended after the typed children instead of kept in "
-           "position, which renumbers every later sibling:\n"
-        << compat.xml;
+    EXPECT_LT(solution, context) << "the preserved fragment was hoisted above its siblings:\n" << compat.xml;
+    EXPECT_LT(context, inference) << "the preserved fragment was appended after the typed children instead of kept in "
+                                     "position, which renumbers every later sibling:\n"
+                                  << compat.xml;
 
     // Position has to be stable under repeated saves, or the file churns.
     const LoadResult reloaded = sacm::io::load_xmi_string(compat.xml);
@@ -737,8 +695,7 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_PreservedFragmentKeepsItsSiblingPosition
 // argument pointing the wrong way, which is silent reinterpretation of a safety
 // argument rather than a formatting detail.
 TEST(Sacm23RoundTrip, SACM23_COMPAT_002_GsnSupportedByEndpointsAreSwappedToSacmDirection) {
-    const LoadResult loaded =
-        sacm::io::load_xmi_file(fixture("interop-emf-gsn-noids-valid.sacm.xmi"));
+    const LoadResult loaded = sacm::io::load_xmi_file(fixture("interop-emf-gsn-noids-valid.sacm.xmi"));
     ASSERT_TRUE(loaded.ok);
 
     // Fixture: element .0 is goal G1, .1 is goal G2, and the first SupportedBy
@@ -785,8 +742,7 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_GsnSupportedByEndpointsAreSwappedToSacmD
 TEST(Sacm23RoundTrip, SACM23_COMPAT_001_EmfReferenceDialectImportsAndNormalizes) {
     const std::filesystem::path path = fixture("interop-emf-reference-dialect-valid.sacm.xmi");
     const LoadResult loaded = sacm::io::load_xmi_file(path);
-    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed"
-                                                          : loaded.diagnostics.front().message);
+    ASSERT_TRUE(loaded.ok) << (loaded.diagnostics.empty() ? "load failed" : loaded.diagnostics.front().message);
     // The per-package namespaces must not be reported as unknown: this dialect
     // is recognized, not merely tolerated as an unrecognized namespace.
     EXPECT_FALSE(has_code(loaded.diagnostics, sacm::validation::codes::kXmiUnknownNamespace));
@@ -860,8 +816,7 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_001_PreservedForeignAttributeSurvivesTwoRoun
     // assertion over vendor content passes without ever looking at it.
     const auto differences = sacm::compare::semantic_compare(*first.document, *second.document);
     for (const auto& difference : differences) {
-        ADD_FAILURE() << "[" << difference.category << "] " << difference.path << ": "
-                      << difference.message;
+        ADD_FAILURE() << "[" << difference.category << "] " << difference.path << ": " << difference.message;
     }
 }
 
@@ -904,14 +859,10 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_001_SavedOutputDeclaresPreservedForeignNames
 
 Document build_minimal_document() {
     Document document;
+    EXPECT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "Created Case"}).applied);
     EXPECT_TRUE(document
-                    .apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"},
-                                                      .name = "Created Case"})
-                    .applied);
-    EXPECT_TRUE(document
-                    .apply(CreateArgumentPackage{.parent = ElementId{"acp_1"},
-                                                 .id = ElementId{"argpkg_1"},
-                                                 .name = "Main Argument"})
+                    .apply(CreateArgumentPackage{
+                        .parent = ElementId{"acp_1"}, .id = ElementId{"argpkg_1"}, .name = "Main Argument"})
                     .applied);
     EXPECT_TRUE(document
                     .apply(CreateClaim{.parent = ElementId{"argpkg_1"},
@@ -928,17 +879,13 @@ TEST(Sacm23RoundTrip, SACM23_RT_002_CreatedDocumentSavesReloadsAndSemanticallyMa
     const sacm::io::SaveResult saved = sacm::io::save_xmi_string(document);
     ASSERT_TRUE(saved.ok);
 
-    const LoadResult reloaded =
-        sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
-    ASSERT_TRUE(reloaded.ok) << (reloaded.diagnostics.empty()
-                                     ? saved.xml
-                                     : reloaded.diagnostics.front().message);
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(reloaded.ok) << (reloaded.diagnostics.empty() ? saved.xml : reloaded.diagnostics.front().message);
     EXPECT_TRUE(sacm::validation::validate(*reloaded.document).empty());
 
     const auto differences = sacm::compare::semantic_compare(document, *reloaded.document);
     for (const auto& difference : differences) {
-        ADD_FAILURE() << "[" << difference.category << "] " << difference.path << ": "
-                      << difference.message;
+        ADD_FAILURE() << "[" << difference.category << "] " << difference.path << ": " << difference.message;
     }
 }
 
@@ -956,8 +903,7 @@ TEST(Sacm23XmiConformance, SACM23_XMI_001_SavesStrictSACM23ForCreatedDocument) {
         out << saved.xml;
         GTEST_SKIP() << "golden regenerated at " << golden_path.string();
     }
-    ASSERT_TRUE(std::filesystem::exists(golden_path))
-        << "golden missing; run with SACM_UPDATE_GOLDEN=1 to create it";
+    ASSERT_TRUE(std::filesystem::exists(golden_path)) << "golden missing; run with SACM_UPDATE_GOLDEN=1 to create it";
     EXPECT_EQ(saved.xml, read_file(golden_path));
 
     // Strict output declares the pinned namespaces.
@@ -987,10 +933,9 @@ TEST(Sacm23XmiConformance, SACM23_XMI_004_StrictSaveOmitsLayoutAndRefusesCompatO
     const sacm::io::SaveResult saved = sacm::io::save_xmi_string(document);
     ASSERT_TRUE(saved.ok);
 
-    for (const std::string_view banned : {"layout", "Layout", "canvas", "Canvas", "position",
-                                          "Goal", "Strategy", "Solution", "TreeItem", "ImGui"}) {
-        EXPECT_EQ(saved.xml.find(banned), std::string::npos)
-            << "strict output leaks layout/GSN vocabulary: " << banned;
+    for (const std::string_view banned :
+         {"layout", "Layout", "canvas", "Canvas", "position", "Goal", "Strategy", "Solution", "TreeItem", "ImGui"}) {
+        EXPECT_EQ(saved.xml.find(banned), std::string::npos) << "strict output leaks layout/GSN vocabulary: " << banned;
     }
 
     // A document carrying compatibility-only vendor content must be refused by
@@ -1002,7 +947,7 @@ TEST(Sacm23XmiConformance, SACM23_XMI_004_StrictSaveOmitsLayoutAndRefusesCompatO
     EXPECT_TRUE(has_code(strict.diagnostics, sacm::validation::codes::kXmiStrictSaveRefused));
 }
 
-}  // namespace
+} // namespace
 
 // The import half of the strict/compatibility mode boundary. The COMPAT-001
 // tests all assert tolerant-load-preserves + strict-save-refuses; without this,
@@ -1074,8 +1019,7 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_MintedIdDoesNotCollideWithPreservedConte
     Document document = std::move(*loaded.document);
     const sacm::commands::MutationResult created =
         document.apply(CreateClaim{.parent = ElementId{"ap_m"}, .name = "New Claim"});
-    ASSERT_TRUE(created.applied)
-        << (created.diagnostics.empty() ? "" : created.diagnostics.front().message);
+    ASSERT_TRUE(created.applied) << (created.diagnostics.empty() ? "" : created.diagnostics.front().message);
     ASSERT_EQ(created.created_ids().size(), 1u);
     EXPECT_NE(created.created_ids().front().value(), "claim_1")
         << "the generator minted an id already used by preserved content; a compatibility save "
@@ -1088,8 +1032,8 @@ TEST(Sacm23RoundTrip, SACM23_COMPAT_002_MintedIdDoesNotCollideWithPreservedConte
     const std::string needle = R"(xmi:id="claim_1")";
     const std::size_t first = saved.xml.find(needle);
     ASSERT_NE(first, std::string::npos);
-    EXPECT_EQ(saved.xml.find(needle, first + 1), std::string::npos)
-        << "duplicate xmi:id in compatibility output:\n" << saved.xml;
+    EXPECT_EQ(saved.xml.find(needle, first + 1), std::string::npos) << "duplicate xmi:id in compatibility output:\n"
+                                                                    << saved.xml;
 }
 
 // --- sacm::compat::adopt_preserved_content ---------------------------------
@@ -1108,21 +1052,19 @@ TEST(Sacm23RoundTrip, SACM23_LIB_002_AdoptPreservedContentRestoresWhatAProjectio
 
     // Stand in for a lossy intermediate: a STRICT reload of the same document
     // keeps the typed model and nothing else, exactly as a POD projection would.
-    const sacm::io::SaveResult intermediate_bytes = sacm::io::save_xmi_string(
-        *source.document, sacm::io::SaveOptions{.mode = Mode::Tolerant});
+    const sacm::io::SaveResult intermediate_bytes =
+        sacm::io::save_xmi_string(*source.document, sacm::io::SaveOptions{.mode = Mode::Tolerant});
     ASSERT_TRUE(intermediate_bytes.ok);
     LoadResult rebuilt = sacm::io::load_xmi_string(intermediate_bytes.xml, LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(rebuilt.document.has_value());
     bool rebuilt_carries_anything = false;
     rebuilt.document->for_each_element([&](const sacm::model::SACMElement& element) {
-        rebuilt_carries_anything = rebuilt_carries_anything ||
-                                   !element.preserved_content().empty() ||
-                                   !element.preserved_attributes().empty();
+        rebuilt_carries_anything =
+            rebuilt_carries_anything || !element.preserved_content().empty() || !element.preserved_attributes().empty();
     });
     ASSERT_FALSE(rebuilt_carries_anything) << "the stand-in intermediate was not lossy";
 
-    const std::size_t adopted =
-        sacm::compat::adopt_preserved_content(*rebuilt.document, *source.document);
+    const std::size_t adopted = sacm::compat::adopt_preserved_content(*rebuilt.document, *source.document);
     EXPECT_EQ(adopted, 1u);
 
     // (a) the fragment is back
@@ -1138,8 +1080,7 @@ TEST(Sacm23RoundTrip, SACM23_LIB_002_AdoptPreservedContentRestoresWhatAProjectio
     // rebuilt document reports a hard SACM-REF-001 Error against an element its
     // own output still carries.
     EXPECT_TRUE(rebuilt.document->has_preserved_element(ElementId{"c1"}));
-    const std::vector<sacm::validation::Diagnostic> problems =
-        sacm::validation::validate(*rebuilt.document);
+    const std::vector<sacm::validation::Diagnostic> problems = sacm::validation::validate(*rebuilt.document);
     EXPECT_FALSE(has_code(problems, sacm::validation::codes::kRefDangling))
         << "adoption restored the bytes but not the knowledge that makes them legible";
     EXPECT_TRUE(has_code(problems, sacm::validation::codes::kRefPreservedTarget));
@@ -1152,10 +1093,8 @@ TEST(Sacm23RoundTrip, SACM23_LIB_002_AdoptPreservedContentRestoresWhatAProjectio
     // that content came from the more recent parse.
     LoadResult already_has = sacm::io::load_xmi_string(kReferenceToPreservedElementDocument);
     ASSERT_TRUE(already_has.ok);
-    const std::size_t before_second =
-        sacm::compat::adopt_preserved_content(*already_has.document, *source.document);
-    EXPECT_EQ(before_second, 0u)
-        << "adoption overwrote preserved content the target already had";
+    const std::size_t before_second = sacm::compat::adopt_preserved_content(*already_has.document, *source.document);
+    EXPECT_EQ(before_second, 0u) << "adoption overwrote preserved content the target already had";
 
     // (e) an id present only in the source does not invent an element.
     const std::size_t count_before = rebuilt.document->element_count();

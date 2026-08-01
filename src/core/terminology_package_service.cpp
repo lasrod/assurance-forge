@@ -213,7 +213,6 @@ bool MatchesRawRef(const std::string& raw_ref, const std::string& id, const std:
     return (!id.empty() && ref == id) || (!gid.empty() && ref == gid);
 }
 
-
 } // namespace
 
 sacm::TerminologyPackage* FindTerminologyPackage(sacm::AssuranceCasePackage& package,
@@ -259,8 +258,7 @@ TerminologyPackageCreateResult CreateTerminologyPackageWithIds(sacm::AssuranceCa
 
     sacm::TerminologyPackage terminology_package;
     terminology_package.id = forced_id.empty() ? GenerateUniqueId(package, "TP") : forced_id;
-    terminology_package.gid =
-        forced_gid.empty() ? GenerateUniqueGid(package, terminology_package.id) : forced_gid;
+    terminology_package.gid = forced_gid.empty() ? GenerateUniqueGid(package, terminology_package.id) : forced_gid;
     terminology_package.name = name;
     terminology_package.name_ml.set("en", name);
     terminology_package.description = description;
@@ -449,6 +447,5 @@ bool DeleteTerminologyTerm(sacm::AssuranceCasePackage& package,
     terminology_package->terms.erase(it);
     return true;
 }
-
 
 } // namespace core

@@ -30,8 +30,7 @@ sacm::AssuranceCasePackage project_library_package(const sacm_adapter::LibraryDo
     return package;
 }
 
-sacm::AssuranceCasePackage project_library_package_with_tags(
-    const sacm_adapter::LibraryDocument& document) {
+sacm::AssuranceCasePackage project_library_package_with_tags(const sacm_adapter::LibraryDocument& document) {
     // Unlike the audit projection (project_library_package), which may collapse
     // packages as long as it does so consistently on both audit sides, the
     // application's sacm_package must faithfully preserve the argument-package
@@ -52,8 +51,7 @@ sacm::AssuranceCasePackage project_library_package_with_tags(
         element_by_id[element.id] = &element;
     }
 
-    std::vector<sacm_adapter::ArgumentPackageShell> shells =
-        sacm_adapter::project_argument_package_shells(document);
+    std::vector<sacm_adapter::ArgumentPackageShell> shells = sacm_adapter::project_argument_package_shells(document);
     for (sacm_adapter::ArgumentPackageShell& shell : shells) {
         core::AssuranceCase filtered;
         for (const std::string& element_id : shell.element_ids) {

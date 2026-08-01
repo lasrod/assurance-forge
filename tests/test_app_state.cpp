@@ -119,8 +119,7 @@ TEST(AppStateTest, LoadFileUsesTheLibraryDocumentAsTheSourceOfTruth) {
 
     // The library document is retained -- loaded_case is projected from it, not
     // parsed by the legacy fallback.
-    ASSERT_NE(state.library_document, nullptr)
-        << "load fell back to the legacy parser: " << state.status_message;
+    ASSERT_NE(state.library_document, nullptr) << "load fell back to the legacy parser: " << state.status_message;
     ASSERT_TRUE(state.loaded_case.has_value());
 
     const parser::SacmElement* goal = FindElement(state.loaded_case.value(), "G1");
@@ -418,13 +417,14 @@ TEST(AppStateTest, LoadFileFromLibraryXmiPreservesMultipleArgumentPackages) {
     ASSERT_TRUE(state.load_file(xmi.string())) << state.status_message;
     ASSERT_TRUE(state.sacm_package.has_value());
 
-    ASSERT_EQ(state.sacm_package->argumentPackages.size(), 2u)
-        << "argument packages collapsed on reload";
+    ASSERT_EQ(state.sacm_package->argumentPackages.size(), 2u) << "argument packages collapsed on reload";
     const sacm::ArgumentPackage* main_pkg = nullptr;
     const sacm::ArgumentPackage* conf_pkg = nullptr;
     for (const sacm::ArgumentPackage& ap : state.sacm_package->argumentPackages) {
-        if (ap.id == "MAIN") main_pkg = &ap;
-        if (ap.id == "CONF") conf_pkg = &ap;
+        if (ap.id == "MAIN")
+            main_pkg = &ap;
+        if (ap.id == "CONF")
+            conf_pkg = &ap;
     }
     ASSERT_NE(main_pkg, nullptr) << "MAIN argument package lost";
     ASSERT_NE(conf_pkg, nullptr) << "CONF argument package lost";

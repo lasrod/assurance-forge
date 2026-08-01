@@ -21,14 +21,22 @@ namespace core::audit {
 
 const char* ToString(DivergenceCause cause) {
     switch (cause) {
-    case DivergenceCause::None:                     return "None";
-    case DivergenceCause::ManifestUnreadable:       return "ManifestUnreadable";
-    case DivergenceCause::SnapshotMissing:          return "SnapshotMissing";
-    case DivergenceCause::EventLogCorrupt:          return "EventLogCorrupt";
-    case DivergenceCause::ReplayFailed:             return "ReplayFailed";
-    case DivergenceCause::ReplayDoesNotMatchOnDisk: return "ReplayDoesNotMatchOnDisk";
-    case DivergenceCause::OnDiskMissing:            return "OnDiskMissing";
-    case DivergenceCause::ManifestStale:            return "ManifestStale";
+    case DivergenceCause::None:
+        return "None";
+    case DivergenceCause::ManifestUnreadable:
+        return "ManifestUnreadable";
+    case DivergenceCause::SnapshotMissing:
+        return "SnapshotMissing";
+    case DivergenceCause::EventLogCorrupt:
+        return "EventLogCorrupt";
+    case DivergenceCause::ReplayFailed:
+        return "ReplayFailed";
+    case DivergenceCause::ReplayDoesNotMatchOnDisk:
+        return "ReplayDoesNotMatchOnDisk";
+    case DivergenceCause::OnDiskMissing:
+        return "OnDiskMissing";
+    case DivergenceCause::ManifestStale:
+        return "ManifestStale";
     }
     return "Unknown";
 }
@@ -47,8 +55,7 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
     if (!std::filesystem::exists(manifest_path)) {
         result.success = true;
         result.ran = false;
-        result.diagnostics.emplace_back("No audit manifest at " + manifest_path.string() +
-                                        "; verifier skipped.");
+        result.diagnostics.emplace_back("No audit manifest at " + manifest_path.string() + "; verifier skipped.");
         return result;
     }
 
@@ -75,8 +82,7 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
     // is now the replay source of truth; `ReplayFrom` and the legacy models
     // survive only as the convergence oracle's reference (tests/test_library_
     // replay_convergence.cpp).
-    const std::filesystem::path snapshot_path =
-        SnapshotSacmPath(project.rootPath, replay_root.snapshot_id);
+    const std::filesystem::path snapshot_path = SnapshotSacmPath(project.rootPath, replay_root.snapshot_id);
     sacm_adapter::LoadOutcome snapshot = sacm_adapter::load_document(snapshot_path);
     if (!snapshot.ok || snapshot.document == nullptr) {
         const std::string diagnostics = sacm_adapter::summarize_load_diagnostics(snapshot.diagnostics);
@@ -104,7 +110,8 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
         }
     }
 
-    auto replayed = Replayer::ReplayToLibrary(std::move(snapshot.document), store->Transactions(),
+    auto replayed = Replayer::ReplayToLibrary(std::move(snapshot.document),
+                                              store->Transactions(),
                                               std::numeric_limits<std::uint64_t>::max(),
                                               replay_root.from_transaction_sequence);
     if (!replayed) {
@@ -122,8 +129,7 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
             result.success = false;
             result.ran = true;
             result.cause = DivergenceCause::ReplayFailed;
-            result.diagnostics.emplace_back(
-                "Failed to load replayed SACM through the library for normalization");
+            result.diagnostics.emplace_back("Failed to load replayed SACM through the library for normalization");
             return result;
         }
         result.replayed_canonical_hash = *library_hash;
@@ -135,8 +141,7 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
     if (on_disk_present) {
         auto disk_hash = core::library_canonical_hash_from_file(on_disk_sacm);
         if (!disk_hash) {
-            result.diagnostics.emplace_back(
-                "Failed to load on-disk SACM through the library for comparison");
+            result.diagnostics.emplace_back("Failed to load on-disk SACM through the library for comparison");
         } else {
             result.on_disk_canonical_hash = *disk_hash;
         }
@@ -155,11 +160,9 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
     // continue as if everything matched. We only flag a user-facing
     // divergence when the log ↔ SACM relationship is actually broken.
     const bool replay_matches_disk =
-        !result.on_disk_canonical_hash.empty() &&
-        result.on_disk_canonical_hash == result.replayed_canonical_hash;
+        !result.on_disk_canonical_hash.empty() && result.on_disk_canonical_hash == result.replayed_canonical_hash;
     const bool manifest_stale =
-        !result.manifest_canonical_hash.empty() &&
-        result.manifest_canonical_hash != result.replayed_canonical_hash;
+        !result.manifest_canonical_hash.empty() && result.manifest_canonical_hash != result.replayed_canonical_hash;
     if (replay_matches_disk && manifest_stale) {
         result.cause = DivergenceCause::ManifestStale;
         AuditManifest rebuilt = manifest;
@@ -178,14 +181,12 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
         std::string write_err;
         if (WriteAuditManifest(project.rootPath, rebuilt, write_err)) {
             result.manifest_canonical_hash = rebuilt.last_known_canonical_model_hash;
-            result.diagnostics.emplace_back(
-                "Manifest hashes were stale relative to replayed state; "
-                "manifest silently rebuilt from snapshot+log+SACM.");
+            result.diagnostics.emplace_back("Manifest hashes were stale relative to replayed state; "
+                                            "manifest silently rebuilt from snapshot+log+SACM.");
         } else {
             // Don't fail verification just because the cache refresh
             // failed; surface a diagnostic and keep going.
-            result.diagnostics.emplace_back(
-                "Manifest hashes were stale and silent rebuild failed: " + write_err);
+            result.diagnostics.emplace_back("Manifest hashes were stale and silent rebuild failed: " + write_err);
         }
     } else if (!result.manifest_canonical_hash.empty() &&
                result.manifest_canonical_hash != result.replayed_canonical_hash) {
@@ -196,19 +197,18 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
             "Replayed canonical hash does not match manifest.last_known_canonical_model_hash (replay=" +
             result.replayed_canonical_hash + ", manifest=" + result.manifest_canonical_hash + ").");
     }
-    if (!result.on_disk_canonical_hash.empty() &&
-        result.on_disk_canonical_hash != result.replayed_canonical_hash) {
+    if (!result.on_disk_canonical_hash.empty() && result.on_disk_canonical_hash != result.replayed_canonical_hash) {
         result.success = false;
         result.cause = DivergenceCause::ReplayDoesNotMatchOnDisk;
-        result.diagnostics.emplace_back(
-            "Replayed canonical hash does not match on-disk SACM canonical hash (replay=" +
-            result.replayed_canonical_hash + ", on_disk=" + result.on_disk_canonical_hash + ").");
+        result.diagnostics.emplace_back("Replayed canonical hash does not match on-disk SACM canonical hash (replay=" +
+                                        result.replayed_canonical_hash + ", on_disk=" + result.on_disk_canonical_hash +
+                                        ").");
     }
     if (!on_disk_present) {
         result.success = false;
         result.cause = DivergenceCause::OnDiskMissing;
-        result.diagnostics.emplace_back(
-            "On-disk SACM file referenced by the manifest is missing: " + on_disk_sacm.string());
+        result.diagnostics.emplace_back("On-disk SACM file referenced by the manifest is missing: " +
+                                        on_disk_sacm.string());
     }
     return result;
 }

@@ -19,8 +19,8 @@
 namespace sacm_adapter {
 
 struct ProjectionDifference {
-    std::string category;  // "element-missing", "element-extra", "field", "case"
-    std::string path;      // element id, or the case-level field
+    std::string category; // "element-missing", "element-extra", "field", "case"
+    std::string path;     // element id, or the case-level field
     std::string message;
 
     friend bool operator==(const ProjectionDifference&, const ProjectionDifference&) = default;
@@ -28,7 +28,6 @@ struct ProjectionDifference {
 
 // `legacy` is what the application renders today; `projected` is what it would
 // render from the library. Order-insensitive: elements are paired by id.
-std::vector<ProjectionDifference> diff_cases(const core::AssuranceCase& legacy,
-                                             const core::AssuranceCase& projected);
+std::vector<ProjectionDifference> diff_cases(const core::AssuranceCase& legacy, const core::AssuranceCase& projected);
 
 } // namespace sacm_adapter

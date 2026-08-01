@@ -67,4 +67,4 @@ std::string_view operation_name(const Operation& operation) {
         operation);
 }
 
-}  // namespace sacm::commands
+} // namespace sacm::commands

@@ -16,13 +16,12 @@ std::size_t ProjectSummary::attention_count() const {
     return warning_problems + error_problems + undeveloped + unlinked_evidence + broken_proposals;
 }
 
-ProjectSummary BuildProjectSummary(
-    const AssuranceProject* project,
-    const AssuranceCase* assurance_case,
-    const AssuranceTree* assurance_tree,
-    const std::vector<ProblemItem>& problems,
-    const std::vector<reviews::ReviewItem>& review_items,
-    const std::vector<reviews::ProposalValidityResult>& proposal_validities) {
+ProjectSummary BuildProjectSummary(const AssuranceProject* project,
+                                   const AssuranceCase* assurance_case,
+                                   const AssuranceTree* assurance_tree,
+                                   const std::vector<ProblemItem>& problems,
+                                   const std::vector<reviews::ReviewItem>& review_items,
+                                   const std::vector<reviews::ProposalValidityResult>& proposal_validities) {
     ProjectSummary summary;
 
     if (project) {

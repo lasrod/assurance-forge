@@ -89,8 +89,7 @@ bool is_self_declared_namespace(std::string_view uri) {
 // prefix declared on any ancestor, and the fragment itself is opaque text once
 // captured. First declaration in document order wins, so a prefix rebound at
 // different depths still yields a deterministic result.
-void collect_foreign_namespaces(const pugi::xml_node& node,
-                                std::map<std::string, std::string>& out) {
+void collect_foreign_namespaces(const pugi::xml_node& node, std::map<std::string, std::string>& out) {
     for (const pugi::xml_attribute& attr : node.attributes()) {
         const std::string_view name = attr.name();
         if (!name.starts_with("xmlns:")) {
@@ -117,8 +116,7 @@ struct Reader {
     // Innermost-first stack of xmlns scopes (prefix -> URI; "" = default ns).
     std::vector<std::unordered_map<std::string, std::string>> ns_scopes;
     std::string source_namespace;
-    metadata::namespaces::StandardVersion source_version =
-        metadata::namespaces::StandardVersion::Unknown;
+    metadata::namespaces::StandardVersion source_version = metadata::namespaces::StandardVersion::Unknown;
     std::uint64_t generated_counter = 0;
     std::unordered_set<std::string> used_ids;
     // Ids found inside subtrees kept as preserved compatibility content. They
@@ -126,7 +124,9 @@ struct Reader {
     // indistinguishable from a reference to nothing (SACM23-COMPAT-002).
     std::unordered_set<ElementId> preserved_element_ids;
 
-    bool strict() const { return mode == Mode::Strict; }
+    bool strict() const {
+        return mode == Mode::Strict;
+    }
 
     std::optional<validation::SourceLocation> locate(const pugi::xml_node& node) const {
         if (buffer == nullptr) {
@@ -149,8 +149,12 @@ struct Reader {
         return validation::SourceLocation{source_file, line, column};
     }
 
-    void report(std::string_view code, Severity severity, std::string_view requirement,
-                const pugi::xml_node& node, std::vector<ElementId> affected, std::string message) {
+    void report(std::string_view code,
+                Severity severity,
+                std::string_view requirement,
+                const pugi::xml_node& node,
+                std::vector<ElementId> affected,
+                std::string message) {
         diagnostics.push_back(Diagnostic{
             .code = std::string(code),
             .severity = severity,
@@ -163,7 +167,9 @@ struct Reader {
     }
 
     // strict -> Error, tolerant -> Warning.
-    Severity mode_severity() const { return strict() ? Severity::Error : Severity::Warning; }
+    Severity mode_severity() const {
+        return strict() ? Severity::Error : Severity::Warning;
+    }
 
     void push_scope(const pugi::xml_node& node) {
         std::unordered_map<std::string, std::string> scope;
@@ -178,7 +184,9 @@ struct Reader {
         ns_scopes.push_back(std::move(scope));
     }
 
-    void pop_scope() { ns_scopes.pop_back(); }
+    void pop_scope() {
+        ns_scopes.pop_back();
+    }
 
     std::string resolve_prefix(std::string_view prefix) const {
         for (auto it = ns_scopes.rbegin(); it != ns_scopes.rend(); ++it) {
@@ -226,11 +234,12 @@ std::string strip_fragment(std::string_view value) {
 }
 
 bool is_external_href(std::string_view value) {
-    return !value.empty() && !value.starts_with('#') &&
-           value.find('#') != std::string_view::npos;
+    return !value.empty() && !value.starts_with('#') && value.find('#') != std::string_view::npos;
 }
 
-bool parse_bool(std::string_view value) { return value == "true" || value == "1"; }
+bool parse_bool(std::string_view value) {
+    return value == "true" || value == "1";
+}
 
 // --- EMF positional-reference normalization -------------------------------
 //
@@ -245,7 +254,9 @@ bool parse_bool(std::string_view value) { return value == "true" || value == "1"
 // the DOM first: give each path-addressed element a deterministic id and
 // rewrite the paths to it. The reader then sees an ordinary id-based document.
 
-bool looks_like_emf_path(std::string_view value) { return value.starts_with("//@"); }
+bool looks_like_emf_path(std::string_view value) {
+    return value.starts_with("//@");
+}
 
 // Deterministic, XML-name-safe id for an EMF containment path: each run of
 // path punctuation becomes a single underscore, so
@@ -284,7 +295,8 @@ bool document_uses_emf_paths(const pugi::xml_node& node) {
 
 // Assigns xmi:id to every element reachable by an EMF path, recording the
 // mapping. `path` is the EMF path of `node` itself ("/" for the root object).
-void assign_emf_path_ids(pugi::xml_node node, const std::string& path,
+void assign_emf_path_ids(pugi::xml_node node,
+                         const std::string& path,
                          std::unordered_map<std::string, std::string>& path_to_id,
                          const std::unordered_set<std::string>& existing_ids) {
     std::unordered_map<std::string, int> next_index_by_role;
@@ -325,8 +337,7 @@ void collect_existing_ids(const pugi::xml_node& node, std::unordered_set<std::st
 // Rewrites EMF paths in attribute values to the ids assigned above. Values may
 // be space-separated lists (the IDREFS form), so each token is mapped
 // independently and unmapped tokens are left alone for the reader to diagnose.
-void rewrite_emf_paths(pugi::xml_node node,
-                       const std::unordered_map<std::string, std::string>& path_to_id) {
+void rewrite_emf_paths(pugi::xml_node node, const std::unordered_map<std::string, std::string>& path_to_id) {
     for (pugi::xml_attribute attr : node.attributes()) {
         const std::string value = attr.value();
         if (value.find("//@") == std::string::npos) {
@@ -336,8 +347,7 @@ void rewrite_emf_paths(pugi::xml_node node,
         std::size_t start = 0;
         while (start <= value.size()) {
             const std::size_t end = value.find(' ', start);
-            const std::string token =
-                value.substr(start, end == std::string::npos ? std::string::npos : end - start);
+            const std::string token = value.substr(start, end == std::string::npos ? std::string::npos : end - start);
             if (!token.empty()) {
                 const auto found = path_to_id.find(token);
                 if (!rewritten.empty()) {
@@ -397,8 +407,12 @@ struct XsiTypeResult {
     // when `PreserveAsCompatibility`, so a caller can name it in a diagnostic.
     std::string type_name;
 
-    bool resolved() const { return outcome == XsiTypeOutcome::Resolved; }
-    bool preserve() const { return outcome == XsiTypeOutcome::PreserveAsCompatibility; }
+    bool resolved() const {
+        return outcome == XsiTypeOutcome::Resolved;
+    }
+    bool preserve() const {
+        return outcome == XsiTypeOutcome::PreserveAsCompatibility;
+    }
 };
 
 // xsi:type="sacm:Claim" -> class name, validating the prefix namespace.
@@ -431,39 +445,48 @@ XsiTypeResult read_xsi_type(Reader& reader, const pugi::xml_node& node) {
                     // subtree rather than silently coercing it into an unrelated
                     // class; strict rejects the document, which is why this is
                     // an error there and a warning on the tolerant path.
-                    reader.report(
-                        validation::codes::kXmiUnknownElement, reader.mode_severity(),
-                        "SACM23-COMPAT-002", node, {},
-                        std::format("xsi:type '{}' extends an abstract SACM class and has no "
-                                    "concrete equivalent",
-                                    value));
-                    return XsiTypeResult{XsiTypeOutcome::PreserveAsCompatibility,
-                                         std::string(value)};
+                    reader.report(validation::codes::kXmiUnknownElement,
+                                  reader.mode_severity(),
+                                  "SACM23-COMPAT-002",
+                                  node,
+                                  {},
+                                  std::format("xsi:type '{}' extends an abstract SACM class and has no "
+                                              "concrete equivalent",
+                                              value));
+                    return XsiTypeResult{XsiTypeOutcome::PreserveAsCompatibility, std::string(value)};
                 }
-                reader.report(validation::codes::kXmiUnknownElement, Severity::Info,
-                              "SACM23-COMPAT-001", node, {},
-                              std::format("xsi:type '{}' resolved to its SACM supertype '{}'", value,
+                reader.report(validation::codes::kXmiUnknownElement,
+                              Severity::Info,
+                              "SACM23-COMPAT-001",
+                              node,
+                              {},
+                              std::format("xsi:type '{}' resolved to its SACM supertype '{}'",
+                                          value,
                                           metadata::kind_name(*extension->sacm_kind)));
-                return XsiTypeResult{XsiTypeOutcome::Resolved,
-                                     std::string(metadata::kind_name(*extension->sacm_kind))};
+                return XsiTypeResult{XsiTypeOutcome::Resolved, std::string(metadata::kind_name(*extension->sacm_kind))};
             }
             // Distinguish "we know this metamodel but not this type" from
             // "we do not know this metamodel at all". Both end up preserved,
             // but only the first means our extension table is out of date, and
             // a reader cannot act on the difference if both say the same thing.
             if (detail::is_sacm_extension_namespace(type_ns)) {
-                reader.report(
-                    validation::codes::kXmiUnknownElement, reader.mode_severity(),
-                    "SACM23-COMPAT-002", node, {},
-                    std::format("xsi:type '{}' is an unrecognized type in the known SACM-extension "
-                                "namespace '{}'",
-                                value, type_ns));
+                reader.report(validation::codes::kXmiUnknownElement,
+                              reader.mode_severity(),
+                              "SACM23-COMPAT-002",
+                              node,
+                              {},
+                              std::format("xsi:type '{}' is an unrecognized type in the known SACM-extension "
+                                          "namespace '{}'",
+                                          value,
+                                          type_ns));
                 return XsiTypeResult{XsiTypeOutcome::PreserveAsCompatibility, std::string(value)};
             }
-            reader.report(validation::codes::kXmiUnknownNamespace, reader.mode_severity(),
-                          "SACM23-XMI-002", node, {},
-                          std::format("xsi:type '{}' resolves to non-SACM namespace '{}'", value,
-                                      type_ns));
+            reader.report(validation::codes::kXmiUnknownNamespace,
+                          reader.mode_severity(),
+                          "SACM23-XMI-002",
+                          node,
+                          {},
+                          std::format("xsi:type '{}' resolves to non-SACM namespace '{}'", value, type_ns));
             if (reader.strict()) {
                 return XsiTypeResult{};
             }
@@ -476,82 +499,82 @@ XsiTypeResult read_xsi_type(Reader& reader, const pugi::xml_node& node) {
 std::unique_ptr<SACMElement> make_element(ElementKind kind, ElementId id) {
     using namespace model;
     switch (kind) {
-        case ElementKind::Description:
-            return std::make_unique<Description>(std::move(id));
-        case ElementKind::ImplementationConstraint:
-            return std::make_unique<ImplementationConstraint>(std::move(id));
-        case ElementKind::Note:
-            return std::make_unique<Note>(std::move(id));
-        case ElementKind::TaggedValue:
-            return std::make_unique<TaggedValue>(std::move(id));
-        case ElementKind::AssuranceCasePackage:
-            return std::make_unique<AssuranceCasePackage>(std::move(id));
-        case ElementKind::AssuranceCasePackageInterface:
-            return std::make_unique<AssuranceCasePackageInterface>(std::move(id));
-        case ElementKind::AssuranceCasePackageBinding:
-            return std::make_unique<AssuranceCasePackageBinding>(std::move(id));
-        case ElementKind::TerminologyPackage:
-            return std::make_unique<TerminologyPackage>(std::move(id));
-        case ElementKind::TerminologyPackageInterface:
-            return std::make_unique<TerminologyPackageInterface>(std::move(id));
-        case ElementKind::TerminologyPackageBinding:
-            return std::make_unique<TerminologyPackageBinding>(std::move(id));
-        case ElementKind::TerminologyGroup:
-            return std::make_unique<TerminologyGroup>(std::move(id));
-        case ElementKind::Category:
-            return std::make_unique<Category>(std::move(id));
-        case ElementKind::Expression:
-            return std::make_unique<Expression>(std::move(id));
-        case ElementKind::Term:
-            return std::make_unique<Term>(std::move(id));
-        case ElementKind::ArgumentPackage:
-            return std::make_unique<ArgumentPackage>(std::move(id));
-        case ElementKind::ArgumentPackageInterface:
-            return std::make_unique<ArgumentPackageInterface>(std::move(id));
-        case ElementKind::ArgumentPackageBinding:
-            return std::make_unique<ArgumentPackageBinding>(std::move(id));
-        case ElementKind::ArgumentGroup:
-            return std::make_unique<ArgumentGroup>(std::move(id));
-        case ElementKind::Claim:
-            return std::make_unique<Claim>(std::move(id));
-        case ElementKind::ArgumentReasoning:
-            return std::make_unique<ArgumentReasoning>(std::move(id));
-        case ElementKind::ArtifactReference:
-            return std::make_unique<ArtifactReference>(std::move(id));
-        case ElementKind::AssertedInference:
-            return std::make_unique<AssertedInference>(std::move(id));
-        case ElementKind::AssertedEvidence:
-            return std::make_unique<AssertedEvidence>(std::move(id));
-        case ElementKind::AssertedContext:
-            return std::make_unique<AssertedContext>(std::move(id));
-        case ElementKind::AssertedArtifactSupport:
-            return std::make_unique<AssertedArtifactSupport>(std::move(id));
-        case ElementKind::AssertedArtifactContext:
-            return std::make_unique<AssertedArtifactContext>(std::move(id));
-        case ElementKind::ArtifactPackage:
-            return std::make_unique<ArtifactPackage>(std::move(id));
-        case ElementKind::ArtifactPackageInterface:
-            return std::make_unique<ArtifactPackageInterface>(std::move(id));
-        case ElementKind::ArtifactPackageBinding:
-            return std::make_unique<ArtifactPackageBinding>(std::move(id));
-        case ElementKind::ArtifactGroup:
-            return std::make_unique<ArtifactGroup>(std::move(id));
-        case ElementKind::Artifact:
-            return std::make_unique<Artifact>(std::move(id));
-        case ElementKind::ArtifactAssetRelationship:
-            return std::make_unique<ArtifactAssetRelationship>(std::move(id));
-        case ElementKind::Activity:
-            return std::make_unique<Activity>(std::move(id));
-        case ElementKind::Event:
-            return std::make_unique<Event>(std::move(id));
-        case ElementKind::Participant:
-            return std::make_unique<Participant>(std::move(id));
-        case ElementKind::Technique:
-            return std::make_unique<Technique>(std::move(id));
-        case ElementKind::Resource:
-            return std::make_unique<Resource>(std::move(id));
-        case ElementKind::Property:
-            return std::make_unique<Property>(std::move(id));
+    case ElementKind::Description:
+        return std::make_unique<Description>(std::move(id));
+    case ElementKind::ImplementationConstraint:
+        return std::make_unique<ImplementationConstraint>(std::move(id));
+    case ElementKind::Note:
+        return std::make_unique<Note>(std::move(id));
+    case ElementKind::TaggedValue:
+        return std::make_unique<TaggedValue>(std::move(id));
+    case ElementKind::AssuranceCasePackage:
+        return std::make_unique<AssuranceCasePackage>(std::move(id));
+    case ElementKind::AssuranceCasePackageInterface:
+        return std::make_unique<AssuranceCasePackageInterface>(std::move(id));
+    case ElementKind::AssuranceCasePackageBinding:
+        return std::make_unique<AssuranceCasePackageBinding>(std::move(id));
+    case ElementKind::TerminologyPackage:
+        return std::make_unique<TerminologyPackage>(std::move(id));
+    case ElementKind::TerminologyPackageInterface:
+        return std::make_unique<TerminologyPackageInterface>(std::move(id));
+    case ElementKind::TerminologyPackageBinding:
+        return std::make_unique<TerminologyPackageBinding>(std::move(id));
+    case ElementKind::TerminologyGroup:
+        return std::make_unique<TerminologyGroup>(std::move(id));
+    case ElementKind::Category:
+        return std::make_unique<Category>(std::move(id));
+    case ElementKind::Expression:
+        return std::make_unique<Expression>(std::move(id));
+    case ElementKind::Term:
+        return std::make_unique<Term>(std::move(id));
+    case ElementKind::ArgumentPackage:
+        return std::make_unique<ArgumentPackage>(std::move(id));
+    case ElementKind::ArgumentPackageInterface:
+        return std::make_unique<ArgumentPackageInterface>(std::move(id));
+    case ElementKind::ArgumentPackageBinding:
+        return std::make_unique<ArgumentPackageBinding>(std::move(id));
+    case ElementKind::ArgumentGroup:
+        return std::make_unique<ArgumentGroup>(std::move(id));
+    case ElementKind::Claim:
+        return std::make_unique<Claim>(std::move(id));
+    case ElementKind::ArgumentReasoning:
+        return std::make_unique<ArgumentReasoning>(std::move(id));
+    case ElementKind::ArtifactReference:
+        return std::make_unique<ArtifactReference>(std::move(id));
+    case ElementKind::AssertedInference:
+        return std::make_unique<AssertedInference>(std::move(id));
+    case ElementKind::AssertedEvidence:
+        return std::make_unique<AssertedEvidence>(std::move(id));
+    case ElementKind::AssertedContext:
+        return std::make_unique<AssertedContext>(std::move(id));
+    case ElementKind::AssertedArtifactSupport:
+        return std::make_unique<AssertedArtifactSupport>(std::move(id));
+    case ElementKind::AssertedArtifactContext:
+        return std::make_unique<AssertedArtifactContext>(std::move(id));
+    case ElementKind::ArtifactPackage:
+        return std::make_unique<ArtifactPackage>(std::move(id));
+    case ElementKind::ArtifactPackageInterface:
+        return std::make_unique<ArtifactPackageInterface>(std::move(id));
+    case ElementKind::ArtifactPackageBinding:
+        return std::make_unique<ArtifactPackageBinding>(std::move(id));
+    case ElementKind::ArtifactGroup:
+        return std::make_unique<ArtifactGroup>(std::move(id));
+    case ElementKind::Artifact:
+        return std::make_unique<Artifact>(std::move(id));
+    case ElementKind::ArtifactAssetRelationship:
+        return std::make_unique<ArtifactAssetRelationship>(std::move(id));
+    case ElementKind::Activity:
+        return std::make_unique<Activity>(std::move(id));
+    case ElementKind::Event:
+        return std::make_unique<Event>(std::move(id));
+    case ElementKind::Participant:
+        return std::make_unique<Participant>(std::move(id));
+    case ElementKind::Technique:
+        return std::make_unique<Technique>(std::move(id));
+    case ElementKind::Resource:
+        return std::make_unique<Resource>(std::move(id));
+    case ElementKind::Property:
+        return std::make_unique<Property>(std::move(id));
     }
     return nullptr;
 }
@@ -559,26 +582,32 @@ std::unique_ptr<SACMElement> make_element(ElementKind kind, ElementId id) {
 void populate(Reader& reader, SACMElement& element, const pugi::xml_node& node);
 
 // Reads an element id (xmi:id preferred), generating one in tolerant mode.
-std::optional<ElementId> read_element_id(Reader& reader, const pugi::xml_node& node,
-                                         ElementKind kind) {
+std::optional<ElementId> read_element_id(Reader& reader, const pugi::xml_node& node, ElementKind kind) {
     const pugi::xml_attribute attr = find_attr_local(node, "id");
     if (attr) {
         reader.used_ids.insert(attr.value());
         return ElementId{attr.value()};
     }
     if (reader.strict()) {
-        reader.report(validation::codes::kXmiMissingId, Severity::Error, "SACM23-XMI-001", node, {},
+        reader.report(validation::codes::kXmiMissingId,
+                      Severity::Error,
+                      "SACM23-XMI-001",
+                      node,
+                      {},
                       std::format("{} element has no xmi:id", metadata::kind_name(kind)));
         return std::nullopt;
     }
-    reader.report(validation::codes::kXmiMissingId, Severity::Warning, "SACM23-XMI-001", node, {},
+    reader.report(validation::codes::kXmiMissingId,
+                  Severity::Warning,
+                  "SACM23-XMI-001",
+                  node,
+                  {},
                   std::format("{} element has no xmi:id; generated one", metadata::kind_name(kind)));
     return reader.generate_id(kind);
 }
 
 // Creates and populates a child element of `kind` from `node`.
-std::unique_ptr<SACMElement> read_element(Reader& reader, ElementKind kind,
-                                          const pugi::xml_node& node) {
+std::unique_ptr<SACMElement> read_element(Reader& reader, ElementKind kind, const pugi::xml_node& node) {
     const std::optional<ElementId> id = read_element_id(reader, node, kind);
     if (!id.has_value()) {
         return nullptr;
@@ -599,10 +628,14 @@ model::LangString read_lang_string(Reader& reader, const pugi::xml_node& node) {
     // rather than dropping it silently: external tooling may still anchor to
     // it, and unannounced loss is what the compliance policy forbids.
     if (const pugi::xml_attribute id = find_attr_local(node, "id")) {
-        reader.report(validation::codes::kXmiUnknownElement, Severity::Info, "SACM23-XMI-001", node,
-                      {}, std::format("LangString xmi:id '{}' is not preserved: LangString is a "
-                                      "value type and nothing in SACM 2.3 can reference one",
-                                      id.value()));
+        reader.report(validation::codes::kXmiUnknownElement,
+                      Severity::Info,
+                      "SACM23-XMI-001",
+                      node,
+                      {},
+                      std::format("LangString xmi:id '{}' is not preserved: LangString is a "
+                                  "value type and nothing in SACM 2.3 can reference one",
+                                  id.value()));
     }
     value.lang = node.attribute("lang").value();
     if (const pugi::xml_attribute content = node.attribute("content")) {
@@ -612,12 +645,10 @@ model::LangString read_lang_string(Reader& reader, const pugi::xml_node& node) {
     }
     if (const pugi::xml_attribute expression = find_attr_local(node, "expression")) {
         value.expression_ref = ElementId{strip_fragment(expression.value())};
-    } else if (const pugi::xml_node child = node.find_child([](const pugi::xml_node& n) {
-                   return local_name(n.name()) == "expression";
-               })) {
-        const pugi::xml_attribute ref = find_attr_local(child, "href")
-                                            ? find_attr_local(child, "href")
-                                            : find_attr_local(child, "ref");
+    } else if (const pugi::xml_node child =
+                   node.find_child([](const pugi::xml_node& n) { return local_name(n.name()) == "expression"; })) {
+        const pugi::xml_attribute ref =
+            find_attr_local(child, "href") ? find_attr_local(child, "href") : find_attr_local(child, "ref");
         if (ref) {
             value.expression_ref = ElementId{strip_fragment(ref.value())};
         }
@@ -630,8 +661,7 @@ model::LangString read_lang_string(Reader& reader, const pugi::xml_node& node) {
 // Strict shape: <content><value lang=".." content=".."/></content>.
 // App shape handled by the caller (sibling <content lang>text</content>
 // nodes each contribute one LangString).
-void read_multi_lang_values(Reader& reader, const pugi::xml_node& wrapper,
-                            model::MultiLangString& out) {
+void read_multi_lang_values(Reader& reader, const pugi::xml_node& wrapper, model::MultiLangString& out) {
     bool has_value_children = false;
     for (const pugi::xml_node& child : wrapper.children()) {
         if (child.type() != pugi::node_element) {
@@ -659,8 +689,11 @@ std::optional<ElementId> read_ref_node(Reader& reader, const pugi::xml_node& nod
         if (const pugi::xml_attribute attr = find_attr_local(node, attr_name)) {
             const std::string_view value = attr.value();
             if (is_external_href(value)) {
-                reader.report(validation::codes::kXmiExternalReference, Severity::Warning,
-                              "SACM23-XMI-003", node, {},
+                reader.report(validation::codes::kXmiExternalReference,
+                              Severity::Warning,
+                              "SACM23-XMI-003",
+                              node,
+                              {},
                               std::format("external reference '{}' is not supported and was "
                                           "ignored",
                                           value));
@@ -714,26 +747,21 @@ void read_common_attributes(Reader& reader, SACMElement& element, const pugi::xm
 
 // Appends `child` (already typed) into the right containment vector of
 // `parent`. Returns false when the child kind is not containable here.
-bool attach_child(Reader& reader, SACMElement& parent, std::unique_ptr<SACMElement> child,
-                  const pugi::xml_node& node) {
+bool attach_child(Reader& reader, SACMElement& parent, std::unique_ptr<SACMElement> child, const pugi::xml_node& node) {
     const ElementKind kind = child->kind();
     SACMElement* raw = child.get();
 
-    const auto downcast = [&child]<typename T>() {
-        return std::unique_ptr<T>(static_cast<T*>(child.release()));
-    };
+    const auto downcast = [&child]<typename T>() { return std::unique_ptr<T>(static_cast<T*>(child.release())); };
 
     if (auto* acp = dynamic_cast<model::AssuranceCasePackage*>(&parent)) {
         if (dynamic_cast<model::AssuranceCasePackage*>(raw) != nullptr) {
-            Access::assurance_case_packages(*acp).push_back(
-                downcast.operator()<model::AssuranceCasePackage>());
+            Access::assurance_case_packages(*acp).push_back(downcast.operator()<model::AssuranceCasePackage>());
         } else if (dynamic_cast<model::ArgumentPackage*>(raw) != nullptr) {
             Access::argument_packages(*acp).push_back(downcast.operator()<model::ArgumentPackage>());
         } else if (dynamic_cast<model::ArtifactPackage*>(raw) != nullptr) {
             Access::artifact_packages(*acp).push_back(downcast.operator()<model::ArtifactPackage>());
         } else if (dynamic_cast<model::TerminologyPackage*>(raw) != nullptr) {
-            Access::terminology_packages(*acp).push_back(
-                downcast.operator()<model::TerminologyPackage>());
+            Access::terminology_packages(*acp).push_back(downcast.operator()<model::TerminologyPackage>());
         } else {
             return false;
         }
@@ -760,8 +788,7 @@ bool attach_child(Reader& reader, SACMElement& parent, std::unique_ptr<SACMEleme
         if (!detail::kind_is_terminology_element(kind)) {
             return false;
         }
-        Access::terminology_elements(*pkg).push_back(
-            downcast.operator()<model::TerminologyElement>());
+        Access::terminology_elements(*pkg).push_back(downcast.operator()<model::TerminologyElement>());
         Access::set_parent(*raw, pkg);
         return true;
     }
@@ -817,9 +844,7 @@ void collect_preserved_ids(Reader& reader, const pugi::xml_node& node) {
             // unconditionally would let such a document downgrade a genuinely
             // dangling reference to SACM-REF-003, which is the same masking the
             // prefix check exists to prevent.
-            const bool is_xmi_identity = uri.empty()
-                                             ? prefix == "xmi"
-                                             : metadata::namespaces::is_xmi_namespace(uri);
+            const bool is_xmi_identity = uri.empty() ? prefix == "xmi" : metadata::namespaces::is_xmi_namespace(uri);
             if (!is_xmi_identity) {
                 continue;
             }
@@ -836,26 +861,37 @@ void collect_preserved_ids(Reader& reader, const pugi::xml_node& node) {
     }
 }
 
-void preserve_extension_subtree(Reader& reader, SACMElement& parent, const pugi::xml_node& node,
-                                std::string_view type_name, std::string_view role,
+void preserve_extension_subtree(Reader& reader,
+                                SACMElement& parent,
+                                const pugi::xml_node& node,
+                                std::string_view type_name,
+                                std::string_view role,
                                 std::size_t role_index) {
     if (reader.strict()) {
         return;
     }
-    Access::preserved_content(parent).push_back(model::PreservedFragment{
-        .xml = node_to_string(node), .role = std::string(role), .index = role_index});
+    Access::preserved_content(parent).push_back(
+        model::PreservedFragment{.xml = node_to_string(node), .role = std::string(role), .index = role_index});
     collect_preserved_ids(reader, node);
-    reader.report(validation::codes::kXmiUnknownElement, Severity::Warning, "SACM23-COMPAT-002",
-                  node, {parent.id()},
+    reader.report(validation::codes::kXmiUnknownElement,
+                  Severity::Warning,
+                  "SACM23-COMPAT-002",
+                  node,
+                  {parent.id()},
                   std::format("element '{}' with xsi:type '{}' preserved as compatibility content "
                               "under {}",
-                              node.name(), type_name, metadata::kind_name(parent.kind())));
+                              node.name(),
+                              type_name,
+                              metadata::kind_name(parent.kind())));
 }
 
 // Handles a containment child whose concrete kind must be resolved from
 // xsi:type, the role's declared type, or (tolerant) the class name.
-void read_containment_child(Reader& reader, SACMElement& parent, const pugi::xml_node& node,
-                            std::optional<ElementKind> declared_kind, std::string_view role,
+void read_containment_child(Reader& reader,
+                            SACMElement& parent,
+                            const pugi::xml_node& node,
+                            std::optional<ElementKind> declared_kind,
+                            std::string_view role,
                             std::size_t role_index) {
     std::optional<ElementKind> kind;
     // Resolve `xsi:type` under the CHILD's own namespace scope: a document may
@@ -881,8 +917,11 @@ void read_containment_child(Reader& reader, SACMElement& parent, const pugi::xml
             kind = detail::kind_from_class_name_ci(xsi_type.type_name);
         }
         if (!kind.has_value()) {
-            reader.report(validation::codes::kXmiUnknownElement, reader.mode_severity(),
-                          "SACM23-XMI-001", node, {parent.id()},
+            reader.report(validation::codes::kXmiUnknownElement,
+                          reader.mode_severity(),
+                          "SACM23-XMI-001",
+                          node,
+                          {parent.id()},
                           std::format("unknown xsi:type '{}'", xsi_type.type_name));
             return;
         }
@@ -893,8 +932,11 @@ void read_containment_child(Reader& reader, SACMElement& parent, const pugi::xml
         // element's local name as a class name.
         kind = detail::kind_from_class_name_ci(local_name(node.name()));
         if (reader.strict()) {
-            reader.report(validation::codes::kXmiMissingType, Severity::Error, "SACM23-XMI-001",
-                          node, {parent.id()},
+            reader.report(validation::codes::kXmiMissingType,
+                          Severity::Error,
+                          "SACM23-XMI-001",
+                          node,
+                          {parent.id()},
                           std::format("containment role '{}' has an abstract type and needs "
                                       "xsi:type",
                                       local_name(node.name())));
@@ -902,8 +944,11 @@ void read_containment_child(Reader& reader, SACMElement& parent, const pugi::xml
         }
     }
     if (!kind.has_value()) {
-        reader.report(validation::codes::kXmiUnknownElement, reader.mode_severity(),
-                      "SACM23-XMI-003", node, {parent.id()},
+        reader.report(validation::codes::kXmiUnknownElement,
+                      reader.mode_severity(),
+                      "SACM23-XMI-003",
+                      node,
+                      {parent.id()},
                       std::format("unknown element '{}'", node.name()));
         return;
     }
@@ -912,9 +957,13 @@ void read_containment_child(Reader& reader, SACMElement& parent, const pugi::xml
         return;
     }
     if (!attach_child(reader, parent, std::move(child), node)) {
-        reader.report(validation::codes::kXmiUnknownElement, reader.mode_severity(),
-                      "SACM23-XMI-001", node, {parent.id()},
-                      std::format("a {} cannot be contained in a {}", metadata::kind_name(*kind),
+        reader.report(validation::codes::kXmiUnknownElement,
+                      reader.mode_severity(),
+                      "SACM23-XMI-001",
+                      node,
+                      {parent.id()},
+                      std::format("a {} cannot be contained in a {}",
+                                  metadata::kind_name(*kind),
                                   metadata::kind_name(parent.kind())));
     }
 }
@@ -956,8 +1005,7 @@ std::unique_ptr<T> read_utility(Reader& reader, ElementKind kind, const pugi::xm
     return element;
 }
 
-void read_model_element_children(Reader& reader, model::ModelElement& element,
-                                 const pugi::xml_node& node) {
+void read_model_element_children(Reader& reader, model::ModelElement& element, const pugi::xml_node& node) {
     for (const pugi::xml_node& child : node.children()) {
         if (child.type() != pugi::node_element) {
             continue;
@@ -972,8 +1020,7 @@ void read_model_element_children(Reader& reader, model::ModelElement& element,
             model::MultiLangString values;
             for (const pugi::xml_node& entry : child.children()) {
                 if (entry.type() == pugi::node_element &&
-                    (local_name(entry.name()) == "content" ||
-                     local_name(entry.name()) == "value")) {
+                    (local_name(entry.name()) == "content" || local_name(entry.name()) == "value")) {
                     values.values.push_back(read_lang_string(reader, entry));
                 }
             }
@@ -982,15 +1029,16 @@ void read_model_element_children(Reader& reader, model::ModelElement& element,
             } else {
                 Access::name(element) = values.values.front();
                 if (values.values.size() > 1) {
-                    auto overflow = std::make_unique<model::TaggedValue>(
-                        reader.generate_id(ElementKind::TaggedValue));
+                    auto overflow = std::make_unique<model::TaggedValue>(reader.generate_id(ElementKind::TaggedValue));
                     Access::key(*overflow).set("", "sacm.import.name");
-                    Access::content(*overflow).values.assign(values.values.begin() + 1,
-                                                             values.values.end());
+                    Access::content(*overflow).values.assign(values.values.begin() + 1, values.values.end());
                     Access::set_parent(*overflow, &element);
                     Access::tagged_values(element).push_back(std::move(overflow));
-                    reader.report(validation::codes::kXmiUnknownElement, Severity::Info,
-                                  "SACM23-BASE-001", child, {element.id()},
+                    reader.report(validation::codes::kXmiUnknownElement,
+                                  Severity::Info,
+                                  "SACM23-BASE-001",
+                                  child,
+                                  {element.id()},
                                   "multi-language name mapped to TaggedValue 'sacm.import.name' "
                                   "(clause 8.6 allows one name LangString)");
                 }
@@ -1000,13 +1048,11 @@ void read_model_element_children(Reader& reader, model::ModelElement& element,
                 read_utility<model::Description>(reader, ElementKind::Description, child));
             Access::set_parent(*Access::descriptions(element).back(), &element);
         } else if (role == "implementationConstraint") {
-            Access::implementation_constraints(element)
-                .push_back(read_utility<model::ImplementationConstraint>(
-                    reader, ElementKind::ImplementationConstraint, child));
+            Access::implementation_constraints(element).push_back(
+                read_utility<model::ImplementationConstraint>(reader, ElementKind::ImplementationConstraint, child));
             Access::set_parent(*Access::implementation_constraints(element).back(), &element);
         } else if (role == "note") {
-            Access::notes(element).push_back(
-                read_utility<model::Note>(reader, ElementKind::Note, child));
+            Access::notes(element).push_back(read_utility<model::Note>(reader, ElementKind::Note, child));
             Access::set_parent(*Access::notes(element).back(), &element);
         } else if (role == "taggedValue") {
             // TaggedValue: strict shape has <key> and <content> wrappers;
@@ -1048,8 +1094,7 @@ void read_model_element_children(Reader& reader, model::ModelElement& element,
         }
     }
     if (const pugi::xml_attribute description = node.attribute("description")) {
-        auto holder = std::make_unique<model::Description>(
-            reader.generate_id(ElementKind::Description));
+        auto holder = std::make_unique<model::Description>(reader.generate_id(ElementKind::Description));
         Access::content(*holder).set("", description.value());
         Access::set_parent(*holder, &element);
         Access::descriptions(element).push_back(std::move(holder));
@@ -1059,8 +1104,7 @@ void read_model_element_children(Reader& reader, model::ModelElement& element,
 // Claim-style content tolerance: <content lang>text</content> children or a
 // content="" attribute directly on an argumentation element map to a
 // Description (clause 8.9: Descriptions provide the content of a Claim).
-void read_claim_content_tolerance(Reader& reader, model::ModelElement& element,
-                                  const pugi::xml_node& node) {
+void read_claim_content_tolerance(Reader& reader, model::ModelElement& element, const pugi::xml_node& node) {
     model::MultiLangString collected;
     if (const pugi::xml_attribute content = node.attribute("content")) {
         collected.set("", content.value());
@@ -1080,8 +1124,7 @@ void read_claim_content_tolerance(Reader& reader, model::ModelElement& element,
     if (collected.values.empty()) {
         return;
     }
-    auto holder =
-        std::make_unique<model::Description>(reader.generate_id(ElementKind::Description));
+    auto holder = std::make_unique<model::Description>(reader.generate_id(ElementKind::Description));
     Access::content(*holder) = std::move(collected);
     Access::set_parent(*holder, &element);
     // A legacy `content=`/`<content>` statement is the element's primary text
@@ -1281,8 +1324,7 @@ bool extension_reverses_endpoints(Reader& reader, const pugi::xml_node& node) {
 // real information, so tolerant loads keep them and strict save refuses,
 // exactly as for unknown child elements. Without this they vanished with no
 // diagnostic and strict save reported success — a silent edit to the document.
-void capture_vendor_attributes(Reader& reader, SACMElement& element,
-                               const pugi::xml_node& node) {
+void capture_vendor_attributes(Reader& reader, SACMElement& element, const pugi::xml_node& node) {
     for (const pugi::xml_attribute& attr : node.attributes()) {
         const std::string_view name = attr.name();
         if (name.starts_with("xmlns")) {
@@ -1297,42 +1339,51 @@ void capture_vendor_attributes(Reader& reader, SACMElement& element,
                 continue;
             }
             if (reader.strict()) {
-                reader.report(validation::codes::kXmiUnknownElement, Severity::Error,
-                              "SACM23-XMI-003", node, {element.id()},
-                              std::format("unknown attribute '{}' on {}", name,
-                                          metadata::kind_name(element.kind())));
+                reader.report(validation::codes::kXmiUnknownElement,
+                              Severity::Error,
+                              "SACM23-XMI-003",
+                              node,
+                              {element.id()},
+                              std::format("unknown attribute '{}' on {}", name, metadata::kind_name(element.kind())));
                 continue;
             }
-            Access::preserved_attributes(element).push_back(
-                std::format(R"({}="{}")", name, attr.value()));
-            reader.report(validation::codes::kXmiUnknownElement, Severity::Warning,
-                          "SACM23-COMPAT-001", node, {element.id()},
+            Access::preserved_attributes(element).push_back(std::format(R"({}="{}")", name, attr.value()));
+            reader.report(validation::codes::kXmiUnknownElement,
+                          Severity::Warning,
+                          "SACM23-COMPAT-001",
+                          node,
+                          {element.id()},
                           std::format("unknown attribute '{}' on {} preserved as compatibility "
                                       "content",
-                                      name, metadata::kind_name(element.kind())));
+                                      name,
+                                      metadata::kind_name(element.kind())));
             continue;
         }
         const std::string attr_ns = reader.resolve_prefix(attr_prefix);
         if (attr_ns.empty() || metadata::namespaces::is_xmi_namespace(attr_ns) ||
-            attr_ns == metadata::namespaces::kXsi ||
-            metadata::namespaces::is_accepted_sacm_namespace(attr_ns) ||
+            attr_ns == metadata::namespaces::kXsi || metadata::namespaces::is_accepted_sacm_namespace(attr_ns) ||
             detail::is_sacm_extension_namespace(attr_ns)) {
             continue;
         }
         if (reader.strict()) {
-            reader.report(validation::codes::kXmiUnknownElement, Severity::Error,
-                          "SACM23-XMI-003", node, {element.id()},
-                          std::format("unknown attribute '{}' from foreign namespace '{}'",
-                                      name, attr_ns));
+            reader.report(validation::codes::kXmiUnknownElement,
+                          Severity::Error,
+                          "SACM23-XMI-003",
+                          node,
+                          {element.id()},
+                          std::format("unknown attribute '{}' from foreign namespace '{}'", name, attr_ns));
             continue;
         }
-        Access::preserved_attributes(element).push_back(
-            std::format(R"({}="{}")", name, attr.value()));
-        reader.report(validation::codes::kXmiUnknownElement, Severity::Warning,
-                      "SACM23-COMPAT-001", node, {element.id()},
+        Access::preserved_attributes(element).push_back(std::format(R"({}="{}")", name, attr.value()));
+        reader.report(validation::codes::kXmiUnknownElement,
+                      Severity::Warning,
+                      "SACM23-COMPAT-001",
+                      node,
+                      {element.id()},
                       std::format("attribute '{}' from foreign namespace '{}' preserved as "
                                   "compatibility content",
-                                  name, attr_ns));
+                                  name,
+                                  attr_ns));
     }
 }
 
@@ -1359,8 +1410,11 @@ void read_reference_attributes(Reader& reader, SACMElement& element, const pugi:
         idrefs_attr(reversed ? "source" : "target", Access::targets(*rel));
         ref_attr("reasoning", Access::reasoning(*rel));
         if (reversed) {
-            reader.report(validation::codes::kXmiUnknownElement, Severity::Info,
-                          "SACM23-COMPAT-002", node, {element.id()},
+            reader.report(validation::codes::kXmiUnknownElement,
+                          Severity::Info,
+                          "SACM23-COMPAT-002",
+                          node,
+                          {element.id()},
                           "GSN relationship endpoints swapped to SACM source/target direction");
         }
     }
@@ -1455,8 +1509,8 @@ std::optional<ExtensionOrigin> extension_type_of(Reader& reader, const pugi::xml
         if (!extension.has_value()) {
             return std::nullopt;
         }
-        return ExtensionOrigin{namespace_uri, extension->type_name, extension->sacm_kind,
-                               extension->assertion_declaration};
+        return ExtensionOrigin{
+            namespace_uri, extension->type_name, extension->sacm_kind, extension->assertion_declaration};
     }
     return std::nullopt;
 }
@@ -1488,8 +1542,7 @@ void record_extension_origin(Reader& reader, SACMElement& element, const pugi::x
 
     auto origin = std::make_unique<model::TaggedValue>(reader.generate_id(ElementKind::TaggedValue));
     Access::key(*origin).set("", std::string(detail::kImportExtensionTypeKey));
-    Access::content(*origin).set(
-        "", std::format("{{{}}}{}", extension->namespace_uri, extension->type_name));
+    Access::content(*origin).set("", std::format("{{{}}}{}", extension->namespace_uri, extension->type_name));
     Access::set_parent(*origin, &element);
     Access::tagged_values(*model_element).push_back(std::move(origin));
 
@@ -1511,16 +1564,19 @@ void record_extension_origin(Reader& reader, SACMElement& element, const pugi::x
         return;
     }
     Access::assertion_declaration(*assertion) = *declaration;
-    reader.report(validation::codes::kXmiUnknownElement, Severity::Info, "SACM23-COMPAT-002", node,
+    reader.report(validation::codes::kXmiUnknownElement,
+                  Severity::Info,
+                  "SACM23-COMPAT-002",
+                  node,
                   {element.id()},
                   std::format("GSN '{}' resolved to Claim with assertionDeclaration='{}' (original "
                               "type preserved in TaggedValue '{}')",
-                              extension->type_name, extension->assertion_declaration,
+                              extension->type_name,
+                              extension->assertion_declaration,
                               detail::kImportExtensionTypeKey));
 }
 
-void read_kind_specific_attributes(Reader& reader, SACMElement& element,
-                                   const pugi::xml_node& node) {
+void read_kind_specific_attributes(Reader& reader, SACMElement& element, const pugi::xml_node& node) {
     if (auto* assertion = dynamic_cast<model::Assertion*>(&element)) {
         if (const pugi::xml_attribute attr = node.attribute("assertionDeclaration")) {
             if (const std::optional<model::AssertionDeclaration> parsed =
@@ -1536,22 +1592,26 @@ void read_kind_specific_attributes(Reader& reader, SACMElement& element,
                 // import convention (mirrors "sacm.import.name"); the Assurance
                 // Forge adapter reads it (sacm_adapter::kImportAssertionDeclarationKey).
                 Access::assertion_declaration(*assertion) = model::AssertionDeclaration::Axiomatic;
-                auto role = std::make_unique<model::TaggedValue>(
-                    reader.generate_id(ElementKind::TaggedValue));
+                auto role = std::make_unique<model::TaggedValue>(reader.generate_id(ElementKind::TaggedValue));
                 Access::key(*role).set("", "sacm.import.assertionDeclaration");
                 Access::content(*role).set("", "justification");
                 Access::set_parent(*role, &element);
                 Access::tagged_values(*assertion).push_back(std::move(role));
-                reader.report(validation::codes::kXmiUnknownElement, Severity::Info,
-                              "SACM23-COMPAT-001", node, {element.id()},
+                reader.report(validation::codes::kXmiUnknownElement,
+                              Severity::Info,
+                              "SACM23-COMPAT-001",
+                              node,
+                              {element.id()},
                               "legacy assertionDeclaration=\"justification\" normalized to "
                               "axiomatic (GSN role preserved in TaggedValue "
                               "'sacm.import.assertionDeclaration')");
             } else {
-                reader.report(validation::codes::kEnumInvalidLiteral, reader.mode_severity(),
-                              "SACM23-ARG-001", node, {element.id()},
-                              std::format("invalid assertionDeclaration literal '{}'",
-                                          attr.value()));
+                reader.report(validation::codes::kEnumInvalidLiteral,
+                              reader.mode_severity(),
+                              "SACM23-ARG-001",
+                              node,
+                              {element.id()},
+                              std::format("invalid assertionDeclaration literal '{}'", attr.value()));
             }
         }
         // Legacy GSN shorthand: an `undeveloped="true"` attribute is the
@@ -1564,8 +1624,11 @@ void read_kind_specific_attributes(Reader& reader, SACMElement& element,
         if (parse_bool(node.attribute("undeveloped").value()) &&
             assertion->assertion_declaration() == model::AssertionDeclaration::Asserted) {
             Access::assertion_declaration(*assertion) = model::AssertionDeclaration::NeedsSupport;
-            reader.report(validation::codes::kXmiUnknownElement, Severity::Info, "SACM23-COMPAT-001",
-                          node, {element.id()},
+            reader.report(validation::codes::kXmiUnknownElement,
+                          Severity::Info,
+                          "SACM23-COMPAT-001",
+                          node,
+                          {element.id()},
                           "legacy undeveloped=\"true\" normalized to assertionDeclaration="
                           "needsSupport");
         }
@@ -1607,13 +1670,16 @@ void read_kind_specific_attributes(Reader& reader, SACMElement& element,
 
 // Containment roles per family; returns the declared child kind when the
 // role's declared type is concrete.
-std::optional<ElementKind> containment_role_kind(const SACMElement& parent,
-                                                 std::string_view role) {
+std::optional<ElementKind> containment_role_kind(const SACMElement& parent, std::string_view role) {
     if (dynamic_cast<const model::AssuranceCasePackage*>(&parent) != nullptr) {
-        if (role == "assuranceCasePackage") return ElementKind::AssuranceCasePackage;
-        if (role == "argumentPackage") return ElementKind::ArgumentPackage;
-        if (role == "artifactPackage") return ElementKind::ArtifactPackage;
-        if (role == "terminologyPackage") return ElementKind::TerminologyPackage;
+        if (role == "assuranceCasePackage")
+            return ElementKind::AssuranceCasePackage;
+        if (role == "argumentPackage")
+            return ElementKind::ArgumentPackage;
+        if (role == "artifactPackage")
+            return ElementKind::ArtifactPackage;
+        if (role == "terminologyPackage")
+            return ElementKind::TerminologyPackage;
     }
     if (dynamic_cast<const model::ArtifactAsset*>(&parent) != nullptr && role == "property") {
         return ElementKind::Property;
@@ -1622,25 +1688,28 @@ std::optional<ElementKind> containment_role_kind(const SACMElement& parent,
 }
 
 bool is_abstract_containment_role(const SACMElement& parent, std::string_view role) {
-    if (role == "argumentElement" &&
-        dynamic_cast<const model::ArgumentPackage*>(&parent) != nullptr) {
+    if (role == "argumentElement" && dynamic_cast<const model::ArgumentPackage*>(&parent) != nullptr) {
         return true;
     }
-    if (role == "artifactElement" &&
-        dynamic_cast<const model::ArtifactPackage*>(&parent) != nullptr) {
+    if (role == "artifactElement" && dynamic_cast<const model::ArtifactPackage*>(&parent) != nullptr) {
         return true;
     }
-    if (role == "terminologyElement" &&
-        dynamic_cast<const model::TerminologyPackage*>(&parent) != nullptr) {
+    if (role == "terminologyElement" && dynamic_cast<const model::TerminologyPackage*>(&parent) != nullptr) {
         return true;
     }
     return false;
 }
 
 constexpr std::string_view kCommonRoles[] = {
-    "name",          "description", "implementationConstraint",
-    "note",          "taggedValue", "content",
-    "statement",     "citedElement", "abstractForm",
+    "name",
+    "description",
+    "implementationConstraint",
+    "note",
+    "taggedValue",
+    "content",
+    "statement",
+    "citedElement",
+    "abstractForm",
 };
 
 bool is_common_role(std::string_view role) {
@@ -1675,10 +1744,9 @@ bool is_reference_role(const SACMElement& element, std::string_view role) {
     if (is_terminology_shorthand_child(element, role)) {
         return false;
     }
-    if (role == "source" || role == "target" || role == "reasoning" || role == "metaClaim" ||
-        role == "interface" || role == "implements" || role == "participantPackage" ||
-        role == "structure" || role == "referencedArtifactElement" ||
-        role == "referencedArtifact" || role == "origin" || role == "category" ||
+    if (role == "source" || role == "target" || role == "reasoning" || role == "metaClaim" || role == "interface" ||
+        role == "implements" || role == "participantPackage" || role == "structure" ||
+        role == "referencedArtifactElement" || role == "referencedArtifact" || role == "origin" || role == "category" ||
         role == "element" || role == "expression") {
         return true;
     }
@@ -1743,8 +1811,7 @@ void populate(Reader& reader, SACMElement& element, const pugi::xml_node& node) 
                 // xsi:type says the element is something the declared class
                 // cannot represent, so falling back to it would silently coerce
                 // the element into an unrelated class.
-                preserve_extension_subtree(reader, element, child, xsi_type.type_name, role,
-                                           role_index);
+                preserve_extension_subtree(reader, element, child, xsi_type.type_name, role, role_index);
                 continue;
             }
             std::optional<ElementKind> kind = declared;
@@ -1755,17 +1822,22 @@ void populate(Reader& reader, SACMElement& element, const pugi::xml_node& node) 
                 }
             }
             if (!kind.has_value()) {
-                reader.report(validation::codes::kXmiUnknownElement, reader.mode_severity(),
-                              "SACM23-XMI-001", child, {element.id()},
+                reader.report(validation::codes::kXmiUnknownElement,
+                              reader.mode_severity(),
+                              "SACM23-XMI-001",
+                              child,
+                              {element.id()},
                               std::format("unknown xsi:type on role '{}'", role));
                 continue;
             }
             std::unique_ptr<SACMElement> parsed = read_element(reader, *kind, child);
             if (parsed != nullptr && !attach_child(reader, element, std::move(parsed), child)) {
-                reader.report(validation::codes::kXmiUnknownElement, reader.mode_severity(),
-                              "SACM23-XMI-001", child, {element.id()},
-                              std::format("a {} cannot be contained in role '{}'",
-                                          metadata::kind_name(*kind), role));
+                reader.report(validation::codes::kXmiUnknownElement,
+                              reader.mode_severity(),
+                              "SACM23-XMI-001",
+                              child,
+                              {element.id()},
+                              std::format("a {} cannot be contained in role '{}'", metadata::kind_name(*kind), role));
             }
             continue;
         }
@@ -1776,8 +1848,11 @@ void populate(Reader& reader, SACMElement& element, const pugi::xml_node& node) 
         // Tolerant fallback: element name is a class name (repo fixtures).
         if (const std::optional<ElementKind> kind = detail::kind_from_class_name_ci(role)) {
             if (reader.strict()) {
-                reader.report(validation::codes::kXmiUnknownElement, Severity::Error,
-                              "SACM23-XMI-001", child, {element.id()},
+                reader.report(validation::codes::kXmiUnknownElement,
+                              Severity::Error,
+                              "SACM23-XMI-001",
+                              child,
+                              {element.id()},
                               std::format("class-name element '{}' is not a strict containment "
                                           "role",
                                           role));
@@ -1785,8 +1860,11 @@ void populate(Reader& reader, SACMElement& element, const pugi::xml_node& node) 
             }
             std::unique_ptr<SACMElement> parsed = read_element(reader, *kind, child);
             if (parsed != nullptr && !attach_child(reader, element, std::move(parsed), child)) {
-                reader.report(validation::codes::kXmiUnknownElement, Severity::Warning,
-                              "SACM23-XMI-001", child, {element.id()},
+                reader.report(validation::codes::kXmiUnknownElement,
+                              Severity::Warning,
+                              "SACM23-XMI-001",
+                              child,
+                              {element.id()},
                               std::format("a {} cannot be contained in a {}; skipped",
                                           metadata::kind_name(*kind),
                                           metadata::kind_name(element.kind())));
@@ -1794,10 +1872,13 @@ void populate(Reader& reader, SACMElement& element, const pugi::xml_node& node) 
             continue;
         }
         if (reader.strict()) {
-            reader.report(validation::codes::kXmiUnknownElement, Severity::Error,
-                          "SACM23-XMI-003", child, {element.id()},
-                          std::format("unknown element '{}' under {}", child.name(),
-                                      metadata::kind_name(element.kind())));
+            reader.report(
+                validation::codes::kXmiUnknownElement,
+                Severity::Error,
+                "SACM23-XMI-003",
+                child,
+                {element.id()},
+                std::format("unknown element '{}' under {}", child.name(), metadata::kind_name(element.kind())));
         } else {
             // Never silently dropped: preserved verbatim; compat save
             // re-emits it, strict save refuses (SACM-XMI-006).
@@ -1808,11 +1889,15 @@ void populate(Reader& reader, SACMElement& element, const pugi::xml_node& node) 
             Access::preserved_content(element).push_back(
                 model::PreservedFragment{.xml = node_to_string(child), .role = {}, .index = 0});
             collect_preserved_ids(reader, child);
-            reader.report(validation::codes::kXmiUnknownElement, Severity::Warning,
-                          "SACM23-COMPAT-001", child, {element.id()},
+            reader.report(validation::codes::kXmiUnknownElement,
+                          Severity::Warning,
+                          "SACM23-COMPAT-001",
+                          child,
+                          {element.id()},
                           std::format("unknown element '{}' under {} preserved as "
                                       "compatibility content",
-                                      child.name(), metadata::kind_name(element.kind())));
+                                      child.name(),
+                                      metadata::kind_name(element.kind())));
         }
     }
 
@@ -1829,29 +1914,42 @@ void check_root_namespace(Reader& reader, const pugi::xml_node& root) {
     // revision was detected, so a caller can decide rather than discovering it
     // later from a subtly wrong model.
     if (reader.source_version != metadata::namespaces::StandardVersion::V2_3 && !uri.empty()) {
-        reader.report(
-            validation::codes::kXmiOlderStandardVersion, Severity::Warning, "SACM23-COMPAT-001",
-            root, {},
-            std::format("document declares SACM {} (namespace '{}'); this library implements 2.3 "
-                        "and loaded it in compatibility mode",
-                        metadata::namespaces::standard_version_name(reader.source_version), uri));
+        reader.report(validation::codes::kXmiOlderStandardVersion,
+                      Severity::Warning,
+                      "SACM23-COMPAT-001",
+                      root,
+                      {},
+                      std::format("document declares SACM {} (namespace '{}'); this library implements 2.3 "
+                                  "and loaded it in compatibility mode",
+                                  metadata::namespaces::standard_version_name(reader.source_version),
+                                  uri));
     }
     if (uri.empty()) {
         if (reader.strict()) {
-            reader.report(validation::codes::kXmiUnknownNamespace, Severity::Error,
-                          "SACM23-XMI-001", root, {},
+            reader.report(validation::codes::kXmiUnknownNamespace,
+                          Severity::Error,
+                          "SACM23-XMI-001",
+                          root,
+                          {},
                           "root element has no namespace; strict SACM 2.3 requires the pinned "
                           "namespace");
         }
         return;
     }
     if (reader.strict() && !metadata::namespaces::is_strict_sacm_namespace(uri)) {
-        reader.report(validation::codes::kXmiUnknownNamespace, Severity::Error, "SACM23-XMI-002",
-                      root, {}, std::format("namespace '{}' is not the strict SACM 2.3 namespace",
-                                            uri));
+        reader.report(validation::codes::kXmiUnknownNamespace,
+                      Severity::Error,
+                      "SACM23-XMI-002",
+                      root,
+                      {},
+                      std::format("namespace '{}' is not the strict SACM 2.3 namespace", uri));
     } else if (!metadata::namespaces::is_accepted_sacm_namespace(uri)) {
-        reader.report(validation::codes::kXmiUnknownNamespace, Severity::Warning, "SACM23-XMI-002",
-                      root, {}, std::format("namespace '{}' is not a known SACM namespace", uri));
+        reader.report(validation::codes::kXmiUnknownNamespace,
+                      Severity::Warning,
+                      "SACM23-XMI-002",
+                      root,
+                      {},
+                      std::format("namespace '{}' is not a known SACM namespace", uri));
     }
 }
 
@@ -1870,8 +1968,7 @@ std::optional<ElementKind> interchange_package_kind(Reader& reader, const pugi::
     const XsiTypeResult xsi_type = read_xsi_type(reader, node);
     reader.pop_scope();
     if (xsi_type.resolved()) {
-        if (const std::optional<ElementKind> kind =
-                package_kind(detail::kind_from_class_name_ci(xsi_type.type_name))) {
+        if (const std::optional<ElementKind> kind = package_kind(detail::kind_from_class_name_ci(xsi_type.type_name))) {
             return kind;
         }
     }
@@ -1888,8 +1985,7 @@ std::optional<ElementKind> interchange_package_kind(Reader& reader, const pugi::
 
 // Collects the OUTERMOST SACM interchange packages inside a foreign container,
 // without descending into one once found (its contents are the reader's job).
-void collect_embedded_packages(Reader& reader, const pugi::xml_node& node,
-                               std::vector<pugi::xml_node>& out) {
+void collect_embedded_packages(Reader& reader, const pugi::xml_node& node, std::vector<pugi::xml_node>& out) {
     for (const pugi::xml_node& child : node.children()) {
         if (child.type() != pugi::node_element) {
             continue;
@@ -1915,17 +2011,20 @@ void read_root(Reader& reader, model::Document& document, const pugi::xml_node& 
         // instead of leaving the type diagnostic to imply a preservation that
         // did not happen: the root is read from its element name as before, and
         // if that is not a package kind the invalid-root error below stands.
-        reader.report(validation::codes::kXmiUnknownElement, reader.mode_severity(),
-                      "SACM23-COMPAT-002", root, {},
+        reader.report(validation::codes::kXmiUnknownElement,
+                      reader.mode_severity(),
+                      "SACM23-COMPAT-002",
+                      root,
+                      {},
                       std::format("root element's xsi:type '{}' has no concrete SACM equivalent "
                                   "and a document root cannot be preserved as compatibility "
                                   "content; reading the root from its element name '{}'",
-                                  xsi_type.type_name, local_name(root.name())));
+                                  xsi_type.type_name,
+                                  local_name(root.name())));
     }
     if (!kind.has_value()) {
         const std::string_view name = local_name(root.name());
-        kind = reader.strict() ? detail::kind_from_class_name(name)
-                               : detail::kind_from_class_name_ci(name);
+        kind = reader.strict() ? detail::kind_from_class_name(name) : detail::kind_from_class_name_ci(name);
         // A multi-valued containment role is spelled plural in real containers:
         // an ODE DDIPackage holds its assurance case under `assuranceCasePackages`.
         // Without this the reader descends past that element into the argument
@@ -1936,8 +2035,7 @@ void read_root(Reader& reader, model::Document& document, const pugi::xml_node& 
     }
     reader.pop_scope();
 
-    const bool valid_root =
-        kind.has_value() && metadata::is_package_kind(*kind);
+    const bool valid_root = kind.has_value() && metadata::is_package_kind(*kind);
     if (!valid_root) {
         // Real toolchains ship SACM embedded in a larger container -- an ODE
         // DDIPackage carrying architecture and failure-logic models alongside
@@ -1955,16 +2053,18 @@ void read_root(Reader& reader, model::Document& document, const pugi::xml_node& 
             std::vector<pugi::xml_node> embedded;
             collect_embedded_packages(reader, root, embedded);
             if (!embedded.empty()) {
-                reader.report(
-                    validation::codes::kXmiForeignContainerRoot, Severity::Warning,
-                    "SACM23-COMPAT-002", root, {},
-                    std::format(
-                        "'{}' is not a SACM interchange package root; {} SACM package(s) were read "
-                        "from inside it. This file does not conform to SACM 2.3 as an interchange "
-                        "document: content outside the SACM packages is NOT represented in the "
-                        "model, and saving will write a conformant SACM document rather than the "
-                        "original container",
-                        root.name(), embedded.size()));
+                reader.report(validation::codes::kXmiForeignContainerRoot,
+                              Severity::Warning,
+                              "SACM23-COMPAT-002",
+                              root,
+                              {},
+                              std::format("'{}' is not a SACM interchange package root; {} SACM package(s) were read "
+                                          "from inside it. This file does not conform to SACM 2.3 as an interchange "
+                                          "document: content outside the SACM packages is NOT represented in the "
+                                          "model, and saving will write a conformant SACM document rather than the "
+                                          "original container",
+                                          root.name(),
+                                          embedded.size()));
                 for (const pugi::xml_node& package : embedded) {
                     reader.push_scope(package);
                     read_root(reader, document, package);
@@ -1973,7 +2073,10 @@ void read_root(Reader& reader, model::Document& document, const pugi::xml_node& 
                 return;
             }
         }
-        reader.report(validation::codes::kXmiInvalidRoot, Severity::Error, "SACM23-XMI-001", root,
+        reader.report(validation::codes::kXmiInvalidRoot,
+                      Severity::Error,
+                      "SACM23-XMI-001",
+                      root,
                       {},
                       std::format("'{}' is not a SACM interchange package root", root.name()));
         return;
@@ -1985,8 +2088,8 @@ void read_root(Reader& reader, model::Document& document, const pugi::xml_node& 
     }
     if (auto* acp = dynamic_cast<model::AssuranceCasePackage*>(element.get())) {
         (void)acp;
-        Access::roots(document).push_back(std::unique_ptr<model::AssuranceCasePackage>(
-            static_cast<model::AssuranceCasePackage*>(element.release())));
+        Access::roots(document).push_back(
+            std::unique_ptr<model::AssuranceCasePackage>(static_cast<model::AssuranceCasePackage*>(element.release())));
     } else {
         Access::other_roots(document).push_back(std::move(element));
     }
@@ -2013,42 +2116,42 @@ void build_index(Reader& reader, model::Document& document) {
 
 void check_references(Reader& reader, const model::Document& document) {
     document.for_each_element([&](const SACMElement& element) {
-        model::traverse::for_each_reference(
-            element, [&](const model::traverse::ReferenceUse& use) {
-                if (document.find(*use.target) != nullptr) {
-                    return;
-                }
-                // An endpoint naming an element we preserved verbatim is not a
-                // broken reference: the target is in the file, we just could not
-                // type it. Saying "missing" there would report an intact
-                // argument as malformed, and at Error severity it would fail
-                // every GSN document containing so much as a Context.
-                if (document.has_preserved_element(*use.target)) {
-                    reader.diagnostics.push_back(Diagnostic{
-                        .code = std::string(validation::codes::kRefPreservedTarget),
-                        .severity = Severity::Warning,
-                        .requirement_id = "SACM23-COMPAT-002",
-                        .operation = "",
-                        .affected = {element.id(), *use.target},
-                        .location = std::nullopt,
-                        .message = std::format(
-                            "'{}' references ({}) '{}', which was preserved as compatibility "
-                            "content and therefore cannot be type-checked",
-                            element.id().value(), use.role, use.target->value()),
-                    });
-                    return;
-                }
+        model::traverse::for_each_reference(element, [&](const model::traverse::ReferenceUse& use) {
+            if (document.find(*use.target) != nullptr) {
+                return;
+            }
+            // An endpoint naming an element we preserved verbatim is not a
+            // broken reference: the target is in the file, we just could not
+            // type it. Saying "missing" there would report an intact
+            // argument as malformed, and at Error severity it would fail
+            // every GSN document containing so much as a Context.
+            if (document.has_preserved_element(*use.target)) {
                 reader.diagnostics.push_back(Diagnostic{
-                    .code = std::string(validation::codes::kRefDangling),
-                    .severity = reader.mode_severity(),
-                    .requirement_id = "SACM23-XMI-003",
+                    .code = std::string(validation::codes::kRefPreservedTarget),
+                    .severity = Severity::Warning,
+                    .requirement_id = "SACM23-COMPAT-002",
                     .operation = "",
                     .affected = {element.id(), *use.target},
                     .location = std::nullopt,
-                    .message = std::format("'{}' references ({}) missing element '{}'",
-                                           element.id().value(), use.role, use.target->value()),
+                    .message = std::format("'{}' references ({}) '{}', which was preserved as compatibility "
+                                           "content and therefore cannot be type-checked",
+                                           element.id().value(),
+                                           use.role,
+                                           use.target->value()),
                 });
+                return;
+            }
+            reader.diagnostics.push_back(Diagnostic{
+                .code = std::string(validation::codes::kRefDangling),
+                .severity = reader.mode_severity(),
+                .requirement_id = "SACM23-XMI-003",
+                .operation = "",
+                .affected = {element.id(), *use.target},
+                .location = std::nullopt,
+                .message = std::format(
+                    "'{}' references ({}) missing element '{}'", element.id().value(), use.role, use.target->value()),
             });
+        });
     });
 }
 
@@ -2060,8 +2163,7 @@ LoadResult load_impl(std::string_view xml, std::string source_file, const LoadOp
     reader.buffer = xml.data();
 
     // SACM-SEC-001: reject DOCTYPE before parsing.
-    if (xml.find("<!DOCTYPE") != std::string_view::npos ||
-        xml.find("<!ENTITY") != std::string_view::npos) {
+    if (xml.find("<!DOCTYPE") != std::string_view::npos || xml.find("<!ENTITY") != std::string_view::npos) {
         result.diagnostics.push_back(Diagnostic{
             .code = std::string(validation::codes::kXmlDoctypeRejected),
             .severity = Severity::Error,
@@ -2075,8 +2177,7 @@ LoadResult load_impl(std::string_view xml, std::string source_file, const LoadOp
     }
 
     pugi::xml_document parsed;
-    const pugi::xml_parse_result parse_result =
-        parsed.load_buffer(xml.data(), xml.size(), pugi::parse_default);
+    const pugi::xml_parse_result parse_result = parsed.load_buffer(xml.data(), xml.size(), pugi::parse_default);
     if (!parse_result) {
         result.diagnostics.push_back(Diagnostic{
             .code = std::string(validation::codes::kXmlMalformed),
@@ -2168,7 +2269,7 @@ LoadResult load_impl(std::string_view xml, std::string source_file, const LoadOp
     return result;
 }
 
-}  // namespace
+} // namespace
 
 LoadResult load_xmi_string(std::string_view xml, const LoadOptions& options) {
     return load_impl(xml, "<string>", options);
@@ -2195,4 +2296,4 @@ LoadResult load_xmi_file(const std::filesystem::path& path, const LoadOptions& o
     return load_impl(content, path.string(), options);
 }
 
-}  // namespace sacm::io
+} // namespace sacm::io

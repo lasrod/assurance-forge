@@ -19,4 +19,4 @@ std::vector<Diagnostic> validate_structure(const model::Document& document);
 // citation/abstraction constraints, and relationship typing rules.
 std::vector<Diagnostic> validate(const model::Document& document);
 
-}  // namespace sacm::validation
+} // namespace sacm::validation

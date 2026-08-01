@@ -16,9 +16,7 @@ constexpr const char* kPopupIdSuffix = "###af_baseline_modal";
 
 } // namespace
 
-void OpenBaselineModal(BaselineModalState& state,
-                       std::uint64_t at_sequence,
-                       const std::string& canonical_model_hash) {
+void OpenBaselineModal(BaselineModalState& state, std::uint64_t at_sequence, const std::string& canonical_model_hash) {
     state.open = true;
     state.at_sequence = at_sequence;
     std::memset(state.name_buf, 0, sizeof(state.name_buf));
@@ -32,7 +30,8 @@ void RenderBaselineModal(BaselineModalState& state,
                          const std::filesystem::path& project_root,
                          const std::string& created_by,
                          const std::function<void(const std::string&)>& on_status) {
-    if (!state.open) return;
+    if (!state.open)
+        return;
 
     // Drive ImGui's modal popup lifecycle from the `open` flag.
     const std::string popup_id = AF_TR("Create baseline") + kPopupIdSuffix;
@@ -67,7 +66,8 @@ void RenderBaselineModal(BaselineModalState& state,
     ImGui::TextUnformatted(AF_TR("Description (optional)").c_str());
     ImGui::SetNextItemWidth(-FLT_MIN);
     ImGui::InputTextMultiline("##baseline_description",
-                              state.description_buf, sizeof(state.description_buf),
+                              state.description_buf,
+                              sizeof(state.description_buf),
                               ImVec2(0.0f, ImGui::GetTextLineHeight() * 4.0f));
 
     if (!state.error_message.empty()) {
@@ -83,7 +83,8 @@ void RenderBaselineModal(BaselineModalState& state,
     const float spacing = ImGui::GetStyle().ItemSpacing.x;
     const float used = button_width * 2.0f + spacing;
     const float avail = ImGui::GetContentRegionAvail().x;
-    if (avail > used) ImGui::Dummy(ImVec2(avail - used, 0.0f));
+    if (avail > used)
+        ImGui::Dummy(ImVec2(avail - used, 0.0f));
     ImGui::SameLine();
 
     bool close_requested = false;
@@ -94,7 +95,8 @@ void RenderBaselineModal(BaselineModalState& state,
 
     const std::string trimmed_name = core::TrimWhitespace(state.name_buf);
     const bool can_create = !trimmed_name.empty();
-    if (!can_create) ImGui::BeginDisabled();
+    if (!can_create)
+        ImGui::BeginDisabled();
     if (ImGui::Button(AF_TR("Create").c_str(), ImVec2(button_width, 0.0f))) {
         core::audit::CreateBaselineRequest req;
         req.name = trimmed_name;
@@ -107,16 +109,16 @@ void RenderBaselineModal(BaselineModalState& state,
         std::string err;
         if (core::audit::CreateBaseline(project_root, req, created, err)) {
             if (on_status) {
-                on_status(ui::i18n::trf("Baseline \"{0}\" created at sequence {1}.",
-                                        created.name,
-                                        created.transaction_sequence));
+                on_status(ui::i18n::trf(
+                    "Baseline \"{0}\" created at sequence {1}.", created.name, created.transaction_sequence));
             }
             close_requested = true;
         } else {
             state.error_message = err.empty() ? AF_TR("Failed to create baseline.") : err;
         }
     }
-    if (!can_create) ImGui::EndDisabled();
+    if (!can_create)
+        ImGui::EndDisabled();
 
     if (close_requested) {
         state.open = false;

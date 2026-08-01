@@ -182,8 +182,7 @@ void UpsertAcpTags(sacm::SacmElement& element, const Acp& acp) {
         AddTag(element.taggedValues, FieldKey(acp.id, kTextField), acp.resolution.text);
     if (acp.resolution.kind == AcpResolutionKind::Text) {
         if (!acp.resolution.confidence_claim_id.empty())
-            AddTag(element.taggedValues, FieldKey(acp.id, kConfidenceClaimIdField),
-                   acp.resolution.confidence_claim_id);
+            AddTag(element.taggedValues, FieldKey(acp.id, kConfidenceClaimIdField), acp.resolution.confidence_claim_id);
     } else if (acp.resolution.kind == AcpResolutionKind::TopGoalReference) {
         AddTag(element.taggedValues, FieldKey(acp.id, kArgumentPackageIdField), acp.resolution.argument_package_id);
         AddTag(element.taggedValues, FieldKey(acp.id, kTopGoalIdField), acp.resolution.top_goal_id);

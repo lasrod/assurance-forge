@@ -63,8 +63,7 @@ constexpr const char* kSampleSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
 
 std::filesystem::path MakeTempProjectRoot(const std::string& tag) {
     auto root = std::filesystem::temp_directory_path() /
-                ("af_libreplay_" + tag + "_" +
-                 std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
+                ("af_libreplay_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(root);
     return root;
@@ -77,11 +76,11 @@ void WriteFile(const std::filesystem::path& path, std::string_view content) {
 }
 
 struct ProjectFixture {
-    core::AssuranceProject     project;
-    std::filesystem::path      sacm_abs;
-    std::filesystem::path      snapshot_abs;
+    core::AssuranceProject project;
+    std::filesystem::path sacm_abs;
+    std::filesystem::path snapshot_abs;
     sacm::AssuranceCasePackage package;
-    parser::AssuranceCase      model;
+    parser::AssuranceCase model;
 };
 
 ProjectFixture MakeFixture(const std::string& tag) {
@@ -117,8 +116,7 @@ ProjectFixture MakeFixture(const std::string& tag) {
 }
 
 // Legacy replay of the whole log from snapshot zero.
-core::audit::ReplayState LegacyReplay(const ProjectFixture& f,
-                                      const std::vector<core::audit::AuditTransaction>& txns) {
+core::audit::ReplayState LegacyReplay(const ProjectFixture& f, const std::vector<core::audit::AuditTransaction>& txns) {
     auto snapshot_pkg = sacm::parse_sacm(f.snapshot_abs.string());
     auto snapshot_model = parser::parse_sacm_xml(f.snapshot_abs.string());
     if (!snapshot_pkg.has_value() || !snapshot_model.has_value()) {
@@ -136,8 +134,8 @@ core::audit::ReplayState LegacyReplay(const ProjectFixture& f,
 
 // Library-primary replay of the whole log from the snapshot loaded through the
 // library.
-std::unique_ptr<sacm_adapter::LibraryDocument> LibraryReplay(
-    const ProjectFixture& f, const std::vector<core::audit::AuditTransaction>& txns) {
+std::unique_ptr<sacm_adapter::LibraryDocument> LibraryReplay(const ProjectFixture& f,
+                                                             const std::vector<core::audit::AuditTransaction>& txns) {
     sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.snapshot_abs);
     EXPECT_TRUE(loaded.ok);
     EXPECT_NE(loaded.document, nullptr);
@@ -204,19 +202,17 @@ TEST(LibraryReplayConvergence, MultiEditElementSequenceConvergesWithLegacyReplay
     // 3b-1 bridges the Content edit, so this now converges on the raw hash. Plus
     // a content edit on a freshly-created sub-goal (clean content semantics, no
     // pre-existing Description) -- both routed through the same bridge.
-    core::commands::UpdateElementTextCommand name_edit("G1", core::ElementTextField::Name, "en",
-                                                       "Revised top goal");
+    core::commands::UpdateElementTextCommand name_edit("G1", core::ElementTextField::Name, "en", "Revised top goal");
     ASSERT_TRUE(bus->Execute(name_edit, ctx, "tester").success);
-    core::commands::UpdateElementTextCommand g1_content_edit("G1", core::ElementTextField::Content,
-                                                             "en", "The system is fully safe.");
+    core::commands::UpdateElementTextCommand g1_content_edit(
+        "G1", core::ElementTextField::Content, "en", "The system is fully safe.");
     ASSERT_TRUE(bus->Execute(g1_content_edit, ctx, "tester").success);
-    core::commands::UpdateElementTextCommand content_edit(sub1_id, core::ElementTextField::Content,
-                                                          "en", "The subsystem is acceptably safe.");
+    core::commands::UpdateElementTextCommand content_edit(
+        sub1_id, core::ElementTextField::Content, "en", "The subsystem is acceptably safe.");
     ASSERT_TRUE(bus->Execute(content_edit, ctx, "tester").success);
 
-    core::commands::CreateChallengeCommand challenge(
-        core::ArgumentTarget{core::ArgumentTarget::Kind::Element, "G1"},
-        core::ChallengeSourceType::CounterArgument);
+    core::commands::CreateChallengeCommand challenge(core::ArgumentTarget{core::ArgumentTarget::Kind::Element, "G1"},
+                                                     core::ChallengeSourceType::CounterArgument);
     ASSERT_TRUE(bus->Execute(challenge, ctx, "tester").success);
 
     core::commands::RemoveElementCommand remove(solution_id, core::RemoveMode::NodeAndDescendants);
@@ -385,8 +381,7 @@ TEST(LibraryReplayConvergence, TerminologyCreateAndAssociateConverge) {
     core::commands::CreateTerminologyTermCommand create_term(package_ref, draft);
     ASSERT_TRUE(bus->Execute(create_term, ctx, "tester").success);
 
-    core::commands::AssociateTerminologyTermWithElementCommand associate("G1", package_ref,
-                                                                         create_term.GeneratedRef());
+    core::commands::AssociateTerminologyTermWithElementCommand associate("G1", package_ref, create_term.GeneratedRef());
     ASSERT_TRUE(bus->Execute(associate, ctx, "tester").success);
 
     const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
@@ -418,8 +413,8 @@ TEST(LibraryReplayConvergence, ContentEditOnDescriptionOnlyClaimConverges) {
     ASSERT_TRUE(bus) << error;
     core::commands::CommandContext ctx{f.model, f.package};
 
-    core::commands::UpdateElementTextCommand content_edit("G1", core::ElementTextField::Content,
-                                                          "en", "The system is fully safe.");
+    core::commands::UpdateElementTextCommand content_edit(
+        "G1", core::ElementTextField::Content, "en", "The system is fully safe.");
     ASSERT_TRUE(bus->Execute(content_edit, ctx, "tester").success);
 
     const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
@@ -458,8 +453,8 @@ TEST(LibraryReplayConvergence, AddTerminologyVisibleContextBridgeConverges) {
     core::commands::CreateTerminologyTermCommand create_term(package_ref, draft);
     ASSERT_TRUE(bus->Execute(create_term, ctx, "tester").success);
 
-    core::commands::AddTerminologyTermAsVisibleContextCommand add_visible("G1", package_ref,
-                                                                          create_term.GeneratedRef());
+    core::commands::AddTerminologyTermAsVisibleContextCommand add_visible(
+        "G1", package_ref, create_term.GeneratedRef());
     ASSERT_TRUE(bus->Execute(add_visible, ctx, "tester").success);
 
     const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
@@ -498,8 +493,7 @@ TEST(LibraryReplayConvergence, RemoveOneSourceOfSharedStrategyInferenceConverges
 
     // Remove the first sub-goal; the strategy's single inference still has the
     // second sub-goal as a source, so it must survive with the source scrubbed.
-    core::commands::RemoveElementCommand remove(add_sub1.GeneratedId(),
-                                                core::RemoveMode::NodeAndDescendants);
+    core::commands::RemoveElementCommand remove(add_sub1.GeneratedId(), core::RemoveMode::NodeAndDescendants);
     ASSERT_TRUE(bus->Execute(remove, ctx, "tester").success);
 
     const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
@@ -580,10 +574,10 @@ TEST(LibraryReplayConvergence, AcpAddAndUpsertConverge) {
     ASSERT_FALSE(acp_id.empty());
 
     parser::AcpRecord edited;
-    edited.id              = acp_id;
-    edited.name            = "Confidence in the test report";
-    edited.target_kind     = "element";
-    edited.target_id       = solution_id;
+    edited.id = acp_id;
+    edited.name = "Confidence in the test report";
+    edited.target_kind = "element";
+    edited.target_id = solution_id;
     edited.resolution_kind = "none";
     core::commands::UpsertAcpCommand upsert(edited);
     ASSERT_TRUE(bus->Execute(upsert, ctx, "tester").success);
@@ -702,8 +696,7 @@ TEST(LibraryReplayConvergence, TreeReorderSiblingsConvergesAndChangesSerializati
     const std::string sub2_id = add_sub2.GeneratedId();
 
     // The strategy's single inference sources the two sub-goals in creation order.
-    ASSERT_EQ(StrategyInferenceSources(f.package, strategy_id),
-              (std::vector<std::string>{sub1_id, sub2_id}));
+    ASSERT_EQ(StrategyInferenceSources(f.package, strategy_id), (std::vector<std::string>{sub1_id, sub2_id}));
     const std::string serialized_before = sacm::serialize_sacm(f.package);
 
     // Move sub2 ABOVE sub1.
@@ -714,8 +707,7 @@ TEST(LibraryReplayConvergence, TreeReorderSiblingsConvergesAndChangesSerializati
     // saves), even though the order-insensitive canonical hash cannot see it.
     const std::string serialized_after = sacm::serialize_sacm(f.package);
     EXPECT_NE(serialized_before, serialized_after);
-    EXPECT_EQ(StrategyInferenceSources(f.package, strategy_id),
-              (std::vector<std::string>{sub2_id, sub1_id}));
+    EXPECT_EQ(StrategyInferenceSources(f.package, strategy_id), (std::vector<std::string>{sub2_id, sub1_id}));
 
     const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
     const core::audit::ReplayState legacy = LegacyReplay(f, txns);

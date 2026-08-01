@@ -83,10 +83,10 @@ void WriteFile(const std::filesystem::path& path, std::string_view content) {
 }
 
 struct ProjectFixture {
-    core::AssuranceProject     project;
-    std::filesystem::path      sacm_abs;
+    core::AssuranceProject project;
+    std::filesystem::path sacm_abs;
     sacm::AssuranceCasePackage package;
-    parser::AssuranceCase      model;
+    parser::AssuranceCase model;
     // Null for the legacy-parsed fixture below; populated by the library-backed
     // variant, which is how production always runs.
     std::unique_ptr<sacm_adapter::LibraryDocument> document;
@@ -98,26 +98,26 @@ ProjectFixture MakeFixture(const std::string& tag, const char* sacm_xml = kSampl
     const std::filesystem::path sacm_rel = "argument.sacm";
     WriteFile(root / sacm_rel, sacm_xml);
 
-    f.project.id       = "p";
-    f.project.name     = "Project";
+    f.project.id = "p";
+    f.project.name = "Project";
     f.project.rootPath = root;
     core::ProjectFileEntry entry;
-    entry.id           = "f1";
+    entry.id = "f1";
     entry.relativePath = sacm_rel;
-    entry.role         = core::ProjectFileRole::SacmArgument;
+    entry.role = core::ProjectFileRole::SacmArgument;
     f.project.files.push_back(entry);
 
     core::audit::EnsureAuditStoreResult ensure;
-    std::string                         error;
+    std::string error;
     EXPECT_TRUE(core::audit::EnsureAuditStore(f.project, sacm_rel, ensure, error)) << error;
 
-    f.sacm_abs  = f.project.rootPath / sacm_rel;
-    auto pkg    = sacm::parse_sacm(f.sacm_abs.string());
+    f.sacm_abs = f.project.rootPath / sacm_rel;
+    auto pkg = sacm::parse_sacm(f.sacm_abs.string());
     EXPECT_TRUE(pkg.has_value());
-    f.package   = std::move(pkg.value());
+    f.package = std::move(pkg.value());
     auto parsed = parser::parse_sacm_xml_string(sacm_xml);
     EXPECT_TRUE(parsed.has_value());
-    f.model     = std::move(parsed.value());
+    f.model = std::move(parsed.value());
     return f;
 }
 
@@ -136,7 +136,9 @@ ProjectFixture MakeLibraryBackedFixture(const std::string& tag, const char* sacm
 }
 
 // Mirror the app's frame boundary after a flipped command.
-void RunCommand(ProjectFixture& f, core::commands::CommandBus& bus, core::commands::ICommand& command,
+void RunCommand(ProjectFixture& f,
+                core::commands::CommandBus& bus,
+                core::commands::ICommand& command,
                 core::commands::CommandContext& ctx) {
     const core::commands::CommandResult result = bus.Execute(command, ctx, "tester");
     ASSERT_TRUE(result.success) << result.error;
@@ -159,9 +161,12 @@ int CountTaggedValuesWithKey(const sacm::AssuranceCasePackage& package, const st
     };
     for (const sacm::ArgumentPackage& ap : package.argumentPackages) {
         count(ap.taggedValues);
-        for (const sacm::Claim& c : ap.claims) count(c.taggedValues);
-        for (const sacm::ArgumentReasoning& r : ap.argumentReasonings) count(r.taggedValues);
-        for (const sacm::ArtifactReference& r : ap.artifactReferences) count(r.taggedValues);
+        for (const sacm::Claim& c : ap.claims)
+            count(c.taggedValues);
+        for (const sacm::ArgumentReasoning& r : ap.argumentReasonings)
+            count(r.taggedValues);
+        for (const sacm::ArtifactReference& r : ap.artifactReferences)
+            count(r.taggedValues);
     }
     return total;
 }
@@ -178,10 +183,12 @@ std::string ReadFile(const std::filesystem::path& path) {
 // including handing the reconstructed DOCUMENT to the command (which is what
 // makes the undo library-primary) and the frame-boundary re-derive that
 // follows a flipped command.
-bool DoUndo(ProjectFixture& f, core::commands::CommandBus& bus, core::commands::CommandContext& ctx,
+bool DoUndo(ProjectFixture& f,
+            core::commands::CommandBus& bus,
+            core::commands::CommandContext& ctx,
             std::string& error_out) {
     const auto& transactions = bus.Store().Transactions();
-    const auto  target       = core::audit::FindUndoTarget(transactions);
+    const auto target = core::audit::FindUndoTarget(transactions);
     if (!target.has_target) {
         error_out = "nothing to undo";
         return false;
@@ -191,10 +198,11 @@ bool DoUndo(ProjectFixture& f, core::commands::CommandBus& bus, core::commands::
         error_out = prior.error();
         return false;
     }
-    core::commands::UndoLastTransactionCommand cmd(
-        target.target_sequence, target.target_command_name,
-        std::move(prior.value().views.model), std::move(prior.value().views.package),
-        std::move(prior.value().document));
+    core::commands::UndoLastTransactionCommand cmd(target.target_sequence,
+                                                   target.target_command_name,
+                                                   std::move(prior.value().views.model),
+                                                   std::move(prior.value().views.package),
+                                                   std::move(prior.value().document));
     const auto result = bus.Execute(cmd, ctx, "tester");
     if (!result.success) {
         error_out = result.error;
@@ -362,22 +370,21 @@ TEST(UndoResolver, FindsLatestNonUndoTarget) {
     auto make = [](std::uint64_t seq, const std::string& name) {
         core::audit::AuditTransaction tx;
         tx.transaction_sequence = seq;
-        tx.command_name         = name;
+        tx.command_name = name;
         core::audit::AuditEvent ev;
-        ev.event_sequence       = seq;
-        ev.event_type           = name;
+        ev.event_sequence = seq;
+        ev.event_type = name;
         tx.events.push_back(std::move(ev));
         return tx;
     };
     auto make_undo = [](std::uint64_t seq, std::uint64_t undone) {
         core::audit::AuditTransaction tx;
         tx.transaction_sequence = seq;
-        tx.command_name         = "Undo";
+        tx.command_name = "Undo";
         core::audit::AuditEvent ev;
-        ev.event_sequence       = seq;
-        ev.event_type           = "Undo";
-        ev.payload              = {{"undone_transaction_sequence", undone},
-                                   {"undone_command_name", "Edit"}};
+        ev.event_sequence = seq;
+        ev.event_type = "Undo";
+        ev.payload = {{"undone_transaction_sequence", undone}, {"undone_command_name", "Edit"}};
         tx.events.push_back(std::move(ev));
         return tx;
     };
@@ -460,8 +467,7 @@ TEST(UndoCommand, ReplayerSkipsUndoneTransactions) {
     const auto live_hash = core::audit::CanonicalModelHash(f.package);
 
     // Replay from snapshot zero produces the same canonical hash.
-    auto replayed = core::audit::ReconstructAtSequence(f.project,
-                                                      std::numeric_limits<std::uint64_t>::max());
+    auto replayed = core::audit::ReconstructAtSequence(f.project, std::numeric_limits<std::uint64_t>::max());
     ASSERT_TRUE(replayed.has_value()) << replayed.error();
     EXPECT_EQ(core::audit::CanonicalModelHash(replayed->views.package), live_hash);
 }
@@ -494,8 +500,7 @@ TEST(UndoCommand, TwoSuccessiveUndosWalkBackwards) {
     // Effective state is the original.
     auto original = core::audit::ReconstructAtSequence(f.project, 0);
     ASSERT_TRUE(original.has_value());
-    EXPECT_EQ(core::audit::CanonicalModelHash(f.package),
-              core::audit::CanonicalModelHash(original->views.package));
+    EXPECT_EQ(core::audit::CanonicalModelHash(f.package), core::audit::CanonicalModelHash(original->views.package));
 }
 
 TEST(UndoCommand, NothingToUndoOnFreshProject) {
@@ -507,4 +512,3 @@ TEST(UndoCommand, NothingToUndoOnFreshProject) {
     auto target = core::audit::FindUndoTarget(bus->Store().Transactions());
     EXPECT_FALSE(target.has_target);
 }
-

@@ -47,9 +47,8 @@ std::filesystem::path UserSettingsFilePath() {
     return std::filesystem::temp_directory_path() / "AssuranceForge" / "settings.json";
 }
 
-nlohmann::json ReadUserSettingsSection(const std::filesystem::path& path,
-                                       const std::string&           section) {
-    const nlohmann::json                 root  = ReadSettingsDocument(path);
+nlohmann::json ReadUserSettingsSection(const std::filesystem::path& path, const std::string& section) {
+    const nlohmann::json root = ReadSettingsDocument(path);
     const nlohmann::json::const_iterator found = root.find(section);
     if (found == root.end()) {
         return nlohmann::json();
@@ -57,13 +56,15 @@ nlohmann::json ReadUserSettingsSection(const std::filesystem::path& path,
     return *found;
 }
 
-bool UpdateUserSettingsSection(const std::filesystem::path& path, const std::string& section,
-                               const nlohmann::json& value, std::string& error) {
+bool UpdateUserSettingsSection(const std::filesystem::path& path,
+                               const std::string& section,
+                               const nlohmann::json& value,
+                               std::string& error) {
     error.clear();
     try {
         // Read first, so sections owned by other components survive this write.
         nlohmann::json root = ReadSettingsDocument(path);
-        root[section]       = value;
+        root[section] = value;
 
         if (!path.parent_path().empty()) {
             std::filesystem::create_directories(path.parent_path());
@@ -96,10 +97,8 @@ McpUserSettings LoadMcpUserSettings(const std::filesystem::path& path) {
     return settings;
 }
 
-bool SaveMcpUserSettings(const std::filesystem::path& path, const McpUserSettings& settings,
-                         std::string& error) {
-    return UpdateUserSettingsSection(path, "mcp", nlohmann::json{{"enabled", settings.enabled}},
-                                     error);
+bool SaveMcpUserSettings(const std::filesystem::path& path, const McpUserSettings& settings, std::string& error) {
+    return UpdateUserSettingsSection(path, "mcp", nlohmann::json{{"enabled", settings.enabled}}, error);
 }
 
 } // namespace core

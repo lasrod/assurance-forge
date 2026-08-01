@@ -65,16 +65,15 @@ std::string TreeNodeDisplayName(const core::TreeNode& node, const UiState& state
     const std::string first_line = label.substr(0, first_break);
     static constexpr std::string_view kEmptyNameSuffix = ": ";
     if (first_line.size() < kEmptyNameSuffix.size() ||
-        first_line.compare(first_line.size() - kEmptyNameSuffix.size(), kEmptyNameSuffix.size(),
-                           kEmptyNameSuffix) != 0) {
+        first_line.compare(first_line.size() - kEmptyNameSuffix.size(), kEmptyNameSuffix.size(), kEmptyNameSuffix) !=
+            0) {
         return first_line;
     }
 
     const std::string::size_type detail_break = label.find('\n', first_break + 1);
-    const std::string            detail =
-        detail_break == std::string::npos
-                       ? label.substr(first_break + 1)
-                       : label.substr(first_break + 1, detail_break - first_break - 1);
+    const std::string detail = detail_break == std::string::npos
+                                   ? label.substr(first_break + 1)
+                                   : label.substr(first_break + 1, detail_break - first_break - 1);
     return detail.empty() ? first_line : first_line + detail;
 }
 
@@ -133,8 +132,8 @@ static bool RenderSingleTreeNode(const core::TreeNode* node,
         flags |= ImGuiTreeNodeFlags_Selected;
 
     constexpr float kArrowIconGapTightenPx = 6.0f;
-    const float label_x = ImGui::GetCursorScreenPos().x +
-                          std::max(0.0f, ImGui::GetTreeNodeToLabelSpacing() - kArrowIconGapTightenPx);
+    const float label_x =
+        ImGui::GetCursorScreenPos().x + std::max(0.0f, ImGui::GetTreeNodeToLabelSpacing() - kArrowIconGapTightenPx);
 
     // Render arrow + selection background only; the visible label is drawn
     // directly onto the draw list so no extra ImGui items are created that
@@ -265,12 +264,11 @@ static bool RenderSingleTreeNode(const core::TreeNode* node,
             if (badge_hovered) {
                 ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
                 const int problem_count = static_cast<int>(summary.problem_count);
-                const std::string tooltip =
-                    ui::i18n::trnf("{0} problem · top: {1}\nClick to open the Problems panel.",
-                                   "{0} problems · top: {1}\nClick to open the Problems panel.",
-                                   problem_count,
-                                   problem_count,
-                                   summary.top_problem_message);
+                const std::string tooltip = ui::i18n::trnf("{0} problem · top: {1}\nClick to open the Problems panel.",
+                                                           "{0} problems · top: {1}\nClick to open the Problems panel.",
+                                                           problem_count,
+                                                           problem_count,
+                                                           summary.top_problem_message);
                 ImGui::SetTooltip("%s", tooltip.c_str());
             }
             if (badge_clicked) {
@@ -347,7 +345,9 @@ void ShowTreeViewPanel(const core::AssuranceTree* tree,
                 ImGui::TableNextRow();
                 ImGui::TableSetColumnIndex(0);
                 ImGui::Separator();
-                if (ImGui::TreeNodeEx("##orphans", ImGuiTreeNodeFlags_SpanAllColumns, "%s",
+                if (ImGui::TreeNodeEx("##orphans",
+                                      ImGuiTreeNodeFlags_SpanAllColumns,
+                                      "%s",
                                       ui::i18n::trf("Orphans ({0})", (int)tree->orphans.size()).c_str())) {
                     for (const auto* orphan : tree->orphans) {
                         RenderTreeNode(orphan, active_case, state, actions, tree_edit_actions);

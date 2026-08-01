@@ -24,7 +24,8 @@ constexpr const char* kSampleSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
 )";
 
 std::filesystem::path MakeTempProjectRoot(const std::string& tag) {
-    auto root = std::filesystem::temp_directory_path() / ("af_test_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
+    auto root = std::filesystem::temp_directory_path() /
+                ("af_test_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(root);
     return root;
@@ -80,8 +81,8 @@ TEST(InitialSnapshot, EnsureAuditStoreCreatesManifestSnapshotAndEmptyLog) {
     // through the same library derivation the audit uses (Phase 9 Stage 6).
     core::audit::AuditManifest manifest;
     ASSERT_TRUE(core::audit::ReadAuditManifest(root, manifest, error)) << error;
-    auto expected = core::library_canonical_hash_from_file(
-        core::audit::SnapshotSacmPath(root, core::audit::kInitialSnapshotId));
+    auto expected =
+        core::library_canonical_hash_from_file(core::audit::SnapshotSacmPath(root, core::audit::kInitialSnapshotId));
     ASSERT_TRUE(expected.has_value());
     EXPECT_EQ(manifest.last_known_canonical_model_hash, *expected);
     EXPECT_FALSE(manifest.last_known_raw_file_hash.empty());

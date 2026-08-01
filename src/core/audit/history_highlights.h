@@ -29,13 +29,11 @@ enum class HistoryHighlightKind { Added, Modified, Deleted };
 // such transaction exists (e.g. target_sequence == 0, meaning the initial
 // snapshot — nothing has been applied yet).
 std::unordered_map<std::string, HistoryHighlightKind>
-BuildHistoryHighlightsForSequence(const std::vector<AuditTransaction>& transactions,
-                                  std::uint64_t target_sequence);
+BuildHistoryHighlightsForSequence(const std::vector<AuditTransaction>& transactions, std::uint64_t target_sequence);
 
 // Build highlights directly from a change set. Exposed for callers that
 // already have the change set in hand. Conflict precedence within a single
 // transaction: Deleted > Added > Modified.
-std::unordered_map<std::string, HistoryHighlightKind>
-BuildHistoryHighlights(const AuditChangeSet& change_set);
+std::unordered_map<std::string, HistoryHighlightKind> BuildHistoryHighlights(const AuditChangeSet& change_set);
 
 } // namespace core::audit

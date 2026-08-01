@@ -166,9 +166,8 @@ void MirrorClaim(sacm::ArgumentPackage* ap, const parser::SacmElement& src) {
     c.isAbstract = src.is_abstract;
     c.assertionDeclaration = src.assertion_declaration;
     c.undeveloped = src.undeveloped;
-    c.taggedValues.push_back(sacm::TaggedValue{.id = src.id + "__gsnIdentifier",
-                                               .key = kGsnIdentifierTagKey,
-                                               .value = GsnIdentifierFor(src)});
+    c.taggedValues.push_back(sacm::TaggedValue{
+        .id = src.id + "__gsnIdentifier", .key = kGsnIdentifierTagKey, .value = GsnIdentifierFor(src)});
     ap->claims.push_back(std::move(c));
 }
 
@@ -180,9 +179,8 @@ void MirrorReasoning(sacm::ArgumentPackage* ap, const parser::SacmElement& src) 
     r.name = src.name;
     r.name_ml.set("en", src.name);
     r.isAbstract = src.is_abstract;
-    r.taggedValues.push_back(sacm::TaggedValue{.id = src.id + "__gsnIdentifier",
-                                               .key = kGsnIdentifierTagKey,
-                                               .value = GsnIdentifierFor(src)});
+    r.taggedValues.push_back(sacm::TaggedValue{
+        .id = src.id + "__gsnIdentifier", .key = kGsnIdentifierTagKey, .value = GsnIdentifierFor(src)});
     ap->argumentReasonings.push_back(std::move(r));
 }
 
@@ -194,9 +192,8 @@ void MirrorArtifactReference(sacm::ArgumentPackage* ap, const parser::SacmElemen
     ar.name = src.name;
     ar.name_ml.set("en", src.name);
     ar.isAbstract = src.is_abstract;
-    ar.taggedValues.push_back(sacm::TaggedValue{.id = src.id + "__gsnIdentifier",
-                                                .key = kGsnIdentifierTagKey,
-                                                .value = GsnIdentifierFor(src)});
+    ar.taggedValues.push_back(sacm::TaggedValue{
+        .id = src.id + "__gsnIdentifier", .key = kGsnIdentifierTagKey, .value = GsnIdentifierFor(src)});
     ap->artifactReferences.push_back(std::move(ar));
 }
 
@@ -326,7 +323,7 @@ bool InstallSubGoalUnderStrategy(parser::AssuranceCase& ac,
         }
         ac.elements.push_back(std::move(goal));
         if (out_created_relationship_id)
-            out_created_relationship_id->clear();  // extending an existing inference creates no relationship
+            out_created_relationship_id->clear(); // extending an existing inference creates no relationship
         return true;
     }
 
@@ -356,7 +353,8 @@ bool InstallSubGoalUnderStrategy(parser::AssuranceCase& ac,
     }
 
     // Consume the render-only placeholder (its role is taken over by the real inference).
-    ac.elements.erase(std::remove_if(ac.elements.begin(), ac.elements.end(),
+    ac.elements.erase(std::remove_if(ac.elements.begin(),
+                                     ac.elements.end(),
                                      [&](const parser::SacmElement& e) { return e.id == placeholder_id; }),
                       ac.elements.end());
 
@@ -450,8 +448,8 @@ bool InstallChildElement(parser::AssuranceCase& ac,
     if (kind == NewElementKind::Strategy)
         return InstallStrategy(ac, ap, parent_id, element_id);
     if (kind == NewElementKind::Goal && ptype == "argumentreasoning")
-        return InstallSubGoalUnderStrategy(ac, ap, parent_id, element_id, relationship_id, out_error,
-                                           out_created_relationship_id);
+        return InstallSubGoalUnderStrategy(
+            ac, ap, parent_id, element_id, relationship_id, out_error, out_created_relationship_id);
 
     // Every other child creates its own relationship, which requires an id.
     if (relationship_id.empty()) {
@@ -737,8 +735,8 @@ bool AddChildElement(parser::AssuranceCase& ac,
     // A strategy and an inference-extending sub-goal create no relationship, so the
     // event must record an empty relationship id -- take the id actually created.
     std::string created_relationship_id;
-    if (!InstallChildElement(ac, pkg, parent_id, kind, element_id, relationship_id, out_error,
-                             &created_relationship_id))
+    if (!InstallChildElement(
+            ac, pkg, parent_id, kind, element_id, relationship_id, out_error, &created_relationship_id))
         return false;
 
     out_new_id = std::move(element_id);
@@ -1182,26 +1180,36 @@ bool RemoveElement(parser::AssuranceCase& ac,
 
 const char* ElementTextFieldToToken(ElementTextField field) {
     switch (field) {
-    case ElementTextField::Name:        return "name";
-    case ElementTextField::Description: return "description";
-    case ElementTextField::Content:     return "content";
+    case ElementTextField::Name:
+        return "name";
+    case ElementTextField::Description:
+        return "description";
+    case ElementTextField::Content:
+        return "content";
     }
     return "name";
 }
 
 bool ElementTextFieldFromToken(const std::string& token, ElementTextField& out) {
-    if (token == "name")        { out = ElementTextField::Name; return true; }
-    if (token == "description") { out = ElementTextField::Description; return true; }
-    if (token == "content")     { out = ElementTextField::Content; return true; }
+    if (token == "name") {
+        out = ElementTextField::Name;
+        return true;
+    }
+    if (token == "description") {
+        out = ElementTextField::Description;
+        return true;
+    }
+    if (token == "content") {
+        out = ElementTextField::Content;
+        return true;
+    }
     return false;
 }
 
 namespace {
 
 // Read the current value of `field`/`language` on the parser element.
-std::string ReadParserField(const parser::SacmElement& elem,
-                            ElementTextField field,
-                            const std::string& language) {
+std::string ReadParserField(const parser::SacmElement& elem, ElementTextField field, const std::string& language) {
     auto from_map = [&](const std::map<std::string, std::string>& m, const std::string& scalar) {
         auto it = m.find(language);
         if (it != m.end())
@@ -1209,9 +1217,12 @@ std::string ReadParserField(const parser::SacmElement& elem,
         return language == "en" ? scalar : std::string{};
     };
     switch (field) {
-    case ElementTextField::Name:        return from_map(elem.name_langs, elem.name);
-    case ElementTextField::Description: return from_map(elem.description_langs, elem.description);
-    case ElementTextField::Content:     return from_map(elem.content_langs, elem.content);
+    case ElementTextField::Name:
+        return from_map(elem.name_langs, elem.name);
+    case ElementTextField::Description:
+        return from_map(elem.description_langs, elem.description);
+    case ElementTextField::Content:
+        return from_map(elem.content_langs, elem.content);
     }
     return {};
 }
@@ -1247,10 +1258,7 @@ void WriteParserField(parser::SacmElement& elem,
 // terminology elements with no SACM-side text). Errors are not signalled
 // here because the parser write is the audit source of truth.
 template <typename Element>
-bool UpdateSacmTexts(Element& e,
-                     ElementTextField field,
-                     const std::string& language,
-                     const std::string& new_value) {
+bool UpdateSacmTexts(Element& e, ElementTextField field, const std::string& language, const std::string& new_value) {
     auto write_ml = [&](sacm::MultiLangText& ml, std::string& scalar) {
         ml.texts[language] = new_value;
         if (language == "en")
@@ -1264,7 +1272,10 @@ bool UpdateSacmTexts(Element& e,
         write_ml(e.description_ml, e.description);
         return true;
     case ElementTextField::Content:
-        if constexpr (requires { e.content_ml; e.content; }) {
+        if constexpr (requires {
+                          e.content_ml;
+                          e.content;
+                      }) {
             write_ml(e.content_ml, e.content);
             return true;
         }
@@ -1279,18 +1290,34 @@ bool UpdateSacmElementText(sacm::AssuranceCasePackage& pkg,
                            const std::string& language,
                            const std::string& new_value) {
     for (auto& ap : pkg.argumentPackages) {
-        for (auto& c : ap.claims)               if (c.id == element_id) return UpdateSacmTexts(c, field, language, new_value);
-        for (auto& ar : ap.argumentReasonings)  if (ar.id == element_id) return UpdateSacmTexts(ar, field, language, new_value);
-        for (auto& ar : ap.artifactReferences)  if (ar.id == element_id) return UpdateSacmTexts(ar, field, language, new_value);
-        for (auto& ai : ap.assertedInferences)  if (ai.id == element_id) return UpdateSacmTexts(ai, field, language, new_value);
-        for (auto& ac : ap.assertedContexts)    if (ac.id == element_id) return UpdateSacmTexts(ac, field, language, new_value);
-        for (auto& ae : ap.assertedEvidences)   if (ae.id == element_id) return UpdateSacmTexts(ae, field, language, new_value);
+        for (auto& c : ap.claims)
+            if (c.id == element_id)
+                return UpdateSacmTexts(c, field, language, new_value);
+        for (auto& ar : ap.argumentReasonings)
+            if (ar.id == element_id)
+                return UpdateSacmTexts(ar, field, language, new_value);
+        for (auto& ar : ap.artifactReferences)
+            if (ar.id == element_id)
+                return UpdateSacmTexts(ar, field, language, new_value);
+        for (auto& ai : ap.assertedInferences)
+            if (ai.id == element_id)
+                return UpdateSacmTexts(ai, field, language, new_value);
+        for (auto& ac : ap.assertedContexts)
+            if (ac.id == element_id)
+                return UpdateSacmTexts(ac, field, language, new_value);
+        for (auto& ae : ap.assertedEvidences)
+            if (ae.id == element_id)
+                return UpdateSacmTexts(ae, field, language, new_value);
     }
     for (auto& artpkg : pkg.artifactPackages) {
-        for (auto& a : artpkg.artifacts)        if (a.id == element_id) return UpdateSacmTexts(a, field, language, new_value);
+        for (auto& a : artpkg.artifacts)
+            if (a.id == element_id)
+                return UpdateSacmTexts(a, field, language, new_value);
     }
     for (auto& tp : pkg.terminologyPackages) {
-        for (auto& e : tp.expressions)          if (e.id == element_id) return UpdateSacmTexts(e, field, language, new_value);
+        for (auto& e : tp.expressions)
+            if (e.id == element_id)
+                return UpdateSacmTexts(e, field, language, new_value);
     }
     return false;
 }
@@ -1393,7 +1420,10 @@ bool SetElementTextField(parser::AssuranceCase& ac,
     }
     parser::SacmElement* elem = nullptr;
     for (auto& e : ac.elements) {
-        if (e.id == element_id) { elem = &e; break; }
+        if (e.id == element_id) {
+            elem = &e;
+            break;
+        }
     }
     if (!elem) {
         out_error = "Element not found: " + element_id;
@@ -1401,8 +1431,7 @@ bool SetElementTextField(parser::AssuranceCase& ac,
     }
     if (field == ElementTextField::Content) {
         if (elem->type != "claim" && elem->type != "argumentreasoning") {
-            out_error = "Element " + element_id + " of type '" + elem->type +
-                        "' has no content field.";
+            out_error = "Element " + element_id + " of type '" + elem->type + "' has no content field.";
             return false;
         }
     }
@@ -1432,12 +1461,11 @@ bool SetGsnIdentifier(parser::AssuranceCase& ac,
     out_old_identifier.clear();
     out_error.clear();
 
-    const auto first_non_space = std::find_if_not(new_identifier.begin(), new_identifier.end(), [](unsigned char ch) {
-        return std::isspace(ch) != 0;
-    });
+    const auto first_non_space = std::find_if_not(
+        new_identifier.begin(), new_identifier.end(), [](unsigned char ch) { return std::isspace(ch) != 0; });
     const auto last_non_space = std::find_if_not(new_identifier.rbegin(), new_identifier.rend(), [](unsigned char ch) {
-        return std::isspace(ch) != 0;
-    }).base();
+                                    return std::isspace(ch) != 0;
+                                }).base();
     if (first_non_space == new_identifier.end()) {
         out_error = "GSN identifier must be non-empty.";
         return false;

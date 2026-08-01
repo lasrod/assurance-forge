@@ -11,7 +11,8 @@
 namespace {
 
 std::filesystem::path MakeTempProjectRoot(const std::string& tag) {
-    auto root = std::filesystem::temp_directory_path() / ("af_test_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
+    auto root = std::filesystem::temp_directory_path() /
+                ("af_test_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(root);
     return root;
@@ -142,9 +143,9 @@ TEST(EventStoreJsonl, RecoversFromTornFinalLine) {
     auto tx3 = MakeTransaction("CmdC");
     ASSERT_TRUE(store2->Append(tx3, error)) << error;
     EXPECT_EQ(tx3.transaction_sequence, 3u);
-    EXPECT_EQ(tx3.previous_transaction_hash, store2->Transactions()[1].previous_transaction_hash.empty()
-                                                 ? std::string{}
-                                                 : tx3.previous_transaction_hash);
+    EXPECT_EQ(tx3.previous_transaction_hash,
+              store2->Transactions()[1].previous_transaction_hash.empty() ? std::string{}
+                                                                          : tx3.previous_transaction_hash);
 
     // A fresh Open of the repaired log should now load cleanly (no torn flag).
     auto store3 = core::audit::EventStore::Open(root, error);

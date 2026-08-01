@@ -102,19 +102,21 @@ bool ApplyQuickFix(parser::AssuranceCase& model, const core::ProblemItem& proble
 
     if (problem.type == "UnresolvedEndpoint") {
         bool removed = false;
-        return core::DropRelationshipReference(model, nullptr, payload.relationship_id, payload.reference,
-                                               removed, error);
+        return core::DropRelationshipReference(
+            model, nullptr, payload.relationship_id, payload.reference, removed, error);
     }
     if (problem.type == "ChallengeTargetUnresolved" || problem.type == "SupportedElementIsALeaf" ||
         problem.type == "ContextualizedElementIsALeaf" || problem.type == "EvidenceSourceIsNotASolution")
         return core::RemoveRelationship(model, nullptr, payload.relationship_id, error);
     if (problem.type == "StrategyUsedAsAssertion")
-        return core::MoveStrategyToReasoning(model, nullptr, payload.relationship_id, problem.element_id,
-                                             error);
+        return core::MoveStrategyToReasoning(model, nullptr, payload.relationship_id, problem.element_id, error);
     if (problem.type == "DuplicateNotationIdentifier") {
         std::string old_identifier;
-        return core::SetGsnIdentifier(model, nullptr, problem.element_id,
-                                      core::NextFreeGsnIdentifier(model, problem.element_id), old_identifier,
+        return core::SetGsnIdentifier(model,
+                                      nullptr,
+                                      problem.element_id,
+                                      core::NextFreeGsnIdentifier(model, problem.element_id),
+                                      old_identifier,
                                       error);
     }
     if (problem.type == "UndevelopedElementHasSupport") {
@@ -206,10 +208,9 @@ TEST(GsnRepairFixtureTest, ApplyingEveryOfferedRepairLeavesACleanCase) {
     // The argument that was sound is still here: repairs withdraw wrong
     // relationships, they do not delete the elements those relationships named.
     for (const char* id : {"G1", "G2", "S1", "Sn1", "Sn2", "C1", "R1", "R2", "R3"}) {
-        const bool present = std::any_of(model.elements.begin(), model.elements.end(),
-                                         [&](const parser::SacmElement& element) {
-                                             return element.id == id;
-                                         });
+        const bool present = std::any_of(model.elements.begin(),
+                                         model.elements.end(),
+                                         [&](const parser::SacmElement& element) { return element.id == id; });
         EXPECT_TRUE(present) << id << " was collateral damage of a repair";
     }
 }

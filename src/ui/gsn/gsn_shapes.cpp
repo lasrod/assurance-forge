@@ -384,15 +384,13 @@ namespace {
 // A short word pinned above the node saying what the agent is proposing. The
 // border carries the same meaning for anyone reading at a glance; this carries
 // it for anyone who cannot separate the colours.
-void DrawProposedChangeBadge(ImDrawList* draw_list, ImVec2 top_left, float zoom, ImU32 color,
-                             const char* label) {
+void DrawProposedChangeBadge(ImDrawList* draw_list, ImVec2 top_left, float zoom, ImU32 color, const char* label) {
     const float scale = DpiScale() * zoom;
     const ImVec2 text_size = ImGui::CalcTextSize(label);
     const float pad_x = 4.0f * scale;
     const float pad_y = 2.0f * scale;
     const ImVec2 badge_min(top_left.x, top_left.y - text_size.y - 2.0f * pad_y - 5.0f * scale);
-    const ImVec2 badge_max(badge_min.x + text_size.x + 2.0f * pad_x,
-                           badge_min.y + text_size.y + 2.0f * pad_y);
+    const ImVec2 badge_max(badge_min.x + text_size.x + 2.0f * pad_x, badge_min.y + text_size.y + 2.0f * pad_y);
 
     draw_list->AddRectFilled(badge_min, badge_max, color, 3.0f * scale);
     draw_list->AddText(ImVec2(badge_min.x + pad_x, badge_min.y + pad_y), InkOn(color), label);
@@ -400,19 +398,22 @@ void DrawProposedChangeBadge(ImDrawList* draw_list, ImVec2 top_left, float zoom,
 
 } // namespace
 
-void DrawProposedChangeDecoration(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right,
-                                  bool circular, float zoom,
+void DrawProposedChangeDecoration(ImDrawList* draw_list,
+                                  ImVec2 top_left,
+                                  ImVec2 bottom_right,
+                                  bool circular,
+                                  float zoom,
                                   core::changesets::ElementChange change) {
     if (change == core::changesets::ElementChange::Unchanged) {
         return;
     }
 
     const Theme& theme = GetTheme();
-    const float  scale = DpiScale() * zoom;
+    const float scale = DpiScale() * zoom;
 
-    ImU32       color = theme.accent;
+    ImU32 color = theme.accent;
     const char* label = "NEW";
-    bool        dashed = true;
+    bool dashed = true;
     switch (change) {
     case core::changesets::ElementChange::Added:
         break;
@@ -420,7 +421,7 @@ void DrawProposedChangeDecoration(ImDrawList* draw_list, ImVec2 top_left, ImVec2
         // Solid rather than dashed: this element already exists, and a dashed
         // border everywhere would stop distinguishing "proposed to exist" from
         // "proposed to change".
-        label  = "EDIT";
+        label = "EDIT";
         dashed = false;
         break;
     case core::changesets::ElementChange::Removed:
@@ -432,26 +433,26 @@ void DrawProposedChangeDecoration(ImDrawList* draw_list, ImVec2 top_left, ImVec2
     }
 
     const float thickness = std::max(2.0f, 2.4f * scale);
-    const float pad       = 3.0f * scale;
+    const float pad = 3.0f * scale;
 
     if (!dashed) {
         draw_list->AddRect(ImVec2(top_left.x - pad, top_left.y - pad),
-                           ImVec2(bottom_right.x + pad, bottom_right.y + pad), color,
-                           DpiSize(kClaimRounding) * zoom + pad, 0, thickness);
+                           ImVec2(bottom_right.x + pad, bottom_right.y + pad),
+                           color,
+                           DpiSize(kClaimRounding) * zoom + pad,
+                           0,
+                           thickness);
     } else if (circular) {
-        const float  w = bottom_right.x - top_left.x;
-        const float  h = bottom_right.y - top_left.y;
-        const ImVec2 center((top_left.x + bottom_right.x) * 0.5f,
-                            (top_left.y + bottom_right.y) * 0.5f);
-        const float  radius = std::min(w, h) * 0.5f + pad;
-        ImVec2       ring[kCircleSegments];
+        const float w = bottom_right.x - top_left.x;
+        const float h = bottom_right.y - top_left.y;
+        const ImVec2 center((top_left.x + bottom_right.x) * 0.5f, (top_left.y + bottom_right.y) * 0.5f);
+        const float radius = std::min(w, h) * 0.5f + pad;
+        ImVec2 ring[kCircleSegments];
         for (int i = 0; i < kCircleSegments; ++i) {
-            const float t =
-                (static_cast<float>(i) / static_cast<float>(kCircleSegments)) * 2.0f * 3.14159265f;
+            const float t = (static_cast<float>(i) / static_cast<float>(kCircleSegments)) * 2.0f * 3.14159265f;
             ring[i] = ImVec2(center.x + std::cos(t) * radius, center.y + std::sin(t) * radius);
         }
-        DrawDashedPath(draw_list, ring, kCircleSegments, /*closed=*/true, color, thickness,
-                       6.0f * scale, 4.0f * scale);
+        DrawDashedPath(draw_list, ring, kCircleSegments, /*closed=*/true, color, thickness, 6.0f * scale, 4.0f * scale);
     } else {
         const ImVec2 corners[4] = {
             ImVec2(top_left.x - pad, top_left.y - pad),
@@ -459,8 +460,7 @@ void DrawProposedChangeDecoration(ImDrawList* draw_list, ImVec2 top_left, ImVec2
             ImVec2(bottom_right.x + pad, bottom_right.y + pad),
             ImVec2(top_left.x - pad, bottom_right.y + pad),
         };
-        DrawDashedPath(draw_list, corners, 4, /*closed=*/true, color, thickness, 6.0f * scale,
-                       4.0f * scale);
+        DrawDashedPath(draw_list, corners, 4, /*closed=*/true, color, thickness, 6.0f * scale, 4.0f * scale);
     }
 
     DrawProposedChangeBadge(draw_list, top_left, zoom, color, label);

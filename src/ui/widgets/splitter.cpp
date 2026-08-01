@@ -16,10 +16,7 @@ ImVec4 SplitterHoverColor() {
 // Returns true while the mouse button is held AND the drag was initiated inside the extended
 // hit zone (i.e. outside the core InvisibleButton rect). Uses ImGui state storage to latch
 // the "started here" flag per splitter window so the check survives the window moving during drag.
-bool TrackExtendedDrag(bool item_active,
-                       const ImVec2& ext_min,
-                       const ImVec2& ext_max,
-                       ImGuiMouseButton button) {
+bool TrackExtendedDrag(bool item_active, const ImVec2& ext_min, const ImVec2& ext_max, ImGuiMouseButton button) {
     ImGuiID latch_id = ImGui::GetID("##ext_drag_latch");
     ImGuiStorage* storage = ImGui::GetStateStorage();
 
@@ -31,8 +28,8 @@ bool TrackExtendedDrag(bool item_active,
     bool latched = storage->GetBool(latch_id, false);
     if (!latched && !item_active) {
         ImVec2 click_pos = ImGui::GetIO().MouseClickedPos[button];
-        if (click_pos.x >= ext_min.x && click_pos.x <= ext_max.x &&
-            click_pos.y >= ext_min.y && click_pos.y <= ext_max.y) {
+        if (click_pos.x >= ext_min.x && click_pos.x <= ext_max.x && click_pos.y >= ext_min.y &&
+            click_pos.y <= ext_max.y) {
             storage->SetBool(latch_id, true);
             latched = true;
         }

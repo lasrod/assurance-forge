@@ -9,7 +9,8 @@
 namespace {
 
 std::filesystem::path MakeTempProjectRoot(const std::string& tag) {
-    auto root = std::filesystem::temp_directory_path() / ("af_test_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
+    auto root = std::filesystem::temp_directory_path() /
+                ("af_test_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(root);
     return root;

@@ -22,8 +22,8 @@ parser::SacmElement Element(std::string id, std::string type) {
 
 bool HasProblemId(const core::ProblemsManager& manager, const std::string& id) {
     const auto& problems = manager.GetProblems();
-    return std::any_of(problems.begin(), problems.end(),
-                       [&](const core::ProblemItem& problem) { return problem.id == id; });
+    return std::any_of(
+        problems.begin(), problems.end(), [&](const core::ProblemItem& problem) { return problem.id == id; });
 }
 
 } // namespace
@@ -43,8 +43,8 @@ TEST(TranslationReviewStore, RoundTripsElementIds) {
 TEST(TranslationReviewStore, EmptyListRoundTrips) {
     std::vector<std::string> parsed;
     std::string error;
-    ASSERT_TRUE(core::translation::ParseTranslationReview(
-        core::translation::SerializeTranslationReview({}), parsed, error))
+    ASSERT_TRUE(
+        core::translation::ParseTranslationReview(core::translation::SerializeTranslationReview({}), parsed, error))
         << error;
     EXPECT_TRUE(parsed.empty());
 }
@@ -52,8 +52,8 @@ TEST(TranslationReviewStore, EmptyListRoundTrips) {
 TEST(TranslationReviewStore, MissingArrayYieldsEmptySuccess) {
     std::vector<std::string> parsed;
     std::string error;
-    ASSERT_TRUE(core::translation::ParseTranslationReview(
-        R"({"format":"assurance-forge-translation-review"})", parsed, error))
+    ASSERT_TRUE(
+        core::translation::ParseTranslationReview(R"({"format":"assurance-forge-translation-review"})", parsed, error))
         << error;
     EXPECT_TRUE(parsed.empty());
 }
@@ -68,9 +68,7 @@ TEST(TranslationReviewStore, MalformedJsonFails) {
 TEST(TranslationReviewStore, SkipsEmptyAndNonStringEntries) {
     std::vector<std::string> parsed;
     std::string error;
-    ASSERT_TRUE(core::translation::ParseTranslationReview(
-        R"({"pending":["G1","",42,"G2"]})", parsed, error))
-        << error;
+    ASSERT_TRUE(core::translation::ParseTranslationReview(R"({"pending":["G1","",42,"G2"]})", parsed, error)) << error;
     ASSERT_EQ(parsed.size(), 2u);
     EXPECT_EQ(parsed[0], "G1");
     EXPECT_EQ(parsed[1], "G2");

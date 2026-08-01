@@ -79,8 +79,7 @@ SupportGraph BuildSupportGraph(const parser::AssuranceCase& model) {
 // a different node then produces the same key, which is what makes
 // deduplication possible at all.
 std::string CanonicalKey(const std::vector<std::string>& cycle) {
-    const size_t smallest = static_cast<size_t>(
-        std::min_element(cycle.begin(), cycle.end()) - cycle.begin());
+    const size_t smallest = static_cast<size_t>(std::min_element(cycle.begin(), cycle.end()) - cycle.begin());
     std::string key;
     for (size_t offset = 0; offset < cycle.size(); ++offset) {
         key += cycle[(smallest + offset) % cycle.size()];
@@ -90,8 +89,7 @@ std::string CanonicalKey(const std::vector<std::string>& cycle) {
 }
 
 std::vector<std::string> RotateToSmallest(const std::vector<std::string>& cycle) {
-    const size_t smallest = static_cast<size_t>(
-        std::min_element(cycle.begin(), cycle.end()) - cycle.begin());
+    const size_t smallest = static_cast<size_t>(std::min_element(cycle.begin(), cycle.end()) - cycle.begin());
     std::vector<std::string> rotated;
     rotated.reserve(cycle.size());
     for (size_t offset = 0; offset < cycle.size(); ++offset)
@@ -139,8 +137,7 @@ void CollectCyclesFrom(const std::string& root,
             if (child_state == VisitState::OnStack) {
                 // Back edge: everything from the child's position to the top of
                 // the path is a cycle.
-                const std::vector<std::string> cycle(path.begin() + static_cast<long>(path_index[child]),
-                                                     path.end());
+                const std::vector<std::string> cycle(path.begin() + static_cast<long>(path_index[child]), path.end());
                 const std::string key = CanonicalKey(cycle);
                 if (seen_keys.insert(key).second)
                     cycles.push_back(ArgumentCycle{RotateToSmallest(cycle)});

@@ -11,20 +11,24 @@ namespace sacm::model {
 // IDs are stable: caller-provided IDs are preserved, generated IDs never
 // change after creation.
 class ElementId {
-  public:
+public:
     ElementId() = default;
     explicit ElementId(std::string value) : value_(std::move(value)) {}
 
-    const std::string& value() const { return value_; }
-    bool empty() const { return value_.empty(); }
+    const std::string& value() const {
+        return value_;
+    }
+    bool empty() const {
+        return value_.empty();
+    }
 
     friend auto operator<=>(const ElementId&, const ElementId&) = default;
 
-  private:
+private:
     std::string value_;
 };
 
-}  // namespace sacm::model
+} // namespace sacm::model
 
 template <>
 struct std::hash<sacm::model::ElementId> {

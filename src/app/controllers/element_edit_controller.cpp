@@ -29,7 +29,7 @@ bool TryGetWorkingModel(AppRuntimeState& state,
         events.Emit(StatusMessageEvent{std::string(action_label) + " failed: no SACM model loaded."});
         return false;
     }
-    out_model   = &state.app_state.loaded_case.value();
+    out_model = &state.app_state.loaded_case.value();
     out_package = &state.app_state.sacm_package.value();
     return true;
 }
@@ -45,7 +45,7 @@ bool ElementEditController::AddChildToSelected(AppRuntimeState& state,
         events_.Emit(StatusMessageEvent{"No element selected."});
         return false;
     }
-    parser::AssuranceCase*      model   = nullptr;
+    parser::AssuranceCase* model = nullptr;
     sacm::AssuranceCasePackage* package = nullptr;
     if (!TryGetWorkingModel(state, "Add", events_, model, package))
         return false;
@@ -68,7 +68,7 @@ bool ElementEditController::AddChildToSelected(AppRuntimeState& state,
 }
 
 bool ElementEditController::AddTopGoal(AppRuntimeState& state) {
-    parser::AssuranceCase*      model   = nullptr;
+    parser::AssuranceCase* model = nullptr;
     sacm::AssuranceCasePackage* package = nullptr;
     if (!TryGetWorkingModel(state, "Add", events_, model, package))
         return false;
@@ -97,7 +97,7 @@ bool ElementEditController::AddChallenge(AppRuntimeState& state,
         events_.Emit(StatusMessageEvent{"No challenge target selected."});
         return false;
     }
-    parser::AssuranceCase*      model   = nullptr;
+    parser::AssuranceCase* model = nullptr;
     sacm::AssuranceCasePackage* package = nullptr;
     if (!TryGetWorkingModel(state, "Add challenge", events_, model, package))
         return false;
@@ -124,7 +124,7 @@ bool ElementEditController::RemoveRelationship(AppRuntimeState& state, const std
         events_.Emit(StatusMessageEvent{"No relationship selected."});
         return false;
     }
-    parser::AssuranceCase*      model   = nullptr;
+    parser::AssuranceCase* model = nullptr;
     sacm::AssuranceCasePackage* package = nullptr;
     if (!TryGetWorkingModel(state, "Remove relationship", events_, model, package))
         return false;
@@ -154,7 +154,7 @@ bool ElementEditController::DropRelationshipReference(AppRuntimeState& state,
         events_.Emit(StatusMessageEvent{"No broken reference selected."});
         return false;
     }
-    parser::AssuranceCase*      model   = nullptr;
+    parser::AssuranceCase* model = nullptr;
     sacm::AssuranceCasePackage* package = nullptr;
     if (!TryGetWorkingModel(state, "Drop reference", events_, model, package))
         return false;
@@ -174,11 +174,11 @@ bool ElementEditController::DropRelationshipReference(AppRuntimeState& state,
     if (cmd.RemovedRelationship()) {
         ui::GetUiState().selected_relationship_id.clear();
         ui::GetUiState().selected_relationship_edge_key.clear();
-        events_.Emit(StatusMessageEvent{"Dropped " + reference + ", which left relationship " +
-                                        relationship_id + " with nothing to relate, so it was removed too."});
+        events_.Emit(StatusMessageEvent{"Dropped " + reference + ", which left relationship " + relationship_id +
+                                        " with nothing to relate, so it was removed too."});
     } else {
-        events_.Emit(StatusMessageEvent{"Dropped the broken reference " + reference + " from " +
-                                        relationship_id + "."});
+        events_.Emit(
+            StatusMessageEvent{"Dropped the broken reference " + reference + " from " + relationship_id + "."});
     }
     return true;
 }
@@ -190,7 +190,7 @@ bool ElementEditController::MoveStrategyToReasoning(AppRuntimeState& state,
         events_.Emit(StatusMessageEvent{"No strategy selected."});
         return false;
     }
-    parser::AssuranceCase*      model   = nullptr;
+    parser::AssuranceCase* model = nullptr;
     sacm::AssuranceCasePackage* package = nullptr;
     if (!TryGetWorkingModel(state, "Move strategy", events_, model, package))
         return false;
@@ -216,7 +216,7 @@ bool ElementEditController::SetElementUndeveloped(AppRuntimeState& state,
         events_.Emit(StatusMessageEvent{"No element selected."});
         return false;
     }
-    parser::AssuranceCase*      model   = nullptr;
+    parser::AssuranceCase* model = nullptr;
     sacm::AssuranceCasePackage* package = nullptr;
     if (!TryGetWorkingModel(state, "Set undeveloped", events_, model, package))
         return false;
@@ -242,7 +242,7 @@ bool ElementEditController::RenumberGsnIdentifier(AppRuntimeState& state, const 
         events_.Emit(StatusMessageEvent{"No element selected."});
         return false;
     }
-    parser::AssuranceCase*      model   = nullptr;
+    parser::AssuranceCase* model = nullptr;
     sacm::AssuranceCasePackage* package = nullptr;
     if (!TryGetWorkingModel(state, "Renumber", events_, model, package))
         return false;
@@ -274,7 +274,7 @@ bool ElementEditController::RemoveSelected(AppRuntimeState& state,
         events_.Emit(StatusMessageEvent{"No element selected."});
         return false;
     }
-    parser::AssuranceCase*      model   = nullptr;
+    parser::AssuranceCase* model = nullptr;
     sacm::AssuranceCasePackage* package = nullptr;
     if (!TryGetWorkingModel(state, "Remove", events_, model, package))
         return false;
@@ -311,9 +311,9 @@ bool ElementEditController::RemoveSelected(AppRuntimeState& state,
     }
 
     show_remove_confirm_ = true;
-    pending_remove_id_   = selected_id;
+    pending_remove_id_ = selected_id;
     pending_remove_mode_ = mode;
-    pending_remove_ids_  = std::move(planned_ids);
+    pending_remove_ids_ = std::move(planned_ids);
     return true;
 }
 
@@ -346,11 +346,11 @@ void ElementEditController::BuildRemovalPreview(AppRuntimeState& state,
 
     const auto to_effect = [](const sacm_adapter::DeleteEffect& effect) {
         return RemovalEffect{
-            .element_id     = effect.element_id,
-            .kind           = effect.kind,
-            .name           = effect.name,
+            .element_id = effect.element_id,
+            .kind = effect.kind,
+            .name = effect.name,
             .is_relationship = effect.is_relationship,
-            .deleted        = effect.deleted,
+            .deleted = effect.deleted,
         };
     };
     for (const sacm_adapter::DeleteEffect& effect : preview.requested)
@@ -380,8 +380,7 @@ void ElementEditController::AppendAcpConsequences(AppRuntimeState& state) {
         return;
 
     std::vector<std::string> doomed;
-    for (const std::vector<RemovalEffect>* bucket :
-         {&pending_remove_targets_, &pending_remove_consequences_}) {
+    for (const std::vector<RemovalEffect>* bucket : {&pending_remove_targets_, &pending_remove_consequences_}) {
         for (const RemovalEffect& effect : *bucket) {
             if (effect.deleted)
                 doomed.push_back(effect.element_id);
@@ -392,19 +391,19 @@ void ElementEditController::AppendAcpConsequences(AppRuntimeState& state) {
         if (std::find(doomed.begin(), doomed.end(), acp.target_id) == doomed.end())
             continue;
         pending_remove_consequences_.push_back(RemovalEffect{
-            .element_id      = acp.id,
-            .kind            = "AssuranceClaimPoint",
-            .name            = acp.name,
+            .element_id = acp.id,
+            .kind = "AssuranceClaimPoint",
+            .name = acp.name,
             .is_relationship = false,
-            .deleted         = true,
+            .deleted = true,
         });
     }
 }
 
 bool ElementEditController::ConfirmPendingRemoval(AppRuntimeState& state) {
-    const std::string      id    = pending_remove_id_;
-    const core::RemoveMode mode  = pending_remove_mode_;
-    const size_t           count = pending_remove_ids_.size();
+    const std::string id = pending_remove_id_;
+    const core::RemoveMode mode = pending_remove_mode_;
+    const size_t count = pending_remove_ids_.size();
     CancelPendingRemoval();
 
     if (id.empty())
@@ -448,7 +447,7 @@ bool ElementEditController::CommitElementTextEdit(AppRuntimeState& state,
     // new == old and emit a no-op transaction. Snapshot both inputs into
     // independent locals before doing anything else.
     const std::string original_copy = original_value;
-    const std::string new_copy      = new_value;
+    const std::string new_copy = new_value;
 
     if (element_id.empty())
         return false;
@@ -496,7 +495,7 @@ bool ElementEditController::CommitElementTextEdit(AppRuntimeState& state,
         return false;
     }
 
-    parser::AssuranceCase*      model   = nullptr;
+    parser::AssuranceCase* model = nullptr;
     sacm::AssuranceCasePackage* package = nullptr;
     if (!TryGetWorkingModel(state, "Edit", events_, model, package))
         return false;
@@ -508,8 +507,8 @@ bool ElementEditController::CommitElementTextEdit(AppRuntimeState& state,
     // new == old.
     std::string discarded;
     std::string revert_error;
-    if (!core::SetElementTextField(*model, package, element_id, field, language, original_copy, discarded,
-                                   revert_error)) {
+    if (!core::SetElementTextField(
+            *model, package, element_id, field, language, original_copy, discarded, revert_error)) {
         events_.Emit(StatusMessageEvent{"Edit failed: " + revert_error});
         return false;
     }
@@ -536,8 +535,8 @@ int ElementEditController::FlushPendingTextEdits(AppRuntimeState& state,
             continue;
         if (edit.original_value == edit.new_value)
             continue;
-        if (CommitElementTextEdit(state, edit.element_id, edit.field_token, edit.language,
-                                  edit.original_value, edit.new_value)) {
+        if (CommitElementTextEdit(
+                state, edit.element_id, edit.field_token, edit.language, edit.original_value, edit.new_value)) {
             ++committed;
         }
     }
@@ -560,13 +559,11 @@ const std::vector<std::string>& ElementEditController::PendingRemoveIds() const 
     return pending_remove_ids_;
 }
 
-const std::vector<ElementEditController::RemovalEffect>&
-ElementEditController::PendingRemoveTargets() const {
+const std::vector<ElementEditController::RemovalEffect>& ElementEditController::PendingRemoveTargets() const {
     return pending_remove_targets_;
 }
 
-const std::vector<ElementEditController::RemovalEffect>&
-ElementEditController::PendingRemoveConsequences() const {
+const std::vector<ElementEditController::RemovalEffect>& ElementEditController::PendingRemoveConsequences() const {
     return pending_remove_consequences_;
 }
 

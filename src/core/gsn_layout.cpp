@@ -157,10 +157,10 @@ double ShiftRightOf(const Contour& base, const Contour& item, double gap) {
 // ===== Sub-item categorisation =====
 
 struct SubItems {
-    std::vector<std::string> structural;   // Group1 children + Below challenge roots (a context's
-                                           // below-challenge is its structural child → hangs under it)
-    std::vector<std::string> left_items;   // Side challenges hosted by this node, left lane
-    std::vector<std::string> right_items;  // Side challenges hosted by this node, right lane
+    std::vector<std::string> structural;     // Group1 children + Below challenge roots (a context's
+                                             // below-challenge is its structural child → hangs under it)
+    std::vector<std::string> left_items;     // Side challenges hosted by this node, left lane
+    std::vector<std::string> right_items;    // Side challenges hosted by this node, right lane
     std::vector<std::string> plain_g2_left;  // Group2 attachments assigned to the left lane
     std::vector<std::string> plain_g2_right; // Group2 attachments assigned to the right lane
 };
@@ -210,8 +210,8 @@ void BuildLanes(LayoutState& state, NodeLayout& node) {
         for (const std::string& id : challenges)
             blocks.push_back({id, HeightOf(state, id), order++});
         // Tallest first; ties keep input order for determinism.
-        std::stable_sort(blocks.begin(), blocks.end(),
-                         [](const Block& a, const Block& b) { return a.height > b.height; });
+        std::stable_sort(
+            blocks.begin(), blocks.end(), [](const Block& a, const Block& b) { return a.height > b.height; });
         std::unordered_set<std::string> on_left;
         int left_h = 0;
         int right_h = 0;
@@ -614,7 +614,8 @@ void ComputeOffsets(LayoutState& state, const std::string& root_id, double gap) 
             std::vector<double> centres;
             centres.reserve(items.structural.size());
             for (const std::string& child_id : items.structural) {
-                const double centre = running.empty() ? 0.0 : ShiftRightOf(running, ContourOf(state, child_id, gap), gap);
+                const double centre =
+                    running.empty() ? 0.0 : ShiftRightOf(running, ContourOf(state, child_id, gap), gap);
                 centres.push_back(centre);
                 MergeInto(running, ContourOf(state, child_id, gap), centre);
             }
@@ -781,8 +782,8 @@ GsnLayoutGraphResult LayoutGsnGraph(const GsnLayoutInput& input,
     // the same spot. (Developed/tree challenges keep their row-based placement.)
     struct StackEntry {
         const NodeLayout* nl = nullptr;
-        std::string key;     // shared by a context and its interleaved below-challenge
-        int height_row = 0;  // row whose stack height this entry contributes to
+        std::string key;         // shared by a context and its interleaved below-challenge
+        int height_row = 0;      // row whose stack height this entry contributes to
         int order_primary = 0;   // context stack index
         int order_secondary = 0; // 0 = the context, 1 = its below-challenge
     };

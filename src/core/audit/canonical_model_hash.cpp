@@ -57,8 +57,7 @@ void AppendMultiLang(std::ostringstream& out, std::string_view key, const sacm::
     // Sort languages so map iteration order (already sorted in std::map) is
     // explicit and survives type changes.
     std::vector<std::pair<std::string, std::string>> entries(text.texts.begin(), text.texts.end());
-    std::sort(entries.begin(), entries.end(),
-              [](const auto& a, const auto& b) { return a.first < b.first; });
+    std::sort(entries.begin(), entries.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
     out << key << "_n:" << entries.size() << '\n';
     for (const auto& [lang, value] : entries) {
         AppendField(out, std::string(key) + "[" + lang + "]", value);
@@ -102,8 +101,7 @@ std::vector<const T*> SortedByStableKey(const std::vector<T>& items) {
     sorted.reserve(items.size());
     for (const T& item : items)
         sorted.push_back(&item);
-    std::sort(sorted.begin(), sorted.end(),
-              [](const T* a, const T* b) { return StableKey(*a) < StableKey(*b); });
+    std::sort(sorted.begin(), sorted.end(), [](const T* a, const T* b) { return StableKey(*a) < StableKey(*b); });
     return sorted;
 }
 

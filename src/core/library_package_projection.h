@@ -43,8 +43,7 @@ sacm::AssuranceCasePackage project_library_package(const sacm_adapter::LibraryDo
 // GSN-role) and each artifact reference's referencedArtifact (terminology
 // detection). Kept separate from the audit projection so the audit canonical
 // hash is unchanged.
-sacm::AssuranceCasePackage project_library_package_with_tags(
-    const sacm_adapter::LibraryDocument& document);
+sacm::AssuranceCasePackage project_library_package_with_tags(const sacm_adapter::LibraryDocument& document);
 
 // Phase 9 Stage 6: the canonical model hash computed by loading the model
 // through the library and projecting it back to a package before hashing. Every

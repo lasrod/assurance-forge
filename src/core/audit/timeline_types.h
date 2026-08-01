@@ -58,39 +58,39 @@ enum class TimelinePointType {
 };
 
 struct TimelinePoint {
-    std::uint64_t     transaction_sequence = 0;
+    std::uint64_t transaction_sequence = 0;
     TimelinePointType type = TimelinePointType::Now;
     // Stable identifier for hit-testing / persistence. Empty for the
     // synthetic Now marker.
-    std::string       id;
+    std::string id;
     // Short label rendered on or near the marker (e.g. "B0", "S3", "NOW").
-    std::string       label;
+    std::string label;
     // Multi-line hover tooltip rendered by the widget.
-    std::string       tooltip;
+    std::string tooltip;
     // True for major markers (baselines + Now) that the rail draws larger.
-    bool              is_major = false;
+    bool is_major = false;
 };
 
 struct TimelineModel {
     std::vector<TimelinePoint> points;
-    std::uint64_t              latest_sequence = 0;
-    bool                       has_audit_store = false;
+    std::uint64_t latest_sequence = 0;
+    bool has_audit_store = false;
 };
 
 struct TimelineQuery {
-    TimelineViewMode             view_mode = TimelineViewMode::Baselines;
-    TimelineScope                scope = TimelineScope::WholeCase;
+    TimelineViewMode view_mode = TimelineViewMode::Baselines;
+    TimelineScope scope = TimelineScope::WholeCase;
     // Optional package identity used when `scope == CurrentPackage`. The
     // builder does not consult these for Phase 1 (filtering happens upstream
     // when the caller passes pre-filtered transactions) but keeps them in
     // the query so future scopes can use them without an API churn.
-    std::optional<std::string>   package_id;
-    std::optional<std::string>   package_gid;
+    std::optional<std::string> package_id;
+    std::optional<std::string> package_gid;
     // When non-empty, the builder tags the snapshot whose `snapshot_id`
     // equals this value as `TimelinePointType::InitialSnapshot` (sorted
     // first at its sequence) instead of `Snapshot`. Sourced from
     // `AuditManifest::initial_snapshot_id`.
-    std::string                  initial_snapshot_id;
+    std::string initial_snapshot_id;
 };
 
 } // namespace core::audit

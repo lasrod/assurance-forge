@@ -22,24 +22,24 @@ namespace core::audit {
 inline constexpr int kBaselineSchemaVersion = 1;
 
 struct BaselineMetadata {
-    int           baseline_schema_version = kBaselineSchemaVersion;
+    int baseline_schema_version = kBaselineSchemaVersion;
     // Stable identifier. Recommended format: `baseline_<6-digit-zero-padded-seq>`,
     // e.g. `baseline_000042`. Must be unique within the project.
-    std::string   baseline_id;
-    std::string   name;
-    std::string   description;
-    std::string   created_at;
-    std::string   created_by;
+    std::string baseline_id;
+    std::string name;
+    std::string description;
+    std::string created_at;
+    std::string created_by;
     // Transaction sequence the baseline pins to. 0 means "initial snapshot
     // before any transactions".
     std::uint64_t transaction_sequence = 0;
     // Optional canonical model hash captured at baseline-creation time. May be
     // empty when the reconstructed model is unavailable.
-    std::string   canonical_model_hash;
+    std::string canonical_model_hash;
 };
 
 std::string SerializeBaselineMetadata(const BaselineMetadata& metadata);
-bool        ParseBaselineMetadata(const std::string& text, BaselineMetadata& out, std::string& error);
+bool ParseBaselineMetadata(const std::string& text, BaselineMetadata& out, std::string& error);
 
 bool ReadBaselineMetadata(const std::filesystem::path& project_root,
                           const std::string& baseline_id,
@@ -57,15 +57,15 @@ std::vector<BaselineMetadata> ListBaselines(const std::filesystem::path& project
                                             std::vector<std::string>* warnings_out = nullptr);
 
 struct CreateBaselineRequest {
-    std::string                  name;
-    std::string                  description;
-    std::string                  created_by;
+    std::string name;
+    std::string description;
+    std::string created_by;
     // Transaction sequence to pin the baseline to. When std::nullopt, the
     // implementation defaults to the manifest's `latest_transaction_sequence`.
     std::optional<std::uint64_t> at_transaction_sequence;
     // Optional canonical model hash to embed (caller may supply when it
     // already has the reconstructed state).
-    std::string                  canonical_model_hash;
+    std::string canonical_model_hash;
 };
 
 // Create a new baseline: writes the sidecar file, appends the id to the

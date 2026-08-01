@@ -91,9 +91,9 @@ void CollectConfidencePackageElementIdentities(const sacm::AssuranceCasePackage&
     }
 }
 
-std::optional<parser::AssuranceCase> FilterConfidencePackageElementsFromMainTree(
-    const parser::AssuranceCase& source,
-    const sacm::AssuranceCasePackage* package) {
+std::optional<parser::AssuranceCase>
+FilterConfidencePackageElementsFromMainTree(const parser::AssuranceCase& source,
+                                            const sacm::AssuranceCasePackage* package) {
     if (!package)
         return std::nullopt;
     std::unordered_set<std::string> hidden_ids;
@@ -455,8 +455,7 @@ void AppRuntime::ScanDirectory() {
     impl_->project_controller->ScanDirectory();
 }
 
-const parser::AssuranceCase& AppRuntime::RefreshAgentChangePreview(
-    const parser::AssuranceCase& committed) {
+const parser::AssuranceCase& AppRuntime::RefreshAgentChangePreview(const parser::AssuranceCase& committed) {
     ui::UiState& ui_state = ui::GetUiState();
 
     // Only change sets written against the argument that is open. Element ids
@@ -465,8 +464,7 @@ const parser::AssuranceCase& AppRuntime::RefreshAgentChangePreview(
     // pointing at an element the agent had never looked at.
     std::vector<const core::changesets::ChangeSet*> open;
     for (const core::changesets::ChangeSet* candidate : impl_->agent_change_sets.Open()) {
-        if (core::changesets::ChangeSetTargetsArgumentFile(*candidate,
-                                                           impl_->app_state.loaded_file_path)) {
+        if (core::changesets::ChangeSetTargetsArgumentFile(*candidate, impl_->app_state.loaded_file_path)) {
             open.push_back(candidate);
         }
     }
@@ -483,8 +481,7 @@ const parser::AssuranceCase& AppRuntime::RefreshAgentChangePreview(
     // supported, but the newest open change set is the one drawn; the Review
     // panel lists them all so the other is not hidden.
     const core::changesets::ChangeSet& shown = *open.back();
-    const core::changesets::ChangeSetDiff diff =
-        core::changesets::ComputeChangeSetDiff(shown, committed);
+    const core::changesets::ChangeSetDiff diff = core::changesets::ComputeChangeSetDiff(shown, committed);
     if (!diff.success) {
         // The argument moved under the change set. Showing a preview that cannot
         // be applied would invite the user to accept something that will be
@@ -504,12 +501,11 @@ const parser::AssuranceCase& AppRuntime::RefreshAgentChangePreview(
         return committed;
     }
 
-    ui_state.agent_change_set_id    = shown.id;
+    ui_state.agent_change_set_id = shown.id;
     ui_state.agent_change_set_title = shown.title;
     ui_state.agent_change_status.clear();
     impl_->agent_preview_added_ids.clear();
-    for (const std::pair<const std::string, core::changesets::ElementChange>& entry :
-         diff.status_by_id) {
+    for (const std::pair<const std::string, core::changesets::ElementChange>& entry : diff.status_by_id) {
         if (entry.second != core::changesets::ElementChange::Unchanged) {
             ui_state.agent_change_status[entry.first] = entry.second;
         }
@@ -573,13 +569,14 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     // lands, rather than as a list of operations beside the diagram. The
     // committed model is untouched; nothing here is saved.
     const parser::AssuranceCase& committed = *impl_->app_state.loaded_case;
-    const parser::AssuranceCase& ac        = RefreshAgentChangePreview(committed);
+    const parser::AssuranceCase& ac = RefreshAgentChangePreview(committed);
 
     const sacm::AssuranceCasePackage* sacm_package =
         impl_->app_state.has_projected_package() ? &impl_->app_state.projected_package() : nullptr;
-    const std::optional<parser::AssuranceCase> filtered_case = FilterConfidencePackageElementsFromMainTree(ac, sacm_package);
-    impl_->current_tree = ui::gsn::BuildAssuranceTree(filtered_case ? *filtered_case : ac,
-                                                      ui::GetUiState().active_secondary_lang);
+    const std::optional<parser::AssuranceCase> filtered_case =
+        FilterConfidencePackageElementsFromMainTree(ac, sacm_package);
+    impl_->current_tree =
+        ui::gsn::BuildAssuranceTree(filtered_case ? *filtered_case : ac, ui::GetUiState().active_secondary_lang);
     core::ApplyTreeDisplayOrder(impl_->current_tree, impl_->tree_display_order);
     impl_->tree_edit_index = core::BuildTreeEditIndex(ac);
     impl_->tree_edit_index_valid = true;
@@ -843,8 +840,7 @@ void AppRuntime::RequestExit(bool& done) {
     // instead of silently losing data.
     if (impl_->app_state.has_unsaved_changes) {
         if (!SaveProject()) {
-            impl_->last_autosave_error =
-                "Auto-flush on close failed: " + impl_->app_state.status_message;
+            impl_->last_autosave_error = "Auto-flush on close failed: " + impl_->app_state.status_message;
             impl_->modal_coordinator->show_save_before_exit_modal = true;
             return;
         }
@@ -858,10 +854,11 @@ void AppRuntime::RequestExit(bool& done) {
     if (impl_->app_state.current_project.has_value()) {
         core::audit::SnapshotMetadata snapshot;
         std::string snapshot_error;
-        const std::string created_by =
-            impl_->reviewer_name.empty() ? std::string("system") : impl_->reviewer_name;
+        const std::string created_by = impl_->reviewer_name.empty() ? std::string("system") : impl_->reviewer_name;
         (void)core::audit::CreateUserSnapshot(impl_->app_state.current_project->rootPath,
-                                              "automatic close snapshot", created_by, snapshot,
+                                              "automatic close snapshot",
+                                              created_by,
+                                              snapshot,
                                               snapshot_error);
     }
 

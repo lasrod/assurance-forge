@@ -15,8 +15,8 @@ namespace core::commands {
 
 // A legacy model+package mutation -- the same shape every `core::*` mutator
 // (SetElementTextField, AddChildElement, ...) already exposes.
-using LibraryBridgeMutator = std::function<bool(parser::AssuranceCase& model,
-                                                sacm::AssuranceCasePackage& package, std::string& error)>;
+using LibraryBridgeMutator =
+    std::function<bool(parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error)>;
 
 // Make a legacy mutation LIBRARY-PRIMARY without touching any live view. Projects
 // a SCRATCH model+package from `document`, runs `mutate` on the scratch, then
@@ -39,7 +39,8 @@ using LibraryBridgeMutator = std::function<bool(parser::AssuranceCase& model,
 // where a recovery silently destroyed every Assurance Claim Point. They are one
 // function now so they cannot drift apart again.
 bool BridgeLegacyMutationToLibrary(sacm_adapter::LibraryDocument& document,
-                                   const LibraryBridgeMutator& mutate, std::string& error,
+                                   const LibraryBridgeMutator& mutate,
+                                   std::string& error,
                                    std::string_view rederive_failure_context = {});
 
 // The single chokepoint every audited command uses to become library-primary.
@@ -52,7 +53,6 @@ bool BridgeLegacyMutationToLibrary(sacm_adapter::LibraryDocument& document,
 // legacy (model, package) signature either way, so a command flips by wrapping its
 // existing mutator once -- reproducing the legacy result, which the audit replay also
 // reproduces, so live and replay converge by construction.
-bool ApplyLibraryPrimaryOrLegacy(CommandContext& ctx, const LibraryBridgeMutator& mutate,
-                                 std::string& error);
+bool ApplyLibraryPrimaryOrLegacy(CommandContext& ctx, const LibraryBridgeMutator& mutate, std::string& error);
 
 } // namespace core::commands

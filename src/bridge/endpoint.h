@@ -21,8 +21,8 @@
 namespace bridge {
 
 struct EndpointRecord {
-    int         protocol = 0;
-    long long   pid      = 0;
+    int protocol = 0;
+    long long pid = 0;
     // Named pipe name on Windows, socket path on POSIX.
     std::string address;
     std::string token;
@@ -52,8 +52,7 @@ bool WriteEndpointRecord(const EndpointRecord& record, std::string& error);
 
 // Absent, unreadable and malformed all report false -- a caller cannot act on
 // the difference, and every one of them means "connect to nothing".
-bool ReadEndpointRecord(const std::filesystem::path& project_root, EndpointRecord& out,
-                        std::string& error);
+bool ReadEndpointRecord(const std::filesystem::path& project_root, EndpointRecord& out, std::string& error);
 
 void RemoveEndpointRecord(const std::filesystem::path& project_root);
 

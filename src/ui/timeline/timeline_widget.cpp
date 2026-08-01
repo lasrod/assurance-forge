@@ -22,27 +22,53 @@ using ui::gsn::DpiSize;
 // Phase 3 visual constants. Marker visual sizes are intentionally compact
 // — the hit-test rect is expanded to `kHitRadius` per marker so users can
 // click the small visuals comfortably.
-float VisibleDotRadius()      { return DpiSize(3.0f); }
-float SnapshotDiamondRadius() { return DpiSize(5.0f); }
-float BaselineLineHalfThk()   { return DpiSize(1.25f); }
-float NowLineHalfThk()        { return DpiSize(1.75f); }
-float RailHalfHeight()        { return DpiSize(9.0f); }   // marker visual half-height
-float HitHalfWidth()          { return DpiSize(10.0f); }  // generous hit-test radius
-float HitHalfHeight()         { return DpiSize(14.0f); }
-float LabelBandHeight()       { return DpiSize(14.0f); }  // reserved above the rail for labels
-float SelectionHaloRadius()   { return DpiSize(10.0f); }
-float RailPad()               { return DpiSize(12.0f); }  // padding inside the rail rect
+float VisibleDotRadius() {
+    return DpiSize(3.0f);
+}
+float SnapshotDiamondRadius() {
+    return DpiSize(5.0f);
+}
+float BaselineLineHalfThk() {
+    return DpiSize(1.25f);
+}
+float NowLineHalfThk() {
+    return DpiSize(1.75f);
+}
+float RailHalfHeight() {
+    return DpiSize(9.0f);
+} // marker visual half-height
+float HitHalfWidth() {
+    return DpiSize(10.0f);
+} // generous hit-test radius
+float HitHalfHeight() {
+    return DpiSize(14.0f);
+}
+float LabelBandHeight() {
+    return DpiSize(14.0f);
+} // reserved above the rail for labels
+float SelectionHaloRadius() {
+    return DpiSize(10.0f);
+}
+float RailPad() {
+    return DpiSize(12.0f);
+} // padding inside the rail rect
 
 // MarkerHalfWidth is the visual half-width (used only for spacing
 // estimation). Hit-test uses `HitHalfWidth()` regardless.
 float MarkerHalfWidth(const TimelinePoint& p) {
     switch (p.type) {
-        case TimelinePointType::Now:             return NowLineHalfThk() * 2.0f;
-        case TimelinePointType::Baseline:        return BaselineLineHalfThk() * 2.0f;
-        case TimelinePointType::InitialSnapshot: return SnapshotDiamondRadius();
-        case TimelinePointType::Snapshot:        return SnapshotDiamondRadius();
-        case TimelinePointType::Change:          return VisibleDotRadius();
-        default:                                 return DpiSize(4.0f);
+    case TimelinePointType::Now:
+        return NowLineHalfThk() * 2.0f;
+    case TimelinePointType::Baseline:
+        return BaselineLineHalfThk() * 2.0f;
+    case TimelinePointType::InitialSnapshot:
+        return SnapshotDiamondRadius();
+    case TimelinePointType::Snapshot:
+        return SnapshotDiamondRadius();
+    case TimelinePointType::Change:
+        return VisibleDotRadius();
+    default:
+        return DpiSize(4.0f);
     }
 }
 
@@ -53,13 +79,13 @@ float MarkerHalfWidth(const TimelinePoint& p) {
 // `Now` marker (always the last point) naturally lands at the far right;
 // every other marker is placed at its index fraction. No collision
 // spreading is required because every slot is unique by construction.
-std::vector<MarkerLayout> ComputeMarkerLayout(const TimelineModel& model,
-                                              const ImVec2& rect_min,
-                                              const ImVec2& rect_max) {
+std::vector<MarkerLayout>
+ComputeMarkerLayout(const TimelineModel& model, const ImVec2& rect_min, const ImVec2& rect_max) {
     std::vector<MarkerLayout> out;
     out.reserve(model.points.size());
     const std::size_t n = model.points.size();
-    if (n == 0) return out;
+    if (n == 0)
+        return out;
 
     const float pad = RailPad();
     const float left = rect_min.x + pad;
@@ -68,8 +94,7 @@ std::vector<MarkerLayout> ComputeMarkerLayout(const TimelineModel& model,
 
     for (std::size_t i = 0; i < n; ++i) {
         const TimelinePoint& p = model.points[i];
-        const float t = (n == 1) ? 1.0f
-                                 : static_cast<float>(i) / static_cast<float>(n - 1);
+        const float t = (n == 1) ? 1.0f : static_cast<float>(i) / static_cast<float>(n - 1);
         MarkerLayout m;
         m.point_index = i;
         m.center_x = left + t * span;
@@ -81,8 +106,8 @@ std::vector<MarkerLayout> ComputeMarkerLayout(const TimelineModel& model,
 
 namespace {
 
-void DrawBaselineMarker(ImDrawList* dl, ImVec2 center, ImU32 fill, ImU32 stroke,
-                        const std::string& label, bool selected) {
+void DrawBaselineMarker(
+    ImDrawList* dl, ImVec2 center, ImU32 fill, ImU32 stroke, const std::string& label, bool selected) {
     const float half_thk = BaselineLineHalfThk() * (selected ? 1.6f : 1.0f);
     const float h = RailHalfHeight();
     ImVec2 tl(center.x - half_thk, center.y - h);
@@ -96,14 +121,13 @@ void DrawBaselineMarker(ImDrawList* dl, ImVec2 center, ImU32 fill, ImU32 stroke,
     }
     if (!label.empty()) {
         ImVec2 text_size = ImGui::CalcTextSize(label.c_str());
-        ImVec2 text_pos(center.x - text_size.x * 0.5f,
-                        center.y - h - LabelBandHeight() + DpiSize(1.0f));
+        ImVec2 text_pos(center.x - text_size.x * 0.5f, center.y - h - LabelBandHeight() + DpiSize(1.0f));
         dl->AddText(text_pos, ui::GetTheme().text_primary, label.c_str());
     }
 }
 
-void DrawSnapshotMarker(ImDrawList* dl, ImVec2 center, ImU32 fill, ImU32 stroke,
-                        bool selected, bool initial, const std::string& label) {
+void DrawSnapshotMarker(
+    ImDrawList* dl, ImVec2 center, ImU32 fill, ImU32 stroke, bool selected, bool initial, const std::string& label) {
     const float r = SnapshotDiamondRadius() * (selected ? 1.25f : 1.0f);
     ImVec2 pts[4] = {
         ImVec2(center.x, center.y - r),
@@ -115,8 +139,7 @@ void DrawSnapshotMarker(ImDrawList* dl, ImVec2 center, ImU32 fill, ImU32 stroke,
     dl->AddPolyline(pts, 4, stroke, ImDrawFlags_Closed, DpiSize(1.0f));
     if (initial && !label.empty()) {
         ImVec2 text_size = ImGui::CalcTextSize(label.c_str());
-        ImVec2 text_pos(center.x - text_size.x * 0.5f,
-                        center.y - RailHalfHeight() - LabelBandHeight() + DpiSize(1.0f));
+        ImVec2 text_pos(center.x - text_size.x * 0.5f, center.y - RailHalfHeight() - LabelBandHeight() + DpiSize(1.0f));
         dl->AddText(text_pos, ui::GetTheme().text_secondary, label.c_str());
     }
 }
@@ -127,8 +150,7 @@ void DrawChangeMarker(ImDrawList* dl, ImVec2 center, ImU32 fill, ImU32 stroke, b
     dl->AddCircle(center, r, stroke, 12, DpiSize(1.0f));
 }
 
-void DrawNowMarker(ImDrawList* dl, ImVec2 center, ImU32 fill, ImU32 stroke,
-                   const std::string& label) {
+void DrawNowMarker(ImDrawList* dl, ImVec2 center, ImU32 fill, ImU32 stroke, const std::string& label) {
     const float half_thk = NowLineHalfThk();
     const float h = RailHalfHeight() + DpiSize(2.0f);
     ImVec2 tl(center.x - half_thk, center.y - h);
@@ -137,8 +159,7 @@ void DrawNowMarker(ImDrawList* dl, ImVec2 center, ImU32 fill, ImU32 stroke,
     dl->AddRect(tl, br, stroke, 0.0f, 0, DpiSize(1.0f));
     if (!label.empty()) {
         ImVec2 text_size = ImGui::CalcTextSize(label.c_str());
-        ImVec2 text_pos(center.x - text_size.x * 0.5f,
-                        center.y - h - LabelBandHeight() + DpiSize(1.0f));
+        ImVec2 text_pos(center.x - text_size.x * 0.5f, center.y - h - LabelBandHeight() + DpiSize(1.0f));
         dl->AddText(text_pos, ui::GetTheme().accent_hover, label.c_str());
     }
 }
@@ -148,11 +169,13 @@ void DrawSelectionHalo(ImDrawList* dl, ImVec2 center, ImU32 color) {
 }
 
 bool MarkerIsPreviewed(const TimelinePoint& p, const TimelineState& state) {
-    if (!state.preview_sequence.has_value()) return false;
+    if (!state.preview_sequence.has_value())
+        return false;
     // Only the non-Now marker(s) at the preview sequence are "selected".
     // Multiple kinds (baseline + change) at the same sequence are all
     // highlighted — they represent the same instant in history.
-    if (p.type == TimelinePointType::Now) return false;
+    if (p.type == TimelinePointType::Now)
+        return false;
     return p.transaction_sequence == *state.preview_sequence;
 }
 
@@ -184,8 +207,7 @@ TimelineAction RenderTimelineWidget(TimelineState& state,
 
     // --- Actions menu (right "⋯" button) ---
     const float menu_btn_x = rect_max.x - pad_x - menu_btn_w;
-    ImGui::SetCursorScreenPos(ImVec2(menu_btn_x,
-                                     rect_min.y + (height - ImGui::GetFrameHeight()) * 0.5f));
+    ImGui::SetCursorScreenPos(ImVec2(menu_btn_x, rect_min.y + (height - ImGui::GetFrameHeight()) * 0.5f));
     {
         if (ImGui::Button("...##tl_actions", ImVec2(menu_btn_w, 0.0f))) {
             ImGui::OpenPopup("##tl_actions_popup");
@@ -228,7 +250,8 @@ TimelineAction RenderTimelineWidget(TimelineState& state,
     const float track_thickness = std::max(1.0f, DpiSize(2.0f));
     dl->AddRectFilled(ImVec2(rail_left, rail_y - track_thickness * 0.5f),
                       ImVec2(rail_right, rail_y + track_thickness * 0.5f),
-                      ui::WithAlpha(th.border_strong, 0.75f), track_thickness);
+                      ui::WithAlpha(th.border_strong, 0.75f),
+                      track_thickness);
 
     // --- Markers ---
     ImVec2 rail_min(rail_left, rail_y);
@@ -250,34 +273,33 @@ TimelineAction RenderTimelineWidget(TimelineState& state,
         ImU32 fill = th.surface_2;
         ImU32 stroke = th.border_strong;
         switch (p.type) {
-            case TimelinePointType::Now:
-                fill = ui::WithAlpha(th.accent, 0.95f);
-                stroke = th.accent_hover;
-                DrawNowMarker(dl, center, fill, stroke, p.label);
-                break;
-            case TimelinePointType::Baseline:
-                fill = ui::WithAlpha(th.accent, 0.65f);
-                stroke = th.accent_hover;
-                DrawBaselineMarker(dl, center, fill, stroke, p.label, selected);
-                break;
-            case TimelinePointType::InitialSnapshot:
-                fill = ui::WithAlpha(th.accent, 0.55f);
-                stroke = th.accent_hover;
-                DrawSnapshotMarker(dl, center, fill, stroke, selected, /*initial=*/true, p.label);
-                break;
-            case TimelinePointType::Snapshot:
-                fill = ui::WithAlpha(th.text_secondary, 0.55f);
-                stroke = th.border_strong;
-                DrawSnapshotMarker(dl, center, fill, stroke, selected, /*initial=*/false,
-                                   std::string());
-                break;
-            case TimelinePointType::Change:
-                fill = ui::WithAlpha(th.text_secondary, 0.65f);
-                stroke = th.border_strong;
-                DrawChangeMarker(dl, center, fill, stroke, selected);
-                break;
-            default:
-                break;
+        case TimelinePointType::Now:
+            fill = ui::WithAlpha(th.accent, 0.95f);
+            stroke = th.accent_hover;
+            DrawNowMarker(dl, center, fill, stroke, p.label);
+            break;
+        case TimelinePointType::Baseline:
+            fill = ui::WithAlpha(th.accent, 0.65f);
+            stroke = th.accent_hover;
+            DrawBaselineMarker(dl, center, fill, stroke, p.label, selected);
+            break;
+        case TimelinePointType::InitialSnapshot:
+            fill = ui::WithAlpha(th.accent, 0.55f);
+            stroke = th.accent_hover;
+            DrawSnapshotMarker(dl, center, fill, stroke, selected, /*initial=*/true, p.label);
+            break;
+        case TimelinePointType::Snapshot:
+            fill = ui::WithAlpha(th.text_secondary, 0.55f);
+            stroke = th.border_strong;
+            DrawSnapshotMarker(dl, center, fill, stroke, selected, /*initial=*/false, std::string());
+            break;
+        case TimelinePointType::Change:
+            fill = ui::WithAlpha(th.text_secondary, 0.65f);
+            stroke = th.border_strong;
+            DrawChangeMarker(dl, center, fill, stroke, selected);
+            break;
+        default:
+            break;
         }
 
         // Phase 3.5: hit-test rect — uniform `HitHalfWidth × HitHalfHeight`

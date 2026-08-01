@@ -16,9 +16,10 @@
 
 namespace core::audit {
 
-std::expected<ReconstructedState, std::string> ReconstructAtSequence(
-    const AssuranceProject& project, std::uint64_t target_transaction_sequence,
-    const std::string& argument_package_id, const std::string& argument_package_gid) {
+std::expected<ReconstructedState, std::string> ReconstructAtSequence(const AssuranceProject& project,
+                                                                     std::uint64_t target_transaction_sequence,
+                                                                     const std::string& argument_package_id,
+                                                                     const std::string& argument_package_gid) {
     if (project.rootPath.empty())
         return std::unexpected("Project has no root path");
 
@@ -42,8 +43,8 @@ std::expected<ReconstructedState, std::string> ReconstructAtSequence(
     if (!store)
         return std::unexpected("Failed to open event store: " + store_error);
 
-    auto replayed_document = Replayer::ReplayToLibrary(std::move(snapshot.document), store->Transactions(),
-                                                       target_transaction_sequence);
+    auto replayed_document =
+        Replayer::ReplayToLibrary(std::move(snapshot.document), store->Transactions(), target_transaction_sequence);
     if (!replayed_document)
         return std::unexpected(std::move(replayed_document.error()));
 
@@ -63,12 +64,12 @@ std::expected<ReconstructedState, std::string> ReconstructAtSequence(
     // missed because it is reached through the audit path rather than the edit one.
     ReconstructedState reconstructed;
     reconstructed.document = std::move(*replayed_document);
-    core::RebuildDerivedViewsFromLibrary(*reconstructed.document, reconstructed.views.model,
-                                         reconstructed.views.package);
+    core::RebuildDerivedViewsFromLibrary(
+        *reconstructed.document, reconstructed.views.model, reconstructed.views.package);
 
     if (!argument_package_id.empty() || !argument_package_gid.empty()) {
-        const sacm::ArgumentPackage* arg_pkg = core::FindArgumentPackageByIdentity(
-            reconstructed.views.package, argument_package_id, argument_package_gid);
+        const sacm::ArgumentPackage* arg_pkg =
+            core::FindArgumentPackageByIdentity(reconstructed.views.package, argument_package_id, argument_package_gid);
         if (arg_pkg) {
             reconstructed.views.model =
                 core::BuildArgumentPackageProjection(reconstructed.views.model, *arg_pkg, arg_pkg->name);

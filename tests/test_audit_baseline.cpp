@@ -22,8 +22,7 @@ using core::audit::ParseBaselineMetadata;
 using core::audit::SerializeBaselineMetadata;
 
 std::filesystem::path MakeTempProjectRoot(const std::string& suffix) {
-    auto root = std::filesystem::temp_directory_path() /
-                ("af_baseline_test_" + suffix);
+    auto root = std::filesystem::temp_directory_path() / ("af_baseline_test_" + suffix);
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(core::audit::AfDir(root));
     return root;
@@ -99,8 +98,7 @@ TEST(BaselineMetadata, CreateBaselineAppendsIndexAndWritesSidecar) {
     EXPECT_FALSE(created.created_at.empty());
 
     // Sidecar file exists.
-    EXPECT_TRUE(std::filesystem::exists(
-        core::audit::BaselineMetadataPath(root, created.baseline_id)));
+    EXPECT_TRUE(std::filesystem::exists(core::audit::BaselineMetadataPath(root, created.baseline_id)));
 
     // Manifest now contains the id.
     core::audit::AuditManifest reloaded;

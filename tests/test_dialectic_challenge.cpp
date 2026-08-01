@@ -156,8 +156,8 @@ TEST(DialecticChallenge, CounterArgumentAgainstElement) {
     std::string new_id, rel_id, err;
 
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, "G1"};
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument,
-                                   new_id, rel_id, err))
+    ASSERT_TRUE(core::AddChallenge(
+        mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument, new_id, rel_id, err))
         << err;
 
     EXPECT_EQ(new_id.rfind("CG", 0), 0u) << "counter argument id should use CG prefix, got " << new_id;
@@ -178,8 +178,8 @@ TEST(DialecticChallenge, CounterArgumentAgainstElement) {
 
     // SACM mirror carries isCounter so it survives serialization.
     const auto& inferences = mini.package.argumentPackages.front().assertedInferences;
-    auto it = std::find_if(inferences.begin(), inferences.end(),
-                           [&](const sacm::AssertedInference& i) { return i.id == rel_id; });
+    auto it = std::find_if(
+        inferences.begin(), inferences.end(), [&](const sacm::AssertedInference& i) { return i.id == rel_id; });
     ASSERT_NE(it, inferences.end());
     EXPECT_TRUE(it->isCounter);
 }
@@ -191,8 +191,8 @@ TEST(DialecticChallenge, CounterEvidenceAgainstElement) {
     std::string new_id, rel_id, err;
 
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, "G2"};
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterEvidence,
-                                   new_id, rel_id, err))
+    ASSERT_TRUE(core::AddChallenge(
+        mini.model, &mini.package, target, core::ChallengeSourceType::CounterEvidence, new_id, rel_id, err))
         << err;
 
     EXPECT_EQ(new_id.rfind("CSn", 0), 0u) << "counter evidence id should use CSn prefix, got " << new_id;
@@ -208,8 +208,8 @@ TEST(DialecticChallenge, CounterEvidenceAgainstElement) {
     EXPECT_EQ(rel->target_refs.front(), "G2");
 
     const auto& evidences = mini.package.argumentPackages.front().assertedEvidences;
-    auto it = std::find_if(evidences.begin(), evidences.end(),
-                           [&](const sacm::AssertedEvidence& e) { return e.id == rel_id; });
+    auto it = std::find_if(
+        evidences.begin(), evidences.end(), [&](const sacm::AssertedEvidence& e) { return e.id == rel_id; });
     ASSERT_NE(it, evidences.end());
     EXPECT_TRUE(it->isCounter);
 }
@@ -221,8 +221,8 @@ TEST(DialecticChallenge, CounterArgumentAgainstRelationship) {
     std::string new_id, rel_id, err;
 
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Relationship, "INF1"};
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument,
-                                   new_id, rel_id, err))
+    ASSERT_TRUE(core::AddChallenge(
+        mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument, new_id, rel_id, err))
         << err;
 
     const parser::SacmElement* rel = FindElement(mini.model, rel_id);
@@ -234,8 +234,8 @@ TEST(DialecticChallenge, CounterArgumentAgainstRelationship) {
     // A challenge may itself be challenged (challenge-to-challenge).
     std::string new_id2, rel_id2, err2;
     core::ArgumentTarget counter_target{core::ArgumentTarget::Kind::Relationship, rel_id};
-    EXPECT_TRUE(core::AddChallenge(mini.model, &mini.package, counter_target,
-                                   core::ChallengeSourceType::CounterArgument, new_id2, rel_id2, err2))
+    EXPECT_TRUE(core::AddChallenge(
+        mini.model, &mini.package, counter_target, core::ChallengeSourceType::CounterArgument, new_id2, rel_id2, err2))
         << err2;
     const parser::SacmElement* rel2 = FindElement(mini.model, rel_id2);
     ASSERT_NE(rel2, nullptr);
@@ -246,8 +246,8 @@ TEST(DialecticChallenge, RejectsMissingTarget) {
     MiniCase mini = MakeBaseCase();
     std::string new_id, rel_id, err;
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, "does-not-exist"};
-    EXPECT_FALSE(core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument,
-                                    new_id, rel_id, err));
+    EXPECT_FALSE(core::AddChallenge(
+        mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument, new_id, rel_id, err));
     EXPECT_FALSE(err.empty());
 }
 
@@ -257,8 +257,8 @@ TEST(DialecticChallenge, TreeBuildMarksCounterSource) {
     MiniCase mini = MakeBaseCase();
     std::string new_id, rel_id, err;
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, "G1"};
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument,
-                                   new_id, rel_id, err))
+    ASSERT_TRUE(core::AddChallenge(
+        mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument, new_id, rel_id, err))
         << err;
 
     core::AssuranceTree tree = core::AssuranceTree::Build(mini.model);
@@ -277,8 +277,8 @@ TEST(DialecticChallenge, TreeBuildResolvesRelationshipTargetToElement) {
     MiniCase mini = MakeBaseCase();
     std::string new_id, rel_id, err;
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Relationship, "INF1"};
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument,
-                                   new_id, rel_id, err))
+    ASSERT_TRUE(core::AddChallenge(
+        mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument, new_id, rel_id, err))
         << err;
 
     core::AssuranceTree tree = core::AssuranceTree::Build(mini.model);
@@ -299,14 +299,14 @@ TEST(DialecticChallenge, CounterArgumentAcceptsChildren) {
     MiniCase mini = MakeBaseCase();
     std::string cg, rel, err;
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, "G1"};
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument,
-                                   cg, rel, err))
+    ASSERT_TRUE(
+        core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument, cg, rel, err))
         << err;
 
     // A strategy can be added under the counter argument like any Goal.
     std::string child, child_rel, err2;
-    ASSERT_TRUE(core::AddChildElement(mini.model, &mini.package, cg, core::NewElementKind::Strategy, child, child_rel,
-                                      err2))
+    ASSERT_TRUE(
+        core::AddChildElement(mini.model, &mini.package, cg, core::NewElementKind::Strategy, child, child_rel, err2))
         << err2;
 
     core::AssuranceTree tree = core::AssuranceTree::Build(mini.model);
@@ -328,8 +328,8 @@ TEST(DialecticChallenge, RemovingCounterKeepsTarget) {
     MiniCase mini = MakeBaseCase();
     std::string new_id, rel_id, err;
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, "G1"};
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument,
-                                   new_id, rel_id, err))
+    ASSERT_TRUE(core::AddChallenge(
+        mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument, new_id, rel_id, err))
         << err;
 
     std::string remove_err;
@@ -387,12 +387,14 @@ TEST(DialecticChallenge, SacmRoundTripPreservesIsCounter) {
     ASSERT_FALSE(reparsed->argumentPackages.empty());
     const auto& ap = reparsed->argumentPackages.front();
 
-    auto inf = std::find_if(ap.assertedInferences.begin(), ap.assertedInferences.end(),
+    auto inf = std::find_if(ap.assertedInferences.begin(),
+                            ap.assertedInferences.end(),
                             [](const sacm::AssertedInference& i) { return i.id == "CH1"; });
     ASSERT_NE(inf, ap.assertedInferences.end());
     EXPECT_TRUE(inf->isCounter);
 
-    auto ev = std::find_if(ap.assertedEvidences.begin(), ap.assertedEvidences.end(),
+    auto ev = std::find_if(ap.assertedEvidences.begin(),
+                           ap.assertedEvidences.end(),
                            [](const sacm::AssertedEvidence& e) { return e.id == "CH2"; });
     ASSERT_NE(ev, ap.assertedEvidences.end());
     EXPECT_TRUE(ev->isCounter);
@@ -467,8 +469,8 @@ TEST(DialecticChallengeLayout, ElementChallengeReservesSideSpace) {
     AddInference(mini, "INF3", "G1", "G3");
     std::string cg, rel, err;
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, "G1"};
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument,
-                                   cg, rel, err))
+    ASSERT_TRUE(
+        core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument, cg, rel, err))
         << err;
 
     const auto layout = LayoutOf(mini.model);
@@ -500,8 +502,8 @@ TEST(DialecticChallengeLayout, ChallengeStaysNearWideHost) {
     }
     std::string cg, rel, err;
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, "S1"};
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument,
-                                   cg, rel, err))
+    ASSERT_TRUE(
+        core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument, cg, rel, err))
         << err;
 
     const auto layout = LayoutOf(mini.model);
@@ -541,8 +543,8 @@ TEST(DialecticChallengeLayout, SolutionChallengePlacedToSide) {
     }
     std::string cg, rel, err;
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, "Sn1"};
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument,
-                                   cg, rel, err))
+    ASSERT_TRUE(
+        core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument, cg, rel, err))
         << err;
 
     const auto layout = LayoutOf(mini.model);
@@ -580,8 +582,8 @@ TEST(DialecticChallengeLayout, ContextChallengePlacedBelow) {
     }
     std::string cg, rel, err;
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, "Cx"};
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument,
-                                   cg, rel, err))
+    ASSERT_TRUE(
+        core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument, cg, rel, err))
         << err;
 
     const auto layout = LayoutOf(mini.model);
@@ -618,8 +620,8 @@ TEST(DialecticChallengeLayout, InContextOfRelationshipChallengeSitsBelowContext)
     }
     std::string cg, rel, err;
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Relationship, "CX1"};
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument,
-                                   cg, rel, err))
+    ASSERT_TRUE(
+        core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument, cg, rel, err))
         << err;
 
     const auto layout = LayoutOf(mini.model);
@@ -650,8 +652,8 @@ TEST(DialecticChallengeLayout, AssumptionChallengePlacedToSide) {
     AddContextLink(mini, "AC1", "G1", "A1");
     std::string cg, rel, err;
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, "A1"};
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument,
-                                   cg, rel, err))
+    ASSERT_TRUE(
+        core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument, cg, rel, err))
         << err;
 
     const auto layout = LayoutOf(mini.model);
@@ -679,13 +681,18 @@ TEST(DialecticChallengeLayout, ChallengesToGoalAndAssumptionDoNotOverlap) {
 
     std::string cg_goal, rel_goal, err;
     core::ArgumentTarget goal_target{core::ArgumentTarget::Kind::Element, "G1"};
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, goal_target,
-                                   core::ChallengeSourceType::CounterArgument, cg_goal, rel_goal, err))
+    ASSERT_TRUE(core::AddChallenge(
+        mini.model, &mini.package, goal_target, core::ChallengeSourceType::CounterArgument, cg_goal, rel_goal, err))
         << err;
     std::string cg_assumption, rel_assumption, err2;
     core::ArgumentTarget assumption_target{core::ArgumentTarget::Kind::Element, "A1"};
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, assumption_target,
-                                   core::ChallengeSourceType::CounterArgument, cg_assumption, rel_assumption, err2))
+    ASSERT_TRUE(core::AddChallenge(mini.model,
+                                   &mini.package,
+                                   assumption_target,
+                                   core::ChallengeSourceType::CounterArgument,
+                                   cg_assumption,
+                                   rel_assumption,
+                                   err2))
         << err2;
 
     const auto layout = LayoutOf(mini.model);
@@ -714,13 +721,13 @@ TEST(DialecticChallengeLayout, DevelopedChallengeOnNodePushesChildrenDown) {
     }
     std::string cg, rel, err;
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, "S1"};
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument,
-                                   cg, rel, err))
+    ASSERT_TRUE(
+        core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument, cg, rel, err))
         << err;
     // Develop the challenge with its own child so it spans more than one row.
     std::string child, child_rel, err2;
-    ASSERT_TRUE(core::AddChildElement(mini.model, &mini.package, cg, core::NewElementKind::Goal, child, child_rel,
-                                      err2))
+    ASSERT_TRUE(
+        core::AddChildElement(mini.model, &mini.package, cg, core::NewElementKind::Goal, child, child_rel, err2))
         << err2;
 
     const auto layout = LayoutOf(mini.model);
@@ -790,8 +797,8 @@ TEST(DialecticChallengeLayout, ContextChallengeTreePushesArgumentDown) {
     }
     std::string cg, rel, err;
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, "Cx"};
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument,
-                                   cg, rel, err))
+    ASSERT_TRUE(
+        core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument, cg, rel, err))
         << err;
     // Develop the context's challenge into a tree.
     std::string cgChild, cgChildRel, err2;
@@ -832,8 +839,13 @@ TEST(DialecticChallengeLayout, ChallengedAssumptionStaysSubstackedBelowContext) 
     AddContextLink(mini, "AC2", "G1", "A1");
     AddContextLink(mini, "AC3", "G1", "C2");
     std::string cg, rg, e;
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "A1"},
-                                   core::ChallengeSourceType::CounterArgument, cg, rg, e))
+    ASSERT_TRUE(core::AddChallenge(mini.model,
+                                   &mini.package,
+                                   {core::ArgumentTarget::Kind::Element, "A1"},
+                                   core::ChallengeSourceType::CounterArgument,
+                                   cg,
+                                   rg,
+                                   e))
         << e;
 
     const auto layout = LayoutOf(mini.model);
@@ -868,11 +880,21 @@ TEST(DialecticChallengeLayout, ChallengesToTwoSameSideAssumptionsDoNotOverlap) {
     AddContextLink(mini, "AC2", "G1", "A2");
     AddContextLink(mini, "AC3", "G1", "A3");
     std::string a, b, ra, rb, e;
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "A1"},
-                                   core::ChallengeSourceType::CounterArgument, a, ra, e))
+    ASSERT_TRUE(core::AddChallenge(mini.model,
+                                   &mini.package,
+                                   {core::ArgumentTarget::Kind::Element, "A1"},
+                                   core::ChallengeSourceType::CounterArgument,
+                                   a,
+                                   ra,
+                                   e))
         << e;
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "A2"},
-                                   core::ChallengeSourceType::CounterArgument, b, rb, e))
+    ASSERT_TRUE(core::AddChallenge(mini.model,
+                                   &mini.package,
+                                   {core::ArgumentTarget::Kind::Element, "A2"},
+                                   core::ChallengeSourceType::CounterArgument,
+                                   b,
+                                   rb,
+                                   e))
         << e;
     ExpectNoOverlaps(LayoutOf(mini.model));
 }
@@ -890,8 +912,13 @@ TEST(DialecticChallengeLayout, ContextAvoidsHostChallengeLane) {
     AddArtifactReference(mini, "C13");
     AddContextLink(mini, "CTX", "S1", "C13"); // context attached to the strategy
     std::string cg, rel, err;
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "S1"},
-                                   core::ChallengeSourceType::CounterArgument, cg, rel, err))
+    ASSERT_TRUE(core::AddChallenge(mini.model,
+                                   &mini.package,
+                                   {core::ArgumentTarget::Kind::Element, "S1"},
+                                   core::ChallengeSourceType::CounterArgument,
+                                   cg,
+                                   rel,
+                                   err))
         << err;
 
     const auto layout = LayoutOf(mini.model);
@@ -925,8 +952,13 @@ TEST(DialecticChallengeLayout, TallChallengeSitsAloneOppositeContexts) {
         AddContextLink(mini, "CTX" + std::to_string(i), "G1", c);
     }
     std::string cg, rel, err;
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "G1"},
-                                   core::ChallengeSourceType::CounterArgument, cg, rel, err))
+    ASSERT_TRUE(core::AddChallenge(mini.model,
+                                   &mini.package,
+                                   {core::ArgumentTarget::Kind::Element, "G1"},
+                                   core::ChallengeSourceType::CounterArgument,
+                                   cg,
+                                   rel,
+                                   err))
         << err;
     std::string child1, child2, r1, r2, e1, e2;
     ASSERT_TRUE(core::AddChildElement(mini.model, &mini.package, cg, core::NewElementKind::Goal, child1, r1, e1)) << e1;
@@ -966,8 +998,13 @@ TEST(DialecticChallengeLayout, HeightBalancedContextsUseBothLanes) {
         AddContextLink(mini, "CTX" + std::to_string(i), "G1", c);
     }
     std::string cg, rel, err;
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "G1"},
-                                   core::ChallengeSourceType::CounterArgument, cg, rel, err))
+    ASSERT_TRUE(core::AddChallenge(mini.model,
+                                   &mini.package,
+                                   {core::ArgumentTarget::Kind::Element, "G1"},
+                                   core::ChallengeSourceType::CounterArgument,
+                                   cg,
+                                   rel,
+                                   err))
         << err;
     std::string child, rc, ec;
     ASSERT_TRUE(core::AddChildElement(mini.model, &mini.package, cg, core::NewElementKind::Goal, child, rc, ec)) << ec;
@@ -1015,11 +1052,21 @@ TEST(DialecticChallengeLayout, ChallengesToTwoSameSideContextsDoNotOverlap) {
     AddContextLink(mini, "AC2", "G1", "C2");
     AddContextLink(mini, "AC3", "G1", "C3");
     std::string a, b, ra, rb, e;
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "C1"},
-                                   core::ChallengeSourceType::CounterArgument, a, ra, e))
+    ASSERT_TRUE(core::AddChallenge(mini.model,
+                                   &mini.package,
+                                   {core::ArgumentTarget::Kind::Element, "C1"},
+                                   core::ChallengeSourceType::CounterArgument,
+                                   a,
+                                   ra,
+                                   e))
         << e;
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "C2"},
-                                   core::ChallengeSourceType::CounterArgument, b, rb, e))
+    ASSERT_TRUE(core::AddChallenge(mini.model,
+                                   &mini.package,
+                                   {core::ArgumentTarget::Kind::Element, "C2"},
+                                   core::ChallengeSourceType::CounterArgument,
+                                   b,
+                                   rb,
+                                   e))
         << e;
     ExpectNoOverlaps(LayoutOf(mini.model));
 }
@@ -1036,11 +1083,21 @@ TEST(DialecticChallengeLayout, GoalAndSameSideAssumptionChallengesDoNotOverlap) 
     AddAssumption(mini, "A1");
     AddContextLink(mini, "AC1", "G1", "A1");
     std::string cg, cga, rg, rga, e;
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "G1"},
-                                   core::ChallengeSourceType::CounterArgument, cg, rg, e))
+    ASSERT_TRUE(core::AddChallenge(mini.model,
+                                   &mini.package,
+                                   {core::ArgumentTarget::Kind::Element, "G1"},
+                                   core::ChallengeSourceType::CounterArgument,
+                                   cg,
+                                   rg,
+                                   e))
         << e;
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "A1"},
-                                   core::ChallengeSourceType::CounterArgument, cga, rga, e))
+    ASSERT_TRUE(core::AddChallenge(mini.model,
+                                   &mini.package,
+                                   {core::ArgumentTarget::Kind::Element, "A1"},
+                                   core::ChallengeSourceType::CounterArgument,
+                                   cga,
+                                   rga,
+                                   e))
         << e;
     ExpectNoOverlaps(LayoutOf(mini.model));
 }
@@ -1052,11 +1109,21 @@ TEST(DialecticChallengeLayout, TwoChallengesToSameNodeDoNotOverlap) {
     MiniCase mini;
     AddClaim(mini, "G1");
     std::string a, b, ra, rb, e;
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "G1"},
-                                   core::ChallengeSourceType::CounterArgument, a, ra, e))
+    ASSERT_TRUE(core::AddChallenge(mini.model,
+                                   &mini.package,
+                                   {core::ArgumentTarget::Kind::Element, "G1"},
+                                   core::ChallengeSourceType::CounterArgument,
+                                   a,
+                                   ra,
+                                   e))
         << e;
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, {core::ArgumentTarget::Kind::Element, "G1"},
-                                   core::ChallengeSourceType::CounterArgument, b, rb, e))
+    ASSERT_TRUE(core::AddChallenge(mini.model,
+                                   &mini.package,
+                                   {core::ArgumentTarget::Kind::Element, "G1"},
+                                   core::ChallengeSourceType::CounterArgument,
+                                   b,
+                                   rb,
+                                   e))
         << e;
     ExpectNoOverlaps(LayoutOf(mini.model));
 }
@@ -1066,13 +1133,13 @@ TEST(DialecticChallengeLayout, DevelopedChallengeStaysClear) {
     MiniCase mini = MakeBaseCase(); // G1 <- G2
     std::string cg, rel, err;
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, "G1"};
-    ASSERT_TRUE(core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument,
-                                   cg, rel, err))
+    ASSERT_TRUE(
+        core::AddChallenge(mini.model, &mini.package, target, core::ChallengeSourceType::CounterArgument, cg, rel, err))
         << err;
     // Develop the counter with its own sub-claim.
     std::string child, child_rel, err2;
-    ASSERT_TRUE(core::AddChildElement(mini.model, &mini.package, cg, core::NewElementKind::Goal, child, child_rel,
-                                      err2))
+    ASSERT_TRUE(
+        core::AddChildElement(mini.model, &mini.package, cg, core::NewElementKind::Goal, child, child_rel, err2))
         << err2;
 
     const auto layout = LayoutOf(mini.model);
@@ -1085,4 +1152,3 @@ TEST(DialecticChallengeLayout, DevelopedChallengeStaysClear) {
     EXPECT_GE(counter_child->position.y, counter->position.y + counter->size.y - 1.0f);
     ExpectNoOverlaps(layout);
 }
-

@@ -24,16 +24,15 @@ namespace {
 // second vocabulary the comparison would then have to reconcile.
 std::string lowercase_kind_name(sacm::metadata::ElementKind kind) {
     std::string name(sacm::metadata::kind_name(kind));
-    std::transform(name.begin(), name.end(), name.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::transform(
+        name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return name;
 }
 
 // The legacy POD keys language maps by tag, defaulting an absent tag to "en"
 // (xml_parser.cpp extract_name/extract_description). Mirror that so the language
 // toggle sees the same keys.
-void fill_lang_map(std::map<std::string, std::string>& out,
-                   const sacm::model::MultiLangString& value) {
+void fill_lang_map(std::map<std::string, std::string>& out, const sacm::model::MultiLangString& value) {
     for (const sacm::model::LangString& entry : value.values) {
         if (entry.content.empty()) {
             continue;
@@ -59,8 +58,7 @@ void fill_lang_map(std::map<std::string, std::string>& out,
 // Without both, a case with translations changed meaning every time it was
 // projected and serialized, which also made its canonical hash unstable and
 // left the audit verifier reporting a divergence Reconcile could never clear.
-void merge_overflow_langs(std::map<std::string, std::string>& out,
-                          const sacm::model::MultiLangString& overflow) {
+void merge_overflow_langs(std::map<std::string, std::string>& out, const sacm::model::MultiLangString& overflow) {
     for (const sacm::model::LangString& entry : overflow.values) {
         if (entry.content.empty() || entry.lang.empty()) {
             continue;
@@ -92,7 +90,8 @@ std::string tagged_value_for(const sacm::model::ModelElement& element, const std
     return {};
 }
 
-void collect_acps(const sacm::model::ModelElement& element, std::string_view target_kind,
+void collect_acps(const sacm::model::ModelElement& element,
+                  std::string_view target_kind,
                   std::vector<core::AcpRecord>& out) {
     std::unordered_set<std::string> seen;
     for (const auto& tag : element.tagged_values()) {
@@ -182,8 +181,7 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
             // statement is what reproduces the legacy parser's `description`
             // field for such a claim. A genuine note (a real second Description,
             // e.g. written by the Description edit seam) is read from slot 1.
-            const sacm::model::MultiLangString& note =
-                descriptions.size() > 1 ? descriptions[1]->content() : statement;
+            const sacm::model::MultiLangString& note = descriptions.size() > 1 ? descriptions[1]->content() : statement;
             projected.description = note.primary();
             projected.description_langs.clear();
             fill_lang_map(projected.description_langs, note);
@@ -201,8 +199,7 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
     }
 
     if (const auto* assertion = dynamic_cast<const sacm::model::Assertion*>(&element)) {
-        projected.assertion_declaration =
-            sacm::model::assertion_declaration_name(assertion->assertion_declaration());
+        projected.assertion_declaration = sacm::model::assertion_declaration_name(assertion->assertion_declaration());
         // A GSN Justification is stored as `axiomatic` plus a vendor gsn.role
         // tag (SACM cannot express the node type; see gsn_role_tag.h). Translate
         // it back to the app's internal "justification" so the tree classifier
@@ -212,12 +209,9 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
         // reserved kImportAssertionDeclarationKey tag, which we also honour so old
         // files render (and re-save via gsn.role) as Justifications.
         if (assertion->assertion_declaration() == sacm::model::AssertionDeclaration::Axiomatic) {
-            if (const auto* model_element =
-                    dynamic_cast<const sacm::model::ModelElement*>(&element)) {
-                const bool via_gsn_role =
-                    tagged_value_for(*model_element, kGsnRoleTagKey) == kGsnRoleJustification;
-                const bool via_import = tagged_value_for(*model_element,
-                                                         kImportAssertionDeclarationKey) ==
+            if (const auto* model_element = dynamic_cast<const sacm::model::ModelElement*>(&element)) {
+                const bool via_gsn_role = tagged_value_for(*model_element, kGsnRoleTagKey) == kGsnRoleJustification;
+                const bool via_import = tagged_value_for(*model_element, kImportAssertionDeclarationKey) ==
                                         kImportAssertionDeclarationJustification;
                 if (via_gsn_role || via_import) {
                     projected.assertion_declaration = "justification";
@@ -227,12 +221,10 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
         projected.meta_claim_refs = to_id_strings(assertion->meta_claims());
         // GSN "undeveloped" is `needsSupport` in SACM terms; see
         // docs/sacm/sacm-gsn-mapping.md.
-        projected.undeveloped =
-            assertion->assertion_declaration() == sacm::model::AssertionDeclaration::NeedsSupport;
+        projected.undeveloped = assertion->assertion_declaration() == sacm::model::AssertionDeclaration::NeedsSupport;
     }
 
-    if (const auto* relationship =
-            dynamic_cast<const sacm::model::AssertedRelationship*>(&element)) {
+    if (const auto* relationship = dynamic_cast<const sacm::model::AssertedRelationship*>(&element)) {
         projected.source_refs = to_id_strings(relationship->sources());
         projected.target_refs = to_id_strings(relationship->targets());
         projected.is_counter = relationship->is_counter();
@@ -304,12 +296,9 @@ core::AssuranceCase project_case(const LibraryDocument& document) {
         // Synthesize any Assurance Claim Points this element carries. Target
         // kind mirrors the legacy parser: relationships are "relationship",
         // everything else "element".
-        if (const auto* model_element =
-                dynamic_cast<const sacm::model::ModelElement*>(&element)) {
-            const bool is_relationship =
-                dynamic_cast<const sacm::model::AssertedRelationship*>(&element) != nullptr;
-            collect_acps(*model_element, is_relationship ? "relationship" : "element",
-                         projected.acps);
+        if (const auto* model_element = dynamic_cast<const sacm::model::ModelElement*>(&element)) {
+            const bool is_relationship = dynamic_cast<const sacm::model::AssertedRelationship*>(&element) != nullptr;
+            collect_acps(*model_element, is_relationship ? "relationship" : "element", projected.acps);
         }
     });
 
@@ -389,14 +378,12 @@ std::vector<sacm::TerminologyPackage> project_terminology_packages(const Library
                     projected_term.category_refs.push_back(category.value());
                 }
                 projected.terms.push_back(std::move(projected_term));
-            } else if (const auto* expression =
-                           dynamic_cast<const sacm::model::Expression*>(element.get())) {
+            } else if (const auto* expression = dynamic_cast<const sacm::model::Expression*>(element.get())) {
                 sacm::Expression projected_expression;
                 copy_common_legacy_fields(projected_expression, *expression);
                 projected_expression.value = expression->value();
                 projected.expressions.push_back(std::move(projected_expression));
-            } else if (const auto* category =
-                           dynamic_cast<const sacm::model::Category*>(element.get())) {
+            } else if (const auto* category = dynamic_cast<const sacm::model::Category*>(element.get())) {
                 sacm::Category projected_category;
                 copy_common_legacy_fields(projected_category, *category);
                 projected.categories.push_back(std::move(projected_category));
@@ -413,8 +400,7 @@ namespace {
 
 // Indexes every legacy element in the package by id so a library element's tags
 // can be attached to its counterpart in one pass.
-void index_by_id(sacm::SacmElement& element,
-                 std::unordered_map<std::string, sacm::SacmElement*>& by_id) {
+void index_by_id(sacm::SacmElement& element, std::unordered_map<std::string, sacm::SacmElement*>& by_id) {
     if (!element.id.empty()) {
         by_id[element.id] = &element;
     }
@@ -423,50 +409,59 @@ void index_by_id(sacm::SacmElement& element,
 void index_terminology_package(sacm::TerminologyPackage& tp,
                                std::unordered_map<std::string, sacm::SacmElement*>& by_id) {
     index_by_id(tp, by_id);
-    for (sacm::Category& c : tp.categories) index_by_id(c, by_id);
-    for (sacm::Expression& e : tp.expressions) index_by_id(e, by_id);
-    for (sacm::Term& t : tp.terms) index_by_id(t, by_id);
+    for (sacm::Category& c : tp.categories)
+        index_by_id(c, by_id);
+    for (sacm::Expression& e : tp.expressions)
+        index_by_id(e, by_id);
+    for (sacm::Term& t : tp.terms)
+        index_by_id(t, by_id);
 }
 
 } // namespace
 
-void copy_library_tags_onto_package(const LibraryDocument& document,
-                                    sacm::AssuranceCasePackage& package) {
+void copy_library_tags_onto_package(const LibraryDocument& document, sacm::AssuranceCasePackage& package) {
     std::unordered_map<std::string, sacm::SacmElement*> by_id;
     // ArtifactReference is indexed separately (by concrete type) so the
     // referencedArtifact the POD drops can be restored -- terminology detection
     // relies on it.
     std::unordered_map<std::string, sacm::ArtifactReference*> artifact_refs_by_id;
     index_by_id(package, by_id);
-    for (sacm::TerminologyPackage& tp : package.terminologyPackages) index_terminology_package(tp, by_id);
+    for (sacm::TerminologyPackage& tp : package.terminologyPackages)
+        index_terminology_package(tp, by_id);
     for (sacm::ArtifactPackage& ap : package.artifactPackages) {
         index_by_id(ap, by_id);
-        for (sacm::Artifact& a : ap.artifacts) index_by_id(a, by_id);
+        for (sacm::Artifact& a : ap.artifacts)
+            index_by_id(a, by_id);
     }
     for (sacm::ArgumentPackage& ap : package.argumentPackages) {
         index_by_id(ap, by_id);
-        for (sacm::Claim& c : ap.claims) index_by_id(c, by_id);
-        for (sacm::ArgumentReasoning& r : ap.argumentReasonings) index_by_id(r, by_id);
+        for (sacm::Claim& c : ap.claims)
+            index_by_id(c, by_id);
+        for (sacm::ArgumentReasoning& r : ap.argumentReasonings)
+            index_by_id(r, by_id);
         for (sacm::ArtifactReference& r : ap.artifactReferences) {
             index_by_id(r, by_id);
-            if (!r.id.empty()) artifact_refs_by_id[r.id] = &r;
+            if (!r.id.empty())
+                artifact_refs_by_id[r.id] = &r;
         }
-        for (sacm::AssertedInference& r : ap.assertedInferences) index_by_id(r, by_id);
-        for (sacm::AssertedContext& r : ap.assertedContexts) index_by_id(r, by_id);
-        for (sacm::AssertedEvidence& r : ap.assertedEvidences) index_by_id(r, by_id);
-        for (sacm::TerminologyPackage& tp : ap.terminologyPackages) index_terminology_package(tp, by_id);
+        for (sacm::AssertedInference& r : ap.assertedInferences)
+            index_by_id(r, by_id);
+        for (sacm::AssertedContext& r : ap.assertedContexts)
+            index_by_id(r, by_id);
+        for (sacm::AssertedEvidence& r : ap.assertedEvidences)
+            index_by_id(r, by_id);
+        for (sacm::TerminologyPackage& tp : ap.terminologyPackages)
+            index_terminology_package(tp, by_id);
     }
 
     const sacm::model::Document& source = LibraryDocumentAccess::document(document);
     source.for_each_element([&](const sacm::model::SACMElement& element) {
         const std::string id = element.id().value();
         // Restore referencedArtifact on artifact references (dropped by the POD).
-        if (const auto* library_ref =
-                dynamic_cast<const sacm::model::ArtifactReference*>(&element)) {
+        if (const auto* library_ref = dynamic_cast<const sacm::model::ArtifactReference*>(&element)) {
             const auto it = artifact_refs_by_id.find(id);
             if (it != artifact_refs_by_id.end() && !library_ref->referenced_artifact_elements().empty()) {
-                it->second->referencedArtifact =
-                    library_ref->referenced_artifact_elements().front().value();
+                it->second->referencedArtifact = library_ref->referenced_artifact_elements().front().value();
             }
         }
         // Restore vendor TaggedValues (ACP, confidence-package, GSN-role).

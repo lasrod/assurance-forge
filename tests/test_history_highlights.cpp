@@ -58,15 +58,17 @@ TEST(HistoryHighlights, SequenceZeroReturnsEmpty) {
 TEST(HistoryHighlights, SequenceSelectsExactTransaction) {
     std::vector<core::audit::AuditTransaction> txs;
     txs.push_back(MakeTx(1, {MakeEvent("CreateTopGoal", {{"generated_id", "G1"}})}));
-    txs.push_back(MakeTx(2, {MakeEvent("CreateChildElement",
-                                       {{"parent_id", "G1"},
-                                        {"kind", "Strategy"},
-                                        {"generated_id", "S1"},
-                                        {"generated_relationship_id", "AI1"}})}));
-    txs.push_back(MakeTx(3, {MakeEvent("RemoveElement",
-                                       {{"element_id", "S1"},
-                                        {"mode", "NodeAndDescendants"},
-                                        {"deleted_ids", nlohmann::ordered_json::array({"S1", "AI1"})}})}));
+    txs.push_back(MakeTx(2,
+                         {MakeEvent("CreateChildElement",
+                                    {{"parent_id", "G1"},
+                                     {"kind", "Strategy"},
+                                     {"generated_id", "S1"},
+                                     {"generated_relationship_id", "AI1"}})}));
+    txs.push_back(MakeTx(3,
+                         {MakeEvent("RemoveElement",
+                                    {{"element_id", "S1"},
+                                     {"mode", "NodeAndDescendants"},
+                                     {"deleted_ids", nlohmann::ordered_json::array({"S1", "AI1"})}})}));
 
     const auto h1 = core::audit::BuildHistoryHighlightsForSequence(txs, 1);
     ASSERT_EQ(h1.size(), 1u);

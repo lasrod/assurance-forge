@@ -212,8 +212,7 @@ TEST(ReviewItemManagerTest, KeepsWhatItHasWhenALoadFails) {
 
     EXPECT_FALSE(manager.Load(error));
     EXPECT_FALSE(error.empty());
-    EXPECT_EQ(manager.GetItems().size(), 1u)
-        << "a read that failed emptied the review items";
+    EXPECT_EQ(manager.GetItems().size(), 1u) << "a read that failed emptied the review items";
     EXPECT_EQ(manager.GetItemsForElement("G1").size(), 1u);
 }
 

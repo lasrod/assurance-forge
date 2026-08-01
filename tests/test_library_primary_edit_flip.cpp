@@ -61,8 +61,7 @@ constexpr const char* kSampleSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
 
 std::filesystem::path MakeTempProjectRoot(const std::string& tag) {
     auto root = std::filesystem::temp_directory_path() /
-                ("af_liveflip_" + tag + "_" +
-                 std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
+                ("af_liveflip_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(root);
     return root;
@@ -78,12 +77,12 @@ void WriteFile(const std::filesystem::path& path, std::string_view content) {
 // for the legacy-path fixture, which is exactly how a legacy-parser-fallback
 // load (and the no-bus dispatch path) reaches the commands.
 struct EditFixture {
-    core::AssuranceProject                        project;
-    std::filesystem::path                         sacm_abs;
-    sacm::AssuranceCasePackage                    package;
-    parser::AssuranceCase                         model;
+    core::AssuranceProject project;
+    std::filesystem::path sacm_abs;
+    sacm::AssuranceCasePackage package;
+    parser::AssuranceCase model;
     std::unique_ptr<sacm_adapter::LibraryDocument> document;
-    std::unique_ptr<core::commands::CommandBus>   bus;
+    std::unique_ptr<core::commands::CommandBus> bus;
 };
 
 // Builds a project whose in-memory views are derived exactly the way
@@ -143,8 +142,8 @@ std::string CanonicalHash(const EditFixture& fixture) {
 // ctx.model, so the views must be fresh before the next one: re-derive here, exactly
 // as the frame boundary would. An unflipped command leaves library_primary false and
 // mutated the views in place, so nothing to do.
-core::commands::CommandResult RunCommand(EditFixture& fixture, core::commands::ICommand& command,
-                                         core::commands::CommandContext& ctx) {
+core::commands::CommandResult
+RunCommand(EditFixture& fixture, core::commands::ICommand& command, core::commands::CommandContext& ctx) {
     core::commands::CommandResult result = fixture.bus->Execute(command, ctx, "tester");
     if (ctx.library_primary && fixture.document != nullptr)
         core::RebuildDerivedViewsFromLibrary(*fixture.document, fixture.model, fixture.package);
@@ -152,8 +151,9 @@ core::commands::CommandResult RunCommand(EditFixture& fixture, core::commands::I
 }
 
 const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const std::string& id) {
-    const auto it = std::find_if(model.elements.begin(), model.elements.end(),
-                                 [&](const parser::SacmElement& element) { return element.id == id; });
+    const auto it = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
+        return element.id == id;
+    });
     return it == model.elements.end() ? nullptr : &*it;
 }
 
@@ -210,17 +210,15 @@ CreateSequenceIds RunCreateSequence(EditFixture& fixture) {
     // Extending the strategy's single inference creates no relationship.
     EXPECT_TRUE(add_sub_two.GeneratedRelationshipId().empty());
 
-    core::commands::CreateChildElementCommand add_solution(ids.sub_goal_one,
-                                                           core::NewElementKind::Solution);
+    core::commands::CreateChildElementCommand add_solution(ids.sub_goal_one, core::NewElementKind::Solution);
     EXPECT_TRUE(RunCommand(fixture, add_solution, ctx).success);
     ids.solution = add_solution.GeneratedId();
 
     core::commands::CreateChildElementCommand add_context("G1", core::NewElementKind::Context);
     EXPECT_TRUE(RunCommand(fixture, add_context, ctx).success);
 
-    core::commands::CreateChallengeCommand challenge(
-        core::ArgumentTarget{core::ArgumentTarget::Kind::Element, "G1"},
-        core::ChallengeSourceType::CounterArgument);
+    core::commands::CreateChallengeCommand challenge(core::ArgumentTarget{core::ArgumentTarget::Kind::Element, "G1"},
+                                                     core::ChallengeSourceType::CounterArgument);
     EXPECT_TRUE(RunCommand(fixture, challenge, ctx).success);
     ids.challenge = challenge.GeneratedId();
     ids.challenge_relationship = challenge.GeneratedRelationshipId();
@@ -268,8 +266,7 @@ TEST(LibraryPrimaryEditFlip, RemoveLeafMatchesLegacyCanonicalHash) {
     const auto run = [](EditFixture& fixture) {
         const CreateSequenceIds ids = RunCreateSequence(fixture);
         core::commands::CommandContext ctx = MakeContext(fixture);
-        core::commands::RemoveElementCommand remove(ids.solution,
-                                                    core::RemoveMode::NodeAndDescendants);
+        core::commands::RemoveElementCommand remove(ids.solution, core::RemoveMode::NodeAndDescendants);
         EXPECT_TRUE(RunCommand(fixture, remove, ctx).success);
         EXPECT_EQ(remove.RemovedCount(), 1u);
         EXPECT_EQ(FindElement(fixture.model, ids.solution), nullptr);
@@ -299,8 +296,7 @@ TEST(LibraryPrimaryEditFlip, RemoveKeepsSiblingUnderSharedStrategyInference) {
         const CreateSequenceIds ids = RunCreateSequence(fixture);
         core::commands::CommandContext ctx = MakeContext(fixture);
 
-        core::commands::RemoveElementCommand remove(ids.sub_goal_one,
-                                                    core::RemoveMode::NodeAndDescendants);
+        core::commands::RemoveElementCommand remove(ids.sub_goal_one, core::RemoveMode::NodeAndDescendants);
         EXPECT_TRUE(RunCommand(fixture, remove, ctx).success);
 
         // The strategy's inference survives, now sourced by the other sub-goal.
@@ -313,13 +309,11 @@ TEST(LibraryPrimaryEditFlip, RemoveKeepsSiblingUnderSharedStrategyInference) {
                 EXPECT_EQ(inference.sources, std::vector<std::string>{ids.sub_goal_two});
             }
         }
-        EXPECT_TRUE(inference_survives)
-            << "deleting one sub-goal detached the strategy from the argument";
+        EXPECT_TRUE(inference_survives) << "deleting one sub-goal detached the strategy from the argument";
 
         // A flipped command right after the fallback: its rebuild reads the
         // library, so this only holds if the library stayed in step.
-        core::commands::CreateChildElementCommand add_goal(ids.sub_goal_two,
-                                                           core::NewElementKind::Solution);
+        core::commands::CreateChildElementCommand add_goal(ids.sub_goal_two, core::NewElementKind::Solution);
         EXPECT_TRUE(RunCommand(fixture, add_goal, ctx).success);
     };
     run(*library_side);
@@ -351,8 +345,7 @@ TEST(LibraryPrimaryEditFlip, RemoveNodeOnlyInteriorReparentsMatchesLegacy) {
 
         core::commands::RemoveElementCommand remove(e_id, core::RemoveMode::NodeOnly);
         EXPECT_TRUE(RunCommand(fixture, remove, ctx).success);
-        EXPECT_FALSE(ctx.library_primary)
-            << "NodeOnly took the library-primary seam, which cannot reparent";
+        EXPECT_FALSE(ctx.library_primary) << "NodeOnly took the library-primary seam, which cannot reparent";
         // E is gone; C survives, reparented onto G1.
         EXPECT_EQ(FindElement(fixture.model, e_id), nullptr);
         EXPECT_NE(FindElement(fixture.model, c_id), nullptr);
@@ -383,14 +376,14 @@ TEST(LibraryPrimaryEditFlip, TextEditsMatchLegacyCanonicalHash) {
         EXPECT_TRUE(RunCommand(fixture, add_sub, ctx).success);
         const std::string sub_id = add_sub.GeneratedId();
 
-        core::commands::UpdateElementTextCommand name_edit("G1", core::ElementTextField::Name, "en",
-                                                           "Revised top goal");
+        core::commands::UpdateElementTextCommand name_edit(
+            "G1", core::ElementTextField::Name, "en", "Revised top goal");
         EXPECT_TRUE(RunCommand(fixture, name_edit, ctx).success);
-        core::commands::UpdateElementTextCommand content_edit("G1", core::ElementTextField::Content, "en",
-                                                              "The system is fully safe.");
+        core::commands::UpdateElementTextCommand content_edit(
+            "G1", core::ElementTextField::Content, "en", "The system is fully safe.");
         EXPECT_TRUE(RunCommand(fixture, content_edit, ctx).success);
-        core::commands::UpdateElementTextCommand sub_content(sub_id, core::ElementTextField::Content, "en",
-                                                             "The subsystem is acceptably safe.");
+        core::commands::UpdateElementTextCommand sub_content(
+            sub_id, core::ElementTextField::Content, "en", "The subsystem is acceptably safe.");
         EXPECT_TRUE(RunCommand(fixture, sub_content, ctx).success);
     };
     run(*library_side);
@@ -419,7 +412,7 @@ TEST(LibraryPrimaryEditFlip, TerminologyEditsMatchLegacyCanonicalHash) {
 
         core::TerminologyTermDraft draft;
         draft.value = "ODD";
-        draft.name  = "Operational Design Domain";
+        draft.name = "Operational Design Domain";
         core::commands::CreateTerminologyTermCommand create_term(pkg, draft);
         EXPECT_TRUE(RunCommand(fixture, create_term, ctx).success);
         const core::TerminologyTermRef term = create_term.GeneratedRef();
@@ -464,10 +457,10 @@ TEST(LibraryPrimaryEditFlip, AcpEditsMatchLegacyCanonicalHash) {
         EXPECT_FALSE(acp_id.empty());
 
         parser::AcpRecord edited;
-        edited.id              = acp_id;
-        edited.name            = "Confidence in the test report";
-        edited.target_kind     = "element";
-        edited.target_id       = solution_id;
+        edited.id = acp_id;
+        edited.name = "Confidence in the test report";
+        edited.target_kind = "element";
+        edited.target_id = solution_id;
         edited.resolution_kind = "none";
         core::commands::UpsertAcpCommand upsert(edited);
         EXPECT_TRUE(RunCommand(fixture, upsert, ctx).success);
@@ -540,8 +533,7 @@ TEST(LibraryPrimaryEditFlip, TreeDropMatchesLegacyCanonicalHash) {
         // must land in the library, not just the transient views.
         core::commands::ReorderSiblingsCommand reorder(sub2_id, sub1_id, core::TreeDropMode::Before);
         EXPECT_TRUE(RunCommand(fixture, reorder, ctx).success);
-        EXPECT_EQ(StrategyInferenceSources(fixture.package, strategy_id),
-                  (std::vector<std::string>{sub2_id, sub1_id}))
+        EXPECT_EQ(StrategyInferenceSources(fixture.package, strategy_id), (std::vector<std::string>{sub2_id, sub1_id}))
             << "the library-primary reorder did not reach the saved model";
 
         // A move changes the relationship structure, so it moves the (order-insensitive)
@@ -618,8 +610,7 @@ TEST(LibraryPrimaryEditFlip, RebuiltModelKeepsBareStrategyPlacement) {
     const std::string strategy_id = add_strategy.GeneratedId();
 
     ASSERT_TRUE(HasElementOfType(fixture->model, strategy_id, "argumentreasoning"));
-    const parser::SacmElement* placeholder =
-        FindElement(fixture->model, strategy_id + "__pending_inference");
+    const parser::SacmElement* placeholder = FindElement(fixture->model, strategy_id + "__pending_inference");
     ASSERT_NE(placeholder, nullptr) << "bare strategy lost its synthesized placement";
     EXPECT_EQ(placeholder->type, "assertedinference");
     EXPECT_EQ(placeholder->reasoning_ref, strategy_id);
@@ -631,8 +622,7 @@ TEST(LibraryPrimaryEditFlip, RebuiltModelKeepsBareStrategyPlacement) {
     core::commands::CreateChildElementCommand add_sub(strategy_id, core::NewElementKind::Goal);
     ASSERT_TRUE(RunCommand(*fixture, add_sub, ctx).success);
     EXPECT_EQ(FindElement(fixture->model, strategy_id + "__pending_inference"), nullptr);
-    const parser::SacmElement* inference =
-        FindElement(fixture->model, add_sub.GeneratedRelationshipId());
+    const parser::SacmElement* inference = FindElement(fixture->model, add_sub.GeneratedRelationshipId());
     ASSERT_NE(inference, nullptr);
     EXPECT_EQ(inference->reasoning_ref, strategy_id);
 }
@@ -660,8 +650,7 @@ TEST(LibraryPrimaryEditFlip, RebuiltModelKeepsTerminologyHiddenButLibraryKeepsIt
     core::commands::CreateTerminologyTermCommand create_term(package_ref, draft);
     ASSERT_TRUE(RunCommand(*fixture, create_term, ctx).success);
 
-    core::commands::AssociateTerminologyTermWithElementCommand associate("G1", package_ref,
-                                                                         create_term.GeneratedRef());
+    core::commands::AssociateTerminologyTermWithElementCommand associate("G1", package_ref, create_term.GeneratedRef());
     ASSERT_TRUE(RunCommand(*fixture, associate, ctx).success);
     const std::string artifact_reference_id = associate.Result().artifact_reference_id;
     ASSERT_FALSE(artifact_reference_id.empty());
@@ -729,7 +718,6 @@ TEST(LibraryPrimaryEditFlip, LegacyCommandAfterFlippedKeepsItsEditOnDisk) {
         term_count += argument_package.terminologyPackages.size();
     EXPECT_EQ(term_count, 1u) << "the legacy terminology edit was clobbered by a stale library_primary";
 }
-
 
 // The interactive app disables the flip via CommandContext::allow_library_primary
 // (a GUI re-entrancy hotfix); with it false, a flippable command must take the

@@ -16,7 +16,7 @@ namespace core::audit {
 inline constexpr int kManifestSchemaVersion = 1;
 
 struct AuditManifest {
-    int         manifest_schema_version = kManifestSchemaVersion;
+    int manifest_schema_version = kManifestSchemaVersion;
     std::string project_id;
     std::string created_at;
     std::string created_by;

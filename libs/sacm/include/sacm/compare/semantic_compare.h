@@ -22,7 +22,6 @@ struct SemanticDifference {
 // within their containment, tolerates ordering differences, normalizes
 // attribute defaults, and compares language maps and reference multisets.
 // Empty result means semantically equivalent.
-std::vector<SemanticDifference> semantic_compare(const model::Document& left,
-                                                 const model::Document& right);
+std::vector<SemanticDifference> semantic_compare(const model::Document& left, const model::Document& right);
 
-}  // namespace sacm::compare
+} // namespace sacm::compare

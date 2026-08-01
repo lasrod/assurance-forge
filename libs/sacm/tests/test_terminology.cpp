@@ -17,11 +17,11 @@ using sacm::commands::CreateExpression;
 using sacm::commands::CreateTerm;
 using sacm::commands::CreateTerminologyPackage;
 using sacm::commands::DeleteElement;
+using sacm::commands::ReferenceDeletePolicy;
 using sacm::commands::SetExpressionCategories;
 using sacm::commands::SetExpressionValue;
 using sacm::commands::SetTermExternalReference;
 using sacm::commands::SetTermOrigin;
-using sacm::commands::ReferenceDeletePolicy;
 using sacm::io::LoadOptions;
 using sacm::io::LoadResult;
 using sacm::io::Mode;
@@ -33,8 +33,8 @@ std::filesystem::path fixture(std::string_view name) {
 }
 
 TEST(Sacm23Terminology, SACM23_TERM_001_TerminologyHeavyFixtureRoundTrips) {
-    const LoadResult first = sacm::io::load_xmi_file(fixture("terminology-full-valid.sacm.xmi"),
-                                                     LoadOptions{.mode = Mode::Strict});
+    const LoadResult first =
+        sacm::io::load_xmi_file(fixture("terminology-full-valid.sacm.xmi"), LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(first.ok) << (first.diagnostics.empty() ? "" : first.diagnostics.front().message);
     const auto& document = *first.document;
 
@@ -47,7 +47,7 @@ TEST(Sacm23Terminology, SACM23_TERM_001_TerminologyHeavyFixtureRoundTrips) {
 
     const auto* category = document.find_as<sacm::model::Category>(ElementId{"cat_standards"});
     ASSERT_NE(category, nullptr);
-    ASSERT_EQ(category->categories().size(), 1u);  // SACM 2.3 sub-category
+    ASSERT_EQ(category->categories().size(), 1u); // SACM 2.3 sub-category
 
     const auto* expression = document.find_as<sacm::model::Expression>(ElementId{"expr_1"});
     ASSERT_NE(expression, nullptr);
@@ -73,29 +73,24 @@ TEST(Sacm23Terminology, SACM23_TERM_001_TerminologyHeavyFixtureRoundTrips) {
 }
 
 TEST(Sacm23Terminology, SACM23_TERM_001_CategoryReferenceToNonCategoryIsInvalid) {
-    const LoadResult result =
-        sacm::io::load_xmi_file(fixture("invalid/category-ref-wrong-type-invalid.sacm.xmi"),
-                                LoadOptions{.mode = Mode::Strict});
+    const LoadResult result = sacm::io::load_xmi_file(fixture("invalid/category-ref-wrong-type-invalid.sacm.xmi"),
+                                                      LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(result.document.has_value());
     const auto diagnostics = sacm::validation::validate(*result.document);
-    EXPECT_TRUE(std::ranges::any_of(diagnostics, [](const auto& diagnostic) {
-        return diagnostic.code == sacm::validation::codes::kRefWrongType;
-    }));
+    EXPECT_TRUE(std::ranges::any_of(
+        diagnostics, [](const auto& diagnostic) { return diagnostic.code == sacm::validation::codes::kRefWrongType; }));
 }
 
 TEST(Sacm23Terminology, SACM23_TERM_001_CreatesAndDeletesTerminologyElements) {
     Document document;
-    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"})
-                    .applied);
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"}).applied);
     ASSERT_TRUE(document
                     .apply(CreateTerminologyPackage{
                         .parent = ElementId{"acp_1"}, .id = ElementId{"termpkg_1"}, .name = "Vocab"})
                     .applied);
-    ASSERT_TRUE(document
-                    .apply(CreateCategory{.parent = ElementId{"termpkg_1"},
-                                          .id = ElementId{"cat_1"},
-                                          .name = "Standards"})
-                    .applied);
+    ASSERT_TRUE(
+        document.apply(CreateCategory{.parent = ElementId{"termpkg_1"}, .id = ElementId{"cat_1"}, .name = "Standards"})
+            .applied);
     ASSERT_TRUE(document
                     .apply(CreateTerm{.parent = ElementId{"termpkg_1"},
                                       .id = ElementId{"term_1"},
@@ -103,15 +98,13 @@ TEST(Sacm23Terminology, SACM23_TERM_001_CreatesAndDeletesTerminologyElements) {
                                       .value = "ISO 26262",
                                       .external_reference = "https://iso.org"})
                     .applied);
-    ASSERT_TRUE(document
-                    .apply(CreateExpression{.parent = ElementId{"termpkg_1"},
-                                            .id = ElementId{"expr_1"},
-                                            .name = "Expr",
-                                            .value = "{ISO 26262}"})
-                    .applied);
+    ASSERT_TRUE(
+        document
+            .apply(CreateExpression{
+                .parent = ElementId{"termpkg_1"}, .id = ElementId{"expr_1"}, .name = "Expr", .value = "{ISO 26262}"})
+            .applied);
 
-    const auto* package =
-        document.find_as<sacm::model::TerminologyPackage>(ElementId{"termpkg_1"});
+    const auto* package = document.find_as<sacm::model::TerminologyPackage>(ElementId{"termpkg_1"});
     ASSERT_NE(package, nullptr);
     EXPECT_EQ(package->terminology_elements().size(), 3u);
     EXPECT_TRUE(sacm::validation::validate(document).empty());
@@ -119,16 +112,14 @@ TEST(Sacm23Terminology, SACM23_TERM_001_CreatesAndDeletesTerminologyElements) {
     // Round-trips through strict save.
     const auto saved = sacm::io::save_xmi_string(document);
     ASSERT_TRUE(saved.ok);
-    const LoadResult reloaded =
-        sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(reloaded.ok);
     EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
 
     // Deleting the term is policy-controlled and leaves the document valid.
     ASSERT_TRUE(document
-                    .apply(DeleteElement{
-                        .target = ElementId{"term_1"},
-                        .reference_policy = ReferenceDeletePolicy::DeleteReferencingRelationships})
+                    .apply(DeleteElement{.target = ElementId{"term_1"},
+                                         .reference_policy = ReferenceDeletePolicy::DeleteReferencingRelationships})
                     .applied);
     EXPECT_EQ(document.find(ElementId{"term_1"}), nullptr);
     EXPECT_TRUE(sacm::validation::validate(document).empty());
@@ -139,41 +130,29 @@ TEST(Sacm23Terminology, SACM23_TERM_001_CreatesAndDeletesTerminologyElements) {
 // Each command applies, and the edited term round-trips through strict save.
 TEST(Sacm23Terminology, SACM23_TERM_001_UpdatesTermFieldsWithCommands) {
     Document document;
-    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"})
-                    .applied);
-    ASSERT_TRUE(document
-                    .apply(CreateTerminologyPackage{
-                        .parent = ElementId{"acp_1"}, .id = ElementId{"tp_1"}, .name = "Vocab"})
-                    .applied);
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"}).applied);
     ASSERT_TRUE(
-        document.apply(CreateCategory{.parent = ElementId{"tp_1"}, .id = ElementId{"cat_1"}, .name = "C1"})
+        document.apply(CreateTerminologyPackage{.parent = ElementId{"acp_1"}, .id = ElementId{"tp_1"}, .name = "Vocab"})
             .applied);
     ASSERT_TRUE(
-        document.apply(CreateCategory{.parent = ElementId{"tp_1"}, .id = ElementId{"cat_2"}, .name = "C2"})
+        document.apply(CreateCategory{.parent = ElementId{"tp_1"}, .id = ElementId{"cat_1"}, .name = "C1"}).applied);
+    ASSERT_TRUE(
+        document.apply(CreateCategory{.parent = ElementId{"tp_1"}, .id = ElementId{"cat_2"}, .name = "C2"}).applied);
+    ASSERT_TRUE(
+        document.apply(CreateTerm{.parent = ElementId{"tp_1"}, .id = ElementId{"term_1"}, .name = "T", .value = "old"})
             .applied);
-    ASSERT_TRUE(document
-                    .apply(CreateTerm{.parent = ElementId{"tp_1"},
-                                      .id = ElementId{"term_1"},
-                                      .name = "T",
-                                      .value = "old"})
-                    .applied);
 
-    ASSERT_TRUE(
-        document.apply(SetExpressionValue{.element = ElementId{"term_1"}, .value = "new value"})
-            .applied);
+    ASSERT_TRUE(document.apply(SetExpressionValue{.element = ElementId{"term_1"}, .value = "new value"}).applied);
     ASSERT_TRUE(document
                     .apply(SetTermExternalReference{.element = ElementId{"term_1"},
                                                     .external_reference = "https://example.org"})
                     .applied);
     ASSERT_TRUE(document
-                    .apply(SetExpressionCategories{
-                        .element = ElementId{"term_1"},
-                        .categories = {ElementId{"cat_1"}, ElementId{"cat_2"}}})
+                    .apply(SetExpressionCategories{.element = ElementId{"term_1"},
+                                                   .categories = {ElementId{"cat_1"}, ElementId{"cat_2"}}})
                     .applied);
     // origin references any element (the library validates existence only).
-    ASSERT_TRUE(
-        document.apply(SetTermOrigin{.element = ElementId{"term_1"}, .origin = ElementId{"cat_1"}})
-            .applied);
+    ASSERT_TRUE(document.apply(SetTermOrigin{.element = ElementId{"term_1"}, .origin = ElementId{"cat_1"}}).applied);
 
     const auto* term = document.find_as<sacm::model::Term>(ElementId{"term_1"});
     ASSERT_NE(term, nullptr);
@@ -186,14 +165,12 @@ TEST(Sacm23Terminology, SACM23_TERM_001_UpdatesTermFieldsWithCommands) {
     EXPECT_TRUE(sacm::validation::validate(document).empty());
     const auto saved = sacm::io::save_xmi_string(document);
     ASSERT_TRUE(saved.ok);
-    const LoadResult reloaded =
-        sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(reloaded.ok);
     EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
 
     // origin can be cleared.
-    ASSERT_TRUE(document.apply(SetTermOrigin{.element = ElementId{"term_1"}, .origin = std::nullopt})
-                    .applied);
+    ASSERT_TRUE(document.apply(SetTermOrigin{.element = ElementId{"term_1"}, .origin = std::nullopt}).applied);
     EXPECT_FALSE(document.find_as<sacm::model::Term>(ElementId{"term_1"})->origin().has_value());
 }
 
@@ -202,28 +179,23 @@ TEST(Sacm23Terminology, SACM23_TERM_001_UpdatesTermFieldsWithCommands) {
 // must resolve to a Category.
 TEST(Sacm23Terminology, SACM23_TERM_001_TermUpdateCommandsValidateTargets) {
     Document document;
-    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"})
-                    .applied);
-    ASSERT_TRUE(document
-                    .apply(CreateTerminologyPackage{
-                        .parent = ElementId{"acp_1"}, .id = ElementId{"tp_1"}, .name = "Vocab"})
-                    .applied);
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"}).applied);
     ASSERT_TRUE(
-        document.apply(CreateCategory{.parent = ElementId{"tp_1"}, .id = ElementId{"cat_1"}, .name = "C"})
+        document.apply(CreateTerminologyPackage{.parent = ElementId{"acp_1"}, .id = ElementId{"tp_1"}, .name = "Vocab"})
             .applied);
-    ASSERT_TRUE(document
-                    .apply(CreateTerm{.parent = ElementId{"tp_1"}, .id = ElementId{"term_1"}, .name = "T"})
-                    .applied);
+    ASSERT_TRUE(
+        document.apply(CreateCategory{.parent = ElementId{"tp_1"}, .id = ElementId{"cat_1"}, .name = "C"}).applied);
+    ASSERT_TRUE(
+        document.apply(CreateTerm{.parent = ElementId{"tp_1"}, .id = ElementId{"term_1"}, .name = "T"}).applied);
 
     // value on a non-expression (a Category) is rejected.
     EXPECT_FALSE(document.apply(SetExpressionValue{.element = ElementId{"cat_1"}, .value = "x"}).applied);
     // external reference on a non-Term (a Category) is rejected.
     EXPECT_FALSE(
-        document.apply(SetTermExternalReference{.element = ElementId{"cat_1"}, .external_reference = "x"})
-            .applied);
+        document.apply(SetTermExternalReference{.element = ElementId{"cat_1"}, .external_reference = "x"}).applied);
     // a category id that is not a Category (the term itself) is rejected.
-    const auto bad_category = document.apply(
-        SetExpressionCategories{.element = ElementId{"term_1"}, .categories = {ElementId{"term_1"}}});
+    const auto bad_category =
+        document.apply(SetExpressionCategories{.element = ElementId{"term_1"}, .categories = {ElementId{"term_1"}}});
     EXPECT_FALSE(bad_category.applied);
     EXPECT_TRUE(std::ranges::any_of(bad_category.diagnostics, [](const auto& diagnostic) {
         return diagnostic.code == sacm::validation::codes::kRefWrongType;
@@ -232,8 +204,7 @@ TEST(Sacm23Terminology, SACM23_TERM_001_TermUpdateCommandsValidateTargets) {
 
 TEST(Sacm23Terminology, SACM23_TERM_001_RejectsTermOutsideTerminologyPackage) {
     Document document;
-    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"})
-                    .applied);
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"}).applied);
     const auto result = document.apply(CreateTerm{
         .parent = ElementId{"acp_1"},
         .name = "term",
@@ -267,8 +238,7 @@ TEST(Sacm23Terminology, SACM23_TERM_001_LegacyTerminologyShorthandIsRead) {
 
     // All three shorthand kinds resolve to their real element types with values
     // carried through -- not dropped, not preserved as opaque blobs.
-    const auto* expression =
-        loaded.document->find_as<sacm::model::Expression>(ElementId{"TERM_SAFE"});
+    const auto* expression = loaded.document->find_as<sacm::model::Expression>(ElementId{"TERM_SAFE"});
     ASSERT_NE(expression, nullptr) << "shorthand <expression> was dropped";
     EXPECT_EQ(expression->value(), "System operates without causing harm");
 
@@ -278,13 +248,11 @@ TEST(Sacm23Terminology, SACM23_TERM_001_LegacyTerminologyShorthandIsRead) {
     ASSERT_EQ(term->categories().size(), 1u);
     EXPECT_EQ(term->categories().front().value(), "CAT_STANDARDS");
 
-    const auto* category =
-        loaded.document->find_as<sacm::model::Category>(ElementId{"CAT_STANDARDS"});
+    const auto* category = loaded.document->find_as<sacm::model::Category>(ElementId{"CAT_STANDARDS"});
     ASSERT_NE(category, nullptr) << "shorthand <category> was dropped";
 
     // All three are contained in the package, not scattered elsewhere.
-    const auto* package =
-        loaded.document->find_as<sacm::model::TerminologyPackage>(ElementId{"TP1"});
+    const auto* package = loaded.document->find_as<sacm::model::TerminologyPackage>(ElementId{"TP1"});
     ASSERT_NE(package, nullptr);
     EXPECT_EQ(package->terminology_elements().size(), 3u);
 
@@ -304,4 +272,4 @@ TEST(Sacm23Terminology, SACM23_TERM_001_LegacyTerminologyShorthandIsRead) {
     EXPECT_FALSE(strict.ok);
 }
 
-}  // namespace
+} // namespace

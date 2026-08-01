@@ -68,7 +68,9 @@ struct ChangeSet {
     // use. Acceptance hands this straight to `ApplyProposalCommand`.
     reviews::ReviewProposal proposal;
 
-    bool open() const { return state == ChangeSetState::Building || state == ChangeSetState::Ready; }
+    bool open() const {
+        return state == ChangeSetState::Building || state == ChangeSetState::Ready;
+    }
 };
 
 // What a change set does to one element.
@@ -85,21 +87,21 @@ const char* ElementChangeToString(ElementChange change);
 // it. `preview_model` is a full assurance case the canvas can render directly,
 // which is what makes the agent's work visible in place rather than as a list.
 struct ChangeSetDiff {
-    bool        success = false;
+    bool success = false;
     std::string error;
 
-    parser::AssuranceCase             preview_model;
+    parser::AssuranceCase preview_model;
     std::map<std::string, ElementChange> status_by_id;
     // Elements the change set removes. They are absent from `preview_model` by
     // definition, so a renderer that wants to ghost them needs them from here.
-    std::vector<parser::SacmElement>  removed;
+    std::vector<parser::SacmElement> removed;
     // `create_ref` -> the id the operation produced, so a caller can report
     // "$goal became G7" rather than leaving the agent to guess.
     std::map<std::string, std::string> generated_ids;
 
-    int added_count    = 0;
+    int added_count = 0;
     int modified_count = 0;
-    int removed_count  = 0;
+    int removed_count = 0;
 
     bool touches_anything() const {
         return added_count > 0 || modified_count > 0 || removed_count > 0;
@@ -108,13 +110,11 @@ struct ChangeSetDiff {
 
 // Runs the change set's operations against `committed` on a scratch copy and
 // reports what they would do. Never mutates `committed`.
-ChangeSetDiff ComputeChangeSetDiff(const ChangeSet&             change_set,
-                                   const parser::AssuranceCase& committed);
+ChangeSetDiff ComputeChangeSetDiff(const ChangeSet& change_set, const parser::AssuranceCase& committed);
 
 // Whether `change_set` was written against `argument_file`. A change set with no
 // recorded file belongs to whatever is open -- there is nothing to contradict.
-bool ChangeSetTargetsArgumentFile(const ChangeSet&             change_set,
-                                  const std::filesystem::path& argument_file);
+bool ChangeSetTargetsArgumentFile(const ChangeSet& change_set, const std::filesystem::path& argument_file);
 
 // Whether a change set can be accepted against what the application has open
 // right now, and why not when it cannot.
@@ -124,15 +124,15 @@ bool ChangeSetTargetsArgumentFile(const ChangeSet&             change_set,
 // "Accept does nothing": the refusal existed, went to the status bar, and was
 // invisible next to the change set it was about.
 struct ChangeSetAcceptability {
-    bool        can_accept = false;
+    bool can_accept = false;
     std::string reason;
     // The obstacle is a different argument being open, not a patch that has gone
     // stale. Worth telling apart because the remedy is different: open that
     // argument, rather than ask the agent to rebuild.
-    bool        wrong_argument_file = false;
+    bool wrong_argument_file = false;
 };
 
-ChangeSetAcceptability EvaluateChangeSetAcceptability(const ChangeSet&             change_set,
+ChangeSetAcceptability EvaluateChangeSetAcceptability(const ChangeSet& change_set,
                                                       const std::filesystem::path& loaded_file,
                                                       const parser::AssuranceCase& loaded_case);
 

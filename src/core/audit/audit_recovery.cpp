@@ -48,8 +48,7 @@ bool RestoreSacmFromAudit(const AssuranceProject& project,
 
     // Phase 1b flip: load the trusted-root snapshot as a library document and
     // replay forward through the library (`ReplayToLibrary`).
-    const std::filesystem::path snapshot_path =
-        SnapshotSacmPath(project.rootPath, replay_root.snapshot_id);
+    const std::filesystem::path snapshot_path = SnapshotSacmPath(project.rootPath, replay_root.snapshot_id);
     sacm_adapter::LoadOutcome snapshot = sacm_adapter::load_document(snapshot_path);
     if (!snapshot.ok || snapshot.document == nullptr) {
         const std::string diagnostics = sacm_adapter::summarize_load_diagnostics(snapshot.diagnostics);
@@ -62,7 +61,8 @@ bool RestoreSacmFromAudit(const AssuranceProject& project,
     if (!store)
         return false;
 
-    auto replayed = Replayer::ReplayToLibrary(std::move(snapshot.document), store->Transactions(),
+    auto replayed = Replayer::ReplayToLibrary(std::move(snapshot.document),
+                                              store->Transactions(),
                                               std::numeric_limits<std::uint64_t>::max(),
                                               replay_root.from_transaction_sequence);
     if (!replayed) {
@@ -100,10 +100,8 @@ bool RestoreSacmFromAudit(const AssuranceProject& project,
         if (saved.ok) {
             xml = std::move(saved.xml);
         } else {
-            const sacm::AssuranceCasePackage replayed_package =
-                core::project_library_package(**replayed);
-            xml = core::library_xmi_from_package(replayed_package)
-                      .value_or(sacm::serialize_sacm(replayed_package));
+            const sacm::AssuranceCasePackage replayed_package = core::project_library_package(**replayed);
+            xml = core::library_xmi_from_package(replayed_package).value_or(sacm::serialize_sacm(replayed_package));
             // Report the degraded path: the projection cannot carry the unknown /
             // vendor-specific content the replayed document held, so a caller must
             // not present this as a fully faithful restore.

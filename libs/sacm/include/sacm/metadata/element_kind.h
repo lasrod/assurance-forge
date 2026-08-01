@@ -64,4 +64,4 @@ bool is_package_kind(ElementKind kind);
 // True for AssertedInference/Evidence/Context/ArtifactSupport/ArtifactContext.
 bool is_asserted_relationship_kind(ElementKind kind);
 
-}  // namespace sacm::metadata
+} // namespace sacm::metadata

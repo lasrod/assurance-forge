@@ -49,10 +49,10 @@ void WriteFile(const std::filesystem::path& path, std::string_view content) {
 }
 
 struct ProjectFixture {
-    core::AssuranceProject     project;
-    std::filesystem::path      sacm_abs;
+    core::AssuranceProject project;
+    std::filesystem::path sacm_abs;
     sacm::AssuranceCasePackage package;
-    parser::AssuranceCase      model;
+    parser::AssuranceCase model;
     // Null for the legacy-parsed fixture below. The library-backed variant
     // populates it, mirroring production where `AppState` always holds one.
     std::unique_ptr<sacm_adapter::LibraryDocument> document;
@@ -105,7 +105,9 @@ ProjectFixture MakeLibraryBackedFixture(const std::string& tag) {
 // Run a command through the bus and mirror the app's frame boundary: a flipped
 // command leaves the live views for `AppRuntime::RebuildDerivedViewsIfNeeded`,
 // and the next command plans its ids from them.
-void RunCommand(ProjectFixture& f, core::commands::CommandBus& bus, core::commands::ICommand& command,
+void RunCommand(ProjectFixture& f,
+                core::commands::CommandBus& bus,
+                core::commands::ICommand& command,
                 core::commands::CommandContext& ctx) {
     const core::commands::CommandResult result = bus.Execute(command, ctx, "tester");
     ASSERT_TRUE(result.success) << result.error;
@@ -128,9 +130,12 @@ int CountTaggedValuesWithKey(const sacm::AssuranceCasePackage& package, const st
     };
     for (const sacm::ArgumentPackage& ap : package.argumentPackages) {
         count(ap.taggedValues);
-        for (const sacm::Claim& c : ap.claims) count(c.taggedValues);
-        for (const sacm::ArgumentReasoning& r : ap.argumentReasonings) count(r.taggedValues);
-        for (const sacm::ArtifactReference& r : ap.artifactReferences) count(r.taggedValues);
+        for (const sacm::Claim& c : ap.claims)
+            count(c.taggedValues);
+        for (const sacm::ArgumentReasoning& r : ap.argumentReasonings)
+            count(r.taggedValues);
+        for (const sacm::ArtifactReference& r : ap.artifactReferences)
+            count(r.taggedValues);
     }
     return total;
 }
@@ -140,8 +145,7 @@ int CountTaggedValuesWithKey(const sacm::AssuranceCasePackage& package, const st
 // the ACP's confidence argument tree (a SECOND ArgumentPackage). Every one of
 // those is vendor TaggedValue content or package structure that the POD
 // projection cannot carry.
-void BuildVendorTagState(ProjectFixture& f, core::commands::CommandBus& bus,
-                         core::commands::CommandContext& ctx) {
+void BuildVendorTagState(ProjectFixture& f, core::commands::CommandBus& bus, core::commands::CommandContext& ctx) {
     core::commands::CreateChildElementCommand add_strategy("G1", core::NewElementKind::Strategy);
     RunCommand(f, bus, add_strategy, ctx);
 
@@ -167,7 +171,8 @@ TEST(HistoryReconstruction, ReturnsSnapshotStateAtSequenceZero) {
     // Snapshot is the empty initial SACM: only G1 should be present.
     bool found_g1 = false;
     for (const auto& e : state->views.model.elements) {
-        if (e.id == "G1") found_g1 = true;
+        if (e.id == "G1")
+            found_g1 = true;
     }
     EXPECT_TRUE(found_g1);
 }
@@ -189,8 +194,10 @@ TEST(HistoryReconstruction, ReconstructsUpToRequestedSequence) {
     ASSERT_TRUE(at_one.has_value());
     bool at_one_has_a = false, at_one_has_b = false;
     for (const auto& e : at_one->views.model.elements) {
-        if (e.id == a.GeneratedId()) at_one_has_a = true;
-        if (e.id == b.GeneratedId()) at_one_has_b = true;
+        if (e.id == a.GeneratedId())
+            at_one_has_a = true;
+        if (e.id == b.GeneratedId())
+            at_one_has_b = true;
     }
     EXPECT_TRUE(at_one_has_a);
     EXPECT_FALSE(at_one_has_b);
@@ -199,7 +206,8 @@ TEST(HistoryReconstruction, ReconstructsUpToRequestedSequence) {
     ASSERT_TRUE(at_two.has_value());
     bool at_two_has_b = false;
     for (const auto& e : at_two->views.model.elements) {
-        if (e.id == b.GeneratedId()) at_two_has_b = true;
+        if (e.id == b.GeneratedId())
+            at_two_has_b = true;
     }
     EXPECT_TRUE(at_two_has_b);
 }
@@ -215,8 +223,7 @@ TEST(HistoryReconstruction, ReconstructionAtLatestSequenceMatchesLiveCanonicalHa
     auto live_result = bus->Execute(a, ctx, "tester");
     ASSERT_TRUE(live_result.success);
 
-    auto state = core::audit::ReconstructAtSequence(f.project,
-                                                    std::numeric_limits<std::uint64_t>::max());
+    auto state = core::audit::ReconstructAtSequence(f.project, std::numeric_limits<std::uint64_t>::max());
     ASSERT_TRUE(state.has_value());
 
     // Compare on the projection-invariant library hash (the one the verifier uses),
@@ -250,15 +257,13 @@ TEST(HistoryReconstruction, SACM23_LIB_002_ReconstructionPreservesVendorTaggedVa
 
     // What the live state carries, so the reconstruction is compared against a
     // measured expectation rather than a guessed one.
-    const int live_strategy_tags =
-        CountTaggedValuesWithKey(f.package, sacm_adapter::kGsnStrategyTargetTagKey);
+    const int live_strategy_tags = CountTaggedValuesWithKey(f.package, sacm_adapter::kGsnStrategyTargetTagKey);
     const int live_acp_tags = CountTaggedValuesWithKey(f.package, "assuranceForge.acp");
     ASSERT_GT(live_strategy_tags, 0);
     ASSERT_GT(live_acp_tags, 0);
     ASSERT_EQ(f.package.argumentPackages.size(), 2u) << "the confidence tree did not get its own package";
 
-    auto state = core::audit::ReconstructAtSequence(f.project,
-                                                    std::numeric_limits<std::uint64_t>::max());
+    auto state = core::audit::ReconstructAtSequence(f.project, std::numeric_limits<std::uint64_t>::max());
     ASSERT_TRUE(state.has_value()) << state.error();
 
     EXPECT_EQ(CountTaggedValuesWithKey(state->views.package, sacm_adapter::kGsnStrategyTargetTagKey),
@@ -286,8 +291,7 @@ TEST(HistoryReconstruction, SACM23_LIB_002_ReconstructionCarriesBareStrategyPlac
     RunCommand(f, *bus, add_strategy, ctx);
     const std::string placement_id = add_strategy.GeneratedId() + "__pending_inference";
 
-    auto state = core::audit::ReconstructAtSequence(f.project,
-                                                    std::numeric_limits<std::uint64_t>::max());
+    auto state = core::audit::ReconstructAtSequence(f.project, std::numeric_limits<std::uint64_t>::max());
     ASSERT_TRUE(state.has_value()) << state.error();
 
     bool found = false;

@@ -103,9 +103,7 @@ TEST(ProjectServiceTest, SACM23_LIB_002_NewProjectSeedIsStrictSacm23Xmi) {
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     std::string error;
-    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("MySafetyCase", tmp.path, project, report,
-                                                         error))
-        << error;
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("MySafetyCase", tmp.path, project, report, error)) << error;
 
     const std::filesystem::path seed = project.rootPath / "arguments" / "main.sacm";
     const sacm::io::LoadResult strict =

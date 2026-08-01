@@ -29,9 +29,9 @@ struct TempDir {
 };
 
 std::filesystem::path UniqueTempPath(const std::string& stem) {
-    static int                  counter = 0;
-    const std::filesystem::path path    = std::filesystem::temp_directory_path() /
-                                       ("af_change_sets_" + stem + "_" + std::to_string(++counter));
+    static int counter = 0;
+    const std::filesystem::path path =
+        std::filesystem::temp_directory_path() / ("af_change_sets_" + stem + "_" + std::to_string(++counter));
     std::filesystem::remove_all(path);
     std::filesystem::create_directories(path);
     return path;
@@ -67,16 +67,13 @@ std::string FirstClaimId(const parser::AssuranceCase& model) {
 // test build an argument with the case's top goal hanging beneath a claim the
 // test had just invented. Nothing noticed, because the assertions counted
 // elements and never looked at the shape.
-std::vector<core::reviews::PatchOperation> AddSubGoalUnder(const std::string& parent_id,
-                                                           const std::string& text) {
+std::vector<core::reviews::PatchOperation> AddSubGoalUnder(const std::string& parent_id, const std::string& text) {
     const nlohmann::json operations = nlohmann::json::array(
         {nlohmann::json{{"type", "CreateClaim"}, {"create_ref", "$sub"}, {"text", text}},
-         nlohmann::json{{"type", "AddSupportedBy"},
-                        {"source", {{"ref", "$sub"}}},
-                        {"target", {{"id", parent_id}}}}});
+         nlohmann::json{{"type", "AddSupportedBy"}, {"source", {{"ref", "$sub"}}}, {"target", {{"id", parent_id}}}}});
 
     std::vector<core::reviews::PatchOperation> parsed;
-    std::string                                error;
+    std::string error;
     if (!agent::ParsePatchOperations(operations, parsed, error)) {
         ADD_FAILURE() << "could not parse operations: " << error;
     }
@@ -84,8 +81,8 @@ std::vector<core::reviews::PatchOperation> AddSubGoalUnder(const std::string& pa
 }
 
 struct Fixture {
-    TempDir                          workspace;
-    core::AppState                   state;
+    TempDir workspace;
+    core::AppState state;
     core::changesets::ChangeSetStore store;
 };
 
@@ -104,14 +101,13 @@ TEST(ChangeSets, StagingChangesNothingInTheModel) {
     ASSERT_NE(fixture, nullptr);
 
     const parser::AssuranceCase before = fixture->state.loaded_case.value();
-    const std::string          parent  = FirstClaimId(before);
+    const std::string parent = FirstClaimId(before);
 
-    const std::string id =
-        fixture->store.Begin(1, "Add a maintenance sub-goal", "", "", "claude-ai 0.1.0");
+    const std::string id = fixture->store.Begin(1, "Add a maintenance sub-goal", "", "", "claude-ai 0.1.0");
 
     std::string error;
-    ASSERT_TRUE(fixture->store.Stage(id, AddSubGoalUnder(parent, "Maintenance is adequate"),
-                                     fixture->state.loaded_case.value(), error))
+    ASSERT_TRUE(fixture->store.Stage(
+        id, AddSubGoalUnder(parent, "Maintenance is adequate"), fixture->state.loaded_case.value(), error))
         << error;
 
     // The whole point: the agent has staged real operations and the safety case
@@ -127,31 +123,28 @@ TEST(ChangeSets, ReportsWhatItWouldAddAndWhere) {
     const std::string parent = FirstClaimId(fixture->state.loaded_case.value());
 
     const std::string id = fixture->store.Begin(1, "Add a sub-goal", "", "", "claude-ai");
-    std::string       error;
-    ASSERT_TRUE(fixture->store.Stage(id, AddSubGoalUnder(parent, "Thermal runaway is mitigated"),
-                                     fixture->state.loaded_case.value(), error))
+    std::string error;
+    ASSERT_TRUE(fixture->store.Stage(
+        id, AddSubGoalUnder(parent, "Thermal runaway is mitigated"), fixture->state.loaded_case.value(), error))
         << error;
 
-    const core::changesets::ChangeSetDiff diff = core::changesets::ComputeChangeSetDiff(
-        *fixture->store.Find(id), fixture->state.loaded_case.value());
+    const core::changesets::ChangeSetDiff diff =
+        core::changesets::ComputeChangeSetDiff(*fixture->store.Find(id), fixture->state.loaded_case.value());
 
     ASSERT_TRUE(diff.success) << diff.error;
     // A claim and the relationship that attaches it.
     EXPECT_EQ(diff.added_count, 2);
     EXPECT_EQ(diff.removed_count, 0);
-    EXPECT_GT(diff.preview_model.elements.size(),
-              fixture->state.loaded_case->elements.size());
+    EXPECT_GT(diff.preview_model.elements.size(), fixture->state.loaded_case->elements.size());
 
     // The preview is a whole assurance case, which is what lets the canvas draw
     // the proposal in place rather than as a list of operations beside it.
     bool found_new_claim = false;
-    for (const std::pair<const std::string, core::changesets::ElementChange>& entry :
-         diff.status_by_id) {
+    for (const std::pair<const std::string, core::changesets::ElementChange>& entry : diff.status_by_id) {
         if (entry.second != core::changesets::ElementChange::Added) {
             continue;
         }
-        const parser::SacmElement* element =
-            parser::FindElementById(diff.preview_model, entry.first);
+        const parser::SacmElement* element = parser::FindElementById(diff.preview_model, entry.first);
         if (element != nullptr && element->content == "Thermal runaway is mitigated") {
             found_new_claim = true;
         }
@@ -165,12 +158,12 @@ TEST(ChangeSets, NamesTheIdItGaveEachCreatedElement) {
     const std::string parent = FirstClaimId(fixture->state.loaded_case.value());
 
     const std::string id = fixture->store.Begin(1, "Add a sub-goal", "", "", "claude-ai");
-    std::string       error;
-    ASSERT_TRUE(fixture->store.Stage(id, AddSubGoalUnder(parent, "Sub-goal"),
-                                     fixture->state.loaded_case.value(), error));
+    std::string error;
+    ASSERT_TRUE(
+        fixture->store.Stage(id, AddSubGoalUnder(parent, "Sub-goal"), fixture->state.loaded_case.value(), error));
 
-    const core::changesets::ChangeSetDiff diff = core::changesets::ComputeChangeSetDiff(
-        *fixture->store.Find(id), fixture->state.loaded_case.value());
+    const core::changesets::ChangeSetDiff diff =
+        core::changesets::ComputeChangeSetDiff(*fixture->store.Find(id), fixture->state.loaded_case.value());
 
     // Without this an agent has to guess what "$sub" became before it can refer
     // to it in a later operation.
@@ -186,9 +179,9 @@ TEST(ChangeSets, RefusesOperationsThatWouldNotApply) {
     ASSERT_NE(fixture, nullptr);
 
     const std::string id = fixture->store.Begin(1, "Attach to nothing", "", "", "claude-ai");
-    std::string       error;
-    EXPECT_FALSE(fixture->store.Stage(id, AddSubGoalUnder("NO-SUCH-ELEMENT", "Orphan"),
-                                      fixture->state.loaded_case.value(), error));
+    std::string error;
+    EXPECT_FALSE(fixture->store.Stage(
+        id, AddSubGoalUnder("NO-SUCH-ELEMENT", "Orphan"), fixture->state.loaded_case.value(), error));
     EXPECT_FALSE(error.empty());
 
     // And the change set is unchanged, not half-staged.
@@ -201,9 +194,9 @@ TEST(ChangeSets, LetsAnAgentTakeBackWhatItStaged) {
     const std::string parent = FirstClaimId(fixture->state.loaded_case.value());
 
     const std::string id = fixture->store.Begin(1, "Reconsider", "", "", "claude-ai");
-    std::string       error;
-    ASSERT_TRUE(fixture->store.Stage(id, AddSubGoalUnder(parent, "First thought"),
-                                     fixture->state.loaded_case.value(), error));
+    std::string error;
+    ASSERT_TRUE(
+        fixture->store.Stage(id, AddSubGoalUnder(parent, "First thought"), fixture->state.loaded_case.value(), error));
     ASSERT_EQ(fixture->store.Find(id)->proposal.operations.size(), 2u);
 
     // Responding to "not there" must not mean starting the conversation over.
@@ -215,7 +208,7 @@ TEST(ChangeSets, GivesEachConnectionItsOwnChangeSet) {
     std::unique_ptr<Fixture> fixture = MakeFixture("twoclients");
     ASSERT_NE(fixture, nullptr);
 
-    const std::string first  = fixture->store.Begin(1, "First client", "", "", "claude-ai");
+    const std::string first = fixture->store.Begin(1, "First client", "", "", "claude-ai");
     const std::string second = fixture->store.Begin(2, "Second client", "", "", "cursor");
 
     ASSERT_NE(fixture->store.OpenFor(1), nullptr);
@@ -232,7 +225,7 @@ TEST(ChangeSets, ReplacesAConnectionsPreviousChangeSet) {
     std::unique_ptr<Fixture> fixture = MakeFixture("replace");
     ASSERT_NE(fixture, nullptr);
 
-    const std::string first  = fixture->store.Begin(1, "First idea", "", "", "claude-ai");
+    const std::string first = fixture->store.Begin(1, "First idea", "", "", "claude-ai");
     const std::string second = fixture->store.Begin(1, "Better idea", "", "", "claude-ai");
 
     EXPECT_EQ(fixture->store.Find(first)->state, core::changesets::ChangeSetState::Discarded);
@@ -275,17 +268,14 @@ TEST(ChangeSets, ReportsTheChangeSetANewOneReplaced) {
     ASSERT_NE(fixture, nullptr);
 
     const agent::ChangeContext context{fixture->state, fixture->store, 1, "claude-ai"};
-    const agent::Result        first =
-        agent::BeginChangeSet(context, nlohmann::json{{"title", "First idea"}});
+    const agent::Result first = agent::BeginChangeSet(context, nlohmann::json{{"title", "First idea"}});
     ASSERT_FALSE(first.is_error) << first.payload.dump();
     EXPECT_FALSE(first.payload.contains("replaced_change_set"));
 
-    const agent::Result second =
-        agent::BeginChangeSet(context, nlohmann::json{{"title", "Better idea"}});
+    const agent::Result second = agent::BeginChangeSet(context, nlohmann::json{{"title", "Better idea"}});
     ASSERT_FALSE(second.is_error) << second.payload.dump();
     ASSERT_TRUE(second.payload.contains("replaced_change_set")) << second.payload.dump();
-    EXPECT_EQ(second.payload["replaced_change_set"]["change_set_id"],
-              first.payload["change_set_id"]);
+    EXPECT_EQ(second.payload["replaced_change_set"]["change_set_id"], first.payload["change_set_id"]);
     EXPECT_EQ(second.payload["replaced_change_set"]["title"], "First idea");
 }
 
@@ -294,7 +284,7 @@ TEST(ChangeSets, RefusesToSubmitAnEmptyChangeSet) {
     ASSERT_NE(fixture, nullptr);
 
     const std::string id = fixture->store.Begin(1, "Nothing yet", "", "", "claude-ai");
-    std::string       error;
+    std::string error;
     EXPECT_FALSE(fixture->store.MarkReady(id, error));
     EXPECT_FALSE(error.empty());
 }
@@ -307,8 +297,8 @@ TEST(ChangeSets, PreviewsAnEmptyChangeSetAsTheUnchangedCase) {
 
     // The canvas asks for a diff every frame, including in the moment between
     // `begin_change_set` and the first staged operation.
-    const core::changesets::ChangeSetDiff diff = core::changesets::ComputeChangeSetDiff(
-        *fixture->store.Find(id), fixture->state.loaded_case.value());
+    const core::changesets::ChangeSetDiff diff =
+        core::changesets::ComputeChangeSetDiff(*fixture->store.Find(id), fixture->state.loaded_case.value());
 
     EXPECT_TRUE(diff.success);
     EXPECT_FALSE(diff.touches_anything());
@@ -324,9 +314,9 @@ TEST(ChangeSets, AnchorsItselfToAnElementItTouches) {
     const std::string parent = FirstClaimId(fixture->state.loaded_case.value());
 
     const std::string id = fixture->store.Begin(1, "Add a sub-goal", "", "", "claude-ai");
-    std::string       error;
-    ASSERT_TRUE(fixture->store.Stage(id, AddSubGoalUnder(parent, "Sub-goal"),
-                                     fixture->state.loaded_case.value(), error));
+    std::string error;
+    ASSERT_TRUE(
+        fixture->store.Stage(id, AddSubGoalUnder(parent, "Sub-goal"), fixture->state.loaded_case.value(), error));
 
     const core::reviews::ReviewProposal& proposal = fixture->store.Find(id)->proposal;
     EXPECT_EQ(proposal.anchor_element_id, parent);
@@ -365,8 +355,8 @@ TEST(ChangeSets, AdvancesARevisionSoTheCanvasKnowsToRedraw) {
     EXPECT_NE(after_begin, at_start) << "beginning a change set must repaint";
 
     std::string error;
-    ASSERT_TRUE(fixture->store.Stage(id, AddSubGoalUnder(parent, "A sub-goal"),
-                                     fixture->state.loaded_case.value(), error))
+    ASSERT_TRUE(
+        fixture->store.Stage(id, AddSubGoalUnder(parent, "A sub-goal"), fixture->state.loaded_case.value(), error))
         << error;
     const std::uint64_t after_stage = fixture->store.revision();
     EXPECT_NE(after_stage, after_begin) << "staging must repaint";
@@ -392,15 +382,15 @@ TEST(ChangeSets, PutsTheNewSubGoalUnderTheGoalItDevelops) {
     ASSERT_NE(fixture, nullptr);
     const std::string parent = FirstClaimId(fixture->state.loaded_case.value());
 
-    const std::string id = fixture->store.Begin(1, "Develop the top goal", "", "", "claude-ai",
-                                                fixture->state.loaded_file_path);
-    std::string       error;
-    ASSERT_TRUE(fixture->store.Stage(id, AddSubGoalUnder(parent, "Cleaning is safe"),
-                                     fixture->state.loaded_case.value(), error))
+    const std::string id =
+        fixture->store.Begin(1, "Develop the top goal", "", "", "claude-ai", fixture->state.loaded_file_path);
+    std::string error;
+    ASSERT_TRUE(fixture->store.Stage(
+        id, AddSubGoalUnder(parent, "Cleaning is safe"), fixture->state.loaded_case.value(), error))
         << error;
 
-    const core::changesets::ChangeSetDiff diff = core::changesets::ComputeChangeSetDiff(
-        *fixture->store.Find(id), fixture->state.loaded_case.value());
+    const core::changesets::ChangeSetDiff diff =
+        core::changesets::ComputeChangeSetDiff(*fixture->store.Find(id), fixture->state.loaded_case.value());
     ASSERT_TRUE(diff.success) << diff.error;
 
     const core::AssuranceTree tree = core::AssuranceTree::Build(diff.preview_model, "ja");
@@ -435,39 +425,33 @@ TEST(ChangeSets, AcceptsAChangeSetThatNamesItsOwnEarlierCreationsById) {
     ASSERT_NE(fixture, nullptr);
     const std::string parent = FirstClaimId(fixture->state.loaded_case.value());
 
-    const std::string id = fixture->store.Begin(1, "Build it in two passes", "", "", "claude-ai",
-                                                fixture->state.loaded_file_path);
-    std::string       error;
-    ASSERT_TRUE(fixture->store.Stage(id, AddSubGoalUnder(parent, "Hazards are mitigated"),
-                                     fixture->state.loaded_case.value(), error))
+    const std::string id =
+        fixture->store.Begin(1, "Build it in two passes", "", "", "claude-ai", fixture->state.loaded_file_path);
+    std::string error;
+    ASSERT_TRUE(fixture->store.Stage(
+        id, AddSubGoalUnder(parent, "Hazards are mitigated"), fixture->state.loaded_case.value(), error))
         << error;
 
     // What the agent is told the first call produced.
-    const core::changesets::ChangeSetDiff first = core::changesets::ComputeChangeSetDiff(
-        *fixture->store.Find(id), fixture->state.loaded_case.value());
+    const core::changesets::ChangeSetDiff first =
+        core::changesets::ComputeChangeSetDiff(*fixture->store.Find(id), fixture->state.loaded_case.value());
     ASSERT_TRUE(first.success) << first.error;
     ASSERT_TRUE(first.generated_ids.count("$sub"));
     const std::string created = first.generated_ids.at("$sub");
 
     // A second call that develops it, naming it the way the reply named it.
     const nlohmann::json more = nlohmann::json::array(
-        {nlohmann::json{{"type", "CreateSolution"},
-                        {"create_ref", "$evidence"},
-                        {"text", "Hazard analysis report"}},
-         nlohmann::json{{"type", "AddSupportedBy"},
-                        {"source", {{"ref", "$evidence"}}},
-                        {"target", {{"id", created}}}}});
+        {nlohmann::json{{"type", "CreateSolution"}, {"create_ref", "$evidence"}, {"text", "Hazard analysis report"}},
+         nlohmann::json{
+             {"type", "AddSupportedBy"}, {"source", {{"ref", "$evidence"}}}, {"target", {{"id", created}}}}});
     std::vector<core::reviews::PatchOperation> parsed;
     ASSERT_TRUE(agent::ParsePatchOperations(more, parsed, error)) << error;
-    ASSERT_TRUE(fixture->store.Stage(id, parsed, fixture->state.loaded_case.value(), error))
-        << error;
+    ASSERT_TRUE(fixture->store.Stage(id, parsed, fixture->state.loaded_case.value(), error)) << error;
 
     // Staging accepted it, so the canvas is showing it and the reviewer has been
     // offered a decision. Acceptance has to be able to honour that.
-    const core::changesets::ChangeSetAcceptability acceptability =
-        core::changesets::EvaluateChangeSetAcceptability(*fixture->store.Find(id),
-                                                         fixture->state.loaded_file_path,
-                                                         fixture->state.loaded_case.value());
+    const core::changesets::ChangeSetAcceptability acceptability = core::changesets::EvaluateChangeSetAcceptability(
+        *fixture->store.Find(id), fixture->state.loaded_file_path, fixture->state.loaded_case.value());
     EXPECT_TRUE(acceptability.can_accept) << acceptability.reason;
 }
 
@@ -481,14 +465,13 @@ TEST(ChangeSets, AcceptsAChangeSetThatNamesItsOwnEarlierCreationsById) {
 TEST(ChangeSets, BelongsToTheArgumentItWasWrittenAgainst) {
     std::unique_ptr<Fixture> fixture = MakeFixture("twoarguments");
     ASSERT_NE(fixture, nullptr);
-    const std::filesystem::path first_file  = fixture->state.loaded_file_path;
-    const parser::AssuranceCase first_case  = fixture->state.loaded_case.value();
-    const std::string           shared_id   = FirstClaimId(first_case);
+    const std::filesystem::path first_file = fixture->state.loaded_file_path;
+    const parser::AssuranceCase first_case = fixture->state.loaded_case.value();
+    const std::string shared_id = FirstClaimId(first_case);
 
     core::ProjectFileEntry second;
-    std::string            error;
-    ASSERT_TRUE(core::ProjectService::AddSacmFile(fixture->state.current_project.value(), "second",
-                                                  second, error))
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::AddSacmFile(fixture->state.current_project.value(), "second", second, error))
         << error;
     ASSERT_TRUE(fixture->state.open_project_file(second));
     const std::filesystem::path second_file = fixture->state.loaded_file_path;
@@ -499,33 +482,27 @@ TEST(ChangeSets, BelongsToTheArgumentItWasWrittenAgainst) {
     ASSERT_NE(parser::FindElementById(fixture->state.loaded_case.value(), shared_id), nullptr)
         << "the two arguments do not share an id, so this fixture proves nothing";
 
-    const std::string id = fixture->store.Begin(1, "Argue about the second file", "", "",
-                                                "claude-ai", second_file);
-    ASSERT_TRUE(fixture->store.Stage(id, AddSubGoalUnder(shared_id, "Only true of the second file"),
-                                     fixture->state.loaded_case.value(), error))
+    const std::string id = fixture->store.Begin(1, "Argue about the second file", "", "", "claude-ai", second_file);
+    ASSERT_TRUE(fixture->store.Stage(
+        id, AddSubGoalUnder(shared_id, "Only true of the second file"), fixture->state.loaded_case.value(), error))
         << error;
 
-    EXPECT_TRUE(core::changesets::ChangeSetTargetsArgumentFile(*fixture->store.Find(id),
-                                                               second_file));
-    EXPECT_FALSE(core::changesets::ChangeSetTargetsArgumentFile(*fixture->store.Find(id),
-                                                                first_file));
+    EXPECT_TRUE(core::changesets::ChangeSetTargetsArgumentFile(*fixture->store.Find(id), second_file));
+    EXPECT_FALSE(core::changesets::ChangeSetTargetsArgumentFile(*fixture->store.Find(id), first_file));
 
     // Against the argument it was written for, it accepts.
-    const core::changesets::ChangeSetAcceptability here =
-        core::changesets::EvaluateChangeSetAcceptability(*fixture->store.Find(id), second_file,
-                                                         fixture->state.loaded_case.value());
+    const core::changesets::ChangeSetAcceptability here = core::changesets::EvaluateChangeSetAcceptability(
+        *fixture->store.Find(id), second_file, fixture->state.loaded_case.value());
     EXPECT_TRUE(here.can_accept) << here.reason;
 
     // Against the other one it does not -- and says so as "a different argument
     // is open", not as staleness. The remedies differ: open that argument,
     // versus ask the agent to rebuild against an argument that has moved.
     const core::changesets::ChangeSetAcceptability there =
-        core::changesets::EvaluateChangeSetAcceptability(*fixture->store.Find(id), first_file,
-                                                         first_case);
+        core::changesets::EvaluateChangeSetAcceptability(*fixture->store.Find(id), first_file, first_case);
     EXPECT_FALSE(there.can_accept);
     EXPECT_TRUE(there.wrong_argument_file);
-    EXPECT_NE(there.reason.find(second_file.filename().generic_string()), std::string::npos)
-        << there.reason;
+    EXPECT_NE(there.reason.find(second_file.filename().generic_string()), std::string::npos) << there.reason;
 }
 
 // The agent's half of the same rule. An agent that stages against whichever
@@ -536,14 +513,13 @@ TEST(ChangeSets, RefusesToStageAgainstADifferentArgumentThanItStarted) {
     const std::string shared_id = FirstClaimId(fixture->state.loaded_case.value());
 
     core::ProjectFileEntry second;
-    std::string            error;
-    ASSERT_TRUE(core::ProjectService::AddSacmFile(fixture->state.current_project.value(), "second",
-                                                  second, error))
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::AddSacmFile(fixture->state.current_project.value(), "second", second, error))
         << error;
     ASSERT_TRUE(fixture->state.open_project_file(second));
 
     const agent::ChangeContext context{fixture->state, fixture->store, 1, "claude-ai"};
-    const agent::Result        begun =
+    const agent::Result begun =
         agent::BeginChangeSet(context, nlohmann::json{{"title", "Argue about the second file"}});
     ASSERT_FALSE(begun.is_error) << begun.payload.dump();
     // Which argument it belongs to is reported, so the refusal below is not a
@@ -552,27 +528,22 @@ TEST(ChangeSets, RefusesToStageAgainstADifferentArgumentThanItStarted) {
 
     // The user clicks back to the first argument while the agent is working.
     for (const core::ProjectFileEntry& entry : fixture->state.current_project->files) {
-        if (entry.role == core::ProjectFileRole::SacmArgument &&
-            entry.relativePath != second.relativePath) {
+        if (entry.role == core::ProjectFileRole::SacmArgument && entry.relativePath != second.relativePath) {
             ASSERT_TRUE(fixture->state.open_project_file(entry));
         }
     }
 
     const nlohmann::json operations = nlohmann::json::array(
         {nlohmann::json{{"type", "CreateClaim"}, {"create_ref", "$sub"}, {"text", "Wrong file"}},
-         nlohmann::json{{"type", "AddSupportedBy"},
-                        {"source", {{"id", shared_id}}},
-                        {"target", {{"ref", "$sub"}}}}});
-    const agent::Result staged =
-        agent::StageOperations(context, nlohmann::json{{"operations", operations}});
+         nlohmann::json{{"type", "AddSupportedBy"}, {"source", {{"id", shared_id}}}, {"target", {{"ref", "$sub"}}}}});
+    const agent::Result staged = agent::StageOperations(context, nlohmann::json{{"operations", operations}});
 
     // The ids resolve in this document too, so without the check the operations
     // would apply cleanly to the wrong argument.
     EXPECT_TRUE(staged.is_error) << staged.payload.dump();
     EXPECT_NE(staged.payload["error"].get<std::string>().find("open_case_file"), std::string::npos)
         << staged.payload.dump();
-    EXPECT_TRUE(fixture->store.Find(begun.payload["change_set_id"].get<std::string>())
-                    ->proposal.operations.empty());
+    EXPECT_TRUE(fixture->store.Find(begun.payload["change_set_id"].get<std::string>())->proposal.operations.empty());
 }
 
 // Reading must not advance it, or the canvas rebuilds every frame a panel

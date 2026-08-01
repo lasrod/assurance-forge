@@ -12,11 +12,13 @@ namespace sacm::model {
 // Contains argumentation, artifact, and terminology packages plus nested
 // assurance case packages.
 class AssuranceCasePackage : public ArtifactElement {
-  public:
+public:
     explicit AssuranceCasePackage(ElementId id)
         : AssuranceCasePackage(ElementKind::AssuranceCasePackage, std::move(id)) {}
 
-    const std::vector<ElementId>& interfaces() const { return interfaces_; }
+    const std::vector<ElementId>& interfaces() const {
+        return interfaces_;
+    }
     const std::vector<std::unique_ptr<AssuranceCasePackage>>& assurance_case_packages() const {
         return assurance_case_packages_;
     }
@@ -30,10 +32,10 @@ class AssuranceCasePackage : public ArtifactElement {
         return terminology_packages_;
     }
 
-  protected:
+protected:
     AssuranceCasePackage(ElementKind kind, ElementId id) : ArtifactElement(kind, std::move(id)) {}
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     std::vector<ElementId> interfaces_;
@@ -44,30 +46,34 @@ class AssuranceCasePackage : public ArtifactElement {
 };
 
 class AssuranceCasePackageInterface final : public AssuranceCasePackage {
-  public:
+public:
     explicit AssuranceCasePackageInterface(ElementId id)
         : AssuranceCasePackage(ElementKind::AssuranceCasePackageInterface, std::move(id)) {}
 
-    const std::optional<ElementId>& implements() const { return implements_; }
+    const std::optional<ElementId>& implements() const {
+        return implements_;
+    }
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     std::optional<ElementId> implements_;
 };
 
 class AssuranceCasePackageBinding final : public AssuranceCasePackage {
-  public:
+public:
     explicit AssuranceCasePackageBinding(ElementId id)
         : AssuranceCasePackage(ElementKind::AssuranceCasePackageBinding, std::move(id)) {}
 
     // participantPackage: AssuranceCasePackage[2..*]
-    const std::vector<ElementId>& participant_packages() const { return participant_packages_; }
+    const std::vector<ElementId>& participant_packages() const {
+        return participant_packages_;
+    }
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     std::vector<ElementId> participant_packages_;
 };
 
-}  // namespace sacm::model
+} // namespace sacm::model

@@ -16,14 +16,12 @@ namespace {
 // derived field moved would put a highlight on the canvas the user cannot
 // explain.
 bool DiffersMeaningfully(const parser::SacmElement& before, const parser::SacmElement& after) {
-    return before.name != after.name || before.content != after.content ||
-           before.description != after.description || before.undeveloped != after.undeveloped ||
-           before.is_abstract != after.is_abstract || before.type != after.type ||
-           before.source_refs != after.source_refs || before.target_refs != after.target_refs ||
-           before.reasoning_ref != after.reasoning_ref ||
-           before.assertion_declaration != after.assertion_declaration ||
-           before.is_counter != after.is_counter || before.name_langs != after.name_langs ||
-           before.content_langs != after.content_langs ||
+    return before.name != after.name || before.content != after.content || before.description != after.description ||
+           before.undeveloped != after.undeveloped || before.is_abstract != after.is_abstract ||
+           before.type != after.type || before.source_refs != after.source_refs ||
+           before.target_refs != after.target_refs || before.reasoning_ref != after.reasoning_ref ||
+           before.assertion_declaration != after.assertion_declaration || before.is_counter != after.is_counter ||
+           before.name_langs != after.name_langs || before.content_langs != after.content_langs ||
            before.description_langs != after.description_langs;
 }
 
@@ -65,36 +63,33 @@ const char* ElementChangeToString(ElementChange change) {
     return "unchanged";
 }
 
-ChangeSetDiff ComputeChangeSetDiff(const ChangeSet&             change_set,
-                                   const parser::AssuranceCase& committed) {
+ChangeSetDiff ComputeChangeSetDiff(const ChangeSet& change_set, const parser::AssuranceCase& committed) {
     ChangeSetDiff diff;
 
     if (change_set.proposal.operations.empty()) {
         // An empty change set is legitimate -- the agent has begun one and not
         // staged anything yet -- and previews as the committed model unchanged.
-        diff.success       = true;
+        diff.success = true;
         diff.preview_model = committed;
         return diff;
     }
 
     const reviews::ReviewProposalPatchService service;
-    const reviews::ProposalPreviewResult      preview =
-        service.BuildPreviewModel(change_set.proposal, committed);
+    const reviews::ProposalPreviewResult preview = service.BuildPreviewModel(change_set.proposal, committed);
     if (!preview.success) {
         diff.error = preview.error;
         return diff;
     }
 
-    diff.success       = true;
+    diff.success = true;
     diff.preview_model = preview.preview_model;
     diff.generated_ids = preview.generated_ids;
 
     const std::map<std::string, const parser::SacmElement*> before = ById(committed);
-    const std::map<std::string, const parser::SacmElement*> after  = ById(diff.preview_model);
+    const std::map<std::string, const parser::SacmElement*> after = ById(diff.preview_model);
 
     for (const std::pair<const std::string, const parser::SacmElement*>& entry : after) {
-        const std::map<std::string, const parser::SacmElement*>::const_iterator was =
-            before.find(entry.first);
+        const std::map<std::string, const parser::SacmElement*>::const_iterator was = before.find(entry.first);
         if (was == before.end()) {
             diff.status_by_id[entry.first] = ElementChange::Added;
             ++diff.added_count;
@@ -123,15 +118,14 @@ ChangeSetDiff ComputeChangeSetDiff(const ChangeSet&             change_set,
     return diff;
 }
 
-bool ChangeSetTargetsArgumentFile(const ChangeSet&             change_set,
-                                  const std::filesystem::path& argument_file) {
+bool ChangeSetTargetsArgumentFile(const ChangeSet& change_set, const std::filesystem::path& argument_file) {
     if (change_set.argument_file.empty()) {
         return true;
     }
     return change_set.argument_file.lexically_normal() == argument_file.lexically_normal();
 }
 
-ChangeSetAcceptability EvaluateChangeSetAcceptability(const ChangeSet&             change_set,
+ChangeSetAcceptability EvaluateChangeSetAcceptability(const ChangeSet& change_set,
                                                       const std::filesystem::path& loaded_file,
                                                       const parser::AssuranceCase& loaded_case) {
     ChangeSetAcceptability acceptability;
@@ -142,11 +136,10 @@ ChangeSetAcceptability EvaluateChangeSetAcceptability(const ChangeSet&          
     // argument moved. It did not. A different argument is open.
     if (!ChangeSetTargetsArgumentFile(change_set, loaded_file)) {
         acceptability.wrong_argument_file = true;
-        acceptability.reason =
-            "This change was written against " +
-            change_set.argument_file.filename().string() + ", and " +
-            (loaded_file.empty() ? std::string("no argument") : loaded_file.filename().string()) +
-            " is open. Open that argument to review it.";
+        acceptability.reason = "This change was written against " + change_set.argument_file.filename().string() +
+                               ", and " +
+                               (loaded_file.empty() ? std::string("no argument") : loaded_file.filename().string()) +
+                               " is open. Open that argument to review it.";
         return acceptability;
     }
 
@@ -159,8 +152,7 @@ ChangeSetAcceptability EvaluateChangeSetAcceptability(const ChangeSet&          
         reviews::EvaluateReviewProposalValidity(change_set.proposal, loaded_case);
     if (validity.validity != reviews::ProposalValidity::Valid) {
         acceptability.reason =
-            "The argument changed while this was being prepared, so it no longer applies: " +
-            validity.reason;
+            "The argument changed while this was being prepared, so it no longer applies: " + validity.reason;
         return acceptability;
     }
 

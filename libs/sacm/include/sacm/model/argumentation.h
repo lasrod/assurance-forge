@@ -19,7 +19,7 @@ std::optional<AssertionDeclaration> parse_assertion_declaration(std::string_view
 
 // Abstract base of all Argumentation package elements (clause 11.2).
 class ArgumentationElement : public ArtifactElement {
-  protected:
+protected:
     using ArtifactElement::ArtifactElement;
 };
 
@@ -27,19 +27,20 @@ class ArgumentationElement : public ArtifactElement {
 // ArgumentationElements (claims, reasoning, relationships, nested packages,
 // groups) in document order via the `argumentElement` role.
 class ArgumentPackage : public ArgumentationElement {
-  public:
-    explicit ArgumentPackage(ElementId id)
-        : ArgumentPackage(ElementKind::ArgumentPackage, std::move(id)) {}
+public:
+    explicit ArgumentPackage(ElementId id) : ArgumentPackage(ElementKind::ArgumentPackage, std::move(id)) {}
 
-    const std::vector<ElementId>& interfaces() const { return interfaces_; }
+    const std::vector<ElementId>& interfaces() const {
+        return interfaces_;
+    }
     const std::vector<std::unique_ptr<ArgumentationElement>>& argument_elements() const {
         return argument_elements_;
     }
 
-  protected:
+protected:
     ArgumentPackage(ElementKind kind, ElementId id) : ArgumentationElement(kind, std::move(id)) {}
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     std::vector<ElementId> interfaces_;
@@ -47,27 +48,31 @@ class ArgumentPackage : public ArgumentationElement {
 };
 
 class ArgumentPackageInterface final : public ArgumentPackage {
-  public:
+public:
     explicit ArgumentPackageInterface(ElementId id)
         : ArgumentPackage(ElementKind::ArgumentPackageInterface, std::move(id)) {}
 
-    const std::optional<ElementId>& implements() const { return implements_; }
+    const std::optional<ElementId>& implements() const {
+        return implements_;
+    }
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     std::optional<ElementId> implements_;
 };
 
 class ArgumentPackageBinding final : public ArgumentPackage {
-  public:
+public:
     explicit ArgumentPackageBinding(ElementId id)
         : ArgumentPackage(ElementKind::ArgumentPackageBinding, std::move(id)) {}
 
     // participantPackage: ArgumentPackage[2..*]
-    const std::vector<ElementId>& participant_packages() const { return participant_packages_; }
+    const std::vector<ElementId>& participant_packages() const {
+        return participant_packages_;
+    }
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     std::vector<ElementId> participant_packages_;
@@ -75,13 +80,14 @@ class ArgumentPackageBinding final : public ArgumentPackage {
 
 // Group referencing member ArgumentationElements (clause 11.3).
 class ArgumentGroup final : public ArgumentationElement {
-  public:
-    explicit ArgumentGroup(ElementId id)
-        : ArgumentationElement(ElementKind::ArgumentGroup, std::move(id)) {}
+public:
+    explicit ArgumentGroup(ElementId id) : ArgumentationElement(ElementKind::ArgumentGroup, std::move(id)) {}
 
-    const std::vector<ElementId>& argument_elements() const { return argument_elements_; }
+    const std::vector<ElementId>& argument_elements() const {
+        return argument_elements_;
+    }
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     std::vector<ElementId> argument_elements_;
@@ -89,20 +95,21 @@ class ArgumentGroup final : public ArgumentationElement {
 
 // Abstract base of the argumentation assets (clause 11.5).
 class ArgumentAsset : public ArgumentationElement {
-  protected:
+protected:
     using ArgumentationElement::ArgumentationElement;
 };
 
 // Description of the reasoning of an argument step (clause 11.12); may point
 // to an ArgumentPackage detailing the reasoning structure.
 class ArgumentReasoning final : public ArgumentAsset {
-  public:
-    explicit ArgumentReasoning(ElementId id)
-        : ArgumentAsset(ElementKind::ArgumentReasoning, std::move(id)) {}
+public:
+    explicit ArgumentReasoning(ElementId id) : ArgumentAsset(ElementKind::ArgumentReasoning, std::move(id)) {}
 
-    const std::optional<ElementId>& structure() const { return structure_; }
+    const std::optional<ElementId>& structure() const {
+        return structure_;
+    }
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     std::optional<ElementId> structure_;
@@ -111,15 +118,14 @@ class ArgumentReasoning final : public ArgumentAsset {
 // Reference from the argumentation to ArtifactElements (clause 11.9), e.g.
 // evidence artifacts.
 class ArtifactReference final : public ArgumentAsset {
-  public:
-    explicit ArtifactReference(ElementId id)
-        : ArgumentAsset(ElementKind::ArtifactReference, std::move(id)) {}
+public:
+    explicit ArtifactReference(ElementId id) : ArgumentAsset(ElementKind::ArtifactReference, std::move(id)) {}
 
     const std::vector<ElementId>& referenced_artifact_elements() const {
         return referenced_artifact_elements_;
     }
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     std::vector<ElementId> referenced_artifact_elements_;
@@ -128,14 +134,18 @@ class ArtifactReference final : public ArgumentAsset {
 // Abstract base of Claim and the asserted relationships (clause 11.6):
 // carries the assertion declaration and meta-claims.
 class Assertion : public ArgumentAsset {
-  public:
-    AssertionDeclaration assertion_declaration() const { return assertion_declaration_; }
-    const std::vector<ElementId>& meta_claims() const { return meta_claims_; }
+public:
+    AssertionDeclaration assertion_declaration() const {
+        return assertion_declaration_;
+    }
+    const std::vector<ElementId>& meta_claims() const {
+        return meta_claims_;
+    }
 
-  protected:
+protected:
     using ArgumentAsset::ArgumentAsset;
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     AssertionDeclaration assertion_declaration_ = AssertionDeclaration::Asserted;
@@ -146,23 +156,31 @@ class Assertion : public ArgumentAsset {
 // of what GSN notations render as a goal. Content lives in the inherited
 // description.
 class Claim final : public Assertion {
-  public:
+public:
     explicit Claim(ElementId id) : Assertion(ElementKind::Claim, std::move(id)) {}
 };
 
 // Abstract base of the asserted relationships (clause 11.13). source and
 // target reference ArgumentAssets; isCounter marks counter-argumentation.
 class AssertedRelationship : public Assertion {
-  public:
-    bool is_counter() const { return is_counter_; }
-    const std::optional<ElementId>& reasoning() const { return reasoning_; }
-    const std::vector<ElementId>& sources() const { return sources_; }
-    const std::vector<ElementId>& targets() const { return targets_; }
+public:
+    bool is_counter() const {
+        return is_counter_;
+    }
+    const std::optional<ElementId>& reasoning() const {
+        return reasoning_;
+    }
+    const std::vector<ElementId>& sources() const {
+        return sources_;
+    }
+    const std::vector<ElementId>& targets() const {
+        return targets_;
+    }
 
-  protected:
+protected:
     using Assertion::Assertion;
 
-  private:
+private:
     friend struct sacm::detail::Access;
 
     bool is_counter_ = false;
@@ -173,37 +191,34 @@ class AssertedRelationship : public Assertion {
 
 // Inference between claims (clause 11.14).
 class AssertedInference final : public AssertedRelationship {
-  public:
-    explicit AssertedInference(ElementId id)
-        : AssertedRelationship(ElementKind::AssertedInference, std::move(id)) {}
+public:
+    explicit AssertedInference(ElementId id) : AssertedRelationship(ElementKind::AssertedInference, std::move(id)) {}
 };
 
 // Evidence relationship from ArtifactReferences to claims (clause 11.15).
 class AssertedEvidence final : public AssertedRelationship {
-  public:
-    explicit AssertedEvidence(ElementId id)
-        : AssertedRelationship(ElementKind::AssertedEvidence, std::move(id)) {}
+public:
+    explicit AssertedEvidence(ElementId id) : AssertedRelationship(ElementKind::AssertedEvidence, std::move(id)) {}
 };
 
 // Contextual relationship (clause 11.16).
 class AssertedContext final : public AssertedRelationship {
-  public:
-    explicit AssertedContext(ElementId id)
-        : AssertedRelationship(ElementKind::AssertedContext, std::move(id)) {}
+public:
+    explicit AssertedContext(ElementId id) : AssertedRelationship(ElementKind::AssertedContext, std::move(id)) {}
 };
 
 // Artifact support relationship (clause 11.17).
 class AssertedArtifactSupport final : public AssertedRelationship {
-  public:
+public:
     explicit AssertedArtifactSupport(ElementId id)
         : AssertedRelationship(ElementKind::AssertedArtifactSupport, std::move(id)) {}
 };
 
 // Artifact context relationship (clause 11.18).
 class AssertedArtifactContext final : public AssertedRelationship {
-  public:
+public:
     explicit AssertedArtifactContext(ElementId id)
         : AssertedRelationship(ElementKind::AssertedArtifactContext, std::move(id)) {}
 };
 
-}  // namespace sacm::model
+} // namespace sacm::model

@@ -36,10 +36,10 @@ long long CurrentProcessId() {
 } // namespace
 
 struct AgentBridgeController::PendingRequest {
-    bridge::Request  request;
-    AgentConnection  connection;
+    bridge::Request request;
+    AgentConnection connection;
     bridge::Response response;
-    bool             done = false;
+    bool done = false;
 };
 
 AgentBridgeController::~AgentBridgeController() {
@@ -47,7 +47,8 @@ AgentBridgeController::~AgentBridgeController() {
 }
 
 bool AgentBridgeController::Start(const std::filesystem::path& project_root,
-                                  std::string app_version, std::string& error) {
+                                  std::string app_version,
+                                  std::string& error) {
     error.clear();
     if (project_root.empty()) {
         error = "Cannot serve the bridge without an open project.";
@@ -61,22 +62,22 @@ bool AgentBridgeController::Start(const std::filesystem::path& project_root,
     Stop();
 
     const std::string address = bridge::EndpointAddressFor(project_root);
-    listener_                 = bridge::Listener::Start(address, error);
+    listener_ = bridge::Listener::Start(address, error);
     if (listener_ == nullptr) {
         return false;
     }
 
     project_root_ = project_root;
-    app_version_  = std::move(app_version);
-    token_        = bridge::GenerateToken();
+    app_version_ = std::move(app_version);
+    token_ = bridge::GenerateToken();
 
     bridge::EndpointRecord record;
-    record.protocol     = bridge::kProtocolVersion;
-    record.pid          = CurrentProcessId();
-    record.address      = address;
-    record.token        = token_;
+    record.protocol = bridge::kProtocolVersion;
+    record.pid = CurrentProcessId();
+    record.address = address;
+    record.token = token_;
     record.project_root = project_root.generic_string();
-    record.app_version  = app_version_;
+    record.app_version = app_version_;
     if (!bridge::WriteEndpointRecord(record, error)) {
         listener_.reset();
         project_root_.clear();
@@ -110,10 +111,9 @@ void AgentBridgeController::Stop() {
         // Nothing queued will ever be answered now. Releasing the waiters is
         // what lets their threads finish.
         for (const std::shared_ptr<PendingRequest>& pending : pending_) {
-            pending->response = bridge::MakeError(pending->request.id,
-                                                  bridge::error_code::kInternal,
-                                                  "Assurance Forge is closing this project.");
-            pending->done     = true;
+            pending->response = bridge::MakeError(
+                pending->request.id, bridge::error_code::kInternal, "Assurance Forge is closing this project.");
+            pending->done = true;
         }
         pending_.clear();
     }
@@ -144,7 +144,7 @@ void AgentBridgeController::Stop() {
 
 void AgentBridgeController::AcceptLoop() {
     while (!stopping_.load()) {
-        std::string                         error;
+        std::string error;
         std::unique_ptr<bridge::Connection> accepted = listener_->Accept(error);
         if (accepted == nullptr) {
             // A clean stop reports no error; a transport failure reports one.
@@ -154,43 +154,43 @@ void AgentBridgeController::AcceptLoop() {
         }
 
         AgentConnection descriptor;
-        descriptor.id            = next_connection_id_.fetch_add(1);
-        descriptor.client_label  = "unknown client";
+        descriptor.id = next_connection_id_.fetch_add(1);
+        descriptor.client_label = "unknown client";
         descriptor.connected_utc = core::NowUtcString();
 
         std::unique_ptr<ServedConnection> entry = std::make_unique<ServedConnection>();
-        entry->descriptor                       = descriptor;
+        entry->descriptor = descriptor;
         entry->connection = std::shared_ptr<bridge::Connection>(accepted.release());
 
         const std::shared_ptr<bridge::Connection> connection = entry->connection;
-        entry->thread = std::thread([this, connection, descriptor] {
-            ServeConnection(connection, descriptor);
-        });
+        entry->thread = std::thread([this, connection, descriptor] { ServeConnection(connection, descriptor); });
 
         const std::lock_guard<std::mutex> lock(mutex_);
         served_.push_back(std::move(entry));
     }
 }
 
-bool AgentBridgeController::CheckEnvelope(const bridge::Request& request, bool initialized,
+bool AgentBridgeController::CheckEnvelope(const bridge::Request& request,
+                                          bool initialized,
                                           bridge::Response& refusal) const {
     if (!bridge::IsSupportedProtocol(request.protocol)) {
-        refusal = bridge::MakeError(request.id, bridge::error_code::kUnsupportedProtocol,
-                                    bridge::UnsupportedProtocolMessage(request.protocol));
+        refusal = bridge::MakeError(
+            request.id, bridge::error_code::kUnsupportedProtocol, bridge::UnsupportedProtocolMessage(request.protocol));
         return false;
     }
     if (request.token != token_) {
         // The endpoint record holding the token lives in the user's own runtime
         // directory. A caller without it did not read that file, so it is not
         // the adapter this application published for.
-        refusal = bridge::MakeError(request.id, bridge::error_code::kUnauthorized,
+        refusal = bridge::MakeError(request.id,
+                                    bridge::error_code::kUnauthorized,
                                     "This connection did not present the token Assurance Forge "
                                     "published for the open project.");
         return false;
     }
     if (!initialized && request.op != bridge::kHelloOperation) {
-        refusal = bridge::MakeError(request.id, bridge::error_code::kNotInitialized,
-                                    "Send \"hello\" before any other operation.");
+        refusal = bridge::MakeError(
+            request.id, bridge::error_code::kNotInitialized, "Send \"hello\" before any other operation.");
         return false;
     }
     return true;
@@ -221,14 +221,14 @@ void AgentBridgeController::ForgetConnection(std::uint64_t id) {
 
 void AgentBridgeController::ServeConnection(std::shared_ptr<bridge::Connection> connection,
                                             AgentConnection descriptor) {
-    bool        initialized = false;
+    bool initialized = false;
     std::string message;
     while (!stopping_.load() && connection->ReadMessage(message)) {
         bridge::Request request;
-        std::string     decode_error;
+        std::string decode_error;
         if (!bridge::DecodeRequest(message, request, decode_error)) {
-            connection->WriteMessage(bridge::EncodeResponse(
-                bridge::MakeError(0, bridge::error_code::kBadRequest, decode_error)));
+            connection->WriteMessage(
+                bridge::EncodeResponse(bridge::MakeError(0, bridge::error_code::kBadRequest, decode_error)));
             continue;
         }
 
@@ -251,19 +251,20 @@ void AgentBridgeController::ServeConnection(std::shared_ptr<bridge::Connection> 
             }
             MarkInitialized(descriptor.id, descriptor.client_label);
             initialized = true;
-            connection->WriteMessage(bridge::EncodeResponse(bridge::MakeResult(
-                request.id, nlohmann::json{
-                                {"protocol", bridge::kProtocolVersion},
-                                {"appVersion", app_version_},
-                                {"projectRoot", project_root_.generic_string()},
-                                {"connectionId", descriptor.id},
-                            })));
+            connection->WriteMessage(
+                bridge::EncodeResponse(bridge::MakeResult(request.id,
+                                                          nlohmann::json{
+                                                              {"protocol", bridge::kProtocolVersion},
+                                                              {"appVersion", app_version_},
+                                                              {"projectRoot", project_root_.generic_string()},
+                                                              {"connectionId", descriptor.id},
+                                                          })));
             continue;
         }
 
         const std::shared_ptr<PendingRequest> pending = std::make_shared<PendingRequest>();
-        pending->request                              = request;
-        pending->connection                           = descriptor;
+        pending->request = request;
+        pending->connection = descriptor;
 
         {
             const std::lock_guard<std::mutex> lock(mutex_);
@@ -274,10 +275,10 @@ void AgentBridgeController::ServeConnection(std::shared_ptr<bridge::Connection> 
         bridge::Response response;
         {
             std::unique_lock<std::mutex> lock(mutex_);
-            const bool answered =
-                queued_.wait_for(lock, kFrameResponseTimeout, [&pending] { return pending->done; });
+            const bool answered = queued_.wait_for(lock, kFrameResponseTimeout, [&pending] { return pending->done; });
             response = answered ? pending->response
-                                : bridge::MakeError(request.id, bridge::error_code::kInternal,
+                                : bridge::MakeError(request.id,
+                                                    bridge::error_code::kInternal,
                                                     "Assurance Forge did not answer in time.");
         }
         if (!connection->WriteMessage(bridge::EncodeResponse(response))) {

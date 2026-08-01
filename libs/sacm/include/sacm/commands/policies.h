@@ -48,4 +48,4 @@ enum class CrossPackageReferencePolicy {
     DeleteExternalReferencingRelationships,
 };
 
-}  // namespace sacm::commands
+} // namespace sacm::commands

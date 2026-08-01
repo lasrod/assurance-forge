@@ -28,7 +28,9 @@
 #include "sacm/sacm_package_tree.h"
 #include "ui/timeline/timeline_state.h"
 
-namespace core::commands { class CommandBus; }
+namespace core::commands {
+class CommandBus;
+}
 
 #include <filesystem>
 #include <cstdint>
@@ -207,7 +209,7 @@ struct AppRuntimeState {
     // The store revision the canvas was last built against. Staging is not a
     // model mutation and so marks nothing dirty; comparing this each frame is
     // what turns an agent's staged operation into a repaint.
-    std::uint64_t                    agent_change_revision_drawn = 0;
+    std::uint64_t agent_change_revision_drawn = 0;
     // The preview the canvas draws while a change set is open: the argument as
     // it would be if the user accepted, plus the elements it would remove put
     // back for display so a deletion can be seen rather than inferred from a gap.
@@ -217,7 +219,7 @@ struct AppRuntimeState {
     // the ids that package holds, and a staged addition is in no package at all
     // -- nothing has been applied -- so without these the projection drops every
     // new element and the preview draws as the committed argument.
-    std::vector<std::string>             agent_preview_added_ids;
+    std::vector<std::string> agent_preview_added_ids;
     std::optional<core::GuidelineCatalog> guideline_catalog;
     bool guideline_catalog_load_attempted = false;
     std::string guideline_catalog_error;

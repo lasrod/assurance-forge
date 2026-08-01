@@ -42,8 +42,8 @@ bool PackageHasLegacyStrategyEncoding(const sacm::AssuranceCasePackage& package)
 bool NormalizeStrategyEncoding(sacm::AssuranceCasePackage& package);
 
 struct StrategyMigrationResult {
-    bool        migrated = false;   // true when the on-disk file was rewritten
-    std::string note;               // user-facing summary (empty when not migrated)
+    bool migrated = false; // true when the on-disk file was rewritten
+    std::string note;      // user-facing summary (empty when not migrated)
     std::string baseline_snapshot_id;
 };
 

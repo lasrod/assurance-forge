@@ -4,7 +4,9 @@
 #include "imgui.h"
 #include "ui/ui_state.h"
 
-namespace app { struct AppRuntimeState; }
+namespace app {
+struct AppRuntimeState;
+}
 
 namespace app::frame {
 

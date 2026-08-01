@@ -69,8 +69,7 @@ struct ExtensionType {
 // SACM supertype is *abstract* resolves with an empty `sacm_kind`: it is a
 // genuine SACM extension point with no concrete equivalent, and the caller must
 // preserve rather than guess.
-std::optional<ExtensionType> resolve_extension_type(std::string_view namespace_uri,
-                                                    std::string_view type_name);
+std::optional<ExtensionType> resolve_extension_type(std::string_view namespace_uri, std::string_view type_name);
 
 // Reserved TaggedValue key recording the extension type an element was read
 // from, e.g. "{http://scsc.acwg.gsn/2.0}Goal". Written on import whenever an
@@ -104,4 +103,4 @@ bool kind_is_terminology_element(ElementKind kind);
 bool kind_is_artifact_asset(ElementKind kind);
 bool kind_is_argument_asset(ElementKind kind);
 
-}  // namespace sacm::io::detail
+} // namespace sacm::io::detail

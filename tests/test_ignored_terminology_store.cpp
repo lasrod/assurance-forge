@@ -41,8 +41,7 @@ TEST(IgnoredTerminologyStore, EmptyListRoundTrips) {
 TEST(IgnoredTerminologyStore, MissingArrayYieldsEmptySuccess) {
     std::vector<IgnoredSuggestion> parsed;
     std::string error;
-    ASSERT_TRUE(ParseIgnoredSuggestions(R"({"format":"assurance-forge-ignored-terminology"})", parsed, error))
-        << error;
+    ASSERT_TRUE(ParseIgnoredSuggestions(R"({"format":"assurance-forge-ignored-terminology"})", parsed, error)) << error;
     EXPECT_TRUE(parsed.empty());
 }
 
@@ -56,8 +55,7 @@ TEST(IgnoredTerminologyStore, MalformedJsonFails) {
 TEST(IgnoredTerminologyStore, SkipsEntriesWithEmptyTerm) {
     std::vector<IgnoredSuggestion> parsed;
     std::string error;
-    const std::string json =
-        R"({"ignored":[{"element_id":"G1","term":""},{"element_id":"G2","term":"OK"}]})";
+    const std::string json = R"({"ignored":[{"element_id":"G1","term":""},{"element_id":"G2","term":"OK"}]})";
     ASSERT_TRUE(ParseIgnoredSuggestions(json, parsed, error)) << error;
     ASSERT_EQ(parsed.size(), 1u);
     EXPECT_EQ(parsed[0].term, "OK");

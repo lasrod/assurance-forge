@@ -22,22 +22,24 @@ struct Guideline {
 };
 
 constexpr Guideline kEvidencePath{
-    "EV.1", "Show, for each claim, the evidence path that supports it, either directly or through "
-            "stated sub-claims and intermediate arguments."};
-constexpr Guideline kInferenceStep{
-    "AR.2", "State how the parent claim is being decomposed or argued; do not make the reviewer "
-            "infer the decomposition rule from wording alone."};
-constexpr Guideline kStructureCarriesArgument{
-    "AR.1", "Use the assurance case structure to make each element's role clear."};
+    "EV.1",
+    "Show, for each claim, the evidence path that supports it, either directly or through "
+    "stated sub-claims and intermediate arguments."};
+constexpr Guideline kInferenceStep{"AR.2",
+                                   "State how the parent claim is being decomposed or argued; do not make the reviewer "
+                                   "infer the decomposition rule from wording alone."};
+constexpr Guideline kStructureCarriesArgument{"AR.1",
+                                              "Use the assurance case structure to make each element's role clear."};
 constexpr Guideline kBoundQualifiers{
-    "CL.5", "Do not leave broad evaluative terms or universal qualifiers unbounded. This includes "
-            "terms such as safe, timely, effective, normal, robust, all, every, and never."};
+    "CL.5",
+    "Do not leave broad evaluative terms or universal qualifiers unbounded. This includes "
+    "terms such as safe, timely, effective, normal, robust, all, every, and never."};
 
 // The terms CL.5 names. Taken from the guideline text rather than invented, so
 // the check cannot drift from what SCCG actually asks for.
 const std::vector<std::string>& UnboundedQualifiers() {
-    static const std::vector<std::string> terms{"safe",   "timely", "effective", "normal",
-                                                "robust", "all",    "every",     "never"};
+    static const std::vector<std::string> terms{
+        "safe", "timely", "effective", "normal", "robust", "all", "every", "never"};
     return terms;
 }
 
@@ -55,12 +57,10 @@ std::string Lowercased(const std::string& text) {
 bool ContainsWord(const std::string& haystack_lower, const std::string& word) {
     std::size_t at = haystack_lower.find(word);
     while (at != std::string::npos) {
-        const bool left_ok =
-            at == 0 || std::isalpha(static_cast<unsigned char>(haystack_lower[at - 1])) == 0;
+        const bool left_ok = at == 0 || std::isalpha(static_cast<unsigned char>(haystack_lower[at - 1])) == 0;
         const std::size_t after = at + word.size();
-        const bool        right_ok =
-            after >= haystack_lower.size() ||
-            std::isalpha(static_cast<unsigned char>(haystack_lower[after])) == 0;
+        const bool right_ok =
+            after >= haystack_lower.size() || std::isalpha(static_cast<unsigned char>(haystack_lower[after])) == 0;
         if (left_ok && right_ok) {
             return true;
         }
@@ -76,10 +76,12 @@ std::string ElementText(const parser::SacmElement& element) {
     return element.name;
 }
 
-void Add(std::vector<StagedFinding>& findings, const Guideline& guideline, std::string detail,
-         const std::string& element_id, FindingSeverity severity) {
-    findings.push_back(
-        StagedFinding{guideline.id, guideline.statement, std::move(detail), element_id, severity});
+void Add(std::vector<StagedFinding>& findings,
+         const Guideline& guideline,
+         std::string detail,
+         const std::string& element_id,
+         FindingSeverity severity) {
+    findings.push_back(StagedFinding{guideline.id, guideline.statement, std::move(detail), element_id, severity});
 }
 
 } // namespace
@@ -88,8 +90,8 @@ const char* FindingSeverityToString(FindingSeverity severity) {
     return severity == FindingSeverity::Problem ? "problem" : "advisory";
 }
 
-std::vector<StagedFinding> CheckStagedArgument(
-    const parser::AssuranceCase& preview, const std::vector<std::string>& changed_element_ids) {
+std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& preview,
+                                               const std::vector<std::string>& changed_element_ids) {
     std::vector<StagedFinding> findings;
 
     const std::set<std::string> changed(changed_element_ids.begin(), changed_element_ids.end());
@@ -123,30 +125,36 @@ std::vector<StagedFinding> CheckStagedArgument(
         switch (node->role) {
         case NodeRole::Claim:
             if (!has_support && !element->undeveloped) {
-                Add(findings, kEvidencePath,
+                Add(findings,
+                    kEvidencePath,
                     "This claim has no support and is not marked undeveloped, so a reviewer cannot "
                     "tell whether evidence is missing or still to come. Give it support, or mark "
                     "it undeveloped to say so deliberately.",
-                    id, FindingSeverity::Advisory);
+                    id,
+                    FindingSeverity::Advisory);
             }
             break;
 
         case NodeRole::Strategy:
             if (!has_support) {
-                Add(findings, kInferenceStep,
+                Add(findings,
+                    kInferenceStep,
                     "This strategy develops into nothing. A decomposition step that produces no "
                     "sub-claims states an inference the argument never makes.",
-                    id, FindingSeverity::Problem);
+                    id,
+                    FindingSeverity::Problem);
             }
             break;
 
         case NodeRole::Solution:
             if (has_support) {
-                Add(findings, kStructureCarriesArgument,
+                Add(findings,
+                    kStructureCarriesArgument,
                     "This is a solution -- the artefact or observation the argument rests on -- so "
                     "it should be a leaf. Elements hanging beneath it are not carrying the role "
                     "the structure says they are.",
-                    id, FindingSeverity::Problem);
+                    id,
+                    FindingSeverity::Problem);
             }
             break;
 
@@ -166,12 +174,14 @@ std::vector<StagedFinding> CheckStagedArgument(
                 if (!ContainsWord(text, term)) {
                     continue;
                 }
-                Add(findings, kBoundQualifiers,
+                Add(findings,
+                    kBoundQualifiers,
                     "This claim uses \"" + term +
                         "\", which SCCG names as a term needing bounds. Say what it means here -- "
                         "against which hazards, in which operating conditions, to what standard -- "
                         "in the claim or in attached context.",
-                    id, FindingSeverity::Advisory);
+                    id,
+                    FindingSeverity::Advisory);
                 break;
             }
         }
@@ -190,7 +200,8 @@ std::vector<StagedFinding> CheckStagedArgument(
         if (!touches_change) {
             continue;
         }
-        Add(findings, kStructureCarriesArgument,
+        Add(findings,
+            kStructureCarriesArgument,
             "These operations put a claim in its own support chain, so the argument supports "
             "itself and establishes nothing.",
             cycle.element_ids.empty() ? std::string() : cycle.element_ids.front(),

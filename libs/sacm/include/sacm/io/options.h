@@ -51,8 +51,7 @@ struct LoadResult {
     // SACM revision the source declared, derived from that namespace. The
     // library implements 2.3; anything else loads in tolerant mode and is
     // reported, so that "it parsed" is never mistaken for "it is 2.3".
-    metadata::namespaces::StandardVersion source_version =
-        metadata::namespaces::StandardVersion::Unknown;
+    metadata::namespaces::StandardVersion source_version = metadata::namespaces::StandardVersion::Unknown;
     bool ok = false;
 };
 
@@ -62,4 +61,4 @@ struct SaveResult {
     bool ok = false;
 };
 
-}  // namespace sacm::io
+} // namespace sacm::io

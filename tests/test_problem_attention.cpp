@@ -116,8 +116,8 @@ TEST(ProblemAttentionTest, BadgeSummaryTracksReviewProblemSeparatelyFromOverallT
     // A higher-severity non-review problem dominates the overall summary, while
     // a lower-severity review problem must still be surfaced for "Go to Review".
     std::vector<core::ProblemItem> problems = {
-        MakeSeverityProblem("validation-error", core::ProblemSource::ModelValidation, "G-1",
-                            core::ProblemSeverity::Error),
+        MakeSeverityProblem(
+            "validation-error", core::ProblemSource::ModelValidation, "G-1", core::ProblemSeverity::Error),
         MakeSeverityProblem("review-warn", core::ProblemSource::ReviewComment, "G-1", core::ProblemSeverity::Warning),
     };
 

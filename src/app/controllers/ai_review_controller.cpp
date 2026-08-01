@@ -339,8 +339,9 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
     }
 
     if (guideline_selection.review_profile &&
-        !ai::IsReviewProfileCompatibleWithElement(
-            *guideline_selection.review_profile, *selected_element, core::FindTreeNode(current_tree, selected_element_id))) {
+        !ai::IsReviewProfileCompatibleWithElement(*guideline_selection.review_profile,
+                                                  *selected_element,
+                                                  core::FindTreeNode(current_tree, selected_element_id))) {
         const std::string message = "SCCG review profile '" + guideline_selection.review_profile->display_name +
                                     "' does not apply to the selected element type.";
         problems_manager_.AddOrUpdateProblem(

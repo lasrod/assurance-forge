@@ -39,9 +39,9 @@ namespace core::commands {
 
 class UndoLastTransactionCommand final : public ICommand {
 public:
-    UndoLastTransactionCommand(std::uint64_t              undone_transaction_sequence,
-                               std::string                undone_command_name,
-                               parser::AssuranceCase      prior_model,
+    UndoLastTransactionCommand(std::uint64_t undone_transaction_sequence,
+                               std::string undone_command_name,
+                               parser::AssuranceCase prior_model,
                                sacm::AssuranceCasePackage prior_package,
                                std::unique_ptr<sacm_adapter::LibraryDocument> prior_document = nullptr)
         : undone_transaction_sequence_(undone_transaction_sequence),
@@ -50,17 +50,23 @@ public:
           prior_package_(std::move(prior_package)),
           prior_document_(std::move(prior_document)) {}
 
-    std::string Name() const override { return "Undo"; }
+    std::string Name() const override {
+        return "Undo";
+    }
 
     bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
-    std::uint64_t       UndoneTransactionSequence() const { return undone_transaction_sequence_; }
-    const std::string&  UndoneCommandName() const { return undone_command_name_; }
+    std::uint64_t UndoneTransactionSequence() const {
+        return undone_transaction_sequence_;
+    }
+    const std::string& UndoneCommandName() const {
+        return undone_command_name_;
+    }
 
 private:
-    std::uint64_t              undone_transaction_sequence_;
-    std::string                undone_command_name_;
-    parser::AssuranceCase      prior_model_;
+    std::uint64_t undone_transaction_sequence_;
+    std::string undone_command_name_;
+    parser::AssuranceCase prior_model_;
     sacm::AssuranceCasePackage prior_package_;
     std::unique_ptr<sacm_adapter::LibraryDocument> prior_document_;
 };

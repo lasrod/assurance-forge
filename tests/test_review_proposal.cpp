@@ -216,8 +216,7 @@ TEST(ReviewProposalTest, RefusesAnUnanchoredProposalThatNamesAffectedElements) {
     core::reviews::ReviewProposal proposal = MakeTopGoalProposal();
     proposal.affected_existing_element_ids = {"G12"};
 
-    const core::reviews::ProposalValidityResult result =
-        core::reviews::EvaluateReviewProposalValidity(proposal, model);
+    const core::reviews::ProposalValidityResult result = core::reviews::EvaluateReviewProposalValidity(proposal, model);
 
     EXPECT_EQ(result.validity, core::reviews::ProposalValidity::Broken);
     EXPECT_NE(result.reason.find("anchor"), std::string::npos);
@@ -236,8 +235,7 @@ TEST(ReviewProposalTest, RefusesAnUnanchoredProposalThatOperatesOnAnExistingElem
     link.target = core::reviews::ElementRef{std::nullopt, "$top_goal"};
     proposal.operations.push_back(link);
 
-    const core::reviews::ProposalValidityResult result =
-        core::reviews::EvaluateReviewProposalValidity(proposal, model);
+    const core::reviews::ProposalValidityResult result = core::reviews::EvaluateReviewProposalValidity(proposal, model);
 
     EXPECT_EQ(result.validity, core::reviews::ProposalValidity::Broken);
     EXPECT_NE(result.reason.find("anchor"), std::string::npos);

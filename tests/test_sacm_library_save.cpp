@@ -25,7 +25,9 @@
 
 namespace {
 
-std::filesystem::path repo_root() { return std::filesystem::path(AF_REPO_ROOT); }
+std::filesystem::path repo_root() {
+    return std::filesystem::path(AF_REPO_ROOT);
+}
 
 const std::vector<std::string>& fixtures() {
     static const std::vector<std::string> kFixtures = {
@@ -62,11 +64,9 @@ TEST(SacmLibrarySave, SACM23_INT_001_XmiSaveRoundTripsTheProjection) {
         ASSERT_TRUE(sacm_adapter::reload_document(reloaded, saved.xml));
         const core::AssuranceCase after = sacm_adapter::project_case(reloaded);
 
-        const std::vector<sacm_adapter::ProjectionDifference> differences =
-            sacm_adapter::diff_cases(before, after);
+        const std::vector<sacm_adapter::ProjectionDifference> differences = sacm_adapter::diff_cases(before, after);
         for (const sacm_adapter::ProjectionDifference& difference : differences) {
-            ADD_FAILURE() << difference.category << " " << difference.path << ": "
-                          << difference.message;
+            ADD_FAILURE() << difference.category << " " << difference.path << ": " << difference.message;
         }
     }
 }
@@ -106,7 +106,7 @@ TEST(SacmLibrarySave, SACM23_INT_001_LibraryPackageHashIsStableUnderXmiRoundTrip
 
     const sacm::AssuranceCasePackage package = core::project_library_package(*loaded.document);
     ASSERT_FALSE(package.argumentPackages.empty());
-    EXPECT_EQ(package.argumentPackages.front().claims.size(), 2u);  // G1, G2 captured
+    EXPECT_EQ(package.argumentPackages.front().claims.size(), 2u); // G1, G2 captured
     const std::string hash_before = core::audit::CanonicalModelHash(package);
     EXPECT_FALSE(hash_before.empty());
 
@@ -124,8 +124,7 @@ TEST(SacmLibrarySave, SACM23_INT_001_LibraryPackageHashIsStableUnderXmiRoundTrip
 // readers onto it would drop terminology from the hash and open a tamper-
 // detection blind spot. This uses a fixture rich in terminology.
 TEST(SacmLibrarySave, SACM23_INT_001_LibraryPackageProjectionCapturesTerminology) {
-    const std::filesystem::path path =
-        repo_root() / "tests" / "data" / "fixture_roundtrip_open_autonomy.sacm.xml";
+    const std::filesystem::path path = repo_root() / "tests" / "data" / "fixture_roundtrip_open_autonomy.sacm.xml";
     ASSERT_TRUE(std::filesystem::exists(path)) << path.string();
 
     sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);

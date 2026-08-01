@@ -28,7 +28,9 @@ struct LangString {
 struct MultiLangString {
     std::vector<LangString> values;
 
-    bool empty() const { return values.empty(); }
+    bool empty() const {
+        return values.empty();
+    }
 
     // Content for an exact language tag, if present.
     const std::string* find(std::string_view lang) const;
@@ -42,4 +44,4 @@ struct MultiLangString {
     friend bool operator==(const MultiLangString&, const MultiLangString&) = default;
 };
 
-}  // namespace sacm::model
+} // namespace sacm::model

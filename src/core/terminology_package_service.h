@@ -237,9 +237,9 @@ TerminologyContextAssociationResult AssociateTerminologyTermWithElement(sacm::As
 // AssertedContext is created; otherwise existing entities are reused.
 TerminologyContextAssociationResult
 AssociateTerminologyTermWithElementWithIds(sacm::AssuranceCasePackage& package,
-                                           const std::string&             target_element_id,
-                                           const TerminologyPackageRef&   package_ref,
-                                           const TerminologyTermRef&      term_ref,
+                                           const std::string& target_element_id,
+                                           const TerminologyPackageRef& package_ref,
+                                           const TerminologyTermRef& term_ref,
                                            const TerminologyContextForcedIds& forced);
 
 TerminologyContextAssociationResult AddTerminologyTermAsVisibleContext(sacm::AssuranceCasePackage& package,
@@ -252,10 +252,10 @@ TerminologyContextAssociationResult AddTerminologyTermAsVisibleContext(sacm::Ass
 // AssertedContext is created; otherwise existing entities are reused or
 // promoted in place.
 TerminologyContextAssociationResult
-AddTerminologyTermAsVisibleContextWithIds(sacm::AssuranceCasePackage&        package,
-                                          const std::string&                 target_element_id,
-                                          const TerminologyPackageRef&       package_ref,
-                                          const TerminologyTermRef&          term_ref,
+AddTerminologyTermAsVisibleContextWithIds(sacm::AssuranceCasePackage& package,
+                                          const std::string& target_element_id,
+                                          const TerminologyPackageRef& package_ref,
+                                          const TerminologyTermRef& term_ref,
                                           const TerminologyContextForcedIds& forced);
 
 TerminologyTermReferenceResolution ResolveTerminologyTermReference(const sacm::AssuranceCasePackage& package,

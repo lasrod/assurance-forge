@@ -58,7 +58,8 @@ commands::MutationResult Document::apply(const commands::Operation& operation,
             .location = std::nullopt,
             .message = std::format("preview taken at revision {} but the document is at revision "
                                    "{}; take a new preview",
-                                   *expected_revision, revision_),
+                                   *expected_revision,
+                                   revision_),
         });
         return result;
     }
@@ -83,4 +84,4 @@ commands::MutationResult Document::apply(const commands::Operation& operation,
     return result;
 }
 
-}  // namespace sacm::model
+} // namespace sacm::model

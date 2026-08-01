@@ -38,16 +38,16 @@ AuditChangeSet ComputeChangeSet(const std::vector<AuditTransaction>& transaction
 // Element Properties panel to surface "Last changed", "Changes", and
 // "Changed since baseline" lifecycle info.
 struct ElementHistorySummary {
-    bool          exists = false;                  // false if last touch was a delete
-    bool          ever_seen = false;               // true if element appeared in any transaction
-    std::uint64_t change_count = 0;                // adds + modifies + deletes touching the element
-    std::uint64_t first_sequence = 0;              // sequence of the first transaction that added it
-    std::uint64_t last_sequence = 0;               // sequence of the last transaction that touched it
-    std::string   created_at;                      // timestamp of first add (ISO-8601)
-    std::string   created_by;                      // author of first add
-    std::string   last_changed_at;                 // timestamp of last touching transaction
-    std::string   last_changed_by;                 // author of last touching transaction
-    bool          changed_since_baseline = false;  // true if any change at seq > baseline_sequence
+    bool exists = false;                 // false if last touch was a delete
+    bool ever_seen = false;              // true if element appeared in any transaction
+    std::uint64_t change_count = 0;      // adds + modifies + deletes touching the element
+    std::uint64_t first_sequence = 0;    // sequence of the first transaction that added it
+    std::uint64_t last_sequence = 0;     // sequence of the last transaction that touched it
+    std::string created_at;              // timestamp of first add (ISO-8601)
+    std::string created_by;              // author of first add
+    std::string last_changed_at;         // timestamp of last touching transaction
+    std::string last_changed_by;         // author of last touching transaction
+    bool changed_since_baseline = false; // true if any change at seq > baseline_sequence
 };
 
 // Compute a per-element history summary from a transaction log. When

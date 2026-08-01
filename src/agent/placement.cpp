@@ -14,7 +14,7 @@ namespace agent {
 namespace {
 
 constexpr int kDefaultSuggestions = 5;
-constexpr int kMaxSuggestions     = 20;
+constexpr int kMaxSuggestions = 20;
 
 std::string Lowercased(const std::string& text) {
     std::string lowered = text;
@@ -29,8 +29,8 @@ std::string Lowercased(const std::string& text) {
 // a ranking useless.
 std::vector<std::string> Keywords(const std::string& topic) {
     std::vector<std::string> words;
-    std::istringstream       stream(Lowercased(topic));
-    std::string              word;
+    std::istringstream stream(Lowercased(topic));
+    std::string word;
     while (stream >> word) {
         std::string cleaned;
         for (char character : word) {
@@ -82,10 +82,10 @@ const char* RoleName(core::NodeRole role) {
 }
 
 struct Candidate {
-    const core::TreeNode*      node = nullptr;
+    const core::TreeNode* node = nullptr;
     const parser::SacmElement* element = nullptr;
-    int                        score = 0;
-    std::vector<std::string>   matched;
+    int score = 0;
+    std::vector<std::string> matched;
 };
 
 } // namespace
@@ -101,7 +101,7 @@ Result SuggestPlacement(const ReadContext& context, const nlohmann::json& argume
         return Result::Error("Argument \"topic\" is required: describe what the new argument would "
                              "establish, and this reports where it would fit.");
     }
-    const std::string              topic    = topic_argument->get<std::string>();
+    const std::string topic = topic_argument->get<std::string>();
     const std::vector<std::string> keywords = Keywords(topic);
 
     int limit = kDefaultSuggestions;
@@ -111,7 +111,7 @@ Result SuggestPlacement(const ReadContext& context, const nlohmann::json& argume
     }
 
     const parser::AssuranceCase& model = context.state.loaded_case.value();
-    const core::AssuranceTree    tree  = core::AssuranceTree::Build(model);
+    const core::AssuranceTree tree = core::AssuranceTree::Build(model);
 
     std::map<std::string, const parser::SacmElement*> by_id;
     for (const parser::SacmElement& element : model.elements) {
@@ -124,13 +124,12 @@ Result SuggestPlacement(const ReadContext& context, const nlohmann::json& argume
     std::vector<Candidate> candidates;
     for (const std::pair<const std::string, const parser::SacmElement*>& entry : by_id) {
         const core::TreeNode* node = core::FindTreeNode(tree, entry.first);
-        if (node == nullptr ||
-            (node->role != core::NodeRole::Claim && node->role != core::NodeRole::Strategy)) {
+        if (node == nullptr || (node->role != core::NodeRole::Claim && node->role != core::NodeRole::Strategy)) {
             continue;
         }
 
         Candidate candidate;
-        candidate.node    = node;
+        candidate.node = node;
         candidate.element = entry.second;
 
         const std::string text = ElementText(*entry.second);
@@ -155,10 +154,9 @@ Result SuggestPlacement(const ReadContext& context, const nlohmann::json& argume
         }
     }
 
-    std::stable_sort(candidates.begin(), candidates.end(),
-                     [](const Candidate& left, const Candidate& right) {
-                         return left.score > right.score;
-                     });
+    std::stable_sort(candidates.begin(), candidates.end(), [](const Candidate& left, const Candidate& right) {
+        return left.score > right.score;
+    });
     if (static_cast<int>(candidates.size()) > limit) {
         candidates.resize(static_cast<std::size_t>(limit));
     }
@@ -174,10 +172,8 @@ Result SuggestPlacement(const ReadContext& context, const nlohmann::json& argume
         nlohmann::json in_scope = nlohmann::json::array();
         for (const core::TreeNode* attachment : candidate.node->group2_attachments) {
             if (attachment != nullptr) {
-                in_scope.push_back(
-                    nlohmann::json{{"id", attachment->id},
-                                   {"role", RoleName(attachment->role)},
-                                   {"label", attachment->label}});
+                in_scope.push_back(nlohmann::json{
+                    {"id", attachment->id}, {"role", RoleName(attachment->role)}, {"label", attachment->label}});
             }
         }
 

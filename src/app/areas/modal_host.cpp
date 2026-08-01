@@ -21,7 +21,6 @@
 #include <string>
 #include <vector>
 
-
 #include "app/areas/modal_host_internal.h"
 
 namespace app::areas {
@@ -81,12 +80,11 @@ void ModalHost::RenderPreferencesWindow() {
     }
 
     model.mcpEnabled = state_.mcp_settings.enabled;
-    model.mcpStatus  = state_.mcp_status;
+    model.mcpStatus = state_.mcp_status;
     if (state_.app_state.current_project.has_value()) {
         model.mcpClientConfig = app::BuildMcpClientConfig(state_.app_state.current_project->rootPath);
         if (model.mcpClientConfig.empty()) {
-            model.mcpConfigUnavailableReason =
-                AF_TR("The MCP server program was not found next to Assurance Forge.");
+            model.mcpConfigUnavailableReason = AF_TR("The MCP server program was not found next to Assurance Forge.");
         }
     } else {
         model.mcpConfigUnavailableReason = AF_TR("Open a project to see its client configuration.");
@@ -182,10 +180,9 @@ void ModalHost::RenderNotImplementedModal() {
     if (ImGui::BeginPopupModal("##not_implemented_modal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         // The feature name is stored as the English msgid; translate here so
         // the modal always matches the current UI language.
-        ImGui::TextUnformatted(
-            ui::i18n::trf("{0} is not implemented yet.",
-                          AF_TR(state_.modal_coordinator->not_implemented_feature.c_str()))
-                .c_str());
+        ImGui::TextUnformatted(ui::i18n::trf("{0} is not implemented yet.",
+                                             AF_TR(state_.modal_coordinator->not_implemented_feature.c_str()))
+                                   .c_str());
         ImGui::Spacing();
         ImGui::Spacing();
 
@@ -215,10 +212,9 @@ void ModalHost::RenderRemoveConfirmModal() {
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal("##remove_confirm_modal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         const int n = static_cast<int>(state_.element_edit_controller->PendingRemoveIds().size());
-        const std::string mode_label =
-            state_.element_edit_controller->PendingRemoveMode() == core::RemoveMode::NodeOnly
-                ? AF_TR("this node and its attachments")
-                : AF_TR("this node and its descendants");
+        const std::string mode_label = state_.element_edit_controller->PendingRemoveMode() == core::RemoveMode::NodeOnly
+                                           ? AF_TR("this node and its attachments")
+                                           : AF_TR("this node and its descendants");
         ImGui::TextUnformatted(ui::i18n::trf("Remove {0}?", mode_label).c_str());
         ImGui::TextUnformatted(ui::i18n::trnf("{0} element will be deleted (highlighted in red).",
                                               "{0} elements will be deleted (highlighted in red).",
@@ -315,7 +311,9 @@ void ModalHost::RenderDeleteReviewItemConfirmModal() {
     auto cancel = [&]() { state_.review_controller->CancelDeleteReviewItem(); };
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal((AF_TR("Delete Review Comment") + "###Delete Review Comment").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal((AF_TR("Delete Review Comment") + "###Delete Review Comment").c_str(),
+                               nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
         const core::reviews::ReviewItem& item = state_.review_controller->PendingDeleteReviewItem();
         ImGui::TextWrapped("%s", AF_TR("Delete this review comment?").c_str());
         ImGui::TextWrapped("%s", AF_TR("The attached proposal will also be deleted.").c_str());
@@ -477,7 +475,9 @@ void ModalHost::RenderProjectLoadReportModal() {
         return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal((AF_TR("Project Loading Status") + "###Project Loading Status").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal((AF_TR("Project Loading Status") + "###Project Loading Status").c_str(),
+                               nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
         for (const auto& step : report.steps) {
             const char* mark = "[OK]";
             if (step.status == core::ProjectLoadStepStatus::Failed)
@@ -513,7 +513,8 @@ void ModalHost::RenderSaveBeforeExitModal() {
         return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal((AF_TR("Unsaved Changes") + "###Unsaved Changes").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal(
+            (AF_TR("Unsaved Changes") + "###Unsaved Changes").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextWrapped("%s", AF_TR("You have unsaved changes. Save before closing?").c_str());
         ImGui::Spacing();
 
@@ -558,7 +559,9 @@ void ModalHost::RenderSaveBeforeProjectFileOpenModal() {
             : AF_TR("the selected project file");
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal((AF_TR("Open Project File") + "###Open Project File").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal((AF_TR("Open Project File") + "###Open Project File").c_str(),
+                               nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextWrapped(
             "%s",
             ui::i18n::trf("You have unsaved changes in the current SACM file. Save before opening {0}?", target)
@@ -595,7 +598,8 @@ void ModalHost::RenderReviewerNamePromptModal() {
         return;
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal((AF_TR("Reviewer Name") + "###Reviewer Name").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal(
+            (AF_TR("Reviewer Name") + "###Reviewer Name").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextWrapped("%s", AF_TR("Enter the name to use for review comments.").c_str());
         ImGui::SetNextItemWidth(360.0f);
         ImGui::InputText("##startup_reviewer_name", state_.reviewer_name_buf, sizeof(state_.reviewer_name_buf));

@@ -26,8 +26,8 @@ void RenderFeedbackDockArea(AppRuntimeState& state,
 
         ImGuiTabItemFlags terminology_usage_flags =
             state.terminology.focus_usages_tab ? ImGuiTabItemFlags_SetSelected : 0;
-        if (ImGui::BeginTabItem((AF_TR("Term Usages") + "###term_usages_tab").c_str(), nullptr,
-                                terminology_usage_flags)) {
+        if (ImGui::BeginTabItem(
+                (AF_TR("Term Usages") + "###term_usages_tab").c_str(), nullptr, terminology_usage_flags)) {
             RenderTermUsagesAreaContent(state, callbacks.term_usages);
             ImGui::EndTabItem();
         }

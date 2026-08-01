@@ -528,9 +528,8 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
                               const parser::ReviewProfile* review_profile,
                               const AiReviewDataPackageBundle* data_packages) {
     nlohmann::json selected = ReviewElementToJson(payload.selected);
-    nlohmann::json parent =
-        payload.parent.transform([](const AiReviewElement& p) { return ReviewElementToJson(p); })
-            .value_or(nlohmann::json(nullptr));
+    nlohmann::json parent = payload.parent.transform([](const AiReviewElement& p) { return ReviewElementToJson(p); })
+                                .value_or(nlohmann::json(nullptr));
     nlohmann::json children = nlohmann::json::array();
     for (const AiReviewElement& child : payload.children) {
         children.push_back(ReviewElementToJson(child));
@@ -592,25 +591,24 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
         artifacts.childElementsJson,
         artifacts.responseSchemaJson);
 
-    artifacts.debugText = std::format(
-        "Selected element data\n{}\n\n"
-        "Parent element data\n{}\n\n"
-        "Child/sub-element data\n{}\n\n"
-        "Available data packages\n{}\n\n"
-        "Unavailable data packages\n{}\n\n"
-        "SCCG review profile data\n{}\n\n"
-        "SCCG guideline data\n{}\n\n"
-        "Final AI prompt text\n{}\n\n"
-        "Expected JSON response schema\n{}\n",
-        artifacts.selectedElementJson,
-        artifacts.parentElementJson,
-        artifacts.childElementsJson,
-        artifacts.availableDataPackagesJson,
-        artifacts.unavailableDataPackagesJson,
-        artifacts.reviewProfileJson,
-        artifacts.guidelinesJson,
-        artifacts.prompt,
-        artifacts.responseSchemaJson);
+    artifacts.debugText = std::format("Selected element data\n{}\n\n"
+                                      "Parent element data\n{}\n\n"
+                                      "Child/sub-element data\n{}\n\n"
+                                      "Available data packages\n{}\n\n"
+                                      "Unavailable data packages\n{}\n\n"
+                                      "SCCG review profile data\n{}\n\n"
+                                      "SCCG guideline data\n{}\n\n"
+                                      "Final AI prompt text\n{}\n\n"
+                                      "Expected JSON response schema\n{}\n",
+                                      artifacts.selectedElementJson,
+                                      artifacts.parentElementJson,
+                                      artifacts.childElementsJson,
+                                      artifacts.availableDataPackagesJson,
+                                      artifacts.unavailableDataPackagesJson,
+                                      artifacts.reviewProfileJson,
+                                      artifacts.guidelinesJson,
+                                      artifacts.prompt,
+                                      artifacts.responseSchemaJson);
     return artifacts;
 }
 

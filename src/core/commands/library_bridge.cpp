@@ -24,19 +24,28 @@ void IndexRepresentedIds(const sacm::AssuranceCasePackage& package, std::set<std
     };
     const auto index_terminology = [&](const sacm::TerminologyPackage& terminology) {
         add(terminology.id);
-        for (const sacm::Category& category : terminology.categories) add(category.id);
-        for (const sacm::Expression& expression : terminology.expressions) add(expression.id);
-        for (const sacm::Term& term : terminology.terms) add(term.id);
+        for (const sacm::Category& category : terminology.categories)
+            add(category.id);
+        for (const sacm::Expression& expression : terminology.expressions)
+            add(expression.id);
+        for (const sacm::Term& term : terminology.terms)
+            add(term.id);
     };
 
     for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
         add(argument_package.id);
-        for (const sacm::Claim& claim : argument_package.claims) add(claim.id);
-        for (const sacm::ArgumentReasoning& r : argument_package.argumentReasonings) add(r.id);
-        for (const sacm::ArtifactReference& r : argument_package.artifactReferences) add(r.id);
-        for (const sacm::AssertedInference& r : argument_package.assertedInferences) add(r.id);
-        for (const sacm::AssertedContext& r : argument_package.assertedContexts) add(r.id);
-        for (const sacm::AssertedEvidence& r : argument_package.assertedEvidences) add(r.id);
+        for (const sacm::Claim& claim : argument_package.claims)
+            add(claim.id);
+        for (const sacm::ArgumentReasoning& r : argument_package.argumentReasonings)
+            add(r.id);
+        for (const sacm::ArtifactReference& r : argument_package.artifactReferences)
+            add(r.id);
+        for (const sacm::AssertedInference& r : argument_package.assertedInferences)
+            add(r.id);
+        for (const sacm::AssertedContext& r : argument_package.assertedContexts)
+            add(r.id);
+        for (const sacm::AssertedEvidence& r : argument_package.assertedEvidences)
+            add(r.id);
         for (const sacm::TerminologyPackage& t : argument_package.terminologyPackages)
             index_terminology(t);
     }
@@ -44,7 +53,8 @@ void IndexRepresentedIds(const sacm::AssuranceCasePackage& package, std::set<std
         index_terminology(terminology);
     for (const sacm::ArtifactPackage& artifact_package : package.artifactPackages) {
         add(artifact_package.id);
-        for (const sacm::Artifact& artifact : artifact_package.artifacts) add(artifact.id);
+        for (const sacm::Artifact& artifact : artifact_package.artifacts)
+            add(artifact.id);
     }
 }
 
@@ -62,8 +72,7 @@ std::string DescribeUnrepresentableElements(const parser::AssuranceCase& model,
     std::vector<std::string> lost;
     for (const parser::SacmElement& element : model.elements) {
         if (represented.count(element.id) == 0)
-            lost.push_back(sacm_adapter::sacm_class_name_for_pod_type(element.type) + " '" +
-                           element.id + "'");
+            lost.push_back(sacm_adapter::sacm_class_name_for_pod_type(element.type) + " '" + element.id + "'");
     }
     if (lost.empty())
         return {};
@@ -83,7 +92,8 @@ std::string DescribeUnrepresentableElements(const parser::AssuranceCase& model,
 } // namespace
 
 bool BridgeLegacyMutationToLibrary(sacm_adapter::LibraryDocument& document,
-                                   const LibraryBridgeMutator& mutate, std::string& error,
+                                   const LibraryBridgeMutator& mutate,
+                                   std::string& error,
                                    std::string_view rederive_failure_context) {
     parser::AssuranceCase model = sacm_adapter::project_case(document);
     // The TAG-CARRYING projection, not the audit one.
@@ -126,10 +136,10 @@ bool BridgeLegacyMutationToLibrary(sacm_adapter::LibraryDocument& document,
     // every argument in the repository's sample projects, projects completely.
     // Only a document carrying one of the unrepresentable kinds is refused, and
     // for those the alternative was losing the content.
-    if (const std::string unrepresentable = DescribeUnrepresentableElements(model, package);
-        !unrepresentable.empty()) {
+    if (const std::string unrepresentable = DescribeUnrepresentableElements(model, package); !unrepresentable.empty()) {
         error = "Refused: this edit goes through a conversion that cannot represent part of this "
-                "case, and applying it would delete " + unrepresentable +
+                "case, and applying it would delete " +
+                unrepresentable +
                 ". The case is unchanged. This is a known gap in the legacy edit path "
                 "(SACM23-LIB-002); creating, deleting and challenging elements still work, as "
                 "they do not use it.";
@@ -142,19 +152,16 @@ bool BridgeLegacyMutationToLibrary(sacm_adapter::LibraryDocument& document,
     // legacy package has no field for unknown/foreign XML, so a plain reload
     // would erase on every bridged edit exactly the vendor content a tolerant
     // load preserved -- silent data loss on the commands users run most.
-    if (!sacm_adapter::reload_document_keeping_compatibility_content(
-            document, sacm::serialize_sacm(package))) {
+    if (!sacm_adapter::reload_document_keeping_compatibility_content(document, sacm::serialize_sacm(package))) {
         error = rederive_failure_context.empty()
                     ? std::string("Library bridge re-derive (reload_document) failed.")
-                    : "Bridge re-derive (reload_document) failed at " +
-                          std::string(rederive_failure_context);
+                    : "Bridge re-derive (reload_document) failed at " + std::string(rederive_failure_context);
         return false;
     }
     return true;
 }
 
-bool ApplyLibraryPrimaryOrLegacy(CommandContext& ctx, const LibraryBridgeMutator& mutate,
-                                 std::string& error) {
+bool ApplyLibraryPrimaryOrLegacy(CommandContext& ctx, const LibraryBridgeMutator& mutate, std::string& error) {
     if (ctx.library_document != nullptr && ctx.allow_library_primary) {
         if (!BridgeLegacyMutationToLibrary(*ctx.library_document, mutate, error))
             return false;

@@ -8,8 +8,8 @@
 namespace {
 
 TEST(McpJsonRpc, ParsesARequestWithParams) {
-    const mcp::jsonrpc::ParseOutcome outcome = mcp::jsonrpc::ParseRequest(
-        R"({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"ping"}})");
+    const mcp::jsonrpc::ParseOutcome outcome =
+        mcp::jsonrpc::ParseRequest(R"({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"ping"}})");
 
     ASSERT_TRUE(outcome.request.has_value());
     EXPECT_FALSE(outcome.error_response.has_value());
@@ -48,8 +48,7 @@ TEST(McpJsonRpc, ReportsParseErrorForInvalidJson) {
 }
 
 TEST(McpJsonRpc, ReportsInvalidRequestWhenMethodIsMissing) {
-    const mcp::jsonrpc::ParseOutcome outcome =
-        mcp::jsonrpc::ParseRequest(R"({"jsonrpc":"2.0","id":1})");
+    const mcp::jsonrpc::ParseOutcome outcome = mcp::jsonrpc::ParseRequest(R"({"jsonrpc":"2.0","id":1})");
 
     EXPECT_FALSE(outcome.request.has_value());
     ASSERT_TRUE(outcome.error_response.has_value());

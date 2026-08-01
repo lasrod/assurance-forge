@@ -338,12 +338,8 @@ void ProjectChallenges(const parser::AssuranceCase& model,
         const std::string& target_ref = relationship.target_refs.front();
 
         if (const size_t* target_index = FindNodeIndex(node_by_ref, target_ref)) {
-            AddEdge(sink,
-                    relationship,
-                    acp_labels,
-                    from_id,
-                    sink.diagram.nodes[*target_index].id,
-                    GsnEdgeKind::Challenges);
+            AddEdge(
+                sink, relationship, acp_labels, from_id, sink.diagram.nodes[*target_index].id, GsnEdgeKind::Challenges);
             continue;
         }
 

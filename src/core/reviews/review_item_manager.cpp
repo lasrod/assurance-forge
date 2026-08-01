@@ -72,11 +72,11 @@ bool ReviewItemManager::Load(std::string& error) {
     }
 
     std::vector<ReviewItem> items;
-    ElementReviewStateMap   element_states;
+    ElementReviewStateMap element_states;
     if (!DeserializeReviewItems(ReadTextFile(file_path_, error), items, element_states, error)) {
         return false;
     }
-    items_          = std::move(items);
+    items_ = std::move(items);
     element_states_ = std::move(element_states);
     return true;
 }

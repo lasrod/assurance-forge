@@ -45,60 +45,54 @@ void WriteFile(const std::filesystem::path& path, std::string_view content) {
 }
 
 struct ProjectFixture {
-    core::AssuranceProject     project;
-    std::filesystem::path      sacm_abs;
+    core::AssuranceProject project;
+    std::filesystem::path sacm_abs;
     sacm::AssuranceCasePackage package;
-    parser::AssuranceCase      model;
+    parser::AssuranceCase model;
 };
 
 ProjectFixture MakeFixture(const std::string& tag) {
-    ProjectFixture              f;
+    ProjectFixture f;
     const std::filesystem::path root =
         std::filesystem::temp_directory_path() /
-        ("af_changeset_accept_" + tag + "_" +
-         std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
+        ("af_changeset_accept_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(root);
 
     const std::filesystem::path sacm_rel = "argument.sacm";
     WriteFile(root / sacm_rel, kSampleSacm);
 
-    f.project.id       = "p";
-    f.project.name     = "Project";
+    f.project.id = "p";
+    f.project.name = "Project";
     f.project.rootPath = root;
     core::ProjectFileEntry entry;
-    entry.id           = "f1";
+    entry.id = "f1";
     entry.relativePath = sacm_rel;
-    entry.role         = core::ProjectFileRole::SacmArgument;
+    entry.role = core::ProjectFileRole::SacmArgument;
     f.project.files.push_back(entry);
 
     core::audit::EnsureAuditStoreResult ensure;
-    std::string                         error;
+    std::string error;
     EXPECT_TRUE(core::audit::EnsureAuditStore(f.project, sacm_rel, ensure, error)) << error;
 
-    f.sacm_abs                                       = f.project.rootPath / sacm_rel;
-    std::expected<sacm::AssuranceCasePackage, std::string> pkg =
-        sacm::parse_sacm(f.sacm_abs.string());
+    f.sacm_abs = f.project.rootPath / sacm_rel;
+    std::expected<sacm::AssuranceCasePackage, std::string> pkg = sacm::parse_sacm(f.sacm_abs.string());
     EXPECT_TRUE(pkg.has_value()) << (pkg.has_value() ? "" : pkg.error());
     f.package = std::move(pkg.value());
 
-    std::expected<parser::AssuranceCase, std::string> parsed =
-        parser::parse_sacm_xml_string(kSampleSacm);
+    std::expected<parser::AssuranceCase, std::string> parsed = parser::parse_sacm_xml_string(kSampleSacm);
     EXPECT_TRUE(parsed.has_value()) << (parsed.has_value() ? "" : parsed.error());
     f.model = std::move(parsed.value());
     return f;
 }
 
-std::vector<core::reviews::PatchOperation> AddSubGoalUnder(const std::string& parent_id,
-                                                           const std::string& text) {
+std::vector<core::reviews::PatchOperation> AddSubGoalUnder(const std::string& parent_id, const std::string& text) {
     const nlohmann::json operations = nlohmann::json::array(
         {nlohmann::json{{"type", "CreateClaim"}, {"create_ref", "$sub"}, {"text", text}},
-         nlohmann::json{{"type", "AddSupportedBy"},
-                        {"source", {{"ref", "$sub"}}},
-                        {"target", {{"id", parent_id}}}}});
+         nlohmann::json{{"type", "AddSupportedBy"}, {"source", {{"ref", "$sub"}}}, {"target", {{"id", parent_id}}}}});
 
     std::vector<core::reviews::PatchOperation> parsed;
-    std::string                                error;
+    std::string error;
     EXPECT_TRUE(agent::ParsePatchOperations(operations, parsed, error)) << error;
     return parsed;
 }
@@ -120,15 +114,13 @@ TEST(ChangeSetAcceptance, AppliesThroughTheAuditedCommandBus) {
 
     core::changesets::ChangeSetStore store;
     const std::string id = store.Begin(1, "Add a maintenance sub-goal", "", "", "claude-ai 0.1.0");
-    std::string       error;
-    ASSERT_TRUE(store.Stage(id, AddSubGoalUnder("G1", "Maintenance is adequate"), f.model, error))
-        << error;
+    std::string error;
+    ASSERT_TRUE(store.Stage(id, AddSubGoalUnder("G1", "Maintenance is adequate"), f.model, error)) << error;
 
     sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
     ASSERT_TRUE(loaded.ok);
 
-    std::unique_ptr<core::commands::CommandBus> bus =
-        core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    std::unique_ptr<core::commands::CommandBus> bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
     ASSERT_NE(bus, nullptr) << error;
     const std::uint64_t before = bus->Store().LatestTransactionSequence();
 
@@ -136,8 +128,8 @@ TEST(ChangeSetAcceptance, AppliesThroughTheAuditedCommandBus) {
     // command type exists, which is what guarantees an agent cannot make a
     // change the application could not make itself.
     core::commands::ApplyProposalCommand command(store.Find(id)->proposal);
-    core::commands::CommandContext       ctx{f.model, f.package, loaded.document.get()};
-    const core::commands::CommandResult   result = bus->Execute(command, ctx, "MCP: claude-ai 0.1.0");
+    core::commands::CommandContext ctx{f.model, f.package, loaded.document.get()};
+    const core::commands::CommandResult result = bus->Execute(command, ctx, "MCP: claude-ai 0.1.0");
     ASSERT_TRUE(result.success) << result.error;
 
     // One transaction, in the append-only log, like any other edit.
@@ -173,33 +165,27 @@ TEST(ChangeSetAcceptance, AppliesExactlyWhatThePreviewShowed) {
 
     core::changesets::ChangeSetStore store;
     const std::string id = store.Begin(1, "Add a sub-goal", "", "", "claude-ai");
-    std::string       error;
-    ASSERT_TRUE(store.Stage(id, AddSubGoalUnder("G1", "Thermal runaway is mitigated"), f.model,
-                            error))
-        << error;
+    std::string error;
+    ASSERT_TRUE(store.Stage(id, AddSubGoalUnder("G1", "Thermal runaway is mitigated"), f.model, error)) << error;
 
-    const core::changesets::ChangeSetDiff preview =
-        core::changesets::ComputeChangeSetDiff(*store.Find(id), f.model);
+    const core::changesets::ChangeSetDiff preview = core::changesets::ComputeChangeSetDiff(*store.Find(id), f.model);
     ASSERT_TRUE(preview.success) << preview.error;
 
     sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
     ASSERT_TRUE(loaded.ok);
-    std::unique_ptr<core::commands::CommandBus> bus =
-        core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    std::unique_ptr<core::commands::CommandBus> bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
     ASSERT_NE(bus, nullptr) << error;
 
     core::commands::ApplyProposalCommand command(store.Find(id)->proposal);
-    core::commands::CommandContext       ctx{f.model, f.package, loaded.document.get()};
+    core::commands::CommandContext ctx{f.model, f.package, loaded.document.get()};
     ASSERT_TRUE(bus->Execute(command, ctx, "MCP: claude-ai").success);
 
     const parser::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
-    for (const std::pair<const std::string, core::changesets::ElementChange>& entry :
-         preview.status_by_id) {
+    for (const std::pair<const std::string, core::changesets::ElementChange>& entry : preview.status_by_id) {
         if (entry.second != core::changesets::ElementChange::Added) {
             continue;
         }
-        const parser::SacmElement* previewed =
-            parser::FindElementById(preview.preview_model, entry.first);
+        const parser::SacmElement* previewed = parser::FindElementById(preview.preview_model, entry.first);
         const parser::SacmElement* applied = parser::FindElementById(after, entry.first);
         ASSERT_NE(applied, nullptr) << "preview added " << entry.first << " but apply did not";
         EXPECT_EQ(applied->content, previewed->content);
@@ -220,26 +206,22 @@ TEST(ChangeSetAcceptance, AcceptsALargeMultiOperationChangeSet) {
 
     nlohmann::json operations = nlohmann::json::array();
     for (int index = 0; index < 20; ++index) {
-        const std::string suffix   = std::to_string(index);
+        const std::string suffix = std::to_string(index);
         const std::string strategy = "$strategy" + suffix;
         const std::string sub_goal = "$goal" + suffix;
-        operations.push_back(nlohmann::json{{"type", "CreateStrategy"},
-                                            {"create_ref", strategy},
-                                            {"text", "Argue over hazard " + suffix}});
-        operations.push_back(nlohmann::json{{"type", "AddSupportedBy"},
-                                            {"source", {{"ref", strategy}}},
-                                            {"target", {{"id", "G1"}}}});
-        operations.push_back(nlohmann::json{{"type", "CreateClaim"},
-                                            {"create_ref", sub_goal},
-                                            {"text", "Hazard " + suffix + " is mitigated"}});
-        operations.push_back(nlohmann::json{{"type", "AddSupportedBy"},
-                                            {"source", {{"ref", sub_goal}}},
-                                            {"target", {{"ref", strategy}}}});
+        operations.push_back(nlohmann::json{
+            {"type", "CreateStrategy"}, {"create_ref", strategy}, {"text", "Argue over hazard " + suffix}});
+        operations.push_back(
+            nlohmann::json{{"type", "AddSupportedBy"}, {"source", {{"ref", strategy}}}, {"target", {{"id", "G1"}}}});
+        operations.push_back(nlohmann::json{
+            {"type", "CreateClaim"}, {"create_ref", sub_goal}, {"text", "Hazard " + suffix + " is mitigated"}});
+        operations.push_back(nlohmann::json{
+            {"type", "AddSupportedBy"}, {"source", {{"ref", sub_goal}}}, {"target", {{"ref", strategy}}}});
     }
     ASSERT_EQ(operations.size(), 80u);
 
     std::vector<core::reviews::PatchOperation> parsed;
-    std::string                                error;
+    std::string error;
     ASSERT_TRUE(agent::ParsePatchOperations(operations, parsed, error)) << error;
     ASSERT_TRUE(store.Stage(id, parsed, f.model, error)) << error;
 
@@ -252,13 +234,12 @@ TEST(ChangeSetAcceptance, AcceptsALargeMultiOperationChangeSet) {
 
     sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
     ASSERT_TRUE(loaded.ok);
-    std::unique_ptr<core::commands::CommandBus> bus =
-        core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    std::unique_ptr<core::commands::CommandBus> bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
     ASSERT_NE(bus, nullptr) << error;
 
     core::commands::ApplyProposalCommand command(store.Find(id)->proposal);
-    core::commands::CommandContext       ctx{f.model, f.package, loaded.document.get()};
-    const core::commands::CommandResult   result = bus->Execute(command, ctx, "MCP: claude-ai");
+    core::commands::CommandContext ctx{f.model, f.package, loaded.document.get()};
+    const core::commands::CommandResult result = bus->Execute(command, ctx, "MCP: claude-ai");
     ASSERT_TRUE(result.success) << result.error;
 
     const parser::AssuranceCase applied = sacm_adapter::project_case(*loaded.document);
@@ -274,14 +255,14 @@ TEST(ChangeSetAcceptance, RefusesAChangeSetTheArgumentHasMovedUnder) {
     core::changesets::ChangeSetStore store;
     const std::string id = store.Begin(1, "Reword the top goal", "", "", "claude-ai");
 
-    const nlohmann::json operations = nlohmann::json::array({nlohmann::json{
-        {"type", "UpdateElementText"},
-        {"element", {{"id", "G1"}}},
-        {"field", "description"},
-        {"old_value", "The system is safe."},
-        {"new_value", "The system is acceptably safe."}}});
+    const nlohmann::json operations =
+        nlohmann::json::array({nlohmann::json{{"type", "UpdateElementText"},
+                                              {"element", {{"id", "G1"}}},
+                                              {"field", "description"},
+                                              {"old_value", "The system is safe."},
+                                              {"new_value", "The system is acceptably safe."}}});
     std::vector<core::reviews::PatchOperation> parsed;
-    std::string                                error;
+    std::string error;
     ASSERT_TRUE(agent::ParsePatchOperations(operations, parsed, error)) << error;
     ASSERT_TRUE(store.Stage(id, parsed, f.model, error)) << error;
 

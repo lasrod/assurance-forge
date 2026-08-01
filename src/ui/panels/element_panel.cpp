@@ -119,8 +119,8 @@ void sync_to_sacm(sacm::AssuranceCasePackage* pkg,
 
 // Helper: multi-line InputText with a buffer sized to accommodate edits.
 // Returns true if the text was modified.
-static bool EditableTextField(const char* label, std::string& text, float width = -1.0f,
-                              ImGuiID* out_widget_id = nullptr) {
+static bool
+EditableTextField(const char* label, std::string& text, float width = -1.0f, ImGuiID* out_widget_id = nullptr) {
     ImGui::PushID(label);
     if (width > 0.0f)
         ImGui::SetNextItemWidth(width);
@@ -280,8 +280,8 @@ void RenderTerminologySuggestions(const sacm::AssuranceCasePackage* sacm_pkg,
     for (const TerminologySuggestion& suggestion : suggestions) {
         ImGui::PushID(suggestion.text.c_str());
         if (suggestion.kind == TerminologySuggestion::Kind::AmbiguousTerm) {
-            ImGui::TextColored(ui::GetWarningColor(), "%s",
-                               ui::i18n::trf("{0} has multiple meanings.", suggestion.text).c_str());
+            ImGui::TextColored(
+                ui::GetWarningColor(), "%s", ui::i18n::trf("{0} has multiple meanings.", suggestion.text).c_str());
             int candidate_index = 0;
             for (const auto& candidate : suggestion.candidates) {
                 ImGui::PushID(candidate_index++);
@@ -304,8 +304,7 @@ void RenderTerminologySuggestions(const sacm::AssuranceCasePackage* sacm_pkg,
             continue;
         }
 
-        ImGui::TextColored(ui::GetWarningColor(), "%s",
-                           ui::i18n::trf("{0} is not defined.", suggestion.text).c_str());
+        ImGui::TextColored(ui::GetWarningColor(), "%s", ui::i18n::trf("{0} is not defined.", suggestion.text).c_str());
         if (callbacks && callbacks->define_term) {
             if (ImGui::Button(AF_TR("Define").c_str()))
                 callbacks->define_term(element_id, suggestion.text);
@@ -379,8 +378,8 @@ bool RenderTranslationReviewNotice(const std::string& element_id,
     if (!callbacks || !callbacks->is_pending || !callbacks->is_pending(element_id))
         return false;
 
-    ImGui::TextColored(ui::GetWarningColor(), "%s",
-                       AF_TR("Text changed — update both languages, then mark reviewed.").c_str());
+    ImGui::TextColored(
+        ui::GetWarningColor(), "%s", AF_TR("Text changed — update both languages, then mark reviewed.").c_str());
     ImGui::BeginDisabled(read_only || !callbacks->accept);
     if (ImGui::SmallButton(AF_TR("Mark reviewed").c_str()) && callbacks->accept)
         callbacks->accept(element_id);
@@ -435,24 +434,22 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     }
 
     if (read_only) {
-        ImGui::PushStyleColor(ImGuiCol_Text,
-                              ImGui::ColorConvertU32ToFloat4(ui::GetTheme().text_secondary));
-        ImGui::TextWrapped("%s",
-                           AF_TR("Historical preview — fields are read-only. Return to latest to edit.").c_str());
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(ui::GetTheme().text_secondary));
+        ImGui::TextWrapped("%s", AF_TR("Historical preview — fields are read-only. Return to latest to edit.").c_str());
         ImGui::PopStyleColor();
         ImGui::Spacing();
         ImGui::BeginDisabled(true);
     }
 
-    auto commit_if_finished = [&](ImGuiID id, const std::string& current_value,
-                                  const char* field_token, const std::string& language) {
-        ui::PendingTextEdit commit;
-        if (TextEditSession::Track(id, current_value, elem->id, field_token, language, commit) &&
-            text_edit_callbacks && text_edit_callbacks->commit_text_edit) {
-            text_edit_callbacks->commit_text_edit(commit.element_id, commit.field_token, commit.language,
-                                                  commit.original_value, commit.new_value);
-        }
-    };
+    auto commit_if_finished =
+        [&](ImGuiID id, const std::string& current_value, const char* field_token, const std::string& language) {
+            ui::PendingTextEdit commit;
+            if (TextEditSession::Track(id, current_value, elem->id, field_token, language, commit) &&
+                text_edit_callbacks && text_edit_callbacks->commit_text_edit) {
+                text_edit_callbacks->commit_text_edit(
+                    commit.element_id, commit.field_token, commit.language, commit.original_value, commit.new_value);
+            }
+        };
 
     // GSN notation identifier (editable independently of the read-only SACM id).
     ImGui::Text("%s", AF_TR("GSN identifier").c_str());
