@@ -29,7 +29,12 @@ PointerAlignment: Left
 SortIncludes: Never
 SpaceAfterCStyleCast: false
 SpaceBeforeParens: ControlStatements
-Standard: c++23
+# `c++23` is not a clang-format enumerator -- the values stop at c++20, plus
+# Latest. Setting it made clang-format reject this whole file with "unknown
+# enumerated scalar" and exit without touching anything, so formatting silently
+# never ran for anyone: `clang-format -i` over a batch printed one error per
+# file and changed none of them, which reads exactly like success.
+Standard: Latest
 TabWidth: 4
 UseTab: Never
 ...

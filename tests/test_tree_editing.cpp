@@ -252,6 +252,50 @@ TEST(TreeEditingValidation, AllowsContextUnderStrategy) {
     EXPECT_EQ(result.relationship_kind, core::TreeRelationshipKind::InContextOf);
 }
 
+// GSN v3: SupportedBy runs from a Goal *or a Strategy* to a Goal, Strategy or
+// Solution, so a strategy discharged directly by evidence is ordinary GSN. The
+// drop used to refuse it while the Add menu created exactly the same thing --
+// the tool disagreeing with itself about its own notation (GSN3-CORE-015).
+//
+// The expected kind is `AssertedEvidence` rather than the value spelled
+// `SupportedBy` because SACM splits GSN's one relationship in two by what sits
+// at the far end: a Solution there is written as `assertedevidence`. See the
+// vocabulary note on TreeRelationshipKind.
+TEST(TreeEditingValidation, AllowsSolutionUnderStrategy) {
+    MiniCase mini_case;
+    AddClaim(mini_case, "G1");
+    AddStrategy(mini_case, "S1");
+    AddArtifactReference(mini_case, "Sn1");
+    AddInference(mini_case, "R1", "G1", {}, "S1");
+    AddEvidence(mini_case, "R2", "G1", "Sn1");
+    core::AssuranceTree tree = core::AssuranceTree::Build(mini_case.model);
+
+    core::TreeDropValidationResult result =
+        core::ValidateTreeDrop(mini_case.model, tree, "Sn1", "S1", core::TreeDropMode::AsChild);
+
+    EXPECT_TRUE(result.allowed) << result.reason;
+    EXPECT_EQ(result.relationship_kind, core::TreeRelationshipKind::AssertedEvidence);
+}
+
+// Still refused, and deliberately: GSN permits it and SACM would hold it, but
+// the single-inference encoding records the goal a strategy supports in a
+// `strategyTarget` tag and nothing has established what that means when the
+// target is itself a strategy. A limit of the encoding, not of the notation.
+TEST(TreeEditingValidation, RejectsStrategyUnderStrategy) {
+    MiniCase mini_case;
+    AddClaim(mini_case, "G1");
+    AddStrategy(mini_case, "S1");
+    AddStrategy(mini_case, "S2");
+    AddInference(mini_case, "R1", "G1", {}, "S1");
+    AddInference(mini_case, "R2", "G1", {}, "S2");
+    core::AssuranceTree tree = core::AssuranceTree::Build(mini_case.model);
+
+    core::TreeDropValidationResult result =
+        core::ValidateTreeDrop(mini_case.model, tree, "S2", "S1", core::TreeDropMode::AsChild);
+
+    EXPECT_FALSE(result.allowed);
+}
+
 TEST(TreeEditingCommand, ReorderSiblingsPersistsSourceOrderAndDisplayOrder) {
     MiniCase mini_case = MakeSiblingCase();
     core::AssuranceTree tree = core::AssuranceTree::Build(mini_case.model);
