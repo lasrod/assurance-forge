@@ -71,6 +71,19 @@ public:
     // planned removal targets more than one element, opens the confirmation
     // modal (with canvas highlight + fit-to-view) instead of removing.
     void RemoveSelected(core::RemoveMode mode);
+
+    // Repairs for the defects the GSN v3 well-formedness checker reports. Each
+    // is an ordinary audited edit, reachable from the Problems panel quick fix
+    // and (for removal) from the canvas edge menu and relationship inspector.
+    bool RemoveRelationship(const std::string& relationship_id);
+    bool DropRelationshipReference(const std::string& relationship_id, const std::string& reference);
+    bool MoveStrategyToReasoning(const std::string& relationship_id, const std::string& strategy_id);
+    bool SetElementUndeveloped(const std::string& element_id, bool undeveloped);
+    bool RenumberGsnIdentifier(const std::string& element_id);
+    // Applies the repair a GSN well-formedness problem offers. False when the
+    // problem belongs to another subsystem, so the quick-fix router falls
+    // through to the next handler.
+    bool ApplyGsnWellFormednessQuickFix(const core::ProblemItem& problem);
     core::TreeDropValidationResult
     ValidateTreeDrop(const std::string& dragged_id, const std::string& target_id, core::TreeDropMode drop_mode) const;
     bool PerformTreeDrop(const std::string& dragged_id, const std::string& target_id, core::TreeDropMode drop_mode);

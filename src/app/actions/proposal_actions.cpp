@@ -6,6 +6,7 @@
 #include "app/proposal_ui_state.h"
 #include "app/project_workflow.h"
 #include "core/commands/proposal_commands.h"
+#include "core/element_factory.h"
 #include "core/sacm_argument_sync.h"
 #include "core/project_service.h"
 #include "core/reviews/review_proposal_factory.h"
@@ -483,13 +484,9 @@ bool ProposalActions::AddChildToSelected(core::NewElementKind kind) {
         SetStatus(state_, "The selected proposal preview element no longer exists.");
         return false;
     }
-    const bool parent_is_container = parent->type == "claim" || parent->type == "argumentreasoning";
-    if (!parent_is_container) {
-        SetStatus(state_, "Cannot add a child to a leaf element (" + parent->type + ").");
-        return false;
-    }
-    if (kind == core::NewElementKind::Strategy && parent->type != "claim") {
-        SetStatus(state_, "Strategy can only be added under a Claim.");
+    std::string connection_error;
+    if (!core::CanAddChildElement(*parent, kind, connection_error)) {
+        SetStatus(state_, connection_error);
         return false;
     }
 

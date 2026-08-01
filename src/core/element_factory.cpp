@@ -1,6 +1,7 @@
 #include "core/element_factory.h"
 
 #include "core/acp/assurance_claim_point.h"
+#include "core/problems/gsn_wellformedness.h"
 #include "sacm_adapter/gsn_role_tag.h"
 
 #include <algorithm>
@@ -377,6 +378,34 @@ bool InstallSubGoalUnderStrategy(parser::AssuranceCase& ac,
     return true;
 }
 
+} // namespace
+
+bool CanAddChildElement(const parser::SacmElement& parent, NewElementKind kind, std::string& out_error) {
+    const GsnElementKind parent_kind = GsnKindOf(parent);
+
+    // GSN v3: an Assumption and a Justification are leaves. Both are Claims in
+    // SACM, so a test on the SACM type alone cannot tell either from a Goal —
+    // which is how the Add menu came to offer a whole sub-argument under an
+    // Assumption, a structure the notation has no way to draw or mean.
+    if (parent_kind == GsnElementKind::Assumption || parent_kind == GsnElementKind::Justification) {
+        out_error = "Cannot add a child to an Assumption or a Justification; both are leaves in GSN.";
+        return false;
+    }
+    // Only a Goal or a Strategy takes children, whether by SupportedBy or by
+    // InContextOf. A Solution and a Context are leaves too.
+    if (!GsnCanBeSupported(parent_kind)) {
+        out_error = "Cannot add a child to a leaf element (" + parent.type + ").";
+        return false;
+    }
+    if (kind == NewElementKind::Strategy && parent_kind != GsnElementKind::Goal) {
+        out_error = "Strategy can only be added under a Claim.";
+        return false;
+    }
+    return true;
+}
+
+namespace {
+
 // Shared installation logic: validate parent, then build the new element +
 // relationship using the supplied ids and install into both models. Both the
 // id-generating `AddChildElement` and the replay-only `AddChildElementWithIds`
@@ -410,15 +439,8 @@ bool InstallChildElement(parser::AssuranceCase& ac,
     }
 
     const std::string& ptype = parent->type;
-    const bool parent_is_container = (ptype == "claim" || ptype == "argumentreasoning");
-    if (!parent_is_container) {
-        out_error = "Cannot add a child to a leaf element (" + ptype + ").";
+    if (!CanAddChildElement(*parent, kind, out_error))
         return false;
-    }
-    if (kind == NewElementKind::Strategy && ptype != "claim") {
-        out_error = "Strategy can only be added under a Claim.";
-        return false;
-    }
 
     sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, parent_id);
 
@@ -633,16 +655,8 @@ bool PlanChildElementIds(const parser::AssuranceCase& ac,
         out_error = "Selected element not found in model.";
         return false;
     }
-    const std::string& ptype = parent->type;
-    const bool parent_is_container = (ptype == "claim" || ptype == "argumentreasoning");
-    if (!parent_is_container) {
-        out_error = "Cannot add a child to a leaf element (" + ptype + ").";
+    if (!CanAddChildElement(*parent, kind, out_error))
         return false;
-    }
-    if (kind == NewElementKind::Strategy && ptype != "claim") {
-        out_error = "Strategy can only be added under a Claim.";
-        return false;
-    }
 
     std::unordered_set<std::string> existing_ids = CollectIds(ac);
     const sacm::ArgumentPackage* ap = FindOwningArgumentPackageConst(pkg, parent_id);
@@ -1468,6 +1482,78 @@ bool SetGsnIdentifier(parser::AssuranceCase& ac,
         return false;
     }
     target->gsn_identifier = normalized_identifier;
+    return true;
+}
+
+std::string NextFreeGsnIdentifier(const parser::AssuranceCase& ac, const std::string& element_id) {
+    const parser::SacmElement* target = FindElement(ac, element_id);
+    if (!target)
+        return std::string();
+
+    // Recover the prefix from the identifier the element already answers to
+    // ("G1" -> "G", "Sn12" -> "Sn", "ACP1_G2" -> "ACP1_G") rather than deriving
+    // it from the element's kind. An ArtifactReference is a Solution or a
+    // Context depending only on how it is wired, so kind cannot decide between
+    // "Sn" and "C" -- and keeping the author's own prefix means a renumber stays
+    // inside whatever scheme the file already uses.
+    const std::string current = GsnIdentifierFor(*target);
+    size_t prefix_end = current.size();
+    while (prefix_end > 0 && std::isdigit(static_cast<unsigned char>(current[prefix_end - 1])))
+        --prefix_end;
+    const std::string prefix = current.substr(0, prefix_end);
+
+    std::unordered_set<std::string> taken;
+    for (const parser::SacmElement& element : ac.elements) {
+        if (&element != target && !IsRelationshipType(element.type))
+            taken.insert(GsnIdentifierFor(element));
+    }
+
+    // Bounded by the number of taken identifiers, so this always terminates.
+    for (size_t suffix = 1; suffix <= taken.size() + 1; ++suffix) {
+        std::string candidate = prefix + std::to_string(suffix);
+        if (taken.find(candidate) == taken.end())
+            return candidate;
+    }
+    return std::string();
+}
+
+bool SetElementUndeveloped(parser::AssuranceCase& ac,
+                           sacm::AssuranceCasePackage* pkg,
+                           const std::string& element_id,
+                           bool undeveloped,
+                           bool& out_old_value,
+                           std::string& out_error) {
+    out_error.clear();
+    parser::SacmElement* target = nullptr;
+    for (parser::SacmElement& element : ac.elements) {
+        if (element.id == element_id) {
+            target = &element;
+            break;
+        }
+    }
+    if (!target) {
+        out_error = "Element not found in model: " + element_id + ".";
+        return false;
+    }
+
+    out_old_value = target->undeveloped;
+    if (out_old_value == undeveloped)
+        return true;
+    target->undeveloped = undeveloped;
+
+    // GSN "undeveloped" is SACM `needsSupport`; see docs/sacm/sacm-gsn-mapping.md.
+    if (pkg) {
+        for (sacm::ArgumentPackage& argument_package : pkg->argumentPackages) {
+            for (sacm::Claim& claim : argument_package.claims) {
+                if (claim.id == element_id)
+                    claim.undeveloped = undeveloped;
+            }
+            for (sacm::ArgumentReasoning& reasoning : argument_package.argumentReasonings) {
+                if (reasoning.id == element_id)
+                    reasoning.undeveloped = undeveloped;
+            }
+        }
+    }
     return true;
 }
 

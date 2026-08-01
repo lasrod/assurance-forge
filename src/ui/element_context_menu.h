@@ -24,6 +24,10 @@ struct ElementContextActions {
     std::function<void()> add_counter_evidence;
     std::function<void(const std::string& relationship_id)> add_counter_argument_to_relationship;
     std::function<void(const std::string& relationship_id)> add_counter_evidence_to_relationship;
+    // Withdraw a relationship, leaving both of its endpoints in place. Node
+    // removal (`remove_selected`) cannot express this: its plan walks the GSN
+    // tree and excludes relationship ids by construction.
+    std::function<void(const std::string& relationship_id)> remove_relationship;
     std::function<void(const core::TerminologyPackageRef&, const core::TerminologyTermRef&)> open_terminology_term;
     std::function<void(const core::TerminologyPackageRef&, const core::TerminologyTermRef&)> edit_terminology_term;
     std::function<void(const std::string& element_id, const std::string& term_value)> define_terminology_term;

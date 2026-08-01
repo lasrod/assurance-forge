@@ -337,6 +337,9 @@ msgstr "分類: {0}"
 msgid "Challenge"
 msgstr "チャレンジ"
 
+msgid "Challenge {0} targets {1}, which is not in this case. The challenge is stored but never shown against anything."
+msgstr "反証 {0} はこのケースに存在しない {1} を対象にしています。この反証は保存されていますが、どの要素に対しても表示されません。"
+
 msgid "Change Proposals"
 msgstr "変更提案"
 
@@ -375,6 +378,9 @@ msgstr "主張"
 
 msgid "Clear all"
 msgstr "すべてクリア"
+
+msgid "Clear decorator"
+msgstr "装飾を解除"
 
 msgid "Click to open in the Problems panel."
 msgstr "クリックして問題パネルで開きます。"
@@ -597,6 +603,9 @@ msgstr "{0} を調整するにはドラッグしてください"
 
 msgid "Drag to scrub transaction history"
 msgstr "ドラッグしてトランザクション履歴をスクラブします"
+
+msgid "Drop broken reference"
+msgstr "壊れた参照を削除"
 
 msgid "Duplicate term value and definition exist in this package."
 msgstr "このパッケージ内に同じ用語と定義の重複があります。"
@@ -942,6 +951,9 @@ msgstr "モード"
 
 msgid "Model"
 msgstr "モデル"
+
+msgid "Move to reasoning"
+msgstr "理由付けへ移動"
 
 msgid "Name"
 msgstr "名前"
@@ -1372,6 +1384,9 @@ msgstr "関係 {0}"
 msgid "Relationship {0} -> {1}"
 msgstr "関係 {0} -> {1}"
 
+msgid "Relationship {0} refers to {1}, which is not in this case. The relationship is not drawn, so the argument shown is smaller than the one stored."
+msgstr "関係 {0} はこのケースに存在しない {1} を参照しています。この関係は描画されないため、表示される議論は保存されている議論より小さくなります。"
+
 msgid "Remove"
 msgstr "除去"
 
@@ -1384,11 +1399,20 @@ msgstr "キーを削除"
 msgid "Remove Subtree"
 msgstr "サブツリーを除去"
 
+msgid "Remove challenge"
+msgstr "反証を削除"
+
+msgid "Remove relationship"
+msgstr "関係を削除"
+
 msgid "Remove the SACM-backed ACP metadata from its target."
 msgstr "対象から SACM ベースの ACP メタデータを除去します。"
 
 msgid "Remove {0}?"
 msgstr "{0} を除去しますか?"
+
+msgid "Renumber"
+msgstr "採番し直す"
 
 msgid "Report Builder"
 msgstr "レポートビルダー"
@@ -1611,6 +1635,9 @@ msgstr "戦略"
 
 msgid "Strategy"
 msgstr "戦略"
+
+msgid "Strategy {0} is wired as an end of relationship {1}. A Strategy is the reasoning of an inference, not one of its ends."
+msgstr "戦略 {0} が関係 {1} の端点として接続されています。戦略は推論の理由付けであり、その端点ではありません。"
 
 msgid "Summary:"
 msgstr "要約:"
@@ -1873,6 +1900,9 @@ msgstr "変更されるもの (参照が削除されます):"
 msgid "Will be removed:"
 msgstr "削除されるもの:"
 
+msgid "Withdraws the relationship. Both elements are kept; one left with no remaining parent shows as an orphan."
+msgstr "関係を取り消します。両方の要素は保持され、親がなくなった要素は孤立要素として表示されます。"
+
 msgid "XML File:"
 msgstr "XML ファイル:"
 
@@ -1969,6 +1999,9 @@ msgstr "{0} ({1})"
 msgid "{0} added, {1} changed, {2} removed"
 msgstr "追加 {0}、変更 {1}、削除 {2}"
 
+msgid "{0} and {1} both use the GSN identifier {2}, so neither can be referred to unambiguously."
+msgstr "{0} と {1} が同じ GSN 識別子 {2} を使用しているため、どちらも一意に参照できません。"
+
 msgid "{0} argument elements are undeveloped"
 msgstr "{0} 件の議論要素が未展開です"
 
@@ -1980,6 +2013,9 @@ msgstr "{0} 件の変更提案を正常に適用できません"
 
 msgid "{0} claims · {1} strategies · {2} evidence · {3} undeveloped"
 msgstr "主張 {0} 件 · 戦略 {1} 件 · エビデンス {2} 件 · 未展開 {3} 件"
+
+msgid "{0} discharges a goal through relationship {1}, but it is not a Solution. Only a reference to evidence can discharge a goal."
+msgstr "{0} は関係 {1} を通じてゴールを立証していますが、ソリューションではありません。ゴールを立証できるのは証拠への参照のみです。"
 
 msgid "{0} errors require attention"
 msgstr "{0} 件のエラーに対応が必要です"
@@ -1993,6 +2029,12 @@ msgstr "{0} には複数の意味があります。"
 msgid "{0} has {1} visible meanings. Choose the intended terminology entry."
 msgstr "{0} には {1} 件の表示可能な意味があります。意図する用語項目を選択してください。"
 
+msgid "{0} is given context by relationship {1}, but only a Goal or a Strategy is declared in context in GSN."
+msgstr "{0} は関係 {1} によってコンテキストを与えられていますが、GSN でコンテキストの中で述べられるのはゴールまたは戦略のみです。"
+
+msgid "{0} is marked undeveloped but is already supported. Either the decorator or the support is out of date."
+msgstr "{0} は未展開と示されていますが、すでに支持されています。装飾か支持のいずれかが古くなっています。"
+
 msgid "{0} is not defined."
 msgstr "{0} は定義されていません。"
 
@@ -2001,6 +2043,9 @@ msgstr "{0} はまだ実装されていません。"
 
 msgid "{0} is supported by itself, so it establishes nothing."
 msgstr "{0} は自分自身によって支持されているため、何も立証しません。"
+
+msgid "{0} is supported by relationship {1}, but only a Goal or a Strategy can be supported in GSN."
+msgstr "{0} は関係 {1} によって支持されていますが、GSN で支持を受けられるのはゴールまたは戦略のみです。"
 
 msgid "{0} looks like an undefined terminology entry."
 msgstr "{0} は未定義の用語項目のように見えます。"

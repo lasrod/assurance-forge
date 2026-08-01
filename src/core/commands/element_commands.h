@@ -146,4 +146,73 @@ private:
     bool        was_no_op_ = false;
 };
 
+// Remove one relationship, leaving both endpoints in place. Distinct from
+// `RemoveElementCommand`, whose plan is node-shaped: it walks the GSN tree,
+// excludes relationship ids and reparents structural children, none of which is
+// meaningful for an edge.
+class RemoveRelationshipCommand final : public ICommand {
+public:
+    explicit RemoveRelationshipCommand(std::string relationship_id)
+        : relationship_id_(std::move(relationship_id)) {}
+
+    std::string Name() const override { return "RemoveRelationship"; }
+    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+private:
+    std::string relationship_id_;
+};
+
+// Drop one reference from a relationship -- the repair for an endpoint naming an
+// element the case does not contain. Records whether scrubbing left the
+// relationship structurally invalid and therefore removed it too, so a replay
+// reproduces the same outcome without re-deciding it.
+class DropRelationshipReferenceCommand final : public ICommand {
+public:
+    DropRelationshipReferenceCommand(std::string relationship_id, std::string reference)
+        : relationship_id_(std::move(relationship_id)), reference_(std::move(reference)) {}
+
+    std::string Name() const override { return "DropRelationshipReference"; }
+    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+    bool RemovedRelationship() const { return removed_relationship_; }
+
+private:
+    std::string relationship_id_;
+    std::string reference_;
+    bool        removed_relationship_ = false;
+};
+
+// Re-wire a Strategy from an inference's source list into its reasoning slot.
+class MoveStrategyToReasoningCommand final : public ICommand {
+public:
+    MoveStrategyToReasoningCommand(std::string relationship_id, std::string strategy_id)
+        : relationship_id_(std::move(relationship_id)), strategy_id_(std::move(strategy_id)) {}
+
+    std::string Name() const override { return "MoveStrategyToReasoning"; }
+    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+private:
+    std::string relationship_id_;
+    std::string strategy_id_;
+};
+
+// Set or clear the GSN undeveloped decorator. The previous value is recorded so
+// the event both applies and describes the change.
+class SetElementUndevelopedCommand final : public ICommand {
+public:
+    SetElementUndevelopedCommand(std::string element_id, bool undeveloped)
+        : element_id_(std::move(element_id)), undeveloped_(undeveloped) {}
+
+    std::string Name() const override { return "SetElementUndeveloped"; }
+    bool        Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+    bool WasNoOp() const { return was_no_op_; }
+
+private:
+    std::string element_id_;
+    bool        undeveloped_ = false;
+    bool        old_value_ = false;
+    bool        was_no_op_ = false;
+};
+
 } // namespace core::commands

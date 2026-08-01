@@ -1,6 +1,7 @@
 #include "app/structure_problem_sync.h"
 
 #include "core/problems/argument_cycles.h"
+#include "core/problems/gsn_wellformedness.h"
 #include "core/problems/problem_utils.h"
 #include "ui/i18n/localization.h"
 
@@ -28,14 +29,8 @@ std::string DescribeCycle(const core::ArgumentCycle& cycle) {
     return path;
 }
 
-} // namespace
-
-void SyncStructureProblems(core::ProblemsManager& problems_manager, const parser::AssuranceCase* model) {
-    core::ClearProblemsByIdPrefix(problems_manager, kStructureProblemPrefix);
-    if (!model)
-        return;
-
-    for (const core::ArgumentCycle& cycle : core::FindSupportCycles(*model)) {
+void SyncCycleProblems(core::ProblemsManager& problems_manager, const parser::AssuranceCase& model) {
+    for (const core::ArgumentCycle& cycle : core::FindSupportCycles(model)) {
         if (cycle.element_ids.empty())
             continue;
 
@@ -51,6 +46,7 @@ void SyncStructureProblems(core::ProblemsManager& problems_manager, const parser
         // the loop.
         problem.element_id = cycle.element_ids.front();
         problem.type = "CircularArgument";
+        problem.guideline_id = "GSN3-CORE-014";
         problem.message =
             cycle.element_ids.size() == 1
                 ? ui::i18n::trf("{0} is supported by itself, so it establishes nothing.",
@@ -58,10 +54,153 @@ void SyncStructureProblems(core::ProblemsManager& problems_manager, const parser
                 : ui::i18n::trf("Circular support: {0}. An argument that assumes its own conclusion "
                                 "establishes nothing.",
                                 DescribeCycle(cycle));
-        problem.quick_fix_label = ui::i18n::tr("Show cycle");
+        // Stored as an English msgid, not as translated text: the panel calls
+        // AF_TR on this at render (problems_panel.cpp), so baking the current
+        // language in here leaves the button stuck in the old one after a
+        // language switch until something forces the sync to re-run.
+        problem.quick_fix_label = "Show cycle";
         problem.quick_fix_payload = cycle.element_ids.front();
         problems_manager.AddOrUpdateProblem(problem);
     }
+}
+
+// What a reader is told about a GSN v3 rule violation. The sentence names the
+// defect and why it matters, because "SupportedElementIsALeaf" tells a safety
+// engineer nothing about their argument.
+std::string DescribeFinding(const core::GsnFinding& finding) {
+    switch (finding.rule) {
+    case core::GsnRule::UnresolvedEndpoint:
+        return ui::i18n::trf("Relationship {0} refers to {1}, which is not in this case. The relationship is "
+                             "not drawn, so the argument shown is smaller than the one stored.",
+                             finding.relationship_id,
+                             finding.detail);
+    case core::GsnRule::ChallengeTargetUnresolved:
+        return ui::i18n::trf("Challenge {0} targets {1}, which is not in this case. The challenge is stored "
+                             "but never shown against anything.",
+                             finding.relationship_id,
+                             finding.detail);
+    case core::GsnRule::SupportedElementIsALeaf:
+        return ui::i18n::trf("{0} is supported by relationship {1}, but only a Goal or a Strategy can be "
+                             "supported in GSN.",
+                             finding.element_id,
+                             finding.relationship_id);
+    case core::GsnRule::ContextualizedElementIsALeaf:
+        return ui::i18n::trf("{0} is given context by relationship {1}, but only a Goal or a Strategy is "
+                             "declared in context in GSN.",
+                             finding.element_id,
+                             finding.relationship_id);
+    case core::GsnRule::StrategyUsedAsAssertion:
+        return ui::i18n::trf("Strategy {0} is wired as an end of relationship {1}. A Strategy is the "
+                             "reasoning of an inference, not one of its ends.",
+                             finding.element_id,
+                             finding.relationship_id);
+    case core::GsnRule::EvidenceSourceIsNotASolution:
+        return ui::i18n::trf("{0} discharges a goal through relationship {1}, but it is not a Solution. "
+                             "Only a reference to evidence can discharge a goal.",
+                             finding.element_id,
+                             finding.relationship_id);
+    case core::GsnRule::DuplicateNotationIdentifier:
+        return ui::i18n::trf("{0} and {1} both use the GSN identifier {2}, so neither can be referred to "
+                             "unambiguously.",
+                             finding.element_id,
+                             finding.related_id,
+                             finding.detail);
+    case core::GsnRule::UndevelopedElementHasSupport:
+        return ui::i18n::trf("{0} is marked undeveloped but is already supported. Either the decorator or "
+                             "the support is out of date.",
+                             finding.element_id);
+    }
+    return std::string();
+}
+
+// A violated structural rule is an error: the argument is not valid GSN. A
+// stale undeveloped decorator is a warning, because the argument is still
+// well-formed — the diagram just no longer says what the author meant.
+core::ProblemSeverity SeverityFor(core::GsnRule rule) {
+    return rule == core::GsnRule::UndevelopedElementHasSupport ? core::ProblemSeverity::Warning
+                                                               : core::ProblemSeverity::Error;
+}
+
+// The repair offered for each rule, as an English msgid the panel translates at
+// display. Deliberately different per rule: deleting the relationship is the
+// right answer for a connection GSN does not permit, and the wrong one for a
+// Strategy that is merely wired into the wrong slot of an inference that is
+// otherwise exactly what the author meant.
+const char* RepairLabelFor(core::GsnRule rule) {
+    switch (rule) {
+    case core::GsnRule::UnresolvedEndpoint:
+        return "Drop broken reference";
+    case core::GsnRule::ChallengeTargetUnresolved:
+        return "Remove challenge";
+    case core::GsnRule::SupportedElementIsALeaf:
+    case core::GsnRule::ContextualizedElementIsALeaf:
+    case core::GsnRule::EvidenceSourceIsNotASolution:
+        return "Remove relationship";
+    case core::GsnRule::StrategyUsedAsAssertion:
+        return "Move to reasoning";
+    case core::GsnRule::DuplicateNotationIdentifier:
+        return "Renumber";
+    case core::GsnRule::UndevelopedElementHasSupport:
+        return "Clear decorator";
+    }
+    return "";
+}
+
+void SyncWellFormednessProblems(core::ProblemsManager& problems_manager, const parser::AssuranceCase& model) {
+    for (const core::GsnFinding& finding : core::CheckGsnWellFormedness(model)) {
+        core::ProblemItem problem;
+        // Keyed on the finding's own content so it survives a rebuild and
+        // disappears the moment the defect is corrected.
+        problem.id = kStructureProblemPrefix + std::string("gsn:") + core::GsnRuleName(finding.rule) + ":" +
+                     finding.element_id + ":" + finding.related_id + ":" + finding.relationship_id + ":" +
+                     finding.detail;
+        problem.severity = SeverityFor(finding.rule);
+        problem.source = core::ProblemSource::ModelValidation;
+        problem.element_id = finding.element_id;
+        problem.type = core::GsnRuleName(finding.rule);
+        // The normative requirement the diagnostic enforces, so a reader can
+        // take it back to docs/gsn/gsn-v3-conformance-matrix.md and the standard
+        // rather than having to trust the tool (GSN3-VAL-001).
+        problem.guideline_id = core::GsnRequirementId(finding.rule);
+        problem.message = DescribeFinding(finding);
+        // The label is stored as an English msgid and translated at display,
+        // like every other quick fix, so it survives a language change without
+        // the sync re-running.
+        problem.quick_fix_label = RepairLabelFor(finding.rule);
+        problem.quick_fix_payload =
+            EncodeGsnRepairPayload(GsnRepairPayload{finding.relationship_id, finding.detail});
+        problems_manager.AddOrUpdateProblem(problem);
+    }
+}
+
+} // namespace
+
+// Unit separator: it cannot occur in a SACM id or in an XML reference, so the
+// two fields can never run together however odd the source file is.
+namespace {
+constexpr char kPayloadSeparator = '\x1f';
+}
+
+std::string EncodeGsnRepairPayload(const GsnRepairPayload& payload) {
+    return payload.relationship_id + kPayloadSeparator + payload.reference;
+}
+
+bool DecodeGsnRepairPayload(const std::string& encoded, GsnRepairPayload& out) {
+    const size_t separator = encoded.find(kPayloadSeparator);
+    if (separator == std::string::npos)
+        return false;
+    out.relationship_id = encoded.substr(0, separator);
+    out.reference = encoded.substr(separator + 1);
+    return true;
+}
+
+void SyncStructureProblems(core::ProblemsManager& problems_manager, const parser::AssuranceCase* model) {
+    core::ClearProblemsByIdPrefix(problems_manager, kStructureProblemPrefix);
+    if (!model)
+        return;
+
+    SyncCycleProblems(problems_manager, *model);
+    SyncWellFormednessProblems(problems_manager, *model);
 }
 
 } // namespace app

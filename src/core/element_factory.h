@@ -104,6 +104,14 @@ bool PlanChallengeIds(const parser::AssuranceCase& ac,
 // prefix is never ACP-scoped and no package is consulted.
 std::string PlanTopGoalId(const parser::AssuranceCase& ac);
 
+// Whether `parent` may take a new child of `kind` under the GSN v3 connection
+// rules (GSN3-CORE-015). On refusal writes a human-readable English reason.
+//
+// Shared by the mutator, the id planner and the proposal preview: three copies
+// of this rule had already drifted from the notation, and a rule the tool
+// enforces in one entry point and not another is not a rule.
+bool CanAddChildElement(const parser::SacmElement& parent, NewElementKind kind, std::string& out_error);
+
 // Add a new element of the given kind as a child of parent_id.
 // Updates both the parser model (drives UI) and the sacm package (drives save).
 // Returns true on success and writes the new element id to out_new_id.
@@ -227,6 +235,20 @@ bool SetGsnIdentifier(parser::AssuranceCase& ac,
                       const std::string& new_identifier,
                       std::string& out_old_identifier,
                       std::string& out_error);
+
+// The next GSN notation identifier free in this case for the element's own
+// prefix -- the repair for two nodes answering to the same identifier. Empty
+// when the element is unknown.
+std::string NextFreeGsnIdentifier(const parser::AssuranceCase& ac, const std::string& element_id);
+
+// Set or clear the GSN undeveloped decorator (SACM `needsSupport`). Writes the
+// previous value so an audited command can record and reverse it.
+bool SetElementUndeveloped(parser::AssuranceCase& ac,
+                           sacm::AssuranceCasePackage* pkg,
+                           const std::string& element_id,
+                           bool undeveloped,
+                           bool& out_old_value,
+                           std::string& out_error);
 
 // Returns true if the element carries a secondary-language translation, i.e. any
 // of its name/description/content localized maps has a non-"en" entry with

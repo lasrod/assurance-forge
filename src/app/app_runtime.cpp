@@ -166,6 +166,9 @@ ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
     actions.add_counter_evidence_to_relationship = [&runtime](const std::string& relationship_id) {
         runtime.AddCounterEvidenceToRelationship(relationship_id);
     };
+    actions.remove_relationship = [&runtime](const std::string& relationship_id) {
+        runtime.RemoveRelationship(relationship_id);
+    };
     return actions;
 }
 
@@ -342,6 +345,26 @@ bool AppRuntime::AddCounterEvidenceToRelationship(const std::string& relationshi
 
 void AppRuntime::RemoveSelected(core::RemoveMode mode) {
     actions::ElementActions(*impl_).RemoveSelected(mode);
+}
+
+bool AppRuntime::RemoveRelationship(const std::string& relationship_id) {
+    return impl_->element_edit_controller->RemoveRelationship(*impl_, relationship_id);
+}
+
+bool AppRuntime::DropRelationshipReference(const std::string& relationship_id, const std::string& reference) {
+    return impl_->element_edit_controller->DropRelationshipReference(*impl_, relationship_id, reference);
+}
+
+bool AppRuntime::MoveStrategyToReasoning(const std::string& relationship_id, const std::string& strategy_id) {
+    return impl_->element_edit_controller->MoveStrategyToReasoning(*impl_, relationship_id, strategy_id);
+}
+
+bool AppRuntime::SetElementUndeveloped(const std::string& element_id, bool undeveloped) {
+    return impl_->element_edit_controller->SetElementUndeveloped(*impl_, element_id, undeveloped);
+}
+
+bool AppRuntime::RenumberGsnIdentifier(const std::string& element_id) {
+    return impl_->element_edit_controller->RenumberGsnIdentifier(*impl_, element_id);
 }
 
 core::TreeDropValidationResult AppRuntime::ValidateTreeDrop(const std::string& dragged_id,
