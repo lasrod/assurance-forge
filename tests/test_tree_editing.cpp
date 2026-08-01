@@ -256,6 +256,11 @@ TEST(TreeEditingValidation, AllowsContextUnderStrategy) {
 // Solution, so a strategy discharged directly by evidence is ordinary GSN. The
 // drop used to refuse it while the Add menu created exactly the same thing --
 // the tool disagreeing with itself about its own notation (GSN3-CORE-015).
+//
+// The expected kind is `AssertedEvidence` rather than the value spelled
+// `SupportedBy` because SACM splits GSN's one relationship in two by what sits
+// at the far end: a Solution there is written as `assertedevidence`. See the
+// vocabulary note on TreeRelationshipKind.
 TEST(TreeEditingValidation, AllowsSolutionUnderStrategy) {
     MiniCase mini_case;
     AddClaim(mini_case, "G1");

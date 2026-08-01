@@ -57,6 +57,11 @@ TreeRelationshipKind DetermineRelationshipKind(NodeRole parent_role, NodeRole ch
         // the Add menu already creates exactly this, and only the drop was
         // turned away. SACM carries it -- AssertedRelationship's target is an
         // `ArgumentAsset` (metamodel inventory), and ArgumentReasoning is one.
+        //
+        // `AssertedEvidence`, not the value spelled `SupportedBy`: this GSN
+        // SupportedBy has a Solution at the far end, and SACM writes that as
+        // `assertedevidence`. Same split as the Claim branch above. See the
+        // vocabulary note on TreeRelationshipKind.
         if (child_role == NodeRole::Solution)
             return TreeRelationshipKind::AssertedEvidence;
         if (IsContextLike(child_role))

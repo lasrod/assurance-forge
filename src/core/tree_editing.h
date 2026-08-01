@@ -23,6 +23,19 @@ enum class TreeDropMode {
     AsChild,
 };
 
+// Which relationship a drop would create. **The names mix two vocabularies**:
+// `SupportedBy` and `InContextOf` are GSN's, `AssertedEvidence` is SACM's. Each
+// value names the SACM relationship actually written:
+//
+//   SupportedBy      -> `assertedinference`
+//   InContextOf      -> `assertedcontext`
+//   AssertedEvidence -> `assertedevidence`
+//
+// So a GSN `SupportedBy` whose child is a Solution maps to `AssertedEvidence`,
+// not to the value spelled `SupportedBy` — GSN has one relationship there where
+// SACM has two, split by what sits at the far end. Reading the enum as pure GSN
+// makes that look like a bug and invites "fixing" the return value, which would
+// write an inference where the evidence relationship belongs.
 enum class TreeRelationshipKind {
     None,
     SupportedBy,
