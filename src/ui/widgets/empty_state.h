@@ -14,6 +14,10 @@
 
 namespace ui::widgets {
 
-void EmptyState(const std::string& message);
+// `detail` is an optional second line explaining how to get out of the empty
+// state. It is centred with the message rather than left to the caller, because
+// a caller emitting its own paragraph afterwards gets a centred headline above
+// a left-aligned block sitting near the bottom of the panel.
+void EmptyState(const std::string& message, const std::string& detail = std::string());
 
 } // namespace ui::widgets

@@ -38,18 +38,14 @@ std::string SummarizeTransaction(const core::audit::AuditTransaction& tx) {
 
 void RenderEmptyState(const HistoryTimelinePanelModel& model) {
     if (!model.has_audit_store) {
-        ImGui::TextDisabled("%s", AF_TR("This project does not have an audit store yet.").c_str());
-        ImGui::TextWrapped("%s",
-                           AF_TR("An audit log is created automatically the first time a model-mutating command "
-                                 "is recorded for a SACM file in this project.")
-                               .c_str());
+        ui::widgets::EmptyState(AF_TR("This project does not have an audit store yet."),
+                                AF_TR("An audit log is created automatically the first time a model-mutating command "
+                                      "is recorded for a SACM file in this project."));
         return;
     }
-    ui::widgets::EmptyState(AF_TR("No transactions have been recorded yet."));
-    ImGui::TextWrapped("%s",
-                       AF_TR("Open a SACM model and use any model-mutating action (add or remove a node) — "
-                             "each command will appear here.")
-                           .c_str());
+    ui::widgets::EmptyState(AF_TR("No transactions have been recorded yet."),
+                            AF_TR("Open a SACM model and use any model-mutating action (add or remove a node) — "
+                                  "each command will appear here."));
 }
 
 // Compact int slider modeled on `DrawOpinionSliderBar` in confidence_panel.cpp.
