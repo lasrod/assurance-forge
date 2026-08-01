@@ -4,6 +4,7 @@
 #include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
+#include "ui/widgets/danger_button.h"
 
 #include <algorithm>
 #include <cstring>
@@ -113,7 +114,7 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
     ImGui::SameLine();
     if (!model.keyStored)
         ImGui::BeginDisabled();
-    if (ImGui::Button(AF_TR("Remove Key").c_str())) {
+    if (ui::widgets::DangerButton(AF_TR("Remove Key").c_str())) {
         if (callbacks.remove_api_key)
             callbacks.remove_api_key();
     }

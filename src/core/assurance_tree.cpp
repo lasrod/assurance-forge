@@ -266,7 +266,10 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
         // etc.) inherit descriptive text from the SACMElement 'description' field.
         bool uses_content = (element.type == "claim" || element.type == "argumentreasoning");
         std::string detail = uses_content ? element.content : element.description;
-        node->label = display_identifier + ": " + element.name;
+        // The separator belongs to the name, not the identifier: an element with
+        // no name yet must not render as "CG1: ", which reads as a broken node.
+        node->has_name = !element.name.empty();
+        node->label = node->has_name ? display_identifier + ": " + element.name : display_identifier;
         if (!detail.empty()) {
             node->label += "\n" + detail;
         }
@@ -292,7 +295,9 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
             auto nit = element.name_langs.find(sec_lang);
             const std::string& sec_name =
                 (nit != element.name_langs.end() && !nit->second.empty()) ? nit->second : element.name;
-            node->label_secondary = display_identifier + ": " + sec_name;
+            node->has_name_secondary = !sec_name.empty();
+            node->label_secondary =
+                node->has_name_secondary ? display_identifier + ": " + sec_name : display_identifier;
             if (!sec_detail.empty()) {
                 node->label_secondary += "\n" + sec_detail;
             }

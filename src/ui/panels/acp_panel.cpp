@@ -7,6 +7,7 @@
 #include "imgui_stdlib.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
+#include "ui/widgets/danger_button.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
@@ -353,7 +354,7 @@ bool ShowAcpPanel(parser::AssuranceCase* model,
     }
 
     ImGui::Spacing();
-    if (ImGui::Button(AF_TR("Delete ACP").c_str())) {
+    if (ui::widgets::DangerButton(AF_TR("Delete ACP").c_str())) {
         if (callbacks && callbacks->remove_acp)
             modified = callbacks->remove_acp(edited.id) || modified;
     }

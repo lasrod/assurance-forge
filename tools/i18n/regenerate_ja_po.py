@@ -629,6 +629,16 @@ TRANSLATIONS = {
     "Source": "ソース",
     "Source: {0}": "ソース: {0}",
 
+    # ===== SACM element type display names =====
+    "Claim": "主張",
+    "Argument Reasoning": "議論の根拠",
+    "Artifact": "成果物",
+    "Artifact Reference": "成果物参照",
+    "Expression": "式",
+    "Asserted Inference": "主張された推論",
+    "Asserted Context": "主張された文脈",
+    "Asserted Evidence": "主張された証拠",
+
     # ===== Toolbar =====
     "Fit to view": "全体を表示",
     "Export GSN SVG": "GSN SVG をエクスポート",

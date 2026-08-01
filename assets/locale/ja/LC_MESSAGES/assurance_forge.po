@@ -217,14 +217,32 @@ msgstr "論証ナビゲーター"
 msgid "Argument Packages"
 msgstr "論証パッケージ"
 
+msgid "Argument Reasoning"
+msgstr "議論の根拠"
+
 msgid "Argument package was not found in the loaded SACM model."
 msgstr "読み込まれた SACM モデルに論証パッケージが見つかりませんでした。"
 
 msgid "Arguments"
 msgstr "議論"
 
+msgid "Artifact"
+msgstr "成果物"
+
 msgid "Artifact Packages"
 msgstr "成果物パッケージ"
+
+msgid "Artifact Reference"
+msgstr "成果物参照"
+
+msgid "Asserted Context"
+msgstr "主張された文脈"
+
+msgid "Asserted Evidence"
+msgstr "主張された証拠"
+
+msgid "Asserted Inference"
+msgstr "主張された推論"
 
 msgid "Assessment Status"
 msgstr "評価ステータス"
@@ -711,6 +729,9 @@ msgstr "エクスポート"
 
 msgid "Export GSN SVG"
 msgstr "GSN SVG をエクスポート"
+
+msgid "Expression"
+msgstr "式"
 
 msgid "External Reference"
 msgstr "外部参照"

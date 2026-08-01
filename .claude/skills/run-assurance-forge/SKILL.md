@@ -102,9 +102,38 @@ before concluding anything is too narrow.
 
 Pass `-Width`/`-Height` to pin a different size deliberately — e.g. to test how
 panels behave when genuinely cramped. Coordinates are only reproducible at a
-given pinned size, and the recent-projects list reorders by last-opened, so
-**verify the project name in the status bar before sending input** rather than
-trusting a remembered click position.
+given pinned size.
+
+### Never send input to a project you did not create
+
+**A batch containing `click` or `key` must run against a throwaway copy.**
+Screenshot-only batches may open anything.
+
+This is not a caution, it is a rule, because the obvious mitigations have both
+failed in practice:
+
+* *"Click the project I want"* — the welcome screen's recent list **reorders by
+  last-opened**, so a remembered coordinate opens a different project on the
+  next run.
+* *"Verify the name first, then type"* — verifying happens in one batch and the
+  typing in the next, by which time the list has reordered again.
+
+Twice this corrupted a real safety case: a `key XYZ` and a `key Z` intended for
+a scratch fixture landed in `MySafetyCase`, and the command bus autosaved both
+to disk before anyone saw a screenshot.
+
+Make a copy first, and open it by path rather than by clicking a list:
+
+```powershell
+$scratch = "$env:TEMP\claude\af-scratch"
+Remove-Item -Recurse -Force $scratch -ErrorAction SilentlyContinue
+Copy-Item -Recurse "C:\development\assurance-forge-projects\MySafetyCase" $scratch
+```
+
+Then drive `File > Open Project` to `$scratch`, or seed the recent list by
+launching once against it. Verify the project name in the status bar in the
+**same batch** that sends the input, and prefer `tests/data` fixtures over any
+copy of the user's work.
 
 ### Single actions
 

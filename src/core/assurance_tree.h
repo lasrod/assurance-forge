@@ -26,6 +26,14 @@ struct TreeNode {
     std::string id;
     std::string label;
     std::string label_secondary; // secondary language label for toggle
+
+    // Whether the element carried a name, per language. Renderers need this:
+    // the canvas must not draw an identifier trailing a separator into nothing
+    // ("CG1: "), while the navigator substitutes the element's text for the
+    // missing name. It was previously inferred from a trailing ": " in `label`,
+    // which meant the two renderers disagreed about what the label may contain.
+    bool has_name = false;
+    bool has_name_secondary = false;
     bool undeveloped = false;
     bool uninstantiated = false;
     NodeRole role = NodeRole::Other;

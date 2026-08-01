@@ -5,6 +5,7 @@
 #include "imgui.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
+#include "ui/widgets/danger_button.h"
 
 #include <algorithm>
 
@@ -355,7 +356,7 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     ImGui::Spacing();
     if (!model.can_delete)
         ImGui::BeginDisabled();
-    if (ImGui::Button(AF_TR("Delete Package").c_str()) && callbacks.delete_package)
+    if (ui::widgets::DangerButton(AF_TR("Delete Package").c_str()) && callbacks.delete_package)
         callbacks.delete_package();
     if (!model.can_delete)
         ImGui::EndDisabled();
@@ -378,7 +379,7 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     ImGui::SameLine();
     if (callbacks.delete_term && (model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty()))
         ImGui::BeginDisabled();
-    if (ImGui::Button(AF_TR("Delete Term").c_str()) && callbacks.delete_term)
+    if (ui::widgets::DangerButton(AF_TR("Delete Term").c_str()) && callbacks.delete_term)
         callbacks.delete_term(model.selected_term_ref);
     if (callbacks.delete_term && (model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty()))
         ImGui::EndDisabled();
@@ -425,7 +426,7 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     ImGui::SameLine();
     if (!has_selected_category)
         ImGui::BeginDisabled();
-    if (ImGui::Button(AF_TR("Delete Category").c_str()) && callbacks.delete_category)
+    if (ui::widgets::DangerButton(AF_TR("Delete Category").c_str()) && callbacks.delete_category)
         callbacks.delete_category(model.selected_category_ref);
     if (!has_selected_category)
         ImGui::EndDisabled();

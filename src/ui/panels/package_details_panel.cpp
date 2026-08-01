@@ -2,13 +2,14 @@
 
 #include "imgui.h"
 #include "ui/i18n/localization.h"
+#include "ui/widgets/empty_state.h"
 
 namespace ui::panels {
 
 void ShowPackageDetailsPanel(const sacm::SacmPackageTreeNode* package_node,
                              const std::filesystem::path& source_file_path) {
     if (!package_node) {
-        ImGui::TextDisabled("%s", AF_TR("No SACM package selected.").c_str());
+        ui::widgets::EmptyState(AF_TR("No SACM package selected."));
         return;
     }
 
