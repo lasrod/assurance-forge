@@ -94,4 +94,14 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
                       const ElementTranslationReviewCallbacks* translation_review_callbacks = nullptr,
                       bool read_only = false);
 
+// Human-readable name for a raw SACM element type.
+//
+// `SacmElement::type` is the XML local name lowercased ("assertedinference"),
+// which is a storage identifier, not something to put in front of a reader
+// deciding whether to trust a safety argument. The parser admits a closed set,
+// so the mapping is complete; an unrecognised value is returned unchanged
+// rather than guessed at, because inventing a label for an element we did not
+// expect would misrepresent the file.
+std::string ElementTypeDisplayName(const std::string& raw_type);
+
 } // namespace ui::panels

@@ -188,7 +188,7 @@ static void RenderMetadataRow(const char* label, const std::string& value) {
 
 static void RenderElementMetadata(const parser::SacmElement& elem) {
     RenderMetadataRow(AF_TR("ID").c_str(), elem.id);
-    RenderMetadataRow(AF_TR("Type").c_str(), elem.type);
+    RenderMetadataRow(AF_TR("Type").c_str(), ElementTypeDisplayName(elem.type));
     ImGui::Spacing();
 }
 
@@ -388,6 +388,28 @@ bool RenderTranslationReviewNotice(const std::string& element_id,
 }
 
 } // namespace
+
+// Literal AF_TR per case: the extractor only sees literals, so translating a
+// variable would leave every one of these permanently English.
+std::string ElementTypeDisplayName(const std::string& raw_type) {
+    if (raw_type == "claim")
+        return AF_TR("Claim");
+    if (raw_type == "argumentreasoning")
+        return AF_TR("Argument Reasoning");
+    if (raw_type == "artifact")
+        return AF_TR("Artifact");
+    if (raw_type == "artifactreference")
+        return AF_TR("Artifact Reference");
+    if (raw_type == "expression")
+        return AF_TR("Expression");
+    if (raw_type == "assertedinference")
+        return AF_TR("Asserted Inference");
+    if (raw_type == "assertedcontext")
+        return AF_TR("Asserted Context");
+    if (raw_type == "assertedevidence")
+        return AF_TR("Asserted Evidence");
+    return raw_type;
+}
 
 bool ShowElementPanel(parser::AssuranceCase* ac,
                       sacm::AssuranceCasePackage* sacm_pkg,

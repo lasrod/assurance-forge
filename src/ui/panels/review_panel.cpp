@@ -5,6 +5,7 @@
 #include "ui/i18n/localization.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/theme.h"
+#include "ui/widgets/danger_button.h"
 
 #include <algorithm>
 #include <cfloat>
@@ -327,7 +328,7 @@ void DrawProposalActions(const core::reviews::ReviewItem& item,
             callbacks.apply_proposal(item);
         ImGui::SameLine();
     }
-    if (ImGui::Button(AF_TR("Delete Proposal").c_str()) && callbacks.delete_proposal)
+    if (ui::widgets::DangerButton(AF_TR("Delete Proposal").c_str()) && callbacks.delete_proposal)
         callbacks.delete_proposal(item);
 
     ImGui::EndGroup();
@@ -346,7 +347,7 @@ void DrawReviewItemActions(const core::reviews::ReviewItem& item,
         }
         ImGui::SameLine();
     }
-    if (ImGui::Button(AF_TR("Delete").c_str()) && callbacks.delete_review_item) {
+    if (ui::widgets::DangerButton(AF_TR("Delete").c_str()) && callbacks.delete_review_item) {
         callbacks.delete_review_item(item);
     }
 }
@@ -477,7 +478,7 @@ void ShowAgentChangeSets(const ReviewPanelModel& model, const ReviewPanelCallbac
         }
         ImGui::EndDisabled();
         ImGui::SameLine();
-        if (ImGui::Button(AF_TR("Reject change").c_str()) && callbacks.reject_agent_change_set) {
+        if (ui::widgets::DangerButton(AF_TR("Reject change").c_str()) && callbacks.reject_agent_change_set) {
             callbacks.reject_agent_change_set(row.id);
         }
 

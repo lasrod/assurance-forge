@@ -4,6 +4,7 @@
 #include "imgui.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
+#include "ui/widgets/danger_button.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
@@ -133,7 +134,7 @@ void ShowRelationshipPanel(parser::AssuranceCase* model, const RelationshipPanel
     const bool can_remove = callbacks && callbacks->remove_relationship;
     if (!can_remove)
         ImGui::BeginDisabled();
-    if (ImGui::Button(AF_TR("Remove relationship").c_str()))
+    if (ui::widgets::DangerButton(AF_TR("Remove relationship").c_str()))
         callbacks->remove_relationship(selected_target->relationship_id);
     if (!can_remove)
         ImGui::EndDisabled();

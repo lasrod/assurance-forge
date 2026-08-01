@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.21)
 project(assurance-forge LANGUAGES C CXX)
 
 if(APPLE)
@@ -340,6 +340,7 @@ add_executable(tests
     tests/test_guideline_catalog.cpp
     tests/test_localization.cpp
     tests/test_theme.cpp
+    tests/test_element_type_display.cpp
     tests/test_status_bar.cpp
     tests/test_toolbar.cpp
     tests/test_text_ellipsis.cpp

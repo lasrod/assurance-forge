@@ -38,6 +38,7 @@ add_library(af_ui OBJECT
     timeline/timeline_widget.cpp
     tree_view.cpp
     ui_state.cpp
+    widgets/danger_button.cpp
     widgets/splitter.cpp
     widgets/text_ellipsis.cpp
 )
