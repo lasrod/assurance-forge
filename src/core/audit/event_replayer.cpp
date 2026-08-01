@@ -13,6 +13,7 @@
 #include "core/tree_editing.h"
 #include "core/commands/library_bridge.h"
 #include "core/library_package_projection.h"
+#include "core/relationship_editing.h"
 #include "core/reviews/review_proposal.h"
 #include "core/reviews/review_proposal_patch_service.h"
 #include "core/sacm_argument_sync.h"
@@ -233,6 +234,76 @@ bool ApplyEvent(ReplayState& state,
         if (!core::RemoveElement(state.model, &state.package, element_id, mode, err)) {
             out_error = "RemoveElement failed at " + FormatLocation(tx_seq, event.event_sequence, type) +
                         ": " + err;
+            return false;
+        }
+        return true;
+    }
+
+    if (type == "RemoveRelationship") {
+        std::string relationship_id;
+        if (!require_string("relationship_id", relationship_id))
+            return false;
+        std::string err;
+        if (!core::RemoveRelationship(state.model, &state.package, relationship_id, err)) {
+            out_error = "RemoveRelationship failed at " +
+                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+            return false;
+        }
+        return true;
+    }
+
+    if (type == "DropRelationshipReference") {
+        std::string relationship_id, reference;
+        if (!require_string("relationship_id", relationship_id))
+            return false;
+        if (!require_string("reference", reference))
+            return false;
+        std::string err;
+        // `removed_relationship` is recorded in the event but not read back here:
+        // the mutator re-derives it from SACM multiplicity, so live and replay
+        // reach the same outcome. The recorded value exists so the event
+        // describes what happened without a reader having to replay it.
+        bool removed_relationship = false;
+        if (!core::DropRelationshipReference(state.model, &state.package, relationship_id, reference,
+                                             removed_relationship, err)) {
+            out_error = "DropRelationshipReference failed at " +
+                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+            return false;
+        }
+        return true;
+    }
+
+    if (type == "MoveStrategyToReasoning") {
+        std::string relationship_id, strategy_id;
+        if (!require_string("relationship_id", relationship_id))
+            return false;
+        if (!require_string("strategy_id", strategy_id))
+            return false;
+        std::string err;
+        if (!core::MoveStrategyToReasoning(state.model, &state.package, relationship_id, strategy_id, err)) {
+            out_error = "MoveStrategyToReasoning failed at " +
+                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+            return false;
+        }
+        return true;
+    }
+
+    if (type == "SetElementUndeveloped") {
+        std::string element_id;
+        if (!require_string("element_id", element_id))
+            return false;
+        const auto new_value = payload.find("new_value");
+        if (new_value == payload.end() || !new_value->is_boolean()) {
+            out_error = "Missing or non-boolean payload field 'new_value' at " +
+                        FormatLocation(tx_seq, event.event_sequence, type);
+            return false;
+        }
+        std::string err;
+        bool old_value_unused = false;
+        if (!core::SetElementUndeveloped(state.model, &state.package, element_id, new_value->get<bool>(),
+                                         old_value_unused, err)) {
+            out_error = "SetElementUndeveloped failed at " +
+                        FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;

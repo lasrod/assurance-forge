@@ -277,6 +277,8 @@ add_executable(tests
     tests/test_multilingual_round_trip.cpp
     tests/test_argument_cycles.cpp
     tests/test_gsn_wellformedness.cpp
+    tests/test_gsn_repair.cpp
+    tests/test_gsn_repair_fixture.cpp
     tests/test_register_model.cpp
     tests/test_assurance_tree.cpp
     tests/test_layout.cpp

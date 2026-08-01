@@ -236,6 +236,20 @@ bool SetGsnIdentifier(parser::AssuranceCase& ac,
                       std::string& out_old_identifier,
                       std::string& out_error);
 
+// The next GSN notation identifier free in this case for the element's own
+// prefix -- the repair for two nodes answering to the same identifier. Empty
+// when the element is unknown.
+std::string NextFreeGsnIdentifier(const parser::AssuranceCase& ac, const std::string& element_id);
+
+// Set or clear the GSN undeveloped decorator (SACM `needsSupport`). Writes the
+// previous value so an audited command can record and reverse it.
+bool SetElementUndeveloped(parser::AssuranceCase& ac,
+                           sacm::AssuranceCasePackage* pkg,
+                           const std::string& element_id,
+                           bool undeveloped,
+                           bool& out_old_value,
+                           std::string& out_error);
+
 // Returns true if the element carries a secondary-language translation, i.e. any
 // of its name/description/content localized maps has a non-"en" entry with
 // non-empty text. Used to decide whether editing the element should flag it for

@@ -812,11 +812,22 @@ TRANSLATIONS = {
         "ゴールを立証できるのは証拠への参照のみです。",
     "{0} and {1} both use the GSN identifier {2}, so neither can be referred to unambiguously.":
         "{0} と {1} が同じ GSN 識別子 {2} を使用しているため、どちらも一意に参照できません。",
-    "{0} is marked undeveloped but is supported through relationship {1}. Either the decorator "
-    "or the support is out of date.":
-        "{0} は未展開と示されていますが、関係 {1} によって支持されています。"
+    "{0} is marked undeveloped but is already supported. Either the decorator or the support "
+    "is out of date.":
+        "{0} は未展開と示されていますが、すでに支持されています。"
         "装飾か支持のいずれかが古くなっています。",
-    "Show element": "要素を表示",
+
+    # ===== GSN repair affordances (canvas edge menu, relationship inspector,
+    # and the per-rule quick fixes on the Problems panel) =====
+    "Remove relationship": "関係を削除",
+    "Withdraws the relationship. Both elements are kept; one left with no remaining parent "
+    "shows as an orphan.":
+        "関係を取り消します。両方の要素は保持され、親がなくなった要素は孤立要素として表示されます。",
+    "Drop broken reference": "壊れた参照を削除",
+    "Remove challenge": "反証を削除",
+    "Move to reasoning": "理由付けへ移動",
+    "Renumber": "採番し直す",
+    "Clear decorator": "装飾を解除",
 
     # ===== Static problem messages (translated at display via AF_TR) =====
     "The stored confidence assessment needs review because this element changed. Review the value "

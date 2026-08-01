@@ -1485,6 +1485,78 @@ bool SetGsnIdentifier(parser::AssuranceCase& ac,
     return true;
 }
 
+std::string NextFreeGsnIdentifier(const parser::AssuranceCase& ac, const std::string& element_id) {
+    const parser::SacmElement* target = FindElement(ac, element_id);
+    if (!target)
+        return std::string();
+
+    // Recover the prefix from the identifier the element already answers to
+    // ("G1" -> "G", "Sn12" -> "Sn", "ACP1_G2" -> "ACP1_G") rather than deriving
+    // it from the element's kind. An ArtifactReference is a Solution or a
+    // Context depending only on how it is wired, so kind cannot decide between
+    // "Sn" and "C" -- and keeping the author's own prefix means a renumber stays
+    // inside whatever scheme the file already uses.
+    const std::string current = GsnIdentifierFor(*target);
+    size_t prefix_end = current.size();
+    while (prefix_end > 0 && std::isdigit(static_cast<unsigned char>(current[prefix_end - 1])))
+        --prefix_end;
+    const std::string prefix = current.substr(0, prefix_end);
+
+    std::unordered_set<std::string> taken;
+    for (const parser::SacmElement& element : ac.elements) {
+        if (&element != target && !IsRelationshipType(element.type))
+            taken.insert(GsnIdentifierFor(element));
+    }
+
+    // Bounded by the number of taken identifiers, so this always terminates.
+    for (size_t suffix = 1; suffix <= taken.size() + 1; ++suffix) {
+        std::string candidate = prefix + std::to_string(suffix);
+        if (taken.find(candidate) == taken.end())
+            return candidate;
+    }
+    return std::string();
+}
+
+bool SetElementUndeveloped(parser::AssuranceCase& ac,
+                           sacm::AssuranceCasePackage* pkg,
+                           const std::string& element_id,
+                           bool undeveloped,
+                           bool& out_old_value,
+                           std::string& out_error) {
+    out_error.clear();
+    parser::SacmElement* target = nullptr;
+    for (parser::SacmElement& element : ac.elements) {
+        if (element.id == element_id) {
+            target = &element;
+            break;
+        }
+    }
+    if (!target) {
+        out_error = "Element not found in model: " + element_id + ".";
+        return false;
+    }
+
+    out_old_value = target->undeveloped;
+    if (out_old_value == undeveloped)
+        return true;
+    target->undeveloped = undeveloped;
+
+    // GSN "undeveloped" is SACM `needsSupport`; see docs/sacm/sacm-gsn-mapping.md.
+    if (pkg) {
+        for (sacm::ArgumentPackage& argument_package : pkg->argumentPackages) {
+            for (sacm::Claim& claim : argument_package.claims) {
+                if (claim.id == element_id)
+                    claim.undeveloped = undeveloped;
+            }
+            for (sacm::ArgumentReasoning& reasoning : argument_package.argumentReasonings) {
+                if (reasoning.id == element_id)
+                    reasoning.undeveloped = undeveloped;
+            }
+        }
+    }
+    return true;
+}
+
 bool ElementHasSecondaryTranslation(const parser::SacmElement& element) {
     const std::map<std::string, std::string>* maps[] = {
         &element.name_langs, &element.description_langs, &element.content_langs};

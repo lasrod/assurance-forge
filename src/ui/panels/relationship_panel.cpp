@@ -128,6 +128,22 @@ void ShowRelationshipPanel(parser::AssuranceCase* model, const RelationshipPanel
         if (!can_add)
             ImGui::EndDisabled();
     }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    const bool can_remove = callbacks && callbacks->remove_relationship;
+    if (!can_remove)
+        ImGui::BeginDisabled();
+    if (ImGui::Button(AF_TR("Remove relationship").c_str()))
+        callbacks->remove_relationship(selected_target->relationship_id);
+    if (!can_remove)
+        ImGui::EndDisabled();
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s",
+                          AF_TR("Withdraws the relationship. Both elements are kept; one left with no "
+                                "remaining parent shows as an orphan.")
+                              .c_str());
+    }
 }
 
 } // namespace ui::panels

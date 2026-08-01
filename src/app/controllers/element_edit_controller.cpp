@@ -6,6 +6,7 @@
 #include "parser/xml_parser.h"
 #include "sacm/sacm_model.h"
 #include "sacm_adapter/document_edit.h"
+#include "ui/ui_state.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -115,6 +116,154 @@ bool ElementEditController::AddChallenge(AppRuntimeState& state,
     events_.Emit(SelectionChangedEvent{new_id, true});
     events_.Emit(DocumentDirtyEvent{});
     events_.Emit(StatusMessageEvent{"Added " + new_id});
+    return true;
+}
+
+bool ElementEditController::RemoveRelationship(AppRuntimeState& state, const std::string& relationship_id) {
+    if (relationship_id.empty()) {
+        events_.Emit(StatusMessageEvent{"No relationship selected."});
+        return false;
+    }
+    parser::AssuranceCase*      model   = nullptr;
+    sacm::AssuranceCasePackage* package = nullptr;
+    if (!TryGetWorkingModel(state, "Remove relationship", events_, model, package))
+        return false;
+
+    core::commands::RemoveRelationshipCommand cmd(relationship_id);
+    const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Remove relationship failed: " + outcome.error});
+        return false;
+    }
+
+    // The relationship is gone, so a selection pointing at it would describe
+    // something that no longer exists.
+    ui::GetUiState().selected_relationship_id.clear();
+    ui::GetUiState().selected_relationship_edge_key.clear();
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(DocumentDirtyEvent{});
+    events_.Emit(StatusMessageEvent{"Removed relationship " + relationship_id +
+                                    ". Its elements were kept; any left unconnected show as orphans."});
+    return true;
+}
+
+bool ElementEditController::DropRelationshipReference(AppRuntimeState& state,
+                                                      const std::string& relationship_id,
+                                                      const std::string& reference) {
+    if (relationship_id.empty() || reference.empty()) {
+        events_.Emit(StatusMessageEvent{"No broken reference selected."});
+        return false;
+    }
+    parser::AssuranceCase*      model   = nullptr;
+    sacm::AssuranceCasePackage* package = nullptr;
+    if (!TryGetWorkingModel(state, "Drop reference", events_, model, package))
+        return false;
+
+    core::commands::DropRelationshipReferenceCommand cmd(relationship_id, reference);
+    const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Drop reference failed: " + outcome.error});
+        return false;
+    }
+
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(DocumentDirtyEvent{});
+    // Say which of the two outcomes happened. Scrubbing the last source out of a
+    // relationship takes the relationship with it, and a user who expected to
+    // lose only a broken reference has to be told.
+    if (cmd.RemovedRelationship()) {
+        ui::GetUiState().selected_relationship_id.clear();
+        ui::GetUiState().selected_relationship_edge_key.clear();
+        events_.Emit(StatusMessageEvent{"Dropped " + reference + ", which left relationship " +
+                                        relationship_id + " with nothing to relate, so it was removed too."});
+    } else {
+        events_.Emit(StatusMessageEvent{"Dropped the broken reference " + reference + " from " +
+                                        relationship_id + "."});
+    }
+    return true;
+}
+
+bool ElementEditController::MoveStrategyToReasoning(AppRuntimeState& state,
+                                                    const std::string& relationship_id,
+                                                    const std::string& strategy_id) {
+    if (relationship_id.empty() || strategy_id.empty()) {
+        events_.Emit(StatusMessageEvent{"No strategy selected."});
+        return false;
+    }
+    parser::AssuranceCase*      model   = nullptr;
+    sacm::AssuranceCasePackage* package = nullptr;
+    if (!TryGetWorkingModel(state, "Move strategy", events_, model, package))
+        return false;
+
+    core::commands::MoveStrategyToReasoningCommand cmd(relationship_id, strategy_id);
+    const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Move strategy failed: " + outcome.error});
+        return false;
+    }
+
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(SelectionChangedEvent{strategy_id, true});
+    events_.Emit(DocumentDirtyEvent{});
+    events_.Emit(StatusMessageEvent{"Moved " + strategy_id + " into the reasoning of " + relationship_id + "."});
+    return true;
+}
+
+bool ElementEditController::SetElementUndeveloped(AppRuntimeState& state,
+                                                  const std::string& element_id,
+                                                  bool undeveloped) {
+    if (element_id.empty()) {
+        events_.Emit(StatusMessageEvent{"No element selected."});
+        return false;
+    }
+    parser::AssuranceCase*      model   = nullptr;
+    sacm::AssuranceCasePackage* package = nullptr;
+    if (!TryGetWorkingModel(state, "Set undeveloped", events_, model, package))
+        return false;
+
+    core::commands::SetElementUndevelopedCommand cmd(element_id, undeveloped);
+    const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Set undeveloped failed: " + outcome.error});
+        return false;
+    }
+    if (cmd.WasNoOp())
+        return true;
+
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(DocumentDirtyEvent{});
+    events_.Emit(StatusMessageEvent{undeveloped ? "Marked " + element_id + " undeveloped."
+                                                : "Cleared the undeveloped decorator on " + element_id + "."});
+    return true;
+}
+
+bool ElementEditController::RenumberGsnIdentifier(AppRuntimeState& state, const std::string& element_id) {
+    if (element_id.empty()) {
+        events_.Emit(StatusMessageEvent{"No element selected."});
+        return false;
+    }
+    parser::AssuranceCase*      model   = nullptr;
+    sacm::AssuranceCasePackage* package = nullptr;
+    if (!TryGetWorkingModel(state, "Renumber", events_, model, package))
+        return false;
+
+    const std::string next = core::NextFreeGsnIdentifier(*model, element_id);
+    if (next.empty()) {
+        events_.Emit(StatusMessageEvent{"Could not find a free GSN identifier for " + element_id + "."});
+        return false;
+    }
+
+    core::commands::UpdateGsnIdentifierCommand cmd(element_id, next);
+    const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Renumber failed: " + outcome.error});
+        return false;
+    }
+
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(SelectionChangedEvent{element_id, true});
+    events_.Emit(DocumentDirtyEvent{});
+    events_.Emit(StatusMessageEvent{"Renumbered " + cmd.OldIdentifier() + " to " + next + "."});
     return true;
 }
 

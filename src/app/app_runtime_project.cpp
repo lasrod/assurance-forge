@@ -11,6 +11,7 @@
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
 #include "app/register_problem_sync.h"
+#include "app/structure_problem_sync.h"
 #include "app/translation_review_sync.h"
 #include "core/translation_review_store.h"
 #include "core/element_factory.h"
@@ -922,6 +923,43 @@ void AppRuntime::DiscardOrphanedRegisterAssessment(const core::ProblemItem& prob
               ". Close the project without saving to keep it after all.");
 }
 
+// Applies the repair a GSN v3 well-formedness finding offers. Returns false when
+// the problem is not one of ours, so the caller falls through to the next
+// handler.
+//
+// The repair is chosen per rule rather than "delete whatever is wrong":
+// withdrawing the relationship is right for a connection GSN does not permit,
+// and wrong for a Strategy that is simply in the wrong slot of an inference the
+// author meant to make.
+bool AppRuntime::ApplyGsnWellFormednessQuickFix(const core::ProblemItem& problem) {
+    GsnRepairPayload payload;
+    if (!DecodeGsnRepairPayload(problem.quick_fix_payload, payload))
+        return false;
+
+    if (problem.type == "UnresolvedEndpoint") {
+        DropRelationshipReference(payload.relationship_id, payload.reference);
+        return true;
+    }
+    if (problem.type == "ChallengeTargetUnresolved" || problem.type == "SupportedElementIsALeaf" ||
+        problem.type == "ContextualizedElementIsALeaf" || problem.type == "EvidenceSourceIsNotASolution") {
+        RemoveRelationship(payload.relationship_id);
+        return true;
+    }
+    if (problem.type == "StrategyUsedAsAssertion") {
+        MoveStrategyToReasoning(payload.relationship_id, problem.element_id);
+        return true;
+    }
+    if (problem.type == "DuplicateNotationIdentifier") {
+        RenumberGsnIdentifier(problem.element_id);
+        return true;
+    }
+    if (problem.type == "UndevelopedElementHasSupport") {
+        SetElementUndeveloped(problem.element_id, false);
+        return true;
+    }
+    return false;
+}
+
 void AppRuntime::HandleProblemQuickFix(const core::ProblemItem& problem) {
     if (problem.type.rfind("Acp", 0) == 0) {
         if (problem.quick_fix_payload.empty()) {
@@ -949,6 +987,8 @@ void AppRuntime::HandleProblemQuickFix(const core::ProblemItem& problem) {
         DiscardOrphanedRegisterAssessment(problem);
         return;
     }
+    if (ApplyGsnWellFormednessQuickFix(problem))
+        return;
     actions::TerminologyActions(*impl_).HandleProblemQuickFix(problem);
 }
 

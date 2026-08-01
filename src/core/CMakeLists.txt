@@ -52,6 +52,7 @@ add_library(af_core OBJECT
     problems/problem_item.cpp
     problems/problem_utils.cpp
     problems/problems_manager.cpp
+    relationship_editing.cpp
     project_model.cpp
     project_file_io.cpp
     project_manifest.cpp

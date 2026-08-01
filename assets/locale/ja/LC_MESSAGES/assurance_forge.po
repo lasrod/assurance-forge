@@ -379,6 +379,9 @@ msgstr "主張"
 msgid "Clear all"
 msgstr "すべてクリア"
 
+msgid "Clear decorator"
+msgstr "装飾を解除"
+
 msgid "Click to open in the Problems panel."
 msgstr "クリックして問題パネルで開きます。"
 
@@ -600,6 +603,9 @@ msgstr "{0} を調整するにはドラッグしてください"
 
 msgid "Drag to scrub transaction history"
 msgstr "ドラッグしてトランザクション履歴をスクラブします"
+
+msgid "Drop broken reference"
+msgstr "壊れた参照を削除"
 
 msgid "Duplicate term value and definition exist in this package."
 msgstr "このパッケージ内に同じ用語と定義の重複があります。"
@@ -945,6 +951,9 @@ msgstr "モード"
 
 msgid "Model"
 msgstr "モデル"
+
+msgid "Move to reasoning"
+msgstr "理由付けへ移動"
 
 msgid "Name"
 msgstr "名前"
@@ -1390,11 +1399,20 @@ msgstr "キーを削除"
 msgid "Remove Subtree"
 msgstr "サブツリーを除去"
 
+msgid "Remove challenge"
+msgstr "反証を削除"
+
+msgid "Remove relationship"
+msgstr "関係を削除"
+
 msgid "Remove the SACM-backed ACP metadata from its target."
 msgstr "対象から SACM ベースの ACP メタデータを除去します。"
 
 msgid "Remove {0}?"
 msgstr "{0} を除去しますか?"
+
+msgid "Renumber"
+msgstr "採番し直す"
 
 msgid "Report Builder"
 msgstr "レポートビルダー"
@@ -1569,9 +1587,6 @@ msgstr "FPS を表示"
 
 msgid "Show cycle"
 msgstr "循環を表示"
-
-msgid "Show element"
-msgstr "要素を表示"
 
 msgid "Shown on the canvas as you watch it build."
 msgstr "作成の様子がキャンバスに表示されています。"
@@ -1885,6 +1900,9 @@ msgstr "変更されるもの (参照が削除されます):"
 msgid "Will be removed:"
 msgstr "削除されるもの:"
 
+msgid "Withdraws the relationship. Both elements are kept; one left with no remaining parent shows as an orphan."
+msgstr "関係を取り消します。両方の要素は保持され、親がなくなった要素は孤立要素として表示されます。"
+
 msgid "XML File:"
 msgstr "XML ファイル:"
 
@@ -2014,8 +2032,8 @@ msgstr "{0} には {1} 件の表示可能な意味があります。意図する
 msgid "{0} is given context by relationship {1}, but only a Goal or a Strategy is declared in context in GSN."
 msgstr "{0} は関係 {1} によってコンテキストを与えられていますが、GSN でコンテキストの中で述べられるのは ゴールまたは戦略のみです。"
 
-msgid "{0} is marked undeveloped but is supported through relationship {1}. Either the decorator or the support is out of date."
-msgstr "{0} は未展開と示されていますが、関係 {1} によって支持されています。装飾か支持のいずれかが古くなっています。"
+msgid "{0} is marked undeveloped but is already supported. Either the decorator or the support is out of date."
+msgstr "{0} は未展開と示されていますが、すでに支持されています。装飾か支持のいずれかが古くなっています。"
 
 msgid "{0} is not defined."
 msgstr "{0} は定義されていません。"

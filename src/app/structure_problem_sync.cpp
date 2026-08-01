@@ -102,10 +102,9 @@ std::string DescribeFinding(const core::GsnFinding& finding) {
                              finding.related_id,
                              finding.detail);
     case core::GsnRule::UndevelopedElementHasSupport:
-        return ui::i18n::trf("{0} is marked undeveloped but is supported through relationship {1}. Either "
-                             "the decorator or the support is out of date.",
-                             finding.element_id,
-                             finding.relationship_id);
+        return ui::i18n::trf("{0} is marked undeveloped but is already supported. Either the decorator or "
+                             "the support is out of date.",
+                             finding.element_id);
     }
     return std::string();
 }
@@ -116,6 +115,31 @@ std::string DescribeFinding(const core::GsnFinding& finding) {
 core::ProblemSeverity SeverityFor(core::GsnRule rule) {
     return rule == core::GsnRule::UndevelopedElementHasSupport ? core::ProblemSeverity::Warning
                                                                : core::ProblemSeverity::Error;
+}
+
+// The repair offered for each rule, as an English msgid the panel translates at
+// display. Deliberately different per rule: deleting the relationship is the
+// right answer for a connection GSN does not permit, and the wrong one for a
+// Strategy that is merely wired into the wrong slot of an inference that is
+// otherwise exactly what the author meant.
+const char* RepairLabelFor(core::GsnRule rule) {
+    switch (rule) {
+    case core::GsnRule::UnresolvedEndpoint:
+        return "Drop broken reference";
+    case core::GsnRule::ChallengeTargetUnresolved:
+        return "Remove challenge";
+    case core::GsnRule::SupportedElementIsALeaf:
+    case core::GsnRule::ContextualizedElementIsALeaf:
+    case core::GsnRule::EvidenceSourceIsNotASolution:
+        return "Remove relationship";
+    case core::GsnRule::StrategyUsedAsAssertion:
+        return "Move to reasoning";
+    case core::GsnRule::DuplicateNotationIdentifier:
+        return "Renumber";
+    case core::GsnRule::UndevelopedElementHasSupport:
+        return "Clear decorator";
+    }
+    return "";
 }
 
 void SyncWellFormednessProblems(core::ProblemsManager& problems_manager, const parser::AssuranceCase& model) {
@@ -135,15 +159,36 @@ void SyncWellFormednessProblems(core::ProblemsManager& problems_manager, const p
         // rather than having to trust the tool (GSN3-VAL-001).
         problem.guideline_id = core::GsnRequirementId(finding.rule);
         problem.message = DescribeFinding(finding);
-        if (!finding.element_id.empty()) {
-            problem.quick_fix_label = ui::i18n::tr("Show element");
-            problem.quick_fix_payload = finding.element_id;
-        }
+        // The label is stored as an English msgid and translated at display,
+        // like every other quick fix, so it survives a language change without
+        // the sync re-running.
+        problem.quick_fix_label = RepairLabelFor(finding.rule);
+        problem.quick_fix_payload =
+            EncodeGsnRepairPayload(GsnRepairPayload{finding.relationship_id, finding.detail});
         problems_manager.AddOrUpdateProblem(problem);
     }
 }
 
 } // namespace
+
+// Unit separator: it cannot occur in a SACM id or in an XML reference, so the
+// two fields can never run together however odd the source file is.
+namespace {
+constexpr char kPayloadSeparator = '\x1f';
+}
+
+std::string EncodeGsnRepairPayload(const GsnRepairPayload& payload) {
+    return payload.relationship_id + kPayloadSeparator + payload.reference;
+}
+
+bool DecodeGsnRepairPayload(const std::string& encoded, GsnRepairPayload& out) {
+    const size_t separator = encoded.find(kPayloadSeparator);
+    if (separator == std::string::npos)
+        return false;
+    out.relationship_id = encoded.substr(0, separator);
+    out.reference = encoded.substr(separator + 1);
+    return true;
+}
 
 void SyncStructureProblems(core::ProblemsManager& problems_manager, const parser::AssuranceCase* model) {
     core::ClearProblemsByIdPrefix(problems_manager, kStructureProblemPrefix);

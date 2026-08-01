@@ -15,4 +15,16 @@ namespace app {
 // docs/gsn/gsn-v3-conformance-matrix.md.
 void SyncStructureProblems(core::ProblemsManager& problems_manager, const parser::AssuranceCase* model);
 
+// What a GSN quick fix needs that `ProblemItem` has no field for. The problem
+// carries its rule in `type` and the subject element in `element_id`; the
+// relationship and the offending literal ride in `quick_fix_payload`.
+struct GsnRepairPayload {
+    std::string relationship_id;
+    // The unresolved reference to drop. Empty for repairs that do not need one.
+    std::string reference;
+};
+
+std::string EncodeGsnRepairPayload(const GsnRepairPayload& payload);
+bool        DecodeGsnRepairPayload(const std::string& encoded, GsnRepairPayload& out);
+
 } // namespace app

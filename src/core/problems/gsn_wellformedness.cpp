@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <map>
+#include <set>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -210,6 +211,12 @@ void CheckIdentifiers(const parser::AssuranceCase& model, std::vector<GsnFinding
 void CheckUndevelopedDecorators(const parser::AssuranceCase& model,
                                 const ElementIndex& index,
                                 std::vector<GsnFinding>& findings) {
+    // Reported once per element, not once per relationship that develops it.
+    // The defect is the decorator contradicting the argument around it, and
+    // there is one decorator; a goal supported three ways is one thing to fix,
+    // and three rows for it would read as three problems.
+    std::set<std::string> already_reported;
+
     for (const parser::SacmElement& relationship : model.elements) {
         if (!IsSupportRelationship(relationship) || relationship.is_counter)
             continue;
@@ -227,12 +234,12 @@ void CheckUndevelopedDecorators(const parser::AssuranceCase& model,
             const parser::SacmElement* target = index.Resolve(reference);
             if (target == nullptr || !target->undeveloped)
                 continue;
-            AddFinding(findings,
-                       GsnRule::UndevelopedElementHasSupport,
-                       target->id,
-                       std::string(),
-                       relationship.id,
-                       {});
+            if (!already_reported.insert(target->id).second)
+                continue;
+            // No relationship is named: naming one of several would suggest it
+            // is the one at fault, and the repair clears the decorator rather
+            // than touching any relationship.
+            AddFinding(findings, GsnRule::UndevelopedElementHasSupport, target->id, {}, {}, {});
         }
     }
 }

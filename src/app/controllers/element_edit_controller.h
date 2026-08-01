@@ -38,6 +38,27 @@ public:
     bool ConfirmPendingRemoval(AppRuntimeState& state);
     void CancelPendingRemoval();
 
+    // Repairs for a relationship, and for the two decorators that can contradict
+    // the argument around them. These are the edits the GSN v3 well-formedness
+    // checker's findings need: without them the tool reports a defect in an
+    // imported case and offers the user no way to correct it.
+    //
+    // Each goes through the audited bus like every other edit, so a repair is
+    // undoable, replayable and attributed. No confirmation modal: they are
+    // single-relationship edits with undo behind them, unlike node removal which
+    // can take a subtree.
+    bool RemoveRelationship(AppRuntimeState& state, const std::string& relationship_id);
+    bool DropRelationshipReference(AppRuntimeState& state,
+                                   const std::string& relationship_id,
+                                   const std::string& reference);
+    bool MoveStrategyToReasoning(AppRuntimeState& state,
+                                 const std::string& relationship_id,
+                                 const std::string& strategy_id);
+    bool SetElementUndeveloped(AppRuntimeState& state, const std::string& element_id, bool undeveloped);
+    // Give `element_id` the next identifier free under its own prefix, the
+    // repair for two nodes answering to the same one.
+    bool RenumberGsnIdentifier(AppRuntimeState& state, const std::string& element_id);
+
     // Commit a finished text-edit session as a single audited transaction.
     // `original_value` is the value the field held when the user first
     // focused it; `new_value` is the value at deactivation. The panel-side

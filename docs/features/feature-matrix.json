@@ -1028,7 +1028,24 @@
       "tests": [
         "tests/test_gsn_wellformedness.cpp"
       ],
-      "notes": "Every finding carries the `GSN3-*` requirement it enforces in the Problems panel's Guideline column, so a reader can take a diagnostic back to docs/gsn/gsn-v3-conformance-matrix.md and the standard instead of trusting the tool. Eight Core and Dialectic rules are checked: an unresolved relationship endpoint, an unresolved challenge target, the permitted element/relationship combinations (a Solution, Context, Assumption or Justification is a leaf), a Strategy wired as an end of an inference rather than as its reasoning, a non-Solution standing in the evidence position, two elements sharing a notation identifier, and an undeveloped decorator left on an element that has since been supported. The same connection rules now gate authoring, so the Add menu no longer offers a sub-argument under an Assumption — it did, and SACM could store the result. **Not a complete GSN v3 validator**: statement constraints (proposition and noun-phrase form) and the Pattern, Modular and Confidence extension rules are not checked. Content whose GSN role is undecidable — an unrecognized element type, a Context that may be either a Claim or an ArtifactReference — is passed over rather than guessed at, because a false structural error against an imported safety argument is worse than a missing one. Argument *quality* stays in the SCCG catalog (AF-AI-010), where a human resolves it."
+      "notes": "Every finding carries the `GSN3-*` requirement it enforces in the Problems panel's Guideline column, so a reader can take a diagnostic back to docs/gsn/gsn-v3-conformance-matrix.md and the standard instead of trusting the tool. Eight Core and Dialectic rules are checked: an unresolved relationship endpoint, an unresolved challenge target, the permitted element/relationship combinations (a Solution, Context, Assumption or Justification is a leaf), a Strategy wired as an end of an inference rather than as its reasoning, a non-Solution standing in the evidence position, two elements sharing a notation identifier, and an undeveloped decorator left on an element that has since been supported. The same connection rules now gate authoring, so the Add menu no longer offers a sub-argument under an Assumption — it did, and SACM could store the result. **Not a complete GSN v3 validator**: statement constraints (proposition and noun-phrase form) and the Pattern, Modular and Confidence extension rules are not checked. Content whose GSN role is undecidable — an unrecognized element type, a Context that may be either a Claim or an ArtifactReference — is passed over rather than guessed at, because a false structural error against an imported safety argument is worse than a missing one. Argument *quality* stays in the SCCG catalog (AF-AI-010), where a human resolves it. Repairs are AF-METH-011."
+    },
+    {
+      "id": "AF-METH-011",
+      "area": "METH",
+      "name": "Repair a reported GSN well-formedness defect",
+      "status": "supported",
+      "evidence": [
+        "src/core/relationship_editing.cpp",
+        "src/app/controllers/element_edit_controller.cpp",
+        "src/app/structure_problem_sync.cpp",
+        "src/ui/gsn/gsn_acp_decorator.cpp",
+        "src/ui/panels/relationship_panel.cpp"
+      ],
+      "tests": [
+        "tests/test_gsn_repair.cpp"
+      ],
+      "notes": "Every finding AF-METH-010 raises carries a quick fix that clears it, and the repair differs by rule rather than deleting whatever is wrong: a broken endpoint drops just that reference (and says so if scrubbing left the relationship with nothing to relate, which removes it too); a connection GSN does not permit withdraws the relationship; a Strategy wired as an end of an inference moves into its reasoning slot, preserving an argument the author meant to make; a duplicated notation identifier is renumbered under its own prefix; a stale undeveloped decorator is cleared. This closed a gap that made the validator close to useless — it reported defects in an imported case that the tool had no way to correct, because `PlanRemoval` is node-shaped by construction and no affordance deleted a relationship at all. Relationship removal is now also a first-class edit, from the canvas edge menu and the relationship inspector. Every repair is an ordinary audited command with a replay branch, so it is undoable and attributed. No confirmation modal: these are single-relationship edits with undo behind them, unlike node removal which can take a subtree — but removing an inference that carried a Strategy detaches that Strategy and everything under it, and only the status message says so."
     },
     {
       "id": "AF-ENG-001",

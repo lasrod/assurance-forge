@@ -1,6 +1,7 @@
 #include "core/commands/element_commands.h"
 
 #include "core/commands/library_bridge.h"
+#include "core/relationship_editing.h"
 #include "sacm_adapter/document_edit.h"
 
 #include <algorithm>
@@ -385,6 +386,114 @@ bool UpdateGsnIdentifierCommand::Apply(CommandContext& ctx,
     out_event.payload["element_id"] = element_id_;
     out_event.payload["old_identifier"] = old_identifier_;
     out_event.payload["new_identifier"] = new_identifier_;
+    return true;
+}
+
+bool RemoveRelationshipCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
+    if (relationship_id_.empty()) {
+        out_error = "RemoveRelationshipCommand requires a relationship id";
+        return false;
+    }
+
+    // The library's delete seam takes any element id and scrubs the deleted id
+    // out of whatever still references it, so a relationship needs no special
+    // case there -- unlike the app's node-shaped removal plan.
+    bool applied_to_library = false;
+    if (ctx.library_document != nullptr && ctx.allow_library_primary) {
+        const sacm_adapter::DeleteOutcome outcome =
+            sacm_adapter::apply_delete_element(*ctx.library_document, relationship_id_);
+        if (outcome.supported && !outcome.applied) {
+            out_error = LibraryRejection("the deletion of relationship " + relationship_id_, outcome.diagnostics);
+            return false;
+        }
+        if (outcome.applied) {
+            ctx.library_primary = true;
+            applied_to_library = true;
+        }
+    }
+    if (!applied_to_library &&
+        !core::RemoveRelationship(ctx.model, &ctx.package, relationship_id_, out_error))
+        return false;
+
+    out_event.event_type = "RemoveRelationship";
+    out_event.payload = nlohmann::ordered_json::object();
+    out_event.payload["relationship_id"] = relationship_id_;
+    return true;
+}
+
+bool DropRelationshipReferenceCommand::Apply(CommandContext& ctx,
+                                             audit::AuditEvent& out_event,
+                                             std::string& out_error) {
+    if (relationship_id_.empty() || reference_.empty()) {
+        out_error = "DropRelationshipReferenceCommand requires a relationship id and a reference";
+        return false;
+    }
+
+    // Bridged rather than routed to a native seam: the library has no operation
+    // for "drop one reference", and its delete seam would remove the referenced
+    // element -- which here does not exist, that being the whole defect.
+    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase& model,
+                                            sacm::AssuranceCasePackage& package,
+                                            std::string& error) {
+        return core::DropRelationshipReference(model, &package, relationship_id_, reference_,
+                                               removed_relationship_, error);
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        return false;
+
+    out_event.event_type = "DropRelationshipReference";
+    out_event.payload = nlohmann::ordered_json::object();
+    out_event.payload["relationship_id"] = relationship_id_;
+    out_event.payload["reference"] = reference_;
+    out_event.payload["removed_relationship"] = removed_relationship_;
+    return true;
+}
+
+bool MoveStrategyToReasoningCommand::Apply(CommandContext& ctx,
+                                           audit::AuditEvent& out_event,
+                                           std::string& out_error) {
+    if (relationship_id_.empty() || strategy_id_.empty()) {
+        out_error = "MoveStrategyToReasoningCommand requires a relationship id and a strategy id";
+        return false;
+    }
+
+    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase& model,
+                                            sacm::AssuranceCasePackage& package,
+                                            std::string& error) {
+        return core::MoveStrategyToReasoning(model, &package, relationship_id_, strategy_id_, error);
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        return false;
+
+    out_event.event_type = "MoveStrategyToReasoning";
+    out_event.payload = nlohmann::ordered_json::object();
+    out_event.payload["relationship_id"] = relationship_id_;
+    out_event.payload["strategy_id"] = strategy_id_;
+    return true;
+}
+
+bool SetElementUndevelopedCommand::Apply(CommandContext& ctx,
+                                         audit::AuditEvent& out_event,
+                                         std::string& out_error) {
+    if (element_id_.empty()) {
+        out_error = "SetElementUndevelopedCommand requires an element id";
+        return false;
+    }
+
+    const LibraryBridgeMutator mutate = [&](parser::AssuranceCase& model,
+                                            sacm::AssuranceCasePackage& package,
+                                            std::string& error) {
+        return core::SetElementUndeveloped(model, &package, element_id_, undeveloped_, old_value_, error);
+    };
+    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        return false;
+
+    was_no_op_ = old_value_ == undeveloped_;
+    out_event.event_type = "SetElementUndeveloped";
+    out_event.payload = nlohmann::ordered_json::object();
+    out_event.payload["element_id"] = element_id_;
+    out_event.payload["old_value"] = old_value_;
+    out_event.payload["new_value"] = undeveloped_;
     return true;
 }
 

@@ -72,6 +72,10 @@ void RenderInspectorArea(AppRuntimeState& state,
                        state.acp_controller->AddRelationshipAcp(state, relationship_id);
             };
             relationship_callbacks.open_acp = [](const std::string&) {};
+            relationship_callbacks.remove_relationship = [&](const std::string& relationship_id) {
+                if (state.element_edit_controller)
+                    state.element_edit_controller->RemoveRelationship(state, relationship_id);
+            };
             ui::panels::ShowRelationshipPanel(loaded_case, &relationship_callbacks);
             ImGui::End();
             return;

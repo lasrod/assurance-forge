@@ -130,7 +130,7 @@ analysis features. They are deliberately excluded from this normative section.
 | GSN3-XMI-001 | Published GSN metamodels and project interoperability policy | Recognized GSN v2.2 and legacy types import without reversing argument meaning | partial | n/a | partial | partial | partial | `libs/sacm/src/io/name_tables.cpp`; `libs/sacm/tests/test_roundtrip.cpp`; abstract or contested types remain preserved fragments. |
 | GSN3-XMI-002 | Project round-trip policy | Original GSN type provenance survives compatibility save and reload | supported | n/a | partial | partial | supported | `libs/sacm/src/io/xmi_reader.cpp`; `libs/sacm/tests/test_roundtrip.cpp`; provenance is retained as `sacm.import.extensionType`, while output syntax is SACM rather than GSN. |
 | GSN3-XMI-003 | GSN v3 | Export a GSN-native representation of every supported v3 construct | absent | n/a | n/a | absent | absent | GSN v3 has no published complete metamodel. A project extension dialect must be explicit and must not be presented as normative GSN XMI. |
-| GSN3-VAL-001 | GSN v3 Part 1 | Produce requirement-traceable GSN conformance diagnostics | partial | n/a | n/a | partial | n/a | The mechanism exists and is tested: `src/core/problems/gsn_wellformedness.cpp` returns rule-tagged findings, `src/app/structure_problem_sync.cpp` carries each requirement id into the Problems panel, and every check in `tests/test_gsn_wellformedness.cpp` names the requirement it backs. Covered: GSN3-CORE-002, -003, -007, -008, -009, -010, -014, -015 and GSN3-DIA-003. Not covered: statement constraints (GSN3-CORE-011), off-diagram notation, and every Pattern, Modular and Confidence extension rule — so this is not yet a complete GSN v3 validator. |
+| GSN3-VAL-001 | GSN v3 Part 1 | Produce requirement-traceable GSN conformance diagnostics | partial | supported | n/a | partial | n/a | The mechanism exists and is tested: `src/core/problems/gsn_wellformedness.cpp` returns rule-tagged findings, `src/app/structure_problem_sync.cpp` carries each requirement id into the Problems panel, and every check in `tests/test_gsn_wellformedness.cpp` names the requirement it backs. Covered: GSN3-CORE-002, -003, -007, -008, -009, -010, -014, -015 and GSN3-DIA-003. Not covered: statement constraints (GSN3-CORE-011), off-diagram notation, and every Pattern, Modular and Confidence extension rule — so this is not yet a complete GSN v3 validator. Create/edit is `supported` because every finding now carries a repair that clears it (`src/core/relationship_editing.cpp`; `tests/test_gsn_repair.cpp`); a diagnostic the tool cannot act on is a defect report the user can only work around. |
 
 ## Conformance conclusion
 
@@ -148,7 +148,10 @@ requirement-traceable well-formedness validator are now in place. The validator
 covers the Core connection rules, relationship endpoint resolution, identifier
 uniqueness, the undeveloped decorator and challenge targets, and every
 diagnostic names the `GSN3-*` requirement it enforces so a reader can check the
-tool against the standard rather than trust it.
+tool against the standard rather than trust it. Each finding also carries a
+repair chosen for its rule, and relationship removal became a first-class edit
+in the process — a validator that reports defects the tool cannot correct only
+tells a user their imported case is wrong.
 
 The next implementation tranche is:
 
