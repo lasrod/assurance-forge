@@ -154,9 +154,11 @@ void CheckConnectionRules(const parser::SacmElement& relationship,
             continue;
         const GsnElementKind kind = GsnKindOf(*source);
         // A Strategy is a node in GSN and an annotation in SACM: it belongs in
-        // the inference's `reasoning` slot, not at either end. Wired as an
-        // endpoint it is also invalid SACM, because ArgumentReasoning is an
-        // ArgumentAsset and clause 11.13 requires an Assertion there.
+        // the inference's `reasoning` slot, not at either end. This is a GSN
+        // rule, not a SACM one -- AssertedRelationship's source and target are
+        // typed `ArgumentAsset`, which ArgumentReasoning is, so SACM will hold
+        // the wrong shape quite happily. That is exactly why it needs checking
+        // here: nothing below this layer objects.
         if (kind == GsnElementKind::Strategy && relationship.type == "assertedinference")
             AddFinding(findings, GsnRule::StrategyUsedAsAssertion, source->id, std::string(), relationship.id, {});
     }

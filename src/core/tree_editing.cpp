@@ -51,10 +51,23 @@ TreeRelationshipKind DetermineRelationshipKind(NodeRole parent_role, NodeRole ch
     if (parent_role == NodeRole::Strategy) {
         if (child_role == NodeRole::Claim)
             return TreeRelationshipKind::SupportedBy;
+        // GSN v3: SupportedBy runs from a Goal *or a Strategy* to a Goal,
+        // Strategy or Solution, so a Strategy discharged directly by evidence is
+        // ordinary GSN. Refusing it here made the tool inconsistent with itself:
+        // the Add menu already creates exactly this, and only the drop was
+        // turned away. SACM carries it -- AssertedRelationship's target is an
+        // `ArgumentAsset` (metamodel inventory), and ArgumentReasoning is one.
+        if (child_role == NodeRole::Solution)
+            return TreeRelationshipKind::AssertedEvidence;
         if (IsContextLike(child_role))
             return TreeRelationshipKind::InContextOf;
     }
 
+    // Still refused: a Strategy under a Strategy. GSN permits it and SACM can
+    // hold it, but the single-inference strategy encoding records the goal a
+    // strategy supports in a `strategyTarget` tag, and nothing has established
+    // what that means when the target is itself a strategy. Turning it away is
+    // a limit of the encoding, not of the notation -- see GSN3-CORE-015.
     return TreeRelationshipKind::None;
 }
 
