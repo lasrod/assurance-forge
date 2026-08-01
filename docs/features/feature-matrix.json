@@ -1649,6 +1649,20 @@
       "notes": "UI for SACM packages; does not imply support for GSN Module notation."
     },
     {
+      "id": "AF-PLAT-012",
+      "area": "PLAT",
+      "name": "Toolbar for primary actions",
+      "status": "supported",
+      "evidence": [
+        "src/ui/panels/toolbar_panel.cpp",
+        "src/app/areas/toolbar_area.cpp"
+      ],
+      "tests": [
+        "tests/test_toolbar.cpp"
+      ],
+      "notes": "Open, save, undo, new SACM file, fit-to-view, export SVG, preferences. Surfaces existing commands only — every button routes to the same callback as its menu item, so the two cannot diverge; it adds no capability of its own. Buttons disable against real state (export needs a loaded case, fit needs the GSN canvas showing) because a control that looks available and does nothing misrepresents what the tool will do. Fit reuses the renderer's existing focus/fit-all request."
+    },
+    {
       "id": "AF-PLAT-011",
       "area": "PLAT",
       "name": "Status bar: save state, active document, problem counts",

@@ -1,4 +1,4 @@
-add_library(af_ui OBJECT
+﻿add_library(af_ui OBJECT
     confidence_model.cpp
     element_context_menu.cpp
     fonts.cpp
@@ -28,6 +28,7 @@ add_library(af_ui OBJECT
     panels/review_panel.cpp
     panels/sacm_viewer_panel.cpp
     panels/status_bar_panel.cpp
+    panels/toolbar_panel.cpp
     panels/terminology_package_panel.cpp
     panels/terminology_usages_panel.cpp
     panels/welcome_modal.cpp
@@ -41,3 +42,4 @@ add_library(af_ui OBJECT
     widgets/text_ellipsis.cpp
 )
 target_link_libraries(af_ui PUBLIC af_common hello_imgui)
+

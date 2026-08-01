@@ -98,6 +98,11 @@ struct UiState {
     // Set to true when the canvas should fit-to-view the marked_for_removal set.
     bool center_on_marked = false;
 
+    // One-shot request to fit the whole argument into the viewport. The live
+    // renderers are owned per tab by the workbench, so the toolbar asks through
+    // here rather than reaching across to them, matching center_on_selection.
+    bool fit_canvas_pending = false;
+
     // Active center panel view
     CenterView center_view = CenterView::GsnCanvas;
 

@@ -748,6 +748,9 @@ msgstr "使用箇所検索: {0}"
 msgid "Find usages: {0}  {1}"
 msgstr "使用箇所検索: {0}  {1}"
 
+msgid "Fit to view"
+msgstr "全体を表示"
+
 msgid "Fix"
 msgstr "修正"
 
@@ -1833,6 +1836,9 @@ msgstr "種別:"
 
 msgid "Type: {0}"
 msgstr "種別: {0}"
+
+msgid "Unavailable right now."
+msgstr "現在は利用できません。"
 
 msgid "Uncategorized"
 msgstr "未分類"

@@ -629,6 +629,10 @@ TRANSLATIONS = {
     "Source": "ソース",
     "Source: {0}": "ソース: {0}",
 
+    # ===== Toolbar =====
+    "Fit to view": "全体を表示",
+    "Unavailable right now.": "現在は利用できません。",
+
     # ===== Status bar =====
     "No project open": "プロジェクトが開かれていません",
     "Unsaved changes": "未保存の変更",
