@@ -18,24 +18,32 @@ if ! command -v clang-format >/dev/null 2>&1; then
     exit 0
 fi
 
-# `external/` is third-party and follows its own upstream style (CONTRIBUTING).
-# Keep this filter in step with the one in cmake/install_git_hooks.cmake's docs.
-staged=$(git diff --cached --name-only --diff-filter=ACMR \
-    | grep -E '\.(c|cc|cpp|h|hh|hpp)$' \
-    | grep -v '^external/' || true)
-
-if [ -z "$staged" ]; then
-    exit 0
-fi
-
+tmp_list=$(mktemp)
 tmp_staged=$(mktemp)
 tmp_formatted=$(mktemp)
-trap 'rm -f "$tmp_staged" "$tmp_formatted"' EXIT
+trap 'rm -f "$tmp_list" "$tmp_staged" "$tmp_formatted"' EXIT
+
+git diff --cached --name-only --diff-filter=ACMR > "$tmp_list"
 
 formatted_count=0
 blocked=""
 
-for file in $staged; do
+# Read line by line rather than iterating a captured string: word splitting
+# would break any path containing a space. Redirected from a file rather than
+# piped so the counters below survive -- a pipeline runs the loop in a subshell
+# and every increment would be discarded.
+while IFS= read -r file; do
+    # `external/` is third-party and keeps its upstream style (CONTRIBUTING.md).
+    case "$file" in
+        external/*) continue ;;
+        *.c | *.cc | *.cpp | *.h | *.hh | *.hpp) ;;
+        *) continue ;;
+    esac
+
+    if [ ! -f "$file" ]; then
+        continue
+    fi
+
     # A file can be staged in one state and present in the working tree in
     # another. Formatting the working tree and re-adding it would sweep the
     # unstaged edits into the commit as a side effect of formatting -- a
@@ -57,7 +65,7 @@ for file in $staged; do
         git add -- "$file"
         formatted_count=$((formatted_count + 1))
     fi
-done
+done < "$tmp_list"
 
 if [ -n "$blocked" ]; then
     echo "pre-commit: these files are staged with unstaged changes alongside," >&2
