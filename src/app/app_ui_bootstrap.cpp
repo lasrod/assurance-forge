@@ -1,5 +1,6 @@
 #include "app/app_ui_bootstrap.h"
 
+#include "ui/fonts.h"
 #include "ui/gsn/gsn_canvas.h"
 
 #include "hello_imgui/hello_imgui.h"
@@ -47,6 +48,11 @@ void ConfigureImGuiFonts() {
             ui::gsn::g_BoldFont = ImGui::GetFont();
         }
     }
+
+    // The body role passes null so it keeps whatever family is current rather
+    // than pinning one — the default font is DroidSans with Noto Sans JP merged
+    // in for Japanese, and naming either explicitly would drop the other.
+    ui::fonts::Initialize(kFontSize, nullptr, ui::gsn::g_BoldFont);
 }
 
 } // namespace app

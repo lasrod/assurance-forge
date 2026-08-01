@@ -106,6 +106,14 @@ DispatchAuditedCommand(AppRuntimeState& state, core::commands::ICommand& command
     if (!result.success) {
         return {false, result.error};
     }
+
+    // Only `sacm_written` means the file matches the model. `result.success` is
+    // still true when the autosave write itself failed, so gating on it here
+    // would tell the user their work is saved when it is not.
+    if (result.sacm_written) {
+        state.app_state.has_unsaved_changes = false;
+        state.autosave_persisted_pending_edit = true;
+    }
     return {true, {}};
 }
 

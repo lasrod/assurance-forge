@@ -140,7 +140,7 @@ void ShowProjectOverviewPanel(const ProjectOverviewPanelModel& model, const Proj
          summary.open_review_items == 0 ? theme.success : theme.warning,
          callbacks.open_reviews},
         {"conformance",
-         ICON_FA_CLIPBOARD_CHECK,
+         ICON_FA_TASKS,
          AF_TR("Conformance"),
          summary.conformance_files == 0 ? std::string("—") : std::to_string(summary.conformance_files),
          conformance_detail,

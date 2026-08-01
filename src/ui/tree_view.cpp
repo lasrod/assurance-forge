@@ -3,6 +3,7 @@
 #include "hello_imgui/icons_font_awesome_4.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
+#include "ui/widgets/text_ellipsis.h"
 
 #include "imgui.h"
 
@@ -29,7 +30,7 @@ static const char* RoleIcon(core::NodeRole role) {
     case core::NodeRole::Justification:
         return ICON_FA_DOT_CIRCLE;
     default:
-        return ICON_FA_PROJECT_DIAGRAM;
+        return ICON_FA_SITEMAP;
     }
 }
 
@@ -75,6 +76,12 @@ std::string TreeNodeDisplayName(const core::TreeNode& node, const UiState& state
                                    ? label.substr(first_break + 1)
                                    : label.substr(first_break + 1, detail_break - first_break - 1);
     return detail.empty() ? first_line : first_line + detail;
+}
+
+// Width of the fixed right-hand column holding the per-element problem badge.
+// Shared so the label budget and the table setup cannot drift apart.
+static float BadgeColumnWidth() {
+    return ImGui::GetFontSize() * 1.4f;
 }
 
 static core::TreeDropMode DetectDropMode(const ImVec2& item_min, const ImVec2& item_size) {
@@ -134,13 +141,15 @@ static bool RenderSingleTreeNode(const core::TreeNode* node,
     constexpr float kArrowIconGapTightenPx = 6.0f;
     const float label_x =
         ImGui::GetCursorScreenPos().x + std::max(0.0f, ImGui::GetTreeNodeToLabelSpacing() - kArrowIconGapTightenPx);
-
     // Render arrow + selection background only; the visible label is drawn
     // directly onto the draw list so no extra ImGui items are created that
     // could intercept hover / click events on the tree node.
     bool open = ImGui::TreeNodeEx(node->id.c_str(), flags, "%s", "");
 
     bool clicked = ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen();
+    // Captured here because BeginPopupContextItem below advances the last item,
+    // after which IsItemHovered() no longer refers to this row.
+    const bool row_hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
 
     // Capture item rect before BeginPopupContextItem advances the last item.
     ImVec2 item_min = ImGui::GetItemRectMin();
@@ -186,6 +195,8 @@ static bool RenderSingleTreeNode(const core::TreeNode* node,
 
     // Overlay the colored role icon and node name using AddText (no new ImGui
     // items, so clicks/right-clicks always land on the tree node).
+    std::string display_name;
+    bool name_truncated = false;
     {
         float text_y = item_min.y + (item_size.y - ImGui::GetTextLineHeight()) * 0.5f;
 
@@ -200,10 +211,21 @@ static bool RenderSingleTreeNode(const core::TreeNode* node,
         float tag_w = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, role_icon).x;
         float space_w = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, " ").x;
 
-        std::string name = TreeNodeDisplayName(*node, state);
+        display_name = TreeNodeDisplayName(*node, state);
         ImU32 name_col = ImGui::GetColorU32(ImGuiCol_Text);
-        dl->AddText(font, font_size, ImVec2(label_x + tag_w + space_w, text_y), name_col, name.c_str());
+        // The node spans all columns, so its rect runs under the badge column;
+        // back that column out to get the label's real right edge.
+        const float label_limit_x = item_max.x - BadgeColumnWidth() - ImGui::GetStyle().ItemSpacing.x;
+        const float name_x = label_x + tag_w + space_w;
+        name_truncated =
+            widgets::AddTextEllipsized(dl, ImVec2(name_x, text_y), name_col, display_name, label_limit_x - name_x);
     }
+
+    // Truncated names are unreadable otherwise: the navigator is the narrowest
+    // panel and argument labels are full sentences. Suppressed while a drag is
+    // in flight so it cannot mask the drop-validation tooltip above.
+    if (name_truncated && row_hovered && !popup_open && ImGui::GetDragDropPayload() == nullptr)
+        ImGui::SetTooltip("%s", display_name.c_str());
 
     if (clicked) {
         state.selected_element_id = node->id;
@@ -331,7 +353,7 @@ void ShowTreeViewPanel(const core::AssuranceTree* tree,
     if (ImGui::BeginChild("TreeViewScroll", ImVec2(0, 0), false)) {
         // Two-column table: stretchy tree column + fixed-width badge column on
         // the right so the alert badge doesn't overlap the node label.
-        const float badge_col_width = ImGui::GetFontSize() * 1.4f;
+        const float badge_col_width = BadgeColumnWidth();
         constexpr ImGuiTableFlags kTreeTableFlags =
             ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_NoPadOuterX | ImGuiTableFlags_SizingFixedFit;
         if (ImGui::BeginTable("##tree_view_table", 2, kTreeTableFlags)) {

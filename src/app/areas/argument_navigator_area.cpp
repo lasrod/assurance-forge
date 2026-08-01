@@ -3,6 +3,7 @@
 #include "app/app_runtime_state.h"
 #include "app/frame/app_layout_regions.h"
 #include "imgui.h"
+#include "ui/fonts.h"
 #include "ui/i18n/localization.h"
 
 namespace app::areas {
@@ -40,7 +41,9 @@ void RenderArgumentNavigatorArea(AppRuntimeState& state,
                                  const ArgumentNavigatorAreaCallbacks& callbacks) {
     ImGui::SetNextWindowPos(region.pos);
     ImGui::SetNextWindowSize(region.size);
+    ui::fonts::Push(ui::fonts::Role::Title);
     ImGui::Begin((AF_TR("Argument Navigator") + "###" + kArgumentNavigatorTitle).c_str(), nullptr, panel_flags);
+    ui::fonts::Pop();
 
     const bool proposal_canvas_active = state.IsProposalCanvasActive();
     ui::ElementContextActions actions = MakeNavigatorContextActions(state, callbacks);

@@ -245,6 +245,14 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
         cache.renderer_seeded = true;
     }
 
+    // Consume the toolbar's fit request against whichever canvas is actually
+    // rendering, so it follows the active tab without the toolbar needing to
+    // know which renderer that is.
+    if (ui_state.fit_canvas_pending) {
+        ui_state.fit_canvas_pending = false;
+        renderer.RequestFocusOnIds({}, /*fit_all_fallback=*/true);
+    }
+
     const sacm::AssuranceCasePackage* terminology_package =
         state.app_state.has_projected_package() ? &state.app_state.projected_package() : nullptr;
     RenderArgumentPackageCanvasWithTimeline(

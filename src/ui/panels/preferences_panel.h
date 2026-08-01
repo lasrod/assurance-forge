@@ -24,7 +24,7 @@ struct PreferencesPanelModel {
     size_t reviewerNameBufferSize = 0;
     ui::AppTheme theme = ui::AppTheme::Dark;
     ui::i18n::Language language = ui::i18n::Language::English;
-    bool showFps = false;
+    bool showDeveloperTools = false;
 
     // MCP server. The panel receives plain data rather than reaching into the
     // `mcp` layer, which it must not depend on.
@@ -46,7 +46,7 @@ struct PreferencesPanelCallbacks {
     std::function<void()> test_connection;
     std::function<void(ui::AppTheme)> set_theme;
     std::function<void(ui::i18n::Language)> set_language;
-    std::function<void(bool)> set_show_fps;
+    std::function<void(bool)> set_show_developer_tools;
     std::function<void(const char*)> save_reviewer_name;
     std::function<void(bool)> set_mcp_enabled;
 };

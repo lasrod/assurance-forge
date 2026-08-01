@@ -246,6 +246,46 @@ TEST(CommandBus, FailedCommandLeavesNoTransactionOrManifestChange) {
     EXPECT_EQ(bus->Manifest().event_store_hash, manifest_before.event_store_hash);
 }
 
+// `sacm_written` is what the UI uses to tell a user their work is on disk, so
+// it must track the file rather than the command outcome.
+TEST(CommandBus, ReportsSacmWrittenWhenTheFileMatchesTheModel) {
+    auto f = MakeFixture("sacm_written");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+
+    core::commands::CreateChildElementCommand cmd("G1", core::NewElementKind::Strategy);
+    core::commands::CommandContext ctx{f.model, f.package};
+    const auto result = bus->Execute(cmd, ctx, "tester");
+
+    ASSERT_TRUE(result.success) << result.error;
+    EXPECT_TRUE(result.sacm_written);
+
+    // The claim must be true of the bytes on disk, not just of the return value:
+    // the new element has to be readable back out of the file.
+    std::ifstream saved(f.sacm_abs, std::ios::binary);
+    ASSERT_TRUE(saved.good());
+    const std::string contents((std::istreambuf_iterator<char>(saved)), std::istreambuf_iterator<char>());
+    EXPECT_NE(contents.find(cmd.GeneratedId()), std::string::npos)
+        << "sacm_written was true but the generated element is absent from the file";
+}
+
+TEST(CommandBus, DoesNotReportSacmWrittenWhenTheCommandFailed) {
+    auto f = MakeFixture("sacm_not_written");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+
+    core::commands::CreateChildElementCommand cmd("does-not-exist", core::NewElementKind::Goal);
+    core::commands::CommandContext ctx{f.model, f.package};
+    const auto result = bus->Execute(cmd, ctx, "tester");
+
+    EXPECT_FALSE(result.success);
+    EXPECT_FALSE(result.sacm_written);
+}
+
 TEST(CommandBus, ConsecutiveCommandsAdvanceSequences) {
     auto f = MakeFixture("multi_cmd");
 

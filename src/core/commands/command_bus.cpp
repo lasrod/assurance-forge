@@ -210,6 +210,9 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
         result.error = "Autosave failed (audit log entry was committed): " + write.error();
         return result;
     }
+    // From here the file on disk matches this command's model. Everything below
+    // is cache maintenance whose failure does not invalidate that.
+    result.sacm_written = true;
 
     // Step 3: update manifest atomically. The manifest is a cache; if this
     // fails the next open rebuilds it from the log + SACM. We still

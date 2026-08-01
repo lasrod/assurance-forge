@@ -35,40 +35,83 @@ them. Treat it as required-but-unverified for a clean machine.
 
 ## Run: the desktop app (agent path)
 
+**This app runs on someone's desktop while they are using it.** Capture has to go
+through the screen (see Gotchas), so every driver action steals focus. Treat
+foreground time as a borrowed resource: batch the whole check into one run,
+finish in seconds, and give the window back.
+
+### Use `batch` — one process, one focus steal
+
 ```powershell
 $d = ".claude\skills\run-assurance-forge\driver.ps1"
-powershell -NoProfile -ExecutionPolicy Bypass -File $d -Action launch
-powershell -NoProfile -ExecutionPolicy Bypass -File $d -Action shot -Out "shots\01.png"
+powershell -NoProfile -ExecutionPolicy Bypass -File $d -Action batch -Script `
+  "launch; click 130 952 wait=4000; shot shots\main.png; shot shots\panel.png crop=16,140,320,420 zoom=3; quit"
 ```
 
-`launch` pins the window to **0,0 at 1600x1000**, so coordinates are reproducible
-between runs. Then read the PNG, find what you want, and click it — screenshot
-pixels and click coordinates are the same space (window-relative, `0,0` = the
-window's top-left including its title bar).
+That whole sequence takes **~8s** and restores the user's foreground window when
+it finishes — including if a step throws. The same thing as separate `-Action`
+calls costs minutes: PowerShell recompiles the interop C# on *every* invocation,
+and every action raises the window again.
 
-| Action | Arguments | Notes |
+Steps are `;`-separated; options are `key=value`:
+
+| Step | Form | Notes |
 |---|---|---|
-| `launch` | `-Width -Height -Exe` | Idempotent; prints the pinned rect. |
-| `shot` | `-Out <path.png>` | Raises the window first, then captures it. |
-| `click` | `-X -Y [-WaitMs]` | Window-relative. Errors if outside the window. |
-| `scroll` | `-X -Y [-Notches]` | Negative scrolls down. Pointer must be over the target region. |
-| `key` | `-Keys <SendKeys>` | e.g. `"%f"` = Alt+F, `"^z"` = Ctrl+Z. |
-| `state` | | Running / responding / rect. |
-| `quit` | | CloseMainWindow, then force. |
+| `launch` | `launch [w=1600] [h=1000]` | Pins the rect. Idempotent. |
+| `click` | `click X Y [wait=MS]` | Window-relative. |
+| `scroll` | `scroll X Y [notches=-3] [wait=MS]` | Pointer must be over the target region. |
+| `key` | `key {F9} [wait=MS]` | SendKeys syntax: `%f` = Alt+F, `^z` = Ctrl+Z. |
+| `shot` | `shot path.png [crop=X,Y,W,H] [zoom=N]` | Crop/zoom happen in-process. |
+| `wait` | `wait 500` | |
+| `quit` | `quit` | |
 
-A worked flow — open a project, then Preferences, then the section below the fold
-(this is exactly the sequence used to verify the MCP settings UI):
+`crop`/`zoom` matter more than they look: reading a 1600x1000 screenshot to
+inspect a 300px panel wastes most of the pixels, and cropping afterwards is
+another process launch for no interaction value.
 
-```powershell
-$d = ".claude\skills\run-assurance-forge\driver.ps1"
-powershell -NoProfile -ExecutionPolicy Bypass -File $d -Action launch
-powershell -NoProfile -ExecutionPolicy Bypass -File $d -Action click -X 130 -Y 818 -WaitMs 4000  # a recent project
-powershell -NoProfile -ExecutionPolicy Bypass -File $d -Action click -X 186 -Y 75               # Edit menu
-powershell -NoProfile -ExecutionPolicy Bypass -File $d -Action click -X 237 -Y 175              # Preferences...
-powershell -NoProfile -ExecutionPolicy Bypass -File $d -Action scroll -X 790 -Y 600 -Notches -10
-powershell -NoProfile -ExecutionPolicy Bypass -File $d -Action shot -Out "shots\prefs.png"
-powershell -NoProfile -ExecutionPolicy Bypass -File $d -Action quit
-```
+### Budget the whole verification, not each step
+
+The expensive mistake is interleaving builds with app runs — the app must be
+closed for the link step anyway, so each interleave is another launch, another
+raise, another minute. Instead:
+
+1. Make **all** the code changes.
+2. Build once (`cmake --build build --config Release --target assurance-forge`).
+3. Run **one** batch that exercises everything you need to see.
+4. Read the PNGs and decide.
+
+### Window size: review logical space, not pixels
+
+`launch` pins the window at 0,0 and derives its size from the display's DPI
+scaling, targeting a **1080p-equivalent** (1920x1080 logical). On a 3840x2160
+display at 175% that is 3360x1890 physical; `launch` prints what it used.
+
+This matters more than it sounds. The driver is DPI-aware, so it pins *physical*
+pixels, while ImGui renders fonts scaled by DPI. A 1600x1000 window on a 175%
+display is only ~914x571 logical pixels — a quarter of a 1080p screen — with
+text still drawn at 1.75x. Panels are then hopelessly cramped and labels
+truncate for reasons the application is not responsible for.
+
+**A UI review done in an undersized window will manufacture findings.** Reviewing
+this app at 1600x1000 produced "the Problems table columns are badly
+proportioned, Message collapses to `Me…`" — which is simply untrue at
+1080p-equivalent, where Message gets the majority of the width and renders a
+full sentence. Three attempts were spent "fixing" a non-problem before the
+window size was checked. Check `launch`'s printed size against the display
+before concluding anything is too narrow.
+
+Pass `-Width`/`-Height` to pin a different size deliberately — e.g. to test how
+panels behave when genuinely cramped. Coordinates are only reproducible at a
+given pinned size, and the recent-projects list reorders by last-opened, so
+**verify the project name in the status bar before sending input** rather than
+trusting a remembered click position.
+
+### Single actions
+
+`-Action launch|shot|click|scroll|key|state|quit` still exist, with `-Out -X -Y
+-Notches -Keys -WaitMs -Width -Height`. Use them only when exploring somewhere
+you have no coordinates for yet and genuinely need to look between each step —
+then collapse what you learned into one `batch` for the actual verification.
 
 **Look at the screenshot.** If it shows a different application, the window was
 not raised — see Gotchas.

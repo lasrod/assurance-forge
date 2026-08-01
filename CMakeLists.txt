@@ -340,6 +340,9 @@ add_executable(tests
     tests/test_guideline_catalog.cpp
     tests/test_localization.cpp
     tests/test_theme.cpp
+    tests/test_status_bar.cpp
+    tests/test_toolbar.cpp
+    tests/test_text_ellipsis.cpp
     tests/test_ui_state.cpp
     tests/test_confidence_model.cpp
     tests/test_confidence_store.cpp
@@ -486,3 +489,4 @@ else()
         "a local build without it cannot verify the translation catalog, the SACM "
         "or GSN conformance matrices, or the capability matrix.")
 endif()
+

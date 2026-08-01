@@ -19,6 +19,8 @@ add_library(af_app OBJECT
     app_runtime_undo.cpp
     app_ui_bootstrap.cpp
     areas/ai_debug_area.cpp
+    areas/status_bar_area.cpp
+    areas/toolbar_area.cpp
     areas/argument_navigator_area.cpp
     areas/audit_data_cache.cpp
     areas/baseline_modal.cpp
@@ -62,3 +64,4 @@ add_library(af_app OBJECT
     translation_review_sync.cpp
 )
 target_link_libraries(af_app PUBLIC af_common hello_imgui)
+

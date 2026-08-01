@@ -339,8 +339,12 @@ Theme MakeTheme(AppTheme app_theme) {
     t.rounding_panel = 8.0f;
     t.rounding_node = 8.0f;
     t.outline_thickness = 1.0f;
-    t.shadow_alpha_top = 0.55f;
-    t.shadow_offset = 4.0f;
+    // Shadows read as depth, not as a drawn band: a small offset with a wide,
+    // faint spread. Dark needs more alpha because black over a near-black
+    // canvas barely registers; there the node outline carries most separation.
+    t.shadow_alpha_top = app_theme == AppTheme::Light ? 0.16f : 0.34f;
+    t.shadow_offset = 2.0f;
+    t.shadow_spread = 2.5f;
 
     t.canvas_grid_spacing = 40.0f;
 

@@ -2,6 +2,8 @@
 
 #include "app/app_runtime_state.h"
 #include "ui/gsn/gsn_dpi.h"
+#include "ui/panels/status_bar_panel.h"
+#include "ui/panels/toolbar_panel.h"
 #include "ui/widgets/splitter.h"
 
 #include <algorithm>
@@ -148,14 +150,19 @@ void NormalizeCenterViewSelection(AppRuntimeState& state, ui::CenterView& center
 
 AppLayoutRegions RenderAppShell(AppRuntimeState& state, float menu_height, ImGuiWindowFlags panel_flags) {
     const ImVec2 display = ImGui::GetIO().DisplaySize;
-    const float content_h = std::max(0.0f, display.y - menu_height);
+    // Panels stop above the status bar rather than running under it — every
+    // height below is derived from content_h, so subtracting once is enough.
+    const float status_bar_height = ui::panels::StatusBarHeight();
+    const float toolbar_height = ui::panels::ToolbarHeight();
+    const float top_y = menu_height + toolbar_height;
+    const float content_h = std::max(0.0f, display.y - top_y - status_bar_height);
 
     float left_w = display.x * state.layout.left_ratio;
     float right_w = display.x * state.layout.right_ratio;
     float center_w = display.x - left_w - right_w - kSplitterThickness * 2.0f;
 
     const float hit_padding = ui::gsn::DpiSize(kSplitterHitPadding);
-    RenderAppSplitters(state, display.x, content_h, left_w, center_w, menu_height, hit_padding, panel_flags);
+    RenderAppSplitters(state, display.x, content_h, left_w, center_w, top_y, hit_padding, panel_flags);
 
     left_w = display.x * state.layout.left_ratio;
     right_w = display.x * state.layout.right_ratio;
@@ -164,22 +171,24 @@ AppLayoutRegions RenderAppShell(AppRuntimeState& state, float menu_height, ImGui
     const float available_h = std::max(0.0f, content_h - kSplitterThickness);
     const float project_h = available_h * state.layout.project_boundary_ratio;
     const float argument_navigator_h = std::max(0.0f, available_h - project_h);
-    const float argument_navigator_y = menu_height + project_h + kSplitterThickness;
+    const float argument_navigator_y = top_y + project_h + kSplitterThickness;
 
     const float center_x = left_w + kSplitterThickness;
     const float center_available_h = std::max(0.0f, content_h - kSplitterThickness);
     const float feedback_h = std::min(state.layout.problems_panel_height, center_available_h);
     const float workbench_h = std::max(0.0f, center_available_h - feedback_h);
-    const float feedback_y = menu_height + workbench_h + kSplitterThickness;
+    const float feedback_y = top_y + workbench_h + kSplitterThickness;
     const float inspector_x = center_x + center_w + kSplitterThickness;
 
     AppLayoutRegions regions;
     regions.menu_height = menu_height;
-    regions.project_explorer = {{0.0f, menu_height}, {left_w, project_h}};
+    regions.toolbar_height = toolbar_height;
+    regions.status_bar_height = status_bar_height;
+    regions.project_explorer = {{0.0f, top_y}, {left_w, project_h}};
     regions.argument_navigator = {{0.0f, argument_navigator_y}, {left_w, argument_navigator_h}};
-    regions.workbench = {{center_x, menu_height}, {center_w, workbench_h}};
+    regions.workbench = {{center_x, top_y}, {center_w, workbench_h}};
     regions.feedback_dock = {{center_x, feedback_y}, {center_w, feedback_h}};
-    regions.inspector = {{inspector_x, menu_height}, {right_w, content_h}};
+    regions.inspector = {{inspector_x, top_y}, {right_w, content_h}};
     return regions;
 }
 

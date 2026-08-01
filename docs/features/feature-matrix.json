@@ -1569,12 +1569,15 @@
       "name": "Dark and light themes",
       "status": "prototype",
       "evidence": [
-        "src/ui/theme.cpp"
+        "src/ui/theme.cpp",
+        "src/ui/fonts.cpp",
+        "src/ui/widgets/text_ellipsis.cpp"
       ],
       "tests": [
-        "tests/test_theme.cpp"
+        "tests/test_theme.cpp",
+        "tests/test_text_ellipsis.cpp"
       ],
-      "notes": "Prototype 2; the styling model is expected to evolve."
+      "notes": "Prototype 2; the styling model is expected to evolve. Beyond colour the model now carries a four-role typographic scale (`ui::fonts`) and shared label truncation (`ui::widgets::Ellipsize`), which panels use so a narrow panel ellipsizes with a tooltip instead of cutting text mid-glyph. Diagnostic surfaces — the menu-bar frame/cull counters, the AI Debug tab and the performance overlay — are off by default behind View ▸ Developer."
     },
     {
       "id": "AF-PLAT-006",
@@ -1644,6 +1647,34 @@
         "tests/test_argument_package_projection.cpp"
       ],
       "notes": "UI for SACM packages; does not imply support for GSN Module notation."
+    },
+    {
+      "id": "AF-PLAT-012",
+      "area": "PLAT",
+      "name": "Toolbar for primary actions",
+      "status": "supported",
+      "evidence": [
+        "src/ui/panels/toolbar_panel.cpp",
+        "src/app/areas/toolbar_area.cpp"
+      ],
+      "tests": [
+        "tests/test_toolbar.cpp"
+      ],
+      "notes": "Open, save, undo, new SACM file, fit-to-view, export SVG, preferences. Surfaces existing commands only — every button routes to the same callback as its menu item, so the two cannot diverge; it adds no capability of its own. Buttons disable against real state (export needs a loaded case, fit needs the GSN canvas showing) because a control that looks available and does nothing misrepresents what the tool will do. Fit reuses the renderer's existing focus/fit-all request."
+    },
+    {
+      "id": "AF-PLAT-011",
+      "area": "PLAT",
+      "name": "Status bar: save state, active document, problem counts",
+      "status": "supported",
+      "evidence": [
+        "src/ui/panels/status_bar_panel.cpp",
+        "src/app/areas/status_bar_area.cpp"
+      ],
+      "tests": [
+        "tests/test_status_bar.cpp"
+      ],
+      "notes": "Saved and unsaved render as distinct labels plus a dot, never as the absence of one — an ambiguous save indicator is a trust problem when the artifact is a safety argument. Also the sink for `core::AppState::status_message`: roughly twenty call sites set it and, before this, only the SACM viewer panel rendered it, so most feedback (load warnings, save failures) was produced and discarded. Save state is reported from `AppState::has_unsaved_changes`, which the audited dispatch clears when `CommandResult::sacm_written` confirms the command bus wrote the file — before this, an autosaved edit stayed marked unsaved forever because the ~30 `DocumentDirtyEvent` emitters run after the dispatch and cannot know it was persisted. **Only command-bus edits autosave**; paths that bypass the bus mutate in memory and are genuinely unsaved until an explicit save, so the indicator is not a claim that every edit is persisted. No last-saved timestamp yet."
     }
   ]
 }

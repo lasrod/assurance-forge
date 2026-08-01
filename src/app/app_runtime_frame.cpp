@@ -14,6 +14,8 @@
 #include "app/areas/project_explorer_area.h"
 #include "app/areas/proposal_editor_area.h"
 #include "app/areas/review_panel_area.h"
+#include "app/areas/status_bar_area.h"
+#include "app/areas/toolbar_area.h"
 #include "app/areas/workbench_area.h"
 #include "app/frame/app_layout_regions.h"
 #include "app/frame/app_menu_bar.h"
@@ -190,6 +192,19 @@ void AppRuntime::RenderFrame(bool& done) {
     }
 
     const frame::AppLayoutRegions regions = frame::RenderAppShell(*impl_, menu_height, kPanelFlags);
+
+    // Same handlers as the menu items above, so a button and its menu entry
+    // cannot drift apart.
+    ui::panels::ToolbarCallbacks toolbar_callbacks;
+    toolbar_callbacks.can_undo = menu_callbacks.can_undo;
+    toolbar_callbacks.open_project = menu_callbacks.begin_open_project;
+    toolbar_callbacks.save_project = [this]() { SaveProject(); };
+    toolbar_callbacks.undo = menu_callbacks.undo;
+    toolbar_callbacks.new_sacm_file = menu_callbacks.begin_create_project_sacm_file;
+    toolbar_callbacks.export_gsn_svg = menu_callbacks.export_gsn_svg;
+    toolbar_callbacks.fit_to_view = []() { ui::GetUiState().fit_canvas_pending = true; };
+    toolbar_callbacks.open_preferences = [this]() { impl_->modal_coordinator->show_preferences_window = true; };
+    areas::RenderToolbarArea(*impl_, toolbar_callbacks, menu_height);
 
     areas::ProjectExplorerAreaCallbacks project_explorer_callbacks{
         [this]() { RefreshSacmPackageTreeCache(); },
@@ -411,6 +426,13 @@ void AppRuntime::RenderFrame(bool& done) {
     {
         core::perf::ScopedTimer s("app.area.inspector");
         areas::RenderInspectorArea(*impl_, regions.inspector, kPanelFlags, inspector_callbacks);
+    }
+
+    // After the panels, before the modals: the bar is chrome the modal dim
+    // layer should still cover.
+    {
+        core::perf::ScopedTimer s("app.area.status_bar");
+        areas::RenderStatusBarArea(*impl_);
     }
 
     areas::ModalHostCallbacks modal_callbacks;

@@ -16,6 +16,8 @@ struct AppLayoutRegions {
     AppLayoutRegion inspector;
     AppLayoutRegion feedback_dock;
     float menu_height = 0.0f;
+    float toolbar_height = 0.0f;
+    float status_bar_height = 0.0f;
 };
 
 } // namespace app::frame

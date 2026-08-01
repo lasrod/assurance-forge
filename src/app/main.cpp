@@ -6,6 +6,7 @@
 #include "hello_imgui/hello_imgui.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
+#include "ui/ui_state.h"
 
 #include <filesystem>
 
@@ -14,6 +15,7 @@ namespace {
 constexpr const char* kLanguagePreference = "AssuranceForge.Language";
 constexpr const char* kRecentProjectsPreference = "AssuranceForge.RecentProjects";
 constexpr const char* kReviewerNamePreference = "AssuranceForge.ReviewerName";
+constexpr const char* kDeveloperToolsPreference = "AssuranceForge.DeveloperTools";
 
 void CancelNativeWindowCloseRequest(HelloImGui::RunnerParams& runner_params) {
     runner_params.appShallExit = false;
@@ -63,11 +65,13 @@ int main(int, char**) {
         ui::i18n::Initialize(localization_config);
         runtime.LoadRecentProjectsPreference(HelloImGui::LoadUserPref(kRecentProjectsPreference));
         runtime.LoadReviewerNamePreference(HelloImGui::LoadUserPref(kReviewerNamePreference));
+        ui::GetUiState().show_developer_tools = HelloImGui::LoadUserPref(kDeveloperToolsPreference) == "1";
     };
     params.callbacks.BeforeExit = [&runtime]() {
         HelloImGui::SaveUserPref(kLanguagePreference, ui::i18n::LanguageCode(ui::i18n::CurrentLanguage()));
         HelloImGui::SaveUserPref(kRecentProjectsPreference, runtime.RecentProjectsPreferenceJson());
         HelloImGui::SaveUserPref(kReviewerNamePreference, runtime.ReviewerNamePreference());
+        HelloImGui::SaveUserPref(kDeveloperToolsPreference, ui::GetUiState().show_developer_tools ? "1" : "0");
     };
     params.callbacks.ShowGui = [&]() {
         HelloImGui::RunnerParams* runner_params = HelloImGui::GetRunnerParams();

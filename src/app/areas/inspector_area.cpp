@@ -11,6 +11,7 @@
 #include "core/commands/gid_commands.h"
 #include "core/confidence/confidence_store.h"
 #include "parser/model_utils.h"
+#include "ui/fonts.h"
 #include "ui/i18n/localization.h"
 #include "ui/panels/acp_panel.h"
 #include "ui/panels/element_panel.h"
@@ -28,7 +29,9 @@ void RenderInspectorArea(AppRuntimeState& state,
                          const InspectorAreaCallbacks& callbacks) {
     ImGui::SetNextWindowPos(region.pos);
     ImGui::SetNextWindowSize(region.size);
+    ui::fonts::Push(ui::fonts::Role::Title);
     ImGui::Begin((AF_TR("Element Properties") + "###Element Properties").c_str(), nullptr, panel_flags);
+    ui::fonts::Pop();
 
     if (state.proposal_controller->creator_active) {
         if (callbacks.render_proposal_element_editor)

@@ -1,4 +1,4 @@
-﻿#include "ui/panels/problems_panel.h"
+#include "ui/panels/problems_panel.h"
 
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
@@ -192,6 +192,57 @@ bool DrawClickableCell(const char* id_suffix,
     return clicked;
 }
 
+// Literal AF_TR calls per case so tools/i18n/extract_msgids.py can discover
+// them; core::ToString returns the stable English id, which is a variable and
+// therefore invisible to the extractor. Same pattern as TranslateFilterLabel.
+std::string TranslateSeverity(core::ProblemSeverity severity) {
+    switch (severity) {
+    case core::ProblemSeverity::Info:
+        return AF_TR("Info");
+    case core::ProblemSeverity::Warning:
+        return AF_TR("Warning");
+    case core::ProblemSeverity::Error:
+        return AF_TR("Error");
+    }
+    return core::ToString(severity);
+}
+
+// A severity is a category, not a sentence. As coloured body text it read as
+// differently-coloured text; as a filled chip it reads as a status at a glance,
+// and the row scans by shape as well as by hue. The word stays, so the state is
+// never carried by colour alone.
+//
+// The click target is an invisible Selectable spanning the whole cell, so the
+// row is still activatable from this column and the badge cannot shrink it.
+void DrawSeverityBadge(const core::ProblemItem& problem,
+                       ui::UiState& ui_state,
+                       const ProblemsPanelCallbacks& callbacks) {
+    const std::string label = TranslateSeverity(problem.severity);
+    const ImU32 accent = ImGui::ColorConvertFloat4ToU32(SeverityColor(problem.severity));
+    const float cell_width = ImGui::GetColumnWidth();
+
+    if (ImGui::Selectable("##severity", false, ImGuiSelectableFlags_AllowDoubleClick, ImVec2(cell_width, 0.0f)))
+        SelectAndActivateProblem(problem, ui_state, callbacks);
+
+    const ImVec2 item_min = ImGui::GetItemRectMin();
+    const ImVec2 item_max = ImGui::GetItemRectMax();
+    const ImVec2 text_size = ImGui::CalcTextSize(label.c_str());
+    // Tight padding, and the right edge clamped to the cell: the Severity column
+    // is barely wider than the word it holds, so a roomier chip would be drawn
+    // with its trailing curve sliced off at the column boundary.
+    const float pad_x = ImGui::GetStyle().FramePadding.x * 0.45f;
+    const float badge_h = text_size.y + 2.0f;
+    const float badge_y = item_min.y + (item_max.y - item_min.y - badge_h) * 0.5f;
+    const float rounding = badge_h * 0.35f;
+
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    const ImVec2 badge_min(item_min.x, badge_y);
+    const ImVec2 badge_max(std::min(item_min.x + text_size.x + pad_x * 2.0f, item_max.x - 1.0f), badge_y + badge_h);
+    draw_list->AddRectFilled(badge_min, badge_max, ui::WithAlpha(accent, 0.16f), rounding);
+    draw_list->AddRect(badge_min, badge_max, ui::WithAlpha(accent, 0.55f), rounding);
+    draw_list->AddText(ImVec2(badge_min.x + pad_x, badge_y + 1.0f), accent, label.c_str());
+}
+
 void DrawProblemRow(const core::ProblemItem& problem, ui::UiState& ui_state, const ProblemsPanelCallbacks& callbacks) {
     const bool selected = ui_state.selected_problem_id == problem.id;
     const bool focus_this_row = selected && ui_state.problems_panel_focus_pending;
@@ -213,8 +264,7 @@ void DrawProblemRow(const core::ProblemItem& problem, ui::UiState& ui_state, con
     }
 
     ImGui::TableSetColumnIndex(0);
-    ImVec4 severity_color = SeverityColor(problem.severity);
-    DrawClickableCell("severity", core::ToString(problem.severity), problem, ui_state, callbacks, &severity_color);
+    DrawSeverityBadge(problem, ui_state, callbacks);
 
     ImGui::TableSetColumnIndex(1);
     DrawClickableCell("source", core::ToString(problem.source), problem, ui_state, callbacks);

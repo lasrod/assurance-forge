@@ -32,6 +32,16 @@ ImU32 TerminologyUnderlineColor(const core::TermOccurrence& occurrence) {
     return WithAlpha(theme.accent, 0.72f);
 }
 
+// A dashed underline is the universal "this is a mistake" mark, so applying it
+// to every detected term made a correctly defined one read as a spelling error.
+// Only the occurrences that genuinely need attention keep it; a term that
+// resolves cleanly gets a solid hairline, which reads as "defined, look it up".
+bool TerminologyUnderlineIsDashed(const core::TermOccurrence& occurrence) {
+    if (occurrence.kind == core::TermOccurrenceKind::UndefinedAcronym)
+        return true;
+    return occurrence.resolution.status == core::TermResolutionStatus::Ambiguous;
+}
+
 bool HasTermRef(const core::TerminologyTermRef& term_ref) {
     return !term_ref.id.empty() || !term_ref.gid.empty();
 }
@@ -73,10 +83,15 @@ CardStateFromOccurrence(const std::string& element_id, const core::TermOccurrenc
     return card;
 }
 
-void DrawDottedUnderline(ImDrawList* draw_list, ImVec2 start, ImVec2 end, ImU32 color, float thickness, float zoom) {
+void DrawTermUnderline(
+    ImDrawList* draw_list, ImVec2 start, ImVec2 end, ImU32 color, float thickness, float zoom, bool dashed) {
     const float length = end.x - start.x;
     if (length <= 0.5f)
         return;
+    if (!dashed) {
+        draw_list->AddLine(start, end, color, thickness);
+        return;
+    }
     const float dash = std::max(2.0f, DpiSize(3.0f) * zoom);
     const float gap = std::max(2.0f, DpiSize(3.0f) * zoom);
     if (length <= dash * 1.5f) {
@@ -108,14 +123,20 @@ BuildAndDrawTerminologySpansForText(ImDrawList* draw_list,
     float line_y = text_pos.y;
     const float underline_offset = std::max(1.0f, DpiSize(1.0f) * zoom);
     const float underline_thickness = std::max(1.0f, DpiSize(1.4f) * zoom);
-    const float font_scale = zoom;
 
     while (line_start < text_end) {
         const char* hard_break = static_cast<const char*>(memchr(line_start, '\n', text_end - line_start));
         const char* line_limit = hard_break ? hard_break : text_end;
         const char* line_end = line_limit;
         if (text_wrap > 0.0f && line_start < line_limit) {
-            const char* wrap_end = font->CalcWordWrapPositionA(font_scale, line_start, line_limit, text_wrap);
+            // Must wrap at `font_size`, the size the label is actually drawn at.
+            // The `...A` overload takes a *scale* and resolves to
+            // `LegacySize * scale` — the size the font was loaded at, not the
+            // size in use. Where those differ the pass splits lines differently
+            // from ImGui's own wrapping, so an occurrence lands on the wrong
+            // line and its x offset is measured from the wrong line start,
+            // putting the underline outside the node.
+            const char* wrap_end = font->CalcWordWrapPosition(font_size, line_start, line_limit, text_wrap);
             if (wrap_end && wrap_end > line_start && wrap_end < line_limit)
                 line_end = wrap_end;
         }
@@ -140,12 +161,13 @@ BuildAndDrawTerminologySpansForText(ImDrawList* draw_list,
             float x1 = text_pos.x + font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, line_start, range_start).x;
             float x2 = text_pos.x + font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, line_start, range_end).x;
             float y = line_y + font_size - underline_offset;
-            DrawDottedUnderline(draw_list,
-                                ImVec2(x1, y),
-                                ImVec2(x2, y),
-                                TerminologyUnderlineColor(occurrence),
-                                underline_thickness,
-                                zoom);
+            DrawTermUnderline(draw_list,
+                              ImVec2(x1, y),
+                              ImVec2(x2, y),
+                              TerminologyUnderlineColor(occurrence),
+                              underline_thickness,
+                              zoom,
+                              TerminologyUnderlineIsDashed(occurrence));
 
             TerminologySpanHitRegion region;
             region.min = ImVec2(x1, line_y);

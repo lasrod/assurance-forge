@@ -222,11 +222,15 @@ void RenderAppearanceSection(PreferencesPanelModel model, const PreferencesPanel
         ImGui::EndCombo();
     }
 
-    bool show_fps = model.showFps;
-    if (ImGui::Checkbox(AF_TR("Show FPS").c_str(), &show_fps)) {
-        if (callbacks.set_show_fps)
-            callbacks.set_show_fps(show_fps);
+    bool show_developer_tools = model.showDeveloperTools;
+    if (ImGui::Checkbox(AF_TR("Developer tools").c_str(), &show_developer_tools)) {
+        if (callbacks.set_show_developer_tools)
+            callbacks.set_show_developer_tools(show_developer_tools);
     }
+    ImGui::TextDisabled("%s", AF_TR("Shows frame and culling counters in the menu bar, and the AI Debug tab.").c_str());
+    if (!show_developer_tools)
+        return;
+
     ImGui::TextColored(ui::CullRatioColor(0.8f), "%s", AF_TR("High culling").c_str());
     ImGui::SameLine();
     ImGui::TextColored(ui::CullRatioColor(0.5f), "%s", AF_TR("Medium culling").c_str());
