@@ -493,6 +493,9 @@ msgstr "作業ドラフトを受理できませんでした: {0}"
 msgid "Could not accept this change: {0}"
 msgstr "この変更を受理できませんでした: {0}"
 
+msgid "Could not add to the draft: {0}"
+msgstr "ドラフトに追加できませんでした: {0}"
+
 msgid "Could not assign a SACM gid for confidence storage."
 msgstr "信頼度保存用の SACM gid を割り当てられませんでした。"
 
@@ -501,6 +504,9 @@ msgstr "作業ドラフトを破棄できませんでした: {0}"
 
 msgid "Could not reject this change: {0}"
 msgstr "この変更を却下できませんでした: {0}"
+
+msgid "Could not remove in the draft: {0}"
+msgstr "ドラフトで削除できませんでした: {0}"
 
 msgid "Could not resolve this preview element for proposal edits."
 msgstr "提案編集のためのこのプレビュー要素を解決できませんでした。"
@@ -1035,6 +1041,9 @@ msgstr "モデル"
 
 msgid "Move to reasoning"
 msgstr "理由付けへ移動"
+
+msgid "My edits"
+msgstr "自分の編集"
 
 msgid "Name"
 msgstr "名前"
@@ -1660,6 +1669,12 @@ msgstr "提案するプロパティを編集するには、提案プレビュー
 msgid "Select an element to review."
 msgstr "レビューする要素を選択してください。"
 
+msgid "Select the element to add under first."
+msgstr "先に追加先の要素を選択してください。"
+
+msgid "Select the element to remove first."
+msgstr "先に削除する要素を選択してください。"
+
 msgid "Select {0}"
 msgstr "{0} を選択"
 
@@ -1869,6 +1884,9 @@ msgstr "選択された提案プレビュー要素は既に存在しません。
 
 msgid "The stored confidence assessment needs review because this element changed. Review the value and reactivate confidence if it is still valid."
 msgstr "この要素が変更されたため、保存された信頼度評価の確認が必要です。値を確認し、まだ有効であれば 信頼度を再アクティブ化してください。"
+
+msgid "The working draft does not change this element. Select an element marked NEW, EDIT or MULTIPLE CHANGES to review and accept it."
+msgstr "作業ドラフトはこの要素を変更しません。NEW、EDIT、MULTIPLE CHANGES と表示された要素を選択すると内容を確認して受理できます。"
 
 msgid "Theme"
 msgstr "テーマ"

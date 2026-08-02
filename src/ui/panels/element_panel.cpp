@@ -221,10 +221,27 @@ static void RenderMetadataRow(const char* label, const std::string& value) {
 static void RenderDraftChangeSection(const std::string& element_id, const ElementDraftCallbacks* callbacks) {
     const UiState& state = GetUiState();
     const DraftElementDetailView& detail = state.draft_selected_detail;
-    if (!detail.present || detail.element_id != element_id)
+    const bool draft_active = !state.draft_element_status.empty() || !state.draft_edge_status.empty();
+    if (!draft_active)
         return;
 
     const Theme& theme = GetTheme();
+
+    if (!detail.present || detail.element_id != element_id) {
+        // Said rather than left blank. A draft is running and this element is
+        // not part of it -- which is a different thing from the panel having
+        // nothing to tell you, and the reader cannot distinguish the two from an
+        // absent section.
+        InspectorSection(ICON_FA_CODE_BRANCH, AF_TR("Working draft"));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.text_secondary));
+        ImGui::TextWrapped("%s",
+                           AF_TR("The working draft does not change this element. Select an element marked "
+                                 "NEW, EDIT or MULTIPLE CHANGES to review and accept it.")
+                               .c_str());
+        ImGui::PopStyleColor();
+        return;
+    }
+
     InspectorSection(ICON_FA_CODE_BRANCH, AF_TR("Working draft"));
 
     const char* change_label = "";
@@ -313,18 +330,24 @@ static void RenderDraftChangeSection(const std::string& element_id, const Elemen
 
 static void RenderElementMetadata(const parser::SacmElement& elem) {
     const Theme& theme = GetTheme();
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(WithAlpha(theme.surface_2, 0.76f)));
-    // Sized by its contents rather than by a hand-computed height.
+    // Two text rows, in a two-column table, inside a bordered child.
     //
-    // The height used to be added up from the two font sizes, the item spacing
-    // and the window padding -- which leaves out the table's cell padding and
-    // the child border, so the second row (the element's id and its type) was
-    // clipped. Any such sum is also wrong again the moment a font role, the
-    // padding or the row count changes; letting ImGui measure cannot drift.
-    ImGui::BeginChild("##element_metadata",
-                      ImVec2(0.0f, 0.0f),
-                      ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY,
-                      ImGuiWindowFlags_NoScrollbar);
+    // The original sum left out the table's cell padding and the child border,
+    // which is why the id and the type were clipped. Both are added here.
+    //
+    // **Not `ImGuiChildFlags_AutoResizeY`**, which is the obvious fix and is
+    // wrong inside a scrolling panel: an auto-resizing child is not measured
+    // while it is clipped, so scrolling this card out of view collapses its
+    // height, shrinks the panel's content extent, and snaps the scroll straight
+    // back to the top. That reads as "the scrollbar does not work", and it is
+    // the reason this height is computed rather than measured.
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float card_height = fonts::SizeFor(fonts::Role::Caption) + fonts::SizeFor(fonts::Role::BodyStrong) +
+                              style.ItemSpacing.y + style.CellPadding.y * 2.0f + style.WindowPadding.y * 2.0f +
+                              style.ChildBorderSize * 2.0f;
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(WithAlpha(theme.surface_2, 0.76f)));
+    ImGui::BeginChild(
+        "##element_metadata", ImVec2(0.0f, card_height), ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollbar);
     if (ImGui::BeginTable("##element_metadata_columns", 2, ImGuiTableFlags_SizingStretchSame)) {
         ImGui::TableNextColumn();
         InspectorFieldLabel(AF_TR("ID"));

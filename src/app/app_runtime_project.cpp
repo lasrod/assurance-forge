@@ -35,6 +35,7 @@
 #include "sacm/sacm_package_tree.h"
 #include "sacm/sacm_serializer.h"
 #include "ui/gsn/gsn_adapter.h"
+#include "ui/i18n/localization.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/ui_state.h"
 
@@ -1352,6 +1353,154 @@ bool AppRuntime::PromoteWorkingDraft(std::string& error) {
     }
     impl_->app_state.mark_dirty();
     impl_->tree_needs_rebuild = true;
+    return true;
+}
+
+namespace {
+
+core::reviews::PatchOperationType CreateOperationFor(core::NewElementKind kind) {
+    switch (kind) {
+    case core::NewElementKind::Goal:
+        return core::reviews::PatchOperationType::CreateClaim;
+    case core::NewElementKind::Strategy:
+        return core::reviews::PatchOperationType::CreateStrategy;
+    case core::NewElementKind::Solution:
+        return core::reviews::PatchOperationType::CreateSolution;
+    case core::NewElementKind::Context:
+        return core::reviews::PatchOperationType::CreateContext;
+    case core::NewElementKind::Assumption:
+        return core::reviews::PatchOperationType::CreateAssumption;
+    case core::NewElementKind::Justification:
+        return core::reviews::PatchOperationType::CreateJustification;
+    }
+    return core::reviews::PatchOperationType::CreateClaim;
+}
+
+// Context, assumption and justification hang off the side of a node; everything
+// else develops it. Same rule the interactive add already follows, restated here
+// because the draft speaks in operations rather than in tree edits.
+bool AttachesAsContext(core::NewElementKind kind) {
+    return kind == core::NewElementKind::Context || kind == core::NewElementKind::Assumption ||
+           kind == core::NewElementKind::Justification;
+}
+
+} // namespace
+
+bool AppRuntime::DraftEditingActive() const {
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    return workspace != nullptr && workspace->has_active_groups() &&
+           workspace->state != core::drafts::DraftWorkspaceState::NeedsRebase;
+}
+
+bool AppRuntime::StageHumanDraftOperations(const std::string& title,
+                                           const std::vector<core::reviews::PatchOperation>& operations,
+                                           std::string& error) {
+    error.clear();
+    if (!impl_->app_state.loaded_case.has_value()) {
+        error = "No assurance case is loaded.";
+        return false;
+    }
+
+    const std::string author = impl_->reviewer_name.empty() ? std::string("You") : impl_->reviewer_name;
+
+    // One group for the session's hand edits rather than one per click: a
+    // reviewer accepting later wants "my corrections", not forty groups of one
+    // operation each.
+    std::string group_id;
+    if (const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace()) {
+        for (const core::drafts::DraftChangeGroup& group : workspace->groups) {
+            if (group.source == core::drafts::DraftSource::Human &&
+                group.state == core::drafts::DraftGroupState::Building && group.source_label == author) {
+                group_id = group.id;
+                break;
+            }
+        }
+    }
+    if (group_id.empty()) {
+        core::drafts::DraftGroupRequest request;
+        request.title = title;
+        request.source = core::drafts::DraftSource::Human;
+        request.source_label = author;
+        group_id = impl_->draft_workspace.BeginGroup(request, impl_->app_state.loaded_case.value(), error);
+        if (group_id.empty())
+            return false;
+    }
+
+    if (!impl_->draft_workspace.StageOperations(group_id, operations, impl_->app_state.loaded_case.value(), error))
+        return false;
+    impl_->tree_needs_rebuild = true;
+    return true;
+}
+
+bool AppRuntime::AddChildToSelectedAsDraft(core::NewElementKind kind) {
+    if (!DraftEditingActive())
+        return false;
+
+    const std::string& parent_id = ui::GetUiState().selected_element_id;
+    if (parent_id.empty()) {
+        SetStatus(AF_TR("Select the element to add under first."));
+        return true;
+    }
+
+    core::reviews::PatchOperation create;
+    create.type = CreateOperationFor(kind);
+    create.create_ref = "$new";
+
+    core::reviews::PatchOperation attach;
+    attach.type = AttachesAsContext(kind) ? core::reviews::PatchOperationType::AddInContextOf
+                                          : core::reviews::PatchOperationType::AddSupportedBy;
+    core::reviews::ElementRef source;
+    source.create_ref = "$new";
+    core::reviews::ElementRef target;
+    // The id the user clicked, which is an id in the *working* model. That is the
+    // whole point: it may be an element another draft group created, which the
+    // accepted model has never heard of.
+    target.existing_id = parent_id;
+    attach.source = source;
+    attach.target = target;
+
+    std::string error;
+    if (!StageHumanDraftOperations(AF_TR("My edits"), {create, attach}, error))
+        SetStatus(ui::i18n::trf("Could not add to the draft: {0}", error));
+    return true;
+}
+
+bool AppRuntime::AddTopGoalAsDraft() {
+    if (!DraftEditingActive())
+        return false;
+
+    core::reviews::PatchOperation create;
+    create.type = core::reviews::PatchOperationType::CreateClaim;
+    create.create_ref = "$new";
+
+    std::string error;
+    if (!StageHumanDraftOperations(AF_TR("My edits"), {create}, error))
+        SetStatus(ui::i18n::trf("Could not add to the draft: {0}", error));
+    return true;
+}
+
+bool AppRuntime::RemoveSelectedAsDraft(core::RemoveMode mode) {
+    if (!DraftEditingActive())
+        return false;
+
+    const std::string& element_id = ui::GetUiState().selected_element_id;
+    if (element_id.empty()) {
+        SetStatus(AF_TR("Select the element to remove first."));
+        return true;
+    }
+
+    core::reviews::PatchOperation remove;
+    remove.type = core::reviews::PatchOperationType::RemoveElement;
+    core::reviews::ElementRef element;
+    element.existing_id = element_id;
+    remove.element = element;
+    remove.field = mode == core::RemoveMode::NodeAndDescendants
+                       ? core::reviews::kReviewProposalRemoveModeNodeAndDescendants
+                       : core::reviews::kReviewProposalRemoveModeNodeOnly;
+
+    std::string error;
+    if (!StageHumanDraftOperations(AF_TR("My edits"), {remove}, error))
+        SetStatus(ui::i18n::trf("Could not remove in the draft: {0}", error));
     return true;
 }
 

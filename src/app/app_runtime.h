@@ -209,6 +209,30 @@ private:
     // accepting it would actually take.
     void RefreshSelectedDraftDetail();
 
+    // Whether the user's edits belong in the draft rather than in the accepted
+    // argument.
+    //
+    // While a draft is active the canvas is drawing the *working* model, so an
+    // edit applied to the accepted model underneath it lands somewhere the user
+    // was not looking -- and against a parent that may not exist there at all.
+    // ADR 0009: no independently changing accepted editing surface underneath an
+    // active draft.
+    bool DraftEditingActive() const;
+
+    // Appends operations to the user's own draft group, creating it on first
+    // use, so a session of hand edits reads as one change rather than as one
+    // group per click.
+    bool StageHumanDraftOperations(const std::string& title,
+                                   const std::vector<core::reviews::PatchOperation>& operations,
+                                   std::string& error);
+
+    // Routes "add a child under the selection" into the draft. Returns false
+    // when no draft is active, so the caller falls through to the ordinary
+    // accepted-model command.
+    bool AddChildToSelectedAsDraft(core::NewElementKind kind);
+    bool AddTopGoalAsDraft();
+    bool RemoveSelectedAsDraft(core::RemoveMode mode);
+
 public:
     // The draft workspace for the argument that is open, or null when there is
     // no draft. Read-only: only `AppRuntime` mutates it, which is what keeps

@@ -318,10 +318,18 @@ void AppRuntime::RequestClose() {
 }
 
 bool AppRuntime::AddChildToSelected(core::NewElementKind kind) {
+    // Into the draft when there is one. The canvas is drawing the working model,
+    // so an add applied to the accepted model underneath it lands somewhere the
+    // user was not looking -- and against a parent the accepted model may not
+    // contain at all, because another draft group created it.
+    if (AddChildToSelectedAsDraft(kind))
+        return true;
     return actions::ElementActions(*impl_).AddChildToSelected(kind);
 }
 
 bool AppRuntime::AddTopGoal() {
+    if (AddTopGoalAsDraft())
+        return true;
     return actions::ElementActions(*impl_).AddTopGoal();
 }
 
@@ -356,6 +364,8 @@ bool AppRuntime::AddCounterEvidenceToRelationship(const std::string& relationshi
 }
 
 void AppRuntime::RemoveSelected(core::RemoveMode mode) {
+    if (RemoveSelectedAsDraft(mode))
+        return;
     actions::ElementActions(*impl_).RemoveSelected(mode);
 }
 
@@ -829,7 +839,6 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     // at least drawn against the draft it is really landing in.
     const parser::AssuranceCase& working = CurrentCanvasView();
     RefreshDraftDecorations();
-    RefreshSelectedDraftDetail();
     const parser::AssuranceCase& ac = RefreshAgentChangePreview(working);
 
     const sacm::AssuranceCasePackage* sacm_package =

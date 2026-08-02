@@ -165,6 +165,14 @@ void AppRuntime::RenderFrame(bool& done) {
         // moved to the working model is exactly the split that made one view of
         // a change set show eighty staged elements and another show none.
         impl_->draft_canvas_view = impl_->app_state.loaded_case.has_value() ? &CurrentCanvasView() : nullptr;
+        // Every frame, not with the derived views.
+        //
+        // `RebuildDerivedViewsIfNeeded` returns early unless the tree is dirty,
+        // and selecting a different element does not dirty it -- so refreshing
+        // there meant the inspector kept showing whatever element happened to be
+        // selected the last time something else rebuilt the tree, which for a
+        // user clicking around the canvas is "nothing at all".
+        RefreshSelectedDraftDetail();
     }
 
     {
