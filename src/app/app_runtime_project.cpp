@@ -14,6 +14,8 @@
 #include "app/structure_problem_sync.h"
 #include "app/translation_review_sync.h"
 #include "core/translation_review_store.h"
+#include "core/drafts/draft_dependency_graph.h"
+#include "core/drafts/draft_promotion_service.h"
 #include "core/element_factory.h"
 #include "core/acp/assurance_claim_point.h"
 #include "core/audit/replay_verifier.h"
@@ -25,20 +27,25 @@
 #include "core/problems/problem_utils.h"
 #include "core/project_service.h"
 #include "core/reviews/review_item.h"
+#include "core/reviews/review_proposal.h"
 #include "core/terminology_package_service.h"
 #include "core/terminology_text_utils.h"
 #include "export/gsn_svg_exporter.h"
 #include "imgui.h"
 #include "parser/model_utils.h"
+#include "sacm_adapter/case_projection.h"
+#include "sacm_adapter/library_load.h"
 #include "sacm/sacm_package_tree.h"
 #include "sacm/sacm_serializer.h"
 #include "ui/gsn/gsn_adapter.h"
+#include "ui/i18n/localization.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <set>
 #include <sstream>
 #include <string>
@@ -1280,6 +1287,436 @@ bool AppRuntime::RejectAgentChangeSet(const std::string& change_set_id, std::str
     if (!impl_->agent_change_sets.Discard(change_set_id, error)) {
         return false;
     }
+    impl_->tree_needs_rebuild = true;
+    return true;
+}
+
+bool AppRuntime::PromoteWorkingDraft(std::string& error) {
+    error.clear();
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    if (workspace == nullptr || !workspace->has_active_groups()) {
+        error = "There is no working draft to accept.";
+        return false;
+    }
+
+    // Delegated rather than duplicated, so accept-all cannot skip the checks
+    // accept-selected performs -- including the verification that the accepted
+    // argument actually ended up holding the change.
+    std::vector<std::string> every_active;
+    for (const core::drafts::DraftChangeGroup* group : workspace->ActiveGroups())
+        every_active.push_back(group->id);
+    return PromoteDraftGroups(every_active, error);
+}
+
+namespace {
+
+core::reviews::PatchOperationType CreateOperationFor(core::NewElementKind kind) {
+    switch (kind) {
+    case core::NewElementKind::Goal:
+        return core::reviews::PatchOperationType::CreateClaim;
+    case core::NewElementKind::Strategy:
+        return core::reviews::PatchOperationType::CreateStrategy;
+    case core::NewElementKind::Solution:
+        return core::reviews::PatchOperationType::CreateSolution;
+    case core::NewElementKind::Context:
+        return core::reviews::PatchOperationType::CreateContext;
+    case core::NewElementKind::Assumption:
+        return core::reviews::PatchOperationType::CreateAssumption;
+    case core::NewElementKind::Justification:
+        return core::reviews::PatchOperationType::CreateJustification;
+    }
+    return core::reviews::PatchOperationType::CreateClaim;
+}
+
+// Context, assumption and justification hang off the side of a node; everything
+// else develops it. Same rule the interactive add already follows, restated here
+// because the draft speaks in operations rather than in tree edits.
+bool AttachesAsContext(core::NewElementKind kind) {
+    return kind == core::NewElementKind::Context || kind == core::NewElementKind::Assumption ||
+           kind == core::NewElementKind::Justification;
+}
+
+void ReplaceCreateRef(std::optional<core::reviews::ElementRef>& element,
+                      const std::string& before,
+                      const std::string& after) {
+    if (element.has_value() && element->create_ref == before)
+        element->create_ref = after;
+}
+
+std::vector<core::reviews::PatchOperation>
+MakeHumanCreateRefsUnique(const core::drafts::DraftChangeGroup& group,
+                          const std::vector<core::reviews::PatchOperation>& operations) {
+    std::set<std::string> used;
+    for (const core::reviews::PatchOperation& operation : group.operations) {
+        if (operation.create_ref.has_value())
+            used.insert(operation.create_ref.value());
+    }
+
+    std::vector<core::reviews::PatchOperation> normalized = operations;
+    std::map<std::string, std::string> replacements;
+    for (const core::reviews::PatchOperation& operation : operations) {
+        if (!operation.create_ref.has_value() || used.count(operation.create_ref.value()) == 0)
+            continue;
+        const std::string& before = operation.create_ref.value();
+        std::string after;
+        for (std::uint64_t suffix = group.operations.size() + 1;; ++suffix) {
+            after = before + "_" + std::to_string(suffix);
+            if (used.insert(after).second)
+                break;
+        }
+        replacements.emplace(before, std::move(after));
+    }
+
+    for (core::reviews::PatchOperation& operation : normalized) {
+        for (const auto& [before, after] : replacements) {
+            if (operation.create_ref == before)
+                operation.create_ref = after;
+            ReplaceCreateRef(operation.element, before, after);
+            ReplaceCreateRef(operation.source, before, after);
+            ReplaceCreateRef(operation.target, before, after);
+        }
+    }
+    return normalized;
+}
+
+} // namespace
+
+bool AppRuntime::DraftEditingActive() const {
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    return workspace != nullptr && workspace->has_active_groups() &&
+           workspace->state == core::drafts::DraftWorkspaceState::Active;
+}
+
+bool AppRuntime::StageHumanDraftOperations(const std::string& title,
+                                           const std::vector<core::reviews::PatchOperation>& operations,
+                                           std::string& error) {
+    error.clear();
+    if (!impl_->app_state.loaded_case.has_value()) {
+        error = "No assurance case is loaded.";
+        return false;
+    }
+
+    const std::string author = impl_->reviewer_name.empty() ? std::string("You") : impl_->reviewer_name;
+
+    // One group for the session's hand edits rather than one per click: a
+    // reviewer accepting later wants "my corrections", not forty groups of one
+    // operation each.
+    std::string group_id;
+    if (const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace()) {
+        for (const core::drafts::DraftChangeGroup& group : workspace->groups) {
+            if (group.source == core::drafts::DraftSource::Human &&
+                group.state == core::drafts::DraftGroupState::Building && group.source_label == author) {
+                group_id = group.id;
+                break;
+            }
+        }
+    }
+    if (group_id.empty()) {
+        core::drafts::DraftGroupRequest request;
+        request.title = title;
+        request.source = core::drafts::DraftSource::Human;
+        request.source_label = author;
+        group_id = impl_->draft_workspace.BeginGroup(request, impl_->app_state.loaded_case.value(), error);
+        if (group_id.empty())
+            return false;
+    }
+
+    std::vector<core::reviews::PatchOperation> normalized = operations;
+    if (const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace()) {
+        if (const core::drafts::DraftChangeGroup* group = workspace->FindGroup(group_id))
+            normalized = MakeHumanCreateRefsUnique(*group, operations);
+    }
+
+    if (!impl_->draft_workspace.StageOperations(group_id, normalized, impl_->app_state.loaded_case.value(), error))
+        return false;
+    impl_->tree_needs_rebuild = true;
+    return true;
+}
+
+bool AppRuntime::AddChildToSelectedAsDraft(core::NewElementKind kind) {
+    if (!DraftEditingActive())
+        return false;
+
+    const std::string& parent_id = ui::GetUiState().selected_element_id;
+    if (parent_id.empty()) {
+        SetStatus(AF_TR("Select the element to add under first."));
+        return true;
+    }
+
+    core::reviews::PatchOperation create;
+    create.type = CreateOperationFor(kind);
+    create.create_ref = "$new";
+
+    core::reviews::PatchOperation attach;
+    attach.type = AttachesAsContext(kind) ? core::reviews::PatchOperationType::AddInContextOf
+                                          : core::reviews::PatchOperationType::AddSupportedBy;
+    core::reviews::ElementRef source;
+    source.create_ref = "$new";
+    core::reviews::ElementRef target;
+    // The id the user clicked, which is an id in the *working* model. That is the
+    // whole point: it may be an element another draft group created, which the
+    // accepted model has never heard of.
+    target.existing_id = parent_id;
+    attach.source = source;
+    attach.target = target;
+
+    std::string error;
+    if (!StageHumanDraftOperations(AF_TR("My edits"), {create, attach}, error))
+        SetStatus(ui::i18n::trf("Could not add to the draft: {0}", error));
+    return true;
+}
+
+bool AppRuntime::AddTopGoalAsDraft() {
+    if (!DraftEditingActive())
+        return false;
+
+    core::reviews::PatchOperation create;
+    create.type = core::reviews::PatchOperationType::CreateClaim;
+    create.create_ref = "$new";
+
+    std::string error;
+    if (!StageHumanDraftOperations(AF_TR("My edits"), {create}, error))
+        SetStatus(ui::i18n::trf("Could not add to the draft: {0}", error));
+    return true;
+}
+
+bool AppRuntime::RemoveSelectedAsDraft(core::RemoveMode mode) {
+    if (!DraftEditingActive())
+        return false;
+
+    const std::string& element_id = ui::GetUiState().selected_element_id;
+    if (element_id.empty()) {
+        SetStatus(AF_TR("Select the element to remove first."));
+        return true;
+    }
+
+    core::reviews::PatchOperation remove;
+    remove.type = core::reviews::PatchOperationType::RemoveElement;
+    core::reviews::ElementRef element;
+    element.existing_id = element_id;
+    remove.element = element;
+    remove.field = mode == core::RemoveMode::NodeAndDescendants
+                       ? core::reviews::kReviewProposalRemoveModeNodeAndDescendants
+                       : core::reviews::kReviewProposalRemoveModeNodeOnly;
+
+    std::string error;
+    if (!StageHumanDraftOperations(AF_TR("My edits"), {remove}, error))
+        SetStatus(ui::i18n::trf("Could not remove in the draft: {0}", error));
+    return true;
+}
+
+bool AppRuntime::CommitTextEditAsDraft(const std::string& element_id,
+                                       const std::string& field_token,
+                                       const std::string& language,
+                                       const std::string& new_value) {
+    if (!DraftEditingActive())
+        return false;
+    if (element_id.empty())
+        return false;
+
+    // The operation vocabulary writes the primary language only:
+    // `UpdateElementText` sets the field and its `en` entry, and carries no
+    // language of its own. A secondary-language edit therefore cannot be
+    // expressed as a draft change, and silently writing it into the accepted
+    // argument underneath the draft is the defect this whole routing exists to
+    // stop. Refused, with the reason -- extending the vocabulary is its own
+    // decision, like the missing move operation.
+    if (!language.empty() && language != "en") {
+        SetStatus(AF_TR("Translations cannot be edited while a working draft is active. "
+                        "Accept or discard the draft first."));
+        return true;
+    }
+    if (field_token != "name" && field_token != "content" && field_token != "description") {
+        SetStatus(ui::i18n::trf("\"{0}\" cannot be edited while a working draft is active.", field_token));
+        return true;
+    }
+
+    core::reviews::PatchOperation update;
+    update.type = core::reviews::PatchOperationType::UpdateElementText;
+    core::reviews::ElementRef element;
+    element.existing_id = element_id;
+    update.element = element;
+    update.field = field_token;
+    update.new_value = new_value;
+
+    std::string error;
+    if (!StageHumanDraftOperations(AF_TR("My edits"), {update}, error))
+        SetStatus(ui::i18n::trf("Could not record the edit in the draft: {0}", error));
+    return true;
+}
+
+parser::AssuranceCase* AppRuntime::InspectorModel() {
+    if (!impl_->app_state.loaded_case.has_value())
+        return nullptr;
+    if (!DraftEditingActive())
+        return &impl_->app_state.loaded_case.value();
+
+    // Refreshed on the same key the materialization is cached under, so this
+    // copy is made when something actually changed rather than every frame.
+    const std::uint64_t draft_revision = impl_->draft_workspace.revision();
+    if (!impl_->inspector_model_valid || impl_->inspector_model_draft_revision != draft_revision ||
+        impl_->inspector_model_case_revision != impl_->app_state.case_revision) {
+        impl_->inspector_model = CurrentArgumentView();
+        impl_->inspector_model_draft_revision = draft_revision;
+        impl_->inspector_model_case_revision = impl_->app_state.case_revision;
+        impl_->inspector_model_valid = true;
+    }
+    return &impl_->inspector_model;
+}
+
+bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, std::string& error) {
+    error.clear();
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    if (workspace == nullptr || group_ids.empty()) {
+        error = "There is nothing to accept.";
+        return false;
+    }
+    if (!impl_->app_state.loaded_case.has_value()) {
+        error = "No assurance case is loaded.";
+        return false;
+    }
+    if (workspace->state == core::drafts::DraftWorkspaceState::NeedsRebase) {
+        error = "The argument changed since this draft was written. Inspect or discard it first.";
+        return false;
+    }
+    if (workspace->state == core::drafts::DraftWorkspaceState::Promoting) {
+        error = "This promotion is awaiting durable SACM completion. Resolve the autosave problem first.";
+        return false;
+    }
+
+    const std::string author = core::drafts::DraftPromotionAuthor(*workspace, group_ids);
+
+    // Everything that can refuse, refuses here -- before the accepted model is
+    // touched at all.
+    const core::drafts::DraftPromotionPlan plan =
+        core::drafts::PlanDraftPromotion(*workspace,
+                                         impl_->app_state.loaded_case.value(),
+                                         group_ids,
+                                         author,
+                                         impl_->draft_workspace.authoritative_identities());
+    if (!plan.ok) {
+        error = plan.error;
+        return false;
+    }
+
+    const bool library_primary_promotion =
+        impl_->command_bus != nullptr && impl_->app_state.library_document != nullptr;
+    std::string authoritative_before_xml;
+    if (library_primary_promotion) {
+        const sacm_adapter::SaveOutcome before = sacm_adapter::save_document(*impl_->app_state.library_document);
+        if (!before.ok) {
+            error = "Could not snapshot the authoritative SACM document before promotion: " +
+                    sacm_adapter::summarize_load_diagnostics(before.diagnostics);
+            return false;
+        }
+        authoritative_before_xml = before.xml;
+    }
+    parser::AssuranceCase authoritative_preflight;
+    if (library_primary_promotion &&
+        !core::commands::PreflightProposalAgainstLibrary(*impl_->app_state.library_document,
+                                                         plan.compiled.proposal,
+                                                         plan.compiled.identities,
+                                                         authoritative_preflight,
+                                                         error)) {
+        return false;
+    }
+
+    if (!impl_->draft_workspace.BeginPromotion(plan.closure, plan.promoted_model, error))
+        return false;
+
+    core::commands::ApplyProposalCommand command(plan.compiled.proposal, plan.compiled.identities);
+    const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(*impl_, command, author);
+    if (!outcome.success) {
+        const std::string dispatch_error = outcome.error;
+        std::string rollback_error;
+        if (library_primary_promotion &&
+            !sacm_adapter::reload_document(*impl_->app_state.library_document, authoritative_before_xml)) {
+            rollback_error = " The in-memory SACM document could not be restored; reopen the project before editing.";
+        }
+        impl_->rederive_views_from_library = library_primary_promotion;
+        impl_->tree_needs_rebuild = true;
+        std::string cancel_error;
+        impl_->draft_workspace.CancelPromotion(cancel_error);
+        error = dispatch_error + rollback_error;
+        if (!cancel_error.empty())
+            error += " Draft recovery could not clear its promotion marker: " + cancel_error;
+        return false;
+    }
+    if (!outcome.sacm_written) {
+        error = "The promotion was recorded in the audit log, but the accepted SACM file was not written. "
+                "The draft is retained in a pending state until recovery confirms the file.";
+        return false;
+    }
+
+    // The authoritative library must now be exactly what the isolated bridge
+    // rehearsal produced. Checked rather than assumed, because a command that
+    // reports success is not the same thing as an argument that contains the
+    // change: the bridge reloads the document from a package projection, and an
+    // element that reaches no package can be dropped on the way.
+    //
+    // This is not hypothetical. Accepting the shipped example reported success,
+    // removed the draft, and wrote a file with none of the accepted changes in
+    // it -- the created claim gone and the reworded goal unchanged. The draft was
+    // the only copy of that work.
+    //
+    // Do not compare the live `loaded_case` on this path: library-primary edits
+    // intentionally rederive that UI projection at the next frame boundary, so
+    // it still describes the pre-promotion case here. That stale comparison was
+    // why a successful Accept All was reported as a mismatch. The draft stays
+    // until the authoritative result is verified; deleting the only remaining
+    // copy of unaccepted work is not recoverable.
+    const parser::AssuranceCase produced_model = library_primary_promotion
+                                                     ? sacm_adapter::project_case(*impl_->app_state.library_document)
+                                                     : impl_->app_state.loaded_case.value();
+    const parser::AssuranceCase& expected_model =
+        library_primary_promotion ? authoritative_preflight : plan.promoted_model;
+    const std::string produced = core::reviews::ComputeModelSemanticHash(produced_model);
+    const std::string expected = core::reviews::ComputeModelSemanticHash(expected_model);
+    if (produced != expected) {
+        error = "The accepted argument does not match what was about to be accepted, so the draft has been kept. "
+                "Undo this change and report it: the promotion path dropped part of the result.";
+        impl_->app_state.mark_dirty();
+        impl_->tree_needs_rebuild = true;
+        return false;
+    }
+
+    // Promoted groups leave the active workspace; the rest stay visible against
+    // the new baseline. The base hash moves with it, or the next open would call
+    // the draft stale against an argument the user just accepted into.
+    if (!impl_->draft_workspace.RemovePromotedGroups(plan.closure, plan.promoted_model, error)) {
+        impl_->app_state.status_message = "Accepted, but the draft could not be updated: " + error;
+    }
+    impl_->app_state.mark_dirty();
+    impl_->tree_needs_rebuild = true;
+    return true;
+}
+
+bool AppRuntime::RejectDraftGroups(const std::vector<std::string>& group_ids, std::string& error) {
+    error.clear();
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    if (workspace == nullptr || group_ids.empty()) {
+        error = "There is nothing to reject.";
+        return false;
+    }
+
+    // A group whose creations another group edits cannot be rejected alone: the
+    // second would refer to an element that will never exist. Both go.
+    std::vector<std::string> rejecting = group_ids;
+    for (const std::string& dependent : core::drafts::DependentsOf(*workspace, group_ids))
+        rejecting.push_back(dependent);
+
+    for (const std::string& group_id : rejecting) {
+        if (!impl_->draft_workspace.RejectGroup(group_id, error))
+            return false;
+    }
+    impl_->tree_needs_rebuild = true;
+    return true;
+}
+
+bool AppRuntime::DiscardWorkingDraft(std::string& error) {
+    error.clear();
+    if (!impl_->draft_workspace.DiscardWorkspace(error))
+        return false;
     impl_->tree_needs_rebuild = true;
     return true;
 }

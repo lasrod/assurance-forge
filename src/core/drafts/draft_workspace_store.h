@@ -1,0 +1,179 @@
+#pragma once
+
+// The one draft workspace the application has open, and the only thing that
+// writes draft recovery state.
+//
+// ADR 0008's single-owner rule is unchanged by drafts existing: the running
+// application owns the open project, and this store is the application's. The
+// MCP adapter holds no workspace, and the offline adapter does not read one --
+// the accepted baseline is the only content a human has accepted, and a headless
+// read has no UI to mark unaccepted content as unaccepted.
+//
+// **Every mutation here bumps the revision and autosaves.** The revision is the
+// staleness token a modifying MCP call must name, and the autosave is what makes
+// a long conversation survive a restart. Neither writes SACM, runs a command,
+// nor records an audit transaction: the accepted `.sacm` stays byte-identical
+// until a human promotes.
+
+#include "core/drafts/draft_materializer.h"
+#include "core/drafts/draft_workspace.h"
+
+#include <cstdint>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
+#include <unordered_set>
+#include <vector>
+
+namespace core::drafts {
+
+// What a caller must supply to open a group. Grouped into a struct because the
+// provenance is the point -- a group with no source label is a change to a safety
+// argument that nobody is accountable for.
+struct DraftGroupRequest {
+    std::string title;
+    std::string summary;
+    std::string rationale;
+    DraftSource source = DraftSource::Human;
+    std::string source_label;
+    std::string source_session_id;
+    std::vector<std::string> guideline_ids;
+    std::vector<std::string> review_item_ids;
+};
+
+class DraftWorkspaceStore {
+public:
+    void SetProjectRoot(std::filesystem::path project_root);
+    const std::filesystem::path& project_root() const {
+        return project_root_;
+    }
+
+    // Opens the workspace for `argument_file`, restoring stored recovery data
+    // when there is any.
+    //
+    // A stored workspace whose `base_model_hash` does not match `accepted`
+    // enters `NeedsRebase`: the argument changed underneath the draft, and its
+    // operations are **not** replayed. Replaying a patch against a document it
+    // was not written for is how a tool silently reinterprets a safety argument.
+    //
+    // Returns false only on a real failure to read; a project with no draft is
+    // the normal case and succeeds with an empty workspace.
+    bool Open(const std::filesystem::path& argument_file, const core::AssuranceCase& accepted, std::string& error);
+
+    // Forgets the in-memory workspace without touching what is on disk, so the
+    // draft is still there when the argument is opened again.
+    void Close();
+
+    bool has_workspace() const {
+        return workspace_.has_value();
+    }
+    const DraftWorkspace* workspace() const {
+        return workspace_.has_value() ? &workspace_.value() : nullptr;
+    }
+
+    std::uint64_t revision() const {
+        return workspace_.has_value() ? workspace_->working_revision : 0;
+    }
+
+    // The complete id domain from the authoritative SACM document, including
+    // packages and utility elements omitted by the canvas projection. New draft
+    // ids are allocated against this set so promotion never discovers a hidden
+    // collision after an identity has already been shown to a user or agent.
+    void SetAuthoritativeIdentities(std::unordered_set<std::string> identities);
+    const std::unordered_set<std::string>& authoritative_identities() const {
+        return authoritative_identities_;
+    }
+
+    // Opens a change group and returns its id, or an empty string on failure.
+    //
+    // Creates the workspace if this is the first group. `accepted` is needed for
+    // that: the base hash is what a later reopen compares against to decide
+    // whether the argument moved underneath the draft, and a workspace without
+    // one would replay silently.
+    std::string BeginGroup(const DraftGroupRequest& request, const core::AssuranceCase& accepted, std::string& error);
+
+    // Appends operations. Refused as a whole if the result would not materialize
+    // on top of everything already active, so a group never holds a patch that
+    // cannot be drawn -- which is what lets the canvas render the working model
+    // at any moment.
+    bool StageOperations(const std::string& group_id,
+                         const std::vector<reviews::PatchOperation>& operations,
+                         const core::AssuranceCase& accepted,
+                         std::string& error);
+
+    // Replaces a group's operations wholesale, so an author can respond to "not
+    // there" without abandoning the group and losing its rationale and links.
+    bool ReplaceOperations(const std::string& group_id,
+                           const std::vector<reviews::PatchOperation>& operations,
+                           const core::AssuranceCase& accepted,
+                           std::string& error);
+
+    bool MarkGroupReady(const std::string& group_id, std::string& error);
+
+    // Rejects a group. It stops taking part in materialization but is kept, so
+    // the record of what was proposed and declined survives.
+    bool RejectGroup(const std::string& group_id, std::string& error);
+
+    // Durably records promotion intent before the accepted SACM/audit command
+    // runs. While pending, draft operations are inert. Recovery can then decide
+    // from the accepted-model hash whether to finalize or cancel after a crash.
+    bool BeginPromotion(const std::vector<std::string>& group_ids,
+                        const core::AssuranceCase& expected_accepted,
+                        std::string& error);
+    bool CancelPromotion(std::string& error);
+
+    // Drops groups that have just been promoted and rebases what is left onto
+    // `new_accepted`.
+    //
+    // The base hash moves with them. Without that, the next open would compare
+    // the draft against the argument the user just accepted into and call it
+    // stale -- refusing to apply the remaining groups because of a change the
+    // user themselves made through this very path.
+    bool RemovePromotedGroups(const std::vector<std::string>& group_ids,
+                              const core::AssuranceCase& new_accepted,
+                              std::string& error);
+
+    // Discards the whole workspace, in memory and on disk. The accepted `.sacm`
+    // is left byte-identical.
+    bool DiscardWorkspace(std::string& error);
+
+    // The working model, and everything derived from it.
+    //
+    // `accepted_revision` is the caller's own token for "the accepted model has
+    // changed" -- the application passes `AppState::case_revision`. Passing it
+    // rather than hashing the model here keeps a per-frame call cheap.
+    //
+    // Identities allocated by this call are persisted before it returns.
+    const DraftMaterializationResult& Materialize(const core::AssuranceCase& accepted, std::uint64_t accepted_revision);
+
+    // Immutable published snapshot for UI/frame consumers. A caller that keeps
+    // this handle may continue rendering it after the workspace is mutated or
+    // discarded; invalidation publishes a replacement later and never destroys
+    // a snapshot still in use.
+    std::shared_ptr<const DraftMaterializationResult> MaterializeSnapshot(const core::AssuranceCase& accepted,
+                                                                          std::uint64_t accepted_revision);
+
+    // Forces the next `Materialize` to recompute. Needed when the accepted model
+    // changed in place without the caller's revision token moving.
+    void InvalidateMaterialization();
+
+private:
+    DraftWorkspace& EnsureWorkspace(const core::AssuranceCase& accepted);
+    void RecordEvent(std::string type, std::string group_id, std::string detail);
+    bool Save(std::string& error);
+    std::string ArgumentKey() const;
+
+    std::filesystem::path project_root_;
+    std::filesystem::path argument_file_;
+    std::filesystem::path project_relative_argument_file_;
+    std::optional<DraftWorkspace> workspace_;
+    std::unordered_set<std::string> authoritative_identities_;
+
+    std::shared_ptr<DraftMaterializationResult> materialization_ = std::make_shared<DraftMaterializationResult>();
+    bool materialization_valid_ = false;
+    std::uint64_t materialized_workspace_revision_ = 0;
+    std::uint64_t materialized_accepted_revision_ = 0;
+};
+
+} // namespace core::drafts

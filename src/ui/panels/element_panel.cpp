@@ -211,12 +211,142 @@ static void RenderMetadataRow(const char* label, const std::string& value) {
     }
 }
 
+// What the working draft does to this element, and the decision about it.
+//
+// This is where "accept or decline *this* change" lives. Accept-all in the
+// banner is the blunt instrument; a reviewer works claim by claim, and being
+// able to see the accepted wording beside the proposed one -- with the source
+// and the reasoning that produced it -- is the whole of what makes accepting it
+// a judgement rather than a leap.
+static void RenderDraftChangeSection(const std::string& element_id, const ElementDraftCallbacks* callbacks) {
+    const UiState& state = GetUiState();
+    const DraftElementDetailView& detail = state.draft_selected_detail;
+    const bool draft_active = !state.draft_element_status.empty() || !state.draft_edge_status.empty();
+    if (!draft_active)
+        return;
+
+    const Theme& theme = GetTheme();
+
+    if (!detail.present || detail.element_id != element_id) {
+        // Said rather than left blank. A draft is running and this element is
+        // not part of it -- which is a different thing from the panel having
+        // nothing to tell you, and the reader cannot distinguish the two from an
+        // absent section.
+        InspectorSection(ICON_FA_CODE_BRANCH, AF_TR("Working draft"));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.text_secondary));
+        ImGui::TextWrapped("%s",
+                           AF_TR("The working draft does not change this element. Select an element marked "
+                                 "NEW, EDIT or MULTIPLE CHANGES to review and accept it.")
+                               .c_str());
+        ImGui::PopStyleColor();
+        return;
+    }
+
+    InspectorSection(ICON_FA_CODE_BRANCH, AF_TR("Working draft"));
+
+    const char* change_label = "";
+    switch (detail.change) {
+    case core::drafts::DraftElementChange::Added:
+        change_label = "This element is proposed and is not in the accepted argument.";
+        break;
+    case core::drafts::DraftElementChange::Modified:
+        change_label = "This element is proposed to change.";
+        break;
+    case core::drafts::DraftElementChange::Removed:
+        change_label = "This element is proposed for removal.";
+        break;
+    case core::drafts::DraftElementChange::Unchanged:
+        return;
+    }
+    ImGui::TextWrapped("%s", ui::i18n::tr(change_label).c_str());
+
+    // Side by side and per field, because "what changed" is the question a
+    // reviewer is actually asking, and switching to the accepted-baseline view
+    // to answer it loses the place they were reading.
+    for (const DraftFieldChangeView& change : detail.field_changes) {
+        InspectorFieldLabel(ui::i18n::trf("{0} — accepted", change.field_label));
+        ImGui::TextWrapped("%s", change.accepted.empty() ? AF_TR("(empty)").c_str() : change.accepted.c_str());
+        ImGui::Dummy(ImVec2(0.0f, 2.0f));
+        InspectorFieldLabel(ui::i18n::trf("{0} — working draft", change.field_label));
+        ImGui::TextWrapped("%s", change.working.empty() ? AF_TR("(empty)").c_str() : change.working.c_str());
+        ImGui::Dummy(ImVec2(0.0f, 4.0f));
+    }
+
+    InspectorFieldLabel(AF_TR("Contributions"));
+    for (const DraftContributionView& contribution : detail.contributions) {
+        ImGui::Bullet();
+        ImGui::SameLine(0.0f, 4.0f);
+        ImGui::TextWrapped("%s",
+                           ui::i18n::trf("{0} — {1}",
+                                         contribution.source_label,
+                                         contribution.title.empty() ? contribution.group_id : contribution.title)
+                               .c_str());
+        if (!contribution.rationale.empty()) {
+            ImGui::Indent();
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.text_secondary));
+            ImGui::TextWrapped("%s", contribution.rationale.c_str());
+            ImGui::PopStyleColor();
+            ImGui::Unindent();
+        }
+    }
+
+    if (!detail.also_accepts_titles.empty()) {
+        // Never widen the selection silently. Accepting a reworded claim that
+        // another group created has to take that group too, and the user is told
+        // so before they press the button, not after.
+        ImGui::Dummy(ImVec2(0.0f, 3.0f));
+        std::string also;
+        for (const std::string& title : detail.also_accepts_titles) {
+            if (!also.empty())
+                also += ", ";
+            also += title;
+        }
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.attention));
+        ImGui::TextWrapped("%s", ui::i18n::trf("Accepting this also accepts: {0}", also).c_str());
+        ImGui::PopStyleColor();
+    }
+
+    ImGui::Dummy(ImVec2(0.0f, 4.0f));
+    const bool blocked = !detail.blocked_reason.empty();
+    ImGui::BeginDisabled(blocked || callbacks == nullptr || !callbacks->accept_groups);
+    if (ImGui::Button(AF_TR("Accept this change").c_str()) && callbacks && callbacks->accept_groups)
+        callbacks->accept_groups(detail.closure_group_ids);
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::BeginDisabled(callbacks == nullptr || !callbacks->reject_groups);
+    if (ImGui::Button(AF_TR("Reject this change").c_str()) && callbacks && callbacks->reject_groups)
+        callbacks->reject_groups(detail.contributing_group_ids);
+    ImGui::EndDisabled();
+
+    if (blocked) {
+        // Disabled with the reason beside it, rather than a button that appears
+        // to work and does nothing.
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.attention));
+        ImGui::TextWrapped("%s", detail.blocked_reason.c_str());
+        ImGui::PopStyleColor();
+    }
+}
+
 static void RenderElementMetadata(const parser::SacmElement& elem) {
     const Theme& theme = GetTheme();
+    // Two text rows, in a two-column table, inside a bordered child.
+    //
+    // The original sum left out the table's cell padding and the child border,
+    // which is why the id and the type were clipped. Both are added here.
+    //
+    // **Not `ImGuiChildFlags_AutoResizeY`**, which is the obvious fix and is
+    // wrong inside a scrolling panel: an auto-resizing child is not measured
+    // while it is clipped, so scrolling this card out of view collapses its
+    // height, shrinks the panel's content extent, and snaps the scroll straight
+    // back to the top. That reads as "the scrollbar does not work", and it is
+    // the reason this height is computed rather than measured.
+    const ImGuiStyle& style = ImGui::GetStyle();
     const float card_height = fonts::SizeFor(fonts::Role::Caption) + fonts::SizeFor(fonts::Role::BodyStrong) +
-                              ImGui::GetStyle().ItemSpacing.y + ImGui::GetStyle().WindowPadding.y * 2.0f;
+                              style.ItemSpacing.y + style.CellPadding.y * 2.0f + style.WindowPadding.y * 2.0f +
+                              style.ChildBorderSize * 2.0f;
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(WithAlpha(theme.surface_2, 0.76f)));
-    ImGui::BeginChild("##element_metadata", ImVec2(0.0f, card_height), true, ImGuiWindowFlags_NoScrollbar);
+    ImGui::BeginChild(
+        "##element_metadata", ImVec2(0.0f, card_height), ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollbar);
     if (ImGui::BeginTable("##element_metadata_columns", 2, ImGuiTableFlags_SizingStretchSame)) {
         ImGui::TableNextColumn();
         InspectorFieldLabel(AF_TR("ID"));
@@ -462,6 +592,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
                       const ElementTextEditCallbacks* text_edit_callbacks,
                       const ElementHistoryCallbacks* history_callbacks,
                       const ElementTranslationReviewCallbacks* translation_review_callbacks,
+                      const ElementDraftCallbacks* draft_callbacks,
                       bool read_only) {
     const UiState& state = GetUiState();
     bool modified = false;
@@ -490,6 +621,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     bool has_secondary = element_has_secondary(*elem, sec_lang);
 
     RenderElementMetadata(*elem);
+    RenderDraftChangeSection(elem->id, draft_callbacks);
 
     if (RenderReviewAttentionNotice(state, elem->id, terminology_callbacks)) {
         ImGui::Spacing();

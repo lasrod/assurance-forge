@@ -135,6 +135,51 @@ void AppRuntime::RenderFrame(bool& done) {
     }
 
     {
+        // The draft view mode and the draft itself both change what the canvas
+        // should draw, and neither is a model mutation, so neither marks
+        // anything dirty on its own. Comparing them here is what turns "show me
+        // the accepted baseline" and an agent's staged group into a repaint --
+        // the same defect the change-set store's revision counter exists to
+        // avoid, where an agent's work stayed invisible until something
+        // unrelated happened to rebuild the tree.
+        ui::UiState& ui_state = ui::GetUiState();
+        static ui::DraftViewMode last_draft_view_mode = ui::DraftViewMode::WorkingDraft;
+        const std::uint64_t draft_revision = impl_->draft_workspace.revision();
+        if (ui_state.draft_view_mode != last_draft_view_mode || draft_revision != impl_->draft_revision_drawn) {
+            impl_->tree_needs_rebuild = true;
+            last_draft_view_mode = ui_state.draft_view_mode;
+            impl_->draft_revision_drawn = draft_revision;
+        }
+    }
+
+    {
+        // After the bridge, for the same reason the bridge runs before the
+        // derived views: a connected client can switch which argument file is
+        // open, and a workspace still pointing at the previous one would
+        // decorate this argument's identically-named elements.
+        core::perf::ScopedTimer s("app.draft_workspace");
+        SyncDraftWorkspace();
+        // Published once per frame so every UI area reads the same argument.
+        // Resolved here rather than in each area because an area that quietly
+        // kept reading the accepted case while the rest of the application had
+        // moved to the working model is exactly the split that made one view of
+        // a change set show eighty staged elements and another show none.
+        // Release the previous immutable owner only at this frame boundary.
+        // Accept/discard in the preceding frame could invalidate the store while
+        // later panels still held pointers into that published snapshot.
+        impl_->draft_frame_materialization.reset();
+        impl_->draft_canvas_view = impl_->app_state.loaded_case.has_value() ? &CurrentCanvasView() : nullptr;
+        // Every frame, not with the derived views.
+        //
+        // `RebuildDerivedViewsIfNeeded` returns early unless the tree is dirty,
+        // and selecting a different element does not dirty it -- so refreshing
+        // there meant the inspector kept showing whatever element happened to be
+        // selected the last time something else rebuilt the tree, which for a
+        // user clicking around the canvas is "nothing at all".
+        RefreshSelectedDraftDetail();
+    }
+
+    {
         core::perf::ScopedTimer s("app.derived_views");
         // Building the tree / GSN layout for a very large case can exhaust memory. Catch it here
         // so an allocation failure reports to the user and drops the case instead of escaping the
@@ -377,6 +422,26 @@ void AppRuntime::RenderFrame(bool& done) {
 
     areas::InspectorAreaCallbacks inspector_callbacks{
         [this, &proposal_editor_callbacks]() { areas::RenderProposalElementEditor(*impl_, proposal_editor_callbacks); },
+        [this]() { return InspectorModel(); },
+        [this](const std::vector<std::string>& group_ids) {
+            std::string error;
+            if (PromoteDraftGroups(group_ids, error)) {
+                SetStatus(ui::i18n::trnf("Accepted {0} draft change.",
+                                         "Accepted {0} draft changes.",
+                                         static_cast<int>(group_ids.size()),
+                                         group_ids.size()));
+            } else {
+                SetStatus(ui::i18n::trf("Could not accept this change: {0}", error));
+            }
+        },
+        [this](const std::vector<std::string>& group_ids) {
+            std::string error;
+            if (RejectDraftGroups(group_ids, error)) {
+                SetStatus(AF_TR("Rejected the change. The accepted argument is unchanged."));
+            } else {
+                SetStatus(ui::i18n::trf("Could not reject this change: {0}", error));
+            }
+        },
         [this](const std::string& element_id, const std::string& term_value) {
             BeginQuickDefineTerminologyTerm(element_id, term_value);
         },
@@ -406,6 +471,14 @@ void AppRuntime::RenderFrame(bool& done) {
                const std::string& new_value) {
             if (!impl_->app_state.loaded_case.has_value())
                 return;
+            // Into the draft when there is one, for the same reason adding a
+            // child is: the panel is showing the working argument, and an edit
+            // applied to the accepted model underneath it changes something the
+            // user is not looking at.
+            if (CommitTextEditAsDraft(element_id, field_token, language, new_value)) {
+                impl_->events.Emit(TreeDirtyEvent{});
+                return;
+            }
             const bool committed = impl_->element_edit_controller->CommitElementTextEdit(
                 *impl_, element_id, field_token, language, original_value, new_value);
             if (committed) {

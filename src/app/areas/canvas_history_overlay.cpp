@@ -21,6 +21,7 @@
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/timeline/timeline_widget.h"
+#include "ui/theme.h"
 #include "ui/ui_state.h"
 
 #include "imgui.h"
@@ -380,6 +381,148 @@ void RenderCanvasAutosaveErrorBanner(AppRuntimeState& state) {
         state.last_autosave_error.clear();
     ImGui::EndChild();
     ImGui::PopStyleColor();
+}
+
+namespace {
+
+// "Claude Code, SCCG AI Review, Jesper" -- who has contributed to what is on
+// screen. A reviewer approving a change to a safety argument is entitled to know
+// that before they read a word of it.
+std::string DraftSourceSummary(const core::drafts::DraftWorkspace& workspace) {
+    std::vector<std::string> labels;
+    for (const core::drafts::DraftChangeGroup& group : workspace.groups) {
+        if (!group.active() || group.operations.empty())
+            continue;
+        const std::string label = group.source_label.empty()
+                                      ? std::string(core::drafts::DraftSourceToString(group.source))
+                                      : group.source_label;
+        if (std::find(labels.begin(), labels.end(), label) == labels.end())
+            labels.push_back(label);
+    }
+    std::string summary;
+    for (const std::string& label : labels) {
+        if (!summary.empty())
+            summary += ", ";
+        summary += label;
+    }
+    return summary;
+}
+
+void DraftViewModeButton(ui::UiState& ui_state, ui::DraftViewMode mode, const std::string& label, const char* id) {
+    const bool active = ui_state.draft_view_mode == mode;
+    // The active mode is marked by its label, not only by its tint. A reader who
+    // cannot distinguish the tint still has to be able to tell which argument
+    // they are looking at -- that is the whole job of this control.
+    const std::string text = (active ? "● " : "") + label;
+    if (active) {
+        const ui::Theme& theme = ui::GetTheme();
+        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(theme.accent));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::ColorConvertU32ToFloat4(theme.accent_hover));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(ui::InkOn(theme.accent)));
+    }
+    if (ImGui::Button((text + id).c_str()))
+        ui_state.draft_view_mode = mode;
+    if (active)
+        ImGui::PopStyleColor(3);
+}
+
+} // namespace
+
+void RenderWorkingDraftBanner(AppRuntimeState& state, const WorkbenchAreaCallbacks& callbacks) {
+    const core::drafts::DraftWorkspace* workspace = state.draft_workspace.workspace();
+    if (workspace == nullptr)
+        return;
+    const std::size_t staged = workspace->staged_group_count();
+    if (staged == 0)
+        return;
+
+    ui::UiState& ui_state = ui::GetUiState();
+    const bool needs_rebase = workspace->state == core::drafts::DraftWorkspaceState::NeedsRebase;
+    const bool blocked = workspace->state == core::drafts::DraftWorkspaceState::Blocked;
+    const bool promoting = workspace->state == core::drafts::DraftWorkspaceState::Promoting;
+
+    // Derived from the theme rather than fixed, or the banner is legible in one
+    // theme and not the other -- and the light theme is exactly where a dark
+    // hardcoded tint leaves the text unreadable. `InkOn` picks the ink that has
+    // contrast against whatever background the tint produced.
+    const ui::Theme& theme = ui::GetTheme();
+    const ImU32 banner_bg =
+        ui::LerpColor(theme.surface_1, needs_rebase || blocked || promoting ? theme.attention : theme.accent, 0.18f);
+    const ImU32 banner_ink = ui::InkOn(banner_bg);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(banner_bg));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(banner_ink));
+    ImGui::BeginChild("##working_draft_banner", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 4.2f), true);
+
+    // Stated in words, not implied by a tint. This is the line that stops a
+    // proposal being read as the accepted safety argument.
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(banner_ink),
+                       "%s",
+                       ui::i18n::trnf("WORKING DRAFT — {0} unaccepted change",
+                                      "WORKING DRAFT — {0} unaccepted changes",
+                                      static_cast<int>(staged),
+                                      staged)
+                           .c_str());
+
+    const std::string sources = DraftSourceSummary(*workspace);
+    if (!sources.empty())
+        ImGui::TextWrapped("%s", ui::i18n::trf("Sources: {0}", sources).c_str());
+
+    if (needs_rebase) {
+        ImGui::TextWrapped("%s",
+                           AF_TR("The argument changed since this draft was written, so none of it is being "
+                                 "applied. Inspect or discard it before continuing.")
+                               .c_str());
+    } else if (blocked) {
+        ImGui::TextWrapped("%s",
+                           AF_TR("This draft cannot be shown because one of its changes no longer applies. "
+                                 "The accepted argument is displayed instead.")
+                               .c_str());
+    } else if (promoting) {
+        ImGui::TextWrapped("%s",
+                           AF_TR("Promotion is recorded, but the accepted SACM file is not yet confirmed. "
+                                 "The draft is retained and cannot be edited or discarded.")
+                               .c_str());
+    }
+
+    DraftViewModeButton(ui_state, ui::DraftViewMode::WorkingDraft, AF_TR("Working draft"), "##draft_view_working");
+    ImGui::SameLine();
+    DraftViewModeButton(
+        ui_state, ui::DraftViewMode::AcceptedBaseline, AF_TR("Accepted baseline"), "##draft_view_accepted");
+    ImGui::SameLine();
+    DraftViewModeButton(ui_state, ui::DraftViewMode::ChangesOnly, AF_TR("Changes only"), "##draft_view_changes");
+
+    ImGui::SameLine();
+    ImGui::Dummy(ImVec2(ImGui::GetFontSize(), 0.0f));
+    ImGui::SameLine();
+
+    // Promotion is disabled rather than hidden while the draft is not in a state
+    // to be accepted, and the reason is on the tooltip. A button that silently
+    // does nothing was the reported defect in the change-set flow it replaces.
+    const bool promotable = !needs_rebase && !blocked && !promoting;
+    ImGui::BeginDisabled(!promotable);
+    if (ImGui::Button((AF_TR("Accept all") + "##draft_accept_all").c_str())) {
+        if (callbacks.promote_working_draft)
+            callbacks.promote_working_draft();
+    }
+    ImGui::EndDisabled();
+    if (!promotable && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        const std::string reason = needs_rebase ? AF_TR("The argument changed since this draft was written.")
+                                   : promoting  ? AF_TR("Promotion is awaiting durable SACM completion.")
+                                                : AF_TR("One of this draft's changes no longer applies.");
+        ImGui::SetTooltip("%s", reason.c_str());
+    }
+
+    ImGui::SameLine();
+    ImGui::BeginDisabled(promoting);
+    if (ImGui::Button((AF_TR("Discard draft") + "##draft_discard").c_str())) {
+        if (callbacks.discard_working_draft)
+            callbacks.discard_working_draft();
+    }
+    ImGui::EndDisabled();
+
+    ImGui::EndChild();
+    ImGui::PopStyleColor(2);
+    ImGui::Spacing();
 }
 
 void RenderArgumentPackageCanvasWithTimeline(AppRuntimeState& state,

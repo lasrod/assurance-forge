@@ -27,12 +27,14 @@
 #include "core/commands/command_bus.h"
 #include "core/commands/element_commands.h"
 #include "core/commands/gid_commands.h"
+#include "core/commands/proposal_commands.h"
 #include "core/commands/terminology_commands.h"
 #include "core/commands/tree_commands.h"
 #include "core/derived_views.h"
 #include "core/element_factory.h"
 #include "core/library_package_projection.h"
 #include "core/project_model.h"
+#include "core/reviews/review_proposal.h"
 #include "core/terminology_package_service.h"
 #include "parser/xml_parser.h"
 #include "sacm/sacm_parser.h"
@@ -233,6 +235,44 @@ CreateSequenceIds RunCreateSequence(EditFixture& fixture) {
 // payload and the on-disk identity; the canonical hash is what the manifest
 // caches and the verifier compares -- so equality on both is the byte-level
 // proof the flip changed the routing and nothing else.
+TEST(LibraryPrimaryEditFlip, ProposalPreflightIsIsolatedAndMatchesTheLiveLibraryPath) {
+    std::unique_ptr<EditFixture> fixture = MakeFixture("proposal_preflight", true);
+    ASSERT_NE(fixture->document, nullptr);
+
+    core::reviews::ReviewProposal proposal;
+    proposal.id = "draft-promotion";
+    core::reviews::PatchOperation update;
+    update.type = core::reviews::PatchOperationType::UpdateElementText;
+    core::reviews::ElementRef element;
+    element.existing_id = "G1";
+    update.element = element;
+    update.field = "description";
+    update.new_value = "The system remains acceptably safe.";
+    proposal.operations.push_back(update);
+
+    const sacm_adapter::SaveOutcome before = sacm_adapter::save_document(*fixture->document);
+    ASSERT_TRUE(before.ok);
+
+    parser::AssuranceCase rehearsed;
+    std::string error;
+    ASSERT_TRUE(core::commands::PreflightProposalAgainstLibrary(*fixture->document, proposal, {}, rehearsed, error))
+        << error;
+    const parser::SacmElement* rehearsed_goal = FindElement(rehearsed, "G1");
+    ASSERT_NE(rehearsed_goal, nullptr);
+    EXPECT_EQ(rehearsed_goal->description, update.new_value);
+
+    const sacm_adapter::SaveOutcome after_preflight = sacm_adapter::save_document(*fixture->document);
+    ASSERT_TRUE(after_preflight.ok);
+    EXPECT_EQ(after_preflight.xml, before.xml) << "preflight mutated the authoritative document";
+
+    core::commands::ApplyProposalCommand command(proposal);
+    core::commands::CommandContext context = MakeContext(*fixture);
+    const core::commands::CommandResult committed = RunCommand(*fixture, command, context);
+    ASSERT_TRUE(committed.success) << committed.error;
+    EXPECT_EQ(core::reviews::ComputeModelSemanticHash(fixture->model),
+              core::reviews::ComputeModelSemanticHash(rehearsed));
+}
+
 TEST(LibraryPrimaryEditFlip, CreateSequenceMatchesLegacyIdsAndCanonicalHash) {
     std::unique_ptr<EditFixture> library_side = MakeFixture("create_library", /*library_backed=*/true);
     std::unique_ptr<EditFixture> legacy_side = MakeFixture("create_legacy", /*library_backed=*/false);

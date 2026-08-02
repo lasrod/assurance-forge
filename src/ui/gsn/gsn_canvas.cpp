@@ -205,9 +205,13 @@ void DrawGsnNode(const GsnNode& node,
     }
 
     // If this node is marked for pending removal, override the fill with a
-    // strong red tint so the user can see exactly what will be removed.
+    // strong red tint so the user can see exactly what will be removed. Draft
+    // deletion tombstones use the same unmistakable treatment.
+    const auto draft_status = ui_state.draft_element_status.find(node.id);
+    const bool draft_removed = draft_status != ui_state.draft_element_status.end() &&
+                               draft_status->second.change == core::drafts::DraftElementChange::Removed;
     const bool marked_for_removal = ui_state.marked_for_removal.count(node.id) > 0;
-    if (marked_for_removal) {
+    if (marked_for_removal || draft_removed) {
         fill_color = GetTheme().danger;
     }
 
@@ -243,9 +247,17 @@ void DrawGsnNode(const GsnNode& node,
         // What a connected AI client is proposing, drawn as it stages it. This
         // is the difference between watching the argument take shape and being
         // handed a finished patch to decode.
+        const bool circular_change_shape = (node.type == "Solution" || node.type == "Evidence");
+        if (!ui_state.draft_element_status.empty()) {
+            const std::unordered_map<std::string, DraftNodeDecoration>::const_iterator draft_found =
+                ui_state.draft_element_status.find(node.id);
+            if (draft_found != ui_state.draft_element_status.end()) {
+                DrawDraftChangeDecoration(
+                    draw_list, top_left, bottom_right, circular_change_shape, zoom, draft_found->second);
+            }
+        }
         if (agent_change != core::changesets::ElementChange::Unchanged) {
-            const bool circular = (node.type == "Solution" || node.type == "Evidence");
-            DrawProposedChangeDecoration(draw_list, top_left, bottom_right, circular, zoom, agent_change);
+            DrawProposedChangeDecoration(draw_list, top_left, bottom_right, circular_change_shape, zoom, agent_change);
         }
     }
 

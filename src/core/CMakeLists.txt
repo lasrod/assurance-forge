@@ -7,6 +7,13 @@ add_library(af_core OBJECT
     sccg/staged_checks.cpp
     changesets/change_set.cpp
     changesets/change_set_store.cpp
+    drafts/draft_change_index.cpp
+    drafts/draft_materializer.cpp
+    drafts/draft_dependency_graph.cpp
+    drafts/draft_persistence.cpp
+    drafts/draft_promotion_service.cpp
+    drafts/draft_workspace.cpp
+    drafts/draft_workspace_store.cpp
     argument_package_projection.cpp
     assurance_tree.cpp
     derived_views.cpp

@@ -44,9 +44,20 @@ void RenderInspectorArea(AppRuntimeState& state,
             "%s", AF_TR("Proposal preview is active. Exit preview before editing element properties.").c_str());
     } else {
         parser::AssuranceCase* loaded_case =
-            state.app_state.loaded_case.has_value() ? &state.app_state.loaded_case.value() : nullptr;
-        sacm::AssuranceCasePackage* sacm_package =
-            state.app_state.sacm_package.has_value() ? &state.app_state.sacm_package.value() : nullptr;
+            callbacks.inspector_model
+                ? callbacks.inspector_model()
+                : (state.app_state.loaded_case.has_value() ? &state.app_state.loaded_case.value() : nullptr);
+        // Withheld while a draft is active. The panel mirrors a live edit into
+        // the package as the user types, and that package is the *accepted*
+        // one -- so handing it over would write draft text into accepted
+        // assurance content on every keystroke, which is the leak this whole
+        // routing exists to close. The edit reaches the model as a staged draft
+        // operation when the field loses focus, and nowhere else.
+        const bool draft_editing =
+            state.draft_workspace.workspace() != nullptr && state.draft_workspace.workspace()->has_active_groups();
+        sacm::AssuranceCasePackage* sacm_package = (!draft_editing && state.app_state.sacm_package.has_value())
+                                                       ? &state.app_state.sacm_package.value()
+                                                       : nullptr;
         if (!ui::GetUiState().selected_acp_id.empty()) {
             ui::panels::AcpPanelCallbacks acp_callbacks;
             acp_callbacks.upsert_acp = [&](const parser::AcpRecord& acp) {
@@ -257,6 +268,10 @@ void RenderInspectorArea(AppRuntimeState& state,
             }
         }
 
+        ui::panels::ElementDraftCallbacks draft_callbacks;
+        draft_callbacks.accept_groups = callbacks.accept_draft_groups;
+        draft_callbacks.reject_groups = callbacks.reject_draft_groups;
+
         if (ui::panels::ShowElementPanel(loaded_case,
                                          sacm_package,
                                          &terminology_callbacks,
@@ -264,6 +279,7 @@ void RenderInspectorArea(AppRuntimeState& state,
                                          &text_edit_callbacks,
                                          &history_callbacks,
                                          &translation_review_callbacks,
+                                         &draft_callbacks,
                                          inspector_read_only)) {
             if (state.confidence_controller && loaded_case) {
                 const bool confidence_changed = state.confidence_controller->RefreshStaleFlags(*loaded_case);

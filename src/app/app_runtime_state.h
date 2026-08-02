@@ -8,6 +8,7 @@
 #include "app/app_events.h"
 #include "app/controllers/agent_bridge_controller.h"
 #include "core/changesets/change_set_store.h"
+#include "core/drafts/draft_workspace_store.h"
 #include "app/controllers/ai_review_controller.h"
 #include "app/controllers/acp_controller.h"
 #include "app/controllers/confidence_controller.h"
@@ -206,6 +207,56 @@ struct AppRuntimeState {
     // into the project: a change set is a proposal in progress, not project
     // data, and a second writer in that directory is what this design removed.
     core::changesets::ChangeSetStore agent_change_sets;
+    // The integrated working draft for the argument that is open: ordered change
+    // groups from MCP, SCCG AI review, the user and imported legacy proposals,
+    // materialized into one complete assurance case (ADR 0009, ADR 0010).
+    //
+    // Owned here rather than in `core::AppState` because a draft is workflow
+    // state, not loaded project data. The accepted case in `app_state` stays
+    // exactly what the user accepted; this is what has been proposed against it.
+    core::drafts::DraftWorkspaceStore draft_workspace;
+    // What `draft_workspace` was last opened for. A draft belongs to one
+    // argument file -- element ids repeat across a project's arguments, so a
+    // draft written against one must never decorate another's identically-named
+    // elements -- and this is how the runtime notices the argument changed.
+    std::filesystem::path draft_workspace_argument;
+    std::filesystem::path draft_workspace_root;
+    // Scratch for the "changes only" view mode, so the canvas can hold a
+    // reference to it across the frame the way it does the other views.
+    parser::AssuranceCase draft_changes_only_view;
+    // Display-only copy of the working model with deletion tombstones restored.
+    // Removed elements stay absent from the semantic working model used by
+    // checks and promotion; the canvas needs the old nodes and relationships in
+    // order to show what the draft proposes to remove.
+    parser::AssuranceCase draft_presentation_view;
+    // The workspace revision the canvas was last built against. Draft mutation
+    // is deliberately not a model mutation and marks nothing dirty, so this is
+    // what turns a staged group into a repaint.
+    std::uint64_t draft_revision_drawn = 0;
+    // The argument the canvas should draw this frame, published by
+    // `AppRuntime::SyncDraftWorkspace` so the UI areas do not each have to
+    // resolve it -- and so none of them can quietly keep reading the accepted
+    // case while the rest of the application has moved to the working model.
+    // Null before the first frame; falls back to the accepted case.
+    const parser::AssuranceCase* draft_canvas_view = nullptr;
+    // Owns the materialized model backing `draft_canvas_view` for the entire
+    // frame. Draft accept/discard can invalidate the store while ImGui is still
+    // rendering; retaining this immutable snapshot prevents the canvas and
+    // inspector from dereferencing freed materialization storage.
+    std::shared_ptr<const core::drafts::DraftMaterializationResult> draft_frame_materialization;
+    // Element ids the draft adds. The argument-package canvas filters by SACM
+    // package ownership, and a proposed element belongs to no package at all --
+    // so without this list the ownership filter drops every one of them and
+    // draws the accepted argument back, which is indistinguishable from the add
+    // having done nothing.
+    std::vector<std::string> draft_added_ids;
+    // The model the inspector edits while a draft is active: its own copy of the
+    // working argument, so the panel's in-place edits cannot scribble on the
+    // materializer's cache. Refreshed on the revisions below.
+    parser::AssuranceCase inspector_model;
+    bool inspector_model_valid = false;
+    std::uint64_t inspector_model_draft_revision = 0;
+    std::uint64_t inspector_model_case_revision = 0;
     // The store revision the canvas was last built against. Staging is not a
     // model mutation and so marks nothing dirty; comparing this each frame is
     // what turns an agent's staged operation into a repaint.

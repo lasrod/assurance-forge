@@ -16,6 +16,9 @@ msgstr " (プレビューするにはパッケージキャンバスを開いて�
 msgid " | Showing {0} of {1} (filtered)"
 msgstr " | {0} / {1} 件を表示 (フィルター適用)"
 
+msgid "\"{0}\" cannot be edited while a working draft is active."
+msgstr "作業ドラフトが有効な間は「{0}」を編集できません。"
+
 msgid "% Frame"
 msgstr "% フレーム"
 
@@ -118,8 +121,26 @@ msgstr "API キーを削除しました。"
 msgid "API key saved securely."
 msgstr "API キーを安全に保存しました。"
 
+msgid "Accept all"
+msgstr "すべて受理"
+
 msgid "Accept change"
 msgstr "変更を受け入れる"
+
+msgid "Accept this change"
+msgstr "この変更を受理"
+
+msgid "Accepted"
+msgstr "受理済み"
+
+msgid "Accepted baseline"
+msgstr "受理済みベースライン"
+
+msgid "Accepted the working draft."
+msgstr "作業ドラフトを受理しました。"
+
+msgid "Accepting this also accepts: {0}"
+msgstr "これを受理すると次も受理されます: {0}"
 
 msgid "Active"
 msgstr "アクティブ"
@@ -370,6 +391,9 @@ msgstr "変更"
 msgid "Changes are recorded in the proposal draft. Save it from the review panel."
 msgstr "変更は提案ドラフトに記録されています。レビューパネルから保存してください。"
 
+msgid "Changes only"
+msgstr "変更のみ"
+
 msgid "Choose a target TerminologyPackage."
 msgstr "対象の TerminologyPackage を選択してください。"
 
@@ -454,6 +478,9 @@ msgstr "コンテキスト"
 msgid "Continue?"
 msgstr "続行しますか?"
 
+msgid "Contributions"
+msgstr "提案の内訳"
+
 msgid "Controlled Environment"
 msgstr "管理環境"
 
@@ -463,8 +490,29 @@ msgstr "設定をコピー"
 msgid "Copy report to clipboard"
 msgstr "レポートをクリップボードにコピー"
 
+msgid "Could not accept the working draft: {0}"
+msgstr "作業ドラフトを受理できませんでした: {0}"
+
+msgid "Could not accept this change: {0}"
+msgstr "この変更を受理できませんでした: {0}"
+
+msgid "Could not add to the draft: {0}"
+msgstr "ドラフトに追加できませんでした: {0}"
+
 msgid "Could not assign a SACM gid for confidence storage."
 msgstr "信頼度保存用の SACM gid を割り当てられませんでした。"
+
+msgid "Could not discard the working draft: {0}"
+msgstr "作業ドラフトを破棄できませんでした: {0}"
+
+msgid "Could not record the edit in the draft: {0}"
+msgstr "ドラフトに編集を記録できませんでした: {0}"
+
+msgid "Could not reject this change: {0}"
+msgstr "この変更を却下できませんでした: {0}"
+
+msgid "Could not remove in the draft: {0}"
+msgstr "ドラフトで削除できませんでした: {0}"
 
 msgid "Could not resolve this preview element for proposal edits."
 msgstr "提案編集のためのこのプレビュー要素を解決できませんでした。"
@@ -615,6 +663,12 @@ msgstr "ドラフトを破棄"
 
 msgid "Discard assessment"
 msgstr "評価を破棄"
+
+msgid "Discard draft"
+msgstr "ドラフトを破棄"
+
+msgid "Discarded the working draft. The accepted argument is unchanged."
+msgstr "作業ドラフトを破棄しました。受理済みの議論は変更されていません。"
 
 msgid "Dismiss"
 msgstr "閉じる"
@@ -994,6 +1048,9 @@ msgstr "モデル"
 msgid "Move to reasoning"
 msgstr "理由付けへ移動"
 
+msgid "My edits"
+msgstr "自分の編集"
+
 msgid "Name"
 msgstr "名前"
 
@@ -1032,6 +1089,9 @@ msgstr "新規 J3377 CAE 登録簿"
 
 msgid "New Project File"
 msgstr "新規プロジェクトファイル"
+
+msgid "New {0}"
+msgstr "新規：{0}"
 
 msgid "No"
 msgstr "いいえ"
@@ -1170,6 +1230,9 @@ msgstr "メモ"
 
 msgid "OK"
 msgstr "OK"
+
+msgid "One of this draft's changes no longer applies."
+msgstr "このドラフトの変更のいずれかが適用できなくなっています。"
 
 msgid "Open"
 msgstr "オープン"
@@ -1357,6 +1420,12 @@ msgstr "プロジェクト名"
 msgid "Projected confidence"
 msgstr "投影信頼度"
 
+msgid "Promotion is awaiting durable SACM completion."
+msgstr "プロモーションは SACM への確実な保存完了を待っています。"
+
+msgid "Promotion is recorded, but the accepted SACM file is not yet confirmed. The draft is retained and cannot be edited or discarded."
+msgstr "プロモーションは記録されましたが、承認済み SACM ファイルへの保存はまだ確認されていません。ドラフトは保持され、編集または破棄できません。"
+
 msgid "Prompt"
 msgstr "プロンプト"
 
@@ -1420,6 +1489,12 @@ msgstr "登録簿の評価を読み込めなかったため、編集を保存で
 msgid "Reject change"
 msgstr "変更を却下する"
 
+msgid "Reject this change"
+msgstr "この変更を却下"
+
+msgid "Rejected the change. The accepted argument is unchanged."
+msgstr "変更を却下しました。受理済みの議論は変更されていません。"
+
 msgid "Relationship not found: {0}"
 msgstr "関係が見つかりません: {0}"
 
@@ -1452,6 +1527,9 @@ msgstr "関係を削除"
 
 msgid "Remove the SACM-backed ACP metadata from its target."
 msgstr "対象から SACM ベースの ACP メタデータを除去します。"
+
+msgid "Remove {0}"
+msgstr "{0}を除去"
 
 msgid "Remove {0}?"
 msgstr "{0} を除去しますか?"
@@ -1609,6 +1687,12 @@ msgstr "提案するプロパティを編集するには、提案プレビュー
 msgid "Select an element to review."
 msgstr "レビューする要素を選択してください。"
 
+msgid "Select the element to add under first."
+msgstr "先に追加先の要素を選択してください。"
+
+msgid "Select the element to remove first."
+msgstr "先に削除する要素を選択してください。"
+
 msgid "Select {0}"
 msgstr "{0} を選択"
 
@@ -1663,6 +1747,9 @@ msgstr "ソース: {0}"
 msgid "Sources:"
 msgstr "ソース:"
 
+msgid "Sources: {0}"
+msgstr "提案元: {0}"
+
 msgid "Start"
 msgstr "開始"
 
@@ -1692,6 +1779,9 @@ msgstr "戦略 {0} が関係 {1} の端点として接続されています。�
 
 msgid "Summary:"
 msgstr "要約:"
+
+msgid "Support"
+msgstr "支持関係"
 
 msgid "Target element: {0}"
 msgstr "対象要素: {0}"
@@ -1786,6 +1876,12 @@ msgstr "Assurance Forge の隣に MCP サーバープログラムが見つかり
 msgid "The SACM library could not preview this removal."
 msgstr "SACM ライブラリはこの削除をプレビューできませんでした。"
 
+msgid "The argument changed since this draft was written, so none of it is being applied. Inspect or discard it before continuing."
+msgstr "このドラフトの作成後に議論が変更されたため、いずれも適用されていません。続行する前に内容を確認するか破棄してください。"
+
+msgid "The argument changed since this draft was written."
+msgstr "このドラフトの作成後に議論が変更されました。"
+
 msgid "The argument changed while this was being prepared, so it no longer applies. Ask the AI client to rebuild it."
 msgstr "準備中に論証が変更されたため、この提案は適用できません。AI クライアントに再作成を依頼してください。"
 
@@ -1810,6 +1906,9 @@ msgstr "選択された提案プレビュー要素は既に存在しません。
 msgid "The stored confidence assessment needs review because this element changed. Review the value and reactivate confidence if it is still valid."
 msgstr "この要素が変更されたため、保存された信頼度評価の確認が必要です。値を確認し、まだ有効であれば 信頼度を再アクティブ化してください。"
 
+msgid "The working draft does not change this element. Select an element marked NEW, EDIT or MULTIPLE CHANGES to review and accept it."
+msgstr "作業ドラフトはこの要素を変更しません。NEW、EDIT、MULTIPLE CHANGES と表示された要素を選択すると内容を確認して受理できます。"
+
 msgid "Theme"
 msgstr "テーマ"
 
@@ -1818,6 +1917,18 @@ msgstr "この変更は {0} に対して作成されました。レビューす�
 
 msgid "This confidence assessment may be stale because the element changed after the value was stored."
 msgstr "この信頼度評価は古い可能性があります — 値が保存された後に要素が変更されました。"
+
+msgid "This draft cannot be shown because one of its changes no longer applies. The accepted argument is displayed instead."
+msgstr "このドラフトの変更のいずれかが適用できないため表示できません。代わりに受理済みの議論を表示しています。"
+
+msgid "This element is proposed and is not in the accepted argument."
+msgstr "この要素は提案されたもので、受理済みの議論には含まれていません。"
+
+msgid "This element is proposed for removal."
+msgstr "この要素は削除が提案されています。"
+
+msgid "This element is proposed to change."
+msgstr "この要素は変更が提案されています。"
 
 msgid "This frame: {0:.2f} ms render across {1} buckets"
 msgstr "このフレーム: {0:.2f} ms ({1} バケット)"
@@ -1857,6 +1968,9 @@ msgstr "トランザクション: {0}   |   現在: Tx {1} / {2}"
 
 msgid "Translation Language"
 msgstr "翻訳言語"
+
+msgid "Translations cannot be edited while a working draft is active. Accept or discard the draft first."
+msgstr "作業ドラフトが有効な間は翻訳を編集できません。先にドラフトを受理または破棄してください。"
 
 msgid "Type"
 msgstr "種別"
@@ -1962,6 +2076,9 @@ msgstr "削除されるもの:"
 
 msgid "Withdraws the relationship. Both elements are kept; one left with no remaining parent shows as an orphan."
 msgstr "関係を取り消します。両方の要素は保持され、親がなくなった要素は孤立要素として表示されます。"
+
+msgid "Working draft"
+msgstr "作業ドラフト"
 
 msgid "XML File:"
 msgstr "XML ファイル:"
@@ -2125,12 +2242,25 @@ msgstr "{0} 件未リンク"
 msgid "{0} warnings require review"
 msgstr "{0} 件の警告を確認する必要があります"
 
+msgid "{0} — accepted"
+msgstr "{0} — 受理済み"
+
+msgid "{0} — working draft"
+msgstr "{0} — 作業ドラフト"
+
+msgid "{0} — {1}"
+msgstr "{0} — {1}"
+
 msgid "● PAUSED"
 msgstr "● 一時停止中"
 
 msgid "AI client connected: {0}"
 msgid_plural "AI clients connected: {0}"
 msgstr[0] "接続中の AI クライアント: {0}"
+
+msgid "Accepted {0} draft change."
+msgid_plural "Accepted {0} draft changes."
+msgstr[0] "ドラフトの変更 {0} 件を受理しました。"
 
 msgid "Proposal draft: {0} operation"
 msgid_plural "Proposal draft: {0} operations"
@@ -2143,6 +2273,10 @@ msgstr[0] "この分類は {0} 件の用語に割り当てられています。�
 msgid "This term value appears {0} time in the current SACM model."
 msgid_plural "This term value appears {0} times in the current SACM model."
 msgstr[0] "この用語値は現在の SACM モデルに {0} 回出現します。"
+
+msgid "WORKING DRAFT — {0} unaccepted change"
+msgid_plural "WORKING DRAFT — {0} unaccepted changes"
+msgstr[0] "作業ドラフト — 未受理の変更 {0} 件"
 
 msgid "{0} SCCG finding"
 msgid_plural "{0} SCCG findings"

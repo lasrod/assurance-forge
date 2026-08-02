@@ -59,6 +59,11 @@ struct WorkbenchAreaCallbacks {
     // Invoked by the History Timeline area when the user clicks the
     // "Reconcile audit log" button on the divergence warning banner.
     std::function<void()> reconcile_audit_store;
+    // The working-draft banner's two decisions. Promotion is the one point where
+    // proposed work becomes accepted argument, and there is deliberately no
+    // route to it that does not pass through a person clicking here.
+    std::function<void()> promote_working_draft;
+    std::function<void()> discard_working_draft;
 };
 
 void RenderWorkbenchArea(AppRuntimeState& state,

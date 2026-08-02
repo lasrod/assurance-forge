@@ -57,4 +57,27 @@ void DrawProposedChangeDecoration(ImDrawList* draw_list,
                                   float zoom,
                                   core::changesets::ElementChange change);
 
+// The same, for the integrated working draft, with the source that proposed it
+// on the badge.
+//
+// "NEW" and "NEW · Claude Code" answer different questions. A reviewer deciding
+// whether to accept a change to a safety argument needs to know an AI wrote it
+// and which one, not only that it is unaccepted. Where several groups touched
+// one element the badge says so rather than naming one and implying the rest do
+// not exist -- the inspector carries the ordered history.
+void DrawDraftChangeDecoration(ImDrawList* draw_list,
+                               ImVec2 top_left,
+                               ImVec2 bottom_right,
+                               bool circular,
+                               float zoom,
+                               const DraftNodeDecoration& decoration);
+
+// Mark a relationship the working draft adds, at the midpoint of its edge.
+//
+// Relationships get their own cue rather than being left to be inferred from the
+// nodes at either end: a support relationship the draft adds changes what the
+// argument claims to have shown, which can matter more than any wording change
+// to a node.
+void DrawDraftEdgeDecoration(ImDrawList* draw_list, ImVec2 midpoint, float zoom, const DraftEdgeDecoration& decoration);
+
 } // namespace ui::gsn

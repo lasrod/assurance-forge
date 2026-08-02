@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace ui::panels {
 
@@ -79,6 +80,16 @@ struct ElementHistoryCallbacks {
     std::function<void(const std::string& element_id)> open_element_history;
 };
 
+// Accepting or rejecting the working-draft change on the selected element.
+//
+// Both take the *closure* the inspector displayed, not the raw contributing
+// groups: the user agreed to what they were shown, and promoting a different set
+// than the one on screen is the failure the closure exists to prevent.
+struct ElementDraftCallbacks {
+    std::function<void(const std::vector<std::string>& group_ids)> accept_groups;
+    std::function<void(const std::vector<std::string>& group_ids)> reject_groups;
+};
+
 // Render the element properties panel with editable fields.
 // Returns true if any field was modified (caller should rebuild tree).
 // When `read_only` is true, all editable widgets (text fields, checkboxes,
@@ -92,6 +103,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
                       const ElementTextEditCallbacks* text_edit_callbacks = nullptr,
                       const ElementHistoryCallbacks* history_callbacks = nullptr,
                       const ElementTranslationReviewCallbacks* translation_review_callbacks = nullptr,
+                      const ElementDraftCallbacks* draft_callbacks = nullptr,
                       bool read_only = false);
 
 // Human-readable name for a raw SACM element type.

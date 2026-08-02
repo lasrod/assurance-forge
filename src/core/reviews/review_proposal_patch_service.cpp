@@ -154,20 +154,7 @@ bool CollectGeneratedIds(const ReviewProposal& proposal,
                          std::map<std::string, std::string>& generated_ids,
                          std::string& error) {
     generated_ids.clear();
-    std::unordered_set<std::string> ids = CollectIds(current_model);
-    for (const PatchOperation& operation : proposal.operations) {
-        if (!IsCreateOperation(operation.type))
-            continue;
-        if (!operation.create_ref.has_value() || !ValidateCreateRefName(operation.create_ref.value(), error)) {
-            return false;
-        }
-        if (generated_ids.count(operation.create_ref.value()) > 0) {
-            error = "Duplicate patch-local create_ref: " + operation.create_ref.value();
-            return false;
-        }
-        generated_ids[operation.create_ref.value()] = GenerateUniqueId(ids, PrefixFor(operation.type));
-    }
-    return true;
+    return AllocateProposalIds(proposal, current_model, {}, generated_ids, error);
 }
 
 bool ResolveRef(const ElementRef& ref,
@@ -511,6 +498,36 @@ bool ApplyOperation(const PatchOperation& operation,
 }
 
 } // namespace
+
+bool AllocateProposalIds(const ReviewProposal& proposal,
+                         const parser::AssuranceCase& current_model,
+                         const std::unordered_set<std::string>& reserved,
+                         std::map<std::string, std::string>& ids,
+                         std::string& error) {
+    std::unordered_set<std::string> taken = CollectIds(current_model);
+    taken.insert(reserved.begin(), reserved.end());
+    // Identities this map already pins are off limits too, or extending a patch
+    // would hand a new create operation an id an earlier one is already using.
+    for (const auto& [create_ref, id] : ids)
+        taken.insert(id);
+
+    std::unordered_set<std::string> seen_refs;
+    for (const PatchOperation& operation : proposal.operations) {
+        if (!IsCreateOperation(operation.type))
+            continue;
+        if (!operation.create_ref.has_value() || !ValidateCreateRefName(operation.create_ref.value(), error))
+            return false;
+        const std::string& create_ref = operation.create_ref.value();
+        if (!seen_refs.insert(create_ref).second) {
+            error = "Duplicate patch-local create_ref: " + create_ref;
+            return false;
+        }
+        if (ids.count(create_ref) > 0)
+            continue;
+        ids[create_ref] = GenerateUniqueId(taken, PrefixFor(operation.type));
+    }
+    return true;
+}
 
 ProposalPreviewResult ReviewProposalPatchService::BuildPreviewModel(const ReviewProposal& proposal,
                                                                     const parser::AssuranceCase& current_model) const {

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "app/app_events.h"
+#include "core/drafts/draft_change_index.h"
+#include "core/drafts/draft_workspace.h"
 #include "core/element_factory.h"
 #include "core/problems/problem_item.h"
 #include "core/project_model.h"
@@ -188,12 +190,130 @@ private:
     // the canvas decorates nodes with.
     const parser::AssuranceCase& RefreshAgentChangePreview(const parser::AssuranceCase& committed);
 
+    // Points the draft workspace store at whatever argument is open, opening its
+    // recovery data when there is any and closing the previous one first.
+    //
+    // A draft belongs to one argument file, and the application has one loaded,
+    // so exactly one workspace is live at a time. Run every frame before the
+    // derived views rebuild: a connected client can switch which argument is
+    // open, and a workspace left pointing at the previous one would decorate
+    // this argument's identically-named elements.
+    void SyncDraftWorkspace();
+
+    // Rebuilds the per-element and per-relationship markers the canvas draws for
+    // the working draft. Run with the derived views, from the same change index.
+    void RefreshDraftDecorations();
+
+    // Rebuilds what the inspector shows for the selected element: the accepted
+    // and working text, the ordered contributions, and the dependency closure
+    // accepting it would actually take.
+    void RefreshSelectedDraftDetail();
+
+    // Whether the user's edits belong in the draft rather than in the accepted
+    // argument.
+    //
+    // While a draft is active the canvas is drawing the *working* model, so an
+    // edit applied to the accepted model underneath it lands somewhere the user
+    // was not looking -- and against a parent that may not exist there at all.
+    // ADR 0009: no independently changing accepted editing surface underneath an
+    // active draft.
+    bool DraftEditingActive() const;
+
+    // Appends operations to the user's own draft group, creating it on first
+    // use, so a session of hand edits reads as one change rather than as one
+    // group per click.
+    bool StageHumanDraftOperations(const std::string& title,
+                                   const std::vector<core::reviews::PatchOperation>& operations,
+                                   std::string& error);
+
+    // Routes "add a child under the selection" into the draft. Returns false
+    // when no draft is active, so the caller falls through to the ordinary
+    // accepted-model command.
+    bool AddChildToSelectedAsDraft(core::NewElementKind kind);
+    bool AddTopGoalAsDraft();
+    bool RemoveSelectedAsDraft(core::RemoveMode mode);
+
+    // Routes a finished text edit into the draft. Returns false when no draft is
+    // active, so the caller falls through to the ordinary audited command.
+    bool CommitTextEditAsDraft(const std::string& element_id,
+                               const std::string& field_token,
+                               const std::string& language,
+                               const std::string& new_value);
+
+    // The model the inspector edits: the working argument while a draft is
+    // active, the accepted one otherwise.
+    //
+    // Held as its own copy rather than handed the materializer's cache, because
+    // the panel edits the element in place for immediate feedback and the cache
+    // is regenerated from the draft on the next materialization. The in-place
+    // edit is provisional; the staged operation is what makes it real.
+    parser::AssuranceCase* InspectorModel();
+
 public:
+    // The draft workspace for the argument that is open, or null when there is
+    // no draft. Read-only: only `AppRuntime` mutates it, which is what keeps
+    // ADR 0008's single-owner rule true of draft state as well as of SACM.
+    const core::drafts::DraftWorkspace* CurrentDraftWorkspace() const;
+
+    // **The one authoritative view of the argument.**
+    //
+    // The working model when a draft workspace is active and materializes, the
+    // accepted model otherwise. The canvas, navigator, inspectors, search,
+    // placement suggestions, validation and -- from phase 3 -- connected MCP
+    // reads all read through this, so a proposal is never evaluated against a
+    // different version of the argument than the one beside it (ADR 0009).
+    //
+    // Export, the audit baseline and the canonical model hash deliberately do
+    // **not**: those are properties of what a human accepted.
+    //
+    // Non-const because it materializes on demand and caches the result. The
+    // reference is valid until the next mutation of the workspace or the
+    // accepted model, which for every caller means "this frame".
+    const parser::AssuranceCase& CurrentArgumentView();
+
+    // What the draft does to each element, and which groups did it. Empty when
+    // no draft is active. Valid for the same window as `CurrentArgumentView`.
+    const core::drafts::DraftChangeIndex& CurrentDraftChangeIndex();
+
+    // What the *canvas* draws, which is the user's view-mode choice applied to
+    // `CurrentArgumentView`.
+    //
+    // Deliberately separate. The view mode is a display preference; validation,
+    // the checks and connected reads must not follow it, or switching to
+    // "accepted baseline" to compare would quietly stop reporting the problems
+    // the draft introduces. A rule about the argument is a property of the
+    // argument, not of the part of it someone happens to be looking at.
+    const parser::AssuranceCase& CurrentCanvasView();
+
+private:
     // Accepts an agent's change set: the one point where staged work becomes a
     // real edit. Goes through `ApplyProposalCommand`, so it is audited, undoable
     // and attributed like any other change. Only a person reaches this.
     bool AcceptAgentChangeSet(const std::string& change_set_id, std::string& error);
     bool RejectAgentChangeSet(const std::string& change_set_id, std::string& error);
+
+    // Accepts every active group in the working draft: the one point where
+    // proposed work becomes accepted argument.
+    //
+    // Compiles the groups into a single `ReviewProposal` and dispatches one
+    // audited `ApplyProposalCommand`, so the whole promotion is one transaction
+    // with one undo boundary and one audit record naming every contributing
+    // source. Only a person reaches this -- there is no tool that does.
+    bool PromoteWorkingDraft(std::string& error);
+
+    // Accepts a dependency-closed selection of draft groups.
+    //
+    // The closure is computed and both halves are materialized -- the selection
+    // against the accepted baseline, the remainder against the result -- before
+    // anything is written. If either fails, nothing is.
+    bool PromoteDraftGroups(const std::vector<std::string>& group_ids, std::string& error);
+
+    // Rejects a selection and everything left dangling by it.
+    bool RejectDraftGroups(const std::vector<std::string>& group_ids, std::string& error);
+
+    // Throws the whole draft away. The accepted `.sacm` is left byte-identical,
+    // because nothing in the draft was ever applied to it.
+    bool DiscardWorkingDraft(std::string& error);
 
 private:
     bool EnsureConfidenceStorage();

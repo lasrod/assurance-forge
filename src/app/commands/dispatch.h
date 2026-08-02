@@ -15,6 +15,10 @@ namespace app::commands {
 struct DispatchOutcome {
     bool success = false;
     std::string error;
+    // True only when the accepted SACM file contains the command result. Audit
+    // intent may already be committed while autosave failed, so promotion must
+    // not delete its recovery workspace based on `success` alone.
+    bool sacm_written = false;
 };
 
 // Run `command` through the project's audit bus. Returns failure if no

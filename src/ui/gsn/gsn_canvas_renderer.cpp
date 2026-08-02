@@ -7,6 +7,7 @@
 #include "ui/gsn/gsn_canvas.h" // for DrawGsnNode
 #include "ui/gsn/gsn_dpi.h"
 #include "ui/gsn/gsn_edge_renderer.h"
+#include "ui/gsn/gsn_shapes.h"
 #include "ui/gsn/gsn_hit_tester.h"
 #include "ui/gsn/gsn_layout.h"
 #include "ui/i18n/localization.h"
@@ -315,6 +316,16 @@ void GsnCanvas::Render(UiState& ui_state,
                     if (acp_it != acp_by_relationship.end())
                         edge_acps = &acp_it->second;
                 }
+                if (!ui_state.draft_edge_status.empty()) {
+                    const auto draft_edge = ui_state.draft_edge_status.find(edge_key);
+                    if (draft_edge != ui_state.draft_edge_status.end()) {
+                        DrawDraftEdgeDecoration(draw_list,
+                                                ImVec2((parent_side.x + attachment_edge.x) * 0.5f,
+                                                       (parent_side.y + attachment_edge.y) * 0.5f),
+                                                zoom,
+                                                draft_edge->second);
+                    }
+                }
                 if (RelationshipEdgeSelected(ui_state, acp_target, edge_key))
                     DrawGroup2EdgeHighlight(draw_list, parent_side, attachment_edge, child_node.is_left_side, zoom);
                 frame_stats.relationship_context_menu_active =
@@ -358,6 +369,16 @@ void GsnCanvas::Render(UiState& ui_state,
                     const auto acp_it = acp_by_relationship.find(acp_target->relationship_id);
                     if (acp_it != acp_by_relationship.end())
                         edge_acps = &acp_it->second;
+                }
+                if (!ui_state.draft_edge_status.empty()) {
+                    const auto draft_edge = ui_state.draft_edge_status.find(edge_key);
+                    if (draft_edge != ui_state.draft_edge_status.end()) {
+                        DrawDraftEdgeDecoration(
+                            draw_list,
+                            ImVec2((parent_bottom.x + child_top.x) * 0.5f, (parent_bottom.y + child_top.y) * 0.5f),
+                            zoom,
+                            draft_edge->second);
+                    }
                 }
                 if (RelationshipEdgeSelected(ui_state, acp_target, edge_key))
                     DrawGroup1EdgeHighlight(draw_list, parent_bottom, child_top, zoom, straight_drop);

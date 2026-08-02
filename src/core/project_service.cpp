@@ -28,7 +28,7 @@ constexpr const char* kProjectFormat = "assurance-forge-project";
 constexpr const char* kProjectFormatVersion = "0.1.0";
 constexpr const char* kManifestFileName = "af.proj";
 
-const std::array<const char*, 10> kProjectDirectories = {
+const std::array<const char*, 11> kProjectDirectories = {
     "arguments",
     "registers",
     "reviews",
@@ -39,7 +39,44 @@ const std::array<const char*, 10> kProjectDirectories = {
     ".af/backups",
     ".af/snapshots",
     ".af/history",
+    ".af/drafts",
 };
+
+// `.af/` holds machine-local working state: caches, backups, snapshots, replay
+// history, and -- since ADR 0010 -- unaccepted draft work.
+//
+// None of it is accepted assurance content and none of it should reach a
+// colleague through version control. It always could: the scaffold has created
+// these directories from the beginning and never wrote an ignore file, so a
+// project under git has been carrying its own caches and backups all along. That
+// was untidy. With drafts in there it would mean committing AI-authored claims
+// that no human has accepted, which is a different order of problem, and ADR
+// 0008 refused to put transient AI state in the project directory for exactly
+// this reason.
+//
+// Written on create *and* on open, so existing projects are covered too.
+constexpr const char* kInternalDirectoryIgnoreFile = R"(# Assurance Forge internal working state.
+#
+# Caches, backups, snapshots, replay history and unaccepted draft work. None of
+# it is accepted assurance-case content, and drafts hold argument text no human
+# has accepted yet. Not for version control.
+*
+)";
+
+void EnsureInternalDirectoryIgnored(const std::filesystem::path& root) {
+    if (root.empty())
+        return;
+    std::error_code ec;
+    const std::filesystem::path internal = root / ".af";
+    if (!std::filesystem::exists(internal, ec))
+        return;
+    const std::filesystem::path ignore_path = internal / ".gitignore";
+    if (std::filesystem::exists(ignore_path, ec))
+        return;
+    // Best effort. A project on read-only media, or one whose owner deleted the
+    // file deliberately, is not a reason to refuse to open it.
+    (void)WriteTextFile(ignore_path, kInternalDirectoryIgnoreFile);
+}
 
 bool MakeUtcTime(std::time_t time, std::tm& utc) {
 #if defined(_WIN32)
@@ -308,6 +345,8 @@ bool ProjectService::CreateEmptyProject(const std::string& project_name,
         }
     }
 
+    EnsureInternalDirectoryIgnored(root);
+
     project = AssuranceProject{};
     project.id = GenerateId("af-project");
     project.name = clean_name;
@@ -358,6 +397,9 @@ bool ProjectService::OpenProject(const std::filesystem::path& project_or_manifes
     AddStep(report, "Load af.proj", ProjectLoadStepStatus::Passed, manifest.string());
 
     loaded.lastOpenedWith = "Assurance Forge";
+    // Covers projects created before the ignore file existed. Without this, the
+    // only protected projects would be ones scaffolded by this version.
+    EnsureInternalDirectoryIgnored(loaded.rootPath);
     report = RefreshFileStatus(loaded);
     report.steps.insert(report.steps.begin(),
                         ProjectLoadStep{"Load af.proj", ProjectLoadStepStatus::Passed, manifest.string()});

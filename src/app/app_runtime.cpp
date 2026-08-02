@@ -30,6 +30,8 @@
 #include "core/acp/assurance_claim_point.h"
 #include "core/app_state.h"
 #include "core/derived_views.h"
+#include "core/drafts/draft_dependency_graph.h"
+#include "core/drafts/draft_promotion_service.h"
 #include "core/element_factory.h"
 #include "core/problems/problem_attention.h"
 #include "core/problems/problems_manager.h"
@@ -39,7 +41,9 @@
 #include "core/terminology_scope_service.h"
 #include "core/time_utils.h"
 #include "imgui.h"
+#include "sacm_adapter/case_projection.h"
 #include "ui/gsn/gsn_adapter.h"
+#include "ui/i18n/localization.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/panels/sacm_viewer_panel.h"
@@ -315,10 +319,18 @@ void AppRuntime::RequestClose() {
 }
 
 bool AppRuntime::AddChildToSelected(core::NewElementKind kind) {
+    // Into the draft when there is one. The canvas is drawing the working model,
+    // so an add applied to the accepted model underneath it lands somewhere the
+    // user was not looking -- and against a parent the accepted model may not
+    // contain at all, because another draft group created it.
+    if (AddChildToSelectedAsDraft(kind))
+        return true;
     return actions::ElementActions(*impl_).AddChildToSelected(kind);
 }
 
 bool AppRuntime::AddTopGoal() {
+    if (AddTopGoalAsDraft())
+        return true;
     return actions::ElementActions(*impl_).AddTopGoal();
 }
 
@@ -353,6 +365,8 @@ bool AppRuntime::AddCounterEvidenceToRelationship(const std::string& relationshi
 }
 
 void AppRuntime::RemoveSelected(core::RemoveMode mode) {
+    if (RemoveSelectedAsDraft(mode))
+        return;
     actions::ElementActions(*impl_).RemoveSelected(mode);
 }
 
@@ -534,6 +548,316 @@ const parser::AssuranceCase& AppRuntime::RefreshAgentChangePreview(const parser:
     return impl_->agent_preview_case.value();
 }
 
+const core::drafts::DraftWorkspace* AppRuntime::CurrentDraftWorkspace() const {
+    return impl_->draft_workspace.workspace();
+}
+
+const parser::AssuranceCase& AppRuntime::CurrentArgumentView() {
+    static const parser::AssuranceCase kEmpty;
+    if (!impl_->app_state.loaded_case.has_value()) {
+        return kEmpty;
+    }
+    const parser::AssuranceCase& accepted = impl_->app_state.loaded_case.value();
+
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    if (workspace == nullptr || !workspace->has_active_groups()) {
+        return accepted;
+    }
+
+    const std::shared_ptr<const core::drafts::DraftMaterializationResult> result =
+        impl_->draft_workspace.MaterializeSnapshot(accepted, impl_->app_state.case_revision);
+    // The canvas publishes a raw pointer for the duration of the frame. Keep
+    // the immutable owner here so accepting or discarding the workspace from a
+    // banner rendered earlier in that frame cannot free the model underneath
+    // the remaining panels.
+    impl_->draft_frame_materialization = result;
+    if (!result->success) {
+        // A draft that cannot be materialized shows the accepted argument, not a
+        // partially applied one. The failure is reported against the group that
+        // caused it; what must not happen is a half-applied safety argument
+        // rendered as though it were the proposal.
+        return accepted;
+    }
+    return result->working_model;
+}
+
+const parser::AssuranceCase& AppRuntime::CurrentCanvasView() {
+    const parser::AssuranceCase& working = CurrentArgumentView();
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    if (workspace == nullptr || !workspace->has_active_groups() || !impl_->app_state.loaded_case.has_value()) {
+        return working;
+    }
+
+    switch (ui::GetUiState().draft_view_mode) {
+    case ui::DraftViewMode::AcceptedBaseline:
+        return impl_->app_state.loaded_case.value();
+    case ui::DraftViewMode::ChangesOnly: {
+        const core::drafts::DraftChangeIndex& index = CurrentDraftChangeIndex();
+        impl_->draft_presentation_view = working;
+        impl_->draft_presentation_view.elements.insert(
+            impl_->draft_presentation_view.elements.end(), index.removed.begin(), index.removed.end());
+        // Rebuilt only when the draft or the accepted model moved, which is the
+        // same condition that invalidates the tree below it.
+        impl_->draft_changes_only_view = core::drafts::BuildChangesOnlyView(impl_->draft_presentation_view, index);
+        return impl_->draft_changes_only_view;
+    }
+    case ui::DraftViewMode::WorkingDraft: {
+        const core::drafts::DraftChangeIndex& index = CurrentDraftChangeIndex();
+        impl_->draft_presentation_view = working;
+        impl_->draft_presentation_view.elements.insert(
+            impl_->draft_presentation_view.elements.end(), index.removed.begin(), index.removed.end());
+        return impl_->draft_presentation_view;
+    }
+    }
+    return working;
+}
+
+void AppRuntime::RefreshDraftDecorations() {
+    ui::UiState& ui_state = ui::GetUiState();
+    ui_state.draft_element_status.clear();
+    ui_state.draft_edge_status.clear();
+    impl_->draft_added_ids.clear();
+
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    if (workspace == nullptr || !workspace->has_active_groups())
+        return;
+    // In "accepted baseline" the canvas is deliberately showing what the user
+    // has now. Marking it up with what is proposed would contradict the mode
+    // they just selected.
+    if (ui::GetUiState().draft_view_mode == ui::DraftViewMode::AcceptedBaseline)
+        return;
+
+    const core::drafts::DraftChangeIndex& index = CurrentDraftChangeIndex();
+    const parser::AssuranceCase& working = CurrentArgumentView();
+
+    for (const std::string& element_id : index.ChangedElementIds()) {
+        const core::drafts::DraftElementEntry* entry = index.Find(element_id);
+        if (entry == nullptr)
+            continue;
+
+        const std::vector<std::string> contributors = index.ContributingGroupIds(element_id);
+        ui::DraftNodeDecoration decoration;
+        decoration.change = entry->change;
+        decoration.multiple_contributions = contributors.size() > 1;
+        if (!contributors.empty()) {
+            const core::drafts::DraftChangeGroup* group = workspace->FindGroup(contributors.back());
+            if (group != nullptr) {
+                decoration.source_label = group->source_label.empty()
+                                              ? std::string(core::drafts::DraftSourceToString(group->source))
+                                              : group->source_label;
+            }
+        }
+
+        // Relationships are elements in the model, so they arrive here mixed in
+        // with the claims. Split them out: an edge is marked on the edge, keyed
+        // by its endpoints, because its own id is not stable across a rebuild.
+        const parser::SacmElement* element = nullptr;
+        for (const parser::SacmElement& candidate : working.elements) {
+            if (candidate.id == element_id) {
+                element = &candidate;
+                break;
+            }
+        }
+        if (element == nullptr && entry->change == core::drafts::DraftElementChange::Removed) {
+            for (const parser::SacmElement& candidate : index.removed) {
+                if (candidate.id == element_id) {
+                    element = &candidate;
+                    break;
+                }
+            }
+        }
+        const bool is_relationship =
+            element != nullptr && (element->type == "assertedinference" || element->type == "assertedcontext" ||
+                                   element->type == "assertedevidence");
+        if (entry->change == core::drafts::DraftElementChange::Added)
+            impl_->draft_added_ids.push_back(element_id);
+
+        if (!is_relationship) {
+            ui_state.draft_element_status.emplace(element_id, std::move(decoration));
+            continue;
+        }
+        if (entry->change != core::drafts::DraftElementChange::Added &&
+            entry->change != core::drafts::DraftElementChange::Removed)
+            continue;
+
+        ui::DraftEdgeDecoration edge;
+        edge.change = entry->change;
+        edge.contextual = element->type == "assertedcontext";
+        edge.source_label = decoration.source_label;
+        // The renderer keys an edge by parent-then-child, and SACM puts the
+        // premise in `source_refs` and the conclusion in `target_refs`, so the
+        // parent is the target.
+        const std::string child = !element->source_refs.empty() ? element->source_refs.front() : element->reasoning_ref;
+        if (child.empty() || element->target_refs.empty())
+            continue;
+        ui_state.draft_edge_status.emplace(element->target_refs.front() + "\x1f" + child, edge);
+    }
+}
+
+namespace {
+
+const parser::SacmElement* FindElementById(const parser::AssuranceCase& model, const std::string& element_id) {
+    for (const parser::SacmElement& element : model.elements) {
+        if (element.id == element_id)
+            return &element;
+    }
+    return nullptr;
+}
+
+// The fields that actually differ, rather than one field chosen in advance.
+//
+// An element has a name, a content and a description, and a draft may touch any
+// of them. Picking one to display showed "accepted" and "working draft" as the
+// same text whenever the edit was to a different field -- which reads as the
+// panel being broken rather than as the edit being elsewhere.
+void CollectFieldChanges(const parser::SacmElement* accepted,
+                         const parser::SacmElement* working,
+                         std::vector<ui::DraftFieldChangeView>& out) {
+    struct Field {
+        const char* label;
+        std::string parser::SacmElement::* member;
+    };
+    const Field fields[] = {
+        {"Name", &parser::SacmElement::name},
+        {"Content", &parser::SacmElement::content},
+        {"Description", &parser::SacmElement::description},
+    };
+    for (const Field& field : fields) {
+        const std::string before = accepted != nullptr ? accepted->*(field.member) : std::string{};
+        const std::string after = working != nullptr ? working->*(field.member) : std::string{};
+        if (before == after)
+            continue;
+        ui::DraftFieldChangeView change;
+        change.field_label = AF_TR(field.label);
+        change.accepted = before;
+        change.working = after;
+        out.push_back(std::move(change));
+    }
+}
+
+} // namespace
+
+void AppRuntime::RefreshSelectedDraftDetail() {
+    ui::UiState& ui_state = ui::GetUiState();
+    ui_state.draft_selected_detail = ui::DraftElementDetailView{};
+
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    const std::string& selected = ui_state.selected_element_id;
+    if (workspace == nullptr || !workspace->has_active_groups() || selected.empty() ||
+        !impl_->app_state.loaded_case.has_value()) {
+        return;
+    }
+
+    const core::drafts::DraftChangeIndex& index = CurrentDraftChangeIndex();
+    const core::drafts::DraftElementEntry* entry = index.Find(selected);
+    if (entry == nullptr || entry->change == core::drafts::DraftElementChange::Unchanged)
+        return;
+
+    ui::DraftElementDetailView& detail = ui_state.draft_selected_detail;
+    detail.present = true;
+    detail.element_id = selected;
+    detail.change = entry->change;
+    CollectFieldChanges(FindElementById(impl_->app_state.loaded_case.value(), selected),
+                        FindElementById(CurrentArgumentView(), selected),
+                        detail.field_changes);
+
+    for (const core::drafts::DraftElementContribution& contribution : entry->contributions) {
+        const core::drafts::DraftChangeGroup* group = workspace->FindGroup(contribution.group_id);
+        if (group == nullptr)
+            continue;
+        ui::DraftContributionView view;
+        view.group_id = group->id;
+        view.title = group->title;
+        view.source_label = group->source_label.empty() ? std::string(core::drafts::DraftSourceToString(group->source))
+                                                        : group->source_label;
+        view.rationale = group->rationale;
+        view.change = contribution.change;
+        detail.contributions.push_back(std::move(view));
+    }
+
+    // What accepting this element would actually promote. Computed here, not at
+    // the moment the button is pressed, so the user sees the real acceptance set
+    // before they commit rather than after.
+    const std::vector<std::string> contributors = index.ContributingGroupIds(selected);
+    detail.contributing_group_ids = contributors;
+    detail.closure_group_ids = core::drafts::DependencyClosure(*workspace, contributors);
+    for (const std::string& group_id : detail.closure_group_ids) {
+        if (std::find(contributors.begin(), contributors.end(), group_id) != contributors.end())
+            continue;
+        const core::drafts::DraftChangeGroup* group = workspace->FindGroup(group_id);
+        if (group != nullptr)
+            detail.also_accepts_titles.push_back(group->title.empty() ? group->id : group->title);
+    }
+
+    if (workspace->state == core::drafts::DraftWorkspaceState::NeedsRebase) {
+        detail.blocked_reason = AF_TR("The argument changed since this draft was written.");
+    } else if (workspace->state == core::drafts::DraftWorkspaceState::Promoting) {
+        detail.blocked_reason = AF_TR("Promotion is awaiting durable SACM completion.");
+    } else {
+        const core::drafts::DraftPromotionPlan plan =
+            core::drafts::PlanDraftPromotion(*workspace,
+                                             impl_->app_state.loaded_case.value(),
+                                             contributors,
+                                             "preview",
+                                             impl_->draft_workspace.authoritative_identities());
+        if (!plan.ok)
+            detail.blocked_reason = plan.error;
+    }
+}
+
+const core::drafts::DraftChangeIndex& AppRuntime::CurrentDraftChangeIndex() {
+    static const core::drafts::DraftChangeIndex kEmpty;
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    if (workspace == nullptr || !workspace->has_active_groups() || !impl_->app_state.loaded_case.has_value()) {
+        return kEmpty;
+    }
+    const core::drafts::DraftMaterializationResult& result =
+        impl_->draft_workspace.Materialize(impl_->app_state.loaded_case.value(), impl_->app_state.case_revision);
+    return result.success ? result.change_index : kEmpty;
+}
+
+void AppRuntime::SyncDraftWorkspace() {
+    const std::filesystem::path root = impl_->app_state.current_project.has_value()
+                                           ? impl_->app_state.current_project->rootPath
+                                           : std::filesystem::path{};
+    const std::filesystem::path argument =
+        impl_->app_state.loaded_case.has_value() ? impl_->app_state.loaded_file_path : std::filesystem::path{};
+
+    std::unordered_set<std::string> authoritative_identities;
+    if (impl_->app_state.library_document) {
+        for (const sacm_adapter::DocumentElement& element :
+             sacm_adapter::list_document_elements(*impl_->app_state.library_document)) {
+            if (!element.id.empty())
+                authoritative_identities.insert(element.id);
+        }
+    }
+    impl_->draft_workspace.SetAuthoritativeIdentities(std::move(authoritative_identities));
+
+    if (root == impl_->draft_workspace_root && argument == impl_->draft_workspace_argument) {
+        return;
+    }
+
+    impl_->draft_workspace_root = root;
+    impl_->draft_workspace_argument = argument;
+    impl_->draft_workspace.SetProjectRoot(root);
+
+    if (argument.empty() || !impl_->app_state.loaded_case.has_value()) {
+        // Forgets the workspace without touching what is on disk, so the draft
+        // is still there when the argument is opened again. Closing the
+        // application is not a decision about unaccepted work.
+        impl_->draft_workspace.Close();
+        return;
+    }
+
+    std::string error;
+    if (!impl_->draft_workspace.Open(argument, impl_->app_state.loaded_case.value(), error)) {
+        // Recovery data that cannot be read is reported rather than deleted. The
+        // work in it may be hours of an agent's conversation, and the file is the
+        // only copy.
+        impl_->app_state.status_message = "Warning: could not read the draft for this argument: " + error;
+    }
+}
+
 void AppRuntime::RebuildDerivedViewsIfNeeded() {
     // A library-primary (flipped) command committed its edit to the library but
     // deliberately did NOT rebuild the live loaded_case/sacm_package inside the
@@ -572,13 +896,30 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
         return;
     }
 
-    // While a connected AI client has a change set open, the canvas draws the
-    // *preview* -- the argument as it would be if the user accepted -- with each
-    // touched node marked. That is what makes the agent's work visible where it
-    // lands, rather than as a list of operations beside the diagram. The
-    // committed model is untouched; nothing here is saved.
-    const parser::AssuranceCase& committed = *impl_->app_state.loaded_case;
-    const parser::AssuranceCase& ac = RefreshAgentChangePreview(committed);
+    // Everything derived below is built from the *working* argument: the
+    // accepted case with every active draft group applied. That is what makes a
+    // proposal visible where it lands rather than as a list of operations beside
+    // the diagram, and it is why two proposals are evaluated against each other
+    // rather than each against the accepted model (ADR 0009).
+    //
+    // The accepted case is untouched; nothing here is saved.
+    //
+    // The change-set preview still layers on top, because MCP writes change sets
+    // until phase 3 moves it onto draft groups. Stacking it on the working model
+    // rather than on the accepted one means a connected client's staged work is
+    // at least drawn against the draft it is really landing in.
+    // The whole working argument, never the view-mode narrowing.
+    //
+    // Everything derived here is shared: the Argument Navigator, the tree edit
+    // index, the register views and the Problems pipeline all read it. Feeding
+    // them `CurrentCanvasView()` meant selecting "changes only" collapsed the
+    // navigator to a handful of nodes and the project counts with it -- the
+    // application believing the safety case had shrunk to whatever the canvas
+    // happened to be showing. A view mode is a statement about the canvas, not
+    // about the argument.
+    const parser::AssuranceCase& working = CurrentArgumentView();
+    RefreshDraftDecorations();
+    const parser::AssuranceCase& ac = RefreshAgentChangePreview(working);
 
     const sacm::AssuranceCasePackage* sacm_package =
         impl_->app_state.has_projected_package() ? &impl_->app_state.projected_package() : nullptr;
@@ -715,6 +1056,22 @@ areas::WorkbenchAreaCallbacks AppRuntime::MakeWorkbenchAreaCallbacks() {
             RestoreTerminologySuggestion(element_id, term);
         },
         [this]() { impl_->pending_reconcile_audit_store = true; },
+        [this]() {
+            std::string error;
+            if (PromoteWorkingDraft(error)) {
+                SetStatus(AF_TR("Accepted the working draft."));
+            } else {
+                SetStatus(ui::i18n::trf("Could not accept the working draft: {0}", error));
+            }
+        },
+        [this]() {
+            std::string error;
+            if (DiscardWorkingDraft(error)) {
+                SetStatus(AF_TR("Discarded the working draft. The accepted argument is unchanged."));
+            } else {
+                SetStatus(ui::i18n::trf("Could not discard the working draft: {0}", error));
+            }
+        },
     };
 }
 
@@ -784,8 +1141,14 @@ void AppRuntime::SyncAcpProblems() {
 }
 
 void AppRuntime::SyncStructureProblems() {
-    const parser::AssuranceCase* model =
-        impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
+    // Structural validation, cycle detection and GSN well-formedness run over the
+    // *working* argument, not the accepted one (ADR 0009).
+    //
+    // This is the half of the design that pays for itself: a strategy left
+    // developing into nothing because one proposal removed the only child
+    // another proposal added is invisible in either proposal alone. Checking the
+    // combination is how it is seen before someone accepts it rather than after.
+    const parser::AssuranceCase* model = impl_->app_state.loaded_case.has_value() ? &CurrentArgumentView() : nullptr;
     app::SyncStructureProblems(impl_->problems_manager, model);
 }
 

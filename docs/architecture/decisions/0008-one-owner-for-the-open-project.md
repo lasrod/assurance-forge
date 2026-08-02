@@ -5,6 +5,14 @@
 - **Supersedes in part:** the "the SACM file is read-only to the server, which
   removes the dual-writer problem" scope decision recorded in
   `docs/features/mcp-server.md`.
+- **Superseded in part by:**
+  [ADR 0009](0009-one-integrated-working-draft-per-argument.md) — agent work is
+  no longer an independent `core::changesets::ChangeSet`; and
+  [ADR 0010](0010-draft-provenance-persistence-and-human-promotion.md) — the
+  "change sets are held in memory" consequence below is replaced by draft
+  recovery state under `.af/drafts/`. The single-owner rule, the IPC boundary,
+  frame-thread execution, the ordinary command/validation/audit path and
+  offline read-only behaviour are unchanged.
 
 ## Context
 

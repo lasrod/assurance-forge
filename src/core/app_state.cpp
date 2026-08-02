@@ -185,7 +185,52 @@ bool AppState::save_current_document() {
         status_message = "Error: No file path available for save.";
         return false;
     }
-    return save_file(loaded_file_path.string());
+    if (!save_file(loaded_file_path.string()))
+        return false;
+
+    // Saving the document is what makes the manifest's recorded hash wrong, so
+    // it is also where the hash has to be brought up to date.
+    //
+    // Without this, the file Assurance Forge just wrote no longer matches the
+    // hash `af.proj` records for it, and the next open reports the project's own
+    // save as "modified outside Assurance Forge" -- every time, until the user
+    // happens to invoke Save Project as well. A warning that fires on a clean
+    // project is worse than no warning: it is the one that would tell you a
+    // colleague had edited a safety argument behind your back, and it stops
+    // meaning anything once it cries wolf on every open.
+    if (!current_project.has_value())
+        return true;
+    return refresh_tracked_file_hashes(loaded_file_path);
+}
+
+bool AppState::refresh_tracked_file_hashes(const std::filesystem::path& file_path) {
+    if (!current_project.has_value())
+        return true;
+
+    AssuranceProject& project = current_project.value();
+    ProjectFileEntry* tracked = nullptr;
+    for (ProjectFileEntry& entry : project.files) {
+        if (project.rootPath / entry.relativePath == file_path) {
+            tracked = &entry;
+            break;
+        }
+    }
+    // A bare SACM document opened outside a project has no manifest entry, and
+    // there is nothing to correct.
+    if (tracked == nullptr)
+        return true;
+
+    if (std::expected<void, std::string> refreshed = RefreshEntryHashes(project, *tracked, false); !refreshed) {
+        status_message = "Saved, but the project manifest could not be updated: " + refreshed.error();
+        return false;
+    }
+
+    std::string error;
+    if (!ProjectService::WriteManifestSafely(project, error)) {
+        status_message = "Saved, but the project manifest could not be written: " + error;
+        return false;
+    }
+    return true;
 }
 
 bool AppState::save_project() {

@@ -34,6 +34,18 @@ void RenderCanvasDivergenceBanner(::app::AppRuntimeState& state, const Workbench
 // Indicates the in-memory model + audit log are ahead of the on-disk SACM.
 void RenderCanvasAutosaveErrorBanner(::app::AppRuntimeState& state);
 
+// Render the working-draft banner while the argument has unaccepted changes.
+//
+// **The single most important thing on the canvas when a draft is active.** The
+// canvas is drawing an argument that includes claims no human has accepted, and
+// a reviewer who mistakes it for the accepted case is the failure ADR 0009 names
+// first. So the banner says so in words, names the sources that contributed, and
+// carries the switch back to the accepted baseline -- never colour alone, which
+// a colour-blind reader or a greyscale screenshot would lose entirely.
+//
+// No-op when nothing is proposed.
+void RenderWorkingDraftBanner(::app::AppRuntimeState& state, const WorkbenchAreaCallbacks& callbacks);
+
 // Render an ArgumentPackage canvas tab with the always-visible Assurance
 // Timeline rail in its bottom overlay strip.
 //
